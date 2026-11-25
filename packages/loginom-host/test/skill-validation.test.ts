@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdtemp, readdir, rm } from "node:fs/promises"
+import { mkdtemp, readdir, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { validateSkillFolder } from "../src/bundled-skills"
@@ -27,6 +27,41 @@ test("validates and repairs a portable skill without writing to its tree", async
     expect((await readdir(directory)).toSorted()).toEqual(["SKILL.md", "references"])
     expect(await Bun.file(skill).text()).toBe(header + "[Required columns](references/columns.md)\n")
     expect(await Bun.file(resource).text()).toBe("id, amount\n")
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("strict validation checks reference links and ignores links shown as code", async () => {
+  const root = await mkdtemp(join(tmpdir(), "loginom-skill-links-"))
+  try {
+    const folder = join(root, "columns")
+    await Bun.write(join(folder, "SKILL.md"), [
+      "---", "name: columns", "description: Checks columns.", "---", "",
+      "Read [the schema][schema].", "",
+      "[schema]: references/columns.md", "",
+      "```markdown", "[Example](placeholder.md)", "```",
+    ].join("\n"))
+
+    expect((await validateSkillFolder(folder)).errors.map((error) => error.message)).toEqual([
+      "Missing local resource: references/columns.md",
+    ])
+    await Bun.write(join(folder, "references/columns.md"), "id, amount")
+    expect((await validateSkillFolder(folder)).errors).toEqual([])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test.skipIf(process.platform === "win32")("strict validation resolves references through internal directory links", async () => {
+  const root = await mkdtemp(join(tmpdir(), "loginom-skill-linked-directory-"))
+  try {
+    const folder = join(root, "columns")
+    await Bun.write(join(folder, "SKILL.md"),
+      "---\nname: columns\ndescription: Checks columns.\n---\n[Schema](references/columns.md)\n")
+    await Bun.write(join(folder, "docs/columns.md"), "id, amount")
+    await symlink("docs", join(folder, "references"))
+    expect((await validateSkillFolder(folder)).errors).toEqual([])
   } finally {
     await rm(root, { recursive: true, force: true })
   }

@@ -615,6 +615,9 @@
     "packages/loginom-runtime": {
       "name": "@loginom-ai-agent/runtime",
       "version": "0.1.0",
+      "dependencies": {
+        "marked": "catalog:",
+      },
     },
     "packages/opencode": {
       "name": "opencode",

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile, readdir, readlink, realpath, stat } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep, win32 } from 'node:path';
+import { marked } from 'marked';
 import { parseDocument } from 'yaml';
 
 // Shared by Host verification and the bundled runtime. Revision depends only
@@ -68,7 +69,7 @@ export async function verifyBundledSkills(resources, { mode = 'installed' } = {}
     const prefix = dirname(entry.path) + '/';
     const files = new Map(entries.filter(file => file.path.startsWith(prefix))
       .map(file => [file.path.slice(prefix.length), contents.get(file.path)]));
-    const result = validateSkillFiles(entry.path.split('/')[1], files, { source: mode === 'source' });
+    const result = await validateSkillFiles(entry.path.split('/')[1], files, { source: mode === 'source' });
     if (result.errors.length) throw Error(result.errors[0].code);
   }
   return skills.map(skill => ({ ...skill, directory: join(root, 'skills', skill.name),
@@ -83,8 +84,9 @@ export async function inspectSkillFolder(directory, { external = false, authoriz
   const files = new Map();
   const markdown = new Map();
   const errors = [];
+  const root = await realpath(directory).catch(() => undefined);
   try {
-    const root = await realpath(directory);
+    if (!root) throw Error();
     await visit(root);
 
     async function visit(parent) {
@@ -109,7 +111,7 @@ export async function inspectSkillFolder(directory, { external = false, authoriz
   } catch {
     errors.push({ code: 'LOGINOM_SKILL_FOLDER_UNREADABLE', message: 'Could not read the skill folder or one of its resources.' });
   }
-  if (errors.length) return { errors, warnings: [] };
+  if (!root || errors.length) return { errors, warnings: [] };
   if (markdown.size) await authorizeRead?.([...new Set([...markdown.values()].flat())]);
   for (const [path, [file, absolute]] of markdown) {
     try {
@@ -120,10 +122,16 @@ export async function inspectSkillFolder(directory, { external = false, authoriz
     }
   }
   if (errors.length) return { errors, warnings: [] };
-  return validateSkillFiles(basename(resolve(directory)), files, { external });
+  return validateSkillFiles(basename(resolve(directory)), files, {
+    external,
+    resolveResource: async (key) => {
+      const target = await realpath(join(root, key)).catch(() => undefined);
+      return target && relative(root, target).split(sep).join('/');
+    },
+  });
 }
 
-function validateSkillFiles(directoryName, files, { external = false, source = false } = {}) {
+async function validateSkillFiles(directoryName, files, { external = false, source = false, resolveResource } = {}) {
   const errors = [];
   const warnings = [];
   const invalid = message => ({ code: 'LOGINOM_SKILL_FRONTMATTER_INVALID', path: 'SKILL.md', message });
@@ -155,28 +163,35 @@ function validateSkillFiles(directoryName, files, { external = false, source = f
 
   const generated = typeof data.metadata?.['loginom-generated'] === 'string' ? data.metadata['loginom-generated'] : undefined;
   const deferred = source && generated ? resourcePath('SKILL.md', generated) : undefined;
-  if (generated && !external) requireResource('SKILL.md', generated);
+  if (generated && !external) await requireResource('SKILL.md', generated);
   for (const [path, markdown] of files) {
     if (!path.endsWith('.md') || markdown === undefined) continue;
-    for (const link of markdown.matchAll(/\[[^\]]*\]\((?:<([^>]+)>|([^\s)]+))(?:\s+"[^"]*")?\)/g)) {
-      const target = link[1] ?? link[2];
-      if (/^(?:https?:|viking:|mailto:|#)/i.test(target)) continue;
-      requireResource(path, target);
-    }
+    const targets = new Set();
+    const tokens = marked.lexer(path === 'SKILL.md' ? markdown.slice(bodyStart) : markdown);
+    marked.walkTokens(tokens, token => {
+      if ((token.type === 'link' || token.type === 'image') && token.href && !/^(?:https?:|viking:|mailto:|#)/i.test(token.href))
+        targets.add(token.href);
+    });
+    for (const target of targets) await requireResource(path, target);
   }
   return { data, errors, warnings };
 
-  function requireResource(path, target) {
+  async function requireResource(path, target) {
     const key = resourcePath(path, target);
     if (!key) {
       errors.push({ code: 'LOGINOM_SKILL_RESOURCE_ESCAPE', path, message: 'Unsafe local resource path: ' + target });
       return;
     }
-    if (!files.has(key) && key !== deferred) {
-      (external ? warnings : errors).push({
-        code: 'LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING', path, message: 'Missing local resource: ' + target,
-      });
+    if (files.has(key) || key === deferred) return;
+    const resolved = await resolveResource?.(key);
+    if (resolved === '..' || resolved?.startsWith('../') || (resolved && win32.isAbsolute(resolved))) {
+      errors.push({ code: 'LOGINOM_SKILL_RESOURCE_ESCAPE', path, message: 'Unsafe local resource path: ' + target });
+      return;
     }
+    if (resolved && files.has(resolved)) return;
+    (external ? warnings : errors).push({
+      code: 'LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING', path, message: 'Missing local resource: ' + target,
+    });
   }
 }
 

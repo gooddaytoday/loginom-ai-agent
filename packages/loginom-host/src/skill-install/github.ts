@@ -13,6 +13,7 @@ type GitHubOptions = Parameters<typeof prepareLocalSkill>[3] & {
 const api = "https://api.github.com"
 const web = "https://github.com"
 const archiveOrigin = "https://codeload.github.com"
+const maxArchiveSize = 512 * 1024 * 1024
 const maxSkillSize = 512 * 1024 * 1024
 
 function repository(source: string) {
@@ -39,7 +40,7 @@ function archiveFiles(entries: Entry[]) {
   let root: string | undefined
   for (const entry of entries) {
     const parts = entry.filename.replace(/\/$/, "").split("/")
-    if (parts.some((part) => !part || part === "." || part === ".." || /[:\\\p{Cc}]/u.test(part)))
+    if (parts.some((part) => !part || part === "." || part === ".."))
       throw Error("Unsafe GitHub archive path.")
     root ??= parts[0]
     if (root !== parts[0] || (parts.length === 1 && !entry.directory)) throw Error("Invalid GitHub archive root.")
@@ -117,7 +118,21 @@ export async function prepareGitHubSkill(source: string, home: string, options: 
       throw Error("Could not download GitHub skill archive. Check access or provide a local skill folder.")
     }
     const zip = join(temporary, "source.zip")
-    await download.body.pipeTo(Writable.toWeb(createWriteStream(zip, { mode: 0o600 })), { signal: options.signal })
+    const sizeError = () => Error("The GitHub archive exceeds the 512 MiB download limit. Provide a local skill folder.")
+    if (Number(download.headers.get("content-length")) > maxArchiveSize) {
+      await download.body.cancel()
+      throw sizeError()
+    }
+    let size = 0
+    const limit = new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        size += chunk.byteLength
+        if (size > maxArchiveSize) throw sizeError()
+        controller.enqueue(chunk)
+      },
+    })
+    await download.body.pipeThrough(limit, { signal: options.signal })
+      .pipeTo(Writable.toWeb(createWriteStream(zip, { mode: 0o600 })), { signal: options.signal })
     const reader = new ZipReader(new BlobReader(await openAsBlob(zip)), { useWebWorkers: false })
     try {
       const entries = archiveFiles(await reader.getEntries())
@@ -155,7 +170,7 @@ export async function prepareGitHubSkill(source: string, home: string, options: 
       for (const name of [folder, ...pack.map(([path]) => path)]) {
         let prefix = ""
         for (const part of name.split("/")) {
-          if (/[<>:"|?*]/.test(part) || /[. ]$/.test(part) ||
+          if (/[<>:"|?*\\\p{Cc}]/u.test(part) || /[. ]$/.test(part) ||
             /^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/i.test(part))
             throw Error("Non-portable resource path in the selected skill.")
           prefix += "/" + part

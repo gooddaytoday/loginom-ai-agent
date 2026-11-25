@@ -1,4 +1,5 @@
 import { Skill } from "@/skill"
+import { Command } from "@/command"
 import { expect } from "bun:test"
 import { rm } from "node:fs/promises"
 import { join, resolve } from "node:path"
@@ -39,6 +40,7 @@ import { pollWithTimeout, testEffect } from "../lib/effect"
 const root = LayerNode.group([
   Agent.node,
   Skill.node,
+  Command.node,
   Session.node,
   SessionProjector.node,
   ToolRegistry.node,

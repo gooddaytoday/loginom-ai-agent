@@ -116,8 +116,12 @@ export async function prepareLocalSkill(
         return true
       },
     })
-    const preparedEntries = [...(await tree(draft, signal)).keys()]
-    const nested = preparedEntries.filter((path) => path.endsWith("/SKILL.md"))
+    const preparedTree = await tree(draft, signal)
+    const preparedEntries = [...preparedTree.keys()]
+    const nested = [...preparedTree].flatMap(([path, item]) =>
+      path !== "SKILL.md" && item.kind !== "directory" && basename(path).toLowerCase() === "skill.md"
+        ? [path] : [],
+    )
     if (nested.length) throw Error("Choose one standalone skill directory. Found: " + ["SKILL.md", ...nested].join(", "))
     const validated = await validateSkillFolder(draft, { external: true })
     if (!validated.data || validated.errors.length) throw Error(validated.errors.map((item) => item.message).join("\n"))

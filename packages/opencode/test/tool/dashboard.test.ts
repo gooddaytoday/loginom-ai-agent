@@ -1,4 +1,5 @@
 import { Skill } from "@/skill"
+import { Command } from "@/command"
 import { afterEach, expect } from "bun:test"
 import { Cause, Effect, Exit, Fiber, Layer } from "effect"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
@@ -62,7 +63,7 @@ function publicationHost(options: { error?: string; latest?: { name: string; sou
 afterEach(() => LoginomHost.disconnect())
 
 const it = testEffect(Layer.mergeAll(
-  LayerNode.compile(LayerNode.group([Agent.node, Skill.node, Session.node, SessionProjector.node, RuntimeFlags.node, Truncate.node, FSUtil.node, AppProcess.node, Permission.node, Plugin.node, MCP.node, ToolRegistry.node]), [
+  LayerNode.compile(LayerNode.group([Agent.node, Command.node, Skill.node, Session.node, SessionProjector.node, RuntimeFlags.node, Truncate.node, FSUtil.node, AppProcess.node, Permission.node, Plugin.node, MCP.node, ToolRegistry.node]), [
     [RuntimeFlags.node, RuntimeFlags.layer()],
     [Config.node, TestConfig.layer({ get: () => Effect.succeed({ permission: { "*": "allow" as const } }) })],
   ]),

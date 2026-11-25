@@ -102,12 +102,16 @@ const layer = Layer.effect(
       yield* Effect.logInfo("asking", { id, permission: info.permission, patterns: info.patterns })
 
       const deferred = yield* Deferred.make<void, PermissionV1.RejectedError | PermissionV1.CorrectedError>()
-      pending.set(id, { info, deferred })
-      yield* events.publish(Event.Asked, info)
       return yield* Effect.ensuring(
-        Deferred.await(deferred),
-        Effect.sync(() => {
+        Effect.gen(function* () {
+          pending.set(id, { info, deferred })
+          yield* events.publish(Event.Asked, info)
+          yield* Deferred.await(deferred)
+        }),
+        Effect.gen(function* () {
+          if (pending.get(id)?.deferred !== deferred) return
           pending.delete(id)
+          yield* events.publish(Event.Replied, { sessionID: info.sessionID, requestID: id, reply: "reject" })
         }),
       )
     })

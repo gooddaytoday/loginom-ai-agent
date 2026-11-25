@@ -6,6 +6,7 @@ import { Global } from "@opencode-ai/core/global"
 import { validateSkillFolder } from "@loginom-ai-agent/loginom-host/bundled-skills"
 import { githubSkillURL, prepareGitHubSkill } from "@loginom-ai-agent/loginom-host/skill-install/github"
 import { prepareLocalSkill } from "@loginom-ai-agent/loginom-host/skill-install/index"
+import { Command } from "@/command"
 import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
 import { RuntimeFlags } from "@/effect/runtime-flags"
@@ -24,6 +25,7 @@ export const SkillInstallTool = Tool.define(
     const fs = yield* FSUtil.Service
     const flags = yield* RuntimeFlags.Service
     const skills = yield* Skill.Service
+    const commands = yield* Command.Service
     return {
       description: "Validate a portable Agent Skill folder without installing it. For a requested installation, pass a local folder or an HTTPS GitHub URL. If several candidates are returned, ask the user to choose and pass its exact returned URL. Publication requires one-time approval.",
       parameters: Parameters,
@@ -32,9 +34,21 @@ export const SkillInstallTool = Tool.define(
           ctx.abort.throwIfAborted()
           if (args.action === "install" && flags.disableExternalSkills)
             throw Error("External skills are disabled in this Loginom process.")
+          const url = /^[a-z][a-z0-9+.-]*:\/\//i.test(args.source)
+          if (args.action === "validate" && url)
+            return {
+              title: "Validate skill folder",
+              output: JSON.stringify({ errors: [{
+                code: "LOGINOM_SKILL_LOCAL_FOLDER_REQUIRED",
+                message: 'Validation takes a local folder. For a GitHub repository or tree URL, use action: "install".',
+              }], warnings: [] }),
+              metadata: {},
+            }
           const instance = yield* InstanceState.context
           const bridge = yield* EffectBridge.make()
-          const github = args.action === "install" && /^[a-z][a-z0-9+.-]*:\/\//i.test(args.source) ? githubSkillURL(args.source) : undefined
+          const withAbort = <A>(effect: Effect.Effect<A>) =>
+            Effect.tryPromise(() => bridge.promise(effect, ctx.abort)).pipe(Effect.orDie)
+          const github = url ? githubSkillURL(args.source) : undefined
           const source = github ?? (args.source.startsWith("~/") ? resolve(Global.Path.home, args.source.slice(2)) : resolve(instance.directory, args.source))
           const directory = github ? source : yield* fs.realPath(source).pipe(Effect.orElseSucceed(() => source))
           const askPaths = (permission: "read" | "edit", paths: string[], filepath: string) =>
@@ -45,15 +59,16 @@ export const SkillInstallTool = Tool.define(
               metadata: { filepath },
             })
           const authorizeRead = (paths: string[]) =>
-            bridge.promise(askPaths("read", paths, directory)).then(() => ctx.abort.throwIfAborted())
+            bridge.promise(askPaths("read", paths, directory), ctx.abort).then(() => ctx.abort.throwIfAborted())
           if (args.action === "validate")
-            yield* ctx.ask({ permission: "skill_install", patterns: [args.action], always: [args.action], metadata: {} })
+            yield* withAbort(ctx.ask({ permission: "skill_install", patterns: [args.action], always: [args.action], metadata: {} }))
           if (github) {
-            yield* ctx.ask({ permission: "webfetch", patterns: [github], always: [github], metadata: { url: github } })
+            yield* withAbort(ctx.ask({ permission: "webfetch", patterns: [github], always: [github], metadata: { url: github } }))
           } else {
-            yield* assertExternalDirectoryEffect(ctx, source, { kind: "directory" })
-            if (directory !== source) yield* assertExternalDirectoryEffect(ctx, directory, { kind: "directory" })
-            yield* askPaths("read", [...new Set([source, directory])], directory)
+            yield* withAbort(assertExternalDirectoryEffect(ctx, source, { kind: "directory" }))
+            if (directory !== source)
+              yield* withAbort(assertExternalDirectoryEffect(ctx, directory, { kind: "directory" }))
+            yield* withAbort(askPaths("read", [...new Set([source, directory])], directory))
           }
           if (args.action === "validate") {
             const result = yield* Effect.tryPromise(() =>
@@ -74,7 +89,7 @@ export const SkillInstallTool = Tool.define(
               bridge.promise(Effect.gen(function* () {
                 if (resources.includes(path)) yield* assertExternalDirectoryEffect(ctx, path, { kind: "directory" })
                 yield* askPaths("read", resources, path)
-              })).then(() => ctx.abort.throwIfAborted()),
+              }), ctx.abort).then(() => ctx.abort.throwIfAborted()),
           }
           return yield* Effect.acquireUseRelease(
             Effect.tryPromise({
@@ -94,17 +109,21 @@ export const SkillInstallTool = Tool.define(
               const override = active?.source === "project" || active?.source === "config" || active?.source === "url"
                 ? active.location
                 : undefined
+              const command = yield* commands.get(candidate.name)
+              const warnings = command && command.source !== "skill"
+                ? [...candidate.warnings, `/${candidate.name} still runs the existing ${command.source === "mcp" ? "MCP prompt" : "command"}.`]
+                : candidate.warnings
               const result = (status: string) => ({
                 title: "Install skill",
-                output: JSON.stringify({ status, name: candidate.name, path: candidate.path, sha: prepared.sha, warnings: candidate.warnings, override }),
+                output: JSON.stringify({ status, name: candidate.name, path: candidate.path, sha: prepared.sha, warnings, override }),
                 metadata: {},
               })
               let previous = candidate.previous
               while (true) {
                 if (previous?.digest === candidate.digest) return result("already-installed")
-                yield* assertExternalDirectoryEffect(ctx, candidate.path, { kind: "directory", write: true })
-                yield* askPaths("edit", [...new Set([...candidate.paths, ...(previous?.paths ?? [])])], candidate.path)
-                yield* ctx.ask({
+                yield* withAbort(assertExternalDirectoryEffect(ctx, candidate.path, { kind: "directory", write: true }))
+                yield* withAbort(askPaths("edit", [...new Set([...candidate.paths, ...(previous?.paths ?? [])])], candidate.path))
+                yield* withAbort(ctx.ask({
                   permission: "skill_install",
                   patterns: [candidate.name],
                   always: [],
@@ -119,10 +138,10 @@ export const SkillInstallTool = Tool.define(
                       "Описание автора: " + literal(candidate.description),
                       "Папка установки: " + literal(candidate.path),
                       "Скилл будет доступен другим агентам, которые используют ~/.agents/skills.",
-                      ...candidate.warnings.map((warning) => "Замечание: " + literal(warning)),
+                      ...warnings.map((warning) => "Замечание: " + literal(warning)),
                     ],
                   },
-                })
+                }))
                 const publication = yield* Effect.tryPromise({ try: () => candidate.publish(previous), catch: (error) => error })
                 if (typeof publication === "string") return result(publication)
                 previous = publication.previous

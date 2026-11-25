@@ -1316,6 +1316,7 @@ const layer = Layer.effect(
               Effect.provideService(Session.Service, sessions),
               Effect.provideService(Agent.Service, agents),
               Effect.provideService(Skill.Service, skills),
+              Effect.provideService(Command.Service, commands),
               Effect.provideService(AppProcess.Service, appProcess),
             )
 

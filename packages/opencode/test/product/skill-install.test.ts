@@ -9,6 +9,7 @@ import { Global } from "@opencode-ai/core/global"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Agent } from "@/agent/agent"
+import { Command } from "@/command"
 import { InstanceState } from "@/effect/instance-state"
 import { Permission } from "@/permission"
 import { toolContributor } from "@/product/tool-contributor"
@@ -23,7 +24,7 @@ import { pollWithTimeout, testEffect } from "../lib/effect"
 
 const it = testEffect(
   Layer.mergeAll(
-    LayerNode.compile(LayerNode.group([Agent.node, AppProcess.node, FSUtil.node, Permission.node, RuntimeFlags.node, Session.node, Skill.node, Truncate.node])),
+    LayerNode.compile(LayerNode.group([Agent.node, AppProcess.node, Command.node, FSUtil.node, Permission.node, RuntimeFlags.node, Session.node, Skill.node, Truncate.node])),
     LayerNode.compile(CrossSpawnSpawner.node),
     testInstanceStoreLayer,
   ),
@@ -60,6 +61,11 @@ it.live("the chat validates with read permissions and only publishes after one-t
       const args = { action: "validate", source: "columns" }
       const result = yield* tool!.execute(args, ctx)
       expect(JSON.parse(result.output)).toMatchObject({ path: join(directory, "columns"), errors: [], warnings: [] })
+      const url = "https://github.com/owner/repository"
+      const wrongAction = yield* tool!.execute({ action: "validate", source: url }, ctx)
+      expect(JSON.parse(wrongAction.output)).toMatchObject({
+        errors: [expect.objectContaining({ message: expect.stringContaining('action: "install"') })],
+      })
       const denied = yield* Effect.exit(tool!.execute(args, {
         ...ctx,
         ask: (request) => permissions.ask({ ...request, sessionID, ruleset: [
@@ -76,6 +82,33 @@ it.live("the chat validates with read permissions and only publishes after one-t
         permissions.list().pipe(Effect.map((requests) => requests.find((request) => request.permission === "skill_install"))),
         "Skill installation did not ask for consent",
       )
+      const stopReading = (path: string) => Effect.gen(function* () {
+        const abort = new AbortController()
+        const stopped = yield* Effect.forkChild(Effect.exit(tool!.execute(installation, {
+          ...ctx,
+          abort: abort.signal,
+          ask: (request) => permissions.ask({ ...request, sessionID, ruleset: [
+            { permission: "*", pattern: "*", action: "allow" },
+            { permission: "read", pattern: relative(instance.worktree, path), action: "ask" },
+          ] }).pipe(Effect.orDie),
+        })))
+        const readRequest = yield* pollWithTimeout(
+          permissions.list().pipe(Effect.map((requests) => requests.find((request) =>
+            request.permission === "read" && request.patterns.includes(relative(instance.worktree, path)),
+          ))),
+          "Skill installation did not ask to read " + path,
+        )
+        abort.abort()
+        yield* pollWithTimeout(
+          permissions.list().pipe(Effect.map((requests) => requests.some((request) => request.id === readRequest.id) ? undefined : true)),
+          "Cancelled skill installation left a read permission pending",
+        ).pipe(
+          Effect.ensuring(permissions.reply({ requestID: readRequest.id, reply: "reject" }).pipe(Effect.ignore)),
+        )
+        expect((yield* Fiber.join(stopped))._tag).toBe("Failure")
+      })
+      yield* stopReading(join(directory, "columns"))
+      yield* stopReading(resource)
       const rejected = yield* Effect.forkChild(Effect.exit(tool!.execute(installation, ctx)))
       const request = yield* pending
       expect(request.metadata.skillInstall).toContain("Папка установки: " + JSON.stringify(installed))
@@ -88,9 +121,15 @@ it.live("the chat validates with read permissions and only publishes after one-t
       const fresh = yield* pending
       expect(fresh.id).not.toBe(request.id)
       yield* permissions.reply({ requestID: fresh.id, reply: "once" })
-      expect(JSON.parse((yield* Fiber.join(approved)).output)).toMatchObject({ status: "installed", path: installed, override: join(directory, ".agents/skills/columns/SKILL.md") })
+      expect(JSON.parse((yield* Fiber.join(approved)).output)).toMatchObject({
+        status: "installed",
+        path: installed,
+        override: join(directory, ".agents/skills/columns/SKILL.md"),
+        warnings: [expect.stringContaining("/columns")],
+      })
       expect(yield* Effect.promise(() => Bun.file(join(installed, "references/columns.md")).text())).toBe("id, amount")
       expect(JSON.parse((yield* tool!.execute(installation, ctx)).output)).toMatchObject({ status: "already-installed" })
+      yield* stopReading(join(installed, "references/columns.md"))
 
       const destinationReadRefused = yield* Effect.exit(tool!.execute(installation, {
         ...ctx,
@@ -130,5 +169,6 @@ it.live("the chat validates with read permissions and only publishes after one-t
       expect(networkRefusal._tag).toBe("Failure")
       expect(yield* permissions.list()).toEqual([])
     }),
+    { config: { command: { columns: { template: "Run the existing columns command." } } } },
   ),
 )

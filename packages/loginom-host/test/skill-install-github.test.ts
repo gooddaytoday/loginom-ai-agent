@@ -16,6 +16,7 @@ test("fixes the GitHub revision and strips read authorization at the archive red
   const writer = new ZipWriter(new BlobWriter())
   await writer.add("owner-repo-a/skills/columns/SKILL.md", new TextReader(header("columns") + "[Schema](references/table.md)"))
   await writer.add("owner-repo-a/skills/columns/references/table.md", new TextReader("id, amount"))
+  await writer.add("owner-repo-a/notes/Release: June.md", new TextReader("Release notes"))
   const archive = await writer.close()
   const credentials: { origin: string; authorized: boolean }[] = []
   const api = Bun.serve({
@@ -114,6 +115,17 @@ test("a damaged or cancelled archive leaves the installed copy alone", async () 
       lock: <T>(name: string, control: string, run: () => Promise<T>) => Flock.withLock("skill-install:" + name, run, { dir: control }),
       signal: signal.signal,
     }
+    let downloaded = false
+    await expect(prepareGitHubSkill(source, home, {
+      ...options,
+      fetch: async (url) => url.pathname.includes("/commits/") ? Response.json({ sha }) : new Response(
+        new ReadableStream({
+          pull(controller) { downloaded = true; controller.close() },
+        }, { highWaterMark: 0 }),
+        { headers: { "content-length": String(513 * 1024 * 1024) } },
+      ),
+    })).rejects.toThrow("512 MiB download limit")
+    expect(downloaded).toBe(false)
     await expect(prepareGitHubSkill(source, home, {
       ...options,
       fetch: async (url) => url.pathname.includes("/commits/") ? Response.json({ sha }) : new Response("broken archive"),

@@ -910,8 +910,8 @@ it.instance(
   { git: true },
 )
 
-it.instance(
-  "reply - publishes replied event",
+for (const replyKind of ["once", "interrupt"] as const) it.instance(
+  `permission ${replyKind} closes the client request`,
   () =>
     Effect.gen(function* () {
       const events = yield* EventV2Bridge.Service
@@ -945,8 +945,13 @@ it.instance(
       })
       yield* Effect.addFinalizer(() => unsub)
 
-      yield* reply({ requestID: PermissionV1.ID.make("per_test7"), reply: "once" })
-      yield* Fiber.join(fiber)
+      if (replyKind === "once") {
+        yield* reply({ requestID: PermissionV1.ID.make("per_test7"), reply: "once" })
+        yield* Fiber.join(fiber)
+      } else {
+        yield* Fiber.interrupt(fiber)
+      }
+      expect(yield* list()).toEqual([])
       expect(
         yield* Deferred.await(seen).pipe(
           Effect.timeoutOrElse({
@@ -957,7 +962,7 @@ it.instance(
       ).toEqual({
         sessionID: SessionID.make("session_test"),
         requestID: PermissionV1.ID.make("per_test7"),
-        reply: "once",
+        reply: replyKind === "once" ? "once" : "reject",
       })
     }),
   { git: true },

@@ -57,6 +57,10 @@ test("local preparation blocks a second skill and linked files outside the sourc
     const prepare = () => prepareLocalSkill(source, home, async () => {}, { lock })
     await expect(prepare()).rejects.toThrow("SKILL.md, example/SKILL.md")
     await rm(nested)
+    const lowercase = join(source, "example", "skill.md")
+    await Bun.write(lowercase, header.replace("name: columns", "name: example"))
+    await expect(prepare()).rejects.toThrow("SKILL.md, example/skill.md")
+    await rm(lowercase)
     if (process.platform !== "win32") {
       await Bun.write(join(root, "outside.txt"), "outside resource")
       await symlink("../outside.txt", join(source, "outside.txt"))
