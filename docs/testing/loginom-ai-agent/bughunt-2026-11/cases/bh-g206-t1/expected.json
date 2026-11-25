@@ -1,0 +1,31 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Продажи"
+    },
+    {
+      "type": "programming.javascript",
+      "label": "Расчёт JS"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "id": "sales",
+        "type": "imports.text",
+        "label": "Продажи"
+      },
+      {
+        "id": "js",
+        "type": "programming.javascript",
+        "label": "Расчёт JS"
+      }
+    ],
+    "links": []
+  },
+  "g2_review": {
+    "script": "unchanged"
+  }
+}

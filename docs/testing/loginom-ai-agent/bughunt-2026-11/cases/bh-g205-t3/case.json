@@ -1,0 +1,15 @@
+{
+  "base": "bh-g205-t2",
+  "input_files": [],
+  "budget": {
+    "max_nodes": 0,
+    "max_errors": 0,
+    "forbid": [
+      "expected.json",
+      "oracle.py",
+      "g2_review",
+      "sqlite3",
+      "convert "
+    ]
+  }
+}

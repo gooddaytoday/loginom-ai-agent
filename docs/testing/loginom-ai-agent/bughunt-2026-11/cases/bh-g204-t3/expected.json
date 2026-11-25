@@ -1,0 +1,45 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Продажи"
+    },
+    {
+      "type": "transform.filter_data",
+      "label": "Фильтр выручки"
+    },
+    {
+      "type": "transform.group_data",
+      "label": "Итоги по регионам"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "id": "sales",
+        "type": "imports.text",
+        "label": "Продажи"
+      },
+      {
+        "id": "filter",
+        "type": "transform.filter_data",
+        "label": "Фильтр выручки"
+      },
+      {
+        "id": "group",
+        "type": "transform.group_data",
+        "label": "Итоги по регионам"
+      }
+    ],
+    "links": [
+      {
+        "source": "sales",
+        "target": "filter",
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "g2_review": {}
+}
