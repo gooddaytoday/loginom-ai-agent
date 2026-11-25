@@ -35,7 +35,16 @@ async function captureWorkspaceStep(page, options) {
     if(records.some(r=>JSON.parse(r.request).session!==sessionId||r.tab!==source.tab||r.packageNode!==source.packageNode
       ||(r.nodeTargetWorkflowNode??r.stepWorkflowNode)!==owner))return refused('WORKFLOW_CHANGED');
     const visible=e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
-    if([...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog,.x-message-box,.bg-mask-message,.x-mask-msg,.x-form-invalid-under]')].some(visible))
+    const activeBlocker=e=>{
+      if(!visible(e))return false;
+      const picker=e.closest?.('[data-tid="OpenDialogForm"]')??e;
+      if(picker.getAttribute('data-tid')!=='OpenDialogForm')return true;
+      const component=globalThis.Ext?.getCmp?.(picker.id);
+      return !(component?.$className==='bg.filedialog.view.OpenDialogForm'
+        &&component.el?.dom===picker&&component.hidden===true
+        &&[...state.receipts.values()].some(r=>r.openDialogElement===picker&&r.openDialog===component));
+    };
+    if([...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog,.x-message-box,.bg-mask-message,.x-mask-msg,.x-form-invalid-under')].some(activeBlocker))
       return {status:'UNAVAILABLE'};
     const card=main.Items?.Workspace?.getActiveTab?.(),model=card?.Controller?.FController;
     const graph=exact(prefix+';ModelForm;cmpDiagram');

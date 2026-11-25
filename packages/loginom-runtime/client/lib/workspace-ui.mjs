@@ -950,7 +950,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const element=value(value(getState.call(view,cell),'shape'),'node');
           if(unique(element)&&!nativeGraphControls.has(element))nativeGraphLinks.add(element);
           const from=nativeInventoryPorts.get(source),to=nativeInventoryPorts.get(target);
-          if(from?.type===1&&to?.type===0)
+          if(from?.type===1&&to?.type===0&&!from.key.includes('|')&&!to.key.includes('|')
+            &&/^Output_[^;|]+$/.test(from.suffix)&&/^Input_[^;|]+$/.test(to.suffix))
             nativeInventoryLinks.add(graphPrefix+from.key+'|'+from.suffix+'|'+to.key+'|'+to.suffix);
         }
       }

@@ -91,7 +91,12 @@ function pageFixture({ authenticated = false, workflow = false, nativeWorkflow =
       if(selector.startsWith('[data-tid^="MF;cntMain;cntWorkspace'))return tabs;
       if(pickerOpen&&selector.includes('.x-window'))return fileDialog.nested?[picker,pickerChild]:[picker];
       if(pickerOpen&&selector==='[data-tid="OpenDialogForm"]')return [picker];
-      if(selector.startsWith('[role=')) {if(blocked)return [element('blocker')];if(busyTicks>0)return [{...element('busy'),matches:()=>true}];return [];}
+      if(selector.startsWith('[role=')) {
+        assert.ok(!selector.endsWith(']')||selector==='[role="dialog"]','Invalid blocker selector');
+        if(blocked)return [element('blocker')];
+        if(busyTicks>0)return [{...element('busy'),matches:()=>true}];
+        return [];
+      }
       const prefix=selector.match(/^\[data-tid\^=(".*")\]$/);
       if(prefix)return tabs.flatMap(t=>t.crumbs).filter(e=>e.tid.startsWith(JSON.parse(prefix[1])));
       const exact=selector.match(/^\[data-tid=(".*")\]$/);
