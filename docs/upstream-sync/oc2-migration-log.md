@@ -23337,3 +23337,61 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 - Настоящая служба и плагин: `loginom.dashboard` на сервере проверял B2.9h (`server/test/loginom-dashboard-target.test.ts`);
   здесь — подставная служба по формату протокола (`RpcError` 400, `RpcInternalError` 500, `{ output }`).
 - Окно, запуск по ссылке через `xdg-open` и регистрация схемы в ОС (упаковка — B4.5a, B4.14b/c); Windows и macOS.
+
+## B6.3 AGENTS.md под v2
+
+Ветка `b63-agents-paths` от `oc2-migration` (`0cfc0a30dd`), дерево `.claude/worktrees/b63`. Bun 1.4.4 переносной первым в
+`PATH`, `bun install --frozen-lockfile` — код 0, `.husky/_` есть. Эталон 0.4 — `v0.4.0`. Настоящую модель не вызывал, в
+`~/.local/share` и другие настоящие каталоги не писал. Правил только `AGENTS.md` и добавил один тест.
+
+### Проверка путей
+
+`packages/product/test/agents-paths.test.ts` — рядом с `repo-paths.test.ts`, в тестах `product` (в `bun run check` не
+входит: `check` — это `lint` и `typecheck`, тесты идут отдельно). Берёт все отслеживаемые `AGENTS.md` (`git ls-files`),
+из каждого — пути в обратных кавычках (с корнем репозитория, с `/` и расширением файла) и цели ссылок Markdown. Путь
+должен существовать от корня репозитория, от каталога файла, от любого его предка или от `src/` одного из них (так
+написаны `src/tool.ts`, `lib/funnel-config.ts`). Исключения — карта `NOT_PATHS` «файл: путь → причина»; тест падает на
+исключении без причины и на исключении, которого в тексте больше нет. Восемь исключений: файлы собранного дашборда
+(`dist/*`, `builds/state.json`, `src/main.tsx` опубликованного приложения, `src/loginom.ts`), `dashboard/apps` стенда,
+`dashboard/template` внутри собранных ресурсов, `i18n/en.ts` каждого плагина GUI.
+
+Первый прогон нашёл шесть настоящих битых путей: `packages/opencode/AGENTS.md` и `packages/desktop/src/main/loginom/AGENTS.md`
+в корне, `src/call-timeout.mjs` и `session/task-scope.ts` в `loginom-host`, `../desktop/src/main/loginom/AGENTS.md` там же,
+`../opencode/src/provider/transform.ts` в `loginom-runtime`.
+
+### Правки
+
+| Файл | Что |
+|---|---|
+| `AGENTS.md` | `packages/opencode/AGENTS.md` заменён на `packages/loginom-agent/AGENTS.md` и `packages/cli/AGENTS.md` |
+| `packages/loginom-agent/AGENTS.md` | новый: карта плагина и правила 0.4, чей код перенесён (допуск, `isError`, итог квитанции, восстановление браузера) |
+| `packages/cli/AGENTS.md` | раздел «Product CLI»: профиль, `.writer`, `loginom`, коды `LOGINOM_CONFIG_REQUIRED` и `LOGINOM_CONNECTION_NOT_READY`, уведомление об обновлении, сборка |
+| `packages/desktop/src/main/loginom/AGENTS.md` | восстановлен: в v2 в каталоге `credentials.ts` и `credential-migration.ts` (B4.13); файлы подключения и восстановления 0.4 убраны, отсылка к B4 |
+| `packages/loginom-host/AGENTS.md` | два пути: `../loginom-runtime/src/call-timeout.mjs`, `src/task-scope.ts` |
+| `packages/loginom-runtime/AGENTS.md` | схема провайдера — `../ai/src/protocols/utils/tool-schema.ts`; адаптация структурных enum OpenAI из 0.4 в v2 не перенесена (CAT-07, B1.7) |
+
+Команды запуска тестов в остальных модульных файлах (`product`, `desktop`, `loginom-host`, `loginom-runtime`, `app`,
+`ui`, `evals`) — `bun test` и `bun typecheck` из каталога пакета, `bun run test:upstream` у `loginom-runtime` — в v2 те же;
+правок не потребовали.
+
+### Где решал сам
+
+- **Меньший вариант.** В 0.4 `packages/opencode/AGENTS.md` был на ~200 строк: standalone CLI, инструменты Loginom, профили
+  и задачи сессии бэкенда v1 (`session/task-scope.ts`, `SessionTools`, `part.update` и т. п.). Перенёс только то, чьё
+  существование в v2 нашёл поиском по коду (символы, файлы, коды выхода). Правила бэкенда v1 без образа в v2 (метаданные
+  активации, проверки subtask, снимки файлов `util/file-snapshot.ts`, `applyCliSystemProxy`, `dist-standalone`) не переносил:
+  не нашёл их в дереве, придумывать не стал. Их судьбу решают задачи этапов B2 и C.
+- Правила о загрузке стороннего upstream-контента (`services/site`, `packages/core/src/tool`) не трогал.
+
+### Найдено, не чинил
+
+- Три правила 0.4 о системном прокси CLI и `SYSTEM_PROXY_NOT_APPLIED`: в v2 `applyCliSystemProxy` нет. Не знаю, перенесено ли
+  иначе; в `packages/cli/AGENTS.md` не писал.
+
+### Приёмка
+
+- `bun test` в `packages/product` (Bun 1.4.4): 63 pass, 3 fail — ровно известные `workspace packages > --filter arguments…`,
+  `CI triggers > path filters…`, `path literals…` (В-95, B5.1); `agents-paths.test.ts` — 3 pass.
+- Мутация: строка с `` `packages/nowhere/src/x.ts` `` в `packages/ui/AGENTS.md` — тест красный
+  (`packages/ui/AGENTS.md: packages/nowhere/src/x.ts`); откатил.
+- `catalog-check.py` — код 0; `apply-identity.py --check` — `would change: 0 files`; `bun run check` — код 0 (39 из 39 задач).
