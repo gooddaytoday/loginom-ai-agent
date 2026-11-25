@@ -25075,6 +25075,17 @@ Run 45694260129 форка (`06ac4c97c9`): `pty (x86_64-unknown-linux-gnu)` и `
 `release-process-daemon.yml`) включает `core.longpaths` перед сборкой на Windows; то же добавлено в ветку Windows действия
 `setup-rust-pty`.
 
+### Цель pty по платформам (ветка `b51f2-pty-target`)
+
+Вход `targets` у `workflow_call` в `loginom-pty.yml`: JSON-список целей, пусто — все три (так же для `push`,
+`pull_request`, `workflow_dispatch`). Матрица — `fromJSON(inputs.targets || '[три цели]')`, `runs-on` выводится из цели
+(`linux` → `ubuntu-22.04`, `apple` → `macos-15`, иначе `windows-2022`). `loginom-linux.yml`, `loginom-macos.yml` и
+`loginom-windows.yml` просят только свою цель, поэтому нехватка раннера macOS или красная цель другой ОС их не блокирует.
+Тест `pty-workflow.test.ts` (6): матрица, выбор раннера, вход, потребители; мутации (чужая цель у потребителя, нет
+`targets`, glibc 2.31, вход игнорируется, раннер macOS-14, нет baseline CPU) краснят по 1 тесту. `product`: 92 pass, 0 fail.
+Проверит только CI: что `fromJSON` в `strategy.matrix` и вход `targets` принимаются GitHub при `workflow_call`.
+
+
 ## Хвосты паритета 3
 
 25.11.2026. Ветка `btails3-parity` от `oc2-migration` (`64199aa641`), дерево `.claude/worktrees/btails3`. Эталон — `v0.4.0` (В-99).

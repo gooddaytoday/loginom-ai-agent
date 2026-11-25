@@ -32,6 +32,8 @@ env:
 jobs:
   pty:
     uses: ./.github/workflows/loginom-pty.yml
+    with:
+      targets: '["x86_64-unknown-linux-gnu"]'
     permissions:
       contents: read
 

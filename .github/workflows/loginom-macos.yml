@@ -43,6 +43,8 @@ jobs:
     # batches and release PRs; node PRs skip (a skipped job still satisfies required checks).
     if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'v040-batch-') || contains(fromJSON('["dev","loginom"]'), github.base_ref)
     uses: ./.github/workflows/loginom-pty.yml
+    with:
+      targets: '["aarch64-apple-darwin"]'
 
   macos:
     needs: pty
