@@ -3,8 +3,25 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
-import { Product, productChannel, productName, productSlug } from "../src/index"
+import { Product, productChannel, productName, productSlug, skillInstallConfirmation } from "../src/index"
+import { isReservedSkillName } from "../src/skills"
 import release from "../loginom-release.json"
+
+test("only a complete skill publication request requires one-time confirmation", () => {
+  const lines = ["Install columns", "Source: columns"]
+  const request = { permission: "skill_install", metadata: { operationId: "installation", skillInstall: lines } }
+  expect(skillInstallConfirmation(request)).toEqual(lines)
+  expect(skillInstallConfirmation({ permission: "skill_install" })).toBeUndefined()
+  expect(skillInstallConfirmation({ ...request, permission: "read" })).toBeUndefined()
+  for (const value of [undefined, [], ["Install columns", 1]]) {
+    expect(skillInstallConfirmation({ ...request, metadata: { ...request.metadata, skillInstall: value } })).toBeUndefined()
+  }
+})
+
+test("authoring skill has a reserved product name", () => {
+  expect(isReservedSkillName("loginom-create-skill")).toBe(true)
+  expect(isReservedSkillName("check-columns")).toBe(false)
+})
 
 test("first-run Loginom defaults use the public service address and no knowledge service is pinned", () => {
   expect(Product.connection.url).toBe("https://app.loginom.ai")

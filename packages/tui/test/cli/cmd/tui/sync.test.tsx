@@ -1,8 +1,18 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, test } from "bun:test"
+import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
+import { useRenderer } from "@opentui/solid"
+import { onCleanup, Show } from "solid-js"
 import { tmpdir } from "../../../fixture/fixture"
-import { mount, wait } from "./sync-fixture"
+import { createTuiResolvedConfig } from "../../../fixture/tui-runtime"
+import { directory, json, mount, wait } from "./sync-fixture"
 import type { GlobalEvent } from "@opencode-ai/sdk/v2"
+import { TuiConfigProvider } from "../../../../src/config"
+import { LocationProvider } from "../../../../src/context/location"
+import { useSync } from "../../../../src/context/sync"
+import { ThemeProvider } from "../../../../src/context/theme"
+import { OpencodeKeymapProvider, registerOpencodeKeymap } from "../../../../src/keymap"
+import { PermissionPrompt } from "../../../../src/routes/session/permission"
 
 function branchEvent(branch: string, workspace?: string): GlobalEvent {
   return {
@@ -18,6 +28,71 @@ function branchEvent(branch: string, workspace?: string): GlobalEvent {
 }
 
 describe("tui sync", () => {
+  test("auto mode replies to ordinary requests and leaves skill installation pending", async () => {
+    await using tmp = await tmpdir()
+    await Bun.write(`${tmp.path}/kv.json`, "{}")
+    const replies: string[] = []
+    const request = {
+      id: "per_install",
+      sessionID: "ses_skill",
+      permission: "skill_install",
+      patterns: ["check-columns"],
+      always: [],
+      metadata: { operationId: "prepared", skillInstall: ["Install check-columns", "Revision: chosen-revision"] },
+    }
+
+    function RenderPermission() {
+      const sync = useSync()
+      const config = createTuiResolvedConfig()
+      const renderer = useRenderer()
+      const keymap = createDefaultOpenTuiKeymap(renderer)
+      onCleanup(registerOpencodeKeymap(keymap, renderer, config))
+      return (
+        <OpencodeKeymapProvider keymap={keymap}>
+          <TuiConfigProvider config={config}>
+            <ThemeProvider mode="dark">
+              <LocationProvider>
+                <Show when={sync.data.permission[request.sessionID]?.[0]}>
+                  {(pending) => <PermissionPrompt request={pending()} />}
+                </Show>
+              </LocationProvider>
+            </ThemeProvider>
+          </TuiConfigProvider>
+        </OpencodeKeymapProvider>
+      )
+    }
+
+    const { app, emit, sync } = await mount((url) => {
+      if (!url.pathname.startsWith("/permission/")) return
+      replies.push(url.pathname)
+      return json(true)
+    }, tmp.path, { auto: true, render: RenderPermission })
+
+    try {
+      emit({
+        directory,
+        payload: { id: "evt_install", type: "permission.asked", properties: request },
+      })
+      emit({
+        directory,
+        payload: { id: "evt_read", type: "permission.asked", properties: { ...request, id: "per_read", permission: "read", metadata: {} } },
+      })
+      await wait(() => sync.data.permission[request.sessionID]?.length === 1 && replies.length > 0)
+      expect(sync.data.permission[request.sessionID]).toEqual([request])
+      expect(replies).toEqual(["/permission/per_read/reply"])
+      const frame = await app.waitForFrame((frame) => frame.includes("Revision: chosen-revision"))
+      expect(frame).toContain("Install check-columns")
+      expect(frame).toContain("Allow once")
+      expect(frame).toContain("Reject")
+      expect(frame).not.toContain("Allow always")
+      app.mockInput.pressEnter()
+      await wait(() => replies.length === 2)
+      expect(replies[1]).toBe("/permission/per_install/reply")
+    } finally {
+      app.renderer.destroy()
+    }
+  })
+
   test("refresh scopes sessions by default and lists project sessions when disabled", async () => {
     await using tmp = await tmpdir()
     await Bun.write(`${tmp.path}/kv.json`, "{}")

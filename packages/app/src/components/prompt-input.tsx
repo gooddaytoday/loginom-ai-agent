@@ -1212,7 +1212,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       setMode: (mode) => setStore("mode", mode),
       setPopover: (popover) => {
         if (!popover) return closePopover()
-        if (popover === "slash" && store.popover !== "slash") refreshCommands()
         setStore({ popover, slashMenu: false, slashMenuQuery: "" })
       },
       newSessionWorktree: () => props.newSessionWorktree,

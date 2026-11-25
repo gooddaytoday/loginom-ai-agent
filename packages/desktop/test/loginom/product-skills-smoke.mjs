@@ -179,23 +179,23 @@ try {
       ...(damage ? ["Bundled skills are unavailable. Verify the Loginom resource path or reinstall the application."] : []),
     ])
     const acknowledged = []
-    const front = page.locator('.toast-v2[data-front="true"][data-visible="true"][data-removed="false"]')
-    await front.hover()
+    const front = '.toast-v2[data-front="true"][data-visible="true"][data-removed="false"]'
     while (remaining.size) {
-      await front.waitFor({ timeout: 10000 })
-      const id = await front.getAttribute("data-testid")
-      if (!id) throw Error("DIAGNOSTIC_ID_REQUIRED")
-      // New warnings may reorder the stack between reading and clicking.
-      const current = page.getByTestId(id)
-      await current.hover()
-      const text = await current.locator("[data-description]").innerText()
+      // Read and dismiss the same element before a later diagnostic can move it.
+      const diagnostic = await page.waitForFunction((selector) => {
+        const toast = document.querySelector(selector)
+        const text = toast?.querySelector("[data-description]")?.textContent
+        const close = toast?.querySelector("[data-close-button]")
+        if (!text || !close) return
+        close.click()
+        return text
+      }, front, { timeout: 10000 })
+      const text = await diagnostic.jsonValue()
       acknowledged.push(text)
       for (const expected of remaining) {
         if (text.includes(expected)) remaining.delete(expected)
       }
       await writeFile(join(evidence, "acknowledged-diagnostics.json"), JSON.stringify(acknowledged, null, 2))
-      await page.screenshot({ path: join(evidence, `acknowledged-diagnostic-${acknowledged.length}.png`) })
-      await current.locator("[data-close-button]").click()
     }
     await page.screenshot({ path: join(evidence, "skill-diagnostics.png") })
   }

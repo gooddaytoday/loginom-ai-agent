@@ -157,5 +157,6 @@ test("auto-approval leaves skill installation pending for the user", () => {
     metadata: { operationId: "snapshot", skillInstall: ["Install columns"] },
   }
   expect(autoRespondsPermission({ root: true }, sessions, request, "/tmp/project")).toBe(false)
+  expect(sessionAutoAccept({ root: true }, sessions, request, "/tmp/project")).toBe(false)
   expect(autoRespondsPermission({ root: true }, sessions, { ...request, metadata: {} }, "/tmp/project")).toBe(true)
 })

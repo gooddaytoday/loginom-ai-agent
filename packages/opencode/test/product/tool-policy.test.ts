@@ -39,6 +39,16 @@ describe("toolPolicy", () => {
     expect(policy.permits("loginom-automation", "bash", "builtin")).toBe(true)
   })
 
+  test("skill installation is available only as a built-in in default and automation profiles", () => {
+    for (const profile of ["default", "loginom-automation"] as const) {
+      expect(policy.permits(profile, "skill_install", "builtin")).toBe(true)
+      expect(policy.permits(profile, "skill_install", "external")).toBe(false)
+      expect(policy.permits(profile, "skill_install", undefined)).toBe(false)
+    }
+    for (const profile of ["package-docs", "loginom-dashboard"] as const)
+      expect(policy.permits(profile, "skill_install", "builtin")).toBe(false)
+  })
+
   test("only automation reaches the mutating Loginom tools", () => {
     for (const name of ["find", "search", "read", "grep", "glob", "list", "tree", "dock_diagnostics"]) {
       expect(policy.isLocalLoginom(name)).toBe(true)

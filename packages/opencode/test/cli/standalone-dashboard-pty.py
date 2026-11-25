@@ -48,12 +48,13 @@ try:
                 output[key.data].extend(chunk)
                 if key.data != "stderr":
                     continue
-                prompts = re.findall(r'Введите «(Удалить [0-9a-f]{8})»', output["stderr"].decode(errors="ignore"))
+                prompts = re.findall(r'Введите «((?:Удалить|Подтвердить) [0-9a-f]{8})»', output["stderr"].decode(errors="ignore"))
                 if cwd is None and prompts:
                     phrase = prompts[0]
                     cwd = os.readlink(f"/proc/{child.pid}/cwd")
                     answers = {
-                        "delete": phrase + "\n", "pipe-delete": phrase + "\n", "partial": phrase + "\n", "cancel": "Отмена\n",
+                        "delete": phrase + "\n", "pipe-delete": phrase + "\n", "partial": phrase + "\n", "confirm": phrase + "\n",
+                        "cancel": "Отмена\n",
                         "eof": "\x04", "interrupt": "\x03", "incomplete": phrase + "\x04",
                     }
                     if choice in answers:

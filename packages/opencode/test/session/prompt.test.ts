@@ -2891,7 +2891,7 @@ for (const subtask of [false, true]) {
 }
 
 unix(
-  "command ! expansion uses configured shell over env shell",
+  "command ! expansion uses configured shell and appends arguments without a placeholder",
   () =>
     withSh(() =>
       Effect.gen(function* () {
@@ -2912,12 +2912,12 @@ unix(
         const result = yield* prompt.command({
           sessionID: chat.id,
           command: "probe",
-          arguments: "",
+          arguments: "additional context",
         })
 
         expect(result.info.role).toBe("assistant")
         const inputs = yield* llm.inputs
-        expect(JSON.stringify(inputs.at(-1)?.messages)).toContain("configured")
+        expect(JSON.stringify(inputs.at(-1)?.messages)).toContain("Probe: configured\\n\\nadditional context")
       }),
     ),
   30_000,
