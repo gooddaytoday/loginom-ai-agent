@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { dispatchNodeApi } from '../lib/node-api.mjs';
 import { createActionRuntime } from '../lib/executor.mjs';
 import { NodeReleaseBlocked, releasePendingNode, verifyRecoveredPendingNode } from '../lib/node-pending-release.mjs';
 import { createBrowserRecovery } from '../lib/browser-recovery.mjs';
@@ -39,6 +40,7 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
     finish: async mode => {
       calls.push('finish');
       if (state.receipt) state.receiptOptions('apply:finish', 'node.finish', 'signature');
+      if (state.acceptExecute && mode === 'execute') state.acceptExecute(state.operation.id);
       if (state.failFinish) throw Error('Wizard Done was not confirmed');
       return { verified: true, cleanup_complete: true, mode, effect_possible: true, execution_id: 'exec', execution_started: true };
     },
@@ -71,6 +73,7 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
     nodeTargetAdapterFactory: () => adapter, nodeApplyHandlers: new Map([[nodeType, handler]]),
     nodeApplyDriverFactory: options => {
       state.receiptOptions = options.receiptOptions; state.operation = options.operation; state.readReceipt = options.readReceipt;
+      if (options.operation.parameters.mode === 'read_existing_output' && state.readDriver) return { ...drivers, ...state.readDriver(options.operation) };
       if (nodeType === 'programming.javascript') {
         const js = createJavascriptCodeNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2',redactor:createRedactor()})
           .nodeApplyDriverFactory(options);
@@ -277,6 +280,8 @@ test('the lease blocks Dock mutations; verification releases on proof and writes
 
 test('T3: public finish offers only an existing-output read after repeated failure with unknown execution', async () => {
   const f = fixture();
+  const accepted = [];
+  f.state.acceptExecute = id => accepted.push(id);
   await stopAtFinish(f);
   await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
   const first = f.runtime.browserRecoveryBasis('apply');
@@ -329,6 +334,45 @@ test('T3: public finish offers only an existing-output read after repeated failu
   assert.match(verified.next_step.instruction, /NEW operation_id and source_operation_id:"apply-2:br2"/);
   assert.doesNotMatch(verified.next_step.instruction, /\bexecute\b|fresh execution|step was completed/i);
   assert.match(verified.next_step.instruction, /read an already active result or wait for an already running execution/i);
+
+  assert.deepEqual(accepted, ['apply', 'apply-2']);
+  const explicit = source => dispatchNodeApi(f.runtime, 'dock_node_read', {
+    operation_id: 'explicit', source_operation_id: source, execution: 'execute' });
+  const readDrivers = [];
+  f.state.readDriver = operation => {
+    readDrivers.push(operation.id);
+    const execution_id = operation.parameters.finish === 'execute' ? 'fresh-' + operation.id : 'old-active';
+    const proof = { verified: true, cleanup_complete: true, execution_id };
+    return {
+      finishGraph: async mode => {
+        if (mode === 'execute') accepted.push(operation.id);
+        return { ...proof, mode, settings_applied: false, execution_started: mode === 'execute' };
+      },
+      waitExecution: async () => ({ ...proof, status: 'completed' }),
+      readOutput: async () => ({ ...proof, status: 'complete', evidence_ref: 'read',
+        ports: [{ port: 0, fresh: true, schema: [{ index: 0, name: 'Id', label: 'Id', type: 'integer' }] }] }),
+    };
+  };
+  const refuse = async (source, reason) => {
+    const count = readDrivers.length;
+    await assert.rejects(explicit(source), reason);
+    await assert.rejects(dispatchNodeApi(f.runtime, 'dock_node_status', { operation_id: 'explicit' }), /Unknown node operation/);
+    assert.equal(readDrivers.length, count);
+    assert.deepEqual(accepted, ['apply', 'apply-2']);
+  };
+  await refuse(verified.receipt_id, /unknown execution/i);
+  let source = verified.receipt_id;
+  for (const id of ['current-1', 'current-2', 'current-3', verified.receipt_id]) {
+    await dispatchNodeApi(f.runtime, 'dock_node_read', { operation_id: id, source_operation_id: source });
+    const { outcome, error } = await dispatchNodeApi(f.runtime, 'dock_node_wait', { operation_id: id, timeout_ms: 1000 });
+    assert.equal(error, null);
+    assert.equal(outcome.status, 'SUCCEEDED', JSON.stringify(outcome));
+    assert.deepEqual(outcome.output.node, node);
+    assert.equal(outcome.output.execution.execution_id, 'old-active');
+    assert.equal(outcome.cleanup_complete, true);
+    source = id;
+    await refuse(source, id === verified.receipt_id ? /ambiguous/i : /unknown execution/i);
+  }
 
   const read = buildNodeReadRequest({ operation_id: 'reread', source_operation_id: 'apply-2:br2' },
     f.events.find(e => e.phase === 'browser_recovery_receipt' && e.receipt.id === 'apply-2:br2').receipt);

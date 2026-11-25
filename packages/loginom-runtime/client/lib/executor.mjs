@@ -3378,6 +3378,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(!['source','context'].includes(args.kind)){
         if(sourceReads.busy||sourceReads.unsettled)throw Error('JavaScript source read retains the Dock browser');
         if(sourceReads.has(args.operation_id))throw Error('Operation ID belongs to a JavaScript read');
+        if(args.execution==='execute'){
+          // Reading an active output preserves its execution and cannot settle an earlier unknown launch.
+          let sourceId=args.source_operation_id;
+          while(sourceId){
+            const operation=operations.get(sourceId), recovery=recoveryReceipts.get(sourceId);
+            if(operation&&recovery)throw Error('Cannot execute from an ambiguous source operation ID');
+            if(recovery?.execution?.status==='unknown')throw Error('Cannot execute after recovery with unknown execution');
+            const request=operation?.parameters??recovery?.request;
+            if(request?.mode!==NODE_READ_MODE||request.parameters.execution_policy!=='existing')break;
+            sourceId=request.parameters.source_operation_id;
+          }
+        }
         const read=buildNodeReadRequest(args,operations.get(args.source_operation_id)??recoveryReceipts.get(args.source_operation_id),{saves:[...operations.values()]});
         // Completed node receipts retain their original navigation. Follow our
         // verified Save chain, including a native-identity-verified reopen.
