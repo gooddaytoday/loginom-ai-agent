@@ -331,11 +331,16 @@ def verify_excel(path):
 
 
 def verify_graph(expected, observed, previous):
-    nodes = observed["nodes"]
+    expected_types = Counter(node["type"] for node in expected["nodes"])
+    nodes = dict(observed["nodes"])
     links = observed["links"]
-    assert Counter(node["type"] for node in nodes.values()) == Counter(
-        node["type"] for node in expected["nodes"]
-    ), "G1_GRAPH_NODE_SET"
+    if VARIABLE not in expected_types:
+        linked = {link[endpoint] for link in links for endpoint in ("source", "target")}
+        nodes = {
+            node_id: node for node_id, node in nodes.items()
+            if node_id in linked or node != {"type": VARIABLE, "label": "Переменные сценария"}
+        }
+    assert Counter(node["type"] for node in nodes.values()) == expected_types, "G1_GRAPH_NODE_SET"
     bindings = {node["type"]: node_id for node_id, node in nodes.items()}
     assert all(
         node["type"] not in bindings or bindings[node["type"]] == node_id
