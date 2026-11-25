@@ -176,8 +176,7 @@ test("LAB-2046: arrays of records across several REST responses route to one Jav
   const get = rest.split("## GET и ответы\n")[1]?.split("\n## ")[0] ?? ""
   // Both runs searched Calculator help for JSON functions (r1 :28/:38, r2 :29/:62); r2 split per RequestID.
   expect(get).toMatch(/Калькулятор[\s\S]*?Свёртка[\s\S]*?Кросс-таблица/)
-  expect(get).toMatch(/Массив записей в ответах нескольких строк[\s\S]*?`programming\.javascript`[\s\S]*?JSON\.parse\(Response\)[\s\S]*?Append на запись/)
-  expect(get).toContain("Не дроби по RequestID")
+  expect(get).toMatch(/Records arrays of several response rows: one `programming\.javascript`[\s\S]*?JSON\.parse\(Response\), Append per record\); no RequestID splits/)
   expect(table).toMatch(/при отказе деревьев вернись к этому пути; массив записей нескольких ответов — по \[REST\]\(integration\.rest_request\.md\)/)
   for (const card of [rest, table]) expect(new TextEncoder().encode(card).length).toBeLessThanOrEqual(6000)
 })

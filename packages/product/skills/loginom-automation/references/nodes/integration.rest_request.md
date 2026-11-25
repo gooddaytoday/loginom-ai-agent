@@ -56,15 +56,13 @@ limit/skip from variables.to_table directly; handler URL-encodes query. Body: st
 Keep JSON types: httpbin args.limit/skip echo as strings even with integer inputs;
 no coercion unless requested.
 Status/errors: read.ports:[1] — HttpStatusCode/ErrorCode/ErrorDesc; port 0 — body/parsing.
-200 ≠ тело; ограничь select, limit/skip по API, без gzip.
+200 ≠ body; bound select, limit/skip per API; no gzip.
 Пустой Response: порт 1; ErrorCode ≠ 0 → REST_RESPONSE_BODY_MISSING:
 «тело ответа не получено: повтори запрос или уменьши ответ (select, limit/skip)».
-Пустой результат не успех; повтор — по просьбе.
-Таблица: Калькулятор → Свёртка → Кросс-таблица — поля объекта.
-Массив записей в ответах нескольких строк Калькулятор и деревья не разворачивают:
-один `programming.javascript`, JSON.parse(Response) на строку, Append на запись,
-поля корня (`skip`) — в её строки. Не дроби по RequestID, не склеивай ответы.
-Дерево: по просьбе либо ровные записи без вложенных контейнеров.
+Empty result ≠ success; retry on request only.
+Таблица: Калькулятор → Свёртка → Кросс-таблица. Tree: on request/flat records.
+Records arrays of several response rows: one `programming.javascript`
+(JSON.parse(Response), Append per record); no RequestID splits.
 
 ## Сведение и завершение
 
