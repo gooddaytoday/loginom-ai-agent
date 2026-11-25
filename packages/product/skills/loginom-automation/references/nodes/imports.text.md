@@ -1,13 +1,13 @@
 # Текстовый файл
 
 <!-- mode: delimited -->
-Existing needs confirmed CSV before Execute/read.
+Existing needs confirmed source CSV before Execute/read.
 Reads may add a visualizer. `NOT_APPLIED`/`effect_possible=false`: ask CSV, skip cleanup/Save.
 
 Missing CSV: `next_step`; SAME node, no XML.
 
 Execute with known schema/format. Otherwise preview and compare ORIGINAL text locally.
-Download only by request or contradiction.
+Server download only by request or contradiction. User bans win.
 `dock_node_apply` `parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
 `finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}`:
 `output.server_profile`: native format/types, no Execute. Reuse `node` as `target.ref` after Close.
@@ -40,7 +40,7 @@ Mask: `source_mask` in an owned directory, `*` only in filename; never `source_p
 Export/Save outside the mask directory. 1 file: plain path; 2+ (max 16): mask.
 Execute: resend `source_mask` + `verified_sources` of ALL on SAME node.
 
-Parallel: SAME Import; `dock_node_apply`,
+Parallel: SAME Import.
 `settings.source.parallel_processing:false/true`, `max_threads:"auto"|2|4|8|16|32`.
 Parallel before threads; lists/masks default sequential. Resend parallel with paths; omissions persist.
 Read `configuration.readback.source`, full row multisets/duplicates/NULL;
