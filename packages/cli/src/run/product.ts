@@ -169,10 +169,10 @@ export async function confirm(request: Pick<PermissionRequest, "resources" | "me
   const answer = Promise.withResolvers<boolean | undefined>()
   const decline = () => answer.resolve(false)
   const cancel = () => answer.resolve(undefined)
-  // Raw input turns Ctrl+C into a key; the run cancels on the signal, as it would without the question.
+  // Raw input turns Ctrl+C into a key; the process's SIGINT handlers then cancel the run, as without the question.
   const interrupt = () => {
     cancel()
-    process.kill(process.pid, "SIGINT")
+    process.emit("SIGINT")
   }
   // End of input can emit readline's buffered text as a line without an Enter.
   const eof = (chunk: Buffer | string) => {
