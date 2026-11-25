@@ -1,0 +1,84 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    },
+    {
+      "type": "integration.rest_request",
+      "label_any": true
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "requests",
+        "type": "imports.text"
+      },
+      {
+        "id": "rest",
+        "type": "integration.rest_request"
+      }
+    ],
+    "links": [
+      {
+        "source": "requests",
+        "target": "rest"
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-i103-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Skip",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "ProductId",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Title",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Width",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Skip": 0,
+          "ProductId": 1,
+          "Title": "Essence Mascara Lash Princess",
+          "Width": 15.14
+        },
+        {
+          "Skip": 0,
+          "ProductId": 2,
+          "Title": "Eyeshadow Palette with Mirror",
+          "Width": 9.26
+        },
+        {
+          "Skip": 5,
+          "ProductId": 6,
+          "Title": "Calvin Klein CK One",
+          "Width": 29.36
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    },
+    {
+      "type": "variables.calculator",
+      "label_any": true
+    },
+    {
+      "type": "programming.python",
+      "label_any": true
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "checks",
+        "type": "imports.text"
+      },
+      {
+        "id": "threshold",
+        "type": "variables.calculator"
+      },
+      {
+        "id": "script",
+        "type": "programming.python"
+      }
+    ],
+    "links": [
+      {
+        "source": "checks",
+        "target": "script"
+      },
+      {
+        "source": "threshold",
+        "target": "script"
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-i106-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "CheckId",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "AboveThreshold",
+          "type": "boolean",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "CheckId": 1,
+          "AboveThreshold": false
+        },
+        {
+          "CheckId": 2,
+          "AboveThreshold": false
+        },
+        {
+          "CheckId": 3,
+          "AboveThreshold": true
+        },
+        {
+          "CheckId": 4,
+          "AboveThreshold": true
+        }
+      ]
+    }
+  ]
+}

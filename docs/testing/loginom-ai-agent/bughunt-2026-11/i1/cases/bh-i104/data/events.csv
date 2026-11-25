@@ -1,0 +1,7 @@
+EventId,Payload
+15,"{""item"":{""sku"":""К-17"",""quantity"":3}}"
+11,"{""item"":{""sku"":""A-1"",""quantity"":0}}"
+12,"{""item"":{""sku"":""B-2"","
+16,"{""item"":{""sku"":""D-4"",""quantity"":null}}"
+13,"{""item"":{""sku"":""C-3""}}"
+14,"{""item"":{""sku"":""E-5"",""quantity"":-2}}"

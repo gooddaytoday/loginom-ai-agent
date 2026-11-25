@@ -1,0 +1,8 @@
+{
+  "products": [
+    {"id": 6, "title": "Calvin Klein CK One", "dimensions": {"width": 29.36, "height": 27.76, "depth": 20.72}}
+  ],
+  "total": 194,
+  "skip": 5,
+  "limit": 1
+}

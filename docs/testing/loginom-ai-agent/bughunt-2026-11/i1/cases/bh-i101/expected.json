@@ -1,0 +1,59 @@
+{
+  "nodes": [
+    {
+      "type": "imports.database",
+      "label_any": true
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "db",
+        "type": "imports.database"
+      }
+    ],
+    "links": []
+  },
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-i101-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "PaidOrders",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "RevenueCents",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Region": "Central",
+          "PaidOrders": 3,
+          "RevenueCents": 4550
+        },
+        {
+          "Region": "North",
+          "PaidOrders": 2,
+          "RevenueCents": 2400
+        },
+        {
+          "Region": "South",
+          "PaidOrders": 1,
+          "RevenueCents": 515
+        }
+      ]
+    }
+  ]
+}

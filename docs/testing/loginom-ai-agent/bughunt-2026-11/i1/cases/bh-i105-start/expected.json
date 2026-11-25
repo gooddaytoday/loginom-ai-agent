@@ -1,0 +1,139 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    },
+    {
+      "type": "programming.python",
+      "label_any": true
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "readings",
+        "type": "imports.text"
+      },
+      {
+        "id": "rolling",
+        "type": "programming.python",
+        "label": "Среднее по серии"
+      }
+    ],
+    "links": [
+      {
+        "source": "readings",
+        "target": "rolling"
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-i105-initial-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Series",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Step",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Prefix",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "RollingMean",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Series": "A",
+          "Step": 1,
+          "Prefix": "ZX",
+          "RollingMean": null
+        },
+        {
+          "Series": "A",
+          "Step": 2,
+          "Prefix": "QX",
+          "RollingMean": null
+        },
+        {
+          "Series": "A",
+          "Step": 3,
+          "Prefix": "QA",
+          "RollingMean": 5.333333333333333
+        },
+        {
+          "Series": "A",
+          "Step": 4,
+          "Prefix": "AA",
+          "RollingMean": 10.666666666666666
+        },
+        {
+          "Series": "A",
+          "Step": 5,
+          "Prefix": null,
+          "RollingMean": 17.833333333333332
+        },
+        {
+          "Series": "A",
+          "Step": 6,
+          "Prefix": "QX",
+          "RollingMean": 25.333333333333332
+        },
+        {
+          "Series": "B",
+          "Step": 1,
+          "Prefix": "AB",
+          "RollingMean": null
+        },
+        {
+          "Series": "B",
+          "Step": 2,
+          "Prefix": "B",
+          "RollingMean": null
+        },
+        {
+          "Series": "B",
+          "Step": 3,
+          "Prefix": "QC",
+          "RollingMean": 8.166666666666666
+        },
+        {
+          "Series": "B",
+          "Step": 4,
+          "Prefix": "L",
+          "RollingMean": 13.333333333333334
+        },
+        {
+          "Series": "B",
+          "Step": 5,
+          "Prefix": null,
+          "RollingMean": 22.833333333333332
+        },
+        {
+          "Series": "B",
+          "Step": 6,
+          "Prefix": "LAB",
+          "RollingMean": 31.166666666666668
+        }
+      ]
+    }
+  ]
+}
