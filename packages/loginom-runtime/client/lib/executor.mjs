@@ -2242,6 +2242,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if(released.status!=='SUCCEEDED')throw Error('Original browser download cleanup is unconfirmed');
   };
   const serverDownloads=cacheDirectory?createServerDownloadRegistry({directory:cacheDirectory,inspect:inspectServerSource,now,recover:drainServerDownload,
+    navigationPending:id=>pending?.id===id,
     withSource:async(ref,{signal,onWorkflowReturn},read)=>{
       const source=currentSource(ref);
       requireServerDownloadFormat(source.path);
@@ -2669,7 +2670,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             ? { recovery_operation_id: cached.outcome.recovery_operation_id } : {}) };
         }
         if (state.receipt.action_key === operation.action.action_key) operation.outcome = state.receipt;
-        if (operation.cleanupConfirmed && operation.outcome.status !== 'AMBIGUOUS') {
+        if (operation.cleanupConfirmed && operation.outcome.status !== 'AMBIGUOUS' && !operation.storageDownloadNavigation) {
           if(operation.action.capability==='artifact.upload' && (operation.outcome.status==='NOT_APPLIED'||operation.outcome.status==='FAILED'&&operation.outcome.output?.conflict_rejected===true))await operation.uploadLease?.release();
           pending = null; return operation.outcome;
         }
@@ -2679,6 +2680,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (['package.save_as', 'package.save_checkpoint'].includes(operation.action.action_key)
           && operation.outcome?.error && operation.outcome.output?.cleanup_error)
         return { ...operation.outcome, cleanup_complete: operation.cleanupConfirmed === true };
+      if (operation.storageDownloadNavigation) return operation.cleanupConfirmed===true ? operation.outcome
+        : failed(operation, 'CLEANUP_RECEIPT_MISSING', 'The original storage navigation has no confirmed browser cleanup.');
       if (operation.cleanupConfirmed === false && !(['package.save_as','package.save_checkpoint'].includes(operation.action.action_key)
           && operation.outcome?.output?.connection_recovery_pending === true)) return failed(operation, 'CLEANUP_RECEIPT_MISSING',
         'The browser call finished but cleanup is unconfirmed. Inspect and restore_control before further mutations.');
@@ -2816,7 +2819,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         requires:['fresh_observed_authorized_csv_ref','confirmed_browser_completion'],provides:['server_copy_byte_verification']});
       return {recovery_options:[],next_steps:base};
     }
-    const strategies = operation.cleanupConfirmed === false ? ['restore_control']
+    const strategies = operation.storageDownloadNavigation && !operation.cleanupConfirmed ? []
+      : operation.cleanupConfirmed === false ? ['restore_control']
       : ['abandon_operation', ...(operation.action.capability === 'ui.act' ? ['accept_observed_state'] : []),
         ...(operation.action.capability === 'link.create.v1' && operation.parameters.target_port.kind === 'add'
           && !operation.outcome?.output?.reason && operation.outcome?.output?.added_ports?.length === 1
@@ -2829,7 +2833,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         requires: ['confirmed_browser_completion', ...(strategy === 'restore_control' ? [] : ['confirmed_cleanup']),
           ...(observed ? ['fresh_observation_id'] : [])], provides: ['recovery_receipt'] });
     }
-    if (operation.cleanupConfirmed === true) base.push({ tool: 'dock_ui_action',
+    if (operation.cleanupConfirmed === true && !operation.storageDownloadNavigation) base.push({ tool: 'dock_ui_action',
       arguments: { recovery_operation_id: operation.id }, required_fields: ['operation_id', 'observation_id', 'action'],
       id_roles: { operation_id: 'new_unique_request', recovery_operation_id: 'original_pending_operation' },
       requires: ['fresh_observation_id', 'observed_owned_ui_ref', 'confirmed_browser_completion', 'confirmed_cleanup'],
@@ -2947,7 +2951,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     },
     async browserRecoveryHandoff(operationId) {
       const operation = operations.get(operationId);
-      if (!operation || pending !== operation && !exportRecoveryTrigger(operation))
+      if (!operation || operation.storageDownloadNavigation || pending !== operation && !exportRecoveryTrigger(operation))
         return { stopped: false, reason: 'The operation is no longer eligible for browser recovery' };
       if (running || nodeJobs.busy || delivery.busy || delivery.blocksMutations || sourceReads.busy) return { stopped: false, reason: 'A Dock action is still running' };
       if (operation.transportUncertain) return { stopped: false, reason: 'The last browser call of this operation is unconfirmed' };
@@ -3473,7 +3477,21 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           }
           await onRecord({phase:listing?'storage_list_failed':'storage_source_failed',operation_id:id,error:{code:'STORAGE_SOURCE_REFUSED',message:String(error.message).slice(0,500)}});
           if(consume){
-            if(navigationUncertain)error.storageNavigationOperationId=id+':nav'+step;
+            if(navigationUncertain){
+              const navigationId=id+':nav'+step;
+              if(!downloadOperation)error.storageNavigationOperationId=navigationId;
+              else{
+                const navigation=operations.get(navigationId);
+                // Own the exact UI receipt, including a completed click whose
+                // resulting workflow could not be verified. The download gate
+                // can release the transfer without freeing this pending click.
+                if(navigation&&(!pending||pending===navigation)){
+                  navigation.storageDownloadNavigation=true;
+                  pending=navigation;
+                  error.storageNavigationOperationId=navigationId;
+                }
+              }
+            }
             throw error;
           }
           // Keep a bounded diagnostic in the tool result. Throwing through the
@@ -3618,6 +3636,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(operation.action.capability==='node.apply')return releaseApply(operation,{strategy,recoveryOperationId,signature,signal});
       if(operation.action.capability==='artifact.upload')throw new Error('Upload requires server transfer verification before recovery or abandonment');
       if (!['complete_link', 'restore_control', 'accept_observed_state', 'abandon_operation'].includes(strategy)) throw new Error('Unsupported recovery strategy');
+      if (operation.storageDownloadNavigation && !['accept_observed_state', 'abandon_operation'].includes(strategy))
+        throw new Error('Inspect the pending download navigation and resolve it with a fresh observation');
       if (strategy === 'complete_link' && operation.action.capability !== 'link.create.v1') throw new Error('complete_link requires a pending link.create operation');
       if (strategy === 'accept_observed_state' && operation.action.capability !== 'ui.act') throw new Error('Only a generic UI gesture can accept an observed state; domain actions require verified postconditions');
       if (running) throw new Error('Another Dock action is still running');
@@ -4603,6 +4623,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     (...args)=>{
       if((storageNavigating||serverDownloads?.unsettled)&&!['serverDownload','cleanupServerCache'].includes(name)){
         const error=Error('Server download retains the browser; use download status/wait/cancel');
+        if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;
+      }
+      if(pending?.storageDownloadNavigation&&!['serverDownload','cleanupServerCache','inspect','observe','recover'].includes(name)){
+        const error=Error('Inspect and resolve the pending download navigation before further Dock actions');
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;
       }
       if(leased&&!readOnly.has(name)){const error=Error('Browser recovery holds the page; finish or stop it before further Dock actions');

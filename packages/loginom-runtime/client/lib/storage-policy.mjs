@@ -244,23 +244,28 @@ export function requireServerDownloadFormat(path) {
 
 // The browser writes to disk; the registry transports only paths and metadata.
 // Cache identity is private authority for the backend exact-scan receipt.
-export function createServerDownloadRegistry({directory,inspect,download,recover,now=Date.now,withSource=(_ref,_options,read)=>read()}) {
+export function createServerDownloadRegistry({directory,inspect,download,recover,now=Date.now,navigationPending=()=>true,withSource=(_ref,_options,read)=>read()}) {
   const jobs=new Map();
   const native=s=>JSON.stringify([s.destination,s.bytes,s.mtime,s.origin,s.account,s.document_id]);
   const local=s=>({size:s.size,mtime:s.mtimeMs,ctime:s.ctimeMs,file_id:`${s.dev}:${s.ino}`});
   const find=id=>{const job=jobs.get(id);if(!job)throw Error('Unknown server download operation');return job;};
+  const unresolvedNavigation=job=>job.navigationOperationId&&navigationPending(job.navigationOperationId);
+  const cleanupComplete=job=>job.state==='settled'&&job.cleanup!==false&&!unresolvedNavigation(job);
   const snapshot=(job,onWorkflowReturn)=>{
     if(job.status==='SUCCEEDED'&&job.workflowReturn==='refused')onWorkflowReturn?.(job.workflowReturn);
     return {result_version:'user-v1',operation_id:job.request.operation_id,state:job.state,
       ...(job.status?{status:job.status}:{}),action_key:'storage.download',phase:job.phase,
-      cancel_requested:job.controller.signal.aborted,cleanup_complete:job.state==='settled'&&job.cleanup!==false,
-      effect_possible:job.navigationUncertain===true,progress:{bytes:job.bytes??0,total_bytes:job.source?.bytes??null,
+      cancel_requested:job.controller.signal.aborted,cleanup_complete:cleanupComplete(job),
+      effect_possible:!!job.navigationOperationId,progress:{bytes:job.bytes??0,total_bytes:job.source?.bytes??null,
         elapsed_ms:Math.max(0,now()-job.started),deadline_at:job.deadline??null,
-        byte_progress:'native_blob_or_chromium_received_bytes'},output:job.output??{},error:job.error??null};
+        byte_progress:'native_blob_or_chromium_received_bytes'},output:job.output??{},error:job.error??null,
+      ...(unresolvedNavigation(job)?{next_step:{tool:'dock_operation_inspect',arguments:{operation_id:job.navigationOperationId},
+        instruction:'Inspect this navigation operation, then follow its recovery steps.'}}:{})};
   };
   const remove=async job=>{if(job.directory)await rm(job.directory,{recursive:true,force:true});};
   return {
     get busy(){return [...jobs.values()].some(j=>j.state==='running');},
+    // The executor owns the navigation gate and admits read-only recovery.
     get unsettled(){return [...jobs.values()].some(j=>j.state==='running'||j.cleanup===false);},
     start(request,{onWorkflowReturn}={}) {
       if(!request||Object.keys(request).some(k=>!['operation_id','server_source_ref'].includes(k))
@@ -326,10 +331,9 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
             native_size:after.bytes,native_mtime:after.mtime,coverage:'downloaded_copy',
             next_step:'loginom_file_profile on path, then loginom_file_scan and loginom_file_sample. Upload only the sample; switch back to the original storage ref.'};
         }catch(error){
-          job.navigationUncertain=!!error.storageNavigationOperationId;
-          if(job.navigationUncertain)job.cleanup=false;
-          job.status=job.navigationUncertain?'AMBIGUOUS':'FAILED';job.phase='failed';
-          job.error=job.navigationUncertain?{code:'STORAGE_SOURCE_REFUSED',message:'Server storage navigation was not confirmed.'}
+          job.navigationOperationId=error.storageNavigationOperationId;
+          job.status=job.navigationOperationId?'AMBIGUOUS':'FAILED';job.phase='failed';
+          job.error=job.navigationOperationId?{code:'STORAGE_SOURCE_REFUSED',message:'Server storage navigation was not confirmed.'}
             :{code:job.controller.signal.aborted?(['LOGINOM_DOWNLOAD_DEADLINE','LOGINOM_DOWNLOAD_NO_PROGRESS'].includes(job.controller.signal.reason?.message)
             ?job.controller.signal.reason.message:'LOGINOM_DOWNLOAD_CANCELLED'):/^LOGINOM_[A-Z_]+$/.test(error.message)?error.message:'LOGINOM_DOWNLOAD_FAILED',
             message:'Server cache is invalid; no full calculation is authorized. Observe the original file and start a new operation.'};
@@ -372,11 +376,11 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
       await Promise.all(selected.map(j=>j.completion));
       for(const job of selected){
         if(job.browserUnsettled){if(!recover)throw Error('Original browser download cleanup is unconfirmed');await recover(job.request.operation_id);job.browserUnsettled=false;}
-        await remove(job);job.phase='removed';job.output={cache_removed:true};job.cleanup=!job.navigationUncertain;
+        await remove(job);job.phase='removed';job.output={cache_removed:true};job.cleanup=true;
       }
-      const cleanupComplete=selected.every(job=>job.cleanup===true);
-      return {result_version:'user-v1',operation_id:id??'storage-cache-cleanup',status:cleanupComplete?'SUCCEEDED':'AMBIGUOUS',
-        cleanup_complete:cleanupComplete,output:{cache_removed:true}};
+      const complete=selected.every(cleanupComplete);
+      return {result_version:'user-v1',operation_id:id??'storage-cache-cleanup',status:complete?'SUCCEEDED':'AMBIGUOUS',
+        cleanup_complete:complete,output:{cache_removed:true}};
     },
   };
 }

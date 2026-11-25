@@ -170,7 +170,7 @@ async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,exte
  Object.assign(base,{active_tab_ref:page.uiReference(base.workflow_ref.tab_tid),
   navigation_context:{status:'observed',kind:'workflow',path:[{tid:base.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Сценарий',label:'Сценарий'}]}});
  let directory=startInFiles?'/worker':null,top=0,revision=0,attempts=0,scrolls=0,rowRef='ui-parent-row';
- let retrySamples=0,folderClicks=0,downloadStarts=0,mtime='native-time',returnDeadline;
+ let retrySamples=0,folderClicks=0,downloadStarts=0,mtime='native-time',returnDeadline,returnReceiptReadable=false,returnClicked=false;
  const filesTab=page.app.Application.FInstance.FMainForm.Items.Workspace;
  const getActiveTab=filesTab.getActiveTab;
  filesTab.getActiveTab=()=>directory===null?getActiveTab():{};
@@ -179,6 +179,7 @@ async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,exte
  page.click=async item=>{
   if(item.tid===button){directory='/';top=0;revision++;return;}
   if(item.tid===base.workflow_ref.tab_tid){
+   returnClicked=true;
    if(fault==='return uncertain'||returnFault==='unknown click')throw Error('Return click outcome was lost');
    if(returnFault==='unknown verification')return;
    directory=null;revision++;return;
@@ -225,7 +226,7 @@ async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,exte
  page.evaluate=async(fn,arg)=>{
   if(fn.toString().includes('return {document:state.epoch,revision:state.revision}'))return {...base.dom_epoch,revision};
   if(fn.toString().includes("Symbol.for('loginom-dock.workspace-ui.identity.v1')")){
-   if(returnFault==='unknown verification'&&page.lastCheckedControl===base.workflow_ref.tab_tid&&arg.discoverRoots)
+   if(returnClicked&&['unknown verification','lost return verification'].includes(returnFault)&&arg.discoverRoots)
     throw Error('Return observation was lost');
    if(arg.rootRef===page.uiReference(strip))abortReturn?.();
    if(fault==='repaint'&&attempts===1&&arg.rootRef===page.uiReference(table)&&++retrySamples===2)revision++;
@@ -245,12 +246,18 @@ async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,exte
     if(returnFault==='cancel in flight'){
      beforeReturnClick();options.signal.throwIfAborted();
     }
+    if(returnFault==='lost return response'){
+     await page.execute(code);
+     throw Error('Return transport lost the completed receipt');
+    }
     if(returnFault==='obscured'){
      const operation_id=code.match(/"operation_id":"([\w-]+:nav\d+)"/)[1];
      return {action_key:'ui.act',operation_id,phase:'preconditions',status:'NOT_APPLIED',cleanup_complete:true,effect_possible:false,output:{},
       error:{code:'UI_REFERENCE_OBSCURED',message:'The observed control has no verified visible interaction point'},trace:[]};
     }
    }
+   if(returnFault==='lost return response'&&!returnReceiptReadable&&code.includes('"receipt_read":true'))
+    return {status:'SUCCEEDED',action_key:'operation.inspect',output:{state:'running'}};
    if(code.includes('"download_path":')){
     assert.equal(directory,'/worker');downloadStarts++;
     const path=JSON.parse(code.match(/"download_path":("(?:[^"\\]|\\.)*")/)[1]);
@@ -284,7 +291,8 @@ async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,exte
  const notices=[],onWorkflowReturn=state=>notices.push(state);
  const result=await r.serverDownload({operation_id:'scroll',path:listing?'/worker':'/worker/'+filename},listing?'dock_storage_list':'dock_storage_source',{signal,onWorkflowReturn});
  return {result,notices,returnDeadline,records,attempts,scrolls,retrySamples,folderClicks,r,page,downloadStarts:()=>downloadStarts,
-  changeFile:()=>{mtime='new-native-time';},failReturn:fault=>{returnFault=fault;},
+  changeFile:()=>{mtime='new-native-time';},failReturn:fault=>{returnFault=fault;returnClicked=false;},
+  revealReturnReceipt:()=>{returnReceiptReadable=true;},
   workflow:{...base.workflow_ref,workflow_id:'flow',navigation_path:base.navigation_context.path},showGraph:()=>{directory=null;}};
 }
 
@@ -389,6 +397,50 @@ for(const fault of ['obscured','unknown click','unconfirmed transfer cleanup'])t
   }
  }
  assert.equal(f.page.events.filter(e=>e==='mouse_click').length,fault==='unknown click'?6:5);
+});
+
+for(const fault of ['lost return response','lost return verification'])test('abandoning a download return releases the session: '+fault,async t=>{
+ const f=await storageScrollAfterFolder(t);
+ f.failReturn(fault);f.page.clock=Date.now();
+ const receiptUnavailable=fault==='lost return response';
+ const operation_id='copy';
+ await f.r.serverDownload({operation_id,server_source_ref:f.result.output.source.server_source_ref},'dock_storage_download_start');
+ const result=await f.r.serverDownload({operation_id,timeout_ms:10000},'dock_storage_download_wait');
+ assert.equal(result.status,'AMBIGUOUS',JSON.stringify(result));
+ assert.equal(result.effect_possible,true);assert.equal(result.cleanup_complete,false);
+ assert.equal(f.downloadStarts(),1);
+ const gestures=f.page.events.filter(e=>e==='mouse_click').length;
+ const first=await f.r.inspect();
+ assert.equal(first.output.state,'pending');assert.equal(first.output.cleanup_confirmed,!receiptUnavailable);
+ const returnId=first.output.operation_id;
+ assert.equal(returnId,f.records.findLast(r=>r.phase==='completed'&&r.action_key==='ui.act').operation_id);
+ assert.deepEqual(result.next_step.arguments,{operation_id:returnId});
+ assert.equal(f.r.hasUnsettledWork(),true);
+ await assert.rejects(f.r.recover(returnId,{strategy:'restore_control',recoveryOperationId:'restore-return'}),/fresh observation/);
+ if(!receiptUnavailable)f.failReturn(undefined);
+ const fresh=await f.r.observe({scope:'roots'});
+ assert.equal(fresh.status,'SUCCEEDED',JSON.stringify(fresh));
+ const abandon={strategy:'abandon_operation',recoveryOperationId:'abandon-return',observationId:fresh.output.observation_id};
+ if(receiptUnavailable)await assert.rejects(f.r.recover(returnId,abandon),/has not confirmed completion/);
+ assert.equal((await f.r.serverDownload({operation_id},'dock_storage_download_cleanup')).status,'AMBIGUOUS');
+ f.revealReturnReceipt();
+ const inspected=await f.r.inspect({operationId:returnId});
+ assert.equal(inspected.output.state,'pending');assert.equal(inspected.output.cleanup_confirmed,true);
+ const blockedSave={path:'/user/data/packages/saved.lgp',conflict_policy:'fail'};
+ await assert.rejects(f.r.run('package.save_checkpoint',blockedSave,{operationId:'early-save'}),/pending.*download|download.*pending/i);
+ await assert.rejects(f.r.serverDownload({operation_id:'early-list',path:'/worker'},'dock_storage_list'),/Resolve the pending/);
+ const recovery=await f.r.recover(returnId,abandon);
+ assert.equal(recovery.status,'SUCCEEDED',JSON.stringify(recovery));assert.equal(recovery.output.goal_verified,false);
+ assert.equal(f.r.hasUnsettledWork(),false);
+ assert.equal(f.page.events.filter(e=>e==='mouse_click').length,gestures);
+ assert.equal((await f.r.serverDownload({operation_id},'dock_storage_download_cleanup')).cleanup_complete,true);
+ const settled=await f.r.serverDownload({operation_id},'dock_storage_download_status');
+ assert.equal(settled.cleanup_complete,true);assert.equal(settled.output.path,undefined);
+ f.failReturn(undefined);
+ const listing=await f.r.serverDownload({operation_id:'after-list',path:'/worker'},'dock_storage_list');
+ assert.equal(listing.status,'SUCCEEDED',JSON.stringify(listing));
+ const save=await f.r.run('package.save_checkpoint',blockedSave,{operationId:'after-save'});
+ assert.equal(save.status,'SUCCEEDED',JSON.stringify(save));
 });
 
 test('unsupported download format is refused before reopening Files',async t=>{
