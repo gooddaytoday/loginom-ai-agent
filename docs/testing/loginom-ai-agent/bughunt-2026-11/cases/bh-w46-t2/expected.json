@@ -37,23 +37,23 @@
       "rows": [
         {
           "category": "Бытовая техника",
-          "metric": 150302.73
+          "metric": 80693.48
         },
         {
           "category": "Книги",
-          "metric": 6877.79
+          "metric": 3058.6
         },
         {
           "category": "Одежда",
-          "metric": 57441.63
+          "metric": 36235.36
         },
         {
           "category": "Продукты",
-          "metric": 4599.33
+          "metric": 3960.46
         },
         {
           "category": "Электроника",
-          "metric": 230526.28
+          "metric": 163664.7
         }
       ],
       "columns": [

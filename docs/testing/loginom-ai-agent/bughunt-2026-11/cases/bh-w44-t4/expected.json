@@ -44,43 +44,43 @@
         },
         {
           "month": "2025-02",
-          "revenue": 221110.65,
-          "moving_avg": 129391.33
+          "revenue": 469221.62,
+          "moving_avg": 253446.81
         },
         {
           "month": "2025-03",
-          "revenue": 40049.45,
-          "moving_avg": 99610.7
+          "revenue": 16439.8,
+          "moving_avg": 174444.47
         },
         {
           "month": "2025-04",
-          "revenue": 99213.59,
-          "moving_avg": 99511.42
+          "revenue": 33278.51,
+          "moving_avg": 139152.98
         },
         {
           "month": "2025-05",
-          "revenue": 626235.53,
-          "moving_avg": 204856.24
+          "revenue": 260998.01,
+          "moving_avg": 163521.99
         },
         {
           "month": "2025-06",
           "revenue": 77700.13,
-          "moving_avg": 183663.56
+          "moving_avg": 149218.35
         },
         {
           "month": "2025-07",
-          "revenue": 69896.78,
-          "moving_avg": 189034.36
+          "revenue": 135185.7,
+          "moving_avg": 165470.63
         },
         {
           "month": "2025-08",
-          "revenue": 49781.36,
-          "moving_avg": 160479.47
+          "revenue": 20966.75,
+          "moving_avg": 90761.48
         },
         {
           "month": "2025-09",
-          "revenue": 262.97,
-          "moving_avg": 153848.39
+          "revenue": 3555.84,
+          "moving_avg": 88614.16
         }
       ],
       "columns": [

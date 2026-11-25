@@ -100,46 +100,6 @@
         {
           "category": "Книги",
           "list_price": 2001.47
-        },
-        {
-          "category": "Бытовая техника",
-          "list_price": 17581.73
-        },
-        {
-          "category": "Одежда",
-          "list_price": 14742.29
-        },
-        {
-          "category": "Электроника",
-          "list_price": 48154.79
-        },
-        {
-          "category": "Одежда",
-          "list_price": 6463.98
-        },
-        {
-          "category": "Книги",
-          "list_price": 1929.6
-        },
-        {
-          "category": "Книги",
-          "list_price": 1889.59
-        },
-        {
-          "category": "Бытовая техника",
-          "list_price": 52027.52
-        },
-        {
-          "category": "Электроника",
-          "list_price": 4765.5
-        },
-        {
-          "category": "Продукты",
-          "list_price": 638.87
-        },
-        {
-          "category": "Электроника",
-          "list_price": 13941.29
         }
       ],
       "columns": [

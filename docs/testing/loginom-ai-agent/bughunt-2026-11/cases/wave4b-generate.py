@@ -52,21 +52,26 @@ def emit_csv(root, chain, table, rows):
 
 def fixtures(root, seed):
     orders = raw_rows(seed / 'orders.csv')
-    chosen = {}
-    for row in orders:
-        month = row['order_date'][:7]
-        if '2025-01' <= month <= '2025-09':
-            chosen.setdefault((month, row['status'] == 'Выполнен'), row)
-    assert len(chosen) == 18
-    sales = {row['order_id']: row for row in chosen.values()}
-    lines = [sales[item['order_id']] | item for item in raw_rows(seed / 'order_items.csv') if item['order_id'] in sales]
-    assert any(not row['discount_pct'] for row in lines) and any(row['discount_pct'] for row in lines)
+    sales = {row['order_id']: row for row in orders if '2025-01' <= row['order_date'][:7] <= '2025-09'}
+    counts = {}
+    lines = []
+    for item in raw_rows(seed / 'order_items.csv'):
+        order = sales.get(item['order_id'])
+        if not order:
+            continue
+        bucket = order['order_date'][:7] if order['status'] == 'Выполнен' else 'excluded'
+        if counts.get(bucket, 0) < 2:
+            lines.append(order | item)
+            counts[bucket] = counts.get(bucket, 0) + 1
+    assert len(counts) == 10 and len(lines) == 20
+    completed = [row for row in lines if row['status'] == 'Выполнен']
+    assert any(not row['discount_pct'] for row in completed) and any(row['discount_pct'] for row in completed)
     emit_csv(root, 44, SALES, lines)
 
     order_ids = {'100', '499', '500', '501', '620', '999', '1000', '1001', '1300', '1500'}
     emit_csv(root, 45, ORDERS, [row for row in orders if row['order_id'] in order_ids])
 
-    products = raw_rows(seed / 'products.csv')[:30]
+    products = raw_rows(seed / 'products.csv')[:20]
     assert any(Decimal(row['list_price']) < 500 for row in products)
     emit_csv(root, 46, PRICES, products)
 
