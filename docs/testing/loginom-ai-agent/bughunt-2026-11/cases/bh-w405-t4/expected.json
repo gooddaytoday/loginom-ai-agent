@@ -26,15 +26,9 @@
         "target": "filter",
         "output": 0,
         "input": 0
-      },
-      {
-        "source": "limit",
-        "target": "filter",
-        "output": 0,
-        "input": 0
       }
     ],
-    "exact": true,
+    "exact": false,
     "retain": [
       "workflow",
       "prices",
@@ -247,5 +241,36 @@
       "ordered": false,
       "column_order": "any"
     }
-  ]
+  ],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.calculator"
+        },
+        "port": 0,
+        "variables": [
+          {
+            "name": "MinPrice",
+            "type": "real",
+            "value": 1000
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.calculator"
+        },
+        "output": 0,
+        "target": {
+          "type": "transform.filter_data",
+          "label": "Ценовой порог"
+        },
+        "input": 0,
+        "kind": "control"
+      }
+    ]
+  }
 }

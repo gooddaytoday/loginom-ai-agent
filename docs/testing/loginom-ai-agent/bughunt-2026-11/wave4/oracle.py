@@ -92,14 +92,15 @@ class Chain:
         self.previous = None
         self.previous_nodes = set()
 
-    def turn(self, task, nodes, links=(), outputs=(), *, manual=None, excel=None):
+    def turn(self, task, nodes, links=(), outputs=(), *, manual=None, excel=None,
+             exact_graph=True, variable_inventory=None):
         number = int(self.previous.rsplit("t", 1)[1]) + 1 if self.previous else 1
         name = f"{self.prefix}-t{number}"
         variables = node("workflow", "variables.user", label="Переменные сценария")
         all_nodes = [variables, *nodes]
         identifiers = {item["id"] for item in all_nodes}
         graph = dict(
-            nodes=all_nodes, links=list(links), exact=True,
+            nodes=all_nodes, links=list(links), exact=exact_graph,
             retain=[item["id"] for item in all_nodes if item["id"] in self.previous_nodes],
         )
         case = dict(output_mode="ports", budget=dict(max_nodes=len(identifiers - self.previous_nodes - {"workflow"})))
@@ -114,6 +115,8 @@ class Chain:
         expected = dict(graph=graph, outputs=list(outputs))
         if excel:
             expected["excel_artifact"] = excel
+        if variable_inventory:
+            expected["variable_inventory"] = variable_inventory
         self.files[Path(name, "case.json")] = json_text(case)
         self.files[Path(name, "expected.json")] = json_text(expected)
         self.files[Path(name, "task.md")] = task + "\n"
@@ -305,11 +308,20 @@ def variable_threshold(prices):
     nodes.append(node("limit", VARS))
     chain.turn("Вновь открой сохранённый пакет, чтобы добавить и выполнить Калькулятор переменных с вещественной MinPrice = 1000.",
                nodes, links)
-    links.append(link("limit", "filter"))
+    def inventory(value):
+        source = dict(type=VARS)
+        target = dict(type=FILTER, label=caption)
+        return dict(
+            outputs=[dict(node=source, port=0, variables=[dict(name="MinPrice", type="real", value=value)])],
+            links=[dict(source=source, output=0, target=target, input=0, kind="control")],
+        )
+
+    # The warm graph projection preserves Input_ControlVar as an opaque string.
+    # Variable inventory checks the native link and output after reopening.
     chain.turn("Подключи MinPrice из Калькулятора переменных как порог в фильтре «Ценовой порог» и проверь оба выхода.",
-               nodes, links, exits(1000))
+               nodes, links, exits(1000), exact_graph=False, variable_inventory=inventory(1000))
     chain.turn("Поменяй MinPrice на 500 в Калькуляторе переменных, пересчитай существующий фильтр и покажи его выходы.",
-               nodes, links, exits(500))
+               nodes, links, exits(500), exact_graph=False, variable_inventory=inventory(500))
     return chain
 
 
