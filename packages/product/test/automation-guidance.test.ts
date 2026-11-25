@@ -14,7 +14,7 @@ test("stepwise edits use the current graph and verify only the requested step", 
   expect(step).toContain("одной строкой спроси")
   expect(step).toContain('finish:"execute"')
   expect(step).toContain("сводки порта")
-  expect(step).toContain("полную таблицу читай только по просьбе")
+  expect(step).toContain("Полную таблицу читай только по просьбе")
   expect(step).toContain("сколько строк")
   expect(step).toContain("пропусти запуск")
   expect(step).toContain("что мешает запуску")
@@ -23,6 +23,8 @@ test("stepwise edits use the current graph and verify only the requested step", 
 test("a step self-check requests only the port row count, even for a small input", async () => {
   const step = skill.split("## Пошаговая сборка\n")[1]?.split("\n## ")[0] ?? ""
   const workflow = await Bun.file(new URL("../skills/loginom-automation/references/workflow.md", import.meta.url)).text()
+  expect(step).toContain("Просьба «посчитай» в шаге задаёт вычисление")
+  expect(step).toContain("Для чтения значений нужна просьба их показать")
   expect(step).toContain("`read.sample_rows:0`")
   expect(step).toContain("даже для маленькой таблицы")
   expect(step).toContain("`row_count`")

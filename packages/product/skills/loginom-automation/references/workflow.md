@@ -100,15 +100,15 @@ Dock сохранит остальные поля. mappings.fields — полн�
 источника для импорта. Каждый node.apply сам проверяет настройки и выполнение.
 Для loginom_dock_node_resume передавай только исходный operation_id; запрос хранится в Dock.
 loginom_dock_node_resume и abandon_operation вызывай, только если loginom_dock_operation_inspect назвал их в recovery_options или next_steps: отказ recover (request_rejected) не меняет операцию. Если recovery_options пуст, next_steps не называет loginom_dock_node_resume или loginom_dock_browser_recovery и нет user_action, сообщи operation_id, фазу и причину и остановись ([правило](browser.md)).
-Для самопроверки шага используй `read.sample_rows:0`: квитанция порта вернёт схему
-и `row_count` без строк. Для запрошенных значений укажи нужное число строк.
+Для самопроверки шага используй `read.sample_rows:0`. Квитанция порта вернёт схему
+и `row_count` без строк. Если просят показать значения, укажи нужное число строк.
 Если успешный apply/wait уже вернул нужные строки и схему с sample_complete=true,
 используй этот результат; не вызывай node_read повторно без изменения источника.
 Для повторного чтения выхода без изменения вычислений используй loginom_dock_node_read
 с новым operation_id, source_operation_id (для табличного узла — успешной локальной операции,
 выполнившей узел, `finish:"execute"`; `finish:"done"` и экспорт не подходят; снимок
 `variables.user` — по его карточке) и read. Повторный Execute нужен при
-`execution:"execute"`; для чтения готового выхода не передавай формулы, mappings и finish.
+`execution:"execute"`. Для чтения готового выхода не передавай формулы, mappings и finish.
 Для новых JS-узлов и переноса вычислений в JS действует правило допуска выше.
 Чтение и исправление существующего JS-узла, которого касается запрос, разрешены;
 это не разрешение переносить в него остальные стандартно решаемые шаги.
