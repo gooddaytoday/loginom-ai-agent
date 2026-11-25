@@ -899,6 +899,7 @@ for(const failure of [null,'owner','operation','mode','settings','digest','close
   const e=Error('JavaScript existing lifecycle preserves observed schema');
   e.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'javascript_existing_schema_mode_refused',proof:{
    node:p.target.ref,owner:{...p.target.ref,operation_id:p.operation_id,ui_epoch:1},admission_id:'00000000-0000-4000-8000-000000000000',observed_schema_mode:'code',requested_schema_mode:'declared',
+   unconfigured:false,reason:'configured_schema_preserved',
    source_identity:{source_sha256:'a'.repeat(64),source_utf8_bytes:0,source_lf_lines:1},settings:{generation:true,grids:[]},settings_sha256:javascriptSourceSettingsDigest({generation:true,grids:[]}),
    source_read_discard_verified:true,settings_unchanged:true,editor_mutation_started:false,explicit_execute_requested:false}};
   const proof=e.nodePhaseRefusal.proof;

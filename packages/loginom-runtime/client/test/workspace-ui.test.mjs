@@ -5961,14 +5961,17 @@ test('native-owned export keeps its hidden node breadcrumb through input, settin
   }
 });
 
-test('restored text Export input0/native0 retains guarded Done with overflowing ancestry',async()=>{
+for(const [icon,wizardIndex] of [['exporttextfile',0],['exportexcelfile',1],['exportnative',1]])
+test(icon+' input0/native0 retains guarded Done with overflowing ancestry',async()=>{
  for(const fault of ['valid','node','port','workflow','opening','index','icon','caption','folder','duplicate','sensitive','hidden']) {
   const {page,binding,crumbs,panel,opening,preparation}=await exportInputPortOverflowFixture();
-  opening.nativeIndex=opening.portTree.FIndex=opening.port.FPortIndex=0;
-  opening.node.FIconCls='bg-vendor-icon-exporttextfile';
-  crumbs[5].children[0].attrs.class='bg-vendor-icon-exporttextfile';
+  opening.nativeIndex=opening.port.FPortIndex=0;
+  opening.wizardIndex=wizardIndex;
+  opening.portTree.FIndex=null;
+  opening.node.FIconCls='bg-vendor-icon-'+icon;
+  crumbs[5].children[0].attrs.class=opening.node.FIconCls;
   const group=opening.portTree.ParentNode,wizardTree=page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node;
-  const collection={FParentNode:group,FItems:[opening.portTree]};
+  const collection={FParentNode:group,FItems:wizardIndex===0?[opening.portTree]:[{FModelNodePort:{}},opening.portTree]};
   group.FSubNodes=opening.portCollection=collection;opening.portTree.FCollection=collection;
   opening.nodeTree.FInputPortsRootNode=group;
   const components=new Map(crumbs.slice(5).map((e,i)=>{
@@ -6004,6 +6007,7 @@ test('restored text Export input0/native0 retains guarded Done with overflowing 
   const result=await page.execute({mode:'observe',prepared_node_context:binding});
   assert.equal(result.output?.wizard?.input_port_context?.status==='observed',fault==='valid',fault);
   assert.equal(result.output?.ui?.elements.some(e=>e.allowed_actions.includes('finish_wizard'))??false,fault==='valid',fault);
+  if(fault==='valid')assert.equal(result.output.prepared_node_context.input_port.wizard_index,wizardIndex);
   assert.deepEqual(page.events,[]);
  }
 });
@@ -7443,15 +7447,16 @@ test('initial wrong-delimiter layout can be ready without accepting an overlong 
  assert.equal(pending.output.wizard.import_columns.initial_layout.status,'unverified');
 });
 
-function bufferedMappingFixture(fault) {
- const page=new Page(),c=mappingCoverageFixture(page,20);
- const records=c.rows.map((row,i)=>{row.attrs['data-recordid']=String(100+i);return {isModel:true,internalId:100+i,
-  data:{Index:i,Name:'Field'+i,DisplayName:'Field'+i,DataType:4,DataKind:1,DefaultUsageType:0}};});
+function bufferedMappingFixture(fault,{clock,count=20}={}) {
+ const page=new Page({clock}),c=mappingCoverageFixture(page,20);
+ const records=Array.from({length:count},(_,i)=>({isModel:true,internalId:100+i,
+  data:{Index:i,Name:'Field'+i,DisplayName:'Field'+i,DataType:4,DataKind:1,DefaultUsageType:0}}));
+ c.rows.forEach((row,i)=>{row.attrs['data-recordid']=String(records[i].internalId);});
  for(const row of c.rows.slice(12))row.remove();c.container.box.height=12*25;
  const source={items:records},collection={items:records,getSource:()=>source};
- const store={$className:'Ext.data.Store',isLoading:()=>false,getData:()=>collection,getCount:()=>20,getTotalCount:()=>20};
+ const store={$className:'Ext.data.Store',isLoading:()=>false,getData:()=>collection,getCount:()=>count,getTotalCount:()=>count};
  page.context.Ext={getCmp:()=>({el:{dom:c.body},getStore:()=>store})};
- const evaluate=page.evaluate.bind(page);page.evaluate=(fn,arg)=>evaluate(fn,arg&&Object.hasOwn(arg,'mappingPage')?{...arg,definitionPrefix:'MF;TF-1;WizrdMCF'}:arg);
+ const evaluate=page.evaluate.bind(page);page.evaluate=(fn,arg)=>evaluate(fn,arg&&Object.hasOwn(arg,'mappingPage')?{...arg,definitionPrefix:arg.definitionPrefix??'MF;TF-1'}:arg);
  if(fault==='missing_source')c.rows[2].children[2].remove();
  if(fault==='foreign_record')c.rows[2].attrs['data-recordid']='999';
  if(fault==='name_mismatch')records[2].data.Name='Different';
@@ -7476,6 +7481,60 @@ for(const fault of ['foreign_record','name_mismatch','filtered_store','incomplet
   const {page}=bufferedMappingFixture(fault),r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
   assert.equal(r.output.wizard.output_columns.page.status,'unverified_definition_page');
  });
+
+for(const cost of ['hit tests','descendant selectors','buffered row refs'])test('wide text import keeps output paging within budget for '+cost,async()=>{
+ const clock=fixtureClock(),{page,c}=bufferedMappingFixture(null,{clock:clock.Date,count:1000});
+ const root=c.form.getAttribute('data-tid');
+ page.add('div',root+';ImportTextFileParamsWizard','',undefined,c.form).attrs.class='x-hidden-offsets';
+ c.body.box.height=c.body.clientHeight=150;
+ c.body.scrollHeight=25000;c.body.style.overflowY='auto';
+ page.add('div','Overlay','',{x:100,y:200,width:100,height:25});
+ const hit=page.document.elementFromPoint.bind(page.document);
+ page.document.elementFromPoint=(x,y)=>{
+   if(x>=100&&x<300&&y>=350&&y<400){if(cost==='hit tests')clock.advance(24);return c.form;}
+   return hit(x,y);
+ };
+ const read=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,mode:'observe',
+    prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},
+   async()=>({verified:true,surface:'wizard',node_id:'node',tid:root}));
+ const roots=await read({discover_roots:true});
+ assert.equal(roots.status,'SUCCEEDED',JSON.stringify(roots.trace));
+ const request={root_ref:roots.output.wizard.root_ref,output_column_page:{offset:0,limit:8}};
+ if(cost==='descendant selectors'){
+   const query=page.document.querySelectorAll.bind(page.document);
+   page.document.querySelectorAll=selector=>{
+     if(selector.includes('] [data-tid]'))clock.advance(501);
+     return query(selector);
+   };
+ }
+ if(cost==='buffered row refs'){
+   const initial=await read(request);
+   assert.equal(initial.status,'SUCCEEDED');
+   const state=vm.runInContext("globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')]",page.context);
+   const rootRef=state.refs.get(request.root_ref);
+   state.refs.delete(request.root_ref);
+   state.refs.delete(initial.output.wizard.output_columns.auto_sync.ref);
+   state.refs=new Map([[request.root_ref,rootRef],...state.refs]);
+   // Model the cached refs of rows from earlier windows. The next scan
+   // allocates a ref after observing the root, then a fresh read needs it.
+   for(let i=state.refs.size;i<4096;i++)state.refs.set('buffered-'+i,rootRef);
+   assert.equal((await read(request)).status,'SUCCEEDED');
+ }
+ const result=await read(request);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.trace));
+ const cols=result.output.wizard.output_columns;
+ assert.equal(cols.page.status,'complete_definition_page');
+ assert.equal(cols.page.total_columns,1000);
+ const control=ref=>result.output.ui.elements.find(e=>e.ref===ref);
+ assert.ok(control(cols.definition_scroll_ref).allowed_actions.includes('scroll'));
+ assert.ok(control(cols.fields[1].name_ref).allowed_actions.includes('click'));
+ for(const field of [cols.fields[0],cols.fields[7]]) {
+   const cell=control(field.name_ref);
+   assert.equal(cell.interaction.state,'point_not_observed');
+   assert.deepEqual(Array.from(cell.allowed_actions),[]);
+ }
+});
 
 for(const property of ['name','label'])for(const scoped of [false,true])test('import text editor separates the hidden original from the uncommitted draft: '+property+' (scoped='+scoped+')',async()=>{
  const page=new Page(),c=importCoverageFixture(page,3),row=property==='name'?0:1,cell=c.cols[0].cells[row];
@@ -8053,6 +8112,17 @@ test('graph launch only exposes typed execution for the exact native selected no
  assert.equal(e.graph_execution.node_id,'node-a');assert.throws(()=>validateUiAction({verb:'click',ref:e.ref},r.output));
  const done=await f.execute({mode:'act',action:{verb:'execute_graph_node',ref:e.ref},snapshot:r.output});assert.equal(done.status,'SUCCEEDED');assert.equal(f.page.events.filter(e=>e==='click').length,1);
 });
+test('graph launch geometry drift is refused before the gesture',async()=>{
+ const fixture=graphLaunchFixture(),observed=await fixture.execute({mode:'observe'});
+ const control=observed.output.ui.elements.find(element=>element.tid===fixture.button.attrs['data-tid']);
+ fixture.page.beforeHandleGeometry=element=>{if(element===fixture.button)element.box.x+=2;};
+ const outcome=await fixture.execute({mode:'act',action:{verb:'execute_graph_node',ref:control.ref},snapshot:observed.output});
+ assert.equal(outcome.status,'NOT_APPLIED');assert.equal(outcome.phase,'preconditions');
+ assert.equal(outcome.error.code,'UI_REFERENCE_STALE');assert.equal(outcome.error.message,'Observed control geometry changed');
+ assert.equal(outcome.effect_possible,false);assert.equal(outcome.cleanup_complete,true);
+ assert.equal(outcome.trace.some(entry=>['ui_preconditions_verified','ui_gesture_applied'].includes(entry.event)),false);
+ assert.equal(fixture.page.events.filter(event=>event==='click').length,0);
+});
 test('graph launch refuses a repainted body of the same selected node before the execution gesture',async()=>{
  const f=graphLaunchFixture(),view=f.model.FDiagram.FmxGraph.view,original=view.getState;let reads=0;
  view.getState=()=>{
@@ -8087,6 +8157,7 @@ test('prepared 1000-column import keeps page refs and rejects hidden or sensitiv
  const first=await read(0),last=await read(992);
  assert.equal(first.status,'SUCCEEDED');assert.equal(last.status,'SUCCEEDED');
  assert.equal(first.output.wizard.import_columns.page.total_columns,1000);assert.equal(last.output.wizard.import_columns.page.status,'complete_definition_page');
+ assert.equal(last.output.scan.max_ms,4500);
  assert.equal(first.output.wizard.import_columns.page.schema_id,last.output.wizard.import_columns.page.schema_id);
  assert.deepEqual(last.output.wizard.import_columns.fields.map(f=>f.index),[992,993,994,995,996,997,998,999]);
  assert.ok(last.output.scan.visited_elements<6000);
@@ -8098,6 +8169,80 @@ test('prepared 1000-column import keeps page refs and rejects hidden or sensitiv
  c.cols[999].cells[1].style.display='none';assert.equal((await read(0)).output.wizard.import_columns.page.status,'unverified');
  c.cols[999].cells[1].style.display='block';c.cols[999].cells[1].attrs['aria-label']='password';
  assert.equal((await read(0)).output.wizard.import_columns.page.status,'unverified');
+ page.add('div',c.base+';normalHeaderCt;1000','',undefined,c.header);
+ const overflow=await read(0);
+ assert.equal(overflow.status,'NOT_APPLIED');assert.equal(overflow.effect_possible,false);
+ assert.equal(overflow.error.code,'UI_SCAN_LIMIT');
+ assert.ok(overflow.trace.some(entry=>entry.event==='ui_scan_limit'&&entry.limit_kind==='elements'));
+});
+
+test('wide import configuration and recovery avoid checking the full guards on preview cells',async()=>{
+ const clock=fixtureClock(),page=new Page({clock:clock.Date}),fixture=importCoverageFixture(page,400);
+ const preview=page.add('div',fixture.base.replace(/;grdSettings;.*/,';grdData'),'',undefined,fixture.form);
+ for(let row=0;row<12;row++)for(let column=0;column<400;column++){
+  const tid=preview.attrs['data-tid']+';colValue_'+row+'_'+column;
+  const cell=page.add('div',tid,'',undefined,preview);page.add('span',tid+';Value','1',undefined,cell);
+ }
+ const close=page.add('button','MF;TF-1;WizrdMCF;btnClose','Закрыть',undefined,fixture.form);
+ const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+ const read=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:binding,mode:'observe',...options},
+  async()=>({verified:true,surface:'wizard',node_id:'node'}));
+ const matches=Element.prototype.matches;
+ Element.prototype.matches=function(selector){
+  if(selector.startsWith('[data-tid*=";WizrdMCF;PythonColumnsWizard;')&&selector.includes('[role="alert"]'))clock.advance(0.08);
+  return matches.call(this,selector);
+ };
+ try {
+  const roots=await read({discover_roots:true});
+  assert.equal(roots.status,'SUCCEEDED',JSON.stringify(roots.trace));
+  const root_ref=roots.output.wizard.root_ref;
+  const configured=await read({root_ref,import_column_page:{offset:392,limit:8}});
+  assert.equal(configured.status,'SUCCEEDED',JSON.stringify(configured.trace));
+  assert.equal(configured.output.wizard.settings.fields.null_marker.value,'old');
+  assert.equal(configured.output.wizard.import_columns.page.total_columns,400);
+  const recovery=await read({root_ref});
+  assert.equal(recovery.status,'SUCCEEDED',JSON.stringify(recovery.trace));
+  assert.ok(recovery.output.ui.elements.some(element=>element.tid===close.attrs['data-tid']&&element.allowed_actions.includes('click')));
+  const hit=page.document.elementFromPoint.bind(page.document);
+  page.document.elementFromPoint=(x,y)=>x===close.box.x+close.box.width/2&&y===close.box.y+close.box.height/2
+    ?fixture.form:hit(x,y);
+  const coveredCenter=await read({root_ref});
+  assert.equal(coveredCenter.status,'SUCCEEDED');
+  assert.equal(coveredCenter.output.ui.elements.find(element=>element.tid===close.attrs['data-tid']).interaction.state,'point_not_observed');
+  page.document.elementFromPoint=hit;
+  const blocker=page.add('div',null,'Warning',undefined,preview);blocker.attrs.role='dialog';blocker.attrs['aria-label']='Warning';
+  const blocked=await read({root_ref});
+  assert.equal(blocked.status,'SUCCEEDED');assert.deepEqual(Array.from(blocked.output.ui.dialogs,dialog=>dialog.title),['Warning']);
+  blocker.remove();
+  page.add('button',close.attrs['data-tid'],'Duplicate Close',undefined,preview);
+  const ambiguous=await read({root_ref});
+  assert.equal(ambiguous.status,'SUCCEEDED');
+  assert.equal(ambiguous.output.wizard.controls.btnClose.status,'ambiguous');
+ } finally {Element.prototype.matches=matches;}
+});
+
+test('paged import probes native points only inside the rendered definition viewport',async()=>{
+ const clock=fixtureClock(),page=new Page({clock:clock.Date}),fixture=importCoverageFixture(page,400);
+ fixture.body.box.height=50;
+ fixture.body.style.overflowY='hidden';
+ const hit=page.document.elementFromPoint.bind(page.document);
+ page.document.elementFromPoint=(x,y)=>{
+  if(x>=100&&y>=275&&y<350){clock.advance(24);return fixture.form;}
+  return hit(x,y);
+ };
+ const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+ const read=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:binding,mode:'observe',...options},
+  async()=>({verified:true,surface:'wizard',node_id:'node'}));
+ const roots=await read({discover_roots:true});
+ const result=await read({root_ref:roots.output.wizard.root_ref,import_column_page:{offset:0,limit:8}});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.trace));
+ assert.equal(result.output.wizard.import_columns.page.total_columns,400);
+ const refs=result.output.wizard.import_columns.fields[0].cell_refs;
+ const control=property=>result.output.ui.elements.find(element=>element.ref===refs[property]);
+ assert.equal(control('name').interaction.state,'point_observed');
+ assert.equal(control('type').interaction.state,'point_not_observed');
 });
 
 test('a populated console scans nested cell wrappers without quadratic work',async()=>{

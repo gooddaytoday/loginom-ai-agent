@@ -96,3 +96,8 @@ test('serialized connection guard refusal keeps its cause through the browser er
  assert.throws(()=>parseCapabilityResult(response),{message:'Pinned browser capability call failed [LOGINOM_DISCONNECTED] (reason=owner)'});
  assert.equal(f.state.effects,1);assert.equal(f.state.clicks,0);
 });
+test('recovery never presses a restore prompt dock_prepare already answered',async()=>{
+ const f=fixture();await f.run();f.c.Connected=false;f.form.FReconnecting=true;
+ f.globals.__loginomDockPreparationV1.receipts=new Map([['prepare',{restore:{prompt:f.globals.Ext.Msg.cfg,pending:true}}]]);
+ await assert.rejects(f.run(),/attempted/);assert.equal(f.state.clicks,0);assert.equal(f.state.effects,1);
+});

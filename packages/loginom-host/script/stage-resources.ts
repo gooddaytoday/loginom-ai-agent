@@ -100,7 +100,7 @@ export async function stageResources(input: {
   }
   await rm(staging, { recursive: true, force: true })
   await mkdir(join(staging, "bin"), { recursive: true })
-  await cp(productSkillsDirectory, join(staging, "skills"), { recursive: true, verbatimSymlinks: true })
+  await stageProductSkills(productSkillsDirectory, join(staging, "skills"))
   await cp(productHelpDirectory, join(staging, "help"), { recursive: true, verbatimSymlinks: true })
   const npm = resolve(
     dirname(node),
@@ -224,6 +224,17 @@ export async function stageResources(input: {
   await rm(destination, { recursive: true, force: true })
   await buildPhase(`${input.flavor}-resource-publish`, () => rename(staging, destination))
   return { files: files.length, destination }
+}
+
+export function stageProductSkills(source: string, destination: string) {
+  return cp(source, destination, {
+    recursive: true,
+    verbatimSymlinks: true,
+    filter: (path) => {
+      const name = basename(path)
+      return name !== "__pycache__" && name !== ".pytest_cache" && !name.endsWith(".pyc")
+    },
+  })
 }
 
 // Chromium refuses to start unless this helper is mode 4755. Ownership is applied later, at install or package time.
