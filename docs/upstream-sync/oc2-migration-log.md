@@ -24667,3 +24667,53 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - `loginom-host` `actual managed entry reads live bridge work…` (`managed-work-entry.test.ts:239`, «Expected refusal») — причина не разбиралась, возможно тоже права root;
 - таймаут под нагрузкой: `server` `skill.test.ts` `lists configured skills` (5000 мс, три набора шли параллельно).
 Новых падений относительно базы нет: код не менялся, база — это и есть этот прогон.
+
+## B5.1d — изоляция XDG в тестах
+
+База `569014e83b`, ветка `b51d-test-xdg`. Проверка: `bun test` пакета с подменённым `HOME` и XDG на пустой каталог,
+затем поиск по каталогам запускающего (`find -newer`).
+
+### Что нашла проба
+
+Без изоляции тесты создают каталоги данных продукта в `HOME` запускающего: `server` — `tool-output`, `shell`,
+`artifacts`, `repos`, `log`; `sdk`, `simulation`, `tui` — `repos`, `log`, `config`; `loginom-host` — файлы
+`attachment-receipts-v1` в каталоге состояния (`os.homedir()`, а не XDG). `cli` собирает свою среду в
+`isolatedEnv` и пишет только пустые каталоги; `ai`, `client`, `codemode`, `product`, `protocol`, `schema`, `util` и др. —
+ничего, кроме кэша Bun.
+
+### Что сделано
+
+- `packages/util/test/isolated-home.ts` — preload: если `LOGINOM_AI_AGENT_TEST_HOME` не задан, создаёт временный
+  каталог, ставит `HOME`, `LOGINOM_AI_AGENT_TEST_HOME`, четыре `XDG_*`, `TMPDIR` и удаляет его в `afterAll`. Нужен до
+  первого импорта `@opencode/util/global`: `Global.Path` считается при импорте. Раннер, уже изолировавший среду
+  (`packages/core/script/test.ts`), не затрагивается.
+- Подключён в `[test]` `bunfig.toml` пакетов `server`, `sdk`, `simulation`, `tui`, `loginom-host`.
+- `packages/util/script/isolated-test.ts` и `loginom-host`: `"test": "bun run ../util/script/isolated-test.ts"`. Bun читает
+  `os.homedir()` при старте процесса, подмена `process.env.HOME` в preload её не меняет (проверено), поэтому для кода с
+  `homedir()` нужен внешний `HOME`.
+- Тест на preload: `packages/server/test/preload.test.ts`.
+
+### Выбор по неоднозначным местам
+
+- `check-test.yml` не менялся: `bun turbo test` запускает скрипты пакетов, preload действует и в CI; `env` задания
+  поверх него ничего не добавляет. Windows (`APPDATA`, `LOCALAPPDATA`) — в `loginom-windows` (i), как в строке.
+- `cli` не подключён: `debug-paths.test.ts` берёт `process.env` целиком, и унаследованный `LOGINOM_AI_AGENT_TEST_HOME`
+  меняет ожидаемый `home` (2 новых падения при пробе). Пишет `cli` только пустые каталоги; правка тестов `cli` — не B5.1d.
+- Каталог upstream: `catalog-check.py` код 0 без новых записей.
+
+### Проверки
+
+- `server`: `bun test` с внешним временным домом (аналог базы) 256 pass / 53 fail; с preload 258 / 51. Различия только
+  в нестабильных тестах (расписания, `vcs`: `serves lazy review bases` проходит 2 из 2 отдельно). База пишет в дом:
+  `tool-output`, `repos`, `log`, `artifacts`, `shell`. Каталоги данных продукта запускающего после прогона `server` с
+  preload не менялись (`find -newer`; менялись только чужие `.cache/loginom-run-check` и `.config/herdr-web-ui`).
+- `sdk`, `simulation`, `tui`, `loginom-host`: список падений до и после совпадает; у `loginom-host` 40 падений есть и в базе.
+- `loginom-host` с обёрткой: каталоги состояния и данных продукта запускающего не менялись, временных каталогов не осталось.
+- Мутации: пустой `bunfig.toml` — тест на preload красный; удалена строка `XDG_DATA_HOME` из preload — красный.
+- `catalog-check.py` 0, `apply-identity --check` 0 файлов.
+
+### Не проверено
+
+- Windows (`USERPROFILE` задан, не запускал); `app`, `dashboard` (браузер, сборка) не пробовал; `desktop` по пробе пишет
+  только кэш `electron`.
+- Падения `server` (около 50) и `loginom-host` (40) есть и в базе; причину не искал.
