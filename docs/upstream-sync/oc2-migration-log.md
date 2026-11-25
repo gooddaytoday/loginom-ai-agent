@@ -23741,3 +23741,53 @@ $ grep -c blacksmith .github/workflows/*.yml                             # check
 - Содержимое секретов и переменных форка (`gh secret list`) не смотрел; вопрос 1 это учитывает. Единственный сетевой запрос —
   метаданные репозитория выше (отступ от условия «только документация»).
 - Состав 57 крейтов и лицензий (g) считал по журналу B2.7a9, не по `Cargo.lock`.
+
+
+## B5.1e — windows-native-check и ACL профиля
+
+25.11.2026. Ветка `b51e-windows-check` от `oc2-migration` (`569014e83b`), эталон `v0.4.0`. Решения оркестратора: подпись как в 0.4
+(Windows без подписи, macOS ad-hoc), ACL профиля CLI переносится (G2). Модель не вызывалась, Actions не запускались.
+
+### Сделано
+
+- `packages/cli/src/profile-windows.ts` — порт `protectWindowsProfile` из 0.4 (скрипт PowerShell без изменений). Выбор меньшего:
+  функция синхронная (`execFileSync`), потому что `CliProfile.apply` в v2 синхронный; `windowsProfileCommand` вынесена отдельно,
+  чтобы логику вокруг PowerShell (путь через stdin, абсолютные пути, `-EncodedCommand`) проверять на Linux.
+- `packages/cli/src/profile.ts`: в `open` на Windows вызывается `protectWindowsProfile(canonical)` до проверки владельца и маркера;
+  комментарий «not ported yet» заменён.
+- `packages/cli/test/profile-windows.test.ts` — тест 0.4 под v2: два теста на любой платформе (логика команды, отказ не на
+  Windows) и два родных для Windows (ACL с Everyone, Chromium capability, LocalSystem; `CliProfile.apply` дважды и отказ после
+  выдачи Everyone). Тест защиты писателя 0.4 (`acquireProfile`) не переносился: в v2 его закрывает `cli-profile.test.ts`.
+- `windows-native-check.yml`: `bun-version-file: package.json` в обоих заданиях (было 1.3.14), пути `packages/cli/{src/profile.ts,
+  src/profile-windows.ts,test/profile-windows.test.ts}` и `packages/desktop/src/main/files/apps.ts` вместо `packages/opencode/**` и
+  `desktop/src/main/apps*`; установка включает фильтр `@opencode/cli` (тест ACL собирает его импорты).
+- `script/test-windows-profile.ps1`: собирает `packages/cli/test/profile-windows.test.ts`.
+- Убран шаг «native application resolution» (`bun test src/main/apps.test.ts`): теста в v2 нет, `apps.ts` стал Effect-кодом
+  (`files/apps.ts`). **Пробел:** нативная проверка `checkAppExists`/`resolveAppPath` на Windows не покрыта; нужен порт `apps.test.ts`
+  0.4 под Effect — отдельная задача. `catalog.json` не менялся: `.github/**` и `script/**` входят в CAT-02, `packages/cli/src` — файлы форка.
+
+### Проверки
+
+- Мутации `profile-windows.ts` (тест 2 прохода до мутации): без проверки абсолютного пути root — красный; без проверки systemRoot —
+  красный; путь в скрипте вместо stdin — красный (после усиления теста; первый вариант теста мутацию пропускал); utf8 вместо utf16le —
+  красный; опечатка в пути `powershell.exe` — красный. **Выживает** снятие проверки платформы: на Linux без неё срабатывает
+  второй слой (`execFileSync` не находит `powershell.exe`, ошибка превращается в `PROFILE_PERMISSIONS_INVALID`). Ветки `output !== "OK"`
+  и вызова в `open` Linux не видит — их проверяет только Windows.
+- `bun test` в `packages/product`: 63 pass, 3 fail — ровно `workspace packages`, `CI triggers`, `path literals`. Эти файлы в них
+  больше не названы; остались `loginom-macos.yml` (`--filter`) и `loginom-windows.yml` (`packages/opencode`) — строки других задач.
+- `catalog-check.py` код 0; `apply-identity.py --check` — `would change: 0 files`; YAML `windows-native-check.yml` разбирается
+  (`python3 yaml`, задания `native`, `timings`); `bun build` теста `profile-windows.test.ts` на Linux собирается, собранный файл проходит.
+- `packages/cli`: `bun typecheck` без ошибок; `profile-windows` и `cli-profile` — 9 pass, 2 skip (Windows-тесты).
+
+### Только CI на GitHub (Windows 2022 и 2025)
+
+Установка `--filter '@loginom-ai-agent/loginom-host' --filter '@opencode/cli'` с `--linker hoisted` (хватает ли фильтра для сборки теста),
+Bun 1.4.4 из `package.json`, реальный `protectWindowsProfile`, два родных теста ACL от обычного пользователя
+(`test-windows-profile.ps1`), тесты и typecheck `loginom-host`, прокси WinINET. Windows-ветка проверена только чтением.
+
+### Итоговые прогоны
+
+- `bun run check` код 0. `packages/cli`: `cli-loginom` 14 pass (после `npm ci` клиента и шаблона дашборда), `cli-profile`, `cli-profile-service`,
+  `import-boundaries`, `profile-windows` без падений при `--timeout 60000`; `help and version` из `cli-standalone` на машине под нагрузкой
+  падал по умолчанию на 5 с, с `--timeout 60000` проходит. Полный `bun test` пакета `cli` за 550 с не завершился (нагрузка от других
+  агентов), поэтому полный набор против базы не сравнивался.
