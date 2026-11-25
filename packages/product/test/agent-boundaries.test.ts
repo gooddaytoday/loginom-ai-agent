@@ -52,3 +52,19 @@ test("workflow reference allows waiting only through Loginom tools and keeps fil
   expect(boundaries).toMatch(/вне рабочего каталога и вложений[\s\S]*?не читай и не создавай/)
   expect(boundaries).toContain("справку этого skill")
 })
+
+// LAB-2015/LAB-2020, bughunt bh-g101..g106 (0.4.3): every user message is a new task whose profile starts
+// without the skill (task-scope.ts derive), so loginom_dock_* stay hidden until the skill is activated again.
+// The second turn called loginom_dock_action_describe from history, got `invalid` and ended in CLI_TOOL_FAILED.
+// Before activation only the frontmatter description reaches the model.
+test("description makes every new chat message activate the skill before Dock tools", () => {
+  const description = skill
+    .split("\n---\n")[0]
+    .split(/\ndescription: >-\n/)[1]
+    ?.split(/\n[a-z]+:/)[0]
+    .replace(/\s+/g, " ")
+  expect(description).toBeDefined()
+  expect(description).toMatch(/[Кк]аждое новое сообщение чата начинай с активации этого skill/)
+  expect(description).toMatch(/без неё `?loginom_dock_\*`? недоступны, история их не возвращает/)
+  expect(description!.length).toBeLessThanOrEqual(1024)
+})

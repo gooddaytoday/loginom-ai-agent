@@ -6,6 +6,8 @@ description: >-
   пакет .lgp. Использовать для запросов «построй сценарий», «измени пакет»,
   «выполни анализ в Loginom», «загрузи файл в Loginom». Документацию по локальному .lgp создаёт
   package-docs; обычные справочные вопросы используют Help без этого skill.
+  Каждое новое сообщение чата начинай с активации этого skill: без неё
+  loginom_dock_* недоступны, история их не возвращает.
 compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, управляемый runtime user-v1 и справка Loginom Dock.
 ---
 
@@ -94,8 +96,7 @@ Preview can infer string from a NULL token; set null_marker, fix SAME Import `se
 ОС и явного запрета в настройках этой подсказки нет.
 
 Продолжение сохранённого пакета без успешной подготовки в текущем runtime начинай
-с `open_package` и точного пути из просьбы или подтверждённого Save. `existing_workflow`
-принимает только ссылку, выданную этим runtime: история чата и diagnostics её не заменяют.
+с `open_package` и точного пути из просьбы или подтверждённого Save.
 Не создавай новый draft вместо продолжения; при pending сначала следуй recovery.
 Пакет открылся «только чтение» (открыт в другой сессии): сразу сообщи причину и предложи
 сохранить копию под новым именем (`package.save_checkpoint`, `conflict_policy:"fail"`);
