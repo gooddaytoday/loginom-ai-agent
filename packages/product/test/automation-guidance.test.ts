@@ -168,3 +168,16 @@ test("binning ties guidance keeps the rule without echoing the acceptance task",
   expect(settings).not.toContain('size:4,ties:"current"')
   expect(Buffer.byteLength(settings)).toBeLessThanOrEqual(6000)
 })
+
+test("LAB-2046: arrays of records across several REST responses route to one JavaScript, not per-request splits", async () => {
+  const nodes = new URL("../skills/loginom-automation/references/nodes/", import.meta.url)
+  const rest = await Bun.file(new URL("integration.rest_request.md", nodes)).text()
+  const table = await Bun.file(new URL("trees.to_table.md", nodes)).text()
+  const get = rest.split("## GET и ответы\n")[1]?.split("\n## ")[0] ?? ""
+  // Both runs searched Calculator help for JSON functions (r1 :28/:38, r2 :29/:62); r2 split per RequestID.
+  expect(get).toMatch(/Калькулятор[\s\S]*?Свёртка[\s\S]*?Кросс-таблица/)
+  expect(get).toMatch(/Массив записей в ответах нескольких строк[\s\S]*?`programming\.javascript`[\s\S]*?JSON\.parse\(Response\)[\s\S]*?Append на запись/)
+  expect(get).toContain("Не дроби по RequestID")
+  expect(table).toMatch(/при отказе деревьев вернись к этому пути; массив записей нескольких ответов — по \[REST\]\(integration\.rest_request\.md\)/)
+  for (const card of [rest, table]) expect(new TextEncoder().encode(card).length).toBeLessThanOrEqual(6000)
+})
