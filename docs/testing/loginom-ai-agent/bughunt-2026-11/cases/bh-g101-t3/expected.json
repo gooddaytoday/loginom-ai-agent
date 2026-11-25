@@ -1,0 +1,82 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.group_data"
+    },
+    {
+      "type": "transform.sorting"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "id": "imports.text",
+        "type": "imports.text"
+      },
+      {
+        "id": "transform.group_data",
+        "type": "transform.group_data"
+      },
+      {
+        "id": "transform.sorting",
+        "type": "transform.sorting"
+      }
+    ],
+    "links": [
+      {
+        "source": "imports.text",
+        "target": "transform.group_data"
+      },
+      {
+        "source": "transform.group_data",
+        "target": "transform.sorting"
+      }
+    ]
+  },
+  "tables": [
+    {
+      "output_node_type": "transform.sorting",
+      "output_port": 0,
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Регион",
+          "label": "Регион",
+          "type": "string",
+          "name_any": true
+        },
+        {
+          "name": "Сумма выручки",
+          "label": "Сумма выручки",
+          "type": "real",
+          "name_any": true,
+          "tolerance": {
+            "abs": 1e-09
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Регион": "Центр",
+          "Сумма выручки": 7800.5
+        },
+        {
+          "Регион": "Северо-Запад",
+          "Сумма выручки": 5250.25
+        },
+        {
+          "Регион": "Урал",
+          "Сумма выручки": 4930.55
+        },
+        {
+          "Регион": "Юг",
+          "Сумма выручки": 1490.95
+        }
+      ]
+    }
+  ]
+}
