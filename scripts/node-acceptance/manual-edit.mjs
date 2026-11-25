@@ -179,8 +179,20 @@ async function filterThreshold({page, adapter, request, readFilterBrowser, recor
     }
     await record({phase:'filter_after', rows:actual});
     requireProof(isDeepStrictEqual(actual, expected), 'FILTER_READBACK_MISMATCH');
+    await locator(page, wizard + ';btnNext').click({timeout:remaining()});
+    const nameField = '[data-tid=' + JSON.stringify(wizard + ';DoneWizard;edtDisplayName') + ']';
+    const name = page.locator('input' + nameField + ':visible,' + nameField + ' input:visible');
+    await name.waitFor({state:'visible', timeout:remaining()});
+    const previousLabel = graph.nodes.find(node => node.ref.node_id === ref.node_id).label;
+    if (await name.inputValue({timeout:remaining()}) !== previousLabel) {
+      await name.click({timeout:remaining()});
+      await name.press('ControlOrMeta+A', {timeout:remaining()});
+      await page.keyboard.type(previousLabel);
+      await name.press('Tab', {timeout:remaining()});
+      requireProof(await name.inputValue({timeout:remaining()}) === previousLabel, 'FILTER_LABEL_CHANGED');
+    }
     await locator(page, wizard + ';btnDone').click({timeout:remaining()});
-    await panel.waitFor({state:'hidden', timeout:remaining()});
+    await close.waitFor({state:'hidden', timeout:remaining()});
     return {status:'SUCCEEDED', cleanup_complete:true, change:{node_id:ref.node_id, field:edit.field, before:row.value, after:edit.value}, rows:expected};
   } catch (error) {
     try {
