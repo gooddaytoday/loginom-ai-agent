@@ -1341,7 +1341,7 @@ const layer = Layer.effect(
               ...env,
               ...instructions,
               ...(mcpInstructions ? [mcpInstructions] : []),
-              ...turn.system(),
+              ...turn.system(Object.keys(tools)),
               ...(skills ? [skills] : []),
             ]
             const format = lastUser.format ?? { type: "text" as const }

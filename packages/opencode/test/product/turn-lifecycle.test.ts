@@ -110,6 +110,111 @@ describe("turnLifecycle", () => {
     expect(prompt).toContain("other than quality assessment or linting, always activate package-docs")
   })
 
+  test("only a catalog with loginom_dock_prepare but no browser Dock tools tells the model to prepare first", async () => {
+    connect()
+    const { run } = acquire()
+    const line = "Начни с loginom_dock_prepare: остальные loginom_dock_* появятся после подготовки; из истории их не вызывай."
+    const systems = await Effect.runPromise(
+      Effect.scoped(
+        run.pipe(
+          Effect.map((turn) => [
+            turn.system(["read", "loginom_find", "loginom_dock_diagnostics", "loginom_dock_prepare"]),
+            turn.system(["loginom_dock_diagnostics", "loginom_dock_prepare", "loginom_dock_action_describe"]),
+            turn.system(["read", "skill", "loginom_find", "loginom_dock_diagnostics"]),
+            turn.system(),
+          ]),
+        ),
+      ),
+    )
+    expect(systems.map((system) => system.includes(line))).toEqual([true, false, false, false])
+    LoginomHost.disconnect()
+    const { run: offline } = acquire()
+    expect(
+      await Effect.runPromise(Effect.scoped(offline.pipe(Effect.map((turn) => turn.system(["loginom_dock_prepare"]))))),
+    ).toEqual([])
+  })
+
+  for (const failure of ["write", "permission"] as const)
+    test(
+      failure === "write"
+        ? "an inherited grant whose DB write fails after the Host applied it stops the loop"
+        : "a refused inherited grant leaves the task on default without a write or a retry",
+      async () => {
+        const requests = connect()
+        const first = MessageID.ascending()
+        const answer = MessageID.ascending()
+        const next = MessageID.ascending()
+        const text = (messageID: MessageID, created: number, value: string): SessionV1.WithParts => ({
+          info: { ...user, id: messageID, time: { created } } as SessionV1.User,
+          parts: [{ id: PartID.ascending(), sessionID, messageID, type: "text", text: value }],
+        })
+        const history: SessionV1.WithParts[] = [
+          text(first, 1, "Построй сценарий"),
+          {
+            info: { id: answer, sessionID, role: "assistant", parentID: first, time: { created: 2 } } as SessionV1.Assistant,
+            parts: [
+              {
+                id: PartID.ascending(),
+                sessionID,
+                messageID: answer,
+                type: "tool",
+                tool: "skill",
+                callID: "activation",
+                state: {
+                  status: "completed",
+                  input: { name: "loginom-automation" },
+                  output: "Loaded skill",
+                  title: "Skill",
+                  metadata: { activation: { name: "loginom-automation", profile: "loginom-automation", digest } },
+                  time: { start: 2, end: 2 },
+                },
+              },
+            ],
+          },
+          text(next, 3, "Добавь узел"),
+        ]
+        const asked: unknown[] = []
+        const { input } = fakes()
+        const run = turnLifecycle.acquireRun({
+          ...(input as object),
+          sessions: {
+            getForExecution: () => Effect.succeed({ id: sessionID, directory: "/fixture/project" }),
+            updatePart: () => Effect.die(Error("DB_WRITE_FAILED")),
+          },
+          agents: { get: () => Effect.succeed({ permission: [] }) },
+          permission: {
+            ask: (request: unknown) =>
+              Effect.suspend(() => {
+                asked.push(request)
+                return failure === "permission" ? Effect.fail(Error("permission denied")) : Effect.void
+              }),
+          },
+        } as never)
+        const exit = await Effect.runPromiseExit(
+          Effect.scoped(
+            Effect.gen(function* () {
+              const turn = yield* run
+              yield* turn.beforeTurn({ session: { id: sessionID } as never, history })
+              yield* turn.beforeTurn({ session: { id: sessionID } as never, history })
+            }),
+          ),
+        )
+        const modes = requests
+          .filter((request) => request.method === "scope")
+          .map((request) => (request.input as { mode: string }).mode)
+        expect(asked).toHaveLength(1)
+        if (failure === "write") {
+          expect(Exit.isFailure(exit)).toBe(true)
+          if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("DB_WRITE_FAILED")
+          expect(modes).toEqual(["bind", "request", "apply"])
+        } else {
+          expect(Exit.isSuccess(exit)).toBe(true)
+          expect(modes).toEqual([])
+          expect(history[2].parts[0].type === "text" && history[2].parts[0].metadata).toBeFalsy()
+        }
+      },
+    )
+
   test("the Host lease is released when the run's scope closes, however it ends", async () => {
     for (const end of ["success", "failure"] as const) {
       const requests = connect()

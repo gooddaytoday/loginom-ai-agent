@@ -158,6 +158,7 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
     const message = history.find((message) => message.info.id === task.taskMessageID)
     const part = message?.parts.find((part) => part.type === "text" && part.synthetic !== true)
     if (message?.info.role !== "user" || part?.type !== "text") return
+    let applied = false
     const updated = yield* Effect.gen(function* () {
       const agent = yield* agents.get(message.info.agent)
       if (!agent) return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
@@ -181,6 +182,7 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
         yield* Effect.promise((signal) =>
           loginom.scope("apply", { taskMessageID: task.taskMessageID, profile: carried.profile }, signal),
         )
+        applied = true
         return yield* sessions.updatePart({
           ...part,
           metadata: { ...TaskScope.cleanMetadata(part.metadata), skill_activation: carried },
@@ -188,7 +190,10 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
       }).pipe(Effect.uninterruptible)
     }).pipe(
       // A refused inheritance leaves the task on its base profile; the model can still activate the skill.
-      Effect.catchCause((cause) => (Cause.hasInterrupts(cause) ? Effect.failCause(cause) : Effect.succeed(undefined))),
+      // After the Host applied it, a failed DB write must stop the loop like any other grant.
+      Effect.catchCause((cause) =>
+        applied || Cause.hasInterrupts(cause) ? Effect.failCause(cause) : Effect.succeed(undefined),
+      ),
     )
     if (updated) message.parts = message.parts.map((part) => (part.id === updated.id ? updated : part))
   })
@@ -255,7 +260,15 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
       activation = { ...source, grant }
     })
 
-  const system = (): string[] =>
+  // Browser loginom_dock_* join the catalog only after this run's preparation (host-port catalog).
+  const unprepared = (tools: readonly string[]) =>
+    tools.includes("loginom_dock_prepare") &&
+    !tools.some(
+      (name) =>
+        name.startsWith("loginom_dock_") && name !== "loginom_dock_prepare" && name !== "loginom_dock_diagnostics",
+    )
+
+  const system = (tools: readonly string[] = []): string[] =>
     status.failure
       ? [
           "Loginom tools are currently unavailable (" +
@@ -265,6 +278,11 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
       : loginom
         ? [
             "Loginom is available through the bundled loginom_* tools. To create, change or execute a scenario, first activate the bundled loginom-automation skill. Browser Loginom tools are available after activation; then use loginom_dock_prepare for dynamic readiness and input artifacts. Help and diagnostics do not require loginom_dock_prepare. For quality assessment or linting of an existing local package, including structure, notes, node labels, variable names, scores and recommendations, use package-linter if available. Do not activate package-docs or loginom-automation merely to produce a quality review or its report. If package-linter is unavailable, report that it is missing; do not substitute package-docs. For a documentation-only request about a Loginom scenario other than quality assessment or linting, always activate package-docs before replying, including when the local .lgp is missing or only a server package is named. Then request the missing local package; never search for it in the browser. Dock tool names in skills have the loginom_ prefix here. Connection credentials are managed privately by the desktop; never ask the model to enter or reveal them.",
+            ...(unprepared(tools)
+              ? [
+                  "Начни с loginom_dock_prepare: остальные loginom_dock_* появятся после подготовки; из истории их не вызывай.",
+                ]
+              : []),
           ]
         : []
 
