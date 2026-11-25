@@ -1,0 +1,114 @@
+name: Loginom pty
+
+# Builds loginom-ai-agent-pty (packages/process-daemon) for the three product platforms. Consumers (Linux, Windows
+# and macOS candidate builds) download the artifact loginom-ai-agent-pty-<target> and point LOGINOM_AI_AGENT_PTY_BIN
+# at the executable; upload-artifact drops the executable bit, so chmod +x it first on Linux and macOS.
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - packages/process-daemon/**
+      - .github/actions/setup-rust-pty/**
+      - .github/workflows/loginom-pty.yml
+  # Stage B: the workflow is not on the default branch yet, so workflow_dispatch cannot reach it; B5.2b calls it from
+  # loginom-release.yml instead.
+  push:
+    branches: [oc2-migration]
+    paths:
+      - packages/process-daemon/**
+      - .github/actions/setup-rust-pty/**
+      - .github/workflows/loginom-pty.yml
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  GNU_GLIBC_VERSION: "2.30"
+  CARGO_ZIGBUILD_VERSION: 0.23.2
+
+jobs:
+  pty:
+    name: pty (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: windows-2022
+            target: x86_64-pc-windows-msvc
+    defaults:
+      run:
+        shell: bash
+        working-directory: packages/process-daemon
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - uses: ./.github/actions/setup-rust-pty
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Install glibc baseline linker
+        if: runner.os == 'Linux'
+        run: cargo install cargo-zigbuild --locked --version "$CARGO_ZIGBUILD_VERSION"
+
+      - name: Build
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            cargo zigbuild --locked --release --target "${{ matrix.target }}.$GNU_GLIBC_VERSION"
+          else
+            cargo build --locked --release --target "${{ matrix.target }}"
+          fi
+
+      - name: Verify glibc baseline
+        if: runner.os == 'Linux'
+        run: |
+          binary="target/${{ matrix.target }}/release/loginom-ai-agent-pty"
+          required="$(readelf --version-info "$binary" | grep -oE 'GLIBC_[0-9]+(\.[0-9]+)+' | sed 's/GLIBC_//' | sort -V | tail -n 1)"
+          echo "Highest required glibc version: $required"
+          test "$(printf '%s\n' "$required" "$GNU_GLIBC_VERSION" | sort -V | tail -n 1)" = "$GNU_GLIBC_VERSION"
+
+      - name: Smoke test
+        run: |
+          exe=""
+          if [ "$RUNNER_OS" = "Windows" ]; then exe=".exe"; fi
+          binary="target/${{ matrix.target }}/release/loginom-ai-agent-pty$exe"
+          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "loginom-ai-agent-pty") | .version')"
+          protocol="$(sed -nE 's/^pub const PROTOCOL_VERSION: u32 = ([0-9]+);\r?$/\1/p' src/protocol.rs)"
+          test -n "$version" && test -n "$protocol"
+          output="$("$binary" --version | tr -d '\r')"
+          test "$output" = "loginom-ai-agent-pty $version (protocol $protocol)"
+          runtime="$RUNNER_TEMP/loginom-ai-agent-pty-smoke"
+          rm -rf "$runtime"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            printf 'new cmd.exe /c "echo release-smoke"\nwait 250\nquit\n' | "$binary" play --runtime-dir "$runtime" --name smoke > "$RUNNER_TEMP/pty-smoke.log"
+          else
+            printf 'new /bin/sh -c "printf release-smoke; sleep 1"\nwait 250\nquit\n' | "$binary" play --runtime-dir "$runtime" --name smoke > "$RUNNER_TEMP/pty-smoke.log"
+          fi
+          grep -q 'release-smoke' "$RUNNER_TEMP/pty-smoke.log"
+          grep -q 'checkpoint' "$RUNNER_TEMP/pty-smoke.log"
+
+      - name: Collect
+        run: |
+          exe=""
+          if [ "$RUNNER_OS" = "Windows" ]; then exe=".exe"; fi
+          mkdir -p "$RUNNER_TEMP/pty-out"
+          cp "target/${{ matrix.target }}/release/loginom-ai-agent-pty$exe" "$RUNNER_TEMP/pty-out/"
+          (cd "$RUNNER_TEMP/pty-out" && sha256sum "loginom-ai-agent-pty$exe" > SHA256SUMS 2>/dev/null || shasum -a 256 "loginom-ai-agent-pty$exe" > SHA256SUMS)
+          cat "$RUNNER_TEMP/pty-out/SHA256SUMS"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: loginom-ai-agent-pty-${{ matrix.target }}
+          path: ${{ runner.temp }}/pty-out/*
+          if-no-files-found: error
+          retention-days: 14
