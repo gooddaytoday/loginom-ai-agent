@@ -286,7 +286,8 @@ test('T3: public finish offers only an existing-output read after repeated failu
 
   // Dock continues over the existing node; the broken finish predicate fails again.
   f.state.release = () => { throw Error('Release verifier unavailable for this surface'); };
-  await stopAtFinish(f, 'apply-2', { kind: 'existing', type: 'imports.text', ref: node });
+  const stopped = await stopAtFinish(f, 'apply-2', { kind: 'existing', type: 'imports.text', ref: node });
+  assert.equal(stopped.outcome.output.execution.status, 'not_requested');
   const previous = (await f.runtime.inspect({ operationId: 'apply' })).output;
   assert.equal(previous.next_steps.some(step => step.tool === 'dock_browser_recovery'), false);
   assert.throws(() => f.runtime.browserRecoveryBasis('apply'), /No browser recovery trigger/);
@@ -297,8 +298,18 @@ test('T3: public finish offers only an existing-output read after repeated failu
   const call = async args => JSON.parse((await recovery.call('dock_browser_recovery', args)).content[0].text);
   const started = await call({ action: 'start', operation_id: 'apply-2' });
   assert.equal(started.phase, 'browser');
+  assert.equal(started.operation_id, 'apply-2');
   assert.equal(started.reason, 'REPEATED_PHASE_FAILURE');
   assert.equal(started.step.key, first.step.key);
+  assert.deepEqual(started.goal.node, node);
+  assert.equal(started.goal.stopped_phase, 'finish');
+  assert.equal(started.goal.requested_finish, 'execute');
+  assert.match(started.goal.required_result, /leave this node unlocked on the quiet graph/i);
+  assert.match(started.goal.required_result, /do not click execute/i);
+  assert.match(started.goal.required_result, /original execution may already have started/i);
+  assert.doesNotMatch(started.goal.required_result, /settings and ports completed|and the node executed/i);
+  assert.match(started.instruction, /current Loginom tab/);
+  assert.equal(recovery.refusesDock('dock_node_apply'), true);
   f.state.release = proved;
   const finished = await call({ action: 'finish', operation_id: 'apply-2', actions_performed: ['Returned to the scenario graph'] });
   const verified = finished.verification;
@@ -306,12 +317,15 @@ test('T3: public finish offers only an existing-output read after repeated failu
   assert.equal(verified.status, 'continuable');
   assert.equal(verified.original_operation.operation_id, 'apply-2');
   assert.equal(verified.original_operation.status, 'FAILED');
+  assert.deepEqual(verified.original_operation.configuration, { status: 'unknown' });
   assert.deepEqual(verified.original_operation.execution, { status: 'unknown', execution_id: null });
   assert.deepEqual(verified.facts, ['node_released_on_quiet_graph', 'no_wizard_dialog_or_mask']);
   assert.equal(verified.next_step.tool, 'dock_node_read');
   assert.equal(verified.next_step.original_operation_id, 'apply-2');
   assert.equal(verified.receipt_id, 'apply-2:br2');
   assert.equal(f.runtime.nodeApplyStatus('apply-2').outcome.output.browser_recovery.receipt_id, verified.receipt_id);
+  assert.equal(recovery.refusesDock('dock_node_apply'), false);
+  assert.equal(f.runtime.hasUnsettledWork(), false);
   assert.match(verified.next_step.instruction, /NEW operation_id and source_operation_id:"apply-2:br2"/);
   assert.doesNotMatch(verified.next_step.instruction, /\bexecute\b|fresh execution|step was completed/i);
   assert.match(verified.next_step.instruction, /read an already active result or wait for an already running execution/i);
@@ -323,6 +337,32 @@ test('T3: public finish offers only an existing-output read after repeated failu
   const reader = nodeReadHandler({ revision: '1', modes: ['delimited'] });
   reader.validate(read.parameters, 'read_existing_output', read);
   assert.throws(() => reader.validate({ ...read.parameters, observed_schema: false }, 'read_existing_output', read), /schema/);
+});
+
+test('T3: public start keeps settings and ports guidance for a stopped configure', async () => {
+  const f = fixture({ stopPhase: 'configure' });
+  const recovery = createBrowserRecovery({ enabled: true, gate: createSerialGate(), executor: f.runtime,
+    probe: async () => ({ ok: true }), record: async event => event });
+  const call = async args => JSON.parse((await recovery.call('dock_browser_recovery', args)).content[0].text);
+  f.runtime.startNodeApply(f.request('apply'));
+  await f.runtime.waitNodeApply('apply', { timeoutMs: 1000 });
+  await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+  assert.equal((await call({ action: 'start', operation_id: 'apply' })).reason, 'NODE_RELEASE_REFUSED');
+  f.state.release = proved;
+  assert.equal((await call({ action: 'finish', operation_id: 'apply', actions_performed: ['Returned to the scenario graph'] })).phase, 'dock');
+
+  f.runtime.startNodeApply(f.request('apply-2', { kind: 'existing', type: 'imports.text', ref: node }));
+  await f.runtime.waitNodeApply('apply-2', { timeoutMs: 1000 });
+  const started = await call({ action: 'start', operation_id: 'apply-2' });
+  assert.equal(started.phase, 'browser');
+  assert.equal(started.reason, 'REPEATED_PHASE_FAILURE');
+  assert.deepEqual(started.goal.node, node);
+  assert.equal(started.goal.stopped_phase, 'configure');
+  assert.equal(started.goal.requested_finish, 'execute');
+  assert.match(started.goal.required_result, /settings and ports .*original request.*returning to the graph/i);
+  assert.match(started.goal.required_result, /leave this node unlocked on the quiet graph/i);
+  assert.doesNotMatch(started.goal.required_result, /\bexecute|already started/i);
+  assert.equal((await call({ action: 'finish', operation_id: 'apply-2', actions_performed: ['Returned to the scenario graph'] })).phase, 'dock');
 });
 
 test('an observed-schema read accepts the fresh schema and still refuses ambiguity', () => {

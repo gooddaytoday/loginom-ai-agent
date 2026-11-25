@@ -716,7 +716,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
     &&['document_id','workflow_id','node_id'].every(k=>proof.node_context?.[k]===state.node[k]),'Release proof differs from the stopped node');
   const verified=name=>state.phases.some(p=>p.phase===name);
   const committed=request.finish!=='close'&&(verified('finish')||handler.output_wizard==='separate'&&verified('node_finish')&&verified('output_mapping'));
-  const launch=['materialization_start','materialization_execute','execute'].includes(pending.phase)||pending.phase==='finish'&&request.finish==='execute';
+  const launch=nodePhaseMayHaveLaunched(pending.phase,request.finish);
   const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||handler?.unchangedExecution?.(request)===true||isUnchangedTransformExecution(request,handler);
   // Export release proves only workspace cleanup. An unconfirmed launch may
   // already have written a file; never infer its settings or offer a replay.
@@ -766,6 +766,10 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   requireValue(saved&&hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(journalCopy(event)),'Node phase journal acknowledgement differs');
   state.pending=null;state.cleanup_complete=true;state.effect_possible=true;state.result=structuredClone(result);
   return result;
+}
+
+export function nodePhaseMayHaveLaunched(phase,finish) {
+  return ['materialization_start','materialization_execute','execute'].includes(phase)||phase==='finish'&&finish==='execute';
 }
 
 function correctNodeRequest(request,node,exportConflict=false) {

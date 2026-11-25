@@ -23,7 +23,7 @@ import { makeWorkspaceUiCode, validateUiAction, uiActionSchema } from './workspa
 import { createObservationPages } from './observation-pages.mjs';
 import { makeWorkspaceBootstrapCode } from './workspace.mjs';
 import { createNodeProcedure } from './node-procedure.mjs';
-import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow, releaseNodeApply } from './node-apply.mjs';
+import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow, releaseNodeApply, nodePhaseMayHaveLaunched } from './node-apply.mjs';
 import {reconcileOutputMappingPhase} from './node-output-mapping-recovery.mjs';
 import {reconcileInputMappingPhase} from './node-input-mapping-recovery.mjs';
 import { createNodeOperationRunner } from './node-operation-runner.mjs';
@@ -2905,9 +2905,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         requested_finish: request.finish, error: structuredClone(operation.outcome?.error ?? null),
         ...(operation.releaseRefused ? { ui_blocker: operation.releaseRefused.ui_blocker ?? operation.releaseRefused.message } : {}),
         how: 'Leave node views and visualizers through the scenario breadcrumb (Сценарий); never close workspace tabs or the package.',
-        required_result: 'Leave this node unlocked on the quiet graph with no wizard, dialog or mask open'
-          + (trigger.reason === 'REPEATED_PHASE_FAILURE' ? ', its settings and ports completed as in the original request'
-            + (request.finish === 'execute' ? ' and the node executed' : '') : '') + '.' } };
+        required_result: 'Leave this node unlocked on the quiet graph with no wizard, dialog or mask open.'
+          + (trigger.reason === 'REPEATED_PHASE_FAILURE'
+            ? nodePhaseMayHaveLaunched(trigger.step.phase, request.finish)
+              ? ' The original execution may already have started. Do not click Execute or start this node again.'
+              : ' Complete the settings and ports in the original request before returning to the graph.'
+            : '') } };
     },
     async browserRecoveryHandoff(operationId) {
       const operation = operations.get(operationId);
