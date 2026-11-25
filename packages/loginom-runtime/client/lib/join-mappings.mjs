@@ -47,14 +47,21 @@ export async function configureJoinInputs(channel,mappings,ctx,request,finishWiz
   }
  }catch(e){if(!newNode)await closePreparedWizard(channel);throw e;}
  const results=[];
- for(const port of [1,0]){
+ // Check the first native input before committing either port on a new Join.
+ // The existing Join still has its second wizard open after schema validation.
+ for(const port of newNode?[0,1]:[1,0]){
   if(newNode||port===0)await channel.openInputPort(port);
   const ready=s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified&&s.node_mapping.node_context.input_port?.port===port;
   let s=await channel.observe({condition:'join input '+port+' before configuration',readMappings:true,ready});
   const requested=mappingFor(port),sources=s.node_mapping.source_fields.map(f=>({...f,used:true}));
   try{
    need(JSON.stringify(schema(effectiveJoinInput(requested,s.node_mapping)))===JSON.stringify(schema(planned[port])),'Join input changed after validation');
-  }catch(e){await closePreparedWizard(channel);throw e;}
+  }catch(error){
+   const closed=await closePreparedWizard(channel);
+   if(newNode&&port===0)error.nodePhaseRefusal={phase:'input_mapping',status:'FAILED',effect_possible:true,
+    cleanup_complete:true,settings_unchanged:true,verification:'join_first_input_schema_refused',proof:{closed}};
+   throw error;
+  }
   const changes=[];
   if(requested.fields){
    changes.push(await configureOutputFields(channel,requested,sources));
