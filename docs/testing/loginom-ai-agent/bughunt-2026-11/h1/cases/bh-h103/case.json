@@ -1,6 +1,7 @@
 {
   "budget": {
     "forbid": [
+      "python3",
       "sqlite3",
       "pandas",
       "to_csv(",

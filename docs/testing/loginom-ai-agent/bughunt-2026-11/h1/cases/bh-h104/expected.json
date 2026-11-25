@@ -14,17 +14,17 @@
       "columns": [
         {
           "name": "Store",
-          "label": "Store",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "WeekStart",
-          "label": "WeekStart",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Revenue",
-          "label": "Revenue",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -33,7 +33,7 @@
         },
         {
           "name": "MovingAverage4",
-          "label": "MovingAverage4",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,

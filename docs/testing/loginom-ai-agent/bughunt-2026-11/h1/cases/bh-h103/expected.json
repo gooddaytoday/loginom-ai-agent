@@ -14,27 +14,27 @@
       "columns": [
         {
           "name": "Cohort",
-          "label": "Cohort",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Age",
-          "label": "Age",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "CohortSize",
-          "label": "CohortSize",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Active",
-          "label": "Active",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Retention",
-          "label": "Retention",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,

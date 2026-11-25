@@ -14,22 +14,22 @@
       "columns": [
         {
           "name": "Customer",
-          "label": "Customer",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Recency",
-          "label": "Recency",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Frequency",
-          "label": "Frequency",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Monetary",
-          "label": "Monetary",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -38,22 +38,22 @@
         },
         {
           "name": "R",
-          "label": "R",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "F",
-          "label": "F",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "M",
-          "label": "M",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Segment",
-          "label": "Segment",
+          "label_any": true,
           "type": "string"
         }
       ],

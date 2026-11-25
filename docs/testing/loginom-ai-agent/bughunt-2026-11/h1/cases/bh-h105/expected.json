@@ -14,12 +14,12 @@
       "columns": [
         {
           "name": "Region",
-          "label": "Region",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Sum01",
-          "label": "Sum01",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -28,12 +28,12 @@
         },
         {
           "name": "Count01",
-          "label": "Count01",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Sum02",
-          "label": "Sum02",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -42,12 +42,12 @@
         },
         {
           "name": "Count02",
-          "label": "Count02",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Sum03",
-          "label": "Sum03",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -56,12 +56,12 @@
         },
         {
           "name": "Count03",
-          "label": "Count03",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Sum04",
-          "label": "Sum04",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -70,12 +70,12 @@
         },
         {
           "name": "Count04",
-          "label": "Count04",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Sum05",
-          "label": "Sum05",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -84,12 +84,12 @@
         },
         {
           "name": "Count05",
-          "label": "Count05",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Sum06",
-          "label": "Sum06",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -98,7 +98,7 @@
         },
         {
           "name": "Count06",
-          "label": "Count06",
+          "label_any": true,
           "type": "integer"
         }
       ],

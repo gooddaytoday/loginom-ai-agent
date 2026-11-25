@@ -162,7 +162,7 @@ def expectation(case, data):
     columns = []
     for field in schema.split():
         name, kind = field.split(':')
-        column = {'name': name, 'label': name, 'type': TYPES[kind]}
+        column = {'name': name, 'label_any': True, 'type': TYPES[kind]}
         if kind == 'r':
             column['tolerance'] = {'abs': 1e-8, 'rel': 1e-10}
         columns.append(column)

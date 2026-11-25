@@ -14,12 +14,12 @@
       "columns": [
         {
           "name": "Product",
-          "label": "Product",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Revenue",
-          "label": "Revenue",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -28,7 +28,7 @@
         },
         {
           "name": "Share",
-          "label": "Share",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -37,7 +37,7 @@
         },
         {
           "name": "CumulativeShare",
-          "label": "CumulativeShare",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -46,7 +46,7 @@
         },
         {
           "name": "Class",
-          "label": "Class",
+          "label_any": true,
           "type": "string"
         }
       ],

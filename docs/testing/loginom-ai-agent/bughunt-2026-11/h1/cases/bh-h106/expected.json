@@ -14,22 +14,22 @@
       "columns": [
         {
           "name": "Sensor",
-          "label": "Sensor",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Measurement",
-          "label": "Measurement",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "MeasuredAt",
-          "label": "MeasuredAt",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Reading",
-          "label": "Reading",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -38,7 +38,7 @@
         },
         {
           "name": "ZScore",
-          "label": "ZScore",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
