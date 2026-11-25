@@ -1,0 +1,89 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Продажи"
+    },
+    {
+      "type": "transform.sorting",
+      "label": "Сортировка выручки"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "id": "sales",
+        "type": "imports.text",
+        "label": "Продажи"
+      },
+      {
+        "id": "sort",
+        "type": "transform.sorting",
+        "label": "Сортировка выручки"
+      }
+    ],
+    "links": [
+      {
+        "source": "sales",
+        "target": "sort",
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "g2_review": {
+    "import_file": "sales-new.csv",
+    "table": {
+      "output_node_type": "transform.sorting",
+      "output_node_label": "Сортировка выручки",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "SaleID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Revenue",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "SaleID": 22,
+          "Region": "West",
+          "Revenue": 350.75
+        },
+        {
+          "SaleID": 24,
+          "Region": "South",
+          "Revenue": 240.25
+        },
+        {
+          "SaleID": 21,
+          "Region": "North",
+          "Revenue": 175.25
+        },
+        {
+          "SaleID": 25,
+          "Region": "North",
+          "Revenue": 160.5
+        },
+        {
+          "SaleID": 23,
+          "Region": "South",
+          "Revenue": 100.5
+        }
+      ]
+    }
+  }
+}

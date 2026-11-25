@@ -1,0 +1,9 @@
+{
+  "products": [
+    {"id": 1, "title": "Essence Mascara Lash Princess", "dimensions": {"width": 15.14, "height": 13.08, "depth": 22.99}},
+    {"id": 2, "title": "Eyeshadow Palette with Mirror", "dimensions": {"width": 9.26, "height": 22.47, "depth": 27.67}}
+  ],
+  "total": 194,
+  "skip": 0,
+  "limit": 2
+}
