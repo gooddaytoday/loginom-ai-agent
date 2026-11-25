@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureSortingOutput} from '../lib/sorting-output.mjs';
+import {configureSorting} from '../lib/sorting-procedure.mjs';
+import {isUnchangedTransformExecution} from '../lib/node-read-contract.mjs';
 
 function fixture() {
  const fields=[['Id','integer'],['Key','real'],['Text','string']].map(([name,type],index)=>({index,name,label:name,type,data_kind:'Дискретный'}));
@@ -23,6 +25,37 @@ test('new Sorting fixes the complete output layout before Save, including non-ke
  assert.equal(r.native_mapping.autosync,false);
  assert.deepEqual(r.native_mapping.target_fields.map(v=>[v.name,v.label,v.type]),[['Id','Id','integer'],['Key','Key','real'],['Text','Text','string']]);
  assert.equal(r.changes[0].rendered_definition_preserved,true);assert.equal(f.gestures.length,1);
+});
+test('first apply to a manually placed Sorting preserves its output order on a saved-package rerun',async()=>{
+ const f=fixture(),fields=f.configuration.input_fields,key=fields[1],keys=[],selected=[];
+ const sortingState=()=>({
+  wizard:{stage:'sorting'},
+  node_sorting:{verified:true,input_fields:fields,keys:[...keys],selections:{selected:[...selected]},options:{
+   chkLocaleAware:{value:true,switch_pressed:false},chkBufferWhole:{value:false},cbxMaxThreadCount:{value:0,switch_pressed:false}}},
+  ui:{elements:[{ref:'add',sorting_field:{field_key:key.name,record_id:'source',role:'available',part:'field'},allowed_actions:['click']},
+   {ref:'select',sorting_field:{field_key:key.name,record_id:'key',role:'selected',part:'field'},allowed_actions:['click']}]},
+ });
+ const sortingChannel={
+  async observe(step){const current=sortingState();assert.ok(step.ready(current));return current;},
+  async perform(step){
+   const current=sortingState();assert.ok(step.ready(current));
+   const gesture=step.resolve(current);
+   if(gesture.verb==='double_click'&&gesture.ref==='add')keys.push({...key,record_id:'key',order:0,direction:'ASC'});
+   else {assert.deepEqual(gesture,{verb:'click',ref:'select'});selected.push('key');}
+  },
+ };
+ const target={kind:'existing',type:'transform.sorting'};
+ const parameters={keys:[{field:{kind:'input_field',name:key.name},direction:'ASC'}]};
+ const applied=await configureSorting(sortingChannel,parameters);
+ const first=await configureSortingOutput(f.channel,applied.configuration,parameters,{}, {target});
+ const output=first.native_mapping.target_fields.map(field=>field.name);
+ assert.deepEqual(output,fields.map(field=>field.name));
+
+ const rerun={target,mode:'keys',inputs:[],mappings:[],finish:'execute',parameters:{}};
+ assert.ok(isUnchangedTransformExecution(rerun,{binding_schema:{}}));
+ // Loginom restores referenced columns first when it rebuilds an autosynced port.
+ const reopened=first.native_mapping.autosync?[key.name,...output.filter(name=>name!==key.name)]:output;
+ assert.deepEqual(reopened,fields.map(field=>field.name));
 });
 test('existing Sorting retains autosync; an explicit new-node autosync still wins',async()=>{
  for(const [kind,mapping] of [['existing',{}],['new',{autosync:true}]]){
