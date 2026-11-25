@@ -238,11 +238,11 @@ export const textImportParametersSchema=object({
 // Cross-field restrictions survive the compact user envelope. Runtime guards
 // remain authoritative after optional defaults are expanded.
 nodeApplyInputSchema.allOf=[
- {if:{properties:{target:{properties:{type:{const:'research.quality'}},required:['type']}},required:['target']},then:{properties:{mode:{const:'profile'},parameters:{type:'object',properties:{},additionalProperties:false}}},else:{properties:{read:{properties:{ports:array(integer(0,2),3)}}}}},
+ {if:{properties:{target:{properties:{type:{const:'research.quality'}},required:['type']}},required:['target']},then:{properties:{mode:choice('profile',NODE_ADD_ONLY_MODE),parameters:{type:'object',properties:{},additionalProperties:false}}},else:{properties:{read:{properties:{ports:array(integer(0,2),3)}}}}},
  {if:{properties:{target:{properties:{type:choice('research.quality','preprocessing.coarse_classes','research.factor_analysis','datamining.assn_rules','transform.ungroup_data','preprocessing.smoothing','preprocessing.elim_outlier','preprocessing.data_partition')},required:['type']}},required:['target']},
   then:{},else:{properties:{read:{properties:{ports:array(integer(0,1),2)}}}}},
  {if:{properties:{target:{properties:{type:{enum:['programming.javascript','programming.python']}},required:['type']}},required:['target']},
-  then:{properties:{mode:{const:'script'},parameters:javascriptParametersSchema}},
+  then:{properties:{mode:choice('script',NODE_ADD_ONLY_MODE),parameters:javascriptParametersSchema}},
   else:{properties:{mode:{not:{const:'script'}},parameters:{not:{anyOf:Object.keys(javascriptParametersSchema.properties).filter(key=>key!=='columns').map(key=>({required:[key]}))}}}}},
  {if:{properties:{target:{properties:{type:{const:'transform.cross_table'}},required:['type']}},required:['target']},
   then:{properties:{parameters:{properties:{columns:crossTableParametersSchema.properties.columns}}}},
@@ -255,14 +255,13 @@ nodeApplyInputSchema.allOf=[
  {if:{properties:{read:{properties:{coverage:{const:'full'}},required:['coverage']}},required:['read']},
   then:{properties:{finish:{const:'execute'},target:{properties:{type:{enum:['transform.collapse_columns','transform.cross_table','programming.javascript']}}},read:{properties:{ports:{const:[0]}}}}}},
  {if:{properties:{target:{properties:{type:{const:'programming.javascript'}},required:['type']},read:{properties:{coverage:{const:'full'}},required:['coverage']}},required:['target','read']},
-  then:{properties:{read:{properties:{sample_rows:{const:100},require_exact_numbers:{const:true}}}}}}
-];
-nodeApplyInputSchema.allOf=[{if:{properties:{mode:{const:NODE_ADD_ONLY_MODE}},required:['mode']},
+  then:{properties:{read:{properties:{sample_rows:{const:100},require_exact_numbers:{const:true}}}}}},
+ {if:{properties:{mode:{const:NODE_ADD_ONLY_MODE}},required:['mode']},
    then:{properties:{target:{properties:{kind:{const:'new'}}},finish:{const:'done'},parameters:{maxProperties:0},
      inputs:{maxItems:0},variable_inputs:{maxItems:0},bindings:{maxItems:0},mappings:{maxItems:0},
      read:{properties:{ports:{maxItems:0},variable_ports:{maxItems:0},sample_rows:{const:0},require_exact_numbers:{const:false}},
-       not:{required:['coverage']}}}},
-   else:{allOf:nodeApplyInputSchema.allOf}}];
+       not:{required:['coverage']}}}}},
+];
 // Only the published representation shares repeated schemas. Runtime guards
 // retain the canonical inline schema: validateActionParameters does not resolve
 // JSON Schema references. Definitions preserve descriptions as well as bounds.

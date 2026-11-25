@@ -12,7 +12,7 @@ test('model schema inventory pins W1 variable inputs and excludes private cold w
  // #1310 lists control input support (+272 full, +136 compact).
  // LAB-2021 adds the graph-only mode and its empty request constraints.
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,204993,'8ca7f715069682532f2e9b5610f7202249fc537191badb9da563986fd288b421'],
+  [nodeApiTools,205067,'1e772bd4a08eb54ad261ddffb0612c46f9bb8d1abd9a76051de46896f5e9bcea'],
   [nodeApiTools.map(userNodeTool),14839,'6d59bccb09e8d3fd7d56aa2711c7ccfc2bef03461ab1fd6273177cb3f75763a0'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
