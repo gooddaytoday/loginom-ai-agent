@@ -1,0 +1,94 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Продажи"
+    },
+    {
+      "type": "transform.filter_data",
+      "label": "Фильтр выручки"
+    },
+    {
+      "type": "transform.group_data",
+      "label": "Итоги по регионам"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "type": "imports.text",
+        "label": "Продажи"
+      },
+      {
+        "type": "transform.filter_data",
+        "label": "Фильтр выручки"
+      },
+      {
+        "type": "transform.group_data",
+        "label": "Итоги по регионам"
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "imports.text",
+          "label": "Продажи"
+        },
+        "target": {
+          "type": "transform.filter_data",
+          "label": "Фильтр выручки"
+        },
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": {
+          "type": "imports.text",
+          "label": "Продажи"
+        },
+        "target": {
+          "type": "transform.group_data",
+          "label": "Итоги по регионам"
+        },
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "g2_review": {
+    "table": {
+      "output_node_type": "transform.group_data",
+      "output_node_label": "Итоги по регионам",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "RevenueStat",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "RevenueStat": 331.75
+        },
+        {
+          "Region": "South",
+          "RevenueStat": 326.0
+        },
+        {
+          "Region": "West",
+          "RevenueStat": 88.5
+        }
+      ]
+    }
+  }
+}

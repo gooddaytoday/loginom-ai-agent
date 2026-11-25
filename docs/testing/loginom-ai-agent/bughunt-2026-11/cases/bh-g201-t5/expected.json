@@ -1,0 +1,115 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Продажи"
+    },
+    {
+      "type": "transform.filter_data",
+      "label": "Фильтр выручки"
+    },
+    {
+      "type": "transform.group_data",
+      "label": "Группировка"
+    },
+    {
+      "type": "exports.excel",
+      "label": "Экспорт Excel"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "type": "imports.text",
+        "label": "Продажи"
+      },
+      {
+        "type": "transform.filter_data",
+        "label": "Фильтр выручки"
+      },
+      {
+        "type": "transform.group_data",
+        "label": "Группировка"
+      },
+      {
+        "type": "exports.excel",
+        "label": "Экспорт Excel"
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "imports.text",
+          "label": "Продажи"
+        },
+        "target": {
+          "type": "transform.filter_data",
+          "label": "Фильтр выручки"
+        },
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": {
+          "type": "transform.filter_data",
+          "label": "Фильтр выручки"
+        },
+        "target": {
+          "type": "transform.group_data",
+          "label": "Группировка"
+        },
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": {
+          "type": "transform.group_data",
+          "label": "Группировка"
+        },
+        "target": {
+          "type": "exports.excel",
+          "label": "Экспорт Excel"
+        },
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "g2_review": {
+    "aggregate": "avg",
+    "workbook": {
+      "filename": "summary.xlsx",
+      "sheet": "Итоги"
+    },
+    "table": {
+      "output_node_type": "transform.group_data",
+      "output_node_label": "Группировка",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "RevenueStat",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "RevenueStat": 140.75
+        },
+        {
+          "Region": "South",
+          "RevenueStat": 163.0
+        }
+      ]
+    }
+  }
+}

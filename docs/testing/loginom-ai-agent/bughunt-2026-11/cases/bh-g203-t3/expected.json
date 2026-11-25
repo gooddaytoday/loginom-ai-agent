@@ -1,0 +1,129 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Январь"
+    },
+    {
+      "type": "imports.text",
+      "label": "Февраль"
+    },
+    {
+      "type": "imports.text",
+      "label": "Март"
+    },
+    {
+      "type": "transform.union_data",
+      "label": "Объединение месяцев"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "type": "imports.text",
+        "label": "Январь"
+      },
+      {
+        "type": "imports.text",
+        "label": "Февраль"
+      },
+      {
+        "type": "imports.text",
+        "label": "Март"
+      },
+      {
+        "type": "transform.union_data",
+        "label": "Объединение месяцев"
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "imports.text",
+          "label": "Январь"
+        },
+        "target": {
+          "type": "transform.union_data",
+          "label": "Объединение месяцев"
+        },
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": {
+          "type": "imports.text",
+          "label": "Март"
+        },
+        "target": {
+          "type": "transform.union_data",
+          "label": "Объединение месяцев"
+        },
+        "output": 0
+      }
+    ]
+  },
+  "g2_review": {
+    "table": {
+      "output_node_type": "transform.union_data",
+      "output_node_label": "Объединение месяцев",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "OrderID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Revenue",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "OrderID": 101,
+          "Region": "North",
+          "Revenue": 20.25
+        },
+        {
+          "OrderID": 102,
+          "Region": "South",
+          "Revenue": 50.5
+        },
+        {
+          "OrderID": 101,
+          "Region": "North",
+          "Revenue": 20.25
+        },
+        {
+          "OrderID": 101,
+          "Region": "North",
+          "Revenue": 20.25
+        },
+        {
+          "OrderID": 301,
+          "Region": "South",
+          "Revenue": 111.75
+        },
+        {
+          "OrderID": 302,
+          "Region": "West",
+          "Revenue": 42.25
+        },
+        {
+          "OrderID": 303,
+          "Region": "North",
+          "Revenue": 70.5
+        }
+      ]
+    }
+  }
+}

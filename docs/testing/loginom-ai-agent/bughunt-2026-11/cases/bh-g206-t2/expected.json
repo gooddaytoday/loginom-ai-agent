@@ -1,0 +1,42 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Продажи"
+    },
+    {
+      "type": "programming.javascript",
+      "label": "Расчёт JS"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "type": "imports.text",
+        "label": "Продажи"
+      },
+      {
+        "type": "programming.javascript",
+        "label": "Расчёт JS"
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "imports.text",
+          "label": "Продажи"
+        },
+        "target": {
+          "type": "programming.javascript",
+          "label": "Расчёт JS"
+        },
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "g2_review": {
+    "script": "unchanged"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Продажи"
+    },
+    {
+      "type": "imports.text",
+      "label": "Возвраты"
+    },
+    {
+      "type": "transform.join_data",
+      "label": "Слияние заказов"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "type": "imports.text",
+        "label": "Продажи"
+      },
+      {
+        "type": "imports.text",
+        "label": "Возвраты"
+      },
+      {
+        "type": "transform.join_data",
+        "label": "Слияние заказов"
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "imports.text",
+          "label": "Возвраты"
+        },
+        "target": {
+          "type": "transform.join_data",
+          "label": "Слияние заказов"
+        },
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": {
+          "type": "imports.text",
+          "label": "Продажи"
+        },
+        "target": {
+          "type": "transform.join_data",
+          "label": "Слияние заказов"
+        },
+        "output": 0,
+        "input": 1
+      }
+    ]
+  },
+  "g2_review": {
+    "join_mode": "inner",
+    "table": {
+      "output_node_type": "transform.join_data",
+      "output_node_label": "Слияние заказов",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "OrderID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "RightAmount",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "OrderID": 101,
+          "Amount": 30.75,
+          "RightAmount": 90.25
+        },
+        {
+          "OrderID": 104,
+          "Amount": 80.75,
+          "RightAmount": 80.75
+        }
+      ]
+    }
+  }
+}

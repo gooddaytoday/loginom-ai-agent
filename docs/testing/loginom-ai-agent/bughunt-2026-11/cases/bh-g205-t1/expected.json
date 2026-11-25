@@ -1,0 +1,67 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Продажи"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "type": "imports.text",
+        "label": "Продажи"
+      }
+    ],
+    "links": []
+  },
+  "g2_review": {
+    "import_file": "sales.csv",
+    "table": {
+      "output_node_type": "imports.text",
+      "output_node_label": "Продажи",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "SaleID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Revenue",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "SaleID": 1,
+          "Region": "North",
+          "Revenue": 120.25
+        },
+        {
+          "SaleID": 2,
+          "Region": "South",
+          "Revenue": 52.75
+        },
+        {
+          "SaleID": 3,
+          "Region": "West",
+          "Revenue": 520.5
+        },
+        {
+          "SaleID": 4,
+          "Region": "South",
+          "Revenue": 23.5
+        }
+      ]
+    }
+  }
+}

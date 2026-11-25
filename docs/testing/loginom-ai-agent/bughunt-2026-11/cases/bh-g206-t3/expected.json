@@ -1,0 +1,96 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Продажи"
+    },
+    {
+      "type": "programming.javascript",
+      "label": "Расчёт JS"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "type": "imports.text",
+        "label": "Продажи"
+      },
+      {
+        "type": "programming.javascript",
+        "label": "Расчёт JS"
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "imports.text",
+          "label": "Продажи"
+        },
+        "target": {
+          "type": "programming.javascript",
+          "label": "Расчёт JS"
+        },
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "g2_review": {
+    "table": {
+      "output_node_type": "programming.javascript",
+      "output_node_label": "Расчёт JS",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "SaleID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Revenue",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "DoubledRevenue",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "SaleID": 1,
+          "Region": "North",
+          "Revenue": 14.25,
+          "DoubledRevenue": 28.5
+        },
+        {
+          "SaleID": 2,
+          "Region": "South",
+          "Revenue": 180.75,
+          "DoubledRevenue": 361.5
+        },
+        {
+          "SaleID": 3,
+          "Region": "West",
+          "Revenue": 60.5,
+          "DoubledRevenue": 121.0
+        },
+        {
+          "SaleID": 4,
+          "Region": "North",
+          "Revenue": 25.25,
+          "DoubledRevenue": 50.5
+        }
+      ]
+    }
+  }
+}
