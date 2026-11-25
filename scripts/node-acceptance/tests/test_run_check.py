@@ -2123,6 +2123,20 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
             self.assertNotIn('failure_class', instance.current)
             self.assertEqual(runner.read(stage / 'graph-observed.json')['location'], 'execution-events.jsonl:1')
 
+    def test_graph_only_excel_requires_file_bound_to_completed_execution(self):
+        destination = '/own/sales-summary.xlsx'
+        receipt = dict(status='SUCCEEDED', cleanup_complete=True, execution=dict(status='completed', execution_id='finish'),
+                       configuration=dict(readback=dict(kind='excel_export', destination=destination)),
+                       output=dict(ports=[], file_artifacts=[dict(destination=destination, bytes=123,
+                           execution_id='finish', verification_id='verified')]))
+        self.assertTrue(runner.verified_graph_workbook([(6, receipt)], 'sales-summary.xlsx'))
+        self.assertFalse(runner.verified_graph_workbook([(6, receipt)], 'other.xlsx'))
+        for changes in (dict(bytes=0), dict(execution_id='wrong'), dict(verification_id=None),
+                        dict(destination='/other/sales-summary.xlsx')):
+            bad = copy.deepcopy(receipt)
+            bad['output']['file_artifacts'][0].update(changes)
+            self.assertFalse(runner.verified_graph_workbook([(6, bad)], 'sales-summary.xlsx'))
+
     def test_private_case_attaches_every_data_format_with_configured_model(self):
         with tempfile.TemporaryDirectory() as directory:
             commands = []

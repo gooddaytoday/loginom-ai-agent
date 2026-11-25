@@ -2215,6 +2215,23 @@ def port_failure(replies, journal, *, required=True):
     return str(journal) + ':' + str(invalid[0] if invalid else 1) if invalid or (required and not delivered) else None
 
 
+def verified_graph_workbook(replies, filename):
+    for _, receipt in replies:
+        if receipt.get('status') != 'SUCCEEDED' or receipt.get('cleanup_complete') is not True:
+            continue
+        readback = (receipt.get('configuration') or {}).get('readback') or {}
+        destination = readback.get('destination') or ''
+        execution = receipt.get('execution') or {}
+        if (readback.get('kind') != 'excel_export' or Path(destination).name != filename
+                or execution.get('status') != 'completed' or not execution.get('execution_id')):
+            continue
+        if any(artifact.get('destination') == destination and artifact.get('bytes', 0) > 0
+               and artifact.get('verification_id') and artifact.get('execution_id') == execution['execution_id']
+               for artifact in receipt.get('output', {}).get('file_artifacts', [])):
+            return True
+    return False
+
+
 def check_lgd_import_result(replies, row_count):
     assert any(o.get('status') == 'SUCCEEDED'
                and o.get('configuration', {}).get('readback', {}).get('kind') == 'lgd_import'
@@ -3304,7 +3321,11 @@ class Runner:
         self.current['read-path'] = '/'.join(sorted((set(self.current.get('read-path', '').split('/')) | paths) - {''}))
         delivered = any(ports([o for _, o in replies]))
         assert not (lgd_corrupt and delivered), 'LGD_CORRUPT_PORTS_FORBIDDEN'
-        invalid = (port_failure(replies, folder / 'model.stdout', required=not only_graph)
+        workbook = expected.get('excel_file') if only_graph else None
+        if workbook:
+            assert verified_graph_workbook(replies, workbook), 'EXCEL_SINK_FILE_EVIDENCE_MISSING'
+        port_required = not only_graph or bool(expected.get('tables') and not workbook)
+        invalid = (port_failure(replies, folder / 'model.stdout', required=port_required)
                    if not spec.get('variable_only') and (not (rejection or refusal or execution_error or lgd_corrupt) or delivered) else None)
         if invalid:
             self.current.update(failure_class='PORT_READ_INVALID', detail='Port source or native binding/exactness/Preview cleanup absent or invalid', location=invalid, failure_load=list(os.getloadavg()))
