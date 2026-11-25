@@ -24717,3 +24717,15 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Windows (`USERPROFILE` задан, не запускал); `app`, `dashboard` (браузер, сборка) не пробовал; `desktop` по пробе пишет
   только кэш `electron`.
 - Падения `server` (около 50) и `loginom-host` (40) есть и в базе; причину не искал.
+
+## B5.1e-ci Проверка Windows на GitHub
+
+Первый прогон `Windows native checks` на опубликованной `oc2-migration` (`950e5da9ce`, run 45675480080 форка), windows-2022
+и windows-2025:
+
+- `Verify native host` и `Verify native profile` прошли. ACL профиля CLI на настоящем Windows: `profile-windows.test.ts`
+  3 pass, 1 skip (случай «fails closed on other platforms»), 0 fail.
+- `Assert system proxy in sidecar` упал: `system-proxy-smoke.ts --assert-windows` импортирует
+  `desktop/src/main/proxy-env` 0.4, которого в v2 нет. Системный прокси службы — после шлюза B (В-97, п. 6).
+  Шаги WinINET-прокси и проверка прокси службы убраны из задания `native` с комментарием, они вернутся вместе с
+  прокси службы. Задание `timings` (только `workflow_dispatch`) не менялось.
