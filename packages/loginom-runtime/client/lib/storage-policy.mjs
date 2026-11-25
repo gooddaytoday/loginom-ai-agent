@@ -5,6 +5,7 @@ import {randomUUID} from 'node:crypto';
 import {mkdir,mkdtemp,lstat,chmod,rm} from 'node:fs/promises';
 import {join,basename} from 'node:path';
 import {protectWindowsDirectory} from './platform.mjs';
+import {fileStatIdentity} from './file-reference.mjs';
 const purposes = ['packages', 'inputs', 'exports'];
 
 export function storagePath(value) {
@@ -247,7 +248,6 @@ export function requireServerDownloadFormat(path) {
 export function createServerDownloadRegistry({directory,inspect,download,recover,now=Date.now,navigationPending=()=>true,withSource=(_ref,_options,read)=>read()}) {
   const jobs=new Map();
   const native=s=>JSON.stringify([s.destination,s.bytes,s.mtime,s.origin,s.account,s.document_id]);
-  const local=s=>({size:s.size,mtime:s.mtimeMs,ctime:s.ctimeMs,file_id:`${s.dev}:${s.ino}`});
   const find=id=>{const job=jobs.get(id);if(!job)throw Error('Unknown server download operation');return job;};
   const unresolvedNavigation=job=>job.navigationOperationId&&navigationPending(job.navigationOperationId);
   const cleanupComplete=job=>job.state==='settled'&&job.cleanup!==false&&!unresolvedNavigation(job);
@@ -320,7 +320,7 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
               storageSession:'verify',operation_id:request.operation_id}),copy=await lstat(job.path);
             if(native(after)!==native(job.source)||!copy.isFile()||copy.isSymbolicLink()||copy.size!==job.source.bytes)
               throw Error('LOGINOM_FILE_CHANGED');
-            await chmod(job.path,0o600);job.identity=local(await lstat(job.path));
+            await chmod(job.path,0o600);job.identity=fileStatIdentity(await lstat(job.path,{bigint:true}));
             job.controller.signal.throwIfAborted();
             if(now()>=job.deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
             clearTimeout(timer);
@@ -363,10 +363,10 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
       for(const job of jobs.values()) {
         if(job.status!=='SUCCEEDED'||job.phase!=='cached'||native(job.source)!==native(source)
           ||receipt.identity?.canonical_path!==job.path||JSON.stringify(localIdentity(receipt.identity))!==JSON.stringify(job.identity))continue;
-        const copy=await lstat(job.path).catch(()=>null);
-        if(!copy||copy.isSymbolicLink()||!copy.isFile()||JSON.stringify(local(copy))!==JSON.stringify(job.identity))return source;
+        const copy=await lstat(job.path,{bigint:true}).catch(()=>null);
+        if(!copy||copy.isSymbolicLink()||!copy.isFile()||JSON.stringify(fileStatIdentity(copy))!==JSON.stringify(job.identity))return source;
         return {...source,sha256:receipt.sha256,cache_binding:{server_source_ref:source.server_source_ref,
-          download_source_ref:job.source.server_source_ref,native_size:source.bytes,native_mtime:source.mtime,copy_bytes:copy.size,identity:receipt.identity}};
+          download_source_ref:job.source.server_source_ref,native_size:source.bytes,native_mtime:source.mtime,copy_bytes:Number(copy.size),identity:receipt.identity}};
       }
       return source;
     },

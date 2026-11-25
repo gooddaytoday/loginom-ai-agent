@@ -4,13 +4,15 @@ import {
   attachmentReceiptSource,
 } from "@loginom-ai-agent/loginom-host/attachment-receipt"
 import { pathToFileURL } from "node:url"
+import { createHash } from "node:crypto"
+import { setTimeout as delay } from "node:timers/promises"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { expect } from "bun:test"
-import { open, mkdir, rm, rename, symlink, writeFile } from "node:fs/promises"
+import { open, mkdir, readFile, rm, rename, symlink, utimes, writeFile } from "node:fs/promises"
 import { basename, join } from "node:path"
 import { Global } from "@opencode-ai/core/global"
-import { profileFile, sampleFile } from "@/tool/loginom-file-profile-core"
+import { exactScanReceipt, profileFile, sampleFile, scanFile } from "@/tool/loginom-file-profile-core"
 import { Cause, Effect, Exit, Layer } from "effect"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
@@ -21,7 +23,7 @@ import { Session } from "@/session/session"
 import { MessageID, PartID } from "@/session/schema"
 import { admitLoginomFileReference, authorizeLoginomFile, snapshotLoginomFile } from "@/tool/loginom-local-file"
 import { admitLoginomLocalFile } from "@/tool/loginom-local-file"
-import { fileReferences } from "@loginom-ai-agent/loginom-host/file-reference"
+import { fileReferences, inspectReferenceFile } from "@loginom-ai-agent/loginom-host/file-reference"
 import { Tool } from "@/tool/tool"
 import { TestInstance, testInstanceStoreLayer } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
@@ -343,6 +345,133 @@ for (const mode of ["stable", "changed", "deleted", "deny"] as const) {
     }),
   )
 }
+
+it.instance(
+  "re-admits both scanned workbooks after a metadata-only update and refuses changed bytes or replacement",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const sessions = yield* Session.Service
+      const ctx = yield* context
+      const dir = join(Global.Path.data, "file-profiles", ctx.sessionID)
+      yield* Effect.addFinalizer(() => Effect.promise(() => rm(dir, { recursive: true, force: true })))
+      const owner = { session: ctx.sessionID, message: ctx.messageID }
+      yield* sessions.updateMessage({
+        id: ctx.messageID,
+        sessionID: ctx.sessionID,
+        role: "user",
+        agent: "build",
+        model: { providerID: ProviderV2.ID.make("test"), modelID: ModelV2.ID.make("test") },
+        time: { created: Date.now() },
+      })
+      const fixtures = join(
+        import.meta.dir,
+        "../../../../docs/node-development/nodes/imports-excel/acceptance/fixtures",
+      )
+      const mtime = 1_700_000_000
+      const digest = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex")
+      const admitted: string[] = []
+      const host = {
+        reserveReference: async () => {
+          throw Error("Expected byte admission")
+        },
+        admitReference: async () => {
+          throw Error("Expected byte admission")
+        },
+        discardReference: async () => {
+          throw Error("Expected byte admission")
+        },
+        admit: async (_message: string, files: { name: string; data: string }[]) => {
+          const sha256 = digest(Buffer.from(files[0].data, "base64"))
+          admitted.push(sha256)
+          return [{ sha256 }]
+        },
+      }
+      const books = yield* Effect.forEach(["book-a.xlsx", "book-b.xlsx"], (name) =>
+        Effect.gen(function* () {
+          const path = join(instance.directory, name)
+          const { reference, bytes, before } = yield* Effect.promise(async () => {
+            const bytes = await readFile(join(fixtures, name))
+            await writeFile(path, bytes)
+            await utimes(path, mtime, mtime)
+            const reference = await createAttachmentReceipt(path)
+            await bindAttachmentReceipt(reference.receipt, path, owner)
+            return { bytes, reference, before: await inspectReferenceFile(path) }
+          })
+          yield* sessions.updatePart({
+            id: PartID.ascending(),
+            sessionID: ctx.sessionID,
+            messageID: ctx.messageID,
+            type: "file",
+            mime: "text/plain",
+            filename: name,
+            url: pathToFileURL(path).href,
+            source: attachmentReceiptSource(reference),
+          })
+          const profile = yield* Effect.promise(() => profileFile(path, dir))
+          if (profile.format !== "xlsx") return yield* Effect.die("Expected XLSX profile")
+          const scan = yield* Effect.promise(() => scanFile(profile.profile_id, dir))
+          expect(scan.sha256).toBe(digest(bytes))
+          return { path, bytes, before, profileID: profile.profile_id, sha256: digest(bytes) }
+        }),
+      )
+      expect(books[0].sha256).not.toBe(books[1].sha256)
+      for (const book of books) {
+        const result = yield* admitLoginomLocalFile(book.path, ctx, host, owner.message)
+        expect(result.artifact).toEqual({ sha256: book.sha256 })
+      }
+
+      // The second pass uses the original attachment and on-disk scan receipts, as after reopening a package.
+      yield* Effect.promise(() => delay(30))
+      for (const book of [...books].reverse()) {
+        yield* Effect.promise(async () => {
+          await utimes(book.path, mtime + 1, mtime)
+          const current = await inspectReferenceFile(book.path)
+          expect(current).toMatchObject({
+            file_id: book.before.file_id,
+            size: book.before.size,
+            mtime_ns: book.before.mtime_ns,
+          })
+          expect(current.ctime_ns).not.toBe(book.before.ctime_ns)
+          expect(digest(await readFile(book.path))).toBe(book.sha256)
+        })
+        const result = yield* admitLoginomLocalFile(
+          book.path,
+          { ...ctx, callID: "reopened-" + basename(book.path) },
+          host,
+          owner.message,
+        )
+        expect(result.artifact).toEqual({ sha256: book.sha256 })
+        const receipt = yield* Effect.promise(() => exactScanReceipt(book.profileID, dir))
+        expect(receipt?.sha256).toBe(book.sha256)
+      }
+
+      const authorized = yield* authorizeLoginomFile(books[0].path, ctx)
+      const wrongSnapshot = yield* authorized.verifyAttachment(books[1].bytes).pipe(Effect.exit)
+      expect(Exit.isFailure(wrongSnapshot)).toBe(true)
+
+      yield* Effect.promise(async () => {
+        const [edited, replaced] = books
+        const changed = Buffer.from(edited.bytes)
+        changed[changed.length - 1] ^= 1
+        await writeFile(edited.path, changed)
+        await utimes(edited.path, mtime, mtime)
+        const replacement = join(instance.directory, "replacement.xlsx")
+        await writeFile(replacement, replaced.bytes)
+        await utimes(replacement, mtime, mtime)
+        await rename(replacement, replaced.path)
+      })
+      for (const book of books) {
+        const result = yield* admitLoginomLocalFile(book.path, ctx, host, owner.message).pipe(Effect.exit)
+        expect(Exit.isFailure(result)).toBe(true)
+        if (Exit.isFailure(result)) expect(String(Cause.squash(result.cause))).toContain("LOGINOM_FILE_CHANGED")
+        yield* Effect.promise(async () => {
+          await expect(exactScanReceipt(book.profileID, dir)).rejects.toThrow("LOGINOM_FILE_CHANGED")
+        })
+      }
+      expect(admitted).toEqual([books[0].sha256, books[1].sha256, books[1].sha256, books[0].sha256])
+    }),
+)
 
 for (const mode of [
   "own",
