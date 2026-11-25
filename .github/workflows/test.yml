@@ -56,36 +56,44 @@ jobs:
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
       - name: Configure git identity
+        id: ready
         run: |
           git config --global user.email "bot@opencode.ai"
           git config --global user.name "opencode"
 
+      # Each package reports its own result: a red guard must not hide the packages after it.
       - name: Test product guards
         working-directory: packages/product
         run: bun test
 
       - name: Test loginom-agent
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
         working-directory: packages/loginom-agent
         run: bun run test
 
       # The resume oracle observes its owned X11 windows and requires a display in CI.
       - name: Test loginom-host
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
         working-directory: packages/loginom-host
         run: xvfb-run -a env GITHUB_ACTIONS=false bun run test
 
       - name: Test dashboard
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
         working-directory: packages/dashboard
         run: bun run test
 
       - name: Test CLI
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
         working-directory: packages/cli
         run: xvfb-run -a env GITHUB_ACTIONS=false bun run test
 
       - name: Verify Loginom workspace address and native link contracts
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
         working-directory: packages/loginom-runtime
         run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/connection-check.test.mjs client/test/workspace.test.mjs client/test/node-link-validation.test.mjs client/test/node-link-hover.test.mjs client/test/node-link-rebind.test.mjs client/test/node-target.test.mjs client/test/text-export-connect.test.mjs client/test/executor.test.mjs client/test/model-schema-budget.test.mjs client/test/user-response-budget.test.mjs client/test/node-guidance.test.mjs client/test/user-profile-bridge.test.mjs'
 
       - name: Verify complete supervised runtime suite with pinned Chromium
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
         timeout-minutes: 6
         working-directory: packages/loginom-runtime
         run: |

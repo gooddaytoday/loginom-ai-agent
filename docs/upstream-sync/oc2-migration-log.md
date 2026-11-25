@@ -24853,3 +24853,14 @@ refusal, and takes --command alone»: процесс CLI из исходнико
 (`install-deps`, закреплённая ревизия) и `sysctl` для user namespaces; `xvfb-run` для `cli` и `loginom-host` (`resume-oracle`
 без дисплея пропускается локально, в CI он обязателен); время под `nice -n 19` и 5 минут на набор runtime; `npm ci` шаблона и
 клиента; первый настоящий прогон на `push` в `oc2-migration` в форке.
+
+## B5.1m-ci Первый прогон loginom-checks на GitHub
+
+Run 45688737120 форка на `oc2-migration` `df77bb443a`: `secrets` — success; `loginom-checks` — failure на шаге
+`Test product guards`. Упали ровно три известных теста (`workspace packages`, `CI triggers`, `path literals`, В-95/B5.1),
+74 pass. Все следующие шаги (`loginom-agent`, `loginom-host`, `dashboard`, `cli`, контракты и набор `loginom-runtime`)
+были пропущены, потому что шаги задания идут до первого красного.
+
+Правка: у шага `Configure git identity` появился `id: ready`, а у шагов пакетов после охранных тестов условие
+`!cancelled() && steps.ready.outcome == 'success'`. Каждый пакет теперь показывает свой результат, задание остаётся
+красным, пока красный любой шаг. Охранные тесты `loginom-checks`, `ci-base` и `ci-workflows` — 12 pass.
