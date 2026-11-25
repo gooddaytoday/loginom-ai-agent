@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { dispatchNodeApi } from '../lib/node-api.mjs';
 import { createActionRuntime } from '../lib/executor.mjs';
+import { createExecutionJournal } from '../lib/execution-journal.mjs';
 import { NodeReleaseBlocked, releasePendingNode, verifyRecoveredPendingNode } from '../lib/node-pending-release.mjs';
 import { createBrowserRecovery } from '../lib/browser-recovery.mjs';
 import { createSerialGate } from '../lib/clipboard.mjs';
@@ -466,6 +470,48 @@ test('the lease blocks Dock mutations; verification releases on proof and writes
   assert.deepEqual(redelivered.browser_recovery, { receipt_id: 'apply:br1', status: 'continuable',
     facts: ['node_released_on_quiet_graph', 'no_wizard_dialog_or_mask'] });
   assert.equal(compactNodeResult(f.runtime.nodeApplyStatus('apply')).browser_recovery.receipt_id, 'apply:br1');
+});
+
+test('a durable node recovery acknowledgement arriving after cancellation cannot release the original operation', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'dock-recovery-ack-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const record = createExecutionJournal({ directory, metadata: { sessionId: 'test-recovery-ack' } });
+  const f = fixture();
+  f.state.receipt = { cleanup: false };
+  const original = await stopAtFinish(f);
+  await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+  const recovery = createBrowserRecovery({ enabled: true, gate: createSerialGate(), executor: f.runtime,
+    probe: async () => ({ ok: true }), record });
+  const call = async (args, signal) => JSON.parse((await recovery.call('dock_browser_recovery',
+    { operation_id: 'apply', ...args }, { signal })).content[0].text);
+  assert.equal((await call({ action: 'start' })).phase, 'browser');
+  f.state.release = proved;
+  const graph = structuredClone(f.graph);
+  const written = Promise.withResolvers(), acknowledgement = Promise.withResolvers();
+  f.state.ack = async event => {
+    if (event.phase !== 'browser_recovery_receipt') return event;
+    written.resolve(await record(event));
+    return acknowledgement.promise;
+  };
+  const controller = new AbortController();
+  const finish = call({ action: 'finish', actions_performed: ['Returned to the graph'] }, controller.signal);
+  const receipt = await written.promise;
+  controller.abort();
+  acknowledgement.resolve(receipt);
+
+  const ended = await finish;
+  assert.equal(ended.verification.status, 'unresolved');
+  assert.equal(ended.stopped.cleanup.state, 'retained_uncertain');
+  assert.equal(recovery.refusesDock('dock_operation_inspect'), true);
+  assert.equal(recovery.refusesDock('dock_node_apply'), true);
+  assert.equal(f.runtime.hasUnsettledWork(), true);
+  const status = await dispatchNodeApi(f.runtime, 'dock_node_status', { operation_id: 'apply' });
+  assert.deepEqual(status.outcome, original.outcome);
+  assert.deepEqual(status.progress, original.progress);
+  assert.throws(() => f.runtime.startNodeApply(f.request('other')), /Browser recovery holds/);
+  assert.ok(!f.events.some(event => event.phase === 'operation_abandoned'));
+  assert.deepEqual(f.graph, graph);
+  assert.equal(f.calls.filter(call => call === 'finish').length, 1);
 });
 
 test('T3: public finish offers only an existing-output read after repeated failure with unknown execution', async () => {

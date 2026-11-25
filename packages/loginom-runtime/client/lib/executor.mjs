@@ -2972,11 +2972,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const journal = { started: false };
       const checkOutput=Object.hasOwn(operation,'recoveryBaseline');
       const deadline=now()+Math.min(remainingMs,NODE_RELEASE_BUDGET_MS);
-      // releaseNodeApply settles its state after its own journal entry. Keep that
-      // settlement private until the recovered output receipt is also acknowledged.
-      const releaseOperation=checkOutput?{...operation,nodeApply:{...operation.nodeApply}}:operation;
+      // Keep release private until the browser recovery receipt is acknowledged.
+      const releaseOperation={...operation,nodeApply:{...operation.nodeApply}};
       const verifyBoundary=()=>{
-        if(!checkOutput)return;
         signal?.throwIfAborted();
         if(now()>=deadline||pending!==operation||leased!==operationId)throw Error('Recovery verification deadline or ownership changed');
       };
