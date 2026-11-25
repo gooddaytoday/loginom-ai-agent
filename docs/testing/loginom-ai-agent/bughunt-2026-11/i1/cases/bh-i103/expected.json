@@ -19,12 +19,6 @@
         "id": "rest",
         "type": "integration.rest_request"
       }
-    ],
-    "links": [
-      {
-        "source": "requests",
-        "target": "rest"
-      }
     ]
   },
   "outputs": [
