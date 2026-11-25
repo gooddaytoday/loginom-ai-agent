@@ -25186,3 +25186,42 @@ catalog-check.py код 0; apply-identity.py --check: would change: 0 files
   load config ... SyntaxError`; после — vite начинает сборку. Полная сборка Desktop здесь не гонялась.
 - Windows и macOS: та же ловушка (`setup-node` в `loginom-windows.yml` и `loginom-macos.yml`, сборка через `desktop/script/build.ts`
   -> `bunx electron-vite`); отдельных правок не нужно, лечит эта же правка. Чужих файлов не менял.
+
+## B5.1l — подпись и пакеты macOS
+
+25.11.2026. Ветка `b51l-macos-sign` от `oc2-migration` (`fa731fbffd`). Эталон — `v0.4.0`. Подпись — вариант A (ad-hoc, как в 0.4);
+Developer ID и нотаризация — этап G. Первый прогон `loginom-macos.yml` до этой задачи (run 45715943370, `fa731fbffd`): `pty` и
+`macos` зелёные, в артефакте `.app.tar`.
+
+### Выбор меньшего варианта
+
+- **Подпись делает `electron-builder`, не отдельный скрипт.** Как в 0.4: `identity "-"` и `mac.signIgnore` (`loginom/bin`,
+  `browsers`, `ripgrep`, `dashboard`). Node, Chromium, `loginom-keychain` и pty подписаны до укладки в ресурсы (Node — поставщиком,
+  остальные — ad-hoc при сборке), builder их не переподписывает, поэтому хеши `resource-manifest.json` не меняются и обновлять их
+  не нужно. Это проверяет шаг CI. `sign-desktop-macos.sh` (Developer ID, имена upstream) не трогался: он для этапа G.
+- **`pack.ts` на macOS:** без `--dir` и `identity=null`; `-c.mac.identity=- -c.dmg.sign=false`; в `dist/desktop` кладутся `.dmg`,
+  `.zip` и по-прежнему `.app.tar` (вход для подписи этапа G). `writeUpdateConfig` на macOS не вызывается: для целей `dmg` и `zip`
+  `app-update.yml` пишет сам builder. В артефакт CI `.app.tar` больше не идёт.
+- **`check-macos.ts` и `build-macos.ts` не портировались** (как в B5.1k). Нужная проверка — новый `script/check-macos-signature.ts`.
+- **Модель «обновления» для помощника:** запись создаётся копией помощника, затем копия переподписывается `codesign --force --sign -`
+  (тот же код, тот же хеш) и читает запись: обязательная проверка. Второй вариант (другой хеш кода, флаг `--options runtime`) только
+  печатается: ad-hoc подпись не обещает доступа к записи после смены хеша.
+
+### Что сделано
+
+- `packages/desktop/script/pack.ts` — macOS: DMG, ZIP, `.app.tar` (выше).
+- `packages/desktop/script/check-macos-signature.ts` (новый): `codesign --verify --deep --strict`; `verifyResources` (хеши всех
+  файлов `resource-manifest.json` внутри подписанного `.app`); создание, повторная подпись и чтение записи Keychain.
+- `loginom-macos.yml`: шаг «Check the signature» после `pack`; в кандидат и артефакт идут `.dmg`, `.zip`, CLI `tar.gz`,
+  `SHA256SUMS`. Код: 2 файла из 5.
+
+### Проверки (Linux, Bun 1.4.4)
+
+- YAML разобран `python3 yaml`; `bun build` нового скрипта проходит; ввод помощника через `Bun.spawn` проверен на `/bin/cat`.
+- `packages/product`: 92 pass, 0 fail.
+
+### Проверит только CI на macOS 15
+
+Что `electron-builder` без `--dir` собирает `dmg` и `zip` с ad-hoc подписью и signIgnore; что `codesign --verify --deep --strict`
+проходит; что хеши ресурсов сходятся; что копия помощника читает запись после `codesign --force`; доступность Keychain на
+раннере; шаг `Verify and collect` (`verify-cli-candidate.ts` не должен видеть грязное дерево).

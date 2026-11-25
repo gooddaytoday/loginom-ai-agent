@@ -1,8 +1,8 @@
 name: Loginom macOS candidate
 
-# Builds the unsigned macOS arm64 candidate: the product CLI (tar.gz) and the Desktop app (.app tarball) from one commit.
+# Builds the ad-hoc signed macOS arm64 candidate: the product CLI (tar.gz) and the Desktop app (DMG and ZIP) from one commit.
 # Run it with workflow_dispatch, or call it from a release workflow (workflow_call). Signing is ad-hoc only, as in 0.4;
-# Developer ID and notarization are stage G, re-checking resource hashes after signing is B5.1l.
+# Developer ID and notarization are stage G.
 
 on:
   workflow_call:
@@ -104,22 +104,27 @@ jobs:
         run: |
           bun run --cwd packages/desktop build
           bun run --cwd packages/desktop pack
+      - name: Check the signature
+        run: |
+          app=$(ls -d packages/desktop/dist/mac-arm64/*.app)
+          bun packages/desktop/script/check-macos-signature.ts "$PWD/$app"
       - name: Verify and collect
         run: |
           candidate="$RUNNER_TEMP/candidate"
-          cp dist/desktop/*.app.tar "$candidate/"
+          cp dist/desktop/*.dmg dist/desktop/*.zip "$candidate/"
           check="$RUNNER_TEMP/cli-check"
           mkdir "$check"
           tar -xpzf "$candidate"/loginom-ai-agent-cli-*-darwin-arm64.tar.gz -C "$check"
           test "$("$check/bin/loginom-ai-agent-cli" --version)" = "$LOGINOM_AI_AGENT_VERSION"
           bun packages/loginom-host/script/verify-cli-candidate.ts "$check" "$GITHUB_WORKSPACE"
-          (cd "$candidate" && shasum -a 256 *.app.tar *.tar.gz > SHA256SUMS && cat SHA256SUMS)
+          (cd "$candidate" && shasum -a 256 *.dmg *.zip *.tar.gz > SHA256SUMS && cat SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: loginom-macos15-arm64-${{ github.run_number }}
           path: |
-            ${{ runner.temp }}/candidate/*.app.tar
+            ${{ runner.temp }}/candidate/*.dmg
+            ${{ runner.temp }}/candidate/*.zip
             ${{ runner.temp }}/candidate/*.tar.gz
             ${{ runner.temp }}/candidate/*.sha256
             ${{ runner.temp }}/candidate/SHA256SUMS
