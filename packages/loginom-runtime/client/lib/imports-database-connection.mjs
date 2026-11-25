@@ -176,15 +176,15 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
      if(!windows.length)return null;
      const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;
      const dialog=windows[0],native=bg.ext?.errormessage?.ErrorMsg?.FInstance?.FMessageBox;
-     const tid=dialog.getAttribute('data-tid');
-     const titles=dialog.querySelectorAll('[data-tid='+JSON.stringify(tid+';p.h;p.t')+']');
      const message=native?.msg?.el?.dom,button=native?.msgButtons?.ok,ok=button?.el?.dom;
+     const tid=ok?.getAttribute('data-tid')?.match(/^(msgbox(?:-\d+)?);tlb;ok$/)?.[1];
+     const titles=dialog.querySelectorAll('[data-tid='+JSON.stringify(tid+';p.h;p.t')+']');
      if(c!==b.controller||c.Node.data.node!==b.module||c.FController!==b.view||b.view.FView.el.dom!==b.root
       ||!b.root.isConnected||!b.tile.isConnected||!b.root.contains(b.tile)||windows.length!==1
-      ||!/^msgbox(?:-\d+)?$/.test(tid)||native?.el?.dom!==dialog||Ext.getCmp(dialog.id)!==native||!native.cfg||native.cfg===b.previousError
+      ||!tid||native?.el?.dom!==dialog||Ext.getCmp(dialog.id)!==native||!native.cfg||native.cfg===b.previousError
       ||titles.length!==1||titles[0].textContent.trim()!=='Loginom '+build
       ||!message||!dialog.contains(message)||message.innerText.trim()!==errorText
-      ||!ok||!dialog.contains(ok)||Ext.getCmp(ok.id)!==button||ok.getAttribute('data-tid')!==tid+';tlb;ok'
+      ||!dialog.contains(ok)||Ext.getCmp(ok.id)!==button
       ||!visible(ok)||ok.textContent.trim()!=='OK'||button.disabled!==false)throw Error('Connections navigation dialog owner differs');
      return ok;
     },{b:opening,build:t.build,errorText});
@@ -276,10 +276,8 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
       if(!windows.length)return null;
       const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;
       const dialog=windows[0],native=Ext.getCmp(dialog.id);
-      const tid=dialog.getAttribute('data-tid');
       const message=native?.msg?.el?.dom;
-      const titles=dialog.querySelectorAll('[data-tid='+JSON.stringify(tid+';p.h;p.t')+']');
-      const title=titles.length===1?titles[0].textContent.trim():null;
+      const title=native?.cfg?.title;
       const text=message?.textContent.trim(),isMessage=native===Ext.Msg&&native.cfg!==prior.message;
       const isError=native===bg.ext?.errormessage?.ErrorMsg?.FInstance?.FMessageBox&&native.cfg!==prior.error;
       const passed=isMessage&&title==='Тестирование соединения'&&text==='Тестирование соединения прошло успешно';
@@ -287,10 +285,11 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
        &&dialog.innerText.includes('Файл "'+path+'" не найден');
       const close=isMessage&&title==='Подтвердить'&&text==='Вы действительно хотите закрыть мастер настройки?';
       const key=confirmation?'yes':'ok',button=native?.msgButtons?.[key],control=button?.el?.dom;
-      if(windows.length!==1||!/^msgbox(?:-\d+)?$/.test(tid)||native?.el?.dom!==dialog||!native.cfg||!message||!dialog.contains(message)
+      const tid=control?.getAttribute('data-tid')?.match(/^msgbox(?:-\d+)?;tlb;(ok|yes)$/);
+      if(windows.length!==1||native?.el?.dom!==dialog||!native.cfg||!message||!dialog.contains(message)
        ||c.FController!==b.wizard||c.Node.data.node?.ParentNode!==b.node||b.wizard.FModelNode!==b.node.FConnectionNode
        ||b.node.ParentNode!==b.connections||(confirmation?!close:!passed&&!refused)||!control||!dialog.contains(control)
-       ||Ext.getCmp(control.id)!==button||control.getAttribute('data-tid')!==tid+';tlb;'+key||!visible(control)
+       ||Ext.getCmp(control.id)!==button||tid?.[1]!==key||!visible(control)
        ||control.textContent.trim()!==(confirmation?'Да':'OK')||button.disabled!==false)
        throw Error('Database connection '+(confirmation?'close confirmation':'test result')+' owner or message differs');
       return {control,refused};

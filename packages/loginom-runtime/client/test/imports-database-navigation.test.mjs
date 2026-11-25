@@ -31,7 +31,6 @@ async function failedNavigation(t,fault){
  moduleController=new ListViewForm();
  const modal=element('msgbox'),title=element('msg-title','Loginom '+build);
  const rootTid=fault==='suffixed'?'msgbox-1':'msgbox';
- modal.getAttribute=()=>rootTid;
  const message=element('msg-text',fault==='foreign window'?'Other operation failed.':errorText);
  const ok=element('msg-ok','OK',85);
  modal.contains=e=>[title,message,ok].includes(e);
