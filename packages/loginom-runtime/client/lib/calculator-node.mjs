@@ -19,6 +19,7 @@ import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolv
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
 import {readCollapseNativeOutput} from './collapse-native-output.mjs';
+import {configureNodeTitle} from './text-import-procedure.mjs';
 import {finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from './node-import-continuation.mjs';
 import {releasePendingNode,verifyRecoveredPendingNode,proveFinishLaunchRefused,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 
@@ -299,7 +300,17 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
    },
    async finish(mode,ctx){
     enter(ctx);if(mode==='close')return closePreparedWizard(channel);requireValue(mode==='done','Separate calculator port requires intermediate Done');
+    // An explicit caption equal to the native default skips the graph rename, so
+    // «Автоматическая метка» stays and Done re-derives it (LAB-2024). Keep it as
+    // the native custom title, then verify the committed graph caption.
+    const label=implementation?.keepTargetLabel?operation.nodeApply.request.target?.label:undefined;
+    if(label!==undefined)await configureNodeTitle(channel,{mode:'custom',label},{subject:'Node',maxLength:200});
     const result=await finishWizard(mode);
+    if(label!==undefined){
+     const g=await operation.nodeTargetAdapter.observe({document_id:operation.nodeApply.request.document_id,workflow_ref:operation.nodeApply.request.workflow_ref},ctx.deadline,ctx.signal);
+     const nodes=g.complete===true?g.nodes.filter(n=>n.ref.node_id===ctx.node.node_id):[];
+     requireValue(nodes.length===1&&nodes[0].label===label,'NODE_LABEL_NOT_PRESERVED: Done left caption '+JSON.stringify(nodes[0]?.label??null)+' instead of target.label');
+    }
     if(implementation?.afterDone)result.bindings=await implementation.afterDone(channel,operation.nodeApply.request,configured,{options,ctx,readGraph:()=>operation.nodeTargetAdapter.observe({document_id:operation.nodeApply.request.document_id,workflow_ref:operation.nodeApply.request.workflow_ref},ctx.deadline,ctx.signal)});
     return result;
    },

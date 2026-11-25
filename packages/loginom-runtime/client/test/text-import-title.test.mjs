@@ -127,11 +127,13 @@ function doneFixture(icon='importtextfile',mode='Пользовательска�
  return {page,picker,modeInput,labelInput,binding,reader,capability,
   observe:()=>capability(page,{mode:'observe',expected_origin:origin,expected_build:build,prepared_node_context:binding},reader)};
 }
-test('native Done title choices are bound to the prepared Text Import only',async()=>{
- for(const icon of ['importtextfile','exporttextfile']){
+// LAB-2024 g201/g204: Grouping Done keeps «Автоматическая метка» and replaces
+// an explicit target.label equal to the native default with «Revenue по Region».
+test('native Done title choices are bound to the prepared Text Import and Grouping only',async()=>{
+ for(const icon of ['importtextfile','groupdata','exporttextfile']){
   const f=doneFixture(icon),r=await f.observe();assert.equal(r.status,'SUCCEEDED');
   const picker=r.output.ui.elements.find(e=>e.wizard_combo?.field.scope==='node_title'&&e.wizard_combo.kind==='picker');
-  assert.equal(!!picker,icon==='importtextfile');
+  assert.equal(!!picker,['importtextfile','groupdata'].includes(icon),icon);
   if(picker){
    assert.equal(picker.wizard_combo.field.name,'label_mode');
    const option=r.output.ui.elements.find(e=>e.wizard_combo?.kind==='option'&&e.wizard_combo.field.scope==='node_title');
