@@ -30,11 +30,16 @@ const dashboardConflicts = [
 
 /**
  * Runs help, version, `diagnostics export` and the `loginom` commands and exits the process; returns only for a command
- * of the CLI. Help and version answer the same way they do with the profile: from the command tree, for any command.
+ * of the CLI. Help answers from the command tree, for any command; version prints the bare number, for any command (0.4).
  */
 export async function early(args: string[]) {
   const options = args.slice(0, args.indexOf("--") < 0 ? args.length : args.indexOf("--"))
-  if (options.some((value) => ["--help", "-h", "--version", "-v"].includes(value))) return exit(await help())
+  if (options.some((value) => ["--help", "-h"].includes(value))) return exit(await help())
+  // A bare number, as in 0.4: the CLI framework prints `name vX`, which the build checks and users' scripts do not expect.
+  if (options.some((value) => ["--version", "-v"].includes(value))) {
+    process.stdout.write(`${LOGINOM_AI_AGENT_VERSION}\n`)
+    return exit(0)
+  }
   const command = options.filter((value) => !headless.includes(value))[0]
   // `loginom setup/status/check/cancel-pending/recover` start their own Host in the profile, without the CLI (B2.7b).
   if (command === "loginom") {
@@ -120,7 +125,7 @@ function take(options: string[], name: string) {
 }
 
 // The command tree without its handlers and without the layers of `index.ts` (paths, config, log): the CLI framework
-// prints help and version itself and never reaches a handler.
+// prints help itself and never reaches a handler.
 async function help() {
   const { NodeServices } = await import("@effect/platform-node")
   const { Effect, Exit } = await import("effect")

@@ -25136,3 +25136,29 @@ packages/product        bun test                    75 pass, 3 fail — workspac
 Smoke Windows сделан как в upstream `release-process-daemon.yml`: настоящий `daemon --runtime-dir --name smoke` по именованному
 каналу, ждём `smoke/service.json` 10 с, незанятый демон сам останавливается за 15 с и убирает каталог. `play` — только
 Linux и macOS.
+
+## Версия CLI как в 0.4
+
+25.11.2026. Ветка `bversion-bare` от `oc2-migration` (`b2fcfe5239`), дерево `.claude/worktrees/bversion`. Эталон — `v0.4.0` (В-99).
+Bun 1.4.4 и Node 24.19.0 первыми в `PATH` только для своих команд; `npm ci --ignore-scripts` клиента `loginom-runtime` и шаблона
+дашборда. Модель не вызывалась. `catalog.json` не менялся: правка в `packages/cli` (пакет форка).
+
+- Находка: `--version` печатал `loginom-ai-agent-cli v… (manifest …)` — формат библиотеки CLI Effect; в `v0.4.0`
+  (`packages/opencode/src/cli/standalone.ts`) — голый номер и перевод строки, для шагов сборок и скриптов.
+- Правка: `packages/cli/src/standalone.ts` (`early`, до профиля и до `Runtime.run`) печатает `LOGINOM_AI_AGENT_VERSION\n` и
+  выходит с кодом 0 для `--version` и `-v`. Справка по-прежнему из дерева команд.
+- Выбор меньшего: в 0.4 `--version` действовал при любой команде (`run --version` — тоже номер) и уступал `--help`; сделано так же.
+  Настройки в библиотеке для голого номера не нашлось, перехват — одна проверка в уже существующем месте.
+- Тест: `cli-standalone.test.ts` «version prints the bare number, as in 0.4» — процесс CLI, вывод ровно номер, `--version`, `-v`,
+  `run --version`, `--version --headless`; код 0, `stderr` пуст, временный корень пуст. Мутация «`--version` обратно в `help()`»
+  красная (лишний вывод `name vX`), без неё зелёная.
+
+```
+packages/cli      bun test --timeout 60000 (LOGINOM_AI_AGENT_TEST_NODE)   625 pass, 11 skip, 0 fail
+packages/product  bun test                                               91 pass, 0 fail
+catalog-check.py код 0; apply-identity.py --check: would change: 0 files
+```
+
+- Примечание: без `npm ci` клиента и шаблона дашборда и без `LOGINOM_AI_AGENT_TEST_NODE` в `cli` падают 8–9 тестов
+  (`cli-loginom`, `cli-dashboard`, `standalone`) — среда, не правка. С таймаутом 5 с тесты `cli` на этой машине тоже
+  нестабильны; проверено `--timeout 60000`.
