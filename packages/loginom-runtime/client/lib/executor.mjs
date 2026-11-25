@@ -3,7 +3,8 @@ import {createRedactor} from './redact.mjs';
 import {browserDownloadsPath} from './browser-downloads.mjs';
 import {journalCopy} from './execution-journal.mjs';
 import {readSavedPackageState} from './package-persistence.mjs';
-import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,requireServerDownloadFormat,serverDownloadTools,storageListPattern,listStorageDirectory} from './storage-policy.mjs';
+import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,requireServerDownloadFormat,serverDownloadTools,storageListPattern,listStorageDirectory,readStorageDestination} from './storage-policy.mjs';
+import {preflightExcelExportDestination} from './exports-excel-procedure.mjs';
 import {buildNodeReadRequest,NODE_READ_MODE} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
 import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady,makeLargeUploadCode,guardUploadDebugDialog} from './artifact-discovery.mjs';
@@ -3209,25 +3210,27 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     return session;
   }});
   const runtime=Object.freeze({
-    serverDownload(request,name,{signal,sourceOperation,deadlineAt,consume,downloadOperation=false,onWorkflowReturn}={}) {
-      if(!serverDownloads)throw Error('Server download cache is unavailable');
-      if(name==='dock_storage_source'||name==='dock_storage_list')return (async()=>{
-        if(storageNavigating||serverDownloads.unsettled&&!downloadOperation||running||pending
+    serverDownload(request,name,{signal,sourceOperation,deadlineAt,consume,downloadOperation=false,onWorkflowReturn,exportDestination=false}={}) {
+      if(!serverDownloads&&!exportDestination)throw Error('Server download cache is unavailable');
+      if(name==='dock_storage_source'||name==='dock_storage_list'||exportDestination)return (async()=>{
+        if(storageNavigating||serverDownloads?.unsettled&&!downloadOperation||running||pending
           ||nodeJobs.unsettled&&!(sourceOperation&&nodeJobs.active?.operation_id===sourceOperation)||sourceReads.unsettled||delivery.unsettled)
           throw Error('Resolve the pending Dock operation before locating a server source');
         checkId(request.operation_id);
         // A folder listing reads the same native Files rows; it never uploads,
         // imports, creates or deletes anything on the server.
-        const listing=name==='dock_storage_list',directories=getStorageBinding()?.directories;
+        const listing=name==='dock_storage_list',storage=getStorageBinding(),directories=storage?.directories;
         // LAB-1468 stage 0: folder and `<folder>/*.csv` paths were refused only
         // after navigation. Name the listing tool before any browser action.
         if(!listing&&typeof request.path==='string'&&(request.path.endsWith('/')||/[*?]/.test(request.path)||!/\.[^./]{1,8}$/.test(request.path)))
           throw Error('dock_storage_source needs one exact file path, not a folder or mask; to see a server folder\'s files call dock_storage_list with the folder path and pattern');
-        const path=listing?requireStorageDestination(typeof request.path==='string'&&request.path.length>1?request.path.replace(/\/$/,''):request.path,directories,'inputs',{directory:true})
+        const path=exportDestination?requireExportDestination(request.path,directories)
+          :listing?requireStorageDestination(typeof request.path==='string'&&request.path.length>1?request.path.replace(/\/$/,''):request.path,directories,'inputs',{directory:true})
           :requireStorageDestination(request.path,directories,'inputs');
         if(!listing&&!downloadOperation&&!/\.(csv|tsv|txt|xlsx|lgd)$/i.test(path))throw Error('Server source must be CSV/TSV/TXT/XLSX/LGD');
         if(listing)storageListPattern(request.pattern);
-        const id=request.operation_id,signature=(listing?'storage.list:'+JSON.stringify([path,request.pattern??null]):'storage.source:'+path);
+        const id=request.operation_id,signature=exportDestination?'storage.export_destination:'+path
+          :listing?'storage.list:'+JSON.stringify([path,request.pattern??null]):'storage.source:'+path;
         if(operations.has(id)||nodeJobs.has(id)||sourceReads.has(id))throw Error('Storage source operation ID conflicts');
         if(auxiliary.has(id)){
           const previous=auxiliary.get(id);
@@ -3456,6 +3459,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             }
           }
           if(current.file_storage.directory!==destination)throw Error('Server storage directory differs');
+          if(exportDestination){
+            const task={binding:storage,workflow:current.workflow_ref,directory:destination,destination:path};
+            guard();
+            const response=await execute(`async page=>({status:'SUCCEEDED',action_key:'storage.export_destination',action_revision:'1',
+              operation_id:${JSON.stringify(id)},phase:'inspect',effect_possible:false,cleanup_complete:true,trace:[],error:null,
+              output:await (${readStorageDestination.toString()})(page,${JSON.stringify(task)})})`,{timeout:Math.max(1,deadline-now())});
+            guard();
+            if(response.status!=='SUCCEEDED'||response.operation_id!==id||response.action_key!=='storage.export_destination'
+              ||response.cleanup_complete!==true||response.effect_possible!==false)
+              throw Error('Exact Excel destination could not be verified in Files');
+            return response.output;
+          }
           if(listing)return listStorageDirectory({destination,pattern:request.pattern,guard,ready,roots,read,act});
           const state=await row(path.slice(path.lastIndexOf('/')+1));
           const file=one(state.ui.elements.filter(e=>e.storage_entry?.path===path&&e.storage_entry?.server_source_ref),'source_file');
@@ -3485,26 +3500,27 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               else delete entry.workflowReturn;
             }
           }
-          const action_key=listing?'storage.list':'storage.source';
+          const action_key=exportDestination?'storage.export_destination':listing?'storage.list':'storage.source';
+          if(exportDestination&&entry.workflowReturn==='refused')
+            error??=Error('Return to the original workflow was refused during Excel destination check');
           if(!error){
-            if(entry.workflowReturn&&!consume)
+            if(entry.workflowReturn&&!consume&&!exportDestination)
               for(const source of listing?output.entries:[output.source])
                 if(source.server_source_ref)serverSources.markReopen(source.server_source_ref);
             entry.outcome={result_version:'user-v1',operation_id:id,status:'SUCCEEDED',action_key,cleanup_complete:true,effect_possible:step>0,output};
             if(sourceObservation){entry.sourceObservation=sourceObservation;entry.sourceSequence=operations.size;}
-            await onRecord({phase:listing?'storage_directory_listed':'storage_source_located',operation_id:id,outcome:entry.outcome});
+            await onRecord({phase:exportDestination?'storage_export_destination_observed':listing?'storage_directory_listed':'storage_source_located',operation_id:id,outcome:entry.outcome});
             return consume?consumed:structuredClone(entry.outcome);
           }
           await onRecord({phase:listing?'storage_list_failed':'storage_source_failed',operation_id:id,error:{code:'STORAGE_SOURCE_REFUSED',message:String(error.message).slice(0,500)}});
-          if(consume){
+          if(consume||exportDestination){
             if(navigationUncertain){
               const navigationId=id+':nav'+step;
-              if(!downloadOperation)error.storageNavigationOperationId=navigationId;
+              if(!downloadOperation&&!exportDestination)error.storageNavigationOperationId=navigationId;
               else{
                 const navigation=operations.get(navigationId);
-                // Own the exact UI receipt, including a completed click whose
-                // resulting workflow could not be verified. The download gate
-                // can release the transfer without freeing this pending click.
+                // Keep the exact UI receipt even if the click completed but
+                // its resulting workflow could not be verified.
                 if(navigation&&(!pending||pending===navigation)){
                   navigation.storageDownloadNavigation=true;
                   pending=navigation;
@@ -3512,7 +3528,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                 }
               }
             }
-            throw error;
+            // Excel's native wizard remains the destination authority when
+            // the optional Files lookup fails with settled navigation.
+            if(consume||navigationUncertain||error.cleanupUnconfirmed||pending||running)throw error;
           }
           // Keep a bounded diagnostic in the tool result. Throwing through the
           // IPC boundary can collapse an observation refusal to CALL_UNCERTAIN.
@@ -4299,7 +4317,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         .map(({o,sequence})=>structuredClone({sequence,request:o.parameters,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed,
           source:o.nodeApply?.phases.find(p=>p.phase==='source')?.value?.source,scan_receipt:o.scanReceipt}));
       let admissionSources=null,admissionFailure=null,admissionUncertainty=null;
-      if(!operation&&serverDownloads){
+      const checkExcelDestination=request.target.type==='exports.excel'&&getStorageBinding()?.document_id===request.document_id;
+      if(!operation&&(serverDownloads||checkExcelDestination)){
         const proofs=new Map(),deadline=Math.min(admissionDeadline,now()+request.budgets.configure_ms);
         const resolve=async(ref,receipt=scanReceipt)=>{
           if(!proofs.has(ref)){
@@ -4313,14 +4332,24 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           return serverDownloads.bind(proofs.get(ref),receipt);
         };
         try{
-          const history=nodeHistory();
-          if(request.finish==='execute'&&history.some(e=>e.request.parameters?.source_switch)){
-            const {verifyDeferredTextImportSources}=await import('./text-import-node.mjs');
-            await verifyDeferredTextImportSources(request,history,resolve);
+          if(checkExcelDestination){
+            const proof=await preflightExcelExportDestination(request,async path=>{
+              const result=await runtime.serverDownload({operation_id:randomUUID(),path},null,
+                {signal,sourceOperation:operationId,deadlineAt:deadline,exportDestination:true});
+              return result.status==='SUCCEEDED'?result.output:null;
+            });
+            if(proof)await onRecord({operation_id:operationId,phase:'excel_export_destination_preflight_completed',proof});
           }
-          if(request.parameters.source?.kind==='storage')await resolve(request.parameters.source.server_source_ref);
-          if(['imports.text','imports.excel'].includes(request.target.type)&&request.parameters.source?.kind==='verified_sources')
-            for(const source of request.parameters.source.sources)if(source.kind==='storage')await resolve(source.server_source_ref);
+          if(serverDownloads){
+            const history=nodeHistory();
+            if(request.finish==='execute'&&history.some(e=>e.request.parameters?.source_switch)){
+              const {verifyDeferredTextImportSources}=await import('./text-import-node.mjs');
+              await verifyDeferredTextImportSources(request,history,resolve);
+            }
+            if(request.parameters.source?.kind==='storage')await resolve(request.parameters.source.server_source_ref);
+            if(['imports.text','imports.excel'].includes(request.target.type)&&request.parameters.source?.kind==='verified_sources')
+              for(const source of request.parameters.source.sources)if(source.kind==='storage')await resolve(source.server_source_ref);
+          }
         }catch(error){
           if(running||pending&&pending.id!==error.storageNavigationOperationId)throw error;
           if(error.storageNavigationOperationId){

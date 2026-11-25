@@ -2,12 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import fs from 'node:fs';
-import {validateTextImportFieldsRequest,validateTextImportPatch,configureTextImportTitle} from '../lib/text-import-procedure.mjs';
+import {validateTextImportFieldsRequest,validateTextImportPatch,configureTextImportTitle,configureNodeTitle} from '../lib/text-import-procedure.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {textImportConfigurationReadback} from '../lib/text-import-readback.mjs';
+import {textImportTitleRequest} from '../lib/text-import-node.mjs';
 import {workspaceUiCapability} from '../lib/workspace-ui.mjs';
 import {Page,build,origin} from './support/workspace-ui-fixture.mjs';
+
+test('a new Text Import applies target.label as its native custom caption within the same wizard',async()=>{
+ const label='Продажи '+ 'X'.repeat(120);
+ const request={target:{kind:'new',type:'imports.text',label},parameters:{settings:{}}};
+ const f=doneFixture('importtextfile','Автоматическая метка','typed.csv');
+ const channel=laggingTitleChannel((await f.observe()).output,'typed.csv');
+ const observed=await configureNodeTitle(channel,textImportTitleRequest(request),{maxLength:200});
+ assert.deepEqual(channel.actions.map(a=>a.verb),['click','select_wizard_option','fill','press']);
+ assert.equal(observed.fields.label.value,label);
+ assert.equal(textImportTitleRequest({...request,target:{kind:'new',type:'imports.text'}}),undefined);
+ assert.deepEqual(textImportTitleRequest({...request,parameters:{settings:{node_title:{mode:'automatic'}}}}),{mode:'automatic'});
+});
 
 test('node_title is an optional native setting in new imports and existing patches',()=>{
  const settings={source:{source_path:'/typed.csv',encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},

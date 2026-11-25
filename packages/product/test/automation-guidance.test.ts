@@ -118,7 +118,7 @@ test("single chain calculation permits source activation only after a safe prefl
   expect(chain).toContain("Последний вычисляющий узел")
   expect(chain).toMatch(/`loginom_dock_node_read` читает выход последнего\s+завершённого выполнения и ждёт идущее/)
   expect(chain).toContain('Изменения внешнего файла/БД/REST не обнаруживает')
-  expect(chain).toContain('если пользователь сообщил об изменении источника, нужен `execution:"execute"`')
+  expect(chain).toContain('После правки источника пользователем или замены файла укажи `execution:"execute"`')
   expect(chain).toMatch(/Не повторяй\s+Execute вычисляющих узлов ради чтения, ответа или экспорта/)
 })
 
