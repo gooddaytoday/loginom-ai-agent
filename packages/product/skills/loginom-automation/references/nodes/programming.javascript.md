@@ -40,6 +40,7 @@ or move unrelated standard operations into it.
 Новому узлу можно задать `variable_inputs` (`kind:"variables"`, `input:0`).
 Импортируй `InputVariables` из `builtIn/Data` и читай `InputVariables.Items.<Имя>.Value`.
 Use the same input_state to rerun/edit a source without links. Omit for connected tables.
+After connecting a table input, run Execute to verify that the new source provides the columns used by the script.
 Declared output maps then executes once, including existing nodes. Code without FS/Fetch
 runs twice: materialize, map, reactivate. Cold/downstream runs once.
 Preserve partial failures. Never retry unknown effects. FS/Fetch Execute requires declared output.

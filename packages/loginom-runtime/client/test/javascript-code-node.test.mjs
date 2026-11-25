@@ -89,7 +89,8 @@ test('reapplying Execute to an existing Data source retains two executions',()=>
 });
 
 for(const fault of ['recover-code','recover-table','recover-variable','refuse-blank','refuse-variable','refuse-configured-input',
- 'configured-link-free','configured-link-code','configured-link-occupied','configured-link-output-changed'])
+ 'configured-link-free','configured-link-code','configured-link-occupied','configured-link-output-changed',
+ 'configured-link-source-text','configured-link-graph-changed','configured-link-execute'])
 test('stopped existing JavaScript lifecycle: '+fault,()=>{
  const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
   fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),fault],{encoding:'utf8',timeout:10000});
