@@ -24915,3 +24915,56 @@ Run 45689615930 форка (`fe60098d89`), задание `loginom-checks` с н
 
 Работа workflow и действия целиком; Linux-сборка на 22.04 без обёртки; macOS arm64; Windows MSVC (`+crt-static`, Zig на
 Windows, первый прогон `daemon/windows.rs`, `play` с `cmd.exe`); кэш Cargo; `check-process-daemon` на `macos-15`.
+
+## B5.1h — сборка Linux: CLI и Desktop
+
+25.11.2026. Ветка `b51h-linux-build` от `oc2-migration` (`840be7c3bb`). Меньший вариант: без новых скриптов, правка только
+файлов строки.
+
+### Что сделано
+
+- `.github/workflows/loginom-linux.yml`. Запуск: `workflow_call`, `workflow_dispatch` и `push` в `oc2-migration` по
+  `packages/**`, `patches/**`, `bun.lock`, `package.json`, `.github/actions/**` и самому файлу (B5.2b заменит push вызовом из
+  `loginom-release.yml`). Задание `pty` вызывает `loginom-pty.yml`; `linux` (ubuntu-24.04, 120 мин) идёт после него с
+  `if: !cancelled()`, чтобы красный pty macOS или Windows не скрыл сборку Linux; без артефакта Linux падает шаг загрузки.
+- Шаги: зависимости (`rpm`, `squashfs-tools`, `xvfb`, GTK/NSS) → `setup-bun` → `setup-loginom-inputs` → артефакт pty
+  (`sha256sum -c`, `LOGINOM_AI_AGENT_PTY_BIN`) → `build-cli.ts` → `verify-cli-candidate.ts` и запуск
+  `bin/loginom-ai-agent-cli --version` из распакованного `tar.gz` с изолированными `HOME` и `XDG_*` (сверка с
+  `cli-manifest.json`) → отрицательный контроль: `desktop/script/build.ts` без `packages/cli/dist` обязан упасть с
+  «Desktop bundles the CLI built from packages/cli» → CLI для Desktop (`LOGINOM_AI_AGENT_TARGET=linux-x64-baseline`,
+  `--skip-install --skip-web-ui`) → Desktop `build` (`NODE_OPTIONS=--max-old-space-size=6144`) → `xvfb-run bun test` в
+  `packages/desktop` → `pack` (AppImage, deb, rpm) → `safe-storage-smoke.cjs` в трёх режимах под `xvfb-run` с
+  `--no-sandbox` → артефакты `loginom-linux-x64-cli` (tar.gz, `.sha256`, `cli-manifest.json`, `SHA256SUMS`) и
+  `loginom-linux-x64-desktop` (AppImage, deb, rpm, `SHA256SUMS`, три файла `safe-storage-*.json`).
+- `ci-workflows.test.ts`: `loginom-linux` в `PRODUCT`. Новый `linux-workflow.test.ts` (4 теста): триггеры, pty, порядок шагов,
+  кодек и отсутствие секретов. Секретов и подписи нет.
+
+### Выбор вместо буквы задания
+
+- В задании «CLI `build-cli.ts` → `packages/cli/dist`». Фактически `build-cli.ts` пишет продуктовый CLI в свой каталог, а
+  Desktop берёт из `packages/cli/dist/cli-linux-x64-baseline` CLI, собранный `bun run build` пакета `cli` (не `--standalone`).
+  Сделаны обе сборки; `build-cli.ts` даёт артефакт `tar.gz`, вторая — вход Desktop.
+- pty: вызов `loginom-pty.yml` целиком (три платформы), без правок файла строки f и без второй сборки pty в этом файле.
+- Без `pull_request` (у macOS и Windows условия по батчам; для этапа B хватает push и dispatch). Без `bun typecheck` в
+  workflow: он в `check`.
+
+### Находка (чужая строка, не правил)
+
+- `loginom-windows.yml` (B5.1j) собирает для `safe-storage-smoke.cjs` кодек из `packages/desktop/src/main/loginom/credentials.ts`.
+  Это слой Desktop без экспорта `credentials`, в бандле `import.meta`, и Electron падает на «Cannot use 'import.meta' outside a
+  module». Скрипт ждёт `credentials` из `packages/loginom-host/src/connection/credentials.ts` (так сказано в его комментарии);
+  здесь взят он. Проверено локально: Electron из `packages/desktop/node_modules`, режимы `write`, `read`, `unavailable` — код 0.
+
+### Проверки
+
+- YAML разобран (`python3 yaml`). Локально выполнены: отрицательный контроль (`build.ts` без CLI — код 1 и нужное
+  сообщение, дерево чистое), шаг `safeStorage` целиком (временные `HOME`, `XDG_*`, `RUNNER_TEMP`; три записи evidence).
+- Тяжёлые сборки (pty, `build-cli.ts`, CLI и Desktop, `pack`) не запускались: `uptime` 10–15 (порог 8). Проверит CI.
+- `packages/product`: 84 pass, 3 fail — известные (`workspace packages`, `CI triggers`, `path literals`), `loginom-linux` в
+  выводе падений нет; эту строку они не закрывают.
+
+### Проверит только CI на GitHub
+
+Весь прогон: `setup-loginom-inputs` на Linux, `build-cli.ts` с baseline Bun, `--version` CLI, сборка CLI для Desktop с
+`--skip-web-ui`, память Desktop `build`, `xvfb-run bun test` Desktop (может оказаться красным на тестах, которым нужен не
+виртуальный дисплей), AppImage, deb, rpm, время (лимит 120 мин), `safeStorage` на раннере без setuid `chrome-sandbox`.
