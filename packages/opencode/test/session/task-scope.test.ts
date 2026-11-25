@@ -300,7 +300,11 @@ test("a new task inherits an earlier applied loginom-automation grant only in a 
   const first = user(1, "Построй сценарий Loginom")
   const grant = activated(2, first, "loginom-automation")
   const next = user(3, "Теперь добавь узел")
-  const carried = { name: "loginom-automation", profile: "loginom-automation", digest: "a".repeat(64) }
+  const carried: TaskScope.Activation = {
+    name: "loginom-automation",
+    profile: "loginom-automation",
+    digest: "a".repeat(64),
+  }
   expect(TaskScope.inherited({ sessionID, messages: [first, grant] })).toBeUndefined()
   expect(TaskScope.inherited({ sessionID, messages: [next, grant, first] })).toEqual(carried)
   // The carried grant persisted on the new message keeps the chain for later messages.
