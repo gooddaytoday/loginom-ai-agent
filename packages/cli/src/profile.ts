@@ -8,6 +8,7 @@ import { Product, productChannel } from "@loginom-ai-agent/product"
 import { cliProfile, cliProfileService, profilePaths } from "@loginom-ai-agent/product/cli-profile"
 import { Effect, Option, Schema } from "effect"
 import { LOGINOM_AI_AGENT_CHANNEL } from "./version"
+import { protectWindowsProfile } from "./profile-windows"
 
 // Loginom AI Agent (B2.7c, G2): profiles of the product CLI, as in 0.4 (`a080f7725c:packages/opencode/src/cli/profile.ts`).
 // The product CLI entry (`loginom-cli.ts`) applies a profile before the CLI loads: its data, config, state and cache live
@@ -177,6 +178,7 @@ function open(root: string) {
     [Product.slug, `${Product.slug}-dev`, `${Product.slug}-beta`].includes(name)
   )
     throw new Error("PROFILE_DESKTOP_ROOT")
+  if (process.platform === "win32") protectWindowsProfile(canonical)
   owned(fs.statSync(canonical))
   admit(canonical)
   const paths = profilePaths(canonical)
@@ -189,7 +191,7 @@ function open(root: string) {
   return paths
 }
 
-// A profile is private to its user, as in 0.4. Its Windows ACL check (`profile-windows.ts` in 0.4) is not ported yet.
+// A profile is private to its user, as in 0.4. On Windows the ACL check is `protectWindowsProfile`, run in `open`.
 function owned(info: fs.Stats) {
   if (process.platform === "win32") return
   if ((process.getuid && info.uid !== process.getuid()) || (info.mode & 0o077) !== 0)
