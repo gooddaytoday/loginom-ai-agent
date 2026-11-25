@@ -6,13 +6,19 @@ import {createHash} from 'node:crypto';
 import {createRedactor} from '../../lib/redact.mjs';
 const fault=process.argv[2]??'safe',events=[],calls=[];
 const recovering=fault.startsWith('recover-'),refusing=fault.startsWith('refuse-');
+const linking=fault.startsWith('configured-link-');
+const existingFixture=recovering||refusing||linking;
 const variableSource=['declared-variable-source','recover-variable','refuse-variable'].includes(fault);
-const tableRecovery=fault==='recover-table'||fault==='refuse-configured-input';
+const tableRecovery=fault==='recover-table'||fault==='refuse-configured-input'||linking;
 const guarded=fault.startsWith('effects-'),declared=fault.startsWith('declared-')||variableSource||tableRecovery;
 const sourceExecution=['source-execute','source-reapply'].includes(fault)||declared||guarded||recovering||refusing,ledger=[];let executed=false,nativeActive=false,mappingDirection='input',executionCount=0;
 const columns=[{name:'Key',label:'Key',type:'integer',data_kind:'Непрерывный',usage:'Не задано'}];
 const node={document_id:'doc',workflow_id:'flow',node_id:'js'};
 const variables={...node,node_id:'variables'};
+const input={...node,node_id:'input'};
+const inputEdge={source:input.node_id,output:0,target:node.node_id,input:0};
+const neighborEdge={...inputEdge,target:'neighbor'};
+const existingEdge={...inputEdge,source:'other-source'};
 const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'nav',label:'Scenario'}]};
 const source=(fault.includes('late')?'/*'+'padding '.repeat(700)+'*/\n':'')
  +(guarded?'import "builtIn/'+(fault.includes('fetch')?'Fetch':'FS')+'";\n':declared&&!variableSource&&!tableRecovery?'import * as fs from "builtIn/FS";\n':'')
@@ -25,14 +31,21 @@ let graphReads=0;
 if(sourceExecution)graph.nodes=[];
 if(variableSource)graph.nodes.push({ref:variables,type:'variables.user',label:'Scenario variables',
  position:{x:64,y:64},inputs:[],outputs:[],variable_outputs:[{kind:'variables',port:4,port_guid:'count-output'}]});
-if(recovering||refusing){
+if(existingFixture){
  graph.nodes.push({ref:node,type:'programming.javascript',label:'Parser',position:{x:320,y:280},inputs:[0],outputs:[0],
   ...(variableSource?{variable_inputs:[{kind:'variables',port:0,port_guid:'js-variable-input'}]}:{})});
  if(variableSource)graph.variable_links=[{source:variables.node_id,output:4,target:node.node_id,input:0,kind:'variables',
   source_port_guid:'count-output',target_port_guid:'js-variable-input'}];
- if(tableRecovery)graph.nodes.push({ref:{...node,node_id:'input'},type:'imports.text',label:'Input',position:{x:64,y:64},inputs:[],outputs:[0]});
+ if(tableRecovery)graph.nodes.push({ref:input,type:'imports.text',label:'Input',position:{x:64,y:64},inputs:[],outputs:[0]});
 }
-let persistedMode=fault==='refuse-configured-input'?'code':'blank',persistedSource='';
+if(linking){
+ graph.nodes.push({ref:{...node,node_id:'neighbor'},type:'programming.javascript',inputs:[0],outputs:[0]},
+  {ref:{...node,node_id:'other-source'},type:'imports.text',inputs:[],outputs:[0]});
+ graph.links.push(neighborEdge);
+ if(fault==='configured-link-occupied')graph.links.push(existingEdge);
+}
+let persistedMode=['refuse-configured-input','configured-link-code'].includes(fault)?'code':linking?'declared':'blank';
+let persistedSource=linking?source:'';
 if(guarded&&fault.includes('existing'))graph.nodes=[{ref:node,type:'programming.javascript',label:'Existing',position:{x:320,y:280},inputs:[0],outputs:[0]}];
 const snapshot=()=>{const result={prepared_node_context:{...node,node_id:stopped&&fault==='owner'?'foreign':'js',verified:true,
  surface:wizard?'wizard':'graph',locked:stopped&&fault==='locked'},wizard:wizard?{status:'observed',root_ref:'wizard',root_tid:'W',
@@ -42,7 +55,8 @@ const snapshot=()=>{const result={prepared_node_context:{...node,node_id:stopped
  state_source:'cached_mapping_stores',settings_applied:false,package_saved:false,autosync:true,
  node_context:{...node,surface:'wizard',input_port:{direction:'input',port:0}},source_fields:[{name:'Key'}],target_fields:[{name:'Key'}]}};
  if(sourceExecution){
-  const input=mappingDirection==='input',name=fault==='declared-stale-output'?'OldKey':'Key',field={index:0,name,label:name,type:'integer',data_kind:'Непрерывный',excluded:false};
+  const input=mappingDirection==='input',name=fault==='declared-stale-output'?'OldKey':linking&&input?'Sales':'Key',
+   field={index:0,name,label:name,type:'integer',data_kind:'Непрерывный',excluded:false};
   if(result.wizard.status==='observed')result.wizard.stage=mappingDirection+'_mapping';
   result.node_mapping={...result.node_mapping,mapping_wizard:input?'TuneDataSourceMappingWizard':'DataSetOutputSocketWizard',
    node_context:{...node,verified:true,surface:'wizard',[mappingDirection+'_port']:{direction:mappingDirection,port:0,port_guid:input?'in-port':'out-port'}},
@@ -63,14 +77,18 @@ const managed=await import('../../lib/javascript-managed-source-adapter.mjs');
 mock.module(new URL('../../lib/javascript-managed-source-adapter.mjs',import.meta.url),{namedExports:{...managed,
  createJavascriptManagedSourceAdapter:()=>{
   let active=false,draftMode;const a={open:async({owner,schemaMode='preserve',expectedSettings})=>{active=true;if(sourceExecution&&executed){nativeActive=false;calls.push('Settings-after-Execute');}
-   if(recovering||refusing){
+   if(existingFixture){
     calls.push('Open-'+schemaMode);
     const schemaFor=mode=>{
      const fields=mode==='declared'?[{record_id:'declared-key',Index:0,Name:'Key',DisplayName:'Key',DataType:4,DataKind:1,
       UsageType:0,DefaultUsageType:0,Required:false,Broken:false}]:[];
+     const connected=linking&&graph.links.some(edge=>edge.target===node.node_id);
+     if(connected&&fault==='configured-link-output-changed')fields[0].DisplayName='Changed';
+     const sourceFields=connected?[{record_id:'source-sales',Index:0,Name:'Sales',DisplayName:'Sales',DataType:4,DataKind:1,
+      UsageType:0,DefaultUsageType:0,Required:false,Broken:false}]:[];
      return {verified:true,inventory_complete:true,form:'JavaScriptColumnsWizard',page_tid:'page',
       node_context:{...owner,verified:true,surface:'wizard'},generation:{checked:mode==='code'},grids:[
-       {tid:'page;grdSourceColumns;tbl',count:0,total:0,fields:[]},
+       {tid:'page;grdSourceColumns;tbl',count:sourceFields.length,total:sourceFields.length,fields:sourceFields},
        {tid:'page;grdTargetColumns;tbl',count:fields.length,total:fields.length,fields}]};
     };
     if(schemaMode!=='preserve')assert.equal(expectedSettings,
@@ -87,7 +105,7 @@ mock.module(new URL('../../lib/javascript-managed-source-adapter.mjs',import.met
       UsageType:0,DefaultUsageType:0,Required:false,Broken:false}]}]}:sourceExecution?{verified:true,node_context:{...owner,verified:true,surface:'wizard'},generation:{checked:true},grids:[]}:{};
    return {owner,settings:declared?managed.javascriptManagedSourceSettings(schema):sourceExecution?{generation:true,grids:[]}:{generation:true},schema,
     ...(declared?{declaredColumns:[{...columns[0],index:0,usage_type:0,default_usage_type:0,required:false}]}:{})};},
-   read:async handle=>({owner:handle.owner,settings:handle.settings,source:recovering||refusing?persistedSource:source}),
+   read:async handle=>({owner:handle.owner,settings:handle.settings,source:existingFixture?persistedSource:source}),
    replace:async()=>({draft_exact:true,source_sha256:createHash('sha256').update(source).digest('hex')}),
    commit:async()=>{calls.push('Done');active=false;if(recovering){persistedMode=draftMode;persistedSource=source;}
     return {owned_done_settled:true,graph_owner_verified:true};},
@@ -134,11 +152,18 @@ if(recovering||refusing){
  if(fault==='refuse-blank'){request.parameters={input_state:'unconnected'};}
  if(fault!=='recover-variable'){request.finish='done';request.read.ports=[];}
 }
+if(linking){
+ request.target={kind:'existing',type:'programming.javascript',ref:node};
+ request.parameters={};
+ request.inputs=[{source:input,input:0,output:0}];
+ request.finish='done';
+ request.read.ports=[];
+}
 const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},allowCandidate:true,
  nodeApplyHandlers:support.nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   operation=options.operation;return support.nodeApplyDriverFactory(options);},
  nodeTargetAdapterFactory:()=>({preflight:async()=>{},positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),
-  mutate:async e=>{if(guarded)calls.push('MUTATION');if(e.kind==='create')graph.nodes.push({ref:node,type:'programming.javascript',label:'Parser',position:e.parameters.position,inputs:[0],outputs:[0],
+  mutate:async e=>{if(linking)calls.push(e.kind);if(guarded)calls.push('MUTATION');if(e.kind==='create')graph.nodes.push({ref:node,type:'programming.javascript',label:'Parser',position:e.parameters.position,inputs:[0],outputs:[0],
    ...(variableSource?{variable_inputs:[{kind:'variables',port:0}]}:{})});
    else if(e.kind==='connect'&&e.parameters.edge.kind==='variables'){
     graph.variable_links=[{...e.parameters.edge,source_port_guid:'count-output',target_port_guid:'js-variable-input'}];
@@ -157,6 +182,36 @@ const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map()
 runtime.startNodeApply(request);
 let job;
 do{job=await runtime.waitNodeApply('apply-js',{timeoutMs:1000});}while(!job.outcome);
+if(linking){
+ const result=job.outcome.output;
+ if(fault==='configured-link-occupied'){
+  assert.equal(result.status,'FAILED',JSON.stringify(result));
+  assert.match(result.error.message,/Requested input is occupied by an unowned link/);
+  assert.equal(result.cleanup_complete,true);
+  assert.deepEqual(graph.links,[neighborEdge,existingEdge]);
+  assert.deepEqual(calls,['Open-preserve']);
+ }else{
+  assert.deepEqual(graph.links,[neighborEdge,inputEdge],JSON.stringify(result));
+  if(fault==='configured-link-output-changed'){
+   assert.match(result.error.message,/JavaScript existing settings changed after connecting the table input/);
+   assert.ok(!calls.includes('Done'));
+  }else{
+   assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+   assert.deepEqual(result.node,node);
+   assert.equal(result.configuration.readback.source.sha256,createHash('sha256').update(source).digest('hex'));
+   assert.equal(result.configuration.readback.schema_mode,persistedMode);
+   if(persistedMode==='declared'){
+    assert.equal(result.configuration.readback.columns[0].name,'Key');
+    assert.equal(result.configuration.readback.columns[0].label,'Key');
+   }
+   assert.equal(operation.nodeApply.phases.find(phase=>phase.phase==='input_mapping')
+    .value.native_mapping.source_fields[0].name,'Sales');
+   assert.equal(runtime.hasUnsettledWork(),false);
+  }
+ }
+ assert.equal(executionCount,0);
+ process.exit(0);
+}
 if(recovering||refusing){
  const result=job.outcome.output;
  assert.equal(result.status,recovering?'SUCCEEDED':'FAILED',JSON.stringify(result));

@@ -318,18 +318,25 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
         enter(ctx);need(admitted&&inputMapping,'JavaScript source/input admission unavailable');
         const preserveSchema=existingBaseline&&!existingBaseline.unconfigured;
         const schema_mode=preserveSchema?existingBaseline.schema_mode:request.parameters.schema_mode;
-        if(existingBaseline?.unconfigured){
+        const target=operation.targetPhase;
+        const [input]=request.inputs;
+        const tableConnected=existingBaseline&&input&&target?.completed===true&&!target.pending
+          &&target.receipts.some(effect=>effect.kind==='connect'&&effect.verified===true
+            &&same(effect.parameters.edge,{source:input.source.node_id,output:input.output,target:owner.node_id,input:input.input}));
+        if(existingBaseline?.unconfigured||tableConnected){
           existingGraphBaseline=await graph(ctx);
-          if(request.inputs.length&&operation.targetPhase?.result?.effects?.some(effect=>effect.kind==='connect'&&effect.verified===true)){
-            // The verified table connection can populate the source grid.
-            // Pin the fresh settings and the original source before editing.
-            const stableSettings=settings=>({...settings,grids:settings.grids.filter(grid=>!grid.tid.endsWith(';grdSourceColumns;tbl'))});
+          if(tableConnected){
+            verifyJavascriptMappingGraph(target.final_graph,existingGraphBaseline,nodeRef(owner));
+            // The verified connection can populate the input fields. Preserve
+            // grid identity, output fields, generation mode and the source digest.
+            const stableSettings=settings=>({...settings,grids:settings.grids.map(grid=>
+              grid.tid.endsWith(';grdSourceColumns;tbl')?{...grid,fields:[]}:grid)});
             const previous=stableSettings(sourceSnapshot.settings);
             const fresh=policyAdmission('existing',owner,ctx.deadline,admitted.previous_source);
             const receipt=await fresh.admit({});
             const baseline=javascriptExistingLifecycleBaseline({receipt,snapshot:sourceSnapshot,parameters:{},owner});
-            need(baseline.unconfigured&&same(previous,stableSettings(sourceSnapshot.settings)),
-              'JavaScript unconfigured settings changed after connecting the table input');
+            need(baseline.unconfigured===existingBaseline.unconfigured&&same(previous,stableSettings(sourceSnapshot.settings)),
+              'JavaScript existing settings changed after connecting the table input');
             existingBaseline=baseline;
           }
         }
