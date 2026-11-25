@@ -20,6 +20,7 @@ import { FSUtil } from "@opencode/util/fs-util"
 import { Option, Schema } from "effect"
 import { exactFileDigest } from "./file-profile-core"
 import { fileSnapshot } from "./file-snapshot"
+import { askWithdrawn } from "./permissions"
 
 const sampleReceipt = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ path: Schema.String, manifest: Schema.Struct({ sha256: Schema.String }) })),
@@ -105,13 +106,7 @@ export async function localFiles(
   const ask = (
     call: ToolContext,
     input: { action: string; resources: string[]; save?: string[]; metadata?: Record<string, unknown> },
-  ) =>
-    plugin.permission.assert({
-      sessionID: call.sessionID,
-      agent: call.agent,
-      source: { type: "tool", messageID: call.messageID, id: call.id },
-      ...input,
-    })
+  ) => askWithdrawn(plugin.permission, call, input)
 
   // Large files cross private IPC only as backend-authorized original references.
   const admitReference = async (

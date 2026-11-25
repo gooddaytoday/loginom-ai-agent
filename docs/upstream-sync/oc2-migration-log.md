@@ -25074,3 +25074,53 @@ Run 45694260129 форка (`06ac4c97c9`): `pty (x86_64-unknown-linux-gnu)` и `
 отвечает `unable to open loose object …: Filename too long`. Upstream (`check-process-daemon.yml`,
 `release-process-daemon.yml`) включает `core.longpaths` перед сборкой на Windows; то же добавлено в ветку Windows действия
 `setup-rust-pty`.
+
+## Хвосты паритета 3
+
+25.11.2026. Ветка `btails3-parity` от `oc2-migration` (`64199aa641`), дерево `.claude/worktrees/btails3`. Эталон — `v0.4.0` (В-99).
+Bun 1.4.4 и Node 24.19.0 первыми в `PATH` только для своих команд; `npm ci --ignore-scripts` клиента `loginom-runtime` и шаблона
+дашборда. Правок upstream-логики нет; `catalog.json` не менялся (файлы `packages/cli`, `packages/loginom-agent` под прежними записями,
+`catalog-check.py` код 0). Модель не вызывалась: процесс CLI ходил в подставной сервер `127.0.0.1`.
+
+### 1. Коды выхода `run` как в 0.4
+
+- `packages/cli/src/run/run.ts`: «нет сообщения» и `--fork` без `--continue` или `--session` у продуктового CLI дают код 2
+  (`v0.4.0:packages/opencode/src/cli/cmd/run.ts:518-525`: `exitCli(LOGINOM_AI_AGENT_CLI_ROOT ? 2 : 1)`); у OpenCode 2 без
+  продуктового профиля остаётся 1. Текст и событие `error` прежние.
+- Выбор меньшего (расхождение с заданием): задание называет пустую `--command=` ошибкой разбора аргументов. В `v0.4.0`
+  проверка была `!args.command`, то есть пустая строка — обычный запрос без навыка (в `standalone-run.ts` разбора пустого значения нет).
+  Сделано как в 0.4: `packages/cli/src/standalone.ts` не записывает пустой `--command` в `LOGINOM_AI_AGENT_RUN_COMMAND`
+  (раньше пустой ID уходил в ядро и давал `Skill not found`). Без сообщения такой запуск — код 2, с сообщением — обычный запрос.
+  Если владельцу нужна именно ошибка разбора (код 2, `CLI_ARGUMENT_INVALID`), это одна строка в `forward`. Живой `yargs` 0.4 не запускался
+  (его нет в дереве v2): вывод по коду `v0.4.0`.
+
+### 2. Вопрос `local-file` снимается при остановке вызова
+
+- Снятие вопроса вынесено из `dashboard-tools.ts` в `askWithdrawn` (`packages/loginom-agent/src/permissions.ts`): остановленный
+  вызов отвечает `once` только на свой вопрос (`reject` снял бы все вопросы сессии). `local-file.ts` (`ask`) использует его же.
+- Проверка остановки после ответа осталась у `dashboard-tools.ts`, а не в общей функции: порт теста 0.4 «остановка во время
+  вопроса — авторизация завершается, резервирования нет (`LOGINOM_UPLOAD_CANCELLED`)» требует, чтобы `local-file` не бросал на ответе.
+  Первая версия с общей проверкой краснила два теста (`loginom-local-file`, `loginom-file-profile`) — исправлена до коммита.
+
+### Тесты и мутации
+
+| Тест | Мутация | Итог |
+|---|---|---|
+| `cli-loginom.test.ts` «run checks the Host before files…»: код 2 для «нет сообщения», `--fork` без `--continue`, пустая `--command=` и `--command ""`; процесс CLI, настоящий Host, подставная модель | `--fork` обратно в 1 | красный |
+| то же | «нет сообщения» обратно в 1 | красный |
+| то же | пустая `--command` в навык | красный |
+| `server/test/loginom-local-file.test.ts` «a stop withdraws only the stopped call's read question…»: настоящее ядро, второй вопрос сессии остаётся | `local-file` без снятия вопроса | красный |
+| то же | `decision: "reject"` | красный |
+
+### Прогоны (нагрузка 6.8–7.5)
+
+```
+packages/cli            bun test --timeout 60000   624 pass, 11 skip, 0 fail
+packages/loginom-agent  bun test                   125 pass, 0 fail
+packages/server         bun test                   318 pass, 3 skip, 0 fail
+packages/product        bun test                    75 pass, 3 fail — workspace packages, CI triggers, path literals (известные)
+```
+
+### Найдено, не чинил
+
+- `v0.4.0:standalone-run.ts` отвечал кодом 2 (`CLI_ARGUMENT_INVALID`) на `--attach`, `--mini`, `--interactive`; в v2 не проверялось.

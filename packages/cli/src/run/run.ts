@@ -58,7 +58,7 @@ export function runNonInteractive(input: RunCommandInput, signal: AbortSignal) {
 }
 
 async function run(input: RunCommandInput, signal: AbortSignal) {
-  if (input.fork && !input.continue && !input.session) fail("--fork requires --continue or --session")
+  if (input.fork && !input.continue && !input.session) usage("--fork requires --continue or --session")
   if (input.worktree !== undefined && (input.continue || input.session))
     fail("--worktree starts a new session and cannot be combined with --continue or --session")
   const root = process.env.PWD ?? process.cwd()
@@ -90,7 +90,7 @@ async function run(input: RunCommandInput, signal: AbortSignal) {
     return
   const message = mergeInput(argument, piped)
   // `run --command <skill>` of the product CLI needs no message, as in 0.4 (`cmd/run.ts:518`).
-  if (!message?.trim() && !(RunProduct.enabled() && RunProduct.skills())) fail("You must provide a message")
+  if (!message?.trim() && !(RunProduct.enabled() && RunProduct.skills())) usage("You must provide a message")
   // Loginom AI Agent (B2.9j): `run --dashboard` reads `--file` in the dashboard's folder, as 0.4 did, once it is prepared.
   const files = RunProduct.dashboarding()
     ? undefined
@@ -276,4 +276,10 @@ export function reportRunError(input: Pick<RunCommandInput, "format">, message: 
 
 function fail(message: string): never {
   throw new Error(message)
+}
+
+// Loginom AI Agent (B2.7a4c): the product CLI exits 2 on a usage error, as 0.4's did (`cmd/run.ts:518-525`); OpenCode 2's 1 stays.
+function usage(message: string): never {
+  if (RunProduct.enabled()) process.exitCode = 2
+  return fail(message)
 }

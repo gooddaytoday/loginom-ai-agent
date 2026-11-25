@@ -766,8 +766,23 @@ describe.skipIf(process.platform !== "linux")("loginom commands with the real No
 
     // Without the Host's checks the order stays: no message is 1, and so is a missing file.
     const noMessage = await run(fixture, [...base])
-    expect({ code: noMessage.code, stderr: noMessage.stderr }).toMatchObject({ code: 1 })
+    // Usage errors of the product CLI exit 2, as in 0.4 (`cmd/run.ts:518-525`); a refused file stays 1.
+    expect({ code: noMessage.code, stderr: noMessage.stderr }).toMatchObject({ code: 2 })
     expect(noMessage.events.at(-1)).toMatchObject({ type: "error", error: { message: "You must provide a message" } })
+    const forkAlone = await run(fixture, [...base, "--fork", "--", "hi"])
+    expect(forkAlone.code).toBe(2)
+    expect(forkAlone.events.at(-1)).toMatchObject({
+      type: "error",
+      error: { message: "--fork requires --continue or --session" },
+    })
+    // An empty `--command=` names no skill (0.4 tested `!args.command`): no message is still 2, a message is a plain prompt.
+    for (const args of [[...base, "--command="], [...base, "--command", ""]]) {
+      const empty = await run(fixture, args)
+      expect({ code: empty.code, message: empty.events.at(-1)?.error?.message }).toEqual({
+        code: 2,
+        message: "You must provide a message",
+      })
+    }
     const noFile = await run(fixture, [...base, "--file", path.join(fixture.root, "no-such-file"), "--", "hi"])
     expect(noFile.code).toBe(1)
     expect(await sessions(fixture)).toBe(0)
