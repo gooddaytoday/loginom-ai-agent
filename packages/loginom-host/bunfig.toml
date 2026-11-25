@@ -1,2 +1,3 @@
 [test]
 root = "."
+preload = ["../util/test/isolated-home.ts"]
