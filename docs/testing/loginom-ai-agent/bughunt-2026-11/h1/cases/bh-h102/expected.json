@@ -1,0 +1,2564 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-h102-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Customer",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "Recency",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Frequency",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Monetary",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "R",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "F",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "M",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Segment",
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "Customer": "K-001",
+          "Recency": 110,
+          "Frequency": 542,
+          "Monetary": 240677.01,
+          "R": 1,
+          "F": 5,
+          "M": 5,
+          "Segment": "Риск"
+        },
+        {
+          "Customer": "K-002",
+          "Recency": 2,
+          "Frequency": 494,
+          "Monetary": 222165.47,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-003",
+          "Recency": 2,
+          "Frequency": 503,
+          "Monetary": 220004.89,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-004",
+          "Recency": 2,
+          "Frequency": 520,
+          "Monetary": 243727.17,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-005",
+          "Recency": 3,
+          "Frequency": 533,
+          "Monetary": 238093.06,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-006",
+          "Recency": 4,
+          "Frequency": 529,
+          "Monetary": 230502.11,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-007",
+          "Recency": 3,
+          "Frequency": 512,
+          "Monetary": 232267.29,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-008",
+          "Recency": 110,
+          "Frequency": 531,
+          "Monetary": 240832.32,
+          "R": 1,
+          "F": 5,
+          "M": 5,
+          "Segment": "Риск"
+        },
+        {
+          "Customer": "K-009",
+          "Recency": 4,
+          "Frequency": 484,
+          "Monetary": 206705.38,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-010",
+          "Recency": 4,
+          "Frequency": 502,
+          "Monetary": 226180.63,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-011",
+          "Recency": 4,
+          "Frequency": 525,
+          "Monetary": 232396.72,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-012",
+          "Recency": 4,
+          "Frequency": 499,
+          "Monetary": 227331.97,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-013",
+          "Recency": 5,
+          "Frequency": 500,
+          "Monetary": 215297.68,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-014",
+          "Recency": 5,
+          "Frequency": 467,
+          "Monetary": 203794.49,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-015",
+          "Recency": 110,
+          "Frequency": 486,
+          "Monetary": 223066.71,
+          "R": 1,
+          "F": 5,
+          "M": 5,
+          "Segment": "Риск"
+        },
+        {
+          "Customer": "K-016",
+          "Recency": 5,
+          "Frequency": 487,
+          "Monetary": 221184.32,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-017",
+          "Recency": 6,
+          "Frequency": 508,
+          "Monetary": 232821.01,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-018",
+          "Recency": 6,
+          "Frequency": 489,
+          "Monetary": 220599.03,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-019",
+          "Recency": 6,
+          "Frequency": 478,
+          "Monetary": 207018.53,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-020",
+          "Recency": 7,
+          "Frequency": 472,
+          "Monetary": 206079.88,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-021",
+          "Recency": 7,
+          "Frequency": 501,
+          "Monetary": 222924.08,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-022",
+          "Recency": 110,
+          "Frequency": 496,
+          "Monetary": 223491.82,
+          "R": 1,
+          "F": 5,
+          "M": 5,
+          "Segment": "Риск"
+        },
+        {
+          "Customer": "K-023",
+          "Recency": 7,
+          "Frequency": 547,
+          "Monetary": 245813.48,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-024",
+          "Recency": 7,
+          "Frequency": 504,
+          "Monetary": 241728.18,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-025",
+          "Recency": 8,
+          "Frequency": 457,
+          "Monetary": 200761.7,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-026",
+          "Recency": 8,
+          "Frequency": 496,
+          "Monetary": 220742.66,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-027",
+          "Recency": 8,
+          "Frequency": 483,
+          "Monetary": 223695.29,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-028",
+          "Recency": 8,
+          "Frequency": 464,
+          "Monetary": 209019.59,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-029",
+          "Recency": 110,
+          "Frequency": 453,
+          "Monetary": 212394.63,
+          "R": 1,
+          "F": 5,
+          "M": 5,
+          "Segment": "Риск"
+        },
+        {
+          "Customer": "K-030",
+          "Recency": 9,
+          "Frequency": 443,
+          "Monetary": 204827.38,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-031",
+          "Recency": 9,
+          "Frequency": 479,
+          "Monetary": 210842.1,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-032",
+          "Recency": 9,
+          "Frequency": 460,
+          "Monetary": 210557.82,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-033",
+          "Recency": 10,
+          "Frequency": 482,
+          "Monetary": 223665.69,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-034",
+          "Recency": 10,
+          "Frequency": 461,
+          "Monetary": 205217.39,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-035",
+          "Recency": 10,
+          "Frequency": 471,
+          "Monetary": 213623.08,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-036",
+          "Recency": 110,
+          "Frequency": 438,
+          "Monetary": 192881.07,
+          "R": 1,
+          "F": 5,
+          "M": 5,
+          "Segment": "Риск"
+        },
+        {
+          "Customer": "K-037",
+          "Recency": 11,
+          "Frequency": 472,
+          "Monetary": 211779.73,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-038",
+          "Recency": 11,
+          "Frequency": 448,
+          "Monetary": 211165.78,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-039",
+          "Recency": 11,
+          "Frequency": 455,
+          "Monetary": 198009.22,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-040",
+          "Recency": 11,
+          "Frequency": 453,
+          "Monetary": 205420.78,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-041",
+          "Recency": 12,
+          "Frequency": 434,
+          "Monetary": 200361.99,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-042",
+          "Recency": 12,
+          "Frequency": 493,
+          "Monetary": 224894.76,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-043",
+          "Recency": 110,
+          "Frequency": 438,
+          "Monetary": 206101.88,
+          "R": 1,
+          "F": 5,
+          "M": 5,
+          "Segment": "Риск"
+        },
+        {
+          "Customer": "K-044",
+          "Recency": 12,
+          "Frequency": 431,
+          "Monetary": 182991.14,
+          "R": 5,
+          "F": 5,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-045",
+          "Recency": 13,
+          "Frequency": 417,
+          "Monetary": 187762.76,
+          "R": 5,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-046",
+          "Recency": 13,
+          "Frequency": 453,
+          "Monetary": 199836.25,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-047",
+          "Recency": 13,
+          "Frequency": 451,
+          "Monetary": 209445.02,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-048",
+          "Recency": 13,
+          "Frequency": 422,
+          "Monetary": 190097.7,
+          "R": 5,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-049",
+          "Recency": 14,
+          "Frequency": 373,
+          "Monetary": 174016.05,
+          "R": 5,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-050",
+          "Recency": 110,
+          "Frequency": 423,
+          "Monetary": 190987.34,
+          "R": 1,
+          "F": 5,
+          "M": 5,
+          "Segment": "Риск"
+        },
+        {
+          "Customer": "K-051",
+          "Recency": 15,
+          "Frequency": 431,
+          "Monetary": 192585.97,
+          "R": 5,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-052",
+          "Recency": 14,
+          "Frequency": 420,
+          "Monetary": 185762.09,
+          "R": 5,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-053",
+          "Recency": 15,
+          "Frequency": 420,
+          "Monetary": 188436.45,
+          "R": 5,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-054",
+          "Recency": 15,
+          "Frequency": 396,
+          "Monetary": 176924.24,
+          "R": 5,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-055",
+          "Recency": 15,
+          "Frequency": 408,
+          "Monetary": 183750.92,
+          "R": 5,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-056",
+          "Recency": 15,
+          "Frequency": 419,
+          "Monetary": 203952.38,
+          "R": 5,
+          "F": 4,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-057",
+          "Recency": 110,
+          "Frequency": 425,
+          "Monetary": 193407.74,
+          "R": 1,
+          "F": 5,
+          "M": 5,
+          "Segment": "Риск"
+        },
+        {
+          "Customer": "K-058",
+          "Recency": 16,
+          "Frequency": 391,
+          "Monetary": 182609.13,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-059",
+          "Recency": 16,
+          "Frequency": 397,
+          "Monetary": 179510.78,
+          "R": 5,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-060",
+          "Recency": 16,
+          "Frequency": 362,
+          "Monetary": 163344.26,
+          "R": 5,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-061",
+          "Recency": 17,
+          "Frequency": 353,
+          "Monetary": 161914.23,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-062",
+          "Recency": 17,
+          "Frequency": 372,
+          "Monetary": 168558.22,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-063",
+          "Recency": 17,
+          "Frequency": 440,
+          "Monetary": 194462.45,
+          "R": 4,
+          "F": 5,
+          "M": 5,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-064",
+          "Recency": 110,
+          "Frequency": 390,
+          "Monetary": 176914.11,
+          "R": 1,
+          "F": 4,
+          "M": 4,
+          "Segment": "Риск"
+        },
+        {
+          "Customer": "K-065",
+          "Recency": 18,
+          "Frequency": 387,
+          "Monetary": 183946.84,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-066",
+          "Recency": 18,
+          "Frequency": 401,
+          "Monetary": 185305.5,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-067",
+          "Recency": 18,
+          "Frequency": 383,
+          "Monetary": 178040.76,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-068",
+          "Recency": 18,
+          "Frequency": 417,
+          "Monetary": 186444.84,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-069",
+          "Recency": 19,
+          "Frequency": 398,
+          "Monetary": 175843.55,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-070",
+          "Recency": 19,
+          "Frequency": 391,
+          "Monetary": 170259.1,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-071",
+          "Recency": 110,
+          "Frequency": 367,
+          "Monetary": 158719.16,
+          "R": 1,
+          "F": 4,
+          "M": 4,
+          "Segment": "Риск"
+        },
+        {
+          "Customer": "K-072",
+          "Recency": 19,
+          "Frequency": 396,
+          "Monetary": 178663.91,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-073",
+          "Recency": 21,
+          "Frequency": 398,
+          "Monetary": 178336.77,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-074",
+          "Recency": 20,
+          "Frequency": 368,
+          "Monetary": 160154.98,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-075",
+          "Recency": 21,
+          "Frequency": 368,
+          "Monetary": 164009.36,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-076",
+          "Recency": 20,
+          "Frequency": 388,
+          "Monetary": 176201.42,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-077",
+          "Recency": 21,
+          "Frequency": 376,
+          "Monetary": 168895.18,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-078",
+          "Recency": 110,
+          "Frequency": 346,
+          "Monetary": 168509.48,
+          "R": 1,
+          "F": 4,
+          "M": 4,
+          "Segment": "Риск"
+        },
+        {
+          "Customer": "K-079",
+          "Recency": 21,
+          "Frequency": 382,
+          "Monetary": 174329.09,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-080",
+          "Recency": 21,
+          "Frequency": 341,
+          "Monetary": 154229.46,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-081",
+          "Recency": 22,
+          "Frequency": 353,
+          "Monetary": 156577.23,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-082",
+          "Recency": 22,
+          "Frequency": 343,
+          "Monetary": 156753.2,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-083",
+          "Recency": 22,
+          "Frequency": 351,
+          "Monetary": 151162.85,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-084",
+          "Recency": 22,
+          "Frequency": 363,
+          "Monetary": 163943.79,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-085",
+          "Recency": 110,
+          "Frequency": 319,
+          "Monetary": 147139.33,
+          "R": 1,
+          "F": 3,
+          "M": 4,
+          "Segment": "Риск"
+        },
+        {
+          "Customer": "K-086",
+          "Recency": 23,
+          "Frequency": 374,
+          "Monetary": 165300.11,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-087",
+          "Recency": 23,
+          "Frequency": 336,
+          "Monetary": 153482.01,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-088",
+          "Recency": 23,
+          "Frequency": 396,
+          "Monetary": 174415.97,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-089",
+          "Recency": 24,
+          "Frequency": 354,
+          "Monetary": 151317.44,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-090",
+          "Recency": 24,
+          "Frequency": 320,
+          "Monetary": 137588.72,
+          "R": 4,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-091",
+          "Recency": 25,
+          "Frequency": 339,
+          "Monetary": 147050.33,
+          "R": 4,
+          "F": 4,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-092",
+          "Recency": 110,
+          "Frequency": 310,
+          "Monetary": 139277.98,
+          "R": 1,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-093",
+          "Recency": 25,
+          "Frequency": 327,
+          "Monetary": 149474.46,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-094",
+          "Recency": 25,
+          "Frequency": 323,
+          "Monetary": 147784.04,
+          "R": 4,
+          "F": 3,
+          "M": 4,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-095",
+          "Recency": 25,
+          "Frequency": 343,
+          "Monetary": 152274.72,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-096",
+          "Recency": 25,
+          "Frequency": 341,
+          "Monetary": 149611.6,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-097",
+          "Recency": 26,
+          "Frequency": 318,
+          "Monetary": 146763.06,
+          "R": 4,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-098",
+          "Recency": 26,
+          "Frequency": 331,
+          "Monetary": 147508.32,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-099",
+          "Recency": 110,
+          "Frequency": 324,
+          "Monetary": 143442.06,
+          "R": 1,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-100",
+          "Recency": 26,
+          "Frequency": 328,
+          "Monetary": 152747.38,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-101",
+          "Recency": 27,
+          "Frequency": 347,
+          "Monetary": 150519.38,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-102",
+          "Recency": 27,
+          "Frequency": 326,
+          "Monetary": 143422.69,
+          "R": 4,
+          "F": 4,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-103",
+          "Recency": 27,
+          "Frequency": 308,
+          "Monetary": 138141.7,
+          "R": 4,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-104",
+          "Recency": 27,
+          "Frequency": 340,
+          "Monetary": 152034.53,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-105",
+          "Recency": 28,
+          "Frequency": 332,
+          "Monetary": 147080.64,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-106",
+          "Recency": 110,
+          "Frequency": 306,
+          "Monetary": 133978.5,
+          "R": 1,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-107",
+          "Recency": 28,
+          "Frequency": 349,
+          "Monetary": 161928.78,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-108",
+          "Recency": 28,
+          "Frequency": 339,
+          "Monetary": 159121.52,
+          "R": 4,
+          "F": 4,
+          "M": 4,
+          "Segment": "VIP"
+        },
+        {
+          "Customer": "K-109",
+          "Recency": 29,
+          "Frequency": 308,
+          "Monetary": 139045.3,
+          "R": 4,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-110",
+          "Recency": 29,
+          "Frequency": 319,
+          "Monetary": 142855.32,
+          "R": 4,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-111",
+          "Recency": 29,
+          "Frequency": 300,
+          "Monetary": 134169.78,
+          "R": 4,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-112",
+          "Recency": 29,
+          "Frequency": 287,
+          "Monetary": 128889.84,
+          "R": 4,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-113",
+          "Recency": 110,
+          "Frequency": 300,
+          "Monetary": 129000.26,
+          "R": 1,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-114",
+          "Recency": 30,
+          "Frequency": 293,
+          "Monetary": 126190.58,
+          "R": 4,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-115",
+          "Recency": 30,
+          "Frequency": 286,
+          "Monetary": 124824.73,
+          "R": 4,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-116",
+          "Recency": 30,
+          "Frequency": 291,
+          "Monetary": 126767.41,
+          "R": 4,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-117",
+          "Recency": 31,
+          "Frequency": 315,
+          "Monetary": 138134.31,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-118",
+          "Recency": 31,
+          "Frequency": 285,
+          "Monetary": 126734.91,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-119",
+          "Recency": 31,
+          "Frequency": 273,
+          "Monetary": 114691.22,
+          "R": 4,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-120",
+          "Recency": 110,
+          "Frequency": 289,
+          "Monetary": 128650.12,
+          "R": 1,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-121",
+          "Recency": 32,
+          "Frequency": 243,
+          "Monetary": 109044.01,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-122",
+          "Recency": 32,
+          "Frequency": 270,
+          "Monetary": 111263.11,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-123",
+          "Recency": 32,
+          "Frequency": 281,
+          "Monetary": 121227.79,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-124",
+          "Recency": 32,
+          "Frequency": 282,
+          "Monetary": 120346.2,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-125",
+          "Recency": 33,
+          "Frequency": 264,
+          "Monetary": 112543.08,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-126",
+          "Recency": 33,
+          "Frequency": 259,
+          "Monetary": 117122.13,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-127",
+          "Recency": 110,
+          "Frequency": 256,
+          "Monetary": 114636.49,
+          "R": 1,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-128",
+          "Recency": 33,
+          "Frequency": 259,
+          "Monetary": 114213.88,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-129",
+          "Recency": 34,
+          "Frequency": 253,
+          "Monetary": 115076.9,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-130",
+          "Recency": 34,
+          "Frequency": 261,
+          "Monetary": 115362.31,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-131",
+          "Recency": 34,
+          "Frequency": 277,
+          "Monetary": 120800.58,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-132",
+          "Recency": 34,
+          "Frequency": 258,
+          "Monetary": 109328.75,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-133",
+          "Recency": 35,
+          "Frequency": 233,
+          "Monetary": 100914.23,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-134",
+          "Recency": 110,
+          "Frequency": 213,
+          "Monetary": 93208.4,
+          "R": 1,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-135",
+          "Recency": 35,
+          "Frequency": 254,
+          "Monetary": 107862.59,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-136",
+          "Recency": 35,
+          "Frequency": 225,
+          "Monetary": 102293.1,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-137",
+          "Recency": 36,
+          "Frequency": 215,
+          "Monetary": 101485.41,
+          "R": 3,
+          "F": 2,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-138",
+          "Recency": 36,
+          "Frequency": 237,
+          "Monetary": 102044.55,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-139",
+          "Recency": 36,
+          "Frequency": 262,
+          "Monetary": 118228.97,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-140",
+          "Recency": 36,
+          "Frequency": 284,
+          "Monetary": 127158.36,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-141",
+          "Recency": 110,
+          "Frequency": 247,
+          "Monetary": 110937.78,
+          "R": 1,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-142",
+          "Recency": 37,
+          "Frequency": 249,
+          "Monetary": 114650.66,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-143",
+          "Recency": 37,
+          "Frequency": 238,
+          "Monetary": 109356.55,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-144",
+          "Recency": 37,
+          "Frequency": 237,
+          "Monetary": 103447.1,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-145",
+          "Recency": 38,
+          "Frequency": 219,
+          "Monetary": 100890.33,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-146",
+          "Recency": 38,
+          "Frequency": 216,
+          "Monetary": 90144.72,
+          "R": 3,
+          "F": 3,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-147",
+          "Recency": 38,
+          "Frequency": 231,
+          "Monetary": 102017.1,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-148",
+          "Recency": 110,
+          "Frequency": 213,
+          "Monetary": 98793.23,
+          "R": 1,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-149",
+          "Recency": 40,
+          "Frequency": 234,
+          "Monetary": 104056.27,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-150",
+          "Recency": 39,
+          "Frequency": 215,
+          "Monetary": 96717.34,
+          "R": 3,
+          "F": 3,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-151",
+          "Recency": 39,
+          "Frequency": 180,
+          "Monetary": 77145.47,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-152",
+          "Recency": 39,
+          "Frequency": 222,
+          "Monetary": 102223.42,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-153",
+          "Recency": 40,
+          "Frequency": 214,
+          "Monetary": 100167.92,
+          "R": 3,
+          "F": 2,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-154",
+          "Recency": 40,
+          "Frequency": 200,
+          "Monetary": 88902.73,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-155",
+          "Recency": 110,
+          "Frequency": 224,
+          "Monetary": 101334.78,
+          "R": 1,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-156",
+          "Recency": 41,
+          "Frequency": 194,
+          "Monetary": 89424.11,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-157",
+          "Recency": 41,
+          "Frequency": 227,
+          "Monetary": 101426.06,
+          "R": 3,
+          "F": 3,
+          "M": 3,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-158",
+          "Recency": 41,
+          "Frequency": 208,
+          "Monetary": 98693.36,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-159",
+          "Recency": 41,
+          "Frequency": 176,
+          "Monetary": 81182.83,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-160",
+          "Recency": 41,
+          "Frequency": 188,
+          "Monetary": 86673.46,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-161",
+          "Recency": 42,
+          "Frequency": 181,
+          "Monetary": 85444.33,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-162",
+          "Recency": 110,
+          "Frequency": 179,
+          "Monetary": 74534.53,
+          "R": 1,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-163",
+          "Recency": 43,
+          "Frequency": 197,
+          "Monetary": 87438.06,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-164",
+          "Recency": 42,
+          "Frequency": 194,
+          "Monetary": 92168.83,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-165",
+          "Recency": 43,
+          "Frequency": 175,
+          "Monetary": 77569.71,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-166",
+          "Recency": 43,
+          "Frequency": 173,
+          "Monetary": 71300.19,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-167",
+          "Recency": 43,
+          "Frequency": 168,
+          "Monetary": 75229.8,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-168",
+          "Recency": 43,
+          "Frequency": 170,
+          "Monetary": 74940.58,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-169",
+          "Recency": 110,
+          "Frequency": 152,
+          "Monetary": 66713.08,
+          "R": 1,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-170",
+          "Recency": 44,
+          "Frequency": 185,
+          "Monetary": 85340.27,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-171",
+          "Recency": 44,
+          "Frequency": 169,
+          "Monetary": 78018.83,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-172",
+          "Recency": 44,
+          "Frequency": 169,
+          "Monetary": 77488.94,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-173",
+          "Recency": 45,
+          "Frequency": 172,
+          "Monetary": 76663.52,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-174",
+          "Recency": 45,
+          "Frequency": 170,
+          "Monetary": 80784.35,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-175",
+          "Recency": 48,
+          "Frequency": 158,
+          "Monetary": 73412.53,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-176",
+          "Recency": 110,
+          "Frequency": 177,
+          "Monetary": 81958.35,
+          "R": 1,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-177",
+          "Recency": 46,
+          "Frequency": 172,
+          "Monetary": 76778.33,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-178",
+          "Recency": 48,
+          "Frequency": 150,
+          "Monetary": 65926.33,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-179",
+          "Recency": 46,
+          "Frequency": 157,
+          "Monetary": 66152.62,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-180",
+          "Recency": 46,
+          "Frequency": 167,
+          "Monetary": 79193.81,
+          "R": 3,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-181",
+          "Recency": 50,
+          "Frequency": 135,
+          "Monetary": 65453.92,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-182",
+          "Recency": 47,
+          "Frequency": 151,
+          "Monetary": 67200.79,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-183",
+          "Recency": 110,
+          "Frequency": 142,
+          "Monetary": 68657.4,
+          "R": 1,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-184",
+          "Recency": 47,
+          "Frequency": 145,
+          "Monetary": 64433.36,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-185",
+          "Recency": 48,
+          "Frequency": 132,
+          "Monetary": 61021.83,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-186",
+          "Recency": 48,
+          "Frequency": 130,
+          "Monetary": 61048.39,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-187",
+          "Recency": 48,
+          "Frequency": 143,
+          "Monetary": 64709.59,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-188",
+          "Recency": 50,
+          "Frequency": 125,
+          "Monetary": 56119.2,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-189",
+          "Recency": 50,
+          "Frequency": 128,
+          "Monetary": 55263.72,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-190",
+          "Recency": 110,
+          "Frequency": 109,
+          "Monetary": 52953.92,
+          "R": 1,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-191",
+          "Recency": 49,
+          "Frequency": 123,
+          "Monetary": 51241.09,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-192",
+          "Recency": 50,
+          "Frequency": 119,
+          "Monetary": 53320.27,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-193",
+          "Recency": 50,
+          "Frequency": 125,
+          "Monetary": 53349.88,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-194",
+          "Recency": 50,
+          "Frequency": 116,
+          "Monetary": 54294.3,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-195",
+          "Recency": 52,
+          "Frequency": 131,
+          "Monetary": 56893.66,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-196",
+          "Recency": 50,
+          "Frequency": 137,
+          "Monetary": 64308.63,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-197",
+          "Recency": 110,
+          "Frequency": 124,
+          "Monetary": 58216.43,
+          "R": 1,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-198",
+          "Recency": 51,
+          "Frequency": 85,
+          "Monetary": 38387.12,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-199",
+          "Recency": 51,
+          "Frequency": 122,
+          "Monetary": 58287.76,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-200",
+          "Recency": 51,
+          "Frequency": 100,
+          "Monetary": 43691.24,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-201",
+          "Recency": 52,
+          "Frequency": 96,
+          "Monetary": 39296.07,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-202",
+          "Recency": 54,
+          "Frequency": 101,
+          "Monetary": 44128.91,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-203",
+          "Recency": 52,
+          "Frequency": 104,
+          "Monetary": 45760.0,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-204",
+          "Recency": 112,
+          "Frequency": 93,
+          "Monetary": 43332.58,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-205",
+          "Recency": 53,
+          "Frequency": 93,
+          "Monetary": 40298.44,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-206",
+          "Recency": 53,
+          "Frequency": 113,
+          "Monetary": 51516.77,
+          "R": 2,
+          "F": 2,
+          "M": 2,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-207",
+          "Recency": 53,
+          "Frequency": 81,
+          "Monetary": 35597.7,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-208",
+          "Recency": 53,
+          "Frequency": 84,
+          "Monetary": 38014.84,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-209",
+          "Recency": 55,
+          "Frequency": 101,
+          "Monetary": 42082.1,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-210",
+          "Recency": 57,
+          "Frequency": 76,
+          "Monetary": 36867.19,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-211",
+          "Recency": 110,
+          "Frequency": 86,
+          "Monetary": 37851.86,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-212",
+          "Recency": 55,
+          "Frequency": 73,
+          "Monetary": 33045.3,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-213",
+          "Recency": 55,
+          "Frequency": 81,
+          "Monetary": 35762.2,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-214",
+          "Recency": 56,
+          "Frequency": 69,
+          "Monetary": 31127.39,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-215",
+          "Recency": 56,
+          "Frequency": 76,
+          "Monetary": 32630.78,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-216",
+          "Recency": 56,
+          "Frequency": 75,
+          "Monetary": 30465.46,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-217",
+          "Recency": 57,
+          "Frequency": 62,
+          "Monetary": 28697.08,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-218",
+          "Recency": 110,
+          "Frequency": 66,
+          "Monetary": 28841.15,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-219",
+          "Recency": 56,
+          "Frequency": 64,
+          "Monetary": 28993.89,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-220",
+          "Recency": 56,
+          "Frequency": 63,
+          "Monetary": 27064.31,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-221",
+          "Recency": 59,
+          "Frequency": 62,
+          "Monetary": 23821.49,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-222",
+          "Recency": 61,
+          "Frequency": 63,
+          "Monetary": 30785.01,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-223",
+          "Recency": 59,
+          "Frequency": 63,
+          "Monetary": 30965.05,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-224",
+          "Recency": 58,
+          "Frequency": 50,
+          "Monetary": 22290.65,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-225",
+          "Recency": 110,
+          "Frequency": 59,
+          "Monetary": 28259.54,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-226",
+          "Recency": 59,
+          "Frequency": 53,
+          "Monetary": 26847.43,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-227",
+          "Recency": 59,
+          "Frequency": 40,
+          "Monetary": 18466.48,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-228",
+          "Recency": 64,
+          "Frequency": 38,
+          "Monetary": 17333.38,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-229",
+          "Recency": 63,
+          "Frequency": 41,
+          "Monetary": 16632.85,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-230",
+          "Recency": 59,
+          "Frequency": 28,
+          "Monetary": 12989.94,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-231",
+          "Recency": 61,
+          "Frequency": 44,
+          "Monetary": 22571.69,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-232",
+          "Recency": 110,
+          "Frequency": 35,
+          "Monetary": 16487.18,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-233",
+          "Recency": 63,
+          "Frequency": 33,
+          "Monetary": 13748.92,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-234",
+          "Recency": 60,
+          "Frequency": 41,
+          "Monetary": 18668.33,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-235",
+          "Recency": 63,
+          "Frequency": 35,
+          "Monetary": 16247.21,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-236",
+          "Recency": 60,
+          "Frequency": 30,
+          "Monetary": 14436.38,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-237",
+          "Recency": 61,
+          "Frequency": 31,
+          "Monetary": 12383.91,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-238",
+          "Recency": 65,
+          "Frequency": 16,
+          "Monetary": 7062.15,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-239",
+          "Recency": 111,
+          "Frequency": 15,
+          "Monetary": 7671.37,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-240",
+          "Recency": 62,
+          "Frequency": 15,
+          "Monetary": 8593.08,
+          "R": 2,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-241",
+          "Recency": 75,
+          "Frequency": 31,
+          "Monetary": 15406.98,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-242",
+          "Recency": 69,
+          "Frequency": 16,
+          "Monetary": 6460.52,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-243",
+          "Recency": 80,
+          "Frequency": 10,
+          "Monetary": 4396.95,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-244",
+          "Recency": 67,
+          "Frequency": 15,
+          "Monetary": 6924.14,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-245",
+          "Recency": 69,
+          "Frequency": 14,
+          "Monetary": 5707.01,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-246",
+          "Recency": 124,
+          "Frequency": 5,
+          "Monetary": 2383.42,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-247",
+          "Recency": 71,
+          "Frequency": 7,
+          "Monetary": 2303.96,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-248",
+          "Recency": 99,
+          "Frequency": 4,
+          "Monetary": 2297.39,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-249",
+          "Recency": 69,
+          "Frequency": 5,
+          "Monetary": 1215.94,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        },
+        {
+          "Customer": "K-250",
+          "Recency": 71,
+          "Frequency": 3,
+          "Monetary": 1562.2,
+          "R": 1,
+          "F": 1,
+          "M": 1,
+          "Segment": "Обычные"
+        }
+      ]
+    }
+  ]
+}

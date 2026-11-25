@@ -1,0 +1,15 @@
+{
+  "base": "bh-g106-t2",
+  "input_files": [],
+  "budget": {
+    "max_errors": 0,
+    "max_nodes": 0,
+    "forbid": [
+      "sqlite3",
+      "openpyxl",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  }
+}
