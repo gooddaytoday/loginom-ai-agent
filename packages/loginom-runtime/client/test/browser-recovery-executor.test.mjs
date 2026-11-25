@@ -577,6 +577,32 @@ test('a changed recovery acknowledgement keeps the original node outcome and own
   assert.ok(!f.events.some(event => event.phase === 'operation_abandoned'));
 });
 
+test('a failed recovery receipt write keeps the original operation', async () => {
+  const f = fixture();
+  const original = await stopAtFinish(f);
+  await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+  const recovery = createBrowserRecovery({ enabled: true, gate: createSerialGate(), executor: f.runtime,
+    probe: async () => ({ ok: true }), record: async event => event });
+  const call = async args => JSON.parse((await recovery.call('dock_browser_recovery',
+    { operation_id: 'apply', ...args })).content[0].text);
+  assert.equal((await call({ action: 'start' })).phase, 'browser');
+  f.state.release = proved;
+  f.state.ack = async event => {
+    if (event.phase === 'browser_recovery_receipt') throw Error('receipt journal write failed');
+    return event;
+  };
+  const ended = await call({ action: 'finish', actions_performed: ['Returned to the graph'] });
+  assert.equal(ended.verification.status, 'unresolved', ended.verification.reason);
+  assert.match(ended.verification.reason, /receipt journal write failed/);
+  assert.equal(ended.stopped.cleanup.state, 'retained_uncertain');
+  const status = await dispatchNodeApi(f.runtime, 'dock_node_status', { operation_id: 'apply' });
+  assert.deepEqual(status.outcome, original.outcome);
+  assert.deepEqual(status.progress, original.progress);
+  assert.equal(f.runtime.hasUnsettledWork(), true);
+  assert.throws(() => f.runtime.startNodeApply(f.request('other')), /Browser recovery holds/);
+  assert.ok(!f.events.some(event => event.phase === 'operation_abandoned'));
+});
+
 test('T3: public finish offers only an existing-output read after repeated failure with unknown execution', async () => {
   const f = fixture();
   const accepted = [];
