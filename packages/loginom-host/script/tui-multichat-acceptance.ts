@@ -97,7 +97,8 @@ try {
     throw Error("TUI_CLEANUP_FAILED")
   for (const field of ["session", "artifact", "source", "sha256"] as const)
     if (!results[0][field] || results[0][field] === results[1][field]) throw Error(`COLLISION_${field}`)
-  const db = new Database(join(profile, "data/loginom-ai-agent.db"), { readonly: true })
+  const db = new Database(join(profile, "data/loginom-ai-agent.db"))
+  db.run("PRAGMA query_only = ON")
   try {
     const sessions = db.query("select id from session").all() as { id: string }[]
     const tools = (db.query("select session_id, data from part").all() as { session_id: string; data: string }[])
