@@ -732,26 +732,82 @@ test('foreign edit while an existing workflow is being activated still refuses',
 test('a lost inactive Prepare activation reply reconciles the original click once',async()=>{
   const fixture=pageFixture({authenticated:true,workflow:true,nativeWorkflow:true});
   const first=await execute(fixture);
-  fixture.tabs[1].crumbs[2].textContent='Manual Save';
+  const target=fixture.tabs[1];
+  target.crumbs[2].textContent='Manual Save';
   fixture.activate(fixture.tabs[0]);
   const locator=fixture.page.locator;
   let clicks=0;
   fixture.page.locator=selector=>{
     const control=locator(selector);
     return {...control,click:async(...args)=>{
-      await control.click(...args);
       if(selector.includes(first.workflow_ref.tab_tid)&&++clicks===1)throw Error('lost activation reply');
+      await control.click(...args);
     }};
   };
-  const request={intent:'existing_workflow',operationId:'return',workflowRef:{...first.workflow_ref,document_id:first.document_id}};
+  const request={intent:'existing_workflow',operationId:'return',workflowRef:{...first.workflow_ref,document_id:first.document_id},timeoutMs:500};
   const interrupted=await execute(fixture,request);
   assert.equal(interrupted.reason,'PREPARATION_INTERRUPTED');
   assert.equal(interrupted.effect_possible,true);
+  assert.equal(target.classList.contains('x-tab-active'),false);
   assert.equal((await execute(fixture,{...request,operationId:'foreign'})).reason,'OPERATION_CONFLICT');
+  // The original click settles after the retry has already observed the inactive tab.
+  fixture.page.waitForTimeout=async()=>fixture.activate(target);
   const recovered=await execute(fixture,{...request,recoverOnly:true});
   assert.equal(recovered.status,'READY',recovered.reason);
   assert.equal(recovered.workflow_ref.navigation_path[2].label,'Manual Save');
   assert.equal(clicks,1);
+});
+
+for(const change of ['owner','package'])for(const rebindReceipt of [false,true])test(
+  'Prepare rechecks the reserved '+change+' after the activation click'+(rebindReceipt?' even when the receipt also changes':''),async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  const target=fixture.tabs[1];
+  if(rebindReceipt)target.crumbs[2].textContent='Manual Save';
+  fixture.activate(fixture.tabs[0]);
+  const locator=fixture.page.locator;
+  fixture.page.locator=selector=>{
+    const control=locator(selector);
+    return {...control,click:async(...args)=>{
+      await control.click(...args);
+      if(!selector.includes(target.tid))return;
+      // Even a receipt that agrees with the live state cannot replace the
+      // owner captured by the original reservation.
+      const {bg:{app},__loginomDockPreparationV1:state}=fixture.context;
+      const receipt=state.receipts.get('prepare');
+      if(change==='owner'){
+        target.workflowNode=Object.assign(new app.WorkFlowTreeNode(),{ParentNode:receipt.packageNode});
+        if(rebindReceipt)receipt.stepWorkflowNode=target.workflowNode;
+      }else{
+        target.workflowNode.ParentNode=new app.PackageTreeNode('/user/other.lgp');
+        if(rebindReceipt)receipt.packageNode=target.workflowNode.ParentNode;
+      }
+    }};
+  };
+  const result=await execute(fixture,{intent:'existing_workflow',operationId:'return',
+    workflowRef:{...first.workflow_ref,document_id:first.document_id},timeoutMs:500});
+  assert.equal(result.status,'NOT_READY');
+  assert.equal(result.reason,rebindReceipt?'FOREIGN_WORKFLOW_CHANGED':'WORKFLOW_CHANGED');
+  assert.equal(result.effect_possible,true);
+});
+
+test('a READY Prepare releases the reservation for the next inactive activation',async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  const target=fixture.tabs[1];
+  target.crumbs[2].textContent='Manual Save';
+  const activate=async (operationId,prepared)=>{
+    fixture.activate(fixture.tabs[0]);
+    const result=await execute(fixture,{intent:'existing_workflow',operationId,
+      workflowRef:{...prepared.workflow_ref,document_id:prepared.document_id}});
+    assert.equal(result.status,'READY',result.reason);
+    assert.equal(result.workflow_ref.workflow_id,first.workflow_ref.workflow_id);
+    assert.equal(target.classList.contains('x-tab-active'),true);
+    return result;
+  };
+  const returned=await activate('return',first);
+  await activate('return-again',returned);
+  assert.equal(fixture.events.filter(event=>event==='create_draft').length,1);
 });
 
 test('Prepare activation preserves a conflicting receipt that appears after lookup',async()=>{
@@ -810,12 +866,46 @@ test('an active blocker cannot click or retire a verified Prepare refresh anchor
   };
   const blocked=await run();
   assert.equal(blocked.reason,'UI_BLOCKED');
-  assert.equal(blocked.effect_possible,false);
+  assert.equal(blocked.effect_possible,true);
   fixture.setBlocked(false);
   const recovered=await run();
   assert.equal(recovered.status,'READY',recovered.reason);
   assert.equal(recovered.workflow_ref.navigation_path[2].label,'Manual Save');
   assert.equal(clicks,0);
+});
+
+for(const restart of ['receipt lost','about:blank'])test('blocked Prepare replay refuses '+restart+' without recreating a draft',async()=>{
+  const firstPage=pageFixture({authenticated:true,nativeWorkflow:true});
+  let fixture=firstPage;
+  const request={operation_id:'prepare',intent:'new_draft',workflow_ref:null};
+  const metadata={skillRevision:'skill'};
+  const run=()=>prepareWorkspaceSession({metadata,request,assertAllowed(){},assertTarget(){},record:async()=>{},save:async()=>{},
+    prepare:options=>execute(fixture,{...options,timeoutMs:500})});
+  assert.equal((await run()).status,'READY');
+  firstPage.setBlocked(true);
+  assert.equal((await run()).reason,'UI_BLOCKED');
+  firstPage.setBlocked(false);
+  if(restart==='about:blank')fixture=pageFixture({authenticated:true,nativeWorkflow:true});
+  else runInContext('globalThis.__loginomDockPreparationV1 = undefined',firstPage.context);
+  const result=await run();
+  const events=fixture===firstPage?firstPage.events:[...firstPage.events,...fixture.events];
+  assert.equal(result.reason,restart==='about:blank'?'DOCUMENT_LOST':'RECEIPT_LOST',
+    JSON.stringify({status:result.status,events}));
+  assert.equal(result.status,'NOT_READY');
+  assert.equal(result.created_draft,false);
+  assert.equal(events.filter(event=>event==='create_draft').length,1);
+  if(restart==='about:blank')assert.deepEqual(fixture.events,[]);
+});
+
+test('blocking a new Prepare ID before activation reports no possible effect',async()=>{
+  const fixture=pageFixture({authenticated:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  fixture.setBlocked(true);
+  const result=await execute(fixture,{intent:'existing_workflow',operationId:'blocked',
+    workflowRef:{...first.workflow_ref,document_id:first.document_id}});
+  assert.equal(result.reason,'UI_BLOCKED');
+  assert.equal(result.effect_possible,false);
+  assert.equal(fixture.events.filter(event=>event==='create_draft').length,1);
 });
 
 test('a host receipt that never published readiness does not authorize a fresh Prepare snapshot',async()=>{

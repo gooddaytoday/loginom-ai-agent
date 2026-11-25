@@ -598,7 +598,9 @@ async function prepareWorkspace(page, options) {
           interaction_readiness:'driver_verification_required',preserved_workflows:[]});
       }
       if(refreshed.status==='NOT_READY'){
-        if(refreshed.reason==='UI_BLOCKED')effectPossible=false;
+        // A blocked refresh has no new effect, but a replay still needs the
+        // original receipt to avoid creating or opening a package again.
+        if(refreshed.reason==='UI_BLOCKED'&&!options.recoverOnly)effectPossible=false;
         return result('NOT_READY',refreshed.reason);
       }
     }
