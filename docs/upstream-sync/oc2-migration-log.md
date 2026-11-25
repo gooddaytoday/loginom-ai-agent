@@ -24729,3 +24729,65 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   `desktop/src/main/proxy-env` 0.4, которого в v2 нет. Системный прокси службы — после шлюза B (В-97, п. 6).
   Шаги WinINET-прокси и проверка прокси службы убраны из задания `native` с комментарием, они вернутся вместе с
   прокси службы. Задание `timings` (только `workflow_dispatch`) не менялось.
+
+## B2.7a4c Порядок проверок run
+
+25.11.2026. Ветка `b27a4c-run-order` от `oc2-migration` (`950e5da9ce`), рабочее дерево `.claude/worktrees/b27a4c`. Bun 1.4.4
+и Node 24.19.0 первыми в `PATH` только для своих команд; `bun install --frozen-lockfile`, `npm ci --ignore-scripts`
+клиента `loginom-runtime` и шаблона дашборда. Хвост B2.7a4b («Порядок проверок не как в 0.4»; строка 5 в B4.8a «Пустая сессия
+после отказа `run --command`»). Правок upstream нет, `catalog.json` и `catalog.md` не менялись; новых контрактов нет.
+
+### Что изменено (`packages/cli/src/run/`)
+
+| Пункт | Итог |
+|---|---|
+| 1. `--command <навык>` без сообщения | `run.ts`: «You must provide a message» не выдаётся, если продуктовый CLI получил `--command` (`RunProduct.skills()`); сервер принимает промпт с пустым текстом и навыком (проверено процессом с подставной моделью). Без `--command` код 1 и текст прежние |
+| 2. Host раньше файлов и сообщения | `run.ts`: клиент создаётся в `run()`, `RunProduct.preflight` — сразу после чтения stdin, до проверки сообщения и `--file`. Ненастроенный профиль с `--command loginom-automation` и отсутствующим `--file` даёт 2 (`LOGINOM_CONFIG_REQUIRED`), строгий журнал — 4 |
+| 3. Нет пустой сессии | `preflight` идёт до `resolveSessionTarget`, ядро не менялось. Вызов убран из `runNonInteractivePrompt` (после создания сессии) и из `RunProduct.dashboard`: теперь он один на запуск. В JSON-событии отказа `sessionID` пуст, как у отказа `dashboard` с B2.9i |
+| 4. `run --dashboard` | Порядок «Host, подготовка папки, сессия» прежний: проверка идёт раньше `loginom.dashboard`, строгий журнал отказывает до траты разового снимка; тесты `cli-dashboard` проходят |
+
+### Потребитель `evals/script/run-node-selection-attempt.ts`
+
+Код не менялся. Событие отказа теперь без `sessionID`, `sessions.length !== 1` при непустых событиях даёт
+`SELECTION_SESSION_INCOMPLETE` (код 2) — тот же итог, что в 0.4 (там сессии при отказе тоже не было). Раньше (одна пустая
+сессия) было `SELECTION_DISPATCH_UNCONFIRMED`. Читатель `readSelectionSnapshot` для пустой сессии оставлен и проверяется
+прежним тестом; в тесте изменён только комментарий.
+
+### Тесты
+
+`packages/cli/test/cli-loginom.test.ts`, «run checks the Host before files and the message, leaves no session after a
+refusal, and takes --command alone»: процесс CLI из исходников, настоящий Host на Node, подставная модель; код и stderr
+каждого отказа, число строк `session_v2` в базе профиля (0), число запросов к модели (0), `--command package-docs` без
+сообщения — код 0 и ответ модели.
+
+Мутации (файл `run.ts` возвращался из копии после каждой):
+
+| Мутация | Результат теста |
+|---|---|
+| база (`git checkout src/run`) | красный |
+| убрано исключение для `--command` из проверки сообщения | красный |
+| `preflight` после проверки сообщения | красный |
+| `preflight` после чтения `--file` | красный |
+| `preflight` после создания сессии | красный (код 1 раньше; отдельно утверждение о числе сессий этой мутацией не проверено) |
+
+Прогоны (`LOGINOM_AI_AGENT_TEST_NODE`, база `950e5da9ce` в отдельном дереве для сравнения):
+
+| Набор | Итог |
+|---|---|
+| `packages/cli` `bun test --timeout 60000` | 624 pass, 11 skip, 0 fail (635 тестов, 83 файла) |
+| `packages/loginom-agent` | 125 pass, 0 fail |
+| `packages/product` | 71 pass, 3 fail — ровно известные: `workspace packages`, `CI triggers`, `path literals` |
+| `evals` `test:unit` (полный) | 1328 pass, 31 fail. Файлы с падениями повторены на базе и на ветке с `--timeout 60000`: на базе 22 падения, на ветке 21 (подмножество базы; общие — запись под `root`, `EACCES`/readonly и cleanup, `near-miss`, `text-import-evidence`, `campaign-*`); остальные 10 из полного прогона прошли при повторе на ветке (нагрузка машины) |
+| `bun typecheck` в `packages/cli` | без ошибок |
+| `catalog-check.py` / `apply-identity.py --check` | код 0 / 0 файлов |
+
+### Найдено, не чинил
+
+- `--command=` с пустым значением и `RunProduct.skills()`: пустой ID считается навыком, сообщение не требуется, сервер
+  ответит `Skill not found`. В 0.4 пустая `--command` была обычным промптом (запись B2.7a4b не менялась).
+- Коды 2 для «нет сообщения»/`--fork` без `--continue` у продуктового CLI в 0.4 (`cmd/run.ts`) — в v2 по-прежнему 1.
+
+### Не проверено
+
+- Собранный CLI (`build-cli.ts`), Windows и macOS; `run` через работающую службу профиля.
+- Реальная модель не вызывалась: все запросы шли в подставной сервер `127.0.0.1`.
