@@ -8,7 +8,8 @@
       },
       {
         "id": "products",
-        "type": "imports.text"
+        "type": "imports.text",
+        "label": "Каталог для ранжирования"
       },
       {
         "id": "rank",

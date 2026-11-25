@@ -7,13 +7,10 @@
     "products.csv"
   ],
   "manual_edit": {
-    "kind": "move",
+    "kind": "rename",
     "node": {
       "type": "imports.text"
     },
-    "position": {
-      "x": 128,
-      "y": 352
-    }
+    "label": "Каталог для ранжирования"
   }
 }

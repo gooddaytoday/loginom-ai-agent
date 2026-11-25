@@ -38,7 +38,11 @@
         },
         {
           "name": "unit_price",
-          "type": "real"
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-12
+          }
         },
         {
           "name": "discount_pct",

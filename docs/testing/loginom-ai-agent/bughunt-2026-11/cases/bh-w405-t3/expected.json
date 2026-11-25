@@ -12,7 +12,8 @@
       },
       {
         "id": "filter",
-        "type": "transform.filter_data"
+        "type": "transform.filter_data",
+        "label": "Ценовой порог"
       },
       {
         "id": "limit",

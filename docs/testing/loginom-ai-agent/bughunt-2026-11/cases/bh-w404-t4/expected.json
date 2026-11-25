@@ -42,11 +42,19 @@
         },
         {
           "name": "revenue",
-          "type": "real"
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-12
+          }
         },
         {
           "name": "moving_avg",
-          "type": "real"
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-12
+          }
         }
       ],
       "rows": [

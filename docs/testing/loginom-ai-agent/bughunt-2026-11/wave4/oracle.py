@@ -52,12 +52,16 @@ def link(source, target, *, output=0, input_port=0):
     return dict(source=source, target=target, output=output, input=input_port)
 
 
-def table(kind, schema, rows, *, ordered=False, port=0, exact_columns=False):
+def table(kind, schema, rows, *, ordered=False, port=0, exact_columns=False, label=None):
     converters = {"integer": int, "real": float, "string": str}
-    return dict(
+    output = dict(
         output_node_type=kind,
         output_port=port,
-        columns=[dict(name=name, type=field_type) for name, field_type in schema],
+        columns=[
+            dict(name=name, type=field_type, tolerance=dict(abs=1e-8, rel=1e-12))
+            if field_type == "real" else dict(name=name, type=field_type)
+            for name, field_type in schema
+        ],
         rows=[
             {
                 name: converters[field_type](row[name]) if row[name] not in ("", None) else None
@@ -68,10 +72,13 @@ def table(kind, schema, rows, *, ordered=False, port=0, exact_columns=False):
         ordered=ordered,
         column_order="exact" if exact_columns else "any",
     )
+    if label:
+        output["output_node_label"] = label
+    return output
 
 
-def move(kind, x, y, **selector):
-    return dict(kind="move", node=dict(type=kind, **selector), position=dict(x=x, y=y))
+def rename(kind, label):
+    return dict(kind="rename", node=dict(type=kind), label=label)
 
 
 class Chain:
@@ -118,15 +125,17 @@ def item_amount(item):
 
 def regional_revenue(orders, clients):
     chain = Chain(1, {"orders.csv": orders, "customers.csv": clients})
-    imports = [node("orders", IMPORT, label_contains="orders"),
-               node("customers", IMPORT, label_contains="customers")]
+    orders_label, customers_label = "Заказы", "Клиенты"
+    imports = [node("orders", IMPORT, label=orders_label),
+               node("customers", IMPORT, label=customers_label)]
     nodes = [imports[0]]
     order_schema = [("order_id", "integer"), ("customer_id", "integer"), ("revenue", "real")]
     client_schema = [("customer_id", "integer"), ("region", "string"), ("email", "string")]
-    chain.turn("Импортируй в сценарий orders.csv с полем revenue вещественного типа и проверь импорт запуском.",
+    chain.turn("Импортируй orders.csv в узел «Заказы» с вещественным revenue и проверь импорт запуском.",
                nodes, outputs=[table(IMPORT, order_schema, orders)])
     nodes = imports.copy()
-    chain.turn("Импортируй в этот сценарий customers.csv и проверь импорт запуском.", nodes)
+    chain.turn("Импортируй customers.csv в узел «Клиенты» и проверь все строки на выходе.",
+               nodes, outputs=[table(IMPORT, client_schema, clients, label=customers_label)])
     nodes.append(node("join", JOIN))
     links = [link("orders", "join"), link("customers", "join", input_port=1)]
     clients_by_id = {client["customer_id"]: client for client in clients}
@@ -135,7 +144,7 @@ def regional_revenue(orders, clients):
              revenue=order["revenue"])
         for order in orders
     ]
-    chain.turn("Добавь внутреннее слияние orders и customers по customer_id, оставь order_id, region и revenue на выходе и выполни его.",
+    chain.turn("Добавь внутреннее слияние «Заказы» и «Клиенты» по customer_id, оставь order_id, region и revenue на выходе и выполни его.",
                nodes, links, [table(JOIN, [order_schema[0], client_schema[1], order_schema[2]], joined)])
     nodes.append(node("group", GROUP))
     links.append(link("join", "group"))
@@ -153,7 +162,7 @@ def regional_revenue(orders, clients):
                nodes, links, [table(SORT, schema, sorted_rows, ordered=True)])
     nodes.append(node("excel", EXCEL))
     links.append(link("sort", "excel"))
-    chain.turn("Выгрузи отсортированный результат в regional-revenue.xlsx на лист «Регионы», с заголовками region и total_revenue в таком порядке, приложи книгу и покажи строки исходной сортировки.",
+    chain.turn("Выгрузи отсортированный результат в regional-revenue.xlsx на лист «Регионы», с заголовками region и total_revenue в таком порядке. Приложи книгу и покажи строки исходной сортировки.",
                nodes, links, [table(SORT, schema, sorted_rows, ordered=True, exact_columns=True)],
                excel=dict(filename="regional-revenue.xlsx", sheet_name="Регионы", header=True))
     return chain
@@ -202,8 +211,11 @@ def product_ranks(products):
     nodes = [node("products", IMPORT)]
     schema = [("product_id", "integer"), ("category", "string"),
               ("list_price", "real"), ("quantity", "integer")]
+    caption = "Каталог для ранжирования"
     chain.turn("Импортируй products.csv со столбцом list_price вещественного типа и проверь импорт запуском.",
-               nodes, outputs=[table(IMPORT, schema, products)], manual=move(IMPORT, 128, 352))
+               nodes, outputs=[table(IMPORT, schema, products)],
+               manual=rename(IMPORT, caption))
+    nodes[0] = node("products", IMPORT, label=caption)
     nodes.append(node("rank", JS))
     links = [link("products", "rank")]
     schema = [("category", "string"), ("product_id", "integer"), ("rank", "integer")]
@@ -221,7 +233,7 @@ def product_ranks(products):
     by_quantity = rank("quantity")
     by_price = rank("list_price")
     assert by_quantity != by_price
-    chain.turn("Добавь узел JavaScript после импорта и посчитай ранг товара внутри category: list_price по убыванию, при равенстве меньший product_id выше. Выведи category, product_id и целочисленный rank с единицы, выполни узел.",
+    chain.turn("Добавь узел JavaScript после «Каталог для ранжирования» и посчитай ранг товара внутри category: list_price по убыванию, при равенстве меньший product_id выше. Выведи category, product_id и целочисленный rank с единицы, выполни узел.",
                nodes, links, [table(JS, schema, by_price)])
     chain.turn("Поменяй в том же узле критерий ранга с цены на quantity по убыванию и проверь запуском.",
                nodes, links, [table(JS, schema, by_quantity)])
@@ -237,7 +249,7 @@ def monthly_revenue(orders):
     caption = "Заказы для динамики"
     chain.turn("Импортируй monthly-orders.csv с order_date как текстом в формате ISO и проверь все строки на выходе.",
                nodes, outputs=[table(IMPORT, inputs, orders)],
-               manual=dict(kind="rename", node=dict(type=IMPORT), label=caption))
+               manual=rename(IMPORT, caption))
     nodes[0] = node("orders", IMPORT, label=caption)
     nodes.append(node("monthly", PYTHON))
     links = [link("orders", "monthly")]
@@ -279,13 +291,15 @@ def variable_threshold(prices):
         return [table(FILTER, schema, passed), table(FILTER, schema, rejected, port=1)]
 
     assert exits(500) != exits(1000)
+    caption = "Ценовой порог"
     chain.turn("Добавь фильтр строк unit_price > 1000 после импорта и проверь оба его выхода.",
-               nodes, links, exits(1000), manual=move(FILTER, 296, 352))
+               nodes, links, exits(1000), manual=rename(FILTER, caption))
+    nodes[1] = node("filter", FILTER, label=caption)
     nodes.append(node("limit", VARS))
     chain.turn("Добавь Калькулятор переменных с одной вещественной переменной MinPrice = 1000 и выполни его.",
                nodes, links)
     links.append(link("limit", "filter"))
-    chain.turn("Подключи MinPrice из Калькулятора переменных как порог в существующем фильтре и проверь оба выхода.",
+    chain.turn("Подключи MinPrice из Калькулятора переменных как порог в фильтре «Ценовой порог» и проверь оба выхода.",
                nodes, links, exits(1000))
     chain.turn("Поменяй MinPrice на 500 в Калькуляторе переменных, пересчитай существующий фильтр и покажи его выходы.",
                nodes, links, exits(500))
@@ -317,12 +331,14 @@ def edit_workflow(quantities):
     assert 0 < len(selected) < len(quantities)
     assert grouped(selected) != grouped(selected, average=True)
     assert grouped(quantities, average=True) != grouped(selected, average=True)
+    caption = "Отбор количества"
     chain.turn("Вставь между импортом и существующей группировкой фильтр quantity ≥ 5, затем выполни группировку.",
-               nodes, via_filter, grouped(selected), manual=move(FILTER, 296, 352))
+               nodes, via_filter, grouped(selected), manual=rename(FILTER, caption))
+    nodes[-1] = node("filter", FILTER, label=caption)
     chain.turn("Замени сумму quantity на среднее в той же группировке, сохрани имя summary и выполни узел.",
                nodes, via_filter, grouped(selected, average=True))
     nodes.pop()
-    chain.turn("Удали вставленный фильтр, восстанови прямую связь импорта с существующей группировкой и выполни её.",
+    chain.turn("Удали фильтр «Отбор количества», восстанови прямую связь импорта с существующей группировкой и выполни её.",
                nodes, direct, grouped(quantities, average=True))
     return chain
 

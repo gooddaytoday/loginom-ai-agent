@@ -51,7 +51,11 @@
         },
         {
           "name": "summary",
-          "type": "real"
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-12
+          }
         }
       ],
       "rows": [

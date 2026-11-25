@@ -9,12 +9,12 @@
       {
         "id": "orders",
         "type": "imports.text",
-        "label_contains": "orders"
+        "label": "Заказы"
       },
       {
         "id": "customers",
         "type": "imports.text",
-        "label_contains": "customers"
+        "label": "Клиенты"
       },
       {
         "id": "join",
@@ -75,7 +75,11 @@
         },
         {
           "name": "total_revenue",
-          "type": "real"
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-12
+          }
         }
       ],
       "rows": [

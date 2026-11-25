@@ -5,13 +5,10 @@
   },
   "base": "bh-w406-t2",
   "manual_edit": {
-    "kind": "move",
+    "kind": "rename",
     "node": {
       "type": "transform.filter_data"
     },
-    "position": {
-      "x": 296,
-      "y": 352
-    }
+    "label": "Отбор количества"
   }
 }
