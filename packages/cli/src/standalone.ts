@@ -13,8 +13,20 @@ import { LOGINOM_AI_AGENT_CHANNEL, LOGINOM_AI_AGENT_VERSION } from "./version"
 // after this.
 
 const headless = ["--headless", "--no-headless"]
-// A dashboard's run starts a new session in its folder (B2.9i), as in 0.4 (`v0.4.0:.../cli/standalone-dashboard.ts`).
-const dashboardConflicts = ["--continue", "-c", "--session", "-s", "--fork", "--command", "--dir", "--attach"]
+// A dashboard's run starts a new session in its folder (B2.9i), as in 0.4 (`v0.4.0:.../cli/standalone-dashboard.ts`), and
+// not in a new worktree, which 0.4's `run` lacked: refused before the one-time snapshot is spent (B2.9j).
+const dashboardConflicts = [
+  "--continue",
+  "-c",
+  "--session",
+  "-s",
+  "--fork",
+  "--command",
+  "--dir",
+  "--attach",
+  "--worktree",
+  "-w",
+]
 
 /**
  * Runs help, version, `diagnostics export` and the `loginom` commands and exits the process; returns only for a command
