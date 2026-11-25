@@ -25173,3 +25173,16 @@ catalog-check.py код 0; apply-identity.py --check: would change: 0 files
 - Примечание: без `npm ci` клиента и шаблона дашборда и без `LOGINOM_AI_AGENT_TEST_NODE` в `cli` падают 8–9 тестов
   (`cli-loginom`, `cli-dashboard`, `standalone`) — среда, не правка. С таймаутом 5 с тесты `cli` на этой машине тоже
   нестабильны; проверено `--timeout 60000`.
+
+### B5.1h-fix — `Build Desktop` на GitHub (run 45711720063)
+
+- Причина: `electron.vite.config.ts` импортирует `script/utils.ts`, а там `exists` из `node:fs/promises` (только Bun; добавлен
+  форком в `4c1cad89ce`, в upstream v2.3.0 строки нет). `bunx electron-vite` грузит конфиг реальным Node из `PATH`
+  (`setup-node` на раннере): `SyntaxError ... does not provide an export named 'exists'`.
+- Выбор: убрать Bun-only импорт (`existsSync` из `node:fs`), а не прятать Node из `PATH` на шаге: правка в файле форка, не
+  upstream; `catalog.md` дополнен. Тест `script/bundled-cli.test.ts` «utils.ts loads under Node» (нужен
+  `LOGINOM_AI_AGENT_TEST_NODE`): до правки красный, после зелёный.
+- Воспроизведение (Node 24.19.0 первым в `PATH`, `uptime` 4): `node node_modules/.bin/electron-vite build` до правки — `failed to
+  load config ... SyntaxError`; после — vite начинает сборку. Полная сборка Desktop здесь не гонялась.
+- Windows и macOS: та же ловушка (`setup-node` в `loginom-windows.yml` и `loginom-macos.yml`, сборка через `desktop/script/build.ts`
+  -> `bunx electron-vite`); отдельных правок не нужно, лечит эта же правка. Чужих файлов не менял.
