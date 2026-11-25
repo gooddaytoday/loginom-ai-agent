@@ -300,11 +300,18 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
    },
    async finish(mode,ctx){
     enter(ctx);if(mode==='close')return closePreparedWizard(channel);requireValue(mode==='done','Separate calculator port requires intermediate Done');
-    // An explicit caption equal to the native default skips the graph rename, so
-    // «Автоматическая метка» stays and Done re-derives it (LAB-2024). Keep it as
-    // the native custom title, then verify the committed graph caption.
-    const label=implementation?.keepTargetLabel?operation.nodeApply.request.target?.label:undefined;
-    if(label!==undefined)await configureNodeTitle(channel,{mode:'custom',label},{subject:'Node',maxLength:200});
+    // An explicit caption equal to the native default skips the graph rename
+    // (node-target.mjs:418), so «Автоматическая метка» stays and Done re-derives
+    // it (LAB-2024). Where the Done page renders the native title, keep target.label
+    // as the custom title; for every type verify the committed graph caption.
+    const label=operation.nodeApply.request.target?.label;
+    if(label!==undefined){
+     const page=await channel.observe({condition:'node Done title before commit',ready:s=>s.wizard?.status==='observed'
+      &&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';btnDone'&&e.allowed_actions.includes('finish_wizard'))});
+     const title=page.wizard.stage==='done'&&page.wizard.completion?.ready===true?page.wizard.completion.fields:null;
+     if(title&&(title.label_mode.value!=='Пользовательская метка'||title.label.value!==label))
+      await configureNodeTitle(channel,{mode:'custom',label},{subject:'Node',maxLength:200});
+    }
     const result=await finishWizard(mode);
     if(label!==undefined){
      const g=await operation.nodeTargetAdapter.observe({document_id:operation.nodeApply.request.document_id,workflow_ref:operation.nodeApply.request.workflow_ref},ctx.deadline,ctx.signal);

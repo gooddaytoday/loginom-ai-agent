@@ -96,18 +96,18 @@ test('automatic to custom title selects the native mode, then enters and commits
  assert.equal(observed.fields.label.value,'Ежедневные продажи');
 });
 
-function doneFixture(icon='importtextfile',mode='Пользовательская метка',label='Import'){
+function doneFixture(icon='importtextfile',mode='Пользовательская метка',label='Import',{title=true,settings='Настройка'}={}){
  const page=new Page(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
  let path='';const crumbs=[];
- for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий','Import','Настройка']){
+ for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий','Import',settings]){
   path+=(path?'>':'')+label;const c=page.add('a',base+'cnrNaviMode;b.s_'+path,label,undefined,panel);crumbs.push(c);
   if(label==='Сценарий')page.add('span',null,'',undefined,c).attrs.class='maptree-icon-workflow';
   if(label==='Import')page.add('span',null,'',undefined,c).attrs.class='bg-vendor-icon-'+icon;
-  if(label==='Настройка')page.add('span',null,'',undefined,c).attrs.class='maptree-icon-wizard';
+  if(label===settings)page.add('span',null,'',undefined,c).attrs.class='maptree-icon-wizard';
  }
  const wizard=page.add('div',base+'WizrdMCF');
  let labelInput,modeInput,picker;
- for(const [key,value] of [['edtDisplayName',label],['cbxNodeTitleMode',mode]]){
+ for(const [key,value] of title?[['edtDisplayName',label],['cbxNodeTitleMode',mode]]:[]){
   const tid=base+'WizrdMCF;DoneWizard;'+key;
   const owner=page.add('div',tid,'',undefined,wizard),input=page.add('input',null,'',undefined,owner);input.value=value;
   if(key==='edtDisplayName')labelInput=input;
@@ -127,13 +127,21 @@ function doneFixture(icon='importtextfile',mode='Пользовательска�
  return {page,picker,modeInput,labelInput,binding,reader,capability,
   observe:()=>capability(page,{mode:'observe',expected_origin:origin,expected_build:build,prepared_node_context:binding},reader)};
 }
-// LAB-2024 g201/g204: Grouping Done keeps «Автоматическая метка» and replaces
-// an explicit target.label equal to the native default with «Revenue по Region».
-test('native Done title choices are bound to the prepared Text Import and Grouping only',async()=>{
- for(const icon of ['importtextfile','groupdata','exporttextfile']){
+// LAB-2024: the title picker belongs to the page, not to a node type. Any
+// prepared node's own settings wizard exposes it where Done renders the native
+// title; a page without cbxNodeTitleMode, or another breadcrumb, exposes none.
+test('native Done title choices follow the prepared settings page, not the node type',async()=>{
+ for(const [icon,options] of [['groupdata',{title:false}],['calculator',{settings:'Порт'}]]){
+  const r=await doneFixture(icon,undefined,undefined,options).observe();assert.equal(r.status,'SUCCEEDED');
+  // Without cbxNodeTitleMode there is no title page; under another breadcrumb
+  // the same complete Done page is observed but is not the prepared settings.
+  assert.equal(r.output.wizard.stage==='done'&&r.output.wizard.completion?.ready===true,!!options.settings,icon);
+  assert.equal(r.output.ui.elements.some(e=>e.wizard_combo?.field.scope==='node_title'),false,icon);
+ }
+ for(const icon of ['importtextfile','groupdata','calculator','exporttextfile']){
   const f=doneFixture(icon),r=await f.observe();assert.equal(r.status,'SUCCEEDED');
   const picker=r.output.ui.elements.find(e=>e.wizard_combo?.field.scope==='node_title'&&e.wizard_combo.kind==='picker');
-  assert.equal(!!picker,['importtextfile','groupdata'].includes(icon),icon);
+  assert.ok(picker,icon);
   if(picker){
    assert.equal(picker.wizard_combo.field.name,'label_mode');
    const option=r.output.ui.elements.find(e=>e.wizard_combo?.kind==='option'&&e.wizard_combo.field.scope==='node_title');

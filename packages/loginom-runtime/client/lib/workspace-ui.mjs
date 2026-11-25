@@ -569,9 +569,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return visibleAncestors(element);
     });
     const sensitivePattern = /password|passwd|\bpwd\b|secret|token|credential|authorization|api[_ -]?key|private[_ -]?key|one[_ -]?time|\botp\b|парол|секрет|токен/i;
-    // Inline definition pages have no separate port opening. Their native-bound
-    // node wizard and exact current breadcrumb supply the node type, read-only.
-    const inlineDefinitionIcon=(()=>{
+    // The prepared node's own settings wizard, without an opened port: its
+    // native-bound wizard and exact current breadcrumb «…>Node>Настройка».
+    const preparedSettingsCrumb=(()=>{
       if(!preparedNodeWizard||!preparedNodeId||!definitionPrefix||!preparedWorkflowPath?.length||preparedInputPort||preparedOutputPort)return null;
       const panels=tids.get(definitionPrefix+';NavigationBar;NavigationPanel')??[];
       if(panels.length!==1||!visible(panels[0]))return null;
@@ -580,9 +580,15 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       if(crumbs.length!==count+2||!preparedWorkflowPath.every((c,i)=>getTid(crumbs[i])===c.tid&&crumbs[i].textContent.trim()===c.label)
         ||!getTid(node)?.startsWith(preparedWorkflowPath.at(-1).tid+'>')||getTid(node).slice(preparedWorkflowPath.at(-1).tid.length+1).includes('>')
         ||settings.textContent.trim()!=='Настройка'||getTid(settings)!==getTid(node)+'>Настройка')return null;
-      const icons=[...node.querySelectorAll('[class*="bg-vendor-icon-"]')];charge();
+      return node;
+    })();
+    // Inline definition pages have no separate port opening. The prepared
+    // settings breadcrumb supplies the node type, read-only.
+    const inlineDefinitionIcon=(()=>{
+      if(!preparedSettingsCrumb)return null;
+      const icons=[...preparedSettingsCrumb.querySelectorAll('[class*="bg-vendor-icon-"]')];charge();
       if(icons.length!==1)return null;
-      return ['importtextfile','joindata','exporttextfile','groupdata'].map(n=>'bg-vendor-icon-'+n).find(n=>icons[0].classList.contains(n))??null;
+      return ['importtextfile','joindata','exporttextfile'].map(n=>'bg-vendor-icon-'+n).find(n=>icons[0].classList.contains(n))??null;
     })();
     const definitionMetadataTid=memoRead(element=>{
       const tid=getTid(element)??'';
@@ -2183,7 +2189,9 @@ function readRenderedInputMapping(observation) {
       wizard.import_source={status:'draft_ui_values',settings_applied:false,file_bytes_verified:false,schema_complete:false,fields};
     }
     const wizardFields=new Map(),wizardCombos=new Map();
-    if(wizard.stage==='done'&&['bg-vendor-icon-importtextfile','bg-vendor-icon-groupdata'].includes(inlineDefinitionIcon)) {
+    // Done «Описание узла» of any prepared node's own settings wizard. Its title
+    // picker exists only where the page renders cbxNodeTitleMode.
+    if(wizard.stage==='done'&&preparedSettingsCrumb) {
       const f=wizard.completion?.fields.label_mode;
       if(f?.status==='observed'&&!f.truncated&&f.enabled)wizardCombos.set(wizard.root_tid+';DoneWizard;cbxNodeTitleMode',
         {name:'label_mode',scope:'node_title',root_ref:wizard.root_ref,owner_ref:f.owner_ref,input_ref:f.input_ref,value:f.value});
