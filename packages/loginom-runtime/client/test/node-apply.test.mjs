@@ -639,6 +639,31 @@ test('invalid Duplicates input ends conclusively only with durable unchanged-dra
  }
 });
 
+test('new Join input 0 refusal settles only with owned and durably acknowledged Close',async()=>{
+ for(const fault of [null,'existing','owner','transport','cleanup','journal']){
+  const f=fixture({failJournal:fault==='journal'?'node_phase_refused':undefined}),p=request();
+  const node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
+  p.target=fault==='existing'?{kind:'existing',type:'transform.join_data',ref:node}:{...p.target,type:'transform.join_data'};
+  p.mode='inner';
+  p.inputs=['left','right'].map((node_id,input)=>({source:{...node,node_id},input,output:0}));
+  f.handlers.set(p.target.type,{...f.handlers.get('imports.text'),modes:['inner']});
+  f.operation.cleanupConfirmed=fault!=='cleanup';
+  f.operation.transportUncertain=fault==='transport';
+  const closed={verified:true,cleanup_complete:true,draft_discarded:true,settings_applied:false,mode:'close',execution_started:false,
+   node_context:{...node,node_id:fault==='owner'?'foreign':node.node_id,verified:true,surface:'graph',locked:false}};
+  f.drivers.mapPorts=async()=>{throw Object.assign(Error('Join input changed after validation'),{nodePhaseRefusal:{
+   phase:'input_mapping',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+   verification:'join_first_input_schema_refused',proof:{closed},
+  }});};
+  const r=await f.run(p);
+  assert.equal(r.status,fault?'AMBIGUOUS':'FAILED',fault);
+  assert.equal(r.effect_possible,true,fault);
+  assert.equal(r.cleanup_complete,!fault,fault);
+  assert.equal(r.pending_phase,fault?'input_mapping':null,fault);
+  assert.ok(!f.calls.includes('open')&&!f.calls.includes('configure')&&!f.calls.includes('execute'));
+ }
+});
+
 test('invalid Excel variable binding ends conclusively at input mapping only when the refusal reports the saved input',async()=>{
  for(const failure of ['none','cleanup_complete','input_saved','claims_unchanged','verification','phase','journal','foreign_type']){
   const f=fixture({failJournal:failure==='journal'?'node_phase_refused':undefined}),p=request();
