@@ -10,8 +10,8 @@ const boundaries = workflow.split("\n## Границы действий\n")[1] ?
 // computed totals in local Python, converted data without consent, and created a doomed 70-column Import.
 test("entry keeps the action boundaries visible before any reference is read", () => {
   const entry = skill.split("\n## ")[0]
-  expect(entry).toContain("Итоги считает Loginom, не локальный Python/bash")
-  expect(entry).toContain("`loginom_file_profile`")
+  expect(entry).toContain("Считай и сверяй итоги в Loginom")
+  expect(entry).toContain("`loginom_file_profile` проверяет допуск файла к загрузке")
   expect(entry).toContain("только его `next_step`/recovery, затем отчёт о блокере")
   expect(entry).toContain("без чтения\nжурналов, diagnostics и исходников продукта")
   expect(entry).toContain("Конвертация и производные файлы — с\nсогласия")

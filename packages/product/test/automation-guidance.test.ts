@@ -24,7 +24,7 @@ test("stepwise edits use the current graph and verify only the requested step", 
 test("stepwise verification and data processing stay in Loginom", () => {
   const step = skill.split("## Пошаговая сборка\n")[1]?.split("\n## ")[0] ?? ""
   expect(step).toContain("Данные пользователя считай, проверяй и преобразуй только в Loginom")
-  expect(step).toContain("Без bash, Python и awk")
+  expect(step).toContain("Без Read, bash, Python и awk")
   expect(step).toContain("Если Loginom не открывает файл, сообщи причину и предложи пересохранить его")
   expect(step).toContain("Сам файл не исправляй")
 })
