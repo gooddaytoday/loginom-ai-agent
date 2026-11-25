@@ -107,15 +107,21 @@ async function filterThreshold({page, adapter, request, readFilterBrowser, recor
   await canvas.locator('[data-tid=' + JSON.stringify(nodeTid) + ']').click({timeout:remaining()});
   await canvas.locator('[data-tid=' + JSON.stringify(nodeTid + ';Setting') + ']').click({timeout:remaining()});
   const close = locator(page, wizard + ';btnClose');
+  const graphReady = timeout => page.waitForFunction(tid => {
+    const visible = element => element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0
+      && getComputedStyle(element).visibility !== 'hidden';
+    const graph = document.querySelector('[data-tid=' + JSON.stringify(tid) + ']');
+    return graph && visible(graph) && ![...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible);
+  }, prefix + ';ModelForm;cmpDiagram', {timeout});
   const discardWizard = async timeout => {
     await close.click({timeout});
     const question = page.locator('[data-tid="msgbox;cnt;cnt;cmp"]:visible,[data-tid="msgbox-1;cnt;cnt;cmp"]:visible');
-    await Promise.race([close.waitFor({state:'hidden', timeout}), question.waitFor({state:'visible', timeout})]);
+    await Promise.race([graphReady(timeout), question.waitFor({state:'visible', timeout})]);
     if (await question.isVisible()) {
       requireProof((await question.innerText({timeout})).trim() === 'Вы действительно хотите закрыть мастер настройки?', 'FILTER_CLOSE_DIALOG_UNEXPECTED');
       const tid = await question.getAttribute('data-tid', {timeout});
       await locator(page, tid.split(';')[0] + ';tlb;yes').click({timeout});
-      await close.waitFor({state:'hidden', timeout});
+      await graphReady(timeout);
     }
   };
   try {
@@ -148,6 +154,8 @@ async function filterThreshold({page, adapter, request, readFilterBrowser, recor
     const row = matches[0];
     if (readOnly) {
       await discardWizard(remaining());
+      const returned = await adapter.observe(request, deadline);
+      requireProof(Object.values(manualGraphDelta(graph, returned)).every(items => items.length === 0), 'FILTER_REOPEN_GRAPH_CHANGED');
       return rows;
     }
     requireProof(row.value !== edit.value && (row.type === 'real' || Number.isSafeInteger(edit.value)), 'FILTER_LITERAL_INVALID');
