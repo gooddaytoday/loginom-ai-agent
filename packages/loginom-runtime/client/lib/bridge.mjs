@@ -17,8 +17,9 @@ import { actionDescribeTool, pinActionCatalog, assertCatalogTarget, validateActi
 import { createActionRuntime, parseCapabilityResult } from './executor.mjs';
 import {createCandidateNodeSupport} from './node-support.mjs';
 import {NODE_TYPES} from './node-contracts.mjs';
+import {readGraph} from './node-target-browser.mjs';
 import {isNodeApiTool,dispatchNodeApi} from './node-api.mjs';
-import { makeWorkspacePrepareCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace, workspaceObserveTool } from './workspace.mjs';
+import { makeWorkspacePrepareCode, makeWorkspaceStepCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace, workspaceObserveTool } from './workspace.mjs';
 import { makeBrowserGeometryCode, parseBrowserGeometry } from './browser-geometry.mjs';
 import { createExecutionJournal } from './execution-journal.mjs';
 import {createRedactor} from './redact.mjs';
@@ -107,6 +108,8 @@ export async function createBridge(config, session, { browserTransport: managedB
   const admitHostArtifacts = createHostArtifactAdmission(config, session);
   const userProfile = config.resultProfile === 'user-v1';
   const userWorkflows = createUserWorkflowBindings();
+  const admittedNodeWorkflows=new Map();
+  let nativeStepDocument=null;
   let userBundleDelivered = false;
   // Identity of a READY new draft whose user-v1 reply this bridge refused.
   let undeliveredDraft = null;
@@ -349,7 +352,17 @@ export async function createBridge(config, session, { browserTransport: managedB
             if(ms<1)throw Error('Local package preparation deadline elapsed');
             return ms;
           };
-          if (userProfile) args = userWorkflows.normalizePreparation(args);
+          if (userProfile) {
+            const previous=session.metadata.workspacePreparation;
+            const prior=previous?.identity&&JSON.parse(previous.identity);
+            const old=prior?.workflow_ref,supplied=args.workflow_ref;
+            const original=prior?.intent==='existing_workflow'&&args.intent===prior.intent
+              &&(args.operation_id??'prepare')===prior.operation_id&&previous.state?.status==='READY'
+              &&['document_id','workflow_id','tab_tid','prefix'].every(key=>old?.[key]===supplied?.[key])
+              &&old?.navigation_path?.length===supplied?.navigation_path?.length
+              &&old?.navigation_path?.every((part,i)=>part.tid===supplied.navigation_path[i].tid&&part.label===supplied.navigation_path[i].label);
+            args=original?{...args,workflow_ref:old}:userWorkflows.normalizePreparation(args);
+          }
           await admitHostArtifacts(args.host_context_token, codexInputIdentity(request.params));
           let preparationRequest = { operation_id: args.operation_id ?? 'prepare', intent: args.intent ?? 'new_draft',
             package_path: privatePackage?.upload.destination??args.package_path??null, workflow_ref: args.workflow_ref ?? null,
@@ -379,7 +392,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                 extra.signal.throwIfAborted(); actionRuntime.assertPreparationAllowed();
                 userWorkflows.resetDescriptions();
               },
-              async prepare({ recoverOnly }) {
+              async prepare({ recoverOnly, refreshVerified }) {
                 if (!config.loginomUrl) throw new Error('Workspace preparation requires the configured Loginom URL');
                 if(privatePackage){
                   if(recoverOnly)throw Error('Reconcile the original package preparation using its server package_path; do not upload again');
@@ -403,13 +416,13 @@ export async function createBridge(config, session, { browserTransport: managedB
                     reason:extra.signal.aborted?'CANCELLED':'DEADLINE',effect_possible:false,created_draft:false,authenticated:true,
                     operation_id:preparationRequest.operation_id,target:identity.target};
                 }
-                const code = makeWorkspacePrepareCode({ ...workspaceOptions, recoverOnly,
+                const code = makeWorkspacePrepareCode({ ...workspaceOptions, recoverOnly, refreshVerified,
                   storageBinding:privatePackage?session.metadata.storageBinding??null:null,
                   ...(privatePackage?{timeoutMs:remaining()}:{}) });
                 const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
                   code:privatePackage?withStorageIdentity(code,session.metadata.storageBinding):code,
                 } }, undefined, { timeout: privatePackage?remaining()+1000:125000 });
-                const state = structuredClone(redactor.redact(parseWorkspacePreparation(response)));
+                const state = structuredClone(redactor.redact(parseWorkspacePreparation(response, document=>{nativeStepDocument=document;})));
                 if (state.status === 'READY') {
                   if (config.storageDirectories) session.metadata.storageBinding = createStorageBinding({
                     sessionId: session.metadata.sessionId, origin: new URL(config.loginomUrl).origin,
@@ -530,7 +543,31 @@ export async function createBridge(config, session, { browserTransport: managedB
                     ...(userProfile?{structuredContent:refusal}:{isError:true})};
                 }
               }
-              const result=await dispatchNodeApi(actionRuntime,request.params.name,args,{signal:extra.signal,scanReceipt});
+              const runtime=userProfile&&request.params.name==='dock_node_apply'?{
+                ...actionRuntime,
+                async startNodeApply(admission,options) {
+                  const prior=admittedNodeWorkflows.get(admission.operation_id);
+                  if(prior?.document_id===admission.document_id&&prior.workflow_ref.workflow_id===admission.workflow_ref.workflow_id)
+                    admission={...admission,workflow_ref:prior.workflow_ref};
+                  if(!prior&&nativeStepDocument===admission.document_id&&!actionRuntime.hasUnsettledWork()){
+                    const code=makeWorkspaceStepCode({loginomUrl:config.loginomUrl,build:session.metadata.targetIdentity.loginom_build,
+                      sessionId:session.metadata.sessionId,workflowRef:{...admission.workflow_ref,document_id:admission.document_id},
+                      readGraph,types:NODE_TYPES});
+                    const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{
+                      code:config.storageDirectories?withStorageIdentity(code,session.metadata.storageBinding):code,
+                    }},undefined,{timeout:15000,signal:extra.signal});
+                    const step=structuredClone(redactor.redact(parseCapabilityResult(response,{redactor}).output));
+                    if(step.status==='NOT_READY')throw Error(step.reason+': prepared scenario changed before Apply');
+                    if(step.status==='READY')admission={...admission,workflow_ref:step.workflow_ref};
+                  }
+                  extra.signal.throwIfAborted();
+                  const result=actionRuntime.startNodeApply(admission,options);
+                  if(result.attempt===1&&!prior)admittedNodeWorkflows.set(admission.operation_id,
+                    {document_id:admission.document_id,workflow_ref:admission.workflow_ref});
+                  return result;
+                },
+              }:actionRuntime;
+              const result=await dispatchNodeApi(runtime,request.params.name,args,{signal:extra.signal,scanReceipt});
               if(userProfile)userWorkflows.rememberDelivery(result,args);
               await logResult(request.params.name,result);
               return nodeResultReply(result,{userProfile,tool:request.params.name});

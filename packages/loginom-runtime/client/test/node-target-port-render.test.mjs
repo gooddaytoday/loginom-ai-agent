@@ -47,8 +47,54 @@ function fixture({portIndex=0}={}){
   node.FPorts[0].FCollection.push(port);inside.push(dom);extraStates.set(port.FCell,{shape:{node:dom}});
   return {port,dom,hide:()=>{port.FCell.visible=false;extraStates.set(port.FCell,{});},unrender:()=>extraStates.set(port.FCell,{}),render:()=>extraStates.set(port.FCell,{shape:{node:dom}})};
  };
- return {page,request,variable:()=>{portTid=portTid.replace('_Data-','_Var-');port.FSubType=3;},mislabeledShape:()=>{alternatePortDom.getAttribute=()=>nodeTid+';Output_Var-3';duplicateShape=true;},tree:()=>{portTid=portTid.replace('_Data-','_DataTree-');},rename:(suffix='Output_Data-'+portIndex,keys='R_Segment')=>{const factor=node.FIconCls===NODE_TYPES['research.factor_analysis'].icon_class,regression=node.FIconCls==='bg-vendor-icon-linregression',cross=node.FIconCls===NODE_TYPES['transform.cross_table'].icon_class,excel=node.FIconCls===NODE_TYPES['imports.excel'].icon_class;nodeTid='MF;TF-1;Graph;'+(excel?'%ExcelPath%':factor?'Фактор._анализ:_X_Y_Z':cross?'cols:_Category;__rows:_'+keys+';__cells:_Amount':regression?'Линрегрессия:_Y_X1_X2_X3':'Квантование:_X');node.FLabel.FRawValue=excel?'%ExcelPath%':factor?'Фактор. анализ: X Y Z':cross?'cols: Category; rows: '+keys.replaceAll('_',' ')+'; cells: Amount':regression?'Линрегрессия: Y X1 X2 X3':'Квантование: X';portTid=nodeTid+';'+suffix;duplicateShape=true;},hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
+ const renameByHand=({alternate=false}={})=>{
+  const suffix=portTid.slice(nodeTid.length);
+  nodeTid='MF;TF-1;Graph;Renamed_Calculator';
+  node.FLabel.FRawValue='Renamed Calculator';
+  portTid=nodeTid+suffix;
+  duplicateShape=alternate;
+ };
+ return {page,request,crumb,renameByHand,variable:()=>{portTid=portTid.replace('_Data-','_Var-');port.FSubType=3;},mislabeledShape:()=>{alternatePortDom.getAttribute=()=>nodeTid+';Output_Var-3';duplicateShape=true;},tree:()=>{portTid=portTid.replace('_Data-','_DataTree-');},rename:(suffix='Output_Data-'+portIndex,keys='R_Segment')=>{const factor=node.FIconCls===NODE_TYPES['research.factor_analysis'].icon_class,regression=node.FIconCls==='bg-vendor-icon-linregression',cross=node.FIconCls===NODE_TYPES['transform.cross_table'].icon_class,excel=node.FIconCls===NODE_TYPES['imports.excel'].icon_class;nodeTid='MF;TF-1;Graph;'+(excel?'%ExcelPath%':factor?'Фактор._анализ:_X_Y_Z':cross?'cols:_Category;__rows:_'+keys+';__cells:_Amount':regression?'Линрегрессия:_Y_X1_X2_X3':'Квантование:_X');node.FLabel.FRawValue=excel?'%ExcelPath%':factor?'Фактор. анализ: X Y Z':cross?'cols: Category; rows: '+keys.replaceAll('_',' ')+'; cells: Amount':regression?'Линрегрессия: Y X1 X2 X3':'Квантование: X';portTid=nodeTid+';'+suffix;duplicateShape=true;},hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
 }
+test('graph reader used by dock_node_apply rejects the old navigation after a manual Save',async()=>{
+ const f=fixture();await f.read();
+ f.crumb.textContent='Saved Package';
+ await assert.rejects(f.read(),/Workflow navigation changed/);
+ f.request.workflow_ref.navigation_path[0].label='Saved Package';
+ assert.equal((await f.read()).nodes[0].label,'Calc');
+});
+
+for(const alternate of [false,true])test('fresh Calculator graph retains the manual caption with '+(alternate?'alternate':'ordinary')+' port rendering',async()=>{
+ const f=fixture();await f.read();
+ f.renameByHand({alternate});
+ if(alternate){
+  const task={request:f.request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2'};
+  await assert.rejects(readGraph(f.page,task),/Visible port identity is not rendered/);
+  await readGraph(f.page,{...task,step_rebaseline:true});
+ }
+ const graph=await f.read();
+ assert.equal(graph.nodes[0].ref.node_id,'n');
+ assert.equal(graph.nodes[0].label,'Renamed Calculator');
+ assert.deepEqual(Array.from(graph.nodes[0].outputs),[0]);
+});
+
+for(const [fault,change] of [
+ ['foreign hit',f=>f.wrongHit()],
+ ['ambiguous rendering',f=>f.duplicatePort()],
+ ['foreign native data',f=>{f.port.data={};}],
+])test('new-step port rebinding refuses '+fault,async()=>{
+ const f=fixture();await f.read();
+ f.renameByHand({alternate:true});change(f);
+ await assert.rejects(readGraph(f.page,{request:f.request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',step_rebaseline:true}),
+  /Visible port identity is not rendered/);
+});
+
+test('initial graph observation binds the manually renamed Calculator port by its current native hit',async()=>{
+ const f=fixture();
+ f.renameByHand({alternate:true});
+ assert.deepEqual(Array.from((await f.read()).nodes[0].outputs),[0]);
+});
+
 test('W1 inventories variable ports by native kind without shifting table ordinals',async()=>{
  const f=fixture({portIndex:2}),link=f.restLink();
  const sourceTid='MF;TF-1;Graph;connection;Output_Var-4',targetTid='MF;TF-1;Graph;rest;Input_Var-1';

@@ -1,5 +1,8 @@
 import {readPreparedNodeContext, validatePreparedNodeContext} from './node-context.mjs';
 import {captureProcessNodeFocus,restoreProcessNodeFocus} from './process-node-focus.mjs';
+import {NODE_TYPES} from './node-contracts.mjs';
+
+const nodeTypesByIcon=Object.fromEntries(Object.values(NODE_TYPES).map(node=>[node.icon_class,node.type]));
 
 // Execution-journal diagnostics only. Never issue refs or classify a window as
 // safe from this read; require the already observed DOM incarnation.
@@ -186,7 +189,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       &&['document_id','workflow_id','node_id'].every(k=>typeof previousNode[k]==='string'&&previousNode[k]===nodeContext[k])
       &&typeof previousPort?.port_guid==='string'&&previousPort.port_guid.length>0
       &&typeof previousPort?.opening_operation_id==='string'&&previousPort.opening_operation_id.length>0;
-    const observed = await page.evaluate(({rootRef,discoverRoots,downloadToastObservation,nodeErrorToastObservation,quietGraphObservation,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedPendingWizardNode,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedPortReturn}) => {
+    const observed = await page.evaluate(({rootRef,discoverRoots,downloadToastObservation,nodeErrorToastObservation,quietGraphObservation,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedPendingWizardNode,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedPortReturn,inventoryTypes}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -849,6 +852,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // Native type, not an editable graph label, owns the extra script deny.
     // Build once per observation; unconfirmed controls never inherit permission.
     const nativeGraphControls=new Map(),nativeGraphLinks=new Set(),nativeVariablePorts=new Map(),nativeBoundaryRoles=new Map();
+    const nativeInventory=new Map(),nativeInventoryPorts=new Map(),nativeInventoryLinks=new Set();
     const nativeGraphControl=element=>ownedGraph(element)&&!nativeGraphLinks.has(element)
       ?nativeGraphControls.get(element)??{status:'unconfirmed'}:null;
     if(graphQueryable&&graphPrefix){
@@ -879,6 +883,24 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           if(typeof guid!=='string'||!guid||guid.length>128||guids.get(guid)!==1||!cell||typeof cell!=='object'||cells.get(cell)!==1
             ||typeof icon!=='string'||!/^bg-vendor-icon-[a-z0-9_-]{1,128}$/.test(icon))continue;
           const rendered=getState.call(view,cell),shape=value(value(rendered,'shape'),'node'),tid=getTid(shape);
+          if(inventoryTypes&&/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(guid)){
+            const label=value(node,'FLabel'),labelCell=value(label,'FCell'),geometry=value(cell,'geometry');
+            const caption=value(label,'parent')===node&&value(labelCell,'parent')===cell?value(label,'FRawValue'):null;
+            const connected=unique(shape)&&tid?.startsWith(graphPrefix)&&!sensitive(shape);
+            // A non-rendered native cell can be listed, but has no DOM refs.
+            // Convert its model-space geometry to the canvas' viewport.
+            const scale=value(view,'scale'),translate=value(view,'translate'),box=boxOf(graphContainer);
+            const bounds=connected?boxOf(shape):[
+              scale,translate?.x,translate?.y,geometry?.x,geometry?.y,geometry?.width,geometry?.height,
+            ].every(Number.isFinite)&&scale>0?{
+              x:box.x+(geometry.x+translate.x)*scale-(graphContainer.scrollLeft??0),
+              y:box.y+(geometry.y+translate.y)*scale-(graphContainer.scrollTop??0),
+              width:geometry.width*scale,height:geometry.height*scale,
+            }:null;
+            if(connected||!shape&&typeof caption==='string'&&caption&&!sensitivePattern.test(caption))
+              nativeInventory.set(guid,{key:connected?tid.slice(graphPrefix.length):null,
+                caption:typeof caption==='string'&&!sensitivePattern.test(caption)?short(caption):null,bounds,icon});
+          }
           if(!unique(shape)||!tid?.startsWith(graphPrefix))continue;
           const identity=[model,diagram,graph,view,node,cell];
           const data=value(node,'data');if(data&&typeof data==='object')identity.push(data);
@@ -910,6 +932,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             if(!portTid?.startsWith(tid+';'+(type===0?'Input_':'Output_')))continue;
             const portData=value(port,'data');retain(element,[...identity,port,portCell,...(portData&&typeof portData==='object'?[portData]:[])],icon);
             const suffix=portTid.slice(tid.length+1),variable=/^(Input|Output)_Var-(\d+)$/.exec(suffix),control=suffix==='Input_ControlVar';
+            if(nativeInventory.has(guid)&&unique(element)&&!sensitive(element))
+              nativeInventoryPorts.set(port,{key:tid.slice(graphPrefix.length),suffix,type});
             if(unique(element)&&portData&&(variable&&subtype===3&&type===(variable[1]==='Input'?0:1)||control&&subtype===4&&type===0)){
               const inventory=nativeVariablePorts.get(guid)??{variable_inputs:[],variable_outputs:[]};
               inventory[type===0?'variable_inputs':'variable_outputs'].push({kind:control?'control':'variables',native_index:control?0:Number(variable[2]),port_guid:portGuid});
@@ -925,6 +949,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           if(!cell||typeof cell!=='object'||!nodes.includes(value(source,'parent'))||!nodes.includes(value(target,'parent')))continue;
           const element=value(value(getState.call(view,cell),'shape'),'node');
           if(unique(element)&&!nativeGraphControls.has(element))nativeGraphLinks.add(element);
+          const from=nativeInventoryPorts.get(source),to=nativeInventoryPorts.get(target);
+          if(from?.type===1&&to?.type===0)
+            nativeInventoryLinks.add(graphPrefix+from.key+'|'+from.suffix+'|'+to.key+'|'+to.suffix);
         }
       }
     }
@@ -3867,13 +3894,22 @@ function readRenderedInputMapping(observation) {
         ports.filter(p=>p.kind===kind).sort((a,b)=>a.native_index-b.native_index).forEach((p,i)=>{p.port=i;});
       return { node_ref: { kind: 'node', node_label: label, workflow_ref: workflow }, bounding_box: node ? boxOf(node) : null,
         ...(native?.node_id?{node_id:native.node_id}:{}),
+        ...(native?.node_id&&nativeInventory.has(native.node_id)?{
+          type:nativeBoundaryRoles.get(native.node_id)==='output'?'control.supernode_output':inventoryTypes[native.icon]??native.icon}:{}),
         ...(native?.node_id&&nativeBoundaryRoles.has(native.node_id)?{boundary_role:nativeBoundaryRoles.get(native.node_id)}:{}),
         ...(native?.icon==='bg-vendor-icon-modelvariables'?{type:'variables.user',target_modes:['existing']}:{}),
         ...(variablePorts??{}),
         ports: graphElements.filter(element => (getTid(element) ?? '').startsWith(nodeTid + ';') && /;(?:Input|Output)_[^;]+$/.test(getTid(element)))
           .slice(0, 100).map(element => ({ tid: getTid(element), bounding_box: boxOf(element), ui_ref: refOf(element) })) };
     });
-    const links = [...new Set(graphElements.map(getTid).filter(tid => { const body = tid.slice(graphPrefix.length); return /^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body); }))].sort();
+    const missingNodes=[...nativeInventory].filter(([id,entry])=>!observedNodeLabels.includes(entry.key)&&!nodes.some(n=>n.node_id===id));
+    for(const [id,entry] of missingNodes.slice(0,200-nodes.length))nodes.push({
+      node_ref:{kind:'node',node_label:entry.caption??entry.key,workflow_ref:workflow},node_id:id,
+      bounding_box:entry.bounds,type:nativeBoundaryRoles.get(id)==='output'?'control.supernode_output':inventoryTypes[entry.icon]??entry.icon,
+      ports:[],
+    });
+    const links = [...new Set([...graphElements.map(getTid).filter(tid => { const body = tid.slice(graphPrefix.length); return /^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body); }),
+      ...nativeInventoryLinks])].sort();
     let packageIdentity = null;
     try {
       const app = globalThis.bg?.app;
@@ -4330,7 +4366,7 @@ function readRenderedInputMapping(observation) {
         ...(definitionPrefix?{scope:omittedRegions.has('table_data_cells')?'node_output_controls':'node_definition_controls',omitted_regions:[...omittedRegions]}:{}) },
       nodes, links: links.slice(0, 500), workarea: workarea ? boxOf(workarea) : null,
       ui: { elements, dialogs: dialogs.slice(0, 12), messages: messages.slice(0, 30), masks: masks.slice(0, 12), table_cells: tableCells,
-        truncated: { elements: !!selectedRoot || controls.length > 240, nodes: !!selectedRoot || observedNodeLabels.length > 200, links: !!selectedRoot || links.length > 500, ports: !!selectedRoot || nodes.some(node => node.ports.length === 100), dialogs: dialogs.length > 12, messages: !!selectedRoot || messages.length > 30, masks: masks.length > 12, table_cells: definitionOnly || !!selectedRoot || cells.length > 120 } } };
+        truncated: { elements: !!selectedRoot || controls.length > 240, nodes: !!selectedRoot || observedNodeLabels.length+missingNodes.length > 200, links: !!selectedRoot || links.length > 500, ports: !!selectedRoot || nodes.some(node => node.ports.length === 100), dialogs: dialogs.length > 12, messages: !!selectedRoot || messages.length > 30, masks: masks.length > 12, table_cells: definitionOnly || !!selectedRoot || cells.length > 120 } } };
     } catch (error) {
       // Playwright serializes thrown Errors without arbitrary properties such
       // as our code. Return a small data envelope across the realm boundary;
@@ -4341,6 +4377,7 @@ function readRenderedInputMapping(observation) {
         ,...(['collect','metadata','output_definitions','import_definitions','controls','data_views'].includes(error?.scan_stage)?{scan_stage:error.scan_stage}:{})}};
     }
   },{downloadToastObservation:task.download_toast_observation===true,nodeErrorToastObservation:task.node_error_toast_observation===true,
+    inventoryTypes:!task.prepared_node_context?task.node_types_by_icon:null,
     quietGraphObservation:task.quiet_graph_observation===true,
     rootRef:rediscover ? null : postActionRoot ?? task.root_ref ?? task.snapshot?.observation_root?.ref ?? null,discoverRoots:rediscover || task.discover_roots===true,storageName:task.storage_name ?? null,
     columnPage:task.import_column_page??(task.snapshot?.wizard?.import_columns?.page?{offset:task.snapshot.wizard.import_columns.page.offset,limit:task.snapshot.wizard.import_columns.page.limit}:null),
@@ -5731,7 +5768,9 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false, downloa
       || !Number.isInteger(p.limit) || p.limit<1 || p.limit>8)throw new Error('Import definition page requires a bounded offset and limit');
   }
   if (options.mode === 'act') validateUiAction(options.action, options.snapshot);
-  const task = { ...structuredClone(options), kind: 'workspace-ui', ...(downloadToastObservation?{download_toast_observation:true}:{}) };
+  const task = { ...structuredClone(options), kind: 'workspace-ui',
+    ...(!options.prepared_node_context?{node_types_by_icon:nodeTypesByIcon}:{}),
+    ...(downloadToastObservation?{download_toast_observation:true}:{}) };
   // Trusted composite operations may supply their own fresh native read after
   // a bounded preparatory gesture. This is not a public tool parameter.
   if(snapshotArgument)return `async (page, snapshot) => (${workspaceUiCapability.toString()})(page, {...${JSON.stringify(task)},snapshot}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()})`;

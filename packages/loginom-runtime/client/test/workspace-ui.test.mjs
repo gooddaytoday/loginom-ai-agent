@@ -703,6 +703,49 @@ test('failure output observes the graph after finally mouse-up, including effect
   assert.equal(outcome.output.verification_required, true);
 });
 
+for(const renderLabel of [true,false])test('graph observation lists a manually added native node with '+(renderLabel?'a visible':'a hidden')+' caption',async()=>{
+ const {page,tid:source,node:sourceNode,port:sourcePort,model}=scriptGraphFixture('First','bg-vendor-icon-calcdata');
+ sourceNode.FGuid='42e7502e-9fbb-4bff-8188-2e907fed167c';
+ const before=await page.observe();
+ assert.deepEqual(before.nodes.map(n=>n.node_ref.node_label),['First']);
+ const tid='MF;TF-1;Graph;Manual_Node',link=source+'|Output_Data-0|Manual_Node|Input_Data-0';
+ const box={x:620,y:300,width:90,height:55},body=page.add('g',tid,'',box);
+ const label=page.add('g',tid+';Label;Label','Manual Node');
+ if(!renderLabel)label.attrs.hidden='';
+ const {byTid}=page.graphModels.get(body.parentElement),node=byTid.get(tid);
+ node.FGuid='f4e7502e-9fbb-4bff-8188-2e907fed167c';
+ node.FIconCls='bg-vendor-icon-calcdata';
+ node.FLabel.FRawValue='Manual Node';
+ node.FCell.geometry={x:box.x,y:box.y};
+ const linkShape=page.add('g',link);
+ model.FDiagram.FLinks.FCollection.at(-1).FSourcePort=sourcePort;
+ if(!renderLabel)linkShape.attrs.hidden='';
+ const snapshot=await page.observe();
+ const observed=snapshot.nodes.find(n=>n.node_id===node.FGuid);
+ assert.ok(observed,'native node missing from the model-facing inventory');
+ assert.equal(observed.node_ref.node_label,renderLabel?'Manual_Node':'Manual Node');
+ assert.equal(observed.type,'transform.calculator');
+ assert.deepEqual(observed.bounding_box,box);
+ assert.ok(snapshot.links.includes(link));
+});
+
+test('model graph inventory reports a native node without a renderer or action refs',async()=>{
+ const {page,body,model}=scriptGraphFixture('First','bg-vendor-icon-calcdata');
+ const diagram=model.FDiagram;
+ Object.assign(diagram.FmxGraph.view,{scale:2,translate:{x:5,y:10}});
+ const node={FGuid:'42e7502e-9fbb-4bff-8188-2e907fed167c',FIconCls:'bg-vendor-icon-calcdata',
+  FCell:{geometry:{x:500,y:60,width:50,height:30}},FPorts:[]};
+ node.FLabel={parent:node,FCell:{parent:node.FCell},FRawValue:'Manually added'};
+ diagram.FNodes.FCollection.push(node);
+ const snapshot=await page.observe(),observed=snapshot.nodes.find(n=>n.node_id===node.FGuid);
+ assert.equal(observed.node_ref.node_label,'Manually added');
+ assert.equal(observed.type,'transform.calculator');
+ assert.deepEqual(observed.bounding_box,{x:1010,y:190,width:100,height:60});
+ assert.deepEqual(observed.ports,[]);
+ assert.ok(!snapshot.ui.elements.some(e=>e.tid?.includes('Manually added')));
+ assert.equal(body.parentElement,diagram.FmxGraph.container);
+});
+
 test('native Calculator graph captions containing code names remain clickable', async () => {
   for (const label of ['Калькулятор_JavaScript', 'JavaScript', 'Калькулятор_python', 'Калькулятор_script', 'Калькулятор_codeeditor']) {
     const {page,tid} = scriptGraphFixture(label, 'bg-vendor-icon-calcdata');
