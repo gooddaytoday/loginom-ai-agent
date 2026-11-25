@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { consoleReturnWindow, protocolUrls } from "./deep-link"
+import { consoleReturnWindow, protocolUrls, startupUrls } from "./deep-link"
 
 describe("Console return deep links", () => {
   test("reads the originating Desktop window", () => {
@@ -42,5 +42,15 @@ describe("protocol links on the command line", () => {
   // Dashboards of 0.4 open through the same scheme (B2.9); the parser passes them on without a target window.
   test("passes dashboard links through without a Console target", () => {
     expect(consoleReturnWindow("loginom-ai-agent://dashboard?id=1&action=create")).toBeUndefined()
+  })
+
+  // Loginom AI Agent (B4.15): a link that launches the app, as 0.4 read it.
+  test("reads the links the app started with from its command line on Linux only", () => {
+    const dashboard = "loginom-ai-agent://dashboard?id=1&action=create"
+    const argv = ["/opt/Loginom AI Agent/loginom-ai-agent", "--no-sandbox", "opencode://open?project=/repo", dashboard]
+
+    expect(startupUrls(argv, "linux")).toEqual([dashboard])
+    expect(startupUrls(argv, "darwin")).toEqual([])
+    expect(startupUrls(argv, "win32")).toEqual([])
   })
 })

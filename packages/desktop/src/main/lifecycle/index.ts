@@ -4,12 +4,13 @@ import { app, BrowserWindow } from "electron"
 import type { Event } from "electron"
 import { Context, Effect, Layer } from "effect"
 import { DeepLinks } from "../deep-links"
+import { DashboardLinks } from "../loginom/dashboard-links"
 import { DesktopLogging, scoped } from "../native/logging"
 import { DesktopStorage } from "../storage"
 import { safeWebContentsURL } from "../windows/state"
 import { getLastFocusedWindow, mainWindows } from "../windows"
 import type { Scope } from "@opencode/plugin/gui/host"
-import { protocolUrls } from "./deep-link"
+import { protocolUrls, startupUrls } from "./deep-link"
 import { marks } from "./marks"
 import {
   createDriver,
@@ -25,6 +26,8 @@ import { Shutdown } from "./shutdown"
 export interface Interface {
   readonly relaunch: () => void
   readonly deepLinks: DeepLinks.Interface
+  /** Loginom AI Agent (B4.15): dashboard links, which wait for the service `connect` hands over. */
+  readonly dashboards: DashboardLinks.Queue
   /** Where the app stands between running and exiting. */
   readonly state: () => State
   /**
@@ -106,12 +109,30 @@ const runtime = Layer.effect(
 
     const deepLinks = yield* DeepLinks.make(focusWindow)
 
+    // Loginom AI Agent (B4.15): the window has nowhere to show a prepared dashboard before stage C, so its answer goes
+    // to the log.
+    const dashboards = DashboardLinks.make((link, result) =>
+      runFork(
+        result.status === "fulfilled"
+          ? Effect.logInfo("dashboard link prepared", { ...link, reply: result.value })
+          : Effect.logError("dashboard link failed", { ...link, error: result.reason }),
+      ),
+    )
+
+    // Loginom AI Agent (B4.15): every product link goes to the windows, and a dashboard's link to the service too.
+    const receive = (urls: readonly string[]) => {
+      deepLinks.receive(urls)
+      dashboards.receive(urls)
+    }
+
+    receive(startupUrls(process.argv, process.platform))
+
     const secondInstance = (_event: Event, argv: string[]) => {
       const urls = protocolUrls(argv)
 
       if (urls.length) {
         runFork(Effect.logInfo("deep link received via second-instance", { urls }))
-        deepLinks.receive(urls)
+        receive(urls)
       }
 
       if (!urls.length) focusWindow(getLastFocusedWindow())
@@ -120,7 +141,7 @@ const runtime = Layer.effect(
     const openUrl = (event: Event, url: string) => {
       event.preventDefault()
       runFork(Effect.logInfo("deep link received via open-url", { url }))
-      deepLinks.receive([url])
+      receive([url])
     }
 
     const beforeQuit = (event: Event) => {
@@ -186,6 +207,7 @@ const runtime = Layer.effect(
     return Service.of({
       relaunch,
       deepLinks,
+      dashboards,
       state: driver.state,
       restart: driver.restart,
       createWindow,
