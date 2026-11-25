@@ -1,0 +1,89 @@
+{
+  "nodes": [
+    {
+      "type": "imports.excel",
+      "label_any": true
+    },
+    {
+      "type": "imports.text",
+      "label_any": true
+    },
+    {
+      "type": "transform.join_data",
+      "label_any": true
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "book",
+        "type": "imports.excel"
+      },
+      {
+        "id": "directory",
+        "type": "imports.text"
+      },
+      {
+        "id": "join",
+        "type": "transform.join_data"
+      }
+    ],
+    "links": [
+      {
+        "source": "book",
+        "target": "join"
+      },
+      {
+        "source": "directory",
+        "target": "join"
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-i102-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "ShipmentId",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "WarehouseName",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Units",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "ShipmentId": 41,
+          "WarehouseName": "Север",
+          "Units": 10
+        },
+        {
+          "ShipmentId": 42,
+          "WarehouseName": "Центр",
+          "Units": 12
+        },
+        {
+          "ShipmentId": 44,
+          "WarehouseName": "Север",
+          "Units": 0
+        },
+        {
+          "ShipmentId": 48,
+          "WarehouseName": "Юг",
+          "Units": 31
+        }
+      ]
+    }
+  ]
+}
