@@ -23853,3 +23853,56 @@ a6b15d33daf6ab7d35569f6d711fdb630b9f04e7	refs/tags/v2.3.0          # лёгки�
 - Для PR шаг заработает только после попадания правки в `loginom`: `pull_request_target` берёт workflow из базы.
 - На push ветка может удалить шаг в своём workflow; барьер — PR-проверка из базы и защита `loginom`.
 - Локальные hooks пины не сверяют: ветка может локально вписать свой SHA и пройти hooks, остановит её CI.
+
+## Отказ одного вопроса
+
+Хвост B2.9f. Остановка вызова `dashboard_publish` или `dashboard_delete` снимала свой открытый вопрос ответом `reject`, а
+ядро (`Permission.reply`, `packages/core/src/permission.ts`) на `reject` отклоняет все открытые вопросы сессии:
+параллельный вопрос подагента или другого инструмента пропадал вместе с ним. База — `0cfc0a30dd`, ветка `breject-one-question`.
+
+### Решение
+
+- **Только плагин, ядро и каталог не тронуты.** API плагина (`ctx.permission.reply`, протокол `session.permission.reply`)
+  не умеет снять один вопрос: `decision` — `once | always | reject`, каскад на `reject` зашит в ядре. Новое поле — это
+  правка протокола, перегенерация клиента и запись каталога; меньший вариант — ответить своему вопросу `once`.
+- Это безопасно: ответ уходит из обработчика `abort` сигнала вызова, и `ask` сразу после ответа делает
+  `call.signal.throwIfAborted()` — инструмент ничего не отправляет и не удаляет. Побочное: в событии `permission.replied`
+  у остановленного вызова стоит `once`, а не `reject`; потребителей, которым это важно, в продукте нет (`ctx.permission.hook`
+  слушает только `evaluate`).
+- Правка: `packages/loginom-agent/src/dashboard-tools.ts`, `decision: "once"` и комментарий в `ask`.
+
+### Тесты
+
+| Тест | До правки | После | Мутация (`decision: "reject"`) |
+|---|---|---|---|
+| новый `packages/server/test/loginom-dashboard-publish.test.ts` «a stop withdraws only the stopped call's question, not the session's other open questions»: настоящее ядро, в сессии вопрос публикации и второй вопрос (`dashboard_delete`, открыт через `POST /permission`); остановка; остаётся только второй | красный: открытых вопросов `[]`, ожидался `["dashboard_delete"]` | зелёный | красный |
+| `packages/loginom-agent/test/dashboard-tools.test.ts` «a stop withdraws the call's own question…»: ответ `once` только своему вопросу (раньше `reject`, подставной ответ — отказ) | — | зелёный | красный |
+
+### Другие места продукта
+
+- `index.ts` (`loginom.permission.conversation`): отвечает `once` — каскада нет.
+- `packages/cli/src/run/noninteractive.ts`: `reject` без `--auto` — осознанный отказ человека-отсутствующего, каскад нужен.
+- Остальные `reject` — ответы пользователя в интерфейсах (`app`, `desktop`) и сам каскад ядра; продуктовых мест, где инструмент
+  снимает вопрос за сессию, больше нет.
+
+### Найдено, не чинил
+
+- `packages/loginom-agent/src/local-file.ts` (`ask`): вопрос инструмента чтения локальных файлов не снимается при остановке
+  вызова — обратная проблема (вопрос остаётся открытым, а не отклоняются лишние). Не проверял, что именно остаётся в ядре.
+
+### Проверки
+
+С `npm ci --ignore-scripts` в `packages/loginom-runtime/client` и `packages/dashboard/template` и `LOGINOM_AI_AGENT_TEST_NODE`
+(Node 24.19.0), Bun 1.4.4:
+
+```
+packages/loginom-agent: bun test   125 pass, 0 fail (10 файлов); bun typecheck — без ошибок
+packages/server:        bun test   316 pass, 0 fail (319 тестов, 60 файлов)
+packages/product:       bun test   60 pass, 3 fail — workspace packages, CI triggers, path literals (известные, В-95/B5.1)
+python3 -I scripts/upstream-sync/catalog-check.py --summary        # код 0
+python3 -I scripts/upstream-sync/apply-identity.py --repo . --check   # would change: 0 files
+bun run check                                                       # код 0 (39 задач)
+```
+
+`core` не менялся и не гонялся. Прогона базы `0cfc0a30dd` целиком не делал: новых падений нет, потому что в `product`
+упали ровно три известных теста, а остальные пакеты зелёные.

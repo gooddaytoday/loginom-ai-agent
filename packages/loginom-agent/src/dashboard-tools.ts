@@ -66,8 +66,10 @@ export function dashboardTools(
   // The question of a publication or a deletion, which names the node and the package (B2.9f, B2.9g): the rules and
   // `permissions.ts` decide whether it is asked (В-102: a publication by «Сохранять пакеты в Loginom», a deletion every
   // time), and a refusal reaches `execute.after` as it is, so the turn goes on (B2.6b, B2.6c). 0.4 raced it with the
-  // call's abort; the plugin's `assert` outlives a stopped call, so a stop withdraws the call's open question instead
-  // (the core's `reply` then declines the session's other open questions too, as for any decline).
+  // call's abort; the plugin's `assert` outlives a stopped call, so a stop withdraws the call's open question instead.
+  // The core's `reject` declines all the session's open questions (parallel sub-agents', other tools'), so the withdrawn
+  // question is answered `once`: the call is aborted, and `ask` throws on the abort right after the answer, before the
+  // tool does anything.
   const ask = async (
     call: ToolContext,
     request: { action: string; resources: string[]; metadata: Record<string, unknown> },
@@ -93,7 +95,7 @@ export function dashboardTools(
             .filter((item) => item.source?.messageID === call.messageID && item.source.id === call.id)
             .map((item) =>
               session.permission
-                .reply({ sessionID: call.sessionID, requestID: item.id, decision: "reject" })
+                .reply({ sessionID: call.sessionID, requestID: item.id, decision: "once" })
                 .catch(() => undefined),
             ),
         )
