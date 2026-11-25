@@ -25130,3 +25130,9 @@ packages/product        bun test                    75 pass, 3 fail — workspac
 `target\…\build\loginom-ai-agent-pty-<hash>\out\ghostty-<sha>\zig-pkg\uucode-0.2.0-<hash>` длиннее MAX_PATH: путь
 `D:\a\loginom-ai-agent-test\loginom-ai-agent-test` на 30 символов длиннее upstream. Каталог Cargo на Windows перенесён в
 `$RUNNER_TEMP/pt` (`CARGO_TARGET_DIR` из `setup-rust-pty`), шаги pty берут бинарник из `${CARGO_TARGET_DIR:-target}`.
+
+После короткого `CARGO_TARGET_DIR` (run 45704778951, `8fd8e7d022`) pty Windows собирается; упал `Smoke test`:
+`loginom-ai-agent-pty client transport is not implemented on this platform` — у клиента `play` нет транспорта Windows.
+Smoke Windows сделан как в upstream `release-process-daemon.yml`: настоящий `daemon --runtime-dir --name smoke` по именованному
+каналу, ждём `smoke/service.json` 10 с, незанятый демон сам останавливается за 15 с и убирает каталог. `play` — только
+Linux и macOS.
