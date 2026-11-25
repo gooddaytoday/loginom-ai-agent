@@ -31,7 +31,7 @@ async function activeConfigure(journal) {
   return { location: journal + ':' + entry[1], operation_id: entry[0], step: 'configure' };
 }
 
-async function gesture(page) {
+async function gesture(page, browser) {
   const wizard = page.locator(wizardSelector);
   if (kind === 'close-wizard') {
     await wizard.click({ timeout: 5000 });
@@ -55,13 +55,24 @@ async function gesture(page) {
     return { main_frame_navigated: true };
   }
   if (kind === 'switch-tab') {
-    const other = await page.context().newPage();
-    await other.goto(new URL(page.url()).origin, { waitUntil: 'commit', timeout: 15_000 });
-    await other.bringToFront();
-    const visibility = await Promise.all([page.evaluate(() => document.visibilityState),
-      other.evaluate(() => document.visibilityState)]);
-    if (visibility.join('/') !== 'hidden/visible') throw Error('TAB_SWITCH_UNCONFIRMED');
-    return { original_hidden: true, other_loginom_tab_visible: true };
+    const context = page.context();
+    const loginom = new URL(page.url());
+    const other = await context.newPage();
+    await other.goto(loginom.href, { waitUntil: 'commit', timeout: 15_000 });
+    if (new URL(other.url()).origin !== loginom.origin) throw Error('TAB_ORIGIN_CHANGED');
+    const targetId = async tab => {
+      const session = await context.newCDPSession(tab);
+      const { targetInfo } = await session.send('Target.getTargetInfo');
+      await session.detach();
+      return targetInfo.targetId;
+    };
+    const from = await targetId(page);
+    const to = await targetId(other);
+    if (from === to) throw Error('NEW_TAB_UNCONFIRMED');
+    const session = await browser.newBrowserCDPSession();
+    await session.send('Target.activateTarget', { targetId: to });
+    await session.detach();
+    return { browser_activation_ack: true, from, to };
   }
   if (kind === 'foreign-dialog') {
     const message = 'Проверка вручную: информационное сообщение';
@@ -102,7 +113,7 @@ try {
         const fresh = await activeConfigure(journal);
         if (fresh?.operation_id !== pending.operation_id) continue;
         await record('before', { ...fresh, wizard_visible: true, filter_panel_visible: true });
-        await record('after', await gesture(page));
+        await record('after', await gesture(page, browser));
         // The original Playwright pipe remains owned by the Loginom runtime.
         process.exit(0);
       }
