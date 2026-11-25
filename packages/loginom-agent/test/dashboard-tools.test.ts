@@ -325,7 +325,7 @@ test(
         },
         reply: async (input) => {
           replies.push(input)
-          question.reject(new Error("declined"))
+          question.resolve()
         },
       },
       bound: async () => {},
@@ -333,7 +333,7 @@ test(
     })
     await expect(tools.publish.execute({}, context)).rejects.toThrow()
     expect(listed).toEqual([1, 2])
-    expect(replies).toEqual([{ sessionID: context.sessionID, requestID: "per_own", decision: "reject" }])
+    expect(replies).toEqual([{ sessionID: context.sessionID, requestID: "per_own", decision: "once" }])
     expect(host.requests("dashboardPublish")).toEqual([])
   },
   timeout,

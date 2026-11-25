@@ -339,6 +339,31 @@ describe("loginom.product dashboard_publish (B2.9f, В-102)", () => {
     )
 
   it.live(
+    "a stop withdraws only the stopped call's question, not the session's other open questions",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const id = yield* test.create()
+        const running = yield* test.run(id, publish)
+        const own = yield* until(() => test.open(id).pipe(Effect.map((items) => items[0])))
+        // Another open question of the same session, as a parallel sub-agent's or another tool's would be.
+        const resources = [test.control.nodeName, test.control.binding.packagePath]
+        expect(yield* test.ask(id, { action: "dashboard_delete", resources })).toBe("ask")
+        expect((yield* test.open(id)).map((item) => item.action)).toEqual(["dashboard_publish", "dashboard_delete"])
+        yield* test.sessions.interrupt(id)
+        yield* Fiber.join(running).pipe(Effect.ignore)
+        // The stopped call's own question is gone and nothing is published; the other one is still waiting.
+        yield* until(() =>
+          test.open(id).pipe(Effect.map((items) => (items.some((item) => item.id === own.id) ? undefined : items))),
+        )
+        expect((yield* test.open(id)).map((item) => item.action)).toEqual(["dashboard_delete"])
+        expect(test.methods()).toEqual(read)
+        expect(test.lookups).toEqual([])
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
     "«Разрешено» publishes without a question",
     () =>
       Effect.gen(function* () {
