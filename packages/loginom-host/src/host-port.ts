@@ -9,6 +9,7 @@ import { DashboardDelete, DashboardRead, DashboardPublish } from "./dashboard"
 import { Schema } from "effect"
 import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
 import { browserRecoveryToolName, isBrowserRecoveryTool } from "../../loginom-runtime/client/lib/browser-recovery.mjs"
+import { dockWorkspaceTools, dockWorkspaceToolsWithRecovery } from "./dock-catalog.mjs"
 
 const knowledgeTools = new Set(["find", "search", "read", "grep", "glob", "list", "tree"])
 const Admissions = Schema.Array(
@@ -65,6 +66,8 @@ export type HostPort = {
 
 export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<typeof createLoginomHost>>) {
   const owner = randomUUID()
+  const bootstrapTools = service.browserRecovery ? dockWorkspaceToolsWithRecovery : dockWorkspaceTools
+  const bootstrapNames = new Set(bootstrapTools.map((tool) => tool.name))
   const runs = new Map<
     string,
     {
@@ -128,6 +131,17 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
   function reply(value: { id: string; result?: unknown; error?: string }, generation?: number) {
     if (state.closed) return
     port.postMessage(generation === undefined ? value : { ...value, generation })
+  }
+  async function preparedBrowserTools(run: NonNullable<ReturnType<typeof runs.get>>) {
+    const generation = run.lease?.generation
+    if (generation === undefined || !service.hasRuntime(generation, run.chat)) return
+    const runtime = await service.runtime(generation, run.chat)
+    const listed = await runtime.request("list").catch((error) => {
+      if (service.hasRuntime(generation, run.chat)) throw error
+    })
+    if (!listed || typeof listed !== "object" || !("prepared" in listed) || listed.prepared !== true) return
+    // Recovery is granted by the host as well as the runtime.
+    return catalogTools(listed).filter((tool) => service.browserRecovery || !isBrowserRecoveryTool(tool.name))
   }
   async function connectionLease(
     id: string,
@@ -377,7 +391,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           (browserCall &&
             "name" in input &&
             typeof input.name === "string" &&
-            (!run.catalog.has(input.name) || (isBrowserRecoveryTool(input.name) && !service.browserRecovery))))
+            ((!run.catalog.has(input.name) && !bootstrapNames.has(input.name)) ||
+              (isBrowserRecoveryTool(input.name) && !service.browserRecovery))))
       )
         throw new Error("LOGINOM_SCOPE_DENIED")
       if (data.method !== "interrupt" && service.journal.pending().length) throw new Error("LOGINOM_RECOVERY_REQUIRED")
@@ -426,17 +441,9 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           // catalog must remain usable when that connection cannot be leased.
           if (automation && !run.lease && service.hasRuntime(generation, run.chat))
             await connectionLease(input.run, run).catch(() => undefined)
-          const listed =
-            automation && run.lease && service.hasRuntime(run.lease.generation, run.chat)
-              ? await (await service.runtime(run.lease.generation, run.chat)).request("list")
-              : undefined
-          // The runtime lists recovery tools only under its own capability; the host
-          // independently withholds them unless this launch carries it too.
-          const browser =
-            listed && typeof listed === "object" && "prepared" in listed && listed.prepared === true
-              ? catalogTools(listed).filter((tool) => service.browserRecovery || !isBrowserRecoveryTool(tool.name))
-              : []
-          run.catalog = new Set([prepareTool.name, ...browser.map((tool) => tool.name)])
+          const prepared = automation ? await preparedBrowserTools(run) : undefined
+          const browser = automation ? (prepared ?? bootstrapTools) : []
+          run.catalog = new Set([prepareTool.name, ...(prepared ?? []).map((tool) => tool.name)])
           reply(
             {
               id: data.id,
@@ -585,6 +592,20 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         )
         if (admissions.some((admission) => admission.files.some((file) => file.name.toLowerCase().endsWith(".lgp"))))
           throw new Error("LOGINOM_SCOPE_DENIED")
+        if (!preparing) {
+          // A failed repeat prepare can invalidate a catalog already sent to the model.
+          const prepared = await preparedBrowserTools(run)
+          if (run.released) throw new Error("LOGINOM_RUN_ABORTED")
+          if (!prepared && bootstrapNames.has(input.name)) {
+            const result = { code: "NOT_PREPARED", next_step: prepareTool.name }
+            reply(
+              { id: data.id, result: { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result } },
+              run.lease?.generation,
+            )
+            return
+          }
+          if (!prepared?.some((tool) => tool.name === input.name)) throw new Error("LOGINOM_SCOPE_DENIED")
+        }
         const lease = await connectionLease(input.run, run, preparation)
         if (input.name !== prepareTool.name && !service.hasRuntime(lease.generation, run.chat))
           throw new Error("LOGINOM_SCOPE_DENIED")

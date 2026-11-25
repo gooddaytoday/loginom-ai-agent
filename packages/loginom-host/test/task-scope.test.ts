@@ -164,6 +164,9 @@ test("pending activation preserves the current catalog and requires application 
       profile: "loginom-automation",
     })
     expect(JSON.stringify(await f.client.request("tools", { run: "one" }))).toContain("dock_prepare")
+    await expect(f.call("dock_workspace_observe")).resolves.toMatchObject({
+      structuredContent: { code: "NOT_PREPARED", next_step: "dock_prepare" },
+    })
     await expect(f.call("dock_prepare")).rejects.toThrow("LOGINOM_CONFIG_REQUIRED")
     await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
   } finally {
@@ -432,7 +435,53 @@ test("automation cannot implicitly create a runtime with a non-prepare call or s
   const f = await fixture(true)
   try {
     await f.scope("bind", "loginom-automation")
-    await expect(f.call("dock_node_wait")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    const listed = (await f.client.request("tools", { run: "one" })) as {
+      tools: { name: string; description: string; inputSchema: { type: string } }[]
+    }
+    const names = listed.tools.map((tool) => tool.name).filter((name) => name.startsWith("dock_"))
+    expect(names.sort()).toEqual([
+      "dock_action_describe",
+      "dock_action_run",
+      "dock_artifact_deliver",
+      "dock_artifact_delivery_cancel",
+      "dock_artifact_delivery_resume",
+      "dock_artifact_delivery_status",
+      "dock_diagnostics",
+      "dock_node_apply",
+      "dock_node_cancel",
+      "dock_node_delete",
+      "dock_node_read",
+      "dock_node_resume",
+      "dock_node_status",
+      "dock_node_stop",
+      "dock_node_wait",
+      "dock_operation_inspect",
+      "dock_operation_recover",
+      "dock_prepare",
+      "dock_storage_download_cancel",
+      "dock_storage_download_cleanup",
+      "dock_storage_download_start",
+      "dock_storage_download_status",
+      "dock_storage_download_wait",
+      "dock_storage_list",
+      "dock_storage_source",
+      "dock_workspace_observe",
+    ])
+    for (const tool of listed.tools.filter((tool) => tool.name.startsWith("dock_"))) {
+      expect(tool.description).not.toBeEmpty()
+      expect(tool.inputSchema.type).toBe("object")
+      if (tool.name === "dock_node_apply")
+        expect(Buffer.byteLength(JSON.stringify(tool), "utf8")).toBeLessThanOrEqual(20_000)
+      if (tool.name === "dock_prepare" || tool.name === "dock_diagnostics") continue
+      const result = { code: "NOT_PREPARED", next_step: "dock_prepare" }
+      const reply = await f.call(tool.name)
+      expect(reply).toMatchObject({
+        content: [{ type: "text", text: expect.any(String) }],
+        structuredContent: result,
+      })
+      expect(reply).not.toHaveProperty("isError", true)
+    }
+    await expect(f.call("dock_unadvertised")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
     await expect(
       f.client.request("admit", {
         run: "one",
@@ -443,6 +492,7 @@ test("automation cannot implicitly create a runtime with a non-prepare call or s
     await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
     expect(await readdir(f.root)).not.toContain("runtime")
     expect(await readdir(f.root)).not.toContain("inputs")
+    expect(await readdir(join(f.root, "recovery"))).toEqual([])
   } finally {
     await f.close()
   }
@@ -460,7 +510,9 @@ test("a replacement runtime receives original bytes again before its explicit pr
     const runtime = await f.host.runtime(1, createHash("sha256").update("chat").digest("hex"))
     await runtime.request("fixture.exit")
     await runtime.exited
-    await expect(f.call("dock_node_wait")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    await expect(f.call("dock_node_wait")).resolves.toMatchObject({
+      structuredContent: { code: "NOT_PREPARED", next_step: "dock_prepare" },
+    })
     await prepare()
     const events: { operation: string; userMessage?: string }[] = (await readFile(f.marker, "utf8"))
       .trim()
@@ -488,12 +540,24 @@ test("a failed prepare keeps the existing runtime unavailable to other Dock call
         args: { fixtureFailure: true },
       }),
     ).toMatchObject({ isError: true })
-    expect(JSON.stringify(await f.client.request("tools", { run: "one" }))).not.toContain("dock_node_wait")
-    await expect(f.call("dock_node_wait")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    expect(JSON.stringify(await f.client.request("tools", { run: "one" }))).toContain("dock_node_wait")
+    await expect(f.call("dock_node_wait")).resolves.toMatchObject({
+      structuredContent: { code: "NOT_PREPARED", next_step: "dock_prepare" },
+    })
     expect(await readdir(join(f.root, "recovery"))).toEqual([])
     await f.call("dock_prepare")
     expect(JSON.stringify(await f.client.request("tools", { run: "one" }))).toContain("dock_node_wait")
     await f.call("dock_node_wait")
+    await f.client.request("call", {
+      run: "one",
+      name: "dock_prepare",
+      userMessage: "msg_original",
+      args: { fixtureFailure: true },
+    })
+    // A failed repeat prepare must take effect even before the model refreshes its catalog.
+    await expect(f.call("dock_node_wait")).resolves.toMatchObject({
+      structuredContent: { code: "NOT_PREPARED", next_step: "dock_prepare" },
+    })
     const events: { operation: string; name?: string }[] = (await readFile(f.marker, "utf8"))
       .trim()
       .split("\n")
@@ -502,6 +566,7 @@ test("a failed prepare keeps the existing runtime unavailable to other Dock call
       "dock_prepare",
       "dock_prepare",
       "dock_node_wait",
+      "dock_prepare",
     ])
   } finally {
     await f.close()
