@@ -179,6 +179,7 @@ const table = sqliteTable("session", {
 
 ## Loginom AI Agent: module map and current state
 
+- Product goal for 0.4.x (owner decision 2026-11-25): stepwise building — the analyst builds the scenario piece by piece with manual edits in between, the agent does exactly the requested step, self-checks by running it and saves only on request, without weakening fail-closed protection. See [intent](docs/intent/stepwise-building.md).
 - In `loginom-cli`, implement the [standalone CLI design](docs/superpowers/specs/2026-09-17-loginom-cli-standalone-design.md), starting from `c37913ab5`. Desktop and CLI own independent backend v1 processes and profiles. The earlier shared-service CLI design is historical; do not introduce service discovery, client leases, or Desktop profile migration.
 - Standalone executable: `loginom-ai-agent-cli`; keep the GUI launcher `loginom-ai-agent`. Track implementation and checks in the design's progress section and [standalone runbook](docs/testing/loginom-ai-agent/standalone-cli.md).
 
