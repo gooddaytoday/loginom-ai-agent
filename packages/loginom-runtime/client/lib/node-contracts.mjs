@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import {JAVASCRIPT_CARD_LIMITATIONS,JAVASCRIPT_KNOWLEDGE_SHA256,describeJavascriptKnowledge} from './javascript-knowledge.mjs';
 
 export const NODE_CONTRACT_REVISION = '1.0.0';
+export const NODE_ADD_ONLY_MODE = 'add_only';
 // Native node labels and ports extend above/left of the model-space origin.
 // Zoom cannot reveal that footprint at the canvas's zero-scroll boundary.
 export const NODE_POSITION_MIN = 64;
@@ -171,7 +172,9 @@ export function describeNodeTypes(types, pins = {}, actions = new Map(), candida
     const javascript=type==='programming.javascript'&&candidate?describeJavascriptKnowledge(observedBuild):null;
     const identity = { type, contract_revision: NODE_CONTRACT_REVISION, pins, candidate_handler_revision:candidate?.revision??null,
       ...(type==='programming.javascript'?{knowledge_sha256:JAVASCRIPT_KNOWLEDGE_SHA256}:{}) };
-    return { ...card, catalog_add_available: admitted, platform_availability: 'requires_live_preflight',
+    return { ...card, ...(card.target_modes?.includes('new')!==false?{
+      add_only: 'Add unconnected.'
+    }:{}), catalog_add_available: admitted, platform_availability: 'requires_live_preflight',
       full_node_apply_available: false, cache_key: createHash('sha256').update(JSON.stringify(identity)).digest('hex'),
       candidate_node_apply_available:!!candidate,
       ...(candidate?{configuration_handler:candidate.revision,configuration_status:'candidate_pending_autonomous_acceptance',candidate_apply_tool:'dock_node_apply',candidate_modes:[...candidate.modes]}:{}),

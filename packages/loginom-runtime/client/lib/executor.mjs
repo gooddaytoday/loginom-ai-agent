@@ -13,7 +13,7 @@ import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingW
 import {NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 import { createNodeTargetBrowserAdapter } from './node-target-browser.mjs';
 import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
-import { validateNodeTargetRequest } from './node-contracts.mjs';
+import { NODE_ADD_ONLY_MODE, validateNodeTargetRequest } from './node-contracts.mjs';
 import { describeNodeTypes } from './node-contracts.mjs';
 import { randomUUID, createHash } from 'node:crypto';
 import {join} from 'node:path';
@@ -4239,7 +4239,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       checkId(operationId);
       let operation=operations.get(operationId);
       const {handler}=validateNodeApplyRequest(request,nodeApplyHandlers,{fresh:!operation&&!resume});
-      if(typeof nodeApplyDriverFactory!=='function')throw new Error('Local node drivers are not installed');
+      const addOnly=request.mode===NODE_ADD_ONLY_MODE;
+      if(!addOnly&&typeof nodeApplyDriverFactory!=='function')throw new Error('Local node drivers are not installed');
       if(running)throw new Error('Another Dock action is still running');
       const signature=fingerprint('node.apply',{request,handler_revision:handler.revision,...(handler.output_wizard==='separate'?{output_wizard:'separate'}:{})});
       if(auxiliary.has(operationId))throw new Error('Operation ID conflicts with a recovery or UI operation');
@@ -4279,7 +4280,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         .map(({o,sequence})=>structuredClone({sequence,request:o.parameters,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed,
           source:o.nodeApply?.phases.find(p=>p.phase==='source')?.value?.source,scan_receipt:o.scanReceipt}));
       let admissionSources=null,admissionFailure=null,admissionUncertainty=null;
-      if(!operation&&serverDownloads){
+      if(!operation&&serverDownloads&&!addOnly){
         const proofs=new Map(),deadline=Math.min(admissionDeadline,now()+request.budgets.configure_ms);
         const resolve=async(ref,receipt=scanReceipt)=>{
           if(!proofs.has(ref)){
@@ -4339,7 +4340,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             if(response.status!=='SUCCEEDED')throw new Error(response.error?.message??'Node driver transport failed');
             return response.output.value;
           };
-          operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,scanReceipt,
+          operation.nodeApplyDrivers=addOnly?{
+            verifySource:async()=>({verified:true,cleanup_complete:true,effect_possible:false}),
+            verifyContinuation:async state=>state.target_reconciled===true,
+          }:nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,scanReceipt,
             resolveStorageSource:async(ref,receipt=scanReceipt)=>{
               const source=admissionSources?.get(ref)??await inspectServerSource(ref,{signal,deadline:operation.deadline});
               return serverDownloads?serverDownloads.bind(source,receipt):source;
@@ -4385,7 +4389,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             verifiedUploads:()=>[...operations.values()].filter(o=>o.action.capability==='artifact.upload'
               && o.outcome?.status==='SUCCEEDED'&&o.cleanupConfirmed===true)
               .map(o=>structuredClone({operation_id:o.id,artifact:o.checkpoint.artifact,outcome:o.outcome}))});
-          for(const name of ['verifySource','mapPorts','openWizard','finish','waitExecution','readOutput','verifyContinuation'])
+          for(const name of addOnly?[]:['verifySource','mapPorts','openWizard','finish','waitExecution','readOutput','verifyContinuation'])
             if(typeof operation.nodeApplyDrivers?.[name]!=='function')throw new Error('Local node driver missing: '+name);
           // Reuse the accepted graph driver directly, under this operation ID.
           const originalContinuation=operation.nodeApplyDrivers.verifyContinuation;
@@ -4403,8 +4407,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             verifyContinuation:async(state,ctx)=>{
               if(state.target_reconciled && !state.phases.some(p=>p.phase==='target')){
                 const {graph}=validateNodeApplyRequest(state.request,nodeApplyHandlers);
-                await inspectNodeTarget({request:graph,operation,adapter:operation.nodeTargetAdapter,
+                const result=await inspectNodeTarget({request:graph,operation,adapter:operation.nodeTargetAdapter,
                   record:nodeTargetRecord,deadline:Math.min(state.deadline,state.configure_deadline,now()+15000)});
+                if(addOnly&&(result.cleanup_complete!==true&&result.status!=='SUCCEEDED'||operation.targetPhase.pending))return false;
               }
               if(state.phases.at(-1)?.phase!=='workflow')return originalContinuation(state,ctx);
               if(state.pending||state.node||state.cleanup_complete!==true||state.phases.length!==2

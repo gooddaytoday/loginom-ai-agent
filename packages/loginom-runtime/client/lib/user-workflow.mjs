@@ -1,5 +1,7 @@
 // The user supplies an issued workflow identity. Long UI paths remain pinned
 // locally; the normal node contract and all live identity guards stay intact.
+import {NODE_ADD_ONLY_MODE} from './node-contracts.mjs';
+
 export const userActionKeys=['package.save_checkpoint','package.save_as'];
 const exportCreationDefaults=Object.freeze({encoding:'UTF-8',delimiter:',',header:'names',bom:false,line_ending:'LF',decimal_separator:'.',null_marker:'',text_qualifier:'"'});
 export function userActionTool(tool) {
@@ -15,6 +17,7 @@ export function userActionTool(tool) {
 export function userActionInventory(value) {
   const copy=structuredClone(value);
   if(copy.available_actions)copy.available_actions=copy.available_actions.filter(k=>userActionKeys.includes(k));
+  for(const card of copy.node_types??[])delete card.catalog_add_available;
   for(const key of ['ui_action_tool','artifact_upload_tool','artifact_verify_tool'])delete copy[key];
   // The prepared JS reference supplies the executable guidance. Keep the full
   // versioned knowledge asset in diagnostic describe, not the model's card.
@@ -67,7 +70,7 @@ export function userNodeTool(tool) {
   copy.inputSchema.properties.parameters={type:'object',properties:{},additionalProperties:true,
     description:'Type-specific settings. First call dock_action_describe with node_types:[target.type], modes:[mode]; follow its parameter_schema and guidance.'};
   copy.inputSchema.properties.mode={type:'string',minLength:1,maxLength:128,
-    description:'Select a mode from the node card returned by dock_action_describe.'};
+    description:'Select a mode from the node card. Use add_only on an explicit request to add an unconnected node: new target, done, empty parameters, inputs, mappings and reads.'};
   // The full runtime schema and handler still validate type-specific modes,
   // parameters and read restrictions before any browser work.
   delete copy.inputSchema.allOf;
@@ -104,6 +107,7 @@ export function createUserWorkflowBindings() {
         if(card.modes?.includes(mode))described.add(JSON.stringify([card.type,mode]));
     },
     checkNodeDescription(request) {
+      if(request.mode===NODE_ADD_ONLY_MODE)return null;
       if(describedDocument&&describedDocument!==request.document_id)return null;
       if(described.has(JSON.stringify([request.target?.type,request.mode])))return null;
       return {result_version:'user-v1',operation_id:request.operation_id??null,
@@ -152,7 +156,7 @@ export function createUserWorkflowBindings() {
       const ports=request.finish!=='execute'||['variables.from_table','exports.text','exports.excel','exports.lgd'].includes(request.target.type)?[]:
         request.target.type==='research.quality'?[0,1,2,3,4]:request.target.type==='preprocessing.coarse_classes'?[0,1,2]:['datamining.assn_rules','transform.filter_data','integration.rest_request','datamining.clustering'].includes(request.target.type)?[0,1]:[0];
       let parameters=request.parameters;
-      if(request.target.kind==='new'&&request.target.type==='exports.text'&&parameters&&typeof parameters==='object'&&!Array.isArray(parameters))
+      if(request.mode!==NODE_ADD_ONLY_MODE&&request.target.kind==='new'&&request.target.type==='exports.text'&&parameters&&typeof parameters==='object'&&!Array.isArray(parameters))
         parameters={...exportCreationDefaults,...parameters};
       if(request.target.kind==='new'&&request.target.type==='imports.text'&&parameters?.settings&&parameters.preview_only!==true){
         const settings=parameters.settings,upload=uploads.get(parameters.source?.upload_operation_id);

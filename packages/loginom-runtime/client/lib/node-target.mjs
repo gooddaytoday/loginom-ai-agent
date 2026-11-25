@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import {journalCopy} from './execution-journal.mjs';
-import { NODE_TYPES, validateNodeTargetRequest } from './node-contracts.mjs';
+import { NODE_ADD_ONLY_MODE, NODE_TYPES, validateNodeTargetRequest } from './node-contracts.mjs';
 import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
 import {variablesColumnUnionTargetRequest} from './variables-coluniondatavar-parameters.mjs';
 
@@ -148,6 +148,7 @@ async function settleMoveMismatch({operation,state,effect,receipt,graph,adapter,
 // Effects are committed one at a time. A possible effect never retries a gesture.
 export async function prepareNodeTarget({ request, operation, adapter, record, signal, now = Date.now, beforeTarget }) {
   validateNodeTargetRequest(request);
+  const addOnly=operation.parameters?.mode===NODE_ADD_ONLY_MODE;
   if(request.target.type==='variables.column_union'&&request.target.kind==='new'&&request.target.label===undefined){
     signal?.throwIfAborted();
     request=variablesColumnUnionTargetRequest(request,operation.targetPhase?.baseline??await adapter.observe(request,operation.deadline,signal));
@@ -400,7 +401,7 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
      }
     }
     if (!state.targetId) {
-      const after = await change('create', {...request.target,position:request.target.position??state.newPosition}, (before, after) => {
+      const after = await change('create', {...request.target,position:request.target.position??state.newPosition,...(addOnly?{add_only:true}:{})}, (before, after) => {
         const proof=verifyNodeTargetEffect({kind:'create',parameters:request.target,before},after,adapter.positionMatches);
         if(!proof)return false;
         state.targetId=proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;state.auto_created_variable_links=proof.auto_created_variable_links;return true;
@@ -432,7 +433,8 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
       });
     }
     const desired = request.inputs.map(i => ({ source: i.source.node_id, output: i.output, target: state.targetId, input: i.input }));
-    for (const edge of graph.links.filter(e => e.target === state.targetId && !desired.some(d => edgeKey(d) === edgeKey(e)))) {
+    for (const edge of graph.links.filter(e => (e.target === state.targetId || addOnly && e.source===state.targetId)
+      && !desired.some(d => edgeKey(d) === edgeKey(e)))) {
       const owned = (state.auto_created_links ?? []).some(a => edgeKey(a) === edgeKey(edge))
         ||(state.replacements??[]).some(r=>same(r.removed,edge))
         ||restInputReplacement(graph)&&edgeKey(edge)===edgeKey(operation.restQueryInput.edge);
@@ -473,7 +475,7 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
           !!verifyNodeTargetEffect({kind:'remove_link',parameters:{edge},before},after,adapter.positionMatches));
       }
     }
-    if(variableDesired.length)for(const edge of state.auto_created_variable_links??[]){
+    if(addOnly||variableDesired.length)for(const edge of state.auto_created_variable_links??[]){
       if(variableDesired.some(d=>edgeKey(d)===edgeKey(edge))||!(graph.variable_links??[]).some(e=>edgeKey(e)===edgeKey(edge)))continue;
       graph=await change('remove_link',{edge},(before,after)=>!!verifyNodeTargetEffect({kind:'remove_link',parameters:{edge},before},after,adapter.positionMatches));
     }
@@ -501,6 +503,13 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
       &&node(graph,state.targetId).label!==request.target.label){
       graph=await change('rename',{ref:node(graph,state.targetId).ref,label:request.target.label},(before,after)=>
         !!verifyNodeTargetEffect({kind:'rename',parameters:{ref:node(before,state.targetId).ref,label:request.target.label},before},after,adapter.positionMatches));
+    }
+    if(addOnly){
+      const quiet=await observe();
+      if(!quiet.interaction_ready||!sameDomainGraph(graph,quiet)
+        ||['links','variable_links','foreign_links','rest_connection_links'].some(key=>!same(quiet[key]??[],state.baseline[key]??[])))
+        throw Error('Complete quiet graph without new connections required');
+      graph=quiet;
     }
     state.completed=true;state.final_graph=structuredClone(graph);
     state.result = { status: 'SUCCEEDED', phase: 'target_ready', node: node(graph, state.targetId),

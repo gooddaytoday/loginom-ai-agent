@@ -22,7 +22,7 @@ const request=()=>({operation_id:'apply',contract_revision:'1.0.0',document_id:'
  target:{kind:'new',type:'imports.text',label:'Source',position:{x:320,y:280}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'done',
  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
 function fixture({execute=async()=>{throw Error('Unexpected public transport')},wrapDrivers,now=Date.now,pinnedActions=new Map(),browserRecovery=false,record=async e=>e}={}){
- const calls=[],events=[];const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[],links:[],foreign_links:[]};
+ const calls=[],events=[];const graph={complete:true,interaction_ready:true,document_id:'doc',workflow_ref:workflow,nodes:[],links:[],foreign_links:[]};
  const adapter={observe:async()=>structuredClone(graph),preflight:async()=>{},positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),reconcile:async()=>({verified:true,cleanup_complete:true}),mutate:async e=>{calls.push(e.kind);if(e.kind==='create')graph.nodes.push({ref:{document_id:'doc',workflow_id:'wf',node_id:'new'},type:e.parameters.type,label:'Source',position:e.parameters.position,inputs:[],outputs:[0]});return {status:'SUCCEEDED',cleanup_complete:true};}};
  const ok=(name,extra={})=>async()=>{calls.push(name);return {verified:true,cleanup_complete:true,effect_possible:false,...extra}};
  const handler={revision:'1',modes:['delimited'],validate:()=>{},configure:ok('configure')};
@@ -194,6 +194,37 @@ test('apply owns the accepted graph driver, inspect and replay under one ID',asy
  const count=f.calls.length;assert.deepEqual(await f.runtime.runNodeApply(request()),result);assert.equal(f.calls.length,count);
  f.runtime.assertPreparationAllowed();assert.ok(!f.runtime.tools.some(t=>t.name.includes('node_apply')));
 });
+test('add_only creates any admitted palette type through the graph without a configuration handler',async()=>{
+ const f=fixture({wrapDrivers:()=>{throw Error('Configuration driver must not be constructed');}});
+ const args={...request(),target:{...request().target,type:'transform.sorting'},mode:'add_only',
+  finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false}};
+ await f.runtime.startNodeApply(args);
+ const job=await f.runtime.waitNodeApply(args.operation_id,{timeoutMs:1000});
+ assertJob(job);
+ assert.equal(job.outcome.status,'SUCCEEDED',JSON.stringify(job.outcome));
+ assert.equal(job.outcome.output.configuration.status,'not_requested');
+ assert.deepEqual(job.outcome.output.node,{document_id:'doc',workflow_id:'wf',node_id:'new'});
+ assert.deepEqual(f.calls,['create']);
+ await f.runtime.startNodeApply(args);
+ assert.deepEqual(f.calls,['create']);
+});
+
+test('add_only keeps an unconfirmed automatic window pending and never repeats the drop',async()=>{
+ const f=fixture(),mutate=f.adapter.mutate;
+ f.adapter.mutate=async effect=>{await mutate(effect);return {status:'AMBIGUOUS',cleanup_complete:false};};
+ f.adapter.reconcile=async()=>({verified:false,cleanup_complete:false});
+ const args={...request(),mode:'add_only'};
+ await f.runtime.startNodeApply(args);
+ const job=await f.runtime.waitNodeApply(args.operation_id,{timeoutMs:1000});
+ assertJob(job);
+ assert.equal(job.outcome.status,'AMBIGUOUS');
+ assert.equal(job.outcome.cleanup_complete,false);
+ assert.equal(job.outcome.output.pending_phase,'target');
+ assert.throws(()=>f.runtime.assertPreparationAllowed(),/pending|uncertain/);
+ await f.runtime.inspect({operationId:args.operation_id});
+ assert.deepEqual(f.calls,['create']);
+});
+
 test('validation and missing drivers cannot create a graph or journal effects',async()=>{
  const f=fixture();f.handler.validate=()=>{throw Error('unsupported schema')};await assert.rejects(f.runtime.runNodeApply(request()),/unsupported/);
  assert.equal(f.events.length,0);assert.equal(f.calls.length,0);

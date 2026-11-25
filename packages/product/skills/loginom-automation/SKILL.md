@@ -278,6 +278,8 @@ New REST, unique label; delete old REST, its URL encoder, unused connection ref 
 `loginom_dock_action_describe`. Узлы и связи создаёт `loginom_dock_node_apply`;
 `loginom_dock_action_run` используется только для объявленных операций сохранения.
 
+Если просят добавить узел без подключения, используй `dock_node_apply` с `mode:"add_only"`, новым узлом, `finish:"done"` и пустыми настройками, входами, mappings и read.
+
 ## Браузер и владение операцией
 
 `target.label` необязателен: используй короткую подпись словами без `; | < >`, кавычек, обратной косой черты и управляющих символов; сравнения и формулы передавай только в `parameters`.

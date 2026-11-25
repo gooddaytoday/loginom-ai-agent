@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { withBrowserReceipt, makeCapabilityCode } from './executor.mjs';
 import { NODE_TYPES, NODE_POSITION_MIN } from './node-contracts.mjs';
 import {activatePreparedWorkflow,needsPreparedWorkflowActivation} from './node-workflow-activation.mjs';
+import {bindAddOnlyDrop,readAddOnlyDrop,settleAddOnlyDrop} from './node-add-only-window.mjs';
 import {exportPaletteScroll} from './text-export-palette.mjs';
 import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlacementGap,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from './node-placement.mjs';
 
@@ -222,9 +223,11 @@ export async function readGraph(page, task) {
 
 // Fixed UI gestures used only through the enclosing graph phase. The complete
 // pre-effect graph must still match immediately before the gesture.
-export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph, overflow, gap) {
+export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph, overflow, gap, addOnlyWindow) {
   let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false,moveGeometry,deletion;
   let gestureBefore=task.effect.before;
+  let dropBinding,addOnlyQuiet=false;
+  const addOnly=task.effect.kind==='create'&&task.effect.parameters.add_only===true;
   const remaining=()=>{if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw new Error('Node target cancelled');const value=task.deadline-Date.now();if(value<=0)throw new Error('Graph deadline');return value;};
   const ensureContext=()=>page.evaluate(({request,epoch})=>{
     const p=globalThis.__loginomDockPreparationV1;
@@ -355,6 +358,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         const currentOrigin=await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').boundingBox();
         if(JSON.stringify(currentOrigin)!==JSON.stringify(origin)||!await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').evaluate((e,p)=>{const b=e.getBoundingClientRect(),hit=document.elementFromPoint(p.x,p.y);return p.x>=b.x&&p.x<b.right&&p.y>=b.y&&p.y<b.bottom&&p.x>=0&&p.y>=0&&p.x<innerWidth&&p.y<innerHeight&&!!hit&&(hit===e||e.contains(hit));},target))throw Error('Export drop changed after palette reveal');
       }
+      if(addOnly)dropBinding=await page.evaluateHandle(addOnlyWindow.bind,task);
       await drag(find(palette),target,palette);
     }else if(kind==='rename'){
       const tid=await targetTid(p.ref);await point(find(tid+';Label;Label'));effectPossible=true;
@@ -602,7 +606,16 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
     const settleJavascript=kind==='create' && p.type==='programming.javascript';
     const maskDeadline=Math.min(task.deadline,Date.now()+15000);
     let pendingNode;
-    let after=await wait('graph_effect_visible_and_drag_idle',async()=>{
+    let after=addOnly?await addOnlyWindow.settle(page,dropBinding,{
+      readSurface:addOnlyWindow.read,remaining,readQuietGraph:async()=>{
+        try{return await read(page,task);}
+        catch(error){
+          if(['Graph is blocked','Workflow navigation changed','Visible port identity is not rendered','Node identity is not rendered']
+            .some(reason=>String(error.message).includes(reason)))return null;
+          throw error;
+        }
+      },
+    }):await wait('graph_effect_visible_and_drag_idle',async()=>{
       try{const g=await read(page,task);return g.interaction_ready&&JSON.stringify(g)!==JSON.stringify(before)?g:null;}
       catch(error){
         if(!settleJavascript)return null;
@@ -636,9 +649,12 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       after=await read(page,task);
       if(!sameGraph(baseline,after))throw Error('Created node graph changed after viewport navigation');
     }
+    addOnlyQuiet=true;
     outcome={status:'SUCCEEDED',effect_possible:true,after};
   }catch(error){if(error.placement_navigation_unverified){effectPossible=true;placementNavigationUncertain=true;}outcome={...outcome,status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,error:String(error.message),...(placementRefusal?{placement_refusal:placementRefusal}:{})};}
   finally{try{if(held){await page.mouse.up();held=false;}if(transient==='delete'){const cancel=find('msgbox;tlb;no');if(await cancel.isVisible())await cancel.click({timeout:3000});}else if(transient)await page.keyboard.press('Escape');transient=false;outcome.cleanup_complete=true;}catch(error){outcome={...outcome,status:'AMBIGUOUS',cleanup_complete:false,cleanup_error:String(error.message)};}}
+  if(dropBinding)await dropBinding.dispose().catch(()=>{});
+  if(addOnly&&effectPossible&&!addOnlyQuiet)outcome.cleanup_complete=false;
   if(paletteScroll)outcome.palette_scroll=paletteScroll;
   if(placementNavigation)outcome.placement_navigation=placementNavigation;
   if(moveGeometry)outcome.move_geometry=moveGeometry;
@@ -1064,7 +1080,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
       }
       const options={receipt_namespace:'node-target:'+request.document_id,receipt_id:effect.id,
         operation_id:effect.id,receipt_signature:createHash('sha256').update(JSON.stringify(effect)).digest('hex')};
-      return await call(withBrowserReceipt(`(${mutateGraph.toString()})(page,${JSON.stringify(t)},${readGraph.toString()},${exportPaletteScroll.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${revealNodePlacement.toString()},${samePlacementGraph.toString()},${nodePlacementOverflow.toString()},${nodePlacementGap.toString()})`,options),deadline);
+      return await call(withBrowserReceipt(`(${mutateGraph.toString()})(page,${JSON.stringify(t)},${readGraph.toString()},${exportPaletteScroll.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${revealNodePlacement.toString()},${samePlacementGraph.toString()},${nodePlacementOverflow.toString()},${nodePlacementGap.toString()},{bind:${bindAddOnlyDrop.toString()},read:${readAddOnlyDrop.toString()},settle:${settleAddOnlyDrop.toString()}})`,options),deadline);
       }finally{signal?.removeEventListener('abort',cancel);if(cancellation){await cancellation;await call(`async page=>{page[Symbol.for('loginom-dock.node-target-cancel')]?.delete(${JSON.stringify(effect.id)});return true;}`,Date.now()+3000);}}
     },
     async reconcile(effect,graph,deadline){
