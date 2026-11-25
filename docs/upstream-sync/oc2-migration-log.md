@@ -24646,7 +24646,7 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 
 База: `oc2-migration` (тесты — на `5d0e3f83c1`, ветка `byaml-clean-install` затем приведена к `950e5da9ce`; между ними только CI и `scripts/node-acceptance`, зависимостей не менялось). Дерево `.claude/worktrees/byaml`, Bun 1.4.4, Node 24.19.0, `HOME=/root`, root.
 
-**Находка не воспроизводится на `oc2-migration`.** Раздела «B4.16 Сторож службы» в этом журнале нет: B4.16 лежит на ветке `b416-service-watchdog` (`ac4b67a97e`), в `oc2-migration` не влита. На `oc2-migration` `credential-migration.ts` не импортирует `yaml`, а `yaml` импортируют только `loginom-host/src/bundled-skills.ts` (объявлен: `"yaml": "2.9.1"`) и `loginom-runtime/client/lib/bundled-skill-manifest.mjs` (объявлен в `client/package.json`: `2.9.1`). Версия в `bun.lock` — `yaml@2.9.1`. Выбор: меньший вариант — зависимости не менять, `bun.lock` не трогать. Если падение есть на `b416-service-watchdog`, чинить там, где появился импорт.
+**Находка не воспроизводится.** На `950e5da9ce` с B4.16 (влит как `c91d769f9f`) на чистой установке не воспроизводится: `node_modules` удалены, `bun install --frozen-lockfile` и два `npm ci`, `credential-migration` 15 pass, `desktop` целиком 644 теста, 0 fail. Первые прогоны ниже сделаны на `5d0e3f83c1`, до влития B4.16. `yaml` импортируют только `loginom-host/src/bundled-skills.ts` и `loginom-runtime/client/lib/bundled-skill-manifest.mjs`, оба объявляют `yaml@2.9.1`. Зависимости и `bun.lock` не менялись.
 
 **Чистая установка.** `bun install --frozen-lockfile` (1607 пакетов, `.husky/_` есть), `npm ci` в `packages/loginom-runtime/client` и `packages/dashboard/template` — без ошибок.
 
