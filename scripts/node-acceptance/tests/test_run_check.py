@@ -186,7 +186,7 @@ db=sqlite3.connect(os.environ['LOGINOM_AI_AGENT_CLI_PROFILE']+'/data/loginom-ai-
 db.execute('create table message(id text,session_id text,data text,time_created integer)')
 db.execute('create table part(id text,session_id text,message_id text,data text,time_created integer)')
 def turn(n):
- db.execute('insert into message values(?,?,?,?)',(f'u{n}','chat',json.dumps(dict(role='user')),n*2))
+ db.execute('insert into message values(?,?,?,?)',(f'u{n}','chat',json.dumps(dict(role='user',model=dict(providerID='deepseek',modelID='deepseek-flash'))),n*2))
  db.execute('insert into message values(?,?,?,?)',(f'a{n}','chat',json.dumps(dict(role='assistant',parentID=f'u{n}',finish='stop',time=dict(completed=time.time()))),n*2+1))
  db.execute('insert into part values(?,?,?,?,?)',(f'p{n}','chat',f'a{n}',json.dumps(dict(type='tool',state=dict(status='completed',output=json.dumps(dict(execution=dict(execution_id=f'native-{n}')))))),n))
  db.commit()
@@ -205,7 +205,7 @@ data=b''
 while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
 ''')
             fake.chmod(0o755)
-            config=dict(executable=str(fake),workspace=str(root),folder=str(root),profile=str(profile),kind=kind,prompts=[kind,'second'],daemon_pid=1)
+            config=dict(executable=str(fake),workspace=str(root),folder=str(root),profile=str(profile),kind=kind,model=runner.MODEL,prompts=[kind,'second'],daemon_pid=1)
             runner.write(root/'transport.json',config)
             result=subprocess.run([sys.executable,str(runner.REPO/'scripts/node-acceptance/run-check-two-turn.py'),str(root/'transport.json')],env=dict(os.environ,LOGINOM_AI_AGENT_CLI_PROFILE=str(profile)),capture_output=True,text=True,timeout=15)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)

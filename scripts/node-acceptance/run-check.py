@@ -33,6 +33,8 @@ CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential', 'logreg-partitio
 # LAB-1869: native Enrich autosync reorders RowID/Key on cold Execute.
 COLD_COLUMNS_BY_NAME_SCENARIOS = ('enrich-data-left',)
 D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week', 'tree-to-table-typed')
+# Acceptance model (B-106). No variant: models.json gives deepseek-flash none. Key comes from DEEPSEEK_API_KEY in the environment.
+MODEL = 'deepseek/deepseek-flash'
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
@@ -2653,7 +2655,7 @@ class Runner:
                 parameter='/sort_result' if grouping else '/compare_with_locale', mode='variable',
                 variable=dict(kind='control', input=0, name='Flag', type='boolean', is_null=False), source=dict(type='variables.user', output=4))]
         write(folder / 'expected.json', expected)
-        command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', 'openai/gpt-6.1-sol', '--variant', 'medium', '--dangerously-skip-permissions']
+        command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', MODEL, '--dangerously-skip-permissions']
         if session: command += ['--session', session]
         # Initial requests need their inputs even when the prose omits names.
         # Continuations only admit new, explicitly requested files (r3/r4).
@@ -2736,12 +2738,12 @@ class Runner:
             second += '\n' + prompt[prompt.rfind('\nСохрани пакет как '):]
             config_path = profile / 'config/loginom-ai-agent.json'
             config = read(config_path)
-            config['model'] = 'openai/gpt-6.1-sol'
+            config['model'] = MODEL
             write(config_path, config)
             (profile / 'state').mkdir(exist_ok=True)
-            write(profile / 'state/model.json', dict(recent=[], favorite=[], variant={'openai/gpt-6.1-sol':'medium'}))
+            write(profile / 'state/model.json', dict(recent=[], favorite=[], variant={}))
             write(folder / 'two-turn.json', dict(executable=str(command[0]), workspace=str(workspace),
-                  profile=str(profile), folder=str(folder), kind=spec['two_turn'], prompts=[first, second], require_medium=True, daemon_pid=daemon_pid()))
+                  profile=str(profile), folder=str(folder), kind=spec['two_turn'], prompts=[first, second], model=MODEL, daemon_pid=daemon_pid()))
             self.phase('model', [sys.executable, '-B', REPO / 'scripts/node-acceptance/run-check-two-turn.py',
                        folder / 'two-turn.json'], folder, timeout=1800, env=env, cwd=workspace)
         else:
@@ -3516,8 +3518,7 @@ class Runner:
                         self.prepared_case = self.prepare_d87(r['scenario'], folder)
                     self.phase('setup', [build / 'bin/loginom-ai-agent-cli', 'loginom', 'setup', '--headless', '--stdin-json', '--format', 'json'], folder, timeout=180, env=env, stdin=json.dumps(dict(url=login['url'], username=login['username'], password=login['password'])))
                     assert read(folder / 'setup.stdout').get('browser', {}).get('state') == 'verified', 'SETUP_NOT_VERIFIED'
-                    (profile / 'data/auth.json').symlink_to(Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json')
-                    write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
+                    write(profile / 'config/loginom-ai-agent.json', dict(model=MODEL))
                     case = r['scenario']
                     spec = scenario(case, self.options.get('case_root'), cases=self.options.get('cases'))
                     if spec.get('fs_case') == 'paths':
