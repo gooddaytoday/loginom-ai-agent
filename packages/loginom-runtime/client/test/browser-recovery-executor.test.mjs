@@ -13,6 +13,7 @@ import { createJavascriptCodeNodeSupport } from '../lib/javascript-code-node.mjs
 import { createNodeReadDrivers } from '../lib/node-read-driver.mjs';
 import { createTextImportNodeSupport } from '../lib/text-import-node.mjs';
 import { createFilterNodeSupport } from '../lib/filter-node.mjs';
+import { createCalculatorNodeSupport } from '../lib/calculator-node.mjs';
 import { existingOutputExecution } from '../lib/node-execution-evidence.mjs';
 import { createRedactor } from '../lib/redact.mjs';
 
@@ -54,7 +55,7 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
     releasePending: async s => { calls.push('release:' + s.pending.phase); return state.release(s); },
     ...(releasePendingPhases ? { releasePendingPhases } : {}),
     ...(recoveryReleasePending ? { recoveryReleasePending } : {}) };
-  const mode = nodeType === 'programming.javascript' ? 'script' : nodeType === 'imports.excel' ? 'xlsx' : nodeType === 'transform.filter_data' ? 'conditions' : 'delimited';
+  const mode = nodeType === 'programming.javascript' ? 'script' : nodeType === 'imports.excel' ? 'xlsx' : nodeType === 'transform.filter_data' ? 'conditions' : nodeType === 'transform.calculator' ? 'expression' : 'delimited';
   const handler = { revision: '1', modes: [mode], validate: () => {}, configure: async () => {
     const result = await ok('configure')();
     if (stopPhase === 'configure' && state.receipt) state.receiptOptions('apply:configure', nodeType==='transform.filter_data'?'ui.act':'node.excel.configure.internal', 'signature');
@@ -87,13 +88,13 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
         drivers.releasePending = js.releasePending; drivers.releasePendingPhases = js.releasePendingPhases;
       }
       if (state.transport) {
-        const support=nodeType==='imports.text'?createTextImportNodeSupport:createFilterNodeSupport;
+        const support=nodeType==='imports.text'?createTextImportNodeSupport:nodeType==='transform.calculator'?createCalculatorNodeSupport:createFilterNodeSupport;
         const real=support({targetOrigin:'http://test',targetBuild:'7.4.2'}).nodeApplyDriverFactory(options);
-        drivers.recoveryChannel=ctx=>({...real.recoveryChannel(ctx),observe:async ({ready})=>{
+        if(typeof real.recoveryChannel==='function')drivers.recoveryChannel=ctx=>({...real.recoveryChannel(ctx),observe:async ({ready})=>{
           const page={wizard:{status:'absent'},ui:{dialogs:[],masks:[]},prepared_node_context:{...node,verified:true,surface:'graph',locked:false}};
           assert.ok(ready(page));return page;
         }});
-        if(nodeType==='transform.filter_data')drivers.recoveryReleasePending=(state,{signal,deadline})=>
+        if(drivers.recoveryChannel&&['transform.filter_data','transform.calculator'].includes(nodeType))drivers.recoveryReleasePending=(state,{signal,deadline})=>
           verifyRecoveredPendingNode({operation:options.operation,channel:drivers.recoveryChannel({...state.request,node:state.node,signal,deadline}),
             readReceipt:options.readReceipt,deadline,now:options.now});
       }
@@ -116,7 +117,7 @@ async function recoverTable(change,{nodeType='transform.filter_data',stopPhase='
   const controller=new AbortController();
   let clock=Date.now();
   const now=()=>clock;
-  const f=fixture({nodeType,stopPhase,now}),ports=nodeType==='imports.text'?[0]:[0,1];
+  const f=fixture({nodeType,stopPhase,now}),ports=nodeType==='imports.text'||nodeType==='transform.calculator'?[0]:[0,1];
   const target={kind:'existing',type:nodeType,ref:node};
   f.graph.nodes.push({...graphOf().nodes[0],type:target.type,outputs:ports});
   const progress_state={verified:true,source:'native_progress_record',state:'completed'};
@@ -145,11 +146,12 @@ async function recoverTable(change,{nodeType='transform.filter_data',stopPhase='
   };
   const req=f.request('apply',target);
   if(stopPhase==='configure')f.state.receipt={cleanup:false};
+  if(nodeType==='transform.calculator')req.parameters={expressions:[]};
   if(nodeType==='imports.text')req.parameters={settings:{source:{encoding:'UTF-8'}},
     source:{artifact_id:'artifact',upload_operation_id:'upload',bytes:15,sha256:'a'.repeat(64)}};
   req.read.ports=ports;
   req.mappings=ports.map(port=>({direction:'output',port,fields:[{source:{kind:'configured_field',name:'Id'},name:schemas[port][0].name}]}));
-  const support=nodeType==='imports.text'?createTextImportNodeSupport:createFilterNodeSupport;
+  const support=nodeType==='imports.text'?createTextImportNodeSupport:nodeType==='transform.calculator'?createCalculatorNodeSupport:createFilterNodeSupport;
   support({}).nodeApplyHandlers.get(nodeType).validate(req.parameters,req.mode,req);
   f.runtime.startNodeApply(req);
   assert.equal((await f.runtime.waitNodeApply('apply',{timeoutMs:1000})).outcome.output.pending_phase,stopPhase);
@@ -229,6 +231,18 @@ test('cancellation during recovery receipt writing retains the lease after all p
   assert.equal(end.verification.status,'unresolved');
   assert.equal(f.runtime.hasUnsettledWork(),true);
   assert.ok(!f.events.some(e=>e.phase==='operation_abandoned'));
+});
+
+test('a calculator stopped in configure verifies its new execution and does not return to configure',async()=>{
+  const {f,end}=await recoverTable(({snapshot,group})=>snapshot.processes.push(...group('2')),
+    {nodeType:'transform.calculator',stopPhase:'configure'});
+  assert.equal(end.verification.recovered_output?.execution.execution_id,'doc:root:2');
+  assert.deepEqual(end.verification.recovered_output.ports.map(p=>p.port),[0]);
+  assert.equal(end.verification.next_step.tool,'dock_node_read');
+  assert.match(end.verification.next_step.instruction,/new execution/);
+  assert.doesNotMatch(end.verification.next_step.instruction,/complete intended settings/);
+  assert.equal(f.calls.filter(c=>c==='configure').length,1);
+  assert.ok(!f.calls.includes('finish'));
 });
 
 test('a text import stopped in open verifies its requested port without entering configure',async()=>{

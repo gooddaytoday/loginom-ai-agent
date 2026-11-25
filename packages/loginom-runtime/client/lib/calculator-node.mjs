@@ -472,7 +472,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     signal?.throwIfAborted();
     return releasePendingNode({operation,channel,deadline,now,readReceipt:options.readReceipt});
    },
-   ...(implementation?.type==='transform.filter_data'?{recoveryChannel:enter}:{}),
+   recoveryChannel:enter,
    async recoveryReleasePending(state,{signal,deadline=now()+NODE_RELEASE_BUDGET_MS}={}){
     enter({signal,deadline,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,node:state.node});
     signal?.throwIfAborted();
