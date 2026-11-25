@@ -1,0 +1,101 @@
+{
+ "location": "l2046-i103-a/bh-i103/profile/…/execution-events.jsonl:1945",
+ "nodes": {
+  "cdf835b6-dc42-4daf-9ab0-6e1947b81e12": {
+   "type": "imports.text",
+   "label": "6e5cff2f4ae44d2b0396fd932f2fbbc55ad7aafbde462351d0e…"
+  },
+  "b6e18b4f-3d79-4351-a96b-dbd052d87e0b": {
+   "type": "exports.text",
+   "label": "Export result CSV"
+  },
+  "2a73963b-1f5f-40e6-96fc-77d333be4ca0": {
+   "type": "integration.rest_request",
+   "label": "GET products"
+  },
+  "5b55c08d-56ff-4e37-9bfc-e5d5bea8e31d": {
+   "type": "transform.col_union_data",
+   "label": "Response + skip"
+  },
+  "b44a4340-8a1d-4f86-9621-ce58874e8b7f": {
+   "type": "transform.calculator",
+   "label": "Select query"
+  },
+  "36b06b6a-c959-41b4-b9e7-b5041ef80e52": {
+   "type": "transform.sorting",
+   "label": "Sort Skip ProductId"
+  },
+  "a51fe31b-580a-4adf-8fe5-6cf5fdbab653": {
+   "type": "programming.javascript",
+   "label": "URL query encoding 5c73d5cf48ed957aad12308fc032c711"
+  },
+  "d33fdd94-9a18-46cc-8a75-269ecd14abb1": {
+   "type": "programming.javascript",
+   "label": "Unfold products"
+  },
+  "6620f9de-e585-39c7-88a9-35255088ebb7": {
+   "type": "variables.user",
+   "label": "Переменные сценария"
+  },
+  "3b3f5d51-5d26-48e9-86cd-93a62f1ed298": {
+   "type": "bg-vendor-icon-restclientconnection",
+   "label": "↶dummyjson-products"
+  }
+ },
+ "links": [
+  {
+   "source": "cdf835b6-dc42-4daf-9ab0-6e1947b81e12",
+   "output": 0,
+   "target": "b44a4340-8a1d-4f86-9621-ce58874e8b7f",
+   "input": 0
+  },
+  {
+   "source": "2a73963b-1f5f-40e6-96fc-77d333be4ca0",
+   "output": 0,
+   "target": "5b55c08d-56ff-4e37-9bfc-e5d5bea8e31d",
+   "input": 0
+  },
+  {
+   "source": "5b55c08d-56ff-4e37-9bfc-e5d5bea8e31d",
+   "output": 0,
+   "target": "d33fdd94-9a18-46cc-8a75-269ecd14abb1",
+   "input": 0
+  },
+  {
+   "source": "b44a4340-8a1d-4f86-9621-ce58874e8b7f",
+   "output": 0,
+   "target": "5b55c08d-56ff-4e37-9bfc-e5d5bea8e31d",
+   "input": 2
+  },
+  {
+   "source": "b44a4340-8a1d-4f86-9621-ce58874e8b7f",
+   "output": 0,
+   "target": "a51fe31b-580a-4adf-8fe5-6cf5fdbab653",
+   "input": 0
+  },
+  {
+   "source": "36b06b6a-c959-41b4-b9e7-b5041ef80e52",
+   "output": 0,
+   "target": "b6e18b4f-3d79-4351-a96b-dbd052d87e0b",
+   "input": 0
+  },
+  {
+   "source": "a51fe31b-580a-4adf-8fe5-6cf5fdbab653",
+   "output": 0,
+   "target": "2a73963b-1f5f-40e6-96fc-77d333be4ca0",
+   "input": 2
+  },
+  {
+   "source": "d33fdd94-9a18-46cc-8a75-269ecd14abb1",
+   "output": 0,
+   "target": "36b06b6a-c959-41b4-b9e7-b5041ef80e52",
+   "input": 0
+  },
+  {
+   "source": "3b3f5d51-5d26-48e9-86cd-93a62f1ed298",
+   "output": 0,
+   "target": "2a73963b-1f5f-40e6-96fc-77d333be4ca0",
+   "input": 0
+  }
+ ]
+}
