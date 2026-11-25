@@ -24284,3 +24284,45 @@ catalog-check.py: код 0;  apply-identity.py --check: would change: 0 files
 (`~/.cargo` → `%USERPROFILE%\.cargo`, читается `homedir()`) не проверялся. Workflow не менялись.
 Не проверено: полный случай `stage-resources` (нужен `LOGINOM_AI_AGENT_TEST_BROWSERS`, пропускается); загрузка крейтов с
 crates.io (кэш был полон).
+
+## Хвосты evals
+
+25.11.2026. Ветка `btails2-evals` от `oc2-migration` (`0cfc0a30dd`), дерево `.claude/worktrees/btails2`. Bun 1.4.4 и Node 24.19.0 — в `PATH`
+только для своих команд. Менялся только `evals/` (`packages/*` и `scripts/node-acceptance/` не трогал); `catalog.json` не менялся.
+Коммит `9ff884eb59`, `bun run secrets staged` — `clean`. Настоящую модель не вызывал: в тестах заглушки и строки базы из
+дампа B2.7b2.
+
+| Пункт | Что сделано | Тест |
+|---|---|---|
+| 1. 401 модели на v2 | `selectionModelStarted`: ветка 0.4 (`UnknownError`, части пользователя) заменена формой v2 из дампа B2.7b2: код CLI 1, сообщения ровно `user`, `assistant`, `idle`, частей нет, `error.type === "provider.auth"` и `status === 401` у ассистента и у `idle` (`outcome: "failed"`). Текст ошибки не сверяется: при ключе API он другой, чем у обновления OAuth. Итог — `false`, то есть код 3 (`SELECTION_AUTH_REFRESH_FAILED`), а не 2 | `node-selection-attempt.test.ts`: три теста (форма снимка, отрицательные случаи, строки таблиц через `readSelectionSnapshot`) |
+| 2. База после отказа проверки ключа | `assertAuth` получил необязательный `historyDir`; отказ `auth list` и «нет ключа» уносят созданную проверкой базу в архив (`auth-refused`) тем же `archiveProfileHistory`, что успешный путь слота (`cleanupSlotStorage`). Слоты передают `lease.slot.historyDir` (`environment-preparation.ts`, `prepared-run.ts`). Сбой самого переноса отказ не скрывает | `profile.test.ts`: правки двух тестов `assertAuth` и тест каталога истории слота |
+| 3. `query_only` снимка | Открытие вынесено в `openSelectionDatabase` (экспорт); тест проверяет, что запись и `DELETE` на этом соединении падают, а чтение работает, и что отсутствующий файл не создаётся | `node-selection-attempt.test.ts` |
+| 4. Журналы Host без Dock | Сбор вынесен в `copySelectionJournals`: нет `<профиль>/loginom/runtime` — пустой список, не `SELECTION_COLLECTION_FAILED` | `node-selection-attempt.test.ts`: без каталога пусто, с каталогом копируются журналы только своего чата |
+| 5. Устаревший OAuth-токен в архивной базе | Не чинил. Владелец выбрал вход по ключу API (В-106): вход по подписке (аккаунт ChatGPT) не проверяется, `data/auth.json` с устаревшим токеном не нужен | — |
+
+### Где решал сам
+
+- Пп. 3 и 4 потребовали по одному новому экспорту (`openSelectionDatabase`, `copySelectionJournals`): иначе `query_only` и обход `runtime`
+  не проверить без Docker и всего сценария. Тела функций — прежний код.
+- Ветку 0.4 в `selectionModelStarted` не оставил: сценарий читает только таблицы v2, форму 0.4 они не дают.
+- Передачу `lease.slot.historyDir` из `environment-preparation.ts` и `prepared-run.ts` тест не покрывает (там нужны Docker и аренды слотов);
+  покрыт параметр `assertAuth`.
+
+### Мутации
+
+| Мутация | Тесты | Итог |
+|---|---|---|
+| M1 `providerAuthRefused` всегда `false` | `node-selection-attempt` | красный: 2 теста |
+| M2 без `PRAGMA query_only = ON` | то же | красный: «the snapshot connection cannot write…» |
+| M3 без проверки существования `runtime` | то же | красный: «a session without a Dock call…» |
+| M4 отказ не уносит базу | `profile` | красный: 3 теста `assertAuth` |
+| M5 отказ уносит не в `historyDir` | `profile` | красный: тест каталога истории слота |
+
+### Приёмка
+
+- `evals`: `bun run typecheck` — код 0. `bun run test:unit` на машине с нагрузкой (load average 13–17): голова 1317 pass, 66 skip, 42 fail;
+  база (`0cfc0a30dd`, те же команды в том же дереве через `git stash`) 1326 pass, 66 skip, 28 fail. Разница — падения по таймауту
+  при нагрузке: `main: ключ провайдера проверяется…` (`run.test.ts` целиком с `--timeout 60000` — 35 pass, 0 fail), файлы
+  `offline-admission`, `profile`, `startup-archive`, `owned-registration` повторно по одному — 0 fail. `campaign-admission`
+  «an external final closes admissions…» плавающий и на базе (из двух прогонов один красный). Новых падений от правок нет.
+- `packages/product`: `bun test` — 60 pass, 3 fail: `workspace packages`, `CI triggers`, `path literals` (известные, В-95, B5.1).

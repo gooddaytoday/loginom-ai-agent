@@ -824,7 +824,9 @@ test("assertAuth: ключ — то, что показывает auth list но�
     expect((refusal as EvalFailure).message).toContain("data/auth.json")
     expect((refusal as EvalFailure).message).not.toContain("providers login")
     expect(await Bun.file(args).json()).toEqual(["auth", "list", "--standalone", "--format", "json"])
-    await archiveProfileHistory(profileDir, "auth-check")
+    // The refusal takes the database the check created to the archive: the next admission finds a clean profile.
+    await assertProfileClean(profileDir)
+    expect(await readdir(`${profileDir}.history`)).toHaveLength(1)
     await writeFile(integrations, JSON.stringify([{ id: "openai", name: "OpenAI", connections: [{ type: "credential" }] }]))
     await assertAuth(openai, listed)
     await archiveProfileHistory(profileDir, "auth-check")
@@ -847,7 +849,28 @@ test("assertAuth: отказ auth list не переносит его stderr в 
     const refusal = await assertAuth(openai, failing).then(() => undefined, (error: unknown) => error)
     expect(refusal).toBeInstanceOf(EvalFailure)
     expect((refusal as EvalFailure).message).toBe("AUTH_LIST_FAILED: auth list завершился кодом 1")
-  } finally { await rm(profileDir, { recursive: true, force: true }) }
+    await assertProfileClean(profileDir)
+    expect(await readdir(`${profileDir}.history`)).toHaveLength(1)
+  } finally {
+    await rm(profileDir, { recursive: true, force: true })
+    await rm(`${profileDir}.history`, { recursive: true, force: true })
+  }
+})
+
+test("assertAuth: отказ в слоте уносит базу проверки в каталог истории слота", async () => {
+  const { config, command, profileDir } = await fakeProfile()
+  const history = `${profileDir}-slot-history`
+  const openai = { ...config, agent: { ...config.agent, model: "openai/gpt-5.6-sol" } }
+  try {
+    await mkdir(history, { mode: 0o700 })
+    await assertAuth(openai, command, history).then(() => undefined, () => undefined)
+    await assertProfileClean(profileDir)
+    expect(await readdir(history)).toHaveLength(1)
+    expect(await Bun.file(`${profileDir}.history`).exists()).toBe(false)
+  } finally {
+    await rm(profileDir, { recursive: true, force: true })
+    await rm(history, { recursive: true, force: true })
+  }
 })
 
 test("assertAuth: база, оставшаяся в профиле, — отказ до auth list", async () => {
