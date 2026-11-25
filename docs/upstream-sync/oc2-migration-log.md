@@ -23128,3 +23128,201 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Остановка посреди `dashboardDelete` и удаление папки во время сборки черновика — по коду (тот же `interrupt` Host и
   `activeStages`, что у публикации и 0.4).
 - Windows и macOS, настоящая модель.
+
+## B4.15 Мост дашбордов в Desktop
+
+25.11.2026. Задача B4.15 (ВШ-6, вне шлюза B, В-97 п. 9), ветка `b4dash-desktop-bridge` от `oc2-migration` (`021fcab942`),
+рабочее дерево `.claude/worktrees/b4dash`. Эталон 0.4 — `v0.4.0` (В-99). Bun 1.4.4 переносной и Node 24.19.0 — первыми в
+`PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, 1607 пакетов, `.husky/_` есть. Хук
+`pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. `packages/cli` и `tui` (B2.9j) не трогал. Тесты,
+мутации и полные прогоны — под `unshare -n` (поднят только `lo`), с временными `HOME`, `TMPDIR`, `XDG_*` в scratchpad и
+`LOGINOM_AI_AGENT_TEST_NODE`; настоящие `~/.local/share`, `~/.local/state`, `~/.config` прогоны не меняли (время каталогов
+`loginom-ai-agent*` — до 25.11). **Модель не вызывалась:** новые тесты не поднимают ни сервер, ни сессии, служба в них —
+подставной `Bun.serve` на `127.0.0.1`, сети нет. Окно Desktop не запускалось.
+
+Прочитано: этот журнал — B4.1 (Desktop-часть дашбордов, вопрос 9), B4.3–B4.4, B2.9h, B2.9i («Найдено»); решения В-85, В-97;
+план этапа B, раздел B4; 0.4 — `desktop/src/main/{deep-links,deep-links.test,dashboard-target,index,ipc}.ts`,
+`app/src/pages/layout/{deep-links,dashboard-links}.ts`; v2 — `desktop/src/main/{lifecycle/{index,deep-link},deep-links/*,
+desktop,service/{background-service,background-service-machine,sidecar-credentials,service-identity},plugin/host}.ts`,
+`protocol/src/groups/{rpc,plugin,location}.ts`, `server/src/location.ts`, `cli/src/run/product.ts`; `AGENTS.md` пакета
+`desktop` и навык `.opencode/skills/unit-tests`.
+
+Подготовка дерева (вне git), как в «Исправление G2 и автозапуск WSL»: `bun install` заблокировал postinstall `electron`,
+бинарник 44.9.1 распакован `install.js` пакета из кэша `/root/.cache/electron` под `unshare -n`; `npm ci --ignore-scripts
+--offline` клиента `packages/loginom-runtime/client`. Без них база `desktop` давала 595 pass, 4 fail («Electron failed to
+install correctly») и 615 pass, 1 fail («the service after the move»: `Could not resolve: "yaml"`); без `lo` — 591 pass, 8 fail.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `995ad4bdc7` `feat(desktop): dashboard links wait for the service and ask loginom.dashboard (B4.15)` | новый `src/main/loginom/dashboard-links.ts` (117 строк); `lifecycle/deep-link.ts` (+5, `startupUrls`), `lifecycle/index.ts` (+25/−3), `desktop.ts` (+3); тесты: новый `src/main/loginom/dashboard-links.test.ts` (5), `lifecycle/deep-link.test.ts` (+1) |
+| следующий | этот раздел; CAT-09 в `catalog.md` |
+
+Файлов кода четыре (предел — пять): один новый файл форка, три файла upstream, которые уже расходились (B4.4, B4.10);
+`catalog.json` не менялся — все под маской CAT-09 `packages/desktop/**`.
+
+### Как устроено
+
+- **Приём.** `lifecycle/index.ts` отдаёт каждую ссылку своей схемы одному `receive`: окнам через автомат доставки
+  (`deepLinks.receive`, как с B4.4) и очереди дашбордов. Источники — `second-instance` (`protocolUrls`, B4.4), `open-url`
+  и новый холодный старт: `startupUrls(process.argv, process.platform)` в `lifecycle/deep-link.ts` — ссылки своей схемы из
+  командной строки, только на Linux, как 0.4 (`createDeepLinkQueue(process.platform === "linux" ? process.argv : [])`).
+  До B4.15 v2 ссылку холодного старта не читал вовсе.
+- **Очередь** (`DashboardLinks.make`). Разбор — `parseDashboardDeepLink` окна 0.4: `loginom-ai-agent://dashboard?id=<UUID>&action=create|edit`,
+  ровно два параметра, без пути, пользователя и `#`; остальные ссылки очередь пропускает (окнам они по-прежнему идут).
+  Ссылка ждёт `connect` — его зовёт `desktop.ts`, когда слои готовы, с `background.connection` службы Desktop (B4.9), — а
+  затем готовности службы: `connection` ждёт её подключения. Ссылки идут по одной, в порядке прихода (плагин и так готовит
+  их по одной, `updates` в `dashboard/src/agent/folder.ts`), каждая — один раз: снимок Studio одноразовый, после отказа
+  ссылку не спрашивают снова.
+- **Мост к RPC.** `@opencode/client` (динамический импорт) на адрес службы с Basic-входом Desktop
+  (`SidecarCredentials.authorization`); адрес и пароль читаются для каждой ссылки — переподключение их меняет.
+  `rpc.call({ rpcID: "loginom.dashboard", method: "prepare", input: { id, defer: true } })` — `defer: true`, как Desktop 0.4
+  (B2.9h). `rpc.unavailable` спрашивается снова каждые 100 мс до минуты, как CLI (`cli/src/run/product.ts`): плагин
+  регистрирует RPC после загрузки плагинов Location, сервер их не ждёт (`AGENTS.md`, «Plugin Loading»). Ответ сверяется со
+  схемой: папка (`directory`, `nodeName`, `action`, `fresh`, `notice`) или код (`code`, `message`); ответ другой формы —
+  `LOGINOM_REPLY_INVALID`, как у CLI.
+- **Ответ окну — журнал Desktop.** `packages/app` v2 ссылок не читает (`grep -rn 'deep-link\|deepLinks\|__OPENCODE__'
+  packages/app/src` — пусто), новое событие IPC читать некому. Поэтому `lifecycle/index.ts` пишет
+  `dashboard link prepared` (`id`, `action`, `reply` — папка, действие, уведомление или код) или `dashboard link failed`
+  (`id`, `action`, `error`); пароля в записи нет.
+
+### Тесты
+
+| Тест 0.4 (`v0.4.0:packages/desktop/src/main/deep-links.test.ts`) | На v2 (`src/main/loginom/dashboard-links.test.ts`) |
+|---|---|
+| «delivers startup and second-instance links once to their own windows» | «delivers startup and second-instance links once to the service's plugin»: ссылка холодного старта — через `startupUrls` из argv `["/opt/Loginom AI Agent/loginom-ai-agent", "--no-sandbox", <cold>]` на `linux`, ссылка второго экземпляра — после `connect`; служба спрошена ровно о двух, по порядку, `{ id, defer: true }`. Отличия: адресат — плагин службы, а не окно (окнам ссылки доставляет автомат v2, его тесты — `deep-links/machine.test.ts`); id — UUID, а не `1` и `2` (окно 0.4 брало только UUID снимка, `id=1` — в списке отказов первого теста); признака `coldDashboard` нет (этап C) |
+
+Новые (служба — подставной `Bun.serve` на `127.0.0.1`, порт 0; ожидание «ничего не случилось» — один оборот цикла событий
+`setImmediate`, без сна):
+
+- «prepares only the product's dashboard links, as 0.4's window read them, one at a time in order» — 12 отказов (чужая
+  схема, схема beta, ссылка Console, `dashboard/`, путь, `id=1`, неверное действие, без действия, лишний параметр, `#`,
+  пользователь, не URL) и две верные ссылки (вторая — `action` первым и UUID в верхнем регистре): служба спрошена только о
+  двух;
+- «a link waits for the app to hand over the service, then for the service to be ready» — до `connect` отчёта нет; после
+  `connect` служба не готова — запросов нет; готова — один запрос и папка;
+- «asks loginom.dashboard of the service's own Location with its credential, again while the plugin loads» — путь
+  `/api/rpc/loginom.dashboard/prepare`, без `location` в запросе, `Authorization: Basic loginom-ai-agent:secret`; два
+  `rpc.unavailable` и третий запрос; код плагина — ответ, а не сбой; ответ другой формы — `LOGINOM_REPLY_INVALID`;
+- «a failed link is reported once and never asked again; the next one reaches the service it reconnected to» —
+  `rpc.internal` (500): один запрос, отчёт `rejected`; следующая ссылка — к новой службе; остановленная служба (`connection`
+  отклонён) — отчёт `rejected` без запроса;
+- `lifecycle/deep-link.test.ts`: «reads the links the app started with from its command line on Linux only» — `linux`,
+  `darwin`, `win32`.
+
+### Мутации
+
+Каждая — точечная правка на `995ad4bdc7` (`<scratchpad>/b4dash/scripts/mutate.py`: правка — только если строка найдена ровно
+один раз), прогон `bun test --timeout 15000 src/main/loginom/dashboard-links.test.ts src/main/lifecycle/deep-link.test.ts`,
+затем файл возвращается из копии. Без мутаций — 11/0.
+
+| Мутация | Итог | Красные |
+|---|---|---|
+| M1 `defer: false` | 6/5 | все пять тестов моста |
+| M2 `rpc.unavailable` не спрашивается снова | 10/1 | «asks loginom.dashboard…» |
+| M3 снова спрашивается при любом отказе | 10/1 | «a failed link…» (по таймауту) |
+| M4 ссылки до `connect` отклоняются | 9/2 | перенесённый 0.4; «a link waits…» |
+| M5 готовность службы не ждётся (прежний адрес) | 10/1 | «a link waits…» |
+| M6 адрес службы прочитан один раз при `connect` | 10/1 | «a failed link…»: вторая ссылка ушла к прежней службе |
+| M7 без `Authorization` | 10/1 | «asks loginom.dashboard…» |
+| M8 своя Location (`location: { directory: "/" }`) | 10/1 | «asks loginom.dashboard…» |
+| M9 отказы не попадают в отчёт | 10/1 | «a failed link…» (по таймауту) |
+| M10 любой `id` | 10/1 | «prepares only…» |
+| M11 лишние параметры | 10/1 | «prepares only…» |
+| M12 схема без `://` (принимает beta) | 10/1 | «prepares only…» |
+| M13 путь после `dashboard` | 10/1 | «prepares only…» |
+| M14 ссылки запуска на всех системах | 10/1 | `deep-link.test.ts` |
+| M15 ссылок запуска нет | 9/2 | перенесённый 0.4; `deep-link.test.ts` |
+| M16 ссылки запуска без фильтра схемы | 10/1 | `deep-link.test.ts` |
+| M17 связка: `lifecycle/index.ts` не читает ссылки запуска | **11/0** | **выжила**: связка в `lifecycle/index.ts` и `desktop.ts` юнит-тестами не покрыта (слой Effect и Electron, как в B4.4) |
+| M18 ссылки параллельно, а не по одной | 9/2 | «asks loginom.dashboard…», «a failed link…» |
+| M19 ответ не сверяется со схемой | 10/1 | «asks loginom.dashboard…» |
+| M20 первая ссылка из argv теряется | 9/2 | перенесённый 0.4; `deep-link.test.ts` |
+
+Итого 20 мутаций: 19 красные, одна выжила (связка). Код базы: `dashboard-links.ts` и `startupUrls` на `021fcab942` нет —
+новые тесты не загружаются. После мутаций `git status` — только файлы задачи.
+
+Повторы (навык `unit-tests`): `bun test src/main/loginom/dashboard-links.test.ts src/main/lifecycle/deep-link.test.ts
+--rerun-each 10 --randomize` — 110 pass, 0 fail, 2,4 с.
+
+### Приёмка
+
+База — это дерево на `021fcab942` до правок, итог — `995ad4bdc7`; тот же скрипт, `unshare -n`, свежие временные каталоги.
+
+| Пакет | `021fcab942` | `995ad4bdc7` |
+|---|---|---|
+| `desktop`, `bun test` | 616 pass, 4 skip, 0 fail, 620 тестов в 80 файлах | 622 pass (+6 новых), 4 skip, 0 fail, 626 тестов в 81 файле |
+| `product`, `bun test` | 60 pass, 3 fail — известные три (В-95, B5.1): `workspace packages`, `CI triggers`, `path literals` | 60 pass, 3 fail — те же |
+
+Новых падений нет.
+
+```text
+$ cd packages/desktop && bun typecheck
+✓ No type errors in 3,371 files across 2 projects
+$ bun run typecheck:tsc                                       # tsc -b — код 0
+$ bun run lint:changed 021fcab942                             # oxlint и anti-slop новых и изменённых файлов
+lint:changed: 0 problem(s) in 0 of 6 changed files since 021fcab942
+$ prettier --check <6 файлов>
+All matched files use Prettier code style!
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0; на базе (временная копия 021fcab942) — то же
+against a6b15d33daf6: 612 divergent upstream files
+  CAT-09: 39
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                          # код 0
+$ bun run check                                                # код 0, под unshare -n, на 995ad4bdc7
+Found 905 warnings and 0 errors.                               # как в B2.9h
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+@opencode/desktop:typecheck: ✓ No type errors in 3,371 files across 2 projects
+ Tasks:    39 successful, 39 total
+```
+
+### Где решал сам
+
+- **Форма ссылки** — `dashboard?id=…&action=…`, как её строит оболочка дашборда (`dashboard/src/shell/index.ts:198`) и читало
+  окно 0.4; `dashboard/...` в задании — сокращение.
+- **Без Location.** RPC зовётся на Location службы по умолчанию (`process.cwd()` службы, `server/src/location.ts`). Эту же
+  Location Desktop уже поднимает сам: хост GUI-плагинов спрашивает `plugin.list` без `location` (`plugin/host.ts`), а у
+  групп `plugin` и `rpc` одна промежуточная Location (`protocol/src/api.ts`). Своя Location (домашний каталог, каталог данных
+  службы) завела бы ещё одну строку `project` (B2.9i, «Найдено»). Тест держит запрос без `location`.
+- **Ответ — в журнал Desktop, без IPC.** Окно v2 ссылок не читает; событие без читателя стоило бы ещё не меньше двух файлов
+  (`shared/ipc-rpc/events.ts`, `renderer/api.ts`). Задание разрешает журнал.
+- **Окнам — каждая ссылка, и ссылка холодного старта тоже.** Один `receive` для трёх источников: разбор B4.4 и доставка не
+  менялись, ссылка запуска теперь доходит до первого окна, как в 0.4 (`restore`). Окно её пока не читает.
+- **По одной, в порядке прихода.** Плагин всё равно готовит дашборды по одной; порядок делает отказы и «один раз»
+  проверяемыми без сна в тестах. Цена — зависшая подготовка держит следующие ссылки, как и очередь плагина.
+- **`startupUrls` — в `lifecycle/deep-link.ts`**, рядом с `protocolUrls`: это ссылки запуска для окон и для очереди, а не
+  только для дашбордов; там же её проверяет тест (условие платформы иначе было бы в непокрытой связке).
+- **Без отмены при выходе.** 0.4 отменял подготовку (`dashboardLifecycle.abort()`); на v2 выход останавливает службу
+  (B4.10): ждущая ссылка получает отказ `connection` («Background service is stopped»), идущий запрос обрывается вместе
+  со службой, и то и другое уходит в журнал. Отдельный `AbortController` ничего бы не добавил.
+- **`parse` не экспортируется**: `AGENTS.md` Desktop запрещает экспорт только для тестов, разбор проверяется через `receive`.
+- **Автомат состояний не заводил.** У очереди одно событие — `connect` (обещание-шлюз); правило `AGENTS.md` об автоматах —
+  для жизненных циклов с переходами, как `deep-links/machine.ts` и `background-service-machine.ts`.
+
+### Оставлено этапу C
+
+- Показ: ответ `prepare` (папка, действие, уведомление, код) окну — событие или IPC, открытие проекта в папке, новый
+  черновик с задачей дашборда (`dashboardPrompt`), тосты уведомлений и кодов (тексты 0.4 — `dashboard.notice.*`,
+  `dashboard.target.*`), «Изменить в чате», признак холодной ссылки (`coldDashboard` 0.4: новая беседа, а не текущая),
+  «новый щелчок побеждает» 0.4, отказ для удалённого сервера (`dashboard.target.localOnly`).
+- **Важно для C:** с B4.15 щелчок по ссылке тратит одноразовый снимок Studio и готовит папку, а ответ есть только в
+  журнале Desktop. Повторный щелчок той же ссылки ответит `DASHBOARD_SNAPSHOT_UNAVAILABLE` (B2.9h, «повтор снимка»);
+  подготовленную папку найдёт `loginom.dashboard.find`.
+
+### Найдено, не чинил
+
+- **macOS: ссылка холодного старта теряется.** v2 подписывается на `open-url` в слое `lifecycle`, то есть после `ready`
+  (`index.ts` грузит `desktop.ts` в `app.whenReady().then(...)`); Electron велит подписываться раньше, иначе ссылка, которой
+  запустили приложение, не придёт. 0.4 подписывался до `app.whenReady()` (`v0.4.0:packages/desktop/src/main/index.ts:301` и
+  `:348`). Правка — ранний `open-url` в `index.ts` с буфером до `lifecycle`; macOS здесь не проверить, оставил.
+- **Windows: ссылка холодного старта не читается** — как в 0.4: `startupUrls` (как `createDeepLinkQueue` 0.4) берёт argv
+  только на Linux, хотя Windows тоже передаёт ссылку в командной строке. Расширять поведение 0.4 не стал.
+
+### Не проверено
+
+- Связка: `receive` в `lifecycle/index.ts` (холодный старт, `second-instance`, `open-url`) и `connect` в `desktop.ts` — только
+  typecheck и чтение; мутация M17 выживает.
+- Настоящая служба и плагин: `loginom.dashboard` на сервере проверял B2.9h (`server/test/loginom-dashboard-target.test.ts`);
+  здесь — подставная служба по формату протокола (`RpcError` 400, `RpcInternalError` 500, `{ output }`).
+- Окно, запуск по ссылке через `xdg-open` и регистрация схемы в ОС (упаковка — B4.5a, B4.14b/c); Windows и macOS.
