@@ -14,7 +14,7 @@ GROUP = ('group', 'transform.group_data', 'Группировка')
 TOTAL = ('group', 'transform.group_data', 'Итоги')
 EXCEL = ('excel', 'exports.excel', None)
 SALES_COLUMNS = [('Region', 'string'), ('Revenue', 'integer')]
-TOTAL_COLUMNS = [('Region', 'string'), ('Total', 'integer')]
+TOTAL_COLUMNS = [('Region', 'string'), ('Total', 'real')]
 
 
 def expected(chain, turn):
@@ -23,7 +23,7 @@ def expected(chain, turn):
     totals = defaultdict(int)
     for sale in sales:
         totals[sale['Region']] += sale['Revenue']
-    groups = [dict(Region=region, Total=total) for region, total in sorted(totals.items())]
+    groups = [dict(Region=region, Total=float(total)) for region, total in sorted(totals.items())]
     sorted_sales = sorted(sales, key=lambda row: row['Revenue'], reverse=True)
 
     def graph(nodes=(), edges=(), retain=()):

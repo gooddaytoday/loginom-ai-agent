@@ -43,7 +43,7 @@
         },
         {
           "name": "Total",
-          "type": "integer"
+          "type": "real"
         }
       ],
       "column_order": "exact",
@@ -51,15 +51,15 @@
       "rows": [
         {
           "Region": "Север",
-          "Total": 320
+          "Total": 320.0
         },
         {
           "Region": "Центр",
-          "Total": 410
+          "Total": 410.0
         },
         {
           "Region": "Юг",
-          "Total": 340
+          "Total": 340.0
         }
       ]
     }
