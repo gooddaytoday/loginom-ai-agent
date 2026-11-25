@@ -5967,7 +5967,7 @@ test('owned text export input observes its actual hidden data-source caption',as
   assert.equal(full.status,'SUCCEEDED',JSON.stringify(full.error));
   assert.equal(full.output.wizard.input_port_context.status,'observed');
   assert.equal(full.output.wizard.input_port_context.port_display_label,'Источник данных');
-  assert.deepEqual(full.output.prepared_node_context.input_port,expectedPort);
+  assert.deepEqual(full.output.prepared_node_context.input_port,{...expectedPort,wizard_index:expectedPort.native_index});
   const narrow=await page.execute({mode:'observe',root_ref:full.output.wizard.root_ref,prepared_node_context:binding});
   assert.deepEqual(narrow.output.wizard.input_port_context,full.output.wizard.input_port_context);
   assert.equal(narrow.output.wizard.input_port_context.opening_verified,false);

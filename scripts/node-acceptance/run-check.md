@@ -649,10 +649,43 @@ export replacement list. Only `task.md` and files in `data/` reach the model;
 oracles remain private. All existing CSV, Save, cold and cleanup checks apply.
 
 A private case may add `case.json` with `base` (another case in the same
-`--cases` directory, run first in the same chat, then this case continues it),
-`input_files` (attachments of this turn) and `budget` (read only by
-`bughunt-audit.py`). The first turn of a private case attaches every file in
-`data/`, any format; a continuation attaches only its `input_files`.
+`--cases` directory), `input_files` (attachments of this turn) and `budget`
+(read only by `bughunt-audit.py`). Pass the last case to `--scenarios`. The
+runner follows `base` to the root and runs up to eight turns in one CLI chat
+with the same profile, workspace and package. It rejects cycles before
+launching. The root attaches the files in `data/` by default, in any format.
+A continuation attaches only its listed `input_files`.
+
+Any turn may add `graph` to `expected.json`. The runner checks the latest
+complete graph recorded during the turn in the existing runtime journal.
+Use a unique local `id` and the canonical `type` for each required node.
+Add `label` for an exact caption or `label_contains` for a case-sensitive
+substring. Each selector must match one distinct node. Links refer to those
+IDs, with optional zero-based `output` and `input` ports. Extra nodes and
+links may be present.
+
+```json
+{
+  "graph": {
+    "nodes": [
+      {"id": "sales", "type": "imports.text", "label": "Продажи"},
+      {"id": "regions", "type": "transform.group_data", "label_contains": "по регионам"}
+    ],
+    "links": [{"source": "sales", "target": "regions", "output": 0, "input": 0}]
+  }
+}
+```
+
+A graph-only turn checks Save, cleanup and the graph. Add `outputs` for
+CSV checks, or `refusal` for an expected refusal. `--cold` reopens the
+saved package for the final turn's output checks. The scenario entry in
+`results.json` lists the turn outcomes in order. The audited graph and its
+journal location are recorded in the turn's `graph-observed.json`.
+
+`python3 scripts/node-acceptance/bughunt-audit.py --patterns RUN_DIR` shows
+counts for patterns a–g by turn. With `--json`, each finding also carries
+its 1-based `turn`. The audit uses one chat's evidence across turns and
+attributes each finding to the turn containing its cited call.
 
 The model under test defaults to `openai/gpt-6.1-sol` medium with the shared
 OAuth link. `RUN_CHECK_MODEL`, `RUN_CHECK_VARIANT` (empty: no `--variant`) and
