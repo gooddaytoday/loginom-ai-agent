@@ -3,7 +3,6 @@
 // every call: the profile, the paths and the chat's draft are checked before and after it (B2.9b…d). The dashboard
 // package is loaded by the first call, as 0.4 loaded it only for a dashboard session.
 import { realpath } from "node:fs/promises"
-import { setTimeout } from "node:timers/promises"
 import type { draftServer } from "@loginom-ai-agent/dashboard/draft/server"
 import type { PublicationRef } from "@loginom-ai-agent/loginom-host/dashboard"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
@@ -14,7 +13,7 @@ import { Tool } from "@opencode/schema/tool"
 import { Schema } from "effect"
 import { Dashboard } from "./dashboard"
 import { ServiceHost } from "./host"
-import { declinedText, isDecline, refusalMetadata } from "./permissions"
+import { askWithdrawn, declinedText, isDecline, refusalMetadata } from "./permissions"
 
 const Parameters = Schema.Struct({})
 
@@ -74,36 +73,7 @@ export function dashboardTools(
     call: ToolContext,
     request: { action: string; resources: string[]; metadata: Record<string, unknown> },
   ) => {
-    const settled = { done: false }
-    call.signal.throwIfAborted()
-    const asking = session.permission
-      .assert({
-        sessionID: call.sessionID,
-        agent: call.agent,
-        source: { type: "tool", messageID: call.messageID, id: call.id },
-        ...request,
-      })
-      .finally(() => {
-        settled.done = true
-      })
-    const withdraw = async () => {
-      // The question may not be open yet: its rules and hooks are still being evaluated.
-      while (!settled.done) {
-        const open = await session.permission.list({ sessionID: call.sessionID }).catch(() => [])
-        await Promise.all(
-          open
-            .filter((item) => item.source?.messageID === call.messageID && item.source.id === call.id)
-            .map((item) =>
-              session.permission
-                .reply({ sessionID: call.sessionID, requestID: item.id, decision: "once" })
-                .catch(() => undefined),
-            ),
-        )
-        await setTimeout(50)
-      }
-    }
-    call.signal.addEventListener("abort", () => void withdraw(), { once: true })
-    await asking.catch((error: unknown) => {
+    await askWithdrawn(session.permission, call, request).catch((error: unknown) => {
       call.signal.throwIfAborted()
       throw error
     })

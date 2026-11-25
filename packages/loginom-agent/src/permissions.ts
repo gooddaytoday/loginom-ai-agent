@@ -16,6 +16,9 @@
 //   config (`/etc/loginom-ai-agent`, `%ProgramData%\loginom-ai-agent`, MDM), which OpenCode's guarded policy plugin
 //   applies in its `permission.evaluate` hook after every rule and before the product's. The product never lifts it
 //   (`settle`), refuses the conversation grant for a kind it touches, and tells the model who denied (`refusal`).
+import { setTimeout } from "node:timers/promises"
+import type { Plugin } from "@opencode/plugin"
+import type { ToolContext } from "@opencode/plugin/promise/tool"
 import type { Permission } from "@opencode/schema/permission"
 
 export type Kind = "read" | "write" | "save" | "export" | "web" | "terminal"
@@ -280,4 +283,46 @@ function wildcard(input: string, pattern: string) {
     .replace(/\?/g, ".")
   const tail = escaped.endsWith(" .*") ? escaped.slice(0, -3) + "( .*)?" : escaped
   return new RegExp("^" + tail + "$", process.platform === "win32" ? "si" : "s").test(input.replaceAll("\\", "/"))
+}
+
+/**
+ * `permission.assert` for a tool call that a stop withdraws (B2.9f, B2.9g; the dashboard's and the local file's questions).
+ * 0.4 raced the question with the call's abort; the plugin's `assert` outlives a stopped call, so a stop withdraws the
+ * call's own open question instead. The core's `reject` declines all the session's open questions (parallel
+ * sub-agents', other tools'), so the withdrawn question is answered `once`: the call is aborted, and the caller must
+ * check its signal after the answer, before the tool does anything.
+ */
+export async function askWithdrawn(
+  permission: Pick<Plugin.Context["permission"], "assert" | "list" | "reply">,
+  call: ToolContext,
+  request: { action: string; resources: string[]; save?: string[]; metadata?: Record<string, unknown> },
+) {
+  const settled = { done: false }
+  call.signal.throwIfAborted()
+  const asking = permission
+    .assert({
+      sessionID: call.sessionID,
+      agent: call.agent,
+      source: { type: "tool", messageID: call.messageID, id: call.id },
+      ...request,
+    })
+    .finally(() => {
+      settled.done = true
+    })
+  const withdraw = async () => {
+    // The question may not be open yet: its rules and hooks are still being evaluated.
+    while (!settled.done) {
+      const open = await permission.list({ sessionID: call.sessionID }).catch(() => [])
+      await Promise.all(
+        open
+          .filter((item) => item.source?.messageID === call.messageID && item.source.id === call.id)
+          .map((item) =>
+            permission.reply({ sessionID: call.sessionID, requestID: item.id, decision: "once" }).catch(() => undefined),
+          ),
+      )
+      await setTimeout(50)
+    }
+  }
+  call.signal.addEventListener("abort", () => void withdraw(), { once: true })
+  await asking
 }

@@ -88,7 +88,8 @@ export function forward(args: string[], cwd: string, env: NodeJS.ProcessEnv = pr
   if (options.includes("--headless")) env.LOGINOM_AI_AGENT_HEADLESS = "1"
   else delete env.LOGINOM_AI_AGENT_HEADLESS
   const command = take(rest, "--command")
-  if (command === undefined) delete env.LOGINOM_AI_AGENT_RUN_COMMAND
+  // An empty `--command=` names no skill: 0.4 tested `!args.command`, so it was an ordinary prompt.
+  if (!command) delete env.LOGINOM_AI_AGENT_RUN_COMMAND
   else env.LOGINOM_AI_AGENT_RUN_COMMAND = command
   const snapshot = take(rest, "--dashboard")
   if (snapshot === undefined) delete env.LOGINOM_AI_AGENT_RUN_DASHBOARD
