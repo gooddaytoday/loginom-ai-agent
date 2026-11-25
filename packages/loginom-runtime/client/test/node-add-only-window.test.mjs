@@ -3,13 +3,13 @@ import test from 'node:test';
 import vm from 'node:vm';
 import {bindAddOnlyDrop, readAddOnlyDrop, settleAddOnlyDrop} from '../lib/node-add-only-window.mjs';
 
-function fixture({window='wizard',sticky=false}={}){
+function fixture({window='wizard',sticky=false,modelData=true}={}){
   const prefix='MF;TF-1',workflow={},nodeData={},components=new Map(),elements=[];
   const app={ModelForm:class ModelForm{},ModelNodeTreeNode:class ModelNodeTreeNode{},
     WizardTreeNode:class WizardTreeNode{},Version:'7.4.2'};
   const nativeNodes=[],model=new app.ModelForm();
   const workflowRef={workflow_id:'wf',prefix,tab_tid:'tab'};
-  const node={FGuid:'new',data:nodeData,FIconCls:'icon'};
+  const node={FGuid:'new',...(modelData?{data:nodeData}:{}),FIconCls:'icon'};
   const element=(tid,parent,role)=>{
     const e={id:tid,isConnected:true,role,children:[],classList:{contains:()=>true},
       contains(other){return this===other||this.children.includes(other);},
@@ -101,4 +101,10 @@ test('add_only never repeats Close while native settlement is unconfirmed',async
   const f=fixture({sticky:true});
   await assert.rejects(f.run(),/Graph deadline/);
   assert.equal(f.clicks.length,1);
+});
+
+test('add_only observes a quiet node before Loginom has loaded its settings object',async()=>{
+  const f=fixture({window:null,modelData:false});
+  assert.deepEqual(await f.run(),f.settledGraph);
+  assert.deepEqual(f.clicks,[]);
 });

@@ -46,13 +46,15 @@ export function readAddOnlyDrop({binding:b,expectedControl,claim=false}) {
     nodes.filter(n=>n.FGuid===id).length!==1||!nodes.includes(node)))
     throw Error('Native add-only graph ownership changed');
   const added=nodes.filter(n=>!b.nodes.has(n.FGuid));
-  if(added.length>1||added.some(n=>!n.FGuid||!n.data||n.FIconCls!==b.icon)
-    ||b.created&&added[0]!==b.created)
+  if(added.length>1||b.created&&added[0]!==b.created)
     throw Error('Native add-only node ownership changed');
-  if(!added.length)return {};
+  if(!added[0]?.FGuid)return {};
   const node=b.created=added[0],surface=controller.FController,tree=controller.Node?.data?.node;
   const wizardRoot=exact(prefix+';WizrdMCF').filter(visible);
-  const ownsWizard=app.WizardTreeNode&&tree instanceof app.WizardTreeNode
+  // The quiet graph proves the type by GUID and rendered icon. Only a window
+  // gesture needs the node settings object, which can be absent on a bare node.
+  const ownsSettings=node.FIconCls===b.icon&&!!node.data;
+  const ownsWizard=ownsSettings&&app.WizardTreeNode&&tree instanceof app.WizardTreeNode
     &&app.ModelNodeTreeNode&&tree.ParentNode instanceof app.ModelNodeTreeNode
     &&tree.ParentNode.ParentNode===workflow&&tree.ParentNode.FGuid===node.FGuid
     &&tree.ParentNode.FModelNode===node.data&&surface?.constructor?.name==='WizardModelComponentForm'
@@ -61,7 +63,7 @@ export function readAddOnlyDrop({binding:b,expectedControl,claim=false}) {
   const dialogs=blocked.filter(e=>e!==wizardRoot[0]&&!blocked.some(other=>other!==e&&other!==wizardRoot[0]&&other.contains(e)));
   const atGraph=surface===model&&tree===workflow&&wizardRoot.length===0;
   let owner, closeKind, controls=[];
-  if(dialogs.length===1){
+  if(dialogs.length===1&&ownsSettings){
     const dialog=dialogs[0],window=ext?.getCmp?.(dialog.id);
     if(window?.el?.dom!==dialog)return {};
     const nativeWizard=surface?.FView;
