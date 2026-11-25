@@ -568,8 +568,8 @@ there are no empty strings. Missing export evidence
 fails `CSV_NULL_MARKER_MISSING`; unsupported markers fail
 `CSV_NULL_MARKER_UNSUPPORTED`. Every NULL cell still must match the chosen marker.
 
-For types300 only, the runner selects the private `--exact-port-windows` cold
-reader. It reads every expected row through contiguous production port windows,
+For types300 and large database outputs, the runner selects the private
+`--exact-port-windows` cold reader. It reads every expected row through contiguous production port windows,
 retaining the same document, workflow, node, port and completed execution.
 Changed bindings, schema, row count, unverified precision or incomplete cleanup
 refuse the result. Each window keeps the ordinary preview budgets; the assembled
@@ -655,6 +655,19 @@ runner follows `base` to the root and runs up to eight turns in one CLI chat
 with the same profile, workspace and package. It rejects cycles before
 launching. The root attaches the files in `data/` by default, in any format.
 A continuation attaches only its listed `input_files`.
+
+Database cases can use `[[DB:DB_HOST]]`, `[[DB:DB_PASSWORD]]` and other
+`[[DB:DB_*]]` fields in `task.md`. The runner reads UTF-8
+`~/.config/loginom-run-check/db-test.conf` as literal `DB_KEY=value`
+assignments. Blank lines and lines starting with `#` are skipped. One pair
+of matching outer quotes is stripped. Missing or empty referenced fields
+fail before launch. The CLI receives the expanded task over stdin.
+The runner masks `DB_PASSWORD` in the saved task, phase output, reports
+and collected text journals. The temporary CLI chat database stays
+available across case turns and is removed when the scenario finishes.
+With `--cold`, database cases with more than 100 expected rows in an
+output use exact native port reads in windows of up to 100 rows. The
+runner verifies every row, up to 1000 per output.
 
 Any turn may add `graph` to `expected.json`. The runner checks the latest
 complete graph recorded during the turn in the existing runtime journal.

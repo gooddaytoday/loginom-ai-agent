@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Quiet, detached live acceptance runner. Python 3 standard library only."""
 import argparse
+from contextlib import contextmanager
 import csv
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -18,7 +19,9 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
+from urllib.parse import quote
 from zipfile import ZipFile
 
 REPO = Path(__file__).resolve().parents[2]
@@ -34,6 +37,7 @@ VARIANT = os.environ.get('RUN_CHECK_VARIANT', 'medium' if MODEL == 'openai/gpt-6
 AUTH = Path(os.environ['RUN_CHECK_AUTH']).expanduser() if os.environ.get('RUN_CHECK_AUTH') else Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json'
 D76_STATUS = 'PASS с ограничением платформы D76'
 MAX_CASE_TURNS = 8
+DB_FIELD = re.compile(r'\[\[DB:(DB_[A-Z0-9_]+)\]\]')
 # Owner decisions 16.11 logreg-{partition,kfold}-csv-by-name: native warm/reopen order differs.
 CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential', 'logreg-partition-column', 'logreg-validation-kfold')
 # LAB-1869: native Enrich autosync reorders RowID/Key on cold Execute.
@@ -74,6 +78,116 @@ def write(path, value):
     temporary = path.with_suffix(path.suffix + '.tmp')
     temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n')
     temporary.replace(path)
+
+
+class DatabasePrompt:
+    def __init__(self):
+        self.values = None
+        self.secret = None
+
+    def load(self):
+        path = Path.home() / '.config/loginom-run-check/db-test.conf'
+        try:
+            lines = path.read_text(encoding='utf-8').splitlines()
+        except (OSError, UnicodeError):
+            raise ValueError(f'DB_CONFIG_UNREADABLE: {path}') from None
+        values = {}
+        for number, line in enumerate(lines, 1):
+            if not line.strip() or line.lstrip().startswith('#'):
+                continue
+            key, separator, value = line.partition('=')
+            key, value = key.strip(), value.strip()
+            if not separator or not re.fullmatch(r'DB_[A-Z0-9_]+', key) or key in values:
+                raise ValueError(f'DB_CONFIG_INVALID: {path}:{number}')
+            if len(value) >= 2 and value[0] in ('"', "'") and value[-1] == value[0]:
+                value = value[1:-1]
+            values[key] = value
+        password = values.get('DB_PASSWORD')
+        if password:
+            forms = {password, quote(password, safe='')}
+            # Tool results can contain JSON serialized inside a JSONL event.
+            for _ in range(2):
+                forms.update(json.dumps(value, ensure_ascii=ascii_only)[1:-1]
+                             for value in tuple(forms) for ascii_only in (False, True))
+            self.secret = re.compile('|'.join(re.escape(value) for value in sorted(forms, key=len, reverse=True)))
+        self.values = values
+
+    def render(self, prompt):
+        if not DB_FIELD.search(prompt):
+            return prompt
+        if self.values is None:
+            self.load()
+
+        def field(match):
+            key = match[1]
+            if not self.values.get(key):
+                raise ValueError(f'DB_CONFIG_MISSING_FIELD: {key}')
+            return self.values[key]
+
+        return DB_FIELD.sub(field, prompt)
+
+    def mask(self, text):
+        return self.secret.sub('[REDACTED]', text) if self.secret else text
+
+    def mask_value(self, value):
+        if isinstance(value, str):
+            return self.mask(value)
+        if isinstance(value, dict):
+            return {self.mask(key): self.mask_value(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self.mask_value(item) for item in value]
+        return value
+
+    def mask_journal(self, line):
+        masked = self.mask(line)
+        if masked == line:
+            return line
+        try:
+            value = json.loads(line)
+        except ValueError:
+            return masked
+        if not isinstance(value, (dict, list)):
+            return masked
+        return json.dumps(self.mask_value(value), ensure_ascii=False) + ('\n' if line.endswith('\n') else '')
+
+    @contextmanager
+    def phase_log(self, path, *, enabled):
+        if not enabled or not self.secret:
+            with path.open('wb') as log:
+                yield log
+            return
+        # The subprocess writes to an unnamed file. Only masked output gets a
+        # pathname under the run directory, even when the command fails.
+        with tempfile.TemporaryFile() as log:
+            try:
+                yield log
+            finally:
+                log.seek(0)
+                with path.open('w', encoding='utf-8', errors='surrogateescape') as evidence:
+                    for line in log:
+                        evidence.write(self.mask_journal(line.decode('utf-8', errors='surrogateescape')))
+
+    def clean_artifacts(self, folder):
+        if not self.secret:
+            return
+        for root, directories, files in os.walk(folder):
+            directories[:] = [name for name in directories if name not in {'browser-profile', 'node_modules', 'workspace'}]
+            for name in files:
+                path = Path(root) / name
+                if path.is_symlink() or path.suffix not in {'.json', '.jsonl', '.log', '.md', '.txt'}:
+                    continue
+                original = path.read_text(encoding='utf-8', errors='surrogateescape')
+                if not self.secret.search(original):
+                    continue
+                if path.suffix == '.json':
+                    masked = self.mask_journal(original)
+                else:
+                    masked = ''.join(map(self.mask_journal, io.StringIO(original)))
+                path.write_text(masked, encoding='utf-8', errors='surrogateescape')
+        # This is the CLI's private chat store. It must stay intact between
+        # turns, and is not needed after the scenario's evidence is collected.
+        for suffix in ('', '-wal', '-shm', '-journal'):
+            (folder / 'profile/data' / ('loginom-ai-agent.db' + suffix)).unlink(missing_ok=True)
 
 
 def daemon_pid():
@@ -2352,6 +2466,8 @@ class Runner:
         self.deadline = self.report['started'] + 85 * 60
         self.last_start = 0
         self.current = None
+        self.db_prompt = DatabasePrompt()
+        self.db_case_active = False
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(('MULTICA_', 'CODEX_'))}
         self.env['LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT'] = self.options.get('viewport', '1280x800')
         self.env.update(LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS='false', HTTP_PROXY='http://127.0.0.1:2080', HTTPS_PROXY='http://127.0.0.1:2080', NO_PROXY='localhost,127.0.0.1,::1,app.loginom.ai,mcp.loginom.ai,mas.kartamyshev.dev')
@@ -2378,14 +2494,16 @@ class Runner:
         return totals
 
     def save(self):
-        write(self.out / 'results.json', self.report)
-        (self.out / 'summary.md').write_text(summary(self.report))
+        report = self.db_prompt.mask_value(self.report) if self.db_case_active else self.report
+        write(self.out / 'results.json', report)
+        (self.out / 'summary.md').write_text(summary(report))
 
     def failure(self, result, error, folder):
-        result.update(status='UNKNOWN' if isinstance(error, TimeoutError) else 'FAIL', failure_class=str(error).split(':')[0] or type(error).__name__, detail=str(error), failure_load=list(os.getloadavg()), failed_phase=self.report['phase'], failed_at=time.time())
+        detail = self.db_prompt.mask(str(error)) if self.db_case_active else str(error)
+        result.update(status='UNKNOWN' if isinstance(error, TimeoutError) else 'FAIL', failure_class=detail.split(':')[0] or type(error).__name__, detail=detail, failure_load=list(os.getloadavg()), failed_phase=self.report['phase'], failed_at=time.time())
         journal = folder / (result['scenario'] + '-checks.jsonl')
         result['location'] = str(journal) + ':1'
-        journal.write_text(json.dumps(result, ensure_ascii=False) + '\n')
+        journal.write_text(json.dumps(self.db_prompt.mask_value(result) if self.db_case_active else result, ensure_ascii=False) + '\n')
 
     def phase(self, name, command, folder, timeout=1800, stdin=None, env=None, cwd=None):
         timing = dict(name=name, scenario=self.current['scenario'] if self.current else None,
@@ -2405,13 +2523,19 @@ class Runner:
                 self.current.setdefault('started', timing['started'])
                 self.current.setdefault('start_load', list(os.getloadavg()))
             self.save()
-            with (folder / (name + '.stdout')).open('wb') as stdout, (folder / (name + '.stderr')).open('wb') as stderr, (folder / 'loads.jsonl').open('a') as loads:
+            stdout_path, stderr_path = (folder / (name + suffix) for suffix in ('.stdout', '.stderr'))
+            stdout_log = self.db_prompt.phase_log(stdout_path, enabled=self.db_case_active)
+            stderr_log = self.db_prompt.phase_log(stderr_path, enabled=self.db_case_active)
+            with stdout_log as stdout, stderr_log as stderr, (folder / 'loads.jsonl').open('a') as loads:
                 child = subprocess.Popen(list(map(str, command)), cwd=cwd or folder, env=env or self.env, stdin=subprocess.PIPE if stdin else subprocess.DEVNULL, stdout=stdout, stderr=stderr, start_new_session=True)
                 self.report['child_pid'] = child.pid
                 self.save()
                 if stdin:
-                    child.stdin.write(stdin.encode())
-                    child.stdin.close()
+                    try:
+                        with child.stdin:
+                            child.stdin.write(stdin.encode())
+                    except BrokenPipeError:
+                        pass  # Read the command exit status and masked stderr below.
                 end = min(self.deadline, time.time() + timeout)
                 while child.poll() is None:
                     loads.write(json.dumps({'at': time.time(), 'phase': name, 'load': os.getloadavg(), 'rss_bytes': self.memory(child.pid)}) + '\n')
@@ -2764,7 +2888,6 @@ class Runner:
                 prompt += '\n' + logreg_normalization_exports(destinations)
             prompt += f'\nСохрани пакет как {package}.'
             if not only_graph and not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('text_export_cases') and not spec.get('text_file_variable') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Доставь все итоговые книги Excel.' if spec.get('excel_mode') else ' Выгрузи и скачай полный итоговый CSV.'
-        (folder / 'task.md').write_text(prompt)
         for index, output in enumerate(expected['outputs']):
             if spec.get('excel_mode') or spec.get('fs_case') == 'paths' or spec.get('text_file_variable'): output['export_destination'] = destinations[index]
             elif output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
@@ -2890,10 +3013,15 @@ class Runner:
                 prompt += f'\nИсходный файл LGD: {target}.'
             else:
                 command += ['--file', target]
-        (folder / 'task.md').write_text(prompt)
+        db_task = DB_FIELD.search(prompt)
+        if db_task:
+            self.db_case_active = True
+            prompt = self.db_prompt.render(prompt)
+        (folder / 'task.md').write_text(self.db_prompt.mask(prompt) if db_task else prompt)
         env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile), LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG='1', LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE='1', LOGINOM_AI_AGENT_PURE='1')
         graph_start = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
         if spec.get('two_turn'):
+            assert not db_task, 'DB_PROMPT_REQUIRES_STANDARD_CASE_TRANSPORT'
             assert session is None, 'TWO_TURN_REQUIRES_FRESH_CHAT'
             assert MODEL == 'openai/gpt-6.1-sol', 'TWO_TURN_REQUIRES_DEFAULT_MODEL'
             # Unique physical name prevents collisions with prior attempts (#1157).
@@ -2914,6 +3042,8 @@ class Runner:
                   profile=str(profile), folder=str(folder), kind=spec['two_turn'], prompts=[first, second], require_medium=True, daemon_pid=daemon_pid()))
             self.phase('model', [sys.executable, '-B', REPO / 'scripts/node-acceptance/run-check-two-turn.py',
                        folder / 'two-turn.json'], folder, timeout=1800, env=env, cwd=workspace)
+        elif db_task:
+            self.phase('model', command, folder, timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace, stdin=prompt)
         else:
             self.phase('model', command + ['--', prompt], folder, timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace)
         events = list(records(folder / 'model.stdout'))
@@ -3683,6 +3813,7 @@ class Runner:
             login = pair_login(account, 'worker.json')
             for r in self.report['runs']:
                 self.current = r
+                self.db_case_active = False
                 if time.time() >= self.deadline:
                     r.update(status='NOT_RUN', reason='BATCH_BUDGET_EXHAUSTED')
                     self.save()
@@ -3749,7 +3880,9 @@ class Runner:
                             cold_expected = stage / 'expected-cold.json'
                             write(cold_expected, cold_columns_by_name(expected, case))
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
+                        read_windows = case == 'types300' or (
+                            self.db_case_active and any(len(output['rows']) > 100 for output in expected['outputs']))
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if read_windows else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
@@ -3782,6 +3915,13 @@ class Runner:
                             # Retain the original model failure if cleanup also fails.
                             r['dataset_cleanup_error'] = str(error)
                             if r.get('status') != 'FAIL': self.failure(r, error, folder)
+                    if self.db_case_active:
+                        try:
+                            self.db_prompt.clean_artifacts(folder)
+                        except OSError:
+                            self.failure(r, RuntimeError('DB_EVIDENCE_REDACTION_FAILED'), folder)
+                        # Keep only masked result values when this package ends.
+                        r.update(self.db_prompt.mask_value(r))
                 self.save()
         except Exception as error:
             for r in self.report['runs']:
@@ -3810,11 +3950,13 @@ def main():
             time.sleep(min(1, max(0, end - time.monotonic())))
     head = git('rev-parse', '--verify', args.head + '^{commit}')
     names = scenario_names(args.scenarios, args.case_root)
+    db_preflight = DatabasePrompt()
     assert 'types300' not in names or args.cold, 'TYPES300_COLD_REQUIRED'
     for name in names:
         for step, spec in scenario_steps(name, args.case_root, cases=args.cases):
             if spec.get('generated') or isinstance(step, Path): continue
             assert spec['prompt'].is_file(), 'Scenario prompt missing'
+            db_preflight.render(spec['prompt'].read_text())
             assert args.case_root or spec.get('oracle', spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
             expected_for(spec, '/preflight/package.lgp')
     pair = args.pair.expanduser().resolve()
