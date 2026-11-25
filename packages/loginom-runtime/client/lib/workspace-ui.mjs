@@ -4732,24 +4732,48 @@ function readRenderedInputMapping(observation) {
         &&actual?.label?.value===fields.name.value)applies(fields.label,fields.name.value);
       for(const {input,text} of edits.slice(0,completed)){
         const name=input.wizard_field.name,after=fresh.ui.elements.find(e=>e.ref===input.ref);
+        const verifyValue=verifyValues||importFormat&&name==='delimiter';
         if(!after||!same(after.identity,input.identity)||!same(after.wizard_field,input.wizard_field)
-          ||verifyValues&&(actual?.[name]?.value!==text||after.value!==text||after.value_truncated))
+          ||verifyValue&&(actual?.[name]?.value!==text||after.value!==text||after.value_truncated))
           fail('WIZARD_FIELD_NOT_CONFIRMED','Wizard draft value was not confirmed: '+name);
         // The next write still needs a fresh binding. During that preflight,
         // draft values already written are checked together at the end.
-        if(!verifyValues&&actual?.[name])applies(fieldsOf(page)[name],fields[name].value);
+        if(!verifyValue&&actual?.[name])applies(fieldsOf(page)[name],fields[name].value);
       }
       if(!same(expected,page))fail('WIZARD_CONTEXT_CHANGED','Wizard page or unrelated settings changed during field apply');
     };
+    const settlePreview=async()=>{
+      // A repaint or late loading mask restarts the same quiet window.
+      let epoch=await readEpoch(),stable=0;
+      for(;;){
+        if(epoch?.document!==initial.dom_epoch.document||!same(await boundNode(),initial.prepared_node_context))
+          fail('WIZARD_CONTEXT_CHANGED','Import wizard owner changed during preview settlement');
+        await page.waitForTimeout(Math.min(100,timeout()));
+        const next=await readEpoch();
+        stable=same(epoch,next)?stable+1:0;
+        epoch=next;
+        if(stable<2)continue;
+        const observed=await readUi();
+        if(!sameFieldContext(initial,observed)||same(epoch,observed.dom_epoch))return observed;
+        epoch=observed.dom_epoch;stable=0;
+      }
+    };
+    const first=edits[0];
+    const delimiterChanged=importFormat&&first.input.wizard_field.name==='delimiter'&&first.input.value!==first.text;
     const prepareNext=async(input,text,name,index)=>{
       for(let attempt=0;;attempt++){
-        const fresh=await readUi();
+        const fresh=await (index===1&&attempt===0&&delimiterChanged?settlePreview():readUi());
         requireDraft(fresh,index,attempt>0);
         const before=fresh.ui.elements.find(e=>e.ref===input.ref);
         if(!before||!same(before.identity,input.identity)||!same(before.wizard_field,input.wizard_field))
           fail('WIZARD_FIELD_CHANGED','The observed wizard input changed: '+name);
+        // requireDraft has already checked every pending value, including
+        // a label the vendor updated to the new name while still linked.
+        const value=fieldsOf(expected)[name].value;
+        const signature=value===input.value?input.signature:
+          {...input.signature,value,value_length_utf16:value.length,value_truncated:false};
+        const target=await checkedHandle({...input,signature},before,'set_wizard_field');
         if(before.value===text)return {fresh,before};
-        const target=await checkedHandle(before,before,'set_wizard_field');
         if(!same(await boundNode(),fresh.prepared_node_context))
           fail('PREPARED_NODE_CONTEXT_CHANGED','Wizard owner changed while checking field: '+name);
         const epoch=await readEpoch();
@@ -4775,22 +4799,7 @@ function readRenderedInputMapping(observation) {
     phase='observing';
     let observed;
     if(importFormat&&effectPossible){
-      // Wait for a quiet preview epoch before reading the complete draft.
-      // Recheck the owner on every sample. A late mask or repaint advances the
-      // epoch and requires a new quiet window under the same deadline.
-      let epoch=await readEpoch(),stable=0;
-      for(;;){
-        if(epoch?.document!==initial.dom_epoch.document||!same(await boundNode(),initial.prepared_node_context))
-          fail('WIZARD_CONTEXT_CHANGED','Import wizard owner changed during preview settlement');
-        await page.waitForTimeout(Math.min(100,timeout()));
-        const next=await readEpoch();
-        stable=same(epoch,next)?stable+1:0;
-        epoch=next;
-        if(stable<2)continue;
-        observed=await readUi();
-        if(!sameFieldContext(initial,observed)||same(epoch,observed.dom_epoch))break;
-        epoch=observed.dom_epoch;stable=0;
-      }
+      observed=await settlePreview();
       if(sameFieldContext(initial,observed))record('import_format_input_settled',{settings_applied:false});
     }else observed=await readUi();
     requireDraft(observed,edits.length,true);

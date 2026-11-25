@@ -1,6 +1,7 @@
 import {readOutputDefinitionPages,observeOutputDefinitionPage,observeOutputDefinitions} from './import-definition-pages.mjs';
 import {expandOutputChanges} from './output-mapping-changes.mjs';
 import {ensureMappingTableView} from './mapping-table-view.mjs';
+import {validateNodeUiAction} from './workspace-ui.mjs';
 
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const mappingControl=(s,suffix,mappingWizard)=>{
@@ -206,15 +207,22 @@ export async function configureOutputField(channel,field,initialObservation) {
   const control=(s,key)=>s.ui.elements.find(e=>e.ref===s.wizard.column_parameters.fields[key]?.input_ref
     &&e.wizard_field?.scope==='output_column'&&e.wizard_field.name===key&&e.allowed_actions.includes('set_wizard_field'));
   const propertyReady=(s,key)=>editorReady(s)&&(s.wizard.column_parameters.fields[key]?.value===field[key]||!!control(s,key));
-  const batchReady=s=>editorReady(s)&&s.prepared_node_context?.verified===true&&keys.every(key=>!!control(s,key));
+  const batchAction=s=>({verb:'set_wizard_fields',fields:keys.map(key=>({ref:control(s,key).ref,text:field[key]}))});
+  const batchReady=s=>{
+    if(!editorReady(s)||s.prepared_node_context?.verified!==true||!keys.every(key=>!!control(s,key)))return false;
+    // Choose the single-field route only before dispatch. An uncertain batch
+    // receipt must never authorize further writes.
+    try{validateNodeUiAction(batchAction(s),s,s.prepared_node_context);}
+    catch{return false;}
+    return true;
+  };
   state=await channel.observe({condition:'bound output field editor',ready:s=>propertyReady(s,'name')});
   let readback;
   if(batchReady(state)){
     const identity=s=>({root,original,node:s.prepared_node_context,editor:s.wizard.column_parameters});
     const expected=identity(state);
     const receipt=await channel.perform({condition:'set output name and label',initialObservation:state,
-      ready:s=>batchReady(s)&&same(identity(s),expected),identity,resolve:s=>({verb:'set_wizard_fields',
-        fields:keys.map(key=>({ref:control(s,key).ref,text:field[key]}))})});
+      ready:s=>batchReady(s)&&same(identity(s),expected),identity,resolve:batchAction});
     readback=receipt?.output;
   }else{
     for(const key of keys){

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureOutputAutosync} from '../lib/port-mapping-procedure.mjs';
+import {validateNodeUiAction} from '../lib/workspace-ui.mjs';
 
 function fixture(initial=true) {
  let value=initial,mutations=0,changed=false,foreign=false;
@@ -55,38 +56,42 @@ test('second output mapping requires the verified exact native port owner',async
  assert.throws(()=>resolve({direction:'input',port:1},configured,native),/direction/);
 });
 
-function fieldFixture({links=false,prepared=false}={}) {
+function fieldFixture({links=false,prepared=false,ineligible=false,batchFailure}={}) {
  const original={record_id:'t',field_id:'0',index:0,name:'Amount',label:'Amount',type:'real',data_kind:'Непрерывный',
   source:{record_id:'s',field_id:'0',index:0,name:'Amount',label:'Amount',type:'real'}};
  let current=structuredClone(original),editor=false,draft={},mutations=0,table=!links;
- const field={current:structuredClone(original),source:original.source,name:'Mapped',label:'Сумма'},observations=[];
+ const field={current:structuredClone(original),source:original.source,name:'Mapped',label:'Сумма'},observations=[],actions=[];
+ const property=name=>({status:'observed',value:draft[name],input_ref:'ui-'+name,owner_ref:'owner-'+name});
  const state=()=>{
   const row={...current,status:'observed',name_ref:'name',selected:editor};
-  const params=editor?{status:'observed',root_ref:'editor',selected_column:{...original,status:'observed'},fields:{name:{value:draft.name,input_ref:'name'},label:{value:draft.label,input_ref:'label'}}}:undefined;
+  const params=editor?{status:'observed',root_ref:'editor',selected_column:{...original,status:'observed'},fields:{name:property('name'),label:property('label')}}:undefined;
   const fields=[row];
-  return {...(prepared?{prepared_node_context:{verified:true}}:{}),wizard:{status:'observed',stage:'output_mapping',root_ref:'wizard',root_tid:'W',column_parameters:params,
+  return {...(prepared?{prepared_node_context:{verified:true,surface:'wizard'}}:{}),wizard:{status:'observed',stage:'output_mapping',root_ref:'wizard',root_tid:'W',column_parameters:params,
    output_columns:{fields,page:{status:'complete_definition_page',offset:0,limit:8,returned:1,total_columns:1,next_offset:null,schema_id:'schema'}}},
    node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,autosync:false,source_fields:[original.source],target_fields:[current],rendered_indices:[0],
     ...(links?{mapping_wizard:'DerivedDataSourceOutputSocketWizard',node_context:{verified:true,node_id:'own'}}:{}),
     ...(links&&!table?{source_selection:{verified:true,record_ids:[]}}:{})},
    ui:{elements:[...(links?['Table','Links'].map(view=>({ref:view,tid:'W;DerivedDataSourceOutputSocketWizard;rb'+view+';DisplayEl',
       signature:{check_state:{kind:'radio',source:'loginom_ext',checked:view==='Table'?table:!table}},allowed_actions:['click']})):[]),
-    ...(editor?[...['name','label'].map(k=>({ref:k,wizard_field:{scope:'output_column',name:k},allowed_actions:['set_wizard_field']})),
+    ...(editor?[...['name','label'].map(k=>({ref:'ui-'+k,wizard_field:{scope:'output_column',name:k,root_ref:'editor',
+       wizard_root_ref:'wizard',owner_ref:ineligible&&k==='label'?'foreign':'owner-'+k},allowed_actions:['set_wizard_field']})),
       {ref:'apply',column_close:{scope:'output'},allowed_actions:['apply_output_column']}]:[{ref:'name',allowed_actions:['double_click']}])]}};
  };
  const channel={async observe(o){observations.push(o.condition);const s=structuredClone(state());if(!o.ready(s))throw Error('Not ready');return s;},
-  async perform(o){const s=structuredClone(state());assert.ok(o.ready(s));const a=o.resolve(s);mutations++;
+  async perform(o){const s=structuredClone(state());assert.ok(o.ready(s));const a=o.resolve(s);actions.push(a.verb);mutations++;
    if(a.verb==='click'&&a.ref==='Table'){table=true;channel.afterTable?.(current);}
    else if(a.verb==='double_click'){editor=true;draft={name:current.name,label:current.label};}
-   else if(a.verb==='set_wizard_field')draft[a.ref]=a.text;
+   else if(a.verb==='set_wizard_field')draft[a.ref.slice(3)]=a.text;
    else if(a.verb==='set_wizard_fields'){
-    for(const {ref,text} of a.fields)draft[ref]=text;
+    validateNodeUiAction(a,s,s.prepared_node_context);
+    if(batchFailure)throw batchFailure;
+    for(const {ref,text} of a.fields)draft[ref.slice(3)]=text;
     return {output:structuredClone(state())};
    }
    else if(a.verb==='apply_output_column'){current={...current,...draft};editor=false;channel.afterApply?.(current);}
    else throw Error('Unexpected action');
   }};
- return {channel,field,mutations:()=>mutations,observations};
+ return {channel,field,mutations:()=>mutations,observations,actions};
 }
 test('output field driver edits name and label once and proves native source preservation',async()=>{
  const {configureOutputField}=await import('../lib/port-mapping-procedure.mjs');
@@ -99,6 +104,20 @@ test('prepared output editor uses the batch readback for Apply and verifies the 
  assert.equal(f.mutations(),3);
  assert.ok(!f.observations.includes('output field Apply ready'));
  assert.ok(f.observations.includes('native output field after Apply'));
+});
+test('prepared output editor falls back before dispatch if the batch validator rejects a field binding',async()=>{
+ const {configureOutputField}=await import('../lib/port-mapping-procedure.mjs');
+ const f=fieldFixture({prepared:true,ineligible:true}),result=await configureOutputField(f.channel,f.field);
+ assert.equal(result.field.name,'Mapped');assert.equal(result.field.label,'Сумма');
+ assert.deepEqual(f.actions,['double_click','set_wizard_field','set_wizard_field','apply_output_column']);
+ assert.ok(f.observations.includes('output field Apply ready'));
+ assert.ok(f.observations.includes('native output field after Apply'));
+});
+test('prepared output editor refuses further writes after an uncertain batch',async()=>{
+ const {configureOutputField}=await import('../lib/port-mapping-procedure.mjs');
+ const failure=new Error('Batch receipt uncertain'),f=fieldFixture({prepared:true,batchFailure:failure});
+ await assert.rejects(configureOutputField(f.channel,f.field),error=>error===failure);
+ assert.deepEqual(f.actions,['double_click','set_wizard_fields']);
 });
 test('output field driver rejects changed identity and unexpected post-Apply state',async()=>{
  const {configureOutputField}=await import('../lib/port-mapping-procedure.mjs');

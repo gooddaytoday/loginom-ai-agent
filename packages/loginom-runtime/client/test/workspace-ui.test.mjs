@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { createObservationPages } from '../lib/observation-pages.mjs';
-import { makeWorkspaceUiCode, validateUiAction, workspaceUiCapability, makeBlockingWindowDiagnosticCode } from '../lib/workspace-ui.mjs';
+import { makeWorkspaceUiCode, validateUiAction, validateNodeUiAction, workspaceUiCapability, makeBlockingWindowDiagnosticCode } from '../lib/workspace-ui.mjs';
 import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
 import {Page,Element,Document,build,origin,clone,fixtureClock,scriptGraphFixture} from './support/workspace-ui-fixture.mjs';
@@ -1807,10 +1807,33 @@ async function importFormatBatchFixture() {
     prepared_node_context:{node,workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},async()=>structuredClone(node));
   const snapshot=(await run({mode:'observe'})).output;
   const field=(name,text)=>({ref:snapshot.wizard.settings.fields[name].input_ref,text});
-  const act=()=>run({mode:'act',snapshot,action:{verb:'set_wizard_fields',
-    fields:[field('delimiter',';'),field('null_marker','\\N')]}});
-  return {page,input,delimiter,act,node};
+  const action={verb:'set_wizard_fields',fields:[field('delimiter',';'),field('null_marker','\\N')]};
+  const act=()=>run({mode:'act',snapshot,action});
+  return {page,input,delimiter,act,node,snapshot,action};
 }
+
+test('the private validator binds batch fields, order and values to the observed page',async()=>{
+  const {snapshot,action,node}=await importFormatBatchFixture();
+  snapshot.wizard.owner_context={status:'observed'};
+  assert.doesNotThrow(()=>validateNodeUiAction(action,snapshot,node));
+  assert.throws(()=>validateUiAction(action,snapshot),/Unsupported/);
+  assert.throws(()=>validateNodeUiAction(action,snapshot),/prepared owner/);
+  for(const change of [
+    a=>a.fields.reverse(),
+    a=>a.fields[1]=a.fields[0],
+    a=>a.fields[1].text='NULL',
+    a=>a.fields[1].text='x'.repeat(257),
+    a=>a.fields[1].ref='ui-foreign',
+    (_,s)=>s.wizard.settings.fields.null_marker.owner_ref='ui-foreign',
+    (_,s)=>s.wizard.settings.fields.null_marker.truncated=true,
+    (_,s)=>s.wizard.owner_context.status='unknown',
+    (_,s)=>s.prepared_node_context.surface='graph'
+  ]){
+    const changedAction=clone(action),changedSnapshot=clone(snapshot);
+    change(changedAction,changedSnapshot);
+    assert.throws(()=>validateNodeUiAction(changedAction,changedSnapshot,node));
+  }
+});
 
 test('an owned import page applies ordered fields with one settled readback',async()=>{
   const {page,delimiter,input,act}=await importFormatBatchFixture();
@@ -1825,15 +1848,78 @@ test('an owned import page applies ordered fields with one settled readback',asy
   assert.equal(result.trace.filter(e=>e.event==='import_format_input_settled').length,1);
 });
 
-test('an owned import page refuses a mismatching final readback with the field name',async()=>{
+for(const name of ['delimiter','null_marker'])test('an owned import page refuses final readback mismatch for '+name,async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===input)(name==='delimiter'?delimiter:input).value='wrong';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_FIELD_NOT_CONFIRMED');
+  assert.match(result.error.message,new RegExp(name));
+  assert.equal(page.events.filter(e=>e==='click').length,2);
+  assert.ok(!result.trace.some(e=>e.event==='wizard_fields_verified'));
+});
+
+test('an owned import page confirms the delimiter before touching the next field',async()=>{
   const {page,input,delimiter,act}=await importFormatBatchFixture();
   page.onPress=(key,element)=>{if(key==='Tab'&&element===delimiter)delimiter.value='wrong';};
   const result=await act();
   assert.equal(result.status,'AMBIGUOUS');
   assert.equal(result.error.code,'WIZARD_FIELD_NOT_CONFIRMED');
   assert.match(result.error.message,/delimiter/);
-  assert.equal(input.value,'\\N');
-  assert.ok(!result.trace.some(e=>e.event==='wizard_fields_verified'));
+  assert.equal(input.value,'old');
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+});
+
+test('an owned import page preserves a pending field changed by the application',async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===delimiter)input.value='app choice';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  assert.equal(input.value,'app choice');
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+});
+
+test('an owned import page refuses a different signature for the next input',async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===delimiter)input.attrs.name='foreign-input-signature';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'UI_REFERENCE_STALE');
+  assert.equal(input.value,'old');
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+});
+
+test('an owned import page rechecks native ownership after select all on the second field',async()=>{
+  const {page,input,act,node}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='ControlOrMeta+A'&&element===input)node.node_id='foreign';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_FIELD_CHANGED');
+  assert.equal(input.value,'old');
+  assert.equal(page.events.filter(e=>e==='keyboard_type').length,1);
+});
+
+for(const field of ['delimiter','null_marker'])test('an owned import page waits for consecutive quiet epochs after '+field,async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  const target=field==='delimiter'?delimiter:input;
+  let waits=0,settling=false,waitsBeforeNext;
+  page.onPress=(key,element)=>{
+    if(key==='Tab'&&element===target){settling=true;target.value='transient';}
+    if(key==='ControlOrMeta+A'&&element===input)waitsBeforeNext=waits;
+  };
+  page.waitForTimeout=async ms=>{
+    page.clock.advance(ms);
+    if(settling&&++waits===2){
+      target.value=field==='delimiter'?';':'\\N';
+      page.mutationObserver.pending.push({type:'attributes',attributeName:'class',target});
+    }
+  };
+  const result=await act();
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  if(field==='delimiter')assert.equal(waitsBeforeNext,4);
+  else assert.equal(waits,4);
+  assert.equal(result.trace.filter(e=>e.event==='wizard_fields_verified').length,1);
 });
 
 test('an owned import page stops before the next write when its native owner changes',async()=>{
@@ -3456,7 +3542,8 @@ test('output columns bind names labels and types to real rows, excluding summary
 });
 
 test('output column typed editing preserves the selected row and all other parameters',async()=>{
-  for(const mode of ['name','label','linked_name','linked_wrong','unlinked_changed','type_changed','selection_changed','missing_type','combo','combo_kind_changed','combo_busy']) {
+  for(const mode of ['name','label','linked_name','linked_wrong','unlinked_changed','type_changed','selection_changed','missing_type',
+    'combo','combo_kind_changed','combo_busy','batch_linked','batch_linked_satisfied','batch_unlinked_changed','batch_linked_signature_changed']) {
     const page=new Page(),base='MF;TF-1;WizrdMCF;',form=page.add('div',base.slice(0,-1));
     page.add('button',base+'DerivedDataSourceOutputSocketWizard;btnAddMappingColumn','',undefined,form);
     const table=page.add('table',null,'',undefined,form);table.attrs.class='x-grid-item-selected';
@@ -3485,9 +3572,31 @@ test('output column typed editing preserves the selected row and all other param
       assert.equal(page.events.filter(e=>e==='click').length,mode==='combo_busy'?0:1);
       continue;
     }
-    if(mode.startsWith('linked_'))inputs.edtDisplayName.value='Quantity';
+    if(mode.startsWith('linked_')||mode.startsWith('batch_linked'))inputs.edtDisplayName.value='Quantity';
     if(mode==='missing_type')inputs.cbxDataType.remove();
-    const full=await page.observe(),read=await page.execute({mode:'observe',root_ref:full.wizard.column_parameters.root_ref});
+    const full=await page.observe(),root_ref=full.wizard.column_parameters.root_ref;
+    if(mode.startsWith('batch_')){
+      const node={verified:true,surface:'wizard',document_id:'doc',workflow_id:'wf',node_id:'node',tid:base.slice(0,-1)};
+      const primitive=vm.runInContext('('+workspaceUiCapability.toString()+')',page.context);
+      const run=options=>primitive(page,{expected_build:build,expected_origin:origin,
+        prepared_node_context:{node,workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},async()=>structuredClone(node));
+      const snapshot=(await run({mode:'observe',root_ref})).output;
+      const action={verb:'set_wizard_fields',fields:['name','label'].map((name,i)=>({
+        ref:snapshot.wizard.column_parameters.fields[name].input_ref,text:i&&mode!=='batch_linked_satisfied'?'Sum':'QuantitySum'}))};
+      validateNodeUiAction(action,snapshot,node);
+      page.onPress=(key,element)=>{
+        if(key!=='Tab'||element!==inputs.edtName)return;
+        inputs.edtDisplayName.value=mode==='batch_unlinked_changed'?'App choice':'QuantitySum';
+        if(mode==='batch_linked_signature_changed')inputs.edtDisplayName.attrs.name='foreign-signature';
+      };
+      const result=await run({mode:'act',snapshot,action});
+      const verified=['batch_linked','batch_linked_satisfied'].includes(mode);
+      assert.equal(result.status,verified?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+      assert.equal(page.events.filter(e=>e==='keyboard_type').length,mode==='batch_linked'?2:1);
+      assert.equal(inputs.edtDisplayName.value,mode==='batch_linked'?'Sum':mode==='batch_unlinked_changed'?'App choice':'QuantitySum');
+      continue;
+    }
+    const read=await page.execute({mode:'observe',root_ref});
     const target=read.output.ui.elements.find(e=>e.wizard_field?.scope==='output_column' && e.wizard_field.name===(mode==='label'?'label':'name'));
     if(mode==='missing_type'){assert.equal(target,undefined);continue;}
     assert.ok(target);
