@@ -273,14 +273,14 @@ bun typecheck
 
 **Файлы:** producer — `packages/loginom-runtime/client/lib/browser-recovery.mjs` и `bridge.mjs`, их `client/test/browser-recovery.test.mjs` и `browser-recovery-bridge.test.mjs`; consumers — `packages/opencode/src/product/tool-contributor.ts`, `product/turn-lifecycle.ts`, `session/browser-recovery.ts`; owning tests `test/product/tool-contributor.test.ts`, `product/turn-lifecycle.test.ts`, `session/browser-recovery.test.ts`, `session/tools.test.ts`, `session/prompt.test.ts`.
 
-**Интерфейс:** runtime ещё не публикует recovery `_meta`, а reminder читает phase из текста. Добавить минимальную metadata для связи состояния с попыткой и задачей. Сохранить публичные text/structuredContent, существующий `_meta.outputFiles` и одно напоминание на попытку.
+**Интерфейс:** runtime передаёт идентификаторы операции и попытки и её фазу в `_meta.browserRecovery`. Для прежней истории остаётся чтение фазы из публичного ответа. Сохраняются text, structuredContent, `_meta.outputFiles` и одно напоминание на попытку.
 
-- [ ] RED/GREEN: настоящий recovery reply из runtime проходит через contributor до task state/reminder. Producer добавляет необходимые metadata, consumer сохраняет их у успешного и ошибочного ответа независимо от text truncation; ошибочный вызов не становится успешным из-за metadata. Тест с искусственно вставленным `_meta` без проверки producer недостаточен.
-- [ ] Проверить сочетание recovery metadata с `_meta.outputFiles`. Сохранить приватные сведения о файлах в tool metadata и прежний вид квитанции экспорта для модели.
-- [ ] Следующие циклы: новая пользовательская задача, compaction/replay, revert и поздний ответ предыдущей задачи. Старое напоминание не должно оживать или привязываться к новой задаче.
-- [ ] Учитывать действующий профиль сессии из `sessions.getForExecution` / `DashboardSession.profile` в `TaskScope.derive`. Проверить, что следы прежней automation-задачи не выдают dashboard-чату recovery tools или reminder и что обычный dashboard-ход не захватывает Loginom Host.
-- [ ] Проверить продолжение текущей попытки и одно напоминание на неё. Сверить публичные tool schemas/permissions; не перестраивать session core.
-- [ ] Пройти проверки, review и commit `fix(opencode): scope recovery metadata to active task`.
+- [x] RED/GREEN: настоящий recovery reply из runtime проходит через contributor до task state/reminder. Producer добавляет необходимые metadata, consumer сохраняет их у успешного и ошибочного ответа независимо от text truncation; ошибочный вызов не становится успешным из-за metadata. Тест с искусственно вставленным `_meta` без проверки producer недостаточен.
+- [x] Проверить сочетание recovery metadata с `_meta.outputFiles`. Сохранить приватные сведения о файлах в tool metadata и прежний вид квитанции экспорта для модели.
+- [x] Следующие циклы: новая пользовательская задача, compaction/replay, revert и поздний ответ предыдущей задачи. Старое напоминание не должно оживать или привязываться к новой задаче.
+- [x] Учитывать действующий профиль сессии из `sessions.getForExecution` / `DashboardSession.profile` в `TaskScope.derive`. Проверить, что следы прежней automation-задачи не выдают dashboard-чату recovery tools или reminder и что обычный dashboard-ход не захватывает Loginom Host.
+- [x] Проверить продолжение текущей попытки и одно напоминание на неё. Сверить публичные tool schemas/permissions; не перестраивать session core.
+- [x] Пройти проверки, review и commit `fix(opencode): scope recovery metadata to active task`.
 
 Из `packages/opencode/`:
 
@@ -474,3 +474,11 @@ sudo systemctl enable --now "loginom-eval-campaign@$campaign_id.service"
 - Независимое чтение первичных квитанций подтвердило SHA серверного CSV на каждой стороне, отдельный чистый профиль Chromium для cold, совпадение пути и GUID, закрытие пакета и выход. Дополнение `01a213e9-8415-79db-90a9-482392318bb6` скачано из LAB-2009 с тем же SHA-256.
 - До закрытия LAB-2009 и передачи S5 требуется штатное освобождение двух исходных броней runner1. В 21:16 МСК SSH через назначенный канал вернул `No route to host`, прямой маршрут также оставался недоступен.
 - Живое сравнение завершено 2/2, cold 1/1. S7 0/12, основной корпус 0/876.
+
+### Checkpoint S5, 25.11.2026
+
+- LAB-2037 в работе. По решению владельца для старта принята живая пара S4 на runner2. Две прежние брони runner1 и закрытие LAB-2009 остаются за S4.
+- Вход `9db4ba3a65a41f3e5190c75f22bcaa9d96e1b706`, продукт `65eb26d5ccfbeef1548bec30e238f18d4d15d2f3`. Независимое ревью кода принято. Квитанция исходной пары в LAB-2037 — `01a2142d-0f7c-7be5-8de6-8d55a5a1d74a`.
+- При усечении настоящего start и ошибочном повторе контроль завершил обработку после трёх запросов локальному HTTP-провайдеру. На кандидате четвёртый запрос получил одно напоминание с правильной операцией. В следующей задаче обе стороны дали ноль чужих подсказок.
+- Проверены Dashboard и отсутствие захвата Host, возврат единственного напоминания после compaction, replay, revert и поздняя квитанция. Протокольная неопределённость Host прекращает использование прежнего состояния. Публичные схемы и permissions сверены. Команды, ревизии и контрольные суммы — в карточке.
+- EvalOps подтвердил свободу выделенного слота runner2 и очистку немодельной проверки. На контрольной установке Chromium завершился с ошибкой SUID helper внутри штатного bubblewrap. Требуются штатный допуск, установленные сравнения и паспорт. Резерв из шести независимых семейств закрыт. Передача S6 ожидает приёмки S5.
