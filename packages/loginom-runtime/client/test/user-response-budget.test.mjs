@@ -153,15 +153,15 @@ test('oversized real node cards supply exact deliverable retries with only match
 
 // LAB-2008: six cards were split into six single requests although three fit
 // together (bh-a10, lab2006-1 model.stdout:33, lab2006-3 model.stdout:41).
-test('six-card refusal names how many cards fit and packs them into fewer requests',async t=>{
+test('six-card refusal groups deliverable cards into fewer requests that fit',async t=>{
  const types=['imports.text','imports.excel','transform.join_data','transform.group_data','transform.sorting','exports.text'];
  const modes=['delimited','xlsx','inner','aggregate','keys'];
  const {value,requests}=await packedDescribeRecovery(t,types,modes);
  assert.ok(requests.length<=3,JSON.stringify(requests));
- const largest=Math.max(...requests.map(request=>request.node_types.length));
- assert.ok(largest>=2);
- assert.match(value.next_step.instruction,new RegExp(`Up to ${largest} of the 6 deliverable node cards fit in one reply; ${requests.length} node requests cover them`));
- assert.match(value.error.message,/fewest requests that fit/);
+ assert.ok(Math.max(...requests.map(request=>request.node_types.length))>=2);
+ assert.match(value.next_step.instruction,new RegExp(`^The 6 deliverable node cards are grouped into ${requests.length} node requests that each fit one reply\\. Run arguments`));
+ assert.match(value.error.message,/next_step groups the cards into requests that fit\./);
+ assert.doesNotMatch(JSON.stringify(value),/fewest|Up to/);
 });
 
 test('an oversized single card is reported without an identical retry or lost modes',()=>{
@@ -172,6 +172,10 @@ test('an oversized single card is reported without an identical retry or lost mo
  const next=JSON.parse(refused.content[0].text).next_step;
  assert.equal(refused.isError,true);assert.equal(next.tool,undefined);assert.equal(next.arguments,undefined);
  assert.deepEqual(next.undeliverable_requests,[{node_types:['imports.text'],modes:['delimited']}]);
+ // With no deliverable request the refusal does not promise a grouped next_step.
+ const message=JSON.parse(refused.content[0].text).error.message;
+ assert.equal(message,'Description exceeds the delivery budget; no cards delivered. Schemas and rules are intact.');
+ assert.match(next.instruction,/No smaller verified request is available/);
  assert.equal(JSON.stringify(original),before);
 });
 
@@ -184,6 +188,8 @@ test('mixed overflow splits saving actions from nodes, omits absent modes and do
  assert.deepEqual(next.arguments,{node_types:['transform.calculator']});
  assert.deepEqual(next.remaining_requests,[{action_keys:['package.save_checkpoint']}]);
  assert.deepEqual(next.undeliverable_requests,[{node_types:['imports.text']}]);
+ // A single deliverable card needs no grouping sentence.
+ assert.match(next.instruction,/^Run arguments/);
  assert.ok(bytes(refused)<2000);
 });
 

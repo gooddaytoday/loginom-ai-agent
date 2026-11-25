@@ -131,8 +131,8 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
 function deliveredUpload(result,outcome) {
   if(!result.upload_operation_id||result.state!=='settled'||outcome?.status!=='SUCCEEDED'||outcome.upload_completion_verified!==true
     ||outcome.upload_operation_id!==result.upload_operation_id)return null;
-  return {instruction:`In node parameters.source use upload_operation_id "${result.upload_operation_id}" (output.upload_operation_id) `
-    +`with this artifact_id, not the delivery operation_id "${result.operation_id}".`};
+  return {instruction:`To use this file as a node source, use upload_operation_id "${result.upload_operation_id}" (output.upload_operation_id), `
+    +`not the delivery operation_id "${result.operation_id}".`};
 }
 
 function previewLimitations(output) {

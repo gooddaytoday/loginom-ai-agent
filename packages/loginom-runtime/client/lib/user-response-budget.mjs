@@ -5,9 +5,9 @@ const textReply=value=>({content:[{type:'text',text:JSON.stringify(value)}]});
 
 const fitsDescribeBudget=(description,value)=>Buffer.byteLength(JSON.stringify(textReply({...description,...value})),'utf8')<=USER_PREVIEW_WIRE_BUDGET;
 
-// Pack complete cards into the fewest ordered requests that each fit as one
-// reply. A card joins a batch only when the batch's combined modes select
-// exactly its original modes, so every retried card is byte-identical.
+// Group complete cards first-fit into ordered requests that each fit as one
+// reply. A batch's modes are the requested modes of its cards, so each card
+// keeps exactly the modes it was refused with.
 function describeRecovery(description,modes) {
  const batches=[],undeliverable=[],actionRequests=[];
  let fitting=0;
@@ -17,19 +17,12 @@ function describeRecovery(description,modes) {
   // Never send a model back to the same oversized single-card request.
   if(!fitsDescribeBudget(description,{actions:[],node_types:[node]})){undeliverable.push(args);continue;}
   fitting++;
-  const batch=batches.find(batch=>{
-   const combined=[...new Set([...(batch.modes??[]),...selected])];
-   return (batch.modes===undefined)===(selected.length===0)
-    &&[...batch.cards,node].every((card,index)=>{
-     const own=index<batch.cards.length?batch.selected[index]:selected;
-     return combined.filter(mode=>card.modes.includes(mode)).sort().join('\n')===[...own].sort().join('\n');
-    })
-    &&fitsDescribeBudget(description,{actions:[],node_types:[...batch.cards,node]});
-  });
+  const batch=batches.find(batch=>(batch.modes===undefined)===(selected.length===0)
+   &&fitsDescribeBudget(description,{actions:[],node_types:[...batch.cards,node]}));
   if(batch){
-   batch.cards.push(node);batch.selected.push(selected);batch.node_types.push(node.type);
-   if(selected.length)batch.modes=(modes??[]).filter(mode=>batch.modes.includes(mode)||selected.includes(mode));
-  }else batches.push({cards:[node],selected:[selected],node_types:[node.type],...(selected.length?{modes:[...selected]}:{})});
+   batch.cards.push(node);batch.node_types.push(node.type);
+   if(selected.length)batch.modes=modes.filter(mode=>batch.modes.includes(mode)||selected.includes(mode));
+  }else batches.push({cards:[node],node_types:[node.type],...(selected.length?{modes:[...selected]}:{})});
  }
  for(const action of description?.actions??[]){
   const args={action_keys:[action.action_key]};
@@ -37,11 +30,10 @@ function describeRecovery(description,modes) {
   else undeliverable.push(args);
  }
  const requests=[...batches.map(({node_types,modes})=>({node_types,...(modes?{modes}:{})})),...actionRequests];
- const largest=Math.max(0,...batches.map(batch=>batch.cards.length));
  return {...(requests.length?{tool:'dock_action_describe',arguments:requests[0],remaining_requests:requests.slice(1)}:{}),
   ...(undeliverable.length?{undeliverable_requests:undeliverable}:{}),
   instruction:requests.length
-   ?`${batches.length?`Up to ${largest} of the ${fitting} deliverable node cards fit in one reply; ${batches.length} node request${batches.length===1?'':'s'} cover${batches.length===1?'s':''} them. `:''}Run arguments, then each remaining_requests entry exactly as given, preserving modes. Do not regroup or repeat the refused request. Earlier cards remain valid. Report undeliverable_requests; never retry them or guess rules.`
+   ?`${fitting>1?`The ${fitting} deliverable node cards are grouped into ${batches.length} node request${batches.length===1?'':'s'} that each fit one reply. `:''}Run arguments, then each remaining_requests entry exactly as given, preserving modes. Do not regroup or repeat the refused request. Earlier cards remain valid. Report undeliverable_requests; never retry them or guess rules.`
    :'Report this description delivery limitation. No smaller verified request is available; do not repeat the oversized request or guess missing schema or rules.'};
 }
 
@@ -58,15 +50,16 @@ export function boundedUserToolReply(reply,{tool,operationId,modes}={}) {
  if(!cardTooLarge&&wireBytes<=USER_PREVIEW_WIRE_BUDGET&&textBytes<=50*1024&&lines<=2000)return reply;
  const id=reply.structuredContent?.operation_id??reply.structuredContent?.owner?.operation_id??operationId;
  const retained=typeof id==='string'&&/^[A-Za-z0-9_.:-]{1,128}$/.test(id)?id:null;
- const describe=tool==='dock_action_describe';
+ const describe=tool==='dock_action_describe',recovery=describe&&!cardTooLarge?describeRecovery(description,modes):null;
  const refusal={result_delivery:'refused',error:{code:'USER_RESPONSE_BUDGET',
    message:cardTooLarge?'The complete JavaScript description exceeds its own delivery budget. Report this limitation; smaller batches cannot deliver this card and its schema/rules were not truncated.'
-     :describe?'Description exceeds the delivery budget; no cards delivered. next_step groups the cards into the fewest requests that fit. Schemas and rules are intact.'
+     :describe?(recovery.tool?'Description exceeds the delivery budget; no cards delivered. next_step groups the cards into requests that fit. Schemas and rules are intact.'
+       :'Description exceeds the delivery budget; no cards delivered. Schemas and rules are intact.')
      :'The complete reply exceeds the delivery budget and was not delivered. Original operation receipts remain retained; inspect them before any correction and never repeat uncertain mutations.',
    scope:cardTooLarge?'javascript_description':'whole_response'},
    ...(retained?{original_operation_id:retained}:{}),
    next_step:cardTooLarge?{instruction:'Report the JavaScript description delivery limitation. Do not guess missing schema or rules or repeat the same oversized single-card request.'}
-     :describe?describeRecovery(description,modes)
+     :describe?recovery
      :retained?{tool:'dock_operation_inspect',arguments:{operation_id:retained},instruction:tool==='dock_prepare'
        ?'Read the retained preparation receipt without the input artifact list or knowledge bundle. Do not repeat preparation to retrieve node cards; request selected node_types and modes through dock_action_describe.'
        :'Inspect the original operation. A local full receipt is not model delivery; obtain smaller analytical output only after effects are reconciled.'}

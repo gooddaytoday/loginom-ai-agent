@@ -126,7 +126,7 @@ export function previewImportFirstFormRefusal(request,history) {
     +'Nothing was changed: resubmit the complete form with a NEW operation_id on the SAME node.':null;
 }
 
-export function verifyTextImportSource(parameters,uploads,uploadHistory,storageProof) {
+export function verifyTextImportSource(parameters,uploads,uploadHistory,storageProof,sourcePath='parameters.source') {
   try {
   const s=parameters.source;
   validateTextSource(s);
@@ -134,7 +134,8 @@ export function verifyTextImportSource(parameters,uploads,uploadHistory,storageP
     const declared=parameters.settings.source??{},paths=Object.hasOwn(declared,'source_paths')?textImportSourcePaths(declared):null;
     requireValue(!Object.hasOwn(declared,'source_path')&&(!paths||paths.length===s.sources.length),'One verified source per ordered source_path required');
     const sources=s.sources.map((source,i)=>verifyTextImportSource({source,settings:{source:{
-      source_path:paths?.[i]??(source.kind==='storage'?storageProof?.[i]?.destination:undefined)}}},uploads,uploadHistory,storageProof?.[i]).source);
+      source_path:paths?.[i]??(source.kind==='storage'?storageProof?.[i]?.destination:undefined)}}},uploads,uploadHistory,storageProof?.[i],
+      `${sourcePath}.sources[${i}]`).source);
     const destinations=sources.map(source=>source.destination);
     textImportSourcePaths({source_paths:destinations});
     if(Object.hasOwn(declared,'source_mask')){
@@ -158,7 +159,7 @@ export function verifyTextImportSource(parameters,uploads,uploadHistory,storageP
   // whose request ID was passed; the refusal itself stays unchanged.
   const receipt=matching.length?[]:uploads.filter(u=>u.operation_id===s.upload_operation_id+':upload'&&u.artifact?.artifact_id===s.artifact_id);
   const u=one(matching,'Verified upload operation is missing or ambiguous. '+(receipt.length===1
-    ?`"${s.upload_operation_id}" is the dock_artifact_deliver operation_id; set source.upload_operation_id to "${receipt[0].operation_id}" from its receipt output.upload_operation_id.`
+    ?`"${s.upload_operation_id}" is the dock_artifact_deliver operation_id; set ${sourcePath}.upload_operation_id to "${receipt[0].operation_id}" from its receipt output.upload_operation_id.`
     :'Use output.upload_operation_id from the successful dock_artifact_deliver receipt.'));
   const proof=verifiedLocalDelivery(u.artifact,u.outcome);
   requireValue(u.outcome.operation_id===s.upload_operation_id&&u.artifact.artifact_id===s.artifact_id

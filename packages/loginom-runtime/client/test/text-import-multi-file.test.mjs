@@ -43,6 +43,22 @@ test('each delivery in a mixed list retains its own bytes and digest witness',()
  p.source.sources[1].sha256='b'.repeat(64);
  assert.throws(()=>verifyTextImportSource(p,[upload],undefined,[proofs[0]]),e=>e.nodePhaseRefusal?.effect_possible===false);
 });
+// LAB-2008 review: a list item's ready upload ID is named by its request path.
+test('a delivery ID in a list item names the ready upload ID at that item path',()=>{
+ const p=parameters(),digest='a'.repeat(64),destination=paths[1];
+ p.source.sources[1]={kind:'verified_delivery',artifact_id:'artifact',upload_operation_id:'deliver',bytes:15,sha256:digest};
+ const upload={operation_id:'deliver:upload',artifact:{artifact_id:'artifact',bytes:15,sha256:digest},
+  outcome:{operation_id:'deliver:upload',action_key:'artifact.upload',status:'SUCCEEDED',cleanup_complete:true,
+   output:{artifact_id:'artifact',destination,bytes:15,sha256:digest,server_copy_verification:{verification_id:'verified',status:'SUCCEEDED',
+    bytes_verified:true,upload_completion_verified:true,destination,bytes:15,sha256:digest}}}};
+ assert.throws(()=>verifyTextImportSource(p,[upload],undefined,[proofs[0]]),e=>{
+  assert.match(e.message,/set parameters\.source\.sources\[1\]\.upload_operation_id to "deliver:upload"/);
+  assert.equal(e.nodePhaseRefusal?.effect_possible,false);
+  return true;
+ });
+ p.source.sources[1].upload_operation_id='deliver:upload';
+ assert.equal(verifyTextImportSource(p,[upload],undefined,[proofs[0]]).source.sources[1].sha256,digest);
+});
 test('invalid lists and service options refuse in production preflight',()=>{
  for(const source of [{source_paths:[]},{source_paths:['','']},{source_paths:['/x.csv｜/y.csv']},
   {source_paths:['/x*.csv']},{source_paths:['/../x.csv']},{source_paths:['https://x/a.csv']},
