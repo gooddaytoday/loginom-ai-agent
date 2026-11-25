@@ -23741,3 +23741,61 @@ $ grep -c blacksmith .github/workflows/*.yml                             # check
 - Содержимое секретов и переменных форка (`gh secret list`) не смотрел; вопрос 1 это учитывает. Единственный сетевой запрос —
   метаданные репозитория выше (отступ от условия «только документация»).
 - Состав 57 крейтов и лицензий (g) считал по журналу B2.7a9, не по `Cargo.lock`.
+
+## B5.1a и B5.1b — выключить upstream-задания и triage
+
+25.11.2026. Ветка `b51ab-upstream-off` от `oc2-migration` (`569014e83b`), дерево `.claude/worktrees/b51ab`. Эталон 0.4 — `v0.4.0` (В-99).
+Bun 1.4.4 переносной первым в `PATH`; `bun install --frozen-lockfile` — код 0, `.husky/_` есть. Actions и модель не вызывались.
+
+### Что сделано
+
+- Условие `github.repository == 'anomalyco/opencode'` на заданиях восьми upstream-workflow, как уже сделано в `deploy*`,
+  `nightly-beta`, `plan` в `release.yml`:
+  - B5.1a: `check-nix` и `check-docs` (условие слито с `!github.event.pull_request.draft`), `release-process-daemon`
+    (только корневое задание `checks`; `build`, `build-windows`, `package`, `release` зависят от него и пропускаются);
+  - B5.1b: `triage-contributor`, `triage-pr-standards` (оба задания), `triage-close-issues`, `triage-close-prs`,
+    `triage-compliance-close`.
+- Охранный тест `packages/product/test/ci-workflows.test.ts`: каждый workflow либо в явном списке продукта (9 имён), либо
+  `bot-nix-hashes` (старт только на push `dev`, публикация с условием), либо каждое его задание имеет условие или зависит
+  только от заданий с условием. Новый upstream-workflow после слияния краснит тест, пока не принято решение. Второй тест —
+  имена из списка существуют.
+- `catalog.md` (CAT-02): восемь файлов в компонентах и тест в проверке при обновлении. `catalog.json` не менялся: маска
+  `.github/**` записи CAT-02 уже покрывает эти файлы (выбор меньшего: запись по маске, не по файлам).
+
+### Выбор
+
+- Условие поставлено на корневое задание `release-process-daemon`, а не на все пять: зависимые задания пропускаются сами.
+  Тест это учитывает (правило «все `needs` выключены»).
+- `check-process-daemon` остаётся в списке продукта (задача f), `check`, `check-test` — задача c. Их не трогал.
+- Файлы вне своей строки не правились.
+
+### Мутации (разбор через `Bun.YAML`, тест краснит)
+
+```text
+убрано условие в check-nix.yml               -> check-nix.yml: nix-eval                         (fail)
+убрано условие в triage-pr-standards.yml     -> check-standards, check-compliance               (fail)
+убрано условие в release-process-daemon.yml  -> checks, build, build-windows, package, release   (fail)
+условие release.yml/plan заменено на true    -> plan, verify, tag, ...                          (fail)
+```
+
+Файлы после каждой мутации возвращены.
+
+### Команды и вывод
+
+```text
+$ cd packages/product && bun test test/ci-workflows.test.ts        # 2 pass, 0 fail
+$ cd packages/product && bun test                                  # 65 pass, 3 fail — ровно известные: workspace packages, CI triggers, path literals
+$ python3 scripts/upstream-sync/catalog-check.py                   # код 0
+$ python3 scripts/upstream-sync/apply-identity.py --check          # would change: 0 files
+$ bun run check                                                    # код 0, 39 задач успешно
+```
+
+### Проверит только CI на GitHub
+
+В форке задания восьми workflow получают статус `skipped`, ничего не висит в очереди на `blacksmith-*`; `triage-*` не закрывают
+issue и PR форка (расписание начнёт работать только после слияния в `loginom`). `actionlint` на машине нет: синтаксис — `Bun.YAML`.
+
+### Не проверено
+
+Поведение GitHub с условием на задании `workflow_dispatch` и `schedule` (по документации — `skipped`). Тесты других пакетов не
+гонялись: код вне `packages/product` не менялся.

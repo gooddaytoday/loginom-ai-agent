@@ -31,6 +31,7 @@ env:
 
 jobs:
   checks:
+    if: github.repository == 'anomalyco/opencode'
     runs-on: ubuntu-22.04
     outputs:
       protocol: ${{ steps.protocol.outputs.protocol }}

@@ -6,6 +6,7 @@ on:
 
 jobs:
   add-contributor-label:
+    if: github.repository == 'anomalyco/opencode'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
