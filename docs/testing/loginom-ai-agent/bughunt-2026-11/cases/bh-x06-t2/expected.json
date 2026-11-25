@@ -1,0 +1,42 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.filter_data"
+    },
+    {
+      "type": "transform.sorting"
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "sales",
+        "type": "imports.text"
+      },
+      {
+        "id": "filter",
+        "type": "transform.filter_data"
+      },
+      {
+        "id": "sort",
+        "type": "transform.sorting"
+      }
+    ],
+    "links": [
+      {
+        "source": "sales",
+        "target": "filter",
+        "output": 0,
+        "input": 0
+      }
+    ],
+    "retain": [
+      "sales",
+      "sort"
+    ]
+  },
+  "outputs": []
+}

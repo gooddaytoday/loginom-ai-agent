@@ -1,0 +1,7 @@
+{
+  "base": "bh-x06-t2",
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 0
+  }
+}
