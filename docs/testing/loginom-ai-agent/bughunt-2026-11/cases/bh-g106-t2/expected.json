@@ -11,9 +11,11 @@
   "graph": {
     "nodes": [
       {
+        "id": "imports.text",
         "type": "imports.text"
       },
       {
+        "id": "programming.python",
         "type": "programming.python"
       }
     ],

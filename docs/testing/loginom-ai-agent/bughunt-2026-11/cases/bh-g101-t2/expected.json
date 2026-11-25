@@ -11,20 +11,18 @@
   "graph": {
     "nodes": [
       {
+        "id": "imports.text",
         "type": "imports.text"
       },
       {
+        "id": "transform.group_data",
         "type": "transform.group_data"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.text"
-        },
-        "target": {
-          "type": "transform.group_data"
-        }
+        "source": "imports.text",
+        "target": "transform.group_data"
       }
     ]
   },

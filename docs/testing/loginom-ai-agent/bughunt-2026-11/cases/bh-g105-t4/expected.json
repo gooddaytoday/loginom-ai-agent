@@ -14,31 +14,26 @@
   "graph": {
     "nodes": [
       {
+        "id": "imports.text",
         "type": "imports.text"
       },
       {
+        "id": "programming.javascript",
         "type": "programming.javascript"
       },
       {
+        "id": "transform.group_data",
         "type": "transform.group_data"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.text"
-        },
-        "target": {
-          "type": "programming.javascript"
-        }
+        "source": "imports.text",
+        "target": "programming.javascript"
       },
       {
-        "source": {
-          "type": "programming.javascript"
-        },
-        "target": {
-          "type": "transform.group_data"
-        }
+        "source": "programming.javascript",
+        "target": "transform.group_data"
       }
     ]
   },

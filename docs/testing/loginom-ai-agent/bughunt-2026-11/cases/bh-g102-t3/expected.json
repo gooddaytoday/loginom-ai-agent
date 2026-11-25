@@ -14,32 +14,27 @@
   "graph": {
     "nodes": [
       {
+        "id": "imports.excel",
         "type": "imports.excel"
       },
       {
+        "id": "imports.text",
         "type": "imports.text"
       },
       {
+        "id": "transform.join_data",
         "type": "transform.join_data"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.excel"
-        },
-        "target": {
-          "type": "transform.join_data"
-        },
+        "source": "imports.excel",
+        "target": "transform.join_data",
         "input": 0
       },
       {
-        "source": {
-          "type": "imports.text"
-        },
-        "target": {
-          "type": "transform.join_data"
-        },
+        "source": "imports.text",
+        "target": "transform.join_data",
         "input": 1
       }
     ]

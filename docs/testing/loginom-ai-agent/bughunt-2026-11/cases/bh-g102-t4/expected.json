@@ -17,44 +17,36 @@
   "graph": {
     "nodes": [
       {
+        "id": "imports.excel",
         "type": "imports.excel"
       },
       {
+        "id": "imports.text",
         "type": "imports.text"
       },
       {
+        "id": "transform.join_data",
         "type": "transform.join_data"
       },
       {
+        "id": "transform.calculator",
         "type": "transform.calculator"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.excel"
-        },
-        "target": {
-          "type": "transform.join_data"
-        },
+        "source": "imports.excel",
+        "target": "transform.join_data",
         "input": 0
       },
       {
-        "source": {
-          "type": "imports.text"
-        },
-        "target": {
-          "type": "transform.join_data"
-        },
+        "source": "imports.text",
+        "target": "transform.join_data",
         "input": 1
       },
       {
-        "source": {
-          "type": "transform.join_data"
-        },
-        "target": {
-          "type": "transform.calculator"
-        }
+        "source": "transform.join_data",
+        "target": "transform.calculator"
       }
     ]
   },

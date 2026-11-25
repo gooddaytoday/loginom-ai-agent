@@ -11,20 +11,18 @@
   "graph": {
     "nodes": [
       {
+        "id": "imports.text",
         "type": "imports.text"
       },
       {
+        "id": "programming.javascript",
         "type": "programming.javascript"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.text"
-        },
-        "target": {
-          "type": "programming.javascript"
-        }
+        "source": "imports.text",
+        "target": "programming.javascript"
       }
     ]
   },

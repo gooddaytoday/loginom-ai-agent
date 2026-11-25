@@ -17,42 +17,34 @@
   "graph": {
     "nodes": [
       {
+        "id": "imports.text",
         "type": "imports.text"
       },
       {
+        "id": "transform.group_data",
         "type": "transform.group_data"
       },
       {
+        "id": "transform.sorting",
         "type": "transform.sorting"
       },
       {
+        "id": "exports.excel",
         "type": "exports.excel"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.text"
-        },
-        "target": {
-          "type": "transform.group_data"
-        }
+        "source": "imports.text",
+        "target": "transform.group_data"
       },
       {
-        "source": {
-          "type": "transform.group_data"
-        },
-        "target": {
-          "type": "transform.sorting"
-        }
+        "source": "transform.group_data",
+        "target": "transform.sorting"
       },
       {
-        "source": {
-          "type": "transform.sorting"
-        },
-        "target": {
-          "type": "exports.excel"
-        }
+        "source": "transform.sorting",
+        "target": "exports.excel"
       }
     ]
   },

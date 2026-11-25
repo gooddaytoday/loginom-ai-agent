@@ -11,9 +11,11 @@
   "graph": {
     "nodes": [
       {
+        "id": "imports.excel",
         "type": "imports.excel"
       },
       {
+        "id": "imports.text",
         "type": "imports.text"
       }
     ],

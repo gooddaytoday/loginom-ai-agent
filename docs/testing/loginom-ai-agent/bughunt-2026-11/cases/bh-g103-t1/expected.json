@@ -8,6 +8,7 @@
   "graph": {
     "nodes": [
       {
+        "id": "transform.filter_data",
         "type": "transform.filter_data"
       }
     ],

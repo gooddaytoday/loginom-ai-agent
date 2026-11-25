@@ -109,31 +109,26 @@
   "graph": {
     "nodes": [
       {
+        "id": "imports.text",
         "type": "imports.text"
       },
       {
+        "id": "programming.python",
         "type": "programming.python"
       },
       {
+        "id": "exports.text",
         "type": "exports.text"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.text"
-        },
-        "target": {
-          "type": "programming.python"
-        }
+        "source": "imports.text",
+        "target": "programming.python"
       },
       {
-        "source": {
-          "type": "programming.python"
-        },
-        "target": {
-          "type": "exports.text"
-        }
+        "source": "programming.python",
+        "target": "exports.text"
       }
     ]
   }

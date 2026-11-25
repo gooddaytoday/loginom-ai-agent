@@ -14,31 +14,26 @@
   "graph": {
     "nodes": [
       {
+        "id": "imports.text",
         "type": "imports.text"
       },
       {
+        "id": "transform.group_data",
         "type": "transform.group_data"
       },
       {
+        "id": "transform.sorting",
         "type": "transform.sorting"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.text"
-        },
-        "target": {
-          "type": "transform.group_data"
-        }
+        "source": "imports.text",
+        "target": "transform.group_data"
       },
       {
-        "source": {
-          "type": "transform.group_data"
-        },
-        "target": {
-          "type": "transform.sorting"
-        }
+        "source": "transform.group_data",
+        "target": "transform.sorting"
       }
     ]
   },

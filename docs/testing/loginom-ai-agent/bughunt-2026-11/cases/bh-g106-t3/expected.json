@@ -11,20 +11,18 @@
   "graph": {
     "nodes": [
       {
+        "id": "imports.text",
         "type": "imports.text"
       },
       {
+        "id": "programming.python",
         "type": "programming.python"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.text"
-        },
-        "target": {
-          "type": "programming.python"
-        }
+        "source": "imports.text",
+        "target": "programming.python"
       }
     ]
   },

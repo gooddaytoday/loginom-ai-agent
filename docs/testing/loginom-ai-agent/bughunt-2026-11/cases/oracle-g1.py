@@ -130,14 +130,12 @@ def table(node, schema, rows, *, ordered=False):
     }
 
 
-def link(source_node, target_node, *, input_port=None, output_port=None, kind=None):
-    edge = {"source": {"type": source_node}, "target": {"type": target_node}}
+def link(source_node, target_node, *, input_port=None, output_port=None):
+    edge = {"source": source_node, "target": target_node}
     if input_port is not None:
         edge["input"] = input_port
     if output_port is not None:
         edge["output"] = output_port
-    if kind is not None:
-        edge["kind"] = kind
     return edge
 
 
@@ -145,7 +143,7 @@ def contract(nodes, links, *tables, **checks):
     return {
         "nodes": [{"type": node} for node in nodes],
         "outputs": [],
-        "graph": {"nodes": [{"type": node} for node in nodes], "links": links},
+        "graph": {"nodes": [{"id": node, "type": node} for node in nodes], "links": links},
         **({"tables": list(tables)} if tables else {}),
         **checks,
     }
@@ -256,7 +254,7 @@ def threshold(turn):
 
     filtered = [row for row in rows if row["Сумма"] is not None and row["Сумма"] > limit]
     return contract(
-        [*nodes, FILTER], [link(IMPORT, FILTER), link(VARIABLE, FILTER, output_port=4, input_port=0, kind="control")],
+        [*nodes, FILTER], [link(IMPORT, FILTER), link(VARIABLE, FILTER, output_port=4, input_port=0)],
         table(FILTER, THRESHOLD_ORDERS, filtered, ordered=True), variables=[variable],
     )
 
@@ -332,13 +330,47 @@ def verify_excel(path):
         assert abs(got["Сумма выручки"] - want["Сумма выручки"]) <= 1e-9, "Unexpected Excel total"
 
 
+def verify_graph(expected, observed, previous):
+    nodes = observed["nodes"]
+    links = observed["links"]
+    assert Counter(node["type"] for node in nodes.values()) == Counter(
+        node["type"] for node in expected["nodes"]
+    ), "G1_GRAPH_NODE_SET"
+    bindings = {node["type"]: node_id for node_id, node in nodes.items()}
+    assert all(
+        node["type"] not in bindings or bindings[node["type"]] == node_id
+        for node_id, node in previous.items()
+    ), "G1_GRAPH_NODE_REPLACED"
+    assert len(links) == len(expected["links"]), "G1_GRAPH_LINK_COUNT"
+    for link in expected["links"]:
+        wanted = {**link, "source": bindings[link["source"]], "target": bindings[link["target"]]}
+        assert any(all(actual.get(key) == value for key, value in wanted.items()) for actual in links), (
+            f"G1_GRAPH_LINK: {link}"
+        )
+
+
 def main(case=None):
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--check", action="store_true")
     mode.add_argument("--write", action="store_true")
     mode.add_argument("--xlsx", type=Path, help="Verify the exported workbook for bh-g101-t4.")
+    mode.add_argument("--observed", type=Path, help="Check a turn's graph-observed.json.")
+    parser.add_argument("--previous", type=Path, help="Also verify node identity against the previous turn.")
     args = parser.parse_args()
+
+    if args.previous and not args.observed:
+        parser.error("--previous requires --observed")
+    if args.observed:
+        if case is None:
+            parser.error("Run --observed with a case's oracle.py")
+        chain, turn = case.name.removeprefix("bh-g").split("-t")
+        expected = CHAINS[chain](int(turn))["graph"]
+        observed = json.loads(args.observed.read_text(encoding="utf8"))
+        previous = json.loads(args.previous.read_text(encoding="utf8"))["nodes"] if args.previous else {}
+        verify_graph(expected, observed, previous)
+        print(f"PASS: {case.name} graph at {observed['location']}")
+        return
 
     if args.xlsx:
         if case is not None and case.name != "bh-g101-t4":

@@ -8,6 +8,7 @@
   "graph": {
     "nodes": [
       {
+        "id": "imports.excel",
         "type": "imports.excel"
       }
     ],

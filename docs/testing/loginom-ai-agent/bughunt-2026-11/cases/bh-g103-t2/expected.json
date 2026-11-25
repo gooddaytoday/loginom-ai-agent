@@ -11,9 +11,11 @@
   "graph": {
     "nodes": [
       {
+        "id": "transform.filter_data",
         "type": "transform.filter_data"
       },
       {
+        "id": "imports.text",
         "type": "imports.text"
       }
     ],
