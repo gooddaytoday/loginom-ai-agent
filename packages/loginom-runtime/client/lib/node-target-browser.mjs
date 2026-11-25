@@ -24,11 +24,13 @@ export async function readGraph(page, task) {
     const exact = value => document.querySelectorAll('[data-tid=' + JSON.stringify(value) + ']');
     const active = exact(request.workflow_ref.tab_tid);
     if (!record || active.length !== 1 || active[0] !== record.tab || !active[0].classList.contains('x-tab-active')) fail('Prepared workflow changed');
+    const visible = e => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0 && getComputedStyle(e).visibility !== 'hidden';
+    const blocked = selector => [...document.querySelectorAll(selector)].some(visible);
+    // An embedded wizard has its own breadcrumbs in the original tab.
+    if (blocker_selector && blocked(blocker_selector)) fail('Graph is blocked');
     const crumbs = [...document.querySelectorAll('[data-tid^=' + JSON.stringify(request.workflow_ref.prefix + ';cnrNaviMode;b.s_') + ']')].map(e => ({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
     if (crumbs.length!==request.workflow_ref.navigation_path.length || crumbs.some((c,i)=>c.tid!==request.workflow_ref.navigation_path[i].tid||c.label!==request.workflow_ref.navigation_path[i].label)) fail('Workflow navigation changed');
-    const visible = e => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0 && getComputedStyle(e).visibility !== 'hidden';
-    const blockers = [...document.querySelectorAll(blocker_selector??'[role="dialog"],.bg-mask-message,.x-mask-msg')].filter(visible);
-    if (blockers.length) fail('Graph is blocked');
+    if (!blocker_selector && blocked('[role="dialog"],.bg-mask-message,.x-mask-msg')) fail('Graph is blocked');
     const app = bg.app, card = app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
     let ancestor = card.Controller.Node?.data?.node, packageNode = null, workflowNode = null;
     for (let i=0;ancestor && i<32;i++,ancestor=ancestor.ParentNode) {
@@ -870,9 +872,9 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
   if(build!=='7.4.2')throw new Error('Node target browser profile is verified only for Loginom 7.4.2');
   let request;
   const graphBlockers='[role="dialog"],.bg-mask-message,.x-mask-msg';
-  const nativeWindowBlockers=graphBlockers+',.x-window,[role="alertdialog"],[aria-modal="true"]';
-  const blockerSelector=requireNoNativeWindow?nativeWindowBlockers:graphBlockers;
-  const task = extra => ({request,types:NODE_TYPES,origin,build,blocker_selector:blockerSelector,...extra});
+  const nativeWindowBlockers=graphBlockers+',.x-window,[role="alertdialog"],[aria-modal="true"],[data-tid$=";WizrdMCF"]';
+  const task = extra => ({request,types:NODE_TYPES,origin,build,
+    ...(requireNoNativeWindow?{blocker_selector:nativeWindowBlockers}:{}),...extra});
   const readCode = t => `async page => (${readGraph.toString()})(page,${JSON.stringify(t)})`;
   const call = (code,deadline) => execute(code,{timeout:Math.max(1,deadline-Date.now())});
   const observeGraph=async(value,deadline,{readBindings=false}={})=>{
@@ -900,7 +902,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
           // Observe only: a transient loading mask may arrive after the prior
           // graph receipt. Wait for its disappearance, then recheck the complete
           // original preparation identity; never retry a possible gesture.
-          await call(`async page => {await page.waitForFunction(selector=>![...document.querySelectorAll(selector)].some(e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden'),${JSON.stringify(blockerSelector)},{timeout:${Math.max(1,Math.min(15000,deadline-Date.now()))}});return true;}`,deadline);
+          await call(`async page => {await page.waitForFunction(selector=>![...document.querySelectorAll(selector)].some(e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden'),${JSON.stringify(graphBlockers)},{timeout:${Math.max(1,Math.min(15000,deadline-Date.now()))}});return true;}`,deadline);
         }
       }
   };

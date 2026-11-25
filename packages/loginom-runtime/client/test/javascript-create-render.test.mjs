@@ -90,10 +90,11 @@ for(const [fault,cleanup,dispatched,error] of [
  assert.match(reply.error,error);
 });
 
-for(const selector of ['.x-window','[role="alertdialog"]'])test('add_only graph reader refuses visible '+selector,async()=>{
+for(const selector of ['.x-window','[role="alertdialog"]','[data-tid$=";WizrdMCF"]'])test('add_only graph reader refuses visible '+selector,async()=>{
  const tab={classList:{contains:()=>true}},dialog={getBoundingClientRect:()=>({width:20,height:20})};
  const document={querySelectorAll:query=>query==='[data-tid="tab"]'?[tab]:query.includes(selector)?[dialog]:[]};
- const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'tab',navigation_path:[]}};
+ const navigation_path=selector.includes('WizrdMCF')?[{tid:'graph-crumb',label:'Graph'}]:[];
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'tab',navigation_path}};
  const origin='https://example.invalid',build='7.4.2';
  const context={document,location:{origin},bg:{app:{Version:build}},getComputedStyle:()=>({visibility:'visible'}),
   __loginomDockPreparationV1:{document,id:'doc',receipts:new Map([['r',{phase:'verified',workflowId:'wf',tab}]])}};
