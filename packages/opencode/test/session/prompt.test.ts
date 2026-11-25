@@ -1406,6 +1406,119 @@ for (const scenario of [
       }),
   )
 
+
+for (const scenario of ["automation", "help"] as const)
+  bundled.instance(
+    scenario === "automation"
+      ? "a chat that activated loginom-automation keeps Dock tools on its next message without a new skill call"
+      : "a help chat without activation gets no Loginom Dock tools or host grant on its next message",
+    () =>
+      Effect.gen(function* () {
+        yield* stageBundledResources
+        const requests: { method: string; input: unknown }[] = []
+        let receive: ((event: { data: unknown }) => void) | undefined
+        LoginomHost.connect({
+          start() {},
+          on(_event, listener) {
+            receive = listener
+          },
+          postMessage(value) {
+            if (!isRecord(value) || typeof value.method !== "string") throw Error("Invalid Host request")
+            requests.push({ method: value.method, input: value.input })
+            const result =
+              value.method === "acquire"
+                ? { generation: 9 }
+                : value.method === "scope" && isRecord(value.input)
+                  ? value.input.scope
+                  : value.method === "tools"
+                    ? { tools: [{ name: "dock_prepare", inputSchema: { type: "object", properties: {} } }] }
+                    : {}
+            receive?.({ data: { id: value.id, generation: 9, result } })
+          },
+        })
+        yield* Effect.addFinalizer(() => Effect.sync(() => LoginomHost.disconnect()))
+        const { llm } = yield* useServerConfig(providerCfg)
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const skills = yield* Skill.Service
+        const session = yield* sessions.create({ permission: [{ permission: "*", pattern: "*", action: "allow" }] })
+        yield* prompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          noReply: true,
+          parts: [
+            { type: "text", text: scenario === "automation" ? "Построй сценарий Loginom" : "Что такое узел Loginom?" },
+          ],
+        })
+        if (scenario === "automation") yield* llm.tool("skill", { name: "loginom-automation" })
+        yield* llm.text("Готово")
+        yield* prompt.loop({ sessionID: session.id })
+        const first = (yield* llm.inputs).length
+        const scopes = requests.filter((request) => request.method === "scope").length
+        const second = yield* prompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          noReply: true,
+          parts: [{ type: "text", text: "Теперь добавь узел фильтра" }],
+        })
+        yield* llm.text("Добавлено")
+        yield* prompt.loop({ sessionID: session.id })
+        const history = yield* sessions.messages({ sessionID: session.id })
+        const info = yield* skills.require("loginom-automation")
+        const catalogs = (yield* llm.inputs)
+          .slice(first)
+          .filter((input) => Array.isArray(input.tools))
+          .map((input) =>
+            Array.isArray(input.tools)
+              ? input.tools.flatMap((item) =>
+                  isRecord(item) && isRecord(item.function) && typeof item.function.name === "string"
+                    ? [item.function.name]
+                    : [],
+                )
+              : [],
+          )
+        expect(catalogs).toHaveLength(1)
+        const inherited = scenario === "automation"
+        expect(catalogs[0].includes("loginom_dock_prepare")).toBe(inherited)
+        expect(catalogs[0].includes("task")).toBe(!inherited)
+        const body = history
+          .find((message) => message.info.id === second.info.id)
+          ?.parts.find((part) => part.type === "text")
+        expect(body?.type === "text" && body.metadata?.skill_activation).toEqual(
+          inherited ? { name: "loginom-automation", profile: "loginom-automation", digest: info.digest } : undefined,
+        )
+        expect(TaskScope.derive({ sessionID: session.id, messages: history })).toEqual({
+          sessionID: session.id,
+          taskMessageID: second.info.id,
+          profile: inherited ? "loginom-automation" : "default",
+        })
+        expect(
+          requests
+            .filter((request) => request.method === "scope")
+            .slice(scopes)
+            .map((request) =>
+              isRecord(request.input) && isRecord(request.input.scope)
+                ? [request.input.mode, request.input.scope.profile]
+                : undefined,
+            ),
+        ).toEqual(
+          inherited
+            ? [
+                ["bind", "default"],
+                ["request", "loginom-automation"],
+                ["apply", "loginom-automation"],
+                ["bind", "loginom-automation"],
+              ]
+            : [["bind", "default"]],
+        )
+        expect(
+          history
+            .flatMap((message) => message.parts)
+            .filter((part) => part.type === "tool" && part.tool === "skill"),
+        ).toHaveLength(inherited ? 1 : 0)
+      }),
+    30_000,
+  )
 it.instance("loop continues when finish is stop but assistant has tool parts", () =>
   Effect.gen(function* () {
     const { llm } = yield* useServerConfig(providerCfg)

@@ -295,3 +295,32 @@ test("persisted activations and subsequent requests cannot change a dashboard ba
   ).toBeUndefined()
   expect(TaskScope.derive({ sessionID, messages: [], base: "loginom-dashboard" })).toBeUndefined()
 })
+
+test("a new task inherits an earlier applied loginom-automation grant only in a default chat that activated it", () => {
+  const first = user(1, "Построй сценарий Loginom")
+  const grant = activated(2, first, "loginom-automation")
+  const next = user(3, "Теперь добавь узел")
+  const carried = { name: "loginom-automation", profile: "loginom-automation", digest: "a".repeat(64) }
+  expect(TaskScope.inherited({ sessionID, messages: [first, grant] })).toBeUndefined()
+  expect(TaskScope.inherited({ sessionID, messages: [next, grant, first] })).toEqual(carried)
+  // The carried grant persisted on the new message keeps the chain for later messages.
+  const persisted = user(3, "Теперь добавь узел", { metadata: { skill_activation: carried } })
+  const third = user(4, "И запусти сценарий")
+  expect(TaskScope.derive({ sessionID, messages: [first, grant, persisted] })?.profile).toBe("loginom-automation")
+  expect(TaskScope.inherited({ sessionID, messages: [first, grant, persisted] })).toBeUndefined()
+  expect(TaskScope.inherited({ sessionID, messages: [first, grant, persisted, third] })).toEqual(carried)
+  // A reverted activation is not inherited.
+  expect(
+    TaskScope.inherited({ sessionID, messages: [first, grant, next], revert: { messageID: grant.info.id } }),
+  ).toBeUndefined()
+  // A help chat without activation and a package-docs chat inherit nothing.
+  const help = user(1, "Что такое узел Loginom?")
+  expect(TaskScope.inherited({ sessionID, messages: [help, user(2, "А что такое порт?")] })).toBeUndefined()
+  const docs = activated(2, first, "package-docs")
+  expect(TaskScope.inherited({ sessionID, messages: [first, docs, next] })).toBeUndefined()
+  // A dashboard chat keeps its immutable base and never inherits automation.
+  expect(TaskScope.inherited({ sessionID, messages: [first, grant, next], base: "loginom-dashboard" })).toBeUndefined()
+  expect(TaskScope.derive({ sessionID, messages: [first, grant, next], base: "loginom-dashboard" })?.profile).toBe(
+    "loginom-dashboard",
+  )
+})

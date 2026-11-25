@@ -1,6 +1,6 @@
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
-import { Effect } from "effect"
+import { Cause, Effect } from "effect"
 import type { Agent } from "@/agent/agent"
 import { DashboardSession } from "@/product/dashboard-session"
 import { Permission } from "@/permission"
@@ -43,6 +43,7 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
             }),
         )
   let activation: Pending | undefined
+  const inheriting = new Set<MessageID>()
 
   const beforeTurn = Effect.fnUntraced(function* (turn: { session: Session.Info; history: History }) {
     const { session, history } = turn
@@ -149,6 +150,47 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
         if (message) message.parts = message.parts.map((part) => (part.id === updated.id ? updated : part))
       }
     }
+    // A new message in a chat that already activated loginom-automation inherits it through the same host grant path.
+    const task = TaskScope.derive({ sessionID, messages: history, revert: session.revert, base })
+    const carried = TaskScope.inherited({ sessionID, messages: history, revert: session.revert, base })
+    if (!loginom || !task || !carried || inheriting.has(task.taskMessageID)) return
+    inheriting.add(task.taskMessageID)
+    const message = history.find((message) => message.info.id === task.taskMessageID)
+    const part = message?.parts.find((part) => part.type === "text" && part.synthetic !== true)
+    if (message?.info.role !== "user" || part?.type !== "text") return
+    const updated = yield* Effect.gen(function* () {
+      const agent = yield* agents.get(message.info.agent)
+      if (!agent) return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
+      yield* permission
+        .ask({
+          sessionID,
+          permission: "skill",
+          metadata: {},
+          patterns: [carried.name],
+          always: [carried.name],
+          ruleset: Permission.merge(agent.permission, session.permission ?? []),
+        })
+        .pipe(Effect.orDie)
+      yield* Effect.promise((signal) =>
+        loginom.scope("bind", { taskMessageID: task.taskMessageID, profile: task.profile }, signal),
+      )
+      yield* Effect.promise((signal) =>
+        loginom.scope("request", { taskMessageID: task.taskMessageID, profile: carried.profile }, signal),
+      )
+      return yield* Effect.gen(function* () {
+        yield* Effect.promise((signal) =>
+          loginom.scope("apply", { taskMessageID: task.taskMessageID, profile: carried.profile }, signal),
+        )
+        return yield* sessions.updatePart({
+          ...part,
+          metadata: { ...TaskScope.cleanMetadata(part.metadata), skill_activation: carried },
+        })
+      }).pipe(Effect.uninterruptible)
+    }).pipe(
+      // A refused inheritance leaves the task on its base profile; the model can still activate the skill.
+      Effect.catchCause((cause) => (Cause.hasInterrupts(cause) ? Effect.failCause(cause) : Effect.succeed(undefined))),
+    )
+    if (updated) message.parts = message.parts.map((part) => (part.id === updated.id ? updated : part))
   })
 
   const endTurn = Effect.fnUntraced(function* (turn: {
