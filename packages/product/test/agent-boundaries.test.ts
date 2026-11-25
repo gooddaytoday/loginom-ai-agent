@@ -55,23 +55,24 @@ test("workflow reference allows waiting only through Loginom tools and keeps fil
 })
 
 // LAB-2015/LAB-2020, bughunt bh-g101..g106 (0.4.3): every user message is a new task whose profile starts
-// without the skill (task-scope.ts derive), so loginom_dock_* stay hidden until the skill is activated again.
-// The second turn called loginom_dock_action_describe from history, got `invalid` and ended in CLI_TOOL_FAILED.
+// without the skill (task-scope.ts derive), so loginom_dock_* stayed hidden until the skill was activated again.
+// LAB-2027: a later message of the same chat inherits the activation (turn-lifecycle.ts beforeTurn), so only
+// the first scenario message activates it; a repeated activation on every message is an unneeded skill call.
 // Before activation only the frontmatter description reaches the model.
 // Help questions and dashboard chats must not activate it: dashboards have no Loginom connection
 // (turn-lifecycle.ts) and activation there fails with LOGINOM_SCOPE_DENIED.
-test("description makes every new scenario message activate the skill before Dock tools", () => {
+test("description makes the first scenario message of a chat activate the skill and says it persists", () => {
   const description = skill
     .split("\n---\n")[0]
     .split(/\ndescription: >-\n/)[1]
     ?.split(/\n[a-z]+:/)[0]
     .replace(/\s+/g, " ")
   expect(description).toBeDefined()
-  const rule = description?.match(/[Кк]аждое новое сообщение[^.:]*начинай с активации этого skill[^.]*\./)?.[0]
+  const rule = description?.match(/Первое сообщение чата[^.:]*начинай с активации этого skill[^.]*\./)?.[0]
   expect(rule).toBeDefined()
   expect(rule).toContain("о сценарии или пакете Loginom")
-  expect(rule).not.toContain("сообщение чата")
-  expect(rule).toMatch(/без неё `?loginom_dock_\*`? недоступны, история их не возвращает/)
+  expect(rule).toContain("в следующих сообщениях этого чата она сохраняется")
+  expect(description).not.toMatch(/[Кк]аждое новое сообщение|история их не возвращает/)
   expect(description).toContain("обычные справочные вопросы используют Help без этого skill")
   expect(description!.length).toBeLessThanOrEqual(1024)
   expect(skill).toContain("`existing_workflow` — только со ссылкой, выданной этим runtime, не из истории чата.")
