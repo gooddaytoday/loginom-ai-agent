@@ -24961,3 +24961,55 @@ Windows, первый прогон `daemon/windows.rs`, `play` с `cmd.exe`); к
 `codesign`, Keychain-помощник); сборка `packages/cli` с `--skip-web-ui` — хватит ли Desktop такого CLI; `electron-builder
 --dir`; `verify-cli-candidate.ts` (дерево исходников не должно стать грязным после сборки Desktop); кучи `NODE_OPTIONS` 4 ГБ;
 время.
+
+## B5.1i — Windows CAND: сборка
+
+25.11.2026. Ветка `b51i-windows-build` от `oc2-migration` (`840be7c3bb`). Меньший вариант: шаги проверок установленного продукта
+(B5.1j) не менялись; `catalog.json` не менялся (`script/` и `.github/**` уже в каталоге; файлов OpenCode не правил).
+
+### Запуск
+
+`gh workflow run loginom-windows.yml --ref oc2-migration` (workflow_dispatch сохранён, добавлен `workflow_call`).
+
+### Что сделано
+
+- `script/build-windows.ps1`: фильтры установки `@opencode/desktop`, `@opencode/cli`, `@loginom-ai-agent/loginom-host`
+  (были `@opencode-ai/desktop` и `opencode`); вместо `package:win` — порядок: CLI Desktop (`packages/cli/script/build.ts
+  --skip-install --skip-web-ui`, цель `windows-x64-baseline`, в `packages/cli/dist`) → `desktop build` → `desktop pack`
+  (распакованное приложение, переносится в `<out>/desktop/win-unpacked`, потому что каждый `pack` очищает `dist/desktop`) →
+  второй `pack` с `LOGINOM_AI_AGENT_DESKTOP_APP` (NSIS) → установщик в `<out>/desktop/` → `loginom-host/script/build-cli.ts`
+  (CLI ZIP). Новый параметр `-PtyBinary` (или `LOGINOM_AI_AGENT_PTY_BIN`), без него сборка отказывает. Переменные среды
+  восстанавливаются в `finally`.
+- `loginom-windows.yml`: `workflow_call`; `paths` вместо `packages/opencode/**` — `packages/cli`, `core`, `server`,
+  `process-daemon`, `loginom-pty.yml`, `setup-rust-pty`; задание `pty` (вызов `loginom-pty.yml`, то же условие запуска, что у
+  сборки) и `build-package-test.needs: pty`; шаг скачивания артефакта `loginom-ai-agent-pty-x86_64-pc-windows-msvc`;
+  «Verify unsigned candidate outputs» и «Upload short-lived unsigned candidates» перенесены сразу после сборки, чтобы красный
+  шаг проверок (j) не лишал артефактов; в шаге j `Push-Location packages/opencode` заменён на `packages/cli` (иначе `path
+  literals` остаётся красным). `updater-fixtures` — по-прежнему только dispatch.
+- Тест `packages/product/test/windows-build.test.ts` (4 теста): фильтры, порядок «CLI → Desktop → pack → pack с приложением →
+  CLI ZIP», pty, dispatch/call и порядок выгрузки. `PRODUCT` в `ci-workflows.test.ts` не менялся: `loginom-windows` там уже есть.
+
+### Проверки
+
+- YAML `loginom-windows.yml` разобран `python3 yaml` (5 заданий, триггеры `workflow_call`, `workflow_dispatch`, `pull_request`).
+  Сборка здесь не выполнялась (машина перегружена: load average около 10, и нужен Windows).
+- `packages/product`: 86 pass, 1 fail — `workspace packages` (`loginom-macos.yml`, закроет B5.1k). Закрыты `CI triggers` и
+  `path literals`. Новых падений нет.
+- `catalog-check.py` код 0; `apply-identity.py --check` — 0 файлов; `bun run check` код 0 (2 мин 19 с).
+
+### Выборы и находки
+
+- `loginom-pty.yml` без входов собирает три платформы; вызывающий берёт только Windows. Входа «только эта цель» не добавлял
+  (файл строки f).
+- Артефакты шагов j (`cli-installed-smoke.json`, `safe-storage-*.json`) раньше шли в тот же `upload-artifact`; теперь выгрузка
+  идёт до них, и в артефакт они не попадают. Задача j должна добавить свою выгрузку.
+- `updater-fixtures` вызывает `build-windows.ps1 -Product Desktop` без pty: теперь он откажет. Не чинил (dispatch-only).
+- `test-windows-profile.ps1` собирает `packages/cli/test/profile-windows.test.ts`, которого нет (порт ACL не сделан): шаг j
+  `Run package-local checks` красный независимо от сборки.
+
+### Проверит только CI на GitHub
+
+Всё выполнение на `windows-2022`: сборка CLI Desktop с `BUN_COMPILE_RELEASE=bun-v1.4.4` (нужен `unzip` из `Git\usr\bin`;
+если распаковка Bun на Windows сломана, как отмечено в `build-cli.ts`, упадёт здесь); `bun install --filter` трёх пакетов;
+два вызова `pack` и NSIS; встраивание pty `.exe` в оба CLI (`resolveProductPty` запускает его `--version`); `build-cli.ts` с
+baseline-средой; скачивание артефакта pty из вызванного workflow; шаги j.
