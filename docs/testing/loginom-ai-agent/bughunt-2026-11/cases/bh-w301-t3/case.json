@@ -1,0 +1,18 @@
+{
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 0
+  },
+  "base": "bh-w301-t2",
+  "manual_edit": {
+    "kind": "remove_link",
+    "source": {
+      "label": "sales.csv"
+    },
+    "target": {
+      "label": "Сортировка"
+    },
+    "output": 0,
+    "input": 0
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "variables",
+        "type": "variables.user",
+        "label": "Переменные сценария"
+      },
+      {
+        "id": "sales",
+        "type": "imports.text",
+        "label": "sales.csv"
+      },
+      {
+        "id": "filter",
+        "type": "transform.filter_data",
+        "label": "Фильтр строк"
+      }
+    ],
+    "links": [
+      {
+        "source": "sales",
+        "target": "filter",
+        "output": 0,
+        "input": 0
+      }
+    ],
+    "exact": true,
+    "retain": [
+      "variables",
+      "sales",
+      "filter"
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_node_label": "Фильтр строк",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Revenue",
+          "type": "integer"
+        }
+      ],
+      "column_order": "exact",
+      "ordered": true,
+      "rows": [
+        {
+          "Region": "Центр",
+          "Revenue": 410
+        },
+        {
+          "Region": "Юг",
+          "Revenue": 290
+        }
+      ]
+    }
+  ]
+}

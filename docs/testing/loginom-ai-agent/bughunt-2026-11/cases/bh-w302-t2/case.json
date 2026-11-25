@@ -1,0 +1,14 @@
+{
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 1
+  },
+  "base": "bh-w302-t1",
+  "manual_edit": {
+    "kind": "rename",
+    "node": {
+      "label": "Группировка"
+    },
+    "label": "Итоги"
+  }
+}

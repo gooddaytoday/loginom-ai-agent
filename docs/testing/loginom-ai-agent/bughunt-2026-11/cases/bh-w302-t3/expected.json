@@ -1,0 +1,83 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "variables",
+        "type": "variables.user",
+        "label": "Переменные сценария"
+      },
+      {
+        "id": "sales",
+        "type": "imports.text",
+        "label": "sales.csv"
+      },
+      {
+        "id": "group",
+        "type": "transform.group_data",
+        "label": "Итоги"
+      },
+      {
+        "id": "excel",
+        "type": "exports.excel"
+      }
+    ],
+    "links": [
+      {
+        "source": "sales",
+        "target": "group",
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": "group",
+        "target": "excel",
+        "output": 0,
+        "input": 0
+      }
+    ],
+    "exact": true,
+    "retain": [
+      "variables",
+      "sales",
+      "group"
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_node_label": "Итоги",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Total",
+          "type": "integer"
+        }
+      ],
+      "column_order": "exact",
+      "ordered": true,
+      "rows": [
+        {
+          "Region": "Север",
+          "Total": 320
+        },
+        {
+          "Region": "Центр",
+          "Total": 410
+        },
+        {
+          "Region": "Юг",
+          "Total": 340
+        }
+      ]
+    }
+  ],
+  "excel_artifact": {
+    "filename": "region-totals.xlsx",
+    "sheet_name": "По регионам",
+    "header": "names"
+  }
+}

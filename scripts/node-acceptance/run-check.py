@@ -77,7 +77,7 @@ def write(path, value):
 
 
 def daemon_pid():
-    return json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))['pid']
+    return json.loads(subprocess.check_output([os.environ.get('MULTICA_CLI_PATH', 'multica'), 'daemon', 'status', '--output', 'json']))['pid']
 
 
 def git(*args, cwd=REPO):
@@ -316,8 +316,12 @@ def scenario(name, case_root=None, *, cases=None):
             # Optional case.json: `base` continues a sibling case in the same chat;
             # `input_files` limits attachments; `budget` is read only by bughunt-audit.py.
             extra = read(src / 'case.json') if (src / 'case.json').is_file() else {}
-            if set(extra) - {'base', 'input_files', 'budget', 'notes'}:
-                raise ValueError(f'{name}/case.json: allowed keys are base, input_files, budget, notes')
+            if not isinstance(extra, dict) or set(extra) - {'base', 'input_files', 'budget', 'notes', 'manual_edit', 'output_mode'}:
+                raise ValueError(f'{name}/case.json: allowed keys are base, input_files, budget, notes, manual_edit, output_mode')
+            if 'manual_edit' in extra:
+                validate_manual_edit(extra['manual_edit'], name)
+            if 'output_mode' in extra and extra['output_mode'] != 'ports':
+                raise ValueError(f'{name}/case.json: output_mode must be ports')
             base = extra.get('base')
             if base == name:
                 raise ValueError(f'Case base cycle: {name} → {name}')
@@ -327,7 +331,8 @@ def scenario(name, case_root=None, *, cases=None):
             if files is not None and not (isinstance(files, list) and all(isinstance(f, str) and '/' not in f and (src / 'data' / f).is_file() for f in files)):
                 raise ValueError(f'{name}/case.json: input_files must list files in data/')
             return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=base, external=True,
-                        attach_all=True, **({'input_files': files} if files is not None else {}))
+                        attach_all=True, manual_edit=extra.get('manual_edit'), output_mode=extra.get('output_mode'),
+                        **({'input_files': files} if files is not None else {}))
     if case_root is not None:
         if name not in SCENARIOS and not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,31}', name):
             raise ValueError('Invalid external case name')
@@ -1477,7 +1482,10 @@ def scenario_steps(name, case_root=None, *, cases=None):
             return [(base, dict(source=base, prompt=base / 'task.md', data=base / 'data')), (step, spec)]
         return [*resolve(base, scenario(base, case_root, cases=cases), (*trail, step)), (step, spec)]
 
-    return resolve(name, scenario(name, case_root, cases=cases), ())
+    steps = resolve(name, scenario(name, case_root, cases=cases), ())
+    if steps[-1][1].get('manual_edit'):
+        raise ValueError(f'{name}/case.json: manual_edit requires a following turn')
+    return steps
 
 
 def expected_for(case, package, cold=False):
@@ -1574,6 +1582,8 @@ def expected_for(case, package, cold=False):
         expected.setdefault('nodes', [])
         if 'columns' not in expected:
             expected.setdefault('outputs', [])
+    if case.get('output_mode') == 'ports' and 'graph' not in expected:
+        raise ValueError('CASE_PORT_GRAPH_REQUIRED')
     if 'outputs' not in expected:
         expected = dict(package_path=expected['package_path'], nodes=expected['nodes'],
                         outputs=[{k: v for k, v in expected.items() if k not in ['package_path', 'nodes', 'graph']}],
@@ -1996,13 +2006,55 @@ def records(path):
         except ValueError: continue
 
 
+def validate_manual_edit(edit, case):
+    fields = {
+        'create': {'type'}, 'rename': {'node', 'label'}, 'move': {'node', 'position'},
+        'remove_link': {'source', 'target', 'output', 'input'},
+        'connect': {'source', 'target', 'output', 'input'},
+        'filter_threshold': {'node', 'field', 'value'}, 'delete_node': {'node'},
+    }
+
+    def need(condition, message):
+        if not condition:
+            raise ValueError(f'{case}/case.json: manual_edit {message}')
+
+    def text(value):
+        return isinstance(value, str) and 0 < len(value) <= 200 and value == value.strip() and value.isprintable()
+
+    def selector(value):
+        return (isinstance(value, dict) and not set(value) - {'label', 'type'}
+                and text(value.get('label')) and ('type' not in value or text(value['type'])))
+
+    need(isinstance(edit, dict) and isinstance(edit.get('kind'), str) and edit['kind'] in fields, 'has an invalid kind')
+    kind = edit['kind']
+    required = fields[kind] | {'kind'}
+    optional = {'position'} if kind == 'create' else set()
+    need(required <= edit.keys() <= required | optional, f'has invalid fields for {kind}')
+    for key in edit.keys() & {'type', 'label', 'field'}:
+        need(text(edit[key]), f'{key} must be nonempty printable text')
+    for key in edit.keys() & {'node', 'source', 'target'}:
+        need(selector(edit[key]), f'{key} must have an exact label and optional type')
+    for key in edit.keys() & {'input', 'output'}:
+        need(type(edit[key]) is int and 0 <= edit[key] <= 99, f'{key} must be a zero-based port')
+    if 'position' in edit:
+        position = edit['position']
+        need(isinstance(position, dict) and position.keys() == {'x', 'y'}
+             and all(type(a) is int and 64 <= a <= 10000 for a in position.values()),
+             'position must have integer x and y between 64 and 10000')
+    if 'value' in edit:
+        value = edit['value']
+        need(type(value) in (int, float) and abs(value) <= (2**53 - 1) and math.isfinite(value),
+             'value must be a finite numeric threshold')
+
+
 def validate_graph_contract(graph):
     def nonempty(value):
         return isinstance(value, str) and bool(value.strip())
 
-    if (not isinstance(graph, dict) or set(graph) - {'nodes', 'links'}
+    if (not isinstance(graph, dict) or set(graph) - {'nodes', 'links', 'exact', 'retain'}
             or not isinstance(graph.get('nodes'), list) or not graph['nodes']
-            or not isinstance(graph.get('links', []), list)):
+            or not isinstance(graph.get('links', []), list)
+            or type(graph.get('exact', False)) is not bool):
         raise ValueError('CASE_GRAPH_INVALID: expected nodes and optional links')
     ids = set()
     for node in graph['nodes']:
@@ -2012,11 +2064,27 @@ def validate_graph_contract(graph):
                 or any(not nonempty(node[k]) for k in ('label', 'label_contains') if k in node)):
             raise ValueError(f'CASE_GRAPH_INVALID_NODE: {node!r}')
         ids.add(node['id'])
+    retain = graph.get('retain', [])
+    if not isinstance(retain, list) or any(not nonempty(item) or item not in ids for item in retain) or len(set(retain)) != len(retain):
+        raise ValueError('CASE_GRAPH_INVALID_RETAIN')
+    links_seen = set()
     for link in graph.get('links', []):
         if (not isinstance(link, dict) or set(link) - {'source', 'target', 'output', 'input'}
                 or not all(nonempty(link.get(k)) and link[k] in ids for k in ('source', 'target'))
-                or any(type(link[k]) is not int or link[k] < 0 for k in ('output', 'input') if k in link)):
+                or any(type(link[k]) is not int or link[k] < 0 for k in ('output', 'input') if k in link)
+                or graph.get('exact') and not {'output', 'input'} <= link.keys()):
             raise ValueError(f'CASE_GRAPH_INVALID_LINK: {link!r}')
+        key = (link['source'], link.get('output'), link['target'], link.get('input'))
+        if graph.get('exact') and key in links_seen:
+            raise ValueError(f'CASE_GRAPH_INVALID_LINK: duplicate {link!r}')
+        links_seen.add(key)
+
+
+def native_case_graph(graph, location):
+    return dict(location=location,
+                nodes={n['ref']['node_id']: dict(type=n['type'], label=n.get('label') or '', **({'position': n['position']} if 'position' in n else {}))
+                       for n in graph['nodes']},
+                links=[*graph['links'], *graph.get('variable_links', []), *graph.get('foreign_links', [])])
 
 
 def observed_case_graph(profile, since):
@@ -2042,10 +2110,9 @@ def observed_case_graph(profile, since):
     evidence = None
     for observed_at, path, line, native, graph in sorted(observations):
         if native:
-            nodes = {n['ref']['node_id']: dict(type=n['type'], label=n.get('label') or '')
-                     for n in graph['nodes']}
+            projected = native_case_graph(graph, f'{path.relative_to(profile)}:{line}')
+            nodes, links = projected['nodes'], projected['links']
             known_nodes.update(nodes)
-            links = [*graph['links'], *graph.get('variable_links', [])]
         else:
             captions = {n['node_label']: n['label_text'] for element in graph.get('ui', {}).get('elements', [])
                         if (n := element.get('graph_node') or {}).get('part') == 'label' and n.get('label_text')}
@@ -2080,6 +2147,8 @@ def observed_case_graph(profile, since):
                     if match[5] == 'Var':
                         input_port = variable_ports.get((target, 'input', input_port))
                     links.append(dict(source=source, output=output, target=target, input=input_port))
+                else:
+                    links.append(raw)
         if observed_at >= since:
             evidence = dict(location=f'{path.relative_to(profile)}:{line}', nodes=nodes, links=links)
     if evidence is None:
@@ -2087,21 +2156,35 @@ def observed_case_graph(profile, since):
     return evidence
 
 
-def check_case_graph(expected, observed):
+def check_case_graph(expected, observed, baseline=None):
+    def match(want, have):
+        return (have['type'] == want['type']
+                and ('label' not in want or want['label'] == have['label'])
+                and ('label_contains' not in want or want['label_contains'] in have['label']))
+
     bindings = {}
+    location = observed['location']
     for want in expected['nodes']:
-        candidates = [node_id for node_id, node in observed['nodes'].items()
-                      if node['type'] == want['type']
-                      and ('label' not in want or want['label'] == node['label'])
-                      and ('label_contains' not in want or want['label_contains'] in node['label'])]
-        assert candidates, f"CASE_GRAPH_NODE_MISSING: {want!r} at {observed['location']}"
-        assert len(candidates) == 1 and candidates[0] not in bindings.values(), (
-            f"CASE_GRAPH_NODE_AMBIGUOUS: {want!r} at {observed['location']}")
-        bindings[want['id']] = candidates[0]
+        candidates = [node_id for node_id, node in observed['nodes'].items() if match(want, node)]
+        assert candidates, f'CASE_GRAPH_NODE_MISSING: {want!r} at {location}'
+        assert len(candidates) == 1 and candidates[0] not in bindings.values(), f'CASE_GRAPH_NODE_AMBIGUOUS: {want!r} at {location}'
+        node_id = candidates[0]
+        bindings[want['id']] = node_id
+        if want['id'] in expected.get('retain', []):
+            assert baseline is not None, 'CASE_GRAPH_BASELINE_MISSING'
+            prior = [key for key, node in baseline['nodes'].items() if match(want, node)]
+            assert prior == [node_id], f'CASE_GRAPH_NODE_REPLACED: {want!r} at {location}'
+            old, new = baseline['nodes'][node_id], observed['nodes'][node_id]
+            if baseline.get('moved_node_id') == node_id or 'position' in old and 'position' in new:
+                assert old.get('position') == new.get('position'), f'CASE_GRAPH_POSITION_CHANGED: {want!r} at {location}'
     for link in expected.get('links', []):
         want = dict(link, source=bindings[link['source']], target=bindings[link['target']])
-        assert any(all(have.get(k) == value for k, value in want.items()) for have in observed['links']), (
-            f"CASE_GRAPH_LINK_MISSING: {link!r} at {observed['location']}")
+        assert any(isinstance(have, dict) and all(have.get(k) == value for k, value in want.items())
+                   for have in observed['links']), f'CASE_GRAPH_LINK_MISSING: {link!r} at {location}'
+    if expected.get('exact'):
+        assert len(bindings) == len(observed['nodes']), f'CASE_GRAPH_UNEXPECTED_NODE: at {location}'
+        assert len(expected.get('links', [])) == len(observed['links']), f'CASE_GRAPH_UNEXPECTED_LINK: at {location}'
+    return bindings
 
 
 def graph_only(spec, expected):
@@ -2338,6 +2421,20 @@ def check_tree(port, expected):
             assert actual.get('is_null') is (kind == 'null') and (kind != 'null' or actual.get('precision') == 'exact_null'), 'TREE_NULL'
 
 
+def check_case_excel_artifact(replies, profile, folder, artifact, output):
+    destination = artifact['destination']
+    assert any(reply.get('status') == 'SUCCEEDED'
+               and any(file.get('destination') == destination and file.get('bytes', 0) > 0
+                       for file in reply.get('output', {}).get('file_artifacts', []))
+               for _, reply in replies), 'CASE_EXCEL_ARTIFACT_MISSING'
+    actual = folder / Path(destination).name
+    shutil.copyfile(downloaded_csv(profile, destination), actual)
+    oracle = runpy.run_path(str(REPO / 'docs/node-development/nodes/exports-excel/acceptance/oracle.py'))
+    columns = output['columns']
+    oracle['verify'](actual, dict(artifact, filename=actual.name, output_port=None, ordered=output['ordered'],
+        columns=columns, rows=[[row[col['name']] for col in columns] for row in output['rows']], row_count=len(output['rows'])))
+
+
 def downloaded_csv(profile, destination):
     files = [p for p in profile.rglob(Path(destination).name) if 'artifacts/input/' not in str(p)]
     assert len(files) == 1, 'DOWNLOAD_MISSING_OR_AMBIGUOUS'
@@ -2417,8 +2514,7 @@ class Runner:
                     loads.write(json.dumps({'at': time.time(), 'phase': name, 'load': os.getloadavg(), 'rss_bytes': self.memory(child.pid)}) + '\n')
                     loads.flush()
                     if time.time() >= end:
-                        daemon = json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))
-                        assert child.pid != daemon['pid'], 'Cannot terminate daemon'
+                        assert child.pid != daemon_pid(), 'Cannot terminate daemon'
                         # The CLI owns runtime close/ACK. Let it close children
                         # before interrupting the whole process group.
                         child.send_signal(signal.SIGINT)
@@ -2641,7 +2737,7 @@ class Runner:
         assert all(delivered['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'TEXT_MASK_INPUT_CLEANUP_MISSING'
         return books
 
-    def model(self, case, folder, profile, workspace, package, login, build, session=None):
+    def model(self, case, folder, profile, workspace, package, login, build, session=None, baseline=None):
         spec = (self.prepared_case if isinstance(case, str) and case in D87 and not getattr(self, 'options', {}).get('case_root') else
                 dict(source=case, prompt=case / 'task.md', data=case / 'data')
                 if isinstance(case, Path) else scenario(case, getattr(self, 'options', {}).get('case_root'),
@@ -2696,6 +2792,7 @@ class Runner:
         refusal = expected.get('refusal')
         execution_error = expected.get('execution_error')
         only_graph = graph_only(spec, expected)
+        port_output = spec.get('output_mode') == 'ports' and bool(expected['outputs'])
         lgd_corrupt = spec.get('lgd') == 'corrupt'
         if refusal is not None:
             assert (isinstance(refusal, dict) and set(refusal) == {'text'}
@@ -2712,7 +2809,7 @@ class Runner:
         if rejection is not None:
             assert rejection == dict(code='LOGINOM_FILE_CHANGED', node_type='transform.group_data') and expected['outputs'] == [], 'INVALID_REJECTION_ORACLE'
         filenames = re.findall(r'[\w-]+\.(?:csv|xlsx|txt)', prompt)
-        exports = ([Path(output['export_destination']).name for output in expected['outputs']]
+        exports = [] if port_output else ([Path(output['export_destination']).name for output in expected['outputs']]
                    if spec.get('external') else
                    list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
                                         and name != (spec.get('local_file').name if spec.get('local_file') else None))))
@@ -2720,12 +2817,19 @@ class Runner:
         if spec.get('text_mask'): exports = ['text-mask-initial.csv', 'text-mask-final.csv']
         if spec.get('excel_mode'): exports = [b['filename'] for b in expected['excel_books']]
         if spec.get('text_file_variable'): exports = [Path(o['export_destination']).name for o in expected['outputs']]
+        if (artifact := expected.get('excel_artifact')):
+            assert port_output, 'CASE_EXCEL_PORT_OUTPUT_REQUIRED'
+            filename = artifact['filename']
+            assert re.fullmatch(r'[\w-]+\.xlsx', filename) and filename in prompt, 'CASE_EXCEL_FILENAME_INVALID'
+            destination = package.removesuffix('.lgp') + '-' + filename
+            prompt = prompt.replace(filename, destination)
+            artifact['destination'] = destination
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
             if exports and not any(name in prompt for name in exports):
                 prompt += '\nВыгрузи и скачай итоговые таблицы в файлы ' + ', '.join(exports) + '.'
         if only_graph or spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') or spec.get('upload_only') or rejection or refusal or execution_error or lgd_corrupt: exports = []
-        if not exports and not only_graph and not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('upload_only') and not rejection and not refusal and not execution_error and not lgd_corrupt:
+        if not exports and not port_output and not only_graph and not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('upload_only') and not rejection and not refusal and not execution_error and not lgd_corrupt:
             count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
@@ -2763,9 +2867,9 @@ class Runner:
             if spec.get('logreg_normalization'):
                 prompt += '\n' + logreg_normalization_exports(destinations)
             prompt += f'\nСохрани пакет как {package}.'
-            if not only_graph and not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('text_export_cases') and not spec.get('text_file_variable') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Доставь все итоговые книги Excel.' if spec.get('excel_mode') else ' Выгрузи и скачай полный итоговый CSV.'
+            if not only_graph and not port_output and not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('text_export_cases') and not spec.get('text_file_variable') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Доставь все итоговые книги Excel.' if spec.get('excel_mode') else ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
-        for index, output in enumerate(expected['outputs']):
+        for index, output in enumerate(expected['outputs'] if not port_output else []):
             if spec.get('excel_mode') or spec.get('fs_case') == 'paths' or spec.get('text_file_variable'): output['export_destination'] = destinations[index]
             elif output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
             elif spec.get('external') or output['output_node_type'] == 'integration.rest_request':
@@ -2926,7 +3030,7 @@ class Runner:
             self.current['graph'] = 'FAIL'
             observed = observed_case_graph(profile, graph_start)
             write(folder / 'graph-observed.json', observed)
-            check_case_graph(expected['graph'], observed)
+            check_case_graph(expected['graph'], observed, baseline)
             self.current['graph'] = 'PASS'
         if spec.get('two_turn'):
             self.current['execution_id'] = check_read_turns(profile, folder, spec['two_turn'])
@@ -3341,6 +3445,20 @@ class Runner:
         if rejection:
             self.current.update(csv='— (expected rejection)', cold='— (expected rejection)')
             return session, expected, None, None
+        if artifact:
+            check_case_excel_artifact(replies, profile, folder, artifact, expected['outputs'][0])
+        if port_output:
+            candidates = []
+            for _, reply in replies:
+                for owner, port in ports(reply):
+                    node = observed['nodes'].get(owner.get('node', {}).get('node_id'))
+                    if node and port_path(owner, port) and owner.get('status') == 'SUCCEEDED':
+                        candidates.append(dict(type=node['type'], label=node['label'], port=port.get('port'), data=port))
+            write(folder / 'case-port-evidence.json', candidates)
+            self.phase('case-port-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/case-ports.mjs',
+                folder / 'expected.json', folder / 'case-port-evidence.json'], folder, timeout=60)
+            self.current['csv'] = '— (native outputs PASS)'
+            return session, expected, None, None
         if only_graph:
             self.current.update(csv='— (graph only)', cold='— (graph only)')
             return session, expected, None, None
@@ -3672,6 +3790,26 @@ class Runner:
         self.current['csv'] = D76_STATUS if any(self.current.get('d76', {}).values()) else 'PASS'
         return session, expected, actual, delimiter
 
+    def manual_edit(self, edit, stage, profile, package, login, build, existing_cleanup, existing_ack):
+        receipts = [read(path) for path in set(profile.rglob('saved-package-cleanup.json')) - existing_cleanup]
+        acknowledgements = [read(path) for path in set((profile / 'loginom/runtime').glob('runtime-close-*.json')) - existing_ack]
+        assert receipts and all(r.get('package_closed') is True and r.get('logged_out') is True and r.get('package_path') == package
+                                and not r.get('unsaved_changes_discarded') for r in receipts), 'MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED'
+        assert acknowledgements and all(a.get('closed_ack') is True for a in acknowledgements), 'MANUAL_EDIT_CLI_CLOSE_ACK_MISSING'
+        output = stage / 'manual'
+        output.mkdir()
+        self.phase('manual-edit', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/manual-edit.mjs',
+                   build / 'resources/loginom', output], stage, timeout=300,
+                   stdin=json.dumps(dict(login=login, packagePath=package, edit=edit)))
+        result = read(output / 'result.json')
+        assert result['status'] == 'PASS' and all(
+            proof.get('package_closed') is True and proof.get('logged_out') is True and not proof.get('unsaved_changes_discarded')
+            for proof in (result['cleanup'], result['reopen_cleanup'])), 'MANUAL_EDIT_PERSISTENCE_UNCONFIRMED'
+        baseline = native_case_graph(result['persisted'], str(output / 'result.json'))
+        if edit['kind'] == 'move':
+            baseline['moved_node_id'] = result['delta']['changed_nodes'][0]['node_id']
+        return baseline
+
     def run(self):
         try:
             build = self.build()
@@ -3712,14 +3850,26 @@ class Runner:
                         write(folder / 'source-config.json', dict(login=login, package=r['package']))
                         self.phase('source-package', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/variables-column-union.mjs', 'prepare', build / 'resources/loginom', folder / 'source-config.json', spec['source_package'], folder / 'source'], folder, timeout=300)
                     session = None
-                    for (step, _), turn in zip(steps, r['turns']):
+                    baseline = None
+                    for (step, step_spec), turn in zip(steps, r['turns']):
                         active_turn = turn
                         turn['status'] = 'PENDING'
                         r.update(csv='—', save='—', cleanup='—')
                         r.pop('graph', None)
                         stage = folder / turn['case']
                         stage.mkdir()
-                        session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
+                        manual = step_spec.get('manual_edit')
+                        existing_cleanup = set(profile.rglob('saved-package-cleanup.json')) if manual else set()
+                        existing_ack = set((profile / 'loginom/runtime').glob('runtime-close-*.json')) if manual else set()
+                        session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session,
+                            **({'baseline': baseline} if baseline is not None else {}))
+                        observed_graph = stage / 'graph-observed.json'
+                        if observed_graph.is_file():
+                            baseline = read(observed_graph)
+                        if manual and not r.get('failure_class'):
+                            turn['manual_edit'] = dict(kind=manual['kind'], status='FAIL', journal=str(stage / 'manual/execution-events.jsonl'))
+                            baseline = self.manual_edit(manual, stage, profile, r['package'], login, build, existing_cleanup, existing_ack)
+                            turn['manual_edit']['status'] = 'PASS'
                         turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class') if k in r},
                                     status='FAIL' if r.get('failure_class') else 'PASS')
                         active_turn = None
@@ -3749,7 +3899,7 @@ class Runner:
                             cold_expected = stage / 'expected-cold.json'
                             write(cold_expected, cold_columns_by_name(expected, case))
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') or spec.get('output_mode') == 'ports' else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'

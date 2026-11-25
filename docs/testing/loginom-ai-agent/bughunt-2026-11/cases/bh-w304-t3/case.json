@@ -1,0 +1,13 @@
+{
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 0
+  },
+  "base": "bh-w304-t2",
+  "manual_edit": {
+    "kind": "delete_node",
+    "node": {
+      "label": "Фильтр строк"
+    }
+  }
+}

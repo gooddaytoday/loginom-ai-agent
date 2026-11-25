@@ -1979,6 +1979,87 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                 self.assertEqual([(t['turn'], t['status']) for t in result['turns']],
                                  [(n, 'PASS') for n in range(1, length + 1)])
 
+    def test_manual_edit_phase_requires_fresh_cli_cleanup_and_precedes_continuation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cases = root / 'cases'
+            edit = dict(kind='rename', node=dict(label='Before'), label='After')
+            for name, config in [('first', dict(manual_edit=edit)), ('second', dict(base='first'))]:
+                case = cases / name
+                case.mkdir(parents=True)
+                (case / 'task.md').write_text(name)
+                runner.write(case / 'case.json', config)
+            with self.assertRaisesRegex(ValueError, 'manual_edit requires a following turn'):
+                runner.scenario_steps('first', cases=cases)
+            for malformed in (None, dict(edit, extra=True), dict(kind='filter_threshold', node=edit['node'], field='Revenue', value=True)):
+                with self.assertRaisesRegex(ValueError, 'manual_edit'):
+                    runner.validate_manual_edit(malformed, 'first')
+
+            pair = root / 'pair'
+            pair.mkdir()
+            worker = dict(url='https://example.invalid', username='worker', password='synthetic', package_directory='/test')
+            runner.write(pair / 'worker.json', worker)
+            proof = dict(package_closed=True, logged_out=True, package_path=f'/test/{root.name}-second.lgp')
+            persisted = dict(complete=True, links=[], nodes=[
+                dict(ref=dict(node_id='node'), label='After', type='imports.text', position=dict(x=64,y=64))])
+            calls = []
+
+            def phase(name, command, folder, **kwargs):
+                calls.append(name)
+                if name == 'setup':
+                    profile = folder / 'profile'
+                    for child in ('data', 'config', 'loginom/runtime'):
+                        (profile / child).mkdir(parents=True)
+                    runner.write(folder / 'setup.stdout', dict(browser=dict(state='verified')))
+                    return
+                self.assertEqual(name, 'manual-edit')
+                self.assertEqual(folder.name, 'first')
+                self.assertEqual(json.loads(kwargs['stdin']), dict(login=worker, packagePath=proof['package_path'], edit=edit))
+                runner.write(folder / 'manual/result.json', dict(status='PASS', persisted=persisted, cleanup=proof, reopen_cleanup=proof))
+
+            def model(name, stage, profile, workspace, package, login, build, session, baseline=None):
+                calls.append(name)
+                cleanup = profile / 'saved-package-cleanup.json'
+                ack = profile / 'loginom/runtime/runtime-close-current.json'
+                if name == 'first':
+                    self.assertIsNone(session)
+                    runner.write(cleanup, proof)
+                    runner.write(ack, dict(closed_ack=True))
+                    with self.assertRaisesRegex(AssertionError, 'MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED'):
+                        instance.manual_edit(edit, stage, profile, package, login, build, {cleanup}, {ack})
+                else:
+                    self.assertEqual(session, 'same-session')
+                    self.assertEqual(baseline['nodes']['node']['label'], 'After')
+                return 'same-session', dict(graph={}, outputs=[]), None, None
+
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.out, instance.env = root, {}
+            instance.options = dict(pair=str(pair), cases=str(cases), cold=False)
+            instance.report = dict(runs=[dict(scenario='second', status='PENDING')])
+            instance.deadline = time.time() + 60
+            with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'save'), \
+                    patch.object(instance, 'phase', side_effect=phase), patch.object(instance, 'model', side_effect=model):
+                instance.run()
+            self.assertEqual(calls, ['setup', 'first', 'manual-edit', 'second'])
+            result = instance.report['runs'][0]
+            self.assertEqual(result['status'], 'PASS')
+            self.assertEqual(result['turns'][0]['manual_edit']['status'], 'PASS')
+
+    def test_exact_graph_detects_replaced_moved_and_extra_nodes_or_edges(self):
+        want = dict(nodes=[dict(id='tag', type='imports.text', label='Sales')], exact=True, retain=['tag'])
+        node = dict(type='imports.text', label='Sales', position=dict(x=128, y=128))
+        baseline = dict(nodes=dict(native=node), links=[], location='manual/result.json', moved_node_id='native')
+        runner.validate_graph_contract(want)
+        runner.check_case_graph(want, baseline, baseline)
+        for code, observed in [
+            ('NODE_REPLACED', dict(baseline, nodes=dict(other=node))),
+            ('POSITION_CHANGED', dict(baseline, nodes=dict(native=dict(node, position=dict(x=192,y=128))))),
+            ('UNEXPECTED_NODE', dict(baseline, nodes=dict(native=node, other=dict(type='transform.sorting', label='Sort')))),
+            ('UNEXPECTED_LINK', dict(baseline, links=['foreign-link'])),
+        ]:
+            with self.assertRaisesRegex(AssertionError, 'CASE_GRAPH_' + code):
+                runner.check_case_graph(want, observed, baseline)
+
     def test_graph_contract_checks_current_snapshot_captions_direction_and_ports(self):
         want = dict(nodes=[dict(id='import', type='imports.text', label='Продажи'),
                            dict(id='group', type='transform.group_data', label_contains='по регионам')],

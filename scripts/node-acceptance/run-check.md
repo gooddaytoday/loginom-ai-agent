@@ -656,13 +656,40 @@ with the same profile, workspace and package. It rejects cycles before
 launching. The root attaches the files in `data/` by default, in any format.
 A continuation attaches only its listed `input_files`.
 
+A case with a following turn can set `manual_edit` in `case.json`.
+The runner waits for the current CLI to close the saved package and
+acknowledge shutdown. It then opens that same package in a separate browser
+under the worker account, performs one UI edit, saves, closes and logs out.
+A second open checks persistence. The next model turn uses the existing chat
+and package. The edit, expected graph and browser receipts stay private.
+
+| `kind` | Fields |
+|---|---|
+| `create` | `type`, optional `position` |
+| `rename` | `node`, new `label` |
+| `move` | `node`, `position` |
+| `remove_link`, `connect` | `source`, `target`, zero-based `output` and `input` |
+| `filter_threshold` | `node`, input `field`, numeric literal `value` |
+| `delete_node` | `node` |
+
+A node selector has an exact `label` and an optional canonical `type` to
+disambiguate it. A position specifies integer `x` and `y` in model
+coordinates. Create requires an unconnected drop. Threshold edits require a
+unique numeric scalar condition on the given field. The edit fails the chain
+if the gesture, graph delta, save, persistence or cleanup cannot be proved.
+Use `manual/execution-events.jsonl` and `manual/result.json` in the preceding
+turn's directory to read the before, after and persisted evidence.
+
 Any turn may add `graph` to `expected.json`. The runner checks the latest
 complete graph recorded during the turn in the existing runtime journal.
 Use a unique local `id` and the canonical `type` for each required node.
 Add `label` for an exact caption or `label_contains` for a case-sensitive
 substring. Each selector must match one distinct node. Links refer to those
-IDs, with optional zero-based `output` and `input` ports. Extra nodes and
-links may be present.
+IDs, with optional zero-based `output` and `input` ports. Setting `exact`
+to true requires both port indexes and rejects extra nodes and links. The
+optional `retain` list requires the same native node IDs from the previous
+turn or its persisted manual graph. A retained manual move must preserve the
+observed canvas position.
 
 ```json
 {
@@ -677,7 +704,13 @@ links may be present.
 ```
 
 A graph-only turn checks Save, cleanup and the graph. Add `outputs` for
-CSV checks, or `refusal` for an expected refusal. `--cold` reopens the
+CSV checks, or `refusal` for an expected refusal. A private case can set
+`"output_mode": "ports"` in `case.json` to check complete typed reads from
+the requested graph node and port. This mode uses `outputs` with
+`output_node_type`, optional `output_node_label`, and zero-based
+`output_port`. It can also check a requested downloaded Excel workbook using
+`excel_artifact` with `filename`, `sheet_name` and `header`. The first
+output supplies the workbook's typed rows in order. `--cold` reopens the
 saved package for the final turn's output checks. The scenario entry in
 `results.json` lists the turn outcomes in order. The audited graph and its
 journal location are recorded in the turn's `graph-observed.json`.

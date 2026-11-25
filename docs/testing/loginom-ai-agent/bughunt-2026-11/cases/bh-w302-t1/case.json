@@ -1,0 +1,16 @@
+{
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 1
+  },
+  "manual_edit": {
+    "kind": "move",
+    "node": {
+      "label": "sales.csv"
+    },
+    "position": {
+      "x": 128,
+      "y": 352
+    }
+  }
+}
