@@ -6,6 +6,13 @@ name: Loginom pty
 
 on:
   workflow_call:
+    inputs:
+      # JSON list of Rust targets to build, e.g. '["aarch64-apple-darwin"]'. Empty builds all three, as push,
+      # pull_request and workflow_dispatch do. A candidate asks for its own platform only, so a missing runner or a
+      # red target elsewhere cannot block it.
+      targets:
+        type: string
+        default: ""
   workflow_dispatch:
   pull_request:
     paths:
@@ -32,18 +39,12 @@ env:
 jobs:
   pty:
     name: pty (${{ matrix.target }})
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ contains(matrix.target, 'linux') && 'ubuntu-22.04' || contains(matrix.target, 'apple') && 'macos-15' || 'windows-2022' }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - runner: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-          - runner: macos-15
-            target: aarch64-apple-darwin
-          - runner: windows-2022
-            target: x86_64-pc-windows-msvc
+        target: ${{ fromJSON(inputs.targets || '["x86_64-unknown-linux-gnu","aarch64-apple-darwin","x86_64-pc-windows-msvc"]') }}
     defaults:
       run:
         shell: bash

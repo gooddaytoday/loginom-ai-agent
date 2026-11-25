@@ -57,11 +57,12 @@ jobs:
           bun test electron.vite.config.test.ts src/main/update-policy.test.ts src/main/update-sources.test.ts src/main/updater-controller.test.ts
           bun typecheck
 
-  # loginom-ai-agent-pty.exe for the CLIs. The reusable workflow builds all three platforms; only the Windows artifact
-  # is used here.
+  # loginom-ai-agent-pty.exe for the CLIs. The reusable workflow builds only the target asked for here.
   pty:
     if: ${{ !inputs.updater-fixtures && (github.event_name != 'pull_request' || startsWith(github.head_ref, 'v040-batch-') || contains(fromJSON('["dev","loginom"]'), github.base_ref)) }}
     uses: ./.github/workflows/loginom-pty.yml
+    with:
+      targets: '["x86_64-pc-windows-msvc"]'
 
   build-package-test:
     # Owner decision v040-ci-platform-batches: pull requests build platform candidates only for integration

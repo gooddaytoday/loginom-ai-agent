@@ -12,11 +12,12 @@ const job = doc.jobs.pty
 
 describe("loginom-pty workflow", () => {
   test("builds the three product platforms as separate artifacts", () => {
-    expect(job.strategy.matrix.include.map((item: any) => [item.runner, item.target])).toEqual([
-      ["ubuntu-22.04", "x86_64-unknown-linux-gnu"],
-      ["macos-15", "aarch64-apple-darwin"],
-      ["windows-2022", "x86_64-pc-windows-msvc"],
-    ])
+    const all = ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin", "x86_64-pc-windows-msvc"]
+    expect(job.strategy.matrix.target).toBe(`\${{ fromJSON(inputs.targets || '${JSON.stringify(all)}') }}`)
+    expect(doc.on.workflow_call.inputs.targets.default).toBe("")
+    expect(job["runs-on"]).toContain("contains(matrix.target, 'linux') && 'ubuntu-22.04'")
+    expect(job["runs-on"]).toContain("contains(matrix.target, 'apple') && 'macos-15'")
+    expect(job["runs-on"]).toContain("|| 'windows-2022'")
     expect(workflow).toContain("name: loginom-ai-agent-pty-${{ matrix.target }}")
     expect(Object.keys(doc.on)).toContain("workflow_call")
   })
@@ -48,5 +49,14 @@ describe("loginom-pty workflow", () => {
     expect(check).not.toContain("blacksmith")
     expect(check).toContain("macos-15")
     expect(check).not.toContain("opencode-pty")
+  })
+
+  test("each candidate builds only its own platform's pty", () => {
+    const own = { linux: "x86_64-unknown-linux-gnu", macos: "aarch64-apple-darwin", windows: "x86_64-pc-windows-msvc" }
+    for (const [name, target] of Object.entries(own)) {
+      const consumer: any = (Bun as any).YAML.parse(read(`.github/workflows/loginom-${name}.yml`))
+      expect(consumer.jobs.pty.with.targets).toBe(JSON.stringify([target]))
+      expect(read(`.github/workflows/loginom-${name}.yml`)).toContain(`name: loginom-ai-agent-pty-${target}`)
+    }
   })
 })
