@@ -501,9 +501,14 @@ export async function createBridge(config, session, { browserTransport: managedB
             requirePreparedWorkspace(session.metadata);
             const args=request.params.arguments??{};
             validateActionParameters(actionRuntime.tools.find(t=>t.name===request.params.name).inputSchema,args);
-            const result=await actionRuntime.serverDownload(args,request.params.name,{signal:extra.signal});
+            let workflowReturn;
+            const result=await actionRuntime.serverDownload(args,request.params.name,{signal:extra.signal,
+              onWorkflowReturn:state=>{workflowReturn=state;}});
             await logResult(request.params.name,result);
-            return {content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result};
+            const content=[{type:'text',text:JSON.stringify(result)}];
+            if(workflowReturn==='restored')content.push({type:'text',text:'Returned to the original workflow tab.'});
+            if(workflowReturn==='refused')content.push({type:'text',text:'The original workflow tab was not restored, so call dock_prepare(intent="existing_workflow") before Save.'});
+            return {content,structuredContent:result};
           }
           if(isNodeApiTool(request.params.name)) {
             const invoke=async()=>{
