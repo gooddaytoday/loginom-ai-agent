@@ -1,0 +1,162 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "workflow",
+        "type": "variables.user",
+        "label": "Переменные сценария"
+      },
+      {
+        "id": "orders",
+        "type": "imports.text"
+      }
+    ],
+    "links": [],
+    "exact": true,
+    "retain": []
+  },
+  "outputs": [
+    {
+      "output_node_type": "imports.text",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "integer"
+        },
+        {
+          "name": "order_date",
+          "type": "string"
+        },
+        {
+          "name": "revenue",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "order_id": 1,
+          "order_date": "2025-11-11",
+          "revenue": 14742.29
+        },
+        {
+          "order_id": 2,
+          "order_date": "2025-12-27",
+          "revenue": 120577.815
+        },
+        {
+          "order_id": 5,
+          "order_date": "2025-09-16",
+          "revenue": 262.9695
+        },
+        {
+          "order_id": 6,
+          "order_date": "2025-10-24",
+          "revenue": 93634.756
+        },
+        {
+          "order_id": 7,
+          "order_date": "2025-03-06",
+          "revenue": 40049.452
+        },
+        {
+          "order_id": 8,
+          "order_date": "2025-10-01",
+          "revenue": 4185.1025
+        },
+        {
+          "order_id": 11,
+          "order_date": "2025-02-28",
+          "revenue": 221110.65
+        },
+        {
+          "order_id": 16,
+          "order_date": "2025-12-27",
+          "revenue": 178726.3285
+        },
+        {
+          "order_id": 22,
+          "order_date": "2025-04-25",
+          "revenue": 99213.5925
+        },
+        {
+          "order_id": 23,
+          "order_date": "2025-03-06",
+          "revenue": 366299.15
+        },
+        {
+          "order_id": 24,
+          "order_date": "2025-06-18",
+          "revenue": 77700.13
+        },
+        {
+          "order_id": 27,
+          "order_date": "2025-05-27",
+          "revenue": 626235.525
+        },
+        {
+          "order_id": 33,
+          "order_date": "2025-04-02",
+          "revenue": 175783.6995
+        },
+        {
+          "order_id": 36,
+          "order_date": "2025-09-30",
+          "revenue": 168037.932
+        },
+        {
+          "order_id": 40,
+          "order_date": "2025-01-17",
+          "revenue": 165308.304
+        },
+        {
+          "order_id": 42,
+          "order_date": "2025-05-12",
+          "revenue": 18618.435
+        },
+        {
+          "order_id": 51,
+          "order_date": "2025-08-21",
+          "revenue": 49781.36
+        },
+        {
+          "order_id": 63,
+          "order_date": "2025-11-21",
+          "revenue": 129635.2
+        },
+        {
+          "order_id": 74,
+          "order_date": "2025-08-23",
+          "revenue": 27516.78
+        },
+        {
+          "order_id": 122,
+          "order_date": "2025-07-25",
+          "revenue": 2178.93
+        },
+        {
+          "order_id": 125,
+          "order_date": "2025-01-26",
+          "revenue": 37672.0
+        },
+        {
+          "order_id": 151,
+          "order_date": "2025-07-13",
+          "revenue": 69896.775
+        },
+        {
+          "order_id": 159,
+          "order_date": "2025-06-20",
+          "revenue": 119631.02
+        },
+        {
+          "order_id": 181,
+          "order_date": "2025-02-18",
+          "revenue": 412755.265
+        }
+      ],
+      "ordered": false,
+      "column_order": "any"
+    }
+  ]
+}

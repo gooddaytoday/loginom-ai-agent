@@ -1,0 +1,28 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "workflow",
+        "type": "variables.user",
+        "label": "Переменные сценария"
+      },
+      {
+        "id": "orders",
+        "type": "imports.text",
+        "label_contains": "orders"
+      },
+      {
+        "id": "customers",
+        "type": "imports.text",
+        "label_contains": "customers"
+      }
+    ],
+    "links": [],
+    "exact": true,
+    "retain": [
+      "workflow",
+      "orders"
+    ]
+  },
+  "outputs": []
+}

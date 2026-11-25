@@ -1,0 +1,198 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "workflow",
+        "type": "variables.user",
+        "label": "Переменные сценария"
+      },
+      {
+        "id": "prices",
+        "type": "imports.text"
+      }
+    ],
+    "links": [],
+    "exact": true,
+    "retain": []
+  },
+  "outputs": [
+    {
+      "output_node_type": "imports.text",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "item_id",
+          "type": "integer"
+        },
+        {
+          "name": "unit_price",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "item_id": 33,
+          "unit_price": 1020.83
+        },
+        {
+          "item_id": 34,
+          "unit_price": 970.25
+        },
+        {
+          "item_id": 35,
+          "unit_price": 1502.31
+        },
+        {
+          "item_id": 36,
+          "unit_price": 10342.53
+        },
+        {
+          "item_id": 37,
+          "unit_price": 6603.38
+        },
+        {
+          "item_id": 38,
+          "unit_price": 367.43
+        },
+        {
+          "item_id": 39,
+          "unit_price": 490.47
+        },
+        {
+          "item_id": 40,
+          "unit_price": 35041.47
+        },
+        {
+          "item_id": 41,
+          "unit_price": 76778.31
+        },
+        {
+          "item_id": 42,
+          "unit_price": 48484.2
+        },
+        {
+          "item_id": 43,
+          "unit_price": 13941.29
+        },
+        {
+          "item_id": 44,
+          "unit_price": 5817.98
+        },
+        {
+          "item_id": 45,
+          "unit_price": 330.69
+        },
+        {
+          "item_id": 46,
+          "unit_price": 43897.37
+        },
+        {
+          "item_id": 47,
+          "unit_price": 683.46
+        },
+        {
+          "item_id": 48,
+          "unit_price": 2184.97
+        },
+        {
+          "item_id": 49,
+          "unit_price": 8268.76
+        },
+        {
+          "item_id": 50,
+          "unit_price": 6203.99
+        },
+        {
+          "item_id": 51,
+          "unit_price": 169.28
+        },
+        {
+          "item_id": 52,
+          "unit_price": 745.18
+        },
+        {
+          "item_id": 53,
+          "unit_price": 52328.45
+        },
+        {
+          "item_id": 54,
+          "unit_price": 11850.1
+        },
+        {
+          "item_id": 55,
+          "unit_price": 6599.53
+        },
+        {
+          "item_id": 56,
+          "unit_price": 29799.44
+        },
+        {
+          "item_id": 57,
+          "unit_price": 5582.49
+        },
+        {
+          "item_id": 58,
+          "unit_price": 6464.42
+        },
+        {
+          "item_id": 59,
+          "unit_price": 52027.52
+        },
+        {
+          "item_id": 60,
+          "unit_price": 741.08
+        },
+        {
+          "item_id": 61,
+          "unit_price": 1057.13
+        },
+        {
+          "item_id": 62,
+          "unit_price": 1329.32
+        },
+        {
+          "item_id": 63,
+          "unit_price": 153.66
+        },
+        {
+          "item_id": 64,
+          "unit_price": 8722.93
+        },
+        {
+          "item_id": 65,
+          "unit_price": 52184.27
+        },
+        {
+          "item_id": 66,
+          "unit_price": 52027.52
+        },
+        {
+          "item_id": 67,
+          "unit_price": 130.61
+        },
+        {
+          "item_id": 68,
+          "unit_price": 9308.28
+        },
+        {
+          "item_id": 69,
+          "unit_price": 781.64
+        },
+        {
+          "item_id": 70,
+          "unit_price": 505.38
+        },
+        {
+          "item_id": 71,
+          "unit_price": 210.9
+        },
+        {
+          "item_id": 72,
+          "unit_price": 385.44
+        }
+      ],
+      "ordered": false,
+      "column_order": "any"
+    }
+  ]
+}

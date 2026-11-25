@@ -1,0 +1,95 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "workflow",
+        "type": "variables.user",
+        "label": "Переменные сценария"
+      },
+      {
+        "id": "items",
+        "type": "imports.text"
+      },
+      {
+        "id": "group",
+        "type": "transform.group_data"
+      },
+      {
+        "id": "filter",
+        "type": "transform.filter_data"
+      }
+    ],
+    "links": [
+      {
+        "source": "items",
+        "target": "filter",
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": "filter",
+        "target": "group",
+        "output": 0,
+        "input": 0
+      }
+    ],
+    "exact": true,
+    "retain": [
+      "workflow",
+      "items",
+      "group"
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "product_id",
+          "type": "integer"
+        },
+        {
+          "name": "summary",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "product_id": 2,
+          "summary": 26.0
+        },
+        {
+          "product_id": 6,
+          "summary": 27.0
+        },
+        {
+          "product_id": 5,
+          "summary": 27.0
+        },
+        {
+          "product_id": 8,
+          "summary": 17.0
+        },
+        {
+          "product_id": 4,
+          "summary": 20.0
+        },
+        {
+          "product_id": 3,
+          "summary": 9.0
+        },
+        {
+          "product_id": 7,
+          "summary": 5.0
+        },
+        {
+          "product_id": 1,
+          "summary": 15.0
+        }
+      ],
+      "ordered": false,
+      "column_order": "any"
+    }
+  ]
+}

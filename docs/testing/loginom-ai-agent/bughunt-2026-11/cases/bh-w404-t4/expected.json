@@ -1,0 +1,118 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "workflow",
+        "type": "variables.user",
+        "label": "Переменные сценария"
+      },
+      {
+        "id": "orders",
+        "type": "imports.text",
+        "label": "Заказы для динамики"
+      },
+      {
+        "id": "monthly",
+        "type": "programming.python"
+      }
+    ],
+    "links": [
+      {
+        "source": "orders",
+        "target": "monthly",
+        "output": 0,
+        "input": 0
+      }
+    ],
+    "exact": true,
+    "retain": [
+      "workflow",
+      "orders",
+      "monthly"
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "programming.python",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "month",
+          "type": "string"
+        },
+        {
+          "name": "revenue",
+          "type": "real"
+        },
+        {
+          "name": "moving_avg",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "month": "2025-01",
+          "revenue": 202980.304,
+          "moving_avg": null
+        },
+        {
+          "month": "2025-02",
+          "revenue": 633865.915,
+          "moving_avg": null
+        },
+        {
+          "month": "2025-03",
+          "revenue": 406348.602,
+          "moving_avg": null
+        },
+        {
+          "month": "2025-04",
+          "revenue": 274997.292,
+          "moving_avg": null
+        },
+        {
+          "month": "2025-05",
+          "revenue": 644853.96,
+          "moving_avg": null
+        },
+        {
+          "month": "2025-06",
+          "revenue": 197331.15,
+          "moving_avg": 393396.20383333333
+        },
+        {
+          "month": "2025-07",
+          "revenue": 72075.705,
+          "moving_avg": 371578.7706666667
+        },
+        {
+          "month": "2025-08",
+          "revenue": 77298.14,
+          "moving_avg": 278817.47483333334
+        },
+        {
+          "month": "2025-09",
+          "revenue": 168300.9015,
+          "moving_avg": 239142.85808333333
+        },
+        {
+          "month": "2025-10",
+          "revenue": 97819.8585,
+          "moving_avg": 209613.28583333333
+        },
+        {
+          "month": "2025-11",
+          "revenue": 144377.49,
+          "moving_avg": 126200.54083333333
+        },
+        {
+          "month": "2025-12",
+          "revenue": 299304.1435,
+          "moving_avg": 143196.03975
+        }
+      ],
+      "ordered": true,
+      "column_order": "any"
+    }
+  ]
+}

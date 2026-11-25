@@ -1,0 +1,189 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "workflow",
+        "type": "variables.user",
+        "label": "Переменные сценария"
+      },
+      {
+        "id": "orders",
+        "type": "imports.text",
+        "label_contains": "orders"
+      },
+      {
+        "id": "customers",
+        "type": "imports.text",
+        "label_contains": "customers"
+      },
+      {
+        "id": "join",
+        "type": "transform.join_data"
+      }
+    ],
+    "links": [
+      {
+        "source": "orders",
+        "target": "join",
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": "customers",
+        "target": "join",
+        "output": 0,
+        "input": 1
+      }
+    ],
+    "exact": true,
+    "retain": [
+      "workflow",
+      "orders",
+      "customers"
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "transform.join_data",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "integer"
+        },
+        {
+          "name": "region",
+          "type": "string"
+        },
+        {
+          "name": "revenue",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "order_id": 1,
+          "region": "Казань",
+          "revenue": 14742.29
+        },
+        {
+          "order_id": 2,
+          "region": "Казань",
+          "revenue": 120577.815
+        },
+        {
+          "order_id": 3,
+          "region": "Самара",
+          "revenue": 676284.4305
+        },
+        {
+          "order_id": 4,
+          "region": "Нижний Новгород",
+          "revenue": 214019.4075
+        },
+        {
+          "order_id": 5,
+          "region": "Санкт-Петербург",
+          "revenue": 262.9695
+        },
+        {
+          "order_id": 6,
+          "region": "Новосибирск",
+          "revenue": 93634.756
+        },
+        {
+          "order_id": 7,
+          "region": "Санкт-Петербург",
+          "revenue": 40049.452
+        },
+        {
+          "order_id": 8,
+          "region": "Екатеринбург",
+          "revenue": 4185.1025
+        },
+        {
+          "order_id": 9,
+          "region": "Самара",
+          "revenue": 6667.726
+        },
+        {
+          "order_id": 10,
+          "region": "Алтай",
+          "revenue": 145665.7935
+        },
+        {
+          "order_id": 11,
+          "region": "Екатеринбург",
+          "revenue": 221110.65
+        },
+        {
+          "order_id": 12,
+          "region": "Москва",
+          "revenue": 12547.84
+        },
+        {
+          "order_id": 13,
+          "region": "Самара",
+          "revenue": 181574.922
+        },
+        {
+          "order_id": 14,
+          "region": "Санкт-Петербург",
+          "revenue": 6075.2
+        },
+        {
+          "order_id": 15,
+          "region": "Алтай",
+          "revenue": 4112.01
+        },
+        {
+          "order_id": 16,
+          "region": "Санкт-Петербург",
+          "revenue": 178726.3285
+        },
+        {
+          "order_id": 17,
+          "region": "Санкт-Петербург",
+          "revenue": 31027.59
+        },
+        {
+          "order_id": 18,
+          "region": "Санкт-Петербург",
+          "revenue": 26344.178
+        },
+        {
+          "order_id": 19,
+          "region": "Алтай",
+          "revenue": 1009966.011
+        },
+        {
+          "order_id": 20,
+          "region": "Екатеринбург",
+          "revenue": 238975.182
+        },
+        {
+          "order_id": 21,
+          "region": "Самара",
+          "revenue": 4647.528
+        },
+        {
+          "order_id": 22,
+          "region": "Самара",
+          "revenue": 99213.5925
+        },
+        {
+          "order_id": 23,
+          "region": "Самара",
+          "revenue": 366299.15
+        },
+        {
+          "order_id": 24,
+          "region": "Новосибирск",
+          "revenue": 77700.13
+        }
+      ],
+      "ordered": false,
+      "column_order": "any"
+    }
+  ]
+}

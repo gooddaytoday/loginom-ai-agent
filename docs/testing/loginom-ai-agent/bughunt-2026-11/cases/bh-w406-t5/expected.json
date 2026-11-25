@@ -1,0 +1,85 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "workflow",
+        "type": "variables.user",
+        "label": "Переменные сценария"
+      },
+      {
+        "id": "items",
+        "type": "imports.text"
+      },
+      {
+        "id": "group",
+        "type": "transform.group_data"
+      }
+    ],
+    "links": [
+      {
+        "source": "items",
+        "target": "group",
+        "output": 0,
+        "input": 0
+      }
+    ],
+    "exact": true,
+    "retain": [
+      "workflow",
+      "items",
+      "group"
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "product_id",
+          "type": "integer"
+        },
+        {
+          "name": "summary",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "product_id": 2,
+          "summary": 7.5
+        },
+        {
+          "product_id": 7,
+          "summary": 3.5
+        },
+        {
+          "product_id": 6,
+          "summary": 7.0
+        },
+        {
+          "product_id": 4,
+          "summary": 6.0
+        },
+        {
+          "product_id": 5,
+          "summary": 7.75
+        },
+        {
+          "product_id": 8,
+          "summary": 5.75
+        },
+        {
+          "product_id": 3,
+          "summary": 3.25
+        },
+        {
+          "product_id": 1,
+          "summary": 5.25
+        }
+      ],
+      "ordered": false,
+      "column_order": "any"
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "workflow",
+        "type": "variables.user",
+        "label": "Переменные сценария"
+      },
+      {
+        "id": "items",
+        "type": "imports.text"
+      },
+      {
+        "id": "calc",
+        "type": "transform.calculator"
+      },
+      {
+        "id": "filter",
+        "type": "transform.filter_data"
+      },
+      {
+        "id": "group",
+        "type": "transform.group_data"
+      }
+    ],
+    "links": [
+      {
+        "source": "items",
+        "target": "calc",
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": "calc",
+        "target": "filter",
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": "filter",
+        "target": "group",
+        "output": 0,
+        "input": 0
+      }
+    ],
+    "exact": true,
+    "retain": [
+      "workflow",
+      "items",
+      "calc",
+      "filter"
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "product_id",
+          "type": "integer"
+        },
+        {
+          "name": "total_amount",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "product_id": 22,
+          "total_amount": 14742.29
+        },
+        {
+          "product_id": 67,
+          "total_amount": 472599.7395
+        },
+        {
+          "product_id": 149,
+          "total_amount": 30562.336
+        },
+        {
+          "product_id": 154,
+          "total_amount": 361015.92
+        },
+        {
+          "product_id": 2,
+          "total_amount": 53134.01
+        },
+        {
+          "product_id": 119,
+          "total_amount": 158954.7175
+        },
+        {
+          "product_id": 36,
+          "total_amount": 60996.936
+        },
+        {
+          "product_id": 103,
+          "total_amount": 9746.712
+        },
+        {
+          "product_id": 78,
+          "total_amount": 141835.5135
+        },
+        {
+          "product_id": 165,
+          "total_amount": 221110.65
+        },
+        {
+          "product_id": 92,
+          "total_amount": 178921.2
+        },
+        {
+          "product_id": 114,
+          "total_amount": 6075.2
+        },
+        {
+          "product_id": 42,
+          "total_amount": 164682.08
+        }
+      ],
+      "ordered": false,
+      "column_order": "any"
+    }
+  ]
+}

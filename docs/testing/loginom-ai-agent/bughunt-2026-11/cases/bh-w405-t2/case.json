@@ -1,0 +1,17 @@
+{
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 1
+  },
+  "base": "bh-w405-t1",
+  "manual_edit": {
+    "kind": "move",
+    "node": {
+      "type": "transform.filter_data"
+    },
+    "position": {
+      "x": 296,
+      "y": 352
+    }
+  }
+}
