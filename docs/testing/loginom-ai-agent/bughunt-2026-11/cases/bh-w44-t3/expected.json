@@ -2,14 +2,19 @@
   "graph": {
     "exact": true,
     "retain": [
+      "scenario_vars",
       "source",
       "monthly"
     ],
     "nodes": [
       {
+        "id": "scenario_vars",
+        "type": "variables.user"
+      },
+      {
         "id": "source",
         "type": "imports.text",
-        "label": "Строки заказов"
+        "label": "Позиции к сверке"
       },
       {
         "id": "monthly",
@@ -81,11 +86,13 @@
       "columns": [
         {
           "name": "month",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "revenue",
           "type": "real",
+          "label_any": true,
           "tolerance": {
             "abs": 1e-06
           }
@@ -93,6 +100,7 @@
         {
           "name": "moving_avg",
           "type": "real",
+          "label_any": true,
           "tolerance": {
             "abs": 1e-06
           }

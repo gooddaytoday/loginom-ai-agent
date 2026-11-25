@@ -4,6 +4,10 @@
     "retain": [],
     "nodes": [
       {
+        "id": "scenario_vars",
+        "type": "variables.user"
+      },
+      {
         "id": "source",
         "type": "imports.text"
       }
@@ -141,11 +145,13 @@
       "columns": [
         {
           "name": "category",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "list_price",
           "type": "real",
+          "label_any": true,
           "tolerance": {
             "abs": 1e-06
           }

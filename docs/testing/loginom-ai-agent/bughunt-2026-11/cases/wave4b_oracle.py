@@ -11,7 +11,7 @@ SALES = ('orders_lines.csv', {'order_date': 'string', 'status': 'string',
 ORDERS = ('order_ids.csv', {'order_id': 'integer'})
 PRICES = ('product_prices.csv', {'category': 'string', 'list_price': 'real'})
 TABLES = {44: SALES, 45: ORDERS, 46: PRICES}
-TYPES = {'source': 'imports.text', 'monthly': 'programming.python',
+TYPES = {'scenario_vars': 'variables.user', 'source': 'imports.text', 'monthly': 'programming.python',
          'limit': 'variables.calculator', 'filter': 'transform.filter_data',
          'group': 'transform.group_data'}
 
@@ -26,10 +26,11 @@ def typed(row, columns):
     return {name: parse[kind](row[name]) if row[name] else None for name, kind in columns.items()}
 
 
-def output(node, columns, rows, *, ordered=True, column_order='exact'):
+def output(node, columns, rows, *, ordered=True, imported_labels=False):
     return {'output_node_type': TYPES[node], 'output_port': 0, 'ordered': ordered,
-            'column_order': column_order, 'rows': rows,
-            'columns': [dict(name=name, type=kind, **({'tolerance': {'abs': 0.000001}} if kind == 'real' else {}))
+            'column_order': 'exact', 'rows': rows,
+            'columns': [dict(name=name, type=kind, **({'name_any': True} if imported_labels else {'label_any': True}),
+                             **({'tolerance': {'abs': 0.000001}} if kind == 'real' else {}))
                         for name, kind in columns.items()]}
 
 
@@ -69,12 +70,12 @@ def expected(root, case):
     source = [typed(row, columns) for row in raw]
     nodes = ['source']
     links, retain, labels = [], [], {}
-    outputs = [output('source', columns, source)]
+    outputs = [output('source', columns, source, imported_labels=chain == 44)]
     if chain == 44 and turn > 1:
         nodes += ['monthly']
         links = [('source', 'monthly')]
         retain = nodes if turn > 2 else ['source']
-        labels['source'] = 'Строки заказов'
+        labels['source'] = 'Позиции к сверке'
         window = {2: 0, 3: 3, 4: 6}[turn]
         result_columns = {'month': 'string', 'revenue': 'real'}
         if window:
@@ -96,7 +97,7 @@ def expected(root, case):
         nodes += ['group']
         retain = ['source'] if turn == 2 else ['source', 'group']
         if turn > 2:
-            labels['group'] = 'Свод цен'
+            labels['group'] = 'Свод цен для закупок'
         filtered = turn in (3, 4)
         if filtered:
             nodes += ['filter']
@@ -106,6 +107,9 @@ def expected(root, case):
         outputs = [output('group', {'category': 'string', 'metric': 'real'},
                           prices(raw, filtered=filtered, average=turn > 3), ordered=False)]
 
+    nodes = ['scenario_vars', *nodes]
+    if turn > 1:
+        retain = ['scenario_vars', *retain]
     return {'graph': {'exact': True, 'retain': retain,
                       'nodes': [dict(id=node, type=TYPES[node], **({'label': labels[node]} if node in labels else {}))
                                 for node in nodes],

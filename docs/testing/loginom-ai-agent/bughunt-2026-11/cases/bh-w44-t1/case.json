@@ -8,6 +8,6 @@
     "node": {
       "type": "imports.text"
     },
-    "label": "Строки заказов"
+    "label": "Позиции к сверке"
   }
 }

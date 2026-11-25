@@ -2,10 +2,15 @@
   "graph": {
     "exact": true,
     "retain": [
+      "scenario_vars",
       "source",
       "group"
     ],
     "nodes": [
+      {
+        "id": "scenario_vars",
+        "type": "variables.user"
+      },
       {
         "id": "source",
         "type": "imports.text"
@@ -13,7 +18,7 @@
       {
         "id": "group",
         "type": "transform.group_data",
-        "label": "Свод цен"
+        "label": "Свод цен для закупок"
       }
     ],
     "links": [
@@ -56,11 +61,13 @@
       "columns": [
         {
           "name": "category",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "metric",
           "type": "real",
+          "label_any": true,
           "tolerance": {
             "abs": 1e-06
           }

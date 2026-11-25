@@ -4,6 +4,10 @@
     "retain": [],
     "nodes": [
       {
+        "id": "scenario_vars",
+        "type": "variables.user"
+      },
+      {
         "id": "source",
         "type": "imports.text"
       }
@@ -350,26 +354,31 @@
       "columns": [
         {
           "name": "order_date",
-          "type": "string"
+          "type": "string",
+          "name_any": true
         },
         {
           "name": "status",
-          "type": "string"
+          "type": "string",
+          "name_any": true
         },
         {
           "name": "quantity",
-          "type": "integer"
+          "type": "integer",
+          "name_any": true
         },
         {
           "name": "unit_price",
           "type": "real",
+          "name_any": true,
           "tolerance": {
             "abs": 1e-06
           }
         },
         {
           "name": "discount_pct",
-          "type": "integer"
+          "type": "integer",
+          "name_any": true
         }
       ]
     }

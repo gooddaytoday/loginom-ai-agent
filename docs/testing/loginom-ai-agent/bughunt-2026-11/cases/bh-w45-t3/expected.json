@@ -2,10 +2,15 @@
   "graph": {
     "exact": true,
     "retain": [
+      "scenario_vars",
       "source",
       "limit"
     ],
     "nodes": [
+      {
+        "id": "scenario_vars",
+        "type": "variables.user"
+      },
       {
         "id": "source",
         "type": "imports.text"
@@ -48,7 +53,8 @@
       "columns": [
         {
           "name": "order_id",
-          "type": "integer"
+          "type": "integer",
+          "label_any": true
         }
       ]
     }

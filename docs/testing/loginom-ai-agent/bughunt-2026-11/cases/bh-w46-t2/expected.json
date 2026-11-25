@@ -2,9 +2,14 @@
   "graph": {
     "exact": true,
     "retain": [
+      "scenario_vars",
       "source"
     ],
     "nodes": [
+      {
+        "id": "scenario_vars",
+        "type": "variables.user"
+      },
       {
         "id": "source",
         "type": "imports.text"
@@ -54,11 +59,13 @@
       "columns": [
         {
           "name": "category",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "metric",
           "type": "real",
+          "label_any": true,
           "tolerance": {
             "abs": 1e-06
           }

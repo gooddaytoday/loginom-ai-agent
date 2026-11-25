@@ -10,6 +10,6 @@
     "node": {
       "type": "transform.group_data"
     },
-    "label": "Свод цен"
+    "label": "Свод цен для закупок"
   }
 }
