@@ -1,0 +1,24 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "programming.python"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "id": "imports.text",
+        "type": "imports.text"
+      },
+      {
+        "id": "programming.python",
+        "type": "programming.python"
+      }
+    ],
+    "links": []
+  }
+}

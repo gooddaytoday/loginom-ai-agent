@@ -1,0 +1,18 @@
+{
+  "base": "bh-g103-t1",
+  "input_files": [
+    "data.csv"
+  ],
+  "budget": {
+    "max_errors": 0,
+    "max_nodes": 1,
+    "forbid": [
+      "sqlite3",
+      "openpyxl",
+      "pandas",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  }
+}

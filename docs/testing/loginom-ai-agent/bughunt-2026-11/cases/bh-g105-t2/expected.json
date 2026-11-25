@@ -1,0 +1,24 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "programming.javascript"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "id": "imports.text",
+        "type": "imports.text"
+      },
+      {
+        "id": "programming.javascript",
+        "type": "programming.javascript"
+      }
+    ],
+    "links": []
+  }
+}
