@@ -1,0 +1,595 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-h103-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Cohort",
+          "label": "Cohort",
+          "type": "string"
+        },
+        {
+          "name": "Age",
+          "label": "Age",
+          "type": "integer"
+        },
+        {
+          "name": "CohortSize",
+          "label": "CohortSize",
+          "type": "integer"
+        },
+        {
+          "name": "Active",
+          "label": "Active",
+          "type": "integer"
+        },
+        {
+          "name": "Retention",
+          "label": "Retention",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Cohort": "2025-09",
+          "Age": 0,
+          "CohortSize": 200,
+          "Active": 200,
+          "Retention": 1.0
+        },
+        {
+          "Cohort": "2025-09",
+          "Age": 1,
+          "CohortSize": 200,
+          "Active": 179,
+          "Retention": 0.895
+        },
+        {
+          "Cohort": "2025-09",
+          "Age": 2,
+          "CohortSize": 200,
+          "Active": 157,
+          "Retention": 0.785
+        },
+        {
+          "Cohort": "2025-09",
+          "Age": 3,
+          "CohortSize": 200,
+          "Active": 136,
+          "Retention": 0.68
+        },
+        {
+          "Cohort": "2025-09",
+          "Age": 4,
+          "CohortSize": 200,
+          "Active": 109,
+          "Retention": 0.545
+        },
+        {
+          "Cohort": "2025-09",
+          "Age": 5,
+          "CohortSize": 200,
+          "Active": 86,
+          "Retention": 0.43
+        },
+        {
+          "Cohort": "2025-09",
+          "Age": 6,
+          "CohortSize": 200,
+          "Active": 58,
+          "Retention": 0.29
+        },
+        {
+          "Cohort": "2025-09",
+          "Age": 7,
+          "CohortSize": 200,
+          "Active": 35,
+          "Retention": 0.175
+        },
+        {
+          "Cohort": "2025-09",
+          "Age": 8,
+          "CohortSize": 200,
+          "Active": 16,
+          "Retention": 0.08
+        },
+        {
+          "Cohort": "2025-09",
+          "Age": 9,
+          "CohortSize": 200,
+          "Active": 7,
+          "Retention": 0.035
+        },
+        {
+          "Cohort": "2025-09",
+          "Age": 10,
+          "CohortSize": 200,
+          "Active": 0,
+          "Retention": 0.0
+        },
+        {
+          "Cohort": "2025-09",
+          "Age": 11,
+          "CohortSize": 200,
+          "Active": 0,
+          "Retention": 0.0
+        },
+        {
+          "Cohort": "2025-10",
+          "Age": 0,
+          "CohortSize": 200,
+          "Active": 200,
+          "Retention": 1.0
+        },
+        {
+          "Cohort": "2025-10",
+          "Age": 1,
+          "CohortSize": 200,
+          "Active": 180,
+          "Retention": 0.9
+        },
+        {
+          "Cohort": "2025-10",
+          "Age": 2,
+          "CohortSize": 200,
+          "Active": 157,
+          "Retention": 0.785
+        },
+        {
+          "Cohort": "2025-10",
+          "Age": 3,
+          "CohortSize": 200,
+          "Active": 135,
+          "Retention": 0.675
+        },
+        {
+          "Cohort": "2025-10",
+          "Age": 4,
+          "CohortSize": 200,
+          "Active": 105,
+          "Retention": 0.525
+        },
+        {
+          "Cohort": "2025-10",
+          "Age": 5,
+          "CohortSize": 200,
+          "Active": 90,
+          "Retention": 0.45
+        },
+        {
+          "Cohort": "2025-10",
+          "Age": 6,
+          "CohortSize": 200,
+          "Active": 61,
+          "Retention": 0.305
+        },
+        {
+          "Cohort": "2025-10",
+          "Age": 7,
+          "CohortSize": 200,
+          "Active": 33,
+          "Retention": 0.165
+        },
+        {
+          "Cohort": "2025-10",
+          "Age": 8,
+          "CohortSize": 200,
+          "Active": 16,
+          "Retention": 0.08
+        },
+        {
+          "Cohort": "2025-10",
+          "Age": 9,
+          "CohortSize": 200,
+          "Active": 8,
+          "Retention": 0.04
+        },
+        {
+          "Cohort": "2025-10",
+          "Age": 10,
+          "CohortSize": 200,
+          "Active": 0,
+          "Retention": 0.0
+        },
+        {
+          "Cohort": "2025-11",
+          "Age": 0,
+          "CohortSize": 200,
+          "Active": 200,
+          "Retention": 1.0
+        },
+        {
+          "Cohort": "2025-11",
+          "Age": 1,
+          "CohortSize": 200,
+          "Active": 180,
+          "Retention": 0.9
+        },
+        {
+          "Cohort": "2025-11",
+          "Age": 2,
+          "CohortSize": 200,
+          "Active": 159,
+          "Retention": 0.795
+        },
+        {
+          "Cohort": "2025-11",
+          "Age": 3,
+          "CohortSize": 200,
+          "Active": 139,
+          "Retention": 0.695
+        },
+        {
+          "Cohort": "2025-11",
+          "Age": 4,
+          "CohortSize": 200,
+          "Active": 107,
+          "Retention": 0.535
+        },
+        {
+          "Cohort": "2025-11",
+          "Age": 5,
+          "CohortSize": 200,
+          "Active": 88,
+          "Retention": 0.44
+        },
+        {
+          "Cohort": "2025-11",
+          "Age": 6,
+          "CohortSize": 200,
+          "Active": 59,
+          "Retention": 0.295
+        },
+        {
+          "Cohort": "2025-11",
+          "Age": 7,
+          "CohortSize": 200,
+          "Active": 29,
+          "Retention": 0.145
+        },
+        {
+          "Cohort": "2025-11",
+          "Age": 8,
+          "CohortSize": 200,
+          "Active": 21,
+          "Retention": 0.105
+        },
+        {
+          "Cohort": "2025-11",
+          "Age": 9,
+          "CohortSize": 200,
+          "Active": 3,
+          "Retention": 0.015
+        },
+        {
+          "Cohort": "2025-12",
+          "Age": 0,
+          "CohortSize": 200,
+          "Active": 200,
+          "Retention": 1.0
+        },
+        {
+          "Cohort": "2025-12",
+          "Age": 1,
+          "CohortSize": 200,
+          "Active": 179,
+          "Retention": 0.895
+        },
+        {
+          "Cohort": "2025-12",
+          "Age": 2,
+          "CohortSize": 200,
+          "Active": 158,
+          "Retention": 0.79
+        },
+        {
+          "Cohort": "2025-12",
+          "Age": 3,
+          "CohortSize": 200,
+          "Active": 133,
+          "Retention": 0.665
+        },
+        {
+          "Cohort": "2025-12",
+          "Age": 4,
+          "CohortSize": 200,
+          "Active": 111,
+          "Retention": 0.555
+        },
+        {
+          "Cohort": "2025-12",
+          "Age": 5,
+          "CohortSize": 200,
+          "Active": 84,
+          "Retention": 0.42
+        },
+        {
+          "Cohort": "2025-12",
+          "Age": 6,
+          "CohortSize": 200,
+          "Active": 64,
+          "Retention": 0.32
+        },
+        {
+          "Cohort": "2025-12",
+          "Age": 7,
+          "CohortSize": 200,
+          "Active": 33,
+          "Retention": 0.165
+        },
+        {
+          "Cohort": "2025-12",
+          "Age": 8,
+          "CohortSize": 200,
+          "Active": 15,
+          "Retention": 0.075
+        },
+        {
+          "Cohort": "2026-01",
+          "Age": 0,
+          "CohortSize": 200,
+          "Active": 200,
+          "Retention": 1.0
+        },
+        {
+          "Cohort": "2026-01",
+          "Age": 1,
+          "CohortSize": 200,
+          "Active": 180,
+          "Retention": 0.9
+        },
+        {
+          "Cohort": "2026-01",
+          "Age": 2,
+          "CohortSize": 200,
+          "Active": 160,
+          "Retention": 0.8
+        },
+        {
+          "Cohort": "2026-01",
+          "Age": 3,
+          "CohortSize": 200,
+          "Active": 137,
+          "Retention": 0.685
+        },
+        {
+          "Cohort": "2026-01",
+          "Age": 4,
+          "CohortSize": 200,
+          "Active": 110,
+          "Retention": 0.55
+        },
+        {
+          "Cohort": "2026-01",
+          "Age": 5,
+          "CohortSize": 200,
+          "Active": 0,
+          "Retention": 0.0
+        },
+        {
+          "Cohort": "2026-01",
+          "Age": 6,
+          "CohortSize": 200,
+          "Active": 50,
+          "Retention": 0.25
+        },
+        {
+          "Cohort": "2026-01",
+          "Age": 7,
+          "CohortSize": 200,
+          "Active": 24,
+          "Retention": 0.12
+        },
+        {
+          "Cohort": "2026-02",
+          "Age": 0,
+          "CohortSize": 200,
+          "Active": 200,
+          "Retention": 1.0
+        },
+        {
+          "Cohort": "2026-02",
+          "Age": 1,
+          "CohortSize": 200,
+          "Active": 179,
+          "Retention": 0.895
+        },
+        {
+          "Cohort": "2026-02",
+          "Age": 2,
+          "CohortSize": 200,
+          "Active": 160,
+          "Retention": 0.8
+        },
+        {
+          "Cohort": "2026-02",
+          "Age": 3,
+          "CohortSize": 200,
+          "Active": 137,
+          "Retention": 0.685
+        },
+        {
+          "Cohort": "2026-02",
+          "Age": 4,
+          "CohortSize": 200,
+          "Active": 115,
+          "Retention": 0.575
+        },
+        {
+          "Cohort": "2026-02",
+          "Age": 5,
+          "CohortSize": 200,
+          "Active": 80,
+          "Retention": 0.4
+        },
+        {
+          "Cohort": "2026-02",
+          "Age": 6,
+          "CohortSize": 200,
+          "Active": 39,
+          "Retention": 0.195
+        },
+        {
+          "Cohort": "2026-03",
+          "Age": 0,
+          "CohortSize": 200,
+          "Active": 200,
+          "Retention": 1.0
+        },
+        {
+          "Cohort": "2026-03",
+          "Age": 1,
+          "CohortSize": 200,
+          "Active": 180,
+          "Retention": 0.9
+        },
+        {
+          "Cohort": "2026-03",
+          "Age": 2,
+          "CohortSize": 200,
+          "Active": 158,
+          "Retention": 0.79
+        },
+        {
+          "Cohort": "2026-03",
+          "Age": 3,
+          "CohortSize": 200,
+          "Active": 136,
+          "Retention": 0.68
+        },
+        {
+          "Cohort": "2026-03",
+          "Age": 4,
+          "CohortSize": 200,
+          "Active": 104,
+          "Retention": 0.52
+        },
+        {
+          "Cohort": "2026-03",
+          "Age": 5,
+          "CohortSize": 200,
+          "Active": 57,
+          "Retention": 0.285
+        },
+        {
+          "Cohort": "2026-04",
+          "Age": 0,
+          "CohortSize": 200,
+          "Active": 200,
+          "Retention": 1.0
+        },
+        {
+          "Cohort": "2026-04",
+          "Age": 1,
+          "CohortSize": 200,
+          "Active": 180,
+          "Retention": 0.9
+        },
+        {
+          "Cohort": "2026-04",
+          "Age": 2,
+          "CohortSize": 200,
+          "Active": 160,
+          "Retention": 0.8
+        },
+        {
+          "Cohort": "2026-04",
+          "Age": 3,
+          "CohortSize": 200,
+          "Active": 131,
+          "Retention": 0.655
+        },
+        {
+          "Cohort": "2026-04",
+          "Age": 4,
+          "CohortSize": 200,
+          "Active": 85,
+          "Retention": 0.425
+        },
+        {
+          "Cohort": "2026-05",
+          "Age": 0,
+          "CohortSize": 200,
+          "Active": 200,
+          "Retention": 1.0
+        },
+        {
+          "Cohort": "2026-05",
+          "Age": 1,
+          "CohortSize": 200,
+          "Active": 180,
+          "Retention": 0.9
+        },
+        {
+          "Cohort": "2026-05",
+          "Age": 2,
+          "CohortSize": 200,
+          "Active": 158,
+          "Retention": 0.79
+        },
+        {
+          "Cohort": "2026-05",
+          "Age": 3,
+          "CohortSize": 200,
+          "Active": 119,
+          "Retention": 0.595
+        },
+        {
+          "Cohort": "2026-06",
+          "Age": 0,
+          "CohortSize": 200,
+          "Active": 200,
+          "Retention": 1.0
+        },
+        {
+          "Cohort": "2026-06",
+          "Age": 1,
+          "CohortSize": 200,
+          "Active": 180,
+          "Retention": 0.9
+        },
+        {
+          "Cohort": "2026-06",
+          "Age": 2,
+          "CohortSize": 200,
+          "Active": 157,
+          "Retention": 0.785
+        },
+        {
+          "Cohort": "2026-07",
+          "Age": 0,
+          "CohortSize": 200,
+          "Active": 200,
+          "Retention": 1.0
+        },
+        {
+          "Cohort": "2026-07",
+          "Age": 1,
+          "CohortSize": 200,
+          "Active": 180,
+          "Retention": 0.9
+        },
+        {
+          "Cohort": "2026-08",
+          "Age": 0,
+          "CohortSize": 200,
+          "Active": 200,
+          "Retention": 1.0
+        }
+      ]
+    }
+  ]
+}

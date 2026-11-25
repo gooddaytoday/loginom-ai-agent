@@ -1,0 +1,739 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-h106-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Sensor",
+          "label": "Sensor",
+          "type": "string"
+        },
+        {
+          "name": "Measurement",
+          "label": "Measurement",
+          "type": "integer"
+        },
+        {
+          "name": "MeasuredAt",
+          "label": "MeasuredAt",
+          "type": "string"
+        },
+        {
+          "name": "Reading",
+          "label": "Reading",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "ZScore",
+          "label": "ZScore",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Sensor": "D-01",
+          "Measurement": 1226,
+          "MeasuredAt": "2026-06-01 20:26:00",
+          "Reading": 6.83,
+          "ZScore": -12.24260981388098
+        },
+        {
+          "Sensor": "D-01",
+          "Measurement": 4291,
+          "MeasuredAt": "2026-06-03 23:31:00",
+          "Reading": 15.35,
+          "ZScore": 11.333473388437312
+        },
+        {
+          "Sensor": "D-01",
+          "Measurement": 9808,
+          "MeasuredAt": "2026-06-07 19:28:00",
+          "Reading": 7.12,
+          "ZScore": -11.440137498309113
+        },
+        {
+          "Sensor": "D-01",
+          "Measurement": 31263,
+          "MeasuredAt": "2026-06-22 17:03:00",
+          "Reading": 15.1,
+          "ZScore": 10.641686909496046
+        },
+        {
+          "Sensor": "D-01",
+          "Measurement": 57622,
+          "MeasuredAt": "2026-07-11 00:22:00",
+          "Reading": 6.57,
+          "ZScore": -12.962067751979895
+        },
+        {
+          "Sensor": "D-01",
+          "Measurement": 59461,
+          "MeasuredAt": "2026-07-12 07:01:00",
+          "Reading": 15.59,
+          "ZScore": 11.997588408220926
+        },
+        {
+          "Sensor": "D-02",
+          "Measurement": 7356,
+          "MeasuredAt": "2026-06-06 02:36:00",
+          "Reading": 7.07,
+          "ZScore": -11.987922185220532
+        },
+        {
+          "Sensor": "D-02",
+          "Measurement": 20229,
+          "MeasuredAt": "2026-06-15 01:09:00",
+          "Reading": 15.82,
+          "ZScore": 11.680368885161858
+        },
+        {
+          "Sensor": "D-02",
+          "Measurement": 33102,
+          "MeasuredAt": "2026-06-23 23:42:00",
+          "Reading": 7.42,
+          "ZScore": -11.041190542405236
+        },
+        {
+          "Sensor": "D-02",
+          "Measurement": 41684,
+          "MeasuredAt": "2026-06-29 22:44:00",
+          "Reading": 7.12,
+          "ZScore": -11.85267480767549
+        },
+        {
+          "Sensor": "D-02",
+          "Measurement": 42297,
+          "MeasuredAt": "2026-06-30 08:57:00",
+          "Reading": 15.41,
+          "ZScore": 10.57134038929251
+        },
+        {
+          "Sensor": "D-02",
+          "Measurement": 47814,
+          "MeasuredAt": "2026-07-04 04:54:00",
+          "Reading": 7.33,
+          "ZScore": -11.284635821986312
+        },
+        {
+          "Sensor": "D-02",
+          "Measurement": 50266,
+          "MeasuredAt": "2026-07-05 21:46:00",
+          "Reading": 6.88,
+          "ZScore": -12.501862219891692
+        },
+        {
+          "Sensor": "D-03",
+          "Measurement": 12260,
+          "MeasuredAt": "2026-06-09 12:20:00",
+          "Reading": 7.98,
+          "ZScore": -10.994250478483242
+        },
+        {
+          "Sensor": "D-03",
+          "Measurement": 21455,
+          "MeasuredAt": "2026-06-15 21:35:00",
+          "Reading": 15.41,
+          "ZScore": 10.680528742800561
+        },
+        {
+          "Sensor": "D-03",
+          "Measurement": 39845,
+          "MeasuredAt": "2026-06-28 16:05:00",
+          "Reading": 15.4,
+          "ZScore": 10.651356765382952
+        },
+        {
+          "Sensor": "D-03",
+          "Measurement": 51492,
+          "MeasuredAt": "2026-07-06 18:12:00",
+          "Reading": 7.61,
+          "ZScore": -12.073613642934793
+        },
+        {
+          "Sensor": "D-04",
+          "Measurement": 2452,
+          "MeasuredAt": "2026-06-02 16:52:00",
+          "Reading": 8.33,
+          "ZScore": -10.313620039619412
+        },
+        {
+          "Sensor": "D-04",
+          "Measurement": 7969,
+          "MeasuredAt": "2026-06-06 12:49:00",
+          "Reading": 15.73,
+          "ZScore": 10.524260345137682
+        },
+        {
+          "Sensor": "D-04",
+          "Measurement": 8582,
+          "MeasuredAt": "2026-06-06 23:02:00",
+          "Reading": 7.55,
+          "ZScore": -12.51004526936408
+        },
+        {
+          "Sensor": "D-04",
+          "Measurement": 22681,
+          "MeasuredAt": "2026-06-16 18:01:00",
+          "Reading": 16.34,
+          "ZScore": 12.24197751198928
+        },
+        {
+          "Sensor": "D-04",
+          "Measurement": 35554,
+          "MeasuredAt": "2026-06-25 16:34:00",
+          "Reading": 7.54,
+          "ZScore": -12.538204567181317
+        },
+        {
+          "Sensor": "D-04",
+          "Measurement": 53944,
+          "MeasuredAt": "2026-07-08 11:04:00",
+          "Reading": 8.09,
+          "ZScore": -10.989443187233155
+        },
+        {
+          "Sensor": "D-05",
+          "Measurement": 10421,
+          "MeasuredAt": "2026-06-08 05:41:00",
+          "Reading": 15.97,
+          "ZScore": 10.71607162071636
+        },
+        {
+          "Sensor": "D-05",
+          "Measurement": 25133,
+          "MeasuredAt": "2026-06-18 10:53:00",
+          "Reading": 16.0,
+          "ZScore": 10.802344286928108
+        },
+        {
+          "Sensor": "D-05",
+          "Measurement": 36780,
+          "MeasuredAt": "2026-06-26 13:00:00",
+          "Reading": 8.2,
+          "ZScore": -11.628548928126188
+        },
+        {
+          "Sensor": "D-05",
+          "Measurement": 40458,
+          "MeasuredAt": "2026-06-29 02:18:00",
+          "Reading": 8.21,
+          "ZScore": -11.599791372722272
+        },
+        {
+          "Sensor": "D-05",
+          "Measurement": 58848,
+          "MeasuredAt": "2026-07-11 20:48:00",
+          "Reading": 7.5,
+          "ZScore": -13.641577806400292
+        },
+        {
+          "Sensor": "D-06",
+          "Measurement": 613,
+          "MeasuredAt": "2026-06-01 10:13:00",
+          "Reading": 16.58,
+          "ZScore": 11.490218090321273
+        },
+        {
+          "Sensor": "D-06",
+          "Measurement": 9195,
+          "MeasuredAt": "2026-06-07 09:15:00",
+          "Reading": 16.86,
+          "ZScore": 12.27863964024339
+        },
+        {
+          "Sensor": "D-06",
+          "Measurement": 55783,
+          "MeasuredAt": "2026-07-09 17:43:00",
+          "Reading": 16.28,
+          "ZScore": 10.64548071540472
+        },
+        {
+          "Sensor": "D-06",
+          "Measurement": 60074,
+          "MeasuredAt": "2026-07-12 17:14:00",
+          "Reading": 8.14,
+          "ZScore": -12.275060057331109
+        },
+        {
+          "Sensor": "D-06",
+          "Measurement": 61913,
+          "MeasuredAt": "2026-07-13 23:53:00",
+          "Reading": 16.22,
+          "ZScore": 10.476533240421409
+        },
+        {
+          "Sensor": "D-06",
+          "Measurement": 62526,
+          "MeasuredAt": "2026-07-14 10:06:00",
+          "Reading": 8.1,
+          "ZScore": -12.387691707319982
+        },
+        {
+          "Sensor": "D-07",
+          "Measurement": 1839,
+          "MeasuredAt": "2026-06-02 06:39:00",
+          "Reading": 17.3,
+          "ZScore": 12.191407142317912
+        },
+        {
+          "Sensor": "D-07",
+          "Measurement": 6743,
+          "MeasuredAt": "2026-06-05 16:23:00",
+          "Reading": 16.86,
+          "ZScore": 11.010799666650726
+        },
+        {
+          "Sensor": "D-07",
+          "Measurement": 11034,
+          "MeasuredAt": "2026-06-08 15:54:00",
+          "Reading": 8.95,
+          "ZScore": -10.213302907275319
+        },
+        {
+          "Sensor": "D-07",
+          "Measurement": 14712,
+          "MeasuredAt": "2026-06-11 05:12:00",
+          "Reading": 8.26,
+          "ZScore": -12.064710085026139
+        },
+        {
+          "Sensor": "D-07",
+          "Measurement": 18390,
+          "MeasuredAt": "2026-06-13 18:30:00",
+          "Reading": 8.05,
+          "ZScore": -12.628181834776386
+        },
+        {
+          "Sensor": "D-07",
+          "Measurement": 32489,
+          "MeasuredAt": "2026-06-23 13:29:00",
+          "Reading": 16.6,
+          "ZScore": 10.31316797648375
+        },
+        {
+          "Sensor": "D-07",
+          "Measurement": 34941,
+          "MeasuredAt": "2026-06-25 06:21:00",
+          "Reading": 16.94,
+          "ZScore": 11.225455571317488
+        },
+        {
+          "Sensor": "D-07",
+          "Measurement": 53331,
+          "MeasuredAt": "2026-07-08 00:51:00",
+          "Reading": 16.97,
+          "ZScore": 11.305951535567521
+        },
+        {
+          "Sensor": "D-08",
+          "Measurement": 15325,
+          "MeasuredAt": "2026-06-11 15:25:00",
+          "Reading": 17.3,
+          "ZScore": 12.253776220300836
+        },
+        {
+          "Sensor": "D-08",
+          "Measurement": 41071,
+          "MeasuredAt": "2026-06-29 12:31:00",
+          "Reading": 17.3,
+          "ZScore": 12.253776220300836
+        },
+        {
+          "Sensor": "D-08",
+          "Measurement": 52105,
+          "MeasuredAt": "2026-07-07 04:25:00",
+          "Reading": 17.03,
+          "ZScore": 11.484715902313397
+        },
+        {
+          "Sensor": "D-08",
+          "Measurement": 52718,
+          "MeasuredAt": "2026-07-07 14:38:00",
+          "Reading": 9.29,
+          "ZScore": -10.56167987999321
+        },
+        {
+          "Sensor": "D-08",
+          "Measurement": 58235,
+          "MeasuredAt": "2026-07-11 10:35:00",
+          "Reading": 17.41,
+          "ZScore": 12.567097090592016
+        },
+        {
+          "Sensor": "D-09",
+          "Measurement": 16551,
+          "MeasuredAt": "2026-06-12 11:51:00",
+          "Reading": 17.39,
+          "ZScore": 11.668299206400626
+        },
+        {
+          "Sensor": "D-09",
+          "Measurement": 17777,
+          "MeasuredAt": "2026-06-13 08:17:00",
+          "Reading": 17.61,
+          "ZScore": 12.289509405107976
+        },
+        {
+          "Sensor": "D-09",
+          "Measurement": 26359,
+          "MeasuredAt": "2026-06-19 07:19:00",
+          "Reading": 17.51,
+          "ZScore": 12.007141132968272
+        },
+        {
+          "Sensor": "D-09",
+          "Measurement": 33715,
+          "MeasuredAt": "2026-06-24 09:55:00",
+          "Reading": 16.91,
+          "ZScore": 10.312931500130038
+        },
+        {
+          "Sensor": "D-09",
+          "Measurement": 39232,
+          "MeasuredAt": "2026-06-28 05:52:00",
+          "Reading": 9.52,
+          "ZScore": -10.554083810994193
+        },
+        {
+          "Sensor": "D-09",
+          "Measurement": 48427,
+          "MeasuredAt": "2026-07-04 15:07:00",
+          "Reading": 17.26,
+          "ZScore": 11.301220452619008
+        },
+        {
+          "Sensor": "D-10",
+          "Measurement": 25746,
+          "MeasuredAt": "2026-06-18 21:06:00",
+          "Reading": 9.52,
+          "ZScore": -11.269944772618185
+        },
+        {
+          "Sensor": "D-10",
+          "Measurement": 49040,
+          "MeasuredAt": "2026-07-05 01:20:00",
+          "Reading": 9.52,
+          "ZScore": -11.269944772618185
+        },
+        {
+          "Sensor": "D-10",
+          "Measurement": 49653,
+          "MeasuredAt": "2026-07-05 11:33:00",
+          "Reading": 17.78,
+          "ZScore": 12.121281275857365
+        },
+        {
+          "Sensor": "D-10",
+          "Measurement": 63139,
+          "MeasuredAt": "2026-07-14 20:19:00",
+          "Reading": 18.19,
+          "ZScore": 13.282346975600099
+        },
+        {
+          "Sensor": "D-10",
+          "Measurement": 63752,
+          "MeasuredAt": "2026-07-15 06:32:00",
+          "Reading": 9.38,
+          "ZScore": -11.666406231066922
+        },
+        {
+          "Sensor": "D-11",
+          "Measurement": 13486,
+          "MeasuredAt": "2026-06-10 08:46:00",
+          "Reading": 9.33,
+          "ZScore": -11.642537427285333
+        },
+        {
+          "Sensor": "D-11",
+          "Measurement": 23907,
+          "MeasuredAt": "2026-06-17 14:27:00",
+          "Reading": 18.1,
+          "ZScore": 11.471733153274617
+        },
+        {
+          "Sensor": "D-11",
+          "Measurement": 27585,
+          "MeasuredAt": "2026-06-20 03:45:00",
+          "Reading": 17.92,
+          "ZScore": 10.997323950937012
+        },
+        {
+          "Sensor": "D-11",
+          "Measurement": 28198,
+          "MeasuredAt": "2026-06-20 13:58:00",
+          "Reading": 9.51,
+          "ZScore": -11.16812822494773
+        },
+        {
+          "Sensor": "D-11",
+          "Measurement": 29424,
+          "MeasuredAt": "2026-06-21 10:24:00",
+          "Reading": 9.31,
+          "ZScore": -11.695249560878402
+        },
+        {
+          "Sensor": "D-11",
+          "Measurement": 36167,
+          "MeasuredAt": "2026-06-26 02:47:00",
+          "Reading": 18.21,
+          "ZScore": 11.761649888036485
+        },
+        {
+          "Sensor": "D-11",
+          "Measurement": 38619,
+          "MeasuredAt": "2026-06-27 19:39:00",
+          "Reading": 17.84,
+          "ZScore": 10.786475416564743
+        },
+        {
+          "Sensor": "D-11",
+          "Measurement": 44749,
+          "MeasuredAt": "2026-07-02 01:49:00",
+          "Reading": 18.31,
+          "ZScore": 12.02521055600182
+        },
+        {
+          "Sensor": "D-11",
+          "Measurement": 56396,
+          "MeasuredAt": "2026-07-10 03:56:00",
+          "Reading": 9.77,
+          "ZScore": -10.482870488237857
+        },
+        {
+          "Sensor": "D-12",
+          "Measurement": 3065,
+          "MeasuredAt": "2026-06-03 03:05:00",
+          "Reading": 18.4,
+          "ZScore": 12.119479433657482
+        },
+        {
+          "Sensor": "D-12",
+          "Measurement": 24520,
+          "MeasuredAt": "2026-06-18 00:40:00",
+          "Reading": 9.73,
+          "ZScore": -11.711599099403456
+        },
+        {
+          "Sensor": "D-12",
+          "Measurement": 26972,
+          "MeasuredAt": "2026-06-19 17:32:00",
+          "Reading": 9.97,
+          "ZScore": -11.051915264578241
+        },
+        {
+          "Sensor": "D-12",
+          "Measurement": 28811,
+          "MeasuredAt": "2026-06-21 00:11:00",
+          "Reading": 18.33,
+          "ZScore": 11.927071648500126
+        },
+        {
+          "Sensor": "D-12",
+          "Measurement": 38006,
+          "MeasuredAt": "2026-06-27 09:26:00",
+          "Reading": 9.76,
+          "ZScore": -11.629138620050306
+        },
+        {
+          "Sensor": "D-12",
+          "Measurement": 45362,
+          "MeasuredAt": "2026-07-02 12:02:00",
+          "Reading": 9.43,
+          "ZScore": -12.536203892934976
+        },
+        {
+          "Sensor": "D-12",
+          "Measurement": 57009,
+          "MeasuredAt": "2026-07-10 14:09:00",
+          "Reading": 18.07,
+          "ZScore": 11.21241416077281
+        },
+        {
+          "Sensor": "D-13",
+          "Measurement": 5517,
+          "MeasuredAt": "2026-06-04 19:57:00",
+          "Reading": 17.92,
+          "ZScore": 10.238357025899807
+        },
+        {
+          "Sensor": "D-13",
+          "Measurement": 17164,
+          "MeasuredAt": "2026-06-12 22:04:00",
+          "Reading": 9.58,
+          "ZScore": -12.975470026719059
+        },
+        {
+          "Sensor": "D-13",
+          "Measurement": 22068,
+          "MeasuredAt": "2026-06-16 07:48:00",
+          "Reading": 9.64,
+          "ZScore": -12.808464076700217
+        },
+        {
+          "Sensor": "D-13",
+          "Measurement": 31876,
+          "MeasuredAt": "2026-06-23 03:16:00",
+          "Reading": 10.41,
+          "ZScore": -10.665221051458428
+        },
+        {
+          "Sensor": "D-13",
+          "Measurement": 55170,
+          "MeasuredAt": "2026-07-09 07:30:00",
+          "Reading": 9.99,
+          "ZScore": -11.834262701590314
+        },
+        {
+          "Sensor": "D-13",
+          "Measurement": 60687,
+          "MeasuredAt": "2026-07-13 03:27:00",
+          "Reading": 18.64,
+          "ZScore": 12.242428426125898
+        },
+        {
+          "Sensor": "D-14",
+          "Measurement": 6130,
+          "MeasuredAt": "2026-06-05 06:10:00",
+          "Reading": 10.3,
+          "ZScore": -11.292828003565974
+        },
+        {
+          "Sensor": "D-14",
+          "Measurement": 14099,
+          "MeasuredAt": "2026-06-10 18:59:00",
+          "Reading": 18.83,
+          "ZScore": 11.652384140657768
+        },
+        {
+          "Sensor": "D-14",
+          "Measurement": 15938,
+          "MeasuredAt": "2026-06-12 01:38:00",
+          "Reading": 10.04,
+          "ZScore": -11.992213133401632
+        },
+        {
+          "Sensor": "D-14",
+          "Measurement": 30037,
+          "MeasuredAt": "2026-06-21 20:37:00",
+          "Reading": 18.69,
+          "ZScore": 11.275792147669334
+        },
+        {
+          "Sensor": "D-14",
+          "Measurement": 30650,
+          "MeasuredAt": "2026-06-22 06:50:00",
+          "Reading": 9.83,
+          "ZScore": -12.55710112288428
+        },
+        {
+          "Sensor": "D-14",
+          "Measurement": 42910,
+          "MeasuredAt": "2026-06-30 19:10:00",
+          "Reading": 10.4,
+          "ZScore": -11.023833722859951
+        },
+        {
+          "Sensor": "D-14",
+          "Measurement": 46588,
+          "MeasuredAt": "2026-07-03 08:28:00",
+          "Reading": 10.51,
+          "ZScore": -10.727940014083327
+        },
+        {
+          "Sensor": "D-14",
+          "Measurement": 61300,
+          "MeasuredAt": "2026-07-13 13:40:00",
+          "Reading": 10.72,
+          "ZScore": -10.163052024600677
+        },
+        {
+          "Sensor": "D-15",
+          "Measurement": 11647,
+          "MeasuredAt": "2026-06-09 02:07:00",
+          "Reading": 18.86,
+          "ZScore": 10.859302690151441
+        },
+        {
+          "Sensor": "D-15",
+          "Measurement": 12873,
+          "MeasuredAt": "2026-06-09 22:33:00",
+          "Reading": 18.48,
+          "ZScore": 9.85603442330119
+        },
+        {
+          "Sensor": "D-15",
+          "Measurement": 20842,
+          "MeasuredAt": "2026-06-15 11:22:00",
+          "Reading": 10.68,
+          "ZScore": -10.737366843624994
+        },
+        {
+          "Sensor": "D-15",
+          "Measurement": 23294,
+          "MeasuredAt": "2026-06-17 04:14:00",
+          "Reading": 10.61,
+          "ZScore": -10.922179419097409
+        },
+        {
+          "Sensor": "D-15",
+          "Measurement": 37393,
+          "MeasuredAt": "2026-06-26 23:13:00",
+          "Reading": 18.7,
+          "ZScore": 10.436873946214494
+        },
+        {
+          "Sensor": "D-15",
+          "Measurement": 44136,
+          "MeasuredAt": "2026-07-01 15:36:00",
+          "Reading": 10.25,
+          "ZScore": -11.872644092955541
+        },
+        {
+          "Sensor": "D-15",
+          "Measurement": 45975,
+          "MeasuredAt": "2026-07-02 22:15:00",
+          "Reading": 18.5,
+          "ZScore": 9.90883801629331
+        },
+        {
+          "Sensor": "D-15",
+          "Measurement": 47201,
+          "MeasuredAt": "2026-07-03 18:41:00",
+          "Reading": 19.46,
+          "ZScore": 12.443410479914995
+        },
+        {
+          "Sensor": "D-15",
+          "Measurement": 50879,
+          "MeasuredAt": "2026-07-06 07:59:00",
+          "Reading": 18.5,
+          "ZScore": 9.90883801629331
+        },
+        {
+          "Sensor": "D-15",
+          "Measurement": 54557,
+          "MeasuredAt": "2026-07-08 21:17:00",
+          "Reading": 18.74,
+          "ZScore": 10.54248113219873
+        }
+      ]
+    }
+  ]
+}

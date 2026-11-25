@@ -1,0 +1,259 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-h105-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Sum01",
+          "label": "Sum01",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Count01",
+          "label": "Count01",
+          "type": "integer"
+        },
+        {
+          "name": "Sum02",
+          "label": "Sum02",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Count02",
+          "label": "Count02",
+          "type": "integer"
+        },
+        {
+          "name": "Sum03",
+          "label": "Sum03",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Count03",
+          "label": "Count03",
+          "type": "integer"
+        },
+        {
+          "name": "Sum04",
+          "label": "Sum04",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Count04",
+          "label": "Count04",
+          "type": "integer"
+        },
+        {
+          "name": "Sum05",
+          "label": "Sum05",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Count05",
+          "label": "Count05",
+          "type": "integer"
+        },
+        {
+          "name": "Sum06",
+          "label": "Sum06",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Count06",
+          "label": "Count06",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "Алтай",
+          "Sum01": 1789021.92,
+          "Count01": 3325,
+          "Sum02": 0.0,
+          "Count02": 0,
+          "Sum03": 857640.24,
+          "Count03": 1610,
+          "Sum04": 897652.57,
+          "Count04": 1670,
+          "Sum05": 878215.36,
+          "Count05": 1663,
+          "Sum06": 886793.14,
+          "Count06": 1676
+        },
+        {
+          "Region": "Волга",
+          "Sum01": 848358.69,
+          "Count01": 1614,
+          "Sum02": 889812.36,
+          "Count02": 1702,
+          "Sum03": 896740.85,
+          "Count03": 1686,
+          "Sum04": 894083.51,
+          "Count04": 1678,
+          "Sum05": 919957.1,
+          "Count05": 1705,
+          "Sum06": 898429.04,
+          "Count06": 1679
+        },
+        {
+          "Region": "Дон",
+          "Sum01": 1827674.07,
+          "Count01": 3382,
+          "Sum02": 884206.55,
+          "Count02": 1645,
+          "Sum03": 905204.53,
+          "Count03": 1674,
+          "Sum04": 0.0,
+          "Count04": 0,
+          "Sum05": 913592.4,
+          "Count05": 1665,
+          "Sum06": 920122.11,
+          "Count06": 1712
+        },
+        {
+          "Region": "Карелия",
+          "Sum01": 889681.6,
+          "Count01": 1662,
+          "Sum02": 903846.04,
+          "Count02": 1718,
+          "Sum03": 898634.62,
+          "Count03": 1651,
+          "Sum04": 866016.08,
+          "Count04": 1647,
+          "Sum05": 888995.49,
+          "Count05": 1660,
+          "Sum06": 876241.94,
+          "Count06": 1644
+        },
+        {
+          "Region": "Москва",
+          "Sum01": 891077.14,
+          "Count01": 1687,
+          "Sum02": 904221.37,
+          "Count02": 1672,
+          "Sum03": 968302.53,
+          "Count03": 1780,
+          "Sum04": 895363.91,
+          "Count04": 1636,
+          "Sum05": 885659.54,
+          "Count05": 1660,
+          "Sum06": 948511.68,
+          "Count06": 1776
+        },
+        {
+          "Region": "Нева",
+          "Sum01": 880347.92,
+          "Count01": 1669,
+          "Sum02": 846467.93,
+          "Count02": 1610,
+          "Sum03": 890713.04,
+          "Count03": 1640,
+          "Sum04": 918347.43,
+          "Count04": 1715,
+          "Sum05": 920635.24,
+          "Count05": 1714,
+          "Sum06": 876659.33,
+          "Count06": 1672
+        },
+        {
+          "Region": "Поморье",
+          "Sum01": 883367.49,
+          "Count01": 1656,
+          "Sum02": 957016.51,
+          "Count02": 1759,
+          "Sum03": 887218.18,
+          "Count03": 1680,
+          "Sum04": 908101.3,
+          "Count04": 1715,
+          "Sum05": 910956.31,
+          "Count05": 1676,
+          "Sum06": 836650.7,
+          "Count06": 1594
+        },
+        {
+          "Region": "Приамурье",
+          "Sum01": 948854.47,
+          "Count01": 1778,
+          "Sum02": 882694.64,
+          "Count02": 1667,
+          "Sum03": 906498.82,
+          "Count03": 1700,
+          "Sum04": 865688.69,
+          "Count04": 1622,
+          "Sum05": 913438.12,
+          "Count05": 1711,
+          "Sum06": 890820.65,
+          "Count06": 1642
+        },
+        {
+          "Region": "Сибирь",
+          "Sum01": 856571.16,
+          "Count01": 1616,
+          "Sum02": 904436.79,
+          "Count02": 1696,
+          "Sum03": 891753.48,
+          "Count03": 1678,
+          "Sum04": 884615.79,
+          "Count04": 1690,
+          "Sum05": 893492.75,
+          "Count05": 1641,
+          "Sum06": 946166.9,
+          "Count06": 1723
+        },
+        {
+          "Region": "Урал",
+          "Sum01": 1770368.5,
+          "Count01": 3306,
+          "Sum02": 909819.93,
+          "Count02": 1718,
+          "Sum03": 873283.58,
+          "Count03": 1641,
+          "Sum04": 894538.87,
+          "Count04": 1670,
+          "Sum05": 886847.18,
+          "Count05": 1652,
+          "Sum06": 0.0,
+          "Count06": 0
+        }
+      ]
+    }
+  ]
+}

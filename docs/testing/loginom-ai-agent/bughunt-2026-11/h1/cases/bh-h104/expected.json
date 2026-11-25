@@ -1,0 +1,1920 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-h104-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Store",
+          "label": "Store",
+          "type": "string"
+        },
+        {
+          "name": "WeekStart",
+          "label": "WeekStart",
+          "type": "string"
+        },
+        {
+          "name": "Revenue",
+          "label": "Revenue",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "MovingAverage4",
+          "label": "MovingAverage4",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-01-05",
+          "Revenue": 105159.28,
+          "MovingAverage4": 105159.28
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-01-12",
+          "Revenue": 0.0,
+          "MovingAverage4": 52579.64
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-01-19",
+          "Revenue": 0.0,
+          "MovingAverage4": 35053.09333333333
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-01-26",
+          "Revenue": 113367.34,
+          "MovingAverage4": 54631.655
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-02-02",
+          "Revenue": 230814.94,
+          "MovingAverage4": 86045.57
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-02-09",
+          "Revenue": 226390.66,
+          "MovingAverage4": 142643.235
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-02-16",
+          "Revenue": 101574.36,
+          "MovingAverage4": 168036.825
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-02-23",
+          "Revenue": 113177.39,
+          "MovingAverage4": 167989.3375
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-03-02",
+          "Revenue": 116533.33,
+          "MovingAverage4": 139418.935
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-03-09",
+          "Revenue": 112567.09,
+          "MovingAverage4": 110963.0425
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-03-16",
+          "Revenue": 109686.54,
+          "MovingAverage4": 112991.0875
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-03-23",
+          "Revenue": 108346.81,
+          "MovingAverage4": 111783.4425
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-03-30",
+          "Revenue": 122499.52,
+          "MovingAverage4": 113274.99
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-04-06",
+          "Revenue": 119089.73,
+          "MovingAverage4": 114905.65
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-04-13",
+          "Revenue": 110592.39,
+          "MovingAverage4": 115132.1125
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-04-20",
+          "Revenue": 109742.79,
+          "MovingAverage4": 115481.1075
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-04-27",
+          "Revenue": 114338.44,
+          "MovingAverage4": 113440.8375
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-05-04",
+          "Revenue": 122675.94,
+          "MovingAverage4": 114337.39
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-05-11",
+          "Revenue": 118320.62,
+          "MovingAverage4": 116269.4475
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-05-18",
+          "Revenue": 135971.98,
+          "MovingAverage4": 122826.745
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-05-25",
+          "Revenue": 109999.84,
+          "MovingAverage4": 121742.095
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-06-01",
+          "Revenue": 119122.04,
+          "MovingAverage4": 120853.62
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-06-08",
+          "Revenue": 119862.94,
+          "MovingAverage4": 121239.2
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-06-15",
+          "Revenue": 105073.42,
+          "MovingAverage4": 113514.56
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-06-22",
+          "Revenue": 120061.14,
+          "MovingAverage4": 116029.885
+        },
+        {
+          "Store": "M-01",
+          "WeekStart": "2026-06-29",
+          "Revenue": 121192.72,
+          "MovingAverage4": 116547.555
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-01-05",
+          "Revenue": 120059.36,
+          "MovingAverage4": 120059.36
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-01-12",
+          "Revenue": 114574.34,
+          "MovingAverage4": 117316.85
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-01-19",
+          "Revenue": 134372.96,
+          "MovingAverage4": 123002.22
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-01-26",
+          "Revenue": 109515.56,
+          "MovingAverage4": 119630.555
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-02-02",
+          "Revenue": 113228.67,
+          "MovingAverage4": 117922.8825
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-02-09",
+          "Revenue": 117104.81,
+          "MovingAverage4": 118555.5
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-02-16",
+          "Revenue": 127141.06,
+          "MovingAverage4": 116747.525
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-02-23",
+          "Revenue": 117286.84,
+          "MovingAverage4": 118690.345
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-03-02",
+          "Revenue": 113986.76,
+          "MovingAverage4": 118879.8675
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-03-09",
+          "Revenue": 119695.52,
+          "MovingAverage4": 119527.545
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-03-16",
+          "Revenue": 101315.43,
+          "MovingAverage4": 113071.1375
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-03-23",
+          "Revenue": 105442.58,
+          "MovingAverage4": 110110.0725
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-03-30",
+          "Revenue": 97521.54,
+          "MovingAverage4": 105993.7675
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-04-06",
+          "Revenue": 125656.65,
+          "MovingAverage4": 107484.05
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-04-13",
+          "Revenue": 110810.6,
+          "MovingAverage4": 109857.8425
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-04-20",
+          "Revenue": 126417.47,
+          "MovingAverage4": 115101.565
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-04-27",
+          "Revenue": 114788.34,
+          "MovingAverage4": 119418.265
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-05-04",
+          "Revenue": 116500.41,
+          "MovingAverage4": 117129.205
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-05-11",
+          "Revenue": 121297.25,
+          "MovingAverage4": 119750.8675
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-05-18",
+          "Revenue": 127103.05,
+          "MovingAverage4": 119922.2625
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-05-25",
+          "Revenue": 114546.12,
+          "MovingAverage4": 119861.7075
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-06-01",
+          "Revenue": 119760.69,
+          "MovingAverage4": 120676.7775
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-06-08",
+          "Revenue": 109181.21,
+          "MovingAverage4": 117647.7675
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-06-15",
+          "Revenue": 117923.91,
+          "MovingAverage4": 115352.9825
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-06-22",
+          "Revenue": 115443.02,
+          "MovingAverage4": 115577.2075
+        },
+        {
+          "Store": "M-02",
+          "WeekStart": "2026-06-29",
+          "Revenue": 121567.14,
+          "MovingAverage4": 116028.82
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-01-05",
+          "Revenue": 0.0,
+          "MovingAverage4": 0.0
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-01-12",
+          "Revenue": 126855.39,
+          "MovingAverage4": 63427.695
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-01-19",
+          "Revenue": 114481.74,
+          "MovingAverage4": 80445.71
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-01-26",
+          "Revenue": 227133.91,
+          "MovingAverage4": 117117.76
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-02-02",
+          "Revenue": 113045.43,
+          "MovingAverage4": 145379.1175
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-02-09",
+          "Revenue": 108488.72,
+          "MovingAverage4": 140787.45
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-02-16",
+          "Revenue": 109615.46,
+          "MovingAverage4": 139570.88
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-02-23",
+          "Revenue": 121715.2,
+          "MovingAverage4": 113216.2025
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-03-02",
+          "Revenue": 113241.6,
+          "MovingAverage4": 113265.245
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-03-09",
+          "Revenue": 108283.4,
+          "MovingAverage4": 113213.915
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-03-16",
+          "Revenue": 120068.82,
+          "MovingAverage4": 115827.255
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-03-23",
+          "Revenue": 122217.81,
+          "MovingAverage4": 115952.9075
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-03-30",
+          "Revenue": 123620.48,
+          "MovingAverage4": 118547.6275
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-04-06",
+          "Revenue": 114616.31,
+          "MovingAverage4": 120130.855
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-04-13",
+          "Revenue": 108492.0,
+          "MovingAverage4": 117236.65
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-04-20",
+          "Revenue": 113732.25,
+          "MovingAverage4": 115115.26
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-04-27",
+          "Revenue": 113637.53,
+          "MovingAverage4": 112619.5225
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-05-04",
+          "Revenue": 125594.28,
+          "MovingAverage4": 115364.015
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-05-11",
+          "Revenue": 104648.94,
+          "MovingAverage4": 114403.25
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-05-18",
+          "Revenue": 107585.73,
+          "MovingAverage4": 112866.62
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-05-25",
+          "Revenue": 117186.92,
+          "MovingAverage4": 113753.9675
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-06-01",
+          "Revenue": 124014.97,
+          "MovingAverage4": 113359.14
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-06-08",
+          "Revenue": 116019.04,
+          "MovingAverage4": 116201.665
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-06-15",
+          "Revenue": 120248.02,
+          "MovingAverage4": 119367.2375
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-06-22",
+          "Revenue": 126169.05,
+          "MovingAverage4": 121612.77
+        },
+        {
+          "Store": "M-03",
+          "WeekStart": "2026-06-29",
+          "Revenue": 120973.95,
+          "MovingAverage4": 120852.515
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-01-05",
+          "Revenue": 111719.96,
+          "MovingAverage4": 111719.96
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-01-12",
+          "Revenue": 109375.7,
+          "MovingAverage4": 110547.83
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-01-19",
+          "Revenue": 108963.76,
+          "MovingAverage4": 110019.80666666667
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-01-26",
+          "Revenue": 109425.09,
+          "MovingAverage4": 109871.1275
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-02-02",
+          "Revenue": 112064.84,
+          "MovingAverage4": 109957.3475
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-02-09",
+          "Revenue": 111813.51,
+          "MovingAverage4": 110566.8
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-02-16",
+          "Revenue": 134795.83,
+          "MovingAverage4": 117024.8175
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-02-23",
+          "Revenue": 116558.61,
+          "MovingAverage4": 118808.1975
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-03-02",
+          "Revenue": 112920.21,
+          "MovingAverage4": 119022.04
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-03-09",
+          "Revenue": 120094.25,
+          "MovingAverage4": 121092.225
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-03-16",
+          "Revenue": 112358.45,
+          "MovingAverage4": 115482.88
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-03-23",
+          "Revenue": 114330.02,
+          "MovingAverage4": 114925.7325
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-03-30",
+          "Revenue": 114685.27,
+          "MovingAverage4": 115366.9975
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-04-06",
+          "Revenue": 106327.32,
+          "MovingAverage4": 111925.265
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-04-13",
+          "Revenue": 111632.74,
+          "MovingAverage4": 111743.8375
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-04-20",
+          "Revenue": 121567.54,
+          "MovingAverage4": 113553.2175
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-04-27",
+          "Revenue": 103060.57,
+          "MovingAverage4": 110647.0425
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-05-04",
+          "Revenue": 118500.78,
+          "MovingAverage4": 113690.4075
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-05-11",
+          "Revenue": 114650.42,
+          "MovingAverage4": 114444.8275
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-05-18",
+          "Revenue": 129068.66,
+          "MovingAverage4": 116320.1075
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-05-25",
+          "Revenue": 110044.92,
+          "MovingAverage4": 118066.195
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-06-01",
+          "Revenue": 107987.01,
+          "MovingAverage4": 115437.7525
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-06-08",
+          "Revenue": 122659.99,
+          "MovingAverage4": 117440.145
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-06-15",
+          "Revenue": 112390.54,
+          "MovingAverage4": 113270.615
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-06-22",
+          "Revenue": 121658.9,
+          "MovingAverage4": 116174.11
+        },
+        {
+          "Store": "M-04",
+          "WeekStart": "2026-06-29",
+          "Revenue": 125796.77,
+          "MovingAverage4": 120626.55
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-01-05",
+          "Revenue": 112424.56,
+          "MovingAverage4": 112424.56
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-01-12",
+          "Revenue": 130192.53,
+          "MovingAverage4": 121308.545
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-01-19",
+          "Revenue": 112568.42,
+          "MovingAverage4": 118395.17
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-01-26",
+          "Revenue": 116167.62,
+          "MovingAverage4": 117838.2825
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-02-02",
+          "Revenue": 107684.98,
+          "MovingAverage4": 116653.3875
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-02-09",
+          "Revenue": 120754.34,
+          "MovingAverage4": 114293.84
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-02-16",
+          "Revenue": 120112.04,
+          "MovingAverage4": 116179.745
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-02-23",
+          "Revenue": 117633.05,
+          "MovingAverage4": 116546.1025
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-03-02",
+          "Revenue": 117794.35,
+          "MovingAverage4": 119073.445
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-03-09",
+          "Revenue": 106050.2,
+          "MovingAverage4": 115397.41
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-03-16",
+          "Revenue": 110324.49,
+          "MovingAverage4": 112950.5225
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-03-23",
+          "Revenue": 114718.37,
+          "MovingAverage4": 112221.8525
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-03-30",
+          "Revenue": 109131.89,
+          "MovingAverage4": 110056.2375
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-04-06",
+          "Revenue": 121112.2,
+          "MovingAverage4": 113821.7375
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-04-13",
+          "Revenue": 121914.84,
+          "MovingAverage4": 116719.325
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-04-20",
+          "Revenue": 123620.2,
+          "MovingAverage4": 118944.7825
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-04-27",
+          "Revenue": 107243.27,
+          "MovingAverage4": 118472.6275
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-05-04",
+          "Revenue": 114717.43,
+          "MovingAverage4": 116873.935
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-05-11",
+          "Revenue": 117383.68,
+          "MovingAverage4": 115741.145
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-05-18",
+          "Revenue": 110469.04,
+          "MovingAverage4": 112453.355
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-05-25",
+          "Revenue": 103606.18,
+          "MovingAverage4": 111544.0825
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-06-01",
+          "Revenue": 136281.98,
+          "MovingAverage4": 116935.22
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-06-08",
+          "Revenue": 121239.32,
+          "MovingAverage4": 117899.13
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-06-15",
+          "Revenue": 113740.3,
+          "MovingAverage4": 118716.945
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-06-22",
+          "Revenue": 109975.63,
+          "MovingAverage4": 120309.3075
+        },
+        {
+          "Store": "M-05",
+          "WeekStart": "2026-06-29",
+          "Revenue": 117851.13,
+          "MovingAverage4": 115701.595
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-01-05",
+          "Revenue": 100292.74,
+          "MovingAverage4": 100292.74
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-01-12",
+          "Revenue": 113918.54,
+          "MovingAverage4": 107105.64
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-01-19",
+          "Revenue": 111050.69,
+          "MovingAverage4": 108420.65666666666
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-01-26",
+          "Revenue": 120898.73,
+          "MovingAverage4": 111540.175
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-02-02",
+          "Revenue": 121914.71,
+          "MovingAverage4": 116945.6675
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-02-09",
+          "Revenue": 108370.48,
+          "MovingAverage4": 115558.6525
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-02-16",
+          "Revenue": 106294.31,
+          "MovingAverage4": 114369.5575
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-02-23",
+          "Revenue": 125274.19,
+          "MovingAverage4": 115463.4225
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-03-02",
+          "Revenue": 105627.98,
+          "MovingAverage4": 111391.74
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-03-09",
+          "Revenue": 107356.77,
+          "MovingAverage4": 111138.3125
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-03-16",
+          "Revenue": 104450.16,
+          "MovingAverage4": 110677.275
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-03-23",
+          "Revenue": 107536.62,
+          "MovingAverage4": 106242.8825
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-03-30",
+          "Revenue": 121720.08,
+          "MovingAverage4": 110265.9075
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-04-06",
+          "Revenue": 125946.02,
+          "MovingAverage4": 114913.22
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-04-13",
+          "Revenue": 112451.05,
+          "MovingAverage4": 116913.4425
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-04-20",
+          "Revenue": 108113.09,
+          "MovingAverage4": 117057.56
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-04-27",
+          "Revenue": 116250.11,
+          "MovingAverage4": 115690.0675
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-05-04",
+          "Revenue": 120970.06,
+          "MovingAverage4": 114446.0775
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-05-11",
+          "Revenue": 109490.95,
+          "MovingAverage4": 113706.0525
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-05-18",
+          "Revenue": 133157.71,
+          "MovingAverage4": 119967.2075
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-05-25",
+          "Revenue": 104603.24,
+          "MovingAverage4": 117055.49
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-06-01",
+          "Revenue": 104495.32,
+          "MovingAverage4": 112936.805
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-06-08",
+          "Revenue": 128435.81,
+          "MovingAverage4": 117673.02
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-06-15",
+          "Revenue": 115356.07,
+          "MovingAverage4": 113222.61
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-06-22",
+          "Revenue": 117675.03,
+          "MovingAverage4": 116490.5575
+        },
+        {
+          "Store": "M-06",
+          "WeekStart": "2026-06-29",
+          "Revenue": 116676.04,
+          "MovingAverage4": 119535.7375
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-01-05",
+          "Revenue": 99692.25,
+          "MovingAverage4": 99692.25
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-01-12",
+          "Revenue": 106995.79,
+          "MovingAverage4": 103344.02
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-01-19",
+          "Revenue": 102229.57,
+          "MovingAverage4": 102972.53666666667
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-01-26",
+          "Revenue": 112086.33,
+          "MovingAverage4": 105250.985
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-02-02",
+          "Revenue": 110068.57,
+          "MovingAverage4": 107845.065
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-02-09",
+          "Revenue": 114996.04,
+          "MovingAverage4": 109845.1275
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-02-16",
+          "Revenue": 106745.15,
+          "MovingAverage4": 110974.0225
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-02-23",
+          "Revenue": 112753.56,
+          "MovingAverage4": 111140.83
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-03-02",
+          "Revenue": 114378.95,
+          "MovingAverage4": 112218.425
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-03-09",
+          "Revenue": 109317.33,
+          "MovingAverage4": 110798.7475
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-03-16",
+          "Revenue": 109203.24,
+          "MovingAverage4": 111413.27
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-03-23",
+          "Revenue": 118755.16,
+          "MovingAverage4": 112913.67
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-03-30",
+          "Revenue": 128066.25,
+          "MovingAverage4": 116335.495
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-04-06",
+          "Revenue": 114237.89,
+          "MovingAverage4": 117565.635
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-04-13",
+          "Revenue": 118648.6,
+          "MovingAverage4": 119926.975
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-04-20",
+          "Revenue": 115665.05,
+          "MovingAverage4": 119154.4475
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-04-27",
+          "Revenue": 129100.2,
+          "MovingAverage4": 119412.935
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-05-04",
+          "Revenue": 119875.53,
+          "MovingAverage4": 120822.345
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-05-11",
+          "Revenue": 123982.55,
+          "MovingAverage4": 122155.8325
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-05-18",
+          "Revenue": 116986.89,
+          "MovingAverage4": 122486.2925
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-05-25",
+          "Revenue": 115988.15,
+          "MovingAverage4": 119208.28
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-06-01",
+          "Revenue": 120225.23,
+          "MovingAverage4": 119295.705
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-06-08",
+          "Revenue": 118018.14,
+          "MovingAverage4": 117804.6025
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-06-15",
+          "Revenue": 112391.29,
+          "MovingAverage4": 116655.7025
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-06-22",
+          "Revenue": 123889.62,
+          "MovingAverage4": 118631.07
+        },
+        {
+          "Store": "M-07",
+          "WeekStart": "2026-06-29",
+          "Revenue": 119586.36,
+          "MovingAverage4": 118471.3525
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-01-05",
+          "Revenue": 123688.1,
+          "MovingAverage4": 123688.1
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-01-12",
+          "Revenue": 110129.86,
+          "MovingAverage4": 116908.98
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-01-19",
+          "Revenue": 119533.48,
+          "MovingAverage4": 117783.81333333334
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-01-26",
+          "Revenue": 120125.03,
+          "MovingAverage4": 118369.1175
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-02-02",
+          "Revenue": 106078.13,
+          "MovingAverage4": 113966.625
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-02-09",
+          "Revenue": 125535.26,
+          "MovingAverage4": 117817.975
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-02-16",
+          "Revenue": 115963.18,
+          "MovingAverage4": 116925.4
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-02-23",
+          "Revenue": 111115.79,
+          "MovingAverage4": 114673.09
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-03-02",
+          "Revenue": 119482.17,
+          "MovingAverage4": 118024.1
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-03-09",
+          "Revenue": 110729.21,
+          "MovingAverage4": 114322.5875
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-03-16",
+          "Revenue": 111000.15,
+          "MovingAverage4": 113081.83
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-03-23",
+          "Revenue": 115542.05,
+          "MovingAverage4": 114188.395
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-03-30",
+          "Revenue": 104640.42,
+          "MovingAverage4": 110477.9575
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-04-06",
+          "Revenue": 124462.73,
+          "MovingAverage4": 113911.3375
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-04-13",
+          "Revenue": 106712.83,
+          "MovingAverage4": 112839.5075
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-04-20",
+          "Revenue": 115526.23,
+          "MovingAverage4": 112835.5525
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-04-27",
+          "Revenue": 104714.52,
+          "MovingAverage4": 112854.0775
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-05-04",
+          "Revenue": 120684.95,
+          "MovingAverage4": 111909.6325
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-05-11",
+          "Revenue": 120701.07,
+          "MovingAverage4": 115406.6925
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-05-18",
+          "Revenue": 114305.65,
+          "MovingAverage4": 115101.5475
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-05-25",
+          "Revenue": 109902.24,
+          "MovingAverage4": 116398.4775
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-06-01",
+          "Revenue": 113734.39,
+          "MovingAverage4": 114660.8375
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-06-08",
+          "Revenue": 108768.32,
+          "MovingAverage4": 111677.65
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-06-15",
+          "Revenue": 111117.29,
+          "MovingAverage4": 110880.56
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-06-22",
+          "Revenue": 113724.5,
+          "MovingAverage4": 111836.125
+        },
+        {
+          "Store": "M-08",
+          "WeekStart": "2026-06-29",
+          "Revenue": 113471.67,
+          "MovingAverage4": 111770.445
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-01-05",
+          "Revenue": 114146.11,
+          "MovingAverage4": 114146.11
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-01-12",
+          "Revenue": 102015.49,
+          "MovingAverage4": 108080.8
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-01-19",
+          "Revenue": 119738.51,
+          "MovingAverage4": 111966.70333333334
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-01-26",
+          "Revenue": 123410.18,
+          "MovingAverage4": 114827.5725
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-02-02",
+          "Revenue": 131763.53,
+          "MovingAverage4": 119231.9275
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-02-09",
+          "Revenue": 113984.68,
+          "MovingAverage4": 122224.225
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-02-16",
+          "Revenue": 110192.08,
+          "MovingAverage4": 119837.6175
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-02-23",
+          "Revenue": 106266.16,
+          "MovingAverage4": 115551.6125
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-03-02",
+          "Revenue": 119343.68,
+          "MovingAverage4": 112446.65
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-03-09",
+          "Revenue": 115383.44,
+          "MovingAverage4": 112796.34
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-03-16",
+          "Revenue": 119825.69,
+          "MovingAverage4": 115204.7425
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-03-23",
+          "Revenue": 123894.92,
+          "MovingAverage4": 119611.9325
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-03-30",
+          "Revenue": 120172.83,
+          "MovingAverage4": 119819.22
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-04-06",
+          "Revenue": 112927.35,
+          "MovingAverage4": 119205.1975
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-04-13",
+          "Revenue": 129464.71,
+          "MovingAverage4": 121614.9525
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-04-20",
+          "Revenue": 118069.64,
+          "MovingAverage4": 120158.6325
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-04-27",
+          "Revenue": 112574.76,
+          "MovingAverage4": 118259.115
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-05-04",
+          "Revenue": 108361.35,
+          "MovingAverage4": 117117.615
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-05-11",
+          "Revenue": 129565.73,
+          "MovingAverage4": 117142.87
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-05-18",
+          "Revenue": 120170.49,
+          "MovingAverage4": 117668.0825
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-05-25",
+          "Revenue": 114090.11,
+          "MovingAverage4": 118046.92
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-06-01",
+          "Revenue": 114257.42,
+          "MovingAverage4": 119520.9375
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-06-08",
+          "Revenue": 122135.83,
+          "MovingAverage4": 117663.4625
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-06-15",
+          "Revenue": 119271.2,
+          "MovingAverage4": 117438.64
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-06-22",
+          "Revenue": 123568.94,
+          "MovingAverage4": 119808.3475
+        },
+        {
+          "Store": "M-09",
+          "WeekStart": "2026-06-29",
+          "Revenue": 115798.96,
+          "MovingAverage4": 120193.7325
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-01-05",
+          "Revenue": 100857.5,
+          "MovingAverage4": 100857.5
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-01-12",
+          "Revenue": 120702.64,
+          "MovingAverage4": 110780.07
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-01-19",
+          "Revenue": 113985.61,
+          "MovingAverage4": 111848.58333333333
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-01-26",
+          "Revenue": 97042.22,
+          "MovingAverage4": 108146.9925
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-02-02",
+          "Revenue": 105942.92,
+          "MovingAverage4": 109418.3475
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-02-09",
+          "Revenue": 106097.14,
+          "MovingAverage4": 105766.9725
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-02-16",
+          "Revenue": 107997.66,
+          "MovingAverage4": 104269.985
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-02-23",
+          "Revenue": 124313.25,
+          "MovingAverage4": 111087.7425
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-03-02",
+          "Revenue": 118484.33,
+          "MovingAverage4": 114223.095
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-03-09",
+          "Revenue": 121631.89,
+          "MovingAverage4": 118106.7825
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-03-16",
+          "Revenue": 118675.77,
+          "MovingAverage4": 120776.31
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-03-23",
+          "Revenue": 102421.29,
+          "MovingAverage4": 115303.32
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-03-30",
+          "Revenue": 128944.51,
+          "MovingAverage4": 117918.365
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-04-06",
+          "Revenue": 116519.36,
+          "MovingAverage4": 116640.2325
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-04-13",
+          "Revenue": 117406.96,
+          "MovingAverage4": 116323.03
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-04-20",
+          "Revenue": 118836.12,
+          "MovingAverage4": 120426.7375
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-04-27",
+          "Revenue": 123101.79,
+          "MovingAverage4": 118966.0575
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-05-04",
+          "Revenue": 122380.08,
+          "MovingAverage4": 120431.2375
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-05-11",
+          "Revenue": 117463.94,
+          "MovingAverage4": 120445.4825
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-05-18",
+          "Revenue": 123907.38,
+          "MovingAverage4": 121713.2975
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-05-25",
+          "Revenue": 108818.25,
+          "MovingAverage4": 118142.4125
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-06-01",
+          "Revenue": 109710.52,
+          "MovingAverage4": 114975.0225
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-06-08",
+          "Revenue": 101397.81,
+          "MovingAverage4": 110958.49
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-06-15",
+          "Revenue": 114196.31,
+          "MovingAverage4": 108530.7225
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-06-22",
+          "Revenue": 115261.32,
+          "MovingAverage4": 110141.49
+        },
+        {
+          "Store": "M-10",
+          "WeekStart": "2026-06-29",
+          "Revenue": 111131.47,
+          "MovingAverage4": 110496.7275
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-01-05",
+          "Revenue": 116481.93,
+          "MovingAverage4": 116481.93
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-01-12",
+          "Revenue": 116265.8,
+          "MovingAverage4": 116373.865
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-01-19",
+          "Revenue": 110715.93,
+          "MovingAverage4": 114487.88666666667
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-01-26",
+          "Revenue": 112354.35,
+          "MovingAverage4": 113954.5025
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-02-02",
+          "Revenue": 116895.43,
+          "MovingAverage4": 114057.8775
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-02-09",
+          "Revenue": 115601.61,
+          "MovingAverage4": 113891.83
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-02-16",
+          "Revenue": 131253.38,
+          "MovingAverage4": 119026.1925
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-02-23",
+          "Revenue": 118393.79,
+          "MovingAverage4": 120536.0525
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-03-02",
+          "Revenue": 121166.68,
+          "MovingAverage4": 121603.865
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-03-09",
+          "Revenue": 121737.6,
+          "MovingAverage4": 123137.8625
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-03-16",
+          "Revenue": 112597.12,
+          "MovingAverage4": 118473.7975
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-03-23",
+          "Revenue": 117086.77,
+          "MovingAverage4": 118147.0425
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-03-30",
+          "Revenue": 120678.08,
+          "MovingAverage4": 118024.8925
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-04-06",
+          "Revenue": 114281.08,
+          "MovingAverage4": 116160.7625
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-04-13",
+          "Revenue": 110029.34,
+          "MovingAverage4": 115518.8175
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-04-20",
+          "Revenue": 120387.96,
+          "MovingAverage4": 116344.115
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-04-27",
+          "Revenue": 117122.37,
+          "MovingAverage4": 115455.1875
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-05-04",
+          "Revenue": 126479.88,
+          "MovingAverage4": 118504.8875
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-05-11",
+          "Revenue": 119687.49,
+          "MovingAverage4": 120919.425
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-05-18",
+          "Revenue": 109779.82,
+          "MovingAverage4": 118267.39
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-05-25",
+          "Revenue": 109345.54,
+          "MovingAverage4": 116323.1825
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-06-01",
+          "Revenue": 113126.63,
+          "MovingAverage4": 112984.87
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-06-08",
+          "Revenue": 111289.62,
+          "MovingAverage4": 110885.4025
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-06-15",
+          "Revenue": 121079.08,
+          "MovingAverage4": 113710.2175
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-06-22",
+          "Revenue": 123219.1,
+          "MovingAverage4": 117178.6075
+        },
+        {
+          "Store": "M-11",
+          "WeekStart": "2026-06-29",
+          "Revenue": 110921.04,
+          "MovingAverage4": 116627.21
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-01-05",
+          "Revenue": 109089.29,
+          "MovingAverage4": 109089.29
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-01-12",
+          "Revenue": 116454.37,
+          "MovingAverage4": 112771.83
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-01-19",
+          "Revenue": 229032.4,
+          "MovingAverage4": 151525.35333333333
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-01-26",
+          "Revenue": 116010.16,
+          "MovingAverage4": 142646.555
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-02-02",
+          "Revenue": 127654.63,
+          "MovingAverage4": 147287.89
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-02-09",
+          "Revenue": 119245.91,
+          "MovingAverage4": 147985.775
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-02-16",
+          "Revenue": 120744.63,
+          "MovingAverage4": 120913.8325
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-02-23",
+          "Revenue": 109131.62,
+          "MovingAverage4": 119194.1975
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-03-02",
+          "Revenue": 120241.34,
+          "MovingAverage4": 117340.875
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-03-09",
+          "Revenue": 116854.46,
+          "MovingAverage4": 116743.0125
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-03-16",
+          "Revenue": 123942.84,
+          "MovingAverage4": 117542.565
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-03-23",
+          "Revenue": 126284.5,
+          "MovingAverage4": 121830.785
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-03-30",
+          "Revenue": 113125.96,
+          "MovingAverage4": 120051.94
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-04-06",
+          "Revenue": 114831.4,
+          "MovingAverage4": 119546.175
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-04-13",
+          "Revenue": 137690.49,
+          "MovingAverage4": 122983.0875
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-04-20",
+          "Revenue": 125389.9,
+          "MovingAverage4": 122759.4375
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-04-27",
+          "Revenue": 111167.25,
+          "MovingAverage4": 122269.76
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-05-04",
+          "Revenue": 125350.07,
+          "MovingAverage4": 124899.4275
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-05-11",
+          "Revenue": 113478.82,
+          "MovingAverage4": 118846.51
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-05-18",
+          "Revenue": 116894.68,
+          "MovingAverage4": 116722.705
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-05-25",
+          "Revenue": 113812.97,
+          "MovingAverage4": 117384.135
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-06-01",
+          "Revenue": 123739.57,
+          "MovingAverage4": 116981.51
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-06-08",
+          "Revenue": 118307.64,
+          "MovingAverage4": 118188.715
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-06-15",
+          "Revenue": 108953.8,
+          "MovingAverage4": 116203.495
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-06-22",
+          "Revenue": 122753.79,
+          "MovingAverage4": 118438.7
+        },
+        {
+          "Store": "M-12",
+          "WeekStart": "2026-06-29",
+          "Revenue": 0.0,
+          "MovingAverage4": 87503.8075
+        }
+      ]
+    }
+  ]
+}
