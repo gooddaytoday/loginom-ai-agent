@@ -25013,3 +25013,11 @@ Windows, первый прогон `daemon/windows.rs`, `play` с `cmd.exe`); к
 если распаковка Bun на Windows сломана, как отмечено в `build-cli.ts`, упадёт здесь); `bun install --filter` трёх пакетов;
 два вызова `pack` и NSIS; встраивание pty `.exe` в оба CLI (`resolveProductPty` запускает его `--version`); `build-cli.ts` с
 baseline-средой; скачивание артефакта pty из вызванного workflow; шаги j.
+
+## B5.1f-ci Первая сборка pty на GitHub
+
+Run 45694260129 форка (`06ac4c97c9`): `pty (x86_64-unknown-linux-gnu)` и `pty (aarch64-apple-darwin)` — success,
+`pty (x86_64-pc-windows-msvc)` — failure: `build.rs` скачивает Ghostty через git в глубокий `OUT_DIR` Cargo, git
+отвечает `unable to open loose object …: Filename too long`. Upstream (`check-process-daemon.yml`,
+`release-process-daemon.yml`) включает `core.longpaths` перед сборкой на Windows; то же добавлено в ветку Windows действия
+`setup-rust-pty`.

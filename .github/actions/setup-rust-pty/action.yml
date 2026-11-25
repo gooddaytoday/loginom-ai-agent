@@ -22,6 +22,9 @@ runs:
           # The shell wrapper below cannot run on Windows; build.rs reads this instead.
           echo "OPENCODE_ZIG_CPU=baseline" >> "$GITHUB_ENV"
           echo "RUSTFLAGS=-C target-feature=+crt-static" >> "$GITHUB_ENV"
+          # build.rs fetches Ghostty with git under the deep Cargo OUT_DIR; without long paths git stops with
+          # "Filename too long" (as check-process-daemon.yml and release-process-daemon.yml do).
+          git config --global core.longpaths true
         else
           chmod +x "$GITHUB_WORKSPACE/packages/process-daemon/script/release-bin/zig"
           echo "OPENCODE_REAL_ZIG=$(command -v zig)" >> "$GITHUB_ENV"
