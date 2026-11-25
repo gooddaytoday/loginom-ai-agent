@@ -30,17 +30,24 @@ async function runDatabaseStep(options,ctx,kind,makeCode,parameters,config){
  if(result.operation_id!==id||result.action_key!==key){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw Error('Database import: step receipt differs');}
  operation.cleanupConfirmed=result.cleanup_complete===true;operation.nodeEffectPossible ||= result.effect_possible===true;
  const checkpoint=kind==='connection'?result.output?.pre_target_checkpoint:null;
+ const testRefusal=checkpoint?.connection_test_refused;
+ const ownsTestRefusal=testRefusal?.database_path===parameters.connection?.database_path
+  &&typeof testRefusal?.tile_label==='string'&&typeof testRefusal.tile_created==='boolean';
  if(checkpoint)operation.cleanupConfirmed=false;
  const completed=await entry('node_step_completed',{outcome:result});
  need(JSON.stringify(completed?.outcome)===JSON.stringify(result),'step outcome was not durably preserved');
  if(checkpoint&&!operation.targetPhase&&!operation.nodeApply?.node&&operation.nodeApply?.pending?.phase==='target'
    &&result.cleanup_complete===true&&checkpoint.graph?.complete===true&&checkpoint.graph.interaction_ready===true
    &&checkpoint.graph.document_id===ctx.document_id&&JSON.stringify(checkpoint.graph.workflow_ref)===JSON.stringify(ctx.workflow_ref)
-   &&(checkpoint.navigation_refused===true||checkpoint.connection?.name===parameters.connection?.name)){
+   &&(checkpoint.navigation_refused===true||ownsTestRefusal||checkpoint.connection?.name===parameters.connection?.name)){
   operation.preTargetGraph=structuredClone(checkpoint.graph);
-  operation.preTargetWarnings=[checkpoint.navigation_refused===true
-   ?'Loginom refused to open the module connections. The original workflow was restored before any SQLite connection or import node was created.'
-   :'The tested SQLite connection '+JSON.stringify(checkpoint.connection.name)+' remains in the module. Its graph reference and the import node were not created.'];
+  if(checkpoint.navigation_refused===true)
+   operation.preTargetWarnings=['Loginom refused to open the module connections. The original workflow was restored before any SQLite connection or import node was created.'];
+  else if(ownsTestRefusal) {
+   operation.preTargetWarnings=['The SQLite file was missing. The rejected connection settings were discarded and the original workflow was restored.'];
+   if(testRefusal.tile_created)operation.preTargetWarnings.push('The unconfigured connection '+JSON.stringify(testRefusal.tile_label)+' remains in the module.');
+  } else operation.preTargetWarnings=['The tested SQLite connection '+JSON.stringify(checkpoint.connection.name)
+   +' remains in the module. Its graph reference and the import node were not created.'];
   operation.cleanupConfirmed=true;operation.nodeApply.cleanup_complete=true;
  }
  if(result.status!=='SUCCEEDED'||!operation.cleanupConfirmed||result.output?.verified!==true)

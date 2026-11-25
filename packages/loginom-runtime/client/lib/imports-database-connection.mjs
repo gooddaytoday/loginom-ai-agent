@@ -117,6 +117,11 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
   await quiet();
   const entryGraph=await readPlacementGraph(page,graphTask);
   need(idleGraph(entryGraph),'complete idle graph required before opening connections');
+  const refusalCheckpoint=async(checkpoint,error)=>{
+   const graph=await readPlacementGraph(page,graphTask);
+   need(idleGraph(graph)&&graphShape(entryGraph)===graphShape(graph),'original idle graph changed after connections refusal');
+   return {verified:false,cleanup_complete:true,effect_possible:true,pre_target_checkpoint:{graph,...checkpoint},error};
+  };
   // The SQLite settings page tid is resolved from its own unique path field.
   let fields=null;
   const resolveFields=async()=>{
@@ -197,10 +202,7 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
      return c===b.controller&&c.Node.data.node===b.module&&c.FController===b.view&&b.view.FView.el.dom===b.root&&b.root.isConnected;
     },opening),'module owner changed after connections navigation refusal');
     await returnToWorkflow();
-    const graph=await readPlacementGraph(page,graphTask);
-    need(idleGraph(graph)&&graphShape(entryGraph)===graphShape(graph),'original idle graph changed after connections navigation refusal');
-    return {verified:false,cleanup_complete:true,effect_possible:true,pre_target_checkpoint:{graph,navigation_refused:true},
-     error:'Database connection: '+errorText};
+    return await refusalCheckpoint({navigation_refused:true},'Database connection: '+errorText);
    }
   }finally{await opening.dispose();}
   await quiet();
@@ -213,8 +215,22 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
    await click(vendor,true);
    tile=await wait('new connection tile',async()=>{const added=(await tiles()).filter(c=>!before.some(b=>b.tid===c.tid));need(added.length<=1,'unexpected added connections');return added[0];});
   }
-  await click(tile.tid);await openSettings();
-  const connectionOwner=await page.evaluateHandle(()=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return {wizard:c.FController,node:c.Node.data.node.ParentNode};});
+  await click(tile.tid);
+  const selected=await page.evaluate(({b,form,label})=>{
+   const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller,view=c.FController;
+   const roots=document.querySelectorAll('[data-tid='+JSON.stringify(form)+']');
+   if(c.Node.data.node!==b.module.FConnectionsNode||view?.constructor?.name!=='ConnectionsViewWizard'
+    ||roots.length!==1||view.FView.el.dom!==roots[0])return null;
+   const rows=bg.ext.GetSelectedGridRecords(view.ListView);
+   const row=rows?.length===1?rows[0].data:null,id=row?.Data?.__ObjectId;
+   return row?.Title===label&&typeof id?.Module==='string'&&Number.isSafeInteger(id.Instance)
+    ?{Module:id.Module,Instance:id.Instance,path:row.ConnectionPath}:null;
+  },{b:owner,form,label:tile.name});
+  await openSettings();
+  const connectionOwner=await page.evaluateHandle(b=>{
+   const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;
+   return {wizard:c.FController,node:c.Node.data.node.ParentNode,connections:b.module.FConnectionsNode};
+  },owner);
   if(sourceConnectionId)need(await page.evaluate(({b,id})=>{const actual=b.node.FConnectionNode?.__ObjectId;return actual?.Module===id.Module&&actual.Instance===id.Instance;},{b:connectionOwner,id:sourceConnectionId}),'requested connection differs from the existing import reference; use a new import target and operation_id');
   // The DB settings form binds its model node asynchronously after opening.
   // Wait for the same controller/tree owner and report which link differs.
@@ -247,16 +263,71 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
   observed=await read();
   need(observed.name===t.connection.name&&observed.database_path===t.connection.database_path&&flags.every(f=>observed[f]===false),'connection label or database path differs');
   // Native test: the file must exist in storage and open as SQLite.
-  await click(await tidOf('btnTestConnection'));
-  const message=await wait('connection test result',async()=>{
-   const boxes=page.locator('[data-tid="msgbox;cnt"]:visible');const n=await boxes.count();need(n<=1,'connection test message is ambiguous');
-   return n===1?(await boxes.innerText()).replace(/\s+/g,' ').trim():null;
-  });
-  const okButtons=page.locator('[data-tid^="msgbox;tlb;"]:visible');need(await okButtons.count()===1,'connection test message has no single close button');
-  // quiet() waits for windows to close, so this one message is dismissed directly.
-  const okPoint=await point(okButtons);await guard();effect=true;await page.mouse.click(okPoint.x,okPoint.y);
-  await wait('connection test message closed',async()=>await page.locator('[data-tid="msgbox;cnt"]:visible').count()===0);
-  need(message.includes('Тестирование соединения прошло успешно'),'connection test failed: '+message.slice(0,400)+'. Check database_path: an existing uploaded SQLite .db file is required');
+  const waitTestDialog=async(gesture,confirmation=false)=>{
+   await ownedWizard();await quiet();
+   const prior=await page.evaluateHandle(()=>({message:Ext.Msg?.cfg,error:bg.ext?.errormessage?.ErrorMsg?.FInstance?.FMessageBox?.cfg}));
+   try {
+    await click(gesture);
+    const result=await wait(confirmation?'connection wizard close confirmation':'connection test result',async()=>{
+     const handle=await page.evaluateHandle(({b,prior,confirmation,build,path})=>{
+      const visible=e=>e?.checkVisibility({checkVisibilityCSS:true});
+      const windows=[...document.querySelectorAll('.x-window')].filter(visible);
+      if(!windows.length)return null;
+      const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;
+      const dialog=windows[0],native=Ext.getCmp(dialog.id);
+      const message=native?.msg?.el?.dom;
+      const title=dialog.querySelector('[data-tid="msgbox;p.h;p.t"]')?.textContent.trim();
+      const text=message?.textContent.trim(),isMessage=native===Ext.Msg&&native.cfg!==prior.message;
+      const isError=native===bg.ext?.errormessage?.ErrorMsg?.FInstance?.FMessageBox&&native.cfg!==prior.error;
+      const passed=isMessage&&title==='Тестирование соединения'&&text==='Тестирование соединения прошло успешно';
+      const refused=isError&&title==='Loginom '+build&&text==='Тестирование соединения'
+       &&dialog.innerText.includes('Файл "'+path+'" не найден');
+      const close=isMessage&&title==='Подтвердить'&&text==='Вы действительно хотите закрыть мастер настройки?';
+      const key=confirmation?'yes':'ok',button=native?.msgButtons?.[key],control=button?.el?.dom;
+      if(windows.length!==1||native?.el?.dom!==dialog||!native.cfg||!message||!dialog.contains(message)
+       ||c.FController!==b.wizard||c.Node.data.node?.ParentNode!==b.node||b.wizard.FModelNode!==b.node.FConnectionNode
+       ||b.node.ParentNode!==b.connections||(confirmation?!close:!passed&&!refused)||!control||!dialog.contains(control)
+       ||Ext.getCmp(control.id)!==button||control.getAttribute('data-tid')!=='msgbox;tlb;'+key||!visible(control)||button.disabled!==false)
+       throw Error('Database connection dialog owner or message differs');
+      return {control,refused};
+     },{b:connectionOwner,prior,confirmation,build:t.build,path:t.connection.database_path});
+     const present=await handle.evaluate(value=>value!==null);
+     if(present)return handle;
+     await handle.dispose();return null;
+    });
+    try {
+     const refused=await result.evaluate(value=>value.refused);
+     const control=(await result.getProperty('control')).asElement();
+     try{await control.click({timeout:remaining()});}finally{await control.dispose();}
+     await wait('connection dialog closed',()=>page.locator('.x-window:visible').count().then(count=>count===0));
+     return refused;
+    }finally{await result.dispose();}
+   }finally{await prior.dispose();}
+  };
+  if(await waitTestDialog(await tidOf('btnTestConnection'))){
+   const error='Database connection: SQLite file '+JSON.stringify(t.connection.database_path)+' was not found';
+   const ownsSelected=await page.evaluate(({b,s})=>{
+    const id=b.node.FConnectionNode?.__ObjectId;
+    return !!s&&id?.Module===s.Module&&id.Instance===s.Instance&&b.node.ParentNode===b.connections;
+   },{b:connectionOwner,s:selected});
+   need(ownsSelected,'missing-file refusal has no exact selected connection owner');
+   await waitTestDialog(wizard+';btnClose',true);
+   await wait('connection list restored',()=>find(form+';cntTile;ListView;tbl').isVisible());await quiet();
+   const originalConnection=await page.evaluate(({b,s,form,label})=>{
+    const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller,view=c.FController;
+    const roots=document.querySelectorAll('[data-tid='+JSON.stringify(form)+']');
+    if(c.Node.data.node!==b.connections||view?.constructor?.name!=='ConnectionsViewWizard'||roots.length!==1||view.FView.el.dom!==roots[0])return false;
+    const records=view.ListView.getRecords(r=>r.Data?.__ObjectId?.Module===s.Module&&r.Data.__ObjectId.Instance===s.Instance,true);
+    return records.length===1&&records[0].Title===label&&records[0].ConnectionPath===s.path;
+   },{b:connectionOwner,s:selected,form,label:tile.name});
+   need(originalConnection,'discarded connection settings could not be verified');
+   const expectedTiles=existing.length?before:[...before,tile];
+   const tilesById=values=>JSON.stringify([...values].sort((a,b)=>a.tid.localeCompare(b.tid)));
+   need(tilesById(await tiles())===tilesById(expectedTiles),'connection inventory changed during refusal');
+   await connectionOwner.dispose();
+   await click(moduleTid);await returnToWorkflow();
+   return await refusalCheckpoint({connection_test_refused:{database_path:t.connection.database_path,tile_label:tile.name,tile_created:!existing.length}},error);
+  }
   await click(wizard+';btnDone');await wait('connection wizard committed',()=>find(form+';cntTile;ListView;tbl').isVisible());await quiet();
   // Reopen the saved object and independently reread the visible settings.
   const saved=(await tiles()).filter(c=>c.name===t.connection.name);need(saved.length===1,'saved connection is not unique');

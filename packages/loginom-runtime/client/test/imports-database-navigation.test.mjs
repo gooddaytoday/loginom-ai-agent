@@ -105,11 +105,13 @@ for(const fault of ['foreign window','foreign native window','extra window','sta
  });
 }
 
-test('pre-target release admits the completed SQLite refusal receipt with a verified graph',async()=>{
+for(const kind of ['navigation','file test'])test('pre-target release admits the completed SQLite '+kind+' refusal receipt with a verified graph',async()=>{
  const request={document_id,workflow_ref:flow,target:{kind:'new',type:'imports.database'},parameters:{database:{database_path:connection.database_path}}};
  const operation={id:'apply',parameters:request,nodeApply:{request,pending:{phase:'target'}}};
+ const checkpoint=kind==='navigation'?{navigation_refused:true}:
+  {connection_test_refused:{database_path:connection.database_path,tile_label:'SQLite',tile_created:true}};
  const receipt={operation_id:'apply:n1',action_key:'node.database.connection.internal',status:'AMBIGUOUS',cleanup_complete:true,effect_possible:true,
-  output:{verified:false,pre_target_checkpoint:{graph,navigation_refused:true}},error:{message:errorText}};
+  output:{verified:false,pre_target_checkpoint:{graph,...checkpoint}},error:{message:errorText}};
  const support=createDatabaseImportNodeSupport({targetOrigin:origin,targetBuild:build});
  const drivers=support.nodeApplyDriverFactory({operation,execute:async()=>receipt,onRecord:async record=>record,
   receiptOptions:(id,key)=>{operation.lastReceipt={id,action_key:key};return {};}});
