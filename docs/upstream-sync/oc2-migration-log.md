@@ -23741,3 +23741,69 @@ $ grep -c blacksmith .github/workflows/*.yml                             # check
 - Содержимое секретов и переменных форка (`gh secret list`) не смотрел; вопрос 1 это учитывает. Единственный сетевой запрос —
   метаданные репозитория выше (отступ от условия «только документация»).
 - Состав 57 крейтов и лицензий (g) считал по журналу B2.7a9, не по `Cargo.lock`.
+
+## B5.2a — манифест выпуска
+
+25.11.2026. Ветка `b52a-release-manifest` от `oc2-migration` (`569014e83b`), коммит `1097079cf3`. Эталон — `v0.4.0` (В-99).
+Подпись как в 0.4: Windows без подписи, macOS ad-hoc (решение оркестратора); Developer ID и нотаризация — этап G.
+Настоящая модель не вызывалась, Actions и сеть не использовались.
+
+### Что сделано
+
+`manifest.ts` в v2 уже совпадал с 0.4 байт в байт (`git diff v0.4.0 -- …/manifest.ts` пуст), не менялся. Добавлено в
+`packages/desktop/scripts/release/`:
+
+- `write-manifest.ts`, `verify-artifact.ts`, `verify-macos.ts` — порт из `v0.4.0`. Изменения только в `write-manifest.ts`:
+  пути `node` и `chromium` Linux и Windows берутся из `resource-manifest.json` (`staged.node`, `staged.browser`), а не
+  собираются из `chromiumRevision` (так уже было для macOS); `reportFiles` без `linux-matrix.json` (матрица DEB — этап G)
+  и `windows-native.json` (его в v2 никто не пишет).
+- `artifact.test.ts` — порт тестов 0.4 плюс новый тест `verify-artifact`: совпадение; подмена байта; файл, которого нет в
+  манифесте (лишний); файл удалён (отсутствующий); чужая идентичность продукта; чужой `resourcesSha256`.
+- `notes.test.ts` — порт тестов `script/release-notes.ts`; добавлен случай «подменён байт обычного артефакта» (`Release
+  artifact mismatch`): мутация проверки хеша артефакта в `release-notes.ts` пережила порт 0.4, потому что подмену ловила
+  только проверка матрицы DEB. В тесте убран мёртвый `if (tag !== "HEAD")` (`tag` — константа).
+
+`script/release-notes.ts` не менялся. «Чужой коммит» (`Release provenance mismatch`) и «неполный набор»
+(`Required release asset missing`, `complete passing Linux matrix`) проверяет он; тесты их держат.
+
+### Выбор меньшего варианта
+
+- `verify-macos.ts` портирован целиком (95 строк): без него `verify-artifact.ts` и тест 0.4 не собираются. Код файлов: 3 (из 5).
+- Не добавлен ключ `--commit` в `verify-artifact.ts`: источник коммита проверяет `release-notes.ts`.
+- Пути профиля в `paths` (`config`, `data`, `state`, `logs`, `profiles`, `secretStore`) оставлены как в 0.4: это описание, его
+  не читает ни один код v2 (`grep reportFiles|paths.config` — только схема). Сверка с раздельными хранилищами каналов
+  (B1.4c) и `secretStore` Linux — не сделана; записано для B5.2b или G.
+
+### Для B5.1k и B5.2b
+
+- `pack.ts` на macOS кладёт `.app.tar`, а манифест и `verify-artifact` знают только `dmg` и `zip` (как `electron-builder`
+  `mac.target`). Либо k собирает DMG и ZIP, либо расширяется `kind`; решает k.
+- `write-manifest.ts` требует в `--dist` архив `*-source.tar.gz`; кто его создаёт в v2 — не определено (B5.2b).
+- `release-notes.ts` по-прежнему требует `linux-matrix.json` и ветку текста `0.4.0`; для выпуска 0.5 решать в B5.2b или G.
+
+### Команды и вывод
+
+```text
+$ cd packages/desktop && bun test scripts/release      # 11 pass, 2 skip (macOS-only), 0 fail
+$ мутации (результат bun test scripts/release; база 11 pass 0 fail):
+  verify-artifact: убрать сравнение sha256 / проверку appId / проверку «артефакт есть в манифесте»   — 1 fail каждая
+  manifest.ts: убрать resourcesSha256 (RELEASE_RESOURCES_MANIFEST_MISMATCH)                          — 2 fail
+  manifest.ts: убрать RELEASE_RESOURCE_HASH_MISMATCH                                                 — 1 fail
+  release-notes.ts: убрать проверку коммита / проверку «пропущен обязательный файл»                  — 1 / 2 fail
+  release-notes.ts: убрать сверку sha256 артефакта с манифестом                                      — 0 fail до нового случая, 1 fail после
+$ packages/product: bun test                            # 63 pass, 3 fail — известные (workspace packages, CI triggers, path literals)
+$ packages/desktop: bun test                            # 633 pass, 0 fail
+$ дымовой прогон write-manifest.ts (временный каталог, поддельный electron, win32-x64, prod 1.0.0) # код 0, 2 артефакта, unsigned
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check   # would change: 0 files
+```
+
+### Только CI и не проверено
+
+- `write-manifest.ts` на настоящих артефактах: Electron в песочнице не скачан (postinstall заблокирован), поэтому дымовой
+  прогон шёл с поддельным `electron`, а тестов на сам `write-manifest.ts` нет (его корень — каталог репозитория, чистое
+  дерево и `git rev-parse`). Настоящий прогон на трёх платформах — в B5.2b (строка «o» плана).
+- `verify-artifact.ts` для DEB, AppImage (`dpkg-deb`, `unsquashfs`) и macOS (`hdiutil`, `codesign`, два теста с `skip`) —
+  нужны раннеры; Windows-ветка покрыта тестом на фикстуре.
+- `bun typecheck` пакета `desktop` не включает `scripts/` (`tsconfig.json`: `include: [src, perf]`); отдельный `tsc` по
+  `scripts/release` чист, кроме `rootDir` временного конфига.
