@@ -1,0 +1,15 @@
+{
+  "base": "bh-g206-t3",
+  "input_files": [],
+  "budget": {
+    "max_nodes": 1,
+    "max_errors": 0,
+    "forbid": [
+      "expected.json",
+      "oracle.py",
+      "g2_review",
+      "sqlite3",
+      "convert "
+    ]
+  }
+}
