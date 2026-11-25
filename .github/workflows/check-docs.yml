@@ -23,7 +23,7 @@ concurrency:
 jobs:
   docs:
     name: docs build
-    if: ${{ !github.event.pull_request.draft }}
+    if: ${{ github.repository == 'anomalyco/opencode' && !github.event.pull_request.draft }}
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
     defaults:
