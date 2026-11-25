@@ -29,5 +29,5 @@ Variant mode: 10/3.5/"text" → real 3.5; 1/1.0/"1" → integer 1; другие 
 
 ## Привязка
 
-Верхний `bindings:[{parameter:"/sort_result",variable:{kind:"control",input:0,name:"Flag"}}]`: `variables.user`/4 через `variable_inputs` control input 0. Flag boolean, не NULL; literal sort_result убери. Проверяй `configuration.bindings`; omit/[] сохраняет привязку. Измени только Flag в источнике, затем тот же GUID с `parameters:{}`, `inputs:[]`, `mappings:[]`, `finish:"execute"`; не перенастраивай узел. Тип/NULL/конфликт: `BINDING_TYPE_MISMATCH`/`BINDING_NULL_UNSUPPORTED`/`BINDING_CONFLICT`. Сверь весь результат, Save/reopen и порядок полей.
+Верхний `bindings:[{parameter:"/sort_result",variable:{kind:"control",input:0,name:"Flag"}}]`: `variables.user`/4 через `variable_inputs` control input 0. Flag boolean, не NULL; literal sort_result убери. Проверяй `configuration.bindings`; omit/[] сохраняет привязку. Измени только Flag в источнике, затем тот же GUID с `parameters:{}`, `inputs:[]`, `mappings:[]`, `finish:"execute"`; не перенастраивай узел. Тип/NULL/конфликт: `BINDING_TYPE_MISMATCH`/`BINDING_NULL_UNSUPPORTED`/`BINDING_CONFLICT`. Проверь сводку; Save/reopen — по просьбе.
 <!-- /mode -->

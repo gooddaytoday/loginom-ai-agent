@@ -184,7 +184,7 @@ Runtime заново сверяет native size/mtime и связь точног
 Проверка источника может оставить навигацию в Files. Перед запрошенным Save вернись через
 `loginom_dock_prepare` с `intent:"existing_workflow"` и последним `workflow_ref`
 этого runtime, включив `document_id`; после Save бери ссылку из
-`workflow_continuations`. Затем Save с новым `operation_id`. Такой возврат
+`workflow_continuations`. Запрошенный Save вызови с новым `operation_id`. Такой возврат
 восстанавливает навигацию, но не разрешает полный расчёт по старому cache.
 Не подменяй точную сверку числом видимых строк или preview, не экспортируй и
 не загружай полный серверный исходник повторно. После завершения вызови

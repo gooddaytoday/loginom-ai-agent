@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { fileURLToPath } from "node:url"
 
 const skill = await Bun.file(new URL("../skills/loginom-automation/SKILL.md", import.meta.url)).text()
 const chain = skill.split("## Один расчёт цепочки\n")[1].split("\n## Выбор узлов")[0]
@@ -13,17 +14,23 @@ test("stepwise edits use the current graph and verify only the requested step", 
   expect(step).toContain("сводки порта")
   expect(step).toContain("полную таблицу читай только по просьбе")
   expect(step).toContain("сколько строк")
+  expect(step).toContain("пропусти запуск")
   expect(step).toContain("что мешает запуску")
 })
 
-test("automation references only instruct package save on request or from an existing receipt", async () => {
+test("automation guidance requires a user request for package saving", async () => {
   expect(skill).toContain("Пакет сохраняй только по явной просьбе пользователя")
   expect(skill).not.toContain("После удаления сохрани пакет")
   const root = new URL("../skills/loginom-automation/references/", import.meta.url)
-  for (const path of ["canvas.md", "workflow.md", "nodes/preprocessing.sampling.md",
-    "nodes/transform.sorting.md", "nodes/variables.user.md", "nodes/datamining.log_regression.md"]) {
+  const automaticSave = [
+    /сохрани (?:готовый |настроенный )?пакет (?:после|отдельно|в конце)|(?:и|затем) сохрани пакет/i,
+    /затем (?:штатный )?Save\b|Save (?:— )?после чтения|Save выполняй отдельно/i,
+    /в конце вызови `package.save_checkpoint`|(?:пакет сохраняй|сохраняй пакет) отдельно/i,
+    /after every values update, save|save again before finishing|save the (?:prepared )?package/i,
+  ]
+  for await (const path of new Bun.Glob("**/*.md").scan(fileURLToPath(root))) {
     const reference = await Bun.file(new URL(path, root)).text()
-    expect(reference).not.toMatch(/Сохрани пакет после|Сохрани готовый пакет в конце|и сохрани пакет после|затем сохрани пакет|After every values update, save|Save again before finishing/i)
+    for (const pattern of automaticSave) expect(reference, path).not.toMatch(pattern)
   }
 })
 

@@ -13,7 +13,7 @@ Intercept, epsilon=1e-10; no bindings. Request parameter_schema.
 
 Enter: `logistic.validation:{method:"kfold",folds:3,sampling:"sequential"}`.
 Integer folds >=2; all train, no partition/weights. Fold informational.
-Readback proves Teach folds/samples. Table 0, technical CSV, Save; no port 2.
+Readback proves Teach folds/samples. Table 0, requested technical CSV; no port 2.
 Reopen/apply: saved validation, no Teach; omission requires none saved.
 
 ## Train/test partition

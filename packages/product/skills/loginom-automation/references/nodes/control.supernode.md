@@ -29,7 +29,7 @@ apply на ЕГО существующий ref, `inputs:[{source:<Calculator>,ou
 `graph_navigation:{direction:"leave"}`. Наблюдай родительский граф: прежние refs
 больше не действуют. Выполни ТУ ЖЕ Подмодель с её mode, `parameters:{}`,
 `inputs:[]`, `mappings:[]`, `finish:"execute"`, `read.ports:[0]`.
-`dock_node_read` перечитывает по локальной квитанции. Save — после последнего чтения.
+`dock_node_read` перечитывает по локальной квитанции.
 Не поддержаны вложенные/рекурсивные Подмодели, compose/expand, лишние порты,
 деревья, выходные переменные, смешанная граница, Условие/Цикл, service links, обучение.
 

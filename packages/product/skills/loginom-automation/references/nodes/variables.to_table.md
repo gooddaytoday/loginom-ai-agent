@@ -30,7 +30,7 @@
 `finish:"done"` применяет настройки без доказательства вычисленного результата;
 `finish:"close"` отменяет черновик. Для повторного чтения завершённого узла
 используй `dock_node_read` с его успешным `source_operation_id`, а не новый узел.
-Сохраняй пакет отдельным `package.save_checkpoint` и проверь квитанцию сохранения.
+По просьбе выполни `package.save_checkpoint` и проверь квитанцию.
 
 Для списка «имя, метка, значение» выбирай тот же `dock_node_apply`,
 `target.type:"variables.to_table"`, `mode:"rows"`, `parameters:{}`, `inputs:[]`
