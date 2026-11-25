@@ -206,6 +206,210 @@ class BughuntAuditTests(unittest.TestCase):
         result, _ = self.report(root, '--cases', root / 'cases')
         self.assertEqual(result.returncode, 1)
 
+    def dock(self, name, output=None, **data):
+        return self.tool('loginom_dock_' + name, output, **data)
+
+    def patterns(self, events, runtime=()):
+        root = self.temp_run(events)
+        if runtime:
+            profile = root / 'sample/profile'
+            profile.mkdir()
+            (profile / 'execution-events.jsonl').write_text(
+                '\n'.join(json.dumps(event) for event in runtime), encoding='utf-8')
+        result, report = self.report('--patterns', root)
+        self.assertEqual(result.returncode, 0)
+        return report['runs'][0]['cases']
+
+    def test_multiple_json_blocks_and_separate_error_result(self):
+        call = self.dock('node_apply', operation_id='original')
+        call['part'].update(callID='call')
+        call['part']['state'].update(status='pending')
+        call['part']['state'].pop('output')
+        result = dict(type='tool_result', tool_call_id='call', isError=True, content=[
+            dict(type='text', text='{"status":"NOT_APPLIED","error":{"code":"RETRY"}}\n'
+                 '{"next_step":{"tool":"dock_node_apply","instruction":"Try again."}}\n'
+                 'Verify the current state.'),
+        ])
+        retry = self.dock('node_apply', {'state': 'running'}, operation_id='new')
+        _, legacy = self.report(self.temp_run([call, result, retry]))
+        self.assertEqual(legacy['stages'][0]['error_details'][0]['code'], 'RETRY')
+        cases = self.patterns([call, result, retry])
+        repeat = next(case for case in cases if case['pattern'] == 'd')
+        self.assertEqual(repeat['trigger']['code'], 'RETRY')
+        self.assertEqual(repeat['trigger']['initiator'], 'runtime_next_step')
+        self.assertTrue(repeat['trigger']['location'].endswith(':2'))
+
+    def test_wizard_cycle_matches_verified_same_node_in_runtime(self):
+        target = dict(kind='existing', type='imports.text', ref=dict(node_id='node'))
+        calls = [self.dock('node_apply', operation_id=op, target=target) for op in ['old', 'new']]
+        open_receipt = dict(status='SUCCEEDED', output=dict(
+            wizard=dict(status='observed'),
+            prepared_node_context=dict(verified=True, surface='wizard', node_id='node')))
+        runtime = [
+            dict(phase='node_step_completed', operation_id='old', outcome=open_receipt),
+            dict(phase='node_operation_released', operation_id='old', result=dict(node=dict(node_id='node'))),
+            dict(phase='node_step_completed', operation_id='new', outcome=open_receipt),
+        ]
+        cases = [case for case in self.patterns(calls, runtime) if case['pattern'] == 'a']
+        self.assertEqual(len(cases), 1)
+        self.assertEqual((cases[0]['variant'], cases[0]['node'], cases[0]['close_kind']), ('import', 'node', 'release'))
+        self.assertEqual(cases[0]['reopened'], 'sample/profile/execution-events.jsonl:3')
+        self.assertEqual(cases[0]['location'], 'sample/sample/model.stdout:2')
+        different = dict(status='SUCCEEDED', output=dict(
+            wizard=dict(status='observed'),
+            prepared_node_context=dict(verified=True, surface='wizard', node_id='other')))
+        runtime[-1]['outcome'] = different
+        self.assertFalse(any(case['pattern'] == 'a' for case in self.patterns(calls, runtime)))
+
+    def test_recreate_requires_verified_deletion_and_matches_node_type(self):
+        target = dict(kind='new', type='imports.text', label='Input')
+        create = self.dock('node_apply', dict(status='SUCCEEDED', node=dict(node_id='one')),
+                           operation_id='create', target=target)
+        delete = self.dock('node_delete', dict(status='SUCCEEDED'),
+                           operation_id='delete', node=dict(node_id='one'))
+        recreate = self.dock('node_apply', dict(status='SUCCEEDED', node=dict(node_id='two')),
+                             operation_id='recreate', target=target)
+        cases = self.patterns([create, delete, recreate])
+        case = next(case for case in cases if case['pattern'] == 'b')
+        self.assertEqual((case['previous_node'], case['node']), ('one', 'two'))
+        delete['part']['state']['output'] = '{"status":"NOT_APPLIED"}'
+        self.assertFalse(any(case['pattern'] == 'b' for case in self.patterns([create, delete, recreate])))
+
+    def test_closed_wizard_and_mapping_have_distinct_surfaces(self):
+        target = dict(kind='existing', type='transform.grouping', ref=dict(node_id='node'))
+        node_context = dict(verified=True, node_id='node')
+        events = [self.dock('node_apply', operation_id='apply', target=target)]
+
+        def observation(status, stage, surface):
+            return dict(phase='node_observation_completed', operation_id='apply', outcome=dict(
+                status='SUCCEEDED', output=dict(wizard=dict(status=status, stage=stage),
+                                               prepared_node_context=dict(node_context, surface=surface))))
+
+        opened = observation('observed', 'grouping', 'wizard')
+        closed = observation('absent', None, 'graph')
+        mapping = observation('observed', 'input_mapping', 'wizard')
+        cases = self.patterns(events, [opened, closed, mapping, closed, opened])
+        self.assertEqual(len(cases), 1)
+        self.assertEqual(cases[0]['wizard_kind'], 'configuration')
+        self.assertEqual(cases[0]['trigger']['initiator'], 'runtime_internal')
+
+    def test_same_target_and_phase_after_recovery(self):
+        target = dict(kind='existing', type='imports.text', ref=dict(node_id='node'))
+        events = [
+            self.dock('node_apply', dict(status='FAILED', phase='configure', error=dict(code='STOPPED')),
+                      operation_id='first', target=target, phase='configure'),
+            self.dock('operation_recover', dict(status='SUCCEEDED', phase='resolved',
+                      next_step=dict(tool='dock_node_apply', instruction='Reapply.')),
+                      operation_id='first', strategy='abandon_operation'),
+            self.dock('node_apply', operation_id='wrong-phase', target=target, phase='read'),
+            self.dock('node_apply', operation_id='same-phase', target=target, phase='configure'),
+        ]
+        cases = [case for case in self.patterns(events) if case['pattern'] == 'c']
+        self.assertEqual([(case['operation_id'], case['phase']) for case in cases], [('same-phase', 'configure')])
+        self.assertEqual(cases[0]['original_code'], 'STOPPED')
+
+    def test_identical_calls_and_running_polls(self):
+        events = [
+            self.dock('node_wait', dict(state='running'), operation_id='a', timeout_ms=3000),
+            self.dock('node_wait', dict(state='running'), operation_id='a', timeout_ms=3000),
+            self.dock('node_wait', dict(state='running'), operation_id='b', timeout_ms=3000),
+            self.dock('node_wait', dict(state='running'), operation_id='a', timeout_ms=5000),
+            self.dock('prepare', operation_id='a', intent='create'),
+            self.dock('prepare', operation_id='b', intent='create'),
+        ]
+        cases = [case for case in self.patterns(events) if case['pattern'] == 'd']
+        self.assertEqual([case['variant'] for case in cases], ['running_poll', 'different_wait_operation', 'identical'])
+        self.assertEqual([case['normal'] for case in cases], [True, False, False])
+
+    def test_repeated_prepare_describe_and_delivery_count_replays_once(self):
+        def upload(op, tool='artifact_deliver'):
+            return self.dock(tool, dict(status='SUCCEEDED', output=dict(
+                upload_operation_id=op, upload_completion_verified=True, sha256='synthetic-digest',
+                destination='incoming/file.csv')), operation_id=op, artifact_id='artifact')
+
+        events = [
+            self.dock('prepare', intent='create'),
+            self.dock('action_describe', node_types=['imports.text', 'imports.excel']),
+            upload('first'), upload('first', 'artifact_delivery_status'), upload('second'),
+            upload('first', 'artifact_delivery_status'),
+            self.dock('prepare', intent='create'),
+            self.dock('action_describe', node_types=['imports.excel', 'imports.text']),
+        ]
+        cases = [case for case in self.patterns(events) if case['pattern'] == 'e']
+        self.assertEqual([case['variant'] for case in cases], ['file_delivery', 'prepare', 'action_describe'])
+        self.assertEqual(cases[0]['file_name'], 'file.csv')
+
+    def test_repeated_file_request_after_failed_delivery(self):
+        failed = self.dock('artifact_deliver', dict(status='NOT_APPLIED', error=dict(code='UPLOAD_REFUSED')),
+                           operation_id='first', artifact_id='file')
+        retry = self.dock('artifact_deliver', dict(status='NOT_APPLIED'),
+                          operation_id='retry', artifact_id='file')
+        cases = [c for c in self.patterns([failed, retry]) if c['pattern'] == 'e']
+        self.assertEqual([case['variant'] for case in cases], ['file_delivery_retry'])
+        self.assertEqual(cases[0]['prior_delivery_code'], 'UPLOAD_REFUSED')
+
+    def release_refusal(self, op, offer=True):
+        output = dict(original_operation_pending=True)
+        if offer:
+            output['next_step'] = dict(tool='dock_browser_recovery', arguments=dict(action='start', operation_id=op))
+        event = self.dock('operation_recover', operation_id=op, strategy='abandon_operation')
+        event['part']['state'].update(status='error', output=None, error=json.dumps(dict(
+            status='AMBIGUOUS', phase='release_refused', output=output, error=dict(code='NODE_RELEASE_REFUSED'))))
+        return event
+
+    def test_manual_recovery_offers_start_finish_and_unoffered_refusal(self):
+        events = [
+            self.release_refusal('started'),
+            self.dock('browser_recovery', dict(phase='browser'), action='start', operation_id='started'),
+            self.dock('browser_recovery', dict(phase='dock', verification=dict(status='continuable')),
+                      action='finish', operation_id='started'),
+            self.dock('node_wait', dict(status='SUCCEEDED', action_key='node.apply'), operation_id='built'),
+            self.release_refusal('ignored'),
+            self.release_refusal('no-offer', offer=False),
+        ]
+        cases = {case['variant']: case for case in self.patterns(events) if case['pattern'] == 'f'}
+        self.assertEqual(set(cases), {'offered_and_started', 'start_to_finish', 'offered_no_start',
+                                     'release_blocked_no_offer'})
+        finish = cases['start_to_finish']
+        self.assertTrue(finish['returned_to_dock'])
+        self.assertTrue(finish['continued'])
+        self.assertTrue(finish['finish'].endswith(':3'))
+        self.assertEqual(cases['offered_no_start']['operation_id'], 'ignored')
+        self.assertEqual(cases['release_blocked_no_offer']['last_tool_result']['operation_id'], 'no-offer')
+
+    def test_deadlock_ignores_read_success_and_resolved_pending(self):
+        events = [
+            self.release_refusal('pending'),
+            self.dock('operation_inspect', dict(status='SUCCEEDED', output=dict(state='pending')),
+                      operation_id='pending'),
+            self.dock('node_read', dict(status='SUCCEEDED'), operation_id='read'),
+        ]
+        deadlock = next(case for case in self.patterns(events) if case['pattern'] == 'g')
+        self.assertEqual(deadlock['pending_operations'], ['pending'])
+        self.assertEqual(deadlock['last_tool_result']['tool'], 'loginom_dock_node_read')
+        events.append(self.dock('operation_recover', dict(status='SUCCEEDED', phase='resolved'),
+                                operation_id='pending', strategy='abandon_operation'))
+        self.assertFalse(any(case['pattern'] == 'g' for case in self.patterns(events)))
+
+    def test_recovery_budget_and_blocker_without_change(self):
+        blocker = self.dock('browser_recovery', {'refused': 'The browser recovery budget is exhausted.'},
+                            operation_id='blocked', action='start')
+        cases = self.patterns([blocker])
+        self.assertEqual({c['variant'] for c in cases},
+                         {'start_refused', 'release_blocked_no_offer', 'blocker_without_change'})
+        last = next(c for c in cases if c['pattern'] == 'g')
+        self.assertEqual(last['trigger']['code'], 'BROWSER_RECOVERY_BUDGET_EXHAUSTED')
+        build = self.dock('node_wait', dict(status='SUCCEEDED', action_key='node.apply'), operation_id='done')
+        self.assertFalse(any(case['pattern'] == 'g' for case in self.patterns([blocker, build])))
+
+    def test_pattern_outputs_include_each_run_even_without_matches(self):
+        root = self.temp_run([dict(type='step_finish', part={})])
+        output = root / 'patterns-output'
+        result = self.run_audit('--patterns', root, '--pattern-output', output)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads((output / root.name / 'patterns.json').read_text())['cases'], [])
+        self.assertEqual((output / 'summary.md').read_text(), result.stdout)
+
 
 if __name__ == '__main__':
     unittest.main()
