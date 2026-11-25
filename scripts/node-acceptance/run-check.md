@@ -664,6 +664,8 @@ turn that should receive the generated Save request.
 
 Any turn may add `graph` to `expected.json`. The runner checks the latest
 complete graph recorded during the turn in the existing runtime journal.
+With an empty `outputs` list a graph-only turn may return no tabular port,
+as with an Excel export. Any returned ports still require valid read evidence.
 Use a unique local `id` and the canonical `type` for each required node.
 Add `label` for an exact caption or `label_contains` for a case-sensitive
 substring. Each selector must match one distinct node. Links refer to those

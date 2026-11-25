@@ -2209,10 +2209,10 @@ def port_path(reply, port):
     return None
 
 
-def port_failure(replies, journal):
+def port_failure(replies, journal, *, required=True):
     delivered = [(n, owner, p) for n, o in replies for owner, p in ports(o)]
     invalid = [n for n, o, p in delivered if port_path(o, p) is None]
-    return str(journal) + ':' + str(invalid[0] if invalid else 1) if not delivered or invalid else None
+    return str(journal) + ':' + str(invalid[0] if invalid else 1) if invalid or (required and not delivered) else None
 
 
 def check_lgd_import_result(replies, row_count):
@@ -3304,12 +3304,13 @@ class Runner:
         self.current['read-path'] = '/'.join(sorted((set(self.current.get('read-path', '').split('/')) | paths) - {''}))
         delivered = any(ports([o for _, o in replies]))
         assert not (lgd_corrupt and delivered), 'LGD_CORRUPT_PORTS_FORBIDDEN'
-        invalid = (port_failure(replies, folder / 'model.stdout')
+        invalid = (port_failure(replies, folder / 'model.stdout', required=not only_graph)
                    if not spec.get('variable_only') and (not (rejection or refusal or execution_error or lgd_corrupt) or delivered) else None)
         if invalid:
             self.current.update(failure_class='PORT_READ_INVALID', detail='Port source or native binding/exactness/Preview cleanup absent or invalid', location=invalid, failure_load=list(os.getloadavg()))
             self.current['port-read'] = 'FAIL'
-        self.current.setdefault('port-read', '— (expected execution error)' if execution_error and not delivered else 'PASS')
+        self.current.setdefault('port-read', '— (graph only)' if only_graph and not delivered
+                                else '— (expected execution error)' if execution_error and not delivered else 'PASS')
         if expected.get('proposed_tree_output'):
             trees = [(owner, port) for _, reply in replies for owner, port in ports(reply) if port.get('port_kind') == 'tree']
             assert trees, 'TREE_READ_MISSING'

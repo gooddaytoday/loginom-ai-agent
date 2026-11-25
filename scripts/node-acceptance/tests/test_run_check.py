@@ -2120,6 +2120,7 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                     'bh-t0-import', stage, profile, workspace, '/own/run.lgp', {'package_directory': '/own'}, root / 'build')
             self.assertEqual((session, expected['outputs'], actual, delimiter), ('chat', [], None, None))
             self.assertEqual(instance.current['graph'], 'PASS')
+            self.assertNotIn('failure_class', instance.current)
             self.assertEqual(runner.read(stage / 'graph-observed.json')['location'], 'execution-events.jsonl:1')
 
     def test_private_case_attaches_every_data_format_with_configured_model(self):
@@ -3317,6 +3318,8 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         reply = {'cleanup_complete': True, 'output': {'ports': [{'port': 0, 'schema': [], 'sample': []}]}}
         self.assertEqual(runner.port_failure([(12, reply)], 'model.stdout'), 'model.stdout:12')
         self.assertEqual(runner.port_failure([], 'model.stdout'), 'model.stdout:1')
+        self.assertIsNone(runner.port_failure([], 'model.stdout', required=False))
+        self.assertEqual(runner.port_failure([(12, reply)], 'model.stdout', required=False), 'model.stdout:12')
         native = self.native_reply()
         self.assertEqual(runner.port_failure([(10, native), (12, reply)], 'model.stdout'), 'model.stdout:12')
         native['output']['ports'].append(reply['output']['ports'][0])
