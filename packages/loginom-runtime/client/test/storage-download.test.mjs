@@ -157,6 +157,116 @@ for(const fault of ['owner','directory','target'])test('source epoch refresh ref
  assert.equal(f.records.filter(r=>r.phase==='completed'&&r.action_key==='ui.act').length,1);
 });
 
+async function storageScrollAfterFolder(t,{listing,fault}={}){
+ const f=await fixture(t),page=new Page(),base=page.uiSnapshot(),records=[];
+ const toolbar='MF;cntMain;tlbMainToolbar',button=toolbar+';btnFilestorage';
+ const strip='MF;cntMain;cntWorkspace;Workspace;t.br',files={tab_tid:strip+';tb-2',prefix:'MF;TF-2'};
+ const nav=files.prefix+';NavigationBar;NavigationPanel',table=files.prefix+';FileStorageForm;pnlFileStorage;tbl';
+ const row=files.prefix+';FileStorageForm;colName_',folder=row+'worker',anchor=row+'..',file=row+'full.csv';
+ const element=(tid,label='',allowed_actions=[])=>({ref:page.uiReference(tid),tid,label,allowed_actions,
+  identity:{anchor_tid:tid,path:[]},signature:{tag:'div',tid},kind:'control',scope:'workspace',visible:true,enabled:true,
+  bounding_box:{x:10,y:10,width:20,height:20},interaction:{state:'point_observed',point:{x:20,y:20}}});
+ Object.assign(base,{active_tab_ref:page.uiReference(base.workflow_ref.tab_tid),
+  navigation_context:{status:'observed',kind:'workflow',path:[{tid:base.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Сценарий',label:'Сценарий'}]}});
+ let directory=null,top=0,revision=0,attempts=0,scrolls=0;
+ const filesTab=page.app.Application.FInstance.FMainForm.Items.Workspace;
+ const getActiveTab=filesTab.getActiveTab;
+ filesTab.getActiveTab=()=>directory===null?getActiveTab():{};
+ const evaluate=page.evaluate.bind(page),elements=page.elements.bind(page),click=page.click.bind(page);
+ page.elements=()=>[...elements(),page.element(button),page.element(folder)];
+ page.click=async item=>{
+  if(item.tid===button){directory='/';revision++;return;}
+  if(item.tid===base.workflow_ref.tab_tid){directory=null;revision++;return;}
+  return click(item);
+ };
+ page.afterDoubleClick=async()=>{page.editor=null;directory='/worker';revision++;};
+ const stateFor=({rootRef,discoverRoots,storageName}={})=>{
+  const state=structuredClone(base);
+  state.dom_epoch.revision=revision;
+  const inFiles=directory!==null;
+  if(inFiles)Object.assign(state,{workflow_ref:files,active_tab_ref:page.uiReference(files.tab_tid),package_identity:null,
+   file_storage:{status:'observed',directory},navigation_context:{status:'unobserved'}});
+  if(discoverRoots){
+   state.observation_kind='roots';
+   delete state.active_tab_ref;
+   delete state.package_identity;
+   delete state.file_storage;
+   state.ui.elements=storageName
+    ?(storageName==='worker'&&directory==='/'?[element(folder,'worker')]:storageName==='full.csv'&&top?[element(file,'full.csv')]:[])
+    :inFiles?[element(nav),element(table),element(strip)]:[element(toolbar),element(strip)];
+   return state;
+  }
+  const up={...element(anchor,'..',['scroll']),storage_entry:{kind:'unknown',directory_entries:2},
+   scroll:{ref:page.uiReference(table),top,max_top:48}};
+  const csv={...element(file,'full.csv'),storage_entry:{kind:'file',path:'/worker/full.csv',bytes:3,mtime:'native-time',bytes_source:'native_file_store',directory_entries:2}};
+  const scenario=element(base.workflow_ref.tab_tid,'Сценарий',['click']);
+  state.ui.elements=!inFiles?[element(button,'',['click'])]
+   :rootRef===scenario.ref?[scenario]
+   :rootRef===page.uiReference(strip)?[scenario,element(files.tab_tid,'Файлы')]
+   :directory==='/'?[{...element(folder,'worker',['double_click']),storage_entry:{kind:'folder'}}]
+   :rootRef===page.uiReference(table)?[up,...(top?[csv]:[])]:rootRef===page.uiReference(file)?[csv]:[];
+  if(rootRef)state.observation_root={ref:rootRef,identity:element(inFiles
+   ?[nav,table,strip,folder,file,base.workflow_ref.tab_tid].find(tid=>page.uiReference(tid)===rootRef):toolbar).identity};
+  return state;
+ };
+ page.evaluate=async(fn,arg)=>{
+  if(fn.toString().includes('return {document:state.epoch,revision:state.revision}'))return {...base.dom_epoch,revision};
+  if(fn.toString().includes("Symbol.for('loginom-dock.workspace-ui.identity.v1')"))return stateFor(arg);
+  return evaluate(fn,arg);
+ };
+ const r=runtime(page,{cacheDirectory:join(f.root,'scroll'),onRecord:async x=>{records.push(x);return x;},
+  getStorageBinding:()=>({session_id:'s',document_id:'d',origin:base.origin,loginom_account:'worker',directories:{inputs:'/worker',packages:'/worker',exports:'/worker'}}),
+  execute:async code=>{
+   if(!code.includes('"action":{"verb":"scroll"'))return page.execute(code);
+   const operation_id=code.match(/"operation_id":"(scroll:nav\d+)"/)[1];
+   const refused=++attempts===1||['persistent','replaced workflow'].includes(fault);
+   revision++;
+   if(fault==='directory')directory='/worker/foreign';
+   if(fault==='tab')page.uiRefs.set(files.tab_tid,'ui-foreign-tab');
+   if(fault==='owner')page.uiRefs.set(table,'ui-foreign-table');
+   if(fault==='position')top=12;
+   if(fault==='replaced workflow')page.uiRefs.set(base.workflow_ref.tab_tid,'ui-replacement-workflow');
+   if(!refused){top=48;scrolls++;}
+   const output=stateFor({rootRef:page.uiReference(table)});
+   return {action_key:'ui.act',action_revision:'1',operation_id,phase:refused?'preconditions':'completed',
+    status:refused?'NOT_APPLIED':'SUCCEEDED',cleanup_complete:true,effect_possible:!refused,output,
+    error:refused?{code:'UI_EPOCH_CHANGED',message:'The document changed since this observation'}:null,trace:[]};
+  }});
+ const result=await r.serverDownload({operation_id:'scroll',path:listing?'/worker':'/worker/full.csv'},listing?'dock_storage_list':'dock_storage_source');
+ return {result,records,attempts,scrolls,r,page};
+}
+
+for(const listing of [false,true])test('Files folder repaint reissues the same scroll for '+(listing?'list':'source'),async t=>{
+ const f=await storageScrollAfterFolder(t,{listing});
+ assert.equal(f.result.status,'SUCCEEDED',JSON.stringify(f.records.find(r=>r.phase.endsWith('_failed'))??f.result));
+ assert.equal(f.attempts,2);assert.equal(f.scrolls,1);
+ assert.ok(listing?f.result.output.complete:f.result.output.source.server_source_ref);
+ const actions=f.records.filter(r=>r.phase==='completed'&&r.parameters?.action.verb==='scroll');
+ assert.notEqual(actions[0].parameters.observation_id,actions[1].parameters.observation_id);
+});
+
+for(const fault of ['directory','tab','owner','position'])test('Files scroll refuses a foreign '+fault+' after an epoch change',async t=>{
+ const f=await storageScrollAfterFolder(t,{fault});
+ assert.equal(f.result.status,'FAILED',JSON.stringify(f.result));
+ assert.equal(f.attempts,1);assert.equal(f.scrolls,0);
+ assert.equal(f.page.events.filter(e=>e==='mouse_click').length,2);
+});
+
+test('Save works after a settled Files scroll refusal returns to the original workflow',async t=>{
+ const f=await storageScrollAfterFolder(t,{fault:'persistent'});
+ assert.equal(f.result.status,'FAILED',JSON.stringify(f.result));assert.equal(f.attempts,3);assert.equal(f.scrolls,0);
+ assert.equal(f.records.at(-1).phase,'storage_workflow_restored',JSON.stringify(f.records.at(-1)));
+ const save=await f.r.run('package.save_checkpoint',{path:'/user/data/packages/saved.lgp',conflict_policy:'fail'},{operationId:'save'});
+ assert.equal(save.status,'SUCCEEDED',JSON.stringify(save));
+});
+
+test('Files refusal never activates a replacement for the original workflow tab',async t=>{
+ const f=await storageScrollAfterFolder(t,{fault:'replaced workflow'});
+ assert.equal(f.result.status,'FAILED');assert.equal(f.attempts,3);assert.equal(f.scrolls,0);
+ assert.equal(f.page.events.filter(e=>e==='mouse_click').length,2);
+ assert.equal(f.records.at(-1).phase,'storage_workflow_restore_failed');
+});
+
 for(const change of ['unchanged','bytes','mtime'])test('deferred source validation restores Files before a new Execute: '+change,async t=>{
  const node={document_id:'doc',workflow_id:'flow',node_id:'import'},group={...node,node_id:'group'};
  const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',

@@ -3234,44 +3234,71 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const one=(entries,control='storage_control')=>{if(entries.length!==1)throw Object.assign(Error('Server storage control is missing or ambiguous'),
           {code:'STORAGE_CONTROL_UNAVAILABLE',storageControl:control});return entries[0];};
         const detail=(s,e)=>read({rootRef:e.ref,observationId:s.observation_id});
-        const act=async(s,e,verb='click',extra={})=>{
-          // Scrolling detaches virtual rows. Preserve the original grid root
-          // so the post-gesture observation can confirm this one scroll.
+        const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+        const owner=state=>[state.origin,state.loginom_build,state.dom_epoch?.document,state.workflow_ref];
+        const binding=state=>[...owner(state),state.active_tab_ref,state.package_identity,state.file_storage?.directory??null];
+        const quiet=state=>state?.authenticated===true&&!state.ui?.masks?.length&&!state.ui?.dialogs?.length;
+        let workflowBeforeFiles,filesEntered,restoreFrom;
+        const beforeGesture=(result,operationId)=>result.operation_id===operationId&&result.action_key==='ui.act'
+          &&result.status==='NOT_APPLIED'&&result.phase==='preconditions'&&result.effect_possible===false
+          &&result.cleanup_complete===true&&result.error?.code==='UI_EPOCH_CHANGED'&&Array.isArray(result.trace)
+          &&!result.trace.some(t=>['ui_preconditions_verified','ui_gesture_applied','ui_scroll_applied'].includes(t.event));
+        const act=async(s,e,verb='click',extra={},exactRef=null)=>{
           if(verb==='scroll'){
-            // Retained whole, like its reads (LAB-1843): the settled in-view rows
-            // that issue the next gesture follow the buffer rows above them.
-            guard();const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId:id+':nav'+(++step),signal,deadlineAt:deadline,whole:true});
-            if(result.status!=='SUCCEEDED'||result.cleanup_complete!==true)throw Error('Server storage navigation requires inspection: '+result.operation_id);
-            // Its retained post-scroll observation issues the next gesture (LAB-1872).
-            return result.output;
+            // Reissue within the original grid. Virtual rows can detach after
+            // the gesture, so a row cannot own its post-scroll observation.
+            const context=binding(s),filesOwner=owner(s),root=s.observation_root,tableTid=s.workflow_ref.prefix+';FileStorageForm;pnlFileStorage;tbl';
+            const target=observations.get(s.observation_id)?.ui.elements.find(item=>item.ref===e.ref);
+            const match=page=>{
+              const state=observations.get(page?.observation_id);
+              if(!target||!quiet(state)||state.file_storage?.status!=='observed'||!same(binding(state),context)
+                ||!same(state.observation_root,root))return null;
+              const matches=state.ui.elements.filter(item=>item.tid===target.tid);
+              const item=matches[0];
+              return matches.length===1&&item.ref===target.ref&&same(item.identity,target.identity)&&same(item.signature,target.signature)
+                &&same(item.scroll,target.scroll)&&item.storage_entry?.row_ref===target.storage_entry?.row_ref
+                &&item.interaction?.state==='point_observed'&&item.allowed_actions.includes('scroll')
+                ?page.ui.elements.find(e=>e.ref===item.ref):null;
+            };
+            for(let attempt=0;attempt<3;attempt++){
+              guard();const operationId=id+':nav'+(++step);
+              const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId,signal,deadlineAt:deadline,whole:true});
+              if(result.operation_id===operationId&&result.action_key==='ui.act'&&result.status==='SUCCEEDED'&&result.cleanup_complete===true)return result.output;
+              const unconfirmed=()=>Error('Server storage navigation requires inspection: '+operationId);
+              if(!beforeGesture(result,operationId)||root?.identity?.anchor_tid!==tableTid||!match(result.output))throw unconfirmed();
+              const discovered=await roots();
+              if(!same(owner(discovered),filesOwner))throw unconfirmed();
+              const tables=discovered.ui.elements.filter(item=>item.tid===tableTid);
+              if(tables.length!==1||tables[0].ref!==root.ref)throw unconfirmed();
+              s=await detail(discovered,tables[0]);e=match(s);
+              if(!e)throw unconfirmed();
+              if(attempt===2){restoreFrom=s;throw unconfirmed();}
+            }
           }
-          const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-          const binding=state=>[state.origin,state.loginom_build,state.dom_epoch?.document,state.workflow_ref,state.active_tab_ref,state.package_identity,state.file_storage?.directory??null];
-          const original=binding(s),rootIdentity=s.observation_root?.identity??e.identity??{anchor_tid:e.tid,path:[]};let quiet=null;
+          const original=binding(s),rootIdentity=s.observation_root?.identity??e.identity??{anchor_tid:e.tid,path:[]};let settled=null;
+          const matchesTarget=item=>item.tid===e.tid&&(!exactRef||item.ref===exactRef)&&same(item.identity,e.identity)&&same(item.signature,e.signature);
           for(let attempt=0;attempt<3;attempt++){
             let previous=null;
             s=await ready(async()=>{
               const fresh=await read({rootRef:e.ref,observationId:s.observation_id});
-              const matches=fresh.ui.elements.filter(item=>item.tid===e.tid&&same(item.identity,e.identity)&&same(item.signature,e.signature));
+              const matches=fresh.ui.elements.filter(matchesTarget);
               if(!same(binding(fresh),original)||matches.length!==1)throw Error('Server storage navigation target changed');
               const item=matches[0],stamp=[fresh.dom_epoch,item.bounding_box,item.interaction];
-              quiet=item.interaction?.state==='point_observed'&&same(stamp,previous);previous=stamp;
+              settled=item.interaction?.state==='point_observed'&&same(stamp,previous);previous=stamp;
               return fresh;
-            },()=>quiet===true);
+            },()=>settled===true);
             e=one(s.ui.elements.filter(item=>item.tid===e.tid));
-            guard();const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId:id+':nav'+(++step),signal,deadlineAt:deadline});
-            if(result.status==='SUCCEEDED'&&result.cleanup_complete===true)return;
-            if(result.status!=='NOT_APPLIED'||result.phase!=='preconditions'||result.effect_possible!==false
-              ||result.cleanup_complete!==true||result.error?.code!=='UI_EPOCH_CHANGED'||attempt===2
-              ||!Array.isArray(result.trace)||result.trace.some(t=>['ui_preconditions_verified','ui_gesture_applied'].includes(t.event)))
-              throw Error('Server storage navigation requires inspection: '+result.operation_id);
+            guard();const operationId=id+':nav'+(++step);
+            const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId,signal,deadlineAt:deadline});
+            if(result.operation_id===operationId&&result.action_key==='ui.act'&&result.status==='SUCCEEDED'&&result.cleanup_complete===true)return;
+            if(attempt===2||!beforeGesture(result,operationId))throw Error('Server storage navigation requires inspection: '+operationId);
             // uiAct consumes the issued observation even for a no-effect
             // refusal. Reissue the same owner/target before the next read.
             const discovered=await read({scope:'roots',...(e.storage_entry?{storageName:e.label}:{})});
             if(!same(binding(discovered).slice(0,4),original.slice(0,4)))throw Error('Server storage owner changed');
             const root=one(discovered.ui.elements.filter(item=>same(item.identity??{anchor_tid:item.tid,path:[]},rootIdentity)));
             const fresh=await detail(discovered,root);
-            const matches=fresh.ui.elements.filter(item=>item.tid===e.tid&&same(item.identity,e.identity)&&same(item.signature,e.signature));
+            const matches=fresh.ui.elements.filter(matchesTarget);
             if(!same(binding(fresh),original)||matches.length!==1)throw Error('Server storage navigation target changed');
             s=fresh;e=matches[0];
           }
@@ -3307,8 +3334,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           if(!initial.ui.elements.some(e=>e.tid?.includes(';FileStorageForm;'))){
             const toolbar=await detail(initial,one(initial.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'main_toolbar'));
             await act(toolbar,one(toolbar.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'),'files_button'));
+            if(toolbar.navigation_context?.kind==='workflow'&&toolbar.navigation_context.status==='observed'
+              &&toolbar.active_tab_ref&&toolbar.package_identity)workflowBeforeFiles=toolbar;
           }
           let current=await directory();const destination=listing?path:path.slice(0,path.lastIndexOf('/'));
+          filesEntered=current;
           const row=async name=>{
             const parent=current;let last;
             return findNativeStorageRow({name,guard,roots:async()=>{last=await roots();return last;},
@@ -3346,6 +3376,27 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           auxiliary.get(id).outcome=structuredClone(result);await onRecord({phase:'storage_source_located',operation_id:id,outcome:result});return result;
         }catch(error){
           await onRecord({phase:listing?'storage_list_failed':'storage_source_failed',operation_id:id,error:{code:'STORAGE_SOURCE_REFUSED',message:String(error.message).slice(0,500)}});
+          // A settled refusal in the Files tab opened here can leave Save
+          // without a package. Restore only the exact originating workflow.
+          if(restoreFrom&&workflowBeforeFiles&&!pending&&!running
+            &&same(owner(restoreFrom),owner(filesEntered))&&restoreFrom.active_tab_ref===filesEntered.active_tab_ref
+            &&same(owner(restoreFrom).slice(0,3),owner(workflowBeforeFiles).slice(0,3))){
+            try{
+              const strip='MF;cntMain;cntWorkspace;Workspace;t.br',r=await roots();
+              const tabs=await detail(r,one(r.ui.elements.filter(e=>e.tid===strip)));
+              if(!quiet(tabs)||!same(binding(tabs),binding(restoreFrom)))throw Error('Files owner changed before return');
+              const tab=one(tabs.ui.elements.filter(e=>e.tid===workflowBeforeFiles.workflow_ref.tab_tid&&e.ref===workflowBeforeFiles.active_tab_ref));
+              await act(tabs,tab,'click',{},tab.ref);
+              await ready(async()=>{
+                const r=await roots();
+                if(!same(owner(r),owner(workflowBeforeFiles)))return null;
+                return detail(r,one(r.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar')));
+              },s=>quiet(s)&&same(binding(s),binding(workflowBeforeFiles))&&same(s.navigation_context,workflowBeforeFiles.navigation_context));
+              await onRecord({phase:'storage_workflow_restored',operation_id:id,workflow_ref:workflowBeforeFiles.workflow_ref});
+            }catch(restoreError){
+              await onRecord({phase:'storage_workflow_restore_failed',operation_id:id,error:{message:String(restoreError.message).slice(0,500)}});
+            }
+          }
           // Keep a bounded diagnostic in the tool result. Throwing through the
           // IPC boundary can collapse an observation refusal to CALL_UNCERTAIN.
           const reason=error.code==='UI_ROOT_STALE'?'observation_root_changed'
