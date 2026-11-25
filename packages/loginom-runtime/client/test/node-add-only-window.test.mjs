@@ -4,7 +4,8 @@ import vm from 'node:vm';
 import {bindAddOnlyDrop, readAddOnlyDrop, settleAddOnlyDrop} from '../lib/node-add-only-window.mjs';
 
 function fixture({window='wizard',sticky=false,modelData=true,preexistingWindow=false,wrongIcon=false,
-  foreignTree=false,foreignSurface=false,anotherNode=false,swapControl=false,deadline=800}={}){
+  foreignTree=false,foreignSurface=false,anotherNode=false,swapControl=false,deadline=800,
+  confirmation=false,foreignConfirmation=false,replaceConfirmation=false,staleConfirmation=false,foreignQuestion=false}={}){
   const prefix='MF;TF-1',workflow={},nodeData={},components=new Map(),elements=[];
   const app={ModelForm:class ModelForm{},ModelNodeTreeNode:class ModelNodeTreeNode{},
     WizardTreeNode:class WizardTreeNode{},Version:'7.4.2'};
@@ -34,17 +35,25 @@ function fixture({window='wizard',sticky=false,modelData=true,preexistingWindow=
   const dialog=element('owned-dialog',null,'dialog'),cancel=element('owned-dialog;btnCancel',dialog);
   dialog.isConnected=cancel.isConnected=false;
   components.set(dialog.id,{el:{dom:dialog},ownerCt:window==='foreign'?{}:{FModelNode:nodeData}});
-  for(const button of [close,cancel])components.set(button.id,{el:{dom:button}});
+  const message=element('msgbox',null,'dialog'),yes=element('msgbox;tlb;yes',message),no=element('msgbox;tlb;no',message);
+  message.innerText=foreignQuestion?'Подтвердить Закрыть другой объект? Да Нет':
+    'Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет';
+  yes.innerText='Да';
+  no.innerText='Нет';
+  message.isConnected=yes.isConnected=no.isConnected=false;
+  const messageBox={el:{dom:message},$className:'Ext.window.MessageBox',cfg:{fn(){}}};
+  components.set(message.id,messageBox);
+  for(const button of [close,cancel,yes,no])components.set(button.id,{el:{dom:button}});
   const document={
     querySelectorAll(selector){
       if(selector.startsWith('[data-tid='))return elements.filter(e=>e.id===JSON.parse(selector.slice(10,-1)));
       return elements.filter(e=>e.role==='dialog');
     },
-    elementFromPoint:()=>cancel.isConnected?cancel:close,
+    elementFromPoint:()=>yes.isConnected?yes:cancel.isConnected?cancel:close,
   };
   const preparation={document,id:'doc',receipts:new Map([['prepare',receipt]]),
     nodeTargetDomEpochs:{objects:new WeakMap([[canvas,1]])}};
-  const context=vm.createContext({__loginomDockPreparationV1:preparation,bg:{app},Ext:{getCmp:id=>components.get(id)},document,
+  const context=vm.createContext({__loginomDockPreparationV1:preparation,bg:{app},Ext:{Msg:foreignConfirmation?{}:messageBox,getCmp:id=>components.get(id)},document,
     location:{origin:'https://example.invalid'},getComputedStyle:()=>({visibility:'visible'})});
   const local=fn=>vm.runInContext('('+fn.toString()+')',context);
   if(preexistingWindow)dialog.isConnected=true;
@@ -65,19 +74,28 @@ function fixture({window='wizard',sticky=false,modelData=true,preexistingWindow=
   const clicks=[],ownership=[],settledGraph={interaction_ready:true,nodes:[{ref:{node_id:'new'}}]};
   const wrap=value=>({
     getProperty:async key=>wrap(value[key]),jsonValue:async()=>value,dispose:async()=>{},
-    asElement:()=>value===close||value===cancel?{value,click:async()=>{
+    asElement:()=>[close,cancel,yes].includes(value)?{value,click:async()=>{
       clicks.push(value.id);
       if(sticky)return;
+      if(confirmation&&value===close){
+        if(!staleConfirmation)messageBox.cfg={fn(){}};
+        message.isConnected=yes.isConnected=no.isConnected=true;
+        return;
+      }
       value.isConnected=false;
-      if(value===close){
-        wizardRoot.isConnected=false;
+      if(value===close||value===yes){
+        message.isConnected=yes.isConnected=no.isConnected=false;
+        wizardRoot.isConnected=close.isConnected=false;
         controller.FController=model;
         controller.Node.data.node=workflow;
       }else dialog.isConnected=false;
     }}:null,
   });
   const page={
-    evaluateHandle:async(fn,args)=>wrap(local(fn)({...args,expectedControl:swapControl?{}:args.expectedControl?.value})),
+    evaluateHandle:async(fn,args)=>{
+      if(replaceConfirmation&&args.claim&&args.expectedControl?.value===yes)messageBox.cfg={...messageBox.cfg};
+      return wrap(local(fn)({...args,expectedControl:swapControl?{}:args.expectedControl?.value}));
+    },
     waitForTimeout:async ms=>{time+=ms;},
   };
   const run=()=>settleAddOnlyDrop(page,binding,{readSurface:readAddOnlyDrop,readQuietGraph:async()=>settledGraph,
@@ -135,4 +153,15 @@ test('add_only settlement has a 15 second cap under a longer target deadline',as
   await assert.rejects(f.run(),/timeout: add-only window settlement/);
   assert.equal(f.time(),15000);
   assert.deepEqual(f.ownership,[]);
+});
+
+test('add_only confirms the exact native prompt from its own Close gesture',async()=>{
+  const f=fixture({confirmation:true});
+  assert.deepEqual(await f.run(),f.settledGraph);
+  assert.deepEqual(f.clicks,['MF;TF-1;WizrdMCF;btnClose','msgbox;tlb;yes']);
+});
+for(const option of ['foreignConfirmation','replaceConfirmation','staleConfirmation','foreignQuestion'])test('add_only refuses '+option+' after Close',async()=>{
+  const f=fixture({confirmation:true,[option]:true});
+  await assert.rejects(f.run(),option==='replaceConfirmation'?/confirmation changed/:/Graph deadline/);
+  assert.deepEqual(f.clicks,['MF;TF-1;WizrdMCF;btnClose']);
 });

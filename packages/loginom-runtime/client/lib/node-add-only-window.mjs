@@ -26,7 +26,7 @@ export function bindAddOnlyDrop({request,origin,build,effect,types}) {
 
 // Serialized into the authenticated browser. Return an exact DOM element only
 // for a native Cancel/Close control bound to the new node and current surface.
-export function readAddOnlyDrop({binding:b,expectedControl,claim=false}) {
+export function readAddOnlyDrop({binding:b,expectedControl,claim=false,wizardCloseCompleted=false}) {
   const {request,app,preparation,receipt,card,controller,model,workflow}=b;
   const prefix=request.workflow_ref.prefix,ext=globalThis.Ext;
   const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
@@ -66,19 +66,37 @@ export function readAddOnlyDrop({binding:b,expectedControl,claim=false}) {
   if(dialogs.length===1&&ownsSettings){
     const dialog=dialogs[0],window=ext?.getCmp?.(dialog.id);
     if(window?.el?.dom!==dialog)return {};
-    const nativeWizard=surface?.FView;
-    const seen=new Set();
-    for(let parent=window.ownerCt;parent&&!seen.has(parent)&&seen.size<32;parent=parent.ownerCt){
-      seen.add(parent);
-      if(ownsWizard&&parent===nativeWizard||parent.FModelNode===node.data&&parent.FModelNode!==undefined){
-        owner=dialog;
-        closeKind='dialog';
-        break;
+    const close=b.wizardClose;
+    if(wizardCloseCompleted&&ownsWizard&&close?.surface===surface&&close.tree===tree&&close.root===wizardRoot[0]
+      &&window===ext.Msg&&window===close.messageBox&&window.$className==='Ext.window.MessageBox'
+      &&window.cfg!==close.previousMessageConfig&&typeof window.cfg?.fn==='function'
+      &&dialog.innerText?.replace(/\s+/g,' ').trim()==='Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'){
+      // Loginom displays this confirmation in its shared MessageBox. Only a
+      // new presentation following our Close on this exact wizard can own it.
+      const confirmation=b.closeConfirmation??={dialog,config:window.cfg};
+      if(confirmation.dialog!==dialog||confirmation.config!==window.cfg)throw Error('Native add-only close confirmation changed');
+      owner=dialog;
+      closeKind='confirmation';
+      const buttons=[...dialog.querySelectorAll('[data-tid]')].filter(e=>visible(e)
+        &&/^msgbox(?:-1)?;tlb;(?:yes|no)$/.test(e.getAttribute('data-tid')));
+      const yes=buttons.find(e=>e.getAttribute('data-tid').endsWith(';yes')&&e.innerText.trim()==='Да');
+      if(buttons.length===2&&yes&&buttons.some(e=>e.getAttribute('data-tid')===yes.getAttribute('data-tid').replace(/yes$/,'no')
+        &&e.innerText.trim()==='Нет'))controls=[yes];
+    }else{
+      const nativeWizard=surface?.FView;
+      const seen=new Set();
+      for(let parent=window.ownerCt;parent&&!seen.has(parent)&&seen.size<32;parent=parent.ownerCt){
+        seen.add(parent);
+        if(ownsWizard&&parent===nativeWizard||parent.FModelNode===node.data&&parent.FModelNode!==undefined){
+          owner=dialog;
+          closeKind='dialog';
+          break;
+        }
       }
+      if(!owner)return {};
+      controls=[...owner.querySelectorAll('[data-tid]')].filter(e=>
+        /;(?:cancel|btnCancel|btnClose)$/.test(e.getAttribute('data-tid'))&&visible(e));
     }
-    if(!owner)return {};
-    controls=[...owner.querySelectorAll('[data-tid]')].filter(e=>
-      /;(?:cancel|btnCancel|btnClose)$/.test(e.getAttribute('data-tid'))&&visible(e));
   }else if(dialogs.length===0&&ownsWizard){
     owner=wizardRoot[0];
     closeKind='wizard';
@@ -97,8 +115,9 @@ export function readAddOnlyDrop({binding:b,expectedControl,claim=false}) {
   if(claim){
     if(control!==expectedControl)throw Error('Native add-only Close control changed');
     b.closing.add(closeKind);
+    if(closeKind==='wizard')b.wizardClose={surface,tree,root:owner,messageBox:ext?.Msg,previousMessageConfig:ext?.Msg?.cfg};
   }
-  return {...owned,control};
+  return {...owned,control,gesture:{kind:closeKind,node_id:node.FGuid}};
 }
 
 export async function settleAddOnlyDrop(page,binding,{readSurface,readQuietGraph,remaining,onOwnedWindow=()=>{},now=Date.now}) {
@@ -108,24 +127,27 @@ export async function settleAddOnlyDrop(page,binding,{readSurface,readQuietGraph
     if(ms<=0)throw Error('Readiness timeout: add-only window settlement');
     return ms;
   };
-  let quietSince,quietGraph;
+  let quietSince,quietGraph,wizardCloseCompleted=false;
   for(;;){
     budget();
-    const surface=await page.evaluateHandle(readSurface,{binding});
+    const surface=await page.evaluateHandle(readSurface,{binding,wizardCloseCompleted});
     try{
       const controlHandle=await surface.getProperty('control');
       try{
         const control=controlHandle.asElement();
         if(control){
-          const id=await surface.getProperty('node_id');
-          try{onOwnedWindow(await id.jsonValue());}finally{await id.dispose();}
-          const checked=await page.evaluateHandle(readSurface,{binding,expectedControl:control,claim:true});
+          const gestureHandle=await surface.getProperty('gesture');
+          let gesture;
+          try{gesture=await gestureHandle.jsonValue();}finally{await gestureHandle.dispose();}
+          onOwnedWindow(gesture.node_id);
+          const checked=await page.evaluateHandle(readSurface,{binding,wizardCloseCompleted,expectedControl:control,claim:true});
           try{
             const sameControl=await checked.getProperty('control');
             try{
               if(!sameControl.asElement())throw Error('Native add-only Close control changed');
             }finally{await sameControl.dispose();}
             await control.click({timeout:budget()});
+            if(gesture.kind==='wizard')wizardCloseCompleted=true;
           }finally{await checked.dispose();}
           quietSince=undefined;
         }else{
