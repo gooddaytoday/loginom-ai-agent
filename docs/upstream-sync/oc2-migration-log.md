@@ -23157,7 +23157,9 @@ install correctly») и 615 pass, 1 fail («the service after the move»: `Could
 | Коммит | Что |
 |---|---|
 | `995ad4bdc7` `feat(desktop): dashboard links wait for the service and ask loginom.dashboard (B4.15)` | новый `src/main/loginom/dashboard-links.ts` (117 строк); `lifecycle/deep-link.ts` (+5, `startupUrls`), `lifecycle/index.ts` (+25/−3), `desktop.ts` (+3); тесты: новый `src/main/loginom/dashboard-links.test.ts` (5), `lifecycle/deep-link.test.ts` (+1) |
-| следующий | этот раздел; CAT-09 в `catalog.md` |
+| `62fed44f62` `docs(upstream-sync): record B4.15 Desktop dashboard bridge, its tests and mutations` | первая версия этого раздела; CAT-09 в `catalog.md` |
+| `aae29be4e9` `fix(desktop): dashboard bridge runs the service connection in the app's context (B4.15)` | по ревью советника: `desktop.ts` — `Effect.runPromiseWith(context)` вместо голого `Effect.runPromise` (навык `unit-tests`); подставная служба пишет метод каждого запроса до разбора тела, так что лишний `GET` (поток событий клиента) попал бы в точные списки |
+| следующий | этот раздел — по `aae29be4e9` |
 
 Файлов кода четыре (предел — пять): один новый файл форка, три файла upstream, которые уже расходились (B4.4, B4.10);
 `catalog.json` не менялся — все под маской CAT-09 `packages/desktop/**`.
@@ -23221,13 +23223,13 @@ install correctly») и 615 pass, 1 fail («the service after the move»: `Could
 |---|---|---|
 | M1 `defer: false` | 6/5 | все пять тестов моста |
 | M2 `rpc.unavailable` не спрашивается снова | 10/1 | «asks loginom.dashboard…» |
-| M3 снова спрашивается при любом отказе | 10/1 | «a failed link…» (по таймауту) |
+| M3 снова спрашивается при любом отказе | 10/1 | «a failed link…»: `this test timed out after 15000ms` |
 | M4 ссылки до `connect` отклоняются | 9/2 | перенесённый 0.4; «a link waits…» |
 | M5 готовность службы не ждётся (прежний адрес) | 10/1 | «a link waits…» |
 | M6 адрес службы прочитан один раз при `connect` | 10/1 | «a failed link…»: вторая ссылка ушла к прежней службе |
 | M7 без `Authorization` | 10/1 | «asks loginom.dashboard…» |
 | M8 своя Location (`location: { directory: "/" }`) | 10/1 | «asks loginom.dashboard…» |
-| M9 отказы не попадают в отчёт | 10/1 | «a failed link…» (по таймауту) |
+| M9 отказы не попадают в отчёт | 10/1 | «a failed link…»: необработанный отказ `RpcInternalError: RPC call failed` |
 | M10 любой `id` | 10/1 | «prepares only…» |
 | M11 лишние параметры | 10/1 | «prepares only…» |
 | M12 схема без `://` (принимает beta) | 10/1 | «prepares only…» |
@@ -23240,17 +23242,19 @@ install correctly») и 615 pass, 1 fail («the service after the move»: `Could
 | M19 ответ не сверяется со схемой | 10/1 | «asks loginom.dashboard…» |
 | M20 первая ссылка из argv теряется | 9/2 | перенесённый 0.4; `deep-link.test.ts` |
 
-Итого 20 мутаций: 19 красные, одна выжила (связка). Код базы: `dashboard-links.ts` и `startupUrls` на `021fcab942` нет —
+Итого 20 мутаций: 19 красные, одна выжила (связка). Таблица — по `995ad4bdc7`; на `aae29be4e9` M3 и M9 повторены с полным
+выводом (причины в таблице — оттуда). Код базы: `dashboard-links.ts` и `startupUrls` на `021fcab942` нет —
 новые тесты не загружаются. После мутаций `git status` — только файлы задачи.
 
 Повторы (навык `unit-tests`): `bun test src/main/loginom/dashboard-links.test.ts src/main/lifecycle/deep-link.test.ts
---rerun-each 10 --randomize` — 110 pass, 0 fail, 2,4 с.
+--rerun-each 10 --randomize` — 110 pass, 0 fail, 2,4 с на `995ad4bdc7` и 2,9 с на `aae29be4e9`.
 
 ### Приёмка
 
-База — это дерево на `021fcab942` до правок, итог — `995ad4bdc7`; тот же скрипт, `unshare -n`, свежие временные каталоги.
+База — это дерево на `021fcab942` до правок, итог — `995ad4bdc7`, `desktop` и `bun run check` повторены на `aae29be4e9`
+(те же числа); тот же скрипт, `unshare -n`, свежие временные каталоги.
 
-| Пакет | `021fcab942` | `995ad4bdc7` |
+| Пакет | `021fcab942` | `995ad4bdc7`, `aae29be4e9` |
 |---|---|---|
 | `desktop`, `bun test` | 616 pass, 4 skip, 0 fail, 620 тестов в 80 файлах | 622 pass (+6 новых), 4 skip, 0 fail, 626 тестов в 81 файле |
 | `product`, `bun test` | 60 pass, 3 fail — известные три (В-95, B5.1): `workspace packages`, `CI triggers`, `path literals` | 60 pass, 3 fail — те же |
@@ -23270,7 +23274,7 @@ against a6b15d33daf6: 612 divergent upstream files
   CAT-09: 39
 $ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
 would change: 0 files                                          # код 0
-$ bun run check                                                # код 0, под unshare -n, на 995ad4bdc7
+$ bun run check                                                # код 0, под unshare -n, на 995ad4bdc7 и aae29be4e9
 Found 905 warnings and 0 errors.                               # как в B2.9h
 sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
 @opencode/desktop:typecheck: ✓ No type errors in 3,371 files across 2 projects
@@ -23293,6 +23297,13 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
   проверяемыми без сна в тестах. Цена — зависшая подготовка держит следующие ссылки, как и очередь плагина.
 - **`startupUrls` — в `lifecycle/deep-link.ts`**, рядом с `protocolUrls`: это ссылки запуска для окон и для очереди, а не
   только для дашбордов; там же её проверяет тест (условие платформы иначе было бы в непокрытой связке).
+- **Холодный старт на macOS не сделан — меньший вариант пункта 1.** 0.4 ставил в очередь ссылку, которой запустили
+  приложение, и на macOS: его `open-url` был подписан до `app.whenReady()`. На v2 подписка — в слое `lifecycle`, после
+  `ready`, и такая ссылка, по документации Electron, не приходит (ниже, «Найдено»). Правка — ранний `open-url` в `index.ts`
+  с буфером: пятый файл кода и механизм, который здесь не проверить. Холодный старт сделан для Linux, как `argv` 0.4;
+  Windows — как в 0.4, без него.
+- **Повтор `rpc.unavailable` — реальные `setTimeout` 100 мс и срок `Date.now() + 60_000`**, как у CLI. `AGENTS.md` Desktop
+  запрещает параметры только для тестов (`delay`), поэтому тест ждёт два настоящих интервала по 100 мс (≈0,2 с).
 - **Без отмены при выходе.** 0.4 отменял подготовку (`dashboardLifecycle.abort()`); на v2 выход останавливает службу
   (B4.10): ждущая ссылка получает отказ `connection` («Background service is stopped»), идущий запрос обрывается вместе
   со службой, и то и другое уходит в журнал. Отдельный `AbortController` ничего бы не добавил.
@@ -23312,9 +23323,9 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 
 ### Найдено, не чинил
 
-- **macOS: ссылка холодного старта теряется.** v2 подписывается на `open-url` в слое `lifecycle`, то есть после `ready`
-  (`index.ts` грузит `desktop.ts` в `app.whenReady().then(...)`); Electron велит подписываться раньше, иначе ссылка, которой
-  запустили приложение, не придёт. 0.4 подписывался до `app.whenReady()` (`v0.4.0:packages/desktop/src/main/index.ts:301` и
+- **macOS: ссылка холодного старта, по-видимому, теряется** (по документации Electron, не проверено). v2 подписывается на
+  `open-url` в слое `lifecycle`, то есть после `ready` (`index.ts` грузит `desktop.ts` в `app.whenReady().then(...)`);
+  документация `open-url` велит подписываться раньше, иначе ссылка, которой запустили приложение, не придёт. 0.4 подписывался до `app.whenReady()` (`v0.4.0:packages/desktop/src/main/index.ts:301` и
   `:348`). Правка — ранний `open-url` в `index.ts` с буфером до `lifecycle`; macOS здесь не проверить, оставил.
 - **Windows: ссылка холодного старта не читается** — как в 0.4: `startupUrls` (как `createDeepLinkQueue` 0.4) берёт argv
   только на Linux, хотя Windows тоже передаёт ссылку в командной строке. Расширять поведение 0.4 не стал.
