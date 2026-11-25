@@ -275,7 +275,7 @@ test('the lease blocks Dock mutations; verification releases on proof and writes
   assert.equal(compactNodeResult(f.runtime.nodeApplyStatus('apply')).browser_recovery.receipt_id, 'apply:br1');
 });
 
-test('T3: the same phase failing again after a recovery is continued through a fresh read of the receipt', async () => {
+test('T3: public finish offers only an existing-output read after repeated failure with unknown execution', async () => {
   const f = fixture();
   await stopAtFinish(f);
   await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
@@ -292,14 +292,29 @@ test('T3: the same phase failing again after a recovery is continued through a f
   assert.throws(() => f.runtime.browserRecoveryBasis('apply'), /No browser recovery trigger/);
   const advice = (await f.runtime.inspect({ operationId: 'apply-2' })).output;
   assert.equal(advice.browser_recovery, 'REPEATED_PHASE_FAILURE');
-  const basis = f.runtime.browserRecoveryBasis('apply-2');
-  assert.equal(basis.step.key, first.step.key);
-  await f.runtime.browserRecoveryHandoff('apply-2');
+  const recovery = createBrowserRecovery({ enabled: true, gate: createSerialGate(), executor: f.runtime,
+    probe: async () => ({ ok: true }), record: async event => event });
+  const call = async args => JSON.parse((await recovery.call('dock_browser_recovery', args)).content[0].text);
+  const started = await call({ action: 'start', operation_id: 'apply-2' });
+  assert.equal(started.phase, 'browser');
+  assert.equal(started.reason, 'REPEATED_PHASE_FAILURE');
+  assert.equal(started.step.key, first.step.key);
   f.state.release = proved;
-  const verified = await f.runtime.verifyBrowserRecovery({ operationId: 'apply-2', step: basis.step,
-    attested: { actions_performed: ['Completed the wizard and pressed Done'] } });
+  const finished = await call({ action: 'finish', operation_id: 'apply-2', actions_performed: ['Returned to the scenario graph'] });
+  const verified = finished.verification;
+  assert.equal(finished.phase, 'dock');
+  assert.equal(verified.status, 'continuable');
+  assert.equal(verified.original_operation.operation_id, 'apply-2');
+  assert.equal(verified.original_operation.status, 'FAILED');
+  assert.deepEqual(verified.original_operation.execution, { status: 'unknown', execution_id: null });
+  assert.deepEqual(verified.facts, ['node_released_on_quiet_graph', 'no_wizard_dialog_or_mask']);
   assert.equal(verified.next_step.tool, 'dock_node_read');
-  assert.match(verified.next_step.instruction, /source_operation_id:"apply-2:br2"/);
+  assert.equal(verified.next_step.original_operation_id, 'apply-2');
+  assert.equal(verified.receipt_id, 'apply-2:br2');
+  assert.equal(f.runtime.nodeApplyStatus('apply-2').outcome.output.browser_recovery.receipt_id, verified.receipt_id);
+  assert.match(verified.next_step.instruction, /NEW operation_id and source_operation_id:"apply-2:br2"/);
+  assert.doesNotMatch(verified.next_step.instruction, /\bexecute\b|fresh execution|step was completed/i);
+  assert.match(verified.next_step.instruction, /read an already active result or wait for an already running execution/i);
 
   const read = buildNodeReadRequest({ operation_id: 'reread', source_operation_id: 'apply-2:br2' },
     f.events.find(e => e.phase === 'browser_recovery_receipt' && e.receipt.id === 'apply-2:br2').receipt);

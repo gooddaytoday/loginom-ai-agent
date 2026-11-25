@@ -2974,9 +2974,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         node: structuredClone(result.node), request: structuredClone(request),
         configuration: structuredClone(result.configuration), execution: structuredClone(result.execution) };
       receipt.next_step = readable ? { tool: 'dock_node_read', original_operation_id: operation.id,
-        instruction: 'The step was completed in the browser and the runtime proved the node rests on the quiet graph. Execute and read '
-          + 'it with dock_node_read using a NEW operation_id and source_operation_id:"' + receipt.id + '"; the read establishes the '
-          + 'fresh execution and observed output schema. Do not re-apply the failed procedure.' } : result.next_step;
+        instruction: 'The runtime verified that the same node rests unlocked on the quiet graph. To read an already active result '
+          + 'or wait for an already running execution, call dock_node_read with a NEW operation_id and source_operation_id:"'
+          + receipt.id + '" and use the default execution policy. Do not re-apply the failed procedure.' } : result.next_step;
       const event = { operation_id: operation.id, action_key: 'node.apply', action_revision: request.contract_revision,
         phase: 'browser_recovery_receipt', receipt };
       const ack = await onRecord(event);
