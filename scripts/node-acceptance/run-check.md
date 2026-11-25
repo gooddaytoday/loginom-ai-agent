@@ -672,8 +672,8 @@ and package. The edit, expected graph and browser receipts stay private.
 | `filter_threshold` | `node`, input `field`, numeric literal `value` |
 | `delete_node` | `node` |
 
-A node selector has an exact `label` and an optional canonical `type` to
-disambiguate it. A position specifies integer `x` and `y` in model
+A node selector uses an exact `label`, a canonical `type` or both.
+It must identify exactly one node. A position specifies integer `x` and `y` in model
 coordinates. Create requires an unconnected drop. Threshold edits require a
 unique numeric scalar condition on the given field. The edit fails the chain
 if the gesture, graph delta, save, persistence or cleanup cannot be proved.

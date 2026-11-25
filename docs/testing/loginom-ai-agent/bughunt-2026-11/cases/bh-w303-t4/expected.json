@@ -8,8 +8,7 @@
       },
       {
         "id": "sales",
-        "type": "imports.text",
-        "label": "sales.csv"
+        "type": "imports.text"
       },
       {
         "id": "filter",
@@ -35,8 +34,8 @@
   "outputs": [
     {
       "output_node_type": "transform.filter_data",
-      "output_node_label": "Фильтр строк",
       "output_port": 1,
+      "output_node_label": "Фильтр строк",
       "columns": [
         {
           "name": "Region",

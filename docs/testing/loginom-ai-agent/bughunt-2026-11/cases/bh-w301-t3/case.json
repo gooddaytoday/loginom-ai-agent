@@ -7,7 +7,7 @@
   "manual_edit": {
     "kind": "remove_link",
     "source": {
-      "label": "sales.csv"
+      "type": "imports.text"
     },
     "target": {
       "label": "Сортировка"

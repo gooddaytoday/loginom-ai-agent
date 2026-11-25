@@ -27,7 +27,7 @@ function fixture(before, after, receipt = {status:'SUCCEEDED', cleanup_complete:
     positionMatches:(node, wanted) => node.position.x === wanted.x && node.position.y === wanted.y,
     mutate:async effect => {mutations.push(effect); return receipt;},
   };
-  const run = edit => applyManualEdit(edit, {adapter, verifyEffect:verifyNodeTargetEffect, request:{},
+  const run = (edit, positionProof) => applyManualEdit(edit, {adapter, verifyEffect:verifyNodeTargetEffect, request:{}, positionProof,
     record:event => events.push(event), deadline:Infinity,
     editFilter:async (ref, edit) => {
       mutations.push({ref, edit});
@@ -81,6 +81,15 @@ test('ambiguous nodes and already existing connections are rejected before a ges
   const connected = fixture(graph(nodes,[edge]), graph(nodes,[edge]));
   await assert.rejects(connected.run({kind:'connect', ...link}), /LINK_PRECONDITION/);
   assert.equal(connected.mutations.length, 0);
+});
+
+test('a unique type binds an unrequested caption and checks previous position before a gesture', async () => {
+  const edit = {kind:'move', node:{type:'imports.text'}, position};
+  const sample = fixture(graph(nodes), graph([{...nodes[0],position},nodes[1]]));
+  await assert.rejects(sample.run(edit,{node_id:'sales',position}), /PREVIOUS_MOVE_NOT_RETAINED/);
+  assert.equal(sample.mutations.length, 0);
+  await sample.run(edit,{node_id:'sales',position:nodes[0].position});
+  assert.equal(sample.mutations[0].parameters.ref.node_id, 'sales');
 });
 
 test('an unconfirmed gesture or a collateral change fails without replay', async () => {

@@ -11,7 +11,7 @@ const locator = (page, tid) => page.locator('[data-tid=' + JSON.stringify(tid) +
 const editId = 'manual-edit';
 
 export function resolveManualNode(graph, selector) {
-  const matches = graph.nodes.filter(node => node.label === selector.label && (!selector.type || node.type === selector.type));
+  const matches = graph.nodes.filter(node => (!selector.label || node.label === selector.label) && (!selector.type || node.type === selector.type));
   requireProof(matches.length === 1, 'NODE_ABSENT_OR_AMBIGUOUS: ' + JSON.stringify(selector));
   return matches[0];
 }
@@ -30,9 +30,13 @@ export function manualGraphDelta(before, after) {
   return {added_nodes, removed_nodes, changed_nodes, added_links:difference(after, before), removed_links:difference(before, after)};
 }
 
-export async function applyManualEdit(edit, {adapter, request, verifyEffect, editFilter, record, deadline}) {
+export async function applyManualEdit(edit, {adapter, request, verifyEffect, editFilter, record, deadline, positionProof}) {
   const before = await adapter.observe(request, deadline);
   await record({phase:'before', graph:before});
+  if (positionProof) {
+    const moved = before.nodes.find(node => node.ref.node_id === positionProof.node_id);
+    requireProof(isDeepStrictEqual(moved?.position, positionProof.position), 'PREVIOUS_MOVE_NOT_RETAINED');
+  }
   const effect = {id:editId, kind:edit.kind, before, parameters:{}};
   const parameters = effect.parameters;
   if (edit.node) parameters.ref = resolveManualNode(before, edit.node).ref;
@@ -50,7 +54,7 @@ export async function applyManualEdit(edit, {adapter, request, verifyEffect, edi
   }
   if (edit.kind === 'rename') {
     parameters.label = edit.label;
-    requireProof(!before.nodes.some(node => node.label === edit.label), 'RENAME_LABEL_ALREADY_PRESENT');
+    requireProof(!before.nodes.some(node => node.ref === parameters.ref && node.label === edit.label), 'RENAME_MUST_CHANGE_LABEL');
   }
   if (edit.kind === 'move') parameters.position = edit.position;
   if (edit.kind === 'connect' || edit.kind === 'remove_link') {
@@ -142,7 +146,7 @@ async function filterThreshold({page, adapter, request, readFilterBrowser}, ref,
   return {status:'SUCCEEDED', cleanup_complete:true, change:{node_id:ref.node_id, field:edit.field, before:row.value, after:edit.value}, rows:expected};
 }
 
-export async function runManualEdit(root, output, {login, packagePath, edit}) {
+export async function runManualEdit(root, output, {login, packagePath, edit, positionProof}) {
   const load = name => import(pathToFileURL(join(root, 'runtime', name)).href);
   const {verifyResources} = await load('src/resources.mjs');
   const resources = await verifyResources(root);
@@ -175,7 +179,7 @@ export async function runManualEdit(root, output, {login, packagePath, edit}) {
       filterReceipt = await filterThreshold({page, adapter, request, readFilterBrowser}, ref, value, end);
       return filterReceipt;
     };
-    const effect = await applyManualEdit(edit, {adapter, request, verifyEffect:verifyNodeTargetEffect, deadline, editFilter, record});
+    const effect = await applyManualEdit(edit, {adapter, request, verifyEffect:verifyNodeTargetEffect, deadline, editFilter, record, positionProof});
     const binding = createStorageBinding({sessionId, origin, build, documentId:request.document_id, account:login.username,
       directories:{inputs:directory, packages:directory, exports:directory}});
     const runtime = createActionRuntime({pinned, execute, allowCandidate:true, targetOrigin:origin, targetBuild:build,

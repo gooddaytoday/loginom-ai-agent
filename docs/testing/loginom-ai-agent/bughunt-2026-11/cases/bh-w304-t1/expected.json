@@ -8,8 +8,7 @@
       },
       {
         "id": "sales",
-        "type": "imports.text",
-        "label": "sales.csv"
+        "type": "imports.text"
       }
     ],
     "links": [],
@@ -18,7 +17,6 @@
   "outputs": [
     {
       "output_node_type": "imports.text",
-      "output_node_label": "sales.csv",
       "output_port": 0,
       "columns": [
         {

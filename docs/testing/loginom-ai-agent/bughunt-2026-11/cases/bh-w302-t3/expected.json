@@ -8,8 +8,7 @@
       },
       {
         "id": "sales",
-        "type": "imports.text",
-        "label": "sales.csv"
+        "type": "imports.text"
       },
       {
         "id": "group",
@@ -45,8 +44,8 @@
   "outputs": [
     {
       "output_node_type": "transform.group_data",
-      "output_node_label": "Итоги",
       "output_port": 0,
+      "output_node_label": "Итоги",
       "columns": [
         {
           "name": "Region",

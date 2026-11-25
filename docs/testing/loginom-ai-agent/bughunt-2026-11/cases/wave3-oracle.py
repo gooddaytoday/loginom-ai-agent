@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent
 VARIABLES = ('variables', 'variables.user', 'Переменные сценария')
-SOURCE = ('sales', 'imports.text', 'sales.csv')
+SOURCE = ('sales', 'imports.text', None)
 SORT = ('sort', 'transform.sorting', 'Сортировка')
 FILTER = ('filter', 'transform.filter_data', 'Фильтр строк')
 GROUP = ('group', 'transform.group_data', 'Группировка')
@@ -34,7 +34,8 @@ def expected(chain, turn):
             exact=True, **({'retain': list(retain)} if retain else {}))
 
     def output(node, rows, columns=SALES_COLUMNS, port=0):
-        return dict(output_node_type=node[1], output_node_label=node[2], output_port=port,
+        return dict(output_node_type=node[1], output_port=port,
+                    **({'output_node_label': node[2]} if node[2] is not None else {}),
                     columns=[dict(name=name, type=kind) for name, kind in columns],
                     column_order='exact', ordered=True, rows=rows)
 

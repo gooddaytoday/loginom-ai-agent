@@ -2022,8 +2022,8 @@ def validate_manual_edit(edit, case):
         return isinstance(value, str) and 0 < len(value) <= 200 and value == value.strip() and value.isprintable()
 
     def selector(value):
-        return (isinstance(value, dict) and not set(value) - {'label', 'type'}
-                and text(value.get('label')) and ('type' not in value or text(value['type'])))
+        return (isinstance(value, dict) and bool(value) and not set(value) - {'label', 'type'}
+                and all(text(item) for item in value.values()))
 
     need(isinstance(edit, dict) and isinstance(edit.get('kind'), str) and edit['kind'] in fields, 'has an invalid kind')
     kind = edit['kind']
@@ -2033,7 +2033,7 @@ def validate_manual_edit(edit, case):
     for key in edit.keys() & {'type', 'label', 'field'}:
         need(text(edit[key]), f'{key} must be nonempty printable text')
     for key in edit.keys() & {'node', 'source', 'target'}:
-        need(selector(edit[key]), f'{key} must have an exact label and optional type')
+        need(selector(edit[key]), f'{key} must have an exact label, a type, or both')
     for key in edit.keys() & {'input', 'output'}:
         need(type(edit[key]) is int and 0 <= edit[key] <= 99, f'{key} must be a zero-based port')
     if 'position' in edit:
@@ -2156,7 +2156,7 @@ def observed_case_graph(profile, since):
     return evidence
 
 
-def check_case_graph(expected, observed, baseline=None):
+def check_case_graph(expected, observed, baseline=None, *, defer_position=False):
     def match(want, have):
         return (have['type'] == want['type']
                 and ('label' not in want or want['label'] == have['label'])
@@ -2175,7 +2175,8 @@ def check_case_graph(expected, observed, baseline=None):
             prior = [key for key, node in baseline['nodes'].items() if match(want, node)]
             assert prior == [node_id], f'CASE_GRAPH_NODE_REPLACED: {want!r} at {location}'
             old, new = baseline['nodes'][node_id], observed['nodes'][node_id]
-            if baseline.get('moved_node_id') == node_id or 'position' in old and 'position' in new:
+            moved = baseline.get('moved_node_id') == node_id
+            if 'position' in new and 'position' in old or moved and not defer_position:
                 assert old.get('position') == new.get('position'), f'CASE_GRAPH_POSITION_CHANGED: {want!r} at {location}'
     for link in expected.get('links', []):
         want = dict(link, source=bindings[link['source']], target=bindings[link['target']])
@@ -3030,7 +3031,9 @@ class Runner:
             self.current['graph'] = 'FAIL'
             observed = observed_case_graph(profile, graph_start)
             write(folder / 'graph-observed.json', observed)
-            check_case_graph(expected['graph'], observed, baseline)
+            browser_followup = spec.get('manual_edit') or (
+                port_output and self.options.get('cold') and case == self.current['scenario'])
+            check_case_graph(expected['graph'], observed, baseline, defer_position=bool(browser_followup))
             self.current['graph'] = 'PASS'
         if spec.get('two_turn'):
             self.current['execution_id'] = check_read_turns(profile, folder, spec['two_turn'])
@@ -3790,7 +3793,8 @@ class Runner:
         self.current['csv'] = D76_STATUS if any(self.current.get('d76', {}).values()) else 'PASS'
         return session, expected, actual, delimiter
 
-    def manual_edit(self, edit, stage, profile, package, login, build, existing_cleanup, existing_ack):
+    def manual_edit(self, edit, stage, profile, package, login, build, existing_cleanup, existing_ack,
+                    *, prior=None, expected_graph=None):
         receipts = [read(path) for path in set(profile.rglob('saved-package-cleanup.json')) - existing_cleanup]
         acknowledgements = [read(path) for path in set((profile / 'loginom/runtime').glob('runtime-close-*.json')) - existing_ack]
         assert receipts and all(r.get('package_closed') is True and r.get('logged_out') is True and r.get('package_path') == package
@@ -3798,9 +3802,14 @@ class Runner:
         assert acknowledgements and all(a.get('closed_ack') is True for a in acknowledgements), 'MANUAL_EDIT_CLI_CLOSE_ACK_MISSING'
         output = stage / 'manual'
         output.mkdir()
+        config = dict(login=login, packagePath=package, edit=edit)
+        if prior and prior.get('moved_node_id') and expected_graph and expected_graph.get('retain'):
+            bindings = check_case_graph(expected_graph, read(stage / 'graph-observed.json'), prior, defer_position=True)
+            moved = prior['moved_node_id']
+            if moved in (bindings[local_id] for local_id in expected_graph['retain']):
+                config['positionProof'] = dict(node_id=moved, position=prior['nodes'][moved]['position'])
         self.phase('manual-edit', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/manual-edit.mjs',
-                   build / 'resources/loginom', output], stage, timeout=300,
-                   stdin=json.dumps(dict(login=login, packagePath=package, edit=edit)))
+                   build / 'resources/loginom', output], stage, timeout=300, stdin=json.dumps(config))
         result = read(output / 'result.json')
         assert result['status'] == 'PASS' and all(
             proof.get('package_closed') is True and proof.get('logged_out') is True and not proof.get('unsaved_changes_discarded')
@@ -3858,6 +3867,7 @@ class Runner:
                         r.pop('graph', None)
                         stage = folder / turn['case']
                         stage.mkdir()
+                        prior = baseline
                         manual = step_spec.get('manual_edit')
                         existing_cleanup = set(profile.rglob('saved-package-cleanup.json')) if manual else set()
                         existing_ack = set((profile / 'loginom/runtime').glob('runtime-close-*.json')) if manual else set()
@@ -3868,7 +3878,8 @@ class Runner:
                             baseline = read(observed_graph)
                         if manual and not r.get('failure_class'):
                             turn['manual_edit'] = dict(kind=manual['kind'], status='FAIL', journal=str(stage / 'manual/execution-events.jsonl'))
-                            baseline = self.manual_edit(manual, stage, profile, r['package'], login, build, existing_cleanup, existing_ack)
+                            baseline = self.manual_edit(manual, stage, profile, r['package'], login, build, existing_cleanup, existing_ack,
+                                prior=prior, expected_graph=expected.get('graph'))
                             turn['manual_edit']['status'] = 'PASS'
                         turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class') if k in r},
                                     status='FAIL' if r.get('failure_class') else 'PASS')
@@ -3903,6 +3914,8 @@ class Runner:
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
+                        if spec.get('output_mode') == 'ports' and expected.get('graph', {}).get('exact'):
+                            check_case_graph(expected['graph'], native_case_graph(cold['case_graph'], 'cold/result.json'), prior)
                         if spec.get('variable_audit') == 'variables-union-inputs':
                             self.phase('cold-inputs-audit', [build / 'resources/loginom/bin/node', spec['oracle'], 'cold', stage / 'variable-oracle.stdout', folder / 'cold/result.json'], folder, timeout=60)
                         if spec.get('loop_for'):

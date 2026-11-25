@@ -8,8 +8,7 @@
       },
       {
         "id": "sales",
-        "type": "imports.text",
-        "label": "sales.csv"
+        "type": "imports.text"
       },
       {
         "id": "sort",
@@ -47,8 +46,8 @@
   "outputs": [
     {
       "output_node_type": "transform.sorting",
-      "output_node_label": "Сортировка",
       "output_port": 0,
+      "output_node_label": "Сортировка",
       "columns": [
         {
           "name": "Region",

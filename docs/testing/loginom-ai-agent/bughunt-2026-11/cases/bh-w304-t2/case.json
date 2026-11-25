@@ -7,7 +7,7 @@
   "manual_edit": {
     "kind": "connect",
     "source": {
-      "label": "sales.csv"
+      "type": "imports.text"
     },
     "target": {
       "label": "Сортировка"

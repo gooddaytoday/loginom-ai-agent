@@ -6,7 +6,7 @@
   "manual_edit": {
     "kind": "move",
     "node": {
-      "label": "sales.csv"
+      "type": "imports.text"
     },
     "position": {
       "x": 128,

@@ -665,6 +665,7 @@ page = context.pages()[0]
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
+    ...(rawExpected.graph?.exact ? {case_graph:graph} : {}),
     ...(graph.loop_for?{loop_for:graph.loop_for}:{}),
     ...(graph.supernode_variable_boundary?{supernode_variable_boundary:graph.supernode_variable_boundary}:{}),
     ...(state.assnrulesExclusion?{assnrules_exclusion:state.assnrulesExclusion}:{}),
