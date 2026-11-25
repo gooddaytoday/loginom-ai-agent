@@ -23128,3 +23128,220 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Остановка посреди `dashboardDelete` и удаление папки во время сборки черновика — по коду (тот же `interrupt` Host и
   `activeStages`, что у публикации и 0.4).
 - Windows и macOS, настоящая модель.
+
+## B2.9j Подтверждения в CLI
+
+25.11.2026. Задача B2.9j (вне шлюза B), ветка `b29j-cli-confirm` от `oc2-migration` (`021fcab942`), рабочее дерево
+`.claude/worktrees/b29j`. Эталон 0.4 — `v0.4.0` (`a63462dde1`, В-99). Bun 1.4.4 переносной и Node 24.19.0 — первыми в
+`PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, `.husky/_` есть; `npm ci
+--ignore-scripts --offline` клиента `packages/loginom-runtime/client` и шаблона `packages/dashboard/template` (кэш npm —
+`/root/.npm`) — в этом дереве и в дереве базы `<scratchpad>/b29j/base` (`021fcab942`, detached), все четыре — код 0. Хук
+`pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Тесты, мутации и полные прогоны — под `unshare -n`
+(поднят только `lo`), со свежими временными `HOME`, `TMPDIR`, `XDG_*` в scratchpad, `LOGINOM_AI_AGENT_TEST_NODE` и
+архивом ripgrep 15.1.0 в `LOGINOM_AI_AGENT_RIPGREP_CACHE` (тот же sha256, что в `/root/.cache/loginom-bootstrap/ripgrep`).
+**Модель не вызывалась:** модель — HTTP-заглушка по сценарию (`cli/test/fixture/product-run.ts`) на `127.0.0.1`, сети
+нет. Прочитано: решение В-102; этот журнал — B2.9a (строка B2.9j), B2.9f, B2.9g, B2.9i («Как устроено», «Где решал сам»,
+«Найдено»); 0.4 — `cli/standalone-dashboard.ts`, `cli/cmd/run.ts` (вопросы, папка), `cli/cmd/run/runtime.stdin.ts`
+(`readTerminalConfirmation`), `cli/cmd/run/tool.ts`, тест `test/cli/standalone-dashboard.test.ts` и
+`standalone-dashboard-pty.py`; v2 — `cli/src/run/{run,noninteractive,product}.ts`, `cli/src/{standalone,mini-host}.ts`,
+`tui/src/mini/tool.ts`, `loginom-agent/src/{dashboard-tools,permissions}.ts`, `core/src/permission.ts` (`reply`,
+`DeclinedError`/`CorrectedError`); навык `.opencode/skills/unit-tests`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `96ed517fb5` `feat(cli): dashboard deletion asks in the terminal, publication needs --auto (B2.9j)` | код: файлы форка `cli/src/run/product.ts` (+98 −1: `confirm`, `refusal`, `dashboarding`), `cli/src/standalone.ts` (+14 −2: `--worktree`, `-w`); правки upstream `cli/src/run/noninteractive.ts` (+12 −5), `cli/src/run/run.ts` (+9 −4), `tui/src/mini/tool.ts` (+3); тесты: `cli/test/cli-dashboard.test.ts` (+288 −21: 3 новых теста, 11 случаев pty), новый `cli/test/standalone-dashboard-pty.py` (78) |
+| следующий | этот раздел; `catalog.md` — CAT-11 (`mini/tool.ts`) и CAT-12 (`noninteractive.ts`, `run.ts`) |
+
+Файлов кода пять (предел — пять). `cli/src/mini-host.ts` из строки нарезки не правил: чтение терминала живёт в файле
+форка `product.ts` и берёт готовый `resolveInteractiveStdin` из `mini-host.ts` динамическим импортом (ниже, «Где решал
+сам»). `loginom-agent` не трогал. `tui/src/mini/tool.ts` до задачи совпадал с upstream — теперь это новый расходящийся
+файл по маске CAT-11 (`catalog.json` не менялся).
+
+### Как устроено
+
+- **Удаление** (`noninteractive.ts`, `replyPermission`; `RunProduct.confirm`). Вопрос `dashboard_delete` задаётся в
+  управляющем терминале всегда — с `--auto`, `--yolo`, `--dangerously-skip-permissions` и без них; ветка не зависит от
+  входа продукта: плагин встроенный, и `--auto` входа upstream иначе одобрил бы удаление. Как в 0.4: в stderr — узел и
+  пакет (JSON-строкой, управляющие и форматные символы — `\u{…}`), число версий к удалению, уже подтверждённые удаления,
+  предупреждение о черновике и «Введите «Удалить <8 hex>» для подтверждения или «Отмена» для отказа.»; терминал — stdin,
+  если это TTY, иначе `/dev/tty` (`CONIN$`), даже когда stdin — канал; readline в сыром режиме.
+  - Совпала строка с фразой — ответ `once`.
+  - Другая строка («Отмена», набранное заранее, фраза прошлого прогона), конец ввода (Ctrl+D, в том числе после фразы
+    без Enter), нет терминала («Удаление отклонено: требуется управляющий терминал.») — ответ `reject` **без** текста
+    обратной связи и `CLI_PERMISSION_REJECTED`, код 1. С текстом ядро дало бы `CorrectedError`, и плагин (B2.9g) потерял
+    бы «Подтверждено удаление версий: N». Ход продолжается (B2.6b).
+  - Ctrl+C — прогон отменяется (`SIGINT` себе), а вопрос остаётся без ответа: отмена останавливает вызов, и плагин
+    снимает свой вопрос сам (B2.9f). Код 130, `CLI_CANCELLED`, модель больше не спрошена. Так же — отмена прогона, пока
+    вопрос открыт.
+- **Публикация.** Без `--auto` CLI отклоняет вопрос `dashboard_publish`, как любой другой, но печатает текст 0.4:
+  «! Публикация отклонена: dashboard_publish (<узел>, <пакет>) требует явного согласия. Для подтверждения в CLI укажите
+  --auto.» (`RunProduct.refusal`, только в CLI продукта). С `--auto` — `once`. При «Разрешено» вопроса нет (В-102,
+  B2.9f), и публикация идёт без `--auto`.
+- **Вывод удаления блоком** (`tui/src/mini/tool.ts`, `toolInlineInfo`): законченный `dashboard_delete` выводится блоком
+  с полным текстом результата, как 0.4 `run/tool.ts`; без этого `run` печатал бы только «⚙ dashboard_delete Unknown».
+- **`--worktree` с `--dashboard`** (решение оркестратора): `--worktree`, `-w` и `--worktree=…` добавлены к конфликтам
+  `Standalone.forward` — `CLI_ARGUMENT_INVALID: run --dashboard …`, код 2, до профиля и подготовки, снимок не тратится.
+- **`--file` с `--dashboard`** (решение оркестратора): `run.ts` при `RunProduct.dashboarding()` не читает файлы до
+  подготовки, а читает их после `RunProduct.dashboard` от рабочей папки дашборда, как 0.4 (`--dir` на папку). Обычный
+  `run` читает файлы там же и тогда же, что и раньше.
+
+### Тесты
+
+`packages/cli/test/cli-dashboard.test.ts`: фикстура B2.9i получила ресурсы сборки публикации (как проба B2.9f:
+`resource-manifest.json`, заглушки черновика и браузера, ссылка на `playwright-core`), Host-заглушка — аренды, `scope`,
+`release`, `interrupt` и хранилище публикаций (две версии; публикация — `changed`, как отвечал тест 0.4; удаление — по
+файлу случая `delete`), Studio — имя узла снимка. Процессные — только Linux, как в 0.4 и B2.9i; pty — новый
+`packages/cli/test/standalone-dashboard-pty.py`, перенос 0.4 (срок прогона 20 → 90 с: частный сервер v2 и его Host
+стартуют дольше).
+
+| Тест 0.4 (`v0.4.0:packages/opencode/test/cli/standalone-dashboard.test.ts`) | На v2 |
+|---|---|
+| «standalone dashboard starts from the snapshot and preserves explicit publication approval», публикация `auto` ложь и истина | «standalone dashboard preserves explicit publication approval»: модель зовёт `dashboard_publish` (сборка шаблона — настоящая); без `--auto` — код 1, `CLI_PERMISSION_REJECTED`, в stderr текст 0.4 с узлом и пакетом, `dashboardPublish` нет, вызов — ошибка; с `--auto` — код 0, одна запись. Новое (В-102): при «Разрешено» (`permissions` конфига) без `--auto` — код 0, одна запись |
+| «ordinary dashboard run %s», «waits for a separate terminal choice before deleting» (9 случаев: `pretyped`, `cancel` `--auto`, `eof` `--yolo`, `incomplete` `--dangerously-skip-permissions`, `interrupt`, `no-tty` `--auto`, `delete` с `--file src/main.tsx`, `stale`, `pipe-delete`) | то же имя, те же случаи и флаги; профиль — с «Разрешено» для `dashboard_delete` (вопрос всё равно задан, В-102). Отличия — ниже |
+| то же, «reports denied and partially completed deletion» (`partial`, `denied`) | то же имя, профиль по умолчанию; `partial` — второй вопрос «Уже подтверждено удаление версий: 1», отказ — ошибка вызова «…Подтверждено удаление версий: 1. Локальный черновик сохранён.»; `denied` — «Недостаточно прав», `CLI_TOOL_FAILED` |
+| — | «standalone dashboard starts from the snapshot…» (B2.9i) дополнен: `--worktree` и `-w` с опубликованным снимком — код 2, stdout пуст, Studio не спрошена, затем тот же снимок открывается; `--file src/main.tsx` при приманке `src/main.tsx` в PWD — в запросе модели «Attached file: main.tsx» и текст файла шаблона из рабочей папки, приманки нет |
+| — | «dashboard rejects conflicting flags…» (B2.9i): ещё `--worktree` и `-w`, в обеих формах |
+
+Отличия pty-случаев от 0.4 — по поведению v2, без правок кода под старые числа:
+
+- рабочий каталог процесса при вопросе — PWD (каталог проекта случая), а не корень дашбордов: `run` v2 остаётся в PWD
+  (B2.9i), и удаляемая папка — не его каталог;
+- запросов к модели с инструментами — 1 после удаления (следующий ответ — без инструментов, B2.9g) и после Ctrl+C,
+  2 после отказа (ход продолжается, B2.6b); в 0.4 ход кончался сразу;
+- `pipe-delete` (без `--format json`): stderr — блок «Дашборд удалён. …», stdout — ответ модели без инструментов после
+  удаления (заглушка отвечает так на запрос без инструментов — «Fixture title»), а не пусто, как в 0.4;
+- имя узла — `Узел\n\u001b[31m\u009b\u202e`: к случаю 0.4 добавлены C1- и форматный символ, иначе экранирование
+  `\u{…}` ничем не проверялось (`JSON.stringify` сам экранирует `\n` и `\u001b`).
+
+Повторы (навык `unit-tests`): `cli-dashboard.test.ts --rerun-each 3` — 21 pass, 0 fail (556 с).
+
+### Мутации
+
+Каждая — точечная правка на `96ed517fb5` (замена, найденная ровно один раз), прогон `bun test test/cli-dashboard.test.ts
+-t <тест>`, затем `git checkout` (`<scratchpad>/b29j/scripts/mutate.py`). Тесты: pty — оба случая «ordinary dashboard
+run» (`ждёт` — 9 случаев, `отказ` — 2), публикация, основной B2.9i, разбор флагов. Без мутаций всё зелёное (повторы выше).
+
+| Мутация | Где | Прогон (pass/fail) | Красные |
+|---|---|---|---|
+| M1 любая строка одобряет | `product.ts` | pty 0/2 | оба |
+| M2 фраза постоянная | `product.ts` | pty 1/1 | `ждёт` (`stale`) |
+| M3 конец ввода после фразы не отказывает | `product.ts` | pty 1/1 | `ждёт` (`incomplete` — прогон висит до срока помощника) |
+| M4 Ctrl+C отвечает отказом, а не отменой | `product.ts` | pty 1/1 | `ждёт` (`interrupt`: второй запрос к модели) |
+| M5 Ctrl+C не отменяет прогон | `product.ts` | pty 1/1 | `ждёт` (`interrupt`) |
+| M6 без терминала — одобрено | `product.ts` | pty 1/1 | `ждёт` (`no-tty`) |
+| M7 имена без экранирования | `product.ts` | pty 0/2 | оба |
+| M8 нет числа версий | `product.ts` | pty 0/2 | оба |
+| M9 нет подтверждённых удалений | `product.ts` | pty 1/1 | `отказ` (`partial`) |
+| M10 текст отказа публикации — OpenCode 2 | `product.ts` | публикация 0/1 | публикация |
+| M11 `dashboarding` ложно | `product.ts` | основной 0/1 | основной (приманка PWD) |
+| N1 удаление по `--auto` | `noninteractive.ts` | pty 0/2 | оба |
+| N2 отказ пользователя с текстом обратной связи | `noninteractive.ts` | pty 1/1 | `отказ` (`partial`: число подтверждённых потеряно) |
+| N3 отказ удаления не отмечен `reject()` | `noninteractive.ts` | pty **2/0** | — равнозначна: отказ отмечает и `observe` по `permissionDenied` metadata вызова (B2.6b) |
+| N4 отменённый прогон отвечает | `noninteractive.ts` | pty 1/1 | `ждёт` (`interrupt`) |
+| N5 текст отказа не используется | `noninteractive.ts` | публикация 0/1 | публикация |
+| R1 `--file` от PWD | `run.ts` | основной 0/1 | основной |
+| R2 `--file` до подготовки | `run.ts` | основной 0/1 | основной |
+| S1 `--worktree` не отклоняется | `standalone.ts` | разбор 0/1; основной 0/1 | оба |
+| T1 удаление не блоком | `tui/src/mini/tool.ts` | pty 1/1 | `ждёт` (`pipe-delete`) |
+
+Код базы (`git checkout 021fcab942 -- packages/cli/src packages/tui/src/mini/tool.ts`, тест на месте): **2/5** — красные
+все пять тестов, которых касается задача; зелёные — два теста B2.9i без её правок («flags preserve», «Ctrl+C …
+strict recovery»). Итого 20 мутаций: 19 красных, N3 равнозначна. После мутаций `git status` — только несохранённый
+`catalog.md`.
+
+### Приёмка
+
+Полные прогоны (`<scratchpad>/b29j/scripts/{suites.sh,t.sh}`): база — `021fcab942` в `<scratchpad>/b29j/base`, итог —
+это дерево на `96ed517fb5`; по пакетам подряд, база, затем итог, `bun test --timeout 60000`, каждый под `unshare -n` со
+свежими временными `HOME`/`TMPDIR`/`XDG_*`; `npm ci` клиента `loginom-runtime` и шаблона `dashboard`,
+`LOGINOM_AI_AGENT_TEST_NODE` и кэш ripgrep заданы. Рядом работал другой агент (нагрузка 9–15 на 6 ядрах).
+
+| Пакет | `021fcab942` | итог |
+|---|---|---|
+| `product` | 60 pass, 3 fail — известные три (В-95, B5.1): `workspace packages`, `CI triggers`, `path literals` | 60 pass, 3 fail — те же |
+| `loginom-agent` | 125 pass, 0 fail | 125 pass, 0 fail |
+| `tui` | 1670 pass, 5 skip, 1 fail: «the art stops every frame when hidden…» (давнее, в журнале с B1) | 1669 pass, 5 skip, 2 fail: то же и «low activity details open below a summary…, 0 wheel steps from the bottom» (`session-activity-anchor.test.tsx`, ожидание рендера 3 с) |
+| `cli` | 612 pass, 9 skip, 1 fail: «standalone server exits when its owner is killed» (`standalone.test.ts`, 10 с) | 616 pass (+3 новых, 1 — как у базы), 9 skip, 0 fail |
+
+Разница падений — под нагрузкой, не от задачи. `session-activity-anchor.test.tsx` и `go-upsell-art.test.tsx` повторены
+отдельно (`--rerun-each 3`, нагрузка ниже): и в базе, и в итоге 12 pass, 3 fail — только «the art stops…» на каждом
+повторе; «low activity details…» прошёл все повторы. Полный экран сессии `mini/tool.ts` не импортирует (`grep` по
+`tui/src`, `tui/test`: только `src/mini/*` и `test/mini/tool.test.ts`). «standalone server exits…» в итоге прошёл.
+
+Изоляция (`<scratchpad>/b29j/scripts/real-xdg.sh`, как в B2.9i): окружение без единой `XDG_*`, `HOME` — свежий каталог в
+scratchpad; после прогона в `HOME` — только кэш транспилятора самого `bun test`, во временном каталоге — общий кэш
+транспилятора дочерних CLI (`isolatedEnv`); профилей, `dashboards` и проектов нет:
+
+```text
+iso exit=0 xdg-vars=0  7 pass  0 fail                         # test/cli-dashboard.test.ts на 96ed517fb5
+iso home left: [.bun .bun/install .bun/install/cache ]
+iso tmp left: [opencode-test-transpiler-cache ]
+```
+
+`product` повторён на дереве `96ed517fb5` с этим разделом (охранные `names` и `repo-paths` читают и журнал): 60 pass,
+3 fail — те же три. Там же:
+
+```text
+$ cd packages/cli && bun typecheck
+✓ No type errors in 2,255 files across 2 projects
+$ cd packages/cli && bun run typecheck:tsc                     # tsc -b — код 0
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary  # код 0; база — 612, CAT-11: 53
+against a6b15d33daf6: 613 divergent upstream files
+  CAT-08: 0 (pending: B2.7)
+  CAT-11: 54
+  CAT-12: 203
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                          # код 0
+$ bun run check                                                # код 0, под unshare -n
+Found 905 warnings and 0 errors.                               # как в B2.9i; в изменённых файлах — ни одного
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total
+```
+
+`prettier --check` изменённых файлов — без замечаний.
+
+### Где решал сам
+
+- **Пять файлов кода без `mini-host.ts`.** Строка нарезки называет четыре файла, пп. 2–3 добавляют `standalone.ts` и
+  `run.ts` — шесть. Чтение терминала (0.4 `readTerminalConfirmation`) — в файле форка `product.ts`; открытие терминала —
+  готовый `resolveInteractiveStdin` из `mini-host.ts` (динамический импорт только на вопросе удаления; граф `run` и Mini
+  проверяет `import-boundaries.test.ts`). Так товарные тексты не попали в файл upstream.
+- **Ctrl+C на вопросе — без ответа.** 0.4 отвечал `reject` и затем отменял: отказ кончал ход. В v2 отказ ход продолжает
+  (B2.6b), и до отмены модель успевала получить ещё запрос (так было на первом прогоне). Поэтому `confirm` возвращает
+  `undefined`, `run` вопрос не отвечает, а отмена прогона останавливает вызов, и вопрос снимает плагин. Сигнал — настоящий
+  `SIGINT` себе (`process.kill`), а не 0.4 `process.emit`: без обработчика процесс завершится, а не повиснет с открытым
+  вопросом.
+- **Отказ удаления — без текста обратной связи** (`PERMISSION_REJECTED_FEEDBACK` — «этот прогон не может спросить
+  пользователя») и не по `--auto`: пользователя спросили. Текст сделал бы отказ `CorrectedError`, а не `DeclinedError`.
+- **Вопрос удаления — во всех `run`**, не только в CLI продукта; текст отказа публикации — только в CLI продукта (в
+  upstream остаётся свой).
+- **Повторный вопрос по одному запросу не исключён.** Запрос может прийти и событием, и в списке после приёма промпта
+  (`lifecycle`); для удаления это открыло бы два чтения одного терминала. Для `run --dashboard` сессия всегда новая, и до
+  приёма промпта вопросов нет; защиту не добавлял (AGENTS.md: сложность ради маловероятной гонки — с согласия). Записано
+  в «Найдено».
+- **`--file` после подготовки** только у `run --dashboard`: неверный `--file` там теперь отказывает после израсходованного
+  снимка, как в 0.4. У обычного `run` порядок прежний (тест «run --file refuses a file it cannot attach before the model»).
+- **Тесты на «Разрешено» сверх 0.4** — по поправке В-102 в задании: публикация без `--auto` и вопрос удаления при
+  «Разрешено» проверены через CLI.
+- **`--title=Удаление`** оставлен, как в 0.4: заголовок не запрашивается, и запрос без инструментов после удаления — только
+  ответ модели.
+
+### Найдено, не чинил
+
+- `run` отвечает на вопрос и по событию `permission.asked`, и по списку `permission.list` после приёма промпта
+  (`noninteractive.ts`, `lifecycle`). Вопрос, созданный между подпиской и списком, обрабатывается дважды: обычно это
+  второй, безвредный `reply`, а для удаления — два чтения одного терминала. Для `run --dashboard` не воспроизводится
+  (сессия новая).
+- `bun check` (`bun typecheck` в `cli`) пропустил символы U+2028/U+2029, попавшие в литерал регулярного выражения
+  `product.ts` при правке; транспилятор Bun на запуске отверг его («Syntax Error»). Исправлено до коммита
+  (`\u2028\u2029`); тест процесса поймал сразу.
+
+### Не проверено
+
+- Настоящий Host, стенд Loginom и Studio: Host — свой `node-host.mjs` по сценарию, Studio — фикстура; сборка шаблона при
+  публикации — настоящая, ожидание сборки на стенде не проверялось (Host отвечает `changed`, как в тесте 0.4).
+- Собранный `loginom-ai-agent-cli` — вход тот же (`loginom-cli.ts`). Windows (`CONIN$`) и macOS — только Linux (pty и
+  процессные тесты — только Linux, как в 0.4).
+- Двойная обработка вопроса (выше, «Найдено») — по коду.
