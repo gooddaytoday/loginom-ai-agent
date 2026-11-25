@@ -167,9 +167,10 @@ for(const icon of [null,'bg-vendor-icon-exportnative'])test('an input opening de
  assert.equal(f.gestures.length,2);assert.equal(failed.cleanup_complete,false);
 });
 
-for(const fault of ['none','nonempty','foreign-type','foreign-column'])test('empty JS input admits only its disabled native delete header '+fault,async()=>{
+for(const script of ['javascript','python'])
+for(const fault of ['none','nonempty','foreign-type','foreign-column'])test('empty '+script+' input admits only its disabled native delete header '+fault,async()=>{
  const f=fixture('input'),base='MF;TF;WizrdMCF;TuneDataSourceMappingWizard;';
- f.node.FIconCls=fault==='foreign-type'?'bg-vendor-icon-calcdata':'bg-vendor-icon-javascript';
+ f.node.FIconCls='bg-vendor-icon-'+(fault==='foreign-type'?'calcdata':script);
  const root=f.wizard.FView.el.dom,column=f.el(base+'colTargetDelete');column.parent=root;
  f.nativeControls.set(column.id,{el:{dom:fault==='foreign-column'?{}:column},disabled:true});
  for(const key of ['grdSourceColumns;tbl','grdTargetColumns;tbl']){

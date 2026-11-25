@@ -6,6 +6,7 @@ import {inspectPythonSourcePolicy as inspectPolicy,pythonCodeSkeleton} from '../
 import {execFileSync} from 'node:child_process';
 import {validatePythonParameters} from '../lib/python-parameters.mjs';
 import {configurePython} from '../lib/python-procedure.mjs';
+import {createPythonNodeSupport} from '../lib/python-node.mjs';
 import {pythonConfigurationReadback} from '../lib/python-readback.mjs';
 import {readPythonOutputs} from '../lib/python-output.mjs';
 import {makePythonColumnsCode,configurePythonColumnsPage} from '../lib/python-columns.mjs';
@@ -21,6 +22,34 @@ const corpus=new Set();
 const inspectPythonSourcePolicy=source=>{corpus.add(source);return inspectPolicy(source);};
 const sha=text=>createHash('sha256').update(text,'utf8').digest('hex');
 const request=(kind='new',extra={})=>({target:{kind,type:'programming.python'},inputs:[{input:0}],mappings:[],read:{ports:[0]},finish:'execute',...extra});
+
+for(const [kind,input] of [['new','unconnected'],['existing','unconnected'],['existing','connected'],['existing','unknown']])
+test('Python input mapping respects the live graph: '+kind+' '+input,async()=>{
+ const node={document_id:'doc',workflow_id:'workflow',node_id:'python'};
+ const workflow_ref={workflow_id:'workflow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',
+  navigation_path:[{tid:'path',label:'Scenario'}]};
+ const graph={complete:true,document_id:'doc',workflow_ref,nodes:[{ref:node,type:'programming.python',inputs:[0],locked:false}],
+  links:[{source:'python',target:'downstream',output:0,input:0}],foreign_links:[]};
+ if(input==='connected')graph.links.push({source:'upstream',target:'python',output:0,input:0});
+ if(input==='unknown')graph.foreign_links.push('unclassified-link');
+ const operation={id:'apply',nodeApply:{node,request:request(kind,{document_id:'doc',workflow_ref,inputs:[],finish:'done'})},
+  nodeTargetAdapter:{observe:async identity=>{
+   assert.deepEqual(identity,{document_id:'doc',workflow_ref});
+   return graph;
+  }}};
+ const {nodeApplyDriverFactory}=createPythonNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2'});
+ const drivers=nodeApplyDriverFactory({operation,now:Date.now,onRecord:async event=>event,
+  execute:async()=>assert.fail('Browser procedure reached')});
+ const mapInput=()=>drivers.mapPorts([],{document_id:'doc',workflow_ref,node,deadline:Date.now()+1000,receipt_id:'apply:input_mapping'});
+ if(input!=='unconnected'){
+  await assert.rejects(mapInput,/Browser procedure reached/);
+  return;
+ }
+ const result=await mapInput();
+ assert.equal(result.not_applicable,true);
+ assert.equal(result.verified,true);
+ assert.equal(result.effect_possible,false);
+});
 const declared=[['Id','integer'],['Amount','real'],['AmountScaled','real'],['Text','string'],['Flag','boolean'],['Date','datetime']].map(([name,type])=>({name,label:name,type}));
 
 test('acceptance sources pass python-module-v1 with the file digest',()=>{

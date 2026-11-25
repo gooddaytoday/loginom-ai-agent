@@ -10,6 +10,35 @@ const sameNode=(context,node)=>context?.verified===true&&['document_id','workflo
 // phase. It never extends that phase or repeats any of its gestures.
 export const NODE_RELEASE_BUDGET_MS=90000;
 
+const inputOpeningReference=operation=>{
+ const ref=operation.lastReceipt;
+ return operation.nodeApply?.pending?.phase==='input_mapping'
+  &&ref?.action_key==='node.input_port.open.internal'&&ref.id===ref.operation_id
+  &&typeof ref.operation_id==='string'&&ref.operation_id.startsWith(operation.id+':n');
+};
+
+export const isPythonInputOpening=operation=>operation.nodeApply?.request?.target?.type==='programming.python'
+ &&inputOpeningReference(operation);
+
+const stoppedInputOpening=(operation,receipt)=>{
+ const ref=operation.lastReceipt,trace=receipt?.trace??[];
+ return inputOpeningReference(operation)&&receipt?.operation_id===ref.operation_id&&receipt.action_key===ref.action_key
+  &&receipt.phase==='port_open'&&receipt.status==='AMBIGUOUS'&&receipt.effect_possible===true&&receipt.cleanup_complete===false
+  &&receipt.output?.verified===false&&receipt.output.cleanup_complete===false&&receipt.error?.code==='OUTPUT_PORT_OPEN_UNCONFIRMED'
+  &&trace.filter(e=>e.event==='input_port_reserved'&&e.native_index===0&&typeof e.port_guid==='string'&&e.port_guid).length===1
+  &&trace.filter(e=>e.event==='input_port_open_issued').length===1
+  &&trace.filter(e=>e.event==='input_port_open_returned').length===1;
+};
+
+export function settledPythonInputOpening(operation,receipt) {
+ const ref=operation.lastReceipt,owner=receipt?.output;
+ return isPythonInputOpening(operation)&&receipt?.operation_id===ref.operation_id&&receipt.action_key===ref.action_key
+  &&receipt.action_revision==='1'&&receipt.phase==='port_open'&&(stoppedInputOpening(operation,receipt)
+   ||receipt.status==='SUCCEEDED'&&receipt.cleanup_complete===true&&sameNode(owner,operation.nodeApply.node)
+    &&owner.direction==='input'&&owner.port===0&&owner.native_index===0&&typeof owner.port_guid==='string'&&owner.port_guid
+    &&owner.opening_operation_id===ref.operation_id);
+}
+
 // Only completed, synchronous mapping refusals before Done are cancellable.
 // Transport/gesture uncertainty and every other node keep the existing gate.
 export function calculatorVariableMappingRefusal(operation,receipt){
@@ -145,15 +174,10 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
    &&['wizard_step','set_wizard_field'].includes(gestures[0].verb)
    &&['WIZARD_STEP_NOT_CONFIRMED','WIZARD_FIELD_NOT_CONFIRMED'].includes(r.error?.code);
   variableDraft=calculatorVariableMappingRefusal(operation,r);
-  const ref=operation.lastReceipt,portTrace=r?.trace??[];
-  const inputOpening=state.pending.phase==='input_mapping'&&['exports.text','exports.excel','exports.lgd'].includes(state.request.target?.type)
-   &&ref.action_key==='node.input_port.open.internal'&&ref.id===ref.operation_id&&typeof ref.operation_id==='string'
-   &&ref.operation_id.startsWith(operation.id+':n')&&r?.operation_id===ref.operation_id&&r.action_key===ref.action_key
-   &&r.phase==='port_open'&&r.status==='AMBIGUOUS'&&r.effect_possible===true&&r.cleanup_complete===false
-   &&r.output?.verified===false&&r.output.cleanup_complete===false&&r.error?.code==='OUTPUT_PORT_OPEN_UNCONFIRMED'
-   &&portTrace.filter(e=>e.event==='input_port_reserved'&&e.native_index===0&&typeof e.port_guid==='string'&&e.port_guid).length===1
-   &&portTrace.filter(e=>e.event==='input_port_open_issued').length===1
-   &&portTrace.filter(e=>e.event==='input_port_open_returned').length===1;
+  const ref=operation.lastReceipt;
+  const inputOpening=['exports.text','exports.excel','exports.lgd'].includes(state.request.target?.type)&&stoppedInputOpening(operation,r)
+   ||settledPythonInputOpening(operation,r);
+  if(isPythonInputOpening(operation))requireValue(inputOpening,'The original Python input opening receipt is unconfirmed');
   const draft=restDraft||exportDraft||wizardDraft||variableDraft||inputOpening;
   draftReceipt=draft;
   const mappingReadCleanup=response?.state==='completed'&&await settleImportMappingRead({operation,channel,receipt:r});
@@ -171,7 +195,9 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   }
   if(inputOpening){
    portOpening=await channel.reconcileInputPortOpening(ref);
-   requireValue(portOpening.port_guid===portTrace.find(e=>e.event==='input_port_reserved').port_guid,
+   const portGuid=r.status==='SUCCEEDED'?r.output.port_guid
+    :r.trace.find(e=>e.event==='input_port_reserved'&&e.native_index===0).port_guid;
+   requireValue(portOpening.port_guid===portGuid,
     'The stopped input opening port identity changed');
   }
   const graphReturn=n?.surface==='graph'&&w?.status==='absent'
@@ -219,7 +245,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   &&sameNode(current.prepared_node_context,node)&&current.prepared_node_context.surface==='wizard'
   &&['direction','port','native_index','port_guid','opening_operation_id'].every(key=>
    current.prepared_node_context.input_port?.[key]===(key==='direction'?'input':portOpening[key])),
-  'The stopped export input port owner changed');
+  'The stopped input port owner changed');
  if(current.wizard.status==='observed'){
   if(current.prepared_node_context?.surface!=='wizard'||!sameNode(current.prepared_node_context,node))
    throw new NodeReleaseBlocked('A Loginom wizard of another node is open',

@@ -441,6 +441,64 @@ for(const foreign of [false,true])test('abandon_operation after '+type+' input o
  assert.equal(f.calls.filter(c=>c==='mapping').length,1);assert.equal(receipt.cleanup_complete,false);
 });
 
+for(const fault of ['none','opened','foreign-owner','wrong-port','running','missing','foreign-receipt'])test('Python release after a lost input opening response: '+fault,async()=>{
+ const id='apply:n7',action_key='node.input_port.open.internal';
+ const port={direction:'input',port:0,native_index:0,port_guid:'port',opening_operation_id:id};
+ const canRelease=['none','opened'].includes(fault);
+ const receipt={status:'AMBIGUOUS',action_key,action_revision:'1',operation_id:fault==='foreign-receipt'?'other:n7':id,
+  phase:'port_open',effect_possible:true,cleanup_complete:false,output:{verified:false,cleanup_complete:false},
+  error:{code:'OUTPUT_PORT_OPEN_UNCONFIRMED',message:'Output port opening deadline'},
+  trace:[{event:'input_port_reserved',port_guid:'port',native_index:0},{event:'input_port_open_issued',port_guid:'port'},
+   {event:'input_port_open_returned'}]};
+ if(fault==='opened')Object.assign(receipt,{status:'SUCCEEDED',cleanup_complete:true,error:null,output:{verified:true,...node,...port}});
+ const ui=surface({wizard:true,foreign:fault==='foreign-owner'});
+ const observe=ui.channel.observe;
+ ui.channel.observe=async options=>{
+  const s=await observe(options);
+  if(s.wizard.status==='observed'){
+   s.wizard.stage='input_mapping';
+   s.prepared_node_context.input_port={...port,node_icon_class:'bg-vendor-icon-python',port_guid:fault==='wrong-port'?'other':'port'};
+  }
+  return s;
+ };
+ let rebinds=0;
+ ui.channel.reconcileInputPortOpening=async ref=>{
+  assert.equal(ref.operation_id,id);rebinds++;
+  return {verified:true,...port};
+ };
+ const f=fixture({type:'programming.python',execute:async code=>{
+  assert.ok(code.includes('"receipt_read":true'));assert.ok(code.includes('"receipt_id":"apply:n7"'));
+  assert.ok(code.includes('"receipt_signature":"opening-signature"'));
+  return {status:'SUCCEEDED',action_key:'operation.inspect',action_revision:'1',operation_id:'apply',phase:'observed',
+   effect_possible:false,error:null,trace:[],output:['running','missing'].includes(fault)?{state:fault}:{state:'completed',receipt}};
+ },release:()=>releasePendingNode({operation:f.context().operation,channel:ui.channel,readReceipt:f.context().readReceipt,
+  deadline:Date.now()+10000})});
+ f.drivers.mapPorts=async()=>{
+  f.context().receiptOptions(id,action_key,'opening-signature');
+  f.context().operation.transportUncertain=true;
+  throw Error('MCP error -32001: Request timed out');
+ };
+ const r=request();r.target.type='programming.python';f.runtime.startNodeApply(r);
+ assert.equal((await f.runtime.waitNodeApply('apply',{timeoutMs:1000})).outcome.output.pending_phase,'input_mapping');
+ if(['running','missing','foreign-receipt'].includes(fault)){
+  const inspected=await f.runtime.inspect({operationId:'apply'});
+  assert.deepEqual(inspected.output.recovery_options,[]);
+  await assert.rejects(f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-python'}),/Release proof unavailable/);
+  assert.equal(rebinds,0);
+ }else{
+  if(fault==='none'){
+   const inspected=await f.runtime.inspect({operationId:'apply'});
+   assert.deepEqual(inspected.output.recovery_options,['abandon_operation']);
+   assert.equal(rebinds,0);
+  }
+  const released=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-python'});
+  assert.equal(released.status,canRelease?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(released));
+  assert.equal(rebinds,1);
+ }
+ assert.equal(f.runtime.hasUnsettledWork(),!canRelease);
+ assert.deepEqual(ui.gestures,canRelease?[{verb:'click',ref:'ui-close'}]:[]);
+});
+
 for(const fault of [null,'foreign','transport','cleanup'])test('JSON configure refusal releases only its own settled draft: '+fault,async()=>{
  const ui=surface({wizard:true,jsonList:true,foreign:fault==='foreign'});
  const f=fixture({type:'trees.from_json',release:()=>releasePendingNode({operation:f.context().operation,channel:ui.channel,

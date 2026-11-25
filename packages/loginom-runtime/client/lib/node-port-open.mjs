@@ -116,9 +116,9 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     &&parent?.getAttribute('data-tid')===b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;colTargetDelete'
     &&column?.$className==='Ext.grid.column.Action'&&column.el.dom===parent&&column.disabled===true&&roots.length===1&&roots[0].contains(parent)
     &&grid.length===1&&Ext.getCmp(grid[0].id).getStore().isLoading()===false;
-   // Ext masks a disabled delete-all column even when the output wizard is ready.
+   // Ext masks a disabled delete-all column even when the mapping wizard is ready.
    // This one native control mask is not a wizard loading overlay.
-   const emptyJavascriptInput=input&&task.port===0&&r?.node?.FIconCls==='bg-vendor-icon-javascript'
+   const emptyScriptInput=input&&task.port===0&&['bg-vendor-icon-javascript','bg-vendor-icon-python'].includes(r?.node?.FIconCls)
     &&['grdSourceColumns;tbl','grdTargetColumns;tbl'].every(key=>{
      const grids=exact(b.workflow_ref.prefix+';WizrdMCF;TuneDataSourceMappingWizard;'+key);
      const view=grids.length===1&&globalThis.Ext?.getCmp?.(grids[0].id),store=view?.getStore?.();
@@ -126,15 +126,15 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
       &&store?.$className==='Ext.data.Store'&&store.isLoading?.()===false&&store.getCount?.()===0
       &&store.getTotalCount?.()===0&&Array.isArray(store.getData?.()?.items)&&store.getData().items.length===0;
     });
-   const columnTid=b.workflow_ref.prefix+';WizrdMCF;'+(emptyJavascriptInput?'TuneDataSourceMappingWizard':variables?'VariablesEditValuesWizard':'DataSetOutputSocketWizard')+';colTargetDelete';
-   const ownDisabledOutputHeader=mode==='finish'&&(!input||emptyJavascriptInput)&&e.classList?.contains('x-mask')
+   const columnTid=b.workflow_ref.prefix+';WizrdMCF;'+(emptyScriptInput?'TuneDataSourceMappingWizard':variables?'VariablesEditValuesWizard':'DataSetOutputSocketWizard')+';colTargetDelete';
+   const ownDisabledDataHeader=mode==='finish'&&(!input||emptyScriptInput)&&e.classList?.contains('x-mask')
     &&!e.classList.contains('x-mask-msg')&&!e.classList.contains('bg-mask-message')
     &&e.getAttribute('role')!=='dialog'&&!e.textContent.trim()
     &&parent?.getAttribute('data-tid')===columnTid&&exact(columnTid).length===1
     &&roots.length===1&&model?.FView?.el?.dom===roots[0]&&roots[0].contains(parent)
     &&column?.el?.dom===parent&&column.disabled===true
     &&blockers.filter(mask=>mask.parentElement===parent).length===1;
-   return !ownDisabledHeader&&!ownDisabledOutputHeader&&!ownGroupingGraphMask(e);
+   return !ownDisabledHeader&&!ownDisabledDataHeader&&!ownGroupingGraphMask(e);
   });
   if(blocked){
    if(mode==='finish')return {pending:true,reason:'port_wizard_loading'};
