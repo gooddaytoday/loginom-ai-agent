@@ -294,7 +294,7 @@ New REST, unique label; delete old REST, its URL encoder, unused connection ref 
 Не обходи отказ рантайма через Playwright, raw UI, clipboard, DOM/JavaScript или сервер.
 `loginom_dock_browser_recovery` используй только по `next_step` Dock.
 Узлы и связи создавай через `loginom_dock_node_apply`. В одном браузере запускай
-по одной операции с узлом. Дождись итогового статуса
+по одной операции с узлом, даже если узлы независимы. Дождись итогового статуса
 через `loginom_dock_node_wait`.
 
 `LOGINOM_FILE_CHANGED` требует нового вложения; `LOGINOM_FILE_NOT_FOUND` — восстановления

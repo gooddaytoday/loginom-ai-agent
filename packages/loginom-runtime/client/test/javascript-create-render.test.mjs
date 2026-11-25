@@ -128,7 +128,7 @@ test('add_only graph read still waits for its transient activity mask',async()=>
 
 for(const scenario of ['quiet','idle:false','different first','different second','deadline'])test('add_only browser cleanup proof: '+scenario,async t=>{
  t.mock.timers.enable({apis:['Date'],now:10000});
- const graph={complete:true,document_id:'doc',workflow_ref:{workflow_id:'wf',navigation_path:[]},interaction_ready:true};
+ const graph={complete:true,document_id:'doc',workflow_ref:{workflow_id:'wf',navigation_path:[]},interaction_ready:scenario!=='idle:false'};
  const deadline=10100+(scenario==='deadline'?0:700);
  let reads=0,waits=0;
  const page={
@@ -136,7 +136,6 @@ for(const scenario of ['quiet','idle:false','different first','different second'
    assert.match(probe.window_blocker_selector,/WizrdMCF/);
    assert.equal(probe.request.document_id,'doc');
    reads++;
-   if(scenario==='idle:false')return {...graph,interaction_ready:false};
    if(scenario===(reads===1?'different first':'different second'))return {...graph,links:[{source:'changed'}]};
    return graph;
   },
