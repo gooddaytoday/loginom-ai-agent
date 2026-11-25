@@ -25,6 +25,9 @@ runs:
           # build.rs fetches Ghostty with git under the deep Cargo OUT_DIR; without long paths git stops with
           # "Filename too long" (as check-process-daemon.yml and release-process-daemon.yml do).
           git config --global core.longpaths true
+          # Zig runs its generators with a working directory deep inside OUT_DIR; under the repository's checkout path
+          # that passes MAX_PATH and the spawn fails with FileNotFound. A short Cargo target directory keeps it below.
+          echo "CARGO_TARGET_DIR=$(cygpath -m "$RUNNER_TEMP")/pt" >> "$GITHUB_ENV"
         else
           chmod +x "$GITHUB_WORKSPACE/packages/process-daemon/script/release-bin/zig"
           echo "OPENCODE_REAL_ZIG=$(command -v zig)" >> "$GITHUB_ENV"
