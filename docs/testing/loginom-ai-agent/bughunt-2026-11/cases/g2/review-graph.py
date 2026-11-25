@@ -6,6 +6,8 @@ from pathlib import Path
 
 from oracle import DEPTHS, expectation, name
 
+BUILTIN_VARIABLES = ('variables.user', 'Переменные сценария')
+
 
 def key(node):
     return node['type'], node['label']
@@ -20,8 +22,9 @@ def check_snapshot(snapshot, contract):
     if len(nodes) != len(ids):
         raise ValueError('Graph contains duplicate node selectors')
     wanted_keys = set(wanted.values())
-    if ids.keys() != wanted_keys:
-        raise ValueError(f'Missing nodes {wanted_keys - ids.keys()}. Extra nodes {ids.keys() - wanted_keys}.')
+    workflow_keys = ids.keys() - {BUILTIN_VARIABLES}
+    if workflow_keys != wanted_keys:
+        raise ValueError(f'Missing nodes {wanted_keys - workflow_keys}. Extra nodes {workflow_keys - wanted_keys}.')
 
     reverse = {node_id: node for node, node_id in ids.items()}
     links = {(reverse[link['source']], link['output'], reverse[link['target']], link['input'])
@@ -45,6 +48,8 @@ def check_snapshot(snapshot, contract):
 def delta(previous, current):
     before_ids, before_links = previous
     after_ids, after_links = current
+    if before_ids and before_ids.get(BUILTIN_VARIABLES) != after_ids.get(BUILTIN_VARIABLES):
+        raise ValueError('The built-in scenario variables node changed')
     before_by_id = {value: node for node, value in before_ids.items()}
     after_by_id = {value: node for node, value in after_ids.items()}
     common_ids = before_by_id.keys() & after_by_id.keys()
