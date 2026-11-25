@@ -124,11 +124,14 @@ test('text export release checks cancellation before observing or closing',async
  await assert.rejects(f.run(c.signal),/release cancelled/);assert.deepEqual(f.gestures,[]);assert.equal(f.operation.deadline,1);
 });
 
-async function stoppedRuntime(phase,{browserRecovery=false,blocked=false,record=async e=>e}={}) {
+async function stoppedRuntime(phase,{browserRecovery=false,blocked=false,record=async e=>e,linked=false}={}) {
  const calls=[],events=[];
  const state={blocked};
- const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[{
-  ref:node,type:'exports.text',label:'Export',position:{x:320,y:280},inputs:[0],outputs:[]}],links:[],foreign_links:[]};
+ const source={document_id:'doc',workflow_id:'flow',node_id:'source'};
+ const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[
+  ...(linked?[{ref:source,type:'imports.text',label:'Source',position:{x:80,y:80},inputs:[],outputs:[0],locked:false}]:[]),
+  {ref:node,type:'exports.text',label:'Export',position:{x:320,y:280},inputs:[0],outputs:[],locked:false}],
+  links:linked?[{source:'source',output:0,target:'export',input:0}]:[],foreign_links:[]};
  const support=createCandidateNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2'});
  const snapshot={origin:'http://test',loginom_build:'7.4.2',workflow_ref:workflow,dom_epoch:{document:'browser',revision:1},scan:{complete:true},
   prepared_node_context:{...node,verified:true,surface:'graph',locked:false},wizard:{status:'absent'},
@@ -154,7 +157,7 @@ async function stoppedRuntime(phase,{browserRecovery=false,blocked=false,record=
   read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
  const job=await runtime.waitNodeApply('apply-export',{timeoutMs:1000});
  assert.equal(job.outcome.output.pending_phase,phase,JSON.stringify(job));
- return {runtime,calls,events,state};
+ return {runtime,calls,events,state,graph};
 }
 for(const phase of ['configure','execute'])test('public export '+phase+' refusal offers abandon and settles without repeating the phase',async()=>{
  const f=await stoppedRuntime(phase),advice=(await f.runtime.inspect({operationId:'apply-export'})).output;
@@ -218,4 +221,26 @@ for(const phase of ['input_mapping','configure'])for(const browserRecovery of [f
   assert.equal(f.calls.filter(c=>c===phase).length,1);
   f.runtime.assertPreparationAllowed();
  }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('an allowed export release continues on the same node and keeps its one link',async()=>{
+ const f=await stoppedRuntime('configure',{linked:true,browserRecovery:false});
+ const before=structuredClone(f.graph);
+ const released=await f.runtime.recover('apply-export',{strategy:'abandon_operation',recoveryOperationId:'release-export'});
+ assert.equal(released.status,'SUCCEEDED',JSON.stringify(released));
+ assert.equal(released.output.original_outcome.output.next_step.tool,'dock_action_run');
+ assert.match(released.output.original_outcome.output.next_step.instruction,/Do not[\s\S]*recreate the node/);
+ assert.equal(f.events.some(event=>String(event.phase).startsWith('browser_recovery')),false);
+ f.runtime.startNodeApply({operation_id:'continue-export',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
+  target:{kind:'existing',type:'exports.text',ref:node},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'execute',
+  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
+ const continued=await f.runtime.waitNodeApply('continue-export',{timeoutMs:1000});
+ assert.equal(continued.outcome.output.pending_phase,'configure');
+ assert.equal(continued.outcome.output.node.node_id,node.node_id);
+ assert.deepEqual(f.graph,before);
+ assert.equal(f.graph.nodes.filter(item=>item.type==='exports.text').length,1);
+ assert.deepEqual(f.graph.links,[{source:'source',output:0,target:'export',input:0}]);
+ assert.equal(f.calls.includes('create'),false);
+ assert.equal(f.calls.includes('connect'),false);
+ assert.equal(f.events.some(event=>String(event.phase).startsWith('browser_recovery')),false);
 });
