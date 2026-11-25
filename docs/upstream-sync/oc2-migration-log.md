@@ -23371,7 +23371,7 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
   PR с чужим пином прошёл бы, а покраснел бы push CI `loginom` уже после слияния. Head читается как данные Git, без
   checkout. Файл базы проверен раньше: он попал в `loginom` как head PR и прошёл push CI `loginom`.
 - **Шаблон `refs/tags/v*` — как в задании, не сужал.** В настоящем репозитории под него попадают не только выпуски:
-  42 из 1115 строк (снимки `v0.0.0-…`, `v0.1.0-beta*`, `v0.0.*-feature-bench`, `vscode-v*`). Все это теги официального
+  42 из 1114 тегов (снимки `v0.0.0-…`, `v0.1.0-beta*`, `v0.0.*-feature-bench`, `vscode-v*`). Все это теги официального
   репозитория; записано в границе доверия.
 - **Подмена адреса в тестах — `url.<голый>.insteadOf` через `GIT_CONFIG_COUNT/KEY/VALUE` и `GIT_ALLOW_PROTOCOL=file`.**
   В коде адрес не настраивается. Если переписывание не сработает, Git откажет `transport 'https' not allowed`, а не
@@ -23426,7 +23426,7 @@ $ bun --no-install packages/script/src/secret-scan.ts pins HEAD   # код 0
 $ bun run secrets pins                                            # код 0
 {"status":"verified","pins":1,"elapsed_ms":326}
 $ git ls-remote --tags https://github.com/anomalyco/opencode 'refs/tags/v*' | grep 'refs/tags/v2.3.0'
-a6b15d33daf6ab7d35569f6d711fdb630b9f04e7	refs/tags/v2.3.0          # лёгкий тег; 1115 строк, одна ^{}
+a6b15d33daf6ab7d35569f6d711fdb630b9f04e7	refs/tags/v2.3.0          # лёгкий тег; 1115 строк = 1114 тегов + одна ^{}
 ```
 
 Мутации — по одной, затем `bun test --timeout 30000 -t 'pin check'` (5 тестов), файл восстанавливается:
