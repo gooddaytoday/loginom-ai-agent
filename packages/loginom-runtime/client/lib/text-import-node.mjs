@@ -153,8 +153,13 @@ export function verifyTextImportSource(parameters,uploads,uploadHistory,storageP
     validateTextImportPatch({source:{source_path:storageProof.destination}});
     return verified({source:structuredClone(storageProof)});
   }
-  const u=one(uploads.filter(u=>u.operation_id===s.upload_operation_id),
-    'Verified upload operation is missing or ambiguous. Use output.upload_operation_id from the successful dock_artifact_deliver receipt.');
+  const matching=uploads.filter(u=>u.operation_id===s.upload_operation_id);
+  // Name the exact receipt value only for the one delivery of this artifact
+  // whose request ID was passed; the refusal itself stays unchanged.
+  const receipt=matching.length?[]:uploads.filter(u=>u.operation_id===s.upload_operation_id+':upload'&&u.artifact?.artifact_id===s.artifact_id);
+  const u=one(matching,'Verified upload operation is missing or ambiguous. '+(receipt.length===1
+    ?`"${s.upload_operation_id}" is the dock_artifact_deliver operation_id; set source.upload_operation_id to "${receipt[0].operation_id}" from its receipt output.upload_operation_id.`
+    :'Use output.upload_operation_id from the successful dock_artifact_deliver receipt.'));
   const proof=verifiedLocalDelivery(u.artifact,u.outcome);
   requireValue(u.outcome.operation_id===s.upload_operation_id&&u.artifact.artifact_id===s.artifact_id
     &&proof.destination===(parameters.settings.source?.source_path??proof.destination)

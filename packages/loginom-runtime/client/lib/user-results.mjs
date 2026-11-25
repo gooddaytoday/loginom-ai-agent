@@ -106,7 +106,7 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
           :outcome.error?.code==='NODE_APPLY_STOPPED'&&outcome.error.message.startsWith('Node procedure readiness timeout: calculator done available;')
           ?'The input mapping or node wizard did not expose an authorized Done action. The timeout authorized no new gesture; earlier node/link/mapping effects may remain. Inspect this original operation and follow its offered recovery: abandon_operation with a NEW recovery_operation_id, or dock_browser_recovery when offered after refused release. Do not submit another node operation, recreate the target, or save through this pending operation.'
           :'Inspect the original operation; do not repeat an unresolved effect.'}
-    :null);
+    :deliveredUpload(result,outcome));
   const reply={
     ...(result.upload_operation_id&&result.status?{upload_status:result.status,progress:pick(result,['bytes','total_bytes','percent','elapsed_ms','deadline_at','poll_after_ms'])}:{}),
     result_version: 'user-v1', ...pick(result, ['operation_id', 'attempt', 'state', 'cancel_requested', 'server_stop_requested']),
@@ -124,6 +124,15 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
       wireSize:value=>wireSize({...value,limitations:[...value.limitations,...previewLimitations(value.output)]})});
   limitations.push(...previewLimitations(output));
   return reply;
+}
+
+// A verified delivery is consumed by its upload ID, not by the delivery
+// request ID; name the exact value so the first node request can use it.
+function deliveredUpload(result,outcome) {
+  if(!result.upload_operation_id||result.state!=='settled'||outcome?.status!=='SUCCEEDED'||outcome.upload_completion_verified!==true
+    ||outcome.upload_operation_id!==result.upload_operation_id)return null;
+  return {instruction:`In node parameters.source use upload_operation_id "${result.upload_operation_id}" (output.upload_operation_id) `
+    +`with this artifact_id, not the delivery operation_id "${result.operation_id}".`};
 }
 
 function previewLimitations(output) {
