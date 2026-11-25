@@ -523,12 +523,14 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // driver checks an already completed upload/inspect/verify receipt chain.
     await phase('source',ctx=>drivers.verifySource(request.parameters,ctx),{mutation:false});
     if(drivers.activateWorkflow)await phase('workflow',ctx=>drivers.activateWorkflow(ctx));
-    const target=await phase('target',ctx=>drivers.prepareTarget(graph,ctx),{verify:value=>requireValue(
-      value.node?.document_id===request.document_id && value.node.workflow_id===request.workflow_ref.workflow_id
-      && id(value.node.node_id), 'Target phase returned a foreign node')});state.node=target.node;
-    if(request.mode===NODE_ADD_ONLY_MODE){
-      requireValue(target.target?.created===true&&target.target.configured===false&&target.target.executed===false,
+    const target=await phase('target',ctx=>drivers.prepareTarget(graph,ctx),{verify:value=>{
+      requireValue(value.node?.document_id===request.document_id&&value.node.workflow_id===request.workflow_ref.workflow_id
+        &&id(value.node.node_id), 'Target phase returned a foreign node');
+      if(request.mode===NODE_ADD_ONLY_MODE)requireValue(value.target?.created===true&&value.target.configured===false
+        &&value.target.executed===false&&value.target.unconnected_verified===true,
         'Creation without configuration was not verified');
+    }});state.node=target.node;
+    if(request.mode===NODE_ADD_ONLY_MODE){
       const result={operation_id:operation.id,status:'SUCCEEDED',effect_possible:state.effect_possible,
         phases:state.phases.map(({value,...p})=>p),node:state.node,execution:state.execution,output:state.output,
         package_saved:false,cleanup_complete:true,warnings:[],configuration:{status:'not_requested'},

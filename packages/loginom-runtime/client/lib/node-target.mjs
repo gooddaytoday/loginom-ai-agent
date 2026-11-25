@@ -143,6 +143,17 @@ async function settleMoveMismatch({operation,state,effect,receipt,graph,adapter,
   return true;
 }
 
+async function reconcileTargetEffect(adapter,effect,graph,deadline,signal){
+  const recovery=await adapter.reconcile(effect,graph,deadline,signal);
+  if(effect.kind==='create'&&effect.parameters.add_only===true
+    &&recovery?.completed===true&&recovery.verified===true&&recovery.cleanup_complete===false
+    &&recovery.receipt?.add_only_window_pending===true
+    &&verifyNodeTargetEffect({...effect,receipt:recovery.receipt},graph,adapter.positionMatches)
+    &&await adapter.verifyAddOnlyCleanup?.(graph,deadline)===true)
+    return {...recovery,cleanup_complete:true,add_only_window_reobserved:true};
+  return recovery;
+}
+
 // Internal graph phase of node.apply. The enclosing runtime owns the gate and
 // operation ID; adapters invoke fixed local primitives, never dock_action_run.
 // Effects are committed one at a time. A possible effect never retries a gesture.
@@ -277,7 +288,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
     if(state.move_mismatch)return structuredClone(state.result);
     if (state.pending) {
       // Adapter reads the receipt; it is never allowed to reissue the gesture.
-      const recovery = await adapter.reconcile(state.pending, graph, operation.deadline, signal);
+      const recovery = await reconcileTargetEffect(adapter,state.pending,graph,operation.deadline,signal);
       if(recovery?.completed===true&&recovery.cleanup_complete===true
         &&await settleMoveMismatch({operation,state,effect:state.pending,receipt:recovery.receipt,graph,adapter,record}))return structuredClone(state.result);
       const refused=normalizeGraphRefusal(state.pending,recovery?.receipt);
@@ -515,7 +526,7 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
     state.result = { status: 'SUCCEEDED', phase: 'target_ready', node: node(graph, state.targetId),
       created: request.target.kind === 'new', links: desired,...(variableDesired.length?{variable_links:graph.variable_links.filter(e=>variableDesired.some(d=>edgeKey(d)===edgeKey(e)))}:{}), auto_created_links: state.auto_created_links ?? [],
       ...((state.replacements??[]).length?{replaced_links:structuredClone(state.replacements)}:{}),
-      effects: state.receipts.map(({ id, kind, verified }) => ({ id, kind, verified })), configured: false, executed: false, package_saved: false };
+      effects: state.receipts.map(({ id, kind, verified }) => ({ id, kind, verified })), ...(addOnly?{unconnected_verified:true}:{}), configured: false, executed: false, package_saved: false };
     await commit(); return structuredClone(state.result);
   } catch (error) {
     if(state.move_mismatch)return structuredClone(state.result);
@@ -534,7 +545,7 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
   const graph=await adapter.observe(request,deadline);
   if(state.pending){
     const effect=state.pending;
-    const recovery=await adapter.reconcile(effect,graph,deadline);
+    const recovery=await reconcileTargetEffect(adapter,effect,graph,deadline);
     if(recovery.completed===true&&recovery.cleanup_complete===true
       &&await settleMoveMismatch({operation,state,effect,receipt:recovery.receipt,graph,adapter,record})){
       operation.targetPhase=state;return structuredClone(state.result);

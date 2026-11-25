@@ -210,6 +210,7 @@ async function handle(message) {
         // Preparation must bind to the same canonical path used by private login.
         loginomUrl: loginomAddress(input.connection.url),
         stateDir: input.stateDir,
+        nodeDefaultsDirectory: join(input.stateDir, "generations", String(input.generation), "chats", input.chat, "node-defaults"),
         agent: "loginom-ai-agent",
         adapterRevision: "1",
         mode: "executor-replay",

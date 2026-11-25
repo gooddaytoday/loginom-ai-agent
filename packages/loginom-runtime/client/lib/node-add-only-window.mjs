@@ -86,40 +86,50 @@ export function readAddOnlyDrop({binding:b,expectedControl,claim=false}) {
   }else if(dialogs.length===0&&atGraph){
     return {graph:true,node_id:node.FGuid};
   }
-  if(!owner||b.closing.has(closeKind)||controls.length!==1)return {};
+  if(!owner)return {};
+  const owned={owned_window:true};
+  if(b.closing.has(closeKind)||controls.length!==1)return owned;
   const control=controls[0],component=ext?.getCmp?.(control.id);
   if(component?.el?.dom!==control||component.disabled===true
-    ||control.closest('.x-item-disabled,.x-btn-disabled,[aria-disabled="true"]'))return {};
+    ||control.closest('.x-item-disabled,.x-btn-disabled,[aria-disabled="true"]'))return owned;
   const box=control.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2;
-  if(!control.contains(document.elementFromPoint(x,y)))return {};
+  if(!control.contains(document.elementFromPoint(x,y)))return owned;
   if(claim){
     if(control!==expectedControl)throw Error('Native add-only Close control changed');
     b.closing.add(closeKind);
   }
-  return {control};
+  return {...owned,control};
 }
 
-export async function settleAddOnlyDrop(page,binding,{readSurface,readQuietGraph,remaining,now=Date.now}) {
+export async function settleAddOnlyDrop(page,binding,{readSurface,readQuietGraph,remaining,onOwnedWindow=()=>{},now=Date.now}) {
+  const end=now()+Math.min(15000,remaining());
+  const budget=()=>{
+    const ms=Math.min(end-now(),remaining());
+    if(ms<=0)throw Error('Readiness timeout: add-only window settlement');
+    return ms;
+  };
   let quietSince,quietGraph;
   for(;;){
-    remaining();
+    budget();
     const surface=await page.evaluateHandle(readSurface,{binding});
     try{
       const controlHandle=await surface.getProperty('control');
       try{
         const control=controlHandle.asElement();
         if(control){
+          onOwnedWindow();
           const checked=await page.evaluateHandle(readSurface,{binding,expectedControl:control,claim:true});
           try{
             const sameControl=await checked.getProperty('control');
             try{
               if(!sameControl.asElement())throw Error('Native add-only Close control changed');
             }finally{await sameControl.dispose();}
-            await control.click({timeout:remaining()});
+            await control.click({timeout:budget()});
           }finally{await checked.dispose();}
           quietSince=undefined;
         }else{
           const state=await surface.jsonValue();
+          if(state?.owned_window)onOwnedWindow();
           const graph=state?.graph?await readQuietGraph():null;
           if(!graph?.interaction_ready||!graph.nodes.some(n=>n.ref.node_id===state.node_id)){
             quietSince=undefined;
@@ -131,6 +141,6 @@ export async function settleAddOnlyDrop(page,binding,{readSurface,readQuietGraph
         }
       }finally{await controlHandle.dispose();}
     }finally{await surface.dispose();}
-    await page.waitForTimeout(Math.min(80,remaining()));
+    await page.waitForTimeout(Math.min(80,budget()));
   }
 }

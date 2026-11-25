@@ -3,13 +3,14 @@ import test from 'node:test';
 import vm from 'node:vm';
 import {bindAddOnlyDrop, readAddOnlyDrop, settleAddOnlyDrop} from '../lib/node-add-only-window.mjs';
 
-function fixture({window='wizard',sticky=false,modelData=true}={}){
+function fixture({window='wizard',sticky=false,modelData=true,preexistingWindow=false,wrongIcon=false,
+  foreignTree=false,foreignSurface=false,anotherNode=false,swapControl=false,deadline=800}={}){
   const prefix='MF;TF-1',workflow={},nodeData={},components=new Map(),elements=[];
   const app={ModelForm:class ModelForm{},ModelNodeTreeNode:class ModelNodeTreeNode{},
     WizardTreeNode:class WizardTreeNode{},Version:'7.4.2'};
   const nativeNodes=[],model=new app.ModelForm();
   const workflowRef={workflow_id:'wf',prefix,tab_tid:'tab'};
-  const node={FGuid:'new',...(modelData?{data:nodeData}:{}),FIconCls:'icon'};
+  const node={FGuid:'new',...(modelData?{data:nodeData}:{}),FIconCls:wrongIcon?'other-icon':'icon'};
   const element=(tid,parent,role)=>{
     const e={id:tid,isConnected:true,role,children:[],classList:{contains:()=>true},
       contains(other){return this===other||this.children.includes(other);},
@@ -27,9 +28,9 @@ function fixture({window='wizard',sticky=false,modelData=true}={}){
   const wizardRoot=element(prefix+';WizrdMCF',null,'dialog');
   const close=element(prefix+';WizrdMCF;btnClose',wizardRoot);
   wizardRoot.isConnected=close.isConnected=false;
-  const nodeTree=Object.assign(new app.ModelNodeTreeNode(),{FGuid:'new',FModelNode:nodeData,ParentNode:workflow});
+  const nodeTree=Object.assign(new app.ModelNodeTreeNode(),{FGuid:'new',FModelNode:foreignTree?{}:nodeData,ParentNode:workflow});
   const wizardTree=Object.assign(new app.WizardTreeNode(),{ParentNode:nodeTree});
-  const wizard=Object.assign(new (class WizardModelComponentForm{})(),{FModelNode:nodeData,FView:{el:{dom:wizardRoot}}});
+  const wizard=Object.assign(new (class WizardModelComponentForm{})(),{FModelNode:foreignSurface?{}:nodeData,FView:{el:{dom:wizardRoot}}});
   const dialog=element('owned-dialog',null,'dialog'),cancel=element('owned-dialog;btnCancel',dialog);
   dialog.isConnected=cancel.isConnected=false;
   components.set(dialog.id,{el:{dom:dialog},ownerCt:window==='foreign'?{}:{FModelNode:nodeData}});
@@ -46,11 +47,13 @@ function fixture({window='wizard',sticky=false,modelData=true}={}){
   const context=vm.createContext({__loginomDockPreparationV1:preparation,bg:{app},Ext:{getCmp:id=>components.get(id)},document,
     location:{origin:'https://example.invalid'},getComputedStyle:()=>({visibility:'visible'})});
   const local=fn=>vm.runInContext('('+fn.toString()+')',context);
+  if(preexistingWindow)dialog.isConnected=true;
   const binding=local(bindAddOnlyDrop)({
     request:{document_id:'doc',workflow_ref:workflowRef},origin:'https://example.invalid',build:'7.4.2',
     effect:{before:{dom_epoch:1,nodes:[]},parameters:{type:'node'}},types:{node:{icon_class:'icon'}},
   });
   nativeNodes.push(node);
+  if(anotherNode)nativeNodes.push({...node,FGuid:'unrelated'});
   if(window==='wizard'){
     wizardRoot.isConnected=close.isConnected=true;
     controller.FController=wizard;
@@ -59,7 +62,7 @@ function fixture({window='wizard',sticky=false,modelData=true}={}){
     dialog.isConnected=cancel.isConnected=true;
   }
   let time=0;
-  const clicks=[],settledGraph={interaction_ready:true,nodes:[{ref:{node_id:'new'}}]};
+  const clicks=[],ownership=[],settledGraph={interaction_ready:true,nodes:[{ref:{node_id:'new'}}]};
   const wrap=value=>({
     getProperty:async key=>wrap(value[key]),jsonValue:async()=>value,dispose:async()=>{},
     asElement:()=>value===close||value===cancel?{value,click:async()=>{
@@ -74,15 +77,15 @@ function fixture({window='wizard',sticky=false,modelData=true}={}){
     }}:null,
   });
   const page={
-    evaluateHandle:async(fn,args)=>wrap(local(fn)({...args,expectedControl:args.expectedControl?.value})),
+    evaluateHandle:async(fn,args)=>wrap(local(fn)({...args,expectedControl:swapControl?{}:args.expectedControl?.value})),
     waitForTimeout:async ms=>{time+=ms;},
   };
   const run=()=>settleAddOnlyDrop(page,binding,{readSurface:readAddOnlyDrop,readQuietGraph:async()=>settledGraph,
-    now:()=>time,remaining:()=>{
-      if(time>=800)throw Error('Graph deadline');
-      return 800-time;
+    onOwnedWindow:()=>ownership.push(true),now:()=>time,remaining:()=>{
+      if(time>=deadline)throw Error('Graph deadline');
+      return deadline-time;
     }});
-  return {run,clicks,settledGraph};
+  return {run,clicks,ownership,settledGraph,time:()=>time};
 }
 
 for(const [window,suffix] of [['wizard','btnClose'],['dialog','btnCancel'],[null,null]])test('add_only settles '+(window??'a quiet graph'),async()=>{
@@ -107,4 +110,28 @@ test('add_only observes a quiet node before Loginom has loaded its settings obje
   const f=fixture({window:null,modelData:false});
   assert.deepEqual(await f.run(),f.settledGraph);
   assert.deepEqual(f.clicks,[]);
+});
+
+test('add_only refuses to bind when a native window already exists before drop',()=>{
+  assert.throws(()=>fixture({preexistingWindow:true}),/already open before/);
+});
+
+for(const [name,options,error] of [
+  ['foreign icon',{wrongIcon:true},/Graph deadline/],
+  ['foreign settings tree',{foreignTree:true},/Graph deadline/],
+  ['foreign settings wizard',{foreignSurface:true},/Graph deadline/],
+  ['second new GUID',{anotherNode:true},/node ownership changed/],
+  ['substituted Close',{swapControl:true},/Close control changed/],
+])test('add_only refuses '+name+' without clicking',async()=>{
+  const f=fixture(options);
+  await assert.rejects(f.run(),error);
+  assert.deepEqual(f.clicks,[]);
+  assert.equal(f.ownership.length,options.swapControl?1:0);
+});
+
+test('add_only settlement has a 15 second cap under a longer target deadline',async()=>{
+  const f=fixture({window:'foreign',deadline:60000});
+  await assert.rejects(f.run(),/timeout: add-only window settlement/);
+  assert.equal(f.time(),15000);
+  assert.deepEqual(f.ownership,[]);
 });

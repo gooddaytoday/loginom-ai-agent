@@ -15,7 +15,7 @@ export async function readGraph(page, task) {
   const finishes=[...(page[Symbol.for('loginom-dock.operation-receipts.v1')]?.values()??[])]
     .filter(r=>r.state==='completed'&&r.outcome?.status==='SUCCEEDED'&&r.outcome.action_key==='ui.act'&&r.outcome.cleanup_complete===true)
     .map(r=>({context:r.outcome.output?.prepared_node_context,trace:r.outcome.trace}));
-  return page.evaluate(({ request, types, origin, build, read_bindings=false, finishes }) => {
+  return page.evaluate(({ request, types, origin, build, read_bindings=false, require_no_native_window=false, finishes }) => {
     const fail = message => { throw new Error(message); };
     const preparation = globalThis.__loginomDockPreparationV1;
     if (location.origin !== origin || globalThis.bg?.app?.Version !== build || preparation?.document !== document
@@ -27,7 +27,7 @@ export async function readGraph(page, task) {
     const crumbs = [...document.querySelectorAll('[data-tid^=' + JSON.stringify(request.workflow_ref.prefix + ';cnrNaviMode;b.s_') + ']')].map(e => ({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
     if (crumbs.length!==request.workflow_ref.navigation_path.length || crumbs.some((c,i)=>c.tid!==request.workflow_ref.navigation_path[i].tid||c.label!==request.workflow_ref.navigation_path[i].label)) fail('Workflow navigation changed');
     const visible = e => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0 && getComputedStyle(e).visibility !== 'hidden';
-    const blockers = [...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].filter(visible);
+    const blockers = [...document.querySelectorAll(require_no_native_window?'[role="dialog"],.bg-mask-message,.x-mask-msg,.x-window,[aria-modal="true"]':'[role="dialog"],.bg-mask-message,.x-mask-msg')].filter(visible);
     if (blockers.length) fail('Graph is blocked');
     const app = bg.app, card = app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
     let ancestor = card.Controller.Node?.data?.node, packageNode = null, workflowNode = null;
@@ -226,7 +226,7 @@ export async function readGraph(page, task) {
 export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph, overflow, gap, addOnlyWindow) {
   let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false,moveGeometry,deletion;
   let gestureBefore=task.effect.before;
-  let dropBinding,addOnlyQuiet=false;
+  let dropBinding,ownedWindowPending=false;
   const addOnly=task.effect.kind==='create'&&task.effect.parameters.add_only===true;
   const remaining=()=>{if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw new Error('Node target cancelled');const value=task.deadline-Date.now();if(value<=0)throw new Error('Graph deadline');return value;};
   const ensureContext=()=>page.evaluate(({request,epoch})=>{
@@ -607,7 +607,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
     const maskDeadline=Math.min(task.deadline,Date.now()+15000);
     let pendingNode;
     let after=addOnly?await addOnlyWindow.settle(page,dropBinding,{
-      readSurface:addOnlyWindow.read,remaining,readQuietGraph:async()=>{
+      readSurface:addOnlyWindow.read,remaining,onOwnedWindow:()=>{ownedWindowPending=true;},readQuietGraph:async()=>{
         try{return await read(page,task);}
         catch(error){
           if(['Graph is blocked','Workflow navigation changed','Visible port identity is not rendered','Node identity is not rendered']
@@ -633,6 +633,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         pendingNode=id;return null;
       }
     },0,settleJavascript);
+    ownedWindowPending=false;
     if(kind==='create'){
       const created=after.nodes.filter(n=>!before.nodes.some(b=>b.ref.node_id===n.ref.node_id));
       if(created.length!==1)throw Error('Created node visibility owner is ambiguous');
@@ -649,17 +650,19 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       after=await read(page,task);
       if(!sameGraph(baseline,after))throw Error('Created node graph changed after viewport navigation');
     }
-    addOnlyQuiet=true;
     outcome={status:'SUCCEEDED',effect_possible:true,after};
   }catch(error){if(error.placement_navigation_unverified){effectPossible=true;placementNavigationUncertain=true;}outcome={...outcome,status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,error:String(error.message),...(placementRefusal?{placement_refusal:placementRefusal}:{})};}
   finally{try{if(held){await page.mouse.up();held=false;}if(transient==='delete'){const cancel=find('msgbox;tlb;no');if(await cancel.isVisible())await cancel.click({timeout:3000});}else if(transient)await page.keyboard.press('Escape');transient=false;outcome.cleanup_complete=true;}catch(error){outcome={...outcome,status:'AMBIGUOUS',cleanup_complete:false,cleanup_error:String(error.message)};}}
   if(dropBinding)await dropBinding.dispose().catch(()=>{});
-  if(addOnly&&effectPossible&&!addOnlyQuiet)outcome.cleanup_complete=false;
   if(paletteScroll)outcome.palette_scroll=paletteScroll;
   if(placementNavigation)outcome.placement_navigation=placementNavigation;
   if(moveGeometry)outcome.move_geometry=moveGeometry;
   if(deletion)outcome.deletion=deletion;
   if(paletteScrollUncertain||placementNavigationUncertain)outcome.cleanup_complete=false;
+  if(ownedWindowPending){
+    if(outcome.cleanup_complete===true)outcome.add_only_window_pending=true;
+    outcome.cleanup_complete=false;
+  }
   return outcome;
 }
 
@@ -1082,6 +1085,18 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
         operation_id:effect.id,receipt_signature:createHash('sha256').update(JSON.stringify(effect)).digest('hex')};
       return await call(withBrowserReceipt(`(${mutateGraph.toString()})(page,${JSON.stringify(t)},${readGraph.toString()},${exportPaletteScroll.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${revealNodePlacement.toString()},${samePlacementGraph.toString()},${nodePlacementOverflow.toString()},${nodePlacementGap.toString()},{bind:${bindAddOnlyDrop.toString()},read:${readAddOnlyDrop.toString()},settle:${settleAddOnlyDrop.toString()}})`,options),deadline);
       }finally{signal?.removeEventListener('abort',cancel);if(cancellation){await cancellation;await call(`async page=>{page[Symbol.for('loginom-dock.node-target-cancel')]?.delete(${JSON.stringify(effect.id)});return true;}`,Date.now()+3000);}}
+    },
+    async verifyAddOnlyCleanup(graph,deadline){
+      const scoped={document_id:graph.document_id,workflow_ref:graph.workflow_ref};
+      const probe=task({request:scoped,require_no_native_window:true});
+      return call(`async page=>{
+        const read=${readGraph.toString()},probe=${JSON.stringify(probe)},expected=${JSON.stringify(graph)};
+        const first=await read(page,probe);
+        if(!first.interaction_ready||JSON.stringify(first)!==JSON.stringify(expected))return false;
+        await page.waitForTimeout(200);
+        const second=await read(page,probe);
+        return Date.now()<${deadline}&&JSON.stringify(second)===JSON.stringify(first);
+      }`,deadline);
     },
     async reconcile(effect,graph,deadline){
       const options={receipt_namespace:'node-target:'+request.document_id,receipt_id:effect.id,

@@ -1,4 +1,4 @@
-# Logistic regression (`datamining.log_regression`)
+# Logistic regression
 
 <!-- mode: enter forward backward stepwise apply -->
 ## Training and predictions

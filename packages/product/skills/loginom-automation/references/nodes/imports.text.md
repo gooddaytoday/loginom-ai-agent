@@ -1,13 +1,13 @@
-# Текстовый файл (`imports.text`)
+# Текстовый файл
 
 <!-- mode: delimited -->
-Existing needs confirmed source CSV before Execute/read.
+Existing needs confirmed CSV before Execute/read.
 Reads may add a visualizer. `NOT_APPLIED`/`effect_possible=false`: ask CSV, skip cleanup/Save.
 
 Missing CSV: `next_step`; SAME node, no XML.
 
 Execute with known schema/format. Otherwise preview and compare ORIGINAL text locally.
-Server download only by request or contradiction. User bans win.
+Download only by request or contradiction.
 `dock_node_apply` `parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
 `finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}`:
 `output.server_profile`: native format/types, no Execute. Reuse `node` as `target.ref` after Close.

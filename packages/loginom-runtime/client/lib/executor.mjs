@@ -4407,9 +4407,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             verifyContinuation:async(state,ctx)=>{
               if(state.target_reconciled && !state.phases.some(p=>p.phase==='target')){
                 const {graph}=validateNodeApplyRequest(state.request,nodeApplyHandlers);
-                const result=await inspectNodeTarget({request:graph,operation,adapter:operation.nodeTargetAdapter,
+                await inspectNodeTarget({request:graph,operation,adapter:operation.nodeTargetAdapter,
                   record:nodeTargetRecord,deadline:Math.min(state.deadline,state.configure_deadline,now()+15000)});
-                if(addOnly&&(result.cleanup_complete!==true&&result.status!=='SUCCEEDED'||operation.targetPhase.pending))return false;
               }
               if(state.phases.at(-1)?.phase!=='workflow')return originalContinuation(state,ctx);
               if(state.pending||state.node||state.cleanup_complete!==true||state.phases.length!==2

@@ -299,3 +299,44 @@ test('replacement Boolean, mixed and external registrations reach the production
  await dispatchNodeApi(runtime,'dock_node_apply',external);
  external.parameters.rules[0].pairs=[];await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',external),/external replacement/);
 });
+
+test('first configuration of an add-only node uses creation defaults after a saved package is reopened',async t=>{
+ const {mkdtemp,rm}=await import('node:fs/promises');
+ const {tmpdir}=await import('node:os');
+ const {join}=await import('node:path');
+ const directory=await mkdtemp(join(tmpdir(),'add-only-defaults-'));
+ t.after(()=>rm(directory,{recursive:true,force:true}));
+ const scope={loginom_account:'worker',package_ref:{path:'/test/scenario.lgp'}};
+ const opened=(doc,wf)=>({...scope,document_id:doc,workflow_ref:{workflow_id:wf,navigation_path:[]}});
+ const options={defaultsDirectory:directory,origin:'https://example.invalid'};
+ const first=createUserWorkflowBindings(options);
+ await first.rememberWorkspace(opened('doc','wf'));
+ for(const [node_id,type] of [['import','imports.text'],['export','exports.text']]){
+  first.recordNodePhase({phase:'node_apply_prepared',operation_id:node_id,request:{mode:'add_only',target:{kind:'new',type}}});
+  first.recordNodePhase({phase:'node_checkpoint',operation_id:node_id,
+   result:{status:'SUCCEEDED',cleanup_complete:true,configuration:{status:'not_requested'},node:{document_id:'doc',workflow_id:'wf',node_id}}});
+ }
+ await first.rememberSavedDefaults(scope.package_ref.path);
+ const next=createUserWorkflowBindings(options);
+ await next.rememberWorkspace(opened('reopened','continued'));
+ const request=(node_id,type,parameters)=>({document_id:'reopened',workflow_ref:{workflow_id:'continued'},
+  target:{kind:'existing',type,ref:{document_id:'reopened',workflow_id:'continued',node_id}},
+  mode:'delimited',finish:'done',parameters});
+ const exported=request('export','exports.text',{destination:'/test/out.csv',delimiter:';'});
+ assert.deepEqual(next.expandNode(exported).parameters,{
+  encoding:'UTF-8',delimiter:';',header:'names',bom:false,line_ending:'LF',decimal_separator:'.',
+  null_marker:'',text_qualifier:'"',destination:'/test/out.csv'});
+ const source=request('import','imports.text',{settings:{source:{encoding:'UTF-16 LE'},columns:[{name:'A',type:'integer'}]}});
+ const expanded=next.expandNode(source).parameters.settings;
+ assert.deepEqual(expanded.source,{encoding:'UTF-16 LE',rows_to_skip:0,first_line_as_title:true});
+ assert.equal(expanded.format.delimiter,',');
+ assert.equal(expanded.columns[0].used,true);
+ next.recordNodePhase({phase:'node_apply_prepared',operation_id:'configure',request:exported});
+ next.recordNodePhase({phase:'node_phase_prepared',operation_id:'configure',receipt:{phase:'finish'}});
+ assert.deepEqual(next.expandNode(exported).parameters,exported.parameters);
+ assert.deepEqual(next.expandNode({...exported,target:{...exported.target,ref:{...exported.target.ref,node_id:'old'}}}).parameters,exported.parameters);
+ await next.rememberSavedDefaults(scope.package_ref.path);
+ const third=createUserWorkflowBindings(options);
+ await third.rememberWorkspace(opened('reopened','continued'));
+ assert.deepEqual(third.expandNode(exported).parameters,exported.parameters);
+});

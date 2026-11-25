@@ -209,20 +209,41 @@ test('add_only creates any admitted palette type through the graph without a con
  assert.deepEqual(f.calls,['create']);
 });
 
-test('add_only keeps an unconfirmed automatic window pending and never repeats the drop',async()=>{
+test('add_only pending window can be inspected, abandoned and followed by a new action',async()=>{
  const f=fixture(),mutate=f.adapter.mutate;
- f.adapter.mutate=async effect=>{await mutate(effect);return {status:'AMBIGUOUS',cleanup_complete:false};};
- f.adapter.reconcile=async()=>({verified:false,cleanup_complete:false});
+ let windowOpen=true;
+ f.adapter.mutate=async effect=>{
+  await mutate(effect);
+  if(effect.parameters.add_only){
+   f.graph.nodes[0].locked=false;
+   return {status:'AMBIGUOUS',cleanup_complete:false,add_only_window_pending:true};
+  }
+  return {status:'SUCCEEDED',cleanup_complete:true};
+ };
+ f.adapter.verifyWorkflow=async()=>({status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,
+  document_id:'doc',workflow_ref:workflow});
+ f.adapter.reconcile=async()=>({completed:true,verified:true,cleanup_complete:false,
+  receipt:{status:'AMBIGUOUS',cleanup_complete:false,add_only_window_pending:true}});
+ f.adapter.verifyAddOnlyCleanup=async()=>!windowOpen;
  const args={...request(),mode:'add_only'};
  await f.runtime.startNodeApply(args);
  const job=await f.runtime.waitNodeApply(args.operation_id,{timeoutMs:1000});
  assertJob(job);
  assert.equal(job.outcome.status,'AMBIGUOUS');
  assert.equal(job.outcome.cleanup_complete,false);
- assert.equal(job.outcome.output.pending_phase,'target');
  assert.throws(()=>f.runtime.assertPreparationAllowed(),/pending|uncertain/);
- await f.runtime.inspect({operationId:args.operation_id});
- assert.deepEqual(f.calls,['create']);
+ assert.deepEqual((await f.runtime.inspect({operationId:args.operation_id})).output.recovery_options,['abandon_operation']);
+ assert.equal((await f.runtime.recover(args.operation_id,{strategy:'abandon_operation',recoveryOperationId:'early'})).status,'AMBIGUOUS');
+ windowOpen=false;
+ const afterClose=await f.runtime.inspect({operationId:args.operation_id});
+ assert.ok(afterClose.output.recovery_options.includes('abandon_operation'));
+ const released=await f.runtime.recover(args.operation_id,{strategy:'abandon_operation',recoveryOperationId:'release'});
+ assert.equal(released.status,'SUCCEEDED',released.error?.message);
+ assert.equal(released.output.original_outcome.output.node.node_id,'new');
+ f.runtime.assertPreparationAllowed();
+ assert.equal((await f.runtime.runNodeApply({...request(),operation_id:'new-action',
+  target:{kind:'existing',type:'imports.text',ref:{document_id:'doc',workflow_id:'wf',node_id:'new'}}})).status,'SUCCEEDED');
+ assert.equal(f.calls.filter(name=>name==='create').length,1);
 });
 
 test('validation and missing drivers cannot create a graph or journal effects',async()=>{
@@ -1085,4 +1106,67 @@ test('terminal readback refusal releases the runtime gate and remains stable thr
  assertJob(job);
  const again=await f.runtime.runNodeApply(r);assert.deepEqual(again,job.outcome);assert.deepEqual(f.calls,calls);
  assert.ok(f.events.some(e=>e.phase==='node_checkpoint'&&e.result.status==='FAILED'));
+});
+
+for(const variant of ['autolinks','late-foreign-link','unsettled'])test('add_only proves the quiet unconnected graph: '+variant,async()=>{
+ const f=fixture(),mutate=f.adapter.mutate,observe=f.adapter.observe;
+ const scoped=node_id=>({document_id:'doc',workflow_id:'wf',node_id});
+ const input={source:'source',output:0,target:'new',input:0};
+ const output={source:'new',output:0,target:'sink',input:0};
+ const variable={source:'source',output:0,target:'new',input:0,kind:'variables'};
+ const old={source:'source',output:0,target:'sink',input:0};
+ f.graph.nodes.push(...['source','sink'].map(name=>({ref:scoped(name),type:'transform.calculator',label:name,inputs:[0],outputs:[0]})));
+ f.graph.links.push(old);
+ f.graph.variable_links=[];
+ f.adapter.mutate=async effect=>{
+  if(effect.kind==='create'){
+   const result=await mutate(effect);
+   if(variant==='autolinks'){
+    f.graph.links.push(input,output);
+    f.graph.variable_links.push(variable);
+   }
+   return result;
+  }
+  const link=effect.parameters.edge,field=link.kind==='variables'?'variable_links':'links';
+  f.graph[field]=f.graph[field].filter(e=>JSON.stringify(e)!==JSON.stringify(link));
+  return mutate(effect);
+ };
+ let readsAfterCreate=0;
+ f.adapter.observe=async()=>{
+  const graph=await observe();
+  if(f.calls.includes('create')&&++readsAfterCreate===2){
+   if(variant==='late-foreign-link')graph.foreign_links=['unowned-tid'];
+   if(variant==='unsettled')graph.interaction_ready=false;
+  }
+  return graph;
+ };
+ const result=await f.runtime.runNodeApply({...request(),mode:'add_only'});
+ if(variant==='autolinks'){
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+  assert.deepEqual(f.calls,['create','remove_link','remove_link','remove_link']);
+  assert.deepEqual(f.graph.links,[old]);
+  assert.deepEqual(f.graph.variable_links,[]);
+ }else{
+  assert.equal(result.status,'AMBIGUOUS',JSON.stringify(result));
+  assert.match(result.error.message,/Complete quiet graph/);
+ }
+});
+
+test('add_only rechecks the inspected graph before resuming and never repeats the drop',async()=>{
+ const f=targetRecoveryFixture({fault:'create'});
+ const args={...request(),mode:'add_only'};
+ const paused=await f.runtime.runNodeApply(args);
+ assert.equal(paused.status,'AMBIGUOUS');
+ assert.equal((await f.runtime.inspect({operationId:args.operation_id})).output.internal_resume_available,true);
+ const reads=[],observe=f.adapter.observe;
+ f.adapter.observe=async(...parameters)=>{
+  reads.push(f.calls.length);
+  return observe(...parameters);
+ };
+ f.graph.foreign_links.push('late-foreign-link');
+ const resumed=await f.runtime.runNodeApply(args,{resume:true});
+ assert.equal(resumed.status,'AMBIGUOUS');
+ assert.match(resumed.error.message,/Partial node target graph changed/);
+ assert.deepEqual(reads,[f.calls.length]);
+ assert.equal(f.calls.filter(call=>call==='create').length,1);
 });

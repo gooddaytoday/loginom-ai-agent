@@ -992,3 +992,16 @@ for(const fault of [null,'other-node','transport','receipt','effect','phase','jo
  const r=await f.run(p);assert.equal(r.status,fault?'AMBIGUOUS':'FAILED',JSON.stringify(r.error));assert.equal(r.cleanup_complete,!fault);assert.equal(r.pending_phase,fault?'input_mapping':null);assert.equal(r.error.code,'NODE_APPLY_STOPPED');
  assert.equal(f.calls.includes('release-rest-variable-refusal'),!fault||fault==='journal');assert.ok(!f.calls.includes('configure')&&!f.calls.includes('execute'));
 });
+
+for(const field of ['created','configured','executed','unconnected_verified'])test('add_only needs verified '+field+' in the target receipt',async()=>{
+ const f=fixture(),prepare=f.drivers.prepareTarget;
+ const args={...request(),mode:'add_only',finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false}};
+ const target={created:true,configured:false,executed:false,unconnected_verified:true};
+ delete target[field];
+ f.drivers.prepareTarget=async(...parameters)=>({...await prepare(...parameters),target,effect_possible:true});
+ const result=await f.run(args);
+ assert.equal(result.status,'AMBIGUOUS');
+ assert.match(result.error.message,/Creation without configuration was not verified/);
+ assert.ok(!f.records.some(e=>e.phase==='node_checkpoint'));
+ assert.ok(!f.calls.includes('open'));
+});

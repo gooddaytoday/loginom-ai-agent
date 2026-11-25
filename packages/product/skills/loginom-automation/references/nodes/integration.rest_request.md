@@ -1,4 +1,4 @@
-# REST-запрос (`integration.rest_request`)
+# REST-запрос
 
 <!-- mode: request -->
 ## Описания кодов
@@ -9,7 +9,7 @@
 
 ## Имитация
 
-Доставь файл; используй его серверный путь:
+Доставь файл и укажи серверный путь:
 `simulation:{enabled:true,file_path:"/своя-папка/response.json"}`.
 Передай connection, query_parameters:[], inputs:[], finish:"execute".
 GET без таблицы: один ответ. Тот же узел: смена файла;
