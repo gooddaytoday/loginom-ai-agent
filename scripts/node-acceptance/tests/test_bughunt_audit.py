@@ -298,15 +298,19 @@ class BughuntAuditTests(unittest.TestCase):
         events = [
             self.dock('node_apply', dict(status='FAILED', phase='configure', error=dict(code='STOPPED')),
                       operation_id='first', target=target, phase='configure'),
-            self.dock('operation_recover', dict(status='SUCCEEDED', phase='resolved',
-                      next_step=dict(tool='dock_node_apply', instruction='Reapply.')),
+            self.dock('operation_recover', dict(status='SUCCEEDED', phase='resolved'),
                       operation_id='first', strategy='abandon_operation'),
+            self.dock('browser_recovery', dict(phase='dock', verification=dict(
+                      next_step=dict(tool='dock_node_apply', instruction='Reapply.'))),
+                      operation_id='first', action='finish'),
             self.dock('node_apply', operation_id='wrong-phase', target=target, phase='read'),
             self.dock('node_apply', operation_id='same-phase', target=target, phase='configure'),
         ]
         cases = [case for case in self.patterns(events) if case['pattern'] == 'c']
         self.assertEqual([(case['operation_id'], case['phase']) for case in cases], [('same-phase', 'configure')])
         self.assertEqual(cases[0]['original_code'], 'STOPPED')
+        self.assertEqual(cases[0]['trigger']['initiator'], 'runtime_next_step')
+        self.assertTrue(cases[0]['trigger']['location'].endswith(':3'))
 
     def test_identical_calls_and_running_polls(self):
         events = [

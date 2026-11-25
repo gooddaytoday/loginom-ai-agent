@@ -786,8 +786,11 @@ class PatternAudit:
                                      observed and phase not in observed):
                     continue
                 del pending[op]
+                directive = next((item for item in reversed(self.by_operation[op])
+                                  if self.index[id(item)] >= self.index[id(recovery)] and self.available(item, call)
+                                  and any(guidance_matches(step, call) for step in item.guidance)), None)
                 variant = 'same_target_and_phase' if evidence else 'same_requested_phase'
-                self.add('c', variant, call, cause=recovery if recovery.code else failure,
+                self.add('c', variant, call, cause=directive or (recovery if recovery.code else failure),
                          node=current_node or old_node, original=self.location(original),
                          recovery=self.location(recovery, True), phase=phase or call.data.get('finish'),
                          phase_evidence=evidence or 'matching_mode_and_finish',
@@ -865,7 +868,7 @@ class PatternAudit:
         output = as_dict(receipt.get('output'))
         return dict(
             location=self.location(call, True), tool=call.tool, operation_id=call.operation,
-            status=receipt.get('status') or call.state['status'], state=receipt.get('state'),
+            status=receipt.get('status') or call.state['status'], state=receipt.get('state') or output.get('state'),
             phase=receipt.get('phase'), code=call.code, message=result_message(call)[:260] or None,
             cleanup_complete=receipt.get('cleanup_complete'),
             original_operation_pending=output.get('original_operation_pending'),
