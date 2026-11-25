@@ -1,0 +1,66 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "sales",
+        "type": "imports.text",
+        "label": "Продажи"
+      },
+      {
+        "id": "regions",
+        "type": "transform.group_data",
+        "label_contains": "по регионам"
+      },
+      {
+        "id": "export",
+        "type": "exports.text"
+      }
+    ],
+    "links": [
+      {
+        "source": "sales",
+        "target": "regions",
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": "regions",
+        "target": "export",
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "regions.csv",
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string"
+        },
+        {
+          "name": "TotalRevenue",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "Север",
+          "TotalRevenue": 20.25
+        },
+        {
+          "Region": "Центр",
+          "TotalRevenue": 3.5
+        },
+        {
+          "Region": "Юг",
+          "TotalRevenue": 7.75
+        }
+      ]
+    }
+  ]
+}

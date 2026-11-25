@@ -1,0 +1,8 @@
+import json
+
+print(json.dumps({'graph': {'nodes': [
+    {'id': 'sales', 'type': 'imports.text', 'label': 'Продажи'},
+    {'id': 'regions', 'type': 'transform.group_data', 'label_contains': 'по регионам'},
+], 'links': [
+    {'source': 'sales', 'target': 'regions', 'output': 0, 'input': 0},
+]}}, ensure_ascii=False, indent=2))

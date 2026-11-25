@@ -1,0 +1,491 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-h101-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Product",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "Revenue",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Share",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "CumulativeShare",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Class",
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "Product": "T-001",
+          "Revenue": 1558283.32,
+          "Share": 0.05559347967161522,
+          "CumulativeShare": 0.05559347967161522,
+          "Class": "A"
+        },
+        {
+          "Product": "T-002",
+          "Revenue": 1520390.04,
+          "Share": 0.054241595027575765,
+          "CumulativeShare": 0.10983507469919099,
+          "Class": "A"
+        },
+        {
+          "Product": "T-003",
+          "Revenue": 1442900.21,
+          "Share": 0.05147705969977548,
+          "CumulativeShare": 0.16131213439896647,
+          "Class": "A"
+        },
+        {
+          "Product": "T-004",
+          "Revenue": 1430884.83,
+          "Share": 0.05104839773875498,
+          "CumulativeShare": 0.21236053213772144,
+          "Class": "A"
+        },
+        {
+          "Product": "T-005",
+          "Revenue": 1365893.19,
+          "Share": 0.048729749152331726,
+          "CumulativeShare": 0.2610902812900532,
+          "Class": "A"
+        },
+        {
+          "Product": "T-006",
+          "Revenue": 1299867.11,
+          "Share": 0.046374195775634834,
+          "CumulativeShare": 0.307464477065688,
+          "Class": "A"
+        },
+        {
+          "Product": "T-007",
+          "Revenue": 1245660.12,
+          "Share": 0.044440301497266736,
+          "CumulativeShare": 0.35190477856295477,
+          "Class": "A"
+        },
+        {
+          "Product": "T-008",
+          "Revenue": 1208456.13,
+          "Share": 0.04311300803578762,
+          "CumulativeShare": 0.39501778659874237,
+          "Class": "A"
+        },
+        {
+          "Product": "T-009",
+          "Revenue": 1089733.11,
+          "Share": 0.03887743308339528,
+          "CumulativeShare": 0.4338952196821376,
+          "Class": "A"
+        },
+        {
+          "Product": "T-010",
+          "Revenue": 1029037.43,
+          "Share": 0.036712047617910824,
+          "CumulativeShare": 0.4706072673000485,
+          "Class": "A"
+        },
+        {
+          "Product": "T-011",
+          "Revenue": 992438.2,
+          "Share": 0.035406329637818625,
+          "CumulativeShare": 0.5060135969378671,
+          "Class": "A"
+        },
+        {
+          "Product": "T-012",
+          "Revenue": 959538.22,
+          "Share": 0.03423258648992524,
+          "CumulativeShare": 0.5402461834277923,
+          "Class": "A"
+        },
+        {
+          "Product": "T-013",
+          "Revenue": 911612.35,
+          "Share": 0.03252277810951502,
+          "CumulativeShare": 0.5727689615373074,
+          "Class": "A"
+        },
+        {
+          "Product": "T-014",
+          "Revenue": 841717.7,
+          "Share": 0.03002920922248511,
+          "CumulativeShare": 0.6027981707597925,
+          "Class": "A"
+        },
+        {
+          "Product": "T-015",
+          "Revenue": 784441.15,
+          "Share": 0.027985804998607998,
+          "CumulativeShare": 0.6307839757584005,
+          "Class": "A"
+        },
+        {
+          "Product": "T-016",
+          "Revenue": 733877.29,
+          "Share": 0.02618188340941432,
+          "CumulativeShare": 0.6569658591678148,
+          "Class": "A"
+        },
+        {
+          "Product": "T-017",
+          "Revenue": 731043.1,
+          "Share": 0.026080770548788632,
+          "CumulativeShare": 0.6830466297166035,
+          "Class": "A"
+        },
+        {
+          "Product": "T-018",
+          "Revenue": 676113.57,
+          "Share": 0.024121098857361956,
+          "CumulativeShare": 0.7071677285739654,
+          "Class": "A"
+        },
+        {
+          "Product": "T-019",
+          "Revenue": 668185.51,
+          "Share": 0.0238382565546892,
+          "CumulativeShare": 0.7310059851286546,
+          "Class": "A"
+        },
+        {
+          "Product": "T-020",
+          "Revenue": 621143.85,
+          "Share": 0.02215999334326688,
+          "CumulativeShare": 0.7531659784719215,
+          "Class": "A"
+        },
+        {
+          "Product": "T-021",
+          "Revenue": 563681.34,
+          "Share": 0.02010995479086488,
+          "CumulativeShare": 0.7732759332627863,
+          "Class": "A"
+        },
+        {
+          "Product": "T-022",
+          "Revenue": 524726.16,
+          "Share": 0.018720185690702714,
+          "CumulativeShare": 0.7919961189534891,
+          "Class": "A"
+        },
+        {
+          "Product": "T-023",
+          "Revenue": 492122.7,
+          "Share": 0.01755702122152626,
+          "CumulativeShare": 0.8095531401750153,
+          "Class": "A"
+        },
+        {
+          "Product": "T-024",
+          "Revenue": 474348.77,
+          "Share": 0.016922916624847583,
+          "CumulativeShare": 0.8264760567998629,
+          "Class": "B"
+        },
+        {
+          "Product": "T-025",
+          "Revenue": 441990.11,
+          "Share": 0.015768485666226587,
+          "CumulativeShare": 0.8422445424660895,
+          "Class": "B"
+        },
+        {
+          "Product": "T-026",
+          "Revenue": 401492.44,
+          "Share": 0.014323686530538744,
+          "CumulativeShare": 0.8565682289966282,
+          "Class": "B"
+        },
+        {
+          "Product": "T-027",
+          "Revenue": 372194.99,
+          "Share": 0.013278467621948255,
+          "CumulativeShare": 0.8698466966185765,
+          "Class": "B"
+        },
+        {
+          "Product": "T-028",
+          "Revenue": 319200.52,
+          "Share": 0.011387831334669621,
+          "CumulativeShare": 0.8812345279532461,
+          "Class": "B"
+        },
+        {
+          "Product": "T-029",
+          "Revenue": 312900.34,
+          "Share": 0.01116306545014644,
+          "CumulativeShare": 0.8923975934033925,
+          "Class": "B"
+        },
+        {
+          "Product": "T-030",
+          "Revenue": 306711.05,
+          "Share": 0.01094225568893002,
+          "CumulativeShare": 0.9033398490923226,
+          "Class": "B"
+        },
+        {
+          "Product": "T-031",
+          "Revenue": 275343.35,
+          "Share": 0.009823178323528121,
+          "CumulativeShare": 0.9131630274158506,
+          "Class": "B"
+        },
+        {
+          "Product": "T-032",
+          "Revenue": 257547.59,
+          "Share": 0.009188294917472705,
+          "CumulativeShare": 0.9223513223333234,
+          "Class": "B"
+        },
+        {
+          "Product": "T-033",
+          "Revenue": 229113.41,
+          "Share": 0.008173874120227022,
+          "CumulativeShare": 0.9305251964535504,
+          "Class": "B"
+        },
+        {
+          "Product": "T-034",
+          "Revenue": 225381.65,
+          "Share": 0.008040739457847817,
+          "CumulativeShare": 0.9385659359113983,
+          "Class": "B"
+        },
+        {
+          "Product": "T-035",
+          "Revenue": 204007.99,
+          "Share": 0.007278210514960836,
+          "CumulativeShare": 0.9458441464263591,
+          "Class": "B"
+        },
+        {
+          "Product": "T-036",
+          "Revenue": 180371.67,
+          "Share": 0.006434958675858951,
+          "CumulativeShare": 0.952279105102218,
+          "Class": "B"
+        },
+        {
+          "Product": "T-037",
+          "Revenue": 165745.25,
+          "Share": 0.005913144977090419,
+          "CumulativeShare": 0.9581922500793084,
+          "Class": "C"
+        },
+        {
+          "Product": "T-038",
+          "Revenue": 147359.95,
+          "Share": 0.005257229079969383,
+          "CumulativeShare": 0.9634494791592778,
+          "Class": "C"
+        },
+        {
+          "Product": "T-039",
+          "Revenue": 129400.71,
+          "Share": 0.004616513344234203,
+          "CumulativeShare": 0.968065992503512,
+          "Class": "C"
+        },
+        {
+          "Product": "T-040",
+          "Revenue": 116752.52,
+          "Share": 0.00416527518707564,
+          "CumulativeShare": 0.9722312676905877,
+          "Class": "C"
+        },
+        {
+          "Product": "T-041",
+          "Revenue": 103710.04,
+          "Share": 0.003699970298393749,
+          "CumulativeShare": 0.9759312379889814,
+          "Class": "C"
+        },
+        {
+          "Product": "T-042",
+          "Revenue": 89616.19,
+          "Share": 0.0031971566229770125,
+          "CumulativeShare": 0.9791283946119584,
+          "Class": "C"
+        },
+        {
+          "Product": "T-043",
+          "Revenue": 81065.59,
+          "Share": 0.0028921045177667014,
+          "CumulativeShare": 0.9820204991297251,
+          "Class": "C"
+        },
+        {
+          "Product": "T-044",
+          "Revenue": 77713.74,
+          "Share": 0.0027725235645179023,
+          "CumulativeShare": 0.9847930226942431,
+          "Class": "C"
+        },
+        {
+          "Product": "T-045",
+          "Revenue": 64530.87,
+          "Share": 0.0023022101074255514,
+          "CumulativeShare": 0.9870952328016686,
+          "Class": "C"
+        },
+        {
+          "Product": "T-046",
+          "Revenue": 62456.34,
+          "Share": 0.002228198956883841,
+          "CumulativeShare": 0.9893234317585524,
+          "Class": "C"
+        },
+        {
+          "Product": "T-047",
+          "Revenue": 58535.6,
+          "Share": 0.0020883222241420128,
+          "CumulativeShare": 0.9914117539826944,
+          "Class": "C"
+        },
+        {
+          "Product": "T-048",
+          "Revenue": 46422.2,
+          "Share": 0.0016561632912888114,
+          "CumulativeShare": 0.9930679172739832,
+          "Class": "C"
+        },
+        {
+          "Product": "T-049",
+          "Revenue": 43257.25,
+          "Share": 0.0015432502021037982,
+          "CumulativeShare": 0.994611167476087,
+          "Class": "C"
+        },
+        {
+          "Product": "T-050",
+          "Revenue": 33690.67,
+          "Share": 0.0012019518875220308,
+          "CumulativeShare": 0.9958131193636091,
+          "Class": "C"
+        },
+        {
+          "Product": "T-051",
+          "Revenue": 24132.33,
+          "Share": 0.0008609475440471956,
+          "CumulativeShare": 0.9966740669076563,
+          "Class": "C"
+        },
+        {
+          "Product": "T-052",
+          "Revenue": 21216.76,
+          "Share": 0.0007569313619795012,
+          "CumulativeShare": 0.9974309982696358,
+          "Class": "C"
+        },
+        {
+          "Product": "T-053",
+          "Revenue": 15682.72,
+          "Share": 0.0005594983687020621,
+          "CumulativeShare": 0.9979904966383378,
+          "Class": "C"
+        },
+        {
+          "Product": "T-054",
+          "Revenue": 15125.82,
+          "Share": 0.0005396303457105033,
+          "CumulativeShare": 0.9985301269840483,
+          "Class": "C"
+        },
+        {
+          "Product": "T-055",
+          "Revenue": 11812.0,
+          "Share": 0.0004214061547428481,
+          "CumulativeShare": 0.9989515331387911,
+          "Class": "C"
+        },
+        {
+          "Product": "T-056",
+          "Revenue": 11041.54,
+          "Share": 0.0003939191427225996,
+          "CumulativeShare": 0.9993454522815137,
+          "Class": "C"
+        },
+        {
+          "Product": "T-059",
+          "Revenue": 5259.15,
+          "Share": 0.00018762598871620805,
+          "CumulativeShare": 0.99953307827023,
+          "Class": "C"
+        },
+        {
+          "Product": "T-057",
+          "Revenue": 5245.49,
+          "Share": 0.00018713865311903674,
+          "CumulativeShare": 0.999720216923349,
+          "Class": "C"
+        },
+        {
+          "Product": "T-058",
+          "Revenue": 4465.0,
+          "Share": 0.00015929380976353001,
+          "CumulativeShare": 0.9998795107331125,
+          "Class": "C"
+        },
+        {
+          "Product": "T-060",
+          "Revenue": 2199.62,
+          "Share": 7.847387454245373e-05,
+          "CumulativeShare": 0.999957984607655,
+          "Class": "C"
+        },
+        {
+          "Product": "T-061",
+          "Revenue": 610.32,
+          "Share": 2.177384053188749e-05,
+          "CumulativeShare": 0.9999797584481869,
+          "Class": "C"
+        },
+        {
+          "Product": "T-062",
+          "Revenue": 567.37,
+          "Share": 2.0241551813109524e-05,
+          "CumulativeShare": 1.0,
+          "Class": "C"
+        }
+      ]
+    }
+  ]
+}
