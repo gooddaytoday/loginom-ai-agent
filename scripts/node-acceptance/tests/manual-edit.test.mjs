@@ -126,9 +126,10 @@ test('manual browser saves once, closes and reopens to prove persistence', async
         state.events.push('login:'+phase);
         const page = {
           open:o => {
-            state.events.push('open:'+phase);
+            state.events.push(o.bindOpenOnly ? 'bind:'+phase : 'open:'+phase);
             state.graph = structuredClone(state.saved);
-            return {status:'READY', document_id:phase, workflow_ref:{workflow_id:'flow',tab_tid:'workflow',navigation_path:[]}, package_ref:{path:o.packagePath}};
+            return {status:'READY', document_id:phase, loginom_account:'tester', effect_possible:false, created_draft:false,
+              workflow_ref:{workflow_id:'flow',tab_tid:'workflow',navigation_path:[]}, package_ref:{path:o.packagePath,persisted:true}};
           },
           clean:() => {state.events.push('logout:'+phase);return {package_closed:true,logged_out:true};},
         };
@@ -159,7 +160,7 @@ test('manual browser saves once, closes and reopens to prove persistence', async
       export const createActionRuntime = () => ({run:async () => {
         state.events.push('save');
         if (!state.dropSave) state.saved = structuredClone(state.graph);
-        return {status:'SUCCEEDED', cleanup_complete:true, output:{save_completed:true}};
+        return {status:'SUCCEEDED', cleanup_complete:true, output:{save_completed:true,reopened:state.reopenSave}};
       }});`,
     'executor/catalog/actions.json': JSON.stringify({actions:[{action_key:'package.save_checkpoint',effect:{}}]}),
     'executor/catalog/selectors.json': JSON.stringify({selectors:[]}),
@@ -183,6 +184,13 @@ test('manual browser saves once, closes and reopens to prove persistence', async
 
   state.saved = before;
   state.events = [];
+  state.reopenSave = true;
+  await run();
+  assert.deepEqual(state.events.slice(3,7),['save','bind:edit','logout:edit','close:edit']);
+
+  state.saved = before;
+  state.events = [];
+  state.reopenSave = false;
   state.dropSave = true;
   await assert.rejects(run(), /PERSISTED_GRAPH_MISMATCH/);
   assert.equal(state.events.filter(event => event === 'save').length, 1);

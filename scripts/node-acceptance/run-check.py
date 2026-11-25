@@ -2422,6 +2422,20 @@ def check_tree(port, expected):
             assert actual.get('is_null') is (kind == 'null') and (kind != 'null' or actual.get('precision') == 'exact_null'), 'TREE_NULL'
 
 
+def cli_cleanup_paths(profile):
+    return (set(profile.rglob('saved-package-cleanup.json')),
+            set((profile / 'loginom/runtime').glob('runtime-close-*.json')))
+
+
+def check_fresh_cli_close(profile, package, before):
+    cleanup_paths, ack_paths = cli_cleanup_paths(profile)
+    receipts = [read(path) for path in cleanup_paths - before[0]]
+    acks = [read(path) for path in ack_paths - before[1]]
+    assert receipts and all(r.get('package_closed') is True and r.get('logged_out') is True and r.get('package_path') == package
+                            and not r.get('unsaved_changes_discarded') for r in receipts), 'MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED'
+    assert acks and all(a.get('closed_ack') is True for a in acks), 'MANUAL_EDIT_CLI_CLOSE_ACK_MISSING'
+
+
 def check_case_excel_artifact(replies, profile, folder, artifact, output):
     destination = artifact['destination']
     assert any(reply.get('status') == 'SUCCEEDED'
@@ -2485,7 +2499,7 @@ class Runner:
         result['location'] = str(journal) + ':1'
         journal.write_text(json.dumps(result, ensure_ascii=False) + '\n')
 
-    def phase(self, name, command, folder, timeout=1800, stdin=None, env=None, cwd=None):
+    def phase(self, name, command, folder, timeout=1800, stdin=None, env=None, cwd=None, check_exit=True):
         timing = dict(name=name, scenario=self.current['scenario'] if self.current else None,
                       queued=time.time(), started=None)
         self.report.setdefault('phase_timings', []).append(timing)
@@ -2530,7 +2544,9 @@ class Runner:
                         raise TimeoutError(name + ' deadline')
                     try: child.wait(timeout=1)
                     except subprocess.TimeoutExpired: pass
-                assert child.returncode == 0, f'{name} exit={child.returncode}: {folder / (name + ".stderr")}:1'
+                if check_exit:
+                    assert child.returncode == 0, f'{name} exit={child.returncode}: {folder / (name + ".stderr")}:1'
+                return child.returncode
         finally:
             timing['finished'] = time.time()
             timing['queue_seconds'] = (timing['started'] if timing['started'] is not None else timing['finished']) - timing['queued']
@@ -2998,6 +3014,8 @@ class Runner:
         (folder / 'task.md').write_text(prompt)
         env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile), LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG='1', LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE='1', LOGINOM_AI_AGENT_PURE='1')
         graph_start = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+        cli_before = cli_cleanup_paths(profile) if port_output else None
+        exit_status = 0
         if spec.get('two_turn'):
             assert session is None, 'TWO_TURN_REQUIRES_FRESH_CHAT'
             assert MODEL == 'openai/gpt-6.1-sol', 'TWO_TURN_REQUIRES_DEFAULT_MODEL'
@@ -3020,8 +3038,17 @@ class Runner:
             self.phase('model', [sys.executable, '-B', REPO / 'scripts/node-acceptance/run-check-two-turn.py',
                        folder / 'two-turn.json'], folder, timeout=1800, env=env, cwd=workspace)
         else:
-            self.phase('model', command + ['--', prompt], folder, timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace)
+            exit_status = self.phase('model', command + ['--', prompt], folder, timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace,
+                                     **({'check_exit': False} if port_output else {}))
         events = list(records(folder / 'model.stdout'))
+        if exit_status:
+            cli_error = next((line for line, event in reversed(events)
+                              if event.get('type') == 'error' and (event.get('error') or {}).get('name') == 'CLI_TOOL_FAILED'), None)
+            assert cli_before and exit_status == 1 and cli_error is not None, f'model exit={exit_status}: {folder / "model.stderr"}:1'
+            self.current['cli_exit'] = dict(code='CLI_TOOL_FAILED', location=f'{folder / "model.stdout"}:{cli_error}')
+            # A nonzero CLI exit remains a failed turn. Later checks may prove
+            # the requested work and its saved, closed package are usable.
+            check_fresh_cli_close(profile, package, cli_before)
         observed_session = next((e['sessionID'] for _, e in events if e.get('sessionID')), None)
         assert observed_session, 'MODEL_SESSION_MISSING'
         assert not (spec.get('attach_all') and session and observed_session != session), 'CASE_SESSION_CHANGED'
@@ -3793,13 +3820,8 @@ class Runner:
         self.current['csv'] = D76_STATUS if any(self.current.get('d76', {}).values()) else 'PASS'
         return session, expected, actual, delimiter
 
-    def manual_edit(self, edit, stage, profile, package, login, build, existing_cleanup, existing_ack,
-                    *, prior=None, expected_graph=None):
-        receipts = [read(path) for path in set(profile.rglob('saved-package-cleanup.json')) - existing_cleanup]
-        acknowledgements = [read(path) for path in set((profile / 'loginom/runtime').glob('runtime-close-*.json')) - existing_ack]
-        assert receipts and all(r.get('package_closed') is True and r.get('logged_out') is True and r.get('package_path') == package
-                                and not r.get('unsaved_changes_discarded') for r in receipts), 'MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED'
-        assert acknowledgements and all(a.get('closed_ack') is True for a in acknowledgements), 'MANUAL_EDIT_CLI_CLOSE_ACK_MISSING'
+    def manual_edit(self, edit, stage, profile, package, login, build, before, *, prior=None, expected_graph=None):
+        check_fresh_cli_close(profile, package, before)
         output = stage / 'manual'
         output.mkdir()
         config = dict(login=login, packagePath=package, edit=edit)
@@ -3865,12 +3887,12 @@ class Runner:
                         turn['status'] = 'PENDING'
                         r.update(csv='—', save='—', cleanup='—')
                         r.pop('graph', None)
+                        r.pop('cli_exit', None)
                         stage = folder / turn['case']
                         stage.mkdir()
                         prior = baseline
                         manual = step_spec.get('manual_edit')
-                        existing_cleanup = set(profile.rglob('saved-package-cleanup.json')) if manual else set()
-                        existing_ack = set((profile / 'loginom/runtime').glob('runtime-close-*.json')) if manual else set()
+                        cli_before = cli_cleanup_paths(profile) if manual else None
                         session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session,
                             **({'baseline': baseline} if baseline is not None else {}))
                         observed_graph = stage / 'graph-observed.json'
@@ -3878,11 +3900,13 @@ class Runner:
                             baseline = read(observed_graph)
                         if manual and not r.get('failure_class'):
                             turn['manual_edit'] = dict(kind=manual['kind'], status='FAIL', journal=str(stage / 'manual/execution-events.jsonl'))
-                            baseline = self.manual_edit(manual, stage, profile, r['package'], login, build, existing_cleanup, existing_ack,
+                            baseline = self.manual_edit(manual, stage, profile, r['package'], login, build, cli_before,
                                 prior=prior, expected_graph=expected.get('graph'))
                             turn['manual_edit']['status'] = 'PASS'
-                        turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class') if k in r},
-                                    status='FAIL' if r.get('failure_class') else 'PASS')
+                        turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class', 'cli_exit') if k in r},
+                                    status='FAIL' if r.get('failure_class') or r.get('cli_exit') else 'PASS')
+                        if 'cli_exit' in turn:
+                            turn.setdefault('failure_class', turn['cli_exit']['code'])
                         active_turn = None
                         if spec.get('attach_all') and r.get('failure_class'):
                             break
@@ -3929,6 +3953,10 @@ class Runner:
                         r.update(cold='PASS', cleanup='both PASS')
                         if spec.get('fs_case'):
                             self.fs_files(spec, folder, login, build, 'fs-cold')
+                    cli_failures = [turn['cli_exit'] for turn in r['turns'] if 'cli_exit' in turn]
+                    if cli_failures and not r.get('failure_class'):
+                        r.update(failure_class=cli_failures[0]['code'], location=cli_failures[0]['location'],
+                                 detail='CLI returned a nonzero exit after the validated turn')
                     r['status'] = 'FAIL' if r.get('failure_class') else (D76_STATUS if r.get('csv') == D76_STATUS else 'PASS')
                 except Exception as error:
                     if isinstance(error, TimeoutError) and not r.get('started') and self.report['phase'].startswith('gate:'):
@@ -3936,7 +3964,7 @@ class Runner:
                     else:
                         self.failure(r, error, folder)
                     if active_turn is not None:
-                        active_turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class') if k in r},
+                        active_turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class', 'cli_exit') if k in r},
                                            status=r['status'])
                 finally:
                     if r.get('dataset'):

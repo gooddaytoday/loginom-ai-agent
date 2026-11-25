@@ -679,6 +679,9 @@ unique numeric scalar condition on the given field. The edit fails the chain
 if the gesture, graph delta, save, persistence or cleanup cannot be proved.
 Use `manual/execution-events.jsonl` and `manual/result.json` in the preceding
 turn's directory to read the before, after and persisted evidence.
+For native-port turns, a terminal `CLI_TOOL_FAILED` is still a failed turn.
+The runner may continue if that turn's outputs, save and fresh package
+close and logout all pass verification.
 
 Any turn may add `graph` to `expected.json`. The runner checks the latest
 complete graph recorded during the turn in the existing runtime journal.

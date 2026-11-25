@@ -107,6 +107,17 @@ async function filterThreshold({page, adapter, request, readFilterBrowser, recor
   await canvas.locator('[data-tid=' + JSON.stringify(nodeTid) + ']').click({timeout:remaining()});
   await canvas.locator('[data-tid=' + JSON.stringify(nodeTid + ';Setting') + ']').click({timeout:remaining()});
   const close = locator(page, wizard + ';btnClose');
+  const discardWizard = async timeout => {
+    await close.click({timeout});
+    const question = page.locator('[data-tid="msgbox;cnt;cnt;cmp"]:visible,[data-tid="msgbox-1;cnt;cnt;cmp"]:visible');
+    await Promise.race([close.waitFor({state:'hidden', timeout}), question.waitFor({state:'visible', timeout})]);
+    if (await question.isVisible()) {
+      requireProof((await question.innerText({timeout})).trim() === 'Вы действительно хотите закрыть мастер настройки?', 'FILTER_CLOSE_DIALOG_UNEXPECTED');
+      const tid = await question.getAttribute('data-tid', {timeout});
+      await locator(page, tid.split(';')[0] + ';tlb;yes').click({timeout});
+      await close.waitFor({state:'hidden', timeout});
+    }
+  };
   try {
     const ready = await Promise.race([
       panel.waitFor({state:'visible', timeout:remaining()}).then(() => 'panel'),
@@ -136,8 +147,7 @@ async function filterThreshold({page, adapter, request, readFilterBrowser, recor
     requireProof(matches.length === 1 && (readOnly || matches[0].cells?.value), 'FILTER_CONDITION_ABSENT_OR_AMBIGUOUS');
     const row = matches[0];
     if (readOnly) {
-      await close.click({timeout:remaining()});
-      await panel.waitFor({state:'hidden', timeout:remaining()});
+      await discardWizard(remaining());
       return rows;
     }
     requireProof(row.value !== edit.value && (row.type === 'real' || Number.isSafeInteger(edit.value)), 'FILTER_LITERAL_INVALID');
@@ -151,23 +161,30 @@ async function filterThreshold({page, adapter, request, readFilterBrowser, recor
       editing = await read();
     }
     await record({phase:'filter_editor', verified:editing.verified, reason:editing.reason, editor:editing.editor});
-    requireProof(editing.verified && editing.editor?.record_id === row.record_id, 'FILTER_EDITOR_UNVERIFIED');
+    requireProof(editing.verified && editing.editor?.record_id === row.record_id && editing.editor.field === 'Value', 'FILTER_EDITOR_UNVERIFIED');
     const decimal = editing.numeric_inputs[0]?.decimal_separator ?? editing.decimal_separator;
     requireProof(['.', ','].includes(decimal), 'FILTER_NUMBER_LOCALE');
-    await editor.fill(String(edit.value).replace('.', decimal), {timeout:remaining()});
+    const text = String(edit.value).replace('.', decimal);
+    await editor.click({timeout:remaining()});
+    await editor.press('ControlOrMeta+A', {timeout:remaining()});
+    await page.keyboard.type(text);
+    requireProof(await editor.inputValue({timeout:remaining()}) === text, 'FILTER_INPUT_MISMATCH');
     await editor.press('Tab', {timeout:remaining()});
-    const actual = filterRows(await read());
     const expected = rows.map((item,i) => i === row.index ? {...item, value:edit.value} : item);
+    const settleDeadline = Math.min(deadline, Date.now() + 5000);
+    let actual = filterRows(await read());
+    while (!isDeepStrictEqual(actual, expected) && Date.now() < settleDeadline) {
+      await page.waitForTimeout(100);
+      actual = filterRows(await read());
+    }
+    await record({phase:'filter_after', rows:actual});
     requireProof(isDeepStrictEqual(actual, expected), 'FILTER_READBACK_MISMATCH');
     await locator(page, wizard + ';btnDone').click({timeout:remaining()});
     await panel.waitFor({state:'hidden', timeout:remaining()});
     return {status:'SUCCEEDED', cleanup_complete:true, change:{node_id:ref.node_id, field:edit.field, before:row.value, after:edit.value}, rows:expected};
   } catch (error) {
     try {
-      if (await close.isVisible()) {
-        await close.click({timeout:3000});
-        await close.waitFor({state:'hidden', timeout:3000});
-      }
+      if (await close.isVisible()) await discardWizard(5000);
     } catch (cleanupError) {
       await record({phase:'filter_cleanup_error', error:cleanupError.message});
     }
@@ -201,7 +218,7 @@ export async function runManualEdit(root, output, {login, packagePath, edit, pos
   const sessionId = randomUUID();
   const record = createExecutionJournal({directory:output, metadata:{sessionId}, knownSecrets:[login.password].filter(Boolean)});
 
-  return withPackage('edit', async ({page, adapter, request, execute}) => {
+  return withPackage('edit', async ({page, adapter, request, execute, rebind}) => {
     const deadline = Date.now() + 90_000;
     let filterReceipt;
     const editFilter = async (ref, value, end) => {
@@ -216,6 +233,8 @@ export async function runManualEdit(root, output, {login, packagePath, edit, pos
     const saved = await runtime.run('package.save_checkpoint', {path:packagePath, conflict_policy:'replace'}, {operationId:'manual-save'});
     await record({phase:'save', status:saved.status, save_completed:saved.output?.save_completed, error:saved.error});
     requireProof(saved.status === 'SUCCEEDED' && saved.output?.save_completed === true && saved.cleanup_complete === true, 'SAVE_UNCONFIRMED');
+    if (saved.output.reopened || saved.trace?.some(event => event.event === 'save_continuations_observed'
+        && event.recovered_reopen === true && event.native_identity_verified === true)) await rebind();
     return {effect, filterReceipt};
   }).then(async ({value:{effect, filterReceipt}, cleanup}) => {
     const {value:persisted, cleanup:reopen_cleanup} = await withPackage('reopen', async ({page, adapter, request}) => {
@@ -249,7 +268,20 @@ export async function runManualEdit(root, output, {login, packagePath, edit, pos
       readOnly = ready.workflow_ref?.navigation_path.some(item => item.label.endsWith('(только чтение)')) === true;
       await record({phase:phase + '_open', status:ready.status, reason:ready.reason, path_matches:pathMatches, read_only:readOnly});
       requireProof(ready.status === 'READY' && pathMatches && !readOnly, 'OPEN_UNCONFIRMED');
-      value = await work({page, execute, request:{document_id:ready.document_id, workflow_ref:ready.workflow_ref},
+      const rebind = async () => {
+        // Some Save checkpoints reopen the package in a new tab. Adopt only
+        // its already open native identity before the guarded Close.
+        const bound = await execute(makeWorkspacePrepareCode({loginomUrl, compatibility, sessionId,
+          operationId:operationId + '-saved-bind', intent:'open_package', packagePath, bindOpenOnly:true, timeoutMs:5000}));
+        const accepted = bound?.status === 'READY' && bound.effect_possible === false && bound.created_draft === false
+          && bound.document_id === ready.document_id && bound.loginom_account === ready.loginom_account
+          && bound.package_ref?.path === packagePath && bound.package_ref.persisted === true
+          && bound.workflow_ref.workflow_id === ready.workflow_ref.workflow_id;
+        await record({phase:'save_reopen_binding', accepted, reason:bound?.reason});
+        requireProof(accepted, 'SAVED_REOPEN_UNBOUND');
+        ready = bound;
+      };
+      value = await work({page, execute, rebind, request:{document_id:ready.document_id, workflow_ref:ready.workflow_ref},
         adapter:createNodeTargetBrowserAdapter({execute, origin, build, pinned, record})});
     } catch (error) {
       failure = error;

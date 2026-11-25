@@ -2025,8 +2025,9 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                     self.assertIsNone(session)
                     runner.write(cleanup, proof)
                     runner.write(ack, dict(closed_ack=True))
+                    instance.current['cli_exit'] = dict(code='CLI_TOOL_FAILED', location='first/model.stdout:1')
                     with self.assertRaisesRegex(AssertionError, 'MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED'):
-                        instance.manual_edit(edit, stage, profile, package, login, build, {cleanup}, {ack})
+                        instance.manual_edit(edit, stage, profile, package, login, build, ({cleanup}, {ack}))
                 else:
                     self.assertEqual(session, 'same-session')
                     self.assertEqual(baseline['nodes']['node']['label'], 'After')
@@ -2042,7 +2043,9 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                 instance.run()
             self.assertEqual(calls, ['setup', 'first', 'manual-edit', 'second'])
             result = instance.report['runs'][0]
-            self.assertEqual(result['status'], 'PASS')
+            self.assertEqual(result['status'], 'FAIL')
+            self.assertEqual(result['failure_class'], 'CLI_TOOL_FAILED')
+            self.assertEqual([turn['status'] for turn in result['turns']], ['FAIL','PASS'])
             self.assertEqual(result['turns'][0]['manual_edit']['status'], 'PASS')
 
     def test_exact_graph_detects_replaced_moved_and_extra_nodes_or_edges(self):
