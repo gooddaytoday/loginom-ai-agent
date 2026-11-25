@@ -108,6 +108,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   }
   if(mode==='lookup')return r?{phase:r.phase,port_guid:r.port.FGuid}:null;
   if(['cleanup_menu','verify_menu_closed','reconcile_menu','release_opening'].includes(mode)) {
+   const immediateCleanup=mode==='cleanup_menu'||mode==='verify_menu_closed';
    if(mode==='release_opening'){
     const expected=task.release_opening,menuOnly=expected.surface==='graph';
     const phases=menuOnly?['menu_issued']:['open_issued','deactivation_issued','verified'];
@@ -135,14 +136,17 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     try{menu.hide();}catch{fail('Native port menu hide failed');}
     return {hide_issued:true};
    }
-   if((r.phase==='menu_issued'||r.menuClosed)&&r.menuObserved!==true)fail('Original port menu was not observed');
+   if(immediateCleanup&&r.menuObserved!==true)fail('Original port menu was not observed');
    const blockers=[...document.querySelectorAll('[role="dialog"],.bg-dialog,.x-message-box,.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible);
    if(blockers.length){
-    if(['reconcile_menu','release_opening'].includes(mode)&&blockers.every(ownGraphMask))return {reason:'port_graph_busy'};
+    if(!immediateCleanup&&blockers.every(ownGraphMask))return {reason:'port_graph_busy'};
     fail('Original port opening graph is blocked');
    }
-   if(r.phase==='menu_issued')r.menuClosed=true;
-   r.phase='released';
+   // Abandon commits the release after its quiet graph readback.
+   if(mode!=='reconcile_menu'){
+    if(r.phase==='menu_issued')r.menuClosed=true;
+    r.phase='released';
+   }
    return {phase:r.phase,verified:true,surface:'graph',document_id:r.document_id,workflow_id:r.workflow_id,node_id:r.node_id,
     direction,port:r.portIndex,native_index:r.nativeIndex,port_guid:r.portGuid,opening_operation_id:r.operation_id};
   }
@@ -427,12 +431,13 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   }
   fail('Unknown port opening phase');
  },{task,mode});
- const settled=async mode=>{
+ const settled=async(mode,deadline=task.deadline)=>{
   let busy;
-  while(remaining()>0){
+  for(;;){
+   remaining(deadline);
    const result=await inspect(mode);if(result?.reason!=='port_graph_busy')return result;
    if(!busy){busy={event:direction+'_port_graph_busy',mode,samples:0};trace.push(busy);}
-   busy.samples++;await page.waitForTimeout(Math.min(100,remaining()));
+   busy.samples++;await page.waitForTimeout(Math.min(100,remaining(deadline)));
   }
  };
  const finish=async()=>{while(remaining()>0){const result=await settled('finish');if(!result.pending)return result;await page.waitForTimeout(Math.min(100,remaining()));}};
@@ -503,9 +508,9 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   remaining(menuDeadline);
   await page.mouse.click(issued.point.x,issued.point.y,{button:'right'});
   await page.locator('[data-tid="mn;mniConfigurePort"]:visible').waitFor({state:'visible',timeout:remaining(menuDeadline)});
-  trace.push({event:direction+'_port_menu_verified',...await settled('menu')});
+  trace.push({event:direction+'_port_menu_verified',...await settled('menu',menuDeadline)});
   await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({trial:true,timeout:remaining(menuDeadline)});
-  trace.push({event:direction+'_port_open_issued',...await settled('open_issued')});
+  trace.push({event:direction+'_port_open_issued',...await settled('open_issued',menuDeadline)});
   menuPending=false;
   await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({timeout:remaining()});
   trace.push({event:direction+'_port_open_returned'});

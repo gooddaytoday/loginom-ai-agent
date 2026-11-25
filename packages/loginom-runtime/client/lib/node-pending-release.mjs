@@ -168,8 +168,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
    portOpening=await channel.reconcileInputPortOpening(ref,inputOpening);
    requireValue(portOpening.port_guid===inputOpening.port_guid,
     'The stopped input opening port identity changed');
-   if(inputOpening.surface==='wizard')
-    releasePortOpening=()=>channel.reconcileInputPortOpening(ref,inputOpening,{release:true});
+   releasePortOpening=()=>channel.reconcileInputPortOpening(ref,inputOpening,{release:true});
   }
   const graphReturn=n?.surface==='graph'&&w?.status==='absent'
     &&['confirm_wizard_close','finish_wizard','execute_wizard'].includes(gestures[0]?.verb);

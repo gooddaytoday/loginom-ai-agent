@@ -431,6 +431,26 @@ test('input menu timeout reserves time for the exact native hide and readback',a
  assert.equal(result.status,'NOT_APPLIED',result.error);
 });
 
+for(const mode of ['menu','open_issued'])test('an owned mask leaves time to hide the input menu at '+mode,async t=>{
+ t.mock.timers.enable({apis:['Date'],now:10000});
+ const f=fixture('input'),evaluate=f.page.evaluate;
+ f.task.deadline=Date.now()+4000;
+ f.page.waitForTimeout=async ms=>t.mock.timers.tick(ms);
+ f.page.evaluate=(fn,arg)=>{
+  if(arg.mode===mode&&!f.flags.graphMasks)groupingBusy(f);
+  return evaluate(fn,arg);
+ };
+ let timeLeft;
+ f.graph.FPortContextMenu.hide=()=>{timeLeft=f.task.deadline-Date.now();f.menu.visible=false;};
+ const failed=await f.run();
+ assert.equal(timeLeft,1000);
+ assert.equal(failed.status,'AMBIGUOUS');
+ assert.ok(failed.trace.some(e=>e.event==='input_port_graph_busy'&&e.mode===mode));
+ assert.equal(failed.trace.find(e=>e.event==='input_port_menu_cleanup_failed')?.reason,'Original port opening graph is blocked');
+ assert.equal(f.prep.inputPortOpenReceipts.get('open').phase,'menu_issued');
+ assert.deepEqual(f.gestures,[f.portDom.tid]);
+});
+
 test('a replacement native menu cannot inherit permission to configure a port',async()=>{
  const f=fixture('input'),locate=f.page.locator;
  let hides=0;
@@ -482,15 +502,31 @@ for(const fault of ['none','unseen','visible-menu','foreign-menu','foreign-port'
   if(fault==='foreign-graph')f.card.Controller.FController={...f.graph};
   if(fault==='changed-port')f.port.data={};
   const result=await openPreparedOutputPort(f.page,{...f.task,reconcile_only:true},f.readNode);
-  assert.equal(result.status,fault==='none'?'SUCCEEDED':'NOT_APPLIED',result.error);
-  if(fault==='none'){
+  const quiet=['none','unseen'].includes(fault);
+  assert.equal(result.status,quiet?'SUCCEEDED':'NOT_APPLIED',result.error);
+  if(quiet){
    assert.equal(result.surface,'graph');
    assert.equal(result.port_guid,'port');
-   assert.equal(f.prep.inputPortOpenReceipts.get('open').phase,'released');
   }
-  if(fault==='unseen')assert.equal(f.prep.inputPortOpenReceipts.get('open').phase,'menu_issued');
+  assert.equal(f.prep.inputPortOpenReceipts.get('open').phase,'menu_issued');
   assert.deepEqual(f.gestures,[f.portDom.tid]);
  });
+
+for(const fault of ['phase','GUID','native index'])test('final release refuses a stopped input opening with changed '+fault,async()=>{
+ const f=fixture('input');
+ f.page.locator=()=>({waitFor:async()=>{throw Error('Menu wait failed');}});
+ f.graph.FPortContextMenu.hide=()=>{};
+ assert.equal((await f.run()).status,'AMBIGUOUS');
+ f.menu.visible=false;
+ const receipt=f.prep.inputPortOpenReceipts.get('open');
+ if(fault==='phase')receipt.phase='reserved';
+ const expected={surface:'graph',port_guid:fault==='GUID'?'foreign':'port',native_index:fault==='native index'?1:0};
+ const result=await openPreparedOutputPort(f.page,{...f.task,release_opening:expected},f.readNode);
+ assert.equal(result.status,'NOT_APPLIED');
+ assert.match(result.error,/Original input opening receipt changed/);
+ assert.equal(receipt.phase,fault==='phase'?'reserved':'menu_issued');
+ assert.deepEqual(f.gestures,[f.portDom.tid]);
+});
 
 for(const icon of ['groupdata','sorting'])test(icon+' deactivation question permits only the same bound busy graph',async()=>{
  for(const foreign of [false,true]){

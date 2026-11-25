@@ -463,15 +463,25 @@ for(const foreign of [false,true])test('abandon_operation after '+type+' input '
  assert.equal(f.calls.filter(c=>c==='mapping').length,1);assert.equal(receipt.cleanup_complete,clean);
 });
 
-for(const stage of ['menu','wizard','manual-menu','manual-wizard'])test('Sort can reopen its exact port after a stopped '+stage+' is released',async()=>{
+for(const stage of ['menu','wizard','manual-menu','manual-wizard','unseen-menu','manual-unseen-menu','ownerless-menu','manual-ownerless-menu'])test('Sort can reopen its exact port after a stopped '+stage+' is released',async()=>{
  const wizard=stage.endsWith('wizard'),manual=stage.startsWith('manual-'),binding={document_id:'doc',workflow_ref:workflow,node};
+ const unseen=stage.includes('unseen'),ownerless=stage.includes('ownerless');
  const native=portOpeningFixture('input',{binding,origin:'http://test',operationId:'apply:n7'});
  native.node.FIconCls='bg-vendor-icon-sorting';
  if(stage==='manual-menu')native.graph.FPortContextMenu.hide=()=>{};
+ const rightClick=native.page.mouse.click;
+ if(unseen||ownerless){
+  native.page.mouse.click=async(...args)=>{
+   await rightClick(...args);
+   native.graph.FCurrentPortMenu=null;
+   if(unseen)native.menu.visible=false;
+  };
+ }
  const originalWorkflow=native.card.Controller.Node.data.node;
  const originalLocator=native.page.locator;
  native.page.locator=selector=>{
   const locator=originalLocator(selector),click=locator.click;
+  if(unseen&&selector.includes('mniConfigurePort'))locator.waitFor=async()=>{throw Error('Port menu did not appear');};
   if(selector.includes('mniConfigurePort'))locator.click=async options=>{
    if(!wizard&&options.trial){assert.equal(native.menu.visible,true);throw Error('Configure trial refused');}
    await click(options);
@@ -483,8 +493,14 @@ for(const stage of ['menu','wizard','manual-menu','manual-wizard'])test('Sort ca
   return locator;
  };
  const failed=await native.run();
- assert.equal(failed.status,wizard||manual?'AMBIGUOUS':'NOT_APPLIED',failed.error);
- assert.equal(native.menu.visible,stage==='manual-menu');
+ assert.equal(failed.status,stage==='menu'?'NOT_APPLIED':'AMBIGUOUS',failed.error);
+ assert.equal(native.menu.visible,stage==='manual-menu'||ownerless);
+ const receipts=native.prep.inputPortOpenReceipts,original=receipts.get('apply:n7');
+ if(unseen||ownerless){
+  assert.equal(original.phase,'menu_issued');
+  assert.equal(original.menuObserved,undefined);
+  assert.ok(!failed.trace.some(e=>e.event==='input_port_menu_closed'));
+ }
  const receipt={status:failed.status,action_key:'node.input_port.open.internal',action_revision:'1',operation_id:'apply:n7',
   phase:'port_open',effect_possible:failed.effect_possible,cleanup_complete:failed.cleanup_complete,output:failed,
   error:{code:'OUTPUT_PORT_OPEN_UNCONFIRMED',message:failed.error},trace:failed.trace};
@@ -492,9 +508,10 @@ for(const stage of ['menu','wizard','manual-menu','manual-wizard'])test('Sort ca
   native.wizard.FView.el.dom.visible=false;native.card.Controller.FController=native.graph;
   native.card.Controller.Node.data.node=originalWorkflow;native.flags.loading=0;
  };
- if(manual){native.menu.visible=false;closeNative();}
+ if(manual||ownerless){native.menu.visible=false;closeNative();}
  const ui=surface({wizard:wizard&&!manual,variableMapping:wizard&&!manual}),observe=ui.channel.observe,perform=ui.channel.perform;
  ui.channel.observe=async options=>{
+  if(options.quietGraph&&(unseen||ownerless))assert.equal(original.phase,'menu_issued');
   const state=await observe(options);
   if(state.wizard.status==='observed')state.prepared_node_context.input_port={
    direction:'input',port:0,native_index:0,port_guid:'port',opening_operation_id:'apply:n7'};
@@ -519,9 +536,9 @@ for(const stage of ['menu','wizard','manual-menu','manual-wizard'])test('Sort ca
  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
  assert.equal(f.runtime.hasUnsettledWork(),false);
  f.runtime.assertPreparationAllowed();
- const receipts=native.prep.inputPortOpenReceipts,original=receipts.get('apply:n7');
  assert.equal(original.phase,'released');
  native.page.locator=originalLocator;
+ native.page.mouse.click=rightClick;
  Object.assign(native.task,{operation_id:'new-apply:n7',deadline:Date.now()+10000});
  const reopened=await native.run();
  assert.equal(reopened.status,'SUCCEEDED',reopened.error);
@@ -536,6 +553,25 @@ const stoppedPortReceipt=()=>({operation_id:'apply:n7',action_key:'node.input_po
  phase:'port_open',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false,
  output:{verified:false,cleanup_complete:false},error:{code:'OUTPUT_PORT_OPEN_UNCONFIRMED'},
  trace:[{...menuReserved},{event:'input_port_menu_issued'}]});
+for(const fault of ['wizard claiming menu cleanup','missing reservation'])test('browser recovery rejects a stopped input receipt with '+fault,async()=>{
+ const operation=stopped(),receipt=stoppedPortReceipt();
+ operation.id='apply';operation.nodeApply.pending.phase='input_mapping';
+ operation.lastReceipt={id:receipt.operation_id,operation_id:receipt.operation_id,action_key:receipt.action_key};
+ operation.receipt={state:'completed',receipt};
+ if(fault==='wizard claiming menu cleanup')receipt.trace.push(
+  {event:'input_port_open_issued'},{event:'input_port_open_returned'},{event:'input_port_menu_closed'});
+ else receipt.trace.shift();
+ const {channel}=surface();
+ let observations=0,reconciliations=0;
+ const observe=channel.observe;
+ channel.observe=async options=>{observations++;return observe(options);};
+ channel.reconcileInputPortOpening=async()=>{reconciliations++;};
+ await assert.rejects(verifyRecoveredPendingNode({operation,channel,readReceipt:async()=>operation.receipt}),
+  /The stopped input port receipt changed before browser recovery/);
+ assert.equal(observations,0);
+ assert.equal(reconciliations,0);
+});
+
 for(const [fault,corrupt] of Object.entries({
  'operation phase':(r,op)=>{op.nodeApply.pending.phase='configure';},
  'reference action':(r,op)=>{op.lastReceipt.action_key='ui.act';r.action_key='ui.act';},
