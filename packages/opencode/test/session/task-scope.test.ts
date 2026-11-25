@@ -318,6 +318,10 @@ test("a new task inherits an earlier applied loginom-automation grant only in a 
   expect(TaskScope.inherited({ sessionID, messages: [help, user(2, "А что такое порт?")] })).toBeUndefined()
   const docs = activated(2, first, "package-docs")
   expect(TaskScope.inherited({ sessionID, messages: [first, docs, next] })).toBeUndefined()
+  // A current task that already applied its own profile does not inherit automation.
+  const docsNow = activated(4, next, "package-docs")
+  expect(TaskScope.derive({ sessionID, messages: [first, grant, next, docsNow] })?.profile).toBe("package-docs")
+  expect(TaskScope.inherited({ sessionID, messages: [first, grant, next, docsNow] })).toBeUndefined()
   // A dashboard chat keeps its immutable base and never inherits automation.
   expect(TaskScope.inherited({ sessionID, messages: [first, grant, next], base: "loginom-dashboard" })).toBeUndefined()
   expect(TaskScope.derive({ sessionID, messages: [first, grant, next], base: "loginom-dashboard" })?.profile).toBe(

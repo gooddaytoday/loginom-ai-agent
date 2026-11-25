@@ -1136,7 +1136,7 @@ const layer = Layer.effect(
       function* (sessionID: SessionID) {
         yield* attachmentResolver.retainCompacted(db, fsys, sessionID)
 
-        const turn = yield* turnLifecycle.acquireRun({ sessionID, sessions, agents, permission })
+        const turn = yield* turnLifecycle.acquireRun({ sessionID, sessions, agents, permission, skills })
         const ctx = yield* InstanceState.context
         let structured: unknown
         let step = 0

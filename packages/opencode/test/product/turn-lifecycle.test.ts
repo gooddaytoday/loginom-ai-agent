@@ -15,7 +15,7 @@ const digest = "a".repeat(64)
 
 type Request = { method: string; input: unknown }
 
-function connect(options: { acquire?: "ready" | "refused" } = {}) {
+function connect(options: { acquire?: "ready" | "refused"; scope?: "request" | "apply" } = {}) {
   const requests: Request[] = []
   let receive: ((event: { data: unknown }) => void) | undefined
   LoginomHost.connect({
@@ -28,6 +28,8 @@ function connect(options: { acquire?: "ready" | "refused" } = {}) {
       requests.push({ method, input })
       if (method === "acquire" && options.acquire === "refused")
         return receive?.({ data: { id, error: "LOGINOM_HOST_NOT_READY" } })
+      if (method === "scope" && (input as { mode?: string }).mode === options.scope)
+        return receive?.({ data: { id, error: "LOGINOM_SCOPE_DENIED" } })
       const result =
         method === "acquire" ? { generation: 4 } : method === "scope" ? (input as { scope: unknown }).scope : {}
       receive?.({ data: { id, generation: 4, result } })
@@ -113,7 +115,8 @@ describe("turnLifecycle", () => {
   test("only a catalog with loginom_dock_prepare but no browser Dock tools tells the model to prepare first", async () => {
     connect()
     const { run } = acquire()
-    const line = "Начни с loginom_dock_prepare: остальные loginom_dock_* появятся после подготовки; из истории их не вызывай."
+    const line =
+      "Для работы со сценарием начни с loginom_dock_prepare: остальные loginom_dock_* появятся после подготовки; из истории их не вызывай."
     const systems = await Effect.runPromise(
       Effect.scoped(
         run.pipe(
@@ -134,13 +137,19 @@ describe("turnLifecycle", () => {
     ).toEqual([])
   })
 
-  for (const failure of ["write", "permission"] as const)
+  for (const failure of ["write", "permission", "request", "apply", "revert", "image", "applied"] as const)
     test(
       failure === "write"
         ? "an inherited grant whose DB write fails after the Host applied it stops the loop"
-        : "a refused inherited grant leaves the task on default without a write or a retry",
+        : failure === "image"
+          ? "an image-only message inherits the grant on an ignored synthetic carrier part"
+          : failure === "applied"
+            ? "an inherited grant carries the current bundled skill digest"
+            : failure === "revert"
+              ? "an activation behind the revert boundary is not inherited"
+              : `a ${failure === "permission" ? "permission" : "host " + failure} refusal leaves the inherited task on default without a write or a retry`,
       async () => {
-        const requests = connect()
+        const requests = connect({ scope: failure === "request" || failure === "apply" ? failure : undefined })
         const first = MessageID.ascending()
         const answer = MessageID.ascending()
         const next = MessageID.ascending()
@@ -171,17 +180,39 @@ describe("turnLifecycle", () => {
               },
             ],
           },
-          text(next, 3, "Добавь узел"),
+          failure === "image"
+            ? {
+                info: { ...user, id: next, time: { created: 3 } } as SessionV1.User,
+                parts: [
+                  {
+                    id: PartID.ascending(),
+                    sessionID,
+                    messageID: next,
+                    type: "file",
+                    mime: "image/png",
+                    filename: "chart.png",
+                    url: "data:image/png;base64,iVBORw0KGgo=",
+                  },
+                ],
+              }
+            : text(next, 3, "Добавь узел"),
         ]
         const asked: unknown[] = []
+        const written: unknown[] = []
+        const current = "b".repeat(64)
         const { input } = fakes()
         const run = turnLifecycle.acquireRun({
           ...(input as object),
           sessions: {
             getForExecution: () => Effect.succeed({ id: sessionID, directory: "/fixture/project" }),
-            updatePart: () => Effect.die(Error("DB_WRITE_FAILED")),
+            updatePart: (part: unknown) =>
+              failure === "write" ? Effect.die(Error("DB_WRITE_FAILED")) : Effect.sync(() => (written.push(part), part)),
           },
           agents: { get: () => Effect.succeed({ permission: [] }) },
+          skills: {
+            require: (name: string) =>
+              Effect.succeed({ name, source: "bundled", digest: current, location: "/skills/" + name + "/SKILL.md" }),
+          },
           permission: {
             ask: (request: unknown) =>
               Effect.suspend(() => {
@@ -194,24 +225,42 @@ describe("turnLifecycle", () => {
           Effect.scoped(
             Effect.gen(function* () {
               const turn = yield* run
-              yield* turn.beforeTurn({ session: { id: sessionID } as never, history })
-              yield* turn.beforeTurn({ session: { id: sessionID } as never, history })
+              const session = {
+                id: sessionID,
+                ...(failure === "revert" ? { revert: { messageID: answer } } : {}),
+              } as never
+              yield* turn.beforeTurn({ session, history })
+              yield* turn.beforeTurn({ session, history })
             }),
           ),
         )
         const modes = requests
           .filter((request) => request.method === "scope")
           .map((request) => (request.input as { mode: string }).mode)
-        expect(asked).toHaveLength(1)
+        const grant = { name: "loginom-automation", profile: "loginom-automation", digest: current }
+        expect(asked).toHaveLength(failure === "revert" ? 0 : 1)
         if (failure === "write") {
           expect(Exit.isFailure(exit)).toBe(true)
           if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("DB_WRITE_FAILED")
           expect(modes).toEqual(["bind", "request", "apply"])
-        } else {
-          expect(Exit.isSuccess(exit)).toBe(true)
-          expect(modes).toEqual([])
-          expect(history[2].parts[0].type === "text" && history[2].parts[0].metadata).toBeFalsy()
+          return
         }
+        expect(Exit.isSuccess(exit)).toBe(true)
+        if (failure === "image" || failure === "applied") {
+          expect(modes).toEqual(["bind", "request", "apply"])
+          expect(written).toHaveLength(1)
+          const carrier = history[2].parts.find((part) => part.type === "text")
+          expect(carrier).toMatchObject(
+            failure === "image"
+              ? { type: "text", text: "", synthetic: true, ignored: true, messageID: next, metadata: { skill_activation: grant } }
+              : { type: "text", text: "Добавь узел", metadata: { skill_activation: grant } },
+          )
+          expect(history[2].parts).toHaveLength(failure === "image" ? 2 : 1)
+          return
+        }
+        expect(modes).toEqual(failure === "request" ? ["bind", "request"] : failure === "apply" ? ["bind", "request", "apply"] : [])
+        expect(written).toEqual([])
+        expect(history[2].parts.some((part) => part.type === "text" && part.metadata?.skill_activation)).toBe(false)
       },
     )
 

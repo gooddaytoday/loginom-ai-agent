@@ -1479,6 +1479,11 @@ for (const scenario of ["automation", "help"] as const)
           )
         expect(catalogs).toHaveLength(1)
         const inherited = scenario === "automation"
+        // The prepare-first line reaches the model only while the catalog has prepare but no browser Dock tools.
+        expect(JSON.stringify((yield* llm.inputs).slice(first).map((input) => input.messages))).toContain(
+          inherited ? "Для работы со сценарием начни с loginom_dock_prepare" : "Loginom is available",
+        )
+        expect(JSON.stringify((yield* llm.inputs).slice(first).map((input) => input.messages)).includes("начни с loginom_dock_prepare")).toBe(inherited)
         expect(catalogs[0].includes("loginom_dock_prepare")).toBe(inherited)
         expect(catalogs[0].includes("task")).toBe(!inherited)
         const body = history

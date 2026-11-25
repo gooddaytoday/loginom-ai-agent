@@ -20,10 +20,11 @@ export type AcquireInput = {
   sessions: Session.Interface
   agents: Agent.Interface
   permission: Permission.Interface
+  skills: Skill.Interface
 }
 
 const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
-  const { sessionID, sessions, agents, permission } = input
+  const { sessionID, sessions, agents, permission, skills } = input
   const session = yield* sessions.getForExecution(sessionID).pipe(Effect.orDie)
   const base = DashboardSession.profile(session)
   const status: { failure?: string } = {}
@@ -156,19 +157,34 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
     if (!loginom || !task || !carried || inheriting.has(task.taskMessageID)) return
     inheriting.add(task.taskMessageID)
     const message = history.find((message) => message.info.id === task.taskMessageID)
-    const part = message?.parts.find((part) => part.type === "text" && part.synthetic !== true)
-    if (message?.info.role !== "user" || part?.type !== "text") return
+    if (message?.info.role !== "user") return
+    // An attachment-only message has no text part; an ignored synthetic carrier holds the grant, as for replay.
+    const existing = message.parts.find((part) => part.type === "text")
+    const part: SessionV1.TextPart =
+      existing?.type === "text"
+        ? existing
+        : {
+            id: PartID.ascending(),
+            sessionID,
+            messageID: message.info.id,
+            type: "text",
+            text: "",
+            synthetic: true,
+            ignored: true,
+          }
     let applied = false
     const updated = yield* Effect.gen(function* () {
       const agent = yield* agents.get(message.info.agent)
-      if (!agent) return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
+      // Like the skill command, the grant carries the current bundled skill digest.
+      const grant = TaskScope.bundledActivation(yield* skills.require(carried.name).pipe(Effect.orDie))
+      if (!agent || grant?.profile !== carried.profile) return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
       yield* permission
         .ask({
           sessionID,
           permission: "skill",
           metadata: {},
-          patterns: [carried.name],
-          always: [carried.name],
+          patterns: [grant.name],
+          always: [grant.name],
           ruleset: Permission.merge(agent.permission, session.permission ?? []),
         })
         .pipe(Effect.orDie)
@@ -176,16 +192,16 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
         loginom.scope("bind", { taskMessageID: task.taskMessageID, profile: task.profile }, signal),
       )
       yield* Effect.promise((signal) =>
-        loginom.scope("request", { taskMessageID: task.taskMessageID, profile: carried.profile }, signal),
+        loginom.scope("request", { taskMessageID: task.taskMessageID, profile: grant.profile }, signal),
       )
       return yield* Effect.gen(function* () {
         yield* Effect.promise((signal) =>
-          loginom.scope("apply", { taskMessageID: task.taskMessageID, profile: carried.profile }, signal),
+          loginom.scope("apply", { taskMessageID: task.taskMessageID, profile: grant.profile }, signal),
         )
         applied = true
         return yield* sessions.updatePart({
           ...part,
-          metadata: { ...TaskScope.cleanMetadata(part.metadata), skill_activation: carried },
+          metadata: { ...TaskScope.cleanMetadata(part.metadata), skill_activation: grant },
         })
       }).pipe(Effect.uninterruptible)
     }).pipe(
@@ -195,7 +211,10 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
         applied || Cause.hasInterrupts(cause) ? Effect.failCause(cause) : Effect.succeed(undefined),
       ),
     )
-    if (updated) message.parts = message.parts.map((part) => (part.id === updated.id ? updated : part))
+    if (updated?.type === "text")
+      message.parts = existing
+        ? message.parts.map((part) => (part.id === updated.id ? updated : part))
+        : [...message.parts, updated]
   })
 
   const endTurn = Effect.fnUntraced(function* (turn: {
@@ -280,7 +299,7 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
             "Loginom is available through the bundled loginom_* tools. To create, change or execute a scenario, first activate the bundled loginom-automation skill. Browser Loginom tools are available after activation; then use loginom_dock_prepare for dynamic readiness and input artifacts. Help and diagnostics do not require loginom_dock_prepare. For quality assessment or linting of an existing local package, including structure, notes, node labels, variable names, scores and recommendations, use package-linter if available. Do not activate package-docs or loginom-automation merely to produce a quality review or its report. If package-linter is unavailable, report that it is missing; do not substitute package-docs. For a documentation-only request about a Loginom scenario other than quality assessment or linting, always activate package-docs before replying, including when the local .lgp is missing or only a server package is named. Then request the missing local package; never search for it in the browser. Dock tool names in skills have the loginom_ prefix here. Connection credentials are managed privately by the desktop; never ask the model to enter or reveal them.",
             ...(unprepared(tools)
               ? [
-                  "Начни с loginom_dock_prepare: остальные loginom_dock_* появятся после подготовки; из истории их не вызывай.",
+                  "Для работы со сценарием начни с loginom_dock_prepare: остальные loginom_dock_* появятся после подготовки; из истории их не вызывай.",
                 ]
               : []),
           ]
