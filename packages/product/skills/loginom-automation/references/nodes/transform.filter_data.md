@@ -32,7 +32,7 @@ Builtin: `bindings`; сохранённый `{kind:"variable",name}` допус�
 В слоте binding не задавай literal или `{kind:"variable"}`.
 Подключи W1 `variable_inputs`, kind `control`, input 0. Источник builtin
 `variables.user` использует output 4; настрой его mode `values`, finish `done`,
-сохрани пакет и прочитай переменные отдельным `dock_node_read`. Builtin не Execute.
+проверь `configuration.readback`. Save и чтение — по [карточке](variables.user.md). Без Execute.
 Scalar integer/real/datetime/string, без преобразований; string — `case_sensitive`.
 Real NULL-порог даёт 0 подходящих и все строки в output 1. Datetime — local ISO.
 После Save/cold проверь ссылки MinScore/Since, типы и оба выхода. Проверь `configuration.bindings` после Done.

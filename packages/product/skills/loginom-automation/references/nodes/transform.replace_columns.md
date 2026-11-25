@@ -52,6 +52,5 @@ NULL сопоставляется с NULL, пустая строка отдел�
 Флаг `_Replaced` — boolean. other.null меняет и исходный NULL, флаг true.
 Незаданные поля/правила и output_mode сохраняются. Повторное выполнение:
 parameters={}, inputs=[], mappings=[] с прежним mode. Для порядка столбцов
-задай полный output mapping с autosync=false. Выполни, прочитай таблицу
-и сохрани пакет.
+задай полный output mapping с autosync=false. Выполни узел и проверь сводку порта.
 <!-- /mode -->

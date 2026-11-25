@@ -36,7 +36,7 @@ export const actionDescribeTool = {
 
 export const actionRunTool = {
   name: 'dock_action_run',
-  description: 'Run a pinned action; call dock_action_describe for exact parameters. node.configure_text_import configures an open wizard, commits Done and rereads settings; it does not execute or save the package. package.save_checkpoint awaits Save As with explicit conflict policy. REST connection references additionally require Close/Open and at most one normalization Save; use the returned fresh workspace for further work. Other packages keep the open workflow. Persisted calculations need separate acceptance. Other UI tasks use dock_ui_action. Invalid arguments are task feedback, not a connection failure.',
+  description: 'Run a pinned action; call dock_action_describe for exact parameters. Save the package only when the user explicitly asks. node.configure_text_import configures an open wizard, commits Done and rereads settings; it does not execute or save the package. package.save_checkpoint awaits Save As with explicit conflict policy. REST connection references additionally require Close/Open and at most one normalization Save; use the returned fresh workspace for further work. Other packages keep the open workflow. Persisted calculations need separate acceptance. Other UI tasks use dock_ui_action. Invalid arguments are task feedback, not a connection failure.',
   inputSchema: {
     type: 'object',
     properties: {

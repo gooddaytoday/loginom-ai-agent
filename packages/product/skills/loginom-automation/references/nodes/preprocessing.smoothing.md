@@ -47,5 +47,5 @@
 `mappings:[{direction:"output",port:0,autosync:false,fields:[...]}]`:
 каждое поле с `source:{kind:"configured_field",name:"RowID"}` (аналогично
 X, Tag и X_S) в нужном порядке. Autosync может менять порядок после reopen.
-Прочитай полный выход, экспортируй CSV с исходными типами и сохрани пакет.
+Проверь сводку выхода. Запрошенный CSV экспортируй с исходными типами.
 <!-- /mode -->

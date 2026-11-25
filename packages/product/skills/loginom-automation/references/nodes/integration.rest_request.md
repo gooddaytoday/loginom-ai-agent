@@ -27,7 +27,7 @@ DELETE запрещает body_field/request_content_type. inputs: исходн�
 query_parameters:[]; запрос на строку. Query+Body совместимы; кодируется только query.
 Сырые ответы: импорт → REST → экспорт 0 (RequestID, Response), без JSON-разбора/
 добавления метода. Порт 1 — статусы; RequestID на обоих — индекс строки с нуля.
-Прочитай, выгрузи, сохрани пакет.
+Прочитай и выгрузи запрошенный результат.
 parameters:{} на существующем узле сохраняет настройки.
 
 ## Заголовки
@@ -44,7 +44,7 @@ parameters:{}, inputs:[], variable_inputs:[], mappings:[], finish execute.
 Литерал: тот же REST, прежние connection/query_parameters/body_field/inputs,
 новые headers, finish execute. httpbin: Response.headers["X-Lab-Cycle"], тело Response.data.
 Ответ+исходный RequestId+порт1.HttpStatusCode сведи по правилу ниже;
-выгрузи второй результат, сохрани пакет.
+выгрузи второй результат по просьбе.
 
 ## GET и ответы
 

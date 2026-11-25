@@ -3,6 +3,30 @@ import { expect, test } from "bun:test"
 const skill = await Bun.file(new URL("../skills/loginom-automation/SKILL.md", import.meta.url)).text()
 const chain = skill.split("## Один расчёт цепочки\n")[1].split("\n## Выбор узлов")[0]
 
+test("stepwise edits use the current graph and verify only the requested step", () => {
+  const step = skill.split("## Пошаговая сборка\n")[1]?.split("\n## ")[0] ?? ""
+  expect(step).toContain("Перед каждым шагом наблюдай текущий граф")
+  expect(step).toContain("Ручные правки между сообщениями")
+  expect(step).toContain("Соседние узлы не меняй")
+  expect(step).toContain("одной строкой спроси")
+  expect(step).toContain('finish:"execute"')
+  expect(step).toContain("сводки порта")
+  expect(step).toContain("полную таблицу читай только по просьбе")
+  expect(step).toContain("сколько строк")
+  expect(step).toContain("что мешает запуску")
+})
+
+test("automation references only instruct package save on request or from an existing receipt", async () => {
+  expect(skill).toContain("Пакет сохраняй только по явной просьбе пользователя")
+  expect(skill).not.toContain("После удаления сохрани пакет")
+  const root = new URL("../skills/loginom-automation/references/", import.meta.url)
+  for (const path of ["canvas.md", "workflow.md", "nodes/preprocessing.sampling.md",
+    "nodes/transform.sorting.md", "nodes/variables.user.md", "nodes/datamining.log_regression.md"]) {
+    const reference = await Bun.file(new URL(path, root)).text()
+    expect(reference).not.toMatch(/Сохрани пакет после|Сохрани готовый пакет в конце|и сохрани пакет после|затем сохрани пакет|After every values update, save|Save again before finishing/i)
+  }
+})
+
 test("input replacement requires an explicit user request and preserves the downstream node", async () => {
   const canvas = await Bun.file(new URL("../skills/loginom-automation/references/canvas.md", import.meta.url)).text()
   expect(skill).toContain("вставка узла и замена входа")

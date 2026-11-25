@@ -4,7 +4,7 @@
 Сохраняй типы/значения: целые X/ID — `type:"integer", data_kind:"Непрерывный"`; Real — дробные поля или явно запрошенный Y. После импорта читай все поля полностью.
 Все строки, константа, без нормализации/валидации; `finish:"execute"` — Teach и Execute. Изменения — Teach того же узла.
 Выходы: **0 — прогноз `<target>_rergession` и исходные поля; 1 — коэффициенты `Name`/`<target>_coefficients` с константой; 2 — сводка**. Таблицы: `read.ports:[0,1]`, `sample_rows:100`, `require_exact_numbers:true`.
-CSV прогнозов — `exports.text` от порта 0, `inputs:[{source:regression.node,output:0,input:0}]`, в том числе при `statistics:"full"`. Коэффициенты: порт 1; их CSV — лишь по запросу, отдельно. сохрани пакет; cold без настройки.
+CSV прогнозов — `exports.text` от порта 0, `inputs:[{source:regression.node,output:0,input:0}]`, в том числе при `statistics:"full"`. CSV коэффициентов — по просьбе, порт 1. Cold без перенастройки.
 После Execute читай сводку через `read.variable_ports:[0]` (физический порт 2). Сверь 15 свежих переменных в `VariablesForm`. В `read.ports` указывай табличные порты. Передавай нативные значения.
 
 <!-- mode: enter apply -->

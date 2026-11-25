@@ -24,7 +24,7 @@ are informational. Omit: all train. Readback: percentages and row counts.
 Column: `logistic.partition:{method:"column",field:"Split"}`; Boolean flag,
 false trains, true tests. Exclude it from input_fields; retain it in output.
 No percentages/validation. Reopen/apply verifies saved partition, no Teach.
-After reopened Execute/read, Save again before finishing.
+After reopened Execute/read, Save again if requested.
 
 ## Real frequency weights
 
@@ -73,9 +73,9 @@ input_fields, target_field, event, threshold remain required; read.ports:[0]
 reads all predictions. normalization none/standardize affects predictors;
 omission on existing preserves it. Intercept is unpenalized.
 Execute trains and predicts. Repeat on the same existing target/ref with inputs:[]
-and saved parameters. Save separately; refresh graph refs after reopen.
+and saved parameters. Refresh graph refs after reopen.
 Apply supports Enter only. After reopen use the saved ridge/lasso/elastic_net
 mode and parameters on the same node, inputs:[], mappings:[], finish:"done",
 read.ports:[], without Teach. For reopened CSV create a new exports.text from
-output:0, Execute with technical names and saved order; check CSV and Save.
+output:0, Execute with technical names and saved order; check the requested CSV.
 <!-- /mode -->
