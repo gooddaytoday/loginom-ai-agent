@@ -1,12 +1,16 @@
 // A settled preparation can attest the current contents of the same native
 // scenario in one read. Historical snapshots remain with their operations.
 async function captureWorkspaceStep(page, options) {
-  return page.evaluate(({origin, pathname, expectedBuild, sessionId, workflowRef, replayId, prepareId})=>{
+  return page.evaluate(({origin, pathname, expectedBuild, sessionId, workflowRef, replayId, prepareId,
+    operationId, intent, packagePath, reserveActivation})=>{
     const state=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
     const refused=reason=>({status:'NOT_READY',reason});
     if(location.origin!==origin||location.pathname!==pathname||app?.Version!==expectedBuild
       ||state?.document!==document||workflowRef&&state.id!==workflowRef.document_id) return refused('WORKFLOW_LOST');
     if([...state.receipts.values()].some(r=>r.restore?.pending||r.restore?.replaced))return refused('NATIVE_MESSAGE_BOX_BLOCKED');
+    const activation=state.stepActivation;
+    const request=JSON.stringify({session:sessionId,intent,packagePath,workflowRef});
+    if(activation&&(activation.operationId!==operationId||activation.request!==request))return refused('OPERATION_CONFLICT');
     const replay=replayId&&state.receipts.get(replayId);
     const workflowId=replayId?replay?.workflowId:workflowRef.workflow_id;
     const records=[...state.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===workflowId);
@@ -24,7 +28,7 @@ async function captureWorkspaceStep(page, options) {
     if(!owner||!session)return {status:'UNAVAILABLE'};
     const tabEntries=exact(tabTid);
     if(tabEntries.length!==1||tabEntries[0]!==source.tab)return refused('WORKFLOW_LOST');
-    if(!source.tab.classList.contains('x-tab-active'))return {status:'INACTIVE'};
+    const active=source.tab.classList.contains('x-tab-active');
     const prefix='MF;TF'+(tabSuffix[1]??'');
     if(workflowRef&&workflowRef.prefix!==prefix)return refused('WORKFLOW_CHANGED');
     const main=app.Application?.FInstance?.FMainForm,connection=main?.FMapTree?.FServerConnection;
@@ -44,8 +48,30 @@ async function captureWorkspaceStep(page, options) {
         &&component.el?.dom===picker&&component.hidden===true
         &&[...state.receipts.values()].some(r=>r.openDialogElement===picker&&r.openDialog===component));
     };
-    if([...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog,.x-message-box,.bg-mask-message,.x-mask-msg,.x-form-invalid-under')].some(activeBlocker))
-      return {status:'UNAVAILABLE'};
+    const blockers=[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog,.x-message-box,.bg-mask-message,.x-mask-msg,.x-form-invalid-under')].filter(activeBlocker);
+    if(blockers.length){
+      if(activation&&blockers.some(e=>!e.matches('.bg-mask-message,.x-mask-msg')))return refused('NATIVE_MESSAGE_BOX_BLOCKED');
+      return operationId&&!activation?refused('UI_BLOCKED'):{status:'UNAVAILABLE'};
+    }
+    const tabs=[...document.querySelectorAll('[data-tid^="MF;cntMain;cntWorkspace;Workspace;t.br;tb"]')]
+      .filter(t=>/^MF;cntMain;cntWorkspace;Workspace;t\.br;tb(?:-\d+)?$/.test(t.getAttribute('data-tid')));
+    if(activation&&(activation.tab!==source.tab||activation.owner!==owner||activation.packageNode!==source.packageNode
+      ||activation.preserved.some(item=>!tabs.includes(item.tab)||!item.graph.isConnected||item.graph.innerHTML!==item.html)))
+      return refused('FOREIGN_WORKFLOW_CHANGED');
+    if(!active){
+      if(reserveActivation){
+        if(activation)return refused('OPERATION_CONFLICT');
+        // Capture a fresh baseline immediately before the one activation.
+        // Recovery can verify this reservation but can never click again.
+        const preserved=tabs.flatMap(tab=>{
+          const suffix=tab.getAttribute('data-tid').match(/;tb(-\d+)?$/)?.[1]??'';
+          const graphs=exact('MF;TF'+suffix+';ModelForm;cmpDiagram');
+          return graphs.length===1?[{tab,graph:graphs[0],html:graphs[0].innerHTML}]:[];
+        });
+        state.stepActivation={operationId,request,tab:source.tab,owner,packageNode:source.packageNode,preserved};
+      }
+      return {status:'INACTIVE',tab_tid:tabTid};
+    }
     const card=main.Items?.Workspace?.getActiveTab?.(),model=card?.Controller?.FController;
     const graph=exact(prefix+';ModelForm;cmpDiagram');
     if(!(model instanceof app.ModelForm)||graph.length!==1||!visible(graph[0])
@@ -66,19 +92,22 @@ async function captureWorkspaceStep(page, options) {
       const last=elements.at(-1),component=globalThis.Ext?.getCmp?.(last.id);
       if(exact(crumbs.at(-1).tid).length!==1||component?.el?.dom!==last||component?._node?.data?.node!==owner)
         return refused('WORKFLOW_CHANGED');
-    }else if(prepareId){
+    }else if(prepareId&&!activation){
       // A new explicit preparation with the existing path still uses the
       // ordinary reservation and verification path.
       return {status:'UNAVAILABLE'};
     }
     if(prepareId){
+      // The operation ID was free at lookup, before the asynchronous tab
+      // gesture. Do not overwrite a receipt that appeared before verification.
       if(state.receipts.has(prepareId))return refused('OPERATION_CONFLICT');
-      state.receipts.set(prepareId,{request:JSON.stringify({session:sessionId,intent:'existing_workflow',packagePath:null,workflowRef}),
+      state.receipts.set(prepareId,{request,
         phase:'verified',stepRefresh:true,workflowId,tab:source.tab,packageNode,nodeTargetWorkflowNode:source.nodeTargetWorkflowNode,
         stepWorkflowNode:owner,crumbs,stepSession:session,
         navigationParentWorkflow:source.navigationParentWorkflow,navigationParentReceipt:source.navigationParentReceipt});
     }
     if(prepareId||replayId)for(const record of records)record.crumbs=crumbs;
+    if(activation)delete state.stepActivation;
     const file=packageNode.PackageFileName;
     const path=typeof file==='string'&&file?'/'+file.replaceAll('\\','/').replace(/^\/+/, ''):null;
     return {status:'READY',document_id:state.id,loginom_account:connection.UserName,refresh_ports:!!source.nodeTargetPortIdentities,
@@ -280,6 +309,11 @@ async function prepareWorkspace(page, options) {
       : options.bindOpenOnly ? [...state.receipts.values()].find(r=>r.phase==='verified'&&r.tab===tab&&r.packageNode===packageNode&&JSON.stringify(r.crumbs)===JSON.stringify(crumbs)) : null;
     const receipt = state.receipts.get(options.operationId);
     if (receipt && receipt.request !== request) return {error:'OPERATION_CONFLICT'};
+    if(mode==='lookup'&&state.stepActivation){
+      const activation=state.stepActivation;
+      if(activation.operationId!==options.operationId||activation.request!==request)return {error:'OPERATION_CONFLICT'};
+      return {exists:!!receipt,step_activation:true,package_gesture:receipt?.packageGesture===true};
+    }
     if (mode==='reserve' && receipt?.preserved.some(item=>!tabs.includes(item.tab)
         || !item.graph.isConnected || item.graph.innerHTML!==item.html)) return {error:'FOREIGN_WORKFLOW_CHANGED'};
     if (mode==='reserve' && !receipt) {
@@ -540,10 +574,21 @@ async function prepareWorkspace(page, options) {
     if (old.phase==='reserved' && (options.intent!=='open_package' || options.recoverOnly))
       return result('NOT_READY','PREVIOUS_ATTEMPT_NOT_COMPLETED',{authenticated:true});
     if (options.bindOpenOnly && old.exists) return result('NOT_READY','OPERATION_CONFLICT',{authenticated:true});
-    if((options.refreshVerified||old.step_refresh)&&old.phase==='verified'
+    if(old.step_activation||(options.refreshVerified||old.step_refresh)&&old.phase==='verified'
       ||!options.recoverOnly&&!old.exists&&options.intent==='existing_workflow'){
-      const refreshed=await captureStep(page,{...options,replayId:old.exists?options.operationId:null,
-        prepareId:old.exists?null:options.operationId});
+      const step={...options,replayId:old.exists?options.operationId:null,prepareId:old.exists?null:options.operationId};
+      if(old.step_activation)effectPossible=true;
+      let refreshed=await captureStep(page,{...step,reserveActivation:!old.step_activation});
+      if(refreshed.status==='INACTIVE'&&!old.step_activation){
+        effectPossible=true;
+        await tid(refreshed.tab_tid).click({timeout:remaining()});
+      }
+      if(refreshed.status==='INACTIVE'||old.step_activation&&refreshed.status==='UNAVAILABLE'){
+        refreshed=await wait('exact_workflow_ready',async()=>{
+          const state=await captureStep(page,step);
+          return ['READY','NOT_READY'].includes(state.status)?state:null;
+        });
+      }
       remaining();
       if(refreshed.status==='READY'){
         const {status,refresh_ports,...proof}=refreshed;
@@ -552,7 +597,10 @@ async function prepareWorkspace(page, options) {
         return result(status,null,{...proof,replayed:old.exists,target_verified:true,ownership_verified:createdDraft,native_step_owner:true,
           interaction_readiness:'driver_verification_required',preserved_workflows:[]});
       }
-      if(refreshed.status==='NOT_READY')return result('NOT_READY',refreshed.reason);
+      if(refreshed.status==='NOT_READY'){
+        if(refreshed.reason==='UI_BLOCKED')effectPossible=false;
+        return result('NOT_READY',refreshed.reason);
+      }
     }
     if (old.exists && old.phase!=='reserved') {
       if (old.tab_tid) await tid(old.tab_tid).click({timeout:remaining()});
@@ -957,15 +1005,18 @@ export async function prepareWorkspaceSession({ metadata, assertAllowed, prepare
     }
     previous = null;
   }
+  // The earlier verified receipt remains a refresh anchor after a read-only
+  // refusal or a lost reply. The browser still verifies it or reconciles its
+  // recorded activation before accepting the new state.
+  const refreshVerified=previous?.refreshVerified===true||wasReady&&previous?.state?.status==='READY';
   metadata.workspaceReady = false;
   try {
     if (request) {
       metadata.workspacePreparation = { identity, operation_id: request.operation_id, attempted: true,
-        effect_possible: true };
+        effect_possible: true, ...(refreshVerified?{refreshVerified:true}:{}) };
       await save();
     }
-    const state = await prepare({ recoverOnly: previous?.effect_possible === true,
-      refreshVerified: wasReady&&previous?.state?.status==='READY' });
+    const state = await prepare({ recoverOnly: previous?.effect_possible === true, refreshVerified });
     if (request) metadata.workspacePreparation = { ...metadata.workspacePreparation, effect_possible: state.effect_possible, state };
     if (signal?.aborted) {
       state.status = 'NOT_READY'; state.reason = 'CANCELLED';

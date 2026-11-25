@@ -723,26 +723,31 @@ for(const renderLabel of [true,false])test('graph observation lists a manually a
  const snapshot=await page.observe();
  const observed=snapshot.nodes.find(n=>n.node_id===node.FGuid);
  assert.ok(observed,'native node missing from the model-facing inventory');
- assert.equal(observed.node_ref.node_label,renderLabel?'Manual_Node':'Manual Node');
+ assert.equal(observed.node_ref.node_label,'Manual_Node');
+ assert.equal(observed.label_text,'Manual Node');
  assert.equal(observed.type,'transform.calculator');
  assert.deepEqual(observed.bounding_box,box);
  assert.ok(snapshot.links.includes(link));
 });
 
 test('model graph inventory reports a native node without a renderer or action refs',async()=>{
- const {page,body,model}=scriptGraphFixture('First','bg-vendor-icon-calcdata');
+ const {page,body,model,node:rendered}=scriptGraphFixture('Calc_1','bg-vendor-icon-calcdata');
+ rendered.FGuid='f4e7502e-9fbb-4bff-8188-2e907fed167c';
+ rendered.FLabel.FRawValue='Calc_1';
  const diagram=model.FDiagram;
  Object.assign(diagram.FmxGraph.view,{scale:2,translate:{x:5,y:10}});
  const node={FGuid:'42e7502e-9fbb-4bff-8188-2e907fed167c',FIconCls:'bg-vendor-icon-calcdata',
   FCell:{geometry:{x:500,y:60,width:50,height:30}},FPorts:[]};
- node.FLabel={parent:node,FCell:{parent:node.FCell},FRawValue:'Manually added'};
+ node.FLabel={parent:node,FCell:{parent:node.FCell},FRawValue:'Calc 1'};
  diagram.FNodes.FCollection.push(node);
  const snapshot=await page.observe(),observed=snapshot.nodes.find(n=>n.node_id===node.FGuid);
- assert.equal(observed.node_ref.node_label,'Manually added');
+ assert.equal(snapshot.nodes.find(n=>n.node_id===rendered.FGuid).node_ref.node_label,'Calc_1');
+ assert.equal(observed.node_ref.node_label,undefined);
+ assert.equal(observed.label_text,'Calc 1');
  assert.equal(observed.type,'transform.calculator');
  assert.deepEqual(observed.bounding_box,{x:1010,y:190,width:100,height:60});
  assert.deepEqual(observed.ports,[]);
- assert.ok(!snapshot.ui.elements.some(e=>e.tid?.includes('Manually added')));
+ assert.ok(!snapshot.ui.elements.some(e=>e.signature?.native_graph?.node_id===node.FGuid));
  assert.equal(body.parentElement,diagram.FmxGraph.container);
 });
 

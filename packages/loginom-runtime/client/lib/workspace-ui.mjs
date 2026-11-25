@@ -899,7 +899,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             }:null;
             if(connected||!shape&&typeof caption==='string'&&caption&&!sensitivePattern.test(caption))
               nativeInventory.set(guid,{key:connected?tid.slice(graphPrefix.length):null,
-                caption:typeof caption==='string'&&!sensitivePattern.test(caption)?short(caption):null,bounds,icon});
+                caption:typeof caption==='string'&&!sensitivePattern.test(caption)?caption.slice(0,240):null,bounds,icon});
           }
           if(!unique(shape)||!tid?.startsWith(graphPrefix))continue;
           const identity=[model,diagram,graph,view,node,cell];
@@ -3890,13 +3890,15 @@ function readRenderedInputMapping(observation) {
       // A saved node's GUID comes only from the existing native/DOM binding,
       // never from its editable label or an arbitrary DOM attribute.
       const native=node&&nativeGraphControl(node);
+      const inventory=native?.node_id&&nativeInventory.get(native.node_id);
       const variablePorts=native?.node_id&&nativeVariablePorts.get(native.node_id);
       if(variablePorts)for(const ports of Object.values(variablePorts))for(const kind of ['variables','control'])
         ports.filter(p=>p.kind===kind).sort((a,b)=>a.native_index-b.native_index).forEach((p,i)=>{p.port=i;});
       return { node_ref: { kind: 'node', node_label: label, workflow_ref: workflow }, bounding_box: node ? boxOf(node) : null,
         ...(native?.node_id?{node_id:native.node_id}:{}),
-        ...(native?.node_id&&nativeInventory.has(native.node_id)?{
+        ...(inventory?{
           type:nativeBoundaryRoles.get(native.node_id)==='output'?'control.supernode_output':inventoryTypes[native.icon]??native.icon}:{}),
+        ...(inventory?.caption?{label_text:inventory.caption}:{}),
         ...(native?.node_id&&nativeBoundaryRoles.has(native.node_id)?{boundary_role:nativeBoundaryRoles.get(native.node_id)}:{}),
         ...(native?.icon==='bg-vendor-icon-modelvariables'?{type:'variables.user',target_modes:['existing']}:{}),
         ...(variablePorts??{}),
@@ -3905,7 +3907,8 @@ function readRenderedInputMapping(observation) {
     });
     const missingNodes=[...nativeInventory].filter(([id,entry])=>!observedNodeLabels.includes(entry.key)&&!nodes.some(n=>n.node_id===id));
     for(const [id,entry] of missingNodes.slice(0,200-nodes.length))nodes.push({
-      node_ref:{kind:'node',node_label:entry.caption??entry.key,workflow_ref:workflow},node_id:id,
+      node_ref:{kind:'node',...(entry.key?{node_label:entry.key}:{}),workflow_ref:workflow},node_id:id,
+      ...(entry.caption?{label_text:entry.caption}:{}),
       bounding_box:entry.bounds,type:nativeBoundaryRoles.get(id)==='output'?'control.supernode_output':inventoryTypes[entry.icon]??entry.icon,
       ports:[],
     });

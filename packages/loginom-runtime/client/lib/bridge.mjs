@@ -108,7 +108,6 @@ export async function createBridge(config, session, { browserTransport: managedB
   const admitHostArtifacts = createHostArtifactAdmission(config, session);
   const userProfile = config.resultProfile === 'user-v1';
   const userWorkflows = createUserWorkflowBindings();
-  const admittedNodeWorkflows=new Map();
   let nativeStepDocument=null;
   let userBundleDelivered = false;
   // Identity of a READY new draft whose user-v1 reply this bridge refused.
@@ -357,7 +356,8 @@ export async function createBridge(config, session, { browserTransport: managedB
             const prior=previous?.identity&&JSON.parse(previous.identity);
             const old=prior?.workflow_ref,supplied=args.workflow_ref;
             const original=prior?.intent==='existing_workflow'&&args.intent===prior.intent
-              &&(args.operation_id??'prepare')===prior.operation_id&&previous.state?.status==='READY'
+              &&(args.operation_id??'prepare')===prior.operation_id
+              &&(previous.state?.status==='READY'||previous.refreshVerified===true)
               &&['document_id','workflow_id','tab_tid','prefix'].every(key=>old?.[key]===supplied?.[key])
               &&old?.navigation_path?.length===supplied?.navigation_path?.length
               &&old?.navigation_path?.every((part,i)=>part.tid===supplied.navigation_path[i].tid&&part.label===supplied.navigation_path[i].label);
@@ -543,10 +543,11 @@ export async function createBridge(config, session, { browserTransport: managedB
                     ...(userProfile?{structuredContent:refusal}:{isError:true})};
                 }
               }
+              let observedPackage;
               const runtime=userProfile&&request.params.name==='dock_node_apply'?{
                 ...actionRuntime,
                 async startNodeApply(admission,options) {
-                  const prior=admittedNodeWorkflows.get(admission.operation_id);
+                  const prior=actionRuntime.nodeApplyWorkflow(admission.operation_id);
                   if(prior?.document_id===admission.document_id&&prior.workflow_ref.workflow_id===admission.workflow_ref.workflow_id)
                     admission={...admission,workflow_ref:prior.workflow_ref};
                   if(!prior&&nativeStepDocument===admission.document_id&&!actionRuntime.hasUnsettledWork()){
@@ -558,19 +559,33 @@ export async function createBridge(config, session, { browserTransport: managedB
                     }},undefined,{timeout:15000,signal:extra.signal});
                     const step=structuredClone(redactor.redact(parseCapabilityResult(response,{redactor}).output));
                     if(step.status==='NOT_READY')throw Error(step.reason+': prepared scenario changed before Apply');
-                    if(step.status==='READY')admission={...admission,workflow_ref:step.workflow_ref};
+                    if(step.status==='READY'){
+                      extra.signal.throwIfAborted();
+                      admission={...admission,workflow_ref:step.workflow_ref};
+                      const preparation=session.metadata.workspacePreparation,prepared=preparation?.state;
+                      if(step.package_ref&&prepared?.document_id===step.document_id
+                        &&prepared.workflow_ref?.workflow_id===step.workflow_ref.workflow_id
+                        &&['path','name','persisted'].some(key=>step.package_ref[key]!==prepared.package_ref?.[key])){
+                        session.metadata.workspacePreparation={...preparation,state:{...prepared,package_ref:step.package_ref}};
+                        try{await session.save(catalog);}
+                        catch(error){session.metadata.workspacePreparation=preparation;throw error;}
+                        observedPackage=step.package_ref;
+                      }
+                    }
                   }
                   extra.signal.throwIfAborted();
-                  const result=actionRuntime.startNodeApply(admission,options);
-                  if(result.attempt===1&&!prior)admittedNodeWorkflows.set(admission.operation_id,
-                    {document_id:admission.document_id,workflow_ref:admission.workflow_ref});
-                  return result;
+                  return actionRuntime.startNodeApply(admission,options);
                 },
               }:actionRuntime;
               const result=await dispatchNodeApi(runtime,request.params.name,args,{signal:extra.signal,scanReceipt});
               if(userProfile)userWorkflows.rememberDelivery(result,args);
               await logResult(request.params.name,result);
-              return nodeResultReply(result,{userProfile,tool:request.params.name});
+              const reply=nodeResultReply(result,{userProfile,tool:request.params.name});
+              if(observedPackage&&!reply.isError){
+                reply.content.push({type:'text',text:JSON.stringify({kind:'dock_package_observation',package_ref:observedPackage})});
+                return boundedUserToolReply(reply,{tool:request.params.name,operationId:args.operation_id});
+              }
+              return reply;
             };
             // Local lifecycle calls must remain available while another request is
             // awaiting browser work. The runtime owns exclusion through cleanup.

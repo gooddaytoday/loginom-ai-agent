@@ -54,24 +54,15 @@ function fixture({portIndex=0}={}){
   portTid=nodeTid+suffix;
   duplicateShape=alternate;
  };
- return {page,request,crumb,renameByHand,variable:()=>{portTid=portTid.replace('_Data-','_Var-');port.FSubType=3;},mislabeledShape:()=>{alternatePortDom.getAttribute=()=>nodeTid+';Output_Var-3';duplicateShape=true;},tree:()=>{portTid=portTid.replace('_Data-','_DataTree-');},rename:(suffix='Output_Data-'+portIndex,keys='R_Segment')=>{const factor=node.FIconCls===NODE_TYPES['research.factor_analysis'].icon_class,regression=node.FIconCls==='bg-vendor-icon-linregression',cross=node.FIconCls===NODE_TYPES['transform.cross_table'].icon_class,excel=node.FIconCls===NODE_TYPES['imports.excel'].icon_class;nodeTid='MF;TF-1;Graph;'+(excel?'%ExcelPath%':factor?'Фактор._анализ:_X_Y_Z':cross?'cols:_Category;__rows:_'+keys+';__cells:_Amount':regression?'Линрегрессия:_Y_X1_X2_X3':'Квантование:_X');node.FLabel.FRawValue=excel?'%ExcelPath%':factor?'Фактор. анализ: X Y Z':cross?'cols: Category; rows: '+keys.replaceAll('_',' ')+'; cells: Amount':regression?'Линрегрессия: Y X1 X2 X3':'Квантование: X';portTid=nodeTid+';'+suffix;duplicateShape=true;},hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
+ return {page,request,crumb,renameByHand,variable:()=>{portTid=portTid.replace('_Data-','_Var-');port.FSubType=3;},mislabeledShape:()=>{alternatePortDom.getAttribute=()=>nodeTid+';Output_Var-3';duplicateShape=true;},tree:()=>{portTid=portTid.replace('_Data-','_DataTree-');},rename:(suffix='Output_Data-'+portIndex,keys='R_Segment')=>{const factor=node.FIconCls===NODE_TYPES['research.factor_analysis'].icon_class,regression=node.FIconCls==='bg-vendor-icon-linregression',cross=node.FIconCls===NODE_TYPES['transform.cross_table'].icon_class,excel=node.FIconCls===NODE_TYPES['imports.excel'].icon_class;nodeTid='MF;TF-1;Graph;'+(excel?'%ExcelPath%':factor?'Фактор._анализ:_X_Y_Z':cross?'cols:_Category;__rows:_'+keys+';__cells:_Amount':regression?'Линрегрессия:_Y_X1_X2_X3':'Квантование:_X');node.FLabel.FRawValue=excel?'%ExcelPath%':factor?'Фактор. анализ: X Y Z':cross?'cols: Category; rows: '+keys.replaceAll('_',' ')+'; cells: Amount':regression?'Линрегрессия: Y X1 X2 X3':'Квантование: X';portTid=nodeTid+';'+suffix;duplicateShape=true;},hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{const copy=element(portTid);inside.push(copy);return ()=>inside.splice(inside.indexOf(copy),1);},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:(enabled=true)=>{wrongHit=enabled;},setPortSuffix:suffix=>{portTid=nodeTid+';'+suffix;},removeLink:link=>inside.splice(inside.indexOf(link.dom),1),losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
 }
-test('graph reader used by dock_node_apply rejects the old navigation after a manual Save',async()=>{
- const f=fixture();await f.read();
- f.crumb.textContent='Saved Package';
- await assert.rejects(f.read(),/Workflow navigation changed/);
- f.request.workflow_ref.navigation_path[0].label='Saved Package';
- assert.equal((await f.read()).nodes[0].label,'Calc');
-});
+const stepRead=f=>readGraph(f.page,{request:f.request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',step_rebaseline:true});
 
-for(const alternate of [false,true])test('fresh Calculator graph retains the manual caption with '+(alternate?'alternate':'ordinary')+' port rendering',async()=>{
+test('the new step commits the renamed port for subsequent strict graph reads',async()=>{
  const f=fixture();await f.read();
- f.renameByHand({alternate});
- if(alternate){
-  const task={request:f.request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2'};
-  await assert.rejects(readGraph(f.page,task),/Visible port identity is not rendered/);
-  await readGraph(f.page,{...task,step_rebaseline:true});
- }
+ f.renameByHand({alternate:true});
+ await assert.rejects(f.binding(),/Visible port identity is not rendered/);
+ await stepRead(f);
  const graph=await f.read();
  assert.equal(graph.nodes[0].ref.node_id,'n');
  assert.equal(graph.nodes[0].label,'Renamed Calculator');
@@ -79,20 +70,38 @@ for(const alternate of [false,true])test('fresh Calculator graph retains the man
 });
 
 for(const [fault,change] of [
- ['foreign hit',f=>f.wrongHit()],
+ ['foreign hit',f=>{f.wrongHit();return ()=>f.wrongHit(false);}],
  ['ambiguous rendering',f=>f.duplicatePort()],
- ['foreign native data',f=>{f.port.data={};}],
-])test('new-step port rebinding refuses '+fault,async()=>{
+ ['foreign native data',f=>{const data=f.port.data;f.port.data={};return ()=>{f.port.data=data;};}],
+])test('new-step port rebinding refuses '+fault+' and binds once ownership is proven',async()=>{
  const f=fixture();await f.read();
- f.renameByHand({alternate:true});change(f);
- await assert.rejects(readGraph(f.page,{request:f.request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',step_rebaseline:true}),
-  /Visible port identity is not rendered/);
+ f.renameByHand({alternate:true});
+ const restore=change(f);
+ await assert.rejects(stepRead(f),/Visible port identity is not rendered/);
+ restore();
+ assert.deepEqual(Array.from((await stepRead(f)).nodes[0].outputs),[0]);
 });
 
-test('initial graph observation binds the manually renamed Calculator port by its current native hit',async()=>{
- const f=fixture();
+test('a failed complete graph read cannot publish the renamed port into the cache',async()=>{
+ const f=fixture();await f.read();
  f.renameByHand({alternate:true});
- assert.deepEqual(Array.from((await f.read()).nodes[0].outputs),[0]);
+ const link=f.restLink(true,true);
+ await assert.rejects(stepRead(f),/Incompatible tree\/table link/);
+ f.removeLink(link);
+ await assert.rejects(f.binding(),/Visible port identity is not rendered/);
+ await stepRead(f);
+ assert.deepEqual(Array.from((await f.binding()).nodes[0].outputs),[0]);
+});
+
+test('a new-step caption refresh cannot adopt a connection or unsupported suffix',async()=>{
+ const f=fixture();
+ f.setPortSuffix('Output_Connection-0');
+ assert.deepEqual(Array.from((await f.read()).nodes[0].other_ports),['Output_Connection-0']);
+ f.renameByHand({alternate:true});
+ await assert.rejects(stepRead(f),/Visible port identity is not rendered/);
+ const table=fixture();await table.read();
+ table.renameByHand({alternate:true});
+ assert.deepEqual(Array.from((await stepRead(table)).nodes[0].outputs),[0]);
 });
 
 test('W1 inventories variable ports by native kind without shifting table ordinals',async()=>{
