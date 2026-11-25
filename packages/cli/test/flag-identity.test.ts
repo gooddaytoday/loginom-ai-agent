@@ -22,9 +22,10 @@ const inherited = {
   OPENCODE_SERVER_PASSWORD: "inherited-password",
 }
 
+// `{root}` is the probe's temporary home: `debug paths` creates the configuration directory, so it must stay inside it.
 const product = {
-  LOGINOM_AI_AGENT_CONFIG_DIR: "/product/config-dir",
-  LOGINOM_AI_AGENT_DB: "/product/loginom-ai-agent.db",
+  LOGINOM_AI_AGENT_CONFIG_DIR: "{root}/product/config-dir",
+  LOGINOM_AI_AGENT_DB: "{root}/product/loginom-ai-agent.db",
   LOGINOM_AI_AGENT_PASSWORD: "product-password",
 }
 
@@ -66,10 +67,10 @@ describe("inherited OpenCode environment", () => {
   })
 
   test("does not override the product variables when both are set", () => {
-    const { paths, password } = probes.both
+    const { root, paths, password } = probes.both
     expect({ config: paths.config, db: paths.db, password }).toEqual({
-      config: product.LOGINOM_AI_AGENT_CONFIG_DIR,
-      db: product.LOGINOM_AI_AGENT_DB,
+      config: product.LOGINOM_AI_AGENT_CONFIG_DIR.replace("{root}", root),
+      db: product.LOGINOM_AI_AGENT_DB.replace("{root}", root),
       password: product.LOGINOM_AI_AGENT_PASSWORD,
     })
   })
@@ -91,7 +92,7 @@ async function probe(env: Record<string, string>) {
     XDG_CONFIG_HOME: path.join(root, "config"),
     XDG_CACHE_HOME: path.join(root, "cache"),
     XDG_STATE_HOME: path.join(root, "state"),
-    ...env,
+    ...Object.fromEntries(Object.entries(env).map(([key, value]) => [key, value.replace("{root}", root)])),
   }
   const [paths, password] = await Promise.all([
     run(["run", path.join(cli, "src/index.ts"), "debug", "paths"], isolated),
