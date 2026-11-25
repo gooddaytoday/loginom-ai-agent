@@ -30,6 +30,8 @@ async function failedNavigation(t,fault){
  class ListViewForm { FView={el:{dom:root}}; }
  moduleController=new ListViewForm();
  const modal=element('msgbox'),title=element('msg-title','Loginom '+build);
+ const rootTid=fault==='suffixed'?'msgbox-1':'msgbox';
+ modal.getAttribute=()=>rootTid;
  const message=element('msg-text',fault==='foreign window'?'Other operation failed.':errorText);
  const ok=element('msg-ok','OK',85);
  modal.contains=e=>[title,message,ok].includes(e);
@@ -38,7 +40,7 @@ async function failedNavigation(t,fault){
  const native={el:{dom:modal},cfg:{},msg:{el:{dom:message}},msgButtons:{ok:button}};
  const components=new Map([[modal.id,native],[ok.id,button]]);
  const byTid=new Map([[moduleTid,moduleTile],[connectionsTid,connections],[workflowTid,workflowTile],[flow.tab_tid,tab]]);
- const dialogElements=new Map([['msgbox;p.h;p.t',title],['msgbox;cnt',message],['msgbox;tlb;ok',ok]]);
+ const dialogElements=new Map([[rootTid+';p.h;p.t',title],[rootTid+';cnt',message],[rootTid+';tlb;ok',ok]]);
  const all=sel=>{
   if(sel==='.x-window')return dialogOpen?windows:[];
   if(sel.includes('x-mask:visible'))return dialogOpen?windows:[];
@@ -86,8 +88,8 @@ async function failedNavigation(t,fault){
  return {calls,result:await databaseConnectionCapability(page,{deadline,document_id,workflow_ref:flow,origin,build,connection},readGraph)};
 }
 
-test('a connections navigation refusal closes its own dialog and restores the quiet graph',async t=>{
- const {calls,result}=await failedNavigation(t);
+for(const fault of [undefined,'suffixed'])test('a connections navigation refusal restores the quiet graph'+(fault?' with a suffixed native dialog ID':''),async t=>{
+ const {calls,result}=await failedNavigation(t,fault);
  assert.deepEqual(calls,['module','open connections','dismiss','return to workflow'],JSON.stringify(result));
  assert.equal(result.verified,false);
  assert.equal(result.cleanup_complete,true);
