@@ -12,6 +12,14 @@ on:
       - packages/process-daemon/**
       - .github/actions/setup-rust-pty/**
       - .github/workflows/loginom-pty.yml
+  # Stage B: the workflow is not on the default branch yet, so workflow_dispatch cannot reach it; B5.2b calls it from
+  # loginom-release.yml instead.
+  push:
+    branches: [oc2-migration]
+    paths:
+      - packages/process-daemon/**
+      - .github/actions/setup-rust-pty/**
+      - .github/workflows/loginom-pty.yml
 
 permissions:
   contents: read
