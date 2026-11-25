@@ -131,14 +131,15 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    if(menus.length||visible(dom)){
     if(mode!=='cleanup_menu'||menus.length!==1||menus[0]!==dom||!exact('mn').includes(dom)||!visible(dom)
      ||owner!==r.port||globalThis.Ext?.getCmp?.(dom.id)!==menu||typeof menu.hide!=='function')fail('Original port menu closure unconfirmed');
-    r.menu=menu;r.menuDom=dom;
-    menu.hide();
+    r.menu=menu;r.menuDom=dom;r.menuObserved=true;
+    try{menu.hide();}catch{fail('Native port menu hide failed');}
     return {hide_issued:true};
    }
-   if(mode==='reconcile_menu'||mode==='release_opening'){
-    const blockers=[...document.querySelectorAll('[role="dialog"],.bg-dialog,.x-message-box,.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible);
-    if(blockers.some(e=>!ownGraphMask(e)))fail('Original port opening graph is blocked');
-    if(blockers.length)return {reason:'port_graph_busy'};
+   if((r.phase==='menu_issued'||r.menuClosed)&&r.menuObserved!==true)fail('Original port menu was not observed');
+   const blockers=[...document.querySelectorAll('[role="dialog"],.bg-dialog,.x-message-box,.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible);
+   if(blockers.length){
+    if(['reconcile_menu','release_opening'].includes(mode)&&blockers.every(ownGraphMask))return {reason:'port_graph_busy'};
+    fail('Original port opening graph is blocked');
    }
    if(r.phase==='menu_issued')r.menuClosed=true;
    r.phase='released';
@@ -383,7 +384,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     ||r.menu&&r.menu!==menu||r.menuDom&&r.menuDom!==menus[0]
     ||!menus[0].checkVisibility({checkVisibilityCSS:true})||buttons.length!==1||!menus[0].contains(buttons[0])
     ||!buttons[0].checkVisibility({checkVisibilityCSS:true})||buttons[0].closest('.x-item-disabled,.x-menu-item-disabled'))fail('Port menu owner changed');
-   r.menu=menu;r.menuDom=menus[0];
+   r.menu=menu;r.menuDom=menus[0];r.menuObserved=true;
    if(mode==='open_issued')r.phase='open_issued';return {phase:r.phase,port_guid:r.port.FGuid};
   }
   if(mode==='finish') {
@@ -426,14 +427,12 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   }
   fail('Unknown port opening phase');
  },{task,mode});
- const settled=async(mode,deadline)=>{
-  let busy,maskDeadline;
-  while(remaining(deadline)>0){
+ const settled=async mode=>{
+  let busy;
+  while(remaining()>0){
    const result=await inspect(mode);if(result?.reason!=='port_graph_busy')return result;
-   if(!busy){busy={event:direction+'_port_graph_busy',mode,samples:0};trace.push(busy);maskDeadline=Date.now()+15000;}
-   const maskRemaining=maskDeadline-Date.now();
-   if(busy.samples>=150||maskRemaining<=0)throw Error('Port opening blocked: ModelForm remained busy');
-   busy.samples++;await page.waitForTimeout(Math.min(100,maskRemaining,remaining(deadline)));
+   if(!busy){busy={event:direction+'_port_graph_busy',mode,samples:0};trace.push(busy);}
+   busy.samples++;await page.waitForTimeout(Math.min(100,remaining()));
   }
  };
  const finish=async()=>{while(remaining()>0){const result=await settled('finish');if(!result.pending)return result;await page.waitForTimeout(Math.min(100,remaining()));}};
@@ -497,16 +496,16 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    }
    trace.push({event:direction+'_port_tooltip_cleared'});
   }
-  menuPending=true;effect=true;
+  menuPending=direction==='input';effect=true;
   trace.push({event:direction+'_port_menu_issued'});
   // Leave part of the original deadline for native hide and readback.
-  const menuDeadline=task.deadline-Math.min(1000,Math.ceil(remaining()/4));
+  const menuDeadline=menuPending?task.deadline-Math.min(1000,Math.ceil(remaining()/4)):task.deadline;
   remaining(menuDeadline);
   await page.mouse.click(issued.point.x,issued.point.y,{button:'right'});
   await page.locator('[data-tid="mn;mniConfigurePort"]:visible').waitFor({state:'visible',timeout:remaining(menuDeadline)});
-  trace.push({event:direction+'_port_menu_verified',...await settled('menu',menuDeadline)});
+  trace.push({event:direction+'_port_menu_verified',...await settled('menu')});
   await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({trial:true,timeout:remaining(menuDeadline)});
-  trace.push({event:direction+'_port_open_issued',...await settled('open_issued',menuDeadline)});
+  trace.push({event:direction+'_port_open_issued',...await settled('open_issued')});
   menuPending=false;
   await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({timeout:remaining()});
   trace.push({event:direction+'_port_open_returned'});
@@ -537,10 +536,16 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    try{
     const cleanup=await inspect('cleanup_menu');
     const closed=cleanup?.hide_issued?await inspect('verify_menu_closed'):cleanup;
-    if(closed?.verified===true){
-     trace.push({event:direction+'_port_menu_closed'});effect=false;
-    }
-   }catch{}
+    if(closed?.verified!==true)throw Error('Original port menu closure unconfirmed');
+    trace.push({event:direction+'_port_menu_closed'});effect=false;
+   }catch(cleanupError){
+    // Report fixed reasons without copying exceptions from the native UI.
+    const reason=['Port opening document changed','Port opening workflow changed','Retained port menu graph changed',
+     'Retained port menu owner changed','Port menu no longer rests on its graph','Original port menu closure unconfirmed',
+     'Native port menu hide failed','Original port menu was not observed','Original port opening graph is blocked']
+     .find(reason=>String(cleanupError?.message??'').endsWith(reason))??'Port menu cleanup could not be verified';
+    trace.push({event:direction+'_port_menu_cleanup_failed',reason});
+   }
   }else if(!effect&&!task.reconcile_only&&!task.release_read&&!task.release_opening){
    try{await inspect('release_reserved');}catch{}
   }

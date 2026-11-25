@@ -23,6 +23,10 @@ test('private quiet graph observation refuses only visible port menus even outsi
  assert.equal((await read({quiet_graph_observation:true})).status,'SUCCEEDED');
  delete menu.attrs.hidden;menu.attrs['data-tid']='different-menu';
  assert.equal((await read({quiet_graph_observation:true})).status,'SUCCEEDED');
+ menu.attrs.class='x-menu';
+ assert.equal((await read({quiet_graph_observation:true})).error?.code,'UI_PORT_MENU_VISIBLE');
+ menu.attrs.hidden='';
+ assert.equal((await read({quiet_graph_observation:true})).status,'SUCCEEDED');
 });
 
 test('error toast template is private and requires the native error class, component and message structure',async()=>{

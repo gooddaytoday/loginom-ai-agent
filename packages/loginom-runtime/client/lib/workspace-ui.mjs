@@ -569,7 +569,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return visibleAncestors(element);
     });
     // A port menu is a floating root outside the prepared graph's detail scan.
-    if(quietGraphObservation&&[...document.querySelectorAll('[data-tid="mn"]')].some(visible))
+    if(quietGraphObservation&&[...document.querySelectorAll('[data-tid="mn"],.x-menu')].some(visible))
       return {ui_read_failure:{code:'UI_PORT_MENU_VISIBLE'}};
     const sensitivePattern = /password|passwd|\bpwd\b|secret|token|credential|authorization|api[_ -]?key|private[_ -]?key|one[_ -]?time|\botp\b|парол|секрет|токен/i;
     // Inline definition pages have no separate port opening. Their native-bound

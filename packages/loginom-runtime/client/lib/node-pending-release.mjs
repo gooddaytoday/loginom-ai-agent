@@ -124,6 +124,8 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  if(operation.lastReceipt){
   const response=await readReceipt(operation.lastReceipt);
   const r=response?.receipt;
+  if(response?.state==='completed'&&operation.lastReceipt.operation_id)
+   requireValue(r?.operation_id===operation.lastReceipt.operation_id,'The last wizard receipt identity changed');
   // REST configure never commits Done/Execute. Its completed failure receipt
   // can truthfully retain cleanup=false because the draft is still open.
   // Permit only the existing owned-wizard cancellation and quiet-graph proof;
@@ -133,7 +135,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
    &&operation.lastReceipt.action_key==='node.rest.configure.internal'&&r.action_key===operation.lastReceipt.action_key
    &&r.phase==='configure'&&r.status==='AMBIGUOUS'&&r.effect_possible===true&&r.cleanup_complete===false
    &&r.output?.verified===false&&r.output.cleanup_complete===false&&r.error?.code==='REST_STEP_UNCONFIRMED';
-  const gestures=r?.trace?.filter(e=>e.event==='ui_gesture_applied')??[];
+  const trace=Array.isArray(r?.trace)?r.trace:[],gestures=trace.filter(e=>e.event==='ui_gesture_applied');
   const exportDraft=state.pending.phase==='configure'&&state.request.target?.type==='exports.text'
    &&operation.lastReceipt.action_key==='node.export.next'&&r?.action_key==='node.export.next'
    &&r.phase==='export_next'&&r.status==='AMBIGUOUS'&&r.effect_possible===true&&r.cleanup_complete===false
@@ -146,15 +148,14 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
    &&['WIZARD_STEP_NOT_CONFIRMED','WIZARD_FIELD_NOT_CONFIRMED'].includes(r.error?.code);
   variableDraft=calculatorVariableMappingRefusal(operation,r);
   const ref=operation.lastReceipt,inputOpening=stoppedInputOpening(operation,r);
-  if(ref.action_key==='node.input_port.open.internal'&&r?.trace?.some(e=>e.event==='input_port_menu_closed'))
+  if(ref.action_key==='node.input_port.open.internal'&&trace.some(e=>e.event==='input_port_menu_closed'
+   ||e.event==='input_port_menu_issued'&&r.cleanup_complete===true&&r.status!=='SUCCEEDED'))
    requireValue(inputOpening?.surface==='graph','The port-menu cleanup receipt identity changed');
   const draft=restDraft||exportDraft||wizardDraft||variableDraft||!!inputOpening;
   draftReceipt=draft;
   const mappingReadCleanup=response?.state==='completed'&&await settleImportMappingRead({operation,channel,receipt:r});
   requireValue(response?.state==='completed'&&(r?.cleanup_complete===true||draft||mappingReadCleanup?.cleanup_complete===true),
    'The last browser gesture of this operation has no confirmed cleanup');
-  if(operation.lastReceipt.operation_id)requireValue(response.receipt.operation_id===operation.lastReceipt.operation_id,
-   'The last wizard receipt identity changed');
   const n=r.output?.prepared_node_context,w=r.output?.wizard;
   if(unionWizardOpeningRefusal(operation,r))settleWizard={node:n,graph_only:true,union_opening:true,
    opening_label:n.pending_wizard_node?.label,deadline};
@@ -241,7 +242,7 @@ function stoppedInputOpening(operation,r,{recovered=false}={}){
  const ref=operation.lastReceipt;
  if(operation.nodeApply.pending.phase!=='input_mapping'||ref.action_key!=='node.input_port.open.internal'
   ||typeof ref.operation_id!=='string'||ref.id!==ref.operation_id||!ref.id.startsWith(operation.id+':n')
-  ||r?.operation_id!==ref.id||r.action_key!==ref.action_key||r.phase!=='port_open'
+  ||r?.action_key!==ref.action_key||r.phase!=='port_open'
   ||r.output?.verified!==false||r.error?.code!=='OUTPUT_PORT_OPEN_UNCONFIRMED'||!Array.isArray(r.trace))return null;
  const count=name=>r.trace.filter(e=>e.event==='input_port_'+name).length;
  const reservations=r.trace.filter(e=>e.event==='input_port_reserved');
@@ -279,7 +280,7 @@ export async function verifyRecoveredPendingNode({operation,channel,readReceipt,
   'The last browser receipt identity changed');
  const receipt=response.receipt,stoppedPort=state.pending.phase==='input_mapping'
   &&reference.action_key==='node.input_port.open.internal'
-  &&(receipt.effect_possible===true||receipt.trace?.some(e=>e.event==='input_port_menu_closed'));
+  &&(receipt.effect_possible===true||Array.isArray(receipt.trace)&&receipt.trace.some(e=>e.event==='input_port_menu_closed'));
  const opening=stoppedPort&&stoppedInputOpening(operation,receipt,{recovered:true});
  if(stoppedPort)requireValue(opening,'The stopped input port receipt changed before browser recovery');
  const proof=await verifyQuietNodeGraph({operation,channel,node,deadline,now,openingConfirmation:false,

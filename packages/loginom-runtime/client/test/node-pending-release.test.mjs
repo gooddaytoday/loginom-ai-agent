@@ -531,6 +531,98 @@ for(const stage of ['menu','wizard','manual-menu','manual-wizard'])test('Sort ca
  assert.equal(native.gestures.length,wizard?4:3);
 });
 
+const menuReserved={event:'input_port_reserved',port:0,native_index:0,port_guid:'port'};
+const stoppedPortReceipt=()=>({operation_id:'apply:n7',action_key:'node.input_port.open.internal',
+ phase:'port_open',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false,
+ output:{verified:false,cleanup_complete:false},error:{code:'OUTPUT_PORT_OPEN_UNCONFIRMED'},
+ trace:[{...menuReserved},{event:'input_port_menu_issued'}]});
+for(const [fault,corrupt] of Object.entries({
+ 'operation phase':(r,op)=>{op.nodeApply.pending.phase='configure';},
+ 'reference action':(r,op)=>{op.lastReceipt.action_key='ui.act';r.action_key='ui.act';},
+ 'reference type':(r,op)=>{r.operation_id=7;op.lastReceipt.operation_id=7;op.lastReceipt.id=7;},
+ 'reference id':(r,op)=>{op.lastReceipt.id='apply:n8';},
+ 'operation prefix':(r,op)=>{op.id='foreign';},
+ 'receipt id':r=>{r.operation_id='apply:n8';},
+ 'receipt action':r=>{r.action_key='ui.act';},
+ 'receipt phase':r=>{r.phase='configure';},
+ 'verified outcome':r=>{r.output.verified=true;},
+ 'foreign error':r=>{r.error.code='UNRELATED';},
+ 'missing trace':r=>{delete r.trace;},
+ 'non-array trace':r=>{r.trace={};},
+ 'duplicate reservation':r=>{r.trace.push({...menuReserved});},
+ 'missing reservation':r=>{r.trace.shift();},
+ 'non-integer port':r=>{r.trace[0].port='0';},
+ 'negative port':r=>{r.trace[0].port=-1;},
+ 'large port':r=>{r.trace[0].port=100;},
+ 'non-integer native index':r=>{r.trace[0].native_index='0';},
+ 'negative native index':r=>{r.trace[0].native_index=-1;},
+ 'large native index':r=>{r.trace[0].native_index=100;},
+ 'non-string guid':r=>{r.trace[0].port_guid=7;},
+ 'empty guid':r=>{r.trace[0].port_guid='';},
+ 'unknown legacy port':r=>{delete r.trace[0].port;r.trace[0].native_index=1;},
+ 'duplicate menu gesture':r=>{r.trace.push({event:'input_port_menu_issued'});},
+ 'unexpected cleanup claim':r=>{r.trace.push({event:'input_port_menu_closed'});},
+ 'unexpected status':r=>{r.status='FAILED';},
+ 'unexpected effect':r=>{r.effect_possible=false;},
+ 'unexpected inner cleanup':r=>{r.output.cleanup_complete=true;},
+ 'unreturned open gesture':r=>{r.trace.push({event:'input_port_open_issued'});},
+ 'unexpected returned open':r=>{r.trace.push({event:'input_port_open_returned'});},
+}))test('stopped input opening rejects '+fault+' before native reconciliation',async()=>{
+ const operation=stopped();
+ operation.id='apply';operation.nodeApply.pending.phase='input_mapping';
+ const receipt=stoppedPortReceipt();
+ operation.lastReceipt={id:receipt.operation_id,operation_id:receipt.operation_id,action_key:receipt.action_key};
+ operation.receipt={state:'completed',receipt};
+ corrupt(receipt,operation);
+ const {channel,gestures}=surface();let calls=0;
+ channel.reconcileInputPortOpening=async()=>{calls++;throw Error('Untrusted native reconciliation');};
+ const malformed=['reference type','missing trace','non-array trace'].includes(fault);
+ if(malformed)await assert.rejects(release(operation,channel),/last browser gesture.*no confirmed cleanup/);
+ else await assert.rejects(release(operation,channel));
+ assert.equal(calls,0);
+ assert.deepEqual(gestures,[]);
+});
+
+for(const [fault,corrupt] of Object.entries({
+ status:r=>{r.status='FAILED';},
+ effect:r=>{r.effect_possible=true;},
+ cleanup:r=>{r.cleanup_complete=false;},
+ 'inner effect':r=>{r.output.effect_possible=true;},
+ 'inner cleanup':r=>{r.output.cleanup_complete=false;},
+ 'no close trace':r=>{r.trace.pop();},
+ 'no menu trace':r=>{r.trace.splice(1,1);},
+ 'duplicate close trace':r=>{r.trace.push({event:'input_port_menu_closed'});},
+}))test('clean input opening release rejects '+fault,async()=>{
+ const operation=stopped();
+ operation.id='apply';operation.nodeApply.pending.phase='input_mapping';
+ const receipt=stoppedPortReceipt();
+ Object.assign(receipt,{status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});
+ Object.assign(receipt.output,{effect_possible:false,cleanup_complete:true});
+ receipt.trace.push({event:'input_port_menu_closed'});
+ operation.lastReceipt={id:receipt.operation_id,operation_id:receipt.operation_id,action_key:receipt.action_key};
+ operation.receipt={state:'completed',receipt};
+ corrupt(receipt);
+ const {channel}=surface();let calls=0;
+ channel.reconcileInputPortOpening=async()=>{calls++;return {surface:'graph',port_guid:'port'};};
+ await assert.rejects(release(operation,channel),/cleanup receipt identity changed/);
+ assert.equal(calls,0);
+});
+
+for(const [key,value] of Object.entries({
+ status:'NOT_APPLIED',verified:false,cleanup_complete:false,opening_operation_id:'apply:n8',
+ direction:'output',port:1,native_index:1,port_guid:'foreign',surface:'wizard',phase:'verified',
+ document_id:'foreign',workflow_id:'foreign',node_id:'foreign',
+}))test('released input owner refuses a changed '+key,async()=>{
+ const binding={document_id:'doc',workflow_ref:workflow,node};
+ const expected={port:0,native_index:0,port_guid:'port',surface:'wizard'};
+ const owner={status:'SUCCEEDED',verified:true,cleanup_complete:true,opening_operation_id:'apply:n7',
+  direction:'input',...expected,surface:'graph',phase:'released',...node,[key]:value};
+ const channel=createNodeProcedure({operation:{id:'apply',deadline:Date.now()+10000,action:{action_key:'node.apply',revision:'1'}},
+  preparedNodeContext:binding,targetOrigin:'http://test',targetBuild:'7.4.2',record:async e=>e,execute:async()=>owner});
+ await assert.rejects(channel.reconcileInputPortOpening({id:'apply:n7',operation_id:'apply:n7',action_key:'node.input_port.open.internal'},
+  expected,{release:true}),/owner could not be reconciled/);
+});
+
 for(const fault of [null,'foreign','transport','cleanup'])test('JSON configure refusal releases only its own settled draft: '+fault,async()=>{
  const ui=surface({wizard:true,jsonList:true,foreign:fault==='foreign'});
  const f=fixture({type:'trees.from_json',release:()=>releasePendingNode({operation:f.context().operation,channel:ui.channel,
