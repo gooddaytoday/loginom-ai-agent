@@ -24,7 +24,7 @@ export function parseExportCsvHeader(text,delimiter=','){
  need(!quoted&&text.length>0,'COLD_EXPORT_CSV_INVALID');
  fields.push(value);return fields;
 }
-export function parseExpectedOutputs(expected){
+export function parseExpectedOutputs(expected,{maxRows=100}={}){
  need(expected&&typeof expected.package_path==='string'&&expected.package_path.endsWith('.lgp'),'EXPECTED_PACKAGE_PATH_REQUIRED');
  need(Array.isArray(expected.nodes),'EXPECTED_SHAPE_INVALID');
  const multiple=Object.hasOwn(expected,'outputs');
@@ -42,7 +42,7 @@ export function parseExpectedOutputs(expected){
    &&(output.output_node_label===undefined||typeof output.output_node_label==='string'&&output.output_node_label.length>0)
    &&typeof output.output_node_type==='string'&&output.output_node_type.length>0
    &&Array.isArray(output.columns)&&output.columns.length>0&&output.columns.length<=1000
-   &&Array.isArray(output.rows)&&output.rows.length<=100,'EXPECTED_SHAPE_INVALID');
+   &&Array.isArray(output.rows)&&output.rows.length<=maxRows,'EXPECTED_SHAPE_INVALID');
   need(output.output_node_type!=='export_input'||!['output_port','output_node_label'].some(k=>Object.hasOwn(output,k)),
    'EXPECTED_EXPORT_INPUT_OPTIONS_INVALID');
   need(output.output_node_type!=='table_content'||!['output_port','output_node_label'].some(k=>Object.hasOwn(output,k)),

@@ -27,7 +27,7 @@ import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
-import {readColdNativeOutput,coldNativeEligible,performColdNodeAction,runColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation,readColdPortWindows} from './cold-reader-policy.mjs'
+import {readColdNativeOutput,coldNativeEligible,performColdNodeAction,runColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation,readColdPortWindows,MAX_COLD_WINDOW_ROWS} from './cold-reader-policy.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -104,7 +104,9 @@ const sampling=expected.sampling_modes===undefined?null:parseSamplingExpected(ex
 if(sampling&&!args['sampling-baseline'])throw Error('SAMPLING_BASELINE_REQUIRED')
 if(!sampling&&args['sampling-baseline'])throw Error('SAMPLING_BASELINE_UNEXPECTED')
 const samplingBaseline=sampling?JSON.parse(await readFile(args['sampling-baseline'],'utf8')):null
-const {multiple,outputs:expectedOutputs}=sampling??parseExpectedOutputs(expected)
+const {multiple,outputs:expectedOutputs}=sampling??parseExpectedOutputs(expected,{
+ ...(args['exact-port-windows']?{maxRows:MAX_COLD_WINDOW_ROWS}:{}),
+})
 if(!['names','labels'].includes(args['csv-header']))throw Error('COLD_EXPORT_CSV_HEADER_MODE_INVALID')
 // --csv is the actual runtime-downloaded export, already checked in full by
 // the scenario's file oracle. It supplies order only, never cold cell values.
@@ -530,7 +532,12 @@ page = context.pages()[0]
    data=read.output;
   }
   if(args['exact-port-windows']){
-   data=await readColdPortWindows(channel,{node,execution,port:outputPort,rowCount:Math.max(...expectedOutputs.map(o=>o.rows.length))});
+   const matching=expectedOutputs.filter(o=>o.output_node_type===target.type
+    &&(o.output_node_label===undefined||o.output_node_label===target.label)&&(o.output_port??0)===outputPort
+    ||o.output_node_type==='export_input'&&exportInput?.node.ref.node_id===node.node_id&&exportInput.output_port===outputPort);
+   const rowCounts=new Set((matching.length?matching:expectedOutputs).map(o=>o.rows.length));
+   if(rowCounts.size!==1)throw Error('COLD_PORT_WINDOW_ROW_COUNT_AMBIGUOUS');
+   data=await readColdPortWindows(channel,{node,execution,port:outputPort,rowCount:[...rowCounts][0]});
   }else if(useNative){
    // Preview enforces the actual 50x8 bound; wide baseline reports retain their
    // existing formatted scalar reader. No native fallback after a failed read.
