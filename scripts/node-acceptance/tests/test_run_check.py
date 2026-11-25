@@ -1915,6 +1915,158 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                     runner.write(follow / 'case.json', bad)
                     runner.scenario('follow-up', cases=root)
 
+    def test_private_case_chains_resolve_root_first_and_limit_depth(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            names = list('zyxwvutsr')
+            for i, name in enumerate(names):
+                folder = root / name
+                folder.mkdir()
+                (folder / 'task.md').write_text(name)
+                if i:
+                    runner.write(folder / 'case.json', dict(base=names[i - 1]))
+            for length in (3, 5, 8):
+                with self.subTest(length=length):
+                    steps = runner.scenario_steps(names[length - 1], cases=root)
+                    self.assertEqual([step for step, _ in steps], names[:length])
+            with self.assertRaisesRegex(ValueError, 'exceeds 8 turns'):
+                runner.scenario_steps(names[-1], cases=root)
+            runner.write(root / 'z/case.json', dict(base='x'))
+            with self.assertRaisesRegex(ValueError, 'Case base cycle: x → y → z → x'):
+                runner.scenario_steps('x', cases=root)
+
+    def test_runner_passes_one_session_profile_and_package_through_private_chain(self):
+        for length in (3, 5):
+            with self.subTest(length=length), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                names = [f'case-{i}' for i in range(length)]
+                for i, name in enumerate(names):
+                    folder = root / 'cases' / name
+                    folder.mkdir(parents=True)
+                    (folder / 'task.md').write_text(name)
+                    if i:
+                        runner.write(folder / 'case.json', dict(base=names[i - 1]))
+                pair = root / 'pair'
+                pair.mkdir()
+                runner.write(pair / 'worker.json', dict(url='https://example.invalid', username='worker',
+                                                        password='synthetic', package_directory='/test'))
+                instance = runner.Runner.__new__(runner.Runner)
+                instance.out, instance.env = root, {}
+                instance.options = dict(pair=str(pair), cases=str(root / 'cases'), cold=True)
+                instance.report = dict(runs=[dict(scenario=names[-1], status='PENDING')])
+                instance.deadline = time.time() + 60
+                model_calls = []
+
+                def phase(name, command, folder, **kwargs):
+                    self.assertEqual(name, 'setup')
+                    for child in ('data', 'config'):
+                        (folder / 'profile' / child).mkdir(parents=True)
+                    runner.write(folder / 'setup.stdout', dict(browser=dict(state='verified')))
+
+                def model(name, folder, profile, workspace, package, login, build, session):
+                    model_calls.append((name, folder.name, profile, workspace, package, session))
+                    return 'shared-session', dict(graph={}, outputs=[]), None, None
+
+                with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'save'), \
+                        patch.object(instance, 'phase', side_effect=phase), patch.object(instance, 'model', side_effect=model):
+                    instance.run()
+                self.assertEqual([(name, folder) for name, folder, *_ in model_calls], list(zip(names, names)))
+                self.assertEqual([call[-1] for call in model_calls], [None] + ['shared-session'] * (length - 1))
+                for index in (2, 3, 4):
+                    self.assertEqual(len({call[index] for call in model_calls}), 1)
+                result = instance.report['runs'][0]
+                self.assertEqual(result['status'], 'PASS')
+                self.assertEqual([(t['turn'], t['status']) for t in result['turns']],
+                                 [(n, 'PASS') for n in range(1, length + 1)])
+
+    def test_graph_contract_checks_current_snapshot_captions_direction_and_ports(self):
+        want = dict(nodes=[dict(id='import', type='imports.text', label='Продажи'),
+                           dict(id='group', type='transform.group_data', label_contains='по регионам')],
+                    links=[dict(source='import', target='group', output=0, input=0)])
+        runner.validate_graph_contract(want)
+        for malformed in [dict(nodes=want['nodes'] * 2), dict(nodes=want['nodes'], links=[dict(source='import', target='unknown')]),
+                          dict(nodes=want['nodes'], links=[dict(want['links'][0], input=True)])]:
+            with self.assertRaisesRegex(ValueError, 'CASE_GRAPH_INVALID'):
+                runner.validate_graph_contract(malformed)
+        with tempfile.TemporaryDirectory() as directory:
+            profile = Path(directory)
+            path = profile / 'execution-events.jsonl'
+            native = dict(complete=True, nodes=[
+                dict(ref=dict(node_id='i'), type='imports.text', label='Старый импорт'),
+                dict(ref=dict(node_id='g'), type='transform.group_data', label='Выручка по регионам')],
+                links=[dict(source='i', target='g', output=0, input=0)])
+            checkpoint = dict(recorded_at='2026-11-25T10:00:00.000Z', phase='node_target_checkpoint',
+                              target_state=dict(final_graph=native))
+            since = '2026-11-25T10:01:00.000Z'
+            raw = dict(scan=dict(complete=True), graph_identity=dict(status='observed', native_prefix='A;Graph;'),
+                       nodes=[dict(node_id='i', node_ref=dict(node_label='Продажи')),
+                              dict(node_id='g', node_ref=dict(node_label='Выручка_по_регионам'))],
+                       links=['A;Graph;Продажи|Output_Data-0|Выручка_по_регионам|Input_Data-0'],
+                       ui=dict(elements=[dict(graph_node=dict(part='label', node_label='Выручка_по_регионам',
+                                                              label_text='Выручка порегионам'))]))
+            current = dict(recorded_at=since, phase='observation_completed',
+                           outcome=dict(status='SUCCEEDED', output=raw))
+            path.write_text(json.dumps(checkpoint) + '\n')
+            with self.assertRaisesRegex(AssertionError, 'CASE_GRAPH_EVIDENCE_MISSING'):
+                runner.observed_case_graph(profile, since)
+            path.write_text('\n'.join(map(json.dumps, (checkpoint, current))))
+            graph = runner.observed_case_graph(profile, since)
+            self.assertEqual(graph['location'], 'execution-events.jsonl:2')
+            runner.check_case_graph(want, graph)
+            caption = raw['ui']['elements'][0]['graph_node']
+            caption['label_text'] = 'Выручка_по_регионам'
+            path.write_text('\n'.join(map(json.dumps, (checkpoint, current))))
+            with self.assertRaisesRegex(AssertionError, 'CASE_GRAPH_NODE_MISSING'):
+                runner.check_case_graph(want, runner.observed_case_graph(profile, since))
+            caption['label_text'] = 'Выручка порегионам'
+            for changed in [dict(want['links'][0], input=1), dict(source='group', target='import')]:
+                with self.assertRaisesRegex(AssertionError, 'CASE_GRAPH_LINK_MISSING'):
+                    runner.check_case_graph(dict(want, links=[changed]), graph)
+            raw['nodes'][0]['variable_outputs'] = [dict(native_index=4, port=2)]
+            raw['nodes'][1]['variable_inputs'] = [dict(native_index=1, port=0)]
+            raw['links'] = ['A;Graph;Продажи|Output_Var-4|Выручка_по_регионам|Input_Var-1']
+            path.write_text('\n'.join(map(json.dumps, (checkpoint, current))))
+            runner.check_case_graph(dict(want, links=[dict(want['links'][0], output=2)]),
+                                    runner.observed_case_graph(profile, since))
+            raw['nodes'].pop()
+            raw['links'].clear()
+            path.write_text('\n'.join(map(json.dumps, (checkpoint, current))))
+            with self.assertRaisesRegex(AssertionError, 'CASE_GRAPH_NODE_MISSING'):
+                runner.check_case_graph(want, runner.observed_case_graph(profile, since))
+
+    def test_graph_only_turn_uses_existing_model_journal_without_export(self):
+        cases = runner.DATA / 'bughunt-2026-11/cases'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profile, workspace, stage = (root / name for name in ('profile', 'workspace', 'bh-t0-import'))
+            for folder in (profile, workspace, stage):
+                folder.mkdir()
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.out, instance.env, instance.options, instance.current = root, {}, dict(cases=cases), {}
+
+            def phase(name, command, folder, **kwargs):
+                self.assertEqual(name, 'model')
+                self.assertEqual(command[command.index('--file') + 1], workspace / 'sales.csv')
+                self.assertNotIn('Выгрузи', command[-1])
+                self.assertIn('Сохрани пакет как /own/run.lgp', command[-1])
+                save = dict(status='SUCCEEDED', action_key='package.save_checkpoint', output=dict(save_completed=True))
+                event = dict(type='tool_use', sessionID='chat', part=dict(state=dict(status='completed', output=json.dumps(save))))
+                (folder / 'model.stdout').write_text(json.dumps(event) + '\n')
+                native = dict(complete=True, nodes=[dict(ref=dict(node_id='sales'), type='imports.text', label='Продажи')],
+                              links=[])
+                event = dict(recorded_at='2099-01-01T00:00:00.000Z', phase='node_target_checkpoint',
+                             target_state=dict(final_graph=native))
+                (profile / 'execution-events.jsonl').write_text(json.dumps(event) + '\n')
+                runner.write(profile / 'saved-package-cleanup.json', dict(package_closed=True, logged_out=True))
+                runner.write(profile / 'runtime-close-model.json', dict(closed_ack=True))
+
+            with patch.object(instance, 'phase', side_effect=phase):
+                session, expected, actual, delimiter = instance.model(
+                    'bh-t0-import', stage, profile, workspace, '/own/run.lgp', {'package_directory': '/own'}, root / 'build')
+            self.assertEqual((session, expected['outputs'], actual, delimiter), ('chat', [], None, None))
+            self.assertEqual(instance.current['graph'], 'PASS')
+            self.assertEqual(runner.read(stage / 'graph-observed.json')['location'], 'execution-events.jsonl:1')
+
     def test_private_case_attaches_every_data_format_with_configured_model(self):
         with tempfile.TemporaryDirectory() as directory:
             commands = []
