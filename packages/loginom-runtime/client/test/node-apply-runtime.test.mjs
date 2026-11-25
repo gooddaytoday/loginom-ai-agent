@@ -21,7 +21,7 @@ const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br
 const request=()=>({operation_id:'apply',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
  target:{kind:'new',type:'imports.text',label:'Source',position:{x:320,y:280}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'done',
  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
-function fixture({execute=async()=>{throw Error('Unexpected public transport')},wrapDrivers,now=Date.now,pinnedActions=new Map(),browserRecovery=false,record=async e=>e}={}){
+function fixture({execute=async()=>{throw Error('Unexpected public transport')},wrapDrivers,wrapAdapter,now=Date.now,pinnedActions=new Map(),browserRecovery=false,record=async e=>e}={}){
  const calls=[],events=[];const graph={complete:true,interaction_ready:true,document_id:'doc',workflow_ref:workflow,nodes:[],links:[],foreign_links:[]};
  const adapter={observe:async()=>structuredClone(graph),preflight:async()=>{},positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),reconcile:async()=>({verified:true,cleanup_complete:true}),mutate:async e=>{calls.push(e.kind);if(e.kind==='create')graph.nodes.push({ref:{document_id:'doc',workflow_id:'wf',node_id:'new'},type:e.parameters.type,label:'Source',position:e.parameters.position,inputs:[],outputs:[0]});return {status:'SUCCEEDED',cleanup_complete:true};}};
  const ok=(name,extra={})=>async()=>{calls.push(name);return {verified:true,cleanup_complete:true,effect_possible:false,...extra}};
@@ -31,7 +31,7 @@ function fixture({execute=async()=>{throw Error('Unexpected public transport')},
  let failRecord;
  const handlers=new Map([['imports.text',handler]]);
  const runtime=createActionRuntime({pinned:{actions:pinnedActions,selectors:new Map(),pins:{}},allowCandidate:pinnedActions.size>0,execute,now,
-  browserRecovery,nodeTargetAdapterFactory:()=>adapter,nodeApplyHandlers:handlers,nodeApplyDriverFactory:context=>wrapDrivers?wrapDrivers(context,drivers):drivers,
+  browserRecovery,nodeTargetAdapterFactory:options=>wrapAdapter?wrapAdapter(adapter,options):adapter,nodeApplyHandlers:handlers,nodeApplyDriverFactory:context=>wrapDrivers?wrapDrivers(context,drivers):drivers,
   onRecord:async e=>{events.push(e);if(e.phase===failRecord)throw Error('disk unavailable');return record(e);}});
  return {runtime,adapter,calls,events,graph,drivers,handler,handlers,failRecord:p=>{failRecord=p}};
 }
@@ -1172,4 +1172,41 @@ test('add_only rechecks the inspected graph before resuming and never repeats th
  assert.match(resumed.error.message,/Partial node target graph changed/);
  assert.deepEqual(reads,[f.calls.length]);
  assert.equal(f.calls.filter(call=>call==='create').length,1);
+});
+
+test('add_only foreign native window blocks graph confirmation until dismissed',async()=>{
+ let open=false;
+ const f=fixture({wrapAdapter:(adapter,options)=>{
+  const observe=adapter.observe;
+  return {...adapter,observe:async(...args)=>{
+   if(open&&options.requireNoNativeWindow)throw Object.assign(Error('Graph is blocked by an Ext window'),{code:'NODE_ADD_ONLY_GRAPH_BLOCKED'});
+   return observe(...args);
+  }};
+ }});
+ const mutate=f.adapter.mutate;
+ const receipt={status:'AMBIGUOUS',cleanup_complete:true,effect_possible:true};
+ f.adapter.mutate=async effect=>{
+  await mutate(effect);
+  f.graph.nodes[0].locked=false;
+  open=true;
+  return receipt;
+ };
+ f.adapter.reconcile=async()=>({completed:true,verified:true,cleanup_complete:true,receipt});
+ f.adapter.verifyWorkflow=async()=>({status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,
+  document_id:'doc',workflow_ref:workflow});
+ const args={...request(),mode:'add_only'};
+ await f.runtime.startNodeApply(args);
+ const {outcome:interrupted}=await f.runtime.waitNodeApply(args.operation_id,{timeoutMs:1000});
+ assert.equal(interrupted.status,'AMBIGUOUS');
+ assert.match(interrupted.error.message,/Graph is blocked/);
+ const stillOpen=await f.runtime.inspect({operationId:args.operation_id});
+ assert.notEqual(stillOpen.output.internal_resume_available,true);
+ assert.equal((await f.runtime.recover(args.operation_id,{strategy:'abandon_operation',recoveryOperationId:'foreign-open'})).status,'AMBIGUOUS');
+ open=false;
+ await f.runtime.inspect({operationId:args.operation_id});
+ const released=await f.runtime.recover(args.operation_id,{strategy:'abandon_operation',recoveryOperationId:'foreign-closed'});
+ assert.equal(released.status,'SUCCEEDED',released.error?.message);
+ assert.equal(released.output.original_outcome.output.node.node_id,'new');
+ assert.doesNotThrow(()=>f.runtime.assertPreparationAllowed());
+ assert.deepEqual(f.calls,['create']);
 });

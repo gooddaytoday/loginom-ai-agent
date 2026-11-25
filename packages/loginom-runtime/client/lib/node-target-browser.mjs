@@ -15,7 +15,7 @@ export async function readGraph(page, task) {
   const finishes=[...(page[Symbol.for('loginom-dock.operation-receipts.v1')]?.values()??[])]
     .filter(r=>r.state==='completed'&&r.outcome?.status==='SUCCEEDED'&&r.outcome.action_key==='ui.act'&&r.outcome.cleanup_complete===true)
     .map(r=>({context:r.outcome.output?.prepared_node_context,trace:r.outcome.trace}));
-  return page.evaluate(({ request, types, origin, build, read_bindings=false, require_no_native_window=false, finishes }) => {
+  return page.evaluate(({ request, types, origin, build, read_bindings=false, blocker_selector, finishes }) => {
     const fail = message => { throw new Error(message); };
     const preparation = globalThis.__loginomDockPreparationV1;
     if (location.origin !== origin || globalThis.bg?.app?.Version !== build || preparation?.document !== document
@@ -27,7 +27,7 @@ export async function readGraph(page, task) {
     const crumbs = [...document.querySelectorAll('[data-tid^=' + JSON.stringify(request.workflow_ref.prefix + ';cnrNaviMode;b.s_') + ']')].map(e => ({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
     if (crumbs.length!==request.workflow_ref.navigation_path.length || crumbs.some((c,i)=>c.tid!==request.workflow_ref.navigation_path[i].tid||c.label!==request.workflow_ref.navigation_path[i].label)) fail('Workflow navigation changed');
     const visible = e => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0 && getComputedStyle(e).visibility !== 'hidden';
-    const blockers = [...document.querySelectorAll(require_no_native_window?'[role="dialog"],.bg-mask-message,.x-mask-msg,.x-window,[aria-modal="true"]':'[role="dialog"],.bg-mask-message,.x-mask-msg')].filter(visible);
+    const blockers = [...document.querySelectorAll(blocker_selector??'[role="dialog"],.bg-mask-message,.x-mask-msg')].filter(visible);
     if (blockers.length) fail('Graph is blocked');
     const app = bg.app, card = app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
     let ancestor = card.Controller.Node?.data?.node, packageNode = null, workflowNode = null;
@@ -866,10 +866,13 @@ export async function prepareLinkHover(page,task,read,sameGraph,reveal,readViewp
   return after;
 }
 
-export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,record=async()=>{}}) {
+export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,record=async()=>{},requireNoNativeWindow=false}) {
   if(build!=='7.4.2')throw new Error('Node target browser profile is verified only for Loginom 7.4.2');
   let request;
-  const task = extra => ({request,types:NODE_TYPES,origin,build,...extra});
+  const graphBlockers='[role="dialog"],.bg-mask-message,.x-mask-msg';
+  const nativeWindowBlockers=graphBlockers+',.x-window,[role="alertdialog"],[aria-modal="true"]';
+  const blockerSelector=requireNoNativeWindow?nativeWindowBlockers:graphBlockers;
+  const task = extra => ({request,types:NODE_TYPES,origin,build,blocker_selector:blockerSelector,...extra});
   const readCode = t => `async page => (${readGraph.toString()})(page,${JSON.stringify(t)})`;
   const call = (code,deadline) => execute(code,{timeout:Math.max(1,deadline-Date.now())});
   const observeGraph=async(value,deadline,{readBindings=false}={})=>{
@@ -890,11 +893,14 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
             await new Promise(resolve=>setTimeout(resolve,80));
             continue;
           }
+          if(requireNoNativeWindow&&message.includes('Graph is blocked'))
+            throw Object.assign(Error('Graph is blocked. Wait for it to settle or dismiss the native window, then inspect the same operation.'),
+              {code:'NODE_ADD_ONLY_GRAPH_BLOCKED'});
           if(maskRefresh++>=2 || !message.includes('Graph is blocked') || Date.now()>=deadline)throw error;
           // Observe only: a transient loading mask may arrive after the prior
           // graph receipt. Wait for its disappearance, then recheck the complete
           // original preparation identity; never retry a possible gesture.
-          await call(`async page => {await page.waitForFunction(()=>![...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].some(e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden'),null,{timeout:${Math.max(1,Math.min(15000,deadline-Date.now()))}});return true;}`,deadline);
+          await call(`async page => {await page.waitForFunction(selector=>![...document.querySelectorAll(selector)].some(e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden'),${JSON.stringify(blockerSelector)},{timeout:${Math.max(1,Math.min(15000,deadline-Date.now()))}});return true;}`,deadline);
         }
       }
   };
@@ -1091,7 +1097,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
     },
     async verifyAddOnlyCleanup(graph,deadline){
       const scoped={document_id:graph.document_id,workflow_ref:graph.workflow_ref};
-      const probe=task({request:scoped,require_no_native_window:true});
+      const probe=task({request:scoped,blocker_selector:nativeWindowBlockers});
       return call(`async page=>{
         const read=${readGraph.toString()},probe=${JSON.stringify(probe)},expected=${JSON.stringify(graph)};
         const first=await read(page,probe);

@@ -2530,7 +2530,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const targetAdapter=operation=>nodeTargetAdapterFactory({execute:async(code,options)=>{
     const wrapped='async page => {const base={action_key:"node.target.transport",action_revision:"1",operation_id:'+JSON.stringify(operation.id)+',phase:"observed",effect_possible:false,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('+code+')(page)}};}catch(error){return {...base,status:"FAILED",output:{},error:{code:"NODE_TARGET_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
     const response=await execute(wrapped,options);if(response.status!=='SUCCEEDED')throw new Error(response.error?.message??'Node target transport failed');return response.output.value;
-  },pinned,origin:targetOrigin,build:targetBuild,record:nodeTargetRecord});
+  },pinned,origin:targetOrigin,build:targetBuild,record:nodeTargetRecord,
+    requireNoNativeWindow:operation.parameters?.mode===NODE_ADD_ONLY_MODE});
   const nodeApplyOutcome=(operation,result)=>({status:result.status,action_key:'node.apply',
     action_revision:operation.action.revision,operation_id:operation.id,
     phase:result.status==='SUCCEEDED'?'node_ready':result.checkpoint_kind==='local_node_released'?'node_released':result.pending_phase??'node_incomplete',
@@ -2620,6 +2621,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           operation.cleanupConfirmed=true;
           await remember(operation,'reconciled',operation.outcome);
         }
+      }catch(error){
+        if(error.code!=='NODE_ADD_ONLY_GRAPH_BLOCKED')throw error;
       }finally{running=false;}
     }
     if(operation.nodeApply?.result){

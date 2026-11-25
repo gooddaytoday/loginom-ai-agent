@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
-import {mutateGraph} from '../lib/node-target-browser.mjs';
+import {createNodeTargetBrowserAdapter,mutateGraph} from '../lib/node-target-browser.mjs';
 import {samePlacementGraph} from '../lib/node-placement.mjs';
 
 function fixture(t, fault, addOnly=false) {
@@ -88,4 +88,17 @@ for(const [fault,cleanup,dispatched,error] of [
  assert.equal(reply.add_only_window_node_id,cleanup?undefined:'new-js');
  assert.equal(f.counts().drags,Number(dispatched));
  assert.match(reply.error,error);
+});
+
+for(const selector of ['.x-window','[role="alertdialog"]'])test('add_only graph reader refuses visible '+selector,async()=>{
+ const tab={classList:{contains:()=>true}},dialog={getBoundingClientRect:()=>({width:20,height:20})};
+ const document={querySelectorAll:query=>query==='[data-tid="tab"]'?[tab]:query.includes(selector)?[dialog]:[]};
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'tab',navigation_path:[]}};
+ const origin='https://example.invalid',build='7.4.2';
+ const context={document,location:{origin},bg:{app:{Version:build}},getComputedStyle:()=>({visibility:'visible'}),
+  __loginomDockPreparationV1:{document,id:'doc',receipts:new Map([['r',{phase:'verified',workflowId:'wf',tab}]])}};
+ const page={evaluate:async(fn,args)=>runInNewContext('('+fn.toString()+')',context)(args)};
+ const adapter=createNodeTargetBrowserAdapter({origin,build,requireNoNativeWindow:true,
+  execute:async code=>Function('return ('+code+')')()(page)});
+ await assert.rejects(adapter.observe(request,Date.now()+1000),{code:'NODE_ADD_ONLY_GRAPH_BLOCKED'});
 });
