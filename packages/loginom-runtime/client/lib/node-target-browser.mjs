@@ -15,7 +15,7 @@ export async function readGraph(page, task) {
   const finishes=[...(page[Symbol.for('loginom-dock.operation-receipts.v1')]?.values()??[])]
     .filter(r=>r.state==='completed'&&r.outcome?.status==='SUCCEEDED'&&r.outcome.action_key==='ui.act'&&r.outcome.cleanup_complete===true)
     .map(r=>({context:r.outcome.output?.prepared_node_context,trace:r.outcome.trace}));
-  return page.evaluate(({ request, types, origin, build, read_bindings=false, blocker_selector, finishes }) => {
+  return page.evaluate(({ request, types, origin, build, read_bindings=false, window_blocker_selector, finishes }) => {
     const fail = message => { throw new Error(message); };
     const preparation = globalThis.__loginomDockPreparationV1;
     if (location.origin !== origin || globalThis.bg?.app?.Version !== build || preparation?.document !== document
@@ -27,10 +27,10 @@ export async function readGraph(page, task) {
     const visible = e => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0 && getComputedStyle(e).visibility !== 'hidden';
     const blocked = selector => [...document.querySelectorAll(selector)].some(visible);
     // An embedded wizard has its own breadcrumbs in the original tab.
-    if (blocker_selector && blocked(blocker_selector)) fail('Graph is blocked');
+    if (window_blocker_selector && blocked(window_blocker_selector)) fail('Graph is blocked by a native window');
     const crumbs = [...document.querySelectorAll('[data-tid^=' + JSON.stringify(request.workflow_ref.prefix + ';cnrNaviMode;b.s_') + ']')].map(e => ({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
     if (crumbs.length!==request.workflow_ref.navigation_path.length || crumbs.some((c,i)=>c.tid!==request.workflow_ref.navigation_path[i].tid||c.label!==request.workflow_ref.navigation_path[i].label)) fail('Workflow navigation changed');
-    if (!blocker_selector && blocked('[role="dialog"],.bg-mask-message,.x-mask-msg')) fail('Graph is blocked');
+    if (blocked('[role="dialog"],.bg-mask-message,.x-mask-msg')) fail('Graph is blocked');
     const app = bg.app, card = app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
     let ancestor = card.Controller.Node?.data?.node, packageNode = null, workflowNode = null;
     for (let i=0;ancestor && i<32;i++,ancestor=ancestor.ParentNode) {
@@ -872,9 +872,9 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
   if(build!=='7.4.2')throw new Error('Node target browser profile is verified only for Loginom 7.4.2');
   let request;
   const graphBlockers='[role="dialog"],.bg-mask-message,.x-mask-msg';
-  const nativeWindowBlockers=graphBlockers+',.x-window,[role="alertdialog"],[aria-modal="true"],[data-tid$=";WizrdMCF"]';
+  const nativeWindowBlockers='[role="dialog"],.x-window,[role="alertdialog"],[aria-modal="true"],[data-tid$=";WizrdMCF"]';
   const task = extra => ({request,types:NODE_TYPES,origin,build,
-    ...(requireNoNativeWindow?{blocker_selector:nativeWindowBlockers}:{}),...extra});
+    ...(requireNoNativeWindow?{window_blocker_selector:nativeWindowBlockers}:{}),...extra});
   const readCode = t => `async page => (${readGraph.toString()})(page,${JSON.stringify(t)})`;
   const call = (code,deadline) => execute(code,{timeout:Math.max(1,deadline-Date.now())});
   const observeGraph=async(value,deadline,{readBindings=false}={})=>{
@@ -895,8 +895,8 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
             await new Promise(resolve=>setTimeout(resolve,80));
             continue;
           }
-          if(requireNoNativeWindow&&message.includes('Graph is blocked'))
-            throw Object.assign(Error('Graph is blocked. Wait for it to settle or dismiss the native window, then inspect the same operation.'),
+          if(requireNoNativeWindow&&message.includes('Graph is blocked by a native window'))
+            throw Object.assign(Error('Graph is blocked by a native window. Close it, wait for the graph to settle, then inspect the same operation.'),
               {code:'NODE_ADD_ONLY_GRAPH_BLOCKED'});
           if(maskRefresh++>=2 || !message.includes('Graph is blocked') || Date.now()>=deadline)throw error;
           // Observe only: a transient loading mask may arrive after the prior
@@ -1099,7 +1099,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
     },
     async verifyAddOnlyCleanup(graph,deadline){
       const scoped={document_id:graph.document_id,workflow_ref:graph.workflow_ref};
-      const probe=task({request:scoped,blocker_selector:nativeWindowBlockers});
+      const probe=task({request:scoped,window_blocker_selector:nativeWindowBlockers});
       return call(`async page=>{
         const read=${readGraph.toString()},probe=${JSON.stringify(probe)},expected=${JSON.stringify(graph)};
         const first=await read(page,probe);

@@ -171,9 +171,12 @@ export function createUserWorkflowBindings({defaultsDirectory,origin}={}) {
         createdNodes.delete(request.target.ref.node_id);
         defaultOperations.delete(id);
       }
-      if(event.phase==='node_checkpoint'){
-        const result=event.result,node=result?.node;
-        if(request.mode===NODE_ADD_ONLY_MODE&&result?.status==='SUCCEEDED'&&result.cleanup_complete===true
+      if(event.phase==='node_checkpoint'||event.phase==='node_operation_released'){
+        const result=event.result,node=result?.node,proof=event.receipt?.proof;
+        const created=event.phase==='node_checkpoint'?result?.status==='SUCCEEDED':
+          result?.released_phase==='target'&&proof?.verified===true&&proof.cleanup_complete===true&&proof.target_state==='found'
+          &&node&&['document_id','workflow_id','node_id'].every(key=>proof.node?.[key]===node[key]);
+        if(request.mode===NODE_ADD_ONLY_MODE&&created&&result.cleanup_complete===true
           &&result.configuration?.status==='not_requested'&&node?.document_id===defaultsWorkspace?.document_id
           &&typeof node?.node_id==='string')
           createdNodes.set(node.node_id,request.target.type);

@@ -323,6 +323,14 @@ test('first configuration of an add-only node uses creation defaults after a sav
   target:{kind:'existing',type,ref:{document_id:'reopened',workflow_id:'continued',node_id}},
   mode:'delimited',finish:'done',parameters});
  const exported=request('export','exports.text',{destination:'/test/out.csv',delimiter:';'});
+ const released=request('released-export','exports.text',exported.parameters);
+ next.recordNodePhase({phase:'node_apply_prepared',operation_id:'released-add',
+  request:{mode:'add_only',target:{kind:'new',type:'exports.text'}}});
+ next.recordNodePhase({phase:'node_operation_released',operation_id:'released-add',
+  receipt:{proof:{verified:true,cleanup_complete:true,target_state:'found',node:released.target.ref}},
+  result:{status:'FAILED',cleanup_complete:true,configuration:{status:'not_requested'},released_phase:'target',
+   node:released.target.ref}});
+ assert.equal(next.expandNode(released).parameters.encoding,'UTF-8');
  assert.deepEqual(next.expandNode(exported).parameters,{
   encoding:'UTF-8',delimiter:';',header:'names',bom:false,line_ending:'LF',decimal_separator:'.',
   null_marker:'',text_qualifier:'"',destination:'/test/out.csv'});

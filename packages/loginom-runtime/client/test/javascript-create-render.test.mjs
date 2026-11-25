@@ -103,3 +103,24 @@ for(const selector of ['.x-window','[role="alertdialog"]','[data-tid$=";WizrdMCF
   execute:async code=>Function('return ('+code+')')()(page)});
  await assert.rejects(adapter.observe(request,Date.now()+1000),{code:'NODE_ADD_ONLY_GRAPH_BLOCKED'});
 });
+
+test('add_only graph read still waits for its transient activity mask',async()=>{
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',navigation_path:[]}};
+ const graph={document_id:'doc',interaction_ready:true};
+ let masked=true,waits=0;
+ const page={
+  async evaluate(){
+   if(masked)throw Error('Graph is blocked');
+   return graph;
+  },
+  async waitForFunction(_probe,selector){
+   assert.match(selector,/\.bg-mask-message/);
+   waits++;
+   masked=false;
+  },
+ };
+ const adapter=createNodeTargetBrowserAdapter({origin:'https://example.invalid',build:'7.4.2',requireNoNativeWindow:true,
+  execute:async code=>Function('return ('+code+')')()(page)});
+ assert.deepEqual(await adapter.observe(request,Date.now()+1000),graph);
+ assert.equal(waits,1);
+});
