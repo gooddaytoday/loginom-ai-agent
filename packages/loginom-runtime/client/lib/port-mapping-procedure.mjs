@@ -1,4 +1,4 @@
-import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
+import {readOutputDefinitionPages,observeOutputDefinitionPage,observeOutputDefinitions} from './import-definition-pages.mjs';
 import {expandOutputChanges} from './output-mapping-changes.mjs';
 import {ensureMappingTableView} from './mapping-table-view.mjs';
 
@@ -16,11 +16,11 @@ const schema=definition=>definition.fields.map(f=>({name:f.name,label:f.label,ty
 // Native synchronization itself remains a separate, explicitly requested action.
 export async function configureOutputAutosync(channel,value,{mappingWizard,stage}={}) {
   if(typeof value!=='boolean')throw new Error('Explicit output autosync boolean required');
-  const before=await readOutputDefinitionPages(channel,{stage});
+  const {definition:before,state}=await observeOutputDefinitions(channel,{stage});
   const ready=s=>s.wizard?.status==='observed'&&(stage?s.wizard.stage===stage:['output_mapping','input_mapping'].includes(s.wizard.stage))
     &&!s.wizard.column_parameters&&s.wizard.output_columns?.auto_sync?.status==='observed'
     &&typeof s.wizard.output_columns.auto_sync.value==='boolean';
-  const initial=await channel.observe({condition:'output autosync option available',ready});
+  const initial=ready(state)?state:await channel.observe({condition:'output autosync option available',ready});
   const root=initial.wizard.root_ref,option=initial.wizard.output_columns.auto_sync;
   const bound=s=>ready(s)&&s.wizard.root_ref===root&&s.wizard.output_columns.auto_sync.ref===option.ref;
   if(option.value!==value) {
@@ -32,8 +32,6 @@ export async function configureOutputAutosync(channel,value,{mappingWizard,stage
         return {verb:'click',ref:option.ref};
       }});
   }
-  await channel.observe({condition:'requested output autosync value applied',
-    ready:s=>bound(s)&&s.wizard.output_columns.auto_sync.value===value});
   const after=await readOutputDefinitionPages(channel,{expectedCount:before.total_columns,stage,
     ready:s=>bound(s)&&s.wizard.output_columns.auto_sync.value===value});
   if(!same(schema(before),schema(after)))throw new Error('Output definition changed while setting autosync');
@@ -180,19 +178,21 @@ export function resolveConfiguredOutputMapping(mapping,configured,native) {
   return {autosync:mapping.autosync??native.autosync,fields:resolved};
 }
 
-export async function configureOutputField(channel,field) {
+export async function configureOutputField(channel,field,initialObservation) {
   const nativeReady=s=>s.wizard?.status==='observed'&&['output_mapping','input_mapping'].includes(s.wizard.stage)
     &&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true;
-  const initial=await channel.observe({condition:'native output field before edit',readMappings:true,ready:nativeReady});
+  const initial=initialObservation??await channel.observe({condition:'native output field before edit',readMappings:true,ready:nativeReady});
+  if(!nativeReady(initial))throw Error('Complete native output field binding required');
   const baseline=initial.node_mapping;
   const find=n=>n.target_fields.filter(t=>t.record_id===field.current.record_id&&t.source?.record_id===field.source.record_id);
   const targets=find(baseline);
   if(targets.length!==1||!same(targets[0],field.current))throw new Error('Output field changed before edit');
   const original=targets[0];
   if(original.name===field.name&&original.label===field.label)return {verified:true,cleanup_complete:true,effect_possible:false,field:original,source_identity_verified:true,settings_applied:false};
-  const definitions=await readOutputDefinitionPages(channel,{expectedCount:baseline.target_fields.length});
+  const {definition:definitions,state:definitionState}=await observeOutputDefinitions(channel,{expectedCount:baseline.target_fields.length});
   const offset=Math.floor(original.index/8)*8;
-  let state=await observeOutputDefinitionPage(channel,{offset,schemaId:definitions.schema_id,total:definitions.total_columns,field:original,fieldAction:'double_click'});
+  let state=await observeOutputDefinitionPage(channel,{offset,schemaId:definitions.schema_id,total:definitions.total_columns,
+    field:original,fieldAction:'double_click',initialObservation:definitionState});
   const rowOf=s=>s.wizard?.output_columns?.fields?.find(f=>f.index===original.index&&f.name===original.name&&f.label===original.label);
   const row=rowOf(state);if(!row)throw new Error('Output field row is unavailable');
   const root=state.wizard.root_ref;
@@ -202,19 +202,33 @@ export async function configureOutputField(channel,field) {
       if(!e)throw new Error('Output field editor gesture unavailable');return {verb:'double_click',ref:e.ref};}});
   const editorReady=s=>s.wizard?.root_ref===root&&s.wizard.column_parameters?.status==='observed'
     &&s.wizard.column_parameters.selected_column?.name===original.name;
-  for(const key of ['name','label']) {
-    const propertyReady=s=>editorReady(s)&&(s.wizard.column_parameters.fields[key]?.value===field[key]
-      ||s.ui.elements.some(e=>e.ref===s.wizard.column_parameters.fields[key]?.input_ref&&e.wizard_field?.scope==='output_column'
-        &&e.wizard_field.name===key&&e.allowed_actions.includes('set_wizard_field')));
-    state=await channel.observe({condition:'bound output field '+key+' editor',ready:propertyReady});
-    if(state.wizard.column_parameters.fields[key]?.value===field[key])continue;
-    await channel.perform({condition:'set output field '+key,initialObservation:state,ready:propertyReady,
-      identity:s=>({root,original,editor:s.wizard.column_parameters.root_ref}),
-      resolve:s=>{const e=s.ui.elements.find(e=>e.wizard_field?.scope==='output_column'&&e.wizard_field.name===key&&e.allowed_actions.includes('set_wizard_field'));
-        if(!e)throw new Error('Writable output field property unavailable');return {verb:'set_wizard_field',ref:e.ref,text:field[key]};}});
+  const keys=['name','label'];
+  const control=(s,key)=>s.ui.elements.find(e=>e.ref===s.wizard.column_parameters.fields[key]?.input_ref
+    &&e.wizard_field?.scope==='output_column'&&e.wizard_field.name===key&&e.allowed_actions.includes('set_wizard_field'));
+  const propertyReady=(s,key)=>editorReady(s)&&(s.wizard.column_parameters.fields[key]?.value===field[key]||!!control(s,key));
+  const batchReady=s=>editorReady(s)&&s.prepared_node_context?.verified===true&&keys.every(key=>!!control(s,key));
+  state=await channel.observe({condition:'bound output field editor',ready:s=>propertyReady(s,'name')});
+  let readback;
+  if(batchReady(state)){
+    const identity=s=>({root,original,node:s.prepared_node_context,editor:s.wizard.column_parameters});
+    const expected=identity(state);
+    const receipt=await channel.perform({condition:'set output name and label',initialObservation:state,
+      ready:s=>batchReady(s)&&same(identity(s),expected),identity,resolve:s=>({verb:'set_wizard_fields',
+        fields:keys.map(key=>({ref:control(s,key).ref,text:field[key]}))})});
+    readback=receipt?.output;
+  }else{
+    for(const key of keys){
+      const ready=s=>propertyReady(s,key);
+      if(key==='label')state=await channel.observe({condition:'bound output field label editor',ready});
+      if(state.wizard.column_parameters.fields[key]?.value===field[key])continue;
+      await channel.perform({condition:'set output field '+key,initialObservation:state,ready,
+        identity:s=>({root,original,editor:s.wizard.column_parameters.root_ref}),
+        resolve:s=>({verb:'set_wizard_field',ref:control(s,key).ref,text:field[key]})});
+    }
   }
-  const applyReady=s=>editorReady(s)&&s.ui.elements.some(e=>e.column_close?.scope==='output'&&e.allowed_actions.includes('apply_output_column'));
-  state=await channel.observe({condition:'output field Apply ready',ready:applyReady});
+  const applyReady=s=>editorReady(s)&&keys.every(key=>s.wizard.column_parameters.fields[key]?.value===field[key])
+    &&s.ui.elements.some(e=>e.column_close?.scope==='output'&&e.allowed_actions.includes('apply_output_column'));
+  state=readback&&applyReady(readback)?readback:await channel.observe({condition:'output field Apply ready',ready:applyReady});
   await channel.perform({condition:'apply the bound output field changes',initialObservation:state,ready:applyReady,
     identity:s=>({root,original,fields:s.wizard.column_parameters.fields}),resolve:s=>{
       const e=s.ui.elements.find(e=>e.column_close?.scope==='output'&&e.allowed_actions.includes('apply_output_column'));
@@ -226,10 +240,11 @@ export async function configureOutputField(channel,field) {
   return {verified:true,cleanup_complete:true,effect_possible:true,field:find(after.node_mapping)[0],source_identity_verified:true,settings_applied:false};
 }
 
-export async function reorderOutputFields(channel,recordIds) {
+export async function reorderOutputFields(channel,recordIds,initialObservation) {
   const ready=s=>['output_mapping','input_mapping'].includes(s.wizard?.stage)&&s.node_mapping?.verified===true
     &&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true;
-  let state=await channel.observe({condition:'native mapping before reorder',readMappings:true,ready});
+  let state=initialObservation??await channel.observe({condition:'native mapping before reorder',readMappings:true,ready});
+  if(!ready(state))throw Error('Complete native mapping required for reorder');
   const baseline=state.node_mapping;
   if(!Array.isArray(recordIds)||recordIds.length!==baseline.target_fields.length||new Set(recordIds).size!==recordIds.length
     ||recordIds.some(id=>!baseline.target_fields.some(f=>f.record_id===id)))throw Error('Reorder requires every native output record exactly once');
@@ -344,7 +359,7 @@ export async function configureOutputFields(channel,mapping,configured) {
     const state=await channel.observe({condition:'native mapping before planned field edit',readMappings:true,ready});
     if(!same(semantic(state.node_mapping),semantic(expected)))throw Error('Mapping changed between planned field edits');
     const current=expected.target_fields.find(f=>f.record_id===step.record_id);
-    const result=await configureOutputField(channel,{current,source:current.source,name:step.name,label:step.label});
+    const result=await configureOutputField(channel,{current,source:current.source,name:step.name,label:step.label},state);
     expected.target_fields=expected.target_fields.map(f=>f.record_id===step.record_id?{...f,name:step.name,label:step.label,...(expected.mapping_wizard==='TuneDataSourceMappingWizard'?{origin_type:1}:{})}:f);
     edits.push({...step,verified:result.verified,effect_possible:result.effect_possible});
   }
@@ -440,7 +455,7 @@ export async function configureSeparateOutputPort(channel,mapping,configured) {
     changes.push(await configureOutputFields(channel,mapping,configured));
     const edited=await channel.observe({condition:'standalone output identities after edits',readMappings:true,ready});
     resolved=resolveConfiguredOutputMapping(mapping,configured,edited.node_mapping);
-    changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));
+    changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id),edited));
   }
   if(mapping.autosync!==undefined)changes.push(await configureOutputAutosync(channel,mapping.autosync));
   const final=await channel.observe({condition:'standalone output mapping complete before Done',readMappings:true,ready});

@@ -44,7 +44,7 @@ export async function configureSortingOutput(channel,configuration,parameters,ma
  if(requested.fields||requested.changes){changes.push(await configureOutputFields(channel,requested,sources));
   s=await channel.observe({condition:'sorting output after edits',readMappings:true,ready});
   const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
-  changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));
+  changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id),s));
  }
  if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
  s=await channel.observe({condition:'sorting output mapping readback',readMappings:true,ready});

@@ -18,10 +18,14 @@ async function observeDefinition(channel,options,stage){
  return channel.observe(options);
 }
 export async function readImportDefinitionPages(channel,{expectedCount,ready=()=>true}={}) {
-  return readDefinitionPages(channel,{expectedCount,ready,output:false});
+  return (await readDefinitionPages(channel,{expectedCount,ready,output:false})).definition;
 }
 
-export async function readOutputDefinitionPages(channel,{expectedCount,ready=()=>true,stage}={}) {
+export async function readOutputDefinitionPages(channel,options) {
+  return (await observeOutputDefinitions(channel,options)).definition;
+}
+
+export function observeOutputDefinitions(channel,{expectedCount,ready=()=>true,stage}={}) {
   return readDefinitionPages(channel,{expectedCount,ready,output:true,stage});
 }
 
@@ -47,8 +51,8 @@ async function readDefinitionPages(channel,{expectedCount,ready,output,stage}) {
     schemaId=p.schema_id;total=p.total_columns;
     fields.push(...structuredClone(columns.fields));offset+=p.returned;
     if(p.next_offset!==(offset===total?null:offset))throw new Error('Import definition cursor differs');
-    if(offset===total)return {schema_id:schemaId,total_columns:total,fields,definition_complete:true,
-      source_schema_verified:false,settings_applied:false};
+    if(offset===total)return {state,definition:{schema_id:schemaId,total_columns:total,fields,definition_complete:true,
+      source_schema_verified:false,settings_applied:false}};
   }
   throw new Error('Import definition page budget exceeded');
 }
@@ -81,11 +85,12 @@ async function revealOutputPage(channel,state,{offset,schemaId,total,ready,stage
   return state;
 }
 
-export async function observeOutputDefinitionPage(channel,{offset,ready=()=>true,schemaId,total,field,stage,fieldAction='click'}={}) {
+export async function observeOutputDefinitionPage(channel,{offset,ready=()=>true,schemaId,total,field,stage,fieldAction='click',initialObservation}={}) {
   if(!Number.isInteger(offset)||offset<0||offset>=1000)throw new Error('Bounded output definition offset required');
   const accepts=s=>outputStage(s,stage)
     &&['complete_definition_page','rendered_definition_window'].includes(s.wizard.output_columns?.page?.status)&&ready(s);
-  let state=await observeDefinition(channel,{condition:'addressed output definition page at '+offset,outputColumnPage:{offset,limit:8},ready:accepts},stage);
+  let state=initialObservation?.wizard?.output_columns?.page?.offset===offset&&accepts(initialObservation)?initialObservation:
+    await observeDefinition(channel,{condition:'addressed output definition page at '+offset,outputColumnPage:{offset,limit:8},ready:accepts},stage);
   state=await revealOutputPage(channel,state,{offset,schemaId,total,ready,stage});
   const p=state.wizard.output_columns.page;
   if(p.status!=='complete_definition_page'||p.offset!==offset||schemaId!==undefined&&p.schema_id!==schemaId

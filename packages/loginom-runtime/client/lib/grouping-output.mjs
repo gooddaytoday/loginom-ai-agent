@@ -80,9 +80,9 @@ export async function configureGroupingOutput(channel,configuration,parameters,m
   // native gesture only after names, labels and relative order are settled.
   const requested={direction:'output',port:0,fields:planned.fields.map(f=>({source:{kind:'configured_field',name:f.source.name},name:f.name,label:f.label,excluded:f.current.excluded}))};
   changes.push(await configureOutputFields(channel,requested,resolveGeneratedGroupingSources(configuration,initial.node_mapping).map(f=>({...f,name:f.source.name,used:true}))));
-  const edited=(await channel.observe({condition:'grouping mapped fields before reorder',readMappings:true,ready})).node_mapping;
-  const ids=planned.fields.map(f=>{const matches=edited.target_fields.filter(t=>(t.source??t.exclusion_source)?.record_id===f.source.record_id);need(matches.length===1,'Grouping mapped source changed');return matches[0].record_id;});
-  changes.push(await reorderOutputFields(channel,ids));
+  const edited=await channel.observe({condition:'grouping mapped fields before reorder',readMappings:true,ready});
+  const ids=planned.fields.map(f=>{const matches=edited.node_mapping.target_fields.filter(t=>(t.source??t.exclusion_source)?.record_id===f.source.record_id);need(matches.length===1,'Grouping mapped source changed');return matches[0].record_id;});
+  changes.push(await reorderOutputFields(channel,ids,edited));
   for(const field of planned.fields.filter(f=>f.excluded&&!f.current.excluded))changes.push(await excludeOutputField(channel,field.source.record_id));
  }
  const final=await channel.observe({condition:'grouping output names and order applied',readMappings:true,ready});

@@ -1795,6 +1795,57 @@ function importFormatField(page) {
   return {form,owner,input};
 }
 
+async function importFormatBatchFixture() {
+  const page=new Page(), {form,input}=importFormatField(page);
+  const box={x:250,y:100,width:100,height:25};
+  const owner=page.add('div',form.getAttribute('data-tid')+';ImportTextFileParamsWizard;edtDelimiterChar;ValueControl','',box,form);
+  const delimiter=page.add('input',null,'',box,owner);
+  delimiter.value=',';
+  const node={verified:true,surface:'wizard',document_id:'doc',workflow_id:'wf',node_id:'node',tid:form.getAttribute('data-tid')};
+  const primitive=vm.runInContext('('+workspaceUiCapability.toString()+')',page.context);
+  const run=options=>primitive(page,{expected_build:build,expected_origin:origin,kind:'workspace-ui',
+    prepared_node_context:{node,workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},async()=>structuredClone(node));
+  const snapshot=(await run({mode:'observe'})).output;
+  const field=(name,text)=>({ref:snapshot.wizard.settings.fields[name].input_ref,text});
+  const act=()=>run({mode:'act',snapshot,action:{verb:'set_wizard_fields',
+    fields:[field('delimiter',';'),field('null_marker','\\N')]}});
+  return {page,input,delimiter,act,node};
+}
+
+test('an owned import page applies ordered fields with one settled readback',async()=>{
+  const {page,delimiter,input,act}=await importFormatBatchFixture();
+  const writes=[];
+  page.onPress=(key,element)=>{if(key==='Tab')writes.push(element);};
+  const result=await act();
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.deepEqual(writes,[delimiter,input]);
+  assert.equal(result.output.wizard.settings.fields.delimiter.value,';');
+  assert.equal(result.output.wizard.settings.fields.null_marker.value,'\\N');
+  assert.equal(result.trace.filter(e=>e.event==='wizard_fields_verified').length,1);
+  assert.equal(result.trace.filter(e=>e.event==='import_format_input_settled').length,1);
+});
+
+test('an owned import page refuses a mismatching final readback with the field name',async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===delimiter)delimiter.value='wrong';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_FIELD_NOT_CONFIRMED');
+  assert.match(result.error.message,/delimiter/);
+  assert.equal(input.value,'\\N');
+  assert.ok(!result.trace.some(e=>e.event==='wizard_fields_verified'));
+});
+
+test('an owned import page stops before the next write when its native owner changes',async()=>{
+  const {page,input,delimiter,act,node}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===delimiter)node.node_id='foreign';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  assert.equal(input.value,'old');
+  assert.equal(page.events.filter(e=>e==='keyboard_type').length,1);
+});
+
 test('typed wizard field replacement confirms exact draft values without claiming apply',async()=>{
   for(const text of ['\\N','', '\t ']) {
     const page=new Page(),c=importFormatField(page),snapshot=await page.observe();

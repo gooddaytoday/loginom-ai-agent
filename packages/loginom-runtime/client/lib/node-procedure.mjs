@@ -37,7 +37,7 @@ import {makeMissingValuesContextCode} from './missing-values-context.mjs';
 import {makeCollapseContextCode} from './collapse-context.mjs';
 import { createHash } from 'node:crypto';
 import {makeVariablesColumnUnionConfigureCode} from './variables-column-union-procedure.mjs';
-import { makeWorkspaceUiCode, validateUiAction, makeBlockingWindowDiagnosticCode } from './workspace-ui.mjs';
+import { makeWorkspaceUiCode, validateNodeUiAction, makeBlockingWindowDiagnosticCode } from './workspace-ui.mjs';
 import {validatePreparedNodeContext} from './node-context.mjs';
 import {makeNodeMappingContextCode} from './node-mapping-context.mjs';
 import {makeNodePreviewSchemaCode} from './node-preview-schema.mjs';
@@ -1256,7 +1256,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw Error('Lost-links answer requires the owned automatic union input change');
         if(operation.variablesUnionInputChangeDispatched)throw Error('Union lost-links policy may dispatch only once per operation');
       }
-      validateUiAction(action, snapshot);
+      validateNodeUiAction(action,snapshot,preparedNodeContext);
       try {assertContext(snapshot,false,snapshotTableDialog,false,snapshotWizardConfirmation);}
       catch(error){
         if(ownedErrorToast)await entry('node_observation_context_refused',{stage:'error_toast_close_context',reason:String(error.message),
@@ -1332,9 +1332,19 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       }
       operation.cleanupConfirmed = result.cleanup_complete === true;
       operation.nodeEffectPossible ||= result.effect_possible === true;
-      await entry('node_step_completed', { step, internal_operation_id: id, outcome: structuredClone(result) });
+      const completed=await entry('node_step_completed', { step, internal_operation_id: id, outcome: structuredClone(result) });
       if (result.status !== 'SUCCEEDED' || !operation.cleanupConfirmed) {
         throw new NodeProcedureStepError(result);
+      }
+      if(action.verb==='set_wizard_fields'){
+        if(completed?.outcome?.operation_id!==id||!completed.outcome.output
+          ||!result.trace?.some(e=>e.event==='wizard_fields_verified'))
+          throw Error('Wizard field readback requires a durable completion receipt');
+        assertContext(result.output);
+        // The verified readback can bind the next action. The browser still
+        // checks its epoch, page, and owner before dispatching that action.
+        snapshot=structuredClone(result.output);
+        evidenceSnapshot=structuredClone(completed.outcome.output);
       }
       const trainCommands=before.node_training_read===true?before.ui.elements.filter(e=>
         e.label==='Обучить узел'&&e.tid?.startsWith('mn;')&&e.allowed_actions.includes('click')):[];
@@ -1345,7 +1355,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         launchEvidence=executionBaseline?{baseline:structuredClone(executionBaseline),browser_document:before.dom_epoch.document,
           operation_id:id,started_at:launchStartedAt,toast_absent:before.ui.dialogs.length===0}:undefined;
       }
-      // Even a successful gesture does not authorize the next one with old refs.
+      // Only the explicitly verified readback above supplies fresh refs.
       return structuredClone(result);
     },
     // Fixed handlers supply the readiness condition and domain identity. Caller
@@ -1441,8 +1451,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw new Error('A nonempty domain identity is required');
         }
         const nextBinding = digest(canonical(object));
-        const nextIntent = digest(canonical(Object.fromEntries(Object.entries(action)
-          .filter(([key]) => !['ref', 'source_ref', 'target_ref'].includes(key)))));
+        const nextIntent = digest(canonical(action.verb==='set_wizard_fields'
+          ?{verb:action.verb,values:action.fields.map(({text})=>text)}
+          :Object.fromEntries(Object.entries(action).filter(([key])=>!['ref','source_ref','target_ref'].includes(key)))));
         if (attempt && (binding !== nextBinding || intent !== nextIntent)) {
           snapshot = null;
           throw new Error('Node procedure recovery target or intent changed');

@@ -55,16 +55,16 @@ test('second output mapping requires the verified exact native port owner',async
  assert.throws(()=>resolve({direction:'input',port:1},configured,native),/direction/);
 });
 
-function fieldFixture({links=false}={}) {
+function fieldFixture({links=false,prepared=false}={}) {
  const original={record_id:'t',field_id:'0',index:0,name:'Amount',label:'Amount',type:'real',data_kind:'Непрерывный',
   source:{record_id:'s',field_id:'0',index:0,name:'Amount',label:'Amount',type:'real'}};
  let current=structuredClone(original),editor=false,draft={},mutations=0,table=!links;
- const field={current:structuredClone(original),source:original.source,name:'Mapped',label:'Сумма'};
+ const field={current:structuredClone(original),source:original.source,name:'Mapped',label:'Сумма'},observations=[];
  const state=()=>{
   const row={...current,status:'observed',name_ref:'name',selected:editor};
   const params=editor?{status:'observed',root_ref:'editor',selected_column:{...original,status:'observed'},fields:{name:{value:draft.name,input_ref:'name'},label:{value:draft.label,input_ref:'label'}}}:undefined;
   const fields=[row];
-  return {wizard:{status:'observed',stage:'output_mapping',root_ref:'wizard',root_tid:'W',column_parameters:params,
+  return {...(prepared?{prepared_node_context:{verified:true}}:{}),wizard:{status:'observed',stage:'output_mapping',root_ref:'wizard',root_tid:'W',column_parameters:params,
    output_columns:{fields,page:{status:'complete_definition_page',offset:0,limit:8,returned:1,total_columns:1,next_offset:null,schema_id:'schema'}}},
    node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,autosync:false,source_fields:[original.source],target_fields:[current],rendered_indices:[0],
     ...(links?{mapping_wizard:'DerivedDataSourceOutputSocketWizard',node_context:{verified:true,node_id:'own'}}:{}),
@@ -74,19 +74,31 @@ function fieldFixture({links=false}={}) {
     ...(editor?[...['name','label'].map(k=>({ref:k,wizard_field:{scope:'output_column',name:k},allowed_actions:['set_wizard_field']})),
       {ref:'apply',column_close:{scope:'output'},allowed_actions:['apply_output_column']}]:[{ref:'name',allowed_actions:['double_click']}])]}};
  };
- const channel={async observe(o){const s=structuredClone(state());if(!o.ready(s))throw Error('Not ready');return s;},
+ const channel={async observe(o){observations.push(o.condition);const s=structuredClone(state());if(!o.ready(s))throw Error('Not ready');return s;},
   async perform(o){const s=structuredClone(state());assert.ok(o.ready(s));const a=o.resolve(s);mutations++;
    if(a.verb==='click'&&a.ref==='Table'){table=true;channel.afterTable?.(current);}
    else if(a.verb==='double_click'){editor=true;draft={name:current.name,label:current.label};}
    else if(a.verb==='set_wizard_field')draft[a.ref]=a.text;
+   else if(a.verb==='set_wizard_fields'){
+    for(const {ref,text} of a.fields)draft[ref]=text;
+    return {output:structuredClone(state())};
+   }
    else if(a.verb==='apply_output_column'){current={...current,...draft};editor=false;channel.afterApply?.(current);}
    else throw Error('Unexpected action');
   }};
- return {channel,field,mutations:()=>mutations};
+ return {channel,field,mutations:()=>mutations,observations};
 }
 test('output field driver edits name and label once and proves native source preservation',async()=>{
  const {configureOutputField}=await import('../lib/port-mapping-procedure.mjs');
  const f=fieldFixture(),r=await configureOutputField(f.channel,f.field);assert.equal(r.verified,true);assert.equal(r.field.name,'Mapped');assert.equal(r.field.source.record_id,'s');assert.equal(f.mutations(),4);
+});
+test('prepared output editor uses the batch readback for Apply and verifies the native mapping',async()=>{
+ const {configureOutputField}=await import('../lib/port-mapping-procedure.mjs');
+ const f=fieldFixture({prepared:true}),result=await configureOutputField(f.channel,f.field);
+ assert.equal(result.field.name,'Mapped');assert.equal(result.field.label,'Сумма');
+ assert.equal(f.mutations(),3);
+ assert.ok(!f.observations.includes('output field Apply ready'));
+ assert.ok(f.observations.includes('native output field after Apply'));
 });
 test('output field driver rejects changed identity and unexpected post-Apply state',async()=>{
  const {configureOutputField}=await import('../lib/port-mapping-procedure.mjs');
