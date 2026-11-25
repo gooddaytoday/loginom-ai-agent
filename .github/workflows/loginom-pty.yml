@@ -87,15 +87,29 @@ jobs:
           test -n "$version" && test -n "$protocol"
           output="$("$binary" --version | tr -d '\r')"
           test "$output" = "loginom-ai-agent-pty $version (protocol $protocol)"
+          # The play client has no Windows transport; Windows starts a real daemon instead (next step), as upstream does.
+          if [ "$RUNNER_OS" = "Windows" ]; then exit 0; fi
           runtime="$RUNNER_TEMP/loginom-ai-agent-pty-smoke"
           rm -rf "$runtime"
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            printf 'new cmd.exe /c "echo release-smoke"\nwait 250\nquit\n' | "$binary" play --runtime-dir "$runtime" --name smoke > "$RUNNER_TEMP/pty-smoke.log"
-          else
-            printf 'new /bin/sh -c "printf release-smoke; sleep 1"\nwait 250\nquit\n' | "$binary" play --runtime-dir "$runtime" --name smoke > "$RUNNER_TEMP/pty-smoke.log"
-          fi
+          printf 'new /bin/sh -c "printf release-smoke; sleep 1"\nwait 250\nquit\n' | "$binary" play --runtime-dir "$runtime" --name smoke > "$RUNNER_TEMP/pty-smoke.log"
           grep -q 'release-smoke' "$RUNNER_TEMP/pty-smoke.log"
           grep -q 'checkpoint' "$RUNNER_TEMP/pty-smoke.log"
+
+      - name: Smoke test the Windows daemon
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $binary = Join-Path $env:CARGO_TARGET_DIR '${{ matrix.target }}/release/loginom-ai-agent-pty.exe'
+          # Start a real daemon over a named pipe; it stops when nobody claims it (release-process-daemon.yml).
+          $runtime = Join-Path $env:RUNNER_TEMP 'loginom-ai-agent-pty-smoke'
+          $daemon = Start-Process $binary -ArgumentList @('daemon', '--runtime-dir', $runtime, '--name', 'smoke') -PassThru -NoNewWindow
+          $deadline = (Get-Date).AddSeconds(10)
+          while (!(Test-Path (Join-Path $runtime 'smoke/service.json'))) {
+            if ($daemon.HasExited -or (Get-Date) -gt $deadline) { throw 'daemon did not register' }
+            Start-Sleep -Milliseconds 50
+          }
+          if (!$daemon.WaitForExit(15000)) { $daemon.Kill(); throw 'unclaimed daemon did not stop' }
+          if (Test-Path (Join-Path $runtime 'smoke')) { throw 'runtime directory was not removed' }
 
       - name: Collect
         run: |
