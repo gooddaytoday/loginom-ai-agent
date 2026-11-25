@@ -188,7 +188,7 @@ export async function reconcileNodeWorkflow({operation,adapter,record,now=Date.n
 }
 
 export async function applyNode({request, operation, handlers, drivers, record,
-  signal, stopSignal, now=Date.now, resume=false, deadlineAt=Infinity}) {
+  signal, stopSignal, now=Date.now, resume=false, deadlineAt=Infinity, admissionUncertainty}) {
   request=structuredClone(request);
   const {graph,handler}=validateNodeApplyRequest(request,handlers);
   requireValue(operation.id===request.operation_id, 'node.apply operation identity differs');
@@ -238,12 +238,20 @@ export async function applyNode({request, operation, handlers, drivers, record,
     delete state.verified_refusal;
     delete state.export_destination_conflict;
   } else {
-    signal?.throwIfAborted();
+    if(!admissionUncertainty)signal?.throwIfAborted();
     state={signature,handler_revision:handler.revision,request:structuredClone(request),phases:[],pending:null,
       node:null,execution:{status:'not_requested',execution_id:null},output:{status:'not_refreshed',evidence_ref:null,ports:[]},
       effect_possible:false,cleanup_complete:true,resumes:0,started_at:now(),deadline:Math.min(deadlineAt,now()+request.budgets.total_ms)};
     await acknowledge({phase:'node_apply_prepared',signature,request:structuredClone(request),deadline_at:state.deadline});
     operation.nodeApply=state;
+    if(admissionUncertainty){
+      // Source navigation ran before the node acquired its gate. Journal the
+      // effect even if the owning call was cancelled or its budget elapsed.
+      state.pending={phase:'source',receipt_id:operation.id+':source',deadline:admissionUncertainty.deadline,
+        effect_possible:true,before_node:null};
+      state.effect_possible=true;state.cleanup_complete=false;
+      await acknowledge({phase:'node_phase_prepared',signature,receipt:state.pending});
+    }
   }
   const context=()=>({operation_id:operation.id,document_id:request.document_id,workflow_ref:request.workflow_ref,
     node:state.node,execution:state.execution,deadline:state.deadline,signal,stopSignal});
@@ -491,6 +499,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
       return null;
   };
   try {
+    if(admissionUncertainty)throw admissionUncertainty.error;
     // Builtin variables prove their source by reading the prepared graph. An
     // upload may have selected Files; activate only its still-owned inactive tab
     // in the existing workflow phase before that read, never inside readGraph.

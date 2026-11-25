@@ -238,29 +238,36 @@ export function serverDownloadBudget(bytes) {
   return Math.min(7200000,120000+Math.ceil(bytes/(1024*1024)*1000));
 }
 
-// The browser writes to disk; this registry transports only paths and metadata.
+export function requireServerDownloadFormat(path) {
+  if(!/\.(csv|tsv|txt|xls|xlsx)$/i.test(path))throw Error('LOGINOM_DOWNLOAD_FORMAT_UNSUPPORTED');
+}
+
+// The browser writes to disk; the registry transports only paths and metadata.
 // Cache identity is private authority for the backend exact-scan receipt.
 export function createServerDownloadRegistry({directory,inspect,download,recover,now=Date.now,withSource=(_ref,_options,read)=>read()}) {
   const jobs=new Map();
   const native=s=>JSON.stringify([s.destination,s.bytes,s.mtime,s.origin,s.account,s.document_id]);
   const local=s=>({size:s.size,mtime:s.mtimeMs,ctime:s.ctimeMs,file_id:`${s.dev}:${s.ino}`});
   const find=id=>{const job=jobs.get(id);if(!job)throw Error('Unknown server download operation');return job;};
-  const snapshot=job=>({result_version:'user-v1',operation_id:job.request.operation_id,state:job.state,
-    ...(job.status?{status:job.status}:{}),action_key:'storage.download',phase:job.phase,
-    cancel_requested:job.controller.signal.aborted,cleanup_complete:job.state==='settled'&&job.cleanup!==false,
-    effect_possible:false,progress:{bytes:job.bytes??0,total_bytes:job.source?.bytes??null,
-      elapsed_ms:Math.max(0,now()-job.started),deadline_at:job.deadline??null,
-      byte_progress:'native_blob_or_chromium_received_bytes'},output:job.output??{},error:job.error??null});
+  const snapshot=(job,onWorkflowReturn)=>{
+    if(job.status==='SUCCEEDED'&&job.workflowReturn==='refused')onWorkflowReturn?.(job.workflowReturn);
+    return {result_version:'user-v1',operation_id:job.request.operation_id,state:job.state,
+      ...(job.status?{status:job.status}:{}),action_key:'storage.download',phase:job.phase,
+      cancel_requested:job.controller.signal.aborted,cleanup_complete:job.state==='settled'&&job.cleanup!==false,
+      effect_possible:job.navigationUncertain===true,progress:{bytes:job.bytes??0,total_bytes:job.source?.bytes??null,
+        elapsed_ms:Math.max(0,now()-job.started),deadline_at:job.deadline??null,
+        byte_progress:'native_blob_or_chromium_received_bytes'},output:job.output??{},error:job.error??null};
+  };
   const remove=async job=>{if(job.directory)await rm(job.directory,{recursive:true,force:true});};
   return {
     get busy(){return [...jobs.values()].some(j=>j.state==='running');},
     get unsettled(){return [...jobs.values()].some(j=>j.state==='running'||j.cleanup===false);},
-    start(request) {
+    start(request,{onWorkflowReturn}={}) {
       if(!request||Object.keys(request).some(k=>!['operation_id','server_source_ref'].includes(k))
         ||![request.operation_id,request.server_source_ref].every(v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,128}$/.test(v)))
         throw Error('Server download requires operation_id and server_source_ref only');
       const old=jobs.get(request.operation_id);
-      if(old){if(old.request.server_source_ref!==request.server_source_ref)throw Error('Download ID has different parameters');return snapshot(old);}
+      if(old){if(old.request.server_source_ref!==request.server_source_ref)throw Error('Download ID has different parameters');return snapshot(old,onWorkflowReturn);}
       if(this.unsettled)throw Error('Another server download is running or its cleanup is unconfirmed');
       if(jobs.size>=128)throw Error('Server download capacity reached');
       const job={request:structuredClone(request),state:'running',phase:'validating',controller:new AbortController(),started:now()};
@@ -279,12 +286,13 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
           timer=setTimeout(()=>job.controller.abort(Error(code)),deadline-now());
         };
         try {
-          const {after,copy}=await withSource(request.server_source_ref,{signal:job.controller.signal},async()=>{
+          const {after,copy}=await withSource(request.server_source_ref,{signal:job.controller.signal,
+            onWorkflowReturn:state=>{job.workflowReturn=state;}},async()=>{
             job.source=await inspect(request.server_source_ref,{signal:job.controller.signal,storageSession:'capture'});job.controller.signal.throwIfAborted();
             job.deadline=job.started+serverDownloadBudget(job.source.bytes);
             if(now()>=job.deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
             job.lastProgress=job.started;arm();job.controller.signal.throwIfAborted();
-            if(!/\.(csv|tsv|txt|xls|xlsx)$/i.test(job.source.destination))throw Error('LOGINOM_DOWNLOAD_FORMAT_UNSUPPORTED');
+            requireServerDownloadFormat(job.source.destination);
             await mkdir(directory,{recursive:true,mode:0o700});
             const root=await lstat(directory);
             // Windows reports POSIX-like 0o777 for every directory: privacy is
@@ -307,18 +315,22 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
               storageSession:'verify',operation_id:request.operation_id}),copy=await lstat(job.path);
             if(native(after)!==native(job.source)||!copy.isFile()||copy.isSymbolicLink()||copy.size!==job.source.bytes)
               throw Error('LOGINOM_FILE_CHANGED');
+            await chmod(job.path,0o600);job.identity=local(await lstat(job.path));
+            job.controller.signal.throwIfAborted();
+            if(now()>=job.deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
+            clearTimeout(timer);
             return {after,copy};
           });
-          await chmod(job.path,0o600);job.identity=local(await lstat(job.path));
-          job.controller.signal.throwIfAborted();
-          if(now()>=job.deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
           job.bytes=copy.size;job.status='SUCCEEDED';job.phase='cached';
           job.output={path:job.path,server_source_ref:request.server_source_ref,bytes:copy.size,
             native_size:after.bytes,native_mtime:after.mtime,coverage:'downloaded_copy',
             next_step:'loginom_file_profile on path, then loginom_file_scan and loginom_file_sample. Upload only the sample; switch back to the original storage ref.'};
         }catch(error){
-          job.status='FAILED';job.phase='failed';
-          job.error={code:job.controller.signal.aborted?(['LOGINOM_DOWNLOAD_DEADLINE','LOGINOM_DOWNLOAD_NO_PROGRESS'].includes(job.controller.signal.reason?.message)
+          job.navigationUncertain=!!error.storageNavigationOperationId;
+          if(job.navigationUncertain)job.cleanup=false;
+          job.status=job.navigationUncertain?'AMBIGUOUS':'FAILED';job.phase='failed';
+          job.error=job.navigationUncertain?{code:'STORAGE_SOURCE_REFUSED',message:'Server storage navigation was not confirmed.'}
+            :{code:job.controller.signal.aborted?(['LOGINOM_DOWNLOAD_DEADLINE','LOGINOM_DOWNLOAD_NO_PROGRESS'].includes(job.controller.signal.reason?.message)
             ?job.controller.signal.reason.message:'LOGINOM_DOWNLOAD_CANCELLED'):/^LOGINOM_[A-Z_]+$/.test(error.message)?error.message:'LOGINOM_DOWNLOAD_FAILED',
             message:'Server cache is invalid; no full calculation is authorized. Observe the original file and start a new operation.'};
           if(['browser_start_refused','save_failed','browser_transfer_failed'].includes(error.details?.reason))
@@ -330,17 +342,17 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
       })();
       return snapshot(job);
     },
-    status:id=>snapshot(find(id)),
-    async wait(id,{timeoutMs=1000,signal}={}) {
+    status:(id,{onWorkflowReturn}={})=>snapshot(find(id),onWorkflowReturn),
+    async wait(id,{timeoutMs=1000,signal,onWorkflowReturn}={}) {
       if(!Number.isInteger(timeoutMs)||timeoutMs<0||timeoutMs>60000)throw Error('Download wait must be 0..60000 ms');
       signal?.throwIfAborted();const job=find(id);let timer,abort;
       try{await Promise.race([job.completion,new Promise((resolve,reject)=>{
         timer=setTimeout(resolve,timeoutMs);
         if(signal){abort=()=>reject(signal.reason);signal.addEventListener('abort',abort,{once:true});}
-      })]);return snapshot(job);}
+      })]);return snapshot(job,onWorkflowReturn);}
       finally{clearTimeout(timer);if(abort)signal.removeEventListener('abort',abort);}
     },
-    cancel(id){const job=find(id);if(job.state==='running')job.controller.abort(Error('LOGINOM_DOWNLOAD_CANCELLED'));return snapshot(job);},
+    cancel(id,{onWorkflowReturn}={}){const job=find(id);if(job.state==='running')job.controller.abort(Error('LOGINOM_DOWNLOAD_CANCELLED'));return snapshot(job,onWorkflowReturn);},
     async bind(source,receipt) {
       if(!receipt||receipt.basis!=='backend_exact_scan'||receipt.bytes!==source.bytes
         ||!/^[a-f0-9]{64}$/.test(receipt.sha256??''))return source;
@@ -360,9 +372,11 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
       await Promise.all(selected.map(j=>j.completion));
       for(const job of selected){
         if(job.browserUnsettled){if(!recover)throw Error('Original browser download cleanup is unconfirmed');await recover(job.request.operation_id);job.browserUnsettled=false;}
-        await remove(job);job.phase='removed';job.output={cache_removed:true};job.cleanup=true;
+        await remove(job);job.phase='removed';job.output={cache_removed:true};job.cleanup=!job.navigationUncertain;
       }
-      return {result_version:'user-v1',operation_id:id??'storage-cache-cleanup',status:'SUCCEEDED',cleanup_complete:true,output:{cache_removed:true}};
+      const cleanupComplete=selected.every(job=>job.cleanup===true);
+      return {result_version:'user-v1',operation_id:id??'storage-cache-cleanup',status:cleanupComplete?'SUCCEEDED':'AMBIGUOUS',
+        cleanup_complete:cleanupComplete,output:{cache_removed:true}};
     },
   };
 }
