@@ -1,6 +1,117 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {configureJoin} from '../lib/join-procedure.mjs';
+import {configureJoinInputs} from '../lib/join-mappings.mjs';
 const p={keys:[{left:'A',right:'B'},{left:'C',right:'D'}],case_sensitive:true,include_joined_keys:false};
+
+function inputFixture({closeError}={}){
+ const node={document_id:'doc',workflow_id:'wf',node_id:'join'};
+ const sources=['left','right'].map(node_id=>({...node,node_id}));
+ const schemas=[['A','C'],['B','D']].map(names=>names.map((name,index)=>({index,name,label:name,type:'string',data_kind:'Дискретный'})));
+ const request={target:{kind:'new'},mode:'inner',parameters:p,mappings:[],inputs:sources.map((source,input)=>({source,input,output:0}))};
+ const preflight={verified:true,proofs:sources.map((source,port)=>({verified:true,cleanup_complete:true,parameters_valid:true,settings_changed:false,
+  source,port:0,schema:structuredClone(schemas[port]),preview:{verified:true,inventory_complete:true,node_id:source.node_id,port:0},
+  node_context:{...source,verified:true,surface:'graph'}}))};
+ const opened=[],finished=[],closed=[];
+ let port=null;
+ const graph={...node,verified:true,surface:'graph',locked:false,tid:'Graph;Join'};
+ const channel={
+  async openInputPort(input){assert.equal(port,null);port=input;opened.push(port);},
+  async observe({ready}){
+   const prepared_node_context=port===null?graph:{...node,verified:true,surface:'wizard',tid:'W',
+    input_port:{direction:'input',port,native_index:port,port_guid:'port-'+port,opening_operation_id:'open-'+opened.length}};
+   const ui={elements:[],dialogs:[],masks:[]};
+   if(port===null){const s={prepared_node_context,wizard:{status:'absent'},ui};assert.ok(ready(s));return s;}
+   ui.elements.push({tid:'W;btnClose',ref:'close',allowed_actions:['click']});
+   const fields=schemas[port].map(f=>({...f,status:'observed'}));
+   const source_fields=fields.map(f=>({...f,field_id:String(f.index),record_id:'s'+f.index}));
+   const s={prepared_node_context,ui,wizard:{status:'observed',stage:'input_mapping',root_tid:'W',root_ref:'root-'+opened.length,
+    output_columns:{page:{status:'complete_definition_page',schema_id:'input-'+port,offset:0,limit:8,total_columns:fields.length,returned:fields.length,next_offset:null},fields}},
+    node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,autosync:true,
+     mapping_wizard:'TuneDataSourceMappingWizard',node_context:prepared_node_context,source_fields,
+     target_fields:fields.map((f,i)=>({...f,source:source_fields[i]}))}};
+   assert.ok(ready(s));return s;
+  },
+  async perform({resolve,initialObservation}){
+   assert.deepEqual(resolve(initialObservation),{verb:'click',ref:'close'});
+   if(closeError)throw Error(closeError);
+   closed.push(port);port=null;
+  },
+ };
+ const finish=async(mode,isPort)=>{
+  assert.equal(mode,'done');assert.equal(isPort,true);finished.push(port);port=null;
+  return {verified:true,cleanup_complete:true,mode,settings_applied:true,node_context:graph};
+ };
+ return {channel,node,request,preflight,opened,finished,closed,finish,schemas};
+}
+
+test('new Join opens each input mapping once and commits both owned ports',async()=>{
+ const f=inputFixture();
+ const r=await configureJoinInputs(f.channel,[],{node:f.node},f.request,f.finish,{preflight:f.preflight});
+ assert.deepEqual(f.opened,[0,1]);
+ assert.deepEqual(f.finished,[0,1]);
+ assert.deepEqual(f.closed,[]);
+ assert.deepEqual(r.ports.map(p=>p.native_mapping.node_context.input_port.port_guid),['port-0','port-1']);
+});
+
+test('new Join closes a mismatched input 0 and refuses before either Done',async()=>{
+ const f=inputFixture();
+ f.schemas[0][0].label='Changed after preflight';
+ const error=await configureJoinInputs(f.channel,[],{node:f.node},f.request,f.finish,{preflight:f.preflight}).then(()=>assert.fail('Expected refusal'),e=>e);
+ assert.match(error.message,/Join input changed after validation/);
+ assert.deepEqual(f.opened,[0]);
+ assert.deepEqual(f.finished,[]);
+ assert.deepEqual(f.closed,[0]);
+ assert.deepEqual(Object.fromEntries(Object.entries(error.nodePhaseRefusal).filter(([key])=>key!=='proof')),{
+  phase:'input_mapping',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'join_first_input_schema_refused',
+ });
+ assert.equal(error.nodePhaseRefusal.proof.closed.draft_discarded,true);
+});
+
+test('new Join closes a mismatched input 1 and retains uncertainty after input 0 Done',async()=>{
+ const f=inputFixture();
+ f.schemas[1][0].label='Changed after preflight';
+ await assert.rejects(configureJoinInputs(f.channel,[],{node:f.node},f.request,f.finish,{preflight:f.preflight}),
+  error=>/Join input changed after validation/.test(error.message)&&error.nodePhaseRefusal===undefined);
+ assert.deepEqual(f.opened,[0,1]);
+ assert.deepEqual(f.finished,[0]);
+ assert.deepEqual(f.closed,[1]);
+});
+
+test('new Join keeps an unconfirmed Close unresolved after an input 0 mismatch',async()=>{
+ const f=inputFixture({closeError:'lost Close response'});
+ f.schemas[0][0].label='Changed after preflight';
+ await assert.rejects(configureJoinInputs(f.channel,[],{node:f.node},f.request,f.finish,{preflight:f.preflight}),
+  error=>/lost Close response/.test(error.message)&&error.nodePhaseRefusal===undefined);
+ assert.deepEqual(f.opened,[0]);
+ assert.deepEqual(f.finished,[]);
+ assert.deepEqual(f.closed,[]);
+});
+
+test('new Join refuses another source receipt before opening either input',async()=>{
+ const f=inputFixture();
+ f.preflight.proofs.reverse();
+ await assert.rejects(configureJoinInputs(f.channel,[],{node:f.node},f.request,f.finish,{preflight:f.preflight}),/Join source preflight receipt differs/);
+ assert.deepEqual(f.opened,[]);
+ assert.deepEqual(f.finished,[]);
+});
+
+for(const [label,mutate] of [
+ ['preflight verified',p=>{p.verified=false;}],
+ ['source receipt verified',p=>{p.proofs[0].verified=false;}],
+ ['source receipt cleanup',p=>{p.proofs[0].cleanup_complete=false;}],
+ ['source receipt validation',p=>{p.proofs[0].parameters_valid=false;}],
+ ['source receipt settings',p=>{p.proofs[0].settings_changed=true;}],
+ ['source receipt port',p=>{p.proofs[0].port=1;}],
+ ['preview port',p=>{p.proofs[0].preview.port=1;}],
+ ['preview verified',p=>{p.proofs[0].preview.verified=false;}],
+ ['preview inventory',p=>{p.proofs[0].preview.inventory_complete=false;}],
+])test('new Join rejects invalid '+label+' before opening either port',async()=>{
+ const f=inputFixture();mutate(f.preflight);
+ await assert.rejects(configureJoinInputs(f.channel,[],{node:f.node},f.request,f.finish,{preflight:f.preflight}),
+  /Both Join source preflight receipts required|Join source preflight receipt differs/);
+ assert.deepEqual(f.opened,[]);
+ assert.deepEqual(f.finished,[]);
+});
 function fixture(fault){
  const c={verified:true,input_fields:[['A','C'].map(name=>({name,type:'string',record_id:name})),['B','D'].map(name=>({name,type:'string',record_id:name}))],keys:[],mode:'inner',case_sensitive:true,include_joined_keys:false,node_context:{node_id:'owned'}};
  const s={wizard:{stage:'join',root_tid:'W',root_ref:'wizard'},node_join:c,ui:{elements:['colSourceName_A','colSourceName_C','colDisplayName_B','colDisplayName_D'].map(tid=>({tid:'W;JoinDataWizard;'+tid,ref:tid,signature:{join_field:{side:tid.startsWith('colSource')?'left':'right',field_key:tid.split('_').at(-1),record_id:tid.split('_').at(-1),wizard_root_ref:'wizard'}},allowed_actions:['drag']}))}};

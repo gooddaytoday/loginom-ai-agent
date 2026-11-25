@@ -52,7 +52,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
   validate:implementation.validate,configure:(ctx,p,drivers)=>drivers.configureCalculator(ctx,p)});}
  const nodeApplyDriverFactory=options=>{
   const {operation,execute,onRecord,now,receiptOptions}=options;
-  let channel,activeSignal,configured,mapping,columns,executionDriver,executionReceipt,multipleOutputs,preconfiguration,inputCheckpoint,outputCheckpoint,configurationGraph,openCheckpoint,finishStart;
+  let channel,activeSignal,configured,mapping,columns,executionDriver,executionReceipt,multipleOutputs,preconfiguration,inputCheckpoint,outputCheckpoint,configurationGraph,openCheckpoint,finishStart,targetPreflight;
   const graphForRejection=async()=>{
    const g=await operation.nodeTargetAdapter.observe({document_id:operation.nodeApply.request.document_id,workflow_ref:operation.nodeApply.request.workflow_ref},operation.deadline);
    requireValue(g.complete===true&&g.document_id===operation.nodeApply.node.document_id&&g.workflow_ref.workflow_id===operation.nodeApply.node.workflow_id,'Complete calculator rollback graph required');
@@ -102,7 +102,10 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
      return true;
     },
    }:{}),
-   ...(!implementation||implementation.preflight?{beforeTarget:ctx=>(implementation?.preflight??preflightCalculatorSource)(options,ctx,{targetOrigin,targetBuild,wait})}:{}),
+   ...(!implementation||implementation.preflight?{async beforeTarget(ctx){
+    targetPreflight=await (implementation?.preflight??preflightCalculatorSource)(options,ctx,{targetOrigin,targetBuild,wait});
+    return targetPreflight;
+   }}:{}),
    releaseBeforeTarget:ctx=>releaseNodeSchemaPreview(options,ctx,{targetOrigin,targetBuild,wait}),
    verifySource:async()=>verified({not_applicable:true,source_kind:'upstream_table'}),
    ...(implementation?.openRecovery?{async verifyPendingOpen(state,{signal}={}){
@@ -200,8 +203,14 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
       return verified({not_applicable:true,mappings:[]});
      }
      enter(ctx);
+     const request=operation.nodeApply.request;
+     if(implementation?.skipInputMapping&&request.inputs.length===0&&mappings.length===0){
+      const graph=await operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline);
+      if(implementation.skipInputMapping(graph,ctx.node))return verified({not_applicable:true,mappings:[]});
+     }
      if(implementation?.beforeInput)await implementation.beforeInput(options,ctx,{targetOrigin,targetBuild,channel,finishWizard});
-     if(implementation?.configureInputs)return implementation.configureInputs(channel,mappings,ctx,operation.nodeApply.request,finishWizard,...(implementation.type==='transform.col_union_data'?[{inputCount:operation.colUnionInputCount}]:[]));
+     if(implementation?.configureInputs)return implementation.configureInputs(channel,mappings,ctx,operation.nodeApply.request,finishWizard,
+      {inputCount:operation.colUnionInputCount,preflight:targetPreflight});
      const recoveryGraph=(!implementation||implementation.inputMappingRecovery)?await graphForInput():null;
      await channel.openInputPort(0);
      const ready=s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified===true;
