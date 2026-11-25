@@ -35,6 +35,10 @@ export function createNodeOperationRunner({run,validate,progress,admitResume}) {
  };
  return Object.freeze({
   has:id=>jobs.has(id),
+  workflow(id){
+   const request=jobs.get(id)?.request;
+   return request?.workflow_ref?structuredClone({document_id:request.document_id,workflow_ref:request.workflow_ref}):null;
+  },
   get busy(){return [...jobs.values()].some(job=>job.state==='running');},
   get active(){const job=[...jobs.values()].find(job=>job.state==='running');return job?snapshot(job):null;},
   get unsettled(){return [...jobs.values()].some(job=>job.state==='running'||job.outcome?.status==='AMBIGUOUS'
