@@ -9,6 +9,7 @@
   "graph": {
     "nodes": [
       {
+        "id": "sales",
         "type": "imports.text",
         "label": "Продажи"
       }

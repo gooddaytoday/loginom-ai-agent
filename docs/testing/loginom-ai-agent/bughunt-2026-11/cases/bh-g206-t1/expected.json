@@ -13,10 +13,12 @@
   "graph": {
     "nodes": [
       {
+        "id": "sales",
         "type": "imports.text",
         "label": "Продажи"
       },
       {
+        "id": "js",
         "type": "programming.javascript",
         "label": "Расчёт JS"
       }

@@ -21,44 +21,36 @@
   "graph": {
     "nodes": [
       {
+        "id": "jan",
         "type": "imports.text",
         "label": "Январь"
       },
       {
+        "id": "feb",
         "type": "imports.text",
         "label": "Февраль"
       },
       {
+        "id": "mar",
         "type": "imports.text",
         "label": "Март"
       },
       {
+        "id": "union",
         "type": "transform.union_data",
         "label": "Объединение месяцев"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.text",
-          "label": "Январь"
-        },
-        "target": {
-          "type": "transform.union_data",
-          "label": "Объединение месяцев"
-        },
+        "source": "jan",
+        "target": "union",
         "output": 0,
         "input": 0
       },
       {
-        "source": {
-          "type": "imports.text",
-          "label": "Март"
-        },
-        "target": {
-          "type": "transform.union_data",
-          "label": "Объединение месяцев"
-        },
+        "source": "mar",
+        "target": "union",
         "output": 0
       }
     ]

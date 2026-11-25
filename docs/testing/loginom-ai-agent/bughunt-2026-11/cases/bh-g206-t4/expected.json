@@ -17,40 +17,31 @@
   "graph": {
     "nodes": [
       {
+        "id": "sales",
         "type": "imports.text",
         "label": "Продажи"
       },
       {
+        "id": "js",
         "type": "programming.javascript",
         "label": "Расчёт JS"
       },
       {
+        "id": "py",
         "type": "programming.python",
         "label": "Корректировка"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.text",
-          "label": "Продажи"
-        },
-        "target": {
-          "type": "programming.javascript",
-          "label": "Расчёт JS"
-        },
+        "source": "sales",
+        "target": "js",
         "output": 0,
         "input": 0
       },
       {
-        "source": {
-          "type": "programming.javascript",
-          "label": "Расчёт JS"
-        },
-        "target": {
-          "type": "programming.python",
-          "label": "Корректировка"
-        },
+        "source": "js",
+        "target": "py",
         "output": 0,
         "input": 0
       }

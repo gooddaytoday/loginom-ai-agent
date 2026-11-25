@@ -13,24 +13,20 @@
   "graph": {
     "nodes": [
       {
+        "id": "sales",
         "type": "imports.text",
         "label": "Продажи"
       },
       {
+        "id": "sort",
         "type": "transform.sorting",
         "label": "Сортировка выручки"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.text",
-          "label": "Продажи"
-        },
-        "target": {
-          "type": "transform.sorting",
-          "label": "Сортировка выручки"
-        },
+        "source": "sales",
+        "target": "sort",
         "output": 0,
         "input": 0
       }

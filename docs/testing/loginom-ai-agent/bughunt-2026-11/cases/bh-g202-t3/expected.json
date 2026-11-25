@@ -17,40 +17,31 @@
   "graph": {
     "nodes": [
       {
+        "id": "sales",
         "type": "imports.text",
         "label": "Продажи"
       },
       {
+        "id": "returns",
         "type": "imports.text",
         "label": "Возвраты"
       },
       {
+        "id": "join",
         "type": "transform.join_data",
         "label": "Слияние заказов"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.text",
-          "label": "Возвраты"
-        },
-        "target": {
-          "type": "transform.join_data",
-          "label": "Слияние заказов"
-        },
+        "source": "returns",
+        "target": "join",
         "output": 0,
         "input": 0
       },
       {
-        "source": {
-          "type": "imports.text",
-          "label": "Продажи"
-        },
-        "target": {
-          "type": "transform.join_data",
-          "label": "Слияние заказов"
-        },
+        "source": "sales",
+        "target": "join",
         "output": 0,
         "input": 1
       }

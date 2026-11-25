@@ -21,56 +21,42 @@
   "graph": {
     "nodes": [
       {
+        "id": "sales",
         "type": "imports.text",
         "label": "Продажи"
       },
       {
+        "id": "filter",
         "type": "transform.filter_data",
         "label": "Фильтр выручки"
       },
       {
+        "id": "group",
         "type": "transform.group_data",
         "label": "Группировка"
       },
       {
+        "id": "xlsx",
         "type": "exports.excel",
         "label": "Экспорт Excel"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.text",
-          "label": "Продажи"
-        },
-        "target": {
-          "type": "transform.filter_data",
-          "label": "Фильтр выручки"
-        },
+        "source": "sales",
+        "target": "filter",
         "output": 0,
         "input": 0
       },
       {
-        "source": {
-          "type": "transform.filter_data",
-          "label": "Фильтр выручки"
-        },
-        "target": {
-          "type": "transform.group_data",
-          "label": "Группировка"
-        },
+        "source": "filter",
+        "target": "group",
         "output": 0,
         "input": 0
       },
       {
-        "source": {
-          "type": "transform.group_data",
-          "label": "Группировка"
-        },
-        "target": {
-          "type": "exports.excel",
-          "label": "Экспорт Excel"
-        },
+        "source": "group",
+        "target": "xlsx",
         "output": 0,
         "input": 0
       }

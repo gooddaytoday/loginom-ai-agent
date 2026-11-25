@@ -17,40 +17,31 @@
   "graph": {
     "nodes": [
       {
+        "id": "jan",
         "type": "imports.text",
         "label": "Январь"
       },
       {
+        "id": "feb",
         "type": "imports.text",
         "label": "Февраль"
       },
       {
+        "id": "union",
         "type": "transform.union_data",
         "label": "Объединение месяцев"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.text",
-          "label": "Январь"
-        },
-        "target": {
-          "type": "transform.union_data",
-          "label": "Объединение месяцев"
-        },
+        "source": "jan",
+        "target": "union",
         "output": 0,
         "input": 0
       },
       {
-        "source": {
-          "type": "imports.text",
-          "label": "Февраль"
-        },
-        "target": {
-          "type": "transform.union_data",
-          "label": "Объединение месяцев"
-        },
+        "source": "feb",
+        "target": "union",
         "output": 0,
         "input": 1
       }

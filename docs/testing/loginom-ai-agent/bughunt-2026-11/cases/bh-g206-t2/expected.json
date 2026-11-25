@@ -13,24 +13,20 @@
   "graph": {
     "nodes": [
       {
+        "id": "sales",
         "type": "imports.text",
         "label": "Продажи"
       },
       {
+        "id": "js",
         "type": "programming.javascript",
         "label": "Расчёт JS"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.text",
-          "label": "Продажи"
-        },
-        "target": {
-          "type": "programming.javascript",
-          "label": "Расчёт JS"
-        },
+        "source": "sales",
+        "target": "js",
         "output": 0,
         "input": 0
       }

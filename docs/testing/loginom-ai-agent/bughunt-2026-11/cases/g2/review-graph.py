@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check complete G2 graph snapshots and compare node IDs between turns."""
+"""Check run-check graph snapshots and compare node IDs between turns."""
 import argparse
 import json
 from pathlib import Path
@@ -12,17 +12,16 @@ def key(node):
 
 
 def check_snapshot(snapshot, contract):
-    if snapshot.get('complete') is not True:
-        raise ValueError('Graph snapshot is incomplete')
-    if snapshot.get('variable_links'):
-        raise ValueError('Unexpected variable links')
+    if not snapshot.get('location'):
+        raise ValueError('Graph snapshot is missing a journal location')
     nodes = snapshot['nodes']
-    ids = {key(node): node['ref']['node_id'] for node in nodes}
-    wanted = {key(node) for node in contract['nodes']}
-    if len(nodes) != len(ids) or len(set(ids.values())) != len(ids):
-        raise ValueError('Graph contains duplicate node selectors or IDs')
-    if ids.keys() != wanted:
-        raise ValueError(f'Missing nodes {wanted - ids.keys()}. Extra nodes {ids.keys() - wanted}.')
+    ids = {key(node): node_id for node_id, node in nodes.items()}
+    wanted = {node['id']: key(node) for node in contract['nodes']}
+    if len(nodes) != len(ids):
+        raise ValueError('Graph contains duplicate node selectors')
+    wanted_keys = set(wanted.values())
+    if ids.keys() != wanted_keys:
+        raise ValueError(f'Missing nodes {wanted_keys - ids.keys()}. Extra nodes {ids.keys() - wanted_keys}.')
 
     reverse = {node_id: node for node, node_id in ids.items()}
     links = {(reverse[link['source']], link['output'], reverse[link['target']], link['input'])
@@ -31,7 +30,7 @@ def check_snapshot(snapshot, contract):
         raise ValueError('Graph contains duplicate links')
     unmatched = set(links)
     for link in contract['links']:
-        source, target = key(link['source']), key(link['target'])
+        source, target = wanted[link['source']], wanted[link['target']]
         matches = {actual for actual in unmatched
                    if actual[:3] == (source, link['output'], target)
                    and (actual[3] == link['input'] if 'input' in link else actual[3] in (1, 2))}
@@ -81,13 +80,13 @@ def compare(chain, paths):
         try:
             loaded = json.loads(path.read_text(encoding='utf-8'))
             contract = expectation(chain, turn)['graph']
-            current = check_snapshot(loaded.get('graph', loaded), contract)
+            current = check_snapshot(loaded, contract)
             changes = delta(previous, current)
             if chain == 204 and turn == 2 and not changes['renamed_nodes']:
                 raise ValueError('Renamed node has a different ID')
             if chain == 203 and turn == 4 and (changes['added_links'] or changes['removed_links']):
                 raise ValueError('Re-execution moved a link')
-            report.append({'case': case, 'status': 'PASS', **changes})
+            report.append({'case': case, 'status': 'PASS', 'location': loaded['location'], **changes})
             previous = current
         except (KeyError, OSError, TypeError, ValueError) as exc:
             report.append({'case': case, 'status': 'FAIL', 'detail': str(exc)})

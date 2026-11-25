@@ -89,8 +89,12 @@ def selector(node):
     return {'type': KINDS[node], 'label': LABELS[node]}
 
 
+def graph_id(node):
+    return 'group' if node == 'totals' else node
+
+
 def edge(source, target, input_port=0):
-    link = {'source': selector(source), 'target': selector(target), 'output': 0}
+    link = {'source': graph_id(source), 'target': graph_id(target), 'output': 0}
     if input_port is not None:
         link['input'] = input_port
     return link
@@ -196,7 +200,8 @@ def expectation(chain, turn):
     if result is not None:
         review['table'] = result
     return dict(nodes=[selector(node) for node in nodes], outputs=outputs,
-                graph=dict(nodes=[selector(node) for node in nodes], links=links), g2_review=review)
+                graph=dict(nodes=[dict(id=graph_id(node), **selector(node)) for node in nodes],
+                           links=links), g2_review=review)
 
 
 def export_output(table_result, filename):

@@ -50,40 +50,31 @@
   "graph": {
     "nodes": [
       {
+        "id": "sales",
         "type": "imports.text",
         "label": "Продажи"
       },
       {
+        "id": "group",
         "type": "transform.group_data",
         "label": "Группировка"
       },
       {
+        "id": "csv",
         "type": "exports.text",
         "label": "Экспорт CSV"
       }
     ],
     "links": [
       {
-        "source": {
-          "type": "imports.text",
-          "label": "Продажи"
-        },
-        "target": {
-          "type": "transform.group_data",
-          "label": "Группировка"
-        },
+        "source": "sales",
+        "target": "group",
         "output": 0,
         "input": 0
       },
       {
-        "source": {
-          "type": "transform.group_data",
-          "label": "Группировка"
-        },
-        "target": {
-          "type": "exports.text",
-          "label": "Экспорт CSV"
-        },
+        "source": "group",
+        "target": "csv",
         "output": 0,
         "input": 0
       }
