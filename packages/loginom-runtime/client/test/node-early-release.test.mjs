@@ -454,3 +454,73 @@ for(const transport of [false,true])test('LAB-506 mask refusal releases settled 
   f.runtime.assertPreparationAllowed();
  }
 });
+
+function connectedExport(record){
+ const f=fixture('target','exports.text');
+ const source={document_id:'doc',workflow_id:'wf',node_id:'source'};
+ f.state.graph.nodes.push({ref:source,type:'imports.text',label:'Source',position:{x:80,y:80},inputs:[],outputs:[0],locked:false});
+ f.request.target.label='Node https://fixture.test';
+ f.request.inputs=[{source,output:0,input:0}];
+ f.adapter.mutate=async effect=>{
+  f.calls.push(effect.kind);
+  if(effect.kind==='create')f.state.graph.nodes.push({ref:{...node},type:effect.parameters.type,label:effect.parameters.label,
+   position:effect.parameters.position,inputs:[0],outputs:[],locked:false});
+  if(effect.kind==='connect')f.state.graph.links.push(structuredClone(effect.parameters.edge));
+  return {status:'SUCCEEDED',cleanup_complete:true};
+ };
+ f.state.ack=async event=>record(event);
+ return f;
+}
+
+test('an exact target receipt continues the created and connected node',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'dock-target-effect-exact-'));
+ t.after(()=>rm(directory,{recursive:true,force:true}));
+ const record=createExecutionJournal({directory,metadata:{sessionId:'test-target-effect-exact'}});
+ const f=connectedExport(record);
+ await stop(f);
+ assert.deepEqual(f.calls,['create','connect']);
+ assert.equal(f.state.graph.links[0].target,node.node_id);
+ assert.equal(f.state.graph.nodes.find(item=>item.ref.node_id===node.node_id).label,'Node https://fixture.test');
+ f.state.blocked=true;
+ assert.equal((await release(f)).error.code,'NODE_RELEASE_REFUSED');
+ const recovery=createBrowserRecovery({enabled:true,gate:createSerialGate(),executor:f.runtime,probe:async()=>({ok:true}),record});
+ const call=async args=>JSON.parse((await recovery.call('dock_browser_recovery',{operation_id:'apply',...args})).content[0].text);
+ assert.equal((await call({action:'start'})).phase,'browser');
+ f.state.blocked=false;
+ const ended=await call({action:'finish',actions_performed:['Returned to the graph']});
+ assert.equal(ended.verification.status,'continuable',ended.verification.reason);
+ assert.match(ended.verification.next_step.instruction,/"node_id":"created"/);
+ assert.equal(f.calls.filter(kind=>kind==='create').length,1);
+ assert.equal(f.calls.filter(kind=>kind==='connect').length,1);
+ f.state.fail=false;
+ f.runtime.startNodeApply({...f.request,operation_id:'continue',target:{kind:'existing',type:'exports.text',ref:{...node}}});
+ const continued=await f.runtime.waitNodeApply('continue',{timeoutMs:1000});
+ assert.equal(continued.outcome.output.node?.node_id,node.node_id,JSON.stringify({status:continued.outcome.status,phase:continued.outcome.output.pending_phase,node:continued.outcome.output.node,calls:f.calls,error:continued.outcome.error}));
+ assert.equal(f.calls.filter(kind=>kind==='create').length,1);
+ assert.equal(f.calls.filter(kind=>kind==='connect').length,1);
+ assert.equal(f.state.graph.nodes.filter(item=>item.type==='exports.text').length,1);
+});
+
+for(const fault of ['missing','inexact'])test('a quiet graph with '+(fault==='inexact'?'an inexact':'a missing')+' target receipt cannot create or connect again',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'dock-target-effect-'+fault+'-'));
+ t.after(()=>rm(directory,{recursive:true,force:true}));
+ const record=createExecutionJournal({directory,metadata:{sessionId:'test-target-effect-'+fault}});
+ const f=connectedExport(record);
+ f.state.ack=async event=>{
+  const saved=await record(event);
+  const connected=event.phase==='node_target_checkpoint'&&event.target_state?.receipts?.some(item=>item.kind==='connect');
+  if(!connected)return saved;
+  if(fault==='missing')return null;
+  return {...saved,target_state:{...saved.target_state,targetId:'other-node'}};
+ };
+ await stop(f);
+ assert.deepEqual(f.calls,['create','connect']);
+ assert.equal(f.state.graph.links[0].target,node.node_id);
+ f.runtime.startNodeApply({...f.request,operation_id:'again'});
+ const again=await f.runtime.waitNodeApply('again',{timeoutMs:1000});
+ assert.equal(again.outcome,null);
+ assert.equal(again.error.code,'NODE_WORKER_REJECTED');
+ assert.match(again.error.message,/pending/);
+ assert.deepEqual(f.calls,['create','connect']);
+ assert.equal(f.state.graph.nodes.filter(item=>item.type==='exports.text').length,1);
+});
