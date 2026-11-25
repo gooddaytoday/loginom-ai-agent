@@ -52,7 +52,7 @@ def link(source, target, *, output=0, input_port=0):
     return dict(source=source, target=target, output=output, input=input_port)
 
 
-def table(kind, schema, rows, *, ordered=False, port=0, exact_columns=False, label=None):
+def table(kind, schema, rows, *, ordered=False, port=0, exact_columns=False, label=None, free_labels=False):
     converters = {"integer": int, "real": float, "string": str}
     output = dict(
         output_node_type=kind,
@@ -72,6 +72,9 @@ def table(kind, schema, rows, *, ordered=False, port=0, exact_columns=False, lab
         ordered=ordered,
         column_order="exact" if exact_columns else "any",
     )
+    if free_labels:
+        for column in output["columns"]:
+            column["label_any"] = True
     if label:
         output["output_node_label"] = label
     return output
@@ -272,11 +275,11 @@ def monthly_revenue(orders):
         ]
 
     chain.turn("Добавь узел Python после переименованного импорта «Заказы для динамики» и выполни помесячный расчёт: month в формате ГГГГ-ММ по возрастанию, revenue как сумма и moving_avg за текущий и два предыдущих месяца. Пока окно неполное, выдай NULL.",
-               nodes, links, [table(PYTHON, schema, rolling(3), ordered=True)])
+               nodes, links, [table(PYTHON, schema, rolling(3), ordered=True, free_labels=True)])
     chain.turn("Измени в этом же узле окно скользящего среднего на шесть месяцев и выполни его.",
-               nodes, links, [table(PYTHON, schema, rolling(6), ordered=True)])
+               nodes, links, [table(PYTHON, schema, rolling(6), ordered=True, free_labels=True)])
     chain.turn("Выполни ещё раз помесячный расчёт с текущим окном и покажи все строки.",
-               nodes, links, [table(PYTHON, schema, rolling(6), ordered=True)])
+               nodes, links, [table(PYTHON, schema, rolling(6), ordered=True, free_labels=True)])
     return chain
 
 
@@ -300,7 +303,7 @@ def variable_threshold(prices):
                nodes, links, exits(1000), manual=rename(FILTER, caption))
     nodes[1] = node("filter", FILTER, label=caption)
     nodes.append(node("limit", VARS))
-    chain.turn("Добавь Калькулятор переменных с одной вещественной переменной MinPrice = 1000 и выполни его.",
+    chain.turn("Вновь открой сохранённый пакет, чтобы добавить и выполнить Калькулятор переменных с вещественной MinPrice = 1000.",
                nodes, links)
     links.append(link("limit", "filter"))
     chain.turn("Подключи MinPrice из Калькулятора переменных как порог в фильтре «Ценовой порог» и проверь оба выхода.",

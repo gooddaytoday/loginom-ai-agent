@@ -37,7 +37,8 @@
       "columns": [
         {
           "name": "month",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "revenue",
@@ -45,7 +46,8 @@
           "tolerance": {
             "abs": 1e-08,
             "rel": 1e-12
-          }
+          },
+          "label_any": true
         },
         {
           "name": "moving_avg",
@@ -53,7 +55,8 @@
           "tolerance": {
             "abs": 1e-08,
             "rel": 1e-12
-          }
+          },
+          "label_any": true
         }
       ],
       "rows": [
