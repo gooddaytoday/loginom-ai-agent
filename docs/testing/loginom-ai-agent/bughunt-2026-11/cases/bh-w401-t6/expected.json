@@ -22,7 +22,8 @@
       },
       {
         "id": "group",
-        "type": "transform.group_data"
+        "type": "transform.group_data",
+        "label": "Итоги по регионам"
       },
       {
         "id": "sort",

@@ -153,12 +153,14 @@ def regional_revenue(orders, clients):
         totals[row["region"]] += Decimal(row["revenue"])
     grouped = [dict(region=region, total_revenue=total) for region, total in totals.items()]
     schema = [("region", "string"), ("total_revenue", "real")]
+    caption = "Итоги по регионам"
     chain.turn("Добавь после слияния группировку по region с суммой revenue в total_revenue и выполни её.",
-               nodes, links, [table(GROUP, schema, grouped)])
+               nodes, links, [table(GROUP, schema, grouped)], manual=rename(GROUP, caption))
+    nodes[-1] = node("group", GROUP, label=caption)
     nodes.append(node("sort", SORT))
     links.append(link("group", "sort"))
     sorted_rows = sorted(grouped, key=lambda row: -row["total_revenue"])
-    chain.turn("Добавь сортировку итогов по total_revenue по убыванию и выполни её.",
+    chain.turn("Добавь после «Итоги по регионам» сортировку по total_revenue по убыванию и выполни её.",
                nodes, links, [table(SORT, schema, sorted_rows, ordered=True)])
     nodes.append(node("excel", EXCEL))
     links.append(link("sort", "excel"))
@@ -181,12 +183,14 @@ def item_totals(items):
     links = [link("items", "calc")]
     calculated = [dict(row, amount=item_amount(row)) for row in items]
     schema += [("amount", "real")]
+    caption = "Расчёт суммы"
     chain.turn("Добавь после импорта калькулятор amount = quantity × unit_price × (1 − discount_pct / 100), считая NULL-скидку нулевой, и выполни его.",
-               nodes, links, [table(CALC, schema, calculated)])
+               nodes, links, [table(CALC, schema, calculated)], manual=rename(CALC, caption))
+    nodes[-1] = node("calc", CALC, label=caption)
     nodes.append(node("filter", FILTER))
     links.append(link("calc", "filter"))
     selected = [row for row in calculated if row["amount"] > 5000]
-    chain.turn("Добавь после калькулятора фильтр amount > 5000 и выполни его.",
+    chain.turn("Добавь после «Расчёт суммы» фильтр amount > 5000 и выполни его.",
                nodes, links, [table(FILTER, schema, selected)])
     nodes.append(node("group", GROUP))
     links.append(link("filter", "group"))

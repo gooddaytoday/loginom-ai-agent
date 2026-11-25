@@ -3,5 +3,12 @@
   "budget": {
     "max_nodes": 1
   },
-  "base": "bh-w401-t3"
+  "base": "bh-w401-t3",
+  "manual_edit": {
+    "kind": "rename",
+    "node": {
+      "type": "transform.group_data"
+    },
+    "label": "Итоги по регионам"
+  }
 }

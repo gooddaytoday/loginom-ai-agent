@@ -12,7 +12,8 @@
       },
       {
         "id": "calc",
-        "type": "transform.calculator"
+        "type": "transform.calculator",
+        "label": "Расчёт суммы"
       },
       {
         "id": "filter",
