@@ -1,0 +1,103 @@
+name: loginom-checks
+
+# Product tests on Linux (B5.1m). The file keeps the name `test.yml` because
+# packages/loginom-runtime/client/test/bridge.test.mjs reads the client suite budget from this path.
+# check-test.yml leaves these packages out of `turbo test` (guarded by packages/product/test/loginom-checks.test.ts).
+on:
+  push:
+    # The orchestrator publishes oc2-migration to the fork; its first real run happens here.
+    branches: [oc2-migration, loginom]
+  pull_request:
+    branches: [loginom]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ format('{0}-{1}', github.workflow, github.event.pull_request.number || github.ref) }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  unit:
+    name: unit
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      # Exports LOGINOM_AI_AGENT_TEST_NODE (the pinned Node) and the pinned Chromium.
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
+
+      - name: Install locked dashboard template dependencies
+        working-directory: packages/dashboard/template
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" "$(dirname "$LOGINOM_AI_AGENT_TEST_NODE")/../lib/node_modules/npm/bin/npm-cli.js" ci --ignore-scripts --no-audit --fund=false'
+
+      - name: Prepare runtime Chromium dependencies and display
+        working-directory: packages/loginom-runtime/client
+        run: |
+          "$LOGINOM_AI_AGENT_TEST_NODE" node_modules/playwright/cli.js install-deps chromium
+          sudo apt-get install -y xvfb xauth x11-utils
+          # Ubuntu 24.04 otherwise denies the user namespaces the sandboxed, non-system Chromium needs.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Configure git identity
+        run: |
+          git config --global user.email "bot@opencode.ai"
+          git config --global user.name "opencode"
+
+      - name: Test product guards
+        working-directory: packages/product
+        run: bun test
+
+      - name: Test loginom-agent
+        working-directory: packages/loginom-agent
+        run: bun run test
+
+      # The resume oracle observes its owned X11 windows and requires a display in CI.
+      - name: Test loginom-host
+        working-directory: packages/loginom-host
+        run: xvfb-run -a env GITHUB_ACTIONS=false bun run test
+
+      - name: Test dashboard
+        working-directory: packages/dashboard
+        run: bun run test
+
+      - name: Test CLI
+        working-directory: packages/cli
+        run: xvfb-run -a env GITHUB_ACTIONS=false bun run test
+
+      - name: Verify Loginom workspace address and native link contracts
+        working-directory: packages/loginom-runtime
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/connection-check.test.mjs client/test/workspace.test.mjs client/test/node-link-validation.test.mjs client/test/node-link-hover.test.mjs client/test/node-link-rebind.test.mjs client/test/node-target.test.mjs client/test/text-export-connect.test.mjs client/test/executor.test.mjs client/test/model-schema-budget.test.mjs client/test/user-response-budget.test.mjs client/test/node-guidance.test.mjs client/test/user-profile-bridge.test.mjs'
+
+      - name: Verify complete supervised runtime suite with pinned Chromium
+        timeout-minutes: 6
+        working-directory: packages/loginom-runtime
+        run: |
+          set -euo pipefail
+          # Resolve the pinned Chromium explicitly so browser tests cannot silently skip.
+          export LOGINOM_DOCK_TEST_BROWSER
+          LOGINOM_DOCK_TEST_BROWSER=$("$LOGINOM_AI_AGENT_TEST_NODE" -e 'process.stdout.write(require("./client/node_modules/playwright").chromium.executablePath())')
+          if [ ! -x "$LOGINOM_DOCK_TEST_BROWSER" ]; then
+            echo "::error::Pinned Chromium executable is missing: $LOGINOM_DOCK_TEST_BROWSER"
+            exit 1
+          fi
+          # Leave CPU for the real managed children on the 4-vCPU runner.
+          # Bound every test and the process tree, including broken test cleanup.
+          # GNU timeout exits 124 on a hang; the job then fails within minutes.
+          timeout --kill-after=10s 5m nice -n 19 "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-timeout=60000 --test-concurrency=2 test/*.test.mjs
