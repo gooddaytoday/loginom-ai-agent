@@ -508,13 +508,15 @@ The pair must contain `worker.json` and `reviewer.json` with the established
 `loginom` and either `package_directory` or `personal_folder` fields (when both
 exist, `package_directory` wins). Unknown formats fail before detach and name
 the file, required fields and supplied keys; credential values are never printed.
-Runs use the worker account. OAuth is
-linked from `~/.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json`, never
-copied. Requires git, Python 3.9+, the pinned Bun/Node/browser bootstrap cache,
+Runs use the worker account. The model is `deepseek/deepseek-flash` (constant
+`MODEL` in `run-check.py`, no variant); the key is read from `DEEPSEEK_API_KEY`
+in the environment, shared OAuth is not used. `make-pair.py` builds the pair in a
+0700 temporary directory from `LOGINOM_{WORKER,REVIEWER}_{USER,PASS}` (see its
+docstring); remove it with `make-pair.py --remove DIR` after `wait`. Requires git, Python 3.9+, the pinned Bun/Node/browser bootstrap cache,
 and network access for the locked dependencies. Build inputs can be overridden
 with `LOGINOM_AI_AGENT_NODE_SOURCE` / `LOGINOM_AI_AGENT_BROWSER_SOURCE`.
 
-Defaults: medium/1800 seconds per model phase, load1 and load5 ≤ 8, ≥60 seconds
+Defaults: 1800 seconds per model phase, load1 and load5 ≤ 8, ≥60 seconds
 between phase starts, 85 minutes total per batch including builds. `--spacing`,
 `--host-load-max`, `--out` and `--build` override these where exposed by help.
 The scenario catalog sets `model_timeout=2700` only for private C1 and 5-REST

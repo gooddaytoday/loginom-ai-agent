@@ -24326,3 +24326,93 @@ crates.io (кэш был полон).
   `offline-admission`, `profile`, `startup-archive`, `owned-registration` повторно по одному — 0 fail. `campaign-admission`
   «an external final closes admissions…» плавающий и на базе (из двух прогонов один красный). Новых падений от правок нет.
 - `packages/product`: `bun test` — 60 pass, 3 fail: `workspace packages`, `CI triggers`, `path literals` (известные, В-95, B5.1).
+
+## B6.1-T Проверка узлов на DeepSeek
+
+25.11.2026. Ветка `b61t-run-check-deepseek` от `oc2-migration` (`569014e83b`), рабочее дерево `.claude/worktrees/b61t`. Bun 1.4.4 и Node
+24.19.0 первыми в `PATH` для своих команд; `bun install --frozen-lockfile` — код 0, `.husky/_` есть. Правки T1–T5, T7 из B6.0, T8 —
+готовая команда без живого прогона. Настоящая модель не вызывалась, Loginom не трогался, секреты не читались и не выводились (в пробах —
+выдуманные `fake-*`).
+
+### Что сделано
+
+| № | Файл | Итог |
+|---|---|---|
+| T1 | `scripts/node-acceptance/run-check.py` | константа `MODEL = 'deepseek/deepseek-flash'` рядом с `D87`; команда `run` без `--variant` |
+| T2 | `run-check.py` | убраны ссылка `data/auth.json` на `shared-oauth-v1` и запись `provider.openai`; ключ — `DEEPSEEK_API_KEY` из окружения (`self.env` и `env` наследуют `os.environ`) |
+| T3 | `run-check.py` | профиль получает только `{"model": MODEL}`; описание модели в конфиг не пишется — она в `models.json` |
+| T4 | `run-check.py` | `config['model'] = MODEL`; `state/model.json` с пустым `variant` |
+| T5 | `run-check-two-turn.py` | `--model` и проверка модели берутся из `two-turn.json` (`model`, пишет `run-check.py`); проверка требует `providerID/modelID` и отсутствие `variant`; `require_medium` снят и проверка теперь безусловная |
+| T7 | `make-pair.py` (новый) | `worker.json` и `reviewer.json` в новом каталоге 0700 (файлы 0600) из `LOGINOM_{WORKER,REVIEWER}_{USER,PASS}` и необязательного `LOGINOM_URL`; `package_directory = /<имя>`; без переменной — отказ с именем переменной и без каталога; печатает только путь; `--remove DIR` удаляет каталог, только если в нём ровно эти два файла |
+| док | `scripts/node-acceptance/run-check.md` | абзац про модель, ключ и `make-pair.py`; «medium» убран из умолчаний (файл внутри `scripts/node-acceptance/`, не общий) |
+
+Выбор меньшего варианта: пара — отдельный скрипт, а не опция `--pair-env` в `run-check.py`. Имена переменных пары выбраны здесь
+(B6.0 назвал только `CHK_USER`/`CHK_PASS`); отображение на записи менеджера — в команде T8. Прокси `HTTP(S)_PROXY=127.0.0.1:2080` в
+`Runner.__init__` остаётся, `api.deepseek.com` в `NO_PROXY` не входит — трафик к DeepSeek пойдёт через тот же прокси; не менял, проверить на
+калибровке.
+
+### T6: текст правки общих документов (не вносилась, ждёт владельца)
+
+- `docs/node-development/RUNBOOK.md`, п. 5: «моделью `openai/gpt-6.1-sol` (medium)» → «моделью `deepseek/deepseek-flash` (без variant, В-106);
+  ключ — переменная `DEEPSEEK_API_KEY`, вход в Loginom — пара `worker.json`/`reviewer.json` из `make-pair.py`». В том же месте Bun 1.3.14 →
+  Bun 1.4.4 (сборка `build-cli.ts` на v2 требует его; см. ниже).
+- `docs/node-development/workflow/acceptance-cli.md`, строка 3: то же имя модели и «общий OAuth не используется».
+
+### T8: команда запуска (не выполнялась)
+
+Значения не печатаются: `kit secret-exec` кладёт их в окружение дочернего процесса, `make-pair.py` печатает только путь, `request.json`
+пары не содержит. Пара: `worker.json` — аккаунт, под которым идёт прогон; `reviewer.json` проверяется только на форму. Для независимой
+проверки под `worker` ставится аккаунт проверяющего. Записи исполнителя в менеджере пока нет (`app-loginom-worker` — имя-заглушка), пароль
+проверяющего в `app-loginom-checker` на момент B6.0 пуст: до этого команда не выполнима.
+
+```text
+kit secret-exec \
+  --env DEEPSEEK_API_KEY=bw://loginom-newapp/deepseek-api-key \
+  --env LOGINOM_WORKER_USER=bw://loginom-newapp/app-loginom-checker#username \
+  --env LOGINOM_WORKER_PASS=bw://loginom-newapp/app-loginom-checker#password \
+  --env LOGINOM_REVIEWER_USER=bw://loginom-newapp/app-loginom-worker#username \
+  --env LOGINOM_REVIEWER_PASS=bw://loginom-newapp/app-loginom-worker#password \
+  -- bash -c 'set -e; cd <дерево>; pair=$(python3 scripts/node-acceptance/make-pair.py)
+      trap "python3 scripts/node-acceptance/make-pair.py --remove $pair" EXIT
+      out=$(python3 scripts/node-acceptance/run-check.py start --head <SHA> --scenarios <группа> --pair "$pair" --build <каталог сборки>)
+      python3 scripts/node-acceptance/run-check.py wait "$out" --timeout 5400'
+```
+
+`--build` обязателен: без него `run-check.py` собирает CLI Bun 1.3.14 из `~/.cache/loginom-bootstrap` и падает (см. ниже). Перед первой
+моделью — проверка T2 без модели (см. «Не проверено»).
+
+### Проверки
+
+```text
+$ cd scripts/node-acceptance/tests && python3 -m unittest discover -s . -p 'test_*.py'
+  до правок (569014e83b): Ran 208 tests, OK;  после: Ran 212 tests, OK  (+3 test_make_pair, +1 константа модели)
+$ мутации make-pair.py: 0o700->0o755; файл 0o600->0o644; снять отказ без переменной; URL по умолчанию; package_directory без «/»  — каждая красная
+$ мутация теста PTY: variant='medium' в сообщении пользователя — красная (TWO_TURN_MODEL_VARIANT_CHANGED)
+$ grep -n "gpt-6.1-sol\|shared-oauth" scripts/node-acceptance/*.py scripts/node-acceptance/*.mjs   # пусто, код 1
+$ cd packages/product && bun test    # 63 pass, 3 fail — ровно известные: workspace packages, CI triggers, path literals (В-95)
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0
+$ bun run check                                                  # код 0 (39 из 39 задач, все из кэша turbo)
+```
+
+Остались `gpt-6.1-sol`/`shared-oauth` только в `tests/test_make_pair.py` (как строки, которые тест запрещает) и в этом журнале.
+Тесты `.mjs` не запускались: правки их не затрагивают.
+
+`--prepare-only` (выдуманная пара из `make-pair.py`, `--out` в каталоге сессии, `--host-load-max 40`, сеть к моделям не нужна):
+`python3 scripts/node-acceptance/run-check.py start --head 569014e83b --scenarios s1 --pair <пара> --prepare-only` — предпроверка
+пары и сценария прошла, `dependencies` — 13 с; фаза `build` без `--build` — FAIL, `build exit=1`:
+`LOGINOM_BUN_NOTICE_REVISION_MISMATCH` — `run-check.py` берёт Bun 1.3.14 из `~/.cache/loginom-bootstrap` (подтверждение B6.0, расхождение 1).
+Сборка тем же `build-cli.ts` Bun 1.4.4 вручную остановилась позже: `cargo build --locked --release` для `loginom-ai-agent-pty`
+(`packages/process-daemon`) падает на `zig build` Ghostty — нужны Rust 1.90.0, Zig 0.16.0 и сеть к Ghostty, либо готовый
+`LOGINOM_AI_AGENT_PTY_BIN`; на этой машине их нет. Собранного CLI нет, поэтому полный `--prepare-only` до конца и проверка T2
+(`auth list --standalone --format json` с `DEEPSEEK_API_KEY` при `LOGINOM_AI_AGENT_PURE=1`) не выполнены.
+Побочный след: `run-check.py` по умолчанию кладёт клон `HEAD` и `bun-install.lock` в `~/.cache/loginom-run-check/freak/<SHA>` (так
+устроено, я не менял); два прогона `--prepare-only` оставили там каталог `569014e83b` и сборочные остатки.
+
+### Не проверено и находки
+
+- Живой прогон, `auth list` с ключом (T2), полный `--prepare-only` до конца: нужен собранный CLI (Rust, Zig, сеть к Ghostty) или готовый
+  `LOGINOM_AI_AGENT_PTY_BIN`; следующая задача — после аккаунта исполнителя.
+- Находка, не правилась (вне T1–T8): `run-check.py:~2308` по умолчанию берёт Bun 1.3.14; без `--build` сборка на v2 падает. Меньший
+  вариант — всегда давать `--build` из Bun 1.4.4; либо правка пути Bun отдельной задачей.
+- Прокси `127.0.0.1:2080` и `NO_PROXY` без `api.deepseek.com` — см. выше.
+- Прогон `--prepare-only` при load average 15–21 стоял бы в очереди (порог 8 по умолчанию); я поднял порог только для этой пробы.

@@ -87,7 +87,7 @@ def run(config):
     folder, profile = Path(config['folder']), Path(config['profile'])
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 40, 140, 0, 0))
-    child = subprocess.Popen([config['executable'], config['workspace'], '--headless', '--model', 'openai/gpt-6.1-sol',
+    child = subprocess.Popen([config['executable'], config['workspace'], '--headless', '--model', config['model'],
                               '--dangerously-skip-permissions', '--prompt', config['prompts'][0]],
                              stdin=slave, stdout=slave, stderr=slave, start_new_session=True,
                              env=dict(os.environ, TERM='xterm-256color'))
@@ -141,10 +141,11 @@ def run(config):
                     session = actual
                 if any(m.get('role') == 'assistant' and m.get('error') for m in messages):
                     raise RuntimeError('TWO_TURN_MODEL_ERROR')
-                if config.get('require_medium'):
-                    for message in messages:
-                        if message.get('role') == 'user':
-                            assert message.get('model') == dict(providerID='openai', modelID='gpt-6.1-sol', variant='medium'), 'TWO_TURN_MODEL_VARIANT_CHANGED'
+                provider, model = config['model'].split('/', 1)
+                for message in messages:
+                    if message.get('role') == 'user':
+                        selected = message.get('model') or {}
+                        assert (selected.get('providerID'), selected.get('modelID')) == (provider, model) and not selected.get('variant'), 'TWO_TURN_MODEL_VARIANT_CHANGED'
                 if not completed_turn(messages, turn): continue
                 if turn == 1:
                     if not first_completed:
