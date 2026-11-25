@@ -102,7 +102,8 @@ export async function preflight(input: {
  * `run --dashboard <id>` (B2.9i): the server's product plugin prepares the dashboard's folder from its Studio snapshot
  * before the session (`loginom.dashboard`, B2.9h), and the run takes place there, with the task 0.4 added to the prompt
  * (`v0.4.0:packages/opencode/src/cli/standalone-run.ts`). The CLI always checks the latest publication, as 0.4's did.
- * Strict recovery refuses before the one-time snapshot is spent, as 0.4 checked its journal first. 0.4's notices go to
+ * `run` checks the Host (`preflight`) first, so strict recovery refuses before the one-time snapshot is spent, as 0.4
+ * checked its journal first. 0.4's notices go to
  * stderr; a refusal is written as 0.4 wrote it, with `LOGINOM_CONFIG_REQUIRED` exiting 2 and the others 1. Returns the
  * directory of the run and the task, the run's own directory without a dashboard, or nothing when refused.
  */
@@ -114,7 +115,6 @@ export async function dashboard(input: {
 }) {
   const id = process.env.LOGINOM_AI_AGENT_RUN_DASHBOARD
   if (id === undefined) return { directory: input.location.directory }
-  if (!(await preflight({ ...input, sessionID: "" }))) return undefined
   const reply = await ask(input, "loginom.dashboard", "prepare", { id, defer: false }).then(
     (output) => Option.getOrElse(decodeDashboard(output), () => ({ code: "LOGINOM_REPLY_INVALID" })),
     () => ({ code: input.signal.aborted ? "CLI_CANCELLED" : "CLI_RUN_FAILED" }),

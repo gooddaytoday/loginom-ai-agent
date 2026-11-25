@@ -1,5 +1,5 @@
-import { Service, type Endpoint } from "@opencode/client/effect/service"
-import { OpenCode, type SessionMessageAssistantTool } from "@opencode/client/promise"
+import { Service } from "@opencode/client/effect/service"
+import { OpenCode, type OpenCodeClient, type SessionMessageAssistantTool } from "@opencode/client/promise"
 import { FSUtil } from "@opencode/util/fs-util"
 import { noTimeoutFetch } from "@opencode/util/no-timeout-fetch"
 import { open } from "node:fs/promises"
@@ -75,22 +75,30 @@ async function run(input: RunCommandInput, signal: AbortSignal) {
         new Promise<undefined>((resolve) => signal.addEventListener("abort", () => resolve(undefined), { once: true })),
       ])
   if (signal.aborted) return
+  const client = OpenCode.make({
+    baseUrl: input.server.endpoint.url,
+    headers: Service.headers(input.server.endpoint),
+    // Bun's default five-minute deadline terminates the event stream used by long-running sessions.
+    fetch: noTimeoutFetch,
+  })
+  // Loginom AI Agent (B2.7a4c): the product CLI's Host checks come first, before the message and `--file`, and before
+  // any session exists, as in 0.4: a refusal leaves no empty session behind. They also precede a dashboard's snapshot.
+  if (
+    RunProduct.enabled() &&
+    !(await RunProduct.preflight({ client, location: { directory }, sessionID: "", format: input.format, signal }))
+  )
+    return
   const message = mergeInput(argument, piped)
-  if (!message?.trim()) fail("You must provide a message")
+  // `run --command <skill>` of the product CLI needs no message, as in 0.4 (`cmd/run.ts:518`).
+  if (!message?.trim() && !(RunProduct.enabled() && RunProduct.skills())) fail("You must provide a message")
   // Loginom AI Agent (B2.9j): `run --dashboard` reads `--file` in the dashboard's folder, as 0.4 did, once it is prepared.
   const files = RunProduct.dashboarding()
     ? undefined
     : await Promise.all(input.file.map((file) => prepareFile(file, root)))
-  return execute(input, { directory, message, files }, input.server.endpoint, signal)
+  return execute(input, { directory, message: message ?? "", files }, client, signal)
 }
 
-async function execute(input: RunCommandInput, prepared: Prepared, endpoint: Endpoint, signal: AbortSignal) {
-  const client = OpenCode.make({
-    baseUrl: endpoint.url,
-    headers: Service.headers(endpoint),
-    // Bun's default five-minute deadline terminates the event stream used by long-running sessions.
-    fetch: noTimeoutFetch,
-  })
+async function execute(input: RunCommandInput, prepared: Prepared, client: OpenCodeClient, signal: AbortSignal) {
   const explicit = parseRunModel(input.model)
   // Loginom AI Agent (B2.9i): `run --dashboard <id>` of the product CLI runs in the dashboard's folder, which the
   // server prepares before the session, and adds the dashboard's task to the prompt (`product.ts`).
