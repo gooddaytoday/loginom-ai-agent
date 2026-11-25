@@ -73,7 +73,7 @@ export async function collectBuildNotices(
   const inventory = {
     status: "incomplete",
     scope: "Package and nested npm notices and pinned upstream supplements for positive Bun output contributions",
-    exclusions: ["Directory symlinks are not traversed", "Bun and embedded native dependencies", "Non-npm resources"],
+    exclusions: ["Directory symlinks are not traversed", "Bun and embedded native dependencies", "Non-npm resources other than loginom-ai-agent-pty, whose notices are in resources/loginom/licenses/loginom-ai-agent-pty"],
     packages,
     missing: packages
       .filter((pkg) => !pkg.files.some((file) => file.scope === "package"))

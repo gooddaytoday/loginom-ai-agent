@@ -11,6 +11,7 @@ import { buildKeychain } from "./build-keychain"
 import { ripgrepPinForTarget, stageRipgrep } from "./ripgrep-resource"
 import { buildPackageDocs } from "./build-package-docs"
 import { collectBuildNotices } from "./collect-build-notices"
+import ghosttyNotice from "../licenses/ghostty/source.json"
 import release from "../../product/loginom-release.json"
 import catalogs from "../../product/loginom-catalogs.json"
 import { productHelpDirectory, productSkillsDirectory } from "@loginom-ai-agent/product/skills"
@@ -235,6 +236,8 @@ export async function stageResources(input: {
 // (B2.7a9, B4.7c). Its notices take the layout and inventory of collectBuildNotices: the service's own license files
 // and those of every crate its Cargo.lock pins, read from crate archives that match the lock's checksums. The archives
 // come from Cargo's download cache, which building the service fills; one missing there is downloaded from crates.io.
+// build.rs also links libghostty-vt from the Ghostty revision pinned next to the lock: its MIT license is pinned in
+// licenses/ghostty and must match that revision, so a bumped revision cannot ship the old text.
 export async function stageCrateNotices(input: {
   output: string
   lock?: string
@@ -275,12 +278,35 @@ export async function stageCrateNotices(input: {
       documentation,
     })
   }
+  const revisionFile = join(dirname(lock), "ghostty-revision")
+  if (await Bun.file(revisionFile).exists()) {
+    if ((await Bun.file(revisionFile).text()).trim() !== ghosttyNotice.revision)
+      throw new Error("LOGINOM_GHOSTTY_NOTICE_REVISION_MISMATCH")
+    const text = await readFile(join(import.meta.dir, "../licenses/ghostty", ghosttyNotice.file))
+    if (createHash("sha256").update(text).digest("hex") !== ghosttyNotice.sha256)
+      throw new Error("LOGINOM_GHOSTTY_NOTICE_HASH_MISMATCH")
+    const path = `${String(packages.length + 1).padStart(4, "0")}/${ghosttyNotice.file}`
+    await Bun.write(join(input.output, path), text)
+    packages.push({
+      name: ghosttyNotice.name,
+      version: ghosttyNotice.revision,
+      license: ghosttyNotice.license,
+      checksum: null,
+      files: [{ path, scope: "package", sha256: ghosttyNotice.sha256 }],
+      documentation: [],
+    })
+  }
   const inventory = {
     status: "incomplete",
     scope:
       "Package and nested notices of loginom-ai-agent-pty and of every crate in its Cargo.lock, from crate archives " +
-      "matching the lock's checksums; the lock also pins crates of other platforms and of tests",
-    exclusions: ["Ghostty and its Zig dependencies, which build.rs fetches and links in", "The Rust standard library"],
+      "matching the lock's checksums, and the license of the pinned Ghostty revision; the lock also pins crates of " +
+      "other platforms and of tests",
+    exclusions: [
+      "The Zig dependencies of Ghostty that its build fetches (build.zig.zon) and links into libghostty-vt",
+      "Zig standard library and compiler-rt code linked into libghostty-vt",
+      "The Rust standard library",
+    ],
     packages,
     missing: packages
       .filter((pkg) => !pkg.files.some((file) => file.scope === "package"))

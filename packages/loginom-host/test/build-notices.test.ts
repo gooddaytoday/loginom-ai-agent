@@ -41,6 +41,8 @@ test.skipIf(process.platform === "win32")(
       expect(inventory.packages.map((pkg) => pkg.name).sort()).toEqual(["@sample/nested", "readme-only"])
       expect(inventory.missing).toEqual(["readme-only@2.0.0"])
       expect(inventory.status).toBe("incomplete")
+      // The pty service has its own inventory, and the exclusion says where.
+      expect(inventory.exclusions.join("\n")).toContain("licenses/loginom-ai-agent-pty")
       const licensed = inventory.packages.find((pkg) => pkg.name === "@sample/nested")!
       expect(licensed.version).toBe("1.2.3")
       expect(

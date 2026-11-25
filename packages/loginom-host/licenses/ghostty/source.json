@@ -1,0 +1,8 @@
+{
+  "name": "ghostty",
+  "repository": "https://github.com/ghostty-org/ghostty",
+  "revision": "ab0b9da9e88fcb4b0533a1854e84628f663930af",
+  "license": "MIT",
+  "file": "LICENSE",
+  "sha256": "386211873e5b7a02f663ae4d7adf96285999f91608f8f9f31fecfd0f4095e6f1"
+}

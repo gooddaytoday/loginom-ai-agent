@@ -43,9 +43,14 @@ test.skipIf(!cached)(
         throw new Error(`unexpected download ${url}`)
       },
     })
-    expect(inventory.packages.map((pkg) => `${pkg.name}@${pkg.version}`)).toEqual(
-      lock.package.map((pkg) => `${pkg.name}@${pkg.version}`),
-    )
+    // Every locked package, then Ghostty at the revision build.rs pins, with its license.
+    expect(inventory.packages.map((pkg) => `${pkg.name}@${pkg.version}`)).toEqual([
+      ...lock.package.map((pkg) => `${pkg.name}@${pkg.version}`),
+      `ghostty@${(await Bun.file(join(service, "ghostty-revision")).text()).trim()}`,
+    ])
+    const ghostty = inventory.packages.at(-1)!
+    expect(ghostty.license).toBe("MIT")
+    expect(await readFile(join(output, ghostty.files[0]!.path), "utf8")).toStartWith("MIT License")
     const own = inventory.packages.find((pkg) => pkg.name === "loginom-ai-agent-pty")!
     expect(own.license).toBe("MIT")
     expect(own.files.map((file) => file.path.split("/").slice(1).join("/"))).toEqual(["LICENSE"])
@@ -88,6 +93,8 @@ test("crate archives must match the lock, cached or downloaded; a crate without 
   )
   await Bun.write(join(root, "service/LICENSE"), "Own service license\n")
   await Bun.write(join(root, "service/README.md"), "# Own service\n")
+  const revision = (await Bun.file(join(service, "ghostty-revision")).text()).trim()
+  await Bun.write(join(root, "service/ghostty-revision"), revision + "\n")
   // Build output under the service directory is not read.
   await Bun.write(join(root, "service/target/release/build/LICENSE"), "Build output\n")
   const licensed = crate("licensed", "1.0.0", {
@@ -152,12 +159,29 @@ test("crate archives must match the lock, cached or downloaded; a crate without 
     },
     { name: "own-service", license: "MIT", files: ["package:0002/LICENSE"], documentation: ["0002/README.md"] },
     { name: "unlicensed", license: "MIT", files: [], documentation: ["0003/README.md"] },
+    { name: "ghostty", license: "MIT", files: ["package:0004/LICENSE"], documentation: [] },
   ])
   expect(inventory.missing).toEqual(["unlicensed@2.0.0"])
+  // Ghostty is listed after the locked packages, with the pinned license text.
+  expect(inventory.packages.at(-1)).toMatchObject({ name: "ghostty", version: revision, license: "MIT" })
+  expect(await Bun.file(join(output, "0004/LICENSE")).text()).toContain("Mitchell Hashimoto")
+  expect(inventory.exclusions.join("\n")).toContain("Zig")
   expect(await Bun.file(join(output, "0001/vendor/COPYING")).text()).toBe("Vendored attribution\n")
   expect(await Bun.file(join(output, "0002/LICENSE")).text()).toBe("Own service license\n")
   expect(inventory.status).toBe("incomplete")
   expect(inventory.exclusions.join("\n")).toContain("Ghostty")
+
+  // A Ghostty revision other than the one the license is pinned to is refused.
+  await Bun.write(join(root, "service/ghostty-revision"), "0".repeat(40) + "\n")
+  await expect(
+    stageCrateNotices({
+      output: join(root, "refused"),
+      lock: join(root, "service/Cargo.lock"),
+      caches: [join(root, "cache")],
+      download,
+    }),
+  ).rejects.toThrow("LOGINOM_GHOSTTY_NOTICE_REVISION_MISMATCH")
+  await Bun.write(join(root, "service/ghostty-revision"), revision + "\n")
 
   // An archive that does not match the lock is refused, cached or downloaded.
   await Bun.write(join(root, "service/Cargo.lock"), lockfile(sha256(unlicensed)))

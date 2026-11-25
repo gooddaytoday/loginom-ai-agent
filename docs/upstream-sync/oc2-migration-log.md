@@ -24220,3 +24220,67 @@ $ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check   # would 
   нужны раннеры; Windows-ветка покрыта тестом на фикстуре.
 - `bun typecheck` пакета `desktop` не включает `scripts/` (`tsconfig.json`: `include: [src, perf]`); отдельный `tsc` по
   `scripts/release` чист, кроме `rootDir` временного конфига.
+
+## B5.1g — уведомления о лицензиях Rust
+
+25.11.2026. Ветка `b51g-rust-notices` от `oc2-migration` (`569014e83b`), дерево `.claude/worktrees/b51g`. Эталон 0.4 — `v0.4.0`.
+Bun 1.4.4 и Node 24.19.0 первыми в `PATH` только для своих команд; тесты — с временными `HOME`, `TMPDIR`, `XDG_*`, `CARGO_HOME`
+настоящего пользователя (кэш крейтов, чтение). Модель не вызывалась. Прочитано: строка B5.1g и раздел B5.0, раздел «Хвосты выпуска:
+npm, журнал, уведомления pty» (23.11), `stage-resources.ts`, `collect-build-notices.ts`, `build-cli.ts`, `process-daemon/build.rs`,
+`ghostty-revision`, `build.zig.zon` Ghostty на закреплённой ревизии.
+
+### Решения
+
+- **Крейты Rust в `collectBuildNotices` не переносятся.** Хвосты 23.11 уже кладут уведомления pty (`stageCrateNotices`) в том же
+  раскладе и с той же описью, что `collectBuildNotices`, в `resources/loginom/licenses/loginom-ai-agent-pty/`; их несут и CLI
+  (`artifact/resources/loginom`), и Desktop. Вариант из плана («`cargo metadata --locked`, файлы из реестра») слабее сделанного:
+  нужен `cargo` и собранное дерево, а `Cargo.lock` с `checksum` каждого `.crate` работает без них и сверяет архив. Вход
+  `collectBuildNotices` — метафайл Bun, у крейтов его нет: перенос смешал бы два вида входа ради одного вызова.
+- **Исключение «Non-npm resources»** в `collectBuildNotices` осталось, но названо точно: «… other than loginom-ai-agent-pty,
+  whose notices are in resources/loginom/licenses/loginom-ai-agent-pty» (тест `build-notices`).
+- **Ghostty.** `build.rs` линкует `libghostty-vt` из закреплённой ревизии. Лицензия Ghostty — MIT, текст взят с этой ревизии
+  (`licenses/ghostty/LICENSE`, sha256 `38621187…`, `licenses/ghostty/source.json` с ревизией). `stageCrateNotices` кладёт её
+  последним пакетом описи (`ghostty@<ревизия>`), сверяя sha256 и ревизию с `ghostty-revision` рядом с lock:
+  `LOGINOM_GHOSTTY_NOTICE_REVISION_MISMATCH`, `LOGINOM_GHOSTTY_NOTICE_HASH_MISMATCH`. Сменить ревизию, не обновив текст, нельзя.
+- **Zig — явное исключение, не покрыто.** Какие из зависимостей `build.zig.zon` (`uucode` и ленивые) попадают в
+  `libghostty-vt`, видно только по настоящей сборке с Zig 0.16.0 (B5.1f, ещё не прогонялась); без неё список был бы догадкой.
+  В `exclusions` описи: зависимости Ghostty, которые тянет его сборка; код стандартной библиотеки Zig и compiler-rt в
+  `libghostty-vt`; стандартная библиотека Rust. `status` остаётся `incomplete`. Закрыть — после первого прогона `loginom-pty.yml`.
+- В `licenses/README.md` артефакта CLI (`build-cli.ts`) одна фраза: уведомления pty, его крейтов и Ghostty — в
+  `resources/loginom/THIRD_PARTY_NOTICES.md`.
+
+Файлы кода — три (предел пять): `loginom-host/script/{stage-resources,collect-build-notices,build-cli}.ts`; данные —
+`licenses/ghostty/{LICENSE,source.json}`; тесты — `test/pty-notices.test.ts`, `test/build-notices.test.ts`. Файлы форка, `catalog.json` не менялся.
+
+### Тесты и мутации
+
+`pty-notices.test.ts` на настоящем `Cargo.lock` (кэш Cargo полон, загрузка запрещена): 58 пакетов lock по порядку и затем
+`ghostty@ab0b9da9…`, MIT, текст начинается с «MIT License». Искусственный lock: Ghostty в описи с `0004/LICENSE`, исключение
+называет Zig, чужая ревизия — отказ, до записи описи.
+
+```text
+BASE (3 теста pty-notices и build-notices): 3 pass / 0 fail
+M1 запись Ghostty не добавляется:               1 pass / 2 fail
+M2 ревизия не сверяется:                         2 pass / 1 fail
+M3 исключения Zig убраны:                        2 pass / 1 fail
+M4 исключение collectBuildNotices прежнее:       2 pass / 1 fail
+```
+
+Мутации — точные замены в копии, файл возвращён (`git status` после — только мои файлы).
+
+### Приёмка
+
+```text
+packages/product bun test:            63 pass / 3 fail — известные: workspace packages, CI triggers, path literals
+packages/loginom-host bun typecheck:  No type errors in 175 files
+packages/loginom-host bun test (xvfb, LOGINOM_AI_AGENT_TEST_NODE): 549 pass / 2 fail, 563 тестов
+  fail: «archive verification preserves manifest modes under a private umask» (cli-manifest.test.ts),
+        «actual managed entry reads live bridge work and dispatching over private IPC» (managed-work-entry.test.ts)
+  те же два на базе 569014e83b (отдельное дерево, bun install и npm ci клиента): 5 pass / 2 fail — не мои, не чинил
+catalog-check.py: код 0;  apply-identity.py --check: would change: 0 files
+```
+
+Только CI: сборка pty с Zig и список зависимостей Zig в `libghostty-vt` (B5.1f); Windows-путь `CARGO_HOME`
+(`~/.cargo` → `%USERPROFILE%\.cargo`, читается `homedir()`) не проверялся. Workflow не менялись.
+Не проверено: полный случай `stage-resources` (нужен `LOGINOM_AI_AGENT_TEST_BROWSERS`, пропускается); загрузка крейтов с
+crates.io (кэш был полон).
