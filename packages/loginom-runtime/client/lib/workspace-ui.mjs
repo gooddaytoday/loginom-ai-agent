@@ -4723,7 +4723,7 @@ function readRenderedInputMapping(observation) {
     const fieldsOf=w=>importFormat?w.settings?.fields:w.column_parameters?.fields;
     const expected=JSON.parse(JSON.stringify(initial.wizard));
     const applies=(field,text)=>Object.assign(field,{value:text,value_length_utf16:text.length,truncated:false});
-    const requireDraft=(fresh,completed,final=false)=>{
+    const requireDraft=(fresh,completed,verifyValues=false)=>{
       if(!sameFieldContext(initial,fresh))fail('WIZARD_CONTEXT_CHANGED','Wizard owner, package or blockers changed during field apply');
       if(importFormat)expected.import_columns=fresh.wizard.import_columns;
       const fields=fieldsOf(expected),actual=fieldsOf(fresh.wizard),page=JSON.parse(JSON.stringify(fresh.wizard));
@@ -4733,29 +4733,41 @@ function readRenderedInputMapping(observation) {
       for(const {input,text} of edits.slice(0,completed)){
         const name=input.wizard_field.name,after=fresh.ui.elements.find(e=>e.ref===input.ref);
         if(!after||!same(after.identity,input.identity)||!same(after.wizard_field,input.wizard_field)
-          ||final&&(actual?.[name]?.value!==text||after.value!==text||after.value_truncated))
+          ||verifyValues&&(actual?.[name]?.value!==text||after.value!==text||after.value_truncated))
           fail('WIZARD_FIELD_NOT_CONFIRMED','Wizard draft value was not confirmed: '+name);
         // The next write still needs a fresh binding. During that preflight,
         // draft values already written are checked together at the end.
-        if(!final&&actual?.[name])applies(fieldsOf(page)[name],fields[name].value);
+        if(!verifyValues&&actual?.[name])applies(fieldsOf(page)[name],fields[name].value);
       }
       if(!same(expected,page))fail('WIZARD_CONTEXT_CHANGED','Wizard page or unrelated settings changed during field apply');
     };
-    let context=initial;
-    for(const [index,{input,text}] of edits.entries()){
-      if(index){
-        context=await readUi();
-        requireDraft(context,index);
-      }
-      const before=context.ui.elements.find(e=>e.ref===input.ref),name=input.wizard_field.name;
-      if(!before||!same(before.identity,input.identity)||!same(before.wizard_field,input.wizard_field))
-        fail('WIZARD_FIELD_CHANGED','The observed wizard input changed: '+name);
-      if(before.value!==text){
-        const target=index===0?targets[index]:await checkedHandle(before,before,'set_wizard_field');
-        if(!same(await boundNode(),context.prepared_node_context)||!same(await readEpoch(),context.dom_epoch))
+    const prepareNext=async(input,text,name,index)=>{
+      for(let attempt=0;;attempt++){
+        const fresh=await readUi();
+        requireDraft(fresh,index,attempt>0);
+        const before=fresh.ui.elements.find(e=>e.ref===input.ref);
+        if(!before||!same(before.identity,input.identity)||!same(before.wizard_field,input.wizard_field))
+          fail('WIZARD_FIELD_CHANGED','The observed wizard input changed: '+name);
+        if(before.value===text)return {fresh,before};
+        const target=await checkedHandle(before,before,'set_wizard_field');
+        if(!same(await boundNode(),fresh.prepared_node_context))
+          fail('PREPARED_NODE_CONTEXT_CHANGED','Wizard owner changed while checking field: '+name);
+        const epoch=await readEpoch();
+        if(same(epoch,fresh.dom_epoch))return {fresh,before,target};
+        if(attempt>=2||epoch?.document!==fresh.dom_epoch.document)
           fail('UI_EPOCH_CHANGED','Wizard changed while checking field: '+name);
+        // Preview may repaint during hit-testing. Rebind only this pending
+        // write after a full owner and draft check. Previous writes stay issued.
+        record('wizard_field_preflight_refreshed',{field:name,attempt:attempt+1});
+        await page.waitForTimeout(Math.min(100,timeout()));
+      }
+    };
+    for(const [index,{input,text}] of edits.entries()){
+      const name=input.wizard_field.name;
+      const {fresh,before,target}=index?await prepareNext(input,text,name,index):{fresh:initial,before:input,target:targets[0]};
+      if(before.value!==text){
         timeout();phase='applying';effectPossible=true;
-        await writeWizardField(context,before,text,target);
+        await writeWizardField(fresh,before,text,target);
         record('ui_gesture_applied',{verb:task.action.verb,field:name});
       }
       applies(fieldsOf(expected)[name],text);

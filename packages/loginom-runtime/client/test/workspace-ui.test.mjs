@@ -1846,6 +1846,21 @@ test('an owned import page stops before the next write when its native owner cha
   assert.equal(page.events.filter(e=>e==='keyboard_type').length,1);
 });
 
+test('an owned import page rechecks a repainted next field without replaying a completed write',async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  let checks=0;
+  page.beforeHandleGeometry=element=>{
+    if(element===input&&++checks===2)
+      page.mutationObserver.pending.push({type:'attributes',attributeName:'class',target:element});
+  };
+  const writes=[];
+  page.onPress=(key,element)=>{if(key==='Tab')writes.push(element);};
+  const result=await act();
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.deepEqual(writes,[delimiter,input]);
+  assert.equal(result.trace.filter(e=>e.event==='wizard_field_preflight_refreshed').length,1);
+});
+
 test('typed wizard field replacement confirms exact draft values without claiming apply',async()=>{
   for(const text of ['\\N','', '\t ']) {
     const page=new Page(),c=importFormatField(page),snapshot=await page.observe();
