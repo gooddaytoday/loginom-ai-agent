@@ -118,7 +118,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  requireValue(state?.pending&&node&&!state.result,'Release requires an unresolved phase of a known node');
  requireValue(Number.isFinite(deadline),'Release requires an explicit finite deadline');
  requireValue(!operation.transportUncertain,'The last browser call has not confirmed completion; inspect the operation again later');
- let settleWizard,beforeSettlement,openingConfirmation,portOpening,draftReceipt=false,variableDraft=false;
+ let settleWizard,beforeSettlement,openingConfirmation,portOpening,releasePortOpening,draftReceipt=false,variableDraft=false;
  if(operation.portReadCleanupComplete!==undefined)requireValue(operation.portReadCleanupComplete===true,
   'The last output-port read has no confirmed settled cleanup');
  if(operation.lastReceipt){
@@ -167,6 +167,8 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
    portOpening=await channel.reconcileInputPortOpening(ref,inputOpening);
    requireValue(portOpening.port_guid===inputOpening.port_guid,
     'The stopped input opening port identity changed');
+   if(inputOpening.surface==='wizard')
+    releasePortOpening=()=>channel.reconcileInputPortOpening(ref,inputOpening,{release:true});
   }
   const graphReturn=n?.surface==='graph'&&w?.status==='absent'
     &&['confirm_wizard_close','finish_wizard','execute_wizard'].includes(gestures[0]?.verb);
@@ -230,10 +232,12 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  // visualizers open; return through the observed scenario control only.
  if(current.wizard.status==='absent'&&current.prepared_node_context?.surface==='views'&&sameNode(current.prepared_node_context,node))
   cleanup.views_returned=(await returnFromNodeViews(channel,node)).returned;
- return verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup,openingConfirmation});
+ const proof=await verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup,openingConfirmation});
+ if(releasePortOpening)await releasePortOpening();
+ return proof;
 }
 
-function stoppedInputOpening(operation,r){
+function stoppedInputOpening(operation,r,{recovered=false}={}){
  const ref=operation.lastReceipt;
  if(operation.nodeApply.pending.phase!=='input_mapping'||ref.action_key!=='node.input_port.open.internal'
   ||typeof ref.operation_id!=='string'||ref.id!==ref.operation_id||!ref.id.startsWith(operation.id+':n')
@@ -251,15 +255,15 @@ function stoppedInputOpening(operation,r){
  const ambiguous=r.status==='AMBIGUOUS'&&r.effect_possible===true&&r.cleanup_complete===false&&r.output.cleanup_complete===false;
  const cleanMenu=r.status==='NOT_APPLIED'&&r.effect_possible===false&&r.cleanup_complete===true
   &&r.output.cleanup_complete===true&&r.output.effect_possible===false&&menuIssued===1&&menuClosed===1;
- if(ambiguous&&opened===1&&returned===1&&menuIssued<=1&&menuClosed===0)
+ if(ambiguous&&opened===1&&(returned===1||recovered&&returned===0)&&menuIssued<=1&&menuClosed===0)
   return {surface:'wizard',port,native_index:nativeIndex,port_guid:portGuid};
  if(opened===0&&returned===0&&(cleanMenu||ambiguous&&menuIssued<=1&&menuClosed===0))
   return {surface:'graph',port,native_index:nativeIndex,port_guid:portGuid};
  return null;
 }
 
-// Browser recovery owns manual cleanup; this verifier observes only and never
-// upgrades the original failed receipt or claims that its draft was discarded.
+// Browser recovery owns manual UI cleanup. The verifier can release retained
+// page bookkeeping while leaving the original failed receipt and draft effect unknown.
 export async function verifyRecoveredPendingNode({operation,channel,readReceipt,
  deadline=operation.deadline,now=channel.now??Date.now}) {
  const state=operation.nodeApply,node=state?.node,reference=operation.lastReceipt;
@@ -273,8 +277,15 @@ export async function verifyRecoveredPendingNode({operation,channel,readReceipt,
  requireValue(response?.state==='completed','The last browser call has not confirmed completion');
  requireValue(response.receipt?.operation_id===reference.operation_id&&response.receipt.action_key===reference.action_key,
   'The last browser receipt identity changed');
- return verifyQuietNodeGraph({operation,channel,node,deadline,now,openingConfirmation:false,
+ const receipt=response.receipt,stoppedPort=state.pending.phase==='input_mapping'
+  &&reference.action_key==='node.input_port.open.internal'
+  &&(receipt.effect_possible===true||receipt.trace?.some(e=>e.event==='input_port_menu_closed'));
+ const opening=stoppedPort&&stoppedInputOpening(operation,receipt,{recovered:true});
+ if(stoppedPort)requireValue(opening,'The stopped input port receipt changed before browser recovery');
+ const proof=await verifyQuietNodeGraph({operation,channel,node,deadline,now,openingConfirmation:false,
   cleanup:{wizard_closed:false,read_view_restored:false,views_returned:false}});
+ if(opening)await channel.reconcileInputPortOpening(reference,opening,{release:true});
+ return proof;
 }
 
 async function verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup,openingConfirmation}) {
@@ -283,13 +294,13 @@ async function verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup
   &&sameNode(s.prepared_node_context,node)&&s.prepared_node_context.locked===false
   &&s.ui?.dialogs?.length===0&&s.ui?.masks?.length===0;
  let first;
- try{first=await channel.observe({condition:'released node rests on its unlocked graph',ready:quiet});}
+ try{first=await channel.observe({condition:'released node rests on its unlocked graph',quietGraph:true,ready:quiet});}
  catch(error){
   throw new NodeReleaseBlocked('The node is not on a quiet unlocked graph: '+String(error.message).slice(0,300),
-   'Warn the user that unsaved settings of an open wizard will be lost, ask them to close any open Loginom dialog or wizard with its Cancel button and return to this scenario graph without saving.'+retry);
+   'Ask the user to dismiss any open port context menu. Warn them that unsaved wizard settings will be lost if they use Cancel to close an open Loginom dialog or wizard, then ask them to return to this scenario graph without saving.'+retry);
  }
  const graph=await readReleaseGraph(operation,node,deadline,now);
- const second=await channel.observe({condition:'released node graph remains quiet',ready:quiet});
+ const second=await channel.observe({condition:'released node graph remains quiet',quietGraph:true,ready:quiet});
  requireValue(same(graph,await readReleaseGraph(operation,node,deadline,now))&&same(first.prepared_node_context,second.prepared_node_context),
   'The graph changed during release; inspect the operation again');
  requireValue(graph.nodes.filter(n=>same(n.ref,node)).length===1,'The released node is absent from its graph');

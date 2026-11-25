@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {createActionRuntime} from '../lib/executor.mjs';
 import {releasePendingNode,verifyRecoveredPendingNode,proveFinishLaunchRefused,NodeReleaseBlocked} from '../lib/node-pending-release.mjs';
@@ -11,6 +12,7 @@ import {runRestStep} from '../lib/rest-step.mjs';
 import {runExportNext} from '../lib/text-export-procedure.mjs';
 import {createNodeProcedure,NodeProcedureStepError} from '../lib/node-procedure.mjs';
 import {actions} from './support/executor-fixture.mjs';
+import {portOpeningFixture} from './support/port-opening-fixture.mjs';
 
 const validateJob=new AjvJsonSchemaValidator().getValidator(nodeJobResultSchema);
 const assertJob=job=>{const result=validateJob(job);assert.equal(result.valid,true,result.errorMessage);};
@@ -19,7 +21,7 @@ const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br
 const graphOf=()=>({complete:true,document_id:'doc',workflow_ref:workflow,
  nodes:[{ref:node,type:'imports.text',label:'Source',position:{x:320,y:280},inputs:[],outputs:[0]}],links:[],foreign_links:[]});
 
-function surface({wizard=false,foreign=false,locked=false,dialog=false,mask=false,views=false,variableMapping=false,jsonList=false,context=node}={}) {
+function surface({wizard=false,foreign=false,locked=false,dialog=false,mask=false,menu=false,views=false,variableMapping=false,jsonList=false,context=node}={}) {
  let open=wizard,visualizers=views,list=jsonList;const gestures=[];const path=[{tid:'MF;TF-1;path',label:'Сценарий'}];
  const jsonRoot='W;JSONToTreeWizard;pedSourceColumn;ValueControl;boundlist';
  const state=()=>visualizers?{wizard:{status:'absent'},prepared_node_context:{...context,verified:true,surface:'views'},
@@ -33,7 +35,7 @@ function surface({wizard=false,foreign=false,locked=false,dialog=false,mask=fals
   :{wizard:{status:'absent'},prepared_node_context:{...context,verified:true,surface:'graph',locked},navigation_context:{status:'observed',path},
    ui:{elements:[],dialogs:dialog?[{ref:'ui-d'}]:[],masks:mask?[{ref:'ui-mask'}]:[]}};
  return {gestures,channel:{
-  observe:async({ready})=>{const s=state();if(!ready(s))throw Error('Node procedure readiness timeout');return structuredClone(s);},
+  observe:async({ready,quietGraph})=>{const s=state();if(quietGraph&&menu)throw Error('A port context menu is visible');if(!ready(s))throw Error('Node procedure readiness timeout');return structuredClone(s);},
   perform:async({resolve,initialObservation})=>{const action=resolve(initialObservation);gestures.push(action);
    if(action.verb==='press'){list=false;return;}open=false;visualizers=false;}}};
 }
@@ -68,8 +70,10 @@ for(const fault of ['none','transport','pending','receipt','action','phase','tra
    }
    return s;
   };
-  ui.channel.reconcileInputPortOpening=async reference=>{
+  ui.channel.reconcileInputPortOpening=async (reference,opening,{release=false}={})=>{
    reconciliations++;assert.equal(reference.operation_id,'apply:n7');
+   assert.equal(release,reconciliations===2);
+   assert.equal(opening.port_guid,'port');
    if(fault==='owner')throw Error('Opened port wizard owner differs');
    return {verified:true,opening_operation_id:'apply:n7',port_guid:fault==='port-guid'?'foreign':'port',port:0,native_index:0};
   };
@@ -78,7 +82,7 @@ for(const fault of ['none','transport','pending','receipt','action','phase','tra
   if(fault==='none'){
    const result=await release(operation,ui.channel);
    assert.equal(result.cleanup_complete,true);assert.equal(result.cleanup.wizard_closed,true);
-   assert.equal(reconciliations,1);assert.deepEqual(ui.gestures,[{verb:'click',ref:'ui-close'}]);
+   assert.equal(reconciliations,2);assert.deepEqual(ui.gestures,[{verb:'click',ref:'ui-close'}]);
    assert.equal(operation.receipt.receipt.cleanup_complete,false);
   }else{
    await assert.rejects(release(operation,ui.channel));
@@ -291,6 +295,7 @@ for(const [name,operation,options,blocked] of [
  ['foreign wizard',stopped(),{wizard:true,foreign:true},true],
  ['locked node',stopped(),{locked:true},true],
  ['open dialog',stopped(),{dialog:true},true],
+ ['visible port menu',stopped(),{menu:true},true],
  ['unconfirmed last gesture',stopped({receipt:{state:'pending'}}),{},false],
  ['last gesture without cleanup',stopped({receipt:{state:'completed',receipt:{cleanup_complete:false}}}),{},false],
  ['transport uncertainty',stopped({transportUncertain:true}),{},false],
@@ -321,7 +326,7 @@ test('browser recovery proves an already quiet graph without claiming a cleanup 
  assert.equal(operation.receipt.receipt.cleanup_complete,false);assert.deepEqual(s.gestures,[]);
 });
 test('browser recovery refuses an unsafe native surface without a cleanup gesture',async()=>{
- for(const options of [{wizard:true},{views:true},{locked:true},{dialog:true},{mask:true},
+ for(const options of [{wizard:true},{views:true},{locked:true},{dialog:true},{mask:true},{menu:true},
   ...['document_id','workflow_id','node_id'].map(k=>({context:{...node,[k]:'foreign'}}))]) {
   const s=surface(options),operation=stopped();let reads=0;
   operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};
@@ -331,6 +336,14 @@ test('browser recovery refuses an unsafe native surface without a cleanup gestur
    /not on a quiet unlocked graph/,JSON.stringify(options));
   assert.equal(reads,0);assert.deepEqual(s.gestures,[]);
  }
+});
+
+test('release checks the port menu again after reading the graph',async()=>{
+ const s=surface(),withMenu=surface({menu:true});
+ const observe=s.channel.observe;
+ s.channel.observe=options=>options.condition==='released node graph remains quiet'?withMenu.channel.observe(options):observe(options);
+ await assert.rejects(release(stopped(),s.channel),/port context menu/);
+ assert.deepEqual(s.gestures,[]);
 });
 test('browser recovery rechecks receipt, transport and port cleanup before observing the node',async()=>{
  for(const fault of ['receipt','identity','transport','port','expired']) {
@@ -421,11 +434,12 @@ for(const foreign of [false,true])test('abandon_operation after '+type+' input '
  const channel=createNodeProcedure({operation:{id:'apply',deadline:Date.now()+10000,
   action:{action_key:'node.apply',revision:'1'}},preparedNodeContext:{document_id:'doc',workflow_ref:workflow,node},
   targetOrigin:'http://test',targetBuild:'7.4.2',record:async e=>e,execute:async code=>{
-   assert.ok(code.includes('"reconcile_only":true'));assert.ok(code.includes('"operation_id":"apply:n7"'));
+   const finalizing=code.includes('"release_opening":');
+   assert.ok(finalizing||code.includes('"reconcile_only":true'));assert.ok(code.includes('"operation_id":"apply:n7"'));
    assert.ok(code.includes('"port":'+port));
    if(foreign&&wizard)throw Error('Opened port wizard owner differs');
    return {status:'SUCCEEDED',verified:true,cleanup_complete:true,...node,direction:'input',port,native_index:nativeIndex,
-    port_guid:'port',opening_operation_id:'apply:n7',surface:wizard?'wizard':'graph'};
+    port_guid:'port',opening_operation_id:'apply:n7',surface:wizard&&!finalizing?'wizard':'graph',...(finalizing?{phase:'released'}:{})};
   }});
  ui.channel.reconcileInputPortOpening=(...args)=>channel.reconcileInputPortOpening(...args);
  f.drivers.mapPorts=async()=>{
@@ -447,6 +461,74 @@ for(const foreign of [false,true])test('abandon_operation after '+type+' input '
   assert.deepEqual(await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-input'}),released);
  }
  assert.equal(f.calls.filter(c=>c==='mapping').length,1);assert.equal(receipt.cleanup_complete,clean);
+});
+
+for(const stage of ['menu','wizard','manual-menu','manual-wizard'])test('Sort can reopen its exact port after a stopped '+stage+' is released',async()=>{
+ const wizard=stage.endsWith('wizard'),manual=stage.startsWith('manual-'),binding={document_id:'doc',workflow_ref:workflow,node};
+ const native=portOpeningFixture('input',{binding,origin:'http://test',operationId:'apply:n7'});
+ native.node.FIconCls='bg-vendor-icon-sorting';
+ if(stage==='manual-menu')native.graph.FPortContextMenu.hide=()=>{};
+ const originalWorkflow=native.card.Controller.Node.data.node;
+ const originalLocator=native.page.locator;
+ native.page.locator=selector=>{
+  const locator=originalLocator(selector),click=locator.click;
+  if(selector.includes('mniConfigurePort'))locator.click=async options=>{
+   if(!wizard&&options.trial){assert.equal(native.menu.visible,true);throw Error('Configure trial refused');}
+   await click(options);
+   if(!options.trial){
+    if(manual)throw Error('Configure click returned an error');
+    native.task.deadline=Date.now()-1;
+   }
+  };
+  return locator;
+ };
+ const failed=await native.run();
+ assert.equal(failed.status,wizard||manual?'AMBIGUOUS':'NOT_APPLIED',failed.error);
+ assert.equal(native.menu.visible,stage==='manual-menu');
+ const receipt={status:failed.status,action_key:'node.input_port.open.internal',action_revision:'1',operation_id:'apply:n7',
+  phase:'port_open',effect_possible:failed.effect_possible,cleanup_complete:failed.cleanup_complete,output:failed,
+  error:{code:'OUTPUT_PORT_OPEN_UNCONFIRMED',message:failed.error},trace:failed.trace};
+ const closeNative=()=>{
+  native.wizard.FView.el.dom.visible=false;native.card.Controller.FController=native.graph;
+  native.card.Controller.Node.data.node=originalWorkflow;native.flags.loading=0;
+ };
+ if(manual){native.menu.visible=false;closeNative();}
+ const ui=surface({wizard:wizard&&!manual,variableMapping:wizard&&!manual}),observe=ui.channel.observe,perform=ui.channel.perform;
+ ui.channel.observe=async options=>{
+  const state=await observe(options);
+  if(state.wizard.status==='observed')state.prepared_node_context.input_port={
+   direction:'input',port:0,native_index:0,port_guid:'port',opening_operation_id:'apply:n7'};
+  return state;
+ };
+ ui.channel.perform=async options=>{await perform(options);closeNative();};
+ const channel=createNodeProcedure({operation:{id:'apply',deadline:Date.now()+10000,
+  action:{action_key:'node.apply',revision:'1'}},preparedNodeContext:binding,targetOrigin:'http://test',targetBuild:'7.4.2',
+  record:async e=>e,execute:code=>vm.runInNewContext('('+code+')',{Date})(native.page)});
+ ui.channel.reconcileInputPortOpening=(...args)=>channel.reconcileInputPortOpening(...args);
+ const f=fixture({type:'transform.sorting',execute:async()=>({status:'SUCCEEDED',action_key:'operation.receipt',action_revision:'1',
+  operation_id:'apply',phase:'observed',effect_possible:false,error:null,trace:[],output:{state:'completed',receipt}}),
+ release:()=>{const release=manual?verifyRecoveredPendingNode:releasePendingNode;
+  return release({operation:f.context().operation,channel:ui.channel,readReceipt:f.context().readReceipt,deadline:Date.now()+10000});}});
+ f.drivers.mapPorts=async()=>{
+  f.context().operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:receipt.action_key};
+  throw new NodeProcedureStepError(receipt);
+ };
+ const apply=request();apply.target.type='transform.sorting';f.runtime.startNodeApply(apply);
+ assert.equal((await f.runtime.waitNodeApply('apply',{timeoutMs:1000})).outcome.output.pending_phase,'input_mapping');
+ const result=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-sort'});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(f.runtime.hasUnsettledWork(),false);
+ f.runtime.assertPreparationAllowed();
+ const receipts=native.prep.inputPortOpenReceipts,original=receipts.get('apply:n7');
+ assert.equal(original.phase,'released');
+ native.page.locator=originalLocator;
+ Object.assign(native.task,{operation_id:'new-apply:n7',deadline:Date.now()+10000});
+ const reopened=await native.run();
+ assert.equal(reopened.status,'SUCCEEDED',reopened.error);
+ assert.equal(reopened.port_guid,'port');
+ assert.equal(receipts.get('apply:n7'),original);
+ assert.equal(receipts.get('new-apply:n7').phase,'verified');
+ assert.equal(native.gestures.length,wizard?4:3);
 });
 
 for(const fault of [null,'foreign','transport','cleanup'])test('JSON configure refusal releases only its own settled draft: '+fault,async()=>{

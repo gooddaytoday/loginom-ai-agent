@@ -6,8 +6,9 @@ export function makePreparedOutputPortOpenCode(binding,options) {
 export function makePreparedInputPortOpenCode(binding,options) {
  return makePreparedPortOpenCode(binding,options,'input');
 }
-export function makePreparedInputPortReconcileCode(binding,options) {
- return makePreparedPortOpenCode(binding,options,'input',true);
+export function makePreparedInputPortReconcileCode(binding,options,releaseOpening) {
+ return makePreparedPortOpenCode(binding,options,'input',
+  releaseOpening?{release_opening:releaseOpening}:{reconcile_only:true});
 }
 export function makeImportVariableInputReleaseCode(binding,{operation_id,port_guid,origin,build,deadline}) {
  validatePreparedNodeContext(binding);
@@ -17,13 +18,13 @@ export function makeImportVariableInputReleaseCode(binding,{operation_id,port_gu
  const task={binding,operation_id,port_guid,origin,build,deadline,direction:'input',kind:'variables',port:0,release_read:true};
  return `async page=>(${openPreparedOutputPort.toString()})(page,${JSON.stringify(task)},${readPreparedNodeContext.toString()})`;
 }
-function makePreparedPortOpenCode(binding,options,direction,reconcileOnly=false) {
+function makePreparedPortOpenCode(binding,options,direction,privateOptions={}) {
  validatePreparedNodeContext(binding);
  if(!options||Object.keys(options).sort().join(',')!=='build,deadline,operation_id,origin,port'
    ||!Number.isInteger(options.port)||options.port<0||options.port>99
    ||typeof options.operation_id!=='string'||! /^[A-Za-z0-9_.:-]{1,160}$/.test(options.operation_id)
    ||!Number.isSafeInteger(options.deadline)||typeof options.origin!=='string'||typeof options.build!=='string')throw Error('Exact bounded output port opening required');
- return `async page=>(${openPreparedOutputPort.toString()})(page,${JSON.stringify({binding,...options,direction,...(reconcileOnly?{reconcile_only:true}:{})})},${readPreparedNodeContext.toString()})`;
+ return `async page=>(${openPreparedOutputPort.toString()})(page,${JSON.stringify({binding,...options,direction,...privateOptions})},${readPreparedNodeContext.toString()})`;
 }
 
 // A local opening receipt retains UI object identity across graph -> port wizard.
@@ -106,8 +107,15 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    return {deactivation:true,phase:r.phase,port_guid:r.portGuid,node_id:r.node_id,confirmation_controls:confirmationControls};
   }
   if(mode==='lookup')return r?{phase:r.phase,port_guid:r.port.FGuid}:null;
-  if(['cleanup_menu','verify_menu_closed','reconcile_menu'].includes(mode)) {
-   if(!r||(r.phase!=='menu_issued'&&!(mode==='reconcile_menu'&&r.phase==='released'&&r.menuClosed)))return null;
+  if(['cleanup_menu','verify_menu_closed','reconcile_menu','release_opening'].includes(mode)) {
+   if(mode==='release_opening'){
+    const expected=task.release_opening,menuOnly=expected.surface==='graph';
+    const phases=menuOnly?['menu_issued']:['open_issued','deactivation_issued','verified'];
+    if(!input||!r||r.portGuid!==expected.port_guid||r.nativeIndex!==expected.native_index
+     ||!['graph','wizard'].includes(expected.surface)
+     ||!phases.includes(r.phase)&&!(r.phase==='released'&&!!r.menuClosed===menuOnly))
+     fail('Original input opening receipt changed');
+   }else if(!r||(r.phase!=='menu_issued'&&!(mode==='reconcile_menu'&&r.phase==='released'&&r.menuClosed)))return null;
    const diagram=model?.FDiagram,roots=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
    const nodes=diagram?.FNodes?.FCollection?.filter(n=>n.FGuid===b.node.node_id);
    if(model!==r.graph||card.Controller.Node?.data?.node!==r.workflow||r.workflow!==prepared.nodeTargetWorkflowNode
@@ -127,12 +135,13 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     menu.hide();
     return {hide_issued:true};
    }
-   if(mode==='reconcile_menu'){
+   if(mode==='reconcile_menu'||mode==='release_opening'){
     const blockers=[...document.querySelectorAll('[role="dialog"],.bg-dialog,.x-message-box,.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible);
-    if(blockers.some(e=>!ownGraphMask(e)))fail('Original port menu graph is blocked');
+    if(blockers.some(e=>!ownGraphMask(e)))fail('Original port opening graph is blocked');
     if(blockers.length)return {reason:'port_graph_busy'};
    }
-   r.menuClosed=true;r.phase='released';
+   if(r.phase==='menu_issued')r.menuClosed=true;
+   r.phase='released';
    return {phase:r.phase,verified:true,surface:'graph',document_id:r.document_id,workflow_id:r.workflow_id,node_id:r.node_id,
     direction,port:r.portIndex,native_index:r.nativeIndex,port_guid:r.portGuid,opening_operation_id:r.operation_id};
   }
@@ -437,7 +446,12 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    remaining();
    return {status:'SUCCEEDED',cleanup_complete:true,effect_possible:false,...await inspect('release_read')};
   }
-  remaining();let existing=await inspect('lookup');
+  remaining();
+  if(task.release_opening){
+   const result=await settled('release_opening');
+   return {status:'SUCCEEDED',...result,effect_possible:false,cleanup_complete:true,trace};
+  }
+  let existing=await inspect('lookup');
   // Cleanup may reconcile a completed opening failure, but must never open a
   // port or confirm deactivation. Reuse all native finish ownership checks.
   if(task.reconcile_only){
@@ -527,7 +541,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
      trace.push({event:direction+'_port_menu_closed'});effect=false;
     }
    }catch{}
-  }else if(!effect&&!task.reconcile_only&&!task.release_read){
+  }else if(!effect&&!task.reconcile_only&&!task.release_read&&!task.release_opening){
    try{await inspect('release_reserved');}catch{}
   }
   return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,
