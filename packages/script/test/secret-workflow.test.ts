@@ -45,8 +45,8 @@ async function repo() {
   return root
 }
 
-function scan(root: string, env: Record<string, string>) {
-  const step = workflow.jobs["secret-scan"].steps.find((step) => step.name === "Scan only incoming commits")
+function scan(root: string, env: Record<string, string>, name = "Scan only incoming commits") {
+  const step = workflow.jobs["secret-scan"].steps.find((step) => step.name === name)
   if (!step?.run) throw new Error("Scan step missing")
   const result = Bun.spawnSync(["bash", "-e", "-o", "pipefail", "-c", step.run], {
     cwd: root,
@@ -77,6 +77,43 @@ test("PR scan runs trusted base code and blocks a head that replaces the scanner
   expect(result.output).toContain("github-pat")
   expect(result.output).not.toContain(token)
   expect(await Bun.file(join(root, "untrusted-executed")).exists()).toBe(false)
+})
+
+test("PR pin check runs before the scan and reads the head's pin file without checking it out", async () => {
+  const steps = workflow.jobs["secret-scan"].steps.map((step) => step.name)
+  expect(steps.indexOf("Verify pinned OpenCode releases")).toBeGreaterThan(
+    steps.indexOf("Fetch PR objects without checking out untrusted code"),
+  )
+  expect(steps.indexOf("Verify pinned OpenCode releases")).toBeLessThan(steps.indexOf("Scan only incoming commits"))
+  const root = await repo()
+  const remote = await mkdtemp(join(tmpdir(), "secret-workflow-remote-"))
+  roots.push(remote)
+  git(remote, "init", "-q", "--bare")
+  git(root, "tag", "v1.0.0")
+  git(root, "-c", "core.hooksPath=/dev/null", "push", "-q", remote, "--tags")
+  const base = git(root, "rev-parse", "HEAD")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "--allow-empty", "-qm", "fork")
+  const fork = git(root, "rev-parse", "HEAD")
+  // The base checkout has no pin file; the head pins its own fork commit.
+  await Bun.write(join(root, ".gitleaks-upstream"), `${fork}\n`)
+  git(root, "add", ".gitleaks-upstream")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "pin a fork commit")
+  const head = git(root, "rev-parse", "HEAD")
+  git(root, "checkout", "-q", "--detach", base)
+  const result = scan(
+    root,
+    {
+      EVENT: "pull_request_target",
+      HEAD: head,
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: `url.${remote}.insteadOf`,
+      GIT_CONFIG_VALUE_0: "https://github.com/anomalyco/opencode",
+      GIT_ALLOW_PROTOCOL: "file",
+    },
+    "Verify pinned OpenCode releases",
+  )
+  expect(result.code).toBe(1)
+  expect(result.output).toContain(`pins ${fork}, not the commit of any OpenCode release tag`)
 })
 
 test("push of a new annotated tag scans its incoming commits", async () => {

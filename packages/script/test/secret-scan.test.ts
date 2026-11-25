@@ -295,6 +295,78 @@ test("a pinned commit missing from the repository is not applied and the scan co
   expect(result.output).not.toContain(upstreamKey)
 })
 
+// A bare repository stands in for OpenCode: a lightweight and an annotated release tag, and a branch tip that only
+// carries a non-release tag. A commit made after the push exists only in the fork.
+async function opencodeRemote(root: string) {
+  const remote = await mkdtemp(join(tmpdir(), "secret-remote-"))
+  roots.push(remote)
+  git(remote, "init", "-q", "--bare")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "v1.0.0", "--allow-empty")
+  git(root, "tag", "v1.0.0")
+  const lightweight = git(root, "rev-parse", "HEAD")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "v1.1.0", "--allow-empty")
+  git(root, "tag", "-am", "release", "v1.1.0")
+  const annotated = git(root, "rev-parse", "HEAD")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "untagged", "--allow-empty")
+  git(root, "tag", "latest")
+  const untagged = git(root, "rev-parse", "HEAD")
+  git(root, "-c", "core.hooksPath=/dev/null", "push", "-q", remote, "HEAD:refs/heads/dev", "--tags")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "fork", "--allow-empty")
+  return { remote, lightweight, annotated, untagged, fork: git(root, "rev-parse", "HEAD") }
+}
+
+// Git rewrites the scanner's constant OpenCode address to the stand-in; only local transport is allowed, so a check
+// that missed the rewrite fails instead of reaching GitHub.
+function pinCheck(root: string, remote: string, ...args: string[]) {
+  return invoke(root, ["pins", ...args], "", {
+    GIT_CONFIG_COUNT: "1",
+    GIT_CONFIG_KEY_0: `url.${remote}.insteadOf`,
+    GIT_CONFIG_VALUE_0: "https://github.com/anomalyco/opencode",
+    GIT_ALLOW_PROTOCOL: "file",
+  })
+}
+
+test("a pin on a release tag commit passes the pin check", async () => {
+  const root = await repo()
+  const opencode = await opencodeRemote(root)
+  await Bun.write(join(root, ".gitleaks-upstream"), `# OpenCode v1.0.0\n${opencode.lightweight}\n`)
+  const result = pinCheck(root, opencode.remote)
+  expect(result.code).toBe(0)
+  expect(report(result.output).summary).toMatchObject({ status: "verified", pins: 1 })
+})
+
+test("a pin on a commit that no release tag names fails the pin check and names it", async () => {
+  const root = await repo()
+  const opencode = await opencodeRemote(root)
+  await Bun.write(join(root, ".gitleaks-upstream"), `${opencode.lightweight}\n${opencode.untagged}\n${opencode.fork}\n`)
+  const result = pinCheck(root, opencode.remote)
+  expect(result.code).toBe(1)
+  expect(result.output).toContain(`pins ${opencode.untagged}, ${opencode.fork}, not the commit of any OpenCode release`)
+  expect(result.output).not.toContain(opencode.lightweight)
+})
+
+test("a pin on the commit of an annotated release tag passes the pin check", async () => {
+  const root = await repo()
+  const opencode = await opencodeRemote(root)
+  await Bun.write(join(root, ".gitleaks-upstream"), `${opencode.annotated}\n`)
+  const result = pinCheck(root, opencode.remote)
+  expect(result.code).toBe(0)
+  expect(report(result.output).summary).toMatchObject({ status: "verified", pins: 1 })
+})
+
+test("an empty pin file passes the pin check without contacting OpenCode", async () => {
+  const root = await repo()
+  const missing = join(root, "missing.git")
+  await Bun.write(join(root, ".gitleaks-upstream"), "# no pins: nothing is exempt from the scan\n")
+  const result = pinCheck(root, missing)
+  expect(result.code).toBe(0)
+  expect(report(result.output).summary).toMatchObject({ status: "verified", pins: 0 })
+  await Bun.write(join(root, ".gitleaks-upstream"), `${git(root, "rev-parse", "HEAD")}\n`)
+  const unreachable = pinCheck(root, missing)
+  expect(unreachable.code).toBe(1)
+  expect(unreachable.output).toContain("Pin check incomplete: cannot list release tags")
+})
+
 test("a merge beyond Git's default rename limit completes range and audit scans", async () => {
   const root = await repo()
   // Git 2.43 skips exhaustive rename detection above 1000 x 1000 unmatched files and warns.
