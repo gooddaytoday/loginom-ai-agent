@@ -16,7 +16,7 @@ const reservedMetadata = [
   "compaction_replay_of",
 ]
 
-type Input = {
+export type Input = {
   sessionID: SessionID
   messages: readonly History[]
   base?: Profile
@@ -41,6 +41,12 @@ export function visible(input: Input) {
 }
 
 export function derive(input: Input): Info | undefined {
+  return currentTask(input).scope
+}
+
+// Reuse the same parent/replay and revert rules for tool grants and recovery reminders.
+export function currentTask(input: Input) {
+  const messages: History[] = []
   const tasks = new Map<MessageID, MessageID | undefined>()
   let scope: Info | undefined
   for (const message of visible(input)) {
@@ -49,8 +55,10 @@ export function derive(input: Input): Info | undefined {
       if (
         !replay &&
         message.parts.some((part) => part.type !== "compaction" && (part.type !== "text" || part.synthetic !== true))
-      )
+      ) {
         scope = { sessionID: input.sessionID, taskMessageID: message.info.id, profile: input.base ?? "default" }
+        messages.length = 0
+      }
       tasks.set(message.info.id, replay ? tasks.get(replay) : scope?.taskMessageID)
     }
     if (
@@ -60,6 +68,7 @@ export function derive(input: Input): Info | undefined {
         : message.info.summary || tasks.get(message.info.parentID) !== scope.taskMessageID)
     )
       continue
+    messages.push(message)
     for (const part of message.parts) {
       const next = activation(
         message.info.role === "user" && part.type === "text"
@@ -74,7 +83,7 @@ export function derive(input: Input): Info | undefined {
       if (next && HostTaskScope.permits(scope.profile, next.profile)) scope = { ...scope, profile: next.profile }
     }
   }
-  return scope
+  return { scope, messages }
 }
 
 export function replayOf(message: History): MessageID | undefined {
@@ -110,10 +119,17 @@ export function sanitize(part: SessionV1.Part, original?: SessionV1.Part): Sessi
 
 // Only the persisted backend part may supply reserved values during a public edit.
 function publicMetadata(value: unknown, original: unknown) {
-  if (!original || typeof original !== "object" || Array.isArray(original)) return cleanMetadata(value)
+  const clean = cleanMetadata(value)
+  delete clean.browserRecovery
+  delete clean.browser_recovery_reminder
+  if (!original || typeof original !== "object" || Array.isArray(original)) return clean
   return {
-    ...cleanMetadata(value),
-    ...Object.fromEntries(Object.entries(original).filter(([key]) => reservedMetadata.includes(key))),
+    ...clean,
+    ...Object.fromEntries(
+      Object.entries(original).filter(
+        ([key]) => reservedMetadata.includes(key) || key === "browserRecovery" || key === "browser_recovery_reminder",
+      ),
+    ),
   }
 }
 

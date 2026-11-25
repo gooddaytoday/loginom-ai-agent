@@ -86,19 +86,30 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
       return !!uncertain || holding();
     },
     async call(name, args, extra) {
-      if (!enabled) return refusal('Browser recovery is unavailable in this build.');
-      if (name !== browserRecoveryToolName) return browserCall(name, args ?? {}, extra);
-      const input = requireInput(args ?? {});
-      if (typeof input === 'string') return refusal(input);
-      if (input.action === 'start') return start(input, extra);
-      if (input.action === 'finish') return finish(input, extra);
-      return stop(input, input.reason ?? 'Stopped by the model.');
+      const pending = dispatch(name, args, extra);
+      // start installs its owner synchronously. Never attribute a late reply to a replacement attempt.
+      const owner = attempt;
+      const result = await pending;
+      if (!owner || (owner !== attempt && owner.phase === 'handoff')) return result;
+      return { ...result, _meta: { ...result._meta, browserRecovery: {
+        attempt_id: owner.id, operation_id: owner.operation_id, phase: owner.phase,
+      } } };
     },
     async close() {
       if (!holding() || attempt.phase === 'stopping') return;
       await stopAttempt('runtime_closed', 'The runtime closed during browser recovery.').catch(() => undefined);
     },
   };
+
+  function dispatch(name, args, extra) {
+    if (!enabled) return refusal('Browser recovery is unavailable in this build.');
+    if (name !== browserRecoveryToolName) return browserCall(name, args ?? {}, extra);
+    const input = requireInput(args ?? {});
+    if (typeof input === 'string') return refusal(input);
+    if (input.action === 'start') return start(input, extra);
+    if (input.action === 'finish') return finish(input, extra);
+    return stop(input, input.reason ?? 'Stopped by the model.');
+  }
 
   async function start(input, extra) {
     if (uncertain) return refusal('A browser recovery action has an unknown outcome; Dock stays blocked in this session.', { uncertain });

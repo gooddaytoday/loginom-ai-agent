@@ -156,8 +156,7 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
     history: History
     lastUser: SessionV1.User
   }) {
-    const recovery = BrowserRecovery.active(turn.history)
-    const task = TaskScope.derive({ sessionID, messages: turn.history, revert: turn.session.revert, base })
+    const { task, recovery } = BrowserRecovery.context({ sessionID, messages: turn.history, revert: turn.session.revert, base })
     if (recovery && !recovery.reminded) {
       // One reminder per attempt; the lease still holds the page for this step.
       const reminder: SessionV1.User = {

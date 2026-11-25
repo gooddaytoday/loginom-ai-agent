@@ -4,6 +4,7 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { BrowserRecovery } from "../../src/session/browser-recovery"
+import { MessageV2 } from "../../src/session/message-v2"
 
 const sessionID = SessionID.create()
 const model = { providerID: ProviderV2.ID.make("test"), modelID: ModelV2.ID.make("test-model") }
@@ -51,7 +52,14 @@ function call(created: number, tool: string, input: Record<string, unknown>, out
         type: "tool",
         tool,
         callID,
-        state: { status: "completed", input, output, title: tool, metadata: {}, time: { start: created, end: created } },
+        state: {
+          status: "completed",
+          input,
+          output,
+          title: tool,
+          metadata: {},
+          time: { start: created, end: created },
+        },
       },
     ],
   }
@@ -109,4 +117,58 @@ test("the reminder is counted once per attempt and a new start resets it", () =>
 
 test("a start that ended in stopped is not an active attempt", () => {
   expect(BrowserRecovery.active([start(1, "start-1", "stopped")])).toBeUndefined()
+})
+
+test("a lost runtime reply invalidates the previous lease until another confirmed start", () => {
+  const lost = call(2, "loginom_dock_browser_recovery", { action: "finish", operation_id: "op-1" }, "", "finish")
+  const part = lost.parts[0]
+  if (part.type !== "tool") throw Error("Expected tool call")
+  part.state = { status: "error", input: part.state.input, error: "LOGINOM_CALL_UNCERTAIN", time: { start: 2, end: 2 } }
+  expect(BrowserRecovery.active([start(1), lost])).toBeUndefined()
+  expect(BrowserRecovery.active([start(1), lost, start(3, "fresh")])?.attempt).toBe("fresh")
+})
+
+test("compaction without a retained tail still delivers the active task's one reminder", () => {
+  const task = reminder(1, "unused")
+  const taskText = task.parts[0]
+  if (taskText.type !== "text") throw Error("Expected task text")
+  task.parts = [{ ...taskText, synthetic: false, metadata: {}, text: "Build the filter" }]
+  const started = start(2)
+  if (started.info.role !== "assistant") throw Error("Expected assistant")
+  started.info.parentID = task.info.id
+  const active = reminder(3, "start-1")
+  const compact = reminder(4, "unused")
+  compact.parts = [{ id: PartID.ascending(), sessionID, messageID: compact.info.id, type: "compaction", auto: true }]
+  const summary = {
+    info: {
+      ...started.info,
+      id: MessageID.ascending(),
+      parentID: compact.info.id,
+      time: { created: 5 },
+      summary: true,
+      finish: "stop",
+    },
+    parts: [],
+  }
+  const messages = [task, started, active, compact, summary]
+  const filtered = MessageV2.filterCompacted(messages.toReversed())
+  expect(filtered.some((message) => message.info.id === active.info.id)).toBe(false)
+  const projected = BrowserRecovery.project(filtered, { sessionID, messages })
+  expect(projected.flatMap((message) => message.parts).filter((part) => part.id === active.parts[0].id)).toHaveLength(1)
+})
+
+test("a late terminal receipt for an older attempt of the same operation leaves the new one active", () => {
+  const receipt = (time: number, action: string, attempt: string, phase: string) => {
+    const message = call(time, "loginom_dock_browser_recovery", { action, operation_id: "op-1" }, "", "c" + time)
+    const part = message.parts[0]
+    if (part.type !== "tool" || part.state.status !== "completed") throw Error("Expected completed call")
+    part.state.metadata.browserRecovery = { operation_id: "op-1", attempt_id: attempt, phase }
+    return message
+  }
+  const state = BrowserRecovery.active([
+    receipt(1, "start", "first", "browser"),
+    receipt(2, "start", "second", "browser"),
+    receipt(3, "finish", "first", "dock"),
+  ])
+  expect(state).toEqual({ operationID: "op-1", attempt: "second", reminded: false })
 })

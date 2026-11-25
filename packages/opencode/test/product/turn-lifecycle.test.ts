@@ -82,7 +82,11 @@ function recoveryHistory(reminded: boolean): SessionV1.WithParts[] {
   }
   return [
     {
-      info: { id: messageID, sessionID, role: "assistant", time: { created: 1 } } as SessionV1.Assistant,
+      info: { ...user, id: taskMessageID, time: { created: 0 } },
+      parts: [{ id: PartID.ascending(), sessionID, messageID: taskMessageID, type: "text", text: "recover" }],
+    },
+    {
+      info: { id: messageID, sessionID, role: "assistant", parentID: taskMessageID, time: { created: 1 } } as SessionV1.Assistant,
       parts: [tool("start-call", "start"), ...(reminded ? [reminder] : [])],
     },
   ]
@@ -161,11 +165,7 @@ describe("turnLifecycle", () => {
   test("the second end of turn stops the recovery attempt and exits", async () => {
     const requests = connect()
     const { run, written } = acquire()
-    const task: SessionV1.WithParts = {
-      info: { ...user, id: taskMessageID, time: { created: 0 } },
-      parts: [{ id: PartID.ascending(), sessionID, messageID: taskMessageID, type: "text", text: "recover" }],
-    }
-    const history = [task, ...recoveryHistory(true)]
+    const history = recoveryHistory(true)
     const outcome = await Effect.runPromise(
       Effect.scoped(Effect.flatMap(run, (turn) => turn.endTurn({ session, history, lastUser: user }))),
     )
@@ -173,6 +173,60 @@ describe("turnLifecycle", () => {
     expect(written).toEqual([])
     const call = requests.find((request) => request.method === "call")
     expect(call?.input).toMatchObject({ name: "dock_browser_recovery", args: { action: "stop", operation_id: "op-1" } })
+  })
+
+  test("a late recovery reply from the previous task cannot remind or stop the new task", async () => {
+    const requests = connect()
+    const { run, written } = acquire()
+    const [original, late] = recoveryHistory(false)
+    const history = [
+      original,
+      {
+        info: { ...user, time: { created: 1 } },
+        parts: [{ id: PartID.ascending(), sessionID, messageID: user.id, type: "text" as const, text: "New request" }],
+      },
+      { ...late, info: { ...late.info, time: { created: 2 } } },
+    ]
+    const outcome = await Effect.runPromise(
+      Effect.scoped(Effect.flatMap(run, (turn) => turn.endTurn({ session, history, lastUser: user }))),
+    )
+    expect(outcome).toBe("exit")
+    expect(written).toEqual([])
+    expect(requests.some((request) => request.method === "call")).toBe(false)
+  })
+
+  test("replay keeps the current recovery reminder and revert hides the reverted start", async () => {
+    const [task, started] = recoveryHistory(false)
+    const replay = {
+      info: user,
+      parts: [
+        {
+          id: PartID.ascending(),
+          sessionID,
+          messageID: user.id,
+          type: "text" as const,
+          text: "recover",
+          metadata: { compaction_replay_of: taskMessageID },
+        },
+      ],
+    }
+    const history = [task, started, replay]
+    const { run, written } = acquire()
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const turn = yield* run
+          const reverted = {
+            id: sessionID,
+            revert: { messageID: started.info.id, partID: started.parts[0].id },
+          } as never
+          expect(yield* turn.endTurn({ session: reverted, history, lastUser: user })).toBe("exit")
+          expect(written).toEqual([])
+          expect(yield* turn.endTurn({ session, history, lastUser: user })).toBe("continue")
+          expect(written[1].value).toMatchObject({ metadata: { browser_recovery_reminder: "start-call" } })
+        }),
+      ),
+    )
   })
 
   test("a skill that is not bundled never requests a profile", async () => {
@@ -271,6 +325,7 @@ test("a dashboard run never acquires a connected Loginom Host or advertises its 
           expect(turn.loginom).toBeUndefined()
           expect(turn.status.failure).toBeUndefined()
           expect(turn.system()).toEqual([])
+          expect(yield* turn.endTurn({ session, history: recoveryHistory(false), lastUser: user })).toBe("exit")
         }),
       ),
     )

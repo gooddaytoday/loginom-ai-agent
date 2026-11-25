@@ -1,3 +1,4 @@
+import { BrowserRecovery } from "./browser-recovery"
 import { attachmentResolver } from "@/product/attachment-resolver"
 import { turnLifecycle } from "@/product/turn-lifecycle"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
@@ -1216,7 +1217,7 @@ const layer = Layer.effect(
 
           if (task?.type === "compaction") {
             const result = yield* compaction.process({
-              messages: msgs,
+              messages: BrowserRecovery.project(msgs),
               parentID: lastUser.id,
               sessionID,
               auto: task.auto,
@@ -1335,7 +1336,9 @@ const layer = Layer.effect(
               sys.environment(model),
               instruction.system().pipe(Effect.orDie),
               toolPolicy.allowsMcp(base) ? sys.mcp(agent, session.permission) : Effect.succeed(""),
-              MessageV2.toModelMessagesEffect(msgs, model),
+              MessageV2.toModelMessagesEffect(
+                BrowserRecovery.project(msgs, { sessionID, messages: history, revert: session.revert, base }), model,
+              ),
             ])
             const system = [
               ...env,

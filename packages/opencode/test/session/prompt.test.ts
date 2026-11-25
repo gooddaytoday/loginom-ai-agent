@@ -1683,6 +1683,25 @@ withMcpInstructions.instance("the first dashboard prompt advertises only dashboa
         title: "Pinned",
         permission: [{ permission: "*", pattern: "*", action: "allow" }],
       })
+      const stale = yield* seed(chat.id, { finish: "tool-calls" })
+      yield* sessions.updatePart({
+        id: PartID.ascending(), sessionID: chat.id, messageID: stale.user.id, type: "text", text: "", synthetic: true,
+        metadata: { skill_activation: { name: "loginom-automation", profile: "loginom-automation", digest: "a".repeat(64) } },
+      })
+      yield* sessions.updatePart({
+        id: PartID.ascending(), sessionID: chat.id, messageID: stale.assistant.id, type: "tool",
+        tool: "loginom_dock_browser_recovery", callID: "old-start",
+        state: { status: "completed", input: { action: "start" }, output: '{"operation_id":"old-filter","phase":"browser"}',
+          title: "recovery", metadata: {}, time: { start: 1, end: 2 } },
+      })
+      const reminder = yield* sessions.updateMessage({ ...stale.user, id: MessageID.ascending(), time: { created: Date.now() } })
+      yield* sessions.updatePart({
+        id: PartID.ascending(), sessionID: chat.id, messageID: reminder.id, type: "text", synthetic: true,
+        text: BrowserRecovery.reminder("old-filter"), metadata: { browser_recovery_reminder: "old-start" },
+      })
+      const hostCalls: unknown[] = []
+      LoginomHost.connect({ start() {}, on() {}, postMessage(value) { hostCalls.push(value); throw Error("Unexpected Host request") } })
+      yield* Effect.addFinalizer(() => Effect.sync(() => LoginomHost.disconnect()))
       yield* llm.text("dashboard reply")
       const result = yield* prompt.prompt({
         sessionID: chat.id,
@@ -1694,6 +1713,8 @@ withMcpInstructions.instance("the first dashboard prompt advertises only dashboa
       const inputs = yield* llm.inputs
       expect(inputs).toHaveLength(1)
       expect(dashboardMcpCalls).toEqual([])
+      expect(hostCalls).toEqual([])
+      expect(JSON.stringify(inputs[0].messages)).not.toContain(BrowserRecovery.reminder("old-filter"))
       expect(JSON.stringify(inputs[0])).not.toContain("guide-server")
       expect(JSON.stringify(inputs[0])).not.toContain("Use lookup before mutate.")
       const tools = inputs[0].tools
@@ -4048,6 +4069,104 @@ noLLMServer.instance(
       yield* sessions.remove(session.id)
     }),
   { config: cfg },
+)
+
+it.instance("a truncated runtime recovery reaches the next provider turn with its attempt ID", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig((url) => ({ ...providerCfg(url), tool_output: { max_bytes: 256 } }))
+    const sessions = yield* Session.Service
+    const prompt = yield* SessionPrompt.Service
+    const chat = yield* sessions.create({
+      title: "Recovery",
+      permission: [{ permission: "*", pattern: "*", action: "allow" }],
+    })
+    const task = yield* user(chat.id, "Continue the filter step")
+    yield* sessions.updatePart({
+      type: "text",
+      id: PartID.ascending(),
+      sessionID: chat.id,
+      messageID: task.id,
+      text: "",
+      synthetic: true,
+      metadata: {
+        skill_activation: { name: "loginom-automation", profile: "loginom-automation", digest: "a".repeat(64) },
+      },
+    })
+    const operation = "op-filter"
+    const starts: string[] = []
+    const { createBrowserRecovery } = yield* Effect.promise(
+      () => import(new URL("../../../loginom-runtime/client/lib/browser-recovery.mjs", import.meta.url).href),
+    )
+    const runtime = createBrowserRecovery({
+      enabled: true,
+      gate: (action: () => Promise<unknown>) => action(),
+      probe: async () => ({ ok: true }),
+      record: async (event: { phase: string; attempt_id: string }) => {
+        if (event.phase === "browser_recovery_started") starts.push(event.attempt_id)
+        return event
+      },
+      executor: {
+        browserRecoveryBasis: () => ({ step: { key: "filter" }, reason: "NODE_RELEASE_REFUSED" }),
+        browserRecoveryHandoff: () => ({ stopped: true }),
+        stopBrowserRecovery: () => ({ state: "retained" }),
+      },
+      browser: {},
+    })
+    let receive: ((event: { data: unknown }) => void) | undefined
+    LoginomHost.connect({
+      start() {},
+      on(_event, listener) {
+        receive = listener
+      },
+      async postMessage(request) {
+        if (!isRecord(request) || !isRecord(request.input)) throw Error("Invalid Host request")
+        const input = request.input
+        const result =
+          request.method === "acquire"
+            ? { generation: 1 }
+            : request.method === "scope"
+              ? input.scope
+              : request.method === "tools"
+                ? { tools: runtime.listTools([]) }
+                : request.method === "call"
+                  ? await runtime.call(input.name, input.args, {})
+                  : {}
+        receive?.({ data: { id: request.id, generation: 1, result } })
+      },
+    })
+    yield* Effect.addFinalizer(() => Effect.sync(() => LoginomHost.disconnect()))
+    yield* llm.tool("loginom_dock_browser_recovery", { action: "start", operation_id: operation })
+    yield* llm.tool("loginom_dock_browser_recovery", { action: "start", operation_id: operation })
+    yield* llm.text("The step still needs work.")
+    yield* llm.text("I have no further action.")
+    yield* prompt.loop({ sessionID: chat.id })
+    const history = yield* sessions.messages({ sessionID: chat.id })
+    const parts = history.flatMap((message) => message.parts)
+    const start = parts.find((part) => part.type === "tool" && part.tool === "loginom_dock_browser_recovery")
+    expect(start?.type === "tool" && start.state.status === "completed" && start.state.metadata.truncated).toBe(true)
+    expect(starts).toHaveLength(1)
+    const requests = yield* llm.inputs
+    const failed = parts.find((part) => part.type === "tool" && part.state.status === "error")
+    expect(failed?.type === "tool" && failed.state.status === "error" && failed.state.metadata).toMatchObject({
+      isError: true,
+      browserRecovery: { operation_id: operation, attempt_id: starts[0], phase: "browser" },
+    })
+    expect(requests).toHaveLength(4)
+    expect(JSON.stringify(requests[3].messages)).toContain(BrowserRecovery.reminder(operation))
+    expect(
+      parts.filter((part) => part.type === "text" && part.metadata?.browser_recovery_reminder === starts[0]),
+    ).toHaveLength(1)
+    yield* llm.text("New task received.")
+    yield* prompt.prompt({
+      sessionID: chat.id,
+      agent: "build",
+      model: ref,
+      parts: [{ type: "text", text: "Summarize a new file." }],
+    })
+    const next = (yield* llm.inputs).at(-1)
+    expect(JSON.stringify(next?.messages)).not.toContain(BrowserRecovery.reminder(operation))
+    expect(JSON.stringify(next?.tools)).not.toContain("loginom_dock_browser_recovery")
+  }),
 )
 
 it.instance("an active browser recovery gets one persisted reminder before the loop exits", () =>

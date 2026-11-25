@@ -80,11 +80,12 @@ describe("toolContributor", () => {
       ' {"state":"settled","status":"SUCCEEDED","output":{"file_artifacts":[{"artifact_id":"csv-1","destination":"/server/result.csv"}]}}\n'
     const content = [{ type: "text" as const, text }]
     const files = [{ artifact_id: "csv-1", path: "/runtime/result.csv", name: "result.csv" }]
+    const recovery = { operation_id: "op-export", attempt_id: "attempt-export", phase: "dock" }
     const execute = async (outputFiles?: typeof files) => {
       const run = setup({
         profile: "loginom-automation",
         catalog: catalogOf(["dock_node_wait"]),
-        result: { content, ...(outputFiles ? { _meta: { outputFiles } } : {}) },
+        result: { content, ...(outputFiles ? { _meta: { outputFiles, browserRecovery: recovery } } : {}) },
       })
       await run.run()
       const tool = run.tools.loginom_dock_node_wait
@@ -101,6 +102,7 @@ describe("toolContributor", () => {
     const result = await execute(files)
     expect(base.metadata.outputFiles).toBeUndefined()
     expect(result.metadata.outputFiles).toEqual(files)
+    expect(result.metadata.browserRecovery).toEqual(recovery)
     expect(result.output).toBe(text)
     expect(result.output).toBe(base.output)
     expect(JSON.stringify(result.content)).toBe(JSON.stringify(base.content))

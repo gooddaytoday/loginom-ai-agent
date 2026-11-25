@@ -1,3 +1,4 @@
+import { BrowserRecovery } from "@/session/browser-recovery"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js"
@@ -257,10 +258,16 @@ const contribute = Effect.fnUntraced(function* (input: ContributeInput) {
                   truncated.truncated && summary
                     ? `${summary}\n\nTable data and verbose details were omitted by the backend response limit. The complete original result is retained at ${truncated.outputPath}. Do not infer unread data or repeat mutations solely to retrieve omitted text.`
                     : truncated.content
+                const recovery = BrowserRecovery.metadata(result._meta?.browserRecovery)
+                const metadata = {
+                  generation: loginom.generation,
+                  ...(recovery ? { browserRecovery: recovery } : {}),
+                  ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
+                }
                 if (state === "failed") {
                   yield* ctx.metadata({
                     title: definition.name,
-                    metadata: { generation: loginom.generation, isError: true },
+                    metadata: { ...metadata, isError: true },
                   })
                   throw new Error(content || "LOGINOM_TOOL_FAILED")
                 }
@@ -268,8 +275,7 @@ const contribute = Effect.fnUntraced(function* (input: ContributeInput) {
                   title: definition.name,
                   output: content,
                   metadata: {
-                    generation: loginom.generation,
-                    ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
+                    ...metadata,
                     truncated: truncated.truncated,
                     ...(state === "pending" ? { loginomPending: true } : {}),
                     ...(truncated.truncated ? { outputPath: truncated.outputPath } : {}),

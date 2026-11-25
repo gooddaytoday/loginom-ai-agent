@@ -295,3 +295,16 @@ test("persisted activations and subsequent requests cannot change a dashboard ba
   ).toBeUndefined()
   expect(TaskScope.derive({ sessionID, messages: [], base: "loginom-dashboard" })).toBeUndefined()
 })
+
+test("editing a stored tool result preserves its runtime recovery identity", () => {
+  const tool = activated(2, user(1), "loginom-automation").parts[0]
+  if (tool.type !== "tool" || tool.state.status !== "completed") throw Error("Expected completed tool")
+  const original = { ...tool, state: { ...tool.state, metadata: { browserRecovery: { attempt_id: "original" } } } }
+  const edited = {
+    ...tool,
+    state: { ...tool.state, metadata: { browserRecovery: { attempt_id: "edited" }, note: "user" } },
+  }
+  expect(TaskScope.sanitize(edited, original)).toMatchObject({
+    state: { metadata: { browserRecovery: { attempt_id: "original" }, note: "user" } },
+  })
+})
