@@ -16,7 +16,8 @@ test("entry keeps the action boundaries visible before any reference is read", (
   expect(entry).toContain("без чтения\nжурналов, diagnostics и исходников продукта")
   expect(entry).toContain("Конвертация и производные файлы — с\nсогласия")
   expect(entry).toContain("[границы](references/workflow.md#границы-действий)")
-  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(36_298 + 2_000)
+  // Internal guard below the owner's 40 000 B SKILL.md budget (raised for LAB-2020; never above 39 000).
+  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(38_500)
 })
 
 test("workflow reference defines Loginom-only results, standard recovery and consent", () => {
@@ -51,4 +52,27 @@ test("workflow reference allows waiting only through Loginom tools and keeps fil
   expect(boundaries).toMatch(/Приложенный `\.lgp` открывай `loginom_dock_prepare`[\s\S]*?не распаковывай/)
   expect(boundaries).toMatch(/вне рабочего каталога и вложений[\s\S]*?не читай и не создавай/)
   expect(boundaries).toContain("справку этого skill")
+})
+
+// LAB-2015/LAB-2020, bughunt bh-g101..g106 (0.4.3): every user message is a new task whose profile starts
+// without the skill (task-scope.ts derive), so loginom_dock_* stay hidden until the skill is activated again.
+// The second turn called loginom_dock_action_describe from history, got `invalid` and ended in CLI_TOOL_FAILED.
+// Before activation only the frontmatter description reaches the model.
+// Help questions and dashboard chats must not activate it: dashboards have no Loginom connection
+// (turn-lifecycle.ts) and activation there fails with LOGINOM_SCOPE_DENIED.
+test("description makes every new scenario message activate the skill before Dock tools", () => {
+  const description = skill
+    .split("\n---\n")[0]
+    .split(/\ndescription: >-\n/)[1]
+    ?.split(/\n[a-z]+:/)[0]
+    .replace(/\s+/g, " ")
+  expect(description).toBeDefined()
+  const rule = description?.match(/[Кк]аждое новое сообщение[^.:]*начинай с активации этого skill[^.]*\./)?.[0]
+  expect(rule).toBeDefined()
+  expect(rule).toContain("о сценарии или пакете Loginom")
+  expect(rule).not.toContain("сообщение чата")
+  expect(rule).toMatch(/без неё `?loginom_dock_\*`? недоступны, история их не возвращает/)
+  expect(description).toContain("обычные справочные вопросы используют Help без этого skill")
+  expect(description!.length).toBeLessThanOrEqual(1024)
+  expect(skill).toContain("`existing_workflow` — только со ссылкой, выданной этим runtime, не из истории чата.")
 })

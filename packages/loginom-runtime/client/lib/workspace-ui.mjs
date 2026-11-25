@@ -186,7 +186,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       &&['document_id','workflow_id','node_id'].every(k=>typeof previousNode[k]==='string'&&previousNode[k]===nodeContext[k])
       &&typeof previousPort?.port_guid==='string'&&previousPort.port_guid.length>0
       &&typeof previousPort?.opening_operation_id==='string'&&previousPort.opening_operation_id.length>0;
-    const observed = await page.evaluate(({rootRef,discoverRoots,downloadToastObservation,nodeErrorToastObservation,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedPendingWizardNode,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedPortReturn}) => {
+    const observed = await page.evaluate(({rootRef,discoverRoots,downloadToastObservation,nodeErrorToastObservation,quietGraphObservation,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedPendingWizardNode,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedPortReturn}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -568,10 +568,13 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       if (!(box.width > 0 && box.height > 0) && !(graphLink && box.width >= 0 && box.height >= 0 && (box.width > 0 || box.height > 0))) return false;
       return visibleAncestors(element);
     });
+    // A port menu is a floating root outside the prepared graph's detail scan.
+    if(quietGraphObservation&&[...document.querySelectorAll('[data-tid="mn"],.x-menu')].some(visible))
+      return {ui_read_failure:{code:'UI_PORT_MENU_VISIBLE'}};
     const sensitivePattern = /password|passwd|\bpwd\b|secret|token|credential|authorization|api[_ -]?key|private[_ -]?key|one[_ -]?time|\botp\b|парол|секрет|токен/i;
-    // Inline definition pages have no separate port opening. Their native-bound
-    // node wizard and exact current breadcrumb supply the node type, read-only.
-    const inlineDefinitionIcon=(()=>{
+    // The prepared node's own settings wizard, without an opened port: its
+    // native-bound wizard and exact current breadcrumb «…>Node>Настройка».
+    const preparedSettingsCrumb=(()=>{
       if(!preparedNodeWizard||!preparedNodeId||!definitionPrefix||!preparedWorkflowPath?.length||preparedInputPort||preparedOutputPort)return null;
       const panels=tids.get(definitionPrefix+';NavigationBar;NavigationPanel')??[];
       if(panels.length!==1||!visible(panels[0]))return null;
@@ -580,7 +583,13 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       if(crumbs.length!==count+2||!preparedWorkflowPath.every((c,i)=>getTid(crumbs[i])===c.tid&&crumbs[i].textContent.trim()===c.label)
         ||!getTid(node)?.startsWith(preparedWorkflowPath.at(-1).tid+'>')||getTid(node).slice(preparedWorkflowPath.at(-1).tid.length+1).includes('>')
         ||settings.textContent.trim()!=='Настройка'||getTid(settings)!==getTid(node)+'>Настройка')return null;
-      const icons=[...node.querySelectorAll('[class*="bg-vendor-icon-"]')];charge();
+      return node;
+    })();
+    // Inline definition pages have no separate port opening. The prepared
+    // settings breadcrumb supplies the node type, read-only.
+    const inlineDefinitionIcon=(()=>{
+      if(!preparedSettingsCrumb)return null;
+      const icons=[...preparedSettingsCrumb.querySelectorAll('[class*="bg-vendor-icon-"]')];charge();
       if(icons.length!==1)return null;
       return ['importtextfile','joindata','exporttextfile'].map(n=>'bg-vendor-icon-'+n).find(n=>icons[0].classList.contains(n))??null;
     })();
@@ -2183,7 +2192,9 @@ function readRenderedInputMapping(observation) {
       wizard.import_source={status:'draft_ui_values',settings_applied:false,file_bytes_verified:false,schema_complete:false,fields};
     }
     const wizardFields=new Map(),wizardCombos=new Map();
-    if(wizard.stage==='done'&&inlineDefinitionIcon==='bg-vendor-icon-importtextfile') {
+    // Done «Описание узла» of any prepared node's own settings wizard. Its title
+    // picker exists only where the page renders cbxNodeTitleMode.
+    if(wizard.stage==='done'&&preparedSettingsCrumb) {
       const f=wizard.completion?.fields.label_mode;
       if(f?.status==='observed'&&!f.truncated&&f.enabled)wizardCombos.set(wizard.root_tid+';DoneWizard;cbxNodeTitleMode',
         {name:'label_mode',scope:'node_title',root_ref:wizard.root_ref,owner_ref:f.owner_ref,input_ref:f.input_ref,value:f.value});
@@ -4337,7 +4348,9 @@ function readRenderedInputMapping(observation) {
       return {ui_read_failure:{code,...(code==='UI_SCAN_LIMIT' && ['work','time','elements','traversal'].includes(error?.limit_kind)?{limit_kind:error.limit_kind}:{})
         ,...(['collect','metadata','output_definitions','import_definitions','controls','data_views'].includes(error?.scan_stage)?{scan_stage:error.scan_stage}:{})}};
     }
-  },{downloadToastObservation:task.download_toast_observation===true,nodeErrorToastObservation:task.node_error_toast_observation===true,rootRef:rediscover ? null : postActionRoot ?? task.root_ref ?? task.snapshot?.observation_root?.ref ?? null,discoverRoots:rediscover || task.discover_roots===true,storageName:task.storage_name ?? null,
+  },{downloadToastObservation:task.download_toast_observation===true,nodeErrorToastObservation:task.node_error_toast_observation===true,
+    quietGraphObservation:task.quiet_graph_observation===true,
+    rootRef:rediscover ? null : postActionRoot ?? task.root_ref ?? task.snapshot?.observation_root?.ref ?? null,discoverRoots:rediscover || task.discover_roots===true,storageName:task.storage_name ?? null,
     columnPage:task.import_column_page??(task.snapshot?.wizard?.import_columns?.page?{offset:task.snapshot.wizard.import_columns.page.offset,limit:task.snapshot.wizard.import_columns.page.limit}:null),
     mappingPage:task.output_column_page??(task.snapshot?.wizard?.output_columns?.page?{offset:task.snapshot.wizard.output_columns.page.offset,limit:task.snapshot.wizard.output_columns.page.limit}:null),
     tableFormatPage:task.table_format_page??(task.snapshot?.table_settings?.format?.page?{offset:task.snapshot.table_settings.format.page.offset,limit:task.snapshot.table_settings.format.page.limit}:null),
@@ -4424,6 +4437,7 @@ function readRenderedInputMapping(observation) {
       }
       const messages={UI_SCAN_LIMIT:'Workspace scan budget exceeded; use root discovery and a narrower observation',
         UI_ROOT_STALE:'Observed root is detached, hidden, inactive or expired',
+        UI_PORT_MENU_VISIBLE:'A port context menu is visible',
         UI_EPOCH_UNAVAILABLE:'DOM mutation tracking is unavailable',UI_OBSERVATION_FAILED:'Browser observation failed'};
       fail(Object.hasOwn(messages,code)?code:'UI_OBSERVATION_FAILED',messages[code]??messages.UI_OBSERVATION_FAILED);
     }
@@ -5683,6 +5697,8 @@ function readRenderedInputMapping(observation) {
 
 export function makeWorkspaceUiCode(options, { snapshotArgument = false, downloadToastObservation = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
+  if(options.quiet_graph_observation!==undefined&&(options.quiet_graph_observation!==true||options.mode!=='observe'||!options.prepared_node_context))
+    throw Error('Quiet graph observation requires a prepared node');
   if(options.deadline!==undefined&&(!Number.isFinite(options.deadline)||options.deadline<=0
     ||options.opening_timeout_ms===undefined&&options.settlement_timeout_ms===undefined&&options.output_settlement_read===undefined))
     throw Error('Absolute node deadline requires a bounded opening or settlement wait');
