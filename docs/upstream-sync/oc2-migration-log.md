@@ -23741,3 +23741,42 @@ $ grep -c blacksmith .github/workflows/*.yml                             # check
 - Содержимое секретов и переменных форка (`gh secret list`) не смотрел; вопрос 1 это учитывает. Единственный сетевой запрос —
   метаданные репозитория выше (отступ от условия «только документация»).
 - Состав 57 крейтов и лицензий (g) считал по журналу B2.7a9, не по `Cargo.lock`.
+
+## B5.1f — pty под платформы
+
+25.11.2026. Ветка `b51f-pty-platforms` от `oc2-migration` (`569014e83b`). Меньший вариант: без правок Rust и `build.rs`, без
+сборки в `release-process-daemon.yml` (остаётся выключенным задачей a).
+
+### Что сделано
+
+- `.github/workflows/loginom-pty.yml` — вызов: `workflow_call` (для сборок h, i, k), `workflow_dispatch`, `pull_request` по
+  `packages/process-daemon/**`, действию и самому файлу. Входов нет. Матрица: `ubuntu-22.04` / `x86_64-unknown-linux-gnu`
+  (`cargo zigbuild --target …gnu.2.30`, cargo-zigbuild 0.23.2, проверка `readelf` ≤ 2.30), `macos-15` / `aarch64-apple-darwin`,
+  `windows-2022` / `x86_64-pc-windows-msvc` (`+crt-static`, `OPENCODE_ZIG_CPU=baseline`). Каждое задание: `--version` =
+  `loginom-ai-agent-pty <версия> (protocol <N>)`, сессия `play`, артефакт.
+- Артефакты (имя → файлы): `loginom-ai-agent-pty-x86_64-unknown-linux-gnu`, `loginom-ai-agent-pty-aarch64-apple-darwin`,
+  `loginom-ai-agent-pty-x86_64-pc-windows-msvc`; внутри `loginom-ai-agent-pty[.exe]` и `SHA256SUMS`. Потребитель скачивает
+  артефакт, на Linux и macOS делает `chmod +x` (upload-artifact теряет бит) и ставит `LOGINOM_AI_AGENT_PTY_BIN`.
+- `.github/actions/setup-rust-pty/action.yml` — вход `target`; Zig 0.16.0, `release-bin/zig` (Unix) или переменные Windows,
+  Rust 1.90.0, `Swatinem/rust-cache`.
+- `check-process-daemon.yml`: macOS на `macos-15` вместо `blacksmith-*`; проверка версии Windows и имя тестового exe теперь
+  `loginom-ai-agent-pty` (прежний шаблон `opencode-pty` не совпал бы с продуктовым именем).
+- Тест `packages/product/test/pty-workflow.test.ts` (5 тестов). Каталог: `.github/**` уже в CAT-12/`.github`, записей не надо.
+
+### Проверки
+
+- Linux x64 здесь, Zig 0.16.0 (только чтение), CARGO_HOME/цели во временном каталоге: `readelf --version-info` — максимум
+  `GLIBC_2.29` (≤ 2.30); `--version` = `loginom-ai-agent-pty 0.5.2 (protocol 8)`; `play`: `release-smoke` и `checkpoint` есть.
+- Оговорка: на этой машине glibc 2.39, и обычный `cargo zigbuild …2.30` падает при линковке (`undefined symbol:
+  arc4random_buf`: Ghostty собирается под нативный glibc 2.39, `build.rs` даёт `-Dtarget` только при HOST≠TARGET). Рабочий
+  результат получен с временной обёрткой zig, добавляющей `-Dtarget=x86_64-linux-gnu.2.30` (в коммит не входит). На
+  `ubuntu-22.04` (glibc 2.35) нативная цель ниже 2.36, как в upstream `release-process-daemon.yml`; проверит CI. Если красно —
+  вынести `-Dtarget=…2.30` в `release-bin/zig`.
+- Мутации теста (glibc 2.31, убран `readelf`, убран baseline CPU, Rust 1.89, `blacksmith`, `windows-2025`): каждая даёт 1 fail.
+- YAML трёх файлов разобран `python3 yaml`. `product`: 68 pass, 3 fail — известные (`workspace packages`, `CI triggers`,
+  `path literals`). `catalog-check.py` код 0; `apply-identity --check` 0 файлов; `bun run check` код 0 (39 задач).
+
+### Проверит только CI на GitHub
+
+Работа workflow и действия целиком; Linux-сборка на 22.04 без обёртки; macOS arm64; Windows MSVC (`+crt-static`, Zig на
+Windows, первый прогон `daemon/windows.rs`, `play` с `cmd.exe`); кэш Cargo; `check-process-daemon` на `macos-15`.
