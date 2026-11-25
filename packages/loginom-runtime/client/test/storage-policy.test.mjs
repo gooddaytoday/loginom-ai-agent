@@ -10,8 +10,8 @@ test('export existence comes from the complete native store of the exact owned f
  const directory=directories.exports,destination=directory+'/Sales report.xlsx',workflow={prefix:'MF;TF-1',tab_tid:'tab'};
  const record=name=>({isModel:true,data:{FileName:name,FilePath:directory+'/'+name,id:directory+'/'+name}});
  const records=[record('Sales_report.xlsx')];
- let loading=false,total=null;
- const store={$className:'bg.filedialog.FileStore',isLoading:()=>loading,getRange:()=>records,
+ let loading=false,filtered=false,total=null;
+ const store={$className:'bg.filedialog.FileStore',isLoading:()=>loading,isFiltered:()=>filtered,getRange:()=>records,
   getCount:()=>records.length,getTotalCount:()=>total??records.length,getData:()=>({items:records})};
  const grid={id:'grid'},tab={classList:{contains:name=>name==='x-tab-active'}};
  const form={constructor:{name:'FileStorageForm'},FView:{el:{dom:{contains:e=>e===grid}}},
@@ -25,8 +25,11 @@ test('export existence comes from the complete native store of the exact owned f
  const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')(input)',{...globals,input:arg})};
  const read=()=>readStorageDestination(page,{binding,workflow,directory,destination});
  assert.equal((await read()).exists,false);
- records.push(record('Sales report.xlsx'));
+ const exact=record('Sales report.xlsx');records.push(exact);
  assert.equal((await read()).exists,true);
+ filtered=true;assert.equal((await read()).verified,false);filtered=false;
+ exact.data.id=directory+'/Another report.xlsx';assert.equal((await read()).verified,false);
+ exact.data.id=destination;
  total=3;assert.equal((await read()).verified,false);
  total=null;loading=true;assert.equal((await read()).verified,false);
  loading=false;connection.Connected=false;assert.equal((await read()).verified,false);

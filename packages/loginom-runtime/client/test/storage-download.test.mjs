@@ -54,12 +54,12 @@ async function sourceNavigation(t,fault,options={}) {
  return {result,records,deadlines,page,refreshed,runtime:r,native,showGraph:()=>{opened=false;}};
 }
 
-test('a confirmed Excel destination conflict leaves the node and links uncreated',async t=>{
+async function excelDestinationNavigation(t){
  const support=createExcelExportNodeSupport({storageDirectories:{packages:'/worker',inputs:'/worker',exports:'/worker'}});
  const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',
   navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]};
  const workflow={status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,document_id:'d',workflow_ref};
- const steps=[];let exists=true;
+ const steps=[];let observation={verified:true,exists:true};
  const f=await sourceNavigation(t,undefined,{...support,
   nodeTargetAdapterFactory:()=>({
    activateWorkflow:async()=>{steps.push('activate');throw Error('Lost workflow reply');},
@@ -70,15 +70,25 @@ test('a confirmed Excel destination conflict leaves the node and links uncreated
  });
  const destination='/worker/report.xlsx',evaluate=f.page.evaluate.bind(f.page);
  f.page.evaluate=async(fn,arg)=>{
+  if(observation.failNavigation&&arg?.discoverRoots){
+   steps.push('files navigation');
+   throw Error('Files navigation could not read its roots');
+  }
   if(!fn.toString().includes('directory,destination})'))return evaluate(fn,arg);
   assert.equal(arg.destination,destination);
   steps.push('destination');
-  return {verified:true,destination,exists};
+  if(observation instanceof Error)throw observation;
+  return {destination,...observation};
  };
  const request={operation_id:'export-conflict',contract_revision:'1.0.0',document_id:'d',workflow_ref,
   target:{kind:'new',type:'exports.excel'},inputs:[{source:{document_id:'d',workflow_id:'flow',node_id:'table'},output:0,input:0}],
   mode:'xlsx',parameters:{excel_export:{destination,sheet_name:'Report',header:'labels',overwrite:'reject'}},mappings:[],finish:'execute',
   read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ return {...f,request,steps,destination,setObservation:value=>{observation=value;}};
+}
+
+test('a confirmed Excel destination conflict leaves the node and links uncreated',async t=>{
+ const f=await excelDestinationNavigation(t),{request,steps,destination}=f;
  const outcome=await f.runtime.runNodeApply(request);
  assert.equal(outcome.status,'NOT_APPLIED',JSON.stringify(outcome.error));
  assert.equal(outcome.cleanup_complete,true);assert.equal(outcome.effect_possible,false);
@@ -90,13 +100,28 @@ test('a confirmed Excel destination conflict leaves the node and links uncreated
  assert.deepEqual(steps,['destination']);
  // Early evidence is kept outside the source fingerprint so workflow recovery
  // can recheck the same source without reissuing the Files navigation.
- exists=false;
+ f.setObservation({verified:true,exists:false});
  const next={...request,operation_id:'export-after-conflict'};
  assert.equal((await f.runtime.runNodeApply(next)).output.pending_phase,'workflow');
  await f.runtime.inspect({operationId:next.operation_id});
  await f.runtime.runNodeApply(next,{resume:true});
  assert.ok(f.records.some(e=>e.phase==='node_continuation_checked'&&e.boundary==='workflow'&&e.verified));
  assert.deepEqual(steps,['destination','destination','activate','graph']);
+});
+
+for(const [name,read,overwrite,expectedSteps] of [
+ ['replace',{verified:true,exists:true},'replace',['activate']],
+ ['filtered',{verified:false},'reject',['destination','activate']],
+ ['read-unavailable',Error('Files read failed'),'reject',['destination','activate']],
+ ['navigation-unavailable',{failNavigation:true},'reject',['files navigation','files navigation','activate']],
+])test('Excel destination preflight defers to the native check: '+name,async t=>{
+ const f=await excelDestinationNavigation(t),{request,steps}=f;
+ f.setObservation(read);
+ request.parameters.excel_export.overwrite=overwrite;
+ const result=await f.runtime.runNodeApply(request);
+ assert.equal(result.output.pending_phase,'workflow',JSON.stringify(result.error));
+ assert.deepEqual(steps,expectedSteps);
+ assert.ok(!f.records.some(e=>e.phase==='excel_export_destination_preflight_completed'));
 });
 
 test('Import binding consumes its observed file witness after Files returns to the graph',async t=>{

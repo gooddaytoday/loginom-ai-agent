@@ -5,7 +5,6 @@ import {journalCopy} from './execution-journal.mjs';
 import {readSavedPackageState} from './package-persistence.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,requireServerDownloadFormat,serverDownloadTools,storageListPattern,listStorageDirectory,readStorageDestination} from './storage-policy.mjs';
 import {preflightExcelExportDestination} from './exports-excel-procedure.mjs';
-import {makeStepwiseSourceObservationCode,observeStepwiseSourceFreshness} from './node-source-freshness.mjs';
 import {buildNodeReadRequest,NODE_READ_MODE} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
 import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady,makeLargeUploadCode,guardUploadDebugDialog} from './artifact-discovery.mjs';
@@ -3448,7 +3447,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               output:await (${readStorageDestination.toString()})(page,${JSON.stringify(task)})})`,{timeout:Math.max(1,deadline-now())});
             guard();
             if(response.status!=='SUCCEEDED'||response.operation_id!==id||response.action_key!=='storage.export_destination'
-              ||response.cleanup_complete!==true||response.effect_possible!==false||response.output?.verified!==true)
+              ||response.cleanup_complete!==true||response.effect_possible!==false)
               throw Error('Exact Excel destination could not be verified in Files');
             return response.output;
           }
@@ -3509,7 +3508,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                 }
               }
             }
-            throw error;
+            // Excel's native wizard remains the destination authority when
+            // the optional Files lookup fails with settled navigation.
+            if(consume||navigationUncertain||error.cleanupUnconfirmed||pending||running)throw error;
           }
           // Keep a bounded diagnostic in the tool result. Throwing through the
           // IPC boundary can collapse an observation refusal to CALL_UNCERTAIN.
@@ -4315,7 +4316,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             const proof=await preflightExcelExportDestination(request,async path=>{
               const result=await runtime.serverDownload({operation_id:randomUUID(),path},null,
                 {signal,sourceOperation:operationId,deadlineAt:deadline,exportDestination:true});
-              return result.output;
+              return result.status==='SUCCEEDED'?result.output:null;
             });
             if(proof)await onRecord({operation_id:operationId,phase:'excel_export_destination_preflight_completed',proof});
           }
@@ -4457,11 +4458,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             const overallDeadline=operation.deadline;operation.deadline=ctx.deadline;
             let result,preflight;
             const sourcePreflight=async()=>{
-              const beforeTarget=operation.nodeApplyDrivers.beforeTarget;
-              const stepwiseInput=graph.target.kind==='new'&&graph.inputs.length===1&&request.finish!=='close'
-                &&['transform.group_data','transform.sorting','exports.excel'].includes(graph.target.type);
-              const existingRead=request.mode===NODE_READ_MODE&&request.parameters.execution_policy==='existing';
-              if(beforeTarget){
+              if(operation.nodeApplyDrivers.beforeTarget){
                 const current=await operation.nodeTargetAdapter.verifyWorkflow({document_id:graph.document_id,workflow_ref:graph.workflow_ref},ctx);
                 if(current?.status!=='SUCCEEDED'||current.verified!==true||current.cleanup_complete!==true
                   ||current.effect_possible!==false||current.document_id!==graph.document_id
@@ -4469,18 +4466,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                 // Bind the freshly reopened native graph before a schema
                 // preflight reads its source port. Workflow activation alone
                 // does not establish the embedded node-context identity.
+                const existingRead=request.mode===NODE_READ_MODE&&request.parameters.execution_policy==='existing';
                 if(existingRead)preflight=await operation.nodeApplyDrivers.beforeTarget(ctx);
                 const sourceGraph=await operation.nodeTargetAdapter.observe(graph,ctx.deadline,ctx.signal);
                 if(sourceGraph?.complete!==true||sourceGraph.document_id!==graph.document_id
                   ||JSON.stringify(sourceGraph.workflow_ref)!==JSON.stringify(graph.workflow_ref))
                   throw Error('Complete owned graph required before node preflight');
+                if(!existingRead)preflight=await operation.nodeApplyDrivers.beforeTarget(ctx);
               }
-              if(stepwiseInput)await observeStepwiseSourceFreshness({request,operationId:operation.id,history:nodeHistory(),record:onRecord,
-                observe:async binding=>{
-                  try{return await executeNodeScript(makeStepwiseSourceObservationCode(binding),{timeout:Math.max(1,ctx.deadline-now()),signal:ctx.signal});}
-                  catch{ctx.signal?.throwIfAborted();return {processes:null,ports:null};}
-                }});
-              if(!existingRead&&beforeTarget)preflight=await operation.nodeApplyDrivers.beforeTarget(ctx);
             };
             try{
               const checkpointPreflight=graph.target.kind==='new'&&['transform.cross_table','transform.calculator','preprocessing.data_recovery'].includes(graph.target.type)

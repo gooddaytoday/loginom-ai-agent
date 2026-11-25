@@ -10,10 +10,11 @@ export async function preflightExcelExportDestination(request,inspect){
  const settings=request.parameters.excel_export;
  if(request.target.type!=='exports.excel'||request.finish==='close'||settings?.destination===undefined)return null;
  const {destination,overwrite='reject'}=settings;
+ if(overwrite!=='reject')return null;
  const observed=await inspect(destination);
- need(observed?.destination===destination&&typeof observed.exists==='boolean','Exact Excel destination could not be verified');
+ if(observed?.verified!==true||observed.destination!==destination||typeof observed.exists!=='boolean')return null;
  const proof={destination,exists:observed.exists,overwrite};
- if(proof.exists&&overwrite==='reject'){
+ if(proof.exists){
   const error=destinationConflict(destination);
   error.nodePhaseRefusal={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,
    verification:'excel_export_destination_preflight',proof};

@@ -25,7 +25,7 @@ const directories={packages:'/operator/packages',inputs:'/operator/inputs',expor
 test('Excel checks the exact destination and refuses a reject conflict before the graph phase',async()=>{
  const destination=directories.exports+'/report.xlsx',calls=[];
  const request={target:{kind:'new',type:'exports.excel'},finish:'execute',parameters:{excel_export:{destination}}};
- const inspect=async path=>{calls.push(path);return {destination:path,exists:true};};
+ const inspect=async path=>{calls.push(path);return {verified:true,destination:path,exists:true};};
  await assert.rejects(preflightExcelExportDestination(request,inspect),error=>{
   assert.equal(error.nodePhaseRefusal?.phase,'source');
   assert.equal(error.nodePhaseRefusal?.cleanup_complete,true);
@@ -34,10 +34,11 @@ test('Excel checks the exact destination and refuses a reject conflict before th
  });
  assert.deepEqual(calls,[destination]);
  request.parameters.excel_export.overwrite='replace';
- assert.deepEqual(await preflightExcelExportDestination(request,inspect),{destination,exists:true,overwrite:'replace'});
+ assert.equal(await preflightExcelExportDestination(request,()=>assert.fail('Replace uses the native check')),null);
  request.parameters.excel_export.overwrite='reject';
- assert.deepEqual(await preflightExcelExportDestination(request,async path=>({destination:path,exists:false})),{destination,exists:false,overwrite:'reject'});
- await assert.rejects(preflightExcelExportDestination(request,async()=>({destination:'/somewhere/report.xlsx',exists:false})),/destination/i);
+ assert.deepEqual(await preflightExcelExportDestination(request,async path=>({verified:true,destination:path,exists:false})),{destination,exists:false,overwrite:'reject'});
+ assert.equal(await preflightExcelExportDestination(request,async()=>({verified:true,destination:'/somewhere/report.xlsx',exists:true})),null);
+ assert.equal(await preflightExcelExportDestination(request,async()=>({verified:false,destination,exists:true})),null);
  request.finish='close';
  assert.equal(await preflightExcelExportDestination(request,()=>assert.fail('Close has no destination check')),null);
 });

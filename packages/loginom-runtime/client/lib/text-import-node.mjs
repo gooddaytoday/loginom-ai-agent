@@ -765,11 +765,20 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           resolve:s=>({verb,ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';'+button),'Unique wizard completion control required').ref}),
           identity:s=>s.prepared_node_context});
         const graph=await channel.observe({condition:'same configured node returned to graph',ready:s=>s.wizard?.status==='absent' && s.prepared_node_context?.surface==='graph'});
-        const label=one(graph.ui.elements.filter(e=>e.tid===graph.prepared_node_context.tid+';Label;Label'
+        const execution=executeRequested?await executionDriver.identify():null;
+        let label;
+        if(nodeTitleRequest?.mode==='custom'){
+          const current=await operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline,ctx.signal);
+          const nodes=current.complete===true&&current.document_id===ctx.document_id
+            &&current.workflow_ref?.workflow_id===ctx.workflow_ref.workflow_id?current.nodes.filter(n=>n.ref.node_id===ctx.node.node_id):[];
+          const saved=nodes[0];
+          requireValue(nodes.length===1&&saved.type==='imports.text'&&saved.ref.document_id===ctx.document_id
+            &&saved.ref.workflow_id===ctx.workflow_ref.workflow_id&&saved.label===nodeTitleRequest.label,
+            'NODE_LABEL_NOT_PRESERVED: saved caption '+JSON.stringify(saved?.label??null)+' differs from '+JSON.stringify(nodeTitleRequest.label));
+          label=saved.label;
+        }else label=one(graph.ui.elements.filter(e=>e.tid===graph.prepared_node_context.tid+';Label;Label'
           &&e.graph_node?.part==='label'),'Configured Import caption is unavailable').graph_node.label_text;
         requireValue(typeof label==='string'&&label.length>0,'Configured Import caption is empty');
-        if(nodeTitleRequest?.mode==='custom')
-          requireValue(label===nodeTitleRequest.label,'NODE_LABEL_NOT_PRESERVED: Done left caption '+JSON.stringify(label)+' instead of '+JSON.stringify(nodeTitleRequest.label));
         if(sourceSwitch){
           await openPreparedWizard(channel);
           const reopened=await captureSwitchSchema();schemaAfter=reopened.schema;
@@ -800,7 +809,6 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
             return verified({effect_possible:true,mode,execution_started:true,settings_applied:true,execution_id:execution.execution_id,execution_group:execution,continuation_surface:continuationSurface,node_context:graph.prepared_node_context,node_label:label,package_saved:false,reopen_performed:true});
           }
         }
-        const execution=executeRequested?await executionDriver.identify():null;
         const continuationSurface=executeRequested?finishedImportSurface(await channel.observe({
           condition:'identified execution and graph continuity checkpoint',readProcesses:true,readOutputs:true,
           ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true&&s.node_outputs?.verified===true})):null;
