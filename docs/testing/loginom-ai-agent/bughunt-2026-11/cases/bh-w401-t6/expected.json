@@ -134,6 +134,6 @@
   "excel_artifact": {
     "filename": "regional-revenue.xlsx",
     "sheet_name": "Регионы",
-    "header": true
+    "header": "names"
   }
 }

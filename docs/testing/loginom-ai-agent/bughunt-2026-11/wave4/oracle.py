@@ -164,7 +164,7 @@ def regional_revenue(orders, clients):
     links.append(link("sort", "excel"))
     chain.turn("Выгрузи отсортированный результат в regional-revenue.xlsx на лист «Регионы», с заголовками region и total_revenue в таком порядке. Приложи книгу и покажи строки исходной сортировки.",
                nodes, links, [table(SORT, schema, sorted_rows, ordered=True, exact_columns=True)],
-               excel=dict(filename="regional-revenue.xlsx", sheet_name="Регионы", header=True))
+               excel=dict(filename="regional-revenue.xlsx", sheet_name="Регионы", header="names"))
     return chain
 
 
@@ -201,7 +201,7 @@ def item_totals(items):
     links.extend([link("group", "sort"), link("sort", "sample")])
     ordered = sorted(grouped, key=lambda row: (-row["total_amount"], row["product_id"]))
     assert len(ordered) > 10
-    chain.turn("Получи топ-10 товаров по total_amount, при равенстве выше ставь меньший product_id. Используй сортировку и выбор первых 10 строк, выполни и покажи результат.",
+    chain.turn("Получи топ-10 товаров: отсортируй по total_amount по убыванию и product_id по возрастанию, отбери первые 10 строк узлом «Сэмплинг» и покажи результат.",
                nodes, links, [table(SAMPLE, schema, ordered[:10], ordered=True)])
     return chain
 
