@@ -64,7 +64,7 @@ function fixture(direction='output') {
  }));
  const node={FGuid:'node',FCell:{},data:{},FLocked:false},port={FGuid:'port',FCell:{},FPortIndex:0,data:{},parent:node};node.FPorts=[{FCollection:[port]}];
  const graph=Object.assign(new ModelForm(),{FDiagram:{FNodes:{FCollection:[node]},FmxGraph:{container:root,
-  view:{getState:c=>({cell:c,shape:{node:c===node.FCell?nodeDom:portDom}})},getCellAt:()=>port.FCell}},FPortContextMenu:{el:{dom:menu}}});
+  view:{getState:c=>({cell:c,shape:{node:c===node.FCell?nodeDom:portDom}})},getCellAt:()=>port.FCell}},FPortContextMenu:{el:{dom:menu},hide:()=>{menu.visible=false;}}});
  const workflow={},packageNode={},nodeTree=Object.assign(new ModelNodeTreeNode(),{ParentNode:workflow,FGuid:'node',FModelNode:node.data});
  const group=Object.assign(new (direction==='input'?ModelInputPortsTreeNode:ModelOutputPortsTreeNode)(),{ParentNode:nodeTree}),portTree=Object.assign(new ModelPortTreeNode(),{ParentNode:group,FIndex:0,FModelNodePort:port.data});
  const wizardTree=Object.assign(new WizardTreeNode(),{ParentNode:portTree});
@@ -73,6 +73,7 @@ function fixture(direction='output') {
  const document={elementFromPoint:()=>flags.foreignHit?menu:portDom,querySelectorAll:q=>{
   if(q.startsWith('[data-tid=')){const t=JSON.parse(q.slice(10,-1));return elements.filter(e=>e.tid===t);}
   if(q.startsWith('[data-tid^=')){const t=JSON.parse(q.slice(11,-1));return elements.filter(e=>e.tid?.startsWith(t));}
+  if(q==='.x-menu')return [menu];
   if(q==='[role="dialog"],.x-message-box')return dialog.visible?[dialog]:[];
   if(q==='.x-mask,.x-mask-msg,.bg-mask-message')return flags.graphMasks??[];
   if(dialog.visible)return [dialog];
@@ -307,7 +308,7 @@ for(const fault of ['foreign-tid','foreign-native','foreign-workflow','foreign-n
  assert.equal(waits,['persistent','changed-owner'].includes(fault)?1:0);
 });
 
-for(const icon of ['groupdata','quality'])for(const stage of ['begin','menu_issued','open_issued'])test(icon+' waits for its bound graph mask at '+stage,async()=>{
+for(const icon of ['groupdata','quality','sorting','filterdata'])for(const stage of ['begin','menu_issued','open_issued'])test(icon+' waits for its bound graph mask at '+stage,async()=>{
  const f=fixture('input');let waits=0;
  const busy=()=>{groupingBusy(f);f.node.FIconCls='bg-vendor-icon-'+icon;};
  if(stage==='begin')busy();
@@ -331,15 +332,15 @@ for(const icon of ['groupdata','quality'])for(const stage of ['begin','menu_issu
  assert.ok(result.trace.some(x=>x.event==='input_port_graph_busy'&&x.mode===stage));
 });
 
-for(const variant of ['foreign-tid','foreign-native','foreign-workflow','foreign-node','foreign-mask','duplicate-root','other-node-type','dialog','persistent','changed-node'])test('Grouping busy mask refuses '+variant,async()=>{
+for(const variant of ['foreign-tid','foreign-native','foreign-workflow','foreign-node','foreign-mask','duplicate-root','dialog','persistent','changed-node'])test('Sort busy mask refuses '+variant,async()=>{
  const f=fixture('input'),panel=groupingBusy(f);
+ f.node.FIconCls='bg-vendor-icon-sorting';
  if(variant==='foreign-tid')panel.getAttribute=()=> 'other';
  if(variant==='foreign-native')f.graph.FView.el.dom={};
  if(variant==='foreign-workflow')f.card.Controller.Node.data.node={};
  if(variant==='foreign-node')f.node.FGuid='other';
  if(variant==='foreign-mask')f.flags.graphMasks.push({...panel,getAttribute:()=> 'foreign'});
  if(variant==='duplicate-root')f.el(panel.tid);
- if(variant==='other-node-type')f.node.FIconCls='bg-vendor-icon-other';
  if(variant==='dialog'){const attr=panel.getAttribute;panel.getAttribute=k=>k==='role'?'dialog':attr(k);}
  let waits=0;f.page.waitForTimeout=async()=>{
   waits++;
@@ -350,6 +351,81 @@ for(const variant of ['foreign-tid','foreign-native','foreign-workflow','foreign
  assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true);assert.deepEqual(f.gestures,[]);
  assert.equal(waits,['persistent','changed-node'].includes(variant)?1:0);
 });
+
+test('a persistent Sort graph mask has the same bounded wait as Calculator',async()=>{
+ const f=fixture('input');groupingBusy(f);f.node.FIconCls='bg-vendor-icon-sorting';
+ let waits=0;
+ f.page.waitForTimeout=async()=>{assert.ok(++waits<=150);};
+ const result=await f.run();
+ assert.equal(result.status,'NOT_APPLIED');
+ assert.match(result.error,/ModelForm remained busy/);
+ assert.equal(waits,150);
+ assert.deepEqual(f.gestures,[]);
+});
+
+for(const fault of ['blocker','wait-timeout','trial-error','click-error','lazy-menu','foreign-port','replacement','hide-noop','hide-error'])
+ test('menu-only input failure closes only the confirmed native menu: '+fault,async()=>{
+  const f=fixture('input'),native=f.graph.FPortContextMenu;
+  f.node.FIconCls='bg-vendor-icon-sorting';
+  let closes=0;
+  native.hide=()=>{
+   closes++;
+   if(fault==='hide-error')throw Error('Hide failed');
+   if(fault!=='hide-noop'){f.menu.visible=false;f.graph.FCurrentPortMenu=null;}
+  };
+  if(fault==='lazy-menu')delete f.graph.FPortContextMenu;
+  const click=f.page.mouse.click;
+  f.page.mouse.click=async(...args)=>{
+   await click(...args);
+   if(fault==='blocker')f.flags.graphMasks=[f.dialog],f.dialog.visible=true;
+   if(fault==='click-error')throw Error('Right click failed after dispatch');
+   if(fault==='lazy-menu')f.graph.FPortContextMenu=native;
+   if(fault==='foreign-port')f.graph.FCurrentPortMenu={};
+   if(fault==='replacement')f.graph.FPortContextMenu={...native,hide:()=>assert.fail('Replacement menu was hidden')};
+  };
+  const locator=f.page.locator;
+  f.page.locator=selector=>{
+   const control=locator(selector);
+   if(!selector.includes('mniConfigurePort'))return control;
+   if(fault==='wait-timeout')control.waitFor=async()=>{throw Error('Menu timed out');};
+   if(fault!=='blocker')control.click=async options=>{
+    assert.equal(options.trial,true);
+    throw Error('Trial click refused');
+   };
+   return control;
+  };
+  const result=await f.run(),clean=['blocker','wait-timeout','trial-error','click-error','lazy-menu'].includes(fault);
+  assert.equal(result.status,clean?'NOT_APPLIED':'AMBIGUOUS',result.error);
+  assert.equal(result.cleanup_complete,clean);
+  assert.equal(result.effect_possible,!clean);
+  assert.equal(f.menu.visible,!clean);
+  assert.equal(closes,['foreign-port','replacement'].includes(fault)?0:1);
+  assert.deepEqual(f.gestures,[f.portDom.tid]);
+  assert.ok(!result.trace.some(event=>event.event==='input_port_open_issued'));
+ });
+
+for(const fault of ['none','visible-menu','foreign-menu','foreign-port','foreign-wizard','foreign-graph','changed-port'])
+ test('reconcile a menu-only opening on its original graph: '+fault,async()=>{
+  const f=fixture('input');
+  f.page.locator=()=>({waitFor:async()=>{throw Error('Menu wait failed');}});
+  f.graph.FPortContextMenu.hide=()=>{};
+  const failed=await f.run();
+  assert.equal(failed.status,'AMBIGUOUS');
+  if(fault!=='visible-menu')f.menu.visible=false;
+  if(fault==='foreign-menu')f.el('mn');
+  if(fault==='foreign-port')f.graph.FCurrentPortMenu={};
+  if(fault==='foreign-wizard')f.el('MF;TF;WizrdMCF');
+  if(fault==='foreign-graph')f.card.Controller.FController={...f.graph};
+  if(fault==='changed-port')f.port.data={};
+  const result=await openPreparedOutputPort(f.page,{...f.task,reconcile_only:true},f.readNode);
+  assert.equal(result.status,fault==='none'?'SUCCEEDED':'NOT_APPLIED',result.error);
+  if(fault==='none'){
+   assert.equal(result.surface,'graph');
+   assert.equal(result.port_guid,'port');
+   assert.equal(f.prep.inputPortOpenReceipts.get('open').phase,'released');
+  }
+  assert.deepEqual(f.gestures,[f.portDom.tid]);
+ });
 
 test('Grouping deactivation question permits only the same bound busy graph',async()=>{
  for(const foreign of [false,true]){
@@ -424,7 +500,7 @@ test('active port opening confirms its bound question once and replay performs n
  const f=fixture();f.flags.deactivation=true;
  const result=await f.run();assert.equal(result.status,'SUCCEEDED',result.error);
  assert.deepEqual(f.gestures.slice(-1),['msgbox;tlb;yes']);assert.equal(f.gestures.length,3);
- assert.deepEqual(result.trace.map(t=>t.event),['output_port_reserved','output_port_menu_verified','output_port_open_issued','output_port_open_returned','output_port_deactivation_question_verified','output_port_deactivation_issued','output_port_wizard_verified']);
+ assert.deepEqual(result.trace.map(t=>t.event),['output_port_reserved','output_port_menu_issued','output_port_menu_verified','output_port_open_issued','output_port_open_returned','output_port_deactivation_question_verified','output_port_deactivation_issued','output_port_wizard_verified']);
  assert.equal((await f.run()).status,'SUCCEEDED');assert.equal(f.gestures.length,3);
 });
 
@@ -790,7 +866,7 @@ test('control input opening refuses a misleading native ordinal without a gestur
 test('pending port opening reports bounded observed state without another gesture',async()=>{
  const f=fixture();f.flags.holdOpen=true;f.page.waitForTimeout=async()=>{f.task.deadline=Date.now()-1;};
  const r=await f.run();assert.equal(r.status,'AMBIGUOUS');assert.equal(f.gestures.length,2);
- assert.deepEqual(r.trace.map(x=>x.event),['output_port_reserved','output_port_menu_verified','output_port_open_issued','output_port_open_returned','output_port_open_pending']);
+ assert.deepEqual(r.trace.map(x=>x.event),['output_port_reserved','output_port_menu_issued','output_port_menu_verified','output_port_open_issued','output_port_open_returned','output_port_open_pending']);
  const pending=r.trace.at(-1);assert.equal(pending.samples,1);assert.equal(pending.last.wizard_count,1);
  assert.deepEqual(Array.from(pending.last.wizard_visible),[false]);assert.equal(pending.last.controller_type,'ModelForm');
  assert.equal(pending.last.port_menu_same,true);assert.equal(pending.last.node_locked,false);
@@ -930,10 +1006,8 @@ for(const stage of ['begin','menu_issued','open_issued'])test('Import variables 
  const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(waits,3);assert.equal(f.gestures.length,2);
  assert.ok(r.trace.some(t=>t.event==='input_port_graph_busy'&&t.mode===stage&&t.samples===3));
 });
-for(const fault of ['data-input','control-input','foreign-tid','foreign-native','foreign-workflow','foreign-node','foreign-mask','duplicate-root','dialog','persistent','changed-owner'])test('Import variable graph wait refuses '+fault,async()=>{
+for(const fault of ['foreign-tid','foreign-native','foreign-workflow','foreign-node','foreign-mask','duplicate-root','dialog','persistent','changed-owner'])test('Import variable graph wait refuses '+fault,async()=>{
  const {f,panel}=importVariablesBusy();
- if(fault==='data-input')delete f.task.kind;
- if(fault==='control-input')f.task.kind='control';
  if(fault==='foreign-tid')panel.getAttribute=()=> 'foreign';
  if(fault==='foreign-native')f.graph.FView.el.dom={};
  if(fault==='foreign-workflow')f.card.Controller.Node.data.node={};
@@ -966,10 +1040,8 @@ for(const stage of ['begin','menu_issued','open_issued'])test('REST variables in
  const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(waits,3);assert.equal(f.gestures.length,2);
  assert.ok(r.trace.some(t=>t.event==='input_port_graph_busy'&&t.mode===stage&&t.samples===3));
 });
-for(const fault of ['data-input','control-input','foreign-tid','foreign-native','foreign-workflow','foreign-node','foreign-mask','duplicate-root','dialog','persistent','changed-owner','locked-node'])test('REST variable graph wait refuses '+fault,async()=>{
+for(const fault of ['foreign-tid','foreign-native','foreign-workflow','foreign-node','foreign-mask','duplicate-root','dialog','persistent','changed-owner','locked-node'])test('REST variable graph wait refuses '+fault,async()=>{
  const {f,panel}=restVariablesBusy();
- if(fault==='data-input')delete f.task.kind;
- if(fault==='control-input')f.task.kind='control';
  if(fault==='foreign-tid')panel.getAttribute=()=> 'foreign';
  if(fault==='foreign-native')f.graph.FView.el.dom={};
  if(fault==='foreign-workflow')f.card.Controller.Node.data.node={};

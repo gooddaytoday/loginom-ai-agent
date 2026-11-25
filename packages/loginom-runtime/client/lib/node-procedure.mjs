@@ -458,18 +458,19 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     },
     async openOutputPort(port) {return channel.openPort('output',port);},
     async openInputPort(port) {return channel.openPort('input',port);},
-    async reconcileInputPortOpening(reference) {
+    async reconcileInputPortOpening(reference,{port,native_index,port_guid,surface}) {
       checkBudget();
       if(!preparedNodeContext||reference.action_key!=='node.input_port.open.internal'
         ||reference.id!==reference.operation_id||!reference.operation_id?.startsWith(operation.id+':n'))
         throw Error('The original input opening receipt is required');
-      const code=makePreparedInputPortReconcileCode(preparedNodeContext,{port:0,operation_id:reference.operation_id,
+      const code=makePreparedInputPortReconcileCode(preparedNodeContext,{port,operation_id:reference.operation_id,
         origin:targetOrigin,build:targetBuild,deadline:operation.deadline});
       const owner=await execute(code,{timeout:Math.max(1,operation.deadline-now())});
       checkBudget();
       await entry('node_port_opening_reconciled',{reference:structuredClone(reference),outcome:structuredClone(owner)});
       if(owner?.status!=='SUCCEEDED'||owner.verified!==true||owner.cleanup_complete!==true
-        ||owner.opening_operation_id!==reference.operation_id||owner.direction!=='input'||owner.port!==0||owner.native_index!==0
+        ||owner.opening_operation_id!==reference.operation_id||owner.direction!=='input'||owner.port!==port||owner.native_index!==native_index
+        ||owner.port_guid!==port_guid||owner.surface!==surface
         ||owner.document_id!==preparedNodeContext.document_id||owner.workflow_id!==preparedNodeContext.workflow_ref.workflow_id
         ||owner.node_id!==preparedNodeContext.node.node_id)throw Error('The stopped input opening owner could not be reconciled');
       return structuredClone(owner);

@@ -389,19 +389,26 @@ const stop=async(f,phase)=>{
  return job;
 };
 
-for(const type of ['exports.text','exports.excel','exports.lgd'])
-for(const foreign of [false,true])test('abandon_operation after '+type+' input opening failure, foreign owner='+foreign,async()=>{
- const receipt={status:'AMBIGUOUS',action_key:'node.input_port.open.internal',action_revision:'1',operation_id:'apply:n7',
-  phase:'port_open',effect_possible:true,cleanup_complete:false,output:{verified:false,cleanup_complete:false},
+for(const [type,stage,port,nativeIndex] of [
+ ['exports.text','wizard',0,0],['exports.excel','wizard',0,0],['exports.lgd','wizard',0,0],
+ ['transform.sorting','wizard',0,0],['transform.join_data','wizard',1,2],
+ ['transform.sorting','menu',0,0],['transform.sorting','clean-menu',0,0],['transform.sorting','legacy-menu',0,0],
+])
+for(const foreign of [false,true])test('abandon_operation after '+type+' input '+stage+' failure, foreign owner='+foreign,async()=>{
+ const wizard=stage==='wizard',clean=stage==='clean-menu',legacy=stage==='legacy-menu';
+ const receipt={status:clean?'NOT_APPLIED':'AMBIGUOUS',action_key:'node.input_port.open.internal',action_revision:'1',operation_id:'apply:n7',
+  phase:'port_open',effect_possible:!clean,cleanup_complete:clean,output:{verified:false,effect_possible:!clean,cleanup_complete:clean},
   error:{code:'OUTPUT_PORT_OPEN_UNCONFIRMED',message:'Opened port wizard owner differs'},
-  trace:[{event:'input_port_reserved',port_guid:'port',native_index:0},{event:'input_port_open_issued',port_guid:'port'},
-   {event:'input_port_open_returned'}]};
- const ui=surface({wizard:true,foreign});const observe=ui.channel.observe;
+  trace:[{event:'input_port_reserved',port_guid:'port',native_index:nativeIndex,...((legacy||type.startsWith('exports.'))?{}:{port})},
+   ...(!legacy&&!type.startsWith('exports.')?[{event:'input_port_menu_issued'}]:[]),
+   ...(wizard?[{event:'input_port_open_issued',port_guid:'port'},{event:'input_port_open_returned'}]:[]),
+   ...(clean?[{event:'input_port_menu_closed'}]:[])]};
+ const ui=surface({wizard:wizard||foreign,foreign});const observe=ui.channel.observe;
  ui.channel.observe=async options=>{
   const s=await observe(options);
   if(s.wizard.status==='observed'){
    s.wizard.stage='input_mapping';
-   s.prepared_node_context.input_port={direction:'input',port:0,native_index:0,port_guid:'port',opening_operation_id:'apply:n7'};
+   s.prepared_node_context.input_port={direction:'input',port,native_index:nativeIndex,port_guid:'port',opening_operation_id:'apply:n7'};
   }
   return s;
  };
@@ -415,11 +422,12 @@ for(const foreign of [false,true])test('abandon_operation after '+type+' input o
   action:{action_key:'node.apply',revision:'1'}},preparedNodeContext:{document_id:'doc',workflow_ref:workflow,node},
   targetOrigin:'http://test',targetBuild:'7.4.2',record:async e=>e,execute:async code=>{
    assert.ok(code.includes('"reconcile_only":true'));assert.ok(code.includes('"operation_id":"apply:n7"'));
-   if(foreign)throw Error('Opened port wizard owner differs');
-   return {status:'SUCCEEDED',verified:true,cleanup_complete:true,...node,direction:'input',port:0,native_index:0,
-    port_guid:'port',opening_operation_id:'apply:n7'};
+   assert.ok(code.includes('"port":'+port));
+   if(foreign&&wizard)throw Error('Opened port wizard owner differs');
+   return {status:'SUCCEEDED',verified:true,cleanup_complete:true,...node,direction:'input',port,native_index:nativeIndex,
+    port_guid:'port',opening_operation_id:'apply:n7',surface:wizard?'wizard':'graph'};
   }});
- ui.channel.reconcileInputPortOpening=reference=>channel.reconcileInputPortOpening(reference);
+ ui.channel.reconcileInputPortOpening=(...args)=>channel.reconcileInputPortOpening(...args);
  f.drivers.mapPorts=async()=>{
   f.calls.push('mapping');f.context().operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:receipt.action_key};
   throw new NodeProcedureStepError(receipt);
@@ -433,12 +441,12 @@ for(const foreign of [false,true])test('abandon_operation after '+type+' input o
   assert.equal(f.runtime.hasUnsettledWork(),true);assert.deepEqual(ui.gestures,[]);
  }else{
   assert.equal(released.status,'SUCCEEDED',JSON.stringify(released));
-  assert.equal(released.output.original_outcome.output.configuration.status,'unknown');
+  assert.equal(released.output.original_outcome.output.configuration.status,wizard&&!type.startsWith('exports.')?'discarded':'unknown');
   assert.equal(released.output.original_outcome.cleanup_complete,true);assert.equal(f.runtime.hasUnsettledWork(),false);
-  f.runtime.assertPreparationAllowed();assert.deepEqual(ui.gestures,[{verb:'click',ref:'ui-close'}]);
+  f.runtime.assertPreparationAllowed();assert.deepEqual(ui.gestures,wizard?[{verb:'click',ref:'ui-close'}]:[]);
   assert.deepEqual(await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-input'}),released);
  }
- assert.equal(f.calls.filter(c=>c==='mapping').length,1);assert.equal(receipt.cleanup_complete,false);
+ assert.equal(f.calls.filter(c=>c==='mapping').length,1);assert.equal(receipt.cleanup_complete,clean);
 });
 
 for(const fault of [null,'foreign','transport','cleanup'])test('JSON configure refusal releases only its own settled draft: '+fault,async()=>{

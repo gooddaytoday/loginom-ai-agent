@@ -30,7 +30,7 @@ function makePreparedPortOpenCode(binding,options,direction,reconcileOnly=false)
 // Proxy objects are compared by reference only; no proxy property/method is used.
 export async function openPreparedOutputPort(page,task,readNode=readPreparedNodeContext) {
  let effect=false;const trace=[],direction=task.direction??'output';
- const remaining=()=>{const n=task.deadline-Date.now();if(n<=0)throw Error('Output port opening deadline');return n;};
+ const remaining=(deadline=task.deadline)=>{const n=Math.min(deadline,task.deadline)-Date.now();if(n<=0)throw Error('Output port opening deadline');return n;};
  const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
  const inspect=mode=>page.evaluate(({task,mode})=>{
   const direction=task.direction??'output',input=direction==='input',control=task.kind==='control',variables=task.kind==='variables';
@@ -49,10 +49,8 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   if(!prepared||records.some(r=>r.tab!==prepared.tab||r.packageNode!==prepared.packageNode)
     ||tabs.length!==1||tabs[0]!==prepared.tab||!tabs[0].classList.contains('x-tab-active'))fail('Port opening workflow changed');
   const card=app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),model=card?.Controller?.FController;
-  const calculatorInput=input&&!control&&!variables&&model?.FDiagram?.FNodes?.FCollection?.some(n=>n.FGuid===b.node.node_id&&n.FIconCls==='bg-vendor-icon-calcdata');
-  // REST variables input follows its data input mapping Done on the same graph (LAB-1963).
-  const restVariablesInput=variables&&input&&model?.FDiagram?.FNodes?.FCollection?.some(n=>n.FGuid===b.node.node_id&&n.FIconCls==='bg-vendor-icon-restclient');
-  const ownGroupingGraphMask=e=>{
+  const visible=e=>e?.checkVisibility({checkVisibilityCSS:true});
+  const ownGraphMask=e=>{
    const roots=exact(b.workflow_ref.prefix+';ModelForm'),diagrams=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
    const nodes=model?.FDiagram?.FNodes?.FCollection?.filter(n=>n.FGuid===b.node.node_id);
    const user=variables&&!input&&task.port===4&&prepared.nodeTargetWorkflowNode.ParentNode instanceof app.ModelUnitItemTreeNode;
@@ -61,17 +59,16 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     &&diagrams.length===1&&model.FDiagram.FmxGraph.container===diagrams[0]&&e.contains(diagrams[0])
     &&e.classList?.contains('bg-mask-message')===true&&!e.classList.contains('x-mask')&&!e.classList.contains('x-mask-msg')
     &&e.getAttribute('role')!=='dialog'&&nodes?.length===1&&nodes[0].FLocked===false
-    &&(calculatorInput||variables&&input&&['bg-vendor-icon-importtextfile','bg-vendor-icon-importexcelfile','bg-vendor-icon-restclient'].includes(nodes[0].FIconCls)
-      ||(user?nodes[0].FIconCls==='bg-vendor-icon-modelvariables':['bg-vendor-icon-quality','bg-vendor-icon-groupdata'].includes(nodes[0].FIconCls)))
+    &&(input||nodes[0].FIconCls==='bg-vendor-icon-modelvariables')
     &&(!r||r.graph===model&&r.workflow===prepared.nodeTargetWorkflowNode&&r.packageNode===prepared.packageNode
       &&r.node===nodes[0]&&r.node.data===r.nodeData&&r.port.parent===r.node&&r.port.data===r.portData&&r.port.FGuid===r.portGuid
       &&(r.port.FPortIndex===undefined||r.port.FPortIndex===r.nativeIndex));
   };
+  const visibleMenus=()=>[...new Set([...exact('mn'),...document.querySelectorAll('.x-menu')])].filter(visible);
   if(['await_open','deactivation_issued'].includes(mode)) {
    if(!r||r.phase!=='open_issued'||r.workflow!==prepared.nodeTargetWorkflowNode||r.packageNode!==prepared.packageNode
      ||r.node.FGuid!==r.node_id||r.node.data!==r.nodeData||r.port.FGuid!==r.portGuid||r.port.data!==r.portData
      ||r.port.parent!==r.node||r.port.FPortIndex!==undefined&&r.port.FPortIndex!==r.nativeIndex)fail('Port confirmation identity changed');
-   const visible=e=>e.checkVisibility({checkVisibilityCSS:true});
    const dialogs=[...document.querySelectorAll('[role="dialog"],.x-message-box')].filter(visible);
    if(!dialogs.length) {
     if(mode==='deactivation_issued')fail('Port confirmation disappeared before gesture');
@@ -87,7 +84,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
      controller:typeof model?.constructor?.name==='string'?model.constructor.name.slice(0,64):null,
      wizard_visible:exact(b.workflow_ref.prefix+';WizrdMCF').some(visible)}));
    const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible);
-   if(masks.some(e=>!ownGroupingGraphMask(e)&&!(e.classList.contains('bg-mask-message')&&e.getAttribute('data-tid')===b.workflow_ref.prefix
+   if(masks.some(e=>!ownGraphMask(e)&&!(e.classList.contains('bg-mask-message')&&e.getAttribute('data-tid')===b.workflow_ref.prefix
        &&e.contains(r.graph.FDiagram.FmxGraph.container))
      &&!(e.classList?.contains('x-mask')===true&&e.classList?.contains('x-mask-msg')!==true&&!e.textContent.trim()
        &&e.parentElement?.getAttribute('data-tid')==='MF')))fail('Port confirmation has an unrelated mask');
@@ -109,6 +106,36 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    return {deactivation:true,phase:r.phase,port_guid:r.portGuid,node_id:r.node_id,confirmation_controls:confirmationControls};
   }
   if(mode==='lookup')return r?{phase:r.phase,port_guid:r.port.FGuid}:null;
+  if(['cleanup_menu','verify_menu_closed','reconcile_menu'].includes(mode)) {
+   if(!r||(r.phase!=='menu_issued'&&!(mode==='reconcile_menu'&&r.phase==='released'&&r.menuClosed)))return null;
+   const diagram=model?.FDiagram,roots=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
+   const nodes=diagram?.FNodes?.FCollection?.filter(n=>n.FGuid===b.node.node_id);
+   if(model!==r.graph||card.Controller.Node?.data?.node!==r.workflow||r.workflow!==prepared.nodeTargetWorkflowNode
+    ||r.packageNode!==prepared.packageNode||roots.length!==1||diagram?.FmxGraph?.container!==roots[0]
+    ||r.menuGraphRoot&&r.menuGraphRoot!==roots[0]
+    ||nodes?.length!==1||nodes[0]!==r.node||r.node.data!==r.nodeData||r.node.FLocked!==false
+    ||!r.node.FPorts.some(group=>group.FCollection.includes(r.port))||r.port.parent!==r.node||r.port.data!==r.portData
+    ||r.port.FGuid!==r.portGuid||r.portCell!==undefined&&r.port.FCell!==r.portCell
+    ||r.port.FPortIndex!==undefined&&r.port.FPortIndex!==r.nativeIndex)fail('Retained port menu graph changed');
+   const menu=model.FPortContextMenu,dom=menu?.el?.dom,menus=visibleMenus(),owner=model.FCurrentPortMenu;
+   if(r.menu&&r.menu!==menu||r.menuDom&&r.menuDom!==dom||owner!=null&&owner!==r.port)fail('Retained port menu owner changed');
+   if(exact(b.workflow_ref.prefix+';WizrdMCF').some(visible))fail('Port menu no longer rests on its graph');
+   if(menus.length||visible(dom)){
+    if(mode!=='cleanup_menu'||menus.length!==1||menus[0]!==dom||!exact('mn').includes(dom)||!visible(dom)
+     ||owner!==r.port||globalThis.Ext?.getCmp?.(dom.id)!==menu||typeof menu.hide!=='function')fail('Original port menu closure unconfirmed');
+    r.menu=menu;r.menuDom=dom;
+    menu.hide();
+    return {hide_issued:true};
+   }
+   if(mode==='reconcile_menu'){
+    const blockers=[...document.querySelectorAll('[role="dialog"],.bg-dialog,.x-message-box,.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible);
+    if(blockers.some(e=>!ownGraphMask(e)))fail('Original port menu graph is blocked');
+    if(blockers.length)return {reason:'port_graph_busy'};
+   }
+   r.menuClosed=true;r.phase='released';
+   return {phase:r.phase,verified:true,surface:'graph',document_id:r.document_id,workflow_id:r.workflow_id,node_id:r.node_id,
+    direction,port:r.portIndex,native_index:r.nativeIndex,port_guid:r.portGuid,opening_operation_id:r.operation_id};
+  }
   const blockers=[...document.querySelectorAll('[role="dialog"],.x-mask,.x-mask-msg,.bg-mask-message')].filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
   const blocked=blockers.find(e=>{
    const parent=e.parentElement,column=parent&&globalThis.Ext?.getCmp?.(parent.id),roots=exact(b.workflow_ref.prefix+';WizrdMCF'),grid=exact(b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;grdTargetColumns');
@@ -134,7 +161,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     &&roots.length===1&&model?.FView?.el?.dom===roots[0]&&roots[0].contains(parent)
     &&column?.el?.dom===parent&&column.disabled===true
     &&blockers.filter(mask=>mask.parentElement===parent).length===1;
-   return !ownDisabledHeader&&!ownDisabledOutputHeader&&!ownGroupingGraphMask(e);
+   return !ownDisabledHeader&&!ownDisabledOutputHeader&&!ownGraphMask(e);
   });
   if(blocked){
    if(mode==='finish')return {pending:true,reason:'port_wizard_loading'};
@@ -152,9 +179,8 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    }catch{}
    fail('Port opening blocked'+detail);
   }
-  // Grouping/rename, Calculator input mapping or user-variable Done can leave its native graph busy. Wait
-  // for this exact surface to settle; never issue a port gesture through it.
-  if(mode!=='release_read'&&blockers.some(ownGroupingGraphMask))return {pending:true,reason:'port_graph_busy',...(calculatorInput||restVariablesInput?{sample_limit:150}:{})};
+  // Graph refresh and port Done can leave this exact ModelForm busy.
+  if(mode!=='release_read'&&blockers.some(ownGraphMask))return {pending:true,reason:'port_graph_busy'};
   if(mode==='begin') {
    if(r)fail('Port opening already reserved');
    if(receipts.size>=128)fail('Port opening receipt bound exceeded');
@@ -205,13 +231,13 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
       ||previous.cell!==target.port.FCell||previous.guid!==target.port.FGuid||previous.data!==target.port.data||previous.tid!==target.tid)fail('Retained builtin user output identity changed');
    }
    if(variables&&input&&(target.port.FType!==0||target.port.FSubType!==3))fail('Variable input native kind changed');
-   if(exact('mn').some(e=>e.checkVisibility({checkVisibilityCSS:true})))fail('An existing context menu is open');
+   if(visibleMenus().length)fail('An existing context menu is open');
    const rec={direction,...(variables?{kind:'variables'}:{}),request:JSON.stringify(b)+':'+task.port,phase:'reserved',graph:model,node,nodeData:node.data,
-    port:target.port,portData:target.port.data,portGuid:target.port.FGuid,portDom:target.dom,
+    port:target.port,portData:target.port.data,portGuid:target.port.FGuid,portCell:target.port.FCell,portDom:target.dom,
     portTid:target.tid,nativeIndex:target.nativeIndex,portIndex:task.port,workflow:prepared.nodeTargetWorkflowNode,packageNode:prepared.packageNode,
     document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,operation_id:task.operation_id,
     mappingRead:input&&variables&&task.read_only===true};
-   receipts.set(task.operation_id,rec);return {phase:rec.phase,port_tid:rec.portTid,port_guid:rec.port.FGuid,native_index:rec.nativeIndex};
+   receipts.set(task.operation_id,rec);return {phase:rec.phase,port:rec.portIndex,port_tid:rec.portTid,port_guid:rec.port.FGuid,native_index:rec.nativeIndex};
   }
   if(!r||r.workflow!==prepared.nodeTargetWorkflowNode||r.packageNode!==prepared.packageNode)fail('Port opening receipt missing or changed');
   if(r.node.FGuid!==r.node_id||r.node.data!==r.nodeData||r.port.FGuid!==r.portGuid||r.port.data!==r.portData
@@ -336,15 +362,19 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     }catch{}
     fail('Port has no observed interaction point'+detail);
    }
-   r.portDom=dom;r.phase='menu_issued';return {phase:r.phase,point};
+   if(visibleMenus().length)fail('An existing context menu is open');
+   r.portDom=dom;r.menuGraphRoot=graph.container;r.menu=model.FPortContextMenu;r.menuDom=r.menu?.el?.dom;
+   r.phase='menu_issued';return {phase:r.phase,point};
   }
   if(mode==='menu'||mode==='open_issued') {
    const visible=e=>e.checkVisibility({checkVisibilityCSS:true});
    const menus=exact('mn').filter(visible),buttons=exact('mn;mniConfigurePort').filter(visible),menu=r.graph.FPortContextMenu;
    if(r.phase!=='menu_issued'||model!==r.graph||model.FCurrentPortMenu!==r.port||r.port.parent!==r.node
     ||menus.length!==1||menu?.el?.dom!==menus[0]||globalThis.Ext?.getCmp?.(menus[0].id)!==menu
+    ||r.menu&&r.menu!==menu||r.menuDom&&r.menuDom!==menus[0]
     ||!menus[0].checkVisibility({checkVisibilityCSS:true})||buttons.length!==1||!menus[0].contains(buttons[0])
     ||!buttons[0].checkVisibility({checkVisibilityCSS:true})||buttons[0].closest('.x-item-disabled,.x-menu-item-disabled'))fail('Port menu owner changed');
+   r.menu=menu;r.menuDom=menus[0];
    if(mode==='open_issued')r.phase='open_issued';return {phase:r.phase,port_guid:r.port.FGuid};
   }
   if(mode==='finish') {
@@ -387,16 +417,18 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   }
   fail('Unknown port opening phase');
  },{task,mode});
- const settled=async mode=>{
-  let busy;
-  while(remaining()>0){
-   const result=await inspect(mode);if(result.reason!=='port_graph_busy')return result;
-   if(!busy){busy={event:direction+'_port_graph_busy',mode,samples:0};trace.push(busy);}
-   if(result.sample_limit&&busy.samples>=result.sample_limit)throw Error('Port opening blocked: ModelForm remained busy');
-   busy.samples++;await page.waitForTimeout(Math.min(100,remaining()));
+ const settled=async(mode,deadline)=>{
+  let busy,maskDeadline;
+  while(remaining(deadline)>0){
+   const result=await inspect(mode);if(result?.reason!=='port_graph_busy')return result;
+   if(!busy){busy={event:direction+'_port_graph_busy',mode,samples:0};trace.push(busy);maskDeadline=Date.now()+15000;}
+   const maskRemaining=maskDeadline-Date.now();
+   if(busy.samples>=150||maskRemaining<=0)throw Error('Port opening blocked: ModelForm remained busy');
+   busy.samples++;await page.waitForTimeout(Math.min(100,maskRemaining,remaining(deadline)));
   }
  };
- const finish=async()=>{while(remaining()>0){const result=await inspect('finish');if(!result.pending)return result;await page.waitForTimeout(Math.min(100,remaining()));}};
+ const finish=async()=>{while(remaining()>0){const result=await settled('finish');if(!result.pending)return result;await page.waitForTimeout(Math.min(100,remaining()));}};
+ let menuPending=false;
  try {
   if(task.release_read){
    remaining();
@@ -409,9 +441,14 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   // Cleanup may reconcile a completed opening failure, but must never open a
   // port or confirm deactivation. Reuse all native finish ownership checks.
   if(task.reconcile_only){
+   if(existing&&['menu_issued','released'].includes(existing.phase)){
+    const result=await settled('reconcile_menu');
+    if(!result)throw Error('No stopped port menu to reconcile');
+    return {status:'SUCCEEDED',...result,effect_possible:false,cleanup_complete:true,trace};
+   }
    if(!existing||!['open_issued','deactivation_issued','verified'].includes(existing.phase))throw Error('No issued port opening to reconcile');
    const result=await finish();
-   return {status:'SUCCEEDED',...result,effect_possible:false,cleanup_complete:true,trace};
+   return {status:'SUCCEEDED',...result,surface:'wizard',effect_possible:false,cleanup_complete:true,trace};
   }
   if(existing?.phase==='reserved'){await inspect('release_reserved');existing=null;}
   if(existing?.phase==='released')throw Error('Port opening was released');
@@ -446,12 +483,17 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    }
    trace.push({event:direction+'_port_tooltip_cleared'});
   }
-  remaining();effect=true;
+  menuPending=true;effect=true;
+  trace.push({event:direction+'_port_menu_issued'});
+  // Leave part of the original deadline for native hide and readback.
+  const menuDeadline=task.deadline-Math.min(1000,Math.ceil(remaining()/4));
+  remaining(menuDeadline);
   await page.mouse.click(issued.point.x,issued.point.y,{button:'right'});
-  await page.locator('[data-tid="mn;mniConfigurePort"]:visible').waitFor({state:'visible',timeout:remaining()});
-  trace.push({event:direction+'_port_menu_verified',...await settled('menu')});
-  await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({trial:true,timeout:remaining()});
-  trace.push({event:direction+'_port_open_issued',...await settled('open_issued')});
+  await page.locator('[data-tid="mn;mniConfigurePort"]:visible').waitFor({state:'visible',timeout:remaining(menuDeadline)});
+  trace.push({event:direction+'_port_menu_verified',...await settled('menu',menuDeadline)});
+  await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({trial:true,timeout:remaining(menuDeadline)});
+  trace.push({event:direction+'_port_open_issued',...await settled('open_issued',menuDeadline)});
+  menuPending=false;
   await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({timeout:remaining()});
   trace.push({event:direction+'_port_open_returned'});
   let pendingObservation;
@@ -476,6 +518,19 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   await at(task.binding.workflow_ref.prefix+';WizrdMCF').waitFor({state:'visible',timeout:remaining()});
   const result=await finish();trace.push({event:direction+'_port_wizard_verified',...result});
   return {status:'SUCCEEDED',...result,effect_possible:true,cleanup_complete:true,replayed:false,trace};
- }catch(error){if(!effect&&!task.reconcile_only&&!task.release_read){try{await inspect('release_reserved');}catch{}}return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,
-  error:String(error.message).slice(0,500),trace};}
+ }catch(error){
+  if(menuPending){
+   try{
+    const cleanup=await inspect('cleanup_menu');
+    const closed=cleanup?.hide_issued?await inspect('verify_menu_closed'):cleanup;
+    if(closed?.verified===true){
+     trace.push({event:direction+'_port_menu_closed'});effect=false;
+    }
+   }catch{}
+  }else if(!effect&&!task.reconcile_only&&!task.release_read){
+   try{await inspect('release_reserved');}catch{}
+  }
+  return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,
+   error:String(error?.message??error).slice(0,500),trace};
+ }
 }

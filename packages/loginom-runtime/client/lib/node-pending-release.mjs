@@ -145,16 +145,10 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
    &&['wizard_step','set_wizard_field'].includes(gestures[0].verb)
    &&['WIZARD_STEP_NOT_CONFIRMED','WIZARD_FIELD_NOT_CONFIRMED'].includes(r.error?.code);
   variableDraft=calculatorVariableMappingRefusal(operation,r);
-  const ref=operation.lastReceipt,portTrace=r?.trace??[];
-  const inputOpening=state.pending.phase==='input_mapping'&&['exports.text','exports.excel','exports.lgd'].includes(state.request.target?.type)
-   &&ref.action_key==='node.input_port.open.internal'&&ref.id===ref.operation_id&&typeof ref.operation_id==='string'
-   &&ref.operation_id.startsWith(operation.id+':n')&&r?.operation_id===ref.operation_id&&r.action_key===ref.action_key
-   &&r.phase==='port_open'&&r.status==='AMBIGUOUS'&&r.effect_possible===true&&r.cleanup_complete===false
-   &&r.output?.verified===false&&r.output.cleanup_complete===false&&r.error?.code==='OUTPUT_PORT_OPEN_UNCONFIRMED'
-   &&portTrace.filter(e=>e.event==='input_port_reserved'&&e.native_index===0&&typeof e.port_guid==='string'&&e.port_guid).length===1
-   &&portTrace.filter(e=>e.event==='input_port_open_issued').length===1
-   &&portTrace.filter(e=>e.event==='input_port_open_returned').length===1;
-  const draft=restDraft||exportDraft||wizardDraft||variableDraft||inputOpening;
+  const ref=operation.lastReceipt,inputOpening=stoppedInputOpening(operation,r);
+  if(ref.action_key==='node.input_port.open.internal'&&r?.trace?.some(e=>e.event==='input_port_menu_closed'))
+   requireValue(inputOpening?.surface==='graph','The port-menu cleanup receipt identity changed');
+  const draft=restDraft||exportDraft||wizardDraft||variableDraft||!!inputOpening;
   draftReceipt=draft;
   const mappingReadCleanup=response?.state==='completed'&&await settleImportMappingRead({operation,channel,receipt:r});
   requireValue(response?.state==='completed'&&(r?.cleanup_complete===true||draft||mappingReadCleanup?.cleanup_complete===true),
@@ -170,8 +164,8 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
     'The completed draft receipt identity changed');
   }
   if(inputOpening){
-   portOpening=await channel.reconcileInputPortOpening(ref);
-   requireValue(portOpening.port_guid===portTrace.find(e=>e.event==='input_port_reserved').port_guid,
+   portOpening=await channel.reconcileInputPortOpening(ref,inputOpening);
+   requireValue(portOpening.port_guid===inputOpening.port_guid,
     'The stopped input opening port identity changed');
   }
   const graphReturn=n?.surface==='graph'&&w?.status==='absent'
@@ -215,11 +209,14 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   &&current.prepared_node_context?.input_port?.node_icon_class==='bg-vendor-icon-calcdata'
   &&current.prepared_node_context.input_port.opening_operation_id===operation.lastReceipt.operation_id+':port',
   'The stopped Calculator variable port owner changed');
- if(portOpening)requireValue(current.wizard?.status==='observed'&&current.wizard.stage==='input_mapping'
+ if(portOpening?.surface==='graph')requireValue(current.wizard?.status==='absent'
+  &&sameNode(current.prepared_node_context,node)&&current.prepared_node_context.surface==='graph'
+  &&current.prepared_node_context.locked===false,'The stopped input port is no longer on its original graph');
+ else if(portOpening)requireValue(current.wizard?.status==='observed'&&current.wizard.stage==='input_mapping'
   &&sameNode(current.prepared_node_context,node)&&current.prepared_node_context.surface==='wizard'
   &&['direction','port','native_index','port_guid','opening_operation_id'].every(key=>
    current.prepared_node_context.input_port?.[key]===(key==='direction'?'input':portOpening[key])),
-  'The stopped export input port owner changed');
+  'The stopped input port wizard owner changed');
  if(current.wizard.status==='observed'){
   if(current.prepared_node_context?.surface!=='wizard'||!sameNode(current.prepared_node_context,node))
    throw new NodeReleaseBlocked('A Loginom wizard of another node is open',
@@ -234,6 +231,31 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  if(current.wizard.status==='absent'&&current.prepared_node_context?.surface==='views'&&sameNode(current.prepared_node_context,node))
   cleanup.views_returned=(await returnFromNodeViews(channel,node)).returned;
  return verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup,openingConfirmation});
+}
+
+function stoppedInputOpening(operation,r){
+ const ref=operation.lastReceipt;
+ if(operation.nodeApply.pending.phase!=='input_mapping'||ref.action_key!=='node.input_port.open.internal'
+  ||typeof ref.operation_id!=='string'||ref.id!==ref.operation_id||!ref.id.startsWith(operation.id+':n')
+  ||r?.operation_id!==ref.id||r.action_key!==ref.action_key||r.phase!=='port_open'
+  ||r.output?.verified!==false||r.error?.code!=='OUTPUT_PORT_OPEN_UNCONFIRMED'||!Array.isArray(r.trace))return null;
+ const count=name=>r.trace.filter(e=>e.event==='input_port_'+name).length;
+ const reservations=r.trace.filter(e=>e.event==='input_port_reserved');
+ const reservation=reservations[0],nativeIndex=reservation?.native_index,portGuid=reservation?.port_guid;
+ // Older receipts omitted the logical port. Only their original 0/0 route
+ // can be inferred; the browser still has to match the native receipt.
+ const port=reservation?.port??(nativeIndex===0?0:undefined);
+ if(reservations.length!==1||!Number.isInteger(port)||port<0||port>99
+  ||!Number.isInteger(nativeIndex)||nativeIndex<0||nativeIndex>99||typeof portGuid!=='string'||!portGuid)return null;
+ const opened=count('open_issued'),returned=count('open_returned'),menuIssued=count('menu_issued'),menuClosed=count('menu_closed');
+ const ambiguous=r.status==='AMBIGUOUS'&&r.effect_possible===true&&r.cleanup_complete===false&&r.output.cleanup_complete===false;
+ const cleanMenu=r.status==='NOT_APPLIED'&&r.effect_possible===false&&r.cleanup_complete===true
+  &&r.output.cleanup_complete===true&&r.output.effect_possible===false&&menuIssued===1&&menuClosed===1;
+ if(ambiguous&&opened===1&&returned===1&&menuIssued<=1&&menuClosed===0)
+  return {surface:'wizard',port,native_index:nativeIndex,port_guid:portGuid};
+ if(opened===0&&returned===0&&(cleanMenu||ambiguous&&menuIssued<=1&&menuClosed===0))
+  return {surface:'graph',port,native_index:nativeIndex,port_guid:portGuid};
+ return null;
 }
 
 // Browser recovery owns manual cleanup; this verifier observes only and never
