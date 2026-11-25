@@ -23,7 +23,11 @@ const inspectPythonSourcePolicy=source=>{corpus.add(source);return inspectPolicy
 const sha=text=>createHash('sha256').update(text,'utf8').digest('hex');
 const request=(kind='new',extra={})=>({target:{kind,type:'programming.python'},inputs:[{input:0}],mappings:[],read:{ports:[0]},finish:'execute',...extra});
 
-for(const [kind,input] of [['new','unconnected'],['existing','unconnected'],['existing','connected'],['existing','unknown']])
+for(const [kind,input] of [
+ ['new','unconnected'],['existing','unconnected'],['existing','connected'],['existing','unknown'],
+ ['new','requested'],['existing','incomplete'],['existing','locked'],['existing','foreign-document'],
+ ['existing','foreign-workflow'],['existing','foreign-node'],
+])
 test('Python input mapping respects the live graph: '+kind+' '+input,async()=>{
  const node={document_id:'doc',workflow_id:'workflow',node_id:'python'};
  const workflow_ref={workflow_id:'workflow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',
@@ -32,8 +36,16 @@ test('Python input mapping respects the live graph: '+kind+' '+input,async()=>{
   links:[{source:'python',target:'downstream',output:0,input:0}],foreign_links:[]};
  if(input==='connected')graph.links.push({source:'upstream',target:'python',output:0,input:0});
  if(input==='unknown')graph.foreign_links.push('unclassified-link');
- const operation={id:'apply',nodeApply:{node,request:request(kind,{document_id:'doc',workflow_ref,inputs:[],finish:'done'})},
+ if(input==='incomplete')graph.complete=false;
+ if(input==='locked')graph.nodes[0].locked=true;
+ if(input==='foreign-document')graph.document_id='other-doc';
+ if(input==='foreign-workflow')graph.workflow_ref={...workflow_ref,workflow_id:'other-workflow'};
+ if(input==='foreign-node')graph.nodes[0].ref={...node,node_id:'other-node'};
+ let graphReads=0;
+ const inputs=input==='requested'?[{input:0}]:[];
+ const operation={id:'apply',nodeApply:{node,request:request(kind,{document_id:'doc',workflow_ref,inputs,finish:'done'})},
   nodeTargetAdapter:{observe:async identity=>{
+   graphReads++;
    assert.deepEqual(identity,{document_id:'doc',workflow_ref});
    return graph;
   }}};
@@ -43,6 +55,7 @@ test('Python input mapping respects the live graph: '+kind+' '+input,async()=>{
  const mapInput=()=>drivers.mapPorts([],{document_id:'doc',workflow_ref,node,deadline:Date.now()+1000,receipt_id:'apply:input_mapping'});
  if(input!=='unconnected'){
   await assert.rejects(mapInput,/Browser procedure reached/);
+  assert.equal(graphReads,input==='requested'?0:1);
   return;
  }
  const result=await mapInput();

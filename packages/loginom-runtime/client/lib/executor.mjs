@@ -2541,7 +2541,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     running=true;
     try{
       // A lost MCP reply can leave a completed browser receipt. Inspection
-      // settles transport only; release still has to rebind the port and close it.
+      // settles transport only; release still has to prove the quiet graph and
+      // rebind and close the port wizard if it is open.
       const state=await readReceipt(operation).catch(()=>null);
       if(state?.state!=='completed'||!settledPythonInputOpening(operation,state.receipt))return;
       await remember(operation,'receipt_recovered',state.receipt);

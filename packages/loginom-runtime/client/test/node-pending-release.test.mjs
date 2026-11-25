@@ -441,29 +441,50 @@ for(const foreign of [false,true])test('abandon_operation after '+type+' input o
  assert.equal(f.calls.filter(c=>c==='mapping').length,1);assert.equal(receipt.cleanup_complete,false);
 });
 
-for(const fault of ['none','opened','foreign-owner','wrong-port','running','missing','foreign-receipt'])test('Python release after a lost input opening response: '+fault,async()=>{
+for(const fault of [
+ 'none','opened','already-closed','refused-before-click','refused-with-wizard','refused-with-effect','invalid-owner-delivered','closed-locked-graph',
+ 'foreign-owner','wrong-port','wrong-live-opening','wrong-success-port','wrong-ambiguous-port',
+ 'running','missing','foreign-receipt','wrong-receipt-owner','wrong-receipt-opening','wrong-receipt-status','incomplete-cleanup',
+])test('Python release after an input opening stops: '+fault,async()=>{
  const id='apply:n7',action_key='node.input_port.open.internal';
  const port={direction:'input',port:0,native_index:0,port_guid:'port',opening_operation_id:id};
- const canRelease=['none','opened'].includes(fault);
+ const quiet=['already-closed','refused-before-click','refused-with-effect','closed-locked-graph'].includes(fault);
+ const delivered=quiet||['invalid-owner-delivered','refused-with-wizard'].includes(fault);
+ const closes=['none','opened'].includes(fault);
+ const canRelease=closes||['already-closed','refused-before-click'].includes(fault);
  const receipt={status:'AMBIGUOUS',action_key,action_revision:'1',operation_id:fault==='foreign-receipt'?'other:n7':id,
   phase:'port_open',effect_possible:true,cleanup_complete:false,output:{verified:false,cleanup_complete:false},
   error:{code:'OUTPUT_PORT_OPEN_UNCONFIRMED',message:'Output port opening deadline'},
   trace:[{event:'input_port_reserved',port_guid:'port',native_index:0},{event:'input_port_open_issued',port_guid:'port'},
    {event:'input_port_open_returned'}]};
- if(fault==='opened')Object.assign(receipt,{status:'SUCCEEDED',cleanup_complete:true,error:null,output:{verified:true,...node,...port}});
- const ui=surface({wizard:true,foreign:fault==='foreign-owner'});
+ if(['opened','already-closed','closed-locked-graph','invalid-owner-delivered','wrong-success-port','wrong-receipt-owner',
+  'wrong-receipt-opening','wrong-receipt-status','incomplete-cleanup'].includes(fault)){
+  Object.assign(receipt,{status:'SUCCEEDED',cleanup_complete:true,error:null,output:{verified:true,...node,...port}});
+ }
+ if(['refused-before-click','refused-with-wizard','refused-with-effect'].includes(fault))Object.assign(receipt,{status:'NOT_APPLIED',
+  effect_possible:fault==='refused-with-effect',cleanup_complete:true,output:{verified:false,cleanup_complete:true},trace:[],
+  error:{code:'OUTPUT_PORT_OPEN_UNCONFIRMED',message:'Port opening blocked'}});
+ if(['wrong-receipt-owner','invalid-owner-delivered'].includes(fault))receipt.output.node_id='other-node';
+ if(fault==='wrong-receipt-opening')receipt.output.opening_operation_id='apply:n8';
+ if(fault==='wrong-receipt-status')receipt.status='FAILED';
+ if(fault==='incomplete-cleanup')receipt.cleanup_complete=false;
+ if(fault==='wrong-success-port')receipt.output.port_guid='other-port';
+ if(fault==='wrong-ambiguous-port')receipt.trace[0].port_guid='other-port';
+ const ui=surface({wizard:!quiet,foreign:fault==='foreign-owner',locked:fault==='closed-locked-graph'});
  const observe=ui.channel.observe;
  ui.channel.observe=async options=>{
   const s=await observe(options);
   if(s.wizard.status==='observed'){
    s.wizard.stage='input_mapping';
-   s.prepared_node_context.input_port={...port,node_icon_class:'bg-vendor-icon-python',port_guid:fault==='wrong-port'?'other':'port'};
+   s.prepared_node_context.input_port={...port,node_icon_class:'bg-vendor-icon-python',port_guid:fault==='wrong-port'?'other':'port',
+    opening_operation_id:fault==='wrong-live-opening'?'apply:n8':id};
   }
   return s;
  };
  let rebinds=0;
  ui.channel.reconcileInputPortOpening=async ref=>{
   assert.equal(ref.operation_id,id);rebinds++;
+  if(quiet)throw Error('Opened port wizard owner differs');
   return {verified:true,...port};
  };
  const f=fixture({type:'programming.python',execute:async code=>{
@@ -475,12 +496,17 @@ for(const fault of ['none','opened','foreign-owner','wrong-port','running','miss
   deadline:Date.now()+10000})});
  f.drivers.mapPorts=async()=>{
   f.context().receiptOptions(id,action_key,'opening-signature');
-  f.context().operation.transportUncertain=true;
+  f.context().operation.transportUncertain=!delivered;
+  if(delivered){
+   f.context().operation.cleanupConfirmed=receipt.cleanup_complete===true;
+   if(receipt.status!=='SUCCEEDED')throw new NodeProcedureStepError(receipt);
+   throw Error('Read-only readiness stopped after input opening');
+  }
   throw Error('MCP error -32001: Request timed out');
  };
  const r=request();r.target.type='programming.python';f.runtime.startNodeApply(r);
  assert.equal((await f.runtime.waitNodeApply('apply',{timeoutMs:1000})).outcome.output.pending_phase,'input_mapping');
- if(['running','missing','foreign-receipt'].includes(fault)){
+ if(['running','missing','foreign-receipt','wrong-receipt-owner','wrong-receipt-opening','wrong-receipt-status','incomplete-cleanup'].includes(fault)){
   const inspected=await f.runtime.inspect({operationId:'apply'});
   assert.deepEqual(inspected.output.recovery_options,[]);
   await assert.rejects(f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-python'}),/Release proof unavailable/);
@@ -493,10 +519,12 @@ for(const fault of ['none','opened','foreign-owner','wrong-port','running','miss
   }
   const released=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-python'});
   assert.equal(released.status,canRelease?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(released));
-  assert.equal(rebinds,1);
+  if(canRelease)assert.equal(released.output.original_outcome.cleanup_complete,true);
+  if(['wrong-success-port','wrong-ambiguous-port'].includes(fault))assert.match(released.error.message,/opening port identity changed/);
+  assert.equal(rebinds,delivered?0:1);
  }
  assert.equal(f.runtime.hasUnsettledWork(),!canRelease);
- assert.deepEqual(ui.gestures,canRelease?[{verb:'click',ref:'ui-close'}]:[]);
+ assert.deepEqual(ui.gestures,closes?[{verb:'click',ref:'ui-close'}]:[]);
 });
 
 for(const fault of [null,'foreign','transport','cleanup'])test('JSON configure refusal releases only its own settled draft: '+fault,async()=>{

@@ -20,6 +20,10 @@ const inputOpeningReference=operation=>{
 export const isPythonInputOpening=operation=>operation.nodeApply?.request?.target?.type==='programming.python'
  &&inputOpeningReference(operation);
 
+const pythonInputOpeningReceipt=(operation,receipt)=>isPythonInputOpening(operation)
+ &&receipt?.operation_id===operation.lastReceipt.operation_id&&receipt.action_key===operation.lastReceipt.action_key
+ &&receipt.action_revision==='1'&&receipt.phase==='port_open';
+
 const stoppedInputOpening=(operation,receipt)=>{
  const ref=operation.lastReceipt,trace=receipt?.trace??[];
  return inputOpeningReference(operation)&&receipt?.operation_id===ref.operation_id&&receipt.action_key===ref.action_key
@@ -32,8 +36,7 @@ const stoppedInputOpening=(operation,receipt)=>{
 
 export function settledPythonInputOpening(operation,receipt) {
  const ref=operation.lastReceipt,owner=receipt?.output;
- return isPythonInputOpening(operation)&&receipt?.operation_id===ref.operation_id&&receipt.action_key===ref.action_key
-  &&receipt.action_revision==='1'&&receipt.phase==='port_open'&&(stoppedInputOpening(operation,receipt)
+ return pythonInputOpeningReceipt(operation,receipt)&&(stoppedInputOpening(operation,receipt)
    ||receipt.status==='SUCCEEDED'&&receipt.cleanup_complete===true&&sameNode(owner,operation.nodeApply.node)
     &&owner.direction==='input'&&owner.port===0&&owner.native_index===0&&typeof owner.port_guid==='string'&&owner.port_guid
     &&owner.opening_operation_id===ref.operation_id);
@@ -147,7 +150,13 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  requireValue(state?.pending&&node&&!state.result,'Release requires an unresolved phase of a known node');
  requireValue(Number.isFinite(deadline),'Release requires an explicit finite deadline');
  requireValue(!operation.transportUncertain,'The last browser call has not confirmed completion; inspect the operation again later');
- let settleWizard,beforeSettlement,openingConfirmation,portOpening,draftReceipt=false,variableDraft=false;
+ let settleWizard,beforeSettlement,openingConfirmation,portOpening,completedPortOpening;
+ let draftReceipt=false,variableDraft=false,pythonOpeningRefused=false;
+ const bindInputOpening=async(ref,portGuid)=>{
+  const opening=await channel.reconcileInputPortOpening(ref);
+  requireValue(opening.port_guid===portGuid,'The stopped input opening port identity changed');
+  return opening;
+ };
  if(operation.portReadCleanupComplete!==undefined)requireValue(operation.portReadCleanupComplete===true,
   'The last output-port read has no confirmed settled cleanup');
  if(operation.lastReceipt){
@@ -177,7 +186,9 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   const ref=operation.lastReceipt;
   const inputOpening=['exports.text','exports.excel','exports.lgd'].includes(state.request.target?.type)&&stoppedInputOpening(operation,r)
    ||settledPythonInputOpening(operation,r);
-  if(isPythonInputOpening(operation))requireValue(inputOpening,'The original Python input opening receipt is unconfirmed');
+  pythonOpeningRefused=pythonInputOpeningReceipt(operation,r)&&r.status==='NOT_APPLIED'
+   &&r.effect_possible===false&&r.cleanup_complete===true;
+  if(isPythonInputOpening(operation))requireValue(inputOpening||pythonOpeningRefused,'The original Python input opening receipt is unconfirmed');
   const draft=restDraft||exportDraft||wizardDraft||variableDraft||inputOpening;
   draftReceipt=draft;
   const mappingReadCleanup=response?.state==='completed'&&await settleImportMappingRead({operation,channel,receipt:r});
@@ -194,11 +205,10 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
     'The completed draft receipt identity changed');
   }
   if(inputOpening){
-   portOpening=await channel.reconcileInputPortOpening(ref);
-   const portGuid=r.status==='SUCCEEDED'?r.output.port_guid
-    :r.trace.find(e=>e.event==='input_port_reserved'&&e.native_index===0).port_guid;
-   requireValue(portOpening.port_guid===portGuid,
-    'The stopped input opening port identity changed');
+   // A successful opening already bound the native wizard, so its current
+   // surface can be observed before deciding whether there is a draft to close.
+   if(r.status==='SUCCEEDED')completedPortOpening={ref,portGuid:r.output.port_guid};
+   else portOpening=await bindInputOpening(ref,r.trace.find(e=>e.event==='input_port_reserved'&&e.native_index===0).port_guid);
   }
   const graphReturn=n?.surface==='graph'&&w?.status==='absent'
     &&['confirm_wizard_close','finish_wizard','execute_wizard'].includes(gestures[0]?.verb);
@@ -221,13 +231,21 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  }
  const cleanup={wizard_closed:false,read_view_restored:false,views_returned:false};
  if(restoreRead)cleanup.read_view_restored=await restoreRead();
+ if(pythonOpeningRefused)return verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup,openingConfirmation});
  // A heavy wizard can exceed the observation budget; only the user can then
  // cancel it. Its unsaved settings are lost, which the agent must say first.
- const current=await channel.observe({condition:'stopped node release surface',releaseWizard:true,
+ const observeSurface=()=>channel.observe({condition:'stopped node release surface',releaseWizard:true,
   ...(openingConfirmation?{wizardConfirmation:openingConfirmation}:{}),...(settleWizard?{settleWizard}:{}),
   ready:s=>['absent','observed'].includes(s.wizard?.status)}).catch(error=>{
    throw new NodeReleaseBlocked('The Loginom workspace could not be observed for release: '+String(error.message).slice(0,300),
     'Warn the user that unsaved settings of the open wizard will be lost, ask them to close any open Loginom wizard or dialog with its Cancel button and return to this scenario graph.'+retry);});
+ let current=await observeSurface();
+ if(completedPortOpening){
+  if(current.wizard.status==='absent'&&current.prepared_node_context?.surface==='graph')
+   return verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup,openingConfirmation});
+  portOpening=await bindInputOpening(completedPortOpening.ref,completedPortOpening.portGuid);
+  current=await observeSurface();
+ }
  if(beforeSettlement)requireValue(same(beforeSettlement,await readReleaseGraph(operation,node,settleWizard.deadline,now)),
   'The graph changed while the original wizard gesture settled; no cleanup was authorized');
  if(openingConfirmation){
