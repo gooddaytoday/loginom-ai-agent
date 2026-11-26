@@ -1,7 +1,7 @@
 import {importBindingSchema,resolveImportBindingParameters,prepareImportBinding,configureImportBinding,readImportBindings,resolveImportBindingSourceReadback} from './import-bindings.mjs';
 import {verifyUploadLineage,verifiedLocalDelivery} from './upload-lineage.mjs';
 import {validateImportSource} from './storage-policy.mjs';
-import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping,outputsOutOfSync,resyncOutputFields} from './port-mapping-procedure.mjs';
+import {configureOutputFields,configureRequestedOutputAutosync,requestedOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping,outputsOutOfSync,resyncOutputFields} from './port-mapping-procedure.mjs';
 import {resolveTextImportEncoding} from './text-import-encoding.mjs';
 import {createNodeProcedure,NodeReadinessTimeout,NodeProcedureStepError} from './node-procedure.mjs';
 import {autoTypesRequested,textImportSourcePaths,textImportSourceMask,configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady,ImportColumnBindingError,ImportInitialSettingsError,previousTextImportStep} from './text-import-procedure.mjs';
@@ -725,9 +725,9 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           const resolved=resolveConfiguredOutputMapping(mapping,outputFields,native);
           changes.push(await configureOutputFields(channel,mapping,outputFields));
           if(resolved.fields)changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));
-          if(mapping.autosync!==undefined)changes.push(await configureOutputAutosync(channel,mapping.autosync));
+          await configureRequestedOutputAutosync(channel,mapping,changes);
           native=(await channel.observe({condition:'requested import native output mapping',readMappings:true,ready:nativeReady})).node_mapping;
-          requireValue(native.autosync===resolved.autosync,'Requested output autosync not preserved');
+          requireValue(native.autosync===(requestedOutputAutosync(mapping)??resolved.autosync),'Requested output autosync not preserved');
           if(resolved.fields)requireValue(native.target_fields.length===resolved.fields.length&&native.target_fields.every((f,i)=>
             f.record_id===resolved.fields[i].current.record_id&&f.name===resolved.fields[i].name&&f.label===resolved.fields[i].label),
             'Requested output layout not preserved');

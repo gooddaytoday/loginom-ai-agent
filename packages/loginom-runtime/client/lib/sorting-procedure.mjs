@@ -108,7 +108,5 @@ export async function configureSorting(channel,p,{newNode=false,bound=false}={})
  need(same(after.keys.map(k=>k.name),plan.map(k=>k.name))&&after.keys.every((k,i)=>!k.missing_input&&k.direction===plan[i].direction&&(plan[i].case_sensitive===undefined||k.case_sensitive===plan[i].case_sensitive)),'Final sorting keys differ');
  need(same(after.input_fields,baseline.input_fields)&&same(after.options.chkBufferWhole,baseline.options.chkBufferWhole)&&(p.max_threads===undefined?same(after.options.cbxMaxThreadCount,baseline.options.cbxMaxThreadCount):after.options.cbxMaxThreadCount.value===p.max_threads&&after.options.cbxMaxThreadCount.switch_pressed===false),'Unrequested sorting settings changed');
  need(bound?same(after.options.chkLocaleAware,baseline.options.chkLocaleAware):after.options.chkLocaleAware.value===locale,'Sorting locale differs');
- return {verified:true,cleanup_complete:true,effect_possible:true,
-  configuration:{...after,first_key_configuration:baseline.keys.length===0},
-  preservation:{input_identity:true,cache:true,threads:p.max_threads===undefined}};
+ return {verified:true,cleanup_complete:true,effect_possible:true,configuration:after,preservation:{input_identity:true,cache:true,threads:p.max_threads===undefined}};
 }

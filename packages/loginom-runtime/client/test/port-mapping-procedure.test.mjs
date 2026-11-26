@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {configureOutputAutosync} from '../lib/port-mapping-procedure.mjs';
+import {configureOutputAutosync,configureRequestedOutputAutosync} from '../lib/port-mapping-procedure.mjs';
 
 function fixture(initial=true) {
  let value=initial,mutations=0,changed=false,foreign=false;
@@ -27,6 +27,15 @@ test('autosync refuses changed fields and foreign wizard after an effect without
 });
 test('autosync requires an explicit boolean before observation',async()=>{
  await assert.rejects(configureOutputAutosync({},'false'),/boolean/);
+});
+test('output rename freezes native layout unless the request explicitly keeps autosync',async()=>{
+ const rename={direction:'output',port:0,changes:[{source:{kind:'configured_field',name:'Id'},name:'Renamed'}]};
+ for(const [mapping,expected,gestures] of [[rename,false,1],[{...rename,autosync:true},true,0]]){
+  const f=fixture(),changes=[];
+  await configureRequestedOutputAutosync(f.channel,mapping,changes);
+  assert.equal(changes[0].autosync.value,expected);
+  assert.equal(f.mutations(),gestures);
+ }
 });
 
 test('configured mapping resolves duplicate labels by source name with explicit order and exclusion',async()=>{

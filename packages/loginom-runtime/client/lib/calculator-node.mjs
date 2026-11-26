@@ -15,7 +15,7 @@ import {calculatorParametersSchema} from './node-api.mjs';
 import {openPreparedWizard,inspectPendingWizardOpen} from './node-wizard-open.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
-import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
+import {configureOutputFields,configureOutputAutosync,configureRequestedOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
 import {readCollapseNativeOutput} from './collapse-native-output.mjs';
@@ -251,7 +251,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
       implementation.materializedSchema(sources.map((f,index)=>({...f,index})),configured,{node:ctx.node,execution:firstExecution});
       const requested=mappings[0]??{direction:'output',port:0},changes=[];
       resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
-      if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
+      await configureRequestedOutputAutosync(channel,requested,changes);
       if(requested.fields||requested.changes)changes.push(await configureOutputFields(channel,requested,sources));
       s=await channel.observe({condition:'CrossTable output edits before order',readMappings:true,ready:s=>s.node_mapping?.verified===true});
       const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
@@ -296,7 +296,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
       const updated=resolveConfiguredOutputMapping(requested,sources,current.node_mapping);
       changes.push(await reorderOutputFields(channel,updated.fields.map(f=>f.current.record_id)));
      }
-     if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
+     await configureRequestedOutputAutosync(channel,requested,changes);
     }
     s=await channel.observe({condition:'configured calculator output mapping readback',readMappings:true,ready});mapping=s.node_mapping;
     const active=mapping.target_fields.filter(f=>!f.excluded),definition=await readOutputDefinitionPages(channel,{expectedCount:mapping.target_fields.length});
@@ -405,7 +405,8 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     const materialized=implementation?.type==='transform.cross_table'&&implementation.materializedSchema
      ?implementation.materializedSchema(output.schema,configured,{node:ctx.node,execution:ctx.execution}):null;
     const expected=materialized?(configured.output_mapping?.target_fields??materialized.columns):columns;
-    requireValue(output.schema.every((field,index)=>field.name===expected[index]?.name),'Output field order differs from the configured output');
+    if(mapping?.autosync!==true||operation.nodeApply.request.mappings.some(m=>m.direction==='output'&&m.fields?.length))
+     requireValue(output.schema.every((field,index)=>field.name===expected[index]?.name),'Output field order differs from the configured output');
     const aligned=alignReadSchema(output.schema,expected);
     output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
     if(materialized)output.category_fields=materialized.category_fields;

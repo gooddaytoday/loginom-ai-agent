@@ -42,6 +42,17 @@ export async function configureOutputAutosync(channel,value,{mappingWizard,stage
     settings_applied:false,package_saved:false};
 }
 
+// Layout requests own the output definition. In their absence the native
+// setting remains authoritative, including for a newly placed node.
+export function requestedOutputAutosync(mapping, columnEdits=false) {
+  return mapping.autosync ?? (mapping.fields?.length||mapping.changes?.length||columnEdits?false:undefined);
+}
+
+export async function configureRequestedOutputAutosync(channel,mapping,changes,columnEdits=false) {
+  const autosync=requestedOutputAutosync(mapping,columnEdits);
+  if(autosync!==undefined)changes.push(await configureOutputAutosync(channel,autosync));
+}
+
 // An output is out of sync when a source has no output or an output lost its source.
 // Source records are recreated by a re-read of the file; outputs keep the old identity.
 const sourceKey=f=>f?.record_id===undefined?null:String(f.record_id)+':'+String(f.field_id);
@@ -436,16 +447,16 @@ export async function configureSeparateOutputPort(channel,mapping,configured) {
   let resolved=resolveConfiguredOutputMapping(mapping,configured,before.node_mapping);
   const changes=[];
   // Validate the full requested namespace before changing autosync or fields.
-  if(mapping.fields!==undefined) {
+  if(resolved.fields) {
     changes.push(await configureOutputFields(channel,mapping,configured));
     const edited=await channel.observe({condition:'standalone output identities after edits',readMappings:true,ready});
     resolved=resolveConfiguredOutputMapping(mapping,configured,edited.node_mapping);
     changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));
   }
-  if(mapping.autosync!==undefined)changes.push(await configureOutputAutosync(channel,mapping.autosync));
+  await configureRequestedOutputAutosync(channel,mapping,changes);
   const final=await channel.observe({condition:'standalone output mapping complete before Done',readMappings:true,ready});
   const actual=final.node_mapping;
-  if(actual.autosync!==resolved.autosync)throw Error('Standalone output autosync differs');
+  if(actual.autosync!==(requestedOutputAutosync(mapping)??before.node_mapping.autosync))throw Error('Standalone output autosync differs');
   if(resolved.fields) {
     const expected=[...resolved.fields.filter(f=>!f.excluded),...resolved.fields.filter(f=>f.excluded)];
     if(actual.target_fields.length!==expected.length||actual.target_fields.some((f,i)=>{

@@ -1,13 +1,9 @@
 import {ensureGroupingOutputSources as ensureDerivedOutputSources} from './grouping-output-sources.mjs';
-import {resolveConfiguredOutputMapping,configureOutputFields,reorderOutputFields,configureOutputAutosync} from './port-mapping-procedure.mjs';
+import {resolveConfiguredOutputMapping,configureOutputFields,reorderOutputFields,configureRequestedOutputAutosync} from './port-mapping-procedure.mjs';
 import {verifyCalculatorInlineSync} from './calculator-inline-mapping.mjs';
-export async function configureSortingOutput(channel,configuration,parameters,mapping={},request){
+export async function configureSortingOutput(channel,configuration,parameters,mapping={}){
  const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
- // Native autosync saves only referenced input columns; after reopen it can
- // append pass-through fields in a different order. Fix the initial output
- // layout even when the unconfigured node was placed manually.
- const sources=configuration.input_fields.map(f=>({...f,used:true})),requested={direction:'output',port:0,
-  ...(request?.target.kind==='new'||configuration.first_key_configuration===true?{autosync:false}:{}),...mapping},changes=[];
+ const sources=configuration.input_fields.map(f=>({...f,used:true})),requested={direction:'output',port:0,...mapping},changes=[];
  let s=await channel.observe({condition:'sorting output inventory',readMappings:true,ready});
  s=await ensureDerivedOutputSources(channel,s);
  // A saved port can retain only the narrowed input's outputs. A full layout
@@ -46,7 +42,7 @@ export async function configureSortingOutput(channel,configuration,parameters,ma
   const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
   changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));
  }
- if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
+ await configureRequestedOutputAutosync(channel,requested,changes);
  s=await channel.observe({condition:'sorting output mapping readback',readMappings:true,ready});
  return {verified:true,cleanup_complete:true,effect_possible:changes.length>0,source_identity_verified:true,native_mapping:s.node_mapping,changes};
 }
