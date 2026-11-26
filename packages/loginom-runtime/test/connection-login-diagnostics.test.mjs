@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { loginPage } from "../src/connection-check.mjs"
+import { loginPage, reauthenticateReloadedPage } from "../src/connection-check.mjs"
 
 const candidate = { url: "https://example.test/app/?opaque=private-query#private-fragment",
   username: "private-user", password: 'tiny"pass', apiKey: "private-key" }
@@ -24,6 +24,25 @@ test("successful login separates network, form, credentials and server response 
   for(const e of phases.filter(e=>e.duration_ms!==undefined))assert.ok(Number.isInteger(e.duration_ms)&&e.duration_ms>=0)
   for(const secret of [candidate.username,candidate.password,candidate.apiKey,'private-query','private-fragment'])
     assert.ok(!JSON.stringify(phases).includes(secret))
+})
+
+test("reload recovery waits for its login form on the original page without navigating", async () => {
+  const f = fixture()
+  let formVisible = false
+  const { locator, evaluate, waitForFunction } = f.page
+  f.page.url = () => candidate.url
+  f.page.isClosed = () => false
+  f.page.locator = selector => selector.includes("btnAvatar")
+    ? { ...locator(selector), or: () => ({ first: () => ({ waitFor: async () => { formVisible = true } }) }) }
+    : locator(selector)
+  f.page.evaluate = async (fn, args) => args?.pathname ? args.formRequired === false || formVisible : evaluate(fn)
+  f.page.waitForFunction = async (fn, args, options) => args?.pathname
+    ? { dispose: async () => {} } : waitForFunction(fn, args, options)
+  const context = { pages: () => [f.page] }
+  const binding = { origin: "https://example.test", account: candidate.username, deadline: Date.now() + 120_000 }
+  assert.equal(await reauthenticateReloadedPage(context, candidate, binding), true)
+  assert.equal(formVisible, true)
+  assert.equal(f.calls.some(call => call.phase === "goto"), false)
 })
 
 function fixture(failure, error, authenticated = false, rejected = false) {

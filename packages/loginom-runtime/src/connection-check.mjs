@@ -300,24 +300,27 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
   }
 }
 
-async function isReloadedLoginForm(page, url) {
+async function isReloadedLoginForm(page, url, formRequired = true) {
   const { origin, pathname } = new URL(loginomAddress(url))
-  return page.evaluate(({ origin, pathname }) => {
+  return page.evaluate(({ origin, pathname, formRequired }) => {
     if (location.origin !== origin || location.pathname !== pathname
       || performance.getEntriesByType("navigation")[0]?.type !== "reload"
-      || globalThis.__loginomDockPreparationV1?.document === document) return false
+      || globalThis.__loginomDockPreparationV1?.document === document
+      || globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName
+      || globalThis.__loginomThemeStartupInteracted === true) return false
+    if (!formRequired) return true
     const element = document.querySelector('[data-tid="LoginForm;Login;edtUsername"]')
     return !!element && element.getBoundingClientRect().width > 0 && getComputedStyle(element).visibility !== "hidden"
-      && !globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName
-      && globalThis.__loginomThemeStartupInteracted !== true
-  }, { origin, pathname })
+  }, { origin, pathname, formRequired })
 }
 
 export async function reauthenticateReloadedPage(context, candidate, { origin, account, deadline, signal }) {
   const target = new URL(loginomAddress(candidate.url))
   if (target.origin !== origin || candidate.username !== account) return false
   const pages = context.pages().filter(page => !page.isClosed())
-  if (pages.length !== 1 || !await isReloadedLoginForm(pages[0], candidate.url)) return false
+  // The old call can fail as soon as the new document commits. loginPage
+  // waits for the new form and checks it again immediately before filling it.
+  if (pages.length !== 1 || !await isReloadedLoginForm(pages[0], candidate.url, false)) return false
   signal?.throwIfAborted()
   await loginPage(pages[0], candidate, { deadline, reuseLoginForm: true })
   signal?.throwIfAborted()
