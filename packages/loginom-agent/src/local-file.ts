@@ -82,12 +82,20 @@ export async function localFiles(
         if (identity) await plugin.storage.set(receiptKey(event.sessionID, event.messageID, file.uri), identity)
       }),
     )
-    // Core sends the model nothing of a data file it cannot read as text, so the prompt names the tool for it.
-    event.prompt.text += (event.prompt.files ?? [])
+    // Core sends the model nothing of a data file it cannot read as text, so a synthetic message (0.4: a synthetic text
+    // part) names the tool for it. Without a description the timeline does not show it, and the user's message keeps its
+    // own text. It is admitted without a wake: the prompt that is being admitted starts the run.
+    const text = (event.prompt.files ?? [])
       .map((file) => attachedPath(file.uri))
       .flatMap((path) => (path ? [referenceText(path)] : []))
-      .flatMap((text) => (text ? ["\n\n" + text] : []))
-      .join("")
+      .join("\n\n")
+    if (text)
+      await plugin.session.synthetic({
+        sessionID: event.sessionID,
+        text,
+        metadata: { loginom_attachment_reference: event.messageID },
+        resume: false,
+      })
   })
   // A compaction keeps the attachments of the messages it summarizes, as 0.4 replayed their prompt (B2.5d). The hook runs
   // while the compaction is open, before its summary is written; once completed, its message heads the session's

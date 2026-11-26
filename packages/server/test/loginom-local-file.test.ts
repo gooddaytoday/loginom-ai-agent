@@ -578,6 +578,23 @@ describe("loginom local file admission (B2.5a)", () => {
         const tools = names.map((name) => sent.match(new RegExp(String.raw`${name}\. Use (\w+)`))?.[1])
         expect(tools).toEqual(["loginom_file_admit", "loginom_file_admit", "loginom_file_profile", undefined])
         expect(sent).toContain("No file bytes are included in this message.")
+        // The guidance is a separate synthetic message without a description (the timeline does not show it); the
+        // user's own message keeps its text.
+        const history = yield* Effect.promise(() => test.plugin.session.context({ sessionID }))
+        const user = history.find((message) => message.type === "user")
+        const synthetic = history.filter((message) => message.type === "synthetic")
+        expect(user?.type === "user" ? user.text : undefined).toBe(script({ text: "attached" }))
+        // The harness builds its own `localFiles` beside the product plugin's, so its hook adds the same message too.
+        expect(synthetic.length).toBeGreaterThan(0)
+        expect(synthetic.every((message) => message.type === "synthetic" && message.description === undefined)).toBe(
+          true,
+        )
+        expect(new Set(synthetic.map((message) => (message.type === "synthetic" ? message.text : ""))).size).toBe(1)
+        const hidden = synthetic[0].type === "synthetic" ? synthetic[0].text : ""
+        expect(hidden).toContain("loginom_file_admit")
+        expect(hidden).toContain("loginom_file_profile")
+        // The model gets it; the user's message does not.
+        expect(sent).toContain("Attached local data reference")
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
