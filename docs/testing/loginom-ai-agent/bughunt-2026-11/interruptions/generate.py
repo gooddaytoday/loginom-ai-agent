@@ -18,7 +18,9 @@ from pathlib import Path
 case = Path(__file__).resolve().parent
 expected = json.loads((case / 'expected.json').read_text())
 for output in expected['outputs']:
-    threshold = 200 if case.name == 'bh-x06' else 100
+    declaration = case / 'intervention.json'
+    intervention = json.loads(declaration.read_text()) if declaration.is_file() else {}
+    threshold = intervention.get('edit', {}).get('value', 100)
     seed = 'bh-x06-t1' if case.name.startswith('bh-x06') else 'bh-x00-t1'
     with (case.parent / seed / 'data/sales.csv').open(newline='') as file:
         values = [int(row['Revenue']) for row in csv.DictReader(file)]
@@ -60,6 +62,8 @@ def contracts():
     # The unconnected sort is present before the user's gesture.
     final_sort = graph(sales, row_filter, sorting, links=(('sales', 'filter'), ('filter', 'sort')),
                        retain=('sales', 'filter', 'sort'))
+    browser_gestures = {1: 'close-wizard', 2: 'reload', 4: 'switch-tab', 5: 'kill-cli', 7: 'foreign-dialog'}
+    manual_threshold = dict(kind='filter_threshold', node=dict(type=FILTER), field='Revenue', value=200)
     for number in range(1, 8):
         name = f'bh-x{number:02d}'
         case_graph = filter_graph
@@ -76,8 +80,12 @@ def contracts():
             case_graph = {**case_graph, 'exact': True, 'nodes': [
                 *case_graph['nodes'], dict(id='variables', type='variables.user')
             ]}
-        yield name, task, case_graph, dict(base=base, output_mode='ports',
-                                           budget=dict(max_nodes=int(number not in (3, 6)))), 200 if number == 6 else 100
+        config = dict(base=base, output_mode='ports', budget=dict(max_nodes=int(number not in (3, 6))))
+        if number in browser_gestures:
+            config['intervention'] = dict(turn=base, kind=browser_gestures[number])
+        if number == 6:
+            config['intervention'] = dict(turn=base, kind='manual-edit', edit=manual_threshold)
+        yield name, task, case_graph, config, manual_threshold['value'] if number == 6 else 100
 
 
 def main():
@@ -108,6 +116,8 @@ def main():
                                 rows=[dict(Revenue=value) for value in rows if value > threshold]))
         expected = dict(nodes=[dict(type=node['type']) for node in graph['nodes']], graph=graph, outputs=outputs)
         materialize(case / 'task.md', prompt + '\n')
+        if intervention := config.pop('intervention', None):
+            materialize(case / 'intervention.json', dump(intervention))
         materialize(case / 'case.json', dump(config))
         materialize(case / 'expected.json', dump(expected))
         materialize(case / 'oracle.py', ORACLE)

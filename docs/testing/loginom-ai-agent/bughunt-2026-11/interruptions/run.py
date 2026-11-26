@@ -11,13 +11,7 @@ import time
 
 
 HERE = Path(__file__).resolve().parent
-INTERVENTIONS = {
-    'bh-x01': 'close-wizard',
-    'bh-x02': 'reload',
-    'bh-x04': 'switch-tab',
-    'bh-x05': 'kill-cli',
-    'bh-x07': 'foreign-dialog',
-}
+BROWSER_GESTURES = ('close-wizard', 'reload', 'switch-tab', 'kill-cli', 'foreign-dialog')
 
 
 def record(path, **evidence):
@@ -27,7 +21,7 @@ def record(path, **evidence):
 
 def kill_gate(log):
     events = [json.loads(line) for line in log.read_text().splitlines()]
-    if not events or events[-1].get('kill_ready') is not True:
+    if len(events) < 2 or events[-1].get('kill_ready') is not True:
         return False
     before = events[-2]
     journal, _, start = before['location'].rpartition(':')
@@ -43,25 +37,25 @@ def kill_gate(log):
     return True
 
 
-def model_process(kind, node, resources, profile, folder, command):
+def model_process(kind, daemon_pid, node, resources, profile, folder, command):
     log = folder / 'intervention.jsonl'
     started = time.time()
-    child = subprocess.Popen(command, stdin=subprocess.DEVNULL)
-    with (folder / 'intervention.stderr').open('w') as browser_errors:
-        gesture = subprocess.Popen([node, HERE / 'intervene.mjs', resources, profile, log, kind, str(started)],
-                                   stdin=subprocess.DEVNULL, stderr=browser_errors)
-        # Only this exact CLI child can be interrupted. Comparison happens before any signal.
-        daemon = None
 
-        def own_signal(process, signum):
-            nonlocal daemon
-            if daemon is None:
-                daemon = json.loads(subprocess.check_output(
-                    [os.environ['MULTICA_CLI_PATH'], 'daemon', 'status', '--output', 'json']
-                ))['pid']
-            assert process.pid != daemon, 'WORKSPACE_DAEMON_IS_NOT_A_TEST_CHILD'
-            if process.poll() is None:
-                process.send_signal(signum)
+    def own_signal(process, signum):
+        # Only a direct child can receive a signal, after checking the daemon PID.
+        assert process.pid != daemon_pid, 'WORKSPACE_DAEMON_IS_NOT_A_TEST_CHILD'
+        if process.poll() is None:
+            process.send_signal(signum)
+
+    with (folder / 'intervention.stderr').open('w') as browser_errors:
+        child = subprocess.Popen(command, stdin=subprocess.DEVNULL)
+        try:
+            gesture = subprocess.Popen([node, HERE / 'intervene.mjs', resources, profile, log, kind, str(started)],
+                                       stdin=subprocess.DEVNULL, stderr=browser_errors)
+        except OSError:
+            own_signal(child, signal.SIGTERM)
+            child.wait()
+            raise
 
         def cancel(signum, _frame):
             own_signal(gesture, signal.SIGTERM)
@@ -90,43 +84,96 @@ class ObservedTurn(Exception):
     pass
 
 
+class InterventionSetupError(RuntimeError):
+    pass
+
+
 def run_check():
     path = Path(os.environ.get('LAB_2047_RUNNER', Path.home() / 'bughunt/runner')).resolve()
     spec = importlib.util.spec_from_file_location('run_check', path / 'scripts/node-acceptance/run-check.py')
     runner = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(runner)
+    if not hasattr(runner.Runner, 'manual_edit') or not hasattr(runner, 'case_intervention'):
+        raise SystemExit('Use bughunt-runner with the LAB-2032 and LAB-2047 runner changes.')
+
+    interventions = {}
+    resolve_steps = runner.scenario_steps
+
+    def register_intervention(path):
+        config = runner.read(path)
+        if not isinstance(config, dict) or not isinstance(config.get('turn'), str):
+            raise ValueError(f'{path}: intervention requires a turn and a kind')
+        kind = config.get('kind')
+        if kind == 'manual-edit' and set(config) == {'turn', 'kind', 'edit'}:
+            runner.validate_manual_edit(config['edit'], path.parent.name)
+        elif kind not in BROWSER_GESTURES or set(config) != {'turn', 'kind'}:
+            raise ValueError(f'{path}: unsupported intervention kind or fields')
+        interventions[path.parent.name] = config
+
+    def scenario_steps(name, *args, **kwargs):
+        steps = resolve_steps(name, *args, **kwargs)
+        for step, _ in steps[:-1]:
+            if step in interventions:
+                raise ValueError(f'{step}/intervention.json: an intervention belongs to the final case of a chain')
+        if config := interventions.get(name):
+            for step, spec in steps[:-1]:
+                if step == config['turn'] and (config['kind'] != 'manual-edit' or spec.get('manual_edit')):
+                    break
+            else:
+                raise ValueError(f'{name}/intervention.json: intervention turn must be a preceding turn '
+                                 '(with manual_edit for a follow-up manual edit)')
+        return steps
+
+    def observation(log, kind):
+        events = [event for _, event in runner.records(log)] if log.is_file() else []
+        after = next((event for event in events if event['phase'] == 'after'), None)
+        if kind == 'kill-cli' and not any(event.get('terminated') for event in events):
+            after = None
+        return after, events
 
     class InterruptionRunner(runner.Runner):
         def __init__(self, directory):
             super().__init__(directory)
             self.deadline = min(self.deadline, float(os.environ.get('LAB_2047_END_AT', self.deadline)))
-            self.env['MULTICA_CLI_PATH'] = os.environ['MULTICA_CLI_PATH']
             self.interruption = None
+
+        def intervention_for(self, turn):
+            config = interventions.get(self.current['scenario'])
+            return config if config and config['turn'] == turn else None
+
+        def failure(self, result, error, folder):
+            if isinstance(error, InterventionSetupError):
+                result['failure_category'] = 'runner/setup'
+            super().failure(result, error, folder)
 
         def phase(self, name, command, folder, **kwargs):
             if self.interruption and name == 'model':
-                profile, build = self.interruption
-                kind = INTERVENTIONS[self.current['scenario']]
+                kind, profile, build = self.interruption
                 resources = build / 'resources/loginom'
-                super().phase(name, [sys.executable, HERE / 'run.py', '_model', kind, resources / 'bin/node',
-                                     resources, profile, folder, *command], folder, **kwargs)
+                try:
+                    daemon_pid = runner.daemon_pid()
+                    super().phase(name, [sys.executable, HERE / 'run.py', '_model', kind, str(daemon_pid),
+                                         resources / 'bin/node', resources, profile, folder, *command], folder, **kwargs)
+                except (AssertionError, OSError, TimeoutError, ValueError, subprocess.CalledProcessError) as error:
+                    if not observation(folder / 'intervention.jsonl', kind)[0]:
+                        raise InterventionSetupError(str(error)) from error
+                    raise
                 raise ObservedTurn
             return super().phase(name, command, folder, **kwargs)
 
         def model(self, case, folder, profile, workspace, package, login, build, session=None, baseline=None):
-            watching = self.current['scenario'] in INTERVENTIONS and case == 'bh-x00-t2'
-            self.interruption = (profile, build) if watching else None
+            config = self.intervention_for(case)
+            self.interruption = ((config['kind'], profile, build)
+                                 if config and config['kind'] in BROWSER_GESTURES else None)
             try:
                 return super().model(case, folder, profile, workspace, package, login, build, session, baseline=baseline)
             except ObservedTurn:
                 log = folder / 'intervention.jsonl'
-                events = [event for _, event in runner.records(log)]
-                after = next((event for event in events if event['phase'] == 'after'), None)
-                if not after or (INTERVENTIONS[self.current['scenario']] == 'kill-cli'
-                                 and not any(event.get('terminated') for event in events)):
+                after, events = observation(log, config['kind'])
+                if not after:
                     error = next((event['code'] for event in events if event['phase'] == 'fixture_error'),
                                  'INTERVENTION_GATE_NOT_REACHED')
-                    raise AssertionError(f'{error}: {log}') from None
+                    raise InterventionSetupError(f'{error}: {log}') from None
                 latest = events[-1]
                 model_session = next((event.get('sessionID') for _, event in runner.records(folder / 'model.stdout')
                                       if event.get('sessionID')), None)
@@ -140,19 +187,21 @@ def run_check():
                 self.interruption = None
 
         def manual_edit(self, edit, stage, profile, package, login, build, before, **kwargs):
-            baseline = super().manual_edit(edit, stage, profile, package, login, build, before, **kwargs)
-            if self.current['scenario'] == 'bh-x06' and edit['kind'] == 'connect':
-                (stage / 'manual').rename(stage / 'manual-connect')
-                threshold = dict(kind='filter_threshold', node=dict(type='transform.filter_data'),
-                                 field='Revenue', value=200)
-                baseline = super().manual_edit(threshold, stage, profile, package, login, build, before, **kwargs)
-            evidence = stage / 'manual/result.json'
-            self.current['intervention'] = dict(kind=edit['kind'], at=evidence.stat().st_mtime,
+            config = self.intervention_for(stage.name)
+            try:
+                baseline = super().manual_edit(edit, stage, profile, package, login, build, before, **kwargs)
+                if config and config['kind'] == 'manual-edit':
+                    (stage / 'manual').rename(stage / ('manual-' + edit['kind']))
+                    baseline = super().manual_edit(config['edit'], stage, profile, package, login, build, before, **kwargs)
+                recorded_at = (stage / 'manual/result.json').stat().st_mtime
+            except (AssertionError, OSError, TimeoutError, ValueError) as error:
+                raise InterventionSetupError(str(error)) from error
+            self.current['intervention'] = dict(kind=edit['kind'], at=recorded_at,
                                                 journal=str(stage / 'manual/execution-events.jsonl'))
             return baseline
 
-    if not hasattr(runner.Runner, 'manual_edit'):
-        raise SystemExit('LAB-2047 requires the LAB-2032 manual-edit fixture runner')
+    runner.case_intervention = register_intervention
+    runner.scenario_steps = scenario_steps
     runner.Runner = InterruptionRunner
     runner.__file__ = str(Path(__file__).resolve())
     return runner.main()
@@ -160,7 +209,7 @@ def run_check():
 
 if __name__ == '__main__':
     if sys.argv[1:2] == ['_model']:
-        kind, node, resources, profile, folder, *command = sys.argv[2:]
-        model_process(kind, node, resources, profile, Path(folder), command)
+        kind, daemon_pid, node, resources, profile, folder, *command = sys.argv[2:]
+        model_process(kind, int(daemon_pid), node, resources, profile, Path(folder), command)
     else:
         sys.exit(run_check())
