@@ -1923,16 +1923,15 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
             attached = sorted(Path(model[i + 1]).name for i, arg in enumerate(model) if arg == '--file')
             self.assertEqual(attached, ['notes.txt', 'orders.json', 'orders.xml'])
             self.assertEqual(model[model.index('--model') + 1], runner.MODEL)
-            self.assertEqual(model[model.index('--variant') + 1] if '--variant' in model else '', runner.VARIANT)
+            self.assertNotIn('--variant', model)
 
-    def test_model_and_auth_come_from_environment(self):
-        loaded = importlib.util.spec_from_file_location('run_check_env', Path(__file__).resolve().parents[1] / 'run-check.py')
-        module = importlib.util.module_from_spec(loaded)
-        with patch.dict(os.environ, {'RUN_CHECK_MODEL': 'opencode-go/deepseek-v4.1-flash', 'RUN_CHECK_AUTH': '/tmp/auth-go.json'}):
-            os.environ.pop('RUN_CHECK_VARIANT', None)
-            loaded.loader.exec_module(module)
-        self.assertEqual((module.MODEL, module.VARIANT, module.AUTH), ('opencode-go/deepseek-v4.1-flash', '', Path('/tmp/auth-go.json')))
-        self.assertEqual((runner.MODEL, runner.VARIANT), ('openai/gpt-6.1-sol', 'medium'))
+    def test_model_is_one_constant_without_variant_or_shared_auth(self):
+        source = (Path(__file__).resolve().parents[1] / 'run-check.py').read_text()
+        self.assertEqual(runner.MODEL, 'deepseek/deepseek-flash')
+        self.assertFalse(hasattr(runner, 'VARIANT') or hasattr(runner, 'AUTH'))
+        self.assertEqual(len(re.findall(r'^MODEL = ', source, re.M)), 1)
+        for stale in ('gpt-6.1-sol', 'shared-oauth', 'RUN_CHECK_MODEL', 'RUN_CHECK_VARIANT', 'RUN_CHECK_AUTH', "'--variant'"):
+            self.assertNotIn(stale, source)
 
     def test_flat_pair_preserves_the_assigned_account(self):
         config = {'username': 'test', 'url': 'https://app.loginom.ai', 'api_key': 'private', 'password': 'private', 'package_directory': '/test'}

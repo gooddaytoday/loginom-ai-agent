@@ -656,12 +656,8 @@ A private case may add `case.json` with `base` (another case in the same
 `bughunt-audit.py`). The first turn of a private case attaches every file in
 `data/`, any format; a continuation attaches only its `input_files`.
 
-The model under test defaults to `openai/gpt-6.1-sol` medium with the shared
-OAuth link. `RUN_CHECK_MODEL`, `RUN_CHECK_VARIANT` (empty: no `--variant`) and
-`RUN_CHECK_AUTH` (an `auth.json` symlinked into each profile, never copied)
-select another provider, e.g. `opencode-go/deepseek-v4.1-flash` with
-`RUN_CHECK_AUTH=~/.config/loginom-run-check/auth-opencode-go.json`. Two-turn
-scenarios keep the default model. `results.json` records the model per run.
+The model under test is the constant `MODEL` of `run-check.py` (`deepseek/deepseek-flash`, no variant); it is
+recorded per run in `results.json`.
 
 Each output may declare `header: false` in private `expected.json` for a CSV
 without a header (including a single JSON cell). Columns then declare CSV

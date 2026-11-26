@@ -215,6 +215,10 @@ function nodeHost(root: string, resources: string) {
           : undefined,
       strictRecovery:
         process.env.LOGINOM_AI_AGENT_CLI_ROOT !== undefined && process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
+      // 0.4.2 enabled it for the CLI's `run` only (`standalone-run.ts`): `forward` marks the private server of a run, so a
+      // service, Desktop's server and `serve` never close a package. The runtime then writes `saved-package-cleanup.json`.
+      closeSavedPackageOnShutdown:
+        process.env.LOGINOM_AI_AGENT_CLI_ROOT !== undefined && process.env.LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE === "1",
       environment: process.env,
     })
 }
