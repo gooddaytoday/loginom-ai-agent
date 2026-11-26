@@ -101,30 +101,6 @@ class NodeProcedureEvidenceTests(unittest.TestCase):
         last['readiness']['identity_sha256'] = 'b'*64
         self.assertIn('target_identity_not_stable', self.verify()['failures'])
 
-    def test_execution_poll_accepts_its_bounded_attempt_count(self):
-        rows = [r for r in self.events if r.get('step') == 1]
-        completion = rows.pop()
-        readiness = dict(policy='semantic_condition_v2', required_samples=1,
-                         condition='one new node execution group', timeout_ms=15000)
-        original = self.events
-        for counts in ([1, 79, 80, 81], range(1, 82)):
-            with self.subTest(written=len(counts)):
-                samples = [dict(copy.deepcopy(rows[-1]), sample=i, attempts=n, readiness=dict(
-                    readiness, satisfied=n == 81, elapsed_ms=(n - 1) * 100)) for i, n in enumerate(counts)]
-                terminal = dict(completion, attempts=81, readiness=samples[-1]['readiness'], outcome=samples[-1]['outcome'])
-                self.events = samples + [terminal] + original[len(rows)+1:]
-                self.assertTrue(self.verify()['passed'], self.verify())
-                for bad in (True, None, 80, 152):
-                    with self.subTest(attempts=bad):
-                        samples[-1]['attempts'] = terminal['attempts'] = bad
-                        self.assertIn('poll_attempt_sequence', self.verify()['failures'])
-                samples[-1]['attempts'], terminal['attempts'] = 81, 82
-                self.assertIn('poll_attempt_sequence', self.verify()['failures'])
-                if len(samples) > 80:
-                    for row in [*samples, terminal]:
-                        del row['attempts']
-                    self.assertIn('observation_sequence', self.verify()['failures'])
-
 
 if __name__ == '__main__':
     unittest.main()

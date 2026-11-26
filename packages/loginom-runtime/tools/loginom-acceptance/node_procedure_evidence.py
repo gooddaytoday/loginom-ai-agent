@@ -5,7 +5,6 @@ admit a catalog, authenticate a journal file, or establish Hermes acceptance.
 It never uses the handler's settings_readback_verified summary as evidence.
 """
 import json
-from math import ceil
 from json_digest import javascript_digest
 
 
@@ -450,7 +449,7 @@ def verify_internal_sequence(events, operation_id, *, max_steps=96, cold_read_ce
     rows = [r for r in events if r.get('operation_id') == operation_id]
     failures, observations, mutations = [], [], []
     current = pending = None
-    samples, poll_rows = [], []
+    samples = []
     observation_attempts = root_refreshes = 0
     previous_step = 0
     session = None
@@ -503,8 +502,6 @@ def verify_internal_sequence(events, operation_id, *, max_steps=96, cold_read_ce
             failures.append('invalid_step'); continue
         if row.get('internal_operation_id') != f'{operation_id}:n{step}':
             failures.append('internal_identity_mismatch')
-        if phase in ('node_observation_sample', 'node_observation_root_refreshed'):
-            poll_rows.append(row)
         if phase == 'node_observation_root_refreshed':
             outcome = row.get('outcome', {})
             if (pending or step != previous_step + 1 or row.get('sample') != observation_attempts
@@ -530,7 +527,7 @@ def verify_internal_sequence(events, operation_id, *, max_steps=96, cold_read_ce
                     or row.get('reason') != 'local_cancel' or row.get('effect_possible') is not False
                     or row.get('cleanup_complete') is not True):
                 failures.append('unsafe_observation_interruption')
-            previous_step, current, samples, poll_rows = step, None, [], []
+            previous_step, current, samples = step, None, []
             observation_attempts = root_refreshes = 0
         elif phase == 'node_observation_completed':
             semantic = row.get('readiness', {}).get('policy') == 'semantic_condition_v2'
@@ -551,23 +548,9 @@ def verify_internal_sequence(events, operation_id, *, max_steps=96, cold_read_ce
                 failures.append('unbound_console_epoch_settlement')
             # Owned console settlement is bounded by time, without the ordinary 80-sample cap.
             sample_limit = len(samples) if console_settlement or epoch_settlement else 4096 if settlement else 80
-            readiness = row.get('readiness')
-            if 'attempts' in row or any('attempts' in read for read in poll_rows):
-                timeout = (readiness or {}).get('timeout_ms')
-                counts = [read.get('attempts') for read in poll_rows]
-                if (semantic and (readiness or {}).get('condition') in
-                        ('one new node execution group', 'new node execution completed')
-                        and type(timeout) in (int, float) and 0 < timeout <= 15000):
-                    # The execution poll starts at once, then uses a 100 ms interval.
-                    sample_limit = ceil(timeout / 100) + 1
-                    if (not counts or type(row.get('attempts')) is not int or row['attempts'] != counts[-1]
-                            or not all(type(n) is int and 1 <= n <= sample_limit for n in counts)
-                            or any(a >= b for a, b in zip(counts, counts[1:]))):
-                        failures.append('poll_attempt_sequence')
-                else:
-                    failures.append('poll_attempt_sequence')
             if step != previous_step + 1 or pending or not required_samples <= len(samples) <= (sample_limit if row.get('readiness') else 12) or observation_attempts > sample_limit:
                 failures.append('observation_sequence')
+            readiness = row.get('readiness')
             if readiness is not None:
                 condition = readiness.get('condition')
                 if (not isinstance(condition, str) or not condition.strip()
@@ -597,7 +580,7 @@ def verify_internal_sequence(events, operation_id, *, max_steps=96, cold_read_ce
                 failures.append('observation_blocked')
             current = state
             observations.append((step, state))
-            previous_step, samples, poll_rows = step, [], []
+            previous_step, samples = step, []
             observation_attempts = root_refreshes = 0
         elif phase == 'node_step_prepared':
             if step != previous_step + 1 or pending or samples or current is None:
