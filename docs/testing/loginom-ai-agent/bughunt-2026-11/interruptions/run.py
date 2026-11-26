@@ -12,6 +12,7 @@ import time
 
 HERE = Path(__file__).resolve().parent
 BROWSER_GESTURES = ('close-wizard', 'reload', 'switch-tab', 'kill-cli', 'foreign-dialog')
+LIVE_CHAIN_UNSUPPORTED = 'interruptions/run.py does not support --live-chain. Remove the flag to run interruption cases.'
 
 
 def record(path, **evidence):
@@ -126,6 +127,8 @@ def install_interruption_runner(runner):
     class InterruptionRunner(runner.Runner):
         def __init__(self, directory):
             super().__init__(directory)
+            if self.options.get('live_chain'):
+                raise SystemExit(LIVE_CHAIN_UNSUPPORTED)
             self.deadline = min(self.deadline, float(os.environ.get('LAB_2047_END_AT', self.deadline)))
             self.interruption = None
 
@@ -194,6 +197,8 @@ def run_check():
     spec = importlib.util.spec_from_file_location('run_check', path / 'scripts/node-acceptance/run-check.py')
     runner = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(runner)
+    if getattr(runner.arguments(), 'live_chain', False):
+        raise SystemExit(LIVE_CHAIN_UNSUPPORTED)
     install_interruption_runner(runner)
     runner.__file__ = str(Path(__file__).resolve())
     return runner.main()

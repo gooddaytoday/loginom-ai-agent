@@ -3,6 +3,8 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -17,6 +19,27 @@ RUNNER = Path(os.environ.get('LAB_2047_RUNNER', HERE.parents[4])) / 'scripts/nod
 
 
 class InterruptionFailureTests(unittest.TestCase):
+    def test_live_chain_is_rejected_before_launch_and_on_worker_resume(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            out = root / 'new-run'
+            saved = root / 'saved-run'
+            saved.mkdir()
+            (saved / 'request.json').write_text(json.dumps({'live_chain': True}))
+            (saved / 'results.json').write_text(json.dumps({'started': time.time()}))
+            start = ['start', '--head', '0' * 40, '--scenarios', 'bh-x01', '--cases', str(CASES),
+                     '--pair', str(root / 'missing-pair'), '--out', str(out)]
+            for args in ([*start, '--live-chain'], [*start, '--live'], ['_worker', str(saved)]):
+                with self.subTest(args=args):
+                    result = subprocess.run([sys.executable, '-B', HERE / 'run.py', *args],
+                                            env=dict(os.environ, LAB_2047_RUNNER=str(RUNNER.resolve().parents[2])),
+                                            capture_output=True, text=True, timeout=10)
+                    self.assertEqual(result.returncode, 1)
+                    self.assertEqual(result.stderr.strip(),
+                                     'interruptions/run.py does not support --live-chain. Remove the flag to run interruption cases.')
+            self.assertFalse(out.exists())
+            self.assertFalse((saved / 'worker.log').exists())
+
     def test_manual_failures_keep_stock_status_and_category(self):
         variants = (
             ('bh-x03', 'package-close', 'MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED', 'FAIL', 'product', []),
