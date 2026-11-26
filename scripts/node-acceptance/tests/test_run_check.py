@@ -1915,6 +1915,34 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                     runner.write(follow / 'case.json', bad)
                     runner.scenario('follow-up', cases=root)
 
+    def test_private_case_compares_columns_by_name_unless_the_task_requires_order(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'order-case'
+            source.mkdir()
+            (source / 'task.md').write_text('Show Id and Name')
+            output = dict(columns=[dict(name='Id', type='integer'), dict(name='Name', type='string')],
+                          rows=[dict(Id=1, Name='A'), dict(Id=2, Name='B')], ordered=True, column_order='exact')
+            runner.write(source / 'expected.json', dict(nodes=[], outputs=[output]))
+            table = root / 'result.csv'
+            table.write_text('Name,Id\nA,1\nB,2\n')
+            def load():
+                spec = runner.scenario(source.name, cases=root)
+                return runner.expected_for(spec, '/package.lgp')['outputs'][0]
+            by_name = load()
+            self.assertEqual(by_name, {**output, 'column_order': 'any'})
+            runner.check_csv(table, by_name)
+            table.write_text('Name,Id\nB,2\nA,1\n')
+            with self.assertRaises(AssertionError):
+                runner.check_csv(table, by_name)
+            table.write_text('Name,Id\nA,1\nB,2\n')
+            (source / 'task.md').write_text('Show Id and Name in this column order')
+            runner.write(source / 'case.json', dict(column_order='exact'))
+            exact = load()
+            self.assertEqual(exact, output)
+            with self.assertRaisesRegex(AssertionError, 'CSV_COLUMN_ORDER'):
+                runner.check_csv(table, exact)
+
     def test_private_case_chains_resolve_root_first_and_limit_depth(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
