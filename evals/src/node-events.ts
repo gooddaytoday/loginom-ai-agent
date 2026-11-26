@@ -55,12 +55,13 @@ export function successful(call: NodeCall) {
   return call.output.status === "SUCCEEDED" && call.output.cleanup_complete === true && call.output.error == null
 }
 
-export function operationReceipts(events: NodeEvents) {
+export function operationReceipts(events: NodeEvents, isRequest = (call: NodeCall) =>
+  call.tool.endsWith("node_apply") || call.tool.endsWith("node_read")) {
   const requests = new Map<string, NodeCall>()
   const receipts: { request: NodeCall; receipt: NodeCall }[] = []
   const failures = [...events.failures]
   for (const call of events.calls) {
-    if (call.tool.endsWith("node_apply") || call.tool.endsWith("node_read")) {
+    if (isRequest(call)) {
       const op = call.input.operation_id
       if (typeof op !== "string") { failures.push("events: missing operation_id"); continue }
       const previous = requests.get(op)

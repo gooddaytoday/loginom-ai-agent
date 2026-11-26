@@ -10,6 +10,7 @@ import { loadTasks } from "../src/task"
 const age = "age-pressure-correlation"
 const cohort = "observed-purchase-cohort-retention-business"
 const node = { document_id: "12345678-abcd-4321-8910-123456789012", workflow_id: "12345678-abcd-4321-8910-123456789012-1", node_id: "abcdef01-2345-4678-8910-abcdef012345" }
+const anotherNode = { ...node, node_id: "abcdef01-2345-4678-8910-abcdef012346" }
 const artifact_id = "12345678-abcd-4321-8910-123456789013"
 const grant_id = "12345678-abcd-4321-8910-123456789014"
 const execution_id = `${node.document_id}:141:1`
@@ -39,6 +40,13 @@ async function judgeEvidence(id: string, change = (calls: Fixture) => {}) {
     },
     wait: { ...success, operation_id: "import" },
     extra: "",
+    deliveryReceipt: "direct",
+    deliveryStatusOperation: "delivery",
+    nodeCompletion: "node_wait",
+    separateRead: false,
+    readExecution: execution_id,
+    readMode: undefined,
+    secondImport: undefined,
     laterReceipts: 0,
   }
   change(calls)
@@ -47,18 +55,39 @@ async function judgeEvidence(id: string, change = (calls: Fixture) => {}) {
       status: "completed", input, output: JSON.stringify(output), time: { start: seq * 10, end: seq * 10 + 1 },
     } },
   })
+  const updatedNode = calls.secondImport === "distinct" ? anotherNode : node
   const events = [
     tool(1, "prepare", {}, calls.prepare),
-    tool(2, "artifact_deliver", { operation_id: "delivery", artifact_id, upload_grant_id: grant_id }, calls.deliver),
+    tool(2, "artifact_deliver", { operation_id: "delivery", artifact_id, upload_grant_id: grant_id },
+      calls.deliveryReceipt === "direct" ? calls.deliver : { operation_id: "delivery", state: "running" }),
+    ...(calls.deliveryReceipt === "direct" ? [] : [
+      tool(2.5, `artifact_delivery_${calls.deliveryReceipt}`, { operation_id: calls.deliveryStatusOperation }, calls.deliver),
+    ]),
     tool(3, "node_apply", {
       operation_id: "import", document_id: node.document_id, workflow_ref: { workflow_id: node.workflow_id }, target: { kind: "new", type: "imports.text" },
       parameters: { source: { kind: "verified_delivery", artifact_id, upload_operation_id: "delivery:upload" } },
     }, { operation_id: "import", state: "running" }),
-    tool(4, "node_wait", { operation_id: "import" }, {
-      ...calls.wait, node, configuration: { status: "applied", readback: calls.readback }, execution: calls.execution, output: calls.output,
+    tool(4, calls.nodeCompletion, { operation_id: "import" }, {
+      ...calls.wait, node, configuration: { status: "applied", readback: calls.readback }, execution: calls.execution, output: calls.separateRead ? undefined : calls.output,
     }),
+    ...(calls.separateRead ? [tool(5, "node_read", { operation_id: "read-import", source_operation_id: "import", execution: calls.readMode }, {
+      ...success, operation_id: "read-import", node, execution: { ...calls.execution, execution_id: calls.readExecution },
+      output: { ...calls.output, execution_id: calls.readExecution, ports: calls.output.ports.map(port => ({ ...port, execution_id: calls.readExecution })) },
+    })] : []),
+    ...(calls.secondImport ? [
+      tool(6, "node_apply", {
+        operation_id: "another-import", document_id: node.document_id, workflow_ref: { workflow_id: node.workflow_id },
+        target: calls.secondImport === "distinct" ? { kind: "new", type: "imports.text" } : { kind: "existing", type: "imports.text", ref: node },
+        parameters: { source: { kind: "verified_delivery", artifact_id, upload_operation_id: "delivery:upload" } },
+      }, { operation_id: "another-import", state: "running" }),
+      tool(7, "node_wait", { operation_id: "another-import" }, {
+        ...success, operation_id: "another-import", node: updatedNode,
+        configuration: { status: "applied", readback: { ...calls.readback, node: updatedNode } },
+        execution: { ...calls.execution, execution_id: `${node.document_id}:142:1` },
+      }),
+    ] : []),
     ...Array.from({ length: calls.laterReceipts }, (_, index) =>
-      tool(5 + index, "node_wait", { operation_id: "unrelated" }, { detail: "a".repeat(10_000) })),
+      tool(10 + index, "node_wait", { operation_id: "unrelated" }, { detail: "a".repeat(10_000) })),
     JSON.stringify({ type: "tool_use", sessionID: "synthetic-session", part: { type: "tool", tool: "loginom_search",
       state: { status: "completed", output: "Example with {unparseable}" } } }),
     calls.extra,
@@ -85,6 +114,13 @@ type Fixture = {
   execution: { execution_id: string; status: string }
   output: { status: string; execution_id: string; ports: { port: number; fresh: boolean; execution_id: string; freshness_basis: string; schema: { name: string; type: string }[]; sample: { type: string; value: string | null; is_null: boolean; precision: string }[][] }[] }
   wait: { operation_id: string; status: string }
+  deliveryReceipt: "direct" | "status" | "resume"
+  deliveryStatusOperation: string
+  nodeCompletion: "node_wait" | "node_status"
+  separateRead: boolean
+  readExecution: string
+  readMode?: "existing" | "execute"
+  secondImport?: "distinct" | "reconfigure"
   laterReceipts: number
   extra: string
 }
@@ -147,4 +183,53 @@ test("an empty string, failed read, stale output or foreign node cannot prove th
     const { proof } = await judgeEvidence(cohort, change)
     expect(proof?.cohort_sample).toBeUndefined()
   }
+})
+
+
+test("a later fresh read can prove I08 for the original import execution only", async () => {
+  for (const mode of [undefined, "existing"] as const) {
+    const matched = await judgeEvidence(cohort, calls => {
+      calls.separateRead = true
+      calls.readMode = mode
+    })
+    expect(matched.proof?.cohort_sample?.customer_id).toEqual({ type: "string", value: null, is_null: true, precision: "exact_null" })
+  }
+  const changed = await judgeEvidence(cohort, calls => {
+    calls.separateRead = true
+    calls.readExecution = `${node.document_id}:142:1`
+  })
+  expect(changed.proof?.cohort_sample).toBeUndefined()
+  const rerun = await judgeEvidence(cohort, calls => {
+    calls.separateRead = true
+    calls.readMode = "execute"
+  })
+  expect(rerun.proof?.cohort_sample).toBeUndefined()
+})
+
+test("a later applied configuration of the same importer supersedes its older sample", async () => {
+  const { proof, expected } = await judgeEvidence(cohort, calls => { calls.secondImport = "reconfigure" })
+  expect(proof).toEqual({ ...expected, execution_id: `${node.document_id}:142:1` })
+})
+
+test("judge can match multiple distinct valid importers to their saved graph", async () => {
+  const { proof, expected } = await judgeEvidence(age, calls => { calls.secondImport = "distinct" })
+  expect(proof).toEqual({ imports: [
+    expected,
+    { ...expected, node: anotherNode, execution_id: `${node.document_id}:142:1` },
+  ] })
+})
+
+test("settled Dock status and resume results are bound to their original operations", async () => {
+  for (const via of ["status", "resume"] as const) {
+    const { proof, expected } = await judgeEvidence(age, calls => {
+      calls.deliveryReceipt = via
+      calls.nodeCompletion = "node_status"
+    })
+    expect(proof).toEqual(expected)
+  }
+  const foreign = await judgeEvidence(age, calls => {
+    calls.deliveryReceipt = "status"
+    calls.deliveryStatusOperation = "another-upload"
+  })
+  expect(foreign.proof).toBeUndefined()
 })

@@ -1,9 +1,12 @@
 import path from "node:path"
-import { after, operationReceipts, readNodeEvents, successful } from "./node-events"
+import { after, operationReceipts, readNodeEvents, type NodeCall } from "./node-events"
 import type { Task } from "./task"
 
-const tools = new Set(["loginom_dock_prepare", "loginom_dock_artifact_deliver", "loginom_dock_node_apply",
-  "loginom_dock_node_wait", "loginom_dock_node_resume"])
+const nodeTools = new Set(["loginom_dock_node_apply", "loginom_dock_node_wait", "loginom_dock_node_resume",
+  "loginom_dock_node_read", "loginom_dock_node_status"])
+const deliveryTools = new Set(["loginom_dock_artifact_deliver", "loginom_dock_artifact_delivery_resume",
+  "loginom_dock_artifact_delivery_status"])
+const tools = new Set(["loginom_dock_prepare", ...nodeTools, ...deliveryTools])
 
 export async function inputDelivery(task: Task, artifactDir: string, sessionId: string) {
   const file = task.id === "age-pressure-correlation" ? "data/dataset.csv"
@@ -22,17 +25,18 @@ export async function inputDelivery(task: Task, artifactDir: string, sessionId: 
     }
   })()
   if (!events) return
-  const calls = events.calls
-  const { receipts, failures } = operationReceipts(events)
-  if (failures.length) return
+  const nodes = operationReceipts({ ...events, calls: events.calls.filter(call => nodeTools.has(call.tool)) })
+  const deliveries = operationReceipts({ ...events, calls: events.calls.filter(call => deliveryTools.has(call.tool)) },
+    call => call.tool === "loginom_dock_artifact_deliver")
+  if (nodes.failures.length || deliveries.failures.length) return
   const input = path.basename(file)
   const sha256 = new Bun.CryptoHasher("sha256").update(data).digest("hex")
   const bytes = data.length
   const proofs = []
 
-  for (const { request, receipt } of receipts) {
-    if (request.tool !== "loginom_dock_node_apply" ||
-      receipt.input.operation_id !== request.input.operation_id || (receipt !== request && !after(receipt, request))) continue
+  const settled = nodes.receipts.filter(pair => boundResult(pair.receipt, pair.request))
+  for (const { request, receipt } of settled) {
+    if (request.tool !== "loginom_dock_node_apply") continue
     const result = receipt.output
     const node = result.node
     const readback = result.configuration?.readback
@@ -44,17 +48,20 @@ export async function inputDelivery(task: Task, artifactDir: string, sessionId: 
       request.input.document_id !== node.document_id || request.input.workflow_ref?.workflow_id !== node.workflow_id ||
       !safeId(execution.execution_id)) continue
 
-    const port = freshPort(result, execution.execution_id)
     if (!sameNode(node, readback.node) || request.input.target.kind === "existing" && !sameNode(node, request.input.target.ref)) continue
 
-    for (const delivery of calls) {
-      const output = delivery.output.output
-      if (delivery.tool !== "loginom_dock_artifact_deliver" || !successful(delivery) ||
-        delivery.output.state !== "settled" || typeof delivery.input.operation_id !== "string" ||
-        delivery.output.operation_id !== delivery.input.operation_id ||
+    const superseded = settled.some(change => change.request.tool === "loginom_dock_node_apply" &&
+      after(change.request, request) && change.request.input.target?.kind === "existing" &&
+      sameNode(node, change.request.input.target.ref) && sameNode(node, change.receipt.output.node) &&
+      change.receipt.output.configuration?.status === "applied")
+    if (superseded) continue
+
+    for (const delivery of deliveries.receipts) {
+      const output = delivery.receipt.output.output
+      if (!boundResult(delivery.receipt, delivery.request) ||
         output?.status !== "SUCCEEDED" || output.cleanup_complete !== true || output.upload_completion_verified !== true ||
-        output.sha256 !== sha256 || output.bytes !== bytes || !after(request, delivery) ||
-        !isUuid(delivery.input.artifact_id) || delivery.input.artifact_id !== parameters.artifact_id ||
+        output.sha256 !== sha256 || output.bytes !== bytes || !after(request, delivery.receipt) ||
+        !isUuid(delivery.request.input.artifact_id) || delivery.request.input.artifact_id !== parameters.artifact_id ||
         typeof output.upload_operation_id !== "string" || !output.upload_operation_id || output.upload_operation_id !== parameters.upload_operation_id) continue
 
       const destination = output.destination
@@ -62,17 +69,38 @@ export async function inputDelivery(task: Task, artifactDir: string, sessionId: 
         path.posix.normalize(destination) !== destination || /[\x00-\x1f\x7f\\]/.test(destination)) continue
       const name = path.posix.basename(destination)
       if (name !== input && !name.endsWith(`-${input}`)) continue
-      const prepared = calls.some(prepare => prepare.tool === "loginom_dock_prepare" && prepare.output.prepared === true &&
-        after(delivery, prepare) && Array.isArray(prepare.output.input_artifacts) &&
+      const prepared = events.calls.some(prepare => prepare.tool === "loginom_dock_prepare" && prepare.output.prepared === true &&
+        after(delivery.request, prepare) && Array.isArray(prepare.output.input_artifacts) &&
         prepare.output.input_artifacts.some((item: { name?: string; artifact_id?: string; sha256?: string; bytes?: number; upload?: { grant_id?: string; destination?: string } }) =>
-          item?.name === name && item.artifact_id === delivery.input.artifact_id && item.sha256 === sha256 && item.bytes === bytes &&
-          isUuid(delivery.input.upload_grant_id) && item.upload?.grant_id === delivery.input.upload_grant_id && item.upload?.destination === destination))
+          item?.name === name && item.artifact_id === delivery.request.input.artifact_id && item.sha256 === sha256 && item.bytes === bytes &&
+          isUuid(delivery.request.input.upload_grant_id) && item.upload?.grant_id === delivery.request.input.upload_grant_id && item.upload?.destination === destination))
       if (!prepared) continue
+      const cohort_sample = input === "purchase_lines.csv" ? [result, ...settled
+        .filter(read => read.request.tool === "loginom_dock_node_read" && after(read.request, receipt) &&
+          (read.request.input.execution === undefined || read.request.input.execution === "existing") &&
+          read.request.input.source_operation_id === request.input.operation_id &&
+          sameNode(node, read.receipt.output.node) && read.receipt.output.execution?.status === "completed" &&
+          read.receipt.output.execution.execution_id === execution.execution_id)
+        .map(read => read.receipt.output)]
+        .map(output => freshPort(output, execution.execution_id))
+        .map(port => port && cohortSample(port))
+        .find(sample => sample !== undefined) : undefined
       proofs.push({ input, bytes, sha256, destination, node: { document_id: node.document_id, workflow_id: node.workflow_id, node_id: node.node_id },
-        execution_id: execution.execution_id, cohort_sample: input === "purchase_lines.csv" && port ? cohortSample(port) : undefined })
+        execution_id: execution.execution_id, cohort_sample })
     }
   }
-  return proofs.findLast(proof => proof.cohort_sample) ?? proofs.at(-1)
+  const latest = new Map<string, (typeof proofs)[number]>()
+  for (const proof of proofs) {
+    const key = JSON.stringify(proof.node)
+    const previous = latest.get(key)
+    if (!previous?.cohort_sample || proof.cohort_sample || proof.execution_id !== previous.execution_id) latest.set(key, proof)
+  }
+  const imports = [...latest.values()]
+  return imports.length > 1 ? { imports } : imports[0]
+}
+
+function boundResult(receipt: NodeCall, request: NodeCall) {
+  return receipt.input.operation_id === request.input.operation_id && (receipt === request || after(receipt, request))
 }
 
 function isUuid(value: unknown): value is string {
