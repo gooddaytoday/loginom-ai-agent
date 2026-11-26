@@ -25601,3 +25601,124 @@ safeStorage прошли; `Run package-local checks` упал в `electron-build
   `hdiutil` и `codesign` нельзя: задание выдаёт раннер только после сборки; число занимаемых раннеров уже минимально
   (один на сборку, один на проверку). Повтор запуска — единственный способ, если очередь снова не выдаст раннер.
 - `actionlint` 1.7.7 по пяти workflow — 0 строк.
+
+## B6.2b Перенос профилей, SEC-01 и установленный Linux на артефакте CI
+
+26.11.2026. Ветка `b62b-linux-data` от `oc2-migration` (`abb6374106`), рабочее дерево `.claude/worktrees/b62b`. Эталон 0.4 — `v0.4.2` (В-110).
+Это задача 2 плана B6.2-S. Код продукта не менялся; изменены только `scripts/live-profiles/live.mjs` (опция `--profile`) и добавлены два скрипта в
+`scripts/candidate-check/`. Настоящая модель не вызывалась: профили писала подставная модель обвязки на `127.0.0.1` (10 вызовов на профиль, 2 на каждый `serve`
+с вопросом), матрица Docker идёт с `--network none`. Протоколы без секретов — `~/.local/share/loginom-evidence/b62b/` (`live/`, `matrix/`, `sec01/`,
+`artifact-sha256.txt`, `fetch.log`).
+
+### Артефакт
+
+`scripts/candidate-check/fetch-linux.sh 9e20d6cf53cd33b96a25c47d5cc5afa57872a854 <каталог>` — run `Loginom Linux` 45777962664 (последний зелёный Linux; `Loginom Windows
+candidate` и macOS на этом SHA без успешного run, скрипт это печатает). Все `SHA256SUMS` — OK. `cli-manifest.json`: версия `0.0.0-dev-5`, канал `dev`,
+`sourceCommit` `9e20d6cf53…`, `sourceDirty: false`.
+
+| Файл | SHA-256 |
+|---|---|
+| `loginom-ai-agent-cli-0.0.0-dev-5-linux-x64.tar.gz` | `2c8d4ed4…116fc` |
+| `loginom-ai-agent-linux-amd64.deb` | `cbf23604…e062` |
+| `loginom-ai-agent-linux-x86_64.AppImage` | `22067036…3f75` |
+| `loginom-ai-agent-linux-x86_64.rpm` | `6e2ed3c3…4e9b` |
+
+Профили писали выпущенные AppImage из `gooddaytoday/loginom-ai-agent`: `v0.3.9` (`d7e64fa0…`, как в B3.3) и `v0.4.2` (`53372997…d107`; в B3.3 был `v0.4.0`). Оба совпали с `SHA256SUMS.txt`.
+
+### Что выбрано меньшим вариантом
+
+- **CLI не принимает каталог Desktop.** В B3.3 бинарник `opencode` читал `~/.local/share/loginom-ai-agent`. `loginom-ai-agent-cli` работает в своём профиле
+  (`~/.config/com.loginom.aiagent.dev/cli/profiles/default/{data,config,…}`, `packages/cli/src/profile.ts`: каталог Desktop — `PROFILE_DESKTOP_ROOT`, чужие данные — `PROFILE_FORMAT_INVALID`),
+  а канал артефакта — `dev`. Поэтому на «чужой» профиль `serve` просто создаёт пустой. Выбрано: `live.mjs v2 --profile <корень>` кладёт данные и конфиг, записанные AppImage, в профиль CLI,
+  который CLI считает своим (`cli-profile.json`, `0700`), и запускает CLI с `LOGINOM_AI_AGENT_CLI_PROFILE`. Это перенос базы 0.3.9/0.4 защитой B3.1b и командой `migrate` в профиле CLI. Приём каталога
+  Desktop 0.4 самим Desktop v2 проверен отдельно, на установленном DEB (матрица ниже, профиль `v0.4.2`).
+- **Матрица Docker — от root.** `lrun` не в группе `docker`. Всё остальное (профили, CLI, SEC-01) — от `lrun` (uid 1001), не root.
+- **SEC-01 — уровень B4.14a (В-86):** кодек `safeStorage`, Linux. Журналы, UI API и экспорт диагностики установленного Desktop — шлюз C.
+- **Установленный CLI.** `install.sh` требует sudo ради `chrome-sandbox`. Распаковано как у `INSTALL.md` (`tar --same-permissions` от `lrun`), затем `chrome-sandbox` — `root:root 4755`, как делает установщик.
+
+### Результаты
+
+**B3.3 Linux** (`b62b-linux.sh`; AppImage в `rel/<версия>/squashfs-root`, Node из ресурсов приложения, `xvfb-run --no-sandbox`, свой `HOME` на профиль; CLI — из артефакта).
+
+| | 0.3.9 `serve` | 0.3.9 `migrate` | 0.4.2 `serve` | 0.4.2 `migrate` |
+|---|---|---|---|---|
+| Профиль `old`: сессии / сообщения / части; миграций; вызовов модели | 4 / 11 / 26; 38; 10 | то же | 4 / 11 / 26; 38; 10 | то же |
+| Сессии в `GET /api/session` | 4/4 | 4/4 | 4/4 | 4/4 |
+| Сообщения v1 по ID | 2/2, 3/3, 4/4, 2/2; пропавших 0 | то же | то же | то же |
+| Сессии каталога в своём проекте (`Анализ продаж`, `repo`) | 3/3, 1/1 | 3/3, 1/1 | 3/3, 1/1 | 3/3, 1/1 |
+| Навык `b33-sales-summary` из конфига; провайдер | да; да | да; да | да; да | да; да |
+| Запрос к модели без ввода ключа: ключ старого профиля, вызовов | да, 2 | да, 2 | да, 2 | да, 2 |
+| `v1-backup.db` = исходная база (SHA-256) | да, `cdce7a82…` | да | да, `47a8b3e1…` | да |
+| Второй `serve`: те же сессии; резерв тот же; второй копии, `.migrating`, блокировки нет | да | да | да | да |
+| `migrate`: код; повтор | — | 0, «Source 4/11/26», «Written 4 sessions, 13 messages»; повтор — «Already migrated», 0, файлы базы те же | — | то же |
+| `migrate` после двух `serve`: «Already migrated», код 0, `.db`/`-wal` те же | да | да | да | да |
+| Конфиг с навыком, `auth.json`, userData Desktop — побайтно те же | да | да | да | да |
+| Готовность первого `serve`, мс | 4564 | 4072 | 5178 | 4943 |
+
+Числа как в B3.3 (4/11/26, 38 миграций, 13 сообщений v2 вместо 11, 10 вызовов модели). Готовность 4–5 с вместо 0,4 с B3.3 — нагрузка соседей (load 7–10) и проверка ресурсов
+пакета при старте; не сравнивалось.
+Журнал `migrated a Loginom AI Agent 0.3.9/0.4 database before opening it` — по одной строке на путь `serve`, на пути `migrate` её нет.
+
+**SEC-01 Linux (B4.14a).** `b62b-sec01-linux.sh`: кодек `loginom-host/src/connection/credentials.ts` в Electron 44.9.1, три режима `safe-storage-smoke.cjs`, обычный пользователь, свой `HOME`.
+Журналы CI из артефакта (`loginom-linux-x64-desktop`) и локальный прогон совпали, кроме `pid`:
+
+```text
+write:       {"mode":"write","platform":"linux","plaintext":true,"roundtrip":true,"protectionAvailable":false,"encryptedRejected":true}
+read:        {"mode":"read", … те же поля}
+unavailable: {"mode":"unavailable","platform":"linux","plaintext":true,"encryptedRejected":true,"forcedPlatformsRejected":["win32","darwin"]}   must-not-exist.json: absent
+```
+
+Повреждённый шифротекст и перенос ключа Electron 42 → 44 на Linux не проверяются (шифротекста нет, B4.14a «Не проверено»).
+
+**Установленный Linux** (`run-matrix.ts`, DEB и AppImage артефакта, `--shutdown 3 --profile <профиль 0.4.2, переименованный в имена канала dev, владелец UID 1200>`):
+
+| | Итог |
+|---|---|
+| PKG-02: хеши, `--verify-resources` 0, Chromium с песочницей | PASS на 10 целях (Ubuntu 22.04/24.04/26.04, Debian 12/13; DEB и AppImage); `--verify-resources` 4,5–8,1 с |
+| PKG-01: окно, renderer без мастера («Projects Add project Settings Help»), служба `0.0.0-dev-5` | PASS на 10 целях; окно 538–885 мс |
+| LIFE-01 (5 образов DEB): закрытие 3/3 и `SIGTERM` 3/3 на образ; повторный запуск 5/5 на образ | 30 из 30, выход 236–525 мс, код 0, после выхода процессов и регистрации нет |
+| Перенос 0.4.2 → Desktop v2 на DEB: подключение | один `moved`, поколение 2; остальные запуски — `current` (31 запуск) |
+| База 0.4.2: перенос при первом запуске, `v1-backup.db` = исходная | да, одна строка журнала, `47a8b3e1…` |
+
+`ubuntu22-appimage` в общем прогоне — FAIL 126 по моей ошибке (`chown -R` оставил AppImage `0700`, UID 1200 его не читает; артефакты `gh` приходят `0600`). После `chmod 755` повтор —
+первый раз FAIL на `apt-get update` (зеркало, фаза `install`, код 100, сеть), второй раз PASS. Остальные девять целей — PASS с первого раза.
+
+### Как перезапустить на итоговом SHA
+
+```text
+# root, gh (6–7 мин, 5 ГБ; артефакты живут 14 дней)
+sh scripts/candidate-check/fetch-linux.sh <40-знаковый SHA> <art>
+chmod a+rx <art>/*/loginom-linux-x64-desktop/*.AppImage; chmod a+r <art>/*/loginom-linux-x64-desktop/*.deb   # UID 1200 в Docker
+# CLI для lrun: не chown -R и не chmod после распаковки, иначе пропадает 4755 и CLI отвечает LOGINOM_BUNDLE_INCOMPLETE
+mkdir <cli>; chown lrun <cli>; runuser -u lrun -- tar --same-permissions -xzf <art>/*/loginom-linux-x64-cli/*.tar.gz -C <cli>
+chown root:root <cli>/resources/loginom/browsers/chromium-1246/chrome-linux64/chrome-sandbox; chmod 4755 <та же>
+# B3.3: <rels>/0.3.9 и <rels>/0.4.2 — squashfs-root от AppImage (gh release download -R gooddaytoday/loginom-ai-agent); <work> с состоянием `old` уже есть,
+# повтор делает только `v2` (~8 мин); скрипты скопировать туда, куда lrun может войти (/root закрыт)
+runuser -u lrun -- bash scripts/candidate-check/b62b-linux.sh <cli>/bin/loginom-ai-agent-cli <rels> <work>
+# SEC-01 (Bun 1.4.4, Node 24.19.0 в PATH; Electron 44: node packages/desktop/node_modules/electron/install.js)
+scripts/candidate-check/b62b-sec01-linux.sh <work-sec01>; diff с <art>/*/loginom-linux-x64-desktop/safe-storage-*.json (без pid)
+# установленный Linux (root, Docker; ~45 мин; TMPDIR — свой каталог; профиль — копия профиля 0.4.2 с именами канала dev, chown 1200)
+cd packages/desktop && bun test/loginom/docker/run-matrix.ts --artifact <deb> --appimage <AppImage> --output <out> --image-prefix b62b-matrix --shutdown 3 --profile <profile>
+```
+
+### Найдено, не чинил
+
+1. **`fetch-linux.sh`** распаковывает CLI без `--same-permissions` и без `chrome-sandbox` `root:root 4755`; под не-root с umask 077 манифест не сойдётся
+   (`LOGINOM_MANIFEST_PAYLOAD_MISMATCH`). Его `--version` под root проходит. Скрипт не менял (чужая задача), порядок — выше.
+2. **CLI не продолжает профиль Desktop 0.3.9/0.4** (по замыслу, `profile.ts`). План B6.2-S («профили 0.3.9 и 0.4.x → кандидат» через `live.mjs v2`) для CLI в этой форме неисполним; для Desktop v2 перенос проверяет матрица.
+3. **Заголовок окна X** в smoke — «Loginom AI Agent» или «Loginom AI Agent Dev» вперемешку (5 из 10 целей), документ — всегда «Loginom AI Agent». В B4.14b было только без `Dev`. Smoke проходит в обоих случаях; причину не искал (гонка заголовка окна и документа?).
+
+### Не проверено
+
+Windows (стенд, DPAPI) и macOS — вне задачи 2. Мутации G1–G6 — задача 1. SEC-01 уровня шлюза C. `live.mjs old` на Windows. Сессии с живой моделью.
+Повторный прогон на итоговом SHA не делался: артефакт — `9e20d6cf53`, не итоговый.
+
+### Проверки дерева
+
+```text
+$ cd packages/product && bun test                                   # 95 pass, 0 fail
+$ python3 -I scripts/upstream-sync/catalog-check.py                 # код 0 (625 divergent upstream files)
+$ python3 -I scripts/upstream-sync/apply-identity.py --check        # would change: 0 files
+$ bun run check                                                     # код 0, Tasks: 39 successful, 39 total (Cached: 39, пакеты не менялись)
+$ prettier --check / oxlint scripts/live-profiles/live.mjs          # чисто, 0 warnings, 0 errors
+```
