@@ -26051,3 +26051,34 @@ packages/product   bun test           115 pass, 0 fail
 Проверки: `actionlint` 0 строк; разбор PowerShell всех шагов `pwsh` и `script/*.ps1` и скриптов smoke — `errors: 0`; Desktop
 44 теста 0 падений, `windows-sidecar-smoke.test.mjs` без падений; `product` — 0 падений; `catalog-check.py` 0; `apply-identity
 --check` 0 файлов; `bun run check` 0. Проверит только CI: чистый прогон на раннере и сам `Remove-Leftover`.
+
+## B6.1-C Закрытие пакета и модель проверки
+
+Основа: `45069384ab`, ветка `bcleanup-saved-package`. Эталон — `v0.4.2` (В-110). Находки B6.1-A: итог приёмки `FAIL: MAIN_CLEANUP_UNCONFIRMED`
+при выполненной моделью задаче, и `VARIANT='medium'` в `run-check.py` после слияния `v0.4.2`.
+
+**1. Закрытие сохранённого пакета.** В `v0.4.2` (`standalone-run.ts:81`) `closeSavedPackageOnShutdown: mode === "run"`: включает только
+обычный `run` CLI; служба, Desktop, TUI, `serve`, проверка соединения и готовность не включают. В этом режиме
+`loginom-runtime/client/lib/bridge.mjs:959` пишет `saved-package-cleanup.json` (без режима — `package-cleanup.json`), его и ждёт
+`run-check.py`; обвязку не менял. В v2 Host запускает процесс сервера, а не `run`, поэтому режим передан через среду, как
+`LOGINOM_AI_AGENT_HEADLESS` (B2.7a4b): `Standalone.forward` для `run` записывает `LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE=1`
+(`cli/src/standalone.ts`), `nodeHost` (`loginom-agent/src/host.ts`) передаёт `closeSavedPackageOnShutdown` только в процессе CLI
+(`LOGINOM_AI_AGENT_CLI_ROOT`) и только при этом значении. Новых контрактов нет: параметр и таймауты (45/60/90 с) уже были в `loginom-host`.
+Тест `cli/test/run-saved-package.test.ts`: настоящий Node-процесс с подставным Host, записывающим полученный `start`; `run` и
+`run --headless` дают `true`, `serve --stdio` — `false`. Мутации: без записи среды в `forward` — красный; без параметра в `nodeHost` — красный.
+Тест `run/product.test.ts` обновлён под новую запись среды `run`. Квитанцию настоящего рантайма это не проверяет: нужен живой прогон.
+
+**2. Модель.** `v0.4.2` вернул (коммит `0f2b259ad1`) `MODEL` из `RUN_CHECK_MODEL`, `VARIANT=medium`, `AUTH` (общий OAuth), проверку
+`TWO_TURN_REQUIRES_DEFAULT_MODEL`, `--variant` в команде `run` и `model=MODEL/VARIANT` в `results.json`. Всё убрано: одна константа
+`MODEL = 'deepseek/deepseek-flash'`, без варианта и общего OAuth (B6.1-T). Остальные `.py` (`run-check-two-turn.py`, `make-pair.py`)
+чисты. Тест `test_model_is_one_constant_without_variant_or_shared_auth` (мутация `MODEL=gpt-6.1-sol` и `VARIANT` краснит),
+тест команды проверяет отсутствие `--variant`. Старый тест «модель из среды» заменён; `run-check.md` исправлен.
+Не тронуто (вне `scripts/node-acceptance`): `docs/node-development/RUNBOOK.md:19` и `workflow/acceptance-cli.md:3` по-прежнему называют
+`openai/gpt-6.1-sol` (medium).
+
+Проверки (Bun 1.4.4, Node 24.19.0):
+- `python3 -B -m unittest discover -p 'test_*.py'` в `scripts/node-acceptance/tests`: 235 тестов, OK; мутация краснит.
+- `node --test scripts/node-acceptance/tests/*.test.mjs` из корня дерева: 812 pass, 23 fail; на базе 811/24 — падения в окружении, не от правки.
+- `packages/product`: 115 pass, 0 fail. `packages/loginom-agent`: 106 pass, 24 fail — те же 24 (тесты dashboard, миллисекунды) без правки, против базы.
+- `packages/cli` (весь пакет): 2 падения, те же на базе `45069384ab` (`loginom commands with the real Node host`, `standalone dashboard preserves explicit publication approval`: `DASHBOARD_RESOURCES_MISSING`); третье, `dashboard flags preserve…` в `cli-dashboard.test.ts`, внесла эта правка (новая запись среды `run`), тест исправлен. `bun typecheck`: `cli`, `loginom-agent` без ошибок.
+- `catalog-check.py` код 0; `apply-identity.py --check`: would change: 0 files.

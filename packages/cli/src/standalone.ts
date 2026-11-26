@@ -92,6 +92,8 @@ export function forward(args: string[], cwd: string, env: NodeJS.ProcessEnv = pr
   if (rest[0] !== "run") return { args: [...rest, ...args.slice(boundary)] }
   if (options.includes("--headless")) env.LOGINOM_AI_AGENT_HEADLESS = "1"
   else delete env.LOGINOM_AI_AGENT_HEADLESS
+  // As 0.4.2's `mode === "run"` (`standalone-run.ts`): only an ordinary run closes its own saved package at its end.
+  env.LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE = "1"
   const command = take(rest, "--command")
   // An empty `--command=` names no skill: 0.4 tested `!args.command`, so it was an ordinary prompt.
   if (!command) delete env.LOGINOM_AI_AGENT_RUN_COMMAND

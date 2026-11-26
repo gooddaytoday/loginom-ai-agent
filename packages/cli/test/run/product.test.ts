@@ -384,14 +384,14 @@ describe("flags of the product run", () => {
     expect(
       Standalone.forward(["run", "--headless", "--command", "loginom-automation", "--", "--command", "x"], "/w", env),
     ).toEqual({ args: ["run", "--", "--command", "x"], directory: undefined })
-    expect(env).toEqual({ LOGINOM_AI_AGENT_HEADLESS: "1", LOGINOM_AI_AGENT_RUN_COMMAND: "loginom-automation" })
+    expect(env).toEqual({ LOGINOM_AI_AGENT_HEADLESS: "1", LOGINOM_AI_AGENT_RUN_COMMAND: "loginom-automation", LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE: "1" })
     expect(Standalone.forward(["serve", "--stdio"], "/w", env).args).toEqual(["serve", "--stdio"])
-    expect(env).toEqual({ LOGINOM_AI_AGENT_HEADLESS: "1", LOGINOM_AI_AGENT_RUN_COMMAND: "loginom-automation" })
+    expect(env).toEqual({ LOGINOM_AI_AGENT_HEADLESS: "1", LOGINOM_AI_AGENT_RUN_COMMAND: "loginom-automation", LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE: "1" })
     expect(Standalone.forward(["run", "--no-headless", "--command=package-docs", "hi"], "/w", env).args).toEqual([
       "run",
       "hi",
     ])
-    expect(env).toEqual({ LOGINOM_AI_AGENT_RUN_COMMAND: "package-docs" })
+    expect(env).toEqual({ LOGINOM_AI_AGENT_RUN_COMMAND: "package-docs", LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE: "1" })
     Standalone.forward(["run", "hi"], "/w", env)
     expect(env).toEqual({})
     expect(() => Standalone.forward(["run", "--command"], "/w", {})).toThrow("CLI_ARGUMENT_INVALID")

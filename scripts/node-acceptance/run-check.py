@@ -27,11 +27,6 @@ SCENARIOS = {
     'C1': dict(model_timeout=2700),
     '5-REST': dict(model_timeout=2700),
 }
-# Model under test. Default is the established shared-OAuth model; RUN_CHECK_AUTH
-# points to an auth.json linked (never copied) into each profile for other providers.
-MODEL = os.environ.get('RUN_CHECK_MODEL') or 'openai/gpt-6.1-sol'
-VARIANT = os.environ.get('RUN_CHECK_VARIANT', 'medium' if MODEL == 'openai/gpt-6.1-sol' else '')
-AUTH = Path(os.environ['RUN_CHECK_AUTH']).expanduser() if os.environ.get('RUN_CHECK_AUTH') else Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json'
 D76_STATUS = 'PASS с ограничением платформы D76'
 # Owner decisions 16.11 logreg-{partition,kfold}-csv-by-name: native warm/reopen order differs.
 CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential', 'logreg-partition-column', 'logreg-validation-kfold')
@@ -39,7 +34,7 @@ CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential', 'logreg-partitio
 COLD_COLUMNS_BY_NAME_SCENARIOS = ('enrich-data-left',)
 D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week', 'tree-to-table-typed')
 # Acceptance model (B-106). No variant: models.json gives deepseek-flash none. Key comes from DEEPSEEK_API_KEY in the environment.
-MODEL = 'deepseek/deepseek-flash'
+MODEL = 'deepseek/deepseek-flash'  # the only place that names the model; `--variant` is never passed
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
@@ -2672,7 +2667,7 @@ class Runner:
                 parameter='/sort_result' if grouping else '/compare_with_locale', mode='variable',
                 variable=dict(kind='control', input=0, name='Flag', type='boolean', is_null=False), source=dict(type='variables.user', output=4))]
         write(folder / 'expected.json', expected)
-        command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', MODEL, *(['--variant', VARIANT] if VARIANT else []), '--dangerously-skip-permissions']
+        command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', MODEL, '--dangerously-skip-permissions']
         if session: command += ['--session', session]
         # Initial requests need their inputs even when the prose omits names.
         # Continuations only admit new, explicitly requested files (r3/r4).
@@ -2748,7 +2743,6 @@ class Runner:
         env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile), LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG='1', LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE='1', LOGINOM_AI_AGENT_PURE='1')
         if spec.get('two_turn'):
             assert session is None, 'TWO_TURN_REQUIRES_FRESH_CHAT'
-            assert MODEL == 'openai/gpt-6.1-sol', 'TWO_TURN_REQUIRES_DEFAULT_MODEL'
             # Unique physical name prevents collisions with prior attempts (#1157).
             source = workspace / 'rows.csv'
             unique = workspace / (self.out.name + '-' + folder.parent.name + '-rows.csv')
@@ -3532,7 +3526,7 @@ class Runner:
                 folder.mkdir()
                 profile, workspace = folder / 'profile', folder / 'workspace'
                 workspace.mkdir()
-                r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp', model=MODEL + ('/' + VARIANT if VARIANT else ''))
+                r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp', model=MODEL)
                 env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile))
                 try:
                     if r['scenario'] in D87 and not self.options.get('case_root'):
