@@ -1,0 +1,15 @@
+{
+  "input_files": [],
+  "budget": {
+    "max_errors": 0,
+    "max_nodes": 1,
+    "forbid": [
+      "sqlite3",
+      "openpyxl",
+      "pandas",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  }
+}

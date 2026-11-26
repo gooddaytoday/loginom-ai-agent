@@ -1,0 +1,116 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Продажи"
+    },
+    {
+      "type": "programming.javascript",
+      "label": "Расчёт JS"
+    },
+    {
+      "type": "programming.python",
+      "label": "Корректировка"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "id": "sales",
+        "type": "imports.text",
+        "label": "Продажи"
+      },
+      {
+        "id": "js",
+        "type": "programming.javascript",
+        "label": "Расчёт JS"
+      },
+      {
+        "id": "py",
+        "type": "programming.python",
+        "label": "Корректировка"
+      }
+    ],
+    "links": [
+      {
+        "source": "sales",
+        "target": "js",
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": "js",
+        "target": "py",
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "g2_review": {
+    "table": {
+      "output_node_type": "programming.python",
+      "output_node_label": "Корректировка",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "SaleID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Revenue",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "DoubledRevenue",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "AdjustedRevenue",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "SaleID": 1,
+          "Region": "North",
+          "Revenue": 14.25,
+          "DoubledRevenue": 28.5,
+          "AdjustedRevenue": 33.5
+        },
+        {
+          "SaleID": 2,
+          "Region": "South",
+          "Revenue": 180.75,
+          "DoubledRevenue": 361.5,
+          "AdjustedRevenue": 366.5
+        },
+        {
+          "SaleID": 3,
+          "Region": "West",
+          "Revenue": 60.5,
+          "DoubledRevenue": 121.0,
+          "AdjustedRevenue": 126.0
+        },
+        {
+          "SaleID": 4,
+          "Region": "North",
+          "Revenue": 25.25,
+          "DoubledRevenue": 50.5,
+          "AdjustedRevenue": 55.5
+        }
+      ]
+    }
+  }
+}
