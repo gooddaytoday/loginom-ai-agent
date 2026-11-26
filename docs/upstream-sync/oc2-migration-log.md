@@ -25588,3 +25588,16 @@ safeStorage прошли; `Run package-local checks` упал в `electron-build
 правок не нужно. Шаг выполнится впервые, остальное проверит CI.
 Проверки: `product` 104 pass, 0 fail; `actionlint` для `loginom-windows.yml` 0 строк; `catalog-check.py` 0; `apply-identity
 --check` 0 файлов; `bun run check` 0.
+
+### B5.2b-fix2 — первый настоящий прогон (run 45781698569)
+
+- `verify-*`: не было зависимостей клиента `loginom-runtime` (`Cannot find package 'yaml'`). Во всех трёх добавлен шаг
+  «Install locked client dependencies» (`npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false` в
+  `packages/loginom-runtime/client`) перед записью манифеста; охранный тест держит порядок.
+- macOS: убран `push` из `loginom-macos.yml` (кандидат на push даёт release). Замечание: он слушал `macos-build` и `loginom`, не
+  `oc2-migration`, так что двойную сборку на этой ветке давал не он. Второй источник macOS-раннера на push в `oc2-migration` —
+  `loginom-pty.yml` (`push` на `packages/process-daemon/**`, собирает все три цели) вместе с вызовом из release; его не менял.
+  Отмена `verify-macos` после 15 минут ожидания раннера — очередь GitHub, шаги не начинались. Облегчить без отказа от
+  `hdiutil` и `codesign` нельзя: задание выдаёт раннер только после сборки; число занимаемых раннеров уже минимально
+  (один на сборку, один на проверку). Повтор запуска — единственный способ, если очередь снова не выдаст раннер.
+- `actionlint` 1.7.7 по пяти workflow — 0 строк.
