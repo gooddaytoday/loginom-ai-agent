@@ -393,7 +393,7 @@ describe("flags of the product run", () => {
     ])
     expect(env).toEqual({ LOGINOM_AI_AGENT_RUN_COMMAND: "package-docs", LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE: "1" })
     Standalone.forward(["run", "hi"], "/w", env)
-    expect(env).toEqual({})
+    expect(env).toEqual({ LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE: "1" })
     expect(() => Standalone.forward(["run", "--command"], "/w", {})).toThrow("CLI_ARGUMENT_INVALID")
   })
 
