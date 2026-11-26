@@ -153,8 +153,7 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
 
 function verifyPreparedTargetEffect(effect, after, positionMatches, request, state) {
   const proof=verifyNodeTargetEffect(effect,after,positionMatches);
-  if(proof||effect.kind!=='connect'||request?.target?.kind!=='new'||request.target.type!=='transform.join_data'
-    ||request.target.label!==undefined)return proof;
+  if(proof||effect.kind!=='connect'||request?.target?.kind!=='new'||request.target.type!=='transform.join_data')return proof;
   const {before,receipt,parameters:{edge}}=effect;
   if(edge.kind||edge.input!==1||edge.target!==state.targetId||after.interaction_ready!==true
     ||receipt?.action_key!=='link.create'||receipt.operation_id!==effect.id||receipt.phase!=='applying'
@@ -165,7 +164,8 @@ function verifyPreparedTargetEffect(effect, after, positionMatches, request, sta
   // rewrites the first link's DOM TID. The native node and first edge must stay.
   const original=before.nodes.find(n=>n.ref.node_id===edge.target);
   const current=after.nodes.find(n=>n.ref.node_id===edge.target);
-  if(original?.type!=='transform.join_data'||original.label!=='Слияние'||current?.label!=='Левое')return null;
+  if(original?.type!=='transform.join_data'||original.label!=='Слияние'||current?.label!=='Левое'
+    ||request.target.label!==undefined&&request.target.label!==original.label)return null;
   const incoming=before.links.filter(link=>link.target===edge.target);
   if(incoming.length!==1||incoming[0].input!==0)return null;
   const prior=state.receipts.find(r=>r.verified&&r.kind==='connect'&&same(r.parameters.edge,incoming[0]));
@@ -592,12 +592,13 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
       graph=await change('connect',{edge},(before,after)=>(after.variable_links??[]).some(e=>edgeKey(e)===edgeKey(edge))
         &&unchangedExcept(before,normalizeVariablesToTableLinkGraph(before,after,edge),[],[edgeKey(edge)]));
     }
-    // Native variable links derive these default captions. Preserve an explicitly
+    // Native links derive these default captions. Preserve an explicitly
     // requested label after the owned transitions, without relinking.
-    if(request.target.kind==='new'&&['variables.to_table','variables.column_union'].includes(request.target.type)&&request.target.label!==undefined
-      &&node(graph,state.targetId).label!==request.target.label){
-      graph=await change('rename',{ref:node(graph,state.targetId).ref,label:request.target.label},(before,after)=>
-        !!verifyNodeTargetEffect({kind:'rename',parameters:{ref:node(before,state.targetId).ref,label:request.target.label},before},after,adapter.positionMatches));
+    const finalTarget=node(graph,state.targetId);
+    const joinCaption=request.target.type==='transform.join_data'&&request.target.label==='Слияние'&&finalTarget.label==='Левое';
+    if(request.target.kind==='new'&&(joinCaption||['variables.to_table','variables.column_union'].includes(request.target.type))
+      &&request.target.label!==undefined&&finalTarget.label!==request.target.label){
+      graph=await change('rename',{ref:finalTarget.ref,label:request.target.label});
     }
     if(addOnly){
       const quiet=await observe();
