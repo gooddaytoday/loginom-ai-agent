@@ -47,15 +47,14 @@ boolean — логическое, NULL — `is_null:true,value:null`; целое
 различай по `cell_type`, не по JS-типу. Смешанные массивы скаляров не поддержаны.
 
 Подключай этот порт к `trees.to_table`, `mode:"selected_nodes"`.
-Новый узел требует `selected_paths` (пути листьев в порядке схемы,
-например `/id`, `/items/sku`, без индексов массива), `repeat_parents`,
+Задай `selected_paths` (листья в порядке схемы: `/id`, `/items/sku`, без индексов), `repeat_parents`,
 `composite_names`, `composite_labels`, `label_separator`: обычно `false`, `false`, `"."`;
 составные — по [справке](trees.to_table.md).
 `repeat_parents:true` повторяет выбранных родителей в каждой позиции,
 `false` — только в первой строке, далее NULL. Выход 0 — таблица.
-Read the whole table, check types and order, export, save.
+Читай весь выход 0 (`sample_rows:100`). Сверь типы, порядок. Экспорт по просьбе.
 Пустая строка/0/false сохраняются; missing scalar и JSON null дают NULL.
-Exporting NULL and empty strings: choose an explicit nonempty NULL marker.
+Export NULLs and empty strings with an explicit nonempty NULL marker.
 
 Пределы: непустые ветви повторяемых объектов, уникальные имена листьев,
 до 64 полей; без ручной схемы, XSD, forced root и ручного формата дат.

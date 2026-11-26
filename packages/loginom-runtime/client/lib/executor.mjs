@@ -14,7 +14,7 @@ import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingW
 import {isPythonInputOpening,settledPythonInputOpening,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 import { createNodeTargetBrowserAdapter } from './node-target-browser.mjs';
 import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
-import { validateNodeTargetRequest } from './node-contracts.mjs';
+import { NODE_ADD_ONLY_MODE, validateNodeTargetRequest } from './node-contracts.mjs';
 import { describeNodeTypes } from './node-contracts.mjs';
 import { randomUUID, createHash } from 'node:crypto';
 import {join} from 'node:path';
@@ -2545,7 +2545,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const targetAdapter=operation=>nodeTargetAdapterFactory({execute:async(code,options)=>{
     const wrapped='async page => {const base={action_key:"node.target.transport",action_revision:"1",operation_id:'+JSON.stringify(operation.id)+',phase:"observed",effect_possible:false,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('+code+')(page)}};}catch(error){return {...base,status:"FAILED",output:{},error:{code:"NODE_TARGET_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
     const response=await execute(wrapped,options);if(response.status!=='SUCCEEDED')throw new Error(response.error?.message??'Node target transport failed');return response.output.value;
-  },pinned,origin:targetOrigin,build:targetBuild,record:nodeTargetRecord});
+  },pinned,origin:targetOrigin,build:targetBuild,record:nodeTargetRecord,
+    requireNoNativeWindow:operation.parameters?.mode===NODE_ADD_ONLY_MODE});
   const nodeApplyOutcome=(operation,result)=>({status:result.status,action_key:'node.apply',
     action_revision:operation.action.revision,operation_id:operation.id,
     phase:result.status==='SUCCEEDED'?'node_ready':result.checkpoint_kind==='local_node_released'?'node_released':result.pending_phase??'node_incomplete',
@@ -2650,6 +2651,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           operation.cleanupConfirmed=true;
           await remember(operation,'reconciled',operation.outcome);
         }
+      }catch(error){
+        if(error.code!=='NODE_ADD_ONLY_GRAPH_BLOCKED')throw error;
       }finally{running=false;}
     }
     if(operation.nodeApply?.result){
@@ -2765,6 +2768,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       instruction:earlyNodePhase(operation)?'Release this early source/workflow/target failure with a NEW recovery_operation_id. Dock only reads the original receipts and quiet graph, proving that the target was not created or finding its exact partial node. Unknown effects remain blocked. Follow the released next_step; do not replay creation.'
         :'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'
           +(filterReconnectPending(operation)?' Release requires the original Loginom session to reconnect. If it cannot reconnect, report the operation as blocked.':'')}:null;
+  const addOnlyWindowStep=operation=>{
+    const effect=operation?.targetPhase?.pending,receipt=effect?.receipt;
+    if(effect?.kind!=='create'||effect.parameters.add_only!==true||receipt?.add_only_window_pending!==true
+      ||!receipt.add_only_window_node_id||receipt.cleanup_complete!==false)return null;
+    return {tool:'dock_operation_inspect',arguments:{operation_id:operation.id},
+      instruction:'Ask the user to close the window for this node and wait for the graph to settle. Then inspect this same operation and use abandon_operation with a new recovery_operation_id.'};
+  };
   const releaseApply=async(operation,{strategy,recoveryOperationId,signature,signal})=>{
     if(strategy!=='abandon_operation')throw new Error('Only abandon_operation can release a stopped node operation; every other strategy is refused for it. If abandon_operation is refused too, follow its next_step instead of another strategy');
     if(running||nodeJobs.busy)throw new Error('Another Dock action is still running');
@@ -2797,9 +2807,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           &&diagnostic.detail==='reason=awaiting_original_attempt';
         if(!waitingForLoginom)operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:error?.userAction??null};
         const trigger=waitingForLoginom?null:browserRecoveryTrigger(operation,null);
-        const nextStep=waitingForLoginom?{
+        const nextStep=addOnlyWindowStep(operation)??(waitingForLoginom?{
           instruction:'Wait for the original Loginom session to reconnect. Then call dock_operation_recover with abandon_operation for the original operation_id and a NEW recovery_operation_id. If the original session cannot reconnect, report the operation as blocked.'
-        }:trigger?browserRecoveryNext(operation,trigger):null;
+        }:trigger?browserRecoveryNext(operation,trigger):null);
         returned={status:'AMBIGUOUS',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'release_refused',
           effect_possible:true,trace:[],recovery_operation_id:recoveryOperationId,
           error:{code:'NODE_RELEASE_REFUSED',message:String(error?.message??error).slice(0,1000)},
@@ -2899,6 +2909,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   // the same node failing again after a recovery (T3). Unconfirmed calls never qualify.
   const recoveryAdvice = operation => {
     const advice = dockRecoveryAdvice(operation);
+    const manualStep=addOnlyWindowStep(operation);
+    if(manualStep)return {...advice,next_steps:[manualStep,...advice.next_steps.filter(step=>step.tool!==manualStep.tool)]};
     const trigger = browserRecoveryTrigger(operation, advice);
     if (trigger) return { ...advice, browser_recovery: trigger.reason,
       next_steps: [browserRecoveryNext(operation, trigger), ...advice.next_steps] };
@@ -2946,7 +2958,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   function browserRecoveryTrigger(operation, advice) {
     const exported = exportRecoveryTrigger(operation);
     if (exported) return exported;
-    if (!browserRecovery || !operation || pending !== operation || operation.action.capability !== 'node.apply'
+    if (!browserRecovery || !operation || addOnlyWindowStep(operation) || pending !== operation || operation.action.capability !== 'node.apply'
       || operation.transportUncertain || !earlyNodePhase(operation)&&typeof operation.nodeApplyDrivers?.releasePending !== 'function') return null;
     // Export draft release must not hand an unsettled file-read lease to the
     // generic node route. Its settled download refusal has the separate T4 path.
@@ -3013,6 +3025,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         try{await verifyPendingWorkflowReceipt({operation,adapter:operation.nodeTargetAdapter,deadline:now()+10000,now});}
         catch(error){return {stopped:false,reason:String(error.message).slice(0,1000)};}
       }
+      if(addOnlyWindowStep(operation))return {stopped:false,reason:addOnlyWindowStep(operation).instruction};
       if(operation.targetPhase?.pending){
         // Target gestures use their own page ledger, not parent lastReceipt.
         // Read only that original effect; graph repair cannot settle its call.
@@ -4313,7 +4326,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       checkId(operationId);
       let operation=operations.get(operationId);
       const {handler}=validateNodeApplyRequest(request,nodeApplyHandlers,{fresh:!operation&&!resume});
-      if(typeof nodeApplyDriverFactory!=='function')throw new Error('Local node drivers are not installed');
+      const addOnly=request.mode===NODE_ADD_ONLY_MODE;
+      if(!addOnly&&typeof nodeApplyDriverFactory!=='function')throw new Error('Local node drivers are not installed');
       if(running)throw new Error('Another Dock action is still running');
       const signature=fingerprint('node.apply',{request,handler_revision:handler.revision,...(handler.output_wizard==='separate'?{output_wizard:'separate'}:{})});
       if(auxiliary.has(operationId))throw new Error('Operation ID conflicts with a recovery or UI operation');
@@ -4354,7 +4368,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           source:o.nodeApply?.phases.find(p=>p.phase==='source')?.value?.source,scan_receipt:o.scanReceipt}));
       let admissionSources=null,admissionFailure=null,admissionUncertainty=null;
       const checkExcelDestination=request.target.type==='exports.excel'&&getStorageBinding()?.document_id===request.document_id;
-      if(!operation&&(serverDownloads||checkExcelDestination)){
+      if(!operation&&!addOnly&&(serverDownloads||checkExcelDestination)){
         const proofs=new Map(),deadline=Math.min(admissionDeadline,now()+request.budgets.configure_ms);
         const resolve=async(ref,receipt=scanReceipt)=>{
           if(!proofs.has(ref)){
@@ -4434,7 +4448,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             if(response.status!=='SUCCEEDED')throw new Error(response.error?.message??'Node driver transport failed');
             return response.output.value;
           };
-          operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,scanReceipt,
+          operation.nodeApplyDrivers=addOnly?{
+            verifySource:async()=>({verified:true,cleanup_complete:true,effect_possible:false}),
+            verifyContinuation:async state=>state.target_reconciled===true,
+          }:nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,scanReceipt,
             resolveStorageSource:async(ref,receipt=scanReceipt)=>{
               const source=admissionSources?.get(ref)??await inspectServerSource(ref,{signal,deadline:operation.deadline});
               return serverDownloads?serverDownloads.bind(source,receipt):source;
@@ -4480,7 +4497,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             verifiedUploads:()=>[...operations.values()].filter(o=>o.action.capability==='artifact.upload'
               && o.outcome?.status==='SUCCEEDED'&&o.cleanupConfirmed===true)
               .map(o=>structuredClone({operation_id:o.id,artifact:o.checkpoint.artifact,outcome:o.outcome}))});
-          for(const name of ['verifySource','mapPorts','openWizard','finish','waitExecution','readOutput','verifyContinuation'])
+          for(const name of addOnly?[]:['verifySource','mapPorts','openWizard','finish','waitExecution','readOutput','verifyContinuation'])
             if(typeof operation.nodeApplyDrivers?.[name]!=='function')throw new Error('Local node driver missing: '+name);
           // Reuse the accepted graph driver directly, under this operation ID.
           const originalContinuation=operation.nodeApplyDrivers.verifyContinuation;
