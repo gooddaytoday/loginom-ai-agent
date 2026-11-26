@@ -139,7 +139,9 @@ async function g5(platform: keyof typeof platforms, work: string, output: string
   else await $`tar -xpzf ${archive} -C ${cli}`
 
   const verifyCli = async () => {
-    const metadata = await verifyCliManifest(cli, { platform: process.platform, arch: process.arch, version: manifest.version })
+    // The CLI carries its own package version (not the Desktop one the release manifest holds); the archive name must agree with it.
+    const metadata = await verifyCliManifest(cli, { platform: process.platform, arch: process.arch })
+    if (!basename(archive).includes(`-cli-${metadata.version}-`)) throw Error("RELEASE_CLI_VERSION_MISMATCH")
     if (metadata.sourceCommit !== manifest.source.commit) throw Error("RELEASE_CLI_COMMIT_MISMATCH")
   }
   const verifyResources = () => verifyResourceTree(resources, manifest.runtime.resourcesSha256, config.target)
