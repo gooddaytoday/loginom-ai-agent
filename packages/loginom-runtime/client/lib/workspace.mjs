@@ -845,10 +845,10 @@ export async function prepareWorkspaceSession({ metadata, assertAllowed, prepare
         effect_possible: true };
       await save();
     }
-    // The refused navigation's owned-draft cleanup carries to its exit (LAB-2054).
-    if (request && afterRefusedNavigation) { metadata.workspacePreparation.after_refused_navigation = true; await save(); }
     const state = await prepare({ recoverOnly: previous?.effect_possible === true });
     if (request) metadata.workspacePreparation = { ...metadata.workspacePreparation, effect_possible: state.effect_possible, state };
+    // The refused navigation's owned-draft cleanup carries to its exit (LAB-2054).
+    if (request && afterRefusedNavigation) metadata.workspacePreparation.after_refused_navigation = true;
     if (signal?.aborted) {
       state.status = 'NOT_READY'; state.reason = 'CANCELLED';
       state.verification_required = state.effect_possible;
