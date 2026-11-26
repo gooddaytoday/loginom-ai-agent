@@ -3,12 +3,13 @@
 <!-- mode: request -->
 ## Описания кодов
 
-`produce_error_descriptions:false` убирает ErrorDesc из порта 1, true возвращает.
+`produce_error_descriptions:false` убирает ErrorDesc, true возвращает.
 Пропуск сохраняет. Порт 1: RequestID, ErrorCode, HttpStatusCode (integer).
+По просьбе выгружай сам порт 1.
 
 ## Имитация
 
-Доставь файл. Укажи серверный путь
+Доставь файл, укажи серверный путь
 `simulation:{enabled:true,file_path:"/своя-папка/response.json"}`.
 Передай connection, query_parameters:[], inputs:[], finish:"execute".
 GET без таблицы — один ответ. Путь меняй на том же узле.
@@ -20,12 +21,12 @@ enabled:false выключает. Пропуск сохраняет. Readback и
 connection: name/base_url/method. Разные методы — разные имена.
 POST/PUT/PATCH: request_content_type application/json, text/plain или application/xml;
 body_field — наблюдённое строковое поле входа 0.
-Body — исходный UTF-8; query бери из других полей. Кодируется только query.
-DELETE запрещает body_field/request_content_type. Передай inputs и при
+Body — исходный UTF-8; query бери из других полей.
+DELETE без body_field/request_content_type. inputs нужны и при
 query_parameters:[]; запрос на строку. Query+Body совместимы.
-Сырые ответы: импорт → REST → экспорт 0 (RequestID, Response) без разбора или
-колонки метода. Чтение и экспорт по просьбе. Порт 1 — статусы, RequestID
-на обоих — индекс с нуля. parameters:{} сохраняет настройки узла.
+Сырые ответы: импорт → REST → экспорт 0 (RequestID, Response) без разбора и
+колонки метода. Чтение и экспорт по просьбе. RequestID на обоих портах —
+индекс с нуля. parameters:{} сохраняет настройки на существующем узле.
 
 ## Заголовки
 
@@ -37,10 +38,10 @@ variable_inputs:[{kind:"variables",input:0,source,output}].
 Источник выполни, имя — после mapping; Var-вход ≠ inputs[0] Body.
 Cycle из variables.user/variables.calculator. Меняй лишь Cycle, перезапусти тот же REST:
 parameters:{}, inputs:[], variable_inputs:[], mappings:[], finish execute.
-Привязка читает Cycle без правки запроса и подстановки литерала.
+Привязка прочтёт Cycle без правки запроса. Не подставляй литерал.
 Литерал: тот же REST, прежние connection/query_parameters/body_field/inputs,
 новые headers, finish execute. httpbin: Response.headers["X-Lab-Cycle"], тело Response.data.
-Сведи Response, RequestID, порт 1.HttpStatusCode по правилу ниже.
+Сведи Response, RequestID и порт 1.HttpStatusCode (см. ниже).
 Второй результат выгрузи по просьбе.
 
 ## GET и ответы
