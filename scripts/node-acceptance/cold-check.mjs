@@ -48,6 +48,7 @@ const args = parseArgs({
     'csv-encoding': { type: "string", default: 'UTF-8' },
     'text-export-case': { type: 'string' },
     'exact-port-windows': { type: 'boolean', default: false },
+    'case-port-read-only': { type: 'boolean', default: false },
     'sampling-baseline': { type: 'string' },
   },
   strict: true,
@@ -192,7 +193,8 @@ page = context.pages()[0]
     state.openFailure={status:prepared.status,reason:'PACKAGE_PATH_MISMATCH'}
     throw Error("COLD_PACKAGE_PATH_MISMATCH")
   }
-  if(prepared.workflow_ref.navigation_path.some(item=>item.label.endsWith("(только чтение)"))) {
+  const readOnly=prepared.workflow_ref.navigation_path.some(item=>item.label.endsWith("(только чтение)"));
+  if(readOnly&&!args['case-port-read-only']) {
     state.openFailure={status:prepared.status,reason:'PACKAGE_READ_ONLY'}
     throw Error("COLD_PACKAGE_NOT_WRITABLE")
   }
@@ -652,8 +654,9 @@ page = context.pages()[0]
       loginomUrl: config.loginom_url,
       loginomBuild: "7.4.2",
       tabTid: prepared.workflow_ref.tab_tid,
-      diagnosticDiscard: true,
-      diagnosticWaitForIdle: true,
+      diagnosticReadOnly: readOnly,
+      diagnosticDiscard: !readOnly,
+      diagnosticWaitForIdle: !readOnly,
     }),
   )
   await writeFile(join(args.output, "cleanup.json"), JSON.stringify(cleanup, null, 2) + "\n")
