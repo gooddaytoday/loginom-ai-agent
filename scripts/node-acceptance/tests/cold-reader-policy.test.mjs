@@ -4,17 +4,17 @@ import {coldNativeEligible,coldGraphExecutionIdentity,performColdNodeAction,runC
 import {createNodeProcedure} from '../../../packages/loginom-runtime/client/lib/node-procedure.mjs';
 const node={document_id:'doc',workflow_id:'wf',node_id:'cross'};
 
-function windowFixture(change=()=>{}) {
+function windowFixture(change=()=>{},rowCount=100) {
  const calls=[],execution={verified:true,owner_verified:true,status:'completed',execution_id:'doc:1',process_id:'1.1',process_record_id:'child'};
- const rows=Array.from({length:100},(_,i)=>[{type:'integer',is_null:false,value:String(i+1)},
+ const rows=Array.from({length:rowCount},(_,i)=>[{type:'integer',is_null:false,value:String(i+1)},
   {type:'string',is_null:false,value:('row '+i+' ').padEnd(6000,'я')}]);
  const channel={async readOutputPort(request){
   calls.push(structuredClone(request));
-  const start=request.rowOffset,end=Math.min(start+43,100);
+  const start=request.rowOffset,end=Math.min(start+Math.min(43,request.sampleRows),rowCount);
   const result={verified:true,cleanup_complete:true,node_context:{...node,verified:true},output:{
    port:0,port_guid:'port',fresh:true,execution_id:execution.execution_id,freshness_basis:'completed_execution_port_source',
    schema:[{index:0,name:'I',label:'I',type:'integer'},{index:1,name:'S',label:'S',type:'string'}],
-   row_count:100,row_offset:start,next_row_offset:end,sample_rows:end-start,sample_complete:false,
+   row_count:rowCount,row_offset:start,next_row_offset:end,sample_rows:end-start,sample_complete:false,
    sample:structuredClone(rows.slice(start,end)),precision:{numbers_verified:true,limitations:[]},
    window_binding:{...node,execution_id:execution.execution_id,process_id:execution.process_id,process_record_id:execution.process_record_id},read_limit:'preview_cell_or_byte_budget'}};
   change(result,calls.length);return result;
@@ -28,6 +28,14 @@ test('cold windows cover all 100 rows in order including both boundaries and com
  assert.equal(result.sample_complete,true);assert.equal(result.sample_rows,100);
  assert.deepEqual(result.sample,f.rows);assert.equal(result.read_limit,undefined);
  assert.deepEqual(result.windows.map(w=>[w.row_offset,w.next_row_offset]),[[0,43],[43,86],[86,100]]);
+});
+test('cold windows cover a full 1000-row table without increasing any request',async()=>{
+ const {readColdPortWindows}=await import('../cold-reader-policy.mjs'),f=windowFixture(()=>{},1000);
+ const result=await readColdPortWindows(f.channel,{node,execution:f.execution,port:0,rowCount:1000});
+ assert.deepEqual(result.sample,f.rows);
+ assert.ok(f.calls.every(r=>r.sampleRows<=100));
+ assert.equal(result.windows.at(-1).next_row_offset,1000);
+ await assert.rejects(()=>readColdPortWindows(f.channel,{node,execution:f.execution,port:0,rowCount:1001}),/COLD_PORT_WINDOW/);
 });
 for(const [fault,change] of Object.entries({
  document:r=>r.node_context.document_id='other',node:r=>r.node_context.node_id='other',
