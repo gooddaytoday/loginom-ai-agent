@@ -243,10 +243,10 @@ for(const layout of ['stale','already current','settled before refresh','still w
  assert.equal(refreshes,settled?0:1);
 });
 
-for(const alreadyDelimited of [false,true])test('prepared import groups writable format fields before checking its dependent layout (delimiter already set='+alreadyDelimited+')',async()=>{
+for(const alreadyDelimited of [false,true])test('prepared import writes each format field separately before checking its dependent layout (delimiter already set='+alreadyDelimited+')',async()=>{
  const f=fixture(8,{nullMarker:'NULL'}),observe=f.channel.observe,act=f.channel.act;
- // Delimiter arrives last. The exact preset and unchanged qualifier must
- // not be included with the literal writes.
+ // Delimiter arrives last. The exact preset uses its picker and the unchanged
+ // qualifier needs no write.
  f.parameters.format={decimal_separator:'.',null_marker:'NULL',text_qualifier:'"',delimiter:','};
  const values={delimiter:alreadyDelimited?',':';',decimal_separator:','},actions=[];
  const ref=name=>'ui-'+name.replace('_','-'),nameOf=ref=>ref.slice(3).replace('-','_');
@@ -270,14 +270,13 @@ for(const alreadyDelimited of [false,true])test('prepared import groups writable
   return state;
  };
  f.channel.act=async action=>{
-  if(action.verb==='set_wizard_fields'){
+  if(action.verb==='set_wizard_field'||action.verb==='set_wizard_fields'){
    const snapshot=await f.channel.observe({ready:()=>true});
    validateNodeUiAction(action,snapshot,snapshot.prepared_node_context);
    actions.push(action);
-   for(const {ref,text} of action.fields)values[nameOf(ref)]=text;
+   for(const {ref,text} of action.fields??[action])values[nameOf(ref)]=text;
    return;
   }
-  if(action.verb==='set_wizard_field'){actions.push(action);values[nameOf(action.ref)]=action.text;return;}
   if(action.ref==='refresh-all'){assert.equal(values.delimiter,',');actions.push(action);refreshed=true;return;}
   if(action.verb==='select_wizard_option')actions.push(action);
   return act(action);
@@ -285,8 +284,8 @@ for(const alreadyDelimited of [false,true])test('prepared import groups writable
  const result=await configureTextImportFields(f.channel,f.parameters,f.owner);
  assert.equal(result.columns.length,8);
  assert.deepEqual(actions,[
-  alreadyDelimited?{verb:'set_wizard_field',ref:ref('decimal_separator'),text:'.'}:
-   {verb:'set_wizard_fields',fields:[{ref:ref('delimiter'),text:','},{ref:ref('decimal_separator'),text:'.'}]},
+  ...(!alreadyDelimited?[{verb:'set_wizard_field',ref:ref('delimiter'),text:','}]:[]),
+  {verb:'set_wizard_field',ref:ref('decimal_separator'),text:'.'},
   {verb:'select_wizard_option',ref:'option-NULL'},
   ...(!alreadyDelimited?[{verb:'click',ref:'refresh-all'}]:[])
  ]);
