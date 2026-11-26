@@ -21,6 +21,12 @@
 узла в пределах текущего сценария. Dock проверит схему порта по завершённому
 выполнению. Не восстанавливай дерево из текста задачи.
 
+Выбери `mode:"selected_nodes"`, `selected_paths` в порядке схемы без индексов
+(например, `/id`, `/items/sku`), `repeat_parents`, `composite_names`,
+`composite_labels` и `label_separator`. Прочитай выход 0 таблицы с
+`sample_rows:100`, проверь типы и порядок. Экспорт по просьбе.
+Для NULL и пустых строк укажи непустой маркер NULL.
+
 Для предпросмотра запроси `read:{ports:[0],sample_rows:100,require_exact_numbers:true}`.
 `tree.schema` содержит порядок, имена, типы и контейнеры. `tree.instances` —
 начало дерева в нативном порядке. Последняя ветвь может быть неполной. При `sample_complete:false` поле

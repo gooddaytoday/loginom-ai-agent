@@ -568,7 +568,7 @@ test('reader_applies_datetime_limitations_without_downgrading_numeric_precision'
 
 // Keep browser/UI boundaries inert while exercising the actual shared driver
 // lifecycle and the real schema/materialization contracts.
-async function sharedOutputFixture({cross=false,mapped=false,native=false,override=false}={}){
+async function sharedOutputFixture({cross=false,mapped=false,native=false,override=false,autosync}={}){
  const {createTabularTransformNodeSupport}=await import('../lib/calculator-node.mjs');
  const {alignReadSchema}=await import('../lib/node-read-contract.mjs');
  const {materializeCrossTableOutput}=await import('../lib/crosstable-output.mjs');
@@ -597,7 +597,7 @@ async function sharedOutputFixture({cross=false,mapped=false,native=false,overri
   selectPreparedGraphNode:async()=>{},openPreparedWizard:async()=>{},readOutputDefinitionPages:async()=>({fields:schema,total_columns:2}),
   openNewOutputTable:()=>assert.fail('Ordinary read must not open Table'),readCollapseNativeOutput:async()=>{calls.push('native');return {ports:[structuredClone(output)]};}};
  const implementation={type:cross?'transform.cross_table':'transform.group_data',revision:'test',configure:async()=>({configuration}),
-  configureOutput:async()=>({native_mapping:{target_fields:schema}}),...(cross?{materializedSchema:materializeCrossTableOutput}:{}),
+  configureOutput:async()=>({native_mapping:{target_fields:schema,autosync}}),...(cross?{materializedSchema:materializeCrossTableOutput}:{}),
   ...(native?{nativeFullOutput:true}:{}),...(override?{configureAllOutputs:async()=>({verified:true}),readOutputs:async()=>{calls.push('override');return {override:true};}}:{})};
  const support=vm.runInNewContext('('+createTabularTransformNodeSupport.toString()+')',context)({},implementation);
  const ctx={node,document_id:'doc',workflow_ref:{workflow_id:'wf'},deadline:10000,execution:{status:'completed',execution_id:'e'}};
@@ -617,6 +617,33 @@ test('shared ordinary output passes the full execution receipt, preserves exact 
  }
  f.output.schema[1].type='integer';
  await assert.rejects(f.drivers.readOutput({ports:[0],sample_rows:1,require_exact_numbers:true},f.ctx),{code:'NODE_READ_SCHEMA_CHANGED'});
+});
+
+test('shared tabular reads accept native order with autosync and require the complete field schema',async()=>{
+ const read={ports:[0],sample_rows:1,require_exact_numbers:true};
+ const autosynced=await sharedOutputFixture({autosync:true});
+ const ordered=await sharedOutputFixture({autosync:false});
+ const reverse=fields=>fields.toReversed().map((field,index)=>({...field,index}));
+ for(const f of [autosynced,ordered]){
+  f.output.schema=reverse(f.output.schema);
+  f.output.sample=f.output.sample.map(row=>row.toReversed());
+ }
+ const result=await autosynced.drivers.readOutput(read,autosynced.ctx);
+ assert.deepEqual(structuredClone(result.ports[0].schema),reverse(autosynced.schema));
+ assert.deepEqual(result.ports[0].sample,autosynced.output.sample);
+ await assert.rejects(ordered.drivers.readOutput(read,ordered.ctx),/output field order differs/i);
+
+ const [first,second]=autosynced.output.schema;
+ for(const schema of [
+  [first],
+  [first,{...first,index:1}],
+  [first,{...second,name:'Foreign'}],
+  [first,{...second,label:'Foreign'}],
+  [first,{...second,type:'integer'}],
+ ]){
+  autosynced.output.schema=schema;
+  await assert.rejects(autosynced.drivers.readOutput(read,autosynced.ctx),{code:'NODE_READ_SCHEMA_CHANGED'});
+ }
 });
 
 test('shared CrossTable ordinary read materializes its observed schema; native full and overrides retain dispatch',async()=>{

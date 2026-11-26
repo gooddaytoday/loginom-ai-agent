@@ -1,19 +1,18 @@
-# REST-запрос (`integration.rest_request`)
+# REST-запрос
 
 <!-- mode: request -->
 ## Описания кодов
 
-`produce_error_descriptions:false` убирает ErrorDesc из порта 1;
-Порт 1: RequestID, ErrorCode, HttpStatusCode (integer). true — вернуть;
-пропуск — сохранить. Выгружай порт 1.
+`produce_error_descriptions:false` убирает ErrorDesc из порта 1, true возвращает.
+Пропуск сохраняет. Порт 1: RequestID, ErrorCode, HttpStatusCode (integer).
 
 ## Имитация
 
-Доставь файл и укажи его путь:
+Доставь файл. Укажи серверный путь
 `simulation:{enabled:true,file_path:"/своя-папка/response.json"}`.
 Передай connection, query_parameters:[], inputs:[], finish:"execute".
-GET без таблицы даёт один ответ. Путь меняй на том же узле.
-enabled:false выключает имитацию. Пропуск сохраняет. Readback из UI.
+GET без таблицы — один ответ. Путь меняй на том же узле.
+enabled:false выключает. Пропуск сохраняет. Readback из UI.
 
 ## Метод и тело
 
@@ -21,12 +20,12 @@ enabled:false выключает имитацию. Пропуск сохраня
 connection: name/base_url/method. Разные методы — разные имена.
 POST/PUT/PATCH: request_content_type application/json, text/plain или application/xml;
 body_field — наблюдённое строковое поле входа 0.
-Body — исходный UTF-8. body_field и query связывай с разными полями.
-DELETE запрещает body_field/request_content_type. inputs: исходник и при
-query_parameters:[]; запрос на строку. Query+Body совместимы; кодируется только query.
-Сырые ответы: импорт → REST → экспорт порта 0 без JSON-разбора.
-Порт 1 — статусы. RequestID — индекс строки с нуля на обоих портах.
-parameters:{} на существующем узле сохраняет настройки.
+Body — исходный UTF-8; query бери из других полей. Кодируется только query.
+DELETE запрещает body_field/request_content_type. Передай inputs и при
+query_parameters:[]; запрос на строку. Query+Body совместимы.
+Сырые ответы: импорт → REST → экспорт 0 (RequestID, Response) без разбора или
+колонки метода. Чтение и экспорт по просьбе. Порт 1 — статусы, RequestID
+на обоих — индекс с нуля. parameters:{} сохраняет настройки узла.
 
 ## Заголовки
 
@@ -38,10 +37,11 @@ variable_inputs:[{kind:"variables",input:0,source,output}].
 Источник выполни, имя — после mapping; Var-вход ≠ inputs[0] Body.
 Cycle из variables.user/variables.calculator. Меняй лишь Cycle, перезапусти тот же REST:
 parameters:{}, inputs:[], variable_inputs:[], mappings:[], finish execute.
-Привязка прочтёт Cycle без правки запроса; не подставляй литерал.
+Привязка читает Cycle без правки запроса и подстановки литерала.
 Литерал: тот же REST, прежние connection/query_parameters/body_field/inputs,
 новые headers, finish execute. httpbin: Response.headers["X-Lab-Cycle"], тело Response.data.
-Ответ, RequestID и порт 1.HttpStatusCode сведи по правилу ниже.
+Сведи Response, RequestID, порт 1.HttpStatusCode по правилу ниже.
+Второй результат выгрузи по просьбе.
 
 ## GET и ответы
 

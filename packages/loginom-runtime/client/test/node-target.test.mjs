@@ -535,3 +535,25 @@ for(const fault of ['none','y','ordinary','identity','port'])test('connect verif
  const result=verifyNodeTargetEffect({kind:'connect',before,parameters:{edge}},after);
  if(fault==='none')assert.ok(result);else assert.equal(result,null);
 });
+
+test('add_only link ownership is the native GUID recorded at drop',()=>{
+ const ref=node_id=>({document_id:'doc',workflow_id:'wf',node_id});
+ const before={complete:true,document_id:'doc',workflow_ref:{workflow_id:'wf'},dom_epoch:1,
+  nodes:[{ref:ref('source'),type:'imports.text'}],links:[],foreign_links:[]};
+ const native={source:'source',output:0,target:'new',input:0,native_link_guid:'drop-link'};
+ const after={...before,nodes:[...before.nodes,{ref:ref('new'),type:'exports.text'}],links:[native]};
+ const receipt={status:'SUCCEEDED',cleanup_complete:true,after,drop_link_guids:[native.native_link_guid]};
+ const effect={kind:'create',before,parameters:{type:'exports.text',add_only:true},receipt};
+ assert.deepEqual(verifyNodeTargetEffect(effect,after).auto_created_links,[native]);
+ for(const observation of [
+  {...after,links:[{...native,native_link_guid:'manual-replacement'}]},
+  {...after,links:[{...native,native_link_guid:undefined}]},
+ ]){
+  const proof=verifyNodeTargetEffect(effect,observation);
+  assert.equal(proof.add_only_unowned_links,true);
+  assert.deepEqual(proof.auto_created_links,[]);
+ }
+ const late=verifyNodeTargetEffect({...effect,receipt:{...receipt,drop_link_guids:[]}},after);
+ assert.equal(late.add_only_unowned_links,true);
+ assert.deepEqual(late.auto_created_links,[]);
+});
