@@ -25769,6 +25769,166 @@ B5.2b-fix3 — run 45786926746
 `actions/cache` по этому хешу в `loginom-pty.yml`) — это минус один раннер без потери проверок. Сборку и проверку слить нельзя:
 первая внутри reusable workflow, а вторую нужно запускать после её артефакта.
 
+## B6.2c Windows: профили B3.3, SEC-01 и чек-лист 4/5/8/10 на артефакте CI
+
+26.11.2026. Ветка `b62c-windows` от `oc2-migration` (`b8a67d48a1`), рабочее дерево `.claude/worktrees/b62c`. Задача 3 плана B6.2-S (строки 5, 7, 8, 9). Эталон 0.4 — `v0.4.2` (В-110), но на
+Windows был установщик 0.4.0 из B3.3 (различие ниже). Настоящая модель не вызывалась. Протоколы без секретов — `~/.local/share/loginom-evidence/b62c/`.
+
+### Артефакт
+
+Кандидат — `b6e0ddc4167136ff7463413a57a2798ac08b19c4` (код продукта в `b8a67d48a1` тот же; разница — журнал и скрипты приёмки), run `45837221197`, `loginom-release.yml`.
+Задания `windows / build-package-test` и `verify windows` зелёные. **Run в целом красный**: `macos / macos` отменено, `verify macos` и `SHA256SUMS` пропущены. Рядом
+`test` (run 45837221048) на том же SHA красный, задание `unit`; не разбирал (чужое). В `loginom-windows-unsigned-45837221197` нет файла `SHA256SUMS` (его собирает
+пропущенное задание): хеши — в `ci-summary.json` и в `*.zip.sha256`; `safe-storage-*.json` лежат в `loginom-windows-installed-smoke-45837221197`, не в `unsigned`.
+
+| Файл | Байт | SHA-256 (Linux = CI `ci-summary.json` = стенд после сборки из частей) |
+|---|---|---|
+| `loginom-ai-agent-win-x64.exe` (NSIS, не подписан) | 560 943 638 | `55c699a8efdb98059b8dfd8fdb7c4a71308669bc8a7ca107d647d7879e21a477` |
+| `loginom-ai-agent-cli-0.0.0-dev-8-win32-x64.zip` | 529 645 766 | `d0a9605bb3cdfbf671db3fb6df24ef537ef9ad74149a53acea63d663169e6c50` |
+| `desktop-0.3.9.exe` (из `C:\lab`, B3.3) | 392 801 847 | `d26120dafd3d262ba31ddb990183df22a33c0f73c5c10dbf1ce196bbf1dd142d` |
+| `desktop-0.4.0.exe` (из `C:\lab`, B3.3) | 414 082 806 | `f75e780fdecf6763c11b2026bce09113e9d29e34fe63e34e3ae8a263e23fbe4b` |
+
+`cli-manifest.json` ZIP: версия `0.0.0-dev-8`, канал `dev`, `sourceCommit` `b6e0ddc416…`, `sourceDirty: false`. Электрон SEC-01 — `electron-v44.9.1-win32-x64.zip`
+`41bd7900…ef91`, равен `checksums.json` пакета Desktop (скачан на стенде с GitHub releases, проверен).
+
+### Стенд и ход
+
+`winstand` (Windows 11 Pro 26200.9974, 25H2). Снимок «до» — `b62c-stand.ps1 snapshot` (копия `windows.ps1` B3.3: только чтение; из списка `C:\lab` исключён сам `b62c`). Учётная запись
+`Проверка Б62`: только «Пользователи», не администратор (`admin=False`), пароль случайный, на стенде — `C:\lab\b62c\secret` (администраторы и SYSTEM), на Linux — файл `0600`
+в scratchpad; подача через `stand.sh user` (в нём имя учётной записи теперь из `B33_ACCOUNT_NAME`, по умолчанию как в B3.3). Пароль не печатался. Группа «Администраторы» до и после — `user`, `Администратор`.
+
+| Шаг | Длительность |
+|---|---|
+| Передача установщика и ZIP (53 части по 20 МБ, 5 потоков, повторов 0) | 65 мин (06:46–07:11), ≈0,28 МБ/с; сборка на стенде и сверка хеша — по минуте |
+| Установка 0.4.0 / 0.3.9 (NSIS `/S /currentuser`) | 786 с (параллельно шла передача) / 284 с |
+| `live.mjs old` 0.4.0 / 0.3.9 | 52 с / 284 с (0.3.9 ждала ответа проверки подключения Loginom) |
+| `serve` 0.4.0 / 0.3.9; `migrate` 0.4.0 / 0.3.9 | 131 / 63 с; 114 / 41 с |
+| SEC-01 (скрипт, все четыре случая) | 23 с вместе с проверкой хеша Electron; сам прогон 1 с, первый холодный запуск Electron — 32 с |
+| Чек-лист Windows 4/5/10 (`windows-installed-smoke.py`) | 476 с, из них установка 292,7 с |
+| CLI из ZIP (шаг 8) | 323 с: установка 209 с, версия 4 с, вход 66 с, задача 23 с, удаление 14 с |
+| Уборка (учётная запись, профиль, `C:\lab\b62c`, снимок «после») | 86 с |
+
+### B3.3 Windows: 2 релиза × 2 пути (строка 5)
+
+CLI — `loginom-ai-agent-cli.exe` из ZIP кандидата, распакованного `tar -xf` под обычной учётной записью, хеш ZIP на стенде равен CI. Профиль писал установленный Desktop релиза
+(`live.mjs old`, подставная модель `live.mjs` на `127.0.0.1`), затем `live.mjs v2 --bin <exe> --path serve|migrate --profile <корень>`. До первого запуска CLI проверено: у обоих
+профилей `baseURL` провайдера — `http://127.0.0.1:<порт>/v1` (порты 23418 и 22246, равны `modelPort` из `old.json`); ключ старого профиля подставная модель сравнила (`keyFromOldProfile: true`).
+
+| | 0.4.0 `serve` | 0.4.0 `migrate` | 0.3.9 `serve` | 0.3.9 `migrate` |
+|---|---|---|---|---|
+| Профиль `old`: сессии / сообщения / части; миграций; вызовов модели | 3 / 9 / 22; 38; 8 | то же | 3 / 9 / 22; 38; 8 | то же |
+| Сессии в `GET /api/session` | 3/3 | 3/3 | 3/3 | 3/3 |
+| Сообщения v1 по ID, пропавших | 2/2, 3/3, 4/4; 0 | то же | то же | то же |
+| Сессии каталога в своём проекте | 3/3 | 3/3 | 3/3 | 3/3 |
+| Навык из конфига; провайдер | да; да | да; да | да; да | да; да |
+| Запрос к модели без ввода ключа: ключ старого профиля, вызовов подставной | да, 2 | да, 2 | да, 2 | да, 2 |
+| `v1-backup.db` = исходная база (SHA-256) | да, `0e792f2b…` | да | да, `2a9e409e…` | да |
+| Второй `serve`: те же сессии; второй копии нет | да | да | да | да |
+| `migrate`: код; повтор | — | 0 «Written: 3 sessions, 11 messages»; 0 «Already migrated», файлы те же | — | то же |
+| Конфиг с навыком, `auth.json`, userData Desktop побайтно те же | да | да | да | да |
+| Готовность первого `serve`, мс | 59231 | 15675 | 41381 | 17494 |
+| Строка журнала `migrated a Loginom AI Agent 0.3.9/0.4 database before opening it` | 1 | 0 | 1 | 0 |
+
+Числа как в B3.3 на Windows (3 / 9 / 22, 38 миграций, 11 сообщений v2 вместо 9, 8 вызовов подставной модели на профиль). Готовность первого `serve` — десятки секунд вместо 0,5–1,3 с
+в B3.3: первый запуск свежей копии CLI на стенде (разбор файлов, проверка ресурсов); второй `serve` — 15–20 с. Отдельно не исследовалось.
+
+**Различие.** Вторая запись — релиз **0.4.0**, а не `v0.4.2`: установщик 0.4.0 уже на стенде (хеш B3.3), а 0.4.2 пришлось бы качать (414 МБ при 0,28 МБ/с). На Linux B6.2b 0.4.2 дал
+те же числа, что 0.4.0; на Windows 0.4.2 не проверялась.
+
+**`live.mjs` и `loginom-ai-agent-cli` (риск плана).** Первый запуск `v2 --profile` на Windows упал: `serve` вышел с кодом 1 без вывода. Причина — в `live.mjs`, не в продукте: каталог профиля создаётся
+в `C:\lab\b62c\u` и наследует записи Администраторов и «Пользователей», а `protectWindowsProfile` (`profile-windows.ts`) у непустого профиля допускает только владельца и SYSTEM
+(`PROFILE_PERMISSIONS_INVALID`; пустой профиль CLI защищает сам). Правка: в `live.mjs` при `--profile` на Windows профиль до копирования данных получает `icacls /inheritance:r`
+для SID учётной записи и SYSTEM (14 строк). После неё все четыре прогона зелёные. Бинарник и пароль Basic (`loginom-ai-agent:`) работают как в B6.2b.
+
+### SEC-01 Windows (строка 7), обычная учётная запись
+
+`b62c-sec01.ps1`: кодек `credentials` из `loginom-host/src/connection/credentials.ts` (бандл Bun, как в `loginom-windows.yml`), Electron 44.9.1, `safe-storage-smoke.cjs`, три режима как в CI
+и повреждение шифротекста между процессами. Учётная запись — не администратор.
+
+| Случай | Результат | Сверка с CI (`safe-storage-*.json` из `loginom-windows-installed-smoke-45837221197`) |
+|---|---|---|
+| Запись (`write`) | код 0; `{"mode":"write","available":true,"roundtrip":true,"tamperRejected":true}`; файл — `{encrypted}` 180 знаков, открытых значений нет (проверяет сам скрипт) | равно, кроме `pid` |
+| Чтение (`read`), другой процесс Electron | код 0; `roundtrip: true`, `tamperRejected: true` | равно, кроме `pid` |
+| Повреждение шифротекста: последний байт файла перевёрнут, `read` | код 1, stderr `Error while decrypting the ciphertext provided to safeStorage.decryptString.`, доказательство не записано | в CI нет (там порча только в памяти процесса) |
+| `unavailable` (`isEncryptionAvailable` ложно) | код 0; `{"plaintextFallback":false,"encodeRejected":true,"decodeRejected":true}`, `must-not-exist.json` нет | равно |
+
+Первый, ручной прогон дал те же результаты. Перенос ключа Electron 42 → 44 не проверялся (на стенде нет Electron 42 с тем же профилем; B4.14a «Не проверено»). Журналы, UI API и экспорт диагностики
+установленного Desktop — шлюз C (В-86).
+
+### Чек-лист Windows 4 / 5 / 8 / 10 (строка 9)
+
+Установщик `55c699a8…a477` (хеш на стенде равен CI, `installer-sha256` PASS). `windows-installed-smoke.py … --login 'Проверка Б62' --password-file … --channel dev --version 2.3.0 --runs 3`,
+сеанс 0, обычная учётная запись, установка `/S /currentuser /D=C:\lab\b62c\smoke\<uuid>\run\installed`. Итог отчёта — `PASS`, 42 проверки, ни одной FAIL или WARN.
+
+| Пункт | Проверки | Результат |
+|---|---|---|
+| 4: подпись | `signature` | `NotSigned` (подписи нет, как в 0.4) |
+| 4: PKG-01 | окно `Chrome_WidgetWin_1` 1040×776 за 3,4 с (потом 0,5 с), renderer `oc://renderer/index.html`, мастера нет; служба на :28290, версия `0.0.0-dev-8`; навыки `loginom-automation`, `loginom-dashboard`, `package-docs`, `package-linter` | PASS; `visible: false` — сеанс 0 |
+| 4: PKG-02 | `silent-install` 292,7 с с `--verify-resources`; кеш 12575 файлов; Chromium 154.0.8037.0; `verify-resources` 0, `manifestHash` `060bbe04…af69` (как в CI) | PASS |
+| 4: BRAND-01 | запись «Loginom AI Agent Dev 2.3.0», `Publisher: Loginom`; exe `ProductName`/`FileDescription` `Loginom AI Agent Dev`; ярлыки; схема `loginom-ai-agent`; нет `opencode`; Диспетчер задач: `loginom-ai-agent-dev.exe`, `node.exe`, `conhost.exe`, служба `loginom-ai-agent-cli.exe` — «Loginom AI Agent Dev» | PASS (в B4.14c служба называлась «Bun» — WARN, сейчас `process-descriptions` PASS) |
+| 5: перезапуск и LIFE-01 | три запуска, каждый закрыт `WM_CLOSE`: выход 0 за 0,59 / 0,35 / 0,39 с, через 5 с нет процессов, новая служба на каждом запуске (pid 9112 → 6520 → 10876); `no-model-calls` 0, 0, 0 | PASS |
+| 10: REMOVE-01 | `/S /currentuser` за 1,5 с: каталог и запись удалены, схема, кеш обновлятора, ярлыки удалены; данные пользователя сохранены; нет процессов и минидампов | PASS |
+| 5: SEC-01 | строка выше (кодек в Electron 44 под DPAPI); в установленном Desktop — шлюз C | PASS, объём B4.14a |
+| 8: CLI из ZIP | `install.cmd` (209 с; `destination …\Programs\loginom-ai-agent-cli\0.0.0-dev-8-dev`), `--version` → `0.0.0-dev-8`; `loginom setup --stdin-json` с выдуманным адресом: подключение сохранено, `browser.failed: LOGINOM_LOGIN_UNAVAILABLE`; `loginom status`: `configured`; задача `run --model b62stub/b62-model` на подставной модели: код 0, ответ `B62C-STUB-ANSWER`, 2 запроса к подставному серверу, оба с ключом профиля; `uninstall.cmd`: `{"uninstalled":true,"profilesPreserved":true}` | PASS (вход — без настоящего Loginom, см. «Не проверено») |
+
+Счётчик подставных запросов: `old` — 8 + 8, `v2 serve|migrate` — по 2 на каждый из четырёх прогонов, шаг 8 — по 2 на каждый запуск задачи. Настоящая модель: 0 (все провайдеры — `127.0.0.1`;
+`no-model-calls` 0, 0, 0; окно чистого профиля по-прежнему предлагает модель «Big Pickle», запросов к ней не было).
+
+### Уборка
+
+`account-delete` (профиль выгружен 41 раз, `Win32_UserProfile` удалён), `C:\lab\b62c` удалён. Снимок «после» равен «до» (`snap-before.json` / `snap-after.json`: пользователи, группы, профили, `C:\Users`, права входа, задачи, службы,
+правила брандмауэра, порты, `C:\lab`, реестр удаления и запуска, процессы). Независимо: `Test-Path C:\lab\b62c` — False, процессов из каталога 0, пользователей `DefaultAccount, user, WDAGUtilityAccount, Администратор, Гость`.
+Политики входа не менялись. Файл пароля на Linux удалён.
+
+### Как перезапустить на итоговом SHA
+
+```text
+# из корня дерева итогового SHA; gh, ssh-алиас winstand, Bun 1.4.4 и Node 24 в PATH; установщики 0.3.9 и 0.4.0 уже лежат в C:\lab на стенде
+scripts/candidate-check/b62c-windows.sh <40-знаковый SHA>              # все стадии: fetch prepare send profiles sec01 smoke cli clean
+scripts/candidate-check/b62c-windows.sh <SHA> sec01 smoke cli           # или отдельные стадии
+```
+
+Артефакты хранятся 14 дней (`retention-days`). Стадия берёт run `loginom-release.yml` этого SHA, у которого зелёные `windows / build-package-test` и `verify windows` (общий итог run может быть красным).
+
+### Что прогнано скриптом, а что вручную
+
+Стадии `sec01`, `smoke`, `cli`, `clean` прошли через `b62c-windows.sh` (`cli` три раза: 1-я и 2-я попытки нашли дефекты самого скрипта — `Cli` в PowerShell это псевдоним `Clear-Item`, а строка `#< CLIXML` из
+дочернего `powershell.exe` попадала под мой фильтр вместе с JSON задачи; исправлено, итог — третья попытка). Стадии `fetch`, `prepare`, `send`, `profiles` собраны из тех же команд, но **скриптом целиком не выполнялись**:
+`fetch` и `prepare` — вручную теми же командами, `send` — отдельным циклом `send.sh` с теми же частями, `profiles` — одноразовыми копиями `b62c-release.ps1` (0.4.0 — в два приёма из-за правки `live.mjs`). `b62c-windows.sh` проверен `bash -n`,
+PowerShell — разбором в Docker (`errors: 0`).
+
+### Найдено, не чинил
+
+1. **CLI: блок `#< CLIXML` в перенаправленном выводе.** При `loginom setup|status` и `run` с `2>&1` в файл в потоке есть блок `#< CLIXML <Objs … Progress …>` («Подготовка модулей к первому использованию»)
+   от дочернего `powershell.exe`; `--version` (профиль не открывается) его не даёт. Вероятная причина — `protectWindowsProfile` (`packages/cli/src/profile-windows.ts:12`): `execFileSync` без `stdio`, stderr PowerShell
+   наследуется. В консоли не виден; скрипты, читающие вывод, получают мусор перед JSON. Причину не проверял.
+2. **Холодный первый запуск CLI** — 28 с на `--version` и 41–59 с до готовности `serve`; повтор — секунды. То же в B4.14c (29 с службы Desktop). Похоже на проверку свежих файлов антивирусом; не измерялось.
+3. **`uninstall.cmd` оставляет пустой `…\Programs\loginom-ai-agent-cli\bin`.** Полезная нагрузка и профиль удалены/сохранены как заявлено; пустой каталог и запись в PATH пользователя остаются (`INSTALL.md`: PATH не правится).
+4. **0.3.9 при удалении оставляет `HKCU\Software\Classes\loginom-ai-agent`** (ключ схемы). Релизный 0.3.9, не кандидат; для чистой установки v2 ключ не мешает (`uri-scheme-removed` PASS).
+5. **`install.cmd` CLI — 209–306 с**, установка Desktop — 293 с (проверка 12 575 / 13 748 файлов на медленном диске стенда): REL/CAND на раннере — 30 с.
+6. **Run 45837221197 красный в целом** и нет `SHA256SUMS` (macOS отменён); `test`/`unit` красный на том же SHA. Для приёмки Windows это не важно, для шлюза — да.
+7. Окно чистого профиля предлагает «Big Pickle» (находка B4.14c остаётся).
+
+### Не проверено
+
+- **Видимое окно**: сеанс 0, `visible: false`, как в B4.14c; окно есть, `main window visible` в журнале, renderer загружен, но на экране интерактивного сеанса его никто не видел.
+- **Подписи** нет (`NotSigned`), как в 0.4.
+- **Вход в Loginom**: настоящего сервера нет; проверен путь `setup`/`status` и отказ `LOGINOM_LOGIN_UNAVAILABLE` на выдуманном адресе.
+- **Windows 0.4.2** (взят 0.4.0), перенос ключа Electron 42 → 44, SEC-01 в установленном Desktop, журналы и экспорт диагностики — шлюз C.
+- Пункты чек-листа 6, 7, 9 (форма Desktop, прокси, обновление с 0.4.x) — шлюз C.
+- `fetch`, `prepare`, `send`, `profiles` скриптом `b62c-windows.sh` целиком не прогонялись.
+
+### Проверки дерева
+
+```text
+$ cd packages/product && bun test                                   # 118 pass, 0 fail
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary       # код 0
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check   # would change: 0 files
+$ bun run check                                                     # см. ниже
+$ prettier --check / oxlint scripts/live-profiles/live.mjs scripts/candidate-check/b62c-task.mjs   # чисто, 0 warnings, 0 errors
+$ pwsh ParseFile scripts/candidate-check/*.ps1 (Docker, PowerShell 7.4)   # errors: 0
+```
+
 ## B6.2a Охранные тесты G1–G6 с мутациями (Linux, репетиция)
 
 26.11.2026. Ветка `b62a-guarantees` от `oc2-migration` (`abb6374106`), дерево `.claude/worktrees/b62a`. Код продукта, `catalog.json` и `catalog.md` не менялись; добавлен

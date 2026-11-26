@@ -201,6 +201,20 @@ async function v2() {
   if (args.profile) {
     fs.rmSync(args.profile, { recursive: true, force: true })
     fs.mkdirSync(args.profile, { recursive: true, mode: 0o700 })
+    // B6.2c: on Windows the CLI inspects the ACL of a profile that is not empty (`profile-windows.ts`) and accepts only the owner and
+    // SYSTEM; a directory made here inherits the parent's entries (Administrators, Users). Make it private first, as the CLI does for an empty one.
+    if (win) {
+      const sid = spawnSync("whoami", ["/user", "/fo", "csv", "/nh"], { encoding: "utf8" })
+        .stdout.trim()
+        .split(",")[1]
+        ?.replaceAll('"', "")
+      const acl = spawnSync(
+        "icacls",
+        [args.profile, "/inheritance:r", "/grant:r", `*${sid}:(OI)(CI)F`, "/grant:r", "*S-1-5-18:(OI)(CI)F"],
+        { encoding: "utf8" },
+      )
+      if (acl.status !== 0) throw new Error(`icacls failed: ${acl.stdout}${acl.stderr}`)
+    }
     fs.writeFileSync(
       path.join(args.profile, "cli-profile.json"),
       JSON.stringify({ format: "loginom-cli", version: 1, channel: args.channel ?? "dev" }),
