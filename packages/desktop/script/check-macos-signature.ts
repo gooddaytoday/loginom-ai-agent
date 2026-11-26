@@ -38,14 +38,33 @@ await cp(join(resources, "bin/loginom-keychain"), binary)
 const created = await helper(binary, "create")
 if (created.code !== 0 || !created.value) throw Error("KEYCHAIN_CREATE_FAILED")
 
-// The release flow signs the helper again with the same identity. This must keep the entry readable.
-await $`/usr/bin/codesign --force --sign - --timestamp=none ${binary}`
-const again = await helper(binary, "read")
-if (again.code !== 0 || again.value !== created.value) throw Error("KEYCHAIN_READ_AFTER_RESIGN_FAILED")
-console.log("keychain helper: entry readable after re-sign")
+// codesign -d prints its details on stderr.
+const cdhash = async () => {
+  const child = Bun.spawn(["/usr/bin/codesign", "-d", "--verbose=4", binary], { stdout: "ignore", stderr: "pipe" })
+  return (await new Response(child.stderr).text()).match(/CDHash=(\w+)/)?.[1]
+}
+const read = async () => {
+  const result = await helper(binary, "read")
+  return result.code === 0 && result.value === created.value
+}
+// Control: reading right after the write. If this fails, the runner's Keychain is the problem, not the signature.
+if (!(await read())) throw Error("KEYCHAIN_CONTROL_READ_FAILED")
+const before = await cdhash()
+console.log(`keychain helper: control read ok, cdhash ${before}`)
 
-// A rebuilt helper has another code directory hash (here: hardened runtime flag). Report only: ad-hoc signatures
-// cannot promise the same access, and stage G (Developer ID) is the fix if it fails.
-await $`/usr/bin/codesign --force --sign - --timestamp=none --options runtime ${binary}`
-const changed = await helper(binary, "read")
-console.log(`keychain helper: entry after a changed code hash: ${changed.code === 0 && changed.value === created.value ? "readable" : "NOT readable (informational)"}`)
+// Same code and the identifier build-keychain.ts uses: ad-hoc signing is deterministic, so the hash must not change
+// and the entry must stay readable. Only a changed hash is a real loss of access.
+await $`/usr/bin/codesign --force --sign - --timestamp=none --identifier com.loginom.aiagent.cli.keychain ${binary}`
+const same = await cdhash()
+console.log(`keychain helper: cdhash after the same re-sign ${same}`)
+if (same !== before) throw Error("KEYCHAIN_RESIGN_NOT_DETERMINISTIC")
+if (!(await read())) throw Error("KEYCHAIN_READ_AFTER_RESIGN_FAILED")
+console.log("keychain helper: entry readable after a re-sign with an unchanged hash")
+
+// A rebuilt helper has another code directory hash (here: hardened runtime flag). Report only: 0.4 never proved access
+// after a changed ad-hoc signature (macos.md), and Developer ID (stage G) is the fix if the entry is lost.
+await $`/usr/bin/codesign --force --sign - --timestamp=none --identifier com.loginom.aiagent.cli.keychain --options runtime ${binary}`
+const changed = await cdhash()
+console.log(
+  `keychain helper: cdhash after a changed signature ${changed}; entry ${(await read()) ? "readable" : "NOT readable (informational)"}`,
+)
