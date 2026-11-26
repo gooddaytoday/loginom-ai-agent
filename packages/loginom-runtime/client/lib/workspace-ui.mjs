@@ -5390,7 +5390,16 @@ function readRenderedInputMapping(observation) {
             const exactBodies=fresh.ui.elements.filter(e=>e.graph_node?.part==='body'&&e.graph_node.node_label===key);
             const nativeBody=fresh.prepared_node_context?.verified===true&&fresh.prepared_node_context.surface==='graph'
               &&exactBodies.length===1&&exactBodies[0].tid===fresh.prepared_node_context.tid;
+            // LAB-2082: the Join port wizard uses the design name in its path
+            // even when the same native node has the automatic graph caption.
+            const inputOwner=current.prepared_node_context;
+            const joinCaption=inputPort&&nativeBody&&expected==='Слияние'&&boundKey==='Левое'
+              &&inputOwner?.verified===true&&inputOwner.surface==='wizard'
+              &&inputOwner.input_port?.node_icon_class==='bg-vendor-icon-joindata'
+              &&inputOwner.navigation_node?.tid===finishOwner.node.tid&&inputOwner.navigation_node?.label===expected
+              &&['document_id','workflow_id','node_id'].every(k=>typeof inputOwner[k]==='string'&&inputOwner[k]===bound[k]);
             const matchesText=text=>{const actual=text.replace(/\s/g,''),full=expected.replace(/\s/g,'');
+              if(joinCaption)return actual===boundKey;
               return actual===full||nativeBody&&actual.endsWith('…')&&actual.length>1&&full.startsWith(actual.slice(0,-1));};
             const labels=fresh.ui.elements.filter(e=>e.graph_node?.part==='label'
               && e.graph_node.node_label===key && typeof e.graph_node.label_text==='string'

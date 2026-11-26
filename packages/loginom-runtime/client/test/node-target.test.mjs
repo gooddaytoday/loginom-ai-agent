@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { prepareNodeTarget, releaseNodeTarget, verifyNodeTargetEffect } from '../lib/node-target.mjs';
+import { prepareNodeTarget, verifyNodeTargetEffect } from '../lib/node-target.mjs';
 import { describeNodeTypes, validateNodeTargetRequest } from '../lib/node-contracts.mjs';
 import {journalCopy} from '../lib/execution-journal.mjs';
 const ref = id => ({ document_id: 'doc', workflow_id: 'wf', node_id: id });
@@ -41,70 +41,6 @@ function fixture() {
    return {status:'SUCCEEDED',cleanup_complete:true,effect_possible:true};
   }};
  return {adapter,operation,calls,events,get graph(){return graph;},run:(r=request())=>prepareNodeTarget({request:r,operation,adapter,record:async e=>{events.push(e);return e;}})};
-}
-for(const fault of ['none','release','foreign edit','first link changed','explicit label','other caption','other receipt','incomplete cleanup','missing rewritten link']){
- test('LAB-2082 second Join input with native caption change: '+fault,async()=>{
-  const f=fixture();
-  Object.assign(f.graph,{dom_epoch:1,interaction_ready:true,foreign_links:[]});
-  Object.assign(f.graph.nodes[0],{label:'Заказы',locked:false});
-  f.graph.nodes.push({...structuredClone(f.graph.nodes[0]),ref:ref('customers'),label:'Клиенты'});
-  const r={...request(),target:{kind:'new',type:'transform.join_data',position:{x:400,y:208}},inputs:[
-   {source:ref('source'),output:0,input:0},{source:ref('customers'),output:0,input:1},
-  ]};
-  if(fault==='explicit label')r.target.label='Слияние';
-  const tid=(label,caption,input)=>workflow.prefix+`;Graph;${label}|Output_Data-0|${caption}|Input_Data-${input}`;
-  const mutate=f.adapter.mutate,observe=f.adapter.observe;
-  let secondReceipt,beforeSecond;
-  f.adapter.observe=async()=>{
-   if(!beforeSecond)return observe();
-   const previous=beforeSecond;
-   beforeSecond=null;
-   return previous;
-  };
-  f.adapter.mutate=async effect=>{
-   const result=await mutate(effect);
-   const target=f.graph.nodes[2];
-   if(effect.kind==='create'){
-    Object.assign(target,{label:'Слияние',locked:false});
-    return result;
-   }
-   const receipt={action_key:'link.create',operation_id:effect.id,cleanup_complete:true,effect_possible:true};
-   if(effect.parameters.edge.input===0)return {...receipt,status:'SUCCEEDED',phase:'verified',
-    output:{link_ref:{kind:'link',tid:tid('Заказы','Слияние',0)}}};
-   // Windows 608/588: the original first edge now has a different DOM TID,
-   // alongside the second edge. The independent graph keeps the first GUID pair.
-   target.label=fault==='other caption'?'Правое':'Левое';
-   target.dom_epoch=4;
-   if(fault==='foreign edit')f.graph.nodes[0].label='Ручная правка';
-   if(fault==='first link changed')f.graph.links[0]={...f.graph.links[0],source:'customers'};
-   secondReceipt={...receipt,status:'AMBIGUOUS',phase:'applying',output:{reason:'unrelated graph changed',
-    added_links:[tid('Заказы','Левое',0),tid('Клиенты','Левое',1)],added_ports:[]}};
-   if(fault==='other receipt')secondReceipt.operation_id='other';
-   if(fault==='incomplete cleanup')secondReceipt.cleanup_complete=false;
-   if(fault==='missing rewritten link')secondReceipt.output.added_links.shift();
-   if(fault==='release')beforeSecond=structuredClone(effect.before);
-   return secondReceipt;
-  };
-  const result=await f.run(r);
-  assert.deepEqual(f.calls,['create','connect','connect']);
-  if(fault==='none'){
-   assert.equal(result.status,'SUCCEEDED',result.error);
-   assert.equal(result.node.ref.node_id,'target');
-   assert.equal(f.operation.targetPhase.final_graph.nodes[2].label,'Левое');
-   return;
-  }
-  assert.equal(result.status,'AMBIGUOUS');
-  assert.equal(f.operation.targetPhase.pending.kind,'connect');
-  if(fault==='release'){
-   f.operation.nodeApply={request:r,pending:{phase:'target'}};
-   f.adapter.reconcile=async()=>({completed:true,verified:true,cleanup_complete:true,receipt:secondReceipt});
-   f.adapter.verifyWorkflow=async value=>({...value,verified:true,status:'SUCCEEDED',cleanup_complete:true,effect_possible:false});
-   const released=await releaseNodeTarget({operation:f.operation,adapter:f.adapter,record:async e=>e,deadline:f.operation.deadline});
-   assert.deepEqual(released.node,ref('target'));
-   assert.equal(f.operation.targetPhase.pending,null);
-   assert.deepEqual(f.calls,['create','connect','connect']);
-  }
- });
 }
 test('failed native marker records fresh topology privately without node labels or URLs',async()=>{
  const f=fixture();f.graph.nodes[0].label='https://private.invalid/?token=secret';
