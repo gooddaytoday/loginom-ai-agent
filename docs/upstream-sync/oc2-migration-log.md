@@ -25722,3 +25722,15 @@ $ python3 -I scripts/upstream-sync/apply-identity.py --check        # would chan
 $ bun run check                                                     # код 0, Tasks: 39 successful, 39 total (Cached: 39, пакеты не менялись)
 $ prettier --check / oxlint scripts/live-profiles/live.mjs          # чисто, 0 warnings, 0 errors
 ```
+
+### B5.2b-fix3 — run 45786926746
+
+`candidate.ts prepare` копировал `release-manifest.json.sha256` в `output`, куда `write-manifest.ts` его уже записал:
+`cp` на самого себя дал EINVAL. Из списка копирования убран `${manifest}.sha256` (манифест в `output` уже есть). Остальные
+копии идут из `dist` и из каталога скачанного CLI, `sums.ts` ничего не копирует; код общий, поэтому исправление относится к
+трём `verify-*` сразу. Повторять на каждой платформе вживую это не удалось — только CI.
+
+Предложение по числу заданий macOS (не внедрено): сейчас три раннера macOS в прогоне — pty, сборка, проверка. Pty можно не
+собирать заново, если хеш `packages/process-daemon/**` и `Cargo.lock` совпал с прошлым успешным (кэш артефакта
+`actions/cache` по этому хешу в `loginom-pty.yml`) — это минус один раннер без потери проверок. Сборку и проверку слить нельзя:
+первая внутри reusable workflow, а вторую нужно запускать после её артефакта.

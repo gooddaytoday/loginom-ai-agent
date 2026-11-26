@@ -98,8 +98,9 @@ async function prepare(
 
   const cli = files.filter((file) => config.cli.test(file))
   if (cli.length !== 1) throw Error(`Expected one CLI archive: ${cli.join(", ")}`)
+  // The manifest and its .sha256 are already in `output`: copying them onto themselves fails with EINVAL.
   await Promise.all(
-    [...decoded.artifacts.map((item) => join(dist, item.file)), cli[0], `${cli[0]}.sha256`, `${manifest}.sha256`].map((file) =>
+    [...decoded.artifacts.map((item) => join(dist, item.file)), cli[0], `${cli[0]}.sha256`].map((file) =>
       cp(file, join(output, basename(file))),
     ),
   )
