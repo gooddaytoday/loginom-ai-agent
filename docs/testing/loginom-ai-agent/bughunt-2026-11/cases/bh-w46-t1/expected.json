@@ -1,0 +1,122 @@
+{
+  "graph": {
+    "exact": true,
+    "retain": [],
+    "nodes": [
+      {
+        "id": "scenario_vars",
+        "type": "variables.user"
+      },
+      {
+        "id": "source",
+        "type": "imports.text"
+      }
+    ],
+    "links": []
+  },
+  "outputs": [
+    {
+      "output_node_type": "imports.text",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "any",
+      "rows": [
+        {
+          "category": "Продукты",
+          "list_price": 1007.35
+        },
+        {
+          "category": "Одежда",
+          "list_price": 6945.62
+        },
+        {
+          "category": "Одежда",
+          "list_price": 10089.18
+        },
+        {
+          "category": "Продукты",
+          "list_price": 1108.23
+        },
+        {
+          "category": "Бытовая техника",
+          "list_price": 42815.07
+        },
+        {
+          "category": "Продукты",
+          "list_price": 128.02
+        },
+        {
+          "category": "Одежда",
+          "list_price": 6599.53
+        },
+        {
+          "category": "Электроника",
+          "list_price": 1956.58
+        },
+        {
+          "category": "Продукты",
+          "list_price": 153.66
+        },
+        {
+          "category": "Электроника",
+          "list_price": 36017.23
+        },
+        {
+          "category": "Электроника",
+          "list_price": 11005.39
+        },
+        {
+          "category": "Электроника",
+          "list_price": 21807.65
+        },
+        {
+          "category": "Электроника",
+          "list_price": 3445.01
+        },
+        {
+          "category": "Электроника",
+          "list_price": 89432.84
+        },
+        {
+          "category": "Бытовая техника",
+          "list_price": 37878.41
+        },
+        {
+          "category": "Продукты",
+          "list_price": 1120.64
+        },
+        {
+          "category": "Одежда",
+          "list_price": 12601.03
+        },
+        {
+          "category": "Книги",
+          "list_price": 1057.13
+        },
+        {
+          "category": "Продукты",
+          "list_price": 442.56
+        },
+        {
+          "category": "Книги",
+          "list_price": 2001.47
+        }
+      ],
+      "columns": [
+        {
+          "name": "category",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "list_price",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-06
+          }
+        }
+      ]
+    }
+  ]
+}
