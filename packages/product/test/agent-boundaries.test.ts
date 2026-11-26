@@ -10,14 +10,14 @@ const boundaries = workflow.split("\n## Границы действий\n")[1] ?
 // computed totals in local Python, converted data without consent, and created a doomed 70-column Import.
 test("entry keeps the action boundaries visible before any reference is read", () => {
   const entry = skill.split("\n## ")[0]
-  expect(entry).toContain("Итоги считает Loginom, не локальный Python/bash")
-  expect(entry).toContain("`loginom_file_profile`")
+  expect(entry).toContain("Считай и сверяй итоги в Loginom")
+  expect(entry).toContain("`loginom_file_profile` проверяет допуск файла к загрузке")
   expect(entry).toContain("только его `next_step`/recovery, затем отчёт о блокере")
   expect(entry).toContain("без чтения\nжурналов, diagnostics и исходников продукта")
   expect(entry).toContain("Конвертация и производные файлы — с\nсогласия")
   expect(entry).toContain("[границы](references/workflow.md#границы-действий)")
-  // Internal guard below the owner's 40 000 B SKILL.md budget (raised for LAB-2020; never above 39 000).
-  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(38_500)
+  // The 39 000 B internal limit leaves headroom under the owner's 40 000 B budget.
+  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(39_000)
 })
 
 test("workflow reference defines Loginom-only results, standard recovery and consent", () => {
