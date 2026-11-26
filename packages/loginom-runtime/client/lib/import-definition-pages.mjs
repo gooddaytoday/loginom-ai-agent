@@ -18,10 +18,14 @@ async function observeDefinition(channel,options,stage){
  return channel.observe(options);
 }
 export async function readImportDefinitionPages(channel,{expectedCount,ready=()=>true}={}) {
-  return readDefinitionPages(channel,{expectedCount,ready,output:false});
+  return (await readDefinitionPages(channel,{expectedCount,ready,output:false})).definition;
 }
 
-export async function readOutputDefinitionPages(channel,{expectedCount,ready=()=>true,stage}={}) {
+export async function readOutputDefinitionPages(channel,options) {
+  return (await observeOutputDefinitions(channel,options)).definition;
+}
+
+export function observeOutputDefinitions(channel,{expectedCount,ready=()=>true,stage}={}) {
   return readDefinitionPages(channel,{expectedCount,ready,output:true,stage});
 }
 
@@ -47,8 +51,8 @@ async function readDefinitionPages(channel,{expectedCount,ready,output,stage}) {
     schemaId=p.schema_id;total=p.total_columns;
     fields.push(...structuredClone(columns.fields));offset+=p.returned;
     if(p.next_offset!==(offset===total?null:offset))throw new Error('Import definition cursor differs');
-    if(offset===total)return {schema_id:schemaId,total_columns:total,fields,definition_complete:true,
-      source_schema_verified:false,settings_applied:false};
+    if(offset===total)return {state,definition:{schema_id:schemaId,total_columns:total,fields,definition_complete:true,
+      source_schema_verified:false,settings_applied:false}};
   }
   throw new Error('Import definition page budget exceeded');
 }

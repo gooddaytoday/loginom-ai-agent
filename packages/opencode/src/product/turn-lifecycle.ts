@@ -1,6 +1,6 @@
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
-import { Effect } from "effect"
+import { Cause, Effect } from "effect"
 import type { Agent } from "@/agent/agent"
 import { DashboardSession } from "@/product/dashboard-session"
 import { Permission } from "@/permission"
@@ -20,10 +20,11 @@ export type AcquireInput = {
   sessions: Session.Interface
   agents: Agent.Interface
   permission: Permission.Interface
+  skills: Skill.Interface
 }
 
 const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
-  const { sessionID, sessions, agents, permission } = input
+  const { sessionID, sessions, agents, permission, skills } = input
   const session = yield* sessions.getForExecution(sessionID).pipe(Effect.orDie)
   const base = DashboardSession.profile(session)
   const status: { failure?: string } = {}
@@ -43,6 +44,7 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
             }),
         )
   let activation: Pending | undefined
+  const inheriting = new Set<MessageID>()
 
   const beforeTurn = Effect.fnUntraced(function* (turn: { session: Session.Info; history: History }) {
     const { session, history } = turn
@@ -149,6 +151,70 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
         if (message) message.parts = message.parts.map((part) => (part.id === updated.id ? updated : part))
       }
     }
+    // A new message in a chat that already activated loginom-automation inherits it through the same host grant path.
+    const task = TaskScope.derive({ sessionID, messages: history, revert: session.revert, base })
+    const carried = TaskScope.inherited({ sessionID, messages: history, revert: session.revert, base })
+    if (!loginom || !task || !carried || inheriting.has(task.taskMessageID)) return
+    inheriting.add(task.taskMessageID)
+    const message = history.find((message) => message.info.id === task.taskMessageID)
+    if (message?.info.role !== "user") return
+    // An attachment-only message has no text part; an ignored synthetic carrier holds the grant, as for replay.
+    const existing = message.parts.find((part) => part.type === "text")
+    const part: SessionV1.TextPart =
+      existing?.type === "text"
+        ? existing
+        : {
+            id: PartID.ascending(),
+            sessionID,
+            messageID: message.info.id,
+            type: "text",
+            text: "",
+            synthetic: true,
+            ignored: true,
+          }
+    let applied = false
+    const updated = yield* Effect.gen(function* () {
+      const agent = yield* agents.get(message.info.agent)
+      // Like the skill command, the grant carries the current bundled skill digest.
+      const grant = TaskScope.bundledActivation(yield* skills.require(carried.name).pipe(Effect.orDie))
+      if (!agent || grant?.profile !== carried.profile) return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
+      yield* permission
+        .ask({
+          sessionID,
+          permission: "skill",
+          metadata: {},
+          patterns: [grant.name],
+          always: [grant.name],
+          ruleset: Permission.merge(agent.permission, session.permission ?? []),
+        })
+        .pipe(Effect.orDie)
+      yield* Effect.promise((signal) =>
+        loginom.scope("bind", { taskMessageID: task.taskMessageID, profile: task.profile }, signal),
+      )
+      yield* Effect.promise((signal) =>
+        loginom.scope("request", { taskMessageID: task.taskMessageID, profile: grant.profile }, signal),
+      )
+      return yield* Effect.gen(function* () {
+        yield* Effect.promise((signal) =>
+          loginom.scope("apply", { taskMessageID: task.taskMessageID, profile: grant.profile }, signal),
+        )
+        applied = true
+        return yield* sessions.updatePart({
+          ...part,
+          metadata: { ...TaskScope.cleanMetadata(part.metadata), skill_activation: grant },
+        })
+      }).pipe(Effect.uninterruptible)
+    }).pipe(
+      // A refused inheritance leaves the task on its base profile; the model can still activate the skill.
+      // After the Host applied it, a failed DB write must stop the loop like any other grant.
+      Effect.catchCause((cause) =>
+        applied || Cause.hasInterrupts(cause) ? Effect.failCause(cause) : Effect.succeed(undefined),
+      ),
+    )
+    if (updated?.type === "text")
+      message.parts = existing
+        ? message.parts.map((part) => (part.id === updated.id ? updated : part))
+        : [...message.parts, updated]
   })
 
   const endTurn = Effect.fnUntraced(function* (turn: {
@@ -213,7 +279,15 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
       activation = { ...source, grant }
     })
 
-  const system = (): string[] =>
+  // Browser loginom_dock_* join the catalog only after this run's preparation (host-port catalog).
+  const unprepared = (tools: readonly string[]) =>
+    tools.includes("loginom_dock_prepare") &&
+    !tools.some(
+      (name) =>
+        name.startsWith("loginom_dock_") && name !== "loginom_dock_prepare" && name !== "loginom_dock_diagnostics",
+    )
+
+  const system = (tools: readonly string[] = []): string[] =>
     status.failure
       ? [
           "Loginom tools are currently unavailable (" +
@@ -223,6 +297,11 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
       : loginom
         ? [
             "Loginom is available through the bundled loginom_* tools. To create, change or execute a scenario, first activate the bundled loginom-automation skill. Browser Loginom tools are available after activation; then use loginom_dock_prepare for dynamic readiness and input artifacts. Help and diagnostics do not require loginom_dock_prepare. For quality assessment or linting of an existing local package, including structure, notes, node labels, variable names, scores and recommendations, use package-linter if available. Do not activate package-docs or loginom-automation merely to produce a quality review or its report. If package-linter is unavailable, report that it is missing; do not substitute package-docs. For a documentation-only request about a Loginom scenario other than quality assessment or linting, always activate package-docs before replying, including when the local .lgp is missing or only a server package is named. Then request the missing local package; never search for it in the browser. Dock tool names in skills have the loginom_ prefix here. Connection credentials are managed privately by the desktop; never ask the model to enter or reveal them.",
+            ...(unprepared(tools)
+              ? [
+                  "Для работы со сценарием начни с loginom_dock_prepare: остальные loginom_dock_* появятся после подготовки; из истории их не вызывай.",
+                ]
+              : []),
           ]
         : []
 
