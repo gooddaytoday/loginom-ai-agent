@@ -656,6 +656,11 @@ with the same profile, workspace and package. It rejects cycles before
 launching. The root attaches the files in `data/` by default, in any format.
 A continuation attaches only its listed `input_files`.
 
+Case table and CSV comparisons match columns by name and preserve each
+oracle's row ordering rule. Set `"column_order": "exact"` in that turn's
+`case.json` when its task explicitly requests a column order. The order
+of column definitions in `expected.json` is otherwise illustrative.
+
 Database cases can use `[[DB:DB_HOST]]`, `[[DB:DB_PASSWORD]]` and other
 `[[DB:DB_*]]` fields in `task.md`. The runner reads UTF-8
 `~/.config/loginom-run-check/db-test.conf` as literal `DB_KEY=value`

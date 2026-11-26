@@ -430,8 +430,11 @@ def scenario(name, case_root=None, *, cases=None):
             # Optional case.json: `base` continues a sibling case in the same chat;
             # `input_files` limits attachments; `budget` is read only by bughunt-audit.py.
             extra = read(src / 'case.json') if (src / 'case.json').is_file() else {}
-            if set(extra) - {'base', 'input_files', 'budget', 'notes'}:
-                raise ValueError(f'{name}/case.json: allowed keys are base, input_files, budget, notes')
+            if not isinstance(extra, dict) or set(extra) - {'base', 'input_files', 'budget', 'notes', 'column_order'}:
+                raise ValueError(f'{name}/case.json: allowed keys are base, input_files, budget, notes, column_order')
+            column_order = extra.get('column_order', 'any')
+            if column_order not in ('any', 'exact'):
+                raise ValueError(f'{name}/case.json: column_order must be any or exact')
             base = extra.get('base')
             if base == name:
                 raise ValueError(f'Case base cycle: {name} → {name}')
@@ -441,7 +444,7 @@ def scenario(name, case_root=None, *, cases=None):
             if files is not None and not (isinstance(files, list) and all(isinstance(f, str) and '/' not in f and (src / 'data' / f).is_file() for f in files)):
                 raise ValueError(f'{name}/case.json: input_files must list files in data/')
             return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=base, external=True,
-                        attach_all=True, **({'input_files': files} if files is not None else {}))
+                        attach_all=True, column_order=column_order, **({'input_files': files} if files is not None else {}))
     if case_root is not None:
         if name not in SCENARIOS and not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,31}', name):
             raise ValueError('Invalid external case name')
@@ -1692,6 +1695,13 @@ def expected_for(case, package, cold=False):
         expected = dict(package_path=expected['package_path'], nodes=expected['nodes'],
                         outputs=[{k: v for k, v in expected.items() if k not in ['package_path', 'nodes', 'graph']}],
                         **({'graph': expected['graph']} if 'graph' in expected else {}))
+    if case.get('attach_all'):
+        # A fixture's listing order does not express a requirement in the task.
+        # Apply the case's explicit opt-in to both warm and cold table evidence.
+        for key in ('outputs', 'tables'):
+            for output in expected.get(key, []):
+                if 'columns' in output:
+                    output['column_order'] = case.get('column_order', 'any')
     if case.get('colunion_output_indices') is not None:
         expected['outputs'] = [expected['outputs'][i] for i in case['colunion_output_indices']]
     if case.get('logreg_kfold'):
@@ -3771,7 +3781,6 @@ class Runner:
                             else read(src / spec['filter_initial'])['outputs'][index] if spec.get('filter_initial') and index < 2
                             else expected['outputs'][index % 2] if spec.get('filter_initial') else expected['outputs'][index])
             delimiter = check_csv(actual, csv_expected, header,
-                                  column_order='any' if isinstance(case, Path) else None,
                                   null_marker=expected.get('null_marker'), scenario_name=case, d76=counts,
                                   export_events=events, destination=destination)
             if counts: self.current['d76'] = counts
