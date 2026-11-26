@@ -2862,15 +2862,19 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const message=String(error?.message??error).slice(0,1000);
         if(error?.code==='LOGINOM_IDENTITY_CHANGED'||signal?.aborted&&operation.reloadProgress)refuseChangedNodeIdentity(operation,message);
         else operation.releaseRefused={message,ui_blocker:error?.userAction??null};
+        const retry=operation.releaseRefused.identityChanged&&canReleaseAfterReload(operation)
+          ?dockRecoveryAdvice(operation):null;
         const userAction=operation.releaseRefused.ui_blocker;
-        const trigger=browserRecoveryTrigger(operation,null);
+        const trigger=retry?null:browserRecoveryTrigger(operation,null);
         returned={status:'AMBIGUOUS',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'release_refused',
           effect_possible:true,trace:[],recovery_operation_id:recoveryOperationId,
           error:{code:'NODE_RELEASE_REFUSED',message},
           // With browser recovery the agent clears the blocker itself; the user is not asked to.
-          output:{original_operation_pending:pending===operation,...(userAction
-            ?trigger?{ui_blocker:userAction}:{user_action:userAction}:{}),
-            ...(trigger?{next_step:browserRecoveryNext(operation,trigger)}:{})}};
+          output:{original_operation_pending:pending===operation,...(retry
+            ?{next_step:retry.next_steps[0],
+              ...(retry.user_action?{user_action:retry.user_action}:{}),...(retry.warnings?{warnings:retry.warnings}:{})}
+            :{...(userAction?trigger?{ui_blocker:userAction}:{user_action:userAction}:{}),
+              ...(trigger?{next_step:browserRecoveryNext(operation,trigger)}:{})})}};
       }
       await remember(record,'recovery_completed',returned);
       auxiliary.set(recoveryOperationId,{signature,outcome:structuredClone(returned)});

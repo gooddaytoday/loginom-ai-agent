@@ -25,7 +25,7 @@ const proved = () => ({ verified: true, cleanup_complete: true, effect_possible:
 const blocked = () => { throw new NodeReleaseBlocked('A Loginom wizard of this node is open', 'Ask the user to close it with Cancel.'); };
 
 function fixture({ browserRecovery = true, release = blocked, releasePendingPhases, recoveryReleasePending,
-  nodeType = 'imports.text', stopPhase = 'finish', probePreparedPage, reopenNodePackage } = {}) {
+  nodeType = 'imports.text', stopPhase = 'finish', probePreparedPage, reopenNodePackage, now } = {}) {
   const calls = [], events = [];
   const graph = { complete: true, document_id: 'doc', workflow_ref: workflow, nodes: [], links: [], foreign_links: [] };
   if(reopenNodePackage)graph.interaction_ready=true;
@@ -56,7 +56,7 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
     if (stopPhase === 'configure') throw Error('Managed source configuration stopped');
     return result;
   } };
-  const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery, probePreparedPage, reopenNodePackage,
+  const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery, probePreparedPage, reopenNodePackage, now,
     // Only the page receipt ledger is read through this transport.
     execute: async code => {
       if (!state.receipt || !code.includes('receipt_read')) throw Error('Unexpected public transport');
@@ -316,7 +316,9 @@ for(const stage of ['probe','login','open','manual login required'])test('reload
   await stopForReload(f);
   const interrupted=await f.runtime.recover('apply',{...retryOptions('interrupted'),signal:controller.signal});
   assert.equal(interrupted.output.original_operation_pending,true);
-  assert.ok(interrupted.output.user_action?.includes(loss),JSON.stringify(interrupted));
+  assert.equal(interrupted.output.next_step?.tool,'dock_operation_recover');
+  if(stage==='manual login required')assert.ok(interrupted.output.user_action.includes(loss));
+  else assert.deepEqual(interrupted.output.warnings,[loss]);
   assert.equal(published,0);
   const advice=(await f.runtime.inspect({operationId:'apply'})).output;
   assert.equal(advice.next_steps[0].tool,'dock_operation_recover');
@@ -369,6 +371,20 @@ test('reopened graphs need a stable second read before any release is published'
   assert.equal(published,0);
   assert.equal((await f.runtime.inspect({operationId:'apply'})).output.next_steps.length,0);
   assert.equal(attempts,1);
+});
+
+test('reopened graph proof received after the original release deadline stays pending',async()=>{
+  let time=Date.now();
+  const f=fixture({stopPhase:'configure',nodeType:'transform.filter_data',probePreparedPage:async()=>reloadProbe,
+    now:()=>time,reopenNodePackage:async({deadline})=>{
+      time=deadline;
+      return reopenedGraphReceipt(async()=>assert.fail('late graph proof was published'));
+    }});
+  await stopForReload(f);
+  const outcome=await f.runtime.recover('apply',retryOptions('late'));
+  assert.match(outcome.error.message,/REOPENED_GRAPH_UNVERIFIED/);
+  assert.equal(outcome.output.original_operation_pending,true);
+  assert.equal(f.runtime.hasUnsettledWork(),true);
 });
 
 test('without the capability the existing user_action contract is unchanged', async () => {
