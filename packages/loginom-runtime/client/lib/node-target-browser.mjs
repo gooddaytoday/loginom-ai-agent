@@ -14,7 +14,7 @@ export async function readGraph(page, task) {
   const finishes=[...(page[Symbol.for('loginom-dock.operation-receipts.v1')]?.values()??[])]
     .filter(r=>r.state==='completed'&&r.outcome?.status==='SUCCEEDED'&&r.outcome.action_key==='ui.act'&&r.outcome.cleanup_complete===true)
     .map(r=>({context:r.outcome.output?.prepared_node_context,trace:r.outcome.trace}));
-  return page.evaluate(({ request, types, origin, build, read_bindings=false, finishes }) => {
+  return page.evaluate(({ request, types, origin, build, read_bindings=false, finishes, step_rebaseline=false }) => {
     const fail = message => { throw new Error(message); };
     const preparation = globalThis.__loginomDockPreparationV1;
     if (location.origin !== origin || globalThis.bg?.app?.Version !== build || preparation?.document !== document
@@ -47,6 +47,7 @@ export async function readGraph(page, task) {
     const epoch=e=>{if(!epochs.objects.has(e))epochs.objects.set(e,++epochs.next);return epochs.objects.get(e);};
     const domEpoch=epoch(containers[0]);
     const portIdentities=record.nodeTargetPortIdentities??=new WeakMap();
+    const stepPorts=[];
     const collection = diagram.FNodes?.FCollection;
     if (!Array.isArray(collection) || collection.length > 200) fail('Graph node bound exceeded');
     const nodeTypes = Object.values(types), byTid = new Map(),variableByTid=new Map(),connectionPorts = new Map(),nativeBindings=[];
@@ -78,6 +79,11 @@ export async function readGraph(page, task) {
         // port whose live hit-test resolves to this exact native cell. Preserve
         // prior identity checks; never infer an index or repair the DOM.
         const previous=portIdentities.get(p);
+        // Only the host's new-step read can rebind a manually renamed port.
+        // Reuse the prior suffix and native identity, then prove the unique
+        // current renderer hit just as for an ordinary alternate SVG.
+        const renamedBetweenSteps=step_rebaseline&&previous&&previous.nodeTid!==tid
+          &&/^(?:(?:Input|Output)_(?:Data(?:Tree)?|Var)-\d+|Input_ControlVar)$/.test(previous.tid.slice(previous.nodeTid.length+1));
         // Binning, regression, CrossTable and factor analysis replace captions after configuration,
         // leaving an alternate SVG without data-tid. Rebind only the same
         // native data port with its exact previous suffix; other types retain
@@ -112,13 +118,15 @@ export async function readGraph(page, task) {
         if((!ptid||variableRedraw) && element && containers[0].contains(element) && visible(element)
           && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && (!previous || (previous.graph===graph && previous.node===n && previous.cell===p.FCell
-            && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedDataPort || renamedVariablePort || renamedExcelVariable)
+            && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedDataPort || renamedVariablePort || renamedExcelVariable || renamedBetweenSteps)
             && previous.type===p.FType && previous.subtype===p.FSubType))){
           const box=containers[0].getBoundingClientRect();
-          const rendered=(previous&&!renamedDataPort&&!renamedVariablePort&&!renamedExcelVariable?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
+          const rendered=(previous&&!renamedDataPort&&!renamedVariablePort&&!renamedExcelVariable&&!renamedBetweenSteps?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
             const candidate=e.getAttribute('data-tid');
             if(!containers[0].contains(e) || !visible(e) || !candidate?.startsWith(tid+';')
               || (!previous && !/^(Input|Output)_Data(?:Tree)?-\d+$/.test(candidate.slice(tid.length+1))))return false;
+            if(renamedBetweenSteps && (candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
+              ||[...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1))return false;
             if(renamedDataPort && (!/^(Input|Output)_Data-\d+$/.test(candidate.slice(tid.length+1)) || candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
               || p.FType!==(candidate.slice(tid.length+1).startsWith('Input_')?0:1)))return false;
             if(renamedVariablePort&&(!/^Output_Var-\d+$/.test(candidate.slice(tid.length+1))
@@ -143,7 +151,10 @@ export async function readGraph(page, task) {
         if (!ptid || !containers[0].contains(element)) continue; // Hidden service ports are outside tabular phase.
         if(!ptid.startsWith(tid+';'))fail('Port identity belongs to another node');
         if(renderedPort.getAttribute('data-tid')===ptid && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
-          && (nativeRebound||[...exact(ptid)].filter(e=>containers[0].contains(e)).length===1))portIdentities.set(p,{graph,node:n,cell:p.FCell,guid:p.FGuid,data:p.data,nodeTid:tid,type:p.FType,subtype:p.FSubType,tid:ptid});
+          && (nativeRebound||[...exact(ptid)].filter(e=>containers[0].contains(e)).length===1)){
+          const identity={graph,node:n,cell:p.FCell,guid:p.FGuid,data:p.data,nodeTid:tid,type:p.FType,subtype:p.FSubType,tid:ptid};
+          if(step_rebaseline)stepPorts.push([p,identity]);else portIdentities.set(p,identity);
+        }
         const suffix = ptid.slice(tid.length + 1), m = /^(Input|Output)_Data(Tree)?-(\d+)$/.exec(suffix);
         const variable=/^(Input|Output)_Var-(\d+)$/.exec(suffix),control=suffix==='Input_ControlVar';
         if([3,4].includes(p.FSubType)&&!variable&&!control)fail('Variable port native identity changed');
@@ -215,6 +226,7 @@ export async function readGraph(page, task) {
     variable_links.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
     if(links.length+variable_links.length+foreign_links.length>400)fail('Graph link bound exceeded');
     rest_connection_links.sort((a,b)=>a.tid.localeCompare(b.tid));
+    for(const [port,identity] of stepPorts)portIdentities.set(port,identity);
     return {complete:true,document_id:request.document_id,workflow_ref:request.workflow_ref,dom_epoch:domEpoch,nodes,links,foreign_links,...(variable_links.length?{variable_links}:{}),...(rest_connection_links.length?{rest_connection_links}:{}),...(read_bindings?{native_bindings:nativeBindings}:{}),
       interaction_ready:model.FCreateDraggedNodeStarted===false && model.FDraggingOverGraph===false && !model.FDraggedNode};
   },{...task,finishes});

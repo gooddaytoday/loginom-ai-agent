@@ -3613,6 +3613,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       finally{running=false;}
     },
     nodeApplyStatus:id=>sourceReads.has(id)?sourceReads.status(id):nodeJobs.status(id),
+    nodeApplyWorkflow:id=>nodeJobs.workflow(id),
     waitNodeApply:(id,options)=>sourceReads.has(id)?sourceReads.wait(id,options):nodeJobs.wait(id,options),
     cancelNodeApply:id=>sourceReads.has(id)?sourceReads.cancel(id):nodeJobs.cancel(id),
     stopNodeApply:id=>nodeJobs.stop(id),
@@ -4666,7 +4667,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }});
   // Internal delivery calls retain the original runtime methods. The returned
   // facade prevents a second caller from changing UI between transfer stages.
-  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','waitNodeApply']);
+  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','nodeApplyWorkflow','waitNodeApply']);
   const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply','deleteNode']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{
