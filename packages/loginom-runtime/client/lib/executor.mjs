@@ -299,6 +299,11 @@ export async function browserServerDownloadProgress(page,task) {
   }
 }
 
+const UNRESOLVED_UPLOAD_VERIFICATION='Server-copy verification of this upload ended without a confirmed download; '
+  +'the upload stays unconfirmed. Do not recover, resume, verify, upload or download it again; report it as a blocker.';
+const UNCONFIRMED_UPLOAD_CLEANUP='The browser upload call finished but its cleanup is unconfirmed; uploads cannot be restored '
+  +'or abandoned. Do not recover, upload or download it again; report it as a blocker.';
+
 async function browserArtifactDownload(page,task,observe,act,reveal,track) {
   let browserStep='preconditions';
   const failureEvidence=error=>{
@@ -438,7 +443,11 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
     let eventPending=true;
     // Large server files can emit the event after the small artifact window.
     // Consume the host job's existing deadline; do not start a new allowance.
-    const eventTimeout=task.server_source_binding?task.deadline_at-Date.now():15000;
+    // Upload verification reads one tiny file, but Loginom can emit its event
+    // ~30 s after the gesture (LAB-2054). Use its own deadline minus a reserve
+    // for save and post-download settlement; never less than the old window.
+    const eventTimeout=task.server_source_binding?task.deadline_at-Date.now()
+      :!task.output_binding&&Number.isFinite(task.deadline_at)?Math.max(15000,task.deadline_at-Date.now()-15000):15000;
     if(eventTimeout<=0)return result(gesture?'AMBIGUOUS':'NOT_APPLIED','LOGINOM_DOWNLOAD_DEADLINE');
     event=page.waitForEvent('download',{timeout:eventTimeout}).then(value=>{
       eventPending=false;
@@ -506,7 +515,11 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
       error_code:/^[A-Z][A-Z0-9_]{0,79}$/.test(action.error?.code??'')?action.error.code:null,
       ...(action.error?.code==='UI_REFERENCE_STALE'?{reference_reason:referenceReasons[action.error.message]??'unclassified',
         ...(referenceChecks?{reference_checks:referenceChecks}:{})}:{})});
-    browserStep='download.event';download=await event;
+    browserStep='download.event';
+    // A gesture refused before any click cannot emit a download (LAB-2054):
+    // bound that wait by the former 15 s window, not the verification deadline.
+    const unclicked=action.effect_possible===false&&action.cleanup_complete===true;
+    download=unclicked&&eventTimeout>15000?await Promise.race([event,page.waitForTimeout(15000).then(()=>null)]):await event;
     if(action.status!=='SUCCEEDED' || action.output?.gesture_applied!==true) {
       if(download) {gesture=true;await download.cancel();completed=true;}
       else if(action.effect_possible===false && action.cleanup_complete===true)completed=true;
@@ -2434,7 +2447,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if (!reference) return { state: 'missing' };
     const code = `async (page) => (${browserReceipt.toString()})(page, ${JSON.stringify({ receipt_namespace: receiptNamespace,
       receipt_id: reference.id, receipt_signature: reference.signature, receipt_read: true, operation_id: operation.id })})`;
-    const value = await execute(code, { timeout: 10000,
+    // Leave time for the original Loginom reconnect guard to return its verdict.
+    const value = await execute(code, { timeout: filterReconnectPending(operation) ? 20000 : 10000,
       ...(['package.save_as','package.save_checkpoint'].includes(operation.action.action_key) ? { storageSession: 'save-reconcile' } : {}) });
     assertActionOutcome(value);
     const state = value.output;
@@ -2698,6 +2712,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return { ...operation.outcome, cleanup_complete: operation.cleanupConfirmed === true };
       if (operation.storageDownloadNavigation) return operation.cleanupConfirmed===true ? operation.outcome
         : failed(operation, 'CLEANUP_RECEIPT_MISSING', 'The original storage navigation has no confirmed browser cleanup.');
+      // A settled server-copy download without confirmed cleanup cannot be
+      // restored or abandoned (LAB-2054). Name the one terminal step instead.
+      if (operation.cleanupConfirmed === false && operation.action.capability === 'artifact.upload' && operation.verification?.settled === true)
+        return failed(operation, 'TRANSFER_VERIFICATION_UNRESOLVED', UNRESOLVED_UPLOAD_VERIFICATION);
+      // Recovery refuses every strategy for uploads; never advise restore_control.
+      if (operation.cleanupConfirmed === false && operation.action.capability === 'artifact.upload')
+        return failed(operation, 'CLEANUP_RECEIPT_MISSING', UNCONFIRMED_UPLOAD_CLEANUP);
       if (operation.cleanupConfirmed === false && !(['package.save_as','package.save_checkpoint'].includes(operation.action.action_key)
           && operation.outcome?.output?.connection_recovery_pending === true)) return failed(operation, 'CLEANUP_RECEIPT_MISSING',
         'The browser call finished but cleanup is unconfirmed. Inspect and restore_control before further mutations.');
@@ -2724,6 +2745,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const earlyNodePhase=operation=>!operation?.nodeApply?.node&&!operation?.nodeApply?.result
     &&(['source','workflow','target'].includes(operation?.nodeApply?.pending?.phase)
       ||operation?.nodeApply?.target_reconciled===true);
+  const filterConfigure=operation=>operation.nodeApply?.pending?.phase==='configure'
+    &&operation.nodeApply.request.target.type==='transform.filter_data';
+  const filterReconnectPending=operation=>filterConfigure(operation)
+    &&operation.outcome?.error?.cause?.code==='LOGINOM_RECONNECT_PENDING';
   const earlyRelease=(operation,signal)=>earlyNodePhase(operation)?async()=>{
     const deadline=now()+NODE_RELEASE_BUDGET_MS;
     await operation.nodeApplyDrivers?.releaseBeforeTarget?.({signal,deadline});
@@ -2738,7 +2763,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       id_roles:{operation_id:'original_pending_operation',recovery_operation_id:'new_unique_request'},
       requires:['runtime_release_proof'],provides:['released_node_operation','unblocked_workspace'],
       instruction:earlyNodePhase(operation)?'Release this early source/workflow/target failure with a NEW recovery_operation_id. Dock only reads the original receipts and quiet graph, proving that the target was not created or finding its exact partial node. Unknown effects remain blocked. Follow the released next_step; do not replay creation.'
-        :'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'}:null;
+        :'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'
+          +(filterReconnectPending(operation)?' Release requires the original Loginom session to reconnect. If it cannot reconnect, report the operation as blocked.':'')}:null;
   const releaseApply=async(operation,{strategy,recoveryOperationId,signature,signal})=>{
     if(strategy!=='abandon_operation')throw new Error('Only abandon_operation can release a stopped node operation; every other strategy is refused for it. If abandon_operation is refused too, follow its next_step instead of another strategy');
     if(running||nodeJobs.busy)throw new Error('Another Dock action is still running');
@@ -2766,15 +2792,21 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }catch(error){
         // The original operation keeps its gate. A blocker the user can clear is
         // named explicitly instead of leaving an empty recovery list.
-        operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:error?.userAction??null};
-        const trigger=browserRecoveryTrigger(operation,null);
+        const diagnostic=operationFailureDiagnostic(error);
+        const waitingForLoginom=filterReconnectPending(operation)&&diagnostic.code==='LOGINOM_DISCONNECTED'
+          &&diagnostic.detail==='reason=awaiting_original_attempt';
+        if(!waitingForLoginom)operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:error?.userAction??null};
+        const trigger=waitingForLoginom?null:browserRecoveryTrigger(operation,null);
+        const nextStep=waitingForLoginom?{
+          instruction:'Wait for the original Loginom session to reconnect. Then call dock_operation_recover with abandon_operation for the original operation_id and a NEW recovery_operation_id. If the original session cannot reconnect, report the operation as blocked.'
+        }:trigger?browserRecoveryNext(operation,trigger):null;
         returned={status:'AMBIGUOUS',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'release_refused',
           effect_possible:true,trace:[],recovery_operation_id:recoveryOperationId,
           error:{code:'NODE_RELEASE_REFUSED',message:String(error?.message??error).slice(0,1000)},
           // With browser recovery the agent clears the blocker itself; the user is not asked to.
           output:{original_operation_pending:pending===operation,...(error?.userAction
             ?trigger?{ui_blocker:error.userAction}:{user_action:error.userAction}:{}),
-            ...(trigger?{next_step:browserRecoveryNext(operation,trigger)}:{})}};
+            ...(nextStep?{next_step:nextStep}:{})}};
       }
       await remember(record,'recovery_completed',returned);
       auxiliary.set(recoveryOperationId,{signature,outcome:structuredClone(returned)});
@@ -2821,7 +2853,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const release=!recovery.available&&nodeReleaseStep(operation);
       return {recovery_options:release?['abandon_operation']:[],next_steps:recovery.available?[base.at(-1)]:release?[release,base[0]]:[base[0]],output_mapping_recovery:structuredClone(recovery),internal_resume_available:false};
     }
-    if (operation.transportUncertain) return { recovery_options: [], next_steps: base };
+    if (operation.transportUncertain) return { recovery_options: [], next_steps: filterConfigure(operation)?[{...base[0],
+      instruction:'The browser did not confirm whether the Filter gesture ran. Keep the original operation_id. If its receipt is still unconfirmed after inspection, report this operation as blocked and leave the wizard and package untouched.'}]:base };
     if(operation.action.capability==='node.apply'){
       const release=nodeReleaseStep(operation);
       return {recovery_options:release?['abandon_operation']:[],next_steps:release?[release,...base]:base,
@@ -3673,7 +3706,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (!operation || pending !== operation) throw new Error('Recovery requires the pending operation of this session');
       if(operation.action.capability==='node.target.internal')throw new Error('Use the enclosing node procedure to resume this internal phase');
       if(operation.action.capability==='node.apply')return releaseApply(operation,{strategy,recoveryOperationId,signature,signal});
-      if(operation.action.capability==='artifact.upload')throw new Error('Upload requires server transfer verification before recovery or abandonment');
+      if(operation.action.capability==='artifact.upload')throw new Error(operation.cleanupConfirmed!==false
+        ?'Upload requires server transfer verification before recovery or abandonment'
+        :operation.verification?.settled===true?UNRESOLVED_UPLOAD_VERIFICATION:UNCONFIRMED_UPLOAD_CLEANUP);
       if (!['complete_link', 'restore_control', 'accept_observed_state', 'abandon_operation'].includes(strategy)) throw new Error('Unsupported recovery strategy');
       if (operation.storageDownloadNavigation && !['accept_observed_state', 'abandon_operation'].includes(strategy))
         throw new Error('Inspect the pending download navigation and resolve it with a fresh observation');
@@ -4383,9 +4418,19 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           // Internal node readers return both typed action outcomes and plain
           // native observations. The real bridge accepts typed envelopes only;
           // unwrap their value locally, preserving the driver's original data.
-          const executeNodeScript=async(code,options)=>{
-            const wrapped='async page => {const base={action_key:"node.apply.transport",action_revision:"1",operation_id:'+JSON.stringify(operation.id)+',phase:"transport",effect_possible:true,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('+code+')(page)}};}catch(error){return {...base,status:"FAILED",cleanup_complete:false,output:{},error:{code:"NODE_APPLY_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
-            const response=await execute(wrapped,options);
+          const executeNodeScript=async(code,{fillOperationId,...options}={})=>{
+            const wrap=script=>'async page => {const base={action_key:"node.apply.transport",action_revision:"1",operation_id:'+JSON.stringify(operation.id)+',phase:"transport",effect_possible:true,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('+script+')(page)}};}catch(error){return {...base,status:"FAILED",cleanup_complete:false,output:{},error:{code:"NODE_APPLY_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
+            const reference=operation.lastReceipt;
+            if(fillOperationId&&filterConfigure(operation)&&reference?.id===fillOperationId&&reference.action_key==='ui.act'){
+              // The bridge invokes this fallback only when the native guard
+              // stops before calling the gesture. A lost browser reply remains uncertain.
+              const refusal={status:'NOT_APPLIED',action_key:'ui.act',action_revision:'1',operation_id:fillOperationId,
+                phase:'preconditions',effect_possible:false,cleanup_complete:true,output:{},trace:[],
+                error:{code:'LOGINOM_RECONNECT_PENDING',message:'The original Loginom session is still reconnecting. The filter value was not sent.'}};
+              options.onPendingReconnect=wrap(withBrowserReceipt('('+JSON.stringify(refusal)+')',{receipt_namespace:receiptNamespace,
+                receipt_id:reference.id,receipt_signature:reference.signature,operation_id:reference.operation_id}));
+            }
+            const response=await execute(wrap(code),options);
             if(response.status!=='SUCCEEDED')throw new Error(response.error?.message??'Node driver transport failed');
             return response.output.value;
           };

@@ -1098,3 +1098,40 @@ test('storage navigation reads each roots/table state with one browser observati
  // Initial, directory() and listing roots reads; one table read; no page reads.
  assert.deepEqual(reads,{roots:3,table:1});
 });
+
+// LAB-2050: the optional Excel Files lookup yields to the native wizard only
+// when its navigation settled. An unconfirmed Files click keeps its receipt
+// pending at the source boundary; no graph or destination step follows.
+test('an unconfirmed Files click during the Excel destination lookup stays pending at the source boundary',async t=>{
+ const f=await excelDestinationNavigation(t),{request,steps}=f;
+ f.showGraph();
+ f.page.click=async()=>{steps.push('files click');throw Error('Files click outcome was lost');};
+ const outcome=await f.runtime.runNodeApply(request);
+ assert.equal(outcome.status,'AMBIGUOUS',JSON.stringify(outcome));
+ assert.equal(outcome.phase,'source');
+ assert.equal(outcome.effect_possible,true);assert.equal(outcome.cleanup_complete,false);
+ assert.deepEqual(steps,['files click']);
+ assert.ok(!f.records.some(e=>e.phase==='excel_export_destination_preflight_completed'));
+ const inspected=await f.runtime.inspect({operationId:request.operation_id});
+ assert.equal(inspected.output.state,'pending');assert.equal(inspected.output.outcome.status,'AMBIGUOUS');
+});
+
+// Without a journaled click receipt there is nothing to recover, but the
+// navigation itself stays unresolved. Refuse at source instead of deferring.
+test('an Excel destination lookup refuses when its Files click receipt cannot be journaled',async t=>{
+ const f=await excelDestinationNavigation(t),{request,steps}=f;
+ f.showGraph();
+ const clicks=()=>f.page.events.filter(e=>e==='mouse_click').length,before=clicks();
+ const push=f.records.push.bind(f.records);
+ f.records.push=record=>{
+  if(record.phase==='prepared'&&record.action_key==='ui.act'&&/:nav1$/.test(record.operation_id))throw Error('Journal write failed');
+  return push(record);
+ };
+ const outcome=await f.runtime.runNodeApply(request);
+ assert.equal(outcome.status,'NOT_APPLIED',JSON.stringify(outcome));
+ assert.equal(outcome.effect_possible,false);assert.equal(outcome.cleanup_complete,true);
+ assert.equal(outcome.output.pending_phase,null);
+ assert.match(outcome.error.message,/Journal write failed/);
+ assert.equal(clicks(),before);
+ assert.deepEqual(steps,[]);
+});
