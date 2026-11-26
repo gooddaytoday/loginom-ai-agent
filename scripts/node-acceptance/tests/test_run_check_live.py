@@ -76,7 +76,8 @@ class LiveChainTest(unittest.TestCase):
                 (7, 9, part('tool', 'current', state=dict(status='running'))),
                 (6, 11, part('tool', 'current', state=dict(status='completed', time=dict(end=10)))),
                 (12, 12, part('step-finish', 'current')),
+                (13, 13, part('tool', 'current', tool='question', state=dict(status='running'))),
             ])
             events = [json.loads(line) for line in (folder / 'model.stdout').read_text().splitlines()]
             self.assertEqual([(event['type'], event['timestamp']) for event in events],
-                             [('step_start', 5), ('tool_use', 10), ('step_finish', 12)])
+                             [('step_start', 5), ('tool_use', 10), ('step_finish', 12), ('interaction_required', 13)])

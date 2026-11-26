@@ -42,6 +42,10 @@ def posted_users(messages, parts):
     return [m for m in messages if m['role'] == 'user' and m['id'] in posted]
 
 
+def awaiting_question(part):
+    return part['type'] == 'tool' and part.get('tool') == 'question' and part['state'].get('status') == 'running'
+
+
 def write_events(folder, assistants, parts):
     ids = {m['id'] for m in assistants}
     kinds = {'text': 'text', 'tool': 'tool_use', 'step-start': 'step_start', 'step-finish': 'step_finish'}
@@ -52,7 +56,9 @@ def write_events(folder, assistants, parts):
             continue
         state = part.get('state', {})
         if kind == 'tool_use' and state.get('status') not in ('completed', 'error'):
-            continue
+            if not awaiting_question(part):
+                continue
+            kind = 'interaction_required'
         timestamp = state.get('time', part.get('time', {})).get('end')
         events.append(dict(type=kind, timestamp=timestamp or (created if kind == 'step_start' else updated),
                            sessionID=part['sessionID'], part=part))
@@ -261,6 +267,9 @@ class LiveChain:
                     assert Path(part.get('filename', '')).name == file.name and (
                         url == file.as_uri() or url.startswith('data:') and base64.b64decode(url.split(',', 1)[1]) == file.read_bytes()
                     ), 'LIVE_CHAIN_ATTACHMENT_MISMATCH'
+                assistant_ids = {message['id'] for message in assistants}
+                if any(part['messageID'] in assistant_ids and awaiting_question(part) for _, _, part in parts):
+                    raise RuntimeError('LIVE_CHAIN_INTERACTION_REQUIRED: ' + str(folder / 'model.stdout'))
                 if any(m.get('error') for m in assistants):
                     raise RuntimeError('LIVE_CHAIN_MODEL_ERROR')
                 for message in reversed(assistants):

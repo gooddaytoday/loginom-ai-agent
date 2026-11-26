@@ -706,7 +706,8 @@ Loginom account and package path in each turn's fresh Save observation.
 `live-turns.jsonl` records message boundaries, PIDs and owner checks.
 The per-turn `model.stdout` is reconstructed read-only from persisted chat
 parts, with timestamps from the parts and tool states. Process exit and
-the cleanup receipt are checked before a cold run.
+the cleanup receipt are checked before a cold run. A model question that
+needs operator input stops the unattended chain and triggers cleanup.
 
 At a `manual_edit` boundary, `--live-chain` exits the live TUI and requires
 verified package close, logout and runtime close ACK. It then runs the
