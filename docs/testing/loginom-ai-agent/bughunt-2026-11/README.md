@@ -292,6 +292,7 @@ python3 -B docs/testing/loginom-ai-agent/bughunt-2026-11/cases/wave3-oracle.py -
 Офлайн-данные корзин и товаров взяты из `database/carts.json` и
 `database/products.json` DummyJSON на коммите
 [`3d78fed5f35b7f1087db1c162edc412f2a736722`](https://github.com/Ovi/DummyJSON/tree/3d78fed5f35b7f1087db1c162edc412f2a736722/database).
+Данные DummyJSON распространяются по [лицензии MIT](https://github.com/Ovi/DummyJSON/blob/3d78fed5f35b7f1087db1c162edc412f2a736722/LICENSE).
 Для локальной имитации `limit=0` массивы обёрнуты в объект с
 `total = limit = len(массив)` и `skip = 0`. Oracle читает тот же исходный JSON,
 проверяет поля пагинации и считает строки разворачивания через исходные записи.
