@@ -25569,3 +25569,10 @@ B5.1i-ci), поэтому шаги после неё ещё ни разу не �
   доступ к записи профиля (запрос Keychain или `LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE`). Выход — Developer ID: ACL
   привязывается к Team ID и идентификатору, а не к хешу.
 - **Проверка:** только прогон на macOS 15; на Linux `bun build` скрипта проходит.
+
+### B5.2b-fix — запуск workflow на GitHub
+
+Run 45781034385 (`83133f7968`) не создал заданий: в `env:` уровня задания контекст `runner` недоступен (`actionlint`, 9 ошибок
+в строках `WORK`, `INPUT`, `RELEASE`). Ветка `b52b2-release`: пути задаются шагом «Set the work paths»
+(`echo "WORK=$RUNNER_TEMP/work" >> "$GITHUB_ENV"` и т. д.) в трёх `verify-*`. `actionlint` 1.7.7 по пяти workflow
+(release, linux, windows, macos, pty) — 0 строк; `product` 0 падений; `catalog-check` 0; `apply-identity --check` 0 файлов.
