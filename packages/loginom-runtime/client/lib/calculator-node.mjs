@@ -19,6 +19,7 @@ import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolv
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
 import {readCollapseNativeOutput} from './collapse-native-output.mjs';
+import {configureNodeTitle} from './text-import-procedure.mjs';
 import {finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from './node-import-continuation.mjs';
 import {releasePendingNode,verifyRecoveredPendingNode,proveFinishLaunchRefused,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 
@@ -46,12 +47,13 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
  if(implementation){nodeApplyHandlers.clear();nodeApplyHandlers.set(implementation.type,{
   revision:implementation.revision,modes:implementation.modes??[implementation.mode],output_wizard:'separate',
   configurationReadback:implementation.readback,parameter_schema:implementation.parameterSchema,
+  ...(implementation.variableInputs?{variable_inputs:implementation.variableInputs}:{}),
   ...(implementation.bindingSchema?{binding_schema:implementation.bindingSchema}:{}),
   ...(implementation.fullUiOutput===true?{fullUiOutput:true}:{}),
   validate:implementation.validate,configure:(ctx,p,drivers)=>drivers.configureCalculator(ctx,p)});}
  const nodeApplyDriverFactory=options=>{
   const {operation,execute,onRecord,now,receiptOptions}=options;
-  let channel,activeSignal,configured,mapping,columns,executionDriver,executionReceipt,multipleOutputs,preconfiguration,inputCheckpoint,outputCheckpoint,configurationGraph,openCheckpoint,finishStart;
+  let channel,activeSignal,configured,mapping,columns,executionDriver,executionReceipt,multipleOutputs,preconfiguration,inputCheckpoint,outputCheckpoint,configurationGraph,openCheckpoint,finishStart,targetPreflight;
   const graphForRejection=async()=>{
    const g=await operation.nodeTargetAdapter.observe({document_id:operation.nodeApply.request.document_id,workflow_ref:operation.nodeApply.request.workflow_ref},operation.deadline);
    requireValue(g.complete===true&&g.document_id===operation.nodeApply.node.document_id&&g.workflow_ref.workflow_id===operation.nodeApply.node.workflow_id,'Complete calculator rollback graph required');
@@ -101,7 +103,10 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
      return true;
     },
    }:{}),
-   ...(!implementation||implementation.preflight?{beforeTarget:ctx=>(implementation?.preflight??preflightCalculatorSource)(options,ctx,{targetOrigin,targetBuild,wait})}:{}),
+   ...(!implementation||implementation.preflight?{async beforeTarget(ctx){
+    targetPreflight=await (implementation?.preflight??preflightCalculatorSource)(options,ctx,{targetOrigin,targetBuild,wait});
+    return targetPreflight;
+   }}:{}),
    releaseBeforeTarget:ctx=>releaseNodeSchemaPreview(options,ctx,{targetOrigin,targetBuild,wait}),
    verifySource:async()=>verified({not_applicable:true,source_kind:'upstream_table'}),
    ...(implementation?.openRecovery?{async verifyPendingOpen(state,{signal}={}){
@@ -199,8 +204,14 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
       return verified({not_applicable:true,mappings:[]});
      }
      enter(ctx);
+     const request=operation.nodeApply.request;
+     if(implementation?.skipInputMapping&&request.inputs.length===0&&mappings.length===0){
+      const graph=await operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline);
+      if(implementation.skipInputMapping(graph,ctx.node))return verified({not_applicable:true,mappings:[]});
+     }
      if(implementation?.beforeInput)await implementation.beforeInput(options,ctx,{targetOrigin,targetBuild,channel,finishWizard});
-     if(implementation?.configureInputs)return implementation.configureInputs(channel,mappings,ctx,operation.nodeApply.request,finishWizard,...(implementation.type==='transform.col_union_data'?[{inputCount:operation.colUnionInputCount}]:[]));
+     if(implementation?.configureInputs)return implementation.configureInputs(channel,mappings,ctx,operation.nodeApply.request,finishWizard,
+      {inputCount:operation.colUnionInputCount,preflight:targetPreflight});
      const recoveryGraph=(!implementation||implementation.inputMappingRecovery)?await graphForInput():null;
      await channel.openInputPort(0);
      const ready=s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified===true;
@@ -299,7 +310,24 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
    },
    async finish(mode,ctx){
     enter(ctx);if(mode==='close')return closePreparedWizard(channel);requireValue(mode==='done','Separate calculator port requires intermediate Done');
+    // An explicit caption equal to the native default skips the graph rename
+    // (node-target.mjs:418), so «Автоматическая метка» stays and Done re-derives
+    // it (LAB-2024). Where the Done page renders the native title, keep target.label
+    // as the custom title; for every type verify the committed graph caption.
+    const label=operation.nodeApply.request.target?.label;
+    if(label!==undefined){
+     const page=await channel.observe({condition:'node Done title before commit',ready:s=>s.wizard?.status==='observed'
+      &&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';btnDone'&&e.allowed_actions.includes('finish_wizard'))});
+     const title=page.wizard.stage==='done'&&page.wizard.completion?.ready===true?page.wizard.completion.fields:null;
+     if(title&&(title.label_mode.value!=='Пользовательская метка'||title.label.value!==label))
+      await configureNodeTitle(channel,{mode:'custom',label},{subject:'Node',maxLength:200});
+    }
     const result=await finishWizard(mode);
+    if(label!==undefined){
+     const g=await operation.nodeTargetAdapter.observe({document_id:operation.nodeApply.request.document_id,workflow_ref:operation.nodeApply.request.workflow_ref},ctx.deadline,ctx.signal);
+     const nodes=g.complete===true?g.nodes.filter(n=>n.ref.node_id===ctx.node.node_id):[];
+     requireValue(nodes.length===1&&nodes[0].label===label,'NODE_LABEL_NOT_PRESERVED: Done left caption '+JSON.stringify(nodes[0]?.label??null)+' instead of target.label');
+    }
     if(implementation?.afterDone)result.bindings=await implementation.afterDone(channel,operation.nodeApply.request,configured,{options,ctx,readGraph:()=>operation.nodeTargetAdapter.observe({document_id:operation.nodeApply.request.document_id,workflow_ref:operation.nodeApply.request.workflow_ref},ctx.deadline,ctx.signal)});
     return result;
    },

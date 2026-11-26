@@ -14,7 +14,7 @@ import {closePreparedWizard} from './node-wizard-close.mjs';
 import {openPreparedWizard} from './node-wizard-open.mjs';
 import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {textImportConfigurationReadback} from './text-import-readback.mjs';
-import {configureTextImportTitle,textImportServiceFields} from './text-import-procedure.mjs';
+import {configureNodeTitle,textImportServiceFields} from './text-import-procedure.mjs';
 import {textImportStepBudget} from './text-import-limits.mjs';
 import {textImportParametersSchema} from './node-api.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
@@ -24,6 +24,11 @@ import {makeNodeProcessContextCode} from './node-process-context.mjs';
 const requireValue=(v,m)=>{if(!v)throw new Error(m);};
 const one=(xs,m)=>{requireValue(xs.length===1,m);return xs[0];};
 const verified=(details={})=>({verified:true,cleanup_complete:true,effect_possible:false,...details});
+export function textImportTitleRequest({target,parameters}){
+ const explicit=parameters.settings?.node_title;
+ if(explicit!==undefined)return explicit;
+ if(target.kind==='new'&&target.label!==undefined)return {mode:'custom',label:target.label};
+}
 function validateTextSource(source) {
   if(source?.kind!=='verified_sources')return validateImportSource(source);
   requireValue(Object.keys(source).sort().join(',')==='kind,sources'&&Array.isArray(source.sources)
@@ -751,8 +756,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         if(mode==='close')return {...await closePreparedWizard(channel),...(configured?.server_profile?{server_profile:configured.server_profile}:{})};
         const executeRequested=mode==='execute'&&!sourceSwitch&&!operation.importBinding,verb=executeRequested?'execute_wizard':'finish_wizard',button=executeRequested?'btnExecute':'btnDone';
         requireValue(mode!=='execute'||executionDriver,'Execution baseline was not prepared');
-        const nodeTitleRequest=operation.nodeApply.request.parameters?.settings?.node_title;
-        if(nodeTitleRequest)await configureTextImportTitle(channel,nodeTitleRequest);
+        const nodeTitleRequest=textImportTitleRequest(operation.nodeApply.request);
+        if(nodeTitleRequest)await configureNodeTitle(channel,nodeTitleRequest,{maxLength:200});
         const s=await read('done',mode+' available for the prepared node',s=>s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+button && e.allowed_actions.includes(verb)));
         const nodeTitle=structuredClone(s.wizard.completion);
         await channel.perform({condition:'bound import '+mode+' available',initialObservation:s,
@@ -760,7 +765,18 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           resolve:s=>({verb,ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';'+button),'Unique wizard completion control required').ref}),
           identity:s=>s.prepared_node_context});
         const graph=await channel.observe({condition:'same configured node returned to graph',ready:s=>s.wizard?.status==='absent' && s.prepared_node_context?.surface==='graph'});
-        const label=one(graph.ui.elements.filter(e=>e.tid===graph.prepared_node_context.tid+';Label;Label'
+        const execution=executeRequested?await executionDriver.identify():null;
+        let label;
+        if(nodeTitleRequest?.mode==='custom'){
+          const current=await operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline,ctx.signal);
+          const nodes=current.complete===true&&current.document_id===ctx.document_id
+            &&current.workflow_ref?.workflow_id===ctx.workflow_ref.workflow_id?current.nodes.filter(n=>n.ref.node_id===ctx.node.node_id):[];
+          const saved=nodes[0];
+          requireValue(nodes.length===1&&saved.type==='imports.text'&&saved.ref.document_id===ctx.document_id
+            &&saved.ref.workflow_id===ctx.workflow_ref.workflow_id&&saved.label===nodeTitleRequest.label,
+            'NODE_LABEL_NOT_PRESERVED: saved caption '+JSON.stringify(saved?.label??null)+' differs from '+JSON.stringify(nodeTitleRequest.label));
+          label=saved.label;
+        }else label=one(graph.ui.elements.filter(e=>e.tid===graph.prepared_node_context.tid+';Label;Label'
           &&e.graph_node?.part==='label'),'Configured Import caption is unavailable').graph_node.label_text;
         requireValue(typeof label==='string'&&label.length>0,'Configured Import caption is empty');
         if(sourceSwitch){
@@ -793,7 +809,6 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
             return verified({effect_possible:true,mode,execution_started:true,settings_applied:true,execution_id:execution.execution_id,execution_group:execution,continuation_surface:continuationSurface,node_context:graph.prepared_node_context,node_label:label,package_saved:false,reopen_performed:true});
           }
         }
-        const execution=executeRequested?await executionDriver.identify():null;
         const continuationSurface=executeRequested?finishedImportSurface(await channel.observe({
           condition:'identified execution and graph continuity checkpoint',readProcesses:true,readOutputs:true,
           ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true&&s.node_outputs?.verified===true})):null;
