@@ -89,7 +89,7 @@ async function gesture(page, browser) {
 }
 
 const attempts = new Map();
-const until = Date.now() + 300_000;
+const until = Date.now() + 1_800_000;
 try {
   while (Date.now() < until) {
     for await (const portFile of glob('loginom/runtime/generations/*/chats/*/attempts/*/browser-profile/DevToolsActivePort',
