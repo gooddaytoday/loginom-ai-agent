@@ -25972,5 +25972,5 @@ name character`. В PowerShell `$Name:` читается как переменн
 - `python3 -B -m unittest discover -p 'test_*.py'` в `scripts/node-acceptance/tests`: 235 тестов, OK; мутация краснит.
 - `node --test scripts/node-acceptance/tests/*.test.mjs` из корня дерева: 812 pass, 23 fail; на базе 811/24 — падения в окружении, не от правки.
 - `packages/product`: 115 pass, 0 fail. `packages/loginom-agent`: 106 pass, 24 fail — те же 24 (тесты dashboard, миллисекунды) без правки, против базы.
-- `packages/cli`: см. итог в отчёте задачи. `bun typecheck`: `cli`, `loginom-agent` без ошибок.
+- `packages/cli` (весь пакет): 2 падения, те же на базе `45069384ab` (`loginom commands with the real Node host`, `standalone dashboard preserves explicit publication approval`: `DASHBOARD_RESOURCES_MISSING`); третье, `dashboard flags preserve…` в `cli-dashboard.test.ts`, внесла эта правка (новая запись среды `run`), тест исправлен. `bun typecheck`: `cli`, `loginom-agent` без ошибок.
 - `catalog-check.py` код 0; `apply-identity.py --check`: would change: 0 files.

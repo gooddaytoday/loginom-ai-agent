@@ -26,22 +26,22 @@ describe("run --dashboard arguments", () => {
       args: ["run", "--", "текст"],
       directory: undefined,
     })
-    expect(env).toEqual({ LOGINOM_AI_AGENT_RUN_DASHBOARD: id })
+    expect(env).toEqual({ LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE: "1", LOGINOM_AI_AGENT_RUN_DASHBOARD: id })
     expect(Standalone.forward(["run", "--headless", "--dashboard=" + id, "текст"], "/w", env).args).toEqual([
       "run",
       "текст",
     ])
-    expect(env).toEqual({ LOGINOM_AI_AGENT_HEADLESS: "1", LOGINOM_AI_AGENT_RUN_DASHBOARD: id })
+    expect(env).toEqual({ LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE: "1", LOGINOM_AI_AGENT_HEADLESS: "1", LOGINOM_AI_AGENT_RUN_DASHBOARD: id })
     // The run's private server keeps it; the next run without the flag drops it.
     expect(Standalone.forward(["serve", "--stdio"], "/w", env).args).toEqual(["serve", "--stdio"])
-    expect(env).toEqual({ LOGINOM_AI_AGENT_HEADLESS: "1", LOGINOM_AI_AGENT_RUN_DASHBOARD: id })
+    expect(env).toEqual({ LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE: "1", LOGINOM_AI_AGENT_HEADLESS: "1", LOGINOM_AI_AGENT_RUN_DASHBOARD: id })
     expect(Standalone.forward(["run", "--", "--dashboard", id], "/w", env).args).toEqual([
       "run",
       "--",
       "--dashboard",
       id,
     ])
-    expect(env).toEqual({})
+    expect(env).toEqual({ LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE: "1" })
   })
 
   test("dashboard rejects conflicting flags, missing IDs and the TUI", () => {
