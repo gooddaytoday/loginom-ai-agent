@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
 import {verifyNodeTargetEffect} from '../lib/node-target.mjs';
 
-function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,contextLost=false,inputPort=0,outputPort=0,bindingsFault=null,selectionChange=null,selectionGuidChanged=false,service=false,selectionMasks=0,maskSelectionChanged=false}={}) {
+function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,contextLost=false,inputPort=0,outputPort=0,bindingsFault=null,selectionChange=null,selectionGuidChanged=false,service=false,selectionMasks=0,maskSelectionChanged=false,confirmationChange}={}) {
   const start=Date.now();let clock=start,clicked=0,deleted=0,contextChecks=0,masked=0;
   const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1'}};
   const edge={source:'source',output:0,target:'target',input:0};
@@ -17,8 +17,21 @@ function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,c
     graph.nodes[0].type='bg-vendor-icon-restclientconnection';graph.nodes[0].other_ports=['Output_Connection-0'];
     graph.nodes[1].type='integration.rest_request';graph.nodes[1].other_ports=['Input_Connection-0'];
   }
+  const confirmationClicks=[];
+  let selectedCell={edge:true};
+  const nativeLink={FGuid:'drop-owned-guid',FCell:selectedCell,
+    FSourcePort:{FGuid:'source-port',parent:{FGuid:'source'}},FTargetPort:{FGuid:'target-port',parent:{FGuid:'target'}}};
+  const nativeDiagram={FLinks:{FCollection:[nativeLink]},FmxGraph:{
+    getSelectionCells:()=>[selectedCell],view:{getState:()=>({shape:{node:{getAttribute:()=>tid}}})},
+  }};
+  const nativeContext={bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{
+    getActiveTab:()=>({Controller:{FController:{FDiagram:nativeDiagram}}}),
+  }}}}}}}};
+  if(confirmationChange)edge.native_link_guid=nativeLink.FGuid;
   const page={
     evaluate:async(fn,arg)=>{
+      if(confirmationChange&&/FLinks\.FCollection|getSelectionCells/.test(String(fn)))
+        return vm.runInNewContext('('+fn.toString()+')',nativeContext)(arg);
       if(fn.toString().includes('FLinks.FCollection'))return (graph.rest_connection_links??graph.links).map(e=>[selectionGuidChanged&&clicked?'changed':e.guid??'link',e.source,'source-port',e.target,'target-port']);
       if(arg?.types){
         if(clicked&&!deleted&&selectionMasks>0){selectionMasks--;masked++;throw Error('Graph is blocked');}
@@ -45,14 +58,26 @@ function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,c
       evaluate:async()=>({x:100,y:100}),
       waitFor:async()=>{},
       textContent:async()=> 'Удалить выделенную связь?',
-      click:async()=>{if(selector.includes('msgbox;tlb;yes')){deleted++;graph.links=[];if(service){graph.foreign_links=[];graph.rest_connection_links=[];}}},
+      click:async()=>{
+        if(selector.includes('btnRemoveSelected')){
+          confirmationClicks.push('toolbar');
+          if(confirmationChange==='selected cell')selectedCell={edge:true};
+          if(confirmationChange==='link GUID')nativeLink.FGuid='user-guid';
+          if(confirmationChange==='port GUID')nativeLink.FTargetPort.FGuid='user-port';
+        }
+        if(selector.includes('msgbox;tlb;no'))confirmationClicks.push('no');
+        if(selector.includes('msgbox;tlb;yes')){
+          confirmationClicks.push('yes');deleted++;graph.links=[];
+          if(service){graph.foreign_links=[];graph.rest_connection_links=[];}
+        }
+      },
     }),
     mouse:{click:async()=>{clicked++;selectionChange?.(graph);},move:async()=>{}},
     waitForTimeout:async ms=>{clock+=ms;},
   };
   class Clock extends Date {static now(){return clock;}}
   const adapter=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',execute:code=>vm.runInNewContext('('+code+')',{Date:Clock})(page)});
-  return {adapter,request,edge,graph,page,start,deadline:start+budget,stats:()=>({clicked,deleted,contextChecks,masked,elapsed:clock-start})};
+  return {adapter,request,edge,graph,page,start,confirmationClicks,deadline:start+budget,stats:()=>({clicked,deleted,contextChecks,masked,elapsed:clock-start})};
 }
 async function run(options) {
   const f=fixture(options);const before=await f.adapter.observe(f.request,f.deadline);
@@ -139,6 +164,19 @@ test('same endpoints cannot hide a changed native link GUID after selection',asy
   const f=await run({selectionGuidChanged:true,selectionChange:g=>{for(const n of g.nodes)n.dom_epoch++;}});
   assert.equal(f.receipt.status,'AMBIGUOUS');assert.match(f.receipt.error,/graph changed before deletion/);
   assert.equal(f.stats().deleted,0);
+});
+
+for(const confirmationChange of ['none','selected cell','link GUID','port GUID'])test('add_only confirms native link ownership after opening Delete: '+confirmationChange,async()=>{
+  const f=await run({confirmationChange}),changed=confirmationChange!=='none';
+  assert.equal(f.receipt.status,changed?'AMBIGUOUS':'SUCCEEDED',f.receipt.error);
+  assert.equal(f.receipt.cleanup_complete,true);
+  assert.deepEqual(f.confirmationClicks,['toolbar',changed?'no':'yes']);
+  assert.equal(f.stats().clicked,1);
+  assert.equal(f.stats().deleted,changed?0:1);
+  if(changed){
+    assert.match(f.receipt.error,/Owned link identity changed before native confirmation/);
+    assert.deepEqual(f.graph.links,[f.edge]);
+  }else assert.ok(verifyNodeTargetEffect(f.effect,f.graph));
 });
 
 for(const selectionMasks of [1,3])test('D45 waits through the selected-link loading mask without replay: '+selectionMasks,async()=>{

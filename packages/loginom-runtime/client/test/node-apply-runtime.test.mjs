@@ -246,7 +246,11 @@ for(const browserRecovery of [false,true])test('add_only pending window tells th
  assert.equal((await f.runtime.recover(args.operation_id,{strategy:'abandon_operation',recoveryOperationId:'wrong-owner'})).status,'AMBIGUOUS');
  f.graph.nodes[0].ref.node_id='new';
  const afterClose=await f.runtime.inspect({operationId:args.operation_id});
+ assert.equal(afterClose.output.cleanup_confirmed,true);
  assert.ok(afterClose.output.recovery_options.includes('abandon_operation'));
+ assert.equal(afterClose.output.next_steps[0]?.tool,'dock_operation_recover');
+ assert.equal(afterClose.output.next_steps[0]?.arguments.strategy,'abandon_operation');
+ assert.ok(!afterClose.output.next_steps.some(step=>/ask the user to close/i.test(step.instruction??'')));
  const released=await f.runtime.recover(args.operation_id,{strategy:'abandon_operation',recoveryOperationId:'release'});
  assert.equal(released.status,'SUCCEEDED',released.error?.message);
  assert.equal(released.output.original_outcome.output.node.node_id,'new');
@@ -254,6 +258,35 @@ for(const browserRecovery of [false,true])test('add_only pending window tells th
  assert.equal((await f.runtime.runNodeApply({...request(),operation_id:'new-action',
   target:{kind:'existing',type:'imports.text',ref:{document_id:'doc',workflow_id:'wf',node_id:'new'}}})).status,'SUCCEEDED');
  assert.equal(f.calls.filter(name=>name==='create').length,1);
+});
+
+for(const [name,receipt] of [
+ ['lost reply',null],
+ ['no owned window',{status:'AMBIGUOUS',cleanup_complete:false}],
+ ['no node identity',{status:'AMBIGUOUS',cleanup_complete:false,add_only_window_pending:true}],
+ ['completed cleanup',{status:'AMBIGUOUS',cleanup_complete:true,add_only_window_pending:true,add_only_window_node_id:'new',
+  create_mismatch:{expected:'imports.text',actual:'imports.excel'}}],
+ ['failed receipt',{status:'FAILED',cleanup_complete:false,add_only_window_pending:true,add_only_window_node_id:'new'}],
+])test('add_only omits manual Close without a pending-window receipt: '+name,async()=>{
+ const f=fixture({browserRecovery:true}),mutate=f.adapter.mutate;
+ f.adapter.mutate=async effect=>{
+  await mutate(effect);
+  f.graph.nodes[0].locked=false;
+  if(!receipt)throw Error('Lost create reply');
+  return receipt;
+ };
+ f.adapter.reconcile=async()=>({completed:false,verified:false,cleanup_complete:false});
+ f.adapter.verifyWorkflow=async()=>({status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,
+  document_id:'doc',workflow_ref:workflow});
+ const outcome=await f.runtime.runNodeApply({...request(),mode:'add_only'});
+ assert.equal(outcome.status,'AMBIGUOUS');
+ const refused=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-without-window'});
+ assert.equal(refused.error.code,'NODE_RELEASE_REFUSED');
+ assert.notEqual(refused.output.next_step?.tool,'dock_operation_inspect');
+ const inspected=await f.runtime.inspect({operationId:'apply'});
+ assert.equal(inspected.output.state,'pending');
+ assert.ok(!inspected.output.next_steps.some(step=>/ask the user to close the window for this node/i.test(step.instruction??'')));
+ assert.deepEqual(f.calls,['create']);
 });
 
 test('validation and missing drivers cannot create a graph or journal effects',async()=>{
