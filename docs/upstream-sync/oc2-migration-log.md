@@ -25999,8 +25999,49 @@ setup 50 с, model 1803 с; s3 queue 908 с, setup 50 с, model 1805 с. Нез�
 Не чинилось: условие готовности, у которого `connection` обязателен и видим, — вероятная точка правки следующей задачи (владелец решает: ослабить условие
 до «поле есть в DOM» либо вернуть на стенде видимость строки подключения).
 
+### Повтор на клиенте v0.4.2 (В-110)
+
+26.11.2026. В ветку влит `oc2-migration` (`a07efd6d4a`, слияние `6ab9e55c39`; конфликт был только в хвосте журнала, обе части сохранены). `loginom-runtime/client/lib`
+совпадает с `v0.4.2`. CLI пересобран из этого дерева: 6 мин 46 с, код 0, `sourceCommit` `6ab9e55c39`, `sourceDirty=false`.
+
+Проба без модели (`wizard-ready-probe.ts`, ресурсы собранного CLI без правок, таймаут 15 с, headless от `lrun`, agent3, машина свободна — load1 0,9–1,3):
+
+| № | load1 | Итог | Время `dock_node_apply` до завершения, с |
+|---|---|---|---|
+| 1 | 1,12 | `SUCCEEDED` | 101 |
+| 2 | 0,86 | `SUCCEEDED` | 104 |
+| 3 | 1,33 | `SUCCEEDED` | 109 |
+
+Мастер импорта становится готов, импорт выполняется до конца (вход и старт рантайма 35–39 с, `dock_prepare` 38 с, загрузка файла 16 с).
+
+Модельный прогон группы A, счёт с нуля (исполнитель agent3, `deepseek/deepseek-flash`, `run-check` с `--build` этой сборки, `--cold`):
+
+| Раунд | Итог | Причина |
+|---|---|---|
+| n1 (s1, s3) | `FAIL` за 5,6 с, модель не работала | обвязка: `provider.no-route: Variant unavailable for deepseek/deepseek-flash: medium` — не в счёт |
+| m1 s1 | `FAIL`, модель 1026 с | `MAIN_CLEANUP_UNCONFIRMED` (Save PASS, port-read PASS, CSV и cold не дошли) |
+| m1 s3 | `FAIL`, модель 1347 с | то же |
+
+Модель в обоих сценариях завершила задачу (Save PASS, чтение порта PASS, CSV скачан, пакет закрыт и сеанс закрыт), провал даёт проверка обвязки. Раунды m2, m3 и независимая
+проверка agent2 не проводились: провал детерминирован (причины ниже), повтор тратил бы модель впустую. Счёт по узлам: PASS 0, FAIL 2 из 2 раундов 1, критерий «2 из 3» не проверяем.
+
+Находки, не правились:
+
+1. **`run-check.py` после слияния `v0.4.2` держит две константы модели.** Строка 32 `MODEL = os.environ.get('RUN_CHECK_MODEL') or 'openai/gpt-6.1-sol'` и строка 33
+   `VARIANT = ... 'medium' if MODEL == 'openai/gpt-6.1-sol' else ''` (версия 0.4.2), строка 42 `MODEL = 'deepseek/deepseek-flash'` (B6.1-T) переопределяет только модель. `VARIANT`
+   остаётся `medium`, и `run` отказывает с `provider.no-route`. Обход без правки кода: `RUN_CHECK_MODEL=deepseek/deepseek-flash` в окружении (тогда `VARIANT` пустой). Правка — убрать
+   строку 42 или `VARIANT` — отдельной задачей.
+2. **`closeSavedPackageOnShutdown` не перенесён в CLI v2.** В `v0.4.2` `packages/opencode/src/cli/standalone-run.ts:81` — `closeSavedPackageOnShutdown: mode === "run"` (и `packages/loginom-host/AGENTS.md:37`: обычный
+   standalone `run` его включает). В этом дереве `launchNodeHost` в `packages/loginom-agent/src/host.ts:200` (и `loginom-management.ts:79`) этот параметр не передаёт. Следствие: при завершении `run` рантайм
+   пишет `package-cleanup.json` (`package_closed: true`, `logged_out: true`, `unsaved_changes_discarded: false`), а `bridge.mjs:959` пишет `saved-package-cleanup.json` только при `closeSavedPackageOnShutdown`.
+   `run-check.py:3126` ищет именно `saved-package-cleanup.json` и даёт `MAIN_CLEANUP_UNCONFIRMED`. Это и разрыв переноса (политика закрытия сохранённого пакета при `run` v2 не включена), и несоответствие обвязки.
+   Решает владелец: перенести параметр в `loginom-agent/src/host.ts` для `run` (продукт) или принять `package-cleanup.json` в обвязке; общие контракты приёмки меняются только по согласованию.
+
+Вывод по бизнес-сценарию: до самого закрытия пакета сценарий из CLI проходит на модели (импорт, расчёт, Save, чтение порта, CSV); оценить PASS узла по критериям `run-check`
+нельзя, пока не решена находка 2. Время модели — 17 и 22 мин на сценарий при свободной машине; очередь по нагрузке не возникала.
+
 ### Что мешает масштабировать на 25 узлов
 
 - Чужая нагрузка на машине (load до 29) и очередь `--host-load-max`: один раунд группы A занял больше часа.
-- Все 25 узлов проходят через ту же фазу `dock_node_apply`; пока мастер импорта не готов, ни один сценарий, начинающийся с `imports.text`, не пройдёт.
+- Два барьера обвязки: нерешённая политика `closeSavedPackageOnShutdown` (находка 2) и дубль `VARIANT` в `run-check.py` (находка 1); оба проявятся на каждом из 25 узлов.
 - Запуск только от не-root пользователя с копией сборки; `parallel-calls-live.ts` устарел (находка, не правилась).
