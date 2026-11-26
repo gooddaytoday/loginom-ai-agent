@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { ByteSize, Effect, Exit, FileSystem } from "effect"
+import { binaryReferenceMime } from "@opencode/app/binary-reference"
 import { nativeT } from "../native/translations"
 import {
   createPickedFileState,
@@ -105,8 +106,9 @@ function rejection(reply: PickedFileCommand | undefined) {
   return new Error(nativeT("desktop.picker.error.notSelected"))
 }
 
-export function assertAttachmentBudget(files: { size: number }[]) {
-  const total = files.reduce((sum, file) => sum + file.size, 0)
+// Binary data files may be attached by path and are then never read, so they do not count against the budget.
+export function assertAttachmentBudget(files: { size: number; name?: string }[]) {
+  const total = files.reduce((sum, file) => sum + (file.name && binaryReferenceMime(file.name) ? 0 : file.size), 0)
 
   if (total <= MAX_ATTACHMENT_BYTES) return
   throw new Error(nativeT("desktop.picker.error.sizeLimit", { limit: MAX_ATTACHMENT_BYTES / 1024 / 1024 }))

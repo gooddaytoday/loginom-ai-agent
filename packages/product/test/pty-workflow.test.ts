@@ -12,9 +12,16 @@ const job = doc.jobs.pty
 
 describe("loginom-pty workflow", () => {
   test("builds the three product platforms as separate artifacts", () => {
-    const all = ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin", "x86_64-pc-windows-msvc"]
-    expect(job.strategy.matrix.target).toBe(`\${{ fromJSON(inputs.targets || '${JSON.stringify(all)}') }}`)
+    expect(JSON.parse(doc.env.ALL_TARGETS)).toEqual([
+      "x86_64-unknown-linux-gnu",
+      "aarch64-apple-darwin",
+      "x86_64-pc-windows-msvc",
+    ])
     expect(doc.on.workflow_call.inputs.targets.default).toBe("")
+    // Only targets without a cached binary are built; the plan job reads the input and falls back to all three.
+    expect(job.strategy.matrix.target).toBe("${{ fromJSON(needs.plan.outputs.missing) }}")
+    expect(workflow).toContain('echo "all=${REQUESTED:-$ALL_TARGETS}"')
+    expect(doc.jobs.plan.steps.find((step: any) => step.id === "targets").env.REQUESTED).toBe("${{ inputs.targets }}")
     expect(job["runs-on"]).toContain("contains(matrix.target, 'linux') && 'ubuntu-22.04'")
     expect(job["runs-on"]).toContain("contains(matrix.target, 'apple') && 'macos-15'")
     expect(job["runs-on"]).toContain("|| 'windows-2022'")
@@ -58,5 +65,44 @@ describe("loginom-pty workflow", () => {
       expect(consumer.jobs.pty.with.targets).toBe(JSON.stringify([target]))
       expect(read(`.github/workflows/loginom-${name}.yml`)).toContain(`name: loginom-ai-agent-pty-${target}`)
     }
+  })
+
+  test("a cached target never starts a build runner and is published as the same artifact", () => {
+    expect(doc.jobs.plan["runs-on"]).toBe("ubuntu-24.04")
+    expect(doc.jobs.reuse["runs-on"]).toBe("ubuntu-24.04")
+    expect(doc.jobs.reuse.strategy.matrix.target).toBe("${{ fromJSON(needs.plan.outputs.cached) }}")
+    expect(doc.jobs.reuse.if).toBe("needs.plan.outputs.cached != '[]'")
+    expect(job.if).toBe("needs.plan.outputs.missing != '[]'")
+    const upload = (name: string) =>
+      doc.jobs[name].steps.find((step: any) => step.uses?.startsWith("actions/upload-artifact@")).with.name
+    expect(upload("reuse")).toBe(upload("pty"))
+    expect(upload("pty")).toBe("loginom-ai-agent-pty-${{ matrix.target }}")
+    // The lookup never downloads, and a restore on a hit must not fall through to an empty artifact.
+    const lookups = doc.jobs.plan.steps.filter((step: any) => step.uses?.startsWith("actions/cache/restore@"))
+    expect(lookups).toHaveLength(3)
+    for (const step of lookups) expect(step.with["lookup-only"]).toBe(true)
+    const restore = doc.jobs.reuse.steps.find((step: any) => step.uses?.startsWith("actions/cache/restore@"))
+    expect(restore.with["fail-on-cache-miss"]).toBe(true)
+  })
+
+  test("the cache key covers every input of the binary and the target, and is saved only after the smoke test", () => {
+    const hash = doc.jobs.plan.steps.find((step: any) => step.id === "hash").run
+    for (const input of [
+      "packages/process-daemon/**",
+      "packages/process-daemon/Cargo.lock",
+      ".github/actions/setup-rust-pty/**",
+      ".github/workflows/loginom-pty.yml",
+    ])
+      expect(hash).toContain(`'${input}'`)
+    const targets = ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin", "x86_64-pc-windows-msvc"]
+    const keys = doc.jobs.plan.steps.filter((step: any) => step.with?.key).map((step: any) => step.with.key)
+    expect(keys).toEqual(targets.map((target) => `pty-${target}-` + "${{ steps.hash.outputs.value }}"))
+    const save = doc.jobs.pty.steps.findIndex((step: any) => step.uses?.startsWith("actions/cache/save@"))
+    const shared = "pty-${{ matrix.target }}-${{ needs.plan.outputs.hash }}"
+    expect(doc.jobs.pty.steps[save].with.key).toBe(shared)
+    expect(doc.jobs.reuse.steps.find((step: any) => step.with?.key).with.key).toBe(shared)
+    expect(save).toBeGreaterThan(doc.jobs.pty.steps.findIndex((step: any) => step.name === "Smoke test"))
+    for (const step of [...doc.jobs.plan.steps, ...doc.jobs.reuse.steps, doc.jobs.pty.steps[save]])
+      if (step.with?.key) expect(step.with.enableCrossOsArchive).toBe(true)
   })
 })

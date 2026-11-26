@@ -71,16 +71,18 @@ describe("installed-product checks", () => {
     expect(missing.map((match) => match[1])).toEqual([])
   })
 
-  test("the smoke wrapper passes only parameters the installed smoke declares, and the red run is a declared mutation", () => {
+  test("the installed smoke gets only parameters it declares, as a child with a deadline, and the red run is a declared mutation", () => {
     const smoke = read("packages/desktop/test/loginom/windows-installed-smoke.ps1")
-    const wrapper = read("script/run-windows-installed-smoke.ps1")
-    const declared = (text: string) => new Set([...(text.match(/param\(([\s\S]*?)\n\)/)?.[1] ?? "").matchAll(/\$([A-Za-z]+)\s*(?:=|,|\n|$)/g)].map((m) => m[1]!.toLowerCase()))
-    const passed = [...wrapper.match(/windows-installed-smoke\.ps1'\) ([^\n]*\n[^\n]*)/)![1]!.matchAll(/ -([A-Za-z]+)/g)].map((m) => m[1]!.toLowerCase())
-    expect(passed.length).toBeGreaterThan(4)
-    expect(passed.filter((name) => !declared(smoke).has(name))).toEqual([])
+    const declared = new Set([...(smoke.match(/param\(([\s\S]*?)\n\)/)?.[1] ?? "").matchAll(/\$([A-Za-z]+)\s*(?:=|,|\n|$)/g)].map((m) => m[1]!.toLowerCase()))
     const calls = run("Install, launch and uninstall Desktop candidate")
-    const mutation = calls.match(/-Mutation (\w+)/)![1]
-    expect(smoke).toContain(`'${mutation}'`)
-    expect(calls).toContain("run-windows-installed-smoke.ps1")
+    const passed = [...calls.match(/'-File'[^\n]*\n?[^\n]*/)![0].matchAll(/'-([A-Za-z]+)'/g), ...calls.matchAll(/@\('-([A-Za-z]+)'/g)]
+      .map((m) => m[1]!.toLowerCase())
+      .filter((name) => !["nologo", "noprofile", "noninteractive", "file"].includes(name))
+    expect(passed).toEqual(expect.arrayContaining(["installer", "runroot", "expectedversion", "channel", "allowserver", "allowadministrator", "mutation"]))
+    expect(passed.filter((name) => !declared.has(name))).toEqual([])
+    expect(smoke).toContain(`'${calls.match(/'-Mutation', '(\w+)'/)![1]}'`)
+    expect(calls).toContain("WaitForExit(720000)")
+    expect(calls).toContain("Remove-Leftover \"before $Name\"")
+    expect(smoke).toContain("if ($observation.status -ne 'PASS') { break }")
   })
 })

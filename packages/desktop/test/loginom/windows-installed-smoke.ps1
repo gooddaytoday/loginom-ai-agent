@@ -17,7 +17,9 @@ param(
     [ValidateSet('None','SkillByte','NoServiceStop','NoRenderer','ForeignScheme','LockedUpdaterCache')][string]$Mutation = 'None',
     # The profile already holds a Loginom connection (a 0.4 one that Desktop moves to its service, B4.13).
     [switch]$Connection,
-    [switch]$AllowServer
+    [switch]$AllowServer,
+    # A hosted CI runner is an elevated administrator, as in 0.4.2. The ordinary-user case belongs to the stand (B6.2).
+    [switch]$AllowAdministrator
 )
 
 $ErrorActionPreference = 'Stop'
@@ -202,12 +204,12 @@ function Wait-For([scriptblock]$Condition, [int]$Seconds = $TimeoutSeconds) {
     } while ((Get-Date) -lt $deadline)
     return $null
 }
-function Run-Installer([string]$Path, [string]$Arguments) {
+function Run-Installer([string]$Path, [string]$Arguments, [int]$TimeoutMs = 1200000) {
     $started = Get-Date
     $child = Start-Process -FilePath $Path -ArgumentList $Arguments -PassThru
     $null = $child.Handle  # keeps ExitCode readable after the process exits
     # The installer ends with `--verify-resources` (B4.5a): hashing and the Chromium warmup took minutes on a stand.
-    if (-not $child.WaitForExit(1200000)) {
+    if (-not $child.WaitForExit($TimeoutMs)) {
         Stop-Process -Id $child.Id -Force -ErrorAction SilentlyContinue
         throw "Installer timed out: $Path"
     }
@@ -396,7 +398,7 @@ try {
     $supported = [Environment]::Is64BitOperatingSystem -and (($os.InstallationType -eq 'Client' -and [int]$os.CurrentBuild -ge 22000) -or ($AllowServer -and $os.InstallationType -ne 'Client'))
     Check 'windows-x64' $supported "$($os.EditionID) build $($report.os.build) $($os.DisplayVersion); allowServer=$AllowServer"
     if (-not $supported) { throw 'Windows 11 x64 or an explicitly allowed Windows Server is required' }
-    Check 'ordinary-user' (-not $report.user.administrator) 'The installing account is not an elevated administrator'
+    Check 'ordinary-user' ($AllowAdministrator -or -not $report.user.administrator) "The installing account is not an elevated administrator; allowAdministrator=$AllowAdministrator administrator=$($report.user.administrator)"
     $Installer = (Resolve-Path -LiteralPath $Installer).Path
     $hash = (Get-FileHash -LiteralPath $Installer -Algorithm SHA256).Hash.ToLowerInvariant()
     $report.sha256 = $hash
@@ -488,6 +490,9 @@ try {
     for ($run = 1; $run -le $Runs; $run++) {
         $observation = Launch $run $previous
         if ($observation.service) { $previous = $observation.service.pid }
+        # A failed launch is the answer: later launches would only wait out the same deadline again, and the report and
+        # the uninstall have to happen well before the caller's own deadline.
+        if ($observation.status -ne 'PASS') { break }
         if ($run -eq 1) {
             Check 'app-window' ([bool]$observation.window -and $observation.window.title -like 'Loginom AI Agent*' -and $observation.window.titleLoaded -like 'Loginom AI Agent*') ($observation.window | ConvertTo-Json -Compress)
             Check 'renderer-loaded' ([bool]$observation.renderer -and -not $observation.renderer.wizard) ($observation.renderer | ConvertTo-Json -Compress)
@@ -542,7 +547,7 @@ try {
             }
             if (-not $uninstaller) { $uninstaller = Get-ChildItem -LiteralPath $install -Filter 'Uninstall *.exe' | Select-Object -First 1 -ExpandProperty FullName }
             if (-not $uninstaller) { throw 'Uninstaller is missing' }
-            $seconds = Run-Installer $uninstaller '/S /currentuser'
+            $seconds = Run-Installer $uninstaller '/S /currentuser' 180000
             $removed = Wait-For { -not (Test-Path -LiteralPath $install) -and (Entries).Count -eq 0 } 90
             Check 'silent-uninstall' ([bool]$removed) "/S /currentuser in $seconds s; installation directory and installed-app entry removed"
             if ($cacheLock) { $cacheLock.Dispose() }

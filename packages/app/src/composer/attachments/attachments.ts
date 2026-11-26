@@ -5,6 +5,7 @@ import { uuid } from "@opencode/util/uuid"
 import type { ComposerPrompt } from "../types"
 import type { ImageAttachmentPart, PathAttachmentPart } from "../state"
 import type { AttachmentDestination } from "./destination"
+import { binaryReferenceMime } from "./binary-reference"
 import { uploads } from "./uploads"
 
 type PromptTarget = {
@@ -17,7 +18,12 @@ type PromptTarget = {
 
 export type ComposerAttachmentConfig = {
   picker?: (
-    options: { defaultPath?: string; multiple?: boolean; accept?: string[] },
+    options: {
+      defaultPath?: string
+      multiple?: boolean
+      accept?: string[]
+      reference?: (name: string) => boolean
+    },
     onFile: (file: File) => Promise<boolean>,
   ) => Promise<void>
   directory: () => string
@@ -65,7 +71,8 @@ export function createComposerAttachments(
   // tools open; those bytes never enter the store, and never get base64-encoded into the request.
   const add = async (file: File, target = capture(), clipboard = false) => {
     if (!target) return false
-    const mime = await attachmentMime(file)
+    // A binary data file keeps its type without sniffing, which would read its bytes.
+    const mime = binaryReferenceMime(file.name) ?? (await attachmentMime(file))
     const destination = input.destination()
 
     if (native(mime, destination.input) && file.size <= MAX_INLINE_BYTES) return addInline(file, mime, target, clipboard)
@@ -260,7 +267,15 @@ export function createComposerAttachments(
       }
 
       void input
-        .picker({ defaultPath: input.directory(), multiple: true }, (file) => add(file))
+        .picker(
+          {
+            defaultPath: input.directory(),
+            multiple: true,
+            // A local server resolves the original path, so binary data files need no bytes.
+            reference: (name) => input.destination().local && Boolean(binaryReferenceMime(name)),
+          },
+          (file) => add(file),
+        )
         .then(done)
         .catch(input.onError)
     },

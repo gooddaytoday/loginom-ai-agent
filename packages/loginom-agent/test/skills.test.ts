@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { obsoleteSkillNames, reservedSkillNames } from "@loginom-ai-agent/product/skills"
+import { readdirSync } from "node:fs"
+import { obsoleteSkillNames, productSkillsDirectory, reservedSkillNames } from "@loginom-ai-agent/product/skills"
 import { Skill } from "@opencode/plugin"
 import type { SkillEditor } from "@opencode/plugin/promise/skill"
 import { admits, apply, hub, type Hub } from "../src/skills"
@@ -16,6 +17,15 @@ const info = (id: string, path: string, name = id) =>
   })
 const catalog = reservedSkillNames.map((name) => info(name, `/resources/skills/${name}/SKILL.md`))
 const reserved = [...reservedSkillNames, ...obsoleteSkillNames]
+
+// 0.4.2 (`23a3012f44`, `af7edb0c7a`): the matrix of the product's bundled skills is four, which the guard and acceptance
+// tests of `server`, `cli` and `loginom-host` read from `reservedSkillNames`; the bundle on disk must hold the same four.
+test("the product bundles four skills, and the bundle on disk holds exactly them", () => {
+  const four: string[] = ["loginom-automation", "loginom-dashboard", "package-docs", "package-linter"]
+  expect<string[]>([...reservedSkillNames].toSorted()).toEqual(four)
+  expect(readdirSync(productSkillsDirectory).toSorted()).toEqual(four)
+  expect(obsoleteSkillNames).toEqual(["package_docs"])
+})
 
 // The skill catalog as the product's transform sees it after every other source.
 function editor(skills: Skill.Info[]) {

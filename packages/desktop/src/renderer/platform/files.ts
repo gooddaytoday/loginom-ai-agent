@@ -1,4 +1,5 @@
 import type { Platform } from "@opencode/app/desktop"
+import { binaryReferenceMime } from "@opencode/app/binary-reference"
 import type { ElectronAPI } from "../api-types"
 
 type DesktopOS = Extract<Platform, { platform: "desktop" }>["os"]
@@ -45,7 +46,10 @@ export function createDesktopFiles(api: DesktopFileAPI, os: DesktopOS) {
 
     try {
       for (const file of result.files) {
-        const selected = new File([await api.readPickedFile(result.token, file.path)], file.name)
+        // Attached by its path: the bytes are not read, and the size limit does not apply.
+        const selected = options?.reference?.(file.name)
+          ? new File([], file.name, { type: binaryReferenceMime(file.name) })
+          : new File([await api.readPickedFile(result.token, file.path)], file.name)
         attachmentPaths.set(selected, file.path)
         await onFile(selected)
       }

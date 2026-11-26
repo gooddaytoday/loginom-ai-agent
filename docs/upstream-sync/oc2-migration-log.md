@@ -25096,6 +25096,29 @@ Run 45694260129 форка (`06ac4c97c9`): `pty (x86_64-unknown-linux-gnu)` и `
 `targets`, glibc 2.31, вход игнорируется, раннер macOS-14, нет baseline CPU) краснят по 1 тесту. `product`: 92 pass, 0 fail.
 Проверит только CI: что `fromJSON` в `strategy.matrix` и вход `targets` принимаются GitHub при `workflow_call`.
 
+### Кэш готового pty (ветка `b51f3-pty-cache`)
+
+Причина: задание `pty (aarch64-apple-darwin)` трижды отменено без шагов («not acquired by Runner of type hosted»,
+нехватка раннеров macOS arm64). Теперь `loginom-pty.yml` состоит из трёх заданий.
+- `plan` (`ubuntu-24.04`): ключ `pty-<цель>-<хеш>`, хеш — `packages/process-daemon/**`, `Cargo.lock`,
+  `.github/actions/setup-rust-pty/**`, `loginom-pty.yml` (в нём пины раннеров, glibc, zigbuild). Для каждой запрошенной
+  цели `actions/cache/restore` с `lookup-only`; выход — списки `cached` и `missing`, хеш.
+- `reuse` (`ubuntu-24.04`): для целей из `cached` восстанавливает кэш (`fail-on-cache-miss`) и грузит тот же артефакт
+  `loginom-ai-agent-pty-<цель>`; раннер macOS и Windows не нужен. Кэш общий между ОС (`enableCrossOsArchive`, путь `pty-out`
+  в рабочей копии).
+- `pty`: собирает только цели из `missing`, как раньше (проверка glibc, smoke, артефакт), и после успешного smoke
+  сохраняет `pty-out` в кэш (`cache/save`; упавшее задание кэш не пишет).
+- Smoke pty на macOS и Windows при попадании в кэш не повторяется: бинарь тот же байт в байт и проверен при сборке, в кэш
+  попадает только прошедший проверки. Шаги сборки и smoke не менялись.
+Проверено: `actionlint` 1.7.12 — 0 по `loginom-pty.yml` и трём потребителям; логику разбиения `cached`/`missing` прогнал в
+`bash`+`jq` (попадания только Linux и Windows, пустой кэш); PowerShell-шаги не менялись. Тест `pty-workflow.test.ts` (8):
+ключ содержит все входы и цель, `lookup-only`, `fail-on-cache-miss`, одинаковое имя артефакта, сохранение после smoke,
+пины раннеров, glibc 2.30, вход `targets`; десять мутаций (нет действия, `Cargo.lock` или цели в ключе, `lookup-only` выкл,
+`fail-on-cache-miss` выкл, glibc, раннер, `plan` на macOS, матрица из `cached`, вход игнорируется) краснят по 1 тесту.
+Проверит только CI: кросс-ОС восстановление кэша (Linux читает запись Windows и macOS), `hashFiles` на sparse checkout,
+`workflow_call`-итог при пропущенном `pty` или `reuse`, гонка вытеснения кэша между `plan` и `reuse` (тогда `reuse`
+краснеет, повторный запуск пересоберёт).
+
 
 ## Хвосты паритета 3
 
@@ -25868,8 +25891,8 @@ CLI кандидата собран с версией своего пакета 
 
 | # | Файл 0.4.2 | Коммит | Что делает | Куда в v2 |
 |---|---|---|---|---|
-| 1 | `packages/app/src/constants/file-picker.ts`, `components/prompt-input/attachments.ts`, `components/prompt-input-v2.tsx`, `session-ui/src/v2/components/prompt-input/attachments.ts`, экспорт `./file-picker` в `app/package.json` | `b5b60e009b` | `.db`, `.lgd`, `.xls` при перетаскивании и вставке идут как ссылка на файл (`binaryReferenceMime`, `referenceFile`), без чтения байт; расширения добавлены в выбор файла | приложение v2 (B4): пути переехали, места нет. **Главная строка**: без неё SQLite, LGD и XLS из окна читаются байтами |
-| 2 | `packages/desktop/src/main/attachment-picker.ts`, `ipc.ts` (`referenceAttachment`) | `b5b60e009b` | выбор файла и IPC `reference-attachment` возвращают квитанцию с `mime` для бинарных данных | Desktop v2 (`packages/desktop/src/main`), нужен вместе со строкой 1 |
+| 1 | `packages/app/src/constants/file-picker.ts`, `components/prompt-input/attachments.ts`, `components/prompt-input-v2.tsx`, `session-ui/src/v2/components/prompt-input/attachments.ts`, экспорт `./file-picker` в `app/package.json` | `b5b60e009b` | `.db`, `.lgd`, `.xls` при перетаскивании и вставке идут как ссылка на файл (`binaryReferenceMime`, `referenceFile`), без чтения байт; расширения добавлены в выбор файла | приложение v2 (B4): пути переехали, места нет. **Главная строка**: без неё SQLite, LGD и XLS из окна читаются байтами. **Перенесено в B1.9d**: [`## B1.9d Доперенос 0.4.2: вложения в интерфейсе`](#b19d-доперенос-042-вложения-в-интерфейсе) |
+| 2 | `packages/desktop/src/main/attachment-picker.ts`, `ipc.ts` (`referenceAttachment`) | `b5b60e009b` | выбор файла и IPC `reference-attachment` возвращают квитанцию с `mime` для бинарных данных | Desktop v2 (`packages/desktop/src/main`), нужен вместе со строкой 1. **Перенесена в B1.9d** в виде v2 (выбор файла без чтения и без лимита 20 МБ для `.db`, `.lgd`, `.xls` на локальном сервере; IPC `reference-attachment` не нужен), см. [`## B1.9d Доперенос 0.4.2: вложения в интерфейсе`](#b19d-доперенос-042-вложения-в-интерфейсе) |
 | 3 | `packages/opencode/src/cli/cmd/run.ts` | `59fbda9ceb` | CLI `run` даёт квитанцию для `application/octet-stream` и `application/vnd.ms-excel` и без `--attach` | `packages/cli/src/run` |
 | 4 | `packages/opencode/src/product/attachment-resolver.ts` | `59fbda9ceb` | текст ссылки на вложение: для бинарных данных «loginom_file_admit», для остальных «loginom_file_profile» | в v2 нет резолвера вложений; вложения — `loginom-agent/src/index.ts` (B2.5d), `local-file.ts` |
 | 5 | тесты `app/test-browser/prompt-attachments.test.ts`, `desktop/src/main/attachment-picker.test.ts`, `opencode/test/cli/run/run-process.test.ts`, `opencode/test/product/attachment-resolver.test.ts` | `b5b60e009b`, `59fbda9ceb` | покрывают строки 1–4 | вместе со строками 1–4 |
@@ -25912,6 +25935,200 @@ catalog-check.py код 0; apply-identity.py --check: would change: 0 files
 - `.gitleaksignore` получил отпечатки слияний 0.4 (`5f79f57f8d`, `11ed9673f8`) — они нужны `secrets range`.
 - `packages/product` (вместе с навыком `package-linter`) : 20 файлов отличаются от `v0.4.2` правками v2 (B1–B5), конфликтов не было.
 - `guarantees.md`, `catalog.md`: `v0.4.0` -> `v0.4.2` и «В-99» -> «В-110» там, где это эталон 0.4 для сравнения.
+
+B5.1j-smoke: установленный smoke Desktop завис без вывода
+
+Ветка `b51j4-installed-smoke` от `oc2-migration` (`2b4bdef5bc`). Run 45792809424: шаг `Install, launch and uninstall Desktop candidate`
+не напечатал ни строки и упал по `timeout-minutes: 15`; `installed-smoke/report.json` и `logs.zip` не появились.
+
+Диагностика (по коду и `v0.4.2`; на Windows не воспроизводил):
+- Вызов шёл через `Start-Process -Credential` (B5.1j) с выводом в файлы, которые печатались только в конце, поэтому вывода не было.
+- Крайний срок обёртки (1 500 000 мс) был больше срока шага (15 мин): шаг гасился раньше, чем срабатывала обёртка. Ошибка проекта.
+- `v0.4.2` запускал `windows-installed-smoke.ps1` прямо от администратора раннера без отдельной учётной записи и без проверки
+  «обычный пользователь». Запуск GUI Electron и NSIS (`/S /currentuser`) от свежей локальной учётной записи без интерактивного
+  рабочего стола (гипотезы 1 и 2) не подтверждён и на раннере ненадёжен. Гипотеза 3 неверна: установщик получает `/S`.
+  Точную причину зависания укажет новый прогон: теперь каждый подшаг пишет строку до запуска.
+- Находка: в выгрузке диагностики путь `installed-smoke-skill-byte/report.json` был испорчен строкой замены (`.../` слитые пути);
+  `actionlint` такого не ловит. Исправлено.
+
+Решение: как в `v0.4.2`, smoke идёт от учётной записи раннера. `script/run-windows-installed-smoke.ps1` удалён. В
+`windows-installed-smoke.ps1` добавлен ключ `-AllowAdministrator` (проверка `ordinary-user` остаётся и по умолчанию красная);
+CI передаёт его. Проверка «от обычного пользователя» уходит на стенд в B6.2 (чек-лист Windows). Шаг: `Log` с временем до каждого
+подшага (поиск установщика, версия, пользователь, сеанс), каждый прогон smoke — дочерний `pwsh` с крайним сроком 8 мин
+(`taskkill /T`, строка «exceeded 8 min», наличие `report.json`, оставшиеся процессы), срок шага 20 мин. Тест продукта проверяет,
+что параметры вызова объявлены в smoke, а красная мутация входит в `ValidateSet`.
+Проверки: `actionlint` 0 строк; `product` 108 pass, 0 fail; `catalog-check.py` 0; `apply-identity --check` 0 файлов; `bun run check` 0.
+Проверит только CI: поведение NSIS и Electron на раннере под администратором.
+
+### B5.1j-ps Разбор PowerShell в smoke Windows
+
+Прогон release 45814367924 (`73b792e781`): шаг `Install, launch and uninstall Desktop candidate` упал до запуска —
+`ParserError … Log "smoke $Name: starting …": Variable reference is not valid. ':' was not followed by a valid variable
+name character`. В PowerShell `$Name:` читается как переменная с областью; три строки журнала переписаны на `${Name}:`.
+В этом прогоне впервые зелёные `verify linux` (манифест, установщики, G5 с отрицательным контролем) и `verify macos`.
+
+## B1.9d Доперенос 0.4.2: вложения в интерфейсе
+
+Ветка `bport2-attachments-ui` от `oc2-migration` (`45069384ab`). Эталон — `b5b60e009b` (`v0.4.2`, В-110). Закрывает строки 1 и 2 таблицы
+«Не перенесено» раздела B1.9b и их тесты из строки 5.
+
+### Что нашёл в v2
+
+- Единственный composer вложений — `packages/app/src/composer/attachments/attachments.ts`. В `packages/session-ui/src/v2` поля ввода с
+  вложениями нет (только просмотр файлов и diff), поэтому часть 0.4.2 про `session-ui` переносить некуда.
+- v2 уже кладёт файл с известным путём в промпт как part `path` без байт; на сервере квитанцию (идентичность файла) берёт хук `prompt`
+  в `loginom-agent/src/local-file.ts` (B2.5d). Отдельные `local_reference`, `referenceAttachment` на платформе и IPC `reference-attachment`
+  в v2 не существуют, и в 0.4.2 они нужны были только для порога 16 МБ и чтения байт.
+- Что не делал v2: для `.db`, `.lgd`, `.xls` определение типа читало первые 4096 байт файла (`attachmentMime`) и выводило тип по
+  содержимому (для `.lgd` и текстоподобного `.db` мог получиться `text/plain`).
+
+### Что сделано
+
+- `packages/app/src/composer/attachments/binary-reference.ts` (новый): `binaryReferenceMime(name)` — `.db`, `.lgd` → `application/octet-stream`,
+  `.xls` → `application/vnd.ms-excel`, регистр расширения не важен.
+- `attachments.ts`: `pick` передаёт выбору `reference`; `add` берёт тип из `binaryReferenceMime` и не читает байты; дальше прежний путь v2 (локальный сервер и путь файла —
+  ссылка `path`; удалённый сервер — загрузка файла как раньше). Правка одной строки.
+- Тест `packages/app/test-browser/composer-binary-reference.test.tsx`: имена и типы; локальный сброс `.DB`, `.lgd`, `.xls` даёт part `path`
+  с типом, `File.slice` бросает при чтении, загрузок нет; удалённый сервер по-прежнему загружает файл с типом.
+
+### Выбор (меньший вариант)
+
+1. **Desktop: без IPC `reference-attachment` и без `mime` в ответе выбора.** По указанию координатора выбор файла получил то же правило, что
+   перетаскивание. `platform.openAttachmentPickerDialog` принимает необязательный `reference(name)`; composer отвечает `true` для `.db`,
+   `.lgd`, `.xls`, если сервер локальный (`destination().local`). Тогда `desktop/src/renderer/platform/files.ts` не вызывает
+   `readPickedFile`, а отдаёт пустой `File` с типом по имени; путь остаётся в `getPathForFile` (карта выбора), и `add` делает part `path`.
+   `main/files/attachment-picker.ts`: `assertAttachmentBudget` не считает такие имена, поэтому `.lgd` больше 20 МБ проходит. Удалённый
+   сервер или иное имя — прежний путь с чтением и лимитом (на удалённом сервере большой `.lgd` по-прежнему отклоняется при чтении).
+   Экспорт `./binary-reference` добавлен в `app/package.json` для главного процесса. Квитанция по-прежнему строится на сервере.
+2. **Остаток снят** (в первой редакции раздела он был записан как отложенный на этап C).
+3. Расширения `.db`, `.lgd`, `.xls` в фильтр выбора не добавлял: composer не передаёт `extensions` (выбор без фильтра).
+4. Тесты строки 5: `attachment-picker.test.ts` (бюджет), `renderer/platform/files.test.ts` (`.LGD` 40 МБ не читается, путь сохранён) и composer (`reference` только для локального сервера). Тест `prompt-attachments.test.ts` (в v2 — каталога
+   `test-browser`, двух реализаций composer там нет) заменён новым файлом выше.
+
+### Проверки
+
+Bun 1.4.4 и Node 24.19.0 первыми в `PATH`, `LOGINOM_AI_AGENT_TEST_NODE` задан.
+
+```
+packages/app   bun run test:browser   379 pass, 0 fail  (база 369/0; +10 новых)
+packages/app   bun run test:unit      2720 pass, 0 fail
+packages/app   bun typecheck          No type errors in 2,235 files
+packages/desktop bun test             644 pass, 0 fail  (база 643/0; +1 тест выбора) и 1 тест бюджета
+packages/desktop bun typecheck        No type errors in 3,372 files
+packages/session-ui bun run test      599 pass, 0 fail
+packages/product   bun test           115 pass, 0 fail
+```
+
+Мутация: в `add` возвращено `await attachmentMime(file)` без `binaryReferenceMime` — красные 4 из 8 тестов (три локальных сброса и
+загрузка с типом). После возврата правки 8 pass.
+
+Замечание по среде: в свежем дереве `packages/loginom-runtime/client` нужен свой `bun install --frozen-lockfile` (иначе `yaml` не
+находится и `desktop` падает на `artifact.test.ts` и сборке хоста); корневой установки недостаточно.
+
+Мутации выбора (каждая краснит ровно один тест): `reference` в `files.ts` заменён на `false`; бюджет без исключения имён; `reference` composer без
+проверки `destination().local`.
+
+### B5.1j-skills: пустой список навыков и висящий негативный контроль
+
+Ветка `b51j5-installed-skills` от `oc2-migration` (`3f0177da0f`). Run 45821372083: красный прогон (`-Mutation SkillByte`) вернул
+`BUNDLED_SKILLS_MISSING … actual: []`, затем шаг ждал 12 минут без `report.json`; второй прогон отказал на чужой установке.
+
+1. **Пустой список — не дефект продукта, а ожидаемый красный итог мутации.** Запись B4.14c, PKG-02: при изменённом бите
+   `skills/loginom-automation/SKILL.md` `verify-resources` даёт `LOGINOM_RESOURCE_HASH_MISMATCH` и «служба без навыков продукта»:
+   Host не отдаёт навыки при несовпадении хеша, поэтому проба `service` видит `[]`. Проба (`/api/skill?location[directory]=`,
+   `{ location, data }`, путь навыка под `resources/skills/`) совпадает с v2 и на стенде B4.14c давала четыре навыка на чистой
+   установке. Чистый прогон на раннере ещё не выполнялся (его блокировала чужая установка), поэтому «четыре навыка на раннере»
+   пока не доказано; следующий прогон это покажет. Матрица Linux B6.2b навыки установленного продукта не проверяет
+   (`run-matrix.ts` ищет другое); подтвердить это там я не стал, проверка идёт только на Windows.
+2. **Почему не писался отчёт.** После ошибки цикл `PKG-01/LIFE-01` продолжал запуски 2 и 3: каждый снова ждал крайний срок
+   пробы (`TimeoutSeconds`, 300 с), и шаг превысил срок. Теперь неудачный запуск прерывает цикл (`break`), после чего идут
+   `report.json` и удаление; удаление ограничено 180 с (`Run-Installer … $TimeoutMs`). Красный прогон идёт с `-Runs 1
+   -TimeoutSeconds 120`; срок одного прогона в шаге 12 мин, шаг 35 мин. Что красный прогон ловит именно `verify-resources` с
+   `LOGINOM_RESOURCE_HASH_MISMATCH`, проверяет шаг (код 1, `status` FAIL, `cleanup` PASS).
+3. **Чужая установка.** Проверка «чужая установка — отказ» в smoke не менялась. Шаг перед каждым прогоном и после него вызывает
+   `Remove-Leftover`: ищет записи `Loginom AI Agent Dev` в реестре, останавливает процессы из каталога, запускает
+   `Uninstall *.exe /S /currentuser` (3 мин), затем убирает запись и каталог вручную; каждая стадия пишется в журнал.
+Проверки: `actionlint` 0 строк; разбор PowerShell всех шагов `pwsh` и `script/*.ps1` и скриптов smoke — `errors: 0`; Desktop
+44 теста 0 падений, `windows-sidecar-smoke.test.mjs` без падений; `product` — 0 падений; `catalog-check.py` 0; `apply-identity
+--check` 0 файлов; `bun run check` 0. Проверит только CI: чистый прогон на раннере и сам `Remove-Leftover`.
+
+## B6.1-C Закрытие пакета и модель проверки
+
+Основа: `45069384ab`, ветка `bcleanup-saved-package`. Эталон — `v0.4.2` (В-110). Находки B6.1-A: итог приёмки `FAIL: MAIN_CLEANUP_UNCONFIRMED`
+при выполненной моделью задаче, и `VARIANT='medium'` в `run-check.py` после слияния `v0.4.2`.
+
+**1. Закрытие сохранённого пакета.** В `v0.4.2` (`standalone-run.ts:81`) `closeSavedPackageOnShutdown: mode === "run"`: включает только
+обычный `run` CLI; служба, Desktop, TUI, `serve`, проверка соединения и готовность не включают. В этом режиме
+`loginom-runtime/client/lib/bridge.mjs:959` пишет `saved-package-cleanup.json` (без режима — `package-cleanup.json`), его и ждёт
+`run-check.py`; обвязку не менял. В v2 Host запускает процесс сервера, а не `run`, поэтому режим передан через среду, как
+`LOGINOM_AI_AGENT_HEADLESS` (B2.7a4b): `Standalone.forward` для `run` записывает `LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE=1`
+(`cli/src/standalone.ts`), `nodeHost` (`loginom-agent/src/host.ts`) передаёт `closeSavedPackageOnShutdown` только в процессе CLI
+(`LOGINOM_AI_AGENT_CLI_ROOT`) и только при этом значении. Новых контрактов нет: параметр и таймауты (45/60/90 с) уже были в `loginom-host`.
+Тест `cli/test/run-saved-package.test.ts`: настоящий Node-процесс с подставным Host, записывающим полученный `start`; `run` и
+`run --headless` дают `true`, `serve --stdio` — `false`. Мутации: без записи среды в `forward` — красный; без параметра в `nodeHost` — красный.
+Тест `run/product.test.ts` обновлён под новую запись среды `run`. Квитанцию настоящего рантайма это не проверяет: нужен живой прогон.
+
+**2. Модель.** `v0.4.2` вернул (коммит `0f2b259ad1`) `MODEL` из `RUN_CHECK_MODEL`, `VARIANT=medium`, `AUTH` (общий OAuth), проверку
+`TWO_TURN_REQUIRES_DEFAULT_MODEL`, `--variant` в команде `run` и `model=MODEL/VARIANT` в `results.json`. Всё убрано: одна константа
+`MODEL = 'deepseek/deepseek-flash'`, без варианта и общего OAuth (B6.1-T). Остальные `.py` (`run-check-two-turn.py`, `make-pair.py`)
+чисты. Тест `test_model_is_one_constant_without_variant_or_shared_auth` (мутация `MODEL=gpt-6.1-sol` и `VARIANT` краснит),
+тест команды проверяет отсутствие `--variant`. Старый тест «модель из среды» заменён; `run-check.md` исправлен.
+Не тронуто (вне `scripts/node-acceptance`): `docs/node-development/RUNBOOK.md:19` и `workflow/acceptance-cli.md:3` по-прежнему называют
+`openai/gpt-6.1-sol` (medium).
+
+Проверки (Bun 1.4.4, Node 24.19.0):
+- `python3 -B -m unittest discover -p 'test_*.py'` в `scripts/node-acceptance/tests`: 235 тестов, OK; мутация краснит.
+- `node --test scripts/node-acceptance/tests/*.test.mjs` из корня дерева: 812 pass, 23 fail; на базе 811/24 — падения в окружении, не от правки.
+- `packages/product`: 115 pass, 0 fail. `packages/loginom-agent`: 106 pass, 24 fail — те же 24 (тесты dashboard, миллисекунды) без правки, против базы.
+- `packages/cli` (весь пакет): 2 падения, те же на базе `45069384ab` (`loginom commands with the real Node host`, `standalone dashboard preserves explicit publication approval`: `DASHBOARD_RESOURCES_MISSING`); третье, `dashboard flags preserve…` в `cli-dashboard.test.ts`, внесла эта правка (новая запись среды `run`), тест исправлен. `bun typecheck`: `cli`, `loginom-agent` без ошибок.
+- `catalog-check.py` код 0; `apply-identity.py --check`: would change: 0 files.
+
+## B1.9c Доперенос 0.4.2: CLI и плагин
+
+Ветка `bport1-attachments-cli` от `oc2-migration` (`45069384ab`). Строки 3, 4, 6, 7 таблицы «Не перенесено» раздела
+B1.9b; строки 1, 2 (приложение, Desktop) делает другая задача. Эталон — `v0.4.2` (В-110).
+
+| Строка | Что сделано | Где |
+|---|---|---|
+| 3 | `run` продуктового CLI передаёт `application/octet-stream` и `application/vnd.ms-excel` ссылкой `file:` (плагин берёт по ней квитанцию), а не байтами `data:`. «Без `--attach`» в v2 — локальный бэкенд (служебный сервис или частный сервер); у `--server` общего диска может не быть, там остаётся `data:` | `packages/cli/src/run/run.ts` (`prepareFile`, `sharesFilesystem`) |
+| 4 | Ядро v2 не отправляет модели ничего про файл, который не читается как текст, картинка или PDF. Хук `prompt` плагина admit-ит отдельное синтетическое сообщение (`session.synthetic`, без `description`, `resume: false`) с `Attached local data reference: <путь>. Use loginom_file_admit …` для бинарных данных и `Use loginom_file_profile …` для остальных; лента его не показывает, модель получает, текст сообщения пользователя не меняется | `packages/loginom-agent/src/local-file.ts` (`referenceText`) |
+| 6 | Тест 0.4.2 перенесён на настоящее ядро: две просканированные книги допускаются повторно после смены только метки времени (`file_id`, размер и `mtime_ns` те же, `ctime_ns` другой); отказ `LOGINOM_FILE_CHANGED` при изменённых байтах и при подмене файла; `exactScanReceipt` отказывает так же | `packages/server/test/loginom-local-file.test.ts` |
+| 7 | Матрица навыков в `server`, `cli` и `loginom-host` (в том числе `script/skills-acceptance`) уже читается из `reservedSkillNames`, там четыре навыка; перечней из трёх там нет. Добавлен охранный тест на ровно четыре навыка и каталог на диске | `packages/loginom-agent/test/skills.test.ts` |
+
+Выборы (меньший вариант):
+
+- Строка 4, доработка по замечанию координатора: первая версия дописывала указание к тексту сообщения пользователя
+  (регрессия понятности). В v2 у текстовых частей сообщения пользователя нет `synthetic: true`; скрытый текст для модели —
+  отдельное сообщение `synthetic` (так делают `fork-notice`, `goal`, `experimental.idle` продукта). Оно без `description`
+  и без `state: "error"` не становится строкой ленты (`isNotice`, `timelineNoticeRequired`). Порядок: сообщение admit-ится
+  в хуке, до самого запроса, поэтому в истории стоит перед ним. Повтор запроса с тем же ID создаст второе такое
+  сообщение (хук не знает, что запрос повторный).
+- Тип берётся по расширению (`FSUtil.mimeType`), как в CLI; тип, который определит ядро по содержимому, плагину неизвестен.
+- Перечни из трёх навыков остались только в Desktop (`windows-sidecar-smoke.test.mjs`, ожидает два) и в `product-skills-smoke.mjs`/`package-docs-pty.py` 0.4, которых в v2 нет: файлы Desktop в этой задаче не трогали (строки 1, 2 и B5). Записано как найденное.
+- Тесты строки 5 для `app`, Desktop и `run-process` не переносились (строки 1, 2); для строк 3 и 4 написаны свои тесты на v2: `packages/cli/test/cli-run.test.ts` (два случая, `.xls` и `.db`), `packages/server/test/loginom-local-file.test.ts` (по расширениям).
+
+Мутации (каждая краснит свой тест, файл возвращён):
+
+| Мутация | Тест |
+|---|---|
+| в `prepareFile` отключена ветка ссылки | `cli-run`: `.xls`, `.db` красные |
+| `referenceText`: бинарное условие `false` / инверсия выбора инструмента | `loginom-local-file`: «an attached data file» красный |
+| указание дописано в текст сообщения пользователя (`event.prompt.text`) / сообщению задан `description` | тот же тест красный |
+| `matchesExactWorkbookBytes` всегда `false` / без сверки хеша / без сверки `file_id` и размера | `loginom-local-file`: «metadata-only» красный |
+| из `reservedSkillNames` убран `package-linter` | `skills.test.ts`: «four skills» красный |
+
+Проверки (Bun 1.4.4, Node 24.19.0, `LOGINOM_AI_AGENT_TEST_NODE`):
+
+- `cli`: 80 файлов по одному; падают два, оба и на базе: `cli-dashboard` «standalone dashboard preserves explicit
+  publication approval» и `cli-loginom` «(unnamed)». Новые тесты (`cli-run`, `.xls` и `.db`) зелёные.
+- `loginom-agent`: 107 pass, 24 fail — тесты чёрновика панели без `npm ci` в `packages/dashboard/template` (среда); тест
+  навыков зелёный.
+- `server`: на базе 260 pass, 51 fail; с изменением 262 pass, 51 fail, те же имена (`package_docs_run`, `dashboard_*`,
+  пять тестов G1/G6/B2.6 и `(unnamed)`). Новые тесты зелёные.
+- `product`: 115 pass, 0 fail.
+- `catalog-check.py` код 0; `apply-identity.py --check`: would change: 0 files; `bun run check` код 0 (39 из 39).
+- Файлы OpenCode: правка `packages/cli/src/run/run.ts` минимальная; `catalog-check` новых нераскрытых расхождений
+  не показал (код 0).
 
 ## B6.1-A Калибровка группы A
 
