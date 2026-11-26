@@ -25,11 +25,12 @@ function firstObject(source: string): ObjectValue {
   throw Error("Incomplete tool output JSON")
 }
 
-export function readNodeEvents(source: string): NodeEvents {
+export function readNodeEvents(source: string, scope?: { sessionId: string; tools: ReadonlySet<string> }): NodeEvents {
   const calls: NodeCall[] = [], failures: string[] = [], seen = new Map<string, string>()
   for (const [index, line] of source.split(/\r?\n/).entries()) {
     if (!line.trim()) continue
     const event = JSON.parse(line), part = event.part, state = part?.state
+    if (scope && (event.sessionID !== scope.sessionId || part?.type !== "tool" || !scope.tools.has(part.tool))) continue
     if (event.type !== "tool_use" || !part.tool?.startsWith("loginom_") || state?.status !== "completed") continue
     const key = part.id ?? part.callID
     if (!key) { failures.push("events: tool-part identity missing"); continue }
