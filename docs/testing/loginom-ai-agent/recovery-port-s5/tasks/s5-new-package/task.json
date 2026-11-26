@@ -1,0 +1,23 @@
+{
+  "id": "s5-new-package",
+  "title": "Новый пустой пакет",
+  "prompt": "Создай и сохрани новый пустой пакет Loginom без аналитических узлов по адресу `{{PACKAGE_PATH}}`.",
+  "inputs": [],
+  "spec": "SPEC.md",
+  "expected_output": "Новый пакет по указанному адресу, один пустой сценарий, ноль аналитических узлов и ноль связей.",
+  "checklist": [
+    {
+      "id": "actual-file",
+      "text": "Назначенный новый пакет получен из серверного хранилища и читается как LGP.",
+      "axis": "result",
+      "required": true
+    },
+    {
+      "id": "empty-workflow",
+      "text": "В пакете один пустой сценарий без аналитических узлов и связей.",
+      "axis": "structure",
+      "required": true
+    }
+  ],
+  "reference": "reference.lgp"
+}
