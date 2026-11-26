@@ -172,7 +172,7 @@ def regional_revenue(orders, clients):
     links.append(link("sort", "excel"))
     chain.turn("Выгрузи отсортированный результат в regional-revenue.xlsx на лист «Регионы», с заголовками region и total_revenue в таком порядке. Приложи книгу и покажи строки исходной сортировки.",
                nodes, links, [table(SORT, schema, sorted_rows, ordered=True)],
-               excel=dict(filename="regional-revenue.xlsx", sheet_name="Регионы", header="names"))
+               excel=dict(filename="regional-revenue.xlsx", sheet_name="Регионы", header="names", column_order="exact"))
     return chain
 
 
