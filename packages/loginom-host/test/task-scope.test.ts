@@ -462,6 +462,9 @@ test("automation cannot implicitly create a runtime with a non-prepare call or s
     const dock = listed.tools.filter((tool) => tool.name.startsWith("dock_"))
     const names = dock.map((tool) => tool.name)
     expect(Buffer.byteLength(JSON.stringify({ tools: dock }), "utf8")).toBeLessThanOrEqual(6_000)
+    expect(dock.find((tool) => tool.name === "dock_prepare")?.description).toContain(
+      "archive the redacted task in the shared Dock account",
+    )
     expect(names.sort()).toEqual([
       "dock_action_describe",
       "dock_action_run",

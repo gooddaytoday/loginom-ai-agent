@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 import type { Tool as AITool } from "ai"
+import type { ListToolsResult } from "@modelcontextprotocol/sdk/types.js"
 import { MessageID, SessionID } from "@/session/schema"
 import type { TaskScope } from "@/session/task-scope"
 import type { Provider } from "@/provider/provider"
@@ -26,7 +27,7 @@ function setup(options: {
   task?: boolean
   image?: boolean
   fail?: boolean
-  catalog?: ReturnType<typeof catalogOf>
+  catalog?: ListToolsResult["tools"]
   result?: { content: { type: "text"; text: string }[]; _meta?: Record<string, unknown> }
 }) {
   const requested: string[] = []
@@ -111,8 +112,20 @@ describe("toolContributor", () => {
     }
   })
 
-  test("a local file can be registered only by automation, and only when the catalog describes dock actions", async () => {
-    const withDescribe = catalogOf(["find", "dock_action_describe"])
+  test("automation keeps the Dock describe stub visible without offering any local file tools", async () => {
+    const run = setup({
+      profile: "loginom-automation",
+      catalog: [...catalogOf(["dock_prepare"]), { name: "dock_action_describe", inputSchema: { type: "object" } }],
+    })
+    await run.run()
+    expect(Object.keys(run.tools).toSorted()).toEqual(["loginom_dock_action_describe", "loginom_dock_prepare"])
+  })
+
+  test("only prepared automation receives the local file tools", async () => {
+    const withDescribe: ListToolsResult["tools"] = [
+      ...catalogOf(["find"]),
+      { name: "dock_action_describe", inputSchema: { type: "object", properties: { action_key: { type: "string" } } } },
+    ]
     const automation = setup({ profile: "loginom-automation", catalog: withDescribe })
     await automation.run()
     expect(Object.keys(automation.tools).toSorted()).toEqual([
