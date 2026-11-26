@@ -234,3 +234,11 @@ test('root object arrays enumerate the native root rows without querying a nonex
  const validate=new AjvJsonSchemaValidator().getValidator(nodeTreeOutputPortSchema);
  assert.equal(validate({port:0,port_guid:'port',port_kind:'tree',fresh:true,execution_id:'exec',freshness_basis:'completed_execution_port_source',tree,sample_complete:true}).valid,true);
 });
+
+test('a private schema read neither loads nor truncates the native tree instances',async()=>{
+ const {source,call,track}=fixture({count:257,noteType:6});
+ source.GetReader=()=>assert.fail('schema read must not construct an instance reader');
+ const result=await readTreePortSource(source,call,track,decodePortCell,undefined,true);
+ assert.deepEqual(Object.keys(result),['schema']);
+ assert.deepEqual(result.schema.map(n=>n.path),['','/id','/active','/items','/items/sku','/items/qty','/items/price','/items/note']);
+});

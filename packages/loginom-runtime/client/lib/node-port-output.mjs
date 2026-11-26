@@ -184,7 +184,7 @@ export async function readNativeVariableCells(port,metadata,{deadline,stable},ca
 
 // The native reader indexes the ordered list passed to GetReader; array row
 // ranges are bound to their parent row, rather than inferred from leaf counts.
-export async function readTreePortSource(source,call,track,decode,native) {
+export async function readTreePortSource(source,call,track,decode,native,schemaOnly=false) {
  const need=(ok,reason)=>{if(!ok)throw Error(reason);};
  const schema=[],definitions=[];
  const rpc=async(name,fn,parameters={})=>call(async()=>{try{return await fn();}catch(error){
@@ -223,6 +223,7 @@ export async function readTreePortSource(source,call,track,decode,native) {
   return index;
  };
  const root=await acquire('root',()=>source.get_RootNodeDef());await visit(root,null,'',0);
+ if(schemaOnly)return {schema};
  const reader=await acquire('reader',()=>source.GetReader(definitions));
  const variants=schema.some(n=>n.type==='variant');
  need(!variants||typeof native==='function','tree_variant_reader_required');
@@ -325,7 +326,9 @@ export function decodePortCell(raw,type) {
 
 export function makeNodePortOutputCode(binding,request,options,quality=null) {
  validatePreparedNodeContext(binding);
- if(!request||!['execution,port,requireExactNumbers,sampleRows','execution,port,requireExactNumbers,rowOffset,sampleRows'].includes(Object.keys(request).filter(k=>!['typedVariants','variantEmptyIsNull'].includes(k)).sort().join(','))
+ if(!request||!['execution,port,requireExactNumbers,sampleRows','execution,port,requireExactNumbers,rowOffset,sampleRows'].includes(Object.keys(request).filter(k=>!['typedVariants','variantEmptyIsNull','treeSchemaOnly'].includes(k)).sort().join(','))
+  ||Object.hasOwn(request,'treeSchemaOnly')&&(request.treeSchemaOnly!==true||request.port!==0||request.sampleRows!==0
+   ||Object.hasOwn(request,'rowOffset'))
   ||Object.hasOwn(request,'typedVariants')&&typeof request.typedVariants!=='boolean'
   ||Object.hasOwn(request,'variantEmptyIsNull')&&(request.variantEmptyIsNull!==true||request.typedVariants!==true)
   ||!Number.isInteger(request.port)||request.port<0||request.port>99
@@ -348,6 +351,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
  const target=inventory.ports?.find(p=>p.index===request.port);
  if(!inventory.verified||JSON.stringify(inventory.node_context)!==JSON.stringify(before))return {verified:false,cleanup_complete:false,reason:'output_context'};
  if(!target?.active)return {verified:false,cleanup_complete:true,reason:'inactive_output'};
+ if(request.treeSchemaOnly&&target.kind!=='tree')return {verified:false,cleanup_complete:true,reason:'not_a_tree_output'};
  const result=await page.evaluate(async ({binding:b,request:q,options:o,before,target,decoder,treeReader,quality,variant})=>{
   const decode=eval(' ('+decoder+')'),readTree=eval(' ('+treeReader+')');
   const need=(ok,code)=>{if(!ok){reason=code;throw Error('Port read refused');}},value=(obj,key)=>Object.getOwnPropertyDescriptor(obj??{},key)?.value;
@@ -429,9 +433,9 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
      const nativeDecode=eval('('+variant.decode+')'),adapt=eval('('+variant.adapt+')');
      nativeReader=await eval('('+variant.read+')')(reader,{deadline:o.deadline,treeValue:true,stable:()=>{live();stable();need(dataSource.GetReader===getter,'tree_reader_changed');}},nativeDecode,eval('('+variant.collect+')'),variant.pins,variant.treePins);
      return async(row,index)=>{const raw=await nativeReader.read(row,index);return adapt(raw,{type:'variant'},{dateProfile:'loginom-7.4.2-native-oadate',civilTime:raw.civilTime},nativeDecode);};
-    });
+    },q.treeSchemaOnly);
     result={port:q.port,port_guid:baseline.portGuid,port_kind:'tree',fresh:true,execution_id:q.execution.execution_id,
-     freshness_basis:'completed_execution_port_source',tree,sample_complete:true};
+     freshness_basis:'completed_execution_port_source',tree,sample_complete:!q.treeSchemaOnly};
    }else{
    const rowCount=await dataSource.get_RowCount();live();stable();
    need(Number.isSafeInteger(rowCount)&&rowCount>=0,'row_count');
