@@ -630,16 +630,19 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw Error('Original wizard receipt context changed');
       };
       let result, lastGeometry, observedAt, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, settlingWizard, settlingDefinition, settlingErrorToast, sampleStarted = observationNow();
+      let lastJournaledPollState, lastUnjournaledPollSample, skippedPollSamples = 0;
       const pollInterval=pollExecution?100:200;
       const sampleLimit=pollExecution?Math.ceil(timeoutMs/pollInterval)+1:80;
       try {
-      for (let sample = 0; settleOutputPort || settleProcessConsole || settlingWizard || settlingDefinition || sample < sampleLimit; sample++) {
+      for (let attempt = 0; settleOutputPort || settleProcessConsole || settlingWizard || settlingDefinition || attempt < sampleLimit; attempt++) {
+        // The journal's sample sequence must remain contiguous after compaction.
+        const sample = attempt - skippedPollSamples;
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
         // Count the observation itself toward the polling interval. A ready
         // identity still gets the 200 ms pause before its second confirmation.
         const pause = satisfied ? 200 : Math.max(0, pollInterval - (observationNow() - sampleStarted));
-        if (sample && pause > 0) await wait(Math.min(pause, Math.max(0, deadline - observationNow())));
+        if (attempt && pause > 0) await wait(Math.min(pause, Math.max(0, deadline - observationNow())));
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
         sampleStarted = observationNow();
@@ -1213,9 +1216,25 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const identity = satisfied && confirmIdentity ? digest(confirmIdentity(result.output)) : null;
         confirmations = satisfied ? (confirmIdentity ? (identity === previousIdentity ? confirmations + 1 : 1) : 1) : 0;
         previousIdentity = identity;
-        await acknowledge('node_observation_sample', { step, sample, internal_operation_id: id,
+        const sampleDetails = { sample,
           readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), ...(settleProcessConsole?.quiet?{console_epoch_settlement:true,deadline}:{}), elapsed_ms: observedAt - started },
-          outcome: structuredClone(result) });
+          outcome: result };
+        const state = result.output;
+        // Compare execution evidence and blockers after validation. DOM revisions
+        // and scan counters can change on repaint with the same native state.
+        const pollState = pollExecution ? JSON.stringify([
+          satisfied, state.dom_epoch?.document, state.prepared_node_context, state.node_processes,
+          state.observation_root?.identity, state.process_console?.status, state.process_console?.grid_ids, state.wizard?.status,
+          state.ui.dialogs, state.ui.masks,
+        ]) : undefined;
+        if (pollExecution && !satisfied && pollState === lastJournaledPollState) {
+          skippedPollSamples++;
+          lastUnjournaledPollSample = sampleDetails;
+        } else {
+          await acknowledge('node_observation_sample', { step, internal_operation_id: id, ...structuredClone(sampleDetails) });
+          lastJournaledPollState = pollState;
+          lastUnjournaledPollSample = undefined;
+        }
         // The action transport checks the exact document epoch again before
         // the gesture. Repeating already satisfied observations adds latency
         // without making that check stronger.
@@ -1224,6 +1243,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (!satisfied || confirmations < (confirmIdentity ? 2 : 1)) {
         const timedOut=await entry('node_observation_timeout',{step,internal_operation_id:id,condition,
           ...(lastGeometry?{geometry:lastGeometry}:{}),
+          ...lastUnjournaledPollSample,
           elapsed_ms:observationNow()-started,effect_possible:false});
         if(timedOut?.condition!==condition||timedOut.effect_possible!==false)throw Error('Observation timeout was not durably acknowledged');
         throw new NodeReadinessTimeout(condition);
@@ -1240,7 +1260,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       } catch(error) {
         if(signal?.aborted&&error===signal.reason) {
           const interrupted=await entry('node_observation_interrupted',{step,internal_operation_id:id,
-            condition,reason:'local_cancel',effect_possible:false,cleanup_complete:true});
+            ...lastUnjournaledPollSample,condition,reason:'local_cancel',effect_possible:false,cleanup_complete:true});
           if(interrupted?.step!==step||interrupted.internal_operation_id!==id||interrupted.condition!==condition
             ||interrupted.reason!=='local_cancel'||interrupted.effect_possible!==false||interrupted.cleanup_complete!==true)
             throw Error('Interrupted observation was not durably acknowledged');

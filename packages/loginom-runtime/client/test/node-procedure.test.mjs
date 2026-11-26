@@ -627,33 +627,47 @@ test('execution polling batches the native read before the scoped UI read and re
   prepared_node_context:node,scan:{complete:true},wizard:{status:'absent'},ui:{elements:[{tid:'MF;ConsoleForm',ref:'ui-console'}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
  const records=[],transports=[];
  let now=0,foreign=false;
- const channel=createNodeProcedure({operation:{id:'execution',deadline:600,action:{action_key:'node.apply',revision:'1'}},
+ const channel=createNodeProcedure({operation:{id:'execution',deadline:650,action:{action_key:'node.apply',revision:'1'}},
   preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
   now:()=>now,wait:async ms=>{now+=ms},record:async r=>{records.push(r);return structuredClone(r)},
   execute:async code=>{
    transports.push(code);
    const result={status:'SUCCEEDED',output:structuredClone(state)};
+   result.output.dom_epoch.revision=now;
    if(code.includes('"discover_roots":true'))return result;
-   const nativeProcesses={verified:true,node_context:{...node,node_id:foreign?'foreign':node.node_id},processes:[]};
+   const group={process_id:'1',record_id:'group',parent_id:null,state:'pending_or_failed'};
+   const nativeProcesses={verified:true,node_context:{...node,node_id:foreign?'foreign':node.node_id},processes:[
+    {...group,...(now>=200?{owner:{verified:true,node_id:node.node_id,source:'native_process_model_identity'}}:{})},
+   ]};
    if(!code.includes('function workspaceUiCapability'))return nativeProcesses;
    assert.ok(code.indexOf('async function readNodeProcesses')>=0);
    assert.ok(code.indexOf('async function readNodeProcesses')<code.indexOf('function workspaceUiCapability'));
    assert.match(code,/"root_ref":"ui-console"/);
    return {result,nativeProcesses};
   }});
- const options={condition:'owned execution group',timeoutMs:250,readProcesses:true,pollExecution:true};
- const ready=await channel.observe({...options,ready:()=>now>=100});
- assert.equal(now,100);
+ const options={condition:'owned execution group',timeoutMs:350,readProcesses:true,pollExecution:true};
+ const ready=await channel.observe({...options,ready:()=>now>=300});
+ assert.equal(now,300);
  assert.equal(ready.node_processes.verified,true);
- assert.equal(transports.length,4);
- assert.equal(records.at(-1).readiness.timeout_ms,250);
+ assert.equal(transports.length,8);
+ const samples=records.filter(e=>e.phase==='node_observation_sample');
+ assert.deepEqual(samples.map(e=>e.sample),[0,1,2]);
+ assert.deepEqual(samples.map(e=>e.outcome.output.dom_epoch.revision),[0,200,300]);
+ assert.equal(samples[0].outcome.output.node_processes.processes[0].owner,undefined);
+ assert.equal(samples[1].outcome.output.node_processes.processes[0].owner.node_id,node.node_id);
+ assert.equal(records.at(-1).readiness.timeout_ms,350);
+ assert.equal(records.at(-1).outcome.output.dom_epoch.revision,300);
  foreign=true;
  await assert.rejects(channel.observe({...options,ready:()=>true}),/context changed/);
  foreign=false;
- await assert.rejects(channel.observe({...options,ready:()=>false}),/readiness timeout/);
- assert.equal(now,350);
+ const beforeTimeout=records.length;
+ await assert.rejects(channel.observe({...options,timeoutMs:250,ready:()=>false}),/readiness timeout/);
+ assert.equal(now,550);
+ assert.deepEqual(records.slice(beforeTimeout).filter(e=>e.phase==='node_observation_sample').map(e=>e.sample),[0]);
  assert.equal(records.at(-1).phase,'node_observation_timeout');
  assert.equal(records.at(-1).elapsed_ms,250);
+ assert.equal(records.at(-1).outcome.output.dom_epoch.revision,500);
+ await assert.rejects(channel.act({verb:'click',ref:'ui-console'}),/fresh internal observation/);
 });
 
 for(const locked of [false,true])test('process observation discards a lock-only transition to '+locked+' and rereads',async()=>{
