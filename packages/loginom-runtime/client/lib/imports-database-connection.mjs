@@ -1,11 +1,12 @@
 import {readGraph} from './node-target-browser.mjs';
 import {NODE_TYPES} from './node-contracts.mjs';
 import {nodePlacementViewport,nodePlacementPoint,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from './node-placement.mjs';
+import {createdDatabaseTile,inspectDatabaseTiles,removeCreatedDatabaseTile} from './imports-database-tile-release.mjs';
 
 // Fixed native UI procedure, invoked under the node operation's existing gate,
 // journal and browser receipt. No connection RPC or Loginom mutation API is used.
-export function makeDatabaseConnectionCode(task){return `async page=>(${databaseConnectionCapability.toString()})(page,${JSON.stringify(task)},${readGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${nodePlacementOverflow.toString()},${samePlacementGraph.toString()},${JSON.stringify(NODE_TYPES)})`;}
-export async function databaseConnectionCapability(page,t,readPlacementGraph=readGraph,reveal=revealNodePlacement,readViewport=nodePlacementViewport,project=nodePlacementPoint,overflow=nodePlacementOverflow,sameGraph=samePlacementGraph,types=NODE_TYPES){
+export function makeDatabaseConnectionCode(task){return `async page=>(${databaseConnectionCapability.toString()})(page,${JSON.stringify(task)},${readGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${nodePlacementOverflow.toString()},${samePlacementGraph.toString()},${JSON.stringify(NODE_TYPES)},${createdDatabaseTile.toString()},${inspectDatabaseTiles.toString()},${removeCreatedDatabaseTile.toString()})`;}
+export async function databaseConnectionCapability(page,t,readPlacementGraph=readGraph,reveal=revealNodePlacement,readViewport=nodePlacementViewport,project=nodePlacementPoint,overflow=nodePlacementOverflow,sameGraph=samePlacementGraph,types=NODE_TYPES,identifyTile=createdDatabaseTile,inspectTiles=inspectDatabaseTiles,removeTile=removeCreatedDatabaseTile){
  const need=(v,m)=>{if(!v)throw Error('Database connection: '+m);};
  // The deadline error names the wait that consumed it.
  let waiting=null;
@@ -210,8 +211,9 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
   const tiles=()=>page.locator('[data-tid^='+JSON.stringify(form+';cntTile;ListView;headercontainer;title_')+']').evaluateAll(es=>es.map(e=>({tid:e.getAttribute('data-tid'),name:e.textContent.replace(/^Метка:/,'').trim()})));
   const before=await tiles();need(before.length<=200,'connection inventory exceeds bound');
   const existing=before.filter(c=>c.name===t.connection.name);need(existing.length<=1,'connection label is ambiguous');
-  let tile=existing[0];
+  let tile=existing[0],nativeBefore;
   if(!tile){
+   nativeBefore=(await page.evaluate(inspectTiles,{owner,form}))?.rows;
    const vendor=form+';pnlConnectionsTree;headercontainer;text_Источники_данных>Базы_данных>SQLite;TreeText';
    await click(vendor,true);
    tile=await wait('new connection tile',async()=>{const added=(await tiles()).filter(c=>!before.some(b=>b.tid===c.tid));need(added.length<=1,'unexpected added connections');return added[0];});
@@ -227,6 +229,10 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
    return row?.Title===label&&typeof id?.Module==='string'&&Number.isSafeInteger(id.Instance)
     ?{Module:id.Module,Instance:id.Instance,path:row.ConnectionPath}:null;
   },{b:owner,form,label:tile.name});
+  const added=nativeBefore&&await page.evaluate(inspectTiles,{owner,form});
+  const candidate=added?.selected;
+  const created=candidate?.label===tile.name&&candidate.Module===selected?.Module&&candidate.Instance===selected.Instance
+   ?identifyTile(nativeBefore,added.rows,candidate):null;
   await openSettings();
   const connectionOwner=await page.evaluateHandle(b=>{
    const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;
@@ -327,9 +333,18 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
    const expectedTiles=existing.length?before:[...before,tile];
    const tilesById=values=>JSON.stringify([...values].sort((a,b)=>a.tid.localeCompare(b.tid)));
    need(tilesById(await tiles())===tilesById(expectedTiles),'connection inventory changed during refusal');
+   let tileRemoved=false;
+   if(created){
+    await click(tile.tid);await quiet();
+    try{
+     tileRemoved=await removeTile(page,{owner,form,before:nativeBefore,expected:added.rows,tile:created,guard,wait,remaining},inspectTiles);
+    }catch(error){
+     throw Error('Deletion of SQLite connection '+JSON.stringify(tile.name)+' is unconfirmed: '+error.message);
+    }
+   }
    await connectionOwner.dispose();
    await click(moduleTid);await returnToWorkflow();
-   return await refusalCheckpoint({connection_test_refused:{database_path:t.connection.database_path,tile_label:tile.name,tile_created:!existing.length}},error);
+   return await refusalCheckpoint({connection_test_refused:{database_path:t.connection.database_path,tile_label:tile.name,tile_created:!existing.length,tile_removed:tileRemoved}},error);
   }
   await click(wizard+';btnDone');await wait('connection wizard committed',()=>find(form+';cntTile;ListView;tbl').isVisible());await quiet();
   // Reopen the saved object and independently reread the visible settings.

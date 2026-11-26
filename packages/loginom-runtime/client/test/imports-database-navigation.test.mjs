@@ -106,11 +106,11 @@ for(const fault of ['foreign window','foreign native window','extra window','sta
  });
 }
 
-for(const kind of ['navigation','file test'])test('pre-target release admits the completed SQLite '+kind+' refusal receipt with a verified graph',async()=>{
+for(const kind of ['navigation','file test','file test with removed tile','file test with existing tile'])test('pre-target release admits the completed SQLite '+kind+' refusal receipt with a verified graph',async()=>{
  const request={document_id,workflow_ref:flow,target:{kind:'new',type:'imports.database'},parameters:{database:{database_path:connection.database_path}}};
  const operation={id:'apply',parameters:request,nodeApply:{request,pending:{phase:'target'}}};
  const checkpoint=kind==='navigation'?{navigation_refused:true}:
-  {connection_test_refused:{database_path:connection.database_path,tile_label:'SQLite',tile_created:true}};
+  {connection_test_refused:{database_path:connection.database_path,tile_label:'SQLite',tile_created:kind!=='file test with existing tile',tile_removed:kind==='file test with removed tile'}};
  const receipt={operation_id:'apply:n1',action_key:'node.database.connection.internal',status:'AMBIGUOUS',cleanup_complete:true,effect_possible:true,
   output:{verified:false,pre_target_checkpoint:{graph,...checkpoint}},error:{message:errorText}};
  const support=createDatabaseImportNodeSupport({targetOrigin:origin,targetBuild:build});
@@ -122,7 +122,9 @@ for(const kind of ['navigation','file test'])test('pre-target release admits the
  const adapter={verifyWorkflow:async()=>({status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,document_id,workflow_ref:flow}),
   observe:async()=>graph};
  const release=()=>releaseNodeTarget({operation,deadline,adapter,readReceipt:async()=>({state:'completed',receipt})});
- assert.equal((await release()).target_state,'not_created');
+ const proof=await release();
+ assert.equal(proof.target_state,'not_created');
+ assert.equal(proof.warnings.some(w=>w.includes('"SQLite" remains in the module')),kind==='file test'||kind==='file test with existing tile');
  operation.transportUncertain=true;
  await assert.rejects(release,/release boundary is unavailable/);
 });

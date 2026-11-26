@@ -32,7 +32,8 @@ async function runDatabaseStep(options,ctx,kind,makeCode,parameters,config){
  const checkpoint=kind==='connection'?result.output?.pre_target_checkpoint:null;
  const testRefusal=checkpoint?.connection_test_refused;
  const ownsTestRefusal=testRefusal?.database_path===parameters.connection?.database_path
-  &&typeof testRefusal?.tile_label==='string'&&typeof testRefusal.tile_created==='boolean';
+  &&typeof testRefusal?.tile_label==='string'&&typeof testRefusal.tile_created==='boolean'
+  &&(testRefusal.tile_removed===undefined||typeof testRefusal.tile_removed==='boolean'&&(!testRefusal.tile_removed||testRefusal.tile_created));
  if(checkpoint)operation.cleanupConfirmed=false;
  const completed=await entry('node_step_completed',{outcome:result});
  need(JSON.stringify(completed?.outcome)===JSON.stringify(result),'step outcome was not durably preserved');
@@ -45,7 +46,10 @@ async function runDatabaseStep(options,ctx,kind,makeCode,parameters,config){
    operation.preTargetWarnings=['Loginom refused to open the module connections. The original workflow was restored before any SQLite connection or import node was created.'];
   else if(ownsTestRefusal) {
    operation.preTargetWarnings=['The SQLite file was missing. The rejected connection settings were discarded and the original workflow was restored.'];
-   if(testRefusal.tile_created)operation.preTargetWarnings.push('The unconfigured connection '+JSON.stringify(testRefusal.tile_label)+' remains in the module.');
+   if(testRefusal.tile_created&&!testRefusal.tile_removed)
+    operation.preTargetWarnings.push('The unconfigured connection '+JSON.stringify(testRefusal.tile_label)+' remains in the module. Safe deletion was not verified.');
+   if(!testRefusal.tile_created)
+    operation.preTargetWarnings.push('The pre-existing connection '+JSON.stringify(testRefusal.tile_label)+' remains in the module with its original settings.');
   } else operation.preTargetWarnings=['The tested SQLite connection '+JSON.stringify(checkpoint.connection.name)
    +' remains in the module. Its graph reference and the import node were not created.'];
   operation.cleanupConfirmed=true;operation.nodeApply.cleanup_complete=true;
