@@ -1,5 +1,6 @@
 # Bundled Loginom client and browser executor
 
+- Автоподстройку выхода не трогать; фиксировать только по просьбе изменить имена, подписи, порядок или состав столбцов; явный autosync побеждает (решение владельца 25.11).
 - `client/` is the active migrated Dock client. Continue development here; the old repository and Codex/Hermes integrations are migration archives, not runtime dependencies. Preserve source attribution and AGPL notices; see [source map](../../docs/migration/source-map.json).
 - `src/managed-entry.mjs` is the supervised entrypoint, `connection-check.mjs` checks a proposed connection, and `resources.mjs` validates the bundled resource tree. The host supplies credentials through private IPC for Desktop and standalone CLI.
 - Public MCP tools and execution must share the authenticated Playwright context. Do not create a second browser/CDP session for Loginom: authentication and download handlers depend on context identity. Dashboard draft self-check separately uses a bundled headless Chromium with an empty temporary profile, without the Loginom session; this does not authorize a second Loginom browser.
