@@ -178,7 +178,13 @@ test("LAB-2046: arrays of records across several REST responses route to one Jav
   // Both runs searched Calculator help for JSON functions (r1 :28/:38, r2 :29/:62); r2 split per RequestID.
   expect(get).toMatch(/Калькулятор[\s\S]*?Свёртка[\s\S]*?Кросс-таблица/)
   expect(get).toMatch(/Records arrays of several response rows: one `programming\.javascript`[\s\S]*?JSON\.parse\(Response\), Append per record with its RequestID\); no RequestID splits/)
-  expect(get).toContain("Big ints/ids: read as strings (JSON.parse rounds >2^53)")
+  // Live Loginom 7.4.2 JS node (l2046-bigint-1): JSON.parse and a context.source reviver both round; quoting first is exact.
+  expect(get).toContain("Big ints/ids: JSON.parse and reviver round >2^53; quote first:")
+  expect(get).toContain("`text.replace(/([:,\\[]\\s*)(-?\\d{16,})(?=\\s*[,}\\]])/g,'$1\"$2\"')`")
+  const quote = (text: string) => text.replace(/([:,\[]\s*)(-?\d{16,})(?=\s*[,}\]])/g, '$1"$2"')
+  const parsed = JSON.parse(quote('{"items":[{"id":9007199254740993,"name":"a:12345678901234567"},{"id":-12345678901234567890,"w":1.5},{"id":42}]}'))
+  expect(parsed.items.map((item: { id: unknown }) => item.id)).toEqual(["9007199254740993", "-12345678901234567890", 42])
+  expect(parsed.items[0].name).toBe("a:12345678901234567")
   expect(get).toContain("Tree: on request/flat records без вложенных контейнеров")
   expect(json).toMatch(/Кросс-таблица; массив записей нескольких ответов —\nпо \[REST\]\(integration\.rest_request\.md\)/)
   expect(table).toMatch(/при отказе деревьев вернись к этому пути; массив записей нескольких ответов — по \[REST\]\(integration\.rest_request\.md\)/)
