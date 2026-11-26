@@ -2,17 +2,20 @@
 // never an expected result or inferred category combinations.
 // This private port path is selected explicitly by the cold runner. Every
 // dispatch uses the production reader, including its exactness and cleanup.
+export const MAX_COLD_WINDOW_ROWS = 1000;
+
 export function readColdNativeOutput(channel,{type,port,execution}){
  return channel.readOutputPort({port,execution,sampleRows:100,requireExactNumbers:true,
   ...(type==='preprocessing.coarse_classes'&&port===1?{typedVariants:true}:{})});
 }
 export async function readColdPortWindows(channel,{node,execution,port,rowCount}) {
  const need=ok=>{if(!ok)throw Error('COLD_PORT_WINDOW_BINDING_OR_COVERAGE_CHANGED');};
- need(Number.isSafeInteger(rowCount)&&rowCount>=0&&rowCount<=100);
+ need(Number.isSafeInteger(rowCount)&&rowCount>=0&&rowCount<=MAX_COLD_WINDOW_ROWS);
  const proof=structuredClone(execution),sample=[],windows=[];
  let first,binding,schema,precision,offset=0;
  do {
-  const r=await channel.readOutputPort({port,execution:structuredClone(proof),sampleRows:Math.min(100,rowCount-offset),
+  const sampleRows=Math.min(100,rowCount-offset);
+  const r=await channel.readOutputPort({port,execution:structuredClone(proof),sampleRows,
    requireExactNumbers:true,rowOffset:offset});
   const o=r?.output,w=o?.window_binding;
   need(r?.verified===true&&r.cleanup_complete===true&&r.node_context?.verified===true
@@ -21,7 +24,7 @@ export async function readColdPortWindows(channel,{node,execution,port,rowCount}
    &&o.freshness_basis==='completed_execution_port_source'&&o.execution_id===proof.execution_id
    &&['execution_id','process_id','process_record_id'].every(k=>typeof proof[k]==='string'&&w[k]===proof[k])
    &&o.row_count===rowCount&&o.row_offset===offset&&Array.isArray(o.sample)
-   &&o.sample_rows===o.sample.length&&o.sample_rows<=rowCount-offset
+   &&o.sample_rows===o.sample.length&&o.sample_rows<=sampleRows
    &&o.next_row_offset===offset+o.sample_rows&&(o.sample_rows>0||rowCount===0)
    &&o.precision?.numbers_verified===true&&Array.isArray(o.precision.limitations)&&o.precision.limitations.length===0
    &&Array.isArray(o.schema)&&o.schema.length>0&&o.sample.every(row=>Array.isArray(row)&&row.length===o.schema.length));

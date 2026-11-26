@@ -1,0 +1,18 @@
+{
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 1
+  },
+  "base": "bh-w45-t1",
+  "input_files": [],
+  "manual_edit": {
+    "kind": "move",
+    "node": {
+      "type": "variables.calculator"
+    },
+    "position": {
+      "x": 320,
+      "y": 352
+    }
+  }
+}

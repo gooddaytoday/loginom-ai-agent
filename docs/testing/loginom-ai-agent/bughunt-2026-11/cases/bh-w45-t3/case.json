@@ -1,0 +1,8 @@
+{
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 1
+  },
+  "base": "bh-w45-t2",
+  "input_files": []
+}

@@ -110,13 +110,23 @@ def verify(path, expected):
     columns = expected['columns']
     require(len(columns) <= 26 and expected['ordered'] is True and expected['output_port'] is None, 'PROPOSAL_SHAPE')
     header = expected['header']
-    rows = ([] if header == 'none' else [[c['name'] if header == 'names' else c['label'] for c in columns]]) + expected['rows']
+    order = expected.get('column_order', 'exact')
+    require(order in ('exact', 'any') and (order == 'exact' or header != 'none'), 'COLUMN_ORDER_REQUIRES_HEADERS')
+    letters = [chr(65 + j) for j in range(len(columns))]
+    headings = [c['name'] if header == 'names' else c['label'] for c in columns] if header != 'none' else []
+    if order == 'any':
+        actual_headings = [cells.get(letter + '1') for letter in letters]
+        require(all(isinstance(value, str) for value in actual_headings)
+                and len(set(headings)) == len(letters) and set(actual_headings) == set(headings), 'COLUMN_HEADERS')
+        by_header = dict(zip(actual_headings, letters))
+        letters = [by_header[heading] for heading in headings]
+    rows = ([headings] if header != 'none' else []) + expected['rows']
     require(len(expected['rows']) == expected['row_count'], 'EXPECTED_ROW_COUNT')
-    addresses = {chr(65 + j) + str(i + 1) for i in range(len(rows)) for j in range(len(columns))}
+    addresses = {letter + str(i + 1) for i in range(len(rows)) for letter in letters}
     require(not (set(cells) - addresses), 'EXTRA_CELLS')
     for i, row in enumerate(rows):
         for j, wanted in enumerate(row):
-            address = chr(65 + j) + str(i + 1)
+            address = letters[j] + str(i + 1)
             got = cells.get(address)
             kind = 'string' if header != 'none' and i == 0 else columns[j]['type']
             if wanted is None:
