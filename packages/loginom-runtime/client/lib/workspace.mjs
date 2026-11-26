@@ -792,7 +792,7 @@ export async function prepareWorkspaceSession({ metadata, assertAllowed, prepare
     throw new Error('Workspace is already prepared. Use dock_workspace_observe for the current UI and dock_action_describe to reread input_artifacts. Preparation has not changed the workspace.');
   }
   const identity = request ? JSON.stringify(request) : null;
-  let previous = metadata.workspacePreparation;
+  let previous = metadata.workspacePreparation, afterRefusedNavigation = false;
   if (previous && previous.identity !== identity) {
     // A verified no-effect refusal permits a new explicit package; a proven
     // missing package also permits a new draft. Uncertain attempts keep their ID.
@@ -833,6 +833,8 @@ export async function prepareWorkspaceSession({ metadata, assertAllowed, prepare
           + 'intent existing_workflow and the workflow_ref of the same document it was given, without graph_navigation.'
         : 'Repeat dock_prepare with operation_id ' + previous.operation_id + ' and exactly its original parameters.'));
     }
+    afterRefusedNavigation = refusedNavigation && !replaceRefusal && !sessionReplaced
+      && !(metadata.workspaceReady === true && previous.state?.status === 'READY');
     previous = null;
   }
   metadata.workspaceReady = false;
@@ -842,6 +844,8 @@ export async function prepareWorkspaceSession({ metadata, assertAllowed, prepare
         effect_possible: true };
       await save();
     }
+    // The refused navigation's owned-draft cleanup carries to its exit (LAB-2054).
+    if (request && afterRefusedNavigation) { metadata.workspacePreparation.after_refused_navigation = true; await save(); }
     const state = await prepare({ recoverOnly: previous?.effect_possible === true });
     if (request) metadata.workspacePreparation = { ...metadata.workspacePreparation, effect_possible: state.effect_possible, state };
     if (signal?.aborted) {

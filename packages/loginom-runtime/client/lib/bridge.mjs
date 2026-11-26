@@ -880,7 +880,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         const cleanupState = refusedDraftNavigation ? ownedUnsavedDraft.state : prepared?.state;
         const unsavedDraft = failedDraft || normalCleanup && !lastSavedPackage
           && (preparationRequest?.intent === 'new_draft'&&cleanupState?.created_draft === true
-            || preparationRequest?.intent === 'existing_workflow'&&preparationRequest.graph_navigation&&cleanupState?.status==='READY'
+            || preparationRequest?.intent === 'existing_workflow'&&(preparationRequest.graph_navigation||prepared?.after_refused_navigation===true)&&cleanupState?.status==='READY'
               &&ownedUnsavedDraft&&ownedUnsavedDraft.document_id===cleanupState.document_id
               &&ownedUnsavedDraft.tab_tid===cleanupState.workflow_ref?.tab_tid
               &&ownedUnsavedDraft.account===cleanupState.loginom_account)

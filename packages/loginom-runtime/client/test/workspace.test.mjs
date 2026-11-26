@@ -736,15 +736,16 @@ for(const variant of ['lost','effect','created','unauthenticated','cancelled','s
 
 // LAB-2054 (bh-i103): a Submodel entry refused before any gesture left only
 // dock_prepare, and every new ID hit the conflict until the run ended.
-for(const variant of ['refused','other-intent','other-document','effect','gesture','verification','same-id'])
+for(const variant of ['refused','other-intent','other-document','effect','gesture','verification','same-id','phase','status','created','held-plain','restore'])
  test('new existing_workflow preparation after a no-effect navigation refusal: '+variant,async()=>{
   const ref={document_id:'doc',workflow_id:'doc-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'MF;TF-1;crumb',label:'Сценарий'}]};
   const metadata={skillRevision:'skill'};
   const request={operation_id:'enter',intent:'existing_workflow',package_path:null,workflow_ref:ref,
-   graph_navigation:{direction:'enter',node_ref:{document_id:'doc',workflow_id:'doc-1',node_id:'node'}}};
-  const state={status:'NOT_READY',reason:'page.evaluate: Error: Submodel selection control unavailable',phase:'graph_navigation',
-   authenticated:true,created_draft:false,effect_possible:variant==='effect',operation_id:'enter',trace:variant==='gesture'?[{event:'graph_navigation_owner_selected'}]:[],
-   verification_required:variant==='verification'};
+   ...(variant==='held-plain'?{}:{graph_navigation:{direction:'enter',node_ref:{document_id:'doc',workflow_id:'doc-1',node_id:'node'}}})};
+  const state={status:variant==='status'?'LOGIN_REQUIRED':'NOT_READY',reason:'page.evaluate: Error: Submodel selection control unavailable',
+   phase:variant==='phase'?'login_or_workspace':'graph_navigation',
+   authenticated:true,created_draft:variant==='created',effect_possible:variant==='effect',operation_id:'enter',trace:variant==='gesture'?[{event:'graph_navigation_owner_selected'}]:[],
+   verification_required:variant==='verification',...(variant==='restore'?{connection_restore:'attempted'}:{})};
   let calls=0;
   const args={metadata,request,assertAllowed(){},assertTarget(){},record:async()=>{},save:async()=>{},prepare:async()=>{calls++;return structuredClone(state);}};
   await prepareWorkspaceSession(args);assert.equal(metadata.workspaceReady,false);
@@ -753,6 +754,10 @@ for(const variant of ['refused','other-intent','other-document','effect','gestur
    prepare:async({recoverOnly})=>{calls++;assert.equal(recoverOnly,false);return {status:'READY',effect_possible:false,created_draft:false,target:{},workflow_ref:ref};}};
   if(variant==='refused'){
    assert.equal((await prepareWorkspaceSession(next)).status,'READY');assert.equal(calls,2);assert.equal(metadata.workspaceReady,true);
+   assert.equal(metadata.workspacePreparation.after_refused_navigation,true);
+   // A later ordinary preparation does not inherit the refused navigation's binding.
+   await prepareWorkspaceSession({...next,request:{...next.request,operation_id:'again'}});
+   assert.equal(metadata.workspacePreparation.after_refused_navigation,undefined);
   }else{
    await assert.rejects(prepareWorkspaceSession(next),/Preparation operation conflict: .*operation_id enter/);assert.equal(calls,1);
   }

@@ -135,10 +135,11 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
       verification_started:job.verificationStarted===true,deadline_at:job.deadline});
     inspected=await runtime.inspect({operationId:job.uploadId});
     await acknowledge(job,'artifact_delivery_resume_inspected',{resume_id:resumeId,inspection:inspected});
-    // A dispatched verification can leave the upload's cleanup unconfirmed
-    // (LAB-2054). Answer with the terminal refusal its next_step names.
+    // Only the executor's settled verification without confirmed cleanup is
+    // terminal (LAB-2054); a lost verification reply may still reconcile.
     requireValue(inspected.output?.operation_id===job.uploadId&&inspected.output?.cleanup_confirmed===true
       &&inspected.output?.outcome?.operation_id===job.uploadId,job.verificationStarted
+      &&inspected.output?.outcome?.error?.code==='TRANSFER_VERIFICATION_UNRESOLVED'
       ? 'The existing verification remains unresolved; no repeated download allowed'
       : 'Original delivery receipt remains uncertain');
     if(inspected.output?.state==='resolved'&&inspected.output.outcome.status==='SUCCEEDED') {

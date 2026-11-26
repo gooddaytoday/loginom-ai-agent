@@ -719,6 +719,32 @@ test('native export download requires its fresh output binding without an input 
  const result=await f.page.execute(makeNativeOutputDownloadCode(options));assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.upload_operation_id,undefined);assert.equal(result.output.output_binding.execution_id,'execution');
  for(const patch of [{expected_bytes:4},{output_binding:{...options.output_binding,execution_id:''}},{artifact:{name:'other.csv'}}])assert.throws(()=>makeNativeOutputDownloadCode({...options,...patch}));
 });
+// LAB-2054 review: only upload verification gets the deadline-based window.
+test('native export download keeps the 15 s event window despite a long deadline',async()=>{
+ const {makeNativeOutputDownloadCode}=await import('../lib/executor.mjs');
+ const f=fixture('native.csv');f.page.directory='/test-2';
+ const original=f.page.uiSnapshot.bind(f.page);
+ f.page.uiSnapshot=()=>{const s=original();for(const e of s.ui.elements)if(e.label==='native.csv')e.storage_entry={bytes:3,kind:'file'};return s;};
+ const snapshot=f.page.uiSnapshot(),file=snapshot.ui.elements.find(e=>e.label==='native.csv'),wait=f.page.waitForEvent;let timeout;
+ f.page.waitForEvent=(type,options)=>{timeout=options.timeout;return wait(type,options);};
+ const options={...f.options,artifact:{artifact_id:'output',name:'native.csv'},snapshot,file_ref:file.ref,expected_bytes:3,deadline_at:f.page.clock+120000,
+  output_binding:{session_id:'session',document_id:'doc',workflow_id:'flow',node_id:'node',execution_id:'execution',directory:'/test-2',destination:'/test-2/native.csv'}};
+ assert.equal((await f.page.execute(makeNativeOutputDownloadCode(options))).status,'SUCCEEDED');assert.equal(timeout,15000);
+});
+
+// LAB-2054 review: a verification gesture refused before any click cannot emit
+// a download; it must not hold the call for the long verification window.
+test('verification refused before its click does not wait the long event window',async()=>{
+ const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page);
+ f.page.uiSnapshot=()=>{const s=snapshot();s.ui.elements=s.ui.elements.map(e=>e.ref===f.options.file_ref?{...e,allowed_actions:[]}:e);return s;};
+ f.options.deadline_at=f.page.clock+60000;
+ let timeout;f.page.waitForEvent=(type,options)=>{timeout=options.timeout;f.calls.push('listen');return new Promise(()=>{});};
+ const started=f.page.clock,result=await f.run();
+ assert.ok(timeout>15000);
+ assert.equal(result.status,'NOT_APPLIED');assert.equal(result.error.code,'DOWNLOAD_GESTURE_NOT_CONFIRMED');
+ assert.ok(f.page.clock-started<=15000,'waited '+(f.page.clock-started)+' ms');assert.deepEqual(f.calls,['listen']);
+});
+
 test('changed native output size refuses download before the gesture',async()=>{
  const {makeNativeOutputDownloadCode}=await import('../lib/executor.mjs');const f=fixture('native.csv');f.page.directory='/test-2';
  const original=f.page.uiSnapshot.bind(f.page);let bytes=3;
