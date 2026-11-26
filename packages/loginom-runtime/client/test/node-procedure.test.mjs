@@ -126,6 +126,55 @@ test('journal failure prevents mutation', async () => {
   await assert.rejects(f.channel.act({ verb: 'click', ref: 'ui-button' }), /disk failure/);
   assert.ok(!f.events.includes('mutated'));
 });
+
+for(const fault of [null,'missing verification','missing acknowledgement','foreign acknowledgement'])
+  test('batch readback requires proof and its journal acknowledgement: '+fault,async()=>{
+    const workflow={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+    const node={document_id:'doc',workflow_id:'wf',node_id:'node'};
+    const preparedNodeContext={document_id:'doc',workflow_ref:workflow,node};
+    const fields=['delimiter','null_marker'];
+    const refOf=name=>'ui-'+name.replace('_','-');
+    const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:workflow,
+      dom_epoch:{document:'dom',revision:1},scan:{complete:true},prepared_node_context:{...node,verified:true,surface:'wizard'},
+      wizard:{status:'observed',stage:'text_import_format',root_ref:'ui-root',owner_context:{status:'observed'},
+        settings:{fields:Object.fromEntries(fields.map(name=>[name,{status:'observed',input_ref:refOf(name),owner_ref:'ui-owner-'+name}]))}},
+      ui:{dialogs:[],masks:[],truncated:{dialogs:false,masks:false},
+        elements:[{ref:'ui-next',allowed_actions:['click']},...fields.map(name=>({ref:refOf(name),allowed_actions:['set_wizard_field'],
+          wizard_field:{name,scope:'import_format',root_ref:'ui-root',owner_ref:'ui-owner-'+name}}))]}};
+    let reads=0,gestures=0;
+    const channel=createNodeProcedure({operation:{id:'batch',deadline:10000,action:{action_key:'node.apply',revision:'1'}},
+      preparedNodeContext,targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>1,
+      wrapMutation:(_,ref)=>ref,execute:async ref=>{
+        if(typeof ref==='string'){reads++;return {status:'SUCCEEDED',output:structuredClone(state)};}
+        gestures++;
+        return {status:'SUCCEEDED',operation_id:ref.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,
+          output:structuredClone(state),trace:fault==='missing verification'?[]:[{event:'wizard_fields_verified'}]};
+      },record:async event=>{
+        const ack=structuredClone(event);
+        if(ack.phase==='node_step_completed'&&gestures===1){
+          if(fault==='missing acknowledgement')delete ack.outcome.output;
+          if(fault==='foreign acknowledgement')ack.outcome.operation_id='foreign';
+        }
+        return ack;
+      }});
+    const observe=()=>channel.observe({condition:'wizard ready',ready:()=>true});
+    const next=()=>channel.act({verb:'click',ref:'ui-next'});
+    await observe();
+    const initialReads=reads;
+    const batch=channel.act({verb:'set_wizard_fields',fields:fields.map((name,i)=>({ref:refOf(name),text:i?'?':';'}))});
+    if(fault){
+      await assert.rejects(batch,/durable completion receipt/);
+      await assert.rejects(next(),/fresh internal observation/);
+      assert.equal(gestures,1);
+      assert.equal(reads,initialReads);
+      await observe();
+    }else await batch;
+    const readsBeforeNext=reads;
+    await next();
+    assert.equal(gestures,2);
+    assert.equal(readsBeforeNext>initialReads,!!fault);
+    assert.equal(reads,readsBeforeNext);
+  });
 test('transport uncertainty retains unresolved cleanup', async () => {
   const f = fixture({ executeFailure: true }); await f.channel.observe({ condition: 'button usable', ready: s => s.ui.elements.some(e => e.ref === 'ui-button') });
   await assert.rejects(f.channel.act({ verb: 'click', ref: 'ui-button' }), /transport/);

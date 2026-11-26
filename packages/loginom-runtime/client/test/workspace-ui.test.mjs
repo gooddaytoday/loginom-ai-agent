@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { createObservationPages } from '../lib/observation-pages.mjs';
-import { makeWorkspaceUiCode, validateUiAction, workspaceUiCapability, makeBlockingWindowDiagnosticCode } from '../lib/workspace-ui.mjs';
+import { makeWorkspaceUiCode, validateUiAction, validateNodeUiAction, workspaceUiCapability, makeBlockingWindowDiagnosticCode } from '../lib/workspace-ui.mjs';
 import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
 import {Page,Element,Document,build,origin,clone,fixtureClock,scriptGraphFixture} from './support/workspace-ui-fixture.mjs';
@@ -1843,6 +1843,158 @@ function importFormatField(page) {
   return {form,owner,input};
 }
 
+async function importFormatBatchFixture() {
+  const page=new Page(), {form,input}=importFormatField(page);
+  const box={x:250,y:100,width:100,height:25};
+  const owner=page.add('div',form.getAttribute('data-tid')+';ImportTextFileParamsWizard;edtDelimiterChar;ValueControl','',box,form);
+  const delimiter=page.add('input',null,'',box,owner);
+  delimiter.value=',';
+  const node={verified:true,surface:'wizard',document_id:'doc',workflow_id:'wf',node_id:'node',tid:form.getAttribute('data-tid')};
+  const primitive=vm.runInContext('('+workspaceUiCapability.toString()+')',page.context);
+  const run=options=>primitive(page,{expected_build:build,expected_origin:origin,kind:'workspace-ui',
+    prepared_node_context:{node,workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},async()=>structuredClone(node));
+  const snapshot=(await run({mode:'observe'})).output;
+  const field=(name,text)=>({ref:snapshot.wizard.settings.fields[name].input_ref,text});
+  const action={verb:'set_wizard_fields',fields:[field('delimiter',';'),field('null_marker','\\N')]};
+  const act=()=>run({mode:'act',snapshot,action});
+  return {page,input,delimiter,act,node,snapshot,action};
+}
+
+test('the private validator binds batch fields, order and values to the observed page',async()=>{
+  const {snapshot,action,node}=await importFormatBatchFixture();
+  snapshot.wizard.owner_context={status:'observed'};
+  assert.doesNotThrow(()=>validateNodeUiAction(action,snapshot,node));
+  assert.throws(()=>validateUiAction(action,snapshot),/Unsupported/);
+  assert.throws(()=>validateNodeUiAction(action,snapshot),/prepared owner/);
+  for(const change of [
+    a=>a.fields.reverse(),
+    a=>a.fields[1]=a.fields[0],
+    a=>a.fields[1].text='NULL',
+    a=>a.fields[1].text='x'.repeat(257),
+    a=>a.fields[1].ref='ui-foreign',
+    (_,s)=>s.wizard.settings.fields.null_marker.owner_ref='ui-foreign',
+    (_,s)=>s.wizard.settings.fields.null_marker.truncated=true,
+    (_,s)=>s.wizard.owner_context.status='unknown',
+    (_,s)=>s.prepared_node_context.surface='graph'
+  ]){
+    const changedAction=clone(action),changedSnapshot=clone(snapshot);
+    change(changedAction,changedSnapshot);
+    assert.throws(()=>validateNodeUiAction(changedAction,changedSnapshot,node));
+  }
+});
+
+test('an owned import page applies ordered fields with one settled readback',async()=>{
+  const {page,delimiter,input,act}=await importFormatBatchFixture();
+  const writes=[];
+  page.onPress=(key,element)=>{if(key==='Tab')writes.push(element);};
+  const result=await act();
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.deepEqual(writes,[delimiter,input]);
+  assert.equal(result.output.wizard.settings.fields.delimiter.value,';');
+  assert.equal(result.output.wizard.settings.fields.null_marker.value,'\\N');
+  assert.equal(result.trace.filter(e=>e.event==='wizard_fields_verified').length,1);
+  assert.equal(result.trace.filter(e=>e.event==='import_format_input_settled').length,1);
+});
+
+for(const name of ['delimiter','null_marker'])test('an owned import page refuses final readback mismatch for '+name,async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===input)(name==='delimiter'?delimiter:input).value='wrong';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_FIELD_NOT_CONFIRMED');
+  assert.match(result.error.message,new RegExp(name));
+  assert.equal(page.events.filter(e=>e==='click').length,2);
+  assert.ok(!result.trace.some(e=>e.event==='wizard_fields_verified'));
+});
+
+test('an owned import page confirms the delimiter before touching the next field',async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===delimiter)delimiter.value='wrong';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_FIELD_NOT_CONFIRMED');
+  assert.match(result.error.message,/delimiter/);
+  assert.equal(input.value,'old');
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+});
+
+test('an owned import page preserves a pending field changed by the application',async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===delimiter)input.value='app choice';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  assert.equal(input.value,'app choice');
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+});
+
+test('an owned import page refuses a different signature for the next input',async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===delimiter)input.attrs.name='foreign-input-signature';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'UI_REFERENCE_STALE');
+  assert.equal(input.value,'old');
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+});
+
+test('an owned import page rechecks native ownership after select all on the second field',async()=>{
+  const {page,input,act,node}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='ControlOrMeta+A'&&element===input)node.node_id='foreign';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_FIELD_CHANGED');
+  assert.equal(input.value,'old');
+  assert.equal(page.events.filter(e=>e==='keyboard_type').length,1);
+});
+
+for(const field of ['delimiter','null_marker'])test('an owned import page waits for consecutive quiet epochs after '+field,async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  const target=field==='delimiter'?delimiter:input;
+  let waits=0,settling=false,waitsBeforeNext;
+  page.onPress=(key,element)=>{
+    if(key==='Tab'&&element===target){settling=true;target.value='transient';}
+    if(key==='ControlOrMeta+A'&&element===input)waitsBeforeNext=waits;
+  };
+  page.waitForTimeout=async ms=>{
+    page.clock.advance(ms);
+    if(settling&&++waits===2){
+      target.value=field==='delimiter'?';':'\\N';
+      page.mutationObserver.pending.push({type:'attributes',attributeName:'class',target});
+    }
+  };
+  const result=await act();
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  if(field==='delimiter')assert.equal(waitsBeforeNext,4);
+  else assert.equal(waits,4);
+  assert.equal(result.trace.filter(e=>e.event==='wizard_fields_verified').length,1);
+});
+
+test('an owned import page stops before the next write when its native owner changes',async()=>{
+  const {page,input,delimiter,act,node}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===delimiter)node.node_id='foreign';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  assert.equal(input.value,'old');
+  assert.equal(page.events.filter(e=>e==='keyboard_type').length,1);
+});
+
+test('an owned import page rechecks a repainted next field without replaying a completed write',async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  let checks=0;
+  page.beforeHandleGeometry=element=>{
+    if(element===input&&++checks===2)
+      page.mutationObserver.pending.push({type:'attributes',attributeName:'class',target:element});
+  };
+  const writes=[];
+  page.onPress=(key,element)=>{if(key==='Tab')writes.push(element);};
+  const result=await act();
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.deepEqual(writes,[delimiter,input]);
+  assert.equal(result.trace.filter(e=>e.event==='wizard_field_preflight_refreshed').length,1);
+});
+
 test('typed wizard field replacement confirms exact draft values without claiming apply',async()=>{
   for(const text of ['\\N','', '\t ']) {
     const page=new Page(),c=importFormatField(page),snapshot=await page.observe();
@@ -3437,19 +3589,86 @@ test('output columns bind names labels and types to real rows, excluding summary
   }
 });
 
+function outputColumnEditorFixture(){
+  const page=new Page(),base='MF;TF-1;WizrdMCF;',form=page.add('div',base.slice(0,-1));
+  page.add('button',base+'DerivedDataSourceOutputSocketWizard;btnAddMappingColumn','',undefined,form);
+  const table=page.add('table',null,'',undefined,form);table.attrs.class='x-grid-item-selected';
+  page.add('td',base+'DerivedDataSourceOutputSocketWizard;colName_Quantity','Quantity',undefined,table);
+  const label=page.add('td',base+'DerivedDataSourceOutputSocketWizard;colDisplayName_Quantity','Quantity|Сумма',undefined,table);
+  page.add('span',null,'',undefined,label).attrs.class='bg-TBGDataType-dtInteger';
+  const dialog=page.add('div',base+'EditColumnDefForm');dialog.attrs.class='x-window';const inputs={};
+  for(const [key,value] of [['edtName','Quantity'],['edtDisplayName','Quantity|Сумма'],['cbxDataType','Целый'],['cbxDataKind','Непрерывный'],['cbxUsageType','Не задано']]) {
+    const owner=page.add('div',base+'EditColumnDefForm;'+key,'',undefined,dialog),input=page.add('input',null,'',undefined,owner);
+    input.value=value;input.box={x:300,y:200+Object.keys(inputs).length*40,width:120,height:25};inputs[key]=input;
+  }
+  return {page,base,form,table,dialog,inputs};
+}
+
+async function observeOutputColumnBatch({page,base},label='Sum'){
+  const full=await page.observe(),root_ref=full.wizard.column_parameters.root_ref;
+  const node={verified:true,surface:'wizard',document_id:'doc',workflow_id:'wf',node_id:'node',tid:base.slice(0,-1)};
+  const binding={node:structuredClone(node),workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+  const primitive=vm.runInContext('('+workspaceUiCapability.toString()+')',page.context);
+  const run=options=>primitive(page,{expected_build:build,expected_origin:origin,prepared_node_context:binding,...options},
+    async()=>structuredClone(node));
+  const snapshot=(await run({mode:'observe',root_ref})).output;
+  const action={verb:'set_wizard_fields',fields:Object.entries({name:'QuantitySum',label}).map(([name,text])=>({
+    ref:snapshot.wizard.column_parameters.fields[name].input_ref,text}))};
+  validateNodeUiAction(action,snapshot,binding);
+  return {node,snapshot,act:()=>run({mode:'act',snapshot,action})};
+}
+
+test('W1 rejects an output batch when the native owner changes on Tab after the name',async()=>{
+  const editor=outputColumnEditorFixture(),{page,inputs}=editor;
+  const {node,act}=await observeOutputColumnBatch(editor);
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===inputs.edtName)node.node_id='foreign';};
+
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  assert.equal(result.effect_possible,true);
+  assert.equal(inputs.edtName.value,'QuantitySum');
+  assert.equal(inputs.edtDisplayName.value,'Quantity|Сумма');
+  assert.equal(page.events.filter(event=>event==='click').length,1);
+  assert.equal(page.events.filter(event=>event==='keyboard_type').length,1);
+});
+
+test('W13 refuses a different output batch owner between observation and action in the same DOM epoch',async()=>{
+  const editor=outputColumnEditorFixture(),{page,inputs}=editor;
+  const {node,snapshot,act}=await observeOutputColumnBatch(editor);
+  node.node_id='foreign';
+
+  const result=await act();
+  assert.equal(result.status,'NOT_APPLIED');
+  assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  assert.equal(result.effect_possible,false);
+  assert.deepEqual(clone(result.output.dom_epoch),clone(snapshot.dom_epoch));
+  assert.equal(result.output.prepared_node_context.node_id,'foreign');
+  assert.deepEqual(page.events,[]);
+  assert.equal(inputs.edtName.value,'Quantity');
+  assert.equal(inputs.edtDisplayName.value,'Quantity|Сумма');
+});
+
+test('R5 preserves an unlinked output label the application changed to the new name',async()=>{
+  const editor=outputColumnEditorFixture(),{page,inputs}=editor;
+  const {act}=await observeOutputColumnBatch(editor);
+  page.onPress=(key,element)=>{
+    if(key==='Tab'&&element===inputs.edtName)inputs.edtDisplayName.value=inputs.edtName.value;
+  };
+
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  assert.equal(inputs.edtName.value,'QuantitySum');
+  assert.equal(inputs.edtDisplayName.value,'QuantitySum');
+  assert.equal(page.events.filter(event=>event==='click').length,1);
+  assert.equal(page.events.filter(event=>event==='keyboard_type').length,1);
+});
+
 test('output column typed editing preserves the selected row and all other parameters',async()=>{
-  for(const mode of ['name','label','linked_name','linked_wrong','unlinked_changed','type_changed','selection_changed','missing_type','combo','combo_kind_changed','combo_busy']) {
-    const page=new Page(),base='MF;TF-1;WizrdMCF;',form=page.add('div',base.slice(0,-1));
-    page.add('button',base+'DerivedDataSourceOutputSocketWizard;btnAddMappingColumn','',undefined,form);
-    const table=page.add('table',null,'',undefined,form);table.attrs.class='x-grid-item-selected';
-    page.add('td',base+'DerivedDataSourceOutputSocketWizard;colName_Quantity','Quantity',undefined,table);
-    const label=page.add('td',base+'DerivedDataSourceOutputSocketWizard;colDisplayName_Quantity','Quantity|Сумма',undefined,table);
-    page.add('span',null,'',undefined,label).attrs.class='bg-TBGDataType-dtInteger';
-    const dialog=page.add('div',base+'EditColumnDefForm');dialog.attrs.class='x-window';const inputs={};
-    for(const [key,value] of [['edtName','Quantity'],['edtDisplayName','Quantity|Сумма'],['cbxDataType','Целый'],['cbxDataKind','Непрерывный'],['cbxUsageType','Не задано']]) {
-      const owner=page.add('div',base+'EditColumnDefForm;'+key,'',undefined,dialog),input=page.add('input',null,'',undefined,owner);
-      input.value=value;input.box={x:300,y:200+Object.keys(inputs).length*40,width:120,height:25};inputs[key]=input;
-    }
+  for(const mode of ['name','label','linked_name','linked_wrong','unlinked_changed','type_changed','selection_changed','missing_type',
+    'combo','combo_kind_changed','combo_busy','batch_linked','batch_linked_satisfied','batch_unlinked_changed','batch_linked_signature_changed']) {
+    const editor=outputColumnEditorFixture(),{page,base,form,table,dialog,inputs}=editor;
     if(mode.startsWith('combo')) {
       const stem=base+'EditColumnDefForm;cbxDataType;';
       const list=page.add('div',stem+'boundlist','',{x:600,y:300,width:140,height:40});
@@ -3467,9 +3686,24 @@ test('output column typed editing preserves the selected row and all other param
       assert.equal(page.events.filter(e=>e==='click').length,mode==='combo_busy'?0:1);
       continue;
     }
-    if(mode.startsWith('linked_'))inputs.edtDisplayName.value='Quantity';
+    if(mode.startsWith('linked_')||mode.startsWith('batch_linked'))inputs.edtDisplayName.value='Quantity';
     if(mode==='missing_type')inputs.cbxDataType.remove();
-    const full=await page.observe(),read=await page.execute({mode:'observe',root_ref:full.wizard.column_parameters.root_ref});
+    if(mode.startsWith('batch_')){
+      const {act}=await observeOutputColumnBatch(editor,mode==='batch_linked_satisfied'?'QuantitySum':'Sum');
+      page.onPress=(key,element)=>{
+        if(key!=='Tab'||element!==inputs.edtName)return;
+        inputs.edtDisplayName.value=mode==='batch_unlinked_changed'?'App choice':'QuantitySum';
+        if(mode==='batch_linked_signature_changed')inputs.edtDisplayName.attrs.name='foreign-signature';
+      };
+      const result=await act();
+      const verified=['batch_linked','batch_linked_satisfied'].includes(mode);
+      assert.equal(result.status,verified?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+      assert.equal(page.events.filter(e=>e==='keyboard_type').length,mode==='batch_linked'?2:1);
+      assert.equal(inputs.edtDisplayName.value,mode==='batch_linked'?'Sum':mode==='batch_unlinked_changed'?'App choice':'QuantitySum');
+      continue;
+    }
+    const full=await page.observe(),root_ref=full.wizard.column_parameters.root_ref;
+    const read=await page.execute({mode:'observe',root_ref});
     const target=read.output.ui.elements.find(e=>e.wizard_field?.scope==='output_column' && e.wizard_field.name===(mode==='label'?'label':'name'));
     if(mode==='missing_type'){assert.equal(target,undefined);continue;}
     assert.ok(target);
