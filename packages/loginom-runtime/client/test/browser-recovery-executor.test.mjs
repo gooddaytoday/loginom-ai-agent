@@ -230,14 +230,18 @@ test('T1: a refused release points to browser recovery instead of asking the use
   assert.equal(basis.goal.ui_blocker, 'Ask the user to close it with Cancel.');
 });
 
-test('verified reopened graph ends the interrupted configure and publishes new references once',async()=>{
+for(const failPublish of [false,true])test('verified reopened graph releases configure only after publishing references, fail='+failPublish,async()=>{
   let published=0;
   const newWorkflow={...workflow,workflow_id:'new-workflow'};
   const ref={document_id:'new-doc',workflow_ref:newWorkflow};
   const graph={complete:true,interaction_ready:true,...ref,nodes:[],links:[],foreign_links:[]};
   const f=fixture({stopPhase:'configure',nodeType:'transform.filter_data',
     probePreparedPage:async()=>({ok:false,reason:'prepared document changed'}),
-    reopenNodePackage:async()=>({first:graph,second:graph,ref,readOnly:false,reloaded:true,publish:async()=>{published++;}})});
+    reopenNodePackage:async()=>({first:graph,second:graph,ref,readOnly:false,reloaded:true,
+      publish:async recordRelease=>{
+        if(failPublish)throw Error('workspace save failed');
+        await recordRelease();published++;
+      }})});
   f.runtime.startNodeApply(f.request('apply'));
   await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
   f.state.operation.transportUncertain=true;
@@ -246,6 +250,15 @@ test('verified reopened graph ends the interrupted configure and publishes new r
   assert.equal(published,0);
   const options={strategy:'abandon_operation',recoveryOperationId:'reload-1'};
   const outcome=await f.runtime.recover('apply',options);
+  if(failPublish){
+    assert.equal(outcome.status,'AMBIGUOUS');
+    assert.equal(outcome.output.original_operation_pending,true);
+    assert.match(outcome.output.user_action,/original scenario/i);
+    assert.equal(f.runtime.hasUnsettledWork(),true);
+    assert.equal(f.events.some(event=>event.phase==='operation_abandoned'),false);
+    assert.equal(published,0);
+    return;
+  }
   assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
   assert.equal(outcome.output.goal_verified,false);
   const original=outcome.output.original_outcome.output;
@@ -253,6 +266,7 @@ test('verified reopened graph ends the interrupted configure and publishes new r
   assert.equal(original.configuration.status,'unknown');
   assert.deepEqual(original.warnings,['Unsaved changes made before reloading were lost.']);
   assert.equal(original.next_step.arguments.document_id,'new-doc');
+  assert.ok(f.events.some(event=>event.phase==='operation_abandoned'));
   assert.equal(f.runtime.hasUnsettledWork(),false);
   assert.deepEqual(await f.runtime.recover('apply',options),outcome);
   assert.equal(published,1);

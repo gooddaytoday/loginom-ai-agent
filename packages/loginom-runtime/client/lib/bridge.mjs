@@ -171,7 +171,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       arguments: { code: makeRecoveryPageProbeCode(binding) } }, undefined, { timeout: 15000, signal });
     return parseRecoveryPageProbe(response, binding);
   };
-  const reopenNodePackage = async ({ documentId, signal, deadline }) => {
+  const reopenNodePackage = async ({ documentId, signal, deadline, saveWorkspace }) => {
     const previous=session.metadata.workspacePreparation?.state, binding=session.metadata.storageBinding;
     if(previous?.status!=='READY'||previous.document_id!==documentId||binding?.document_id!==documentId
       ||previous.loginom_account!==binding.loginom_account||binding.origin!==new URL(config.loginomUrl).origin)
@@ -208,7 +208,7 @@ export async function createBridge(config, session, { browserTransport: managedB
     let first, second;
     try{first=await read();second=await read();}
     catch{signal?.throwIfAborted();return {reloaded:true,reason:'REOPENED_GRAPH_UNAVAILABLE'};}
-    return {reloaded:true,first,second,ref,readOnly:opened.package_ref.read_only,async publish(){
+    return {reloaded:true,first,second,ref,readOnly:opened.package_ref.read_only,async publish(recordRelease){
       signal?.throwIfAborted();
       const keys=['workspacePreparation','workspaceReady','targetIdentity','workflowRef','storageBinding'];
       const old=Object.fromEntries(keys.map(key=>[key,session.metadata[key]]));
@@ -217,8 +217,12 @@ export async function createBridge(config, session, { browserTransport: managedB
       Object.assign(session.metadata,{storageBinding,workspaceReady:true,targetIdentity:opened.target,workflowRef:opened.workflow_ref,
         workspacePreparation:{identity:JSON.stringify(request),operation_id:request.operation_id,attempted:true,
           effect_possible:opened.effect_possible,state:opened}});
-      try{await session.save(catalog);}
-      catch(error){Object.assign(session.metadata,old);throw error;}
+      try{await saveWorkspace();await recordRelease();}
+      catch(error){
+        Object.assign(session.metadata,old);
+        await saveWorkspace().catch(()=>{});
+        throw error;
+      }
       lastSavedPackage=null;
       reopenedSave=null;
       ownedUnsavedDraft=null;
@@ -256,7 +260,9 @@ export async function createBridge(config, session, { browserTransport: managedB
         artifactStore:session.artifactStore, allowCandidate: replay, onRecord: recordExecution, redactor,
         browserRecovery: config.browserRecovery === true && userProfile,
         ...(userProfile ? { probePreparedPage } : {}),
-        ...(userProfile && config.storageDirectories && reauthenticateReload ? { reopenNodePackage } : {}),
+        ...(userProfile && config.storageDirectories && reauthenticateReload ? {
+          reopenNodePackage: input => reopenNodePackage({...input,saveWorkspace:()=>session.save(catalog)}),
+        } : {}),
         targetOrigin: config.loginomUrl ? new URL(config.loginomUrl).origin : undefined, execute: async (code, options) => {
         const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
           code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding, options?.storageSession) : code,

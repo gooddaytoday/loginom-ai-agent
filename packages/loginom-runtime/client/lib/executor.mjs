@@ -2793,10 +2793,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         instruction:'Follow the original user request with a NEW operation_id, the verified references below, and the full intended filter settings. Use the retained input links when the target already exists. Read the node card before applying.'}};
     const event={operation_id:operation.id,action_key:'node.apply',action_revision:request.contract_revision,
       phase:'node_operation_released',signature:state.signature,receipt:{...state.pending,proof},result};
-    const ack=await onRecord(event);
-    if(!ack||fingerprint('ack',Object.fromEntries(Object.keys(event).map(k=>[k,ack[k]])))!==fingerprint('ack',journalCopy(event)))
-      throw Error('Node phase journal acknowledgement differs');
-    return {result,publish:reopened.publish};
+    return {result,publish:recordRelease=>reopened.publish(async()=>{
+      const ack=await onRecord(event);
+      if(!ack||fingerprint('ack',Object.fromEntries(Object.keys(event).map(k=>[k,ack[k]])))!==fingerprint('ack',journalCopy(event)))
+        throw Error('Node phase journal acknowledgement differs');
+      await recordRelease();
+    })};
   };
   const releaseApply=async(operation,{strategy,recoveryOperationId,signature,signal})=>{
     if(strategy!=='abandon_operation')throw new Error('Only abandon_operation can release a stopped node operation; every other strategy is refused for it. If abandon_operation is refused too, follow its next_step instead of another strategy');
@@ -2832,12 +2834,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           }
         }
         const outcome=nodeApplyOutcome(operation,reload?.result??result);
-        await remember(operation,'operation_abandoned',outcome);
         if(reload){
-          await reload.publish();
+          try{await reload.publish(()=>remember(operation,'operation_abandoned',outcome));}
+          catch{
+            signal?.throwIfAborted();
+            throw Object.assign(new Error('The verified saved graph could not be bound to the Dock workspace'),{code:'LOGINOM_IDENTITY_CHANGED'});
+          }
           Object.assign(operation.nodeApply,{pending:null,cleanup_complete:true,result:structuredClone(reload.result)});
           operation.transportUncertain=false;
-        }
+        }else await remember(operation,'operation_abandoned',outcome);
         operation.outcome=outcome;operation.cleanupConfirmed=true;
         pending=null;nodeJobs.settle(operation.id,operation.outcome);
         returned={status:'SUCCEEDED',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'resolved',
