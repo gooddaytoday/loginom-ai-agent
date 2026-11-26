@@ -1,0 +1,62 @@
+{
+  "nodes": [
+    {
+      "type": "imports.excel",
+      "label": "Заказы"
+    },
+    {
+      "type": "imports.excel",
+      "label": "Товары"
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "orders",
+        "type": "imports.excel",
+        "label": "Заказы"
+      },
+      {
+        "id": "products",
+        "type": "imports.excel",
+        "label": "Товары"
+      }
+    ],
+    "links": []
+  },
+  "outputs": [
+    {
+      "output_node_type": "imports.excel",
+      "output_node_label": "Товары",
+      "output_port": 0,
+      "column_order": "any",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "ProductID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Category",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "ProductID": 7,
+          "Category": "Книги"
+        },
+        {
+          "ProductID": 8,
+          "Category": "Кофе"
+        },
+        {
+          "ProductID": 9,
+          "Category": "Книги"
+        }
+      ]
+    }
+  ]
+}

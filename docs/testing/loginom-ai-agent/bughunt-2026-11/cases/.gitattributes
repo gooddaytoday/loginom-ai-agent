@@ -1,0 +1,3 @@
+bh-w48-t1/data/payments.tsv -text whitespace=cr-at-eol
+bh-w50-t1/data/february.csv -text whitespace=cr-at-eol
+bh-w50-t1/data/january.csv -text whitespace=cr-at-eol

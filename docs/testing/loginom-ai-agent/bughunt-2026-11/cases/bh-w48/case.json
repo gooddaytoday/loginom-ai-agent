@@ -1,0 +1,9 @@
+{
+  "budget": {
+    "max_nodes": 1,
+    "max_errors": 0
+  },
+  "base": "bh-w48-t2",
+  "input_files": [],
+  "output_mode": "ports"
+}

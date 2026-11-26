@@ -1,0 +1,77 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Платежи"
+    },
+    {
+      "type": "transform.filter_data",
+      "label": "Платежи 2025"
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "payments",
+        "type": "imports.text",
+        "label": "Платежи"
+      },
+      {
+        "id": "year",
+        "type": "transform.filter_data",
+        "label": "Платежи 2025"
+      }
+    ],
+    "links": [
+      {
+        "source": "payments",
+        "target": "year",
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_node_label": "Платежи 2025",
+      "output_port": 0,
+      "column_order": "any",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "X",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "X": "2025-01-01T00:00:00.000",
+          "Amount": 7.25,
+          "Note": "Оплата"
+        },
+        {
+          "X": "2025-04-15T00:00:00.000",
+          "Amount": -3.75,
+          "Note": "Возврат"
+        },
+        {
+          "X": "2025-12-31T00:00:00.000",
+          "Amount": 18.5,
+          "Note": "Оплата"
+        }
+      ]
+    }
+  ]
+}
