@@ -75,12 +75,15 @@ jobs:
       run:
         shell: bash
     env:
-      WORK: ${{ runner.temp }}/work
-      INPUT: ${{ runner.temp }}/in
-      RELEASE: ${{ runner.temp }}/release
       VERSION: ${{ needs.plan.outputs.version }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      # The runner context is not available in a job-level env, so the paths are set from $RUNNER_TEMP.
+      - name: Set the work paths
+        run: |
+          echo "WORK=$RUNNER_TEMP/work" >> "$GITHUB_ENV"
+          echo "INPUT=$RUNNER_TEMP/in" >> "$GITHUB_ENV"
+          echo "RELEASE=$RUNNER_TEMP/release" >> "$GITHUB_ENV"
       - name: Install the tools that unpack and run Linux packages
         run: |
           sudo apt-get update
@@ -126,12 +129,15 @@ jobs:
       run:
         shell: bash
     env:
-      WORK: ${{ runner.temp }}/work
-      INPUT: ${{ runner.temp }}/in
-      RELEASE: ${{ runner.temp }}/release
       VERSION: ${{ needs.plan.outputs.version }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      # The runner context is not available in a job-level env, so the paths are set from $RUNNER_TEMP.
+      - name: Set the work paths
+        run: |
+          echo "WORK=$RUNNER_TEMP/work" >> "$GITHUB_ENV"
+          echo "INPUT=$RUNNER_TEMP/in" >> "$GITHUB_ENV"
+          echo "RELEASE=$RUNNER_TEMP/release" >> "$GITHUB_ENV"
       - uses: ./.github/actions/setup-bun
       # write-manifest.ts reads the Electron version from the installed binary; Bun skips the download script.
       - name: Install Electron
@@ -168,12 +174,15 @@ jobs:
       run:
         shell: bash
     env:
-      WORK: ${{ runner.temp }}/work
-      INPUT: ${{ runner.temp }}/in
-      RELEASE: ${{ runner.temp }}/release
       VERSION: ${{ needs.plan.outputs.version }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      # The runner context is not available in a job-level env, so the paths are set from $RUNNER_TEMP.
+      - name: Set the work paths
+        run: |
+          echo "WORK=$RUNNER_TEMP/work" >> "$GITHUB_ENV"
+          echo "INPUT=$RUNNER_TEMP/in" >> "$GITHUB_ENV"
+          echo "RELEASE=$RUNNER_TEMP/release" >> "$GITHUB_ENV"
       - uses: ./.github/actions/setup-bun
       # write-manifest.ts reads the Electron version from the installed binary; Bun skips the download script.
       - name: Install Electron
