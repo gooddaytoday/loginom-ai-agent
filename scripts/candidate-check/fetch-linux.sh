@@ -29,7 +29,7 @@ for dir in "$out"/*/loginom-linux-x64-cli "$out"/*/loginom-linux-x64-desktop; do
   (cd "$dir" && sha256sum -c SHA256SUMS)
 done
 cli=$(ls -d "$out"/*/loginom-linux-x64-cli)
-mkdir -p "$out/cli" && tar -xzf "$cli"/loginom-ai-agent-cli-*-linux-x64.tar.gz -C "$out/cli"
+mkdir -p "$out/cli" && tar --same-permissions -xzf "$cli"/loginom-ai-agent-cli-*-linux-x64.tar.gz -C "$out/cli"
 # the archive is flat: bin/, resources/, cli-manifest.json. A throwaway HOME keeps the real profile untouched.
 home=$(mktemp -d)
 env -i HOME="$home" PATH=/usr/bin:/bin "$out/cli/bin/loginom-ai-agent-cli" --version
