@@ -9,8 +9,10 @@
 Тело: `control.supernode` / `tabular_boundary`, обязательный табличный input 0,
 табличный output 0. Подключи импорт для схемы. Войди через
 `dock_prepare.graph_navigation`, получи свежие refs. Внутри InputNode → обработчик
-→ существующий OutputNode (`control.supernode_output`). Для Calculator явно задай
-все выходные поля в нужном порядке, `autosync:false` (новое поле native ставит первым).
+→ существующий OutputNode (`control.supernode_output`). Меняй раскладку выхода
+Calculator только по просьбе изменить имена, подписи, порядок или состав столбцов.
+Для запрошенного порядка перечисли все поля в `mappings[].fields`.
+Без запроса сохрани автоподстройку. Явное значение передай в `autosync`.
 Для REST API table input 0 означает native порт 2, ответ — output 0;
 один запрос на строку. Вернись в родительский workflow, снова наблюдай граф.
 
