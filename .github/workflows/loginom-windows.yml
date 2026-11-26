@@ -314,23 +314,39 @@ jobs:
 
       - name: Install, launch and uninstall Desktop candidate
         shell: pwsh
-        timeout-minutes: 15
+        timeout-minutes: 20
         run: |
+          function Log([string]$Message) { Write-Host "$((Get-Date).ToUniversalTime().ToString('HH:mm:ss'))Z $Message" }
+          # Every smoke run is a child process with its own deadline below the step's, so a hang reports its stage
+          # instead of the step timing out in silence. The smoke prints its table when it ends, not while it runs.
+          function Invoke-Smoke([string]$Name, [string[]]$Extra) {
+            $root = Join-Path $env:LOGINOM_WINDOWS_OUTPUT $Name
+            Log "smoke $Name: starting installer, launch and uninstall (deadline 8 min), run root $root"
+            $arguments = @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', ".\packages\desktop\test\loginom\windows-installed-smoke.ps1",
+              '-Installer', $installer[0].FullName, '-RunRoot', $root, '-ExpectedVersion', $version, '-Channel', 'dev', '-AllowServer', '-AllowAdministrator') + $Extra
+            $child = Start-Process -FilePath (Get-Command pwsh.exe).Source -ArgumentList $arguments -NoNewWindow -PassThru
+            if (-not $child.WaitForExit(480000)) {
+              & taskkill.exe /PID $child.Id /T /F | Out-Null
+              Log "smoke $Name: exceeded 8 min; report.json present: $(Test-Path -LiteralPath (Join-Path $root 'report.json'))"
+              Get-Process | Where-Object { $_.Path -and $_.Path -like "*\Programs\*" -and $_.ProcessName -like "loginom*" } | ForEach-Object { Log "left running: $($_.ProcessName) $($_.Id)" }
+              return -1
+            }
+            Log "smoke $Name: exit $($child.ExitCode)"
+            return $child.ExitCode
+          }
+          Log "locating the installer"
           $installer = @(Get-ChildItem -LiteralPath (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "desktop") -Filter "*-win-x64.exe" -File)
           if ($installer.Count -ne 1) { throw "Expected exactly one Desktop installer" }
           $version = (Get-Content -LiteralPath packages/desktop/package.json -Raw | ConvertFrom-Json).version
-          $smoke = ".\script\run-windows-installed-smoke.ps1"
+          Log "installer $($installer[0].Name), version $version, user $([Environment]::UserName), session $((Get-Process -Id $PID).SessionId)"
           # Negative control (B4.14c M4): same installer and smoke, one bit of the installed loginom-automation skill
-          # flipped in the disposable installation. The smoke runs as a throw-away standard user, because the hosted
-          # runner account is an elevated administrator.
-          $redOut = Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke-skill-byte"
-          & $smoke -Installer $installer[0].FullName -ExpectedVersion $version -Channel dev -Mutation SkillByte -OutputDirectory $redOut
-          $redExit = $LASTEXITCODE
+          # flipped in the disposable installation. As in 0.4.2 the smoke runs as the runner account; the ordinary-user
+          # case is checked on the stand (B6.2 Windows checklist).
+          $redExit = Invoke-Smoke "installed-smoke-skill-byte" @('-Mutation', 'SkillByte')
           # Always observe the pristine candidate too, including after an unexpected negative-control result,
           # without accepting either failure.
-          & $smoke -Installer $installer[0].FullName -ExpectedVersion $version -Channel dev -OutputDirectory (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke")
-          $greenExit = $LASTEXITCODE
-          $redReport = Join-Path $redOut "report.json"
+          $greenExit = Invoke-Smoke "installed-smoke" @()
+          $redReport = Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke-skill-byte\report.json"
           if ($redExit -ne 1 -or -not (Test-Path -LiteralPath $redReport -PathType Leaf)) { throw "Negative control must exit 1 with a report, got $redExit" }
           $red = Get-Content -LiteralPath $redReport -Raw | ConvertFrom-Json
           if ($red.status -ne 'FAIL' -or @($red.checks | Where-Object { $_.id -eq 'verify-resources' -and $_.status -eq 'FAIL' -and $_.detail -match 'LOGINOM_RESOURCE_HASH_MISMATCH' }).Count -ne 1) {
@@ -339,7 +355,7 @@ jobs:
           if (@($red.checks | Where-Object { $_.id -eq 'cleanup' -and $_.status -eq 'PASS' }).Count -ne 1) {
             throw "Mutated candidate cleanup failed"
           }
-          Write-Host 'PASS negative control: a flipped byte of the installed loginom-automation skill makes the smoke FAIL'
+          Log 'PASS negative control: a flipped byte of the installed loginom-automation skill makes the smoke FAIL'
           if ($greenExit -ne 0) { throw "Pristine installed Desktop smoke failed with exit $greenExit" }
 
       - name: Upload installed Desktop smoke diagnostics
@@ -351,7 +367,7 @@ jobs:
             ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke/report.json
             ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke/logs.zip
             ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke-skill-byte/report.json
-            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke-skill-byte/logs.zip
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke-skill-byte/logs.zip
             ${{ env.LOGINOM_WINDOWS_OUTPUT }}/cli-installed-smoke.json
             ${{ env.LOGINOM_WINDOWS_OUTPUT }}/safe-storage-*.json
           if-no-files-found: warn

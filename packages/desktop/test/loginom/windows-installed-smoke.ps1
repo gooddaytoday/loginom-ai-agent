@@ -17,7 +17,9 @@ param(
     [ValidateSet('None','SkillByte','NoServiceStop','NoRenderer','ForeignScheme','LockedUpdaterCache')][string]$Mutation = 'None',
     # The profile already holds a Loginom connection (a 0.4 one that Desktop moves to its service, B4.13).
     [switch]$Connection,
-    [switch]$AllowServer
+    [switch]$AllowServer,
+    # A hosted CI runner is an elevated administrator, as in 0.4.2. The ordinary-user case belongs to the stand (B6.2).
+    [switch]$AllowAdministrator
 )
 
 $ErrorActionPreference = 'Stop'
@@ -396,7 +398,7 @@ try {
     $supported = [Environment]::Is64BitOperatingSystem -and (($os.InstallationType -eq 'Client' -and [int]$os.CurrentBuild -ge 22000) -or ($AllowServer -and $os.InstallationType -ne 'Client'))
     Check 'windows-x64' $supported "$($os.EditionID) build $($report.os.build) $($os.DisplayVersion); allowServer=$AllowServer"
     if (-not $supported) { throw 'Windows 11 x64 or an explicitly allowed Windows Server is required' }
-    Check 'ordinary-user' (-not $report.user.administrator) 'The installing account is not an elevated administrator'
+    Check 'ordinary-user' ($AllowAdministrator -or -not $report.user.administrator) "The installing account is not an elevated administrator; allowAdministrator=$AllowAdministrator administrator=$($report.user.administrator)"
     $Installer = (Resolve-Path -LiteralPath $Installer).Path
     $hash = (Get-FileHash -LiteralPath $Installer -Algorithm SHA256).Hash.ToLowerInvariant()
     $report.sha256 = $hash
