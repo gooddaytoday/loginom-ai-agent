@@ -341,9 +341,18 @@ jobs:
               if ($location -and (Test-Path -LiteralPath $location)) { Log "removing $location by hand"; Remove-Item -LiteralPath $location -Recurse -Force -ErrorAction SilentlyContinue }
             }
           }
+          # The dev channel's profile and service data come from earlier steps of this job (safeStorage, the CLI ZIP, the
+          # previous smoke run). The smoke's `clean-profile` check stays strict, so the disposable runner starts it clean.
+          function Clear-Profile([string]$Stage) {
+            foreach ($path in @((Join-Path $env:APPDATA 'com.loginom.aiagent.dev'), (Join-Path $env:USERPROFILE '.local\share\loginom-ai-agent-dev'))) {
+              if (Test-Path -LiteralPath $path) { Log "profile ${Stage}: removing $path"; Remove-Item -LiteralPath $path -Recurse -Force }
+              else { Log "profile ${Stage}: $path is absent" }
+            }
+          }
           function Invoke-Smoke([string]$Name, [string[]]$Extra) {
             $root = Join-Path $env:LOGINOM_WINDOWS_OUTPUT $Name
             Remove-Leftover "before $Name"
+            Clear-Profile "before $Name"
             Log "smoke ${Name}: starting installer, launch and uninstall (deadline 12 min), run root $root"
             $arguments = @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', ".\packages\desktop\test\loginom\windows-installed-smoke.ps1",
               '-Installer', $installer[0].FullName, '-RunRoot', $root, '-ExpectedVersion', $version, '-Channel', 'dev', '-AllowServer', '-AllowAdministrator') + $Extra
