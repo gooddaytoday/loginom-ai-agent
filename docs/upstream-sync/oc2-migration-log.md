@@ -26082,3 +26082,50 @@ packages/product   bun test           115 pass, 0 fail
 - `packages/product`: 115 pass, 0 fail. `packages/loginom-agent`: 106 pass, 24 fail — те же 24 (тесты dashboard, миллисекунды) без правки, против базы.
 - `packages/cli` (весь пакет): 2 падения, те же на базе `45069384ab` (`loginom commands with the real Node host`, `standalone dashboard preserves explicit publication approval`: `DASHBOARD_RESOURCES_MISSING`); третье, `dashboard flags preserve…` в `cli-dashboard.test.ts`, внесла эта правка (новая запись среды `run`), тест исправлен. `bun typecheck`: `cli`, `loginom-agent` без ошибок.
 - `catalog-check.py` код 0; `apply-identity.py --check`: would change: 0 files.
+
+## B1.9c Доперенос 0.4.2: CLI и плагин
+
+Ветка `bport1-attachments-cli` от `oc2-migration` (`45069384ab`). Строки 3, 4, 6, 7 таблицы «Не перенесено» раздела
+B1.9b; строки 1, 2 (приложение, Desktop) делает другая задача. Эталон — `v0.4.2` (В-110).
+
+| Строка | Что сделано | Где |
+|---|---|---|
+| 3 | `run` продуктового CLI передаёт `application/octet-stream` и `application/vnd.ms-excel` ссылкой `file:` (плагин берёт по ней квитанцию), а не байтами `data:`. «Без `--attach`» в v2 — локальный бэкенд (служебный сервис или частный сервер); у `--server` общего диска может не быть, там остаётся `data:` | `packages/cli/src/run/run.ts` (`prepareFile`, `sharesFilesystem`) |
+| 4 | Ядро v2 не отправляет модели ничего про файл, который не читается как текст, картинка или PDF. Хук `prompt` плагина admit-ит отдельное синтетическое сообщение (`session.synthetic`, без `description`, `resume: false`) с `Attached local data reference: <путь>. Use loginom_file_admit …` для бинарных данных и `Use loginom_file_profile …` для остальных; лента его не показывает, модель получает, текст сообщения пользователя не меняется | `packages/loginom-agent/src/local-file.ts` (`referenceText`) |
+| 6 | Тест 0.4.2 перенесён на настоящее ядро: две просканированные книги допускаются повторно после смены только метки времени (`file_id`, размер и `mtime_ns` те же, `ctime_ns` другой); отказ `LOGINOM_FILE_CHANGED` при изменённых байтах и при подмене файла; `exactScanReceipt` отказывает так же | `packages/server/test/loginom-local-file.test.ts` |
+| 7 | Матрица навыков в `server`, `cli` и `loginom-host` (в том числе `script/skills-acceptance`) уже читается из `reservedSkillNames`, там четыре навыка; перечней из трёх там нет. Добавлен охранный тест на ровно четыре навыка и каталог на диске | `packages/loginom-agent/test/skills.test.ts` |
+
+Выборы (меньший вариант):
+
+- Строка 4, доработка по замечанию координатора: первая версия дописывала указание к тексту сообщения пользователя
+  (регрессия понятности). В v2 у текстовых частей сообщения пользователя нет `synthetic: true`; скрытый текст для модели —
+  отдельное сообщение `synthetic` (так делают `fork-notice`, `goal`, `experimental.idle` продукта). Оно без `description`
+  и без `state: "error"` не становится строкой ленты (`isNotice`, `timelineNoticeRequired`). Порядок: сообщение admit-ится
+  в хуке, до самого запроса, поэтому в истории стоит перед ним. Повтор запроса с тем же ID создаст второе такое
+  сообщение (хук не знает, что запрос повторный).
+- Тип берётся по расширению (`FSUtil.mimeType`), как в CLI; тип, который определит ядро по содержимому, плагину неизвестен.
+- Перечни из трёх навыков остались только в Desktop (`windows-sidecar-smoke.test.mjs`, ожидает два) и в `product-skills-smoke.mjs`/`package-docs-pty.py` 0.4, которых в v2 нет: файлы Desktop в этой задаче не трогали (строки 1, 2 и B5). Записано как найденное.
+- Тесты строки 5 для `app`, Desktop и `run-process` не переносились (строки 1, 2); для строк 3 и 4 написаны свои тесты на v2: `packages/cli/test/cli-run.test.ts` (два случая, `.xls` и `.db`), `packages/server/test/loginom-local-file.test.ts` (по расширениям).
+
+Мутации (каждая краснит свой тест, файл возвращён):
+
+| Мутация | Тест |
+|---|---|
+| в `prepareFile` отключена ветка ссылки | `cli-run`: `.xls`, `.db` красные |
+| `referenceText`: бинарное условие `false` / инверсия выбора инструмента | `loginom-local-file`: «an attached data file» красный |
+| указание дописано в текст сообщения пользователя (`event.prompt.text`) / сообщению задан `description` | тот же тест красный |
+| `matchesExactWorkbookBytes` всегда `false` / без сверки хеша / без сверки `file_id` и размера | `loginom-local-file`: «metadata-only» красный |
+| из `reservedSkillNames` убран `package-linter` | `skills.test.ts`: «four skills» красный |
+
+Проверки (Bun 1.4.4, Node 24.19.0, `LOGINOM_AI_AGENT_TEST_NODE`):
+
+- `cli`: 80 файлов по одному; падают два, оба и на базе: `cli-dashboard` «standalone dashboard preserves explicit
+  publication approval» и `cli-loginom` «(unnamed)». Новые тесты (`cli-run`, `.xls` и `.db`) зелёные.
+- `loginom-agent`: 107 pass, 24 fail — тесты чёрновика панели без `npm ci` в `packages/dashboard/template` (среда); тест
+  навыков зелёный.
+- `server`: на базе 260 pass, 51 fail; с изменением 262 pass, 51 fail, те же имена (`package_docs_run`, `dashboard_*`,
+  пять тестов G1/G6/B2.6 и `(unnamed)`). Новые тесты зелёные.
+- `product`: 115 pass, 0 fail.
+- `catalog-check.py` код 0; `apply-identity.py --check`: would change: 0 files; `bun run check` код 0 (39 из 39).
+- Файлы OpenCode: правка `packages/cli/src/run/run.ts` минимальная; `catalog-check` новых нераскрытых расхождений
+  не показал (код 0).
