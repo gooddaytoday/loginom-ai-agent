@@ -2,10 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureSamplingOutputs} from '../lib/sampling-node.mjs';
 import {samplingOutputColumns,validateSamplingOutputMapping} from '../lib/sampling-output.mjs';
+import {samplingConfigurationReadback} from '../lib/sampling-readback.mjs';
 
 for(const kind of ['sampling','data_partition'])for(const mode of ['stratified','biased','random','sequential'])for(const new_node of [true,false])
-test(`${kind} ${mode} new=${new_node}: preserve native output autosync`,async()=>{
- const c={kind,mode,new_node,input_fields:[{name:'RowID',type:'integer'},{name:'Class',type:'string'},{name:'Value',type:'integer'}].map(f=>({...f,label:f.name,data_kind:f.type==='string'?'Дискретный':'Непрерывный'}))};
+test(`${kind} ${mode} new=${new_node}: preserve native output autosync through configuration readback`,async()=>{
+ const node={document_id:'d',workflow_id:'w',node_id:'n'},owner={verified:true,...node};
+ const c={kind,mode,new_node,verified:true,inventory_complete:true,node_context:owner,
+  input_fields:[{name:'RowID',type:'integer'},{name:'Class',type:'string'},{name:'Value',type:'integer'}].map(f=>({...f,label:f.name,data_kind:f.type==='string'?'Дискретный':'Непрерывный'}))};
  let port=0;
  const values=Array(kind==='data_partition'?3:1).fill(true),saved=[];
  const nativeFields=()=>samplingOutputColumns(c,port).toReversed();
@@ -15,7 +18,7 @@ test(`${kind} ${mode} new=${new_node}: preserve native output autosync`,async()=
    output_columns:{auto_sync:{status:'observed',value:values[port],ref:'auto'+port},
     page:{status:'complete_definition_page',schema_id:root+values[port],offset:0,limit:8,total_columns:fields.length,returned:fields.length,next_offset:null},
     fields:fields.map((f,index)=>({...f,index,status:'observed',source:{cell_ref:'cell'+index,status:'rendered_source',label:f.label,type:f.type}}))}},
-   node_mapping:{verified:true,inventory_complete:true,source_identity_verified:values[port],source_fields:values[port]?fields:[],autosync:values[port],node_context:{output_port:{port}},target_fields:fields.map(f=>({...f,source:null,inherited:false,excluded:false}))},
+   node_mapping:{verified:true,inventory_complete:true,source_identity_verified:values[port],source_fields:values[port]?fields:[],autosync:values[port],node_context:{...owner,output_port:{port}},target_fields:fields.map(f=>({...f,source:null,inherited:false,excluded:false}))},
    ui:{elements:[{ref:'auto'+port,tid:root+';DerivedDataSourceOutputSocketWizard;btnAutoSyncThroughColumns',allowed_actions:['click']}]}};
  };
  const channel={openOutputPort:async p=>{port=p;},observe:async o=>{const s=snapshot();assert.ok(o.ready(s));return s;},
@@ -23,10 +26,20 @@ test(`${kind} ${mode} new=${new_node}: preserve native output autosync`,async()=
  const result=await configureSamplingOutputs(channel,c,{},[],async(finish,applied,definition)=>{
   assert.equal(finish,'done');assert.equal(applied,true);
   assert.deepEqual(definition.fields.map(f=>f.name),nativeFields().map(f=>f.name));
-  saved.push(values[port]);return {verified:true,cleanup_complete:true,settings_applied:true};
+  saved.push(values[port]);return {verified:true,cleanup_complete:true,settings_applied:true,node_context:owner};
  });
  assert.deepEqual(saved,values.map(()=>true));
  assert.equal(result.ports.length,values.length);
+ const phase=(phase,value)=>({phase,status:'verified',receipt_id:'op:'+phase,value:{verified:true,cleanup_complete:true,...value}});
+ const committed={settings_applied:true,node_context:owner};
+ const phases=[phase('input_mapping',{native_mapping:{node_context:owner}}),
+  phase('configure',{configuration:c,validation:{status:'accepted_by_loginom_next',node_context:owner}}),
+  phase('node_finish',committed),phase('output_mapping',result),phase('finish',committed)];
+ const readback=()=>samplingConfigurationReadback({node,phases,operation_id:'op'});
+ assert.deepEqual(readback().output_mappings.map(({fields})=>fields.map(({index,name})=>[index,name])),
+  values.map((_,port)=>samplingOutputColumns(c,port).toReversed().map(({name},index)=>[index,name])));
+ result.ports[0].schema.reverse();
+ assert.throws(readback,/retained output schema differs/);
 });
 
 test('frozen categorical output requires a complete exact input field set and the owned port',()=>{

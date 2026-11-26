@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from 'node:util';
+
 export const packageReadOnlyAdvice = 'The saved package is read-only and the lock owner is unverified. Ask the user for permission to use Save As with a new name before proceeding.';
 // A settled preparation can attest the current contents of the same native
 // scenario in one read. Historical snapshots remain with their operations.
@@ -998,13 +1000,14 @@ export async function prepareWorkspaceSession({ metadata, assertAllowed, prepare
   const identity = request ? JSON.stringify(request) : null;
   const wasReady=metadata.workspaceReady===true;
   let previous = metadata.workspacePreparation;
-  if (previous && previous.identity !== identity) {
+  const held = previous && JSON.parse(previous.identity ?? 'null');
+  if (previous && previous.identity !== identity && (!request || !isDeepStrictEqual(held, JSON.parse(identity)))) {
     // A verified no-effect refusal permits a new explicit package; a proven
     // missing package also permits a new draft. Uncertain attempts keep their ID.
     const missingWithoutEffect = previous.state?.reason === 'PACKAGE_OPEN_REJECTED'
       && previous.state.package_absence_verified === true
-      && JSON.parse(previous.identity).intent === 'open_package'
-      && previous.state.package_path === JSON.parse(previous.identity).package_path;
+      && held?.intent === 'open_package'
+      && previous.state.package_path === held.package_path;
     // A pressed restore click is not a package gesture, but its operation
     // stays unresolved until that same operation reconciles it.
     const restorePressed = ['attempted', 'awaiting_original_attempt', 'gesture_unconfirmed'].includes(previous.state?.connection_restore);
@@ -1022,7 +1025,6 @@ export async function prepareWorkspaceSession({ metadata, assertAllowed, prepare
           && previous.state.created_draft === false && previous.effect_possible === false);
     // A Submodel navigation refused before any gesture left the page on its
     // prepared workflow (LAB-2054). A NEW ID may prepare the same document.
-    const held = JSON.parse(previous.identity ?? 'null');
     const navigationExit = previous.effect_possible === false && !restorePressed
       && previous.state?.status === 'NOT_READY' && previous.state.phase === 'graph_navigation'
       && previous.state.effect_possible === false && previous.state.created_draft === false
@@ -1049,11 +1051,14 @@ export async function prepareWorkspaceSession({ metadata, assertAllowed, prepare
   metadata.workspaceReady = false;
   try {
     if (request) {
-      metadata.workspacePreparation = { identity, operation_id: request.operation_id, attempted: true,
+      metadata.workspacePreparation = { identity: previous?.identity ?? identity, operation_id: request.operation_id, attempted: true,
         effect_possible: true, ...(refreshVerified?{refreshVerified:true}:{}) };
       await save();
     }
-    const state = await prepare({ recoverOnly: previous?.effect_possible === true, refreshVerified });
+    // Browser receipts keep the original serialized request. Send the original
+    // key order on replay so those receipts can still bind the exact operation.
+    const state = await prepare({ recoverOnly: previous?.effect_possible === true, refreshVerified,
+      request: request && previous ? held : request });
     if (request) metadata.workspacePreparation = { ...metadata.workspacePreparation, effect_possible: state.effect_possible, state };
     // The refused navigation's owned-draft cleanup carries to its exit (LAB-2054).
     if (request && afterRefusedNavigation) metadata.workspacePreparation.after_refused_navigation = true;

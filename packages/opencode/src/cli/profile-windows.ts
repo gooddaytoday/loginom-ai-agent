@@ -33,6 +33,20 @@ try {
     if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { exit 1 }
     $security = Get-Acl -LiteralPath $entry.FullName
     if ($security.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $sid.Value) { exit 1 }
+    # On Windows the runtime keeps Chromium's user-data-dir in cache/tmp/lbXXXXXX
+    # (mkdtemp under the profile TMP, for MAX_PATH) and the validation login its
+    # disk cache in loginom/validation/http-cache. Normal shutdown removes both;
+    # a killed CLI leaves them. Match them only strictly below these root-relative
+    # anchors; an entry not below the root gets no exception.
+    $relative = @()
+    $prefix = $item.FullName + [IO.Path]::DirectorySeparatorChar
+    if ($entry.FullName.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+      $relative = @($entry.FullName.Substring($prefix.Length).Split([IO.Path]::DirectorySeparatorChar))
+    }
+    $chromiumCache = $relative.Count -ge 4 -and (
+      ($relative[0] -eq 'cache' -and $relative[1] -eq 'tmp' -and $relative[2] -cmatch '^lb[A-Za-z0-9]{6}\\z') -or
+      ($relative[0] -eq 'loginom' -and $relative[1] -eq 'validation' -and $relative[2] -eq 'http-cache')
+    )
     $rules = $security.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])
     $userFull = $false
     foreach ($access in $rules) {
@@ -46,8 +60,8 @@ try {
       if ($access.IdentityReference.Value -ne $sid.Value -and $access.IdentityReference.Value -ne 'S-1-5-18') {
         # Chromium grants its restricted AppContainer capability modify access
         # to cache/network directories. Accept that narrow SID class only
-        # inside browser-profile and never with FullControl.
-        $browserCapability = @($entry.FullName.Split([IO.Path]::DirectorySeparatorChar)) -contains 'browser-profile' -and
+        # inside browser-profile or the Chromium caches above, never with FullControl.
+        $browserCapability = ($chromiumCache -or (@($entry.FullName.Split([IO.Path]::DirectorySeparatorChar)) -contains 'browser-profile')) -and
           $access.IdentityReference.Value -match '^S-1-15-3-1024-(?:[0-9]+-){7}[0-9]+$' -and
           ($access.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne [Security.AccessControl.FileSystemRights]::FullControl
         if (!$browserCapability) { exit 1 }
