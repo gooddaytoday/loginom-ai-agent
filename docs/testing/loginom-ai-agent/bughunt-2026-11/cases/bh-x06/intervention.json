@@ -1,0 +1,12 @@
+{
+  "turn": "bh-x06-t2",
+  "kind": "manual-edit",
+  "edit": {
+    "kind": "filter_threshold",
+    "node": {
+      "type": "transform.filter_data"
+    },
+    "field": "Revenue",
+    "value": 200
+  }
+}

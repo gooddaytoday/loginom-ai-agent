@@ -1,0 +1,17 @@
+{
+  "base": "bh-x00-t1",
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 1
+  },
+  "manual_edit": {
+    "kind": "move",
+    "node": {
+      "type": "transform.filter_data"
+    },
+    "position": {
+      "x": 480,
+      "y": 224
+    }
+  }
+}
