@@ -92,14 +92,21 @@ export function userNodeTool(tool) {
 export function createUserWorkflowBindings() {
   const references = new Map();
   const described=new Set();
+  const deliveredDescriptions=new Set();
   let describedDocument;
   const deliveryArtifacts=new Map(),uploads=new Map();
   const key = (document, workflow) => JSON.stringify([document, workflow]);
+  const descriptionKey=(card,modes)=>JSON.stringify([card.type,card.cache_key,modes.filter(mode=>card.modes.includes(mode)).sort()]);
+  const resetDescriptions=()=>{described.clear();deliveredDescriptions.clear();};
   const samePath = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length
     && a.every((part, i) => part.tid === b[i].tid && part.label === b[i].label);
   return {
-    resetDescriptions() { described.clear(); },
+    resetDescriptions,
+    hasDescription(card,modes=[]) {
+      return deliveredDescriptions.has(descriptionKey(card,modes));
+    },
     rememberDescriptions(description, modes=[]) {
+      for(const card of description.node_types??[])if(typeof card.cache_key==='string')deliveredDescriptions.add(descriptionKey(card,modes));
       for(const card of description.node_types??[])for(const mode of modes)
         if(card.modes?.includes(mode))described.add(JSON.stringify([card.type,mode]));
     },
@@ -122,7 +129,7 @@ export function createUserWorkflowBindings() {
     },
     remember({ document_id, workflow_ref, previous_workflow_ref }) {
       if (typeof document_id !== 'string' || !workflow_ref?.workflow_id || !Array.isArray(workflow_ref.navigation_path)) return;
-      if(describedDocument!==document_id)described.clear();
+      if(describedDocument!==document_id)resetDescriptions();
       describedDocument=document_id;
       if(previous_workflow_ref?.workflow_id)references.delete(key(document_id,previous_workflow_ref.workflow_id));
       references.set(key(document_id, workflow_ref.workflow_id), structuredClone(workflow_ref));

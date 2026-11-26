@@ -563,14 +563,27 @@ export async function createBridge(config, session, { browserTransport: managedB
                 description.node_types=await skill.describeNodes(description.node_types,args.modes);
               }
               const delivered=userProfile?userActionInventory(description):description;
+              if(userProfile&&delivered.node_types?.length){
+                const cards=[],reused=[];
+                for(const card of delivered.node_types){
+                  if(userWorkflows.hasDescription(card,args.modes))reused.push({type:card.type,cache_key:card.cache_key});
+                  else cards.push(card);
+                }
+                if(reused.length){
+                  delivered.node_types=cards;
+                  delivered.reused_node_types=reused;
+                  delivered.description_notice='Description already delivered. Use the earlier node card with the matching cache_key.';
+                }
+              }
               const content={content:[{type:'text',text:JSON.stringify(delivered)}]};
               const reply=userProfile?boundedUserToolReply(content,{tool:'dock_action_describe',modes:args.modes}):content;
-              if(userProfile&&reply.isError!==true&&description.node_types?.length){
-                await recordExecution({phase:'node_types_described',node_types:args.node_types,modes:args.modes??[],
+              if(userProfile&&reply.isError!==true&&delivered.node_types?.length){
+                await recordExecution({phase:'node_types_described',node_types:delivered.node_types.map(card=>card.type),modes:args.modes??[],
+                  receipts:delivered.node_types.map(({type,cache_key})=>({type,cache_key})),
                   skill_revision:(await skill.prepare()).detail.revision});
               }
               await logResult('dock_action_describe',reply.isError===true?JSON.parse(reply.content[0].text):delivered);
-              if(userProfile&&reply.isError!==true)userWorkflows.rememberDescriptions(description,args.modes);
+              if(userProfile&&reply.isError!==true)userWorkflows.rememberDescriptions(delivered,args.modes);
               return reply;
             };
             return await (userProfile?dockGate(request.params.name,invoke):invoke());

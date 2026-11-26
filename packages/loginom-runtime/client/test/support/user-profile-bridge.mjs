@@ -141,7 +141,14 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const actual=await describe(encodedArgs);
     const decoded=JSON.parse(actual.content[0].text);
     assert.equal(decoded.error,undefined,JSON.stringify(decoded.error));
-    assert.deepEqual(decoded,JSON.parse((await describe(nativeArgs)).content[0].text));
+    const repeated=JSON.parse((await describe(nativeArgs)).content[0].text);
+    assert.deepEqual(repeated.actions,decoded.actions);
+    assert.deepEqual(repeated.node_types,[]);
+    assert.deepEqual(repeated.reused_node_types.map(({type,cache_key})=>({type,cache_key})),
+      decoded.node_types.map(({type,cache_key})=>({type,cache_key})));
+    const mixed=JSON.parse((await describe({node_types:['imports.text','transform.group_data'],modes:['delimited','aggregate']})).content[0].text);
+    assert.deepEqual(mixed.reused_node_types.map(card=>card.type),['imports.text']);
+    assert.deepEqual(mixed.node_types.map(card=>card.type),['transform.group_data']);
     for(const args of [{action_keys:'['},{action_keys:'null'},{node_types:'"imports.text"'},{modes:'[1]',node_types:'["imports.text"]'},{action_keys:'["node.add"]'}]){
       const denied=await describe(args);
       assert.equal(JSON.parse(denied.content[0].text).error.code,'REQUEST_REJECTED');
@@ -212,6 +219,8 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const afterPrepare=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,
       document_id:rebound.workspace.document_id,workflow_ref:{workflow_id:rebound.workspace.workflow_ref.workflow_id}}});
     assert.equal(JSON.parse(afterPrepare.content[0].text).error.code,'NODE_TYPE_NOT_DESCRIBED');
+    const refreshed=JSON.parse((await describe({node_types:['transform.sorting'],modes:['keys']})).content[0].text);
+    assert.equal(refreshed.node_types[0].type,'transform.sorting');
     assert.equal(reloadedPage.events.filter(selector=>selector.includes('OpenDialogForm;btnOpen')).length,1);
     reloadedPage=null;
     const rejected=await client.callTool({name:'dock_action_describe',arguments:{action_key:'package.save_checkpoint',node_types:['imports.text','transform.join_data','exports.text']}});

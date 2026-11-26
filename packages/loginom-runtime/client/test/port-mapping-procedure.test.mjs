@@ -100,11 +100,17 @@ test('output field driver preserves a matching field without opening its editor'
 test('planned output edits bind their baseline after the owned Links to Table switch (D69 p18)',async()=>{
  const {configureOutputFields}=await import('../lib/port-mapping-procedure.mjs');
  const f=fieldFixture({links:true});
+ const observations=[],observe=f.channel.observe;
+ f.channel.observe=o=>{observations.push(o);return observe(o);};
  const result=await configureOutputFields(f.channel,{direction:'output',port:0,fields:[{source:{kind:'configured_field',name:'Amount'},name:'Mapped',label:'Сумма'}]},
   [{name:'Amount',label:'Amount',type:'real',used:true}]);
  assert.equal(result.verified,true);assert.equal(result.definition.source_selection,undefined);
  assert.equal(result.definition.target_fields[0].name,'Mapped');assert.equal(result.definition.target_fields[0].source.record_id,'s');
  assert.equal(f.mutations(),5);
+ assert.equal(observations.filter(o=>o.readMappings&&o.outputColumnPage).length,1,
+  'Bind the addressed row and the complete native mapping in one observation');
+ assert.equal(observations.filter(o=>o.readMappings&&!o.outputColumnPage).length,3,
+  'Reuse the Table view receipt and check the complete mapping after Apply');
 });
 test('D69 output edits still reject unrelated native changes at the view switch or field Apply',async()=>{
  const {configureOutputFields}=await import('../lib/port-mapping-procedure.mjs');
@@ -129,8 +135,8 @@ function reorderFixture(grouped=false,sourceSelection) {
 }
 test('output reorder moves only requested records and retains native source identities',async()=>{
  const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');const f=reorderFixture(),r=await reorderOutputFields(f.channel,['t2','t1','t0']);
- assert.equal(r.moves,3);assert.equal(f.actions(),6);assert.deepEqual(r.definition.target_fields.map(f=>f.source.name),['C','B','A']);
- const noop=await reorderOutputFields(f.channel,['t2','t1','t0']);assert.equal(noop.effect_possible,false);assert.equal(f.actions(),6);
+ assert.equal(r.moves,3);assert.equal(f.actions(),5);assert.deepEqual(r.definition.target_fields.map(f=>f.source.name),['C','B','A']);
+ const noop=await reorderOutputFields(f.channel,['t2','t1','t0']);assert.equal(noop.effect_possible,false);assert.equal(f.actions(),5);
 });
 test('output reorder refuses incomplete goals and stops after an unexpected native change',async()=>{
  const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');
