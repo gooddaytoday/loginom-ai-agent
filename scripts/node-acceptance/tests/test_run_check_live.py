@@ -5,6 +5,7 @@ import socket
 from pathlib import Path
 import subprocess
 import sys
+import time
 from tempfile import TemporaryDirectory
 from threading import Event
 import unittest
@@ -63,6 +64,29 @@ class LiveChainTest(unittest.TestCase):
             finally:
                 released.set()
                 task.result()
+
+    def test_live_turn_stops_as_soon_as_operator_input_is_required(self):
+        with TemporaryDirectory() as directory:
+            profile = Path(directory)
+            chain = LiveChain(profile, profile, profile, 'test-user', '/test-user/sample.lgp', 'p/m', '', lambda: -1, Path(sys.executable))
+            chain.child = Mock(pid=42)
+            chain.child.poll.return_value = None
+            chain.verify_owner = Mock()
+            chain.send = Mock()
+            chain.pump = Mock()
+            messages = [
+                dict(id='user', sessionID='chat', role='user', model=dict(providerID='p', modelID='m')),
+                dict(id='assistant', sessionID='chat', role='assistant', parentID='user'),
+            ]
+            parts = [
+                (1, 1, dict(type='text', text='Prompt', sessionID='chat', messageID='user')),
+                (2, 2, dict(type='tool', tool='question', state={'status': 'running'}, sessionID='chat', messageID='assistant')),
+            ]
+            with patch('run_check_live.transcript', side_effect=[([], []), (messages, parts)]):
+                with self.assertRaisesRegex(RuntimeError, 'LIVE_CHAIN_INTERACTION_REQUIRED'):
+                    chain.turn(profile, 'unused', {}, None, 'Prompt', [], time.monotonic() + 10)
+            event = json.loads((profile / 'model.stdout').read_text())
+            self.assertEqual((event['type'], event['part']['tool']), ('interaction_required', 'question'))
 
     def test_turn_events_exclude_previous_turn_and_pending_tool(self):
         def part(kind, message, **fields):
