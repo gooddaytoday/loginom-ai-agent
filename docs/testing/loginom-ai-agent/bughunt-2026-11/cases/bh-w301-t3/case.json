@@ -1,0 +1,18 @@
+{
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 0
+  },
+  "base": "bh-w301-t2",
+  "manual_edit": {
+    "kind": "remove_link",
+    "source": {
+      "type": "imports.text"
+    },
+    "target": {
+      "type": "transform.sorting"
+    },
+    "output": 0,
+    "input": 0
+  }
+}
