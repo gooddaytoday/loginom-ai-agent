@@ -3691,12 +3691,35 @@ class Runner:
             candidates = []
             for _, reply in replies:
                 for owner, port in ports(reply):
-                    node = observed['nodes'].get(owner.get('node', {}).get('node_id'))
+                    node_id = owner.get('node', {}).get('node_id')
+                    node = observed['nodes'].get(node_id)
                     if node and port_path(owner, port) and owner.get('status') == 'SUCCEEDED':
-                        candidates.append(dict(type=node['type'], label=node['label'], port=port.get('port'), data=port))
+                        candidates.append(dict(node_id=node_id, type=node['type'], label=node['label'], port=port.get('port'), data=port))
             write(folder / 'case-port-evidence.json', candidates)
-            self.phase('case-port-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/case-ports.mjs',
-                folder / 'expected.json', folder / 'case-port-evidence.json'], folder, timeout=60)
+            oracle = [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/case-ports.mjs',
+                      folder / 'expected.json', folder / 'case-port-evidence.json']
+            self.phase('case-port-oracle', oracle, folder, timeout=60)
+            readback = read(folder / 'case-port-oracle.stdout')
+            if readback:
+                if live and (spec.get('manual_edit') or case == self.current['scenario']):
+                    self.close_live(live)
+                write(folder / 'case-port-expected.json', dict(package_path=package,
+                    outputs=[target['output'] for target in readback],
+                    case_port_node_ids=[target['node_id'] for target in readback],
+                    **{key: expected[key] for key in ('nodes', 'n18_javascript_step') if key in expected}))
+                write(folder / 'case-port-config.json', dict(loginom_url=login['url'], workflow_profile=dict(
+                    loginom_user=login['username'], password=login['password'], passwordless_login=login.get('passwordless_login', False))))
+                self.phase('case-port-readback', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs',
+                    '--config', folder / 'case-port-config.json', '--resources', build / 'resources/loginom',
+                    '--saved', package, '--expected', folder / 'case-port-expected.json', '--output', folder / 'case-port-readback',
+                    *(['--case-port-read-only'] if live and live.child is not None else [])], folder)
+                result = folder / 'case-port-readback/result.json'
+                verified = read(result)
+                assert verified['status'] == 'PASS' and all(verified['cleanup'].get(key) is True
+                    for key in ['package_closed', 'logged_out']), 'CASE_PORT_READBACK_UNCONFIRMED'
+                assert [match['node']['node_id'] for match in verified['correspondence']] == [
+                    target['node_id'] for target in readback], 'CASE_PORT_READBACK_NODE_CHANGED'
+                self.phase('case-port-sample-oracle', [*oracle, result], folder, timeout=60)
             self.current['csv'] = '— (native outputs PASS)'
             return session, expected, None, None
         if only_graph:

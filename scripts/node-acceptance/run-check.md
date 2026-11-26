@@ -703,6 +703,14 @@ The runner keeps the CLI handle until the process is reaped. Shutdown
 records Chromium exit, the owned package close, logout and the runtime
 acknowledgement independently, including when the first turn fails.
 
+If an ordinary intermediate turn has a partial native-port sample, a
+second browser opens the saved package for full readback while the TUI
+browser stays open. It can open the package read-only and must confirm
+package close and logout before the runner sends the next prompt. The
+readback and cleanup receipts are under the turn's `case-port-readback/`.
+At a manual edit boundary or the final turn, the runner closes the live
+segment before this readback.
+
 At a `manual_edit` boundary, `--live-chain` exits the live TUI and requires
 verified package close, logout and runtime close ACK. It then runs the
 same verified browser edit described above and resumes the existing chat
@@ -751,8 +759,15 @@ observed canvas position.
 
 A graph-only turn checks Save, cleanup and the graph. Add `outputs` for
 CSV checks, or `refusal` for an expected refusal. A private case can set
-`"output_mode": "ports"` in `case.json` to check complete typed reads from
-the requested graph node and port. This mode uses `outputs` with
+`"output_mode": "ports"` in `case.json` to check typed reads from the
+requested graph node and port. If the model's last read has
+`sample_complete: false`, the cold reader reads the entire saved port
+for the same node ID. The complete table must match the oracle, and the
+model's rows must match its prefix for an ordered output or a subset
+that preserves duplicate multiplicities for an unordered output.
+`CASE_PORT_SAMPLE_MISMATCH` also rejects an empty partial sample of a
+nonempty port.
+This mode uses `outputs` with
 `output_node_type`, optional `output_node_label`, and zero-based
 `output_port`. It can also check a requested downloaded Excel workbook using
 `excel_artifact` with `filename`, `sheet_name` and `header`. The first
