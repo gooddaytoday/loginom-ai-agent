@@ -552,7 +552,7 @@ describe("loginom.product permissions (B2.6a)", () => {
         const result = path.join(Global.Path.data, "tool-output", `b26a2-${crypto.randomUUID()}.txt`)
         yield* Effect.addFinalizer(() => Effect.promise(() => fs.rm(result, { force: true })))
         // The verified bundled catalog of B2.4, so the `skill` tool lists the reference file itself.
-        const skills = ["loginom-automation", "package-docs", "loginom-dashboard"].map((name) =>
+        const skills = ["loginom-automation", "package-docs", "loginom-dashboard", "package-linter"].map((name) =>
           path.join(resources, "skills", name, "SKILL.md"),
         )
         yield* Effect.promise(async () => {
@@ -909,7 +909,7 @@ describe("loginom.product the administrator's deny (B2.6c, В-69)", () => {
         const outside = (yield* tmpdirScoped("loginom-permissions-skills-")).path
         const resources = path.join(outside, "resources")
         yield* environment("LOGINOM_AI_AGENT_RESOURCES", resources)
-        const bundled = ["loginom-automation", "package-docs", "loginom-dashboard"]
+        const bundled = ["loginom-automation", "package-docs", "loginom-dashboard", "package-linter"]
         yield* Effect.promise(async () => {
           for (const [directory, name] of [
             ...bundled.map((name) => [path.join(resources, "skills", name), name]),

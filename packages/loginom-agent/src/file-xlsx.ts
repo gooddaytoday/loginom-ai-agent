@@ -6,7 +6,7 @@ import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { posix, join, resolve } from "node:path"
 import { Parser } from "htmlparser2"
 import { ZipReader, ZipWriter, TextReader, type Entry } from "@zip.js/zip.js"
-import { readProfileFileIdentity, verifyProfileFileIdentity, type ProfileSource } from "./loginom-file-profile-core"
+import { readProfileFileIdentity, verifyProfileFileIdentity, type ProfileSource } from "./file-profile-core"
 
 const MiB = 1024 * 1024
 const CELL = MiB

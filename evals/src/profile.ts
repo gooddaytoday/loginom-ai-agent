@@ -318,7 +318,7 @@ export async function verifyProfile(config: EvalConfig, command: AgentCommand) {
   const view = parseView(observed.stdout)
   // `configured`: a saved connection whose Help this status's own Host has not loaded yet (B2.7b); the built-in knowledge
   // key left no `hasApiKey` in the status.
-  if (observed.exitCode !== 0 || !view || !["ready", "starting", "configured"].includes(view.state) || view.failure || view.recoveries?.length ||
+  if (observed.exitCode !== 0 || !view || !["ready", "starting", "configured"].includes(view.state) || view.failure || view.recoveries?.length || !(view.hasApiKey === undefined && view.hasPassword === undefined ? passwordMatches : connectionConfigured)(view, Boolean(config.loginom.password)) ||
     view.url !== config.loginom.url || view.username !== config.loginom.username)
     throw new EvalFailure("PROFILE_NOT_PREPARED", 2)
   const saved = await Bun.file(path.join(config.profileDir, "config/loginom-ai-agent.json")).json().catch(() => undefined)
@@ -432,7 +432,7 @@ export async function recoverIfNeeded(command: AgentCommand, exitCode: 1 | 2, ex
     !connectionConfigured(restored, expectedHasPassword)) throw new EvalFailure("PROFILE_NOT_PREPARED", exitCode)
   // Each standalone status has its own Help startup. Polling another process
   // cannot finish that startup; an explicit check proves readiness in one host.
-  const checked = (restored.state === "configured" || restored.state === "starting" && restored.hasApiKey === true) &&
+  const checked = (restored.state === "configured" || restored.state === "starting" && connectionConfigured(restored, expectedHasPassword)) &&
     !restored.failure && !restored.recoveries?.length
     ? await checkStarting(command, exitCode) : false
   const view = checked ? restored : await settle(command, restored, exitCode)

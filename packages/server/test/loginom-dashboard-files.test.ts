@@ -71,10 +71,10 @@ const boot = (options: Options = {}) =>
     const global = path.join(dir, "global")
     const system = path.join(global, "system")
     // The bundled skill catalog, verified as in an installation (B2.4; its verifier needs `npm ci` in
-    // `packages/loginom-runtime/client`), which holds all three product skills, the dashboard's own among them.
+    // `packages/loginom-runtime/client`), which holds all four product skills, the dashboard's own among them.
     const resources = path.join(dir, "resources")
     yield* Effect.promise(async () => {
-      for (const name of ["loginom-automation", "package-docs", "loginom-dashboard"])
+      for (const name of ["loginom-automation", "package-docs", "loginom-dashboard", "package-linter"])
         await Bun.write(
           path.join(resources, "skills", name, "SKILL.md"),
           `---\nname: ${name}\ndescription: Bundled ${name}.\n---\n\nBUNDLED ${name}\n`,

@@ -30,7 +30,15 @@ const sampleReceipt = Schema.decodeUnknownOption(
 const receiptKey = (sessionID: string, messageID: string, uri: string) =>
   `attachment-receipt:${sessionID}:${messageID}:${uri}`
 const carriedKey = (sessionID: string, compactionID: string) => `compacted-attachments:${sessionID}:${compactionID}`
-const decodeReceipt = Schema.decodeUnknownOption(Schema.Struct({ canonical_path: Schema.String }))
+const decodeReceipt = Schema.decodeUnknownOption(
+  Schema.Struct({
+    canonical_path: Schema.String,
+    size: Schema.Number,
+    mtime: Schema.Number,
+    ctime: Schema.Number,
+    file_id: Schema.String,
+  }),
+)
 const decodeCarried = Schema.decodeUnknownOption(
   Schema.Array(Schema.Struct({ message: Schema.String, uri: Schema.String })),
 )

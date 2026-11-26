@@ -37,7 +37,7 @@ type Step = { tool: string; input?: unknown } | { text: string }
 const script = (...steps: Step[]) => `SCRIPT<${JSON.stringify(steps)}>SCRIPT`
 // Each case boots a server Location and runs one or two scripted sessions, about 1 s locally.
 const timeout = 30_000
-const bundled = ["loginom-automation", "package-docs", "loginom-dashboard"]
+const bundled = ["loginom-automation", "package-docs", "loginom-dashboard", "package-linter"]
 const fileTools = ["loginom_file_admit", "loginom_file_profile", "loginom_file_sample", "loginom_file_scan"]
 
 type PluginContext = Parameters<Parameters<typeof define>[0]["effect"]>[0]
