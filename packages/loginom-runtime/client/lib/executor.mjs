@@ -10,7 +10,7 @@ import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
 import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady,makeLargeUploadCode,guardUploadDebugDialog} from './artifact-discovery.mjs';
 import {createArtifactDelivery} from './artifact-delivery.mjs';
 import {findNativeStorageRow} from './text-export-output.mjs';
-import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingWorkflowReceipt } from './node-target.mjs';
+import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingWorkflowReceipt, proveReloadedNode } from './node-target.mjs';
 import {isPythonInputOpening,settledPythonInputOpening,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 import { createNodeTargetBrowserAdapter } from './node-target-browser.mjs';
 import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
@@ -22,7 +22,7 @@ import { requireCapability } from './capability-registry.mjs';
 import { actionDescribeTool, actionRunTool, assertActionOutcome, validateActionParameters } from './action-catalog.mjs';
 import { makeWorkspaceUiCode, validateUiAction, uiActionSchema } from './workspace-ui.mjs';
 import { createObservationPages } from './observation-pages.mjs';
-import { makeWorkspaceBootstrapCode } from './workspace.mjs';
+import { makeWorkspaceBootstrapCode, packageReadOnlyAdvice } from './workspace.mjs';
 import { createNodeProcedure } from './node-procedure.mjs';
 import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow, releaseNodeApply, NodeVariableInputError } from './node-apply.mjs';
 import {reconcileOutputMappingPhase} from './node-output-mapping-recovery.mjs';
@@ -2182,7 +2182,8 @@ export function parseCapabilityResult(response,{redactor}={}) {
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
-  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, getPreparationReceipt = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = true }) {
+  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, getPreparationReceipt = () => null,
+  browserRecovery = false, probePreparedPage, reopenNodePackage, cacheDirectory, serverSourceCache = true }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   const executeBrowser=execute;
   execute=async(...args)=>{
@@ -2566,11 +2567,40 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       operation.cleanupConfirmed=state.receipt.cleanup_complete===true;
     }finally{running=false;}
   };
-  const inspectApply=async operation=>{
+  const reloadLoss='Unsaved changes made before reloading were lost.';
+  const reloadObserved=operation=>operation.reloadObserved===true||Number.isFinite(operation.reloadProgress?.timeOrigin);
+  const refuseChangedNodeIdentity=(operation,message)=>{
+    const instruction=operation.reloadAwaitingLogin
+      ?'Sign in to the original Loginom account, then ask Dock to recover the original operation.'
+      :'Ask the user to open the original scenario in Loginom under the original account and complete this step there.';
+    operation.releaseRefused={message,identityChanged:true,
+      ui_blocker:instruction+(reloadObserved(operation)?' '+reloadLoss:'')};
+  };
+  const canReleaseAfterReload=operation=>reopenNodePackage&&!operation.reloadAttempted&&operation.targetPhase?.completed===true
+    &&operation.nodeApply?.pending?.phase==='configure'&&operation.nodeApply.request.target.type==='transform.filter_data';
+  const inspectChangedNodeDocument=async(operation,signal)=>{
+    if(operation.releaseRefused?.identityChanged)return true;
+    const state=operation.nodeApply;
+    if(!probePreparedPage||nodeJobs.busy||state?.pending?.phase!=='configure'
+      ||!operation.transportUncertain&&!canReleaseAfterReload(operation))return false;
+    // A reload can interrupt the browser reply before the connection guard
+    // returns its identity error. This read can only explain a refusal.
+    running=true;
+    try{
+      const observed=await probePreparedPage({origin:targetOrigin,documentId:state.request.document_id},{signal}).catch(()=>null);
+      signal?.throwIfAborted();
+      if(observed?.ok!==false||observed.reason!=='prepared document changed')return false;
+      if(observed.reloaded===true)operation.reloadObserved=true;
+      refuseChangedNodeIdentity(operation,'Original prepared Loginom document changed [LOGINOM_IDENTITY_CHANGED]');
+      return true;
+    }finally{running=false;}
+  };
+  const inspectApply=async(operation,signal)=>{
     // An inspection never calls configuration, execution or generic action
     // reconciliation. Unknown phases keep the gate until a phase-specific
     // verifier is available. A durable node checkpoint is safe to redeliver.
     if(running)return failed(operation,'OPERATION_STILL_PENDING','The original node operation is not yet confirmed. Inspect its operation_id after the active Dock call completes; do not repeat effects.');
+    if(await inspectChangedNodeDocument(operation,signal))return structuredClone(operation.outcome);
     if(!nodeJobs.busy)await inspectPythonInputOpening(operation);
     if(operation.storageAdmissionChild?.transportUncertain){
       const child=operation.storageAdmissionChild;
@@ -2675,9 +2705,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if(result.status!=='AMBIGUOUS'&&result.cleanup_complete===true)pending=null;
     return outcome;
   };
-  const reconcilePending = async () => {
+  const reconcilePending = async signal => {
     const operation = pending;
-    if(operation.action.capability==='node.apply')return inspectApply(operation);
+    if(operation.action.capability==='node.apply')return inspectApply(operation,signal);
     if(operation.action.capability==='node.target.internal'){try{return await inspectTarget(operation);}catch(error){return failed(operation,'RECONCILIATION_FAILED',String(error.message));}}
     if (running && operation.action.capability === 'node.configure_text_import.v1') {
       return failed(operation, 'OPERATION_STILL_PENDING', 'The bounded node procedure is still running');
@@ -2768,7 +2798,47 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       instruction:earlyNodePhase(operation)?'Release this early source/workflow/target failure with a NEW recovery_operation_id. Dock only reads the original receipts and quiet graph, proving that the target was not created or finding its exact partial node. Unknown effects remain blocked. Follow the released next_step; do not replay creation.'
         :'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'
           +(filterReconnectPending(operation)?' Release requires the original Loginom session to reconnect. If it cannot reconnect, report the operation as blocked.':'')}:null;
+  const releaseAfterReload=async(operation,signal)=>{
+    const state=operation.nodeApply, request=state.request;
+    const deadline=now()+NODE_RELEASE_BUDGET_MS;
+    const reload=operation.reloadProgress??={};
+    signal?.throwIfAborted();
+    let reopened;
+    try{reopened=await reopenNodePackage({documentId:request.document_id,deadline,signal,reload});}
+    catch{signal?.throwIfAborted();}
+    signal?.throwIfAborted();
+    if(reopened?.reloaded===true)operation.reloadObserved=true;
+    operation.reloadAwaitingLogin=reopened?.reason==='RELOAD_LOGIN_UNVERIFIED'&&reloadObserved(operation)&&!reload.openDispatched;
+    const proof=proveReloadedNode(operation,reopened?.first,reopened?.second,{readOnly:reopened?.readOnly===true});
+    if(!proof||now()>=deadline){
+      operation.reloadAttempted=!operation.reloadAwaitingLogin;
+      const reason=reopened?.reason??'REOPENED_GRAPH_UNVERIFIED';
+      throw Object.assign(new Error('The original saved graph could not be verified after reloading ['+reason+']'),{code:'LOGINOM_IDENTITY_CHANGED'});
+    }
+    const {ref}=reopened;
+    const target=proof.node?{kind:'existing',type:request.target.type,ref:proof.node}:request.target;
+    const inputs=proof.node?[]:request.inputs.map(input=>({...input,
+      source:{document_id:ref.document_id,workflow_id:ref.workflow_ref.workflow_id,node_id:input.source.node_id}}));
+    const result={operation_id:operation.id,status:'FAILED',effect_possible:state.effect_possible,cleanup_complete:true,
+      node:proof.node,configuration:{status:'unknown'},execution:state.execution,output:state.output,
+      phases:state.phases.map(({value,...phase})=>phase),warnings:[reloadLoss],package_saved:false,persisted_package_verified:false,
+      checkpoint_kind:'local_node_released',pending_phase:null,released_phase:'configure',
+      error:{code:'NODE_OPERATION_RELEASED',message:'The original saved graph was verified in a new Loginom session. The stopped configuration was abandoned.'},
+      next_step:reopened.readOnly?{instruction:packageReadOnlyAdvice}:{
+        tool:'dock_node_apply',arguments:{document_id:ref.document_id,workflow_ref:{workflow_id:ref.workflow_ref.workflow_id},
+          target,inputs,contract_revision:request.contract_revision,mode:request.mode},
+        instruction:'Follow the original user request with a NEW operation_id, the verified references below, and the full intended filter settings. Use the retained input links when the target already exists. Read the node card before applying.'}};
+    const event={operation_id:operation.id,action_key:'node.apply',action_revision:request.contract_revision,
+      phase:'node_operation_released',signature:state.signature,receipt:{...state.pending,proof},result};
+    return {result,publish:recordRelease=>reopened.publish(async()=>{
+      const ack=await onRecord(event);
+      if(!ack||fingerprint('ack',Object.fromEntries(Object.keys(event).map(k=>[k,ack[k]])))!==fingerprint('ack',journalCopy(event)))
+        throw Error('Node phase journal acknowledgement differs');
+      await recordRelease();
+    })};
+  };
   const addOnlyWindowStep=operation=>{
+    if(operation?.releaseRefused?.identityChanged)return null;
     const effect=operation?.targetPhase?.pending,receipt=effect?.receipt;
     if(effect?.kind!=='create'||effect.parameters.add_only!==true||receipt?.add_only_window_pending!==true
       ||!receipt.add_only_window_node_id||receipt.cleanup_complete!==false)return null;
@@ -2783,7 +2853,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       signal?.throwIfAborted();
       if(running||nodeJobs.busy||pending!==operation)throw new Error('The stopped Dock operation is no longer available for release');
     }
-    if(!nodeReleaseStep(operation))throw new Error('Release proof unavailable: inspect the operation; its last browser call is unconfirmed or its stopped phase has no node release verifier');
+    const releaseAvailable=nodeReleaseStep(operation);
+    if(!releaseAvailable){
+      if(!await inspectChangedNodeDocument(operation,signal))
+        throw new Error('Release proof unavailable: inspect the operation; its last browser call is unconfirmed or its stopped phase has no node release verifier');
+      if(running||nodeJobs.busy||pending!==operation)throw new Error('The stopped Dock operation is no longer available for release');
+    }
     running=true;
     try{
       const record={...operation,id:recoveryOperationId,parameters:{original_operation_id:operation.id,strategy}};
@@ -2791,10 +2866,30 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       observations.clear();
       let returned;
       try{
-        const result=await releaseNodeApply({operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,record:onRecord,signal,
-          releaseBeforeTarget:earlyRelease(operation,signal)});
-        operation.outcome=nodeApplyOutcome(operation,result);operation.cleanupConfirmed=true;
-        await remember(operation,'operation_abandoned',operation.outcome);
+        let reload, result;
+        if(operation.releaseRefused?.identityChanged&&canReleaseAfterReload(operation))reload=await releaseAfterReload(operation,signal);
+        else{
+          try{
+            if(!releaseAvailable)throw Object.assign(new Error(operation.releaseRefused.message),{code:'LOGINOM_IDENTITY_CHANGED'});
+            result=await releaseNodeApply({operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,record:onRecord,signal,
+              releaseBeforeTarget:earlyRelease(operation,signal)});
+          }catch(error){
+            if(error?.code!=='LOGINOM_IDENTITY_CHANGED'||!canReleaseAfterReload(operation))throw error;
+            reload=await releaseAfterReload(operation,signal);
+          }
+        }
+        const outcome=nodeApplyOutcome(operation,reload?.result??result);
+        if(reload){
+          try{await reload.publish(()=>remember(operation,'operation_abandoned',outcome));}
+          catch{
+            signal?.throwIfAborted();
+            operation.reloadAttempted=true;
+            throw Object.assign(new Error('The verified saved graph could not be bound to the Dock workspace'),{code:'LOGINOM_IDENTITY_CHANGED'});
+          }
+          Object.assign(operation.nodeApply,{pending:null,cleanup_complete:true,result:structuredClone(reload.result)});
+          operation.transportUncertain=false;
+        }else await remember(operation,'operation_abandoned',outcome);
+        operation.outcome=outcome;operation.cleanupConfirmed=true;
         pending=null;nodeJobs.settle(operation.id,operation.outcome);
         returned={status:'SUCCEEDED',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'resolved',
           effect_possible:false,error:null,trace:[],recovery_operation_id:recoveryOperationId,
@@ -2802,21 +2897,29 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }catch(error){
         // The original operation keeps its gate. A blocker the user can clear is
         // named explicitly instead of leaving an empty recovery list.
+        const message=String(error?.message??error).slice(0,1000);
+        const reloaded=error?.code==='LOGINOM_IDENTITY_CHANGED'||signal?.aborted&&operation.reloadProgress;
         const diagnostic=operationFailureDiagnostic(error);
-        const waitingForLoginom=filterReconnectPending(operation)&&diagnostic.code==='LOGINOM_DISCONNECTED'
+        const waitingForLoginom=!reloaded&&filterReconnectPending(operation)&&diagnostic.code==='LOGINOM_DISCONNECTED'
           &&diagnostic.detail==='reason=awaiting_original_attempt';
-        if(!waitingForLoginom)operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:error?.userAction??null};
-        const trigger=waitingForLoginom?null:browserRecoveryTrigger(operation,null);
-        const nextStep=addOnlyWindowStep(operation)??(waitingForLoginom?{
+        if(reloaded)refuseChangedNodeIdentity(operation,message);
+        else if(!waitingForLoginom)operation.releaseRefused={message,ui_blocker:error?.userAction??null};
+        const retry=reloaded&&canReleaseAfterReload(operation)?dockRecoveryAdvice(operation):null;
+        const userAction=waitingForLoginom?error?.userAction:operation.releaseRefused.ui_blocker;
+        const trigger=retry||waitingForLoginom?null:browserRecoveryTrigger(operation,null);
+        const windowStep=addOnlyWindowStep(operation);
+        const nextStep=windowStep??(waitingForLoginom?{
           instruction:'Wait for the original Loginom session to reconnect. Then call dock_operation_recover with abandon_operation for the original operation_id and a NEW recovery_operation_id. If the original session cannot reconnect, report the operation as blocked.'
         }:trigger?browserRecoveryNext(operation,trigger):null);
         returned={status:'AMBIGUOUS',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'release_refused',
           effect_possible:true,trace:[],recovery_operation_id:recoveryOperationId,
-          error:{code:'NODE_RELEASE_REFUSED',message:String(error?.message??error).slice(0,1000)},
+          error:{code:'NODE_RELEASE_REFUSED',message},
           // With browser recovery the agent clears the blocker itself; the user is not asked to.
-          output:{original_operation_pending:pending===operation,...(error?.userAction
-            ?trigger?{ui_blocker:error.userAction}:{user_action:error.userAction}:{}),
-            ...(nextStep?{next_step:nextStep}:{})}};
+          output:{original_operation_pending:pending===operation,...(retry
+            ?{next_step:retry.next_steps[0],
+              ...(retry.user_action?{user_action:retry.user_action}:{}),...(retry.warnings?{warnings:retry.warnings}:{})}
+            :{...(userAction?trigger?{ui_blocker:userAction}:{user_action:userAction}:{}),
+              ...(nextStep?{next_step:nextStep}:{})})}};
       }
       await remember(record,'recovery_completed',returned);
       auxiliary.set(recoveryOperationId,{signature,outcome:structuredClone(returned)});
@@ -2830,6 +2933,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const base = [{ tool: 'dock_workspace_observe', arguments: {}, required_fields: [],
       requires: [], provides: ['observation_id', 'fresh_ui_refs'] }];
     if (!operation || pending !== operation) return { recovery_options: [], next_steps: base };
+    if(operation.releaseRefused?.identityChanged){
+      if(canReleaseAfterReload(operation))return {recovery_options:['abandon_operation'],next_steps:[{
+        tool:'dock_operation_recover',arguments:{operation_id:operation.id,strategy:'abandon_operation'},
+        required_fields:['recovery_operation_id'],instruction:'Use a new recovery_operation_id. Dock can verify the original saved graph before abandoning this configuration.'}],
+        ...(operation.reloadAwaitingLogin?{user_action:operation.releaseRefused.ui_blocker}
+          :reloadObserved(operation)?{warnings:[reloadLoss]}:{})};
+      return {recovery_options:[],next_steps:[],user_action:operation.releaseRefused.ui_blocker};
+    }
     base.unshift({ tool: 'dock_operation_inspect', arguments: { operation_id: operation.id },
       required_fields: [], requires: [], provides: ['completion_receipt', 'cleanup_state'] });
     if(saveConnectionPending(operation))return {recovery_options:[],next_steps:[{...base[0],
@@ -2956,6 +3067,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         || other.nodeApply.request.parameters.destination === destination));
   }
   function browserRecoveryTrigger(operation, advice) {
+    if (operation?.releaseRefused?.identityChanged) return null;
     const exported = exportRecoveryTrigger(operation);
     if (exported) return exported;
     if (!browserRecovery || !operation || addOnlyWindowStep(operation) || pending !== operation || operation.action.capability !== 'node.apply'
@@ -3025,7 +3137,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         try{await verifyPendingWorkflowReceipt({operation,adapter:operation.nodeTargetAdapter,deadline:now()+10000,now});}
         catch(error){return {stopped:false,reason:String(error.message).slice(0,1000)};}
       }
-      if(addOnlyWindowStep(operation))return {stopped:false,reason:addOnlyWindowStep(operation).instruction};
+      const windowStep=addOnlyWindowStep(operation);
+      if(windowStep)return {stopped:false,reason:windowStep.instruction};
       if(operation.targetPhase?.pending){
         // Target gestures use their own page ledger, not parent lastReceipt.
         // Read only that original effect; graph repair cannot settle its call.
@@ -3175,7 +3288,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }
     if (operationId && !operation) throw new Error('Operation is not known in this session');
     if (!operation || pending !== operation) return view(operation);
-    return view(operation, await reconcilePending());
+    return view(operation, await reconcilePending(signal));
   };
   const nodeResumeRefusal='Resume requires the original inspected node checkpoint without an unresolved phase';
   const nodeResumeBlocked=operation=>{

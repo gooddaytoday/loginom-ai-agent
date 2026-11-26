@@ -1,3 +1,4 @@
+export const packageReadOnlyAdvice = 'The saved package is read-only and the lock owner is unverified. Ask the user for permission to use Save As with a new name before proceeding.';
 // A settled preparation can attest the current contents of the same native
 // scenario in one read. Historical snapshots remain with their operations.
 async function captureWorkspaceStep(page, options) {
@@ -112,7 +113,8 @@ async function captureWorkspaceStep(page, options) {
     const path=typeof file==='string'&&file?'/'+file.replaceAll('\\','/').replace(/^\/+/, ''):null;
     return {status:'READY',document_id:state.id,loginom_account:connection.UserName,refresh_ports:!!source.nodeTargetPortIdentities,
       workflow_ref:{tab_tid:tabTid,prefix,navigation_path:crumbs,workflow_id:workflowId},
-      package_ref:{path,name:packageNode.PackageName??null,persisted:path!==null}};
+      package_ref:{path,name:packageNode.PackageName??null,persisted:path!==null,
+        ...(typeof packageNode.ReadOnly==='boolean'?{read_only:packageNode.ReadOnly}:{})}};
   },options);
 }
 
@@ -308,6 +310,12 @@ async function prepareWorkspace(page, options) {
     const knownWorkflow = options.intent==='existing_workflow' ? [...state.receipts.values()].find(r=>r.workflowId===options.workflowRef.workflow_id && r.tab && r.phase==='verified')
       : options.bindOpenOnly ? [...state.receipts.values()].find(r=>r.phase==='verified'&&r.tab===tab&&r.packageNode===packageNode&&JSON.stringify(r.crumbs)===JSON.stringify(crumbs)) : null;
     const receipt = state.receipts.get(options.operationId);
+    if(options.recoveryAccount&&(location.origin!==options.origin||location.pathname!==options.pathname
+      ||app?.Version!==options.expectedBuild||serverConnection?.Connected!==true||mainForm.FReconnecting===true
+      ||serverConnection.UserName!==options.recoveryAccount||!serverConnection.Session
+      ||receipt&&(receipt.openConnection!==serverConnection||receipt.openServerSession!==serverConnection.Session)
+      ||mode==='reserve'&&mainForm.FMapTree.PackageNodes?.Count!==0
+        &&!(mainForm.FMapTree.PackageNodes?.Count===1&&ready&&path===options.packagePath)))return {error:'RELOAD_IDENTITY_UNVERIFIED'};
     if (receipt && receipt.request !== request) return {error:'OPERATION_CONFLICT'};
     if(mode==='lookup'&&state.stepActivation){
       const activation=state.stepActivation;
@@ -479,7 +487,7 @@ async function prepareWorkspace(page, options) {
       const match=restorePrompt();
       if(match){
         // Bind-only adopts an already open package and never answers the prompt.
-        if(options.bindOpenOnly)return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:'bind_only',blocking_windows:blockingWindows};
+        if(options.bindOpenOnly||options.recoveryAccount)return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:'bind_only',blocking_windows:blockingWindows};
         const refused=restoreRefused(match.prompt);
         if(refused)return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:refused,blocking_windows:blockingWindows};
         current.restoreCandidate=match.prompt;
@@ -518,7 +526,8 @@ async function prepareWorkspace(page, options) {
       current.workflowId ??= knownWorkflow?.workflowId ?? state.id+'-'+(state.sequence=(state.sequence??0)+1);
       return {document_id:state.id,loginom_account:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
         workflow_ref:{tab_tid:tabTid,prefix,navigation_path:crumbs,workflow_id:current.workflowId},
-        package_ref:{path,name:packageNode.PackageName??null,persisted:path!==null},preserved_workflows:preserved,
+        package_ref:{path,name:packageNode.PackageName??null,persisted:path!==null,
+          ...(typeof packageNode.ReadOnly==='boolean'?{read_only:packageNode.ReadOnly}:{})},preserved_workflows:preserved,
         ownership_verified:options.intent==='new_draft',target_verified:true,
         ...(current.stepSession?{native_step_owner:true}:{}),
         interaction_readiness:'driver_verification_required',
@@ -571,11 +580,11 @@ async function prepareWorkspace(page, options) {
     if (old.error) return result('NOT_READY',old.error,{authenticated:true});
     if (old.missing) return missingPackage(old);
     // A confirmed pre-open refusal may continue without replacing its original receipt.
-    if (old.phase==='reserved' && (options.intent!=='open_package' || options.recoverOnly))
+    if (old.phase==='reserved' && (options.intent!=='open_package' || options.recoverOnly&&!options.recoveryAccount))
       return result('NOT_READY','PREVIOUS_ATTEMPT_NOT_COMPLETED',{authenticated:true});
     if (options.bindOpenOnly && old.exists) return result('NOT_READY','OPERATION_CONFLICT',{authenticated:true});
-    if(old.step_activation||(options.refreshVerified||old.step_refresh)&&old.phase==='verified'
-      ||!options.recoverOnly&&!old.exists&&options.intent==='existing_workflow'){
+    if(!options.recoveryAccount&&(old.step_activation||(options.refreshVerified||old.step_refresh)&&old.phase==='verified'
+      ||!options.recoverOnly&&!old.exists&&options.intent==='existing_workflow')){
       const step={...options,replayId:old.exists?options.operationId:null,prepareId:old.exists?null:options.operationId};
       if(old.step_activation)effectPossible=true;
       let refreshed=await captureStep(page,{...step,reserveActivation:!old.step_activation});
@@ -604,7 +613,12 @@ async function prepareWorkspace(page, options) {
         return result('NOT_READY',refreshed.reason);
       }
     }
-    if (old.exists && old.phase!=='reserved') {
+    if(options.recoveryAccount&&options.recoverOnly){
+      // The interrupted Open keeps its reservation. Re-read only; even a
+      // reserved or missing gesture receipt cannot authorize another Open.
+      if(!old.exists)return result('NOT_READY','RECEIPT_LOST',{authenticated:true});
+      effectPossible=packageGesture;
+    } else if (old.exists && old.phase!=='reserved') {
       if (old.tab_tid) await tid(old.tab_tid).click({timeout:remaining()});
       effectPossible=true;
     } else {
@@ -775,7 +789,8 @@ async function navigatePreparedGraph(page, options) {
       const path=typeof packageNode.PackageFileName==='string'&&packageNode.PackageFileName?'/'+packageNode.PackageFileName.replaceAll('\\','/').replace(/^\/+/, ''):null;
       existing.navigationResult={document_id:p.id,loginom_account:app.Application.FInstance.FMainForm.FMapTree?.FServerConnection?.UserName??null,
         workflow_ref:{workflow_id:existing.workflowId,tab_tid:ref.tab_tid,prefix:ref.prefix,navigation_path:crumbs},
-        package_ref:{path,name:packageNode.PackageName??null,persisted:path!==null},target_verified:true,ownership_verified:false,preserved_workflows:[]};
+        package_ref:{path,name:packageNode.PackageName??null,persisted:path!==null,
+        ...(typeof packageNode.ReadOnly==='boolean'?{read_only:packageNode.ReadOnly}:{})},target_verified:true,ownership_verified:false,preserved_workflows:[]};
       return existing.navigationResult;
     }
     if(source.phase!=='verified'||!samePath||source.nodeTargetWorkflowNode&&source.nodeTargetWorkflowNode!==workflow)fail('Prepared workflow navigation changed');
@@ -880,7 +895,7 @@ async function navigatePreparedGraph(page, options) {
   }
 }
 
-export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestLogin = false, testLoginUser = null, platform = process.platform, sessionId = "standalone", operationId = "prepare", intent = "new_draft", packagePath = null, workflowRef = null, graphNavigation = null, timeoutMs = 120000, recoverOnly = false, refreshVerified = false, identityOnly = false, storageBinding = null, bindOpenOnly = false }) {
+export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestLogin = false, testLoginUser = null, platform = process.platform, sessionId = "standalone", operationId = "prepare", intent = "new_draft", packagePath = null, workflowRef = null, graphNavigation = null, timeoutMs = 120000, recoverOnly = false, refreshVerified = false, identityOnly = false, storageBinding = null, bindOpenOnly = false, recoveryAccount = null }) {
   const url = new URL(loginomUrl);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash
       || [...url.searchParams.keys()].some(key => /token|password|secret|auth|api.?key/i.test(key))) {
@@ -895,6 +910,9 @@ export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestL
   if (intent !== 'open_package' && packagePath !== null) throw new Error('A new draft cannot specify a stored package');
   if (bindOpenOnly !== false && (bindOpenOnly !== true || intent !== 'open_package' || allowTestLogin || recoverOnly || identityOnly))
     throw new Error('Bind-only preparation requires an exact open_package binding without login or recovery');
+  if(recoveryAccount!==null&&(typeof recoveryAccount!=='string'||!recoveryAccount.trim()
+    ||intent!=='open_package'||allowTestLogin||identityOnly||bindOpenOnly))
+    throw new Error('Reload requires an authenticated account and an exact saved package');
   if (intent === 'existing_workflow') {
     if (!workflowRef || Object.keys(workflowRef).some(k=>!['document_id','tab_tid','prefix','navigation_path','workflow_id'].includes(k))
         || typeof workflowRef.workflow_id !== 'string' || !workflowRef.workflow_id || workflowRef.workflow_id.length>160
@@ -914,7 +932,7 @@ export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestL
   }
   if (!compatibility?.loginom_build) throw new Error('An exact Loginom build pin is required');
   const options = { url: url.href, origin: url.origin, pathname: url.pathname,
-    sessionId, operationId, intent, packagePath, workflowRef, graphNavigation, timeoutMs, recoverOnly, refreshVerified, identityOnly, storageBinding, bindOpenOnly,
+    sessionId, operationId, intent, packagePath, workflowRef, graphNavigation, timeoutMs, recoverOnly, refreshVerified, identityOnly, storageBinding, bindOpenOnly, recoveryAccount,
     expectedBuild: compatibility?.loginom_build ?? null, profileId: compatibility?.profile_id,
     platform: ({ darwin: 'macos', linux: 'linux', win32: 'windows' })[platform] ?? platform,
     allowTestLogin: allowTestLogin === true, testLoginUser: allowTestLogin ? testLoginUser : null };

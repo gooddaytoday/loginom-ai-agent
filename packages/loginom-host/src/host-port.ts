@@ -38,7 +38,8 @@ const diagnosticTool = {
 }
 const bootstrapPrepareTool = {
   ...prepareTool,
-  description: "Prepare Loginom and return workspace identity and input artifacts. Use new_draft for new work or open_package with a saved path.",
+  description:
+    "Prepare Loginom and return workspace identity and input artifacts. Use new_draft for new work or open_package with a saved path. Successful preparation enables the native adapter to archive the redacted task in the shared Dock account.",
 }
 
 function catalogTools(input: unknown) {

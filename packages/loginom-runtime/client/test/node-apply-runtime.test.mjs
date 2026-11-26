@@ -209,9 +209,8 @@ test('add_only creates any admitted palette type through the graph without a con
  assert.deepEqual(f.calls,['create']);
 });
 
-for(const browserRecovery of [false,true])test('add_only pending window tells the user to close it, browser recovery='+browserRecovery,async()=>{
+function addOnlyWindowFixture(browserRecovery){
  const f=fixture({browserRecovery}),mutate=f.adapter.mutate;
- let windowOpen=true;
  f.adapter.mutate=async effect=>{
   await mutate(effect);
   if(effect.parameters.add_only){
@@ -224,6 +223,12 @@ for(const browserRecovery of [false,true])test('add_only pending window tells th
   document_id:'doc',workflow_ref:workflow});
  f.adapter.reconcile=async()=>({completed:true,verified:true,cleanup_complete:false,
   receipt:{status:'AMBIGUOUS',cleanup_complete:false,add_only_window_pending:true,add_only_window_node_id:'new'}});
+ return f;
+}
+
+for(const browserRecovery of [false,true])test('add_only pending window tells the user to close it, browser recovery='+browserRecovery,async()=>{
+ const f=addOnlyWindowFixture(browserRecovery);
+ let windowOpen=true;
  f.adapter.verifyAddOnlyCleanup=async()=>!windowOpen;
  const args={...request(),mode:'add_only'};
  await f.runtime.startNodeApply(args);
@@ -254,6 +259,41 @@ for(const browserRecovery of [false,true])test('add_only pending window tells th
  assert.equal((await f.runtime.runNodeApply({...request(),operation_id:'new-action',
   target:{kind:'existing',type:'imports.text',ref:{document_id:'doc',workflow_id:'wf',node_id:'new'}}})).status,'SUCCEEDED');
  assert.equal(f.calls.filter(name=>name==='create').length,1);
+});
+
+test('add_only reload clears stale window advice across release, inspect and browser recovery',async()=>{
+ const f=addOnlyWindowFixture(true);
+ const args={...request(),mode:'add_only'};
+ await f.runtime.startNodeApply(args);
+ const {outcome}=await f.runtime.waitNodeApply(args.operation_id,{timeoutMs:1000});
+ assert.equal(outcome.status,'AMBIGUOUS');
+ assert.equal(outcome.cleanup_complete,false);
+
+ let workflowChecks=0;
+ f.adapter.verifyWorkflow=async()=>{
+  workflowChecks++;
+  return parseCapabilityResult({isError:true,content:[{type:'text',
+   text:'Loginom account or document changed; prepare the workspace again'}]});
+ };
+ const refused=await f.runtime.recover(args.operation_id,{strategy:'abandon_operation',recoveryOperationId:'after-reload'});
+ assert.equal(workflowChecks,1);
+ assert.equal(refused.error.code,'NODE_RELEASE_REFUSED');
+ assert.match(refused.error.message,/LOGINOM_IDENTITY_CHANGED/);
+ assert.match(refused.output.user_action,/open the original scenario/i);
+ assert.equal(refused.output.next_step,undefined);
+ assert.equal(refused.output.original_operation_pending,true);
+
+ const {output:inspection}=await f.runtime.inspect({operationId:args.operation_id});
+ assert.throws(()=>f.runtime.browserRecoveryBasis(args.operation_id),/No browser recovery trigger/);
+ const handoff=await f.runtime.browserRecoveryHandoff(args.operation_id);
+ assert.deepEqual({next_steps:inspection.next_steps,handoff},{
+  next_steps:[],
+  handoff:{stopped:false,reason:'The original target receipt has no confirmed completion and cleanup'},
+ });
+ assert.deepEqual(inspection.recovery_options,[]);
+ assert.equal(inspection.user_action,refused.output.user_action);
+ assert.equal(f.runtime.hasUnsettledWork(),true);
+ assert.deepEqual(f.calls,['create']);
 });
 
 test('validation and missing drivers cannot create a graph or journal effects',async()=>{

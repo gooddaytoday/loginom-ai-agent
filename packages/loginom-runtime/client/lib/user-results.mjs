@@ -120,7 +120,8 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   // JS configuration/source bindings remain complete; only ordinary analytical
   // rows may be omitted. Native full-table evidence keeps its strict contract.
   if(node?.configuration?.readback?.kind!=='user_variables'&&!node?.configuration?.variable_mappings?.length)budgetUserPreview(reply,
-    {preserveConfiguration:node?.configuration?.readback?.kind==='javascript'||node?.configuration?.bindings!==undefined||data?.javascript_source?.policy==='javascript-module-v1',
+    {allowCompleteTreePreview:node?.configuration?.readback?.kind==='json_to_tree',
+     preserveConfiguration:node?.configuration?.readback?.kind==='javascript'||node?.configuration?.bindings!==undefined||data?.javascript_source?.policy==='javascript-module-v1',
       wireSize:value=>wireSize({...value,limitations:[...value.limitations,...previewLimitations(value.output)]})});
   limitations.push(...previewLimitations(output));
   return reply;
@@ -137,6 +138,8 @@ function deliveredUpload(result,outcome) {
 
 function previewLimitations(output) {
   const limitations=[];
+  for(const port of output.ports??[])if(port.port_kind==='tree'&&port.sample_complete===false)
+    limitations.push('Tree preview: '+port.tree.node_count+' instances returned in native order. The exact total was not read. Use the native output port for the full tree.');
   for(const port of output.ports??[])if(Number.isSafeInteger(port.row_count)&&port.sample_rows<port.row_count)
     limitations.push('Output port '+port.port+': only '+port.sample_rows+' of '+port.row_count+' rows returned. Do not report unseen rows or a complete ranking from this preview. Compute report statistics in nodes and request the needed output.');
   for(const port of output.ports??[])if(port.sample?.length){
@@ -164,7 +167,7 @@ export function compactActionResult(result,{wireSize=previewWireSize}={}) {
   if(node?.output?.ports&&wireSize({...copy,result_version:'user-v1'})>USER_PREVIEW_WIRE_BUDGET){
     const preview={output:node.output,limitations:node.warnings??[]};
     node.warnings=preview.limitations;
-    budgetUserPreview(preview,{preserveConfiguration:true,wireSize:()=>wireSize({...copy,result_version:'user-v1'})});
+    budgetUserPreview(preview,{allowCompleteTreePreview:node.configuration?.readback?.kind==='json_to_tree',preserveConfiguration:true,wireSize:()=>wireSize({...copy,result_version:'user-v1'})});
   }
   if (copy.status === 'SUCCEEDED' && ['package.save_as', 'package.save_checkpoint'].includes(copy.action_key)) {
     copy.output = pick(copy.output, ['package_ref', 'reopened', 'workflow_preserved', 'save_completed', 'persisted_content_verified', 'workflow_continuations']);

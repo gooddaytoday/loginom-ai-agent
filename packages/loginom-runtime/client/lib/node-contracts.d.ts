@@ -458,8 +458,8 @@ export interface TreeConfigurationReadback {
 }
 export interface TreeNodeOutputPort {
   port: number; port_guid: string; port_kind: 'tree'; fresh: true; execution_id: string;
-  freshness_basis: 'completed_execution_port_source'; sample_complete: true;
-  tree: {complete: true; node_count: number; max_depth: number; limits: {max_nodes: 256; max_depth: 16; max_bytes: 1048576};
+  freshness_basis: 'completed_execution_port_source'; sample_complete: boolean;
+  tree: {complete: boolean; node_count: number; max_depth: number; limits: {max_nodes: 256; max_depth: 16; max_bytes: 1048576};
     schema: Array<{index: number; parent: number | null; path: string; name: string; label: string; type: string; is_container: boolean; is_array: boolean; children: number[]}>;
     instances: Array<{index: number; parent: number | null; schema_index: number; path: string; type: string; children?: number[]; value?: string | number | boolean | null; is_null?: boolean; precision?: string; timezone?: string}>};
 }
