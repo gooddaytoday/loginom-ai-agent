@@ -6891,6 +6891,47 @@ for(const fault of ['none','release','foreign edit','first link changed','explic
  });
 }
 
+for(const fault of ['none','foreign node','foreign workflow','other component','other title']){
+  test('LAB-2082 opens the bound Join wizard from its automatic graph caption: '+fault,async()=>{
+    const icon=fault==='other component'?'bg-vendor-icon-calcdata':'bg-vendor-icon-joindata';
+    const {page,tid,body,node}=scriptGraphFixture('Левое',icon),prefix='MF;TF-1';
+    node.FGuid='node';
+    const panel=page.add('div',prefix+';NavigationBar;NavigationPanel');
+    const crumbs=['Сервер','Пакеты','Package1','Модуль1','Сценарий'];
+    const breadcrumb=prefix+';cnrNaviMode;b.s_';
+    crumbs.forEach((label,i)=>{
+      const element=page.add('a',breadcrumb+crumbs.slice(0,i+1).join('>'),label,undefined,panel);
+      if(i===4)page.add('span',null,'',undefined,element).attrs.class='maptree-icon-workflow';
+    });
+    let opened=false;
+    const binding=async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:opened&&fault==='foreign node'?'foreign':'node',
+      surface:opened?'wizard':'graph',tid:opened?prefix+';WizrdMCF':tid,...(opened?{}:{locked:false})});
+    page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+      {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix,navigation_path:[]}},...options},binding));
+    const snapshot=await page.observe();
+    const settings=snapshot.ui.elements.find(element=>element.wizard_open);
+    assert.ok(settings);
+    const click=page.mouse.click;
+    page.mouse.click=async(...args)=>{
+      await click(...args);
+      opened=true;
+      body.parentElement.remove();
+      const wizard=page.add('div',prefix+';WizrdMCF');
+      page.add('table',prefix+';WizrdMCF;JoinDataWizard;grdSourceColumns;tbl','',undefined,wizard);
+      const name=fault==='other title'?'Другой':'Слияние';
+      const path=crumbs.join('>').replace('Модуль1',fault==='foreign workflow'?'Модуль2':'Модуль1');
+      const owner=page.add('a',breadcrumb+path+'>'+name,name,undefined,panel);
+      page.add('span',null,'',undefined,owner).attrs.class='bg-vendor-icon-joindata';
+      const last=page.add('a',breadcrumb+path+'>'+name+'>Настройка','Настройка',undefined,panel);
+      page.add('span',null,'',undefined,last).attrs.class='maptree-icon-wizard';
+    };
+    const result=await page.act({verb:'begin_wizard',ref:settings.ref},snapshot);
+    assert.equal(page.events.filter(event=>event==='click').length,1);
+    assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result.error));
+    assert.equal(result.trace.some(event=>event.event==='wizard_open_verified'),fault==='none');
+  });
+}
+
 for(const mode of ['join_caption','join_caption_foreign_node','join_caption_other_component','join_caption_other_text']){
   test('LAB-2082 input Done uses the bound Join graph caption: '+mode,async()=>{
     const {page}=await inputPortFinishFixture(mode),snapshot=await page.observe();
