@@ -102,9 +102,9 @@ export function profileEnvironment(paths: ReturnType<typeof profilePaths>, env: 
 // machine (platform, machine id, host name, pid namespace, then pid plus start
 // time, so a reused pid is not mistaken for the owner) AND the offline cleanup
 // of its run is confirmed: after SIGKILL the forked host, runtime and Chromium
-// still run their own shutdown. The new start waits for them, then stops the
-// ones it recognises (SIGTERM, then SIGKILL) and takes over only when no
-// process of that run uses the profile any more. Anything that cannot be
+// still run their own shutdown. The new start waits for them, then (on Linux
+// only) stops the ones it recognises (SIGTERM, then SIGKILL) and takes over
+// only when no process of that run uses the profile any more. Anything that cannot be
 // proven (older owner format, another machine or namespace, probe failure,
 // unrecognised process) stays PROFILE_BUSY.
 export type WriterOwner = {
@@ -573,33 +573,32 @@ export const systemWriterProbe: WriterProbe = {
     if (process.platform === "win32") {
       // Windows keeps ParentProcessId of orphans, so the dead owner's process
       // tree is still discoverable; Chromium also names the profile in argv.
+      // Nothing is stopped here: the tree cannot be tied to this profile
+      // reliably, so survivors are only reported and keep the profile busy.
       const processes = (await windowsProcesses()).filter(
         (entry) => entry.pid !== process.pid && entry.pid !== process.ppid,
       )
       const lower = root.toLowerCase()
       const found = new Map<number, (typeof processes)[number]>()
       for (const entry of processes) if (entry.command.toLowerCase().includes(lower)) found.set(entry.pid, entry)
+      // A process that reuses the owner's pid has its own children; only
+      // children created before it can be orphans of the owner.
+      const reuser = processes.find((entry) => entry.pid === owner.pid)
       const queue = [owner.pid]
       const visited = new Set(queue)
       for (let parent = queue.shift(); parent !== undefined; parent = queue.shift())
         for (const entry of processes)
-          if (entry.parent === parent && entry.created >= owner.start - START_MARGIN_MS && !visited.has(entry.pid)) {
+          if (
+            entry.parent === parent &&
+            entry.created >= owner.start - START_MARGIN_MS &&
+            (parent !== owner.pid || !reuser || entry.created < reuser.created) &&
+            !visited.has(entry.pid)
+          ) {
             visited.add(entry.pid)
             found.set(entry.pid, entry)
             queue.push(entry.pid)
           }
-      const browsers = [...found.values()]
-        .filter((entry) => /--user-data-dir=/i.test(entry.command) && entry.command.toLowerCase().includes(lower))
-        .map((entry) => entry.command.split(/"?\s+--/)[0]?.replace(/^"/, "").toLowerCase() ?? "")
-        .filter(Boolean)
-      return [...found.values()].map((entry) => ({
-        pid: entry.pid,
-        command: entry.command,
-        recognised:
-          RUNTIME_ENTRIES.some((name) => entry.command.toLowerCase().includes(name)) ||
-          browsers.some((browser) => entry.command.replace(/^"/, "").toLowerCase().startsWith(browser)),
-        identity: String(entry.created),
-      }))
+      return [...found.values()].map((entry) => ({ pid: entry.pid, command: entry.command, recognised: false }))
     }
     // macOS: no environment or cwd of other processes, and the host names no
     // profile, so an orphaned host or runtime cannot be attributed: it is
@@ -623,16 +622,10 @@ export const systemWriterProbe: WriterProbe = {
       .map((entry) => ({ pid: entry.pid, command: entry.command, recognised: false }))
   },
   async signal(survivor, signal) {
-    if (!survivor.recognised || survivor.identity === undefined) return false
-    if (process.platform === "linux") {
-      const stat = await linuxStat(survivor.pid)
-      if (!stat || stat.ticks !== survivor.identity) return false
-    } else if (process.platform === "win32") {
-      // Windows has no graceful signal for another process; only the final stop is sent.
-      if (signal !== "SIGKILL") return false
-      const entry = (await windowsProcesses()).find((item) => item.pid === survivor.pid)
-      if (!entry || String(entry.created) !== survivor.identity) return false
-    } else return false
+    // Only Linux can tie a survivor to this profile and re-check its start ticks.
+    if (process.platform !== "linux" || !survivor.recognised || survivor.identity === undefined) return false
+    const stat = await linuxStat(survivor.pid)
+    if (!stat || stat.ticks !== survivor.identity) return false
     try {
       process.kill(survivor.pid, signal)
       return true

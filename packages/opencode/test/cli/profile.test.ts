@@ -434,3 +434,21 @@ test("a contender that judged the owner stale does not replace a fresh owner", a
   await intruder!.release()
   expect(await fs.readdir(root)).not.toContain(".writer")
 }, 30000)
+
+test.skipIf(process.platform !== "linux")(
+  "a survivor is signalled only while its pid keeps the recorded start identity",
+  async () => {
+    const child = Bun.spawn(["sleep", "600"], { stdout: "ignore", stderr: "ignore" })
+    children.push(child)
+    const stat = await fs.readFile(`/proc/${child.pid}/stat`, "utf8")
+    const ticks = stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19]
+    const survivor = { pid: child.pid, command: "sleep 600", recognised: true }
+    // Another start identity means the pid now belongs to another process.
+    expect(await systemWriterProbe.signal({ ...survivor, identity: String(Number(ticks) + 1) }, "SIGKILL")).toBe(false)
+    expect(await systemWriterProbe.signal({ ...survivor, recognised: false, identity: ticks }, "SIGKILL")).toBe(false)
+    expect(() => process.kill(child.pid, 0)).not.toThrow()
+    expect(await systemWriterProbe.signal({ ...survivor, identity: ticks }, "SIGKILL")).toBe(true)
+    expect(await child.exited).not.toBe(0)
+  },
+  30000,
+)
