@@ -168,3 +168,19 @@ test("binning ties guidance keeps the rule without echoing the acceptance task",
   expect(settings).not.toContain('size:4,ties:"current"')
   expect(Buffer.byteLength(settings)).toBeLessThanOrEqual(6000)
 })
+
+test("LAB-2046: arrays of records across several REST responses route to one JavaScript, not per-request splits", async () => {
+  const nodes = new URL("../skills/loginom-automation/references/nodes/", import.meta.url)
+  const rest = await Bun.file(new URL("integration.rest_request.md", nodes)).text()
+  const table = await Bun.file(new URL("trees.to_table.md", nodes)).text()
+  const json = await Bun.file(new URL("trees.from_json.md", nodes)).text()
+  const get = rest.split("## GET и ответы\n")[1]?.split("\n## ")[0] ?? ""
+  // Both runs searched Calculator help for JSON functions (r1 :28/:38, r2 :29/:62); r2 split per RequestID.
+  expect(get).toMatch(/Калькулятор[\s\S]*?Свёртка[\s\S]*?Кросс-таблица/)
+  expect(get).toMatch(/Records arrays of several response rows: one `programming\.javascript`[\s\S]*?JSON\.parse\(Response\), Append per record with its RequestID\); no RequestID splits/)
+  expect(get).toContain("Big ints/ids: read as strings (JSON.parse rounds >2^53)")
+  expect(get).toContain("Tree: on request/flat records без вложенных контейнеров")
+  expect(json).toMatch(/Кросс-таблица; массив записей нескольких ответов —\nпо \[REST\]\(integration\.rest_request\.md\)/)
+  expect(table).toMatch(/при отказе деревьев вернись к этому пути; массив записей нескольких ответов — по \[REST\]\(integration\.rest_request\.md\)/)
+  for (const card of [rest, table, json]) expect(new TextEncoder().encode(card).length).toBeLessThanOrEqual(6000)
+})
