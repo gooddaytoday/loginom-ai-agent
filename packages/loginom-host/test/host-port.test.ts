@@ -564,7 +564,9 @@ test("a killed runtime requires an explicit prepare before the next scenario cal
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
     await prepareRun(client, "one")
     await expect(call("kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
-    await expect(call("finish")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    await expect(call("finish")).resolves.toMatchObject({
+      structuredContent: { code: "NOT_PREPARED", next_step: "dock_prepare" },
+    })
     await prepareRun(client, "one")
     expect(await call("finish")).toEqual({ action: "finish" })
     const started = (await readFile(launches, "utf8"))
@@ -713,7 +715,9 @@ test.each(["after-call", "during-admission", "disconnect-before-exit", "strict-b
         await expect(call("one", "finish")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
       }
       if (exitAt === "after-call" || exitAt === "disconnect-before-exit") await killRuntime()
-      await expect(call("one", "finish")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+      await expect(call("one", "finish")).resolves.toMatchObject({
+        structuredContent: { code: "NOT_PREPARED", next_step: "dock_prepare" },
+      })
       await expect(prepareRun(client, "one")).rejects.toThrow("LOGINOM_RUNTIME_UNAVAILABLE")
       expect(
         (await readFile(calls, "utf8"))

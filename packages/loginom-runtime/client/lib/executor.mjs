@@ -3,7 +3,8 @@ import {createRedactor} from './redact.mjs';
 import {browserDownloadsPath} from './browser-downloads.mjs';
 import {journalCopy} from './execution-journal.mjs';
 import {readSavedPackageState} from './package-persistence.mjs';
-import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,requireServerDownloadFormat,serverDownloadTools,storageListPattern,listStorageDirectory} from './storage-policy.mjs';
+import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,requireServerDownloadFormat,serverDownloadTools,storageListPattern,listStorageDirectory,readStorageDestination} from './storage-policy.mjs';
+import {preflightExcelExportDestination} from './exports-excel-procedure.mjs';
 import {buildNodeReadRequest,NODE_READ_MODE} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
 import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady,makeLargeUploadCode,guardUploadDebugDialog} from './artifact-discovery.mjs';
@@ -298,6 +299,11 @@ export async function browserServerDownloadProgress(page,task) {
   }
 }
 
+const UNRESOLVED_UPLOAD_VERIFICATION='Server-copy verification of this upload ended without a confirmed download; '
+  +'the upload stays unconfirmed. Do not recover, resume, verify, upload or download it again; report it as a blocker.';
+const UNCONFIRMED_UPLOAD_CLEANUP='The browser upload call finished but its cleanup is unconfirmed; uploads cannot be restored '
+  +'or abandoned. Do not recover, upload or download it again; report it as a blocker.';
+
 async function browserArtifactDownload(page,task,observe,act,reveal,track) {
   let browserStep='preconditions';
   const failureEvidence=error=>{
@@ -437,7 +443,11 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
     let eventPending=true;
     // Large server files can emit the event after the small artifact window.
     // Consume the host job's existing deadline; do not start a new allowance.
-    const eventTimeout=task.server_source_binding?task.deadline_at-Date.now():15000;
+    // Upload verification reads one tiny file, but Loginom can emit its event
+    // ~30 s after the gesture (LAB-2054). Use its own deadline minus a reserve
+    // for save and post-download settlement; never less than the old window.
+    const eventTimeout=task.server_source_binding?task.deadline_at-Date.now()
+      :!task.output_binding&&Number.isFinite(task.deadline_at)?Math.max(15000,task.deadline_at-Date.now()-15000):15000;
     if(eventTimeout<=0)return result(gesture?'AMBIGUOUS':'NOT_APPLIED','LOGINOM_DOWNLOAD_DEADLINE');
     event=page.waitForEvent('download',{timeout:eventTimeout}).then(value=>{
       eventPending=false;
@@ -505,7 +515,11 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
       error_code:/^[A-Z][A-Z0-9_]{0,79}$/.test(action.error?.code??'')?action.error.code:null,
       ...(action.error?.code==='UI_REFERENCE_STALE'?{reference_reason:referenceReasons[action.error.message]??'unclassified',
         ...(referenceChecks?{reference_checks:referenceChecks}:{})}:{})});
-    browserStep='download.event';download=await event;
+    browserStep='download.event';
+    // A gesture refused before any click cannot emit a download (LAB-2054):
+    // bound that wait by the former 15 s window, not the verification deadline.
+    const unclicked=action.effect_possible===false&&action.cleanup_complete===true;
+    download=unclicked&&eventTimeout>15000?await Promise.race([event,page.waitForTimeout(15000).then(()=>null)]):await event;
     if(action.status!=='SUCCEEDED' || action.output?.gesture_applied!==true) {
       if(download) {gesture=true;await download.cancel();completed=true;}
       else if(action.effect_possible===false && action.cleanup_complete===true)completed=true;
@@ -2433,7 +2447,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if (!reference) return { state: 'missing' };
     const code = `async (page) => (${browserReceipt.toString()})(page, ${JSON.stringify({ receipt_namespace: receiptNamespace,
       receipt_id: reference.id, receipt_signature: reference.signature, receipt_read: true, operation_id: operation.id })})`;
-    const value = await execute(code, { timeout: 10000,
+    // Leave time for the original Loginom reconnect guard to return its verdict.
+    const value = await execute(code, { timeout: filterReconnectPending(operation) ? 20000 : 10000,
       ...(['package.save_as','package.save_checkpoint'].includes(operation.action.action_key) ? { storageSession: 'save-reconcile' } : {}) });
     assertActionOutcome(value);
     const state = value.output;
@@ -2700,6 +2715,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return { ...operation.outcome, cleanup_complete: operation.cleanupConfirmed === true };
       if (operation.storageDownloadNavigation) return operation.cleanupConfirmed===true ? operation.outcome
         : failed(operation, 'CLEANUP_RECEIPT_MISSING', 'The original storage navigation has no confirmed browser cleanup.');
+      // A settled server-copy download without confirmed cleanup cannot be
+      // restored or abandoned (LAB-2054). Name the one terminal step instead.
+      if (operation.cleanupConfirmed === false && operation.action.capability === 'artifact.upload' && operation.verification?.settled === true)
+        return failed(operation, 'TRANSFER_VERIFICATION_UNRESOLVED', UNRESOLVED_UPLOAD_VERIFICATION);
+      // Recovery refuses every strategy for uploads; never advise restore_control.
+      if (operation.cleanupConfirmed === false && operation.action.capability === 'artifact.upload')
+        return failed(operation, 'CLEANUP_RECEIPT_MISSING', UNCONFIRMED_UPLOAD_CLEANUP);
       if (operation.cleanupConfirmed === false && !(['package.save_as','package.save_checkpoint'].includes(operation.action.action_key)
           && operation.outcome?.output?.connection_recovery_pending === true)) return failed(operation, 'CLEANUP_RECEIPT_MISSING',
         'The browser call finished but cleanup is unconfirmed. Inspect and restore_control before further mutations.');
@@ -2726,6 +2748,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const earlyNodePhase=operation=>!operation?.nodeApply?.node&&!operation?.nodeApply?.result
     &&(['source','workflow','target'].includes(operation?.nodeApply?.pending?.phase)
       ||operation?.nodeApply?.target_reconciled===true);
+  const filterConfigure=operation=>operation.nodeApply?.pending?.phase==='configure'
+    &&operation.nodeApply.request.target.type==='transform.filter_data';
+  const filterReconnectPending=operation=>filterConfigure(operation)
+    &&operation.outcome?.error?.cause?.code==='LOGINOM_RECONNECT_PENDING';
   const earlyRelease=(operation,signal)=>earlyNodePhase(operation)?async()=>{
     const deadline=now()+NODE_RELEASE_BUDGET_MS;
     await operation.nodeApplyDrivers?.releaseBeforeTarget?.({signal,deadline});
@@ -2740,7 +2766,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       id_roles:{operation_id:'original_pending_operation',recovery_operation_id:'new_unique_request'},
       requires:['runtime_release_proof'],provides:['released_node_operation','unblocked_workspace'],
       instruction:earlyNodePhase(operation)?'Release this early source/workflow/target failure with a NEW recovery_operation_id. Dock only reads the original receipts and quiet graph, proving that the target was not created or finding its exact partial node. Unknown effects remain blocked. Follow the released next_step; do not replay creation.'
-        :'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'}:null;
+        :'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'
+          +(filterReconnectPending(operation)?' Release requires the original Loginom session to reconnect. If it cannot reconnect, report the operation as blocked.':'')}:null;
   const addOnlyWindowStep=operation=>{
     const effect=operation?.targetPhase?.pending,receipt=effect?.receipt;
     if(effect?.kind!=='create'||effect.parameters.add_only!==true||receipt?.add_only_window_pending!==true
@@ -2775,16 +2802,21 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }catch(error){
         // The original operation keeps its gate. A blocker the user can clear is
         // named explicitly instead of leaving an empty recovery list.
-        operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:error?.userAction??null};
-        const manualStep=addOnlyWindowStep(operation);
-        const trigger=browserRecoveryTrigger(operation,null);
+        const diagnostic=operationFailureDiagnostic(error);
+        const waitingForLoginom=filterReconnectPending(operation)&&diagnostic.code==='LOGINOM_DISCONNECTED'
+          &&diagnostic.detail==='reason=awaiting_original_attempt';
+        if(!waitingForLoginom)operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:error?.userAction??null};
+        const trigger=waitingForLoginom?null:browserRecoveryTrigger(operation,null);
+        const nextStep=addOnlyWindowStep(operation)??(waitingForLoginom?{
+          instruction:'Wait for the original Loginom session to reconnect. Then call dock_operation_recover with abandon_operation for the original operation_id and a NEW recovery_operation_id. If the original session cannot reconnect, report the operation as blocked.'
+        }:trigger?browserRecoveryNext(operation,trigger):null);
         returned={status:'AMBIGUOUS',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'release_refused',
           effect_possible:true,trace:[],recovery_operation_id:recoveryOperationId,
           error:{code:'NODE_RELEASE_REFUSED',message:String(error?.message??error).slice(0,1000)},
           // With browser recovery the agent clears the blocker itself; the user is not asked to.
           output:{original_operation_pending:pending===operation,...(error?.userAction
             ?trigger?{ui_blocker:error.userAction}:{user_action:error.userAction}:{}),
-            ...(manualStep?{next_step:manualStep}:trigger?{next_step:browserRecoveryNext(operation,trigger)}:{})}};
+            ...(nextStep?{next_step:nextStep}:{})}};
       }
       await remember(record,'recovery_completed',returned);
       auxiliary.set(recoveryOperationId,{signature,outcome:structuredClone(returned)});
@@ -2831,7 +2863,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const release=!recovery.available&&nodeReleaseStep(operation);
       return {recovery_options:release?['abandon_operation']:[],next_steps:recovery.available?[base.at(-1)]:release?[release,base[0]]:[base[0]],output_mapping_recovery:structuredClone(recovery),internal_resume_available:false};
     }
-    if (operation.transportUncertain) return { recovery_options: [], next_steps: base };
+    if (operation.transportUncertain) return { recovery_options: [], next_steps: filterConfigure(operation)?[{...base[0],
+      instruction:'The browser did not confirm whether the Filter gesture ran. Keep the original operation_id. If its receipt is still unconfirmed after inspection, report this operation as blocked and leave the wizard and package untouched.'}]:base };
     if(operation.action.capability==='node.apply'){
       const release=nodeReleaseStep(operation);
       return {recovery_options:release?['abandon_operation']:[],next_steps:release?[release,...base]:base,
@@ -3223,25 +3256,27 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     return session;
   }});
   const runtime=Object.freeze({
-    serverDownload(request,name,{signal,sourceOperation,deadlineAt,consume,downloadOperation=false,onWorkflowReturn}={}) {
-      if(!serverDownloads)throw Error('Server download cache is unavailable');
-      if(name==='dock_storage_source'||name==='dock_storage_list')return (async()=>{
-        if(storageNavigating||serverDownloads.unsettled&&!downloadOperation||running||pending
+    serverDownload(request,name,{signal,sourceOperation,deadlineAt,consume,downloadOperation=false,onWorkflowReturn,exportDestination=false}={}) {
+      if(!serverDownloads&&!exportDestination)throw Error('Server download cache is unavailable');
+      if(name==='dock_storage_source'||name==='dock_storage_list'||exportDestination)return (async()=>{
+        if(storageNavigating||serverDownloads?.unsettled&&!downloadOperation||running||pending
           ||nodeJobs.unsettled&&!(sourceOperation&&nodeJobs.active?.operation_id===sourceOperation)||sourceReads.unsettled||delivery.unsettled)
           throw Error('Resolve the pending Dock operation before locating a server source');
         checkId(request.operation_id);
         // A folder listing reads the same native Files rows; it never uploads,
         // imports, creates or deletes anything on the server.
-        const listing=name==='dock_storage_list',directories=getStorageBinding()?.directories;
+        const listing=name==='dock_storage_list',storage=getStorageBinding(),directories=storage?.directories;
         // LAB-1468 stage 0: folder and `<folder>/*.csv` paths were refused only
         // after navigation. Name the listing tool before any browser action.
         if(!listing&&typeof request.path==='string'&&(request.path.endsWith('/')||/[*?]/.test(request.path)||!/\.[^./]{1,8}$/.test(request.path)))
           throw Error('dock_storage_source needs one exact file path, not a folder or mask; to see a server folder\'s files call dock_storage_list with the folder path and pattern');
-        const path=listing?requireStorageDestination(typeof request.path==='string'&&request.path.length>1?request.path.replace(/\/$/,''):request.path,directories,'inputs',{directory:true})
+        const path=exportDestination?requireExportDestination(request.path,directories)
+          :listing?requireStorageDestination(typeof request.path==='string'&&request.path.length>1?request.path.replace(/\/$/,''):request.path,directories,'inputs',{directory:true})
           :requireStorageDestination(request.path,directories,'inputs');
         if(!listing&&!downloadOperation&&!/\.(csv|tsv|txt|xlsx|lgd)$/i.test(path))throw Error('Server source must be CSV/TSV/TXT/XLSX/LGD');
         if(listing)storageListPattern(request.pattern);
-        const id=request.operation_id,signature=(listing?'storage.list:'+JSON.stringify([path,request.pattern??null]):'storage.source:'+path);
+        const id=request.operation_id,signature=exportDestination?'storage.export_destination:'+path
+          :listing?'storage.list:'+JSON.stringify([path,request.pattern??null]):'storage.source:'+path;
         if(operations.has(id)||nodeJobs.has(id)||sourceReads.has(id))throw Error('Storage source operation ID conflicts');
         if(auxiliary.has(id)){
           const previous=auxiliary.get(id);
@@ -3470,6 +3505,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             }
           }
           if(current.file_storage.directory!==destination)throw Error('Server storage directory differs');
+          if(exportDestination){
+            const task={binding:storage,workflow:current.workflow_ref,directory:destination,destination:path};
+            guard();
+            const response=await execute(`async page=>({status:'SUCCEEDED',action_key:'storage.export_destination',action_revision:'1',
+              operation_id:${JSON.stringify(id)},phase:'inspect',effect_possible:false,cleanup_complete:true,trace:[],error:null,
+              output:await (${readStorageDestination.toString()})(page,${JSON.stringify(task)})})`,{timeout:Math.max(1,deadline-now())});
+            guard();
+            if(response.status!=='SUCCEEDED'||response.operation_id!==id||response.action_key!=='storage.export_destination'
+              ||response.cleanup_complete!==true||response.effect_possible!==false)
+              throw Error('Exact Excel destination could not be verified in Files');
+            return response.output;
+          }
           if(listing)return listStorageDirectory({destination,pattern:request.pattern,guard,ready,roots,read,act});
           const state=await row(path.slice(path.lastIndexOf('/')+1));
           const file=one(state.ui.elements.filter(e=>e.storage_entry?.path===path&&e.storage_entry?.server_source_ref),'source_file');
@@ -3499,26 +3546,27 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               else delete entry.workflowReturn;
             }
           }
-          const action_key=listing?'storage.list':'storage.source';
+          const action_key=exportDestination?'storage.export_destination':listing?'storage.list':'storage.source';
+          if(exportDestination&&entry.workflowReturn==='refused')
+            error??=Error('Return to the original workflow was refused during Excel destination check');
           if(!error){
-            if(entry.workflowReturn&&!consume)
+            if(entry.workflowReturn&&!consume&&!exportDestination)
               for(const source of listing?output.entries:[output.source])
                 if(source.server_source_ref)serverSources.markReopen(source.server_source_ref);
             entry.outcome={result_version:'user-v1',operation_id:id,status:'SUCCEEDED',action_key,cleanup_complete:true,effect_possible:step>0,output};
             if(sourceObservation){entry.sourceObservation=sourceObservation;entry.sourceSequence=operations.size;}
-            await onRecord({phase:listing?'storage_directory_listed':'storage_source_located',operation_id:id,outcome:entry.outcome});
+            await onRecord({phase:exportDestination?'storage_export_destination_observed':listing?'storage_directory_listed':'storage_source_located',operation_id:id,outcome:entry.outcome});
             return consume?consumed:structuredClone(entry.outcome);
           }
           await onRecord({phase:listing?'storage_list_failed':'storage_source_failed',operation_id:id,error:{code:'STORAGE_SOURCE_REFUSED',message:String(error.message).slice(0,500)}});
-          if(consume){
+          if(consume||exportDestination){
             if(navigationUncertain){
               const navigationId=id+':nav'+step;
-              if(!downloadOperation)error.storageNavigationOperationId=navigationId;
+              if(!downloadOperation&&!exportDestination)error.storageNavigationOperationId=navigationId;
               else{
                 const navigation=operations.get(navigationId);
-                // Own the exact UI receipt, including a completed click whose
-                // resulting workflow could not be verified. The download gate
-                // can release the transfer without freeing this pending click.
+                // Keep the exact UI receipt even if the click completed but
+                // its resulting workflow could not be verified.
                 if(navigation&&(!pending||pending===navigation)){
                   navigation.storageDownloadNavigation=true;
                   pending=navigation;
@@ -3526,7 +3574,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                 }
               }
             }
-            throw error;
+            // Excel's native wizard remains the destination authority when
+            // the optional Files lookup fails with settled navigation.
+            if(consume||navigationUncertain||error.cleanupUnconfirmed||pending||running)throw error;
           }
           // Keep a bounded diagnostic in the tool result. Throwing through the
           // IPC boundary can collapse an observation refusal to CALL_UNCERTAIN.
@@ -3609,6 +3659,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       finally{running=false;}
     },
     nodeApplyStatus:id=>sourceReads.has(id)?sourceReads.status(id):nodeJobs.status(id),
+    nodeApplyWorkflow:id=>nodeJobs.workflow(id),
     waitNodeApply:(id,options)=>sourceReads.has(id)?sourceReads.wait(id,options):nodeJobs.wait(id,options),
     cancelNodeApply:id=>sourceReads.has(id)?sourceReads.cancel(id):nodeJobs.cancel(id),
     stopNodeApply:id=>nodeJobs.stop(id),
@@ -3668,7 +3719,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (!operation || pending !== operation) throw new Error('Recovery requires the pending operation of this session');
       if(operation.action.capability==='node.target.internal')throw new Error('Use the enclosing node procedure to resume this internal phase');
       if(operation.action.capability==='node.apply')return releaseApply(operation,{strategy,recoveryOperationId,signature,signal});
-      if(operation.action.capability==='artifact.upload')throw new Error('Upload requires server transfer verification before recovery or abandonment');
+      if(operation.action.capability==='artifact.upload')throw new Error(operation.cleanupConfirmed!==false
+        ?'Upload requires server transfer verification before recovery or abandonment'
+        :operation.verification?.settled===true?UNRESOLVED_UPLOAD_VERIFICATION:UNCONFIRMED_UPLOAD_CLEANUP);
       if (!['complete_link', 'restore_control', 'accept_observed_state', 'abandon_operation'].includes(strategy)) throw new Error('Unsupported recovery strategy');
       if (operation.storageDownloadNavigation && !['accept_observed_state', 'abandon_operation'].includes(strategy))
         throw new Error('Inspect the pending download navigation and resolve it with a fresh observation');
@@ -4314,7 +4367,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         .map(({o,sequence})=>structuredClone({sequence,request:o.parameters,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed,
           source:o.nodeApply?.phases.find(p=>p.phase==='source')?.value?.source,scan_receipt:o.scanReceipt}));
       let admissionSources=null,admissionFailure=null,admissionUncertainty=null;
-      if(!operation&&serverDownloads&&!addOnly){
+      const checkExcelDestination=request.target.type==='exports.excel'&&getStorageBinding()?.document_id===request.document_id;
+      if(!operation&&!addOnly&&(serverDownloads||checkExcelDestination)){
         const proofs=new Map(),deadline=Math.min(admissionDeadline,now()+request.budgets.configure_ms);
         const resolve=async(ref,receipt=scanReceipt)=>{
           if(!proofs.has(ref)){
@@ -4328,14 +4382,24 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           return serverDownloads.bind(proofs.get(ref),receipt);
         };
         try{
-          const history=nodeHistory();
-          if(request.finish==='execute'&&history.some(e=>e.request.parameters?.source_switch)){
-            const {verifyDeferredTextImportSources}=await import('./text-import-node.mjs');
-            await verifyDeferredTextImportSources(request,history,resolve);
+          if(checkExcelDestination){
+            const proof=await preflightExcelExportDestination(request,async path=>{
+              const result=await runtime.serverDownload({operation_id:randomUUID(),path},null,
+                {signal,sourceOperation:operationId,deadlineAt:deadline,exportDestination:true});
+              return result.status==='SUCCEEDED'?result.output:null;
+            });
+            if(proof)await onRecord({operation_id:operationId,phase:'excel_export_destination_preflight_completed',proof});
           }
-          if(request.parameters.source?.kind==='storage')await resolve(request.parameters.source.server_source_ref);
-          if(['imports.text','imports.excel'].includes(request.target.type)&&request.parameters.source?.kind==='verified_sources')
-            for(const source of request.parameters.source.sources)if(source.kind==='storage')await resolve(source.server_source_ref);
+          if(serverDownloads){
+            const history=nodeHistory();
+            if(request.finish==='execute'&&history.some(e=>e.request.parameters?.source_switch)){
+              const {verifyDeferredTextImportSources}=await import('./text-import-node.mjs');
+              await verifyDeferredTextImportSources(request,history,resolve);
+            }
+            if(request.parameters.source?.kind==='storage')await resolve(request.parameters.source.server_source_ref);
+            if(['imports.text','imports.excel'].includes(request.target.type)&&request.parameters.source?.kind==='verified_sources')
+              for(const source of request.parameters.source.sources)if(source.kind==='storage')await resolve(source.server_source_ref);
+          }
         }catch(error){
           if(running||pending&&pending.id!==error.storageNavigationOperationId)throw error;
           if(error.storageNavigationOperationId){
@@ -4368,9 +4432,19 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           // Internal node readers return both typed action outcomes and plain
           // native observations. The real bridge accepts typed envelopes only;
           // unwrap their value locally, preserving the driver's original data.
-          const executeNodeScript=async(code,options)=>{
-            const wrapped='async page => {const base={action_key:"node.apply.transport",action_revision:"1",operation_id:'+JSON.stringify(operation.id)+',phase:"transport",effect_possible:true,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('+code+')(page)}};}catch(error){return {...base,status:"FAILED",cleanup_complete:false,output:{},error:{code:"NODE_APPLY_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
-            const response=await execute(wrapped,options);
+          const executeNodeScript=async(code,{fillOperationId,...options}={})=>{
+            const wrap=script=>'async page => {const base={action_key:"node.apply.transport",action_revision:"1",operation_id:'+JSON.stringify(operation.id)+',phase:"transport",effect_possible:true,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('+script+')(page)}};}catch(error){return {...base,status:"FAILED",cleanup_complete:false,output:{},error:{code:"NODE_APPLY_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
+            const reference=operation.lastReceipt;
+            if(fillOperationId&&filterConfigure(operation)&&reference?.id===fillOperationId&&reference.action_key==='ui.act'){
+              // The bridge invokes this fallback only when the native guard
+              // stops before calling the gesture. A lost browser reply remains uncertain.
+              const refusal={status:'NOT_APPLIED',action_key:'ui.act',action_revision:'1',operation_id:fillOperationId,
+                phase:'preconditions',effect_possible:false,cleanup_complete:true,output:{},trace:[],
+                error:{code:'LOGINOM_RECONNECT_PENDING',message:'The original Loginom session is still reconnecting. The filter value was not sent.'}};
+              options.onPendingReconnect=wrap(withBrowserReceipt('('+JSON.stringify(refusal)+')',{receipt_namespace:receiptNamespace,
+                receipt_id:reference.id,receipt_signature:reference.signature,operation_id:reference.operation_id}));
+            }
+            const response=await execute(wrap(code),options);
             if(response.status!=='SUCCEEDED')throw new Error(response.error?.message??'Node driver transport failed');
             return response.output.value;
           };
@@ -4655,7 +4729,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }});
   // Internal delivery calls retain the original runtime methods. The returned
   // facade prevents a second caller from changing UI between transfer stages.
-  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','waitNodeApply']);
+  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','nodeApplyWorkflow','waitNodeApply']);
   const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply','deleteNode']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{

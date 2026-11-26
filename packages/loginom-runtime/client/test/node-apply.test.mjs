@@ -175,6 +175,14 @@ for(const mode of ['done','execute'])test('Import reports its observed Finish ca
  assert.match(result.warnings.join(' '),/node1/);
  assert.deepEqual(await f.run(p),result);
 });
+test('a Text Import caption confirmed on the first apply does not suggest a second apply',async()=>{
+ const f=fixture(),p=request(),finish=f.drivers.finish;
+ f.drivers.finish=async mode=>({...await finish(mode),node_label:p.target.label});
+ const result=await f.run(p);
+ assert.equal(result.status,'SUCCEEDED');
+ assert.match(result.warnings.join(' '),/observed caption "Import"/);
+ assert.doesNotMatch(result.warnings.join(' '),/NEW dock_node_apply/);
+});
 test('full shell orders configuration before execution and binds empty fresh output',async()=>{
  const f=fixture(),r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.equal(r.execution.status,'completed');assert.equal(r.output.ports[0].row_count,0);
  assert.deepEqual(f.calls,['source','target','mapping','open','configure','mapping','finish','execute','read']);
@@ -1017,7 +1025,6 @@ for(const fault of [null,'other-node','transport','receipt','effect','phase','jo
  const r=await f.run(p);assert.equal(r.status,fault?'AMBIGUOUS':'FAILED',JSON.stringify(r.error));assert.equal(r.cleanup_complete,!fault);assert.equal(r.pending_phase,fault?'input_mapping':null);assert.equal(r.error.code,'NODE_APPLY_STOPPED');
  assert.equal(f.calls.includes('release-rest-variable-refusal'),!fault||fault==='journal');assert.ok(!f.calls.includes('configure')&&!f.calls.includes('execute'));
 });
-
 for(const field of ['created','configured','executed','unconnected_verified'])test('add_only needs verified '+field+' in the target receipt',async()=>{
  const f=fixture(),prepare=f.drivers.prepareTarget;
  const args={...request(),mode:'add_only',finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false}};
@@ -1029,4 +1036,19 @@ for(const field of ['created','configured','executed','unconnected_verified'])te
  assert.match(result.error.message,/Creation without configuration was not verified/);
  assert.ok(!f.records.some(e=>e.phase==='node_checkpoint'));
  assert.ok(!f.calls.includes('open'));
+});
+
+// LAB-2024: a caption Done did not preserve keeps its own public code. Done has
+// already committed, so the node_finish effect is possible and unresolved.
+test('node_finish caption refusal is public NODE_LABEL_NOT_PRESERVED, never NODE_APPLY_STOPPED',async()=>{
+ const f=fixture();f.handlers.get('imports.text').output_wizard='separate';
+ const message='NODE_LABEL_NOT_PRESERVED: Done left caption "Revenue по Region" instead of target.label';
+ f.drivers.finish=async mode=>{f.calls.push('finish:'+mode);throw Error(message);};f.drivers.finishGraph=async()=>{throw Error('unexpected graph finish');};
+ const result=await f.run();
+ assert.equal(result.error.code,'NODE_LABEL_NOT_PRESERVED');assert.equal(result.error.message,message);
+ assert.equal(result.status,'AMBIGUOUS');assert.equal(result.effect_possible,true);assert.equal(result.pending_phase,'node_finish');
+ assert.deepEqual(f.calls.filter(c=>c.startsWith('finish')),['finish:done']);assert.ok(!f.calls.includes('execute')&&!f.calls.includes('read'));
+ const {nodeApplyResultSchema}=await import('../lib/node-result-schema.mjs');
+ const {AjvJsonSchemaValidator}=await import('@modelcontextprotocol/sdk/validation/ajv');
+ const validation=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(result);assert.equal(validation.valid,true,validation.errorMessage);
 });
