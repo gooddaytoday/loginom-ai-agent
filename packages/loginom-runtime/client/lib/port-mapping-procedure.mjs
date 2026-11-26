@@ -4,6 +4,9 @@ import {ensureMappingTableView} from './mapping-table-view.mjs';
 import {validateNodeUiAction} from './workspace-ui.mjs';
 
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const nativeMappingReady=s=>s.wizard?.status==='observed'&&['output_mapping','input_mapping'].includes(s.wizard.stage)
+  &&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true;
+const mappingSemantics=({rendered_indices,...rest})=>rest;
 const mappingControl=(s,suffix,mappingWizard)=>{
   const tids=(mappingWizard?[mappingWizard]:['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','TuneDataSourceMappingWizard','DerivedDataSourceMappingEngineOutputPortWizard']).map(form=>s.wizard.root_tid+';'+form+';'+suffix);
   const controls=s.ui.elements.filter(e=>tids.includes(e.tid)&&e.allowed_actions.includes('click'));
@@ -190,26 +193,32 @@ export function resolveConfiguredOutputMapping(mapping,configured,native) {
   return {autosync:mapping.autosync??native.autosync,fields:resolved};
 }
 
-export async function configureOutputField(channel,field,initialObservation) {
-  const nativeReady=s=>s.wizard?.status==='observed'&&['output_mapping','input_mapping'].includes(s.wizard.stage)
-    &&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true;
-  const initial=initialObservation??await channel.observe({condition:'native output field before edit',readMappings:true,ready:nativeReady});
-  if(!nativeReady(initial))throw Error('Complete native output field binding required');
+export async function configureOutputField(channel,field) {
+  const initial=await channel.observe({condition:'native output field before edit',readMappings:true,ready:nativeMappingReady});
+  return (await editOutputField(channel,field,initial)).receipt;
+}
+
+async function editOutputField(channel,field,initial) {
   const baseline=initial.node_mapping;
   const find=n=>n.target_fields.filter(t=>t.record_id===field.current.record_id&&t.source?.record_id===field.source.record_id);
   const targets=find(baseline);
   if(targets.length!==1||!same(targets[0],field.current))throw new Error('Output field changed before edit');
   const original=targets[0];
-  if(original.name===field.name&&original.label===field.label)return {verified:true,cleanup_complete:true,effect_possible:false,field:original,source_identity_verified:true,settings_applied:false};
-  const {definition:definitions,state:definitionState}=await observeOutputDefinitions(channel,{expectedCount:baseline.target_fields.length});
+  if(original.name===field.name&&original.label===field.label)return {state:initial,
+    receipt:{verified:true,cleanup_complete:true,effect_possible:false,field:original,source_identity_verified:true,settings_applied:false}};
   const offset=Math.floor(original.index/8)*8;
-  let state=await observeOutputDefinitionPage(channel,{offset,schemaId:definitions.schema_id,total:definitions.total_columns,
-    field:original,fieldAction:'double_click',initialObservation:definitionState});
+  const bound=s=>nativeMappingReady(s)&&s.wizard.root_ref===initial.wizard.root_ref
+    &&s.wizard.root_tid===initial.wizard.root_tid&&s.wizard.stage===initial.wizard.stage;
+  const ready=s=>bound(s)&&same(mappingSemantics(s.node_mapping),mappingSemantics(baseline));
+  // Observe the addressed rendered page together with the complete native mapping.
+  // The native mapping comparison covers fields outside the rendered page.
+  let state=await observeOutputDefinitionPage(channel,{offset,total:baseline.target_fields.length,field:original,
+    fieldAction:'double_click',readMappings:true,ready});
   const rowOf=s=>s.wizard?.output_columns?.fields?.find(f=>f.index===original.index&&f.name===original.name&&f.label===original.label);
   const row=rowOf(state);if(!row)throw new Error('Output field row is unavailable');
   const root=state.wizard.root_ref;
   await channel.perform({condition:'select the exact output field editor',initialObservation:state,
-    ready:s=>s.wizard.root_ref===root&&!!rowOf(s),identity:()=>original,
+    ready:s=>ready(s)&&!!rowOf(s),identity:()=>original,
     resolve:s=>{const r=rowOf(s),e=s.ui.elements.find(e=>e.ref===r.name_ref&&e.allowed_actions.includes('double_click'));
       if(!e)throw new Error('Output field editor gesture unavailable');return {verb:'double_click',ref:e.ref};}});
   const editorReady=s=>s.wizard?.root_ref===root&&s.wizard.column_parameters?.status==='observed'
@@ -252,11 +261,11 @@ export async function configureOutputField(channel,field,initialObservation) {
     identity:s=>({root,original,fields:s.wizard.column_parameters.fields}),resolve:s=>{
       const e=s.ui.elements.find(e=>e.column_close?.scope==='output'&&e.allowed_actions.includes('apply_output_column'));
       if(!e)throw new Error('Output field Apply unavailable');return {verb:'apply_output_column',ref:e.ref};}});
-  const after=await channel.observe({condition:'native output field after Apply',readMappings:true,ready:nativeReady});
+  const after=await channel.observe({condition:'native output field after Apply',readMappings:true,ready:bound});
   const expected={...baseline,target_fields:baseline.target_fields.map(t=>t.record_id===original.record_id?{...t,name:field.name,label:field.label,...(baseline.mapping_wizard==='TuneDataSourceMappingWizard'?{origin_type:1}:{})}:t)};
-  const semantic=({rendered_indices,...rest})=>rest;
-  if(!same(semantic(after.node_mapping),semantic(expected)))throw new Error('Output field edit changed unrelated native mapping state');
-  return {verified:true,cleanup_complete:true,effect_possible:true,field:find(after.node_mapping)[0],source_identity_verified:true,settings_applied:false};
+  if(!same(mappingSemantics(after.node_mapping),mappingSemantics(expected)))throw new Error('Output field edit changed unrelated native mapping state');
+  return {state:after,receipt:{verified:true,cleanup_complete:true,effect_possible:true,field:find(after.node_mapping)[0],
+    source_identity_verified:true,settings_applied:false}};
 }
 
 export async function reorderOutputFields(channel,recordIds,initialObservation) {
@@ -265,6 +274,8 @@ export async function reorderOutputFields(channel,recordIds,initialObservation) 
   let state=initialObservation??await channel.observe({condition:'native mapping before reorder',readMappings:true,ready});
   if(!ready(state))throw Error('Complete native mapping required for reorder');
   const baseline=state.node_mapping;
+  const root=state.wizard.root_ref,stage=state.wizard.stage;
+  const bound=s=>ready(s)&&s.wizard.root_ref===root&&s.wizard.stage===stage;
   if(!Array.isArray(recordIds)||recordIds.length!==baseline.target_fields.length||new Set(recordIds).size!==recordIds.length
     ||recordIds.some(id=>!baseline.target_fields.some(f=>f.record_id===id)))throw Error('Reorder requires every native output record exactly once');
   const grouped=['DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard'].includes(baseline.mapping_wizard);
@@ -282,17 +293,25 @@ export async function reorderOutputFields(channel,recordIds,initialObservation) 
       const index=expected.target_fields.findIndex(f=>f.record_id===recordIds[destination]),field=expected.target_fields[index];
       if(grouped&&expected.target_fields[index-1].excluded!==field.excluded)throw Error('Output reorder would cross an exclusion group');
       const offset=Math.floor(index/8)*8;
-      state=await observeOutputDefinitionPage(channel,{offset,total:recordIds.length,field});
       const rowOf=s=>s.wizard?.output_columns?.fields?.find(f=>f.index===index&&f.name===field.name&&f.label===field.label);
-      const root=state.wizard.root_ref;
-      await channel.perform({condition:'select output field to move',initialObservation:state,
-        ready:s=>s.wizard.root_ref===root&&!!rowOf(s),identity:()=>field,
-        resolve:s=>{const row=rowOf(s),e=s.ui.elements.find(e=>e.ref===row.name_ref&&e.allowed_actions.includes('click'));
-          if(!e)throw Error('Output reorder selection unavailable');return {verb:'click',ref:e.ref};}});
-      state=await channel.observe({condition:'selected output field move up ready',outputColumnPage:{offset,limit:8},
-        ready:s=>s.wizard?.root_ref===root&&rowOf(s)?.selected===true});
+      const moveReady=s=>{
+        const page=s.wizard?.output_columns?.page;
+        return s.wizard?.root_ref===root&&s.wizard.stage===stage&&page?.status==='complete_definition_page'
+          &&page.offset===offset&&page.total_columns===recordIds.length&&rowOf(s)?.selected===true;
+      };
+      // Use the freshly reconciled selection for consecutive moves of this row.
+      // Crossing a page or losing selection goes through the normal guarded select.
+      if(!moveReady(state)){
+        state=await observeOutputDefinitionPage(channel,{offset,total:recordIds.length,field,stage,
+          ready:s=>s.wizard?.root_ref===root});
+        await channel.perform({condition:'select output field to move',initialObservation:state,
+          ready:s=>s.wizard.root_ref===root&&!!rowOf(s),identity:()=>field,
+          resolve:s=>{const row=rowOf(s),e=s.ui.elements.find(e=>e.ref===row.name_ref&&e.allowed_actions.includes('click'));
+            if(!e)throw Error('Output reorder selection unavailable');return {verb:'click',ref:e.ref};}});
+        state=await channel.observe({condition:'selected output field move up ready',outputColumnPage:{offset,limit:8},ready:moveReady});
+      }
       await channel.perform({condition:'move the selected output field one position up',initialObservation:state,
-        ready:s=>s.wizard?.root_ref===root&&rowOf(s)?.selected===true,identity:()=>field,
+        ready:moveReady,identity:()=>field,
         resolve:s=>({verb:'click',ref:mappingControl(s,'btnMoveMappingColumnUp').ref})});
       [expected.target_fields[index-1],expected.target_fields[index]]=[expected.target_fields[index],expected.target_fields[index-1]];
       const groupIndices=new Map();
@@ -300,7 +319,8 @@ export async function reorderOutputFields(channel,recordIds,initialObservation) 
         const groupIndex=groupIndices.get(f.excluded)??0;groupIndices.set(f.excluded,groupIndex+1);
         return {...f,index:i,...(grouped?{group_index:groupIndex}:{})};
       });moves++;
-      state=await channel.observe({condition:'native output order after one move',readMappings:true,ready});
+      state=await channel.observe({condition:'native output order and selection after one move',readMappings:true,
+        outputColumnPage:{offset:Math.floor((index-1)/8)*8,limit:8},ready:bound});
       const observed=semantic(state.node_mapping),wanted=semantic(expected),selection=wanted.source_selection;
       // Moving an output row can remove the confirmed empty source selection.
       // No selected source or other mapping property may change with the move.
@@ -350,9 +370,7 @@ export function planOutputFieldEdits(fields) {
 }
 
 export async function configureOutputFields(channel,mapping,configured) {
-  const ready=s=>s.wizard?.status==='observed'&&['output_mapping','input_mapping'].includes(s.wizard.stage)
-    &&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true;
-  const before=await channel.observe({condition:'complete native mapping before field edits',readMappings:true,ready});
+  const before=await channel.observe({condition:'complete native mapping before field edits',readMappings:true,ready:nativeMappingReady});
   const resolved=resolveConfiguredOutputMapping(mapping,configured,before.node_mapping);
   if(resolved.fields===null)return {verified:true,effect_possible:false,cleanup_complete:true,edits:[],settings_applied:false};
   // An existing exclusion is preserved as native state; only a new exclusion
@@ -365,62 +383,62 @@ export async function configureOutputFields(channel,mapping,configured) {
   const steps=planOutputFieldEdits(planned);
   // Definition reads use Table view, where Links-only source_selection is absent.
   // Bind the full edit baseline after that guarded, mapping-preserving switch.
-  let expected=structuredClone((steps.length?await ensureMappingTableView(channel,before):before).node_mapping);
-  const semantic=({rendered_indices,...rest})=>rest;
+  let state=steps.length||exclusions.length?await ensureMappingTableView(channel,before):before;
+  // Every mutation returns its reconciled native state. The next addressed
+  // page checks against that state before dispatching another gesture.
   for(const field of exclusions) {
-    const state=await channel.observe({condition:'native mapping before planned exclusion',readMappings:true,ready});
-    if(!same(semantic(state.node_mapping),semantic(expected)))throw Error('Mapping changed between planned exclusions');
-    const result=await excludeOutputField(channel,field.source.record_id);
-    expected=structuredClone(result.definition);
-    edits.push({source_record_id:field.source.record_id,excluded:true,verified:result.verified,effect_possible:result.effect_possible});
+    const excluded=await excludeMappedField(channel,field.source.record_id,state);
+    state=excluded.state;
+    edits.push({source_record_id:field.source.record_id,excluded:true,verified:excluded.receipt.verified,effect_possible:excluded.receipt.effect_possible});
   }
   for(const step of steps) {
-    const state=await channel.observe({condition:'native mapping before planned field edit',readMappings:true,ready});
-    if(!same(semantic(state.node_mapping),semantic(expected)))throw Error('Mapping changed between planned field edits');
-    const current=expected.target_fields.find(f=>f.record_id===step.record_id);
-    const result=await configureOutputField(channel,{current,source:current.source,name:step.name,label:step.label},state);
-    expected.target_fields=expected.target_fields.map(f=>f.record_id===step.record_id?{...f,name:step.name,label:step.label,...(expected.mapping_wizard==='TuneDataSourceMappingWizard'?{origin_type:1}:{})}:f);
-    edits.push({...step,verified:result.verified,effect_possible:result.effect_possible});
+    const current=state.node_mapping.target_fields.find(f=>f.record_id===step.record_id);
+    const result=await editOutputField(channel,{current,source:current.source,name:step.name,label:step.label},state);
+    state=result.state;
+    edits.push({...step,verified:result.receipt.verified,effect_possible:result.receipt.effect_possible});
   }
   return {verified:true,cleanup_complete:true,effect_possible:edits.some(e=>e.effect_possible),edits,
-    source_identity_verified:true,definition:expected,settings_applied:false};
+    source_identity_verified:true,definition:state.node_mapping,settings_applied:false};
 }
 
 // Exclusion is a source exclusion record, not deletion of the input field.
 // The node context and complete cached mapping are checked before every gesture.
+const exclusionMappingReady=s=>nativeMappingReady(s)&&s.node_mapping.mapping_wizard==='DerivedDataSourceOutputSocketWizard';
 export async function excludeOutputField(channel,sourceRecordId) {
   if(typeof sourceRecordId!=='string'||!sourceRecordId)throw Error('Exact native source record required');
-  const ready=s=>s.wizard?.status==='observed'&&['output_mapping','input_mapping'].includes(s.wizard.stage)
-    &&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true
-    &&s.node_mapping.mapping_wizard==='DerivedDataSourceOutputSocketWizard';
-  let state=await channel.observe({condition:'native output mapping before exclusion',readMappings:true,ready});
-  // Definition paging uses Table view; bind the baseline after that guarded UI-only transition.
-  state=await ensureMappingTableView(channel,state);
-  const baseline=state.node_mapping,source=baseline.source_fields.filter(f=>f.record_id===sourceRecordId);
+  const state=await channel.observe({condition:'native output mapping before exclusion',readMappings:true,ready:exclusionMappingReady});
+  return (await excludeMappedField(channel,sourceRecordId,await ensureMappingTableView(channel,state))).receipt;
+}
+
+async function excludeMappedField(channel,sourceRecordId,initial) {
+  const baseline=initial.node_mapping,source=baseline.source_fields.filter(f=>f.record_id===sourceRecordId);
   if(source.length!==1||source[0].required!==false)throw Error('Only a verified optional source can be excluded');
   const existing=baseline.target_fields.filter(f=>f.excluded===true&&f.exclusion_source?.record_id===sourceRecordId);
-  if(existing.length===1)return {verified:true,effect_possible:false,cleanup_complete:true,definition:baseline,settings_applied:false};
+  if(existing.length===1)return {state:initial,
+    receipt:{verified:true,effect_possible:false,cleanup_complete:true,definition:baseline,settings_applied:false}};
   const matches=baseline.target_fields.filter(f=>f.source?.record_id===sourceRecordId),field=matches[0];
   if(existing.length||matches.length!==1||field.required!==false||field.inherited!==false||field.excluded!==false
     ||baseline.target_fields.filter(f=>!f.excluded).length<2)throw Error('Output exclusion restriction or ambiguous source');
-  const semantic=({rendered_indices,...rest})=>rest;
-  const definition=await readOutputDefinitionPages(channel,{expectedCount:baseline.target_fields.length});
-  state=await observeOutputDefinitionPage(channel,{offset:Math.floor(field.index/8)*8,schemaId:definition.schema_id,total:definition.total_columns,field});
+  const root=initial.wizard.root_ref,offset=Math.floor(field.index/8)*8;
+  const ready=s=>exclusionMappingReady(s)&&s.wizard.root_ref===root&&s.wizard.root_tid===initial.wizard.root_tid
+    &&s.wizard.stage===initial.wizard.stage&&same(s.node_mapping.node_context,baseline.node_context);
+  const unchanged=s=>ready(s)&&same(mappingSemantics(s.node_mapping),mappingSemantics(baseline));
+  let state=await observeOutputDefinitionPage(channel,{offset,total:baseline.target_fields.length,field,readMappings:true,ready:unchanged});
   const rowOf=s=>s.wizard?.output_columns?.fields?.find(f=>f.index===field.index&&f.name===field.name&&f.label===field.label);
-  const root=state.wizard.root_ref;
   await channel.perform({condition:'select optional output field',initialObservation:state,
-    ready:s=>s.wizard?.root_ref===root&&!!rowOf(s),identity:()=>({source:source[0],field}),resolve:s=>{
+    ready:s=>unchanged(s)&&!!rowOf(s),identity:()=>({source:source[0],field}),resolve:s=>{
       const row=rowOf(s),e=s.ui.elements.find(e=>e.ref===row.name_ref&&e.allowed_actions.includes('click'));
       if(!e)throw Error('Optional output field selection unavailable');return {verb:'click',ref:e.ref};}});
   state=await channel.observe({condition:'selected optional field before exclusion',readMappings:true,
-    outputColumnPage:{offset:Math.floor(field.index/8)*8,limit:8},ready:s=>ready(s)&&s.wizard.root_ref===root&&rowOf(s)?.selected===true});
-  if(!same(semantic(state.node_mapping),semantic(baseline)))throw Error('Mapping changed before exclusion');
+    outputColumnPage:{offset,limit:8},ready:s=>ready(s)&&rowOf(s)?.selected===true});
+  if(!unchanged(state))throw Error('Mapping changed before exclusion');
   await channel.perform({condition:'exclude the selected optional output field',initialObservation:state,
-    ready:s=>ready(s)&&s.wizard.root_ref===root&&rowOf(s)?.selected===true&&same(semantic(s.node_mapping),semantic(baseline)),
+    ready:s=>unchanged(s)&&rowOf(s)?.selected===true,
     identity:()=>({source:source[0],field}),resolve:s=>{
       const controls=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';DerivedDataSourceOutputSocketWizard;btnAddMappingToExcluded'&&e.allowed_actions.includes('click'));
       if(controls.length!==1)throw Error('Optional output exclusion action unavailable');return {verb:'click',ref:controls[0].ref};}});
-  const after=(await channel.observe({condition:'native excluded source and preserved mappings',readMappings:true,ready})).node_mapping;
+  state=await channel.observe({condition:'native excluded source and preserved mappings',readMappings:true,ready});
+  const after=state.node_mapping;
   if(!same(after.source_fields,baseline.source_fields)||after.autosync!==baseline.autosync||after.target_fields.length!==baseline.target_fields.length)
     throw Error('Output exclusion changed the source or unrelated port options');
   const added=after.target_fields.filter(f=>!baseline.target_fields.some(b=>b.record_id===f.record_id));
@@ -435,8 +453,8 @@ export async function excludeOutputField(channel,sourceRecordId) {
   const properties=({index,group_index,...rest})=>rest;
   if(!same(oldRemaining.map(properties),newRemaining.map(properties)))throw Error('Output exclusion changed unrelated fields');
   if(after.target_fields.at(-1)!==excluded)throw Error('Excluded record was not appended');
-  return {verified:true,effect_possible:true,cleanup_complete:true,source_identity_verified:true,
-    excluded_source:source[0],removed_output_record_id:field.record_id,excluded_record:excluded,definition:after,settings_applied:false,package_saved:false};
+  return {state,receipt:{verified:true,effect_possible:true,cleanup_complete:true,source_identity_verified:true,
+    excluded_source:source[0],removed_output_record_id:field.record_id,excluded_record:excluded,definition:after,settings_applied:false,package_saved:false}};
 }
 
 export async function finishPreparedOutputPort(channel) {

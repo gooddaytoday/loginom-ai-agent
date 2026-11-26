@@ -8,12 +8,13 @@ const fitsDescribeBudget=(description,value)=>Buffer.byteLength(JSON.stringify(t
 // Group complete cards first-fit into ordered requests that each fit as one
 // reply. A batch's modes are the requested modes of its cards, so each card
 // keeps exactly the modes it was refused with.
-function describeRecovery(description,modes) {
+function describeRecovery(description,modes,refresh) {
  const batches=[],undeliverable=[],actionRequests=[];
+ const refreshArgs=refresh?{refresh:true}:{};
  let fitting=0;
  for(const node of description?.node_types??[]){
   const selected=modes?.filter(mode=>node.modes.includes(mode))??[];
-  const args={node_types:[node.type],...(selected.length?{modes:selected}:{})};
+  const args={node_types:[node.type],...(selected.length?{modes:selected}:{}),...refreshArgs};
   // Never send a model back to the same oversized single-card request.
   if(!fitsDescribeBudget(description,{actions:[],node_types:[node]})){undeliverable.push(args);continue;}
   fitting++;
@@ -29,7 +30,7 @@ function describeRecovery(description,modes) {
   if(fitsDescribeBudget(description,{actions:[action],node_types:[]}))actionRequests.push(args);
   else undeliverable.push(args);
  }
- const requests=[...batches.map(({node_types,modes})=>({node_types,...(modes?{modes}:{})})),...actionRequests];
+ const requests=[...batches.map(({node_types,modes})=>({node_types,...(modes?{modes}:{}),...refreshArgs})),...actionRequests];
  return {...(requests.length?{tool:'dock_action_describe',arguments:requests[0],remaining_requests:requests.slice(1)}:{}),
   ...(undeliverable.length?{undeliverable_requests:undeliverable}:{}),
   instruction:requests.length
@@ -39,7 +40,7 @@ function describeRecovery(description,modes) {
 
 // The consumer reads joined text, while MCP also transports its escaped copy
 // and structuredContent. Check the final reply without changing any receipt.
-export function boundedUserToolReply(reply,{tool,operationId,modes}={}) {
+export function boundedUserToolReply(reply,{tool,operationId,modes,refresh}={}) {
  const text=reply.content.flatMap(block=>block.type==='text'?[block.text]:[]).join('\n\n');
  const wireBytes=Buffer.byteLength(JSON.stringify(reply),'utf8');
  const textBytes=Buffer.byteLength(text,'utf8'),lines=text.split('\n').length;
@@ -50,7 +51,7 @@ export function boundedUserToolReply(reply,{tool,operationId,modes}={}) {
  if(!cardTooLarge&&wireBytes<=USER_PREVIEW_WIRE_BUDGET&&textBytes<=50*1024&&lines<=2000)return reply;
  const id=reply.structuredContent?.operation_id??reply.structuredContent?.owner?.operation_id??operationId;
  const retained=typeof id==='string'&&/^[A-Za-z0-9_.:-]{1,128}$/.test(id)?id:null;
- const describe=tool==='dock_action_describe',recovery=describe&&!cardTooLarge?describeRecovery(description,modes):null;
+ const describe=tool==='dock_action_describe',recovery=describe&&!cardTooLarge?describeRecovery(description,modes,refresh):null;
  const refusal={result_delivery:'refused',error:{code:'USER_RESPONSE_BUDGET',
    message:cardTooLarge?'The complete JavaScript description exceeds its own delivery budget. Report this limitation; smaller batches cannot deliver this card and its schema/rules were not truncated.'
      :describe?(recovery.tool?'Description exceeds the delivery budget; no cards delivered. next_step groups the cards into requests that fit. Schemas and rules are intact.'
