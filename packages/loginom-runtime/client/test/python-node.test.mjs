@@ -292,10 +292,12 @@ test('f-string literal text, escaped braces and nested specs stay admitted; only
 // Fake columns page: Add → EditColumnDefForm → type picker → Apply. After each
 // Apply, `cover` probes of elementFromPoint hit a foreign mask (closing editor),
 // as on mas3 (LAB-1640: second Add refused 'Python column control covered').
-function columnsPage({cover=0,coverAfterApply=false,missingType=null,deadline=Date.now()+20000}={}){
+function columnsPage({initialColumns=[],cover=0,coverAfterApply=false,missingType=null,deadline=Date.now()+20000}={}){
  const root='MF;TF;WizrdMCF',base=root+';PythonColumnsWizard',form=root+';EditColumnDefForm',els=new Map(),cmps=new Map();
  const names={1:'Логический',2:'Дата/Время',3:'Вещественный',4:'Целый',5:'Строковый'};
- const records=[],at=new Map();let open=false,pickerShown=false,draft=null,covering=coverAfterApply?0:cover,probes=0,clicks=0,ids=0;
+ const codes={integer:4,real:3,string:5,boolean:1,datetime:2};
+ const records=initialColumns.map(c=>({Name:c.name,DisplayName:c.label,DataType:codes[c.type]}));
+ const at=new Map();let open=false,pickerShown=false,draft=null,covering=coverAfterApply?0:cover,probes=0,clicks=0,ids=0;
  const el=(tid,x,y,visible=()=>true)=>{const e={id:'e'+(++ids),tid,getAttribute:k=>k==='data-tid'?tid:null,checkVisibility:()=>visible(),
   getBoundingClientRect:()=>({x:x-5,y:y-5,width:10,height:10}),contains:o=>o===e,closest:()=>e};if(tid)els.set(tid,e);at.set(x+','+y,e);return e;};
  const mask={className:'x-mask',closest:()=>null};
@@ -325,10 +327,37 @@ function columnsPage({cover=0,coverAfterApply=false,missingType=null,deadline=Da
     else if(key==='btnApply'){records.push({Name:draft.name,DisplayName:draft.label,DataType:draft.type});open=false;draft=null;if(coverAfterApply)covering=cover;}
     else if(key==='btnCancel'){open=false;draft=null;}},
    waitFor:async()=>{}};}};
- const task={binding:{workflow_ref:{prefix:'MF;TF'}},columns:declared.map(c=>({...c,code:{integer:4,real:3,string:5,boolean:1,datetime:2}[c.type]})),deadline};
+ const task={binding:{workflow_ref:{prefix:'MF;TF'}},columns:declared.map(c=>({...c,code:codes[c.type]})),deadline};
  const readNode=async()=>({verified:true,surface:'wizard',document_id:'doc',workflow_id:'wf',node_id:'py'});
  return {run:()=>configurePythonColumnsPage(page,task,readNode),records,get probes(){return probes;}};
 }
+
+test('an existing declared schema can be extended in place with the remaining columns',async()=>{
+ const fixture=columnsPage({initialColumns:declared.slice(0,2)});
+ const original=fixture.records.slice();
+ const result=await fixture.run();
+ assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.equal(result.verified,true);
+ assert.deepEqual(JSON.parse(JSON.stringify(result.columns)),declared);
+ for(const [index,record] of original.entries())assert.equal(fixture.records[index],record);
+});
+
+test('declared column extension refuses to remove, reorder or modify existing columns',async()=>{
+ for(const initialColumns of [
+  [...declared,{name:'Extra',label:'Extra',type:'real'}],
+  [declared[1],declared[0]],
+  [{...declared[0],type:'real'}],
+  [{...declared[0],label:'Another label'}],
+ ]){
+  const fixture=columnsPage({initialColumns});
+  const original=structuredClone(fixture.records);
+  const result=await fixture.run();
+  assert.equal(result.status,'NOT_APPLIED');
+  assert.equal(result.effect_possible,false);
+  assert.deepEqual(fixture.records,original);
+  assert.equal(fixture.probes,0);
+ }
+});
 
 test('declared columns wait out a transient cover over Add after Apply and still refuse a lasting one',{timeout:30000},async()=>{
  const transient=columnsPage({cover:3,coverAfterApply:true});

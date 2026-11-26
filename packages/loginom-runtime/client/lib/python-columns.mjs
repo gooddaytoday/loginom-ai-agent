@@ -57,11 +57,11 @@ export async function configurePythonColumnsPage(page,task,readNode){
   if(!node.verified||node.surface!=='wizard')throw Error('Python columns page owner unavailable');
   let inventory=await inspect('inventory');
   const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b),wanted=task.columns.map(({name,label,type})=>({name,label,type}));
-  if(!same(inventory.columns.map(c=>c.name),wanted.map(c=>c.name))&&inventory.columns.length)
-   throw Error('Existing declared columns differ; only an empty columns page or the same names are supported: '+inventory.columns.map(c=>c.name).join(','));
-  for(const [index,column] of task.columns.entries()){
-   if(inventory.columns[index]&&same(inventory.columns[index],wanted[index]))continue;
-   if(inventory.columns[index])throw Error('Existing declared column '+column.name+' differs in type or label');
+  const existingCount=inventory.columns.length;
+  if(!same(inventory.columns,wanted.slice(0,existingCount)))
+   throw Error('Existing declared columns must match the start of the requested schema in order, name, type and label');
+  for(const [offset,column] of task.columns.slice(existingCount).entries()){
+   const count=existingCount+offset+1;
    const add=await settle(()=>inspect('button',{name:'btnAddMappingColumn'}),10000);effect=true;await page.mouse.click(add.x,add.y);
    let dialog=await settle(()=>inspect('dialog'));formTid=dialog.form;
    const fill=async(key,value)=>{const input=page.locator('[data-tid='+JSON.stringify(formTid+';'+key)+'] input:visible');if(await input.count()!==1)throw Error('Unique Python column field required: '+key);
@@ -75,8 +75,8 @@ export async function configurePythonColumnsPage(page,task,readNode){
    }
    if(dialog.name!==column.name||dialog.label!==column.label||dialog.type!==column.code)throw Error('Python column editor readback differs for '+column.name);
    await page.locator('[data-tid='+JSON.stringify(formTid+';btnApply')+']:visible').click({timeout:remaining()});
-   inventory=await settle(async()=>{const i=await inspect('inventory');return !i.form_open&&i.columns.length===index+1?i:null;});formTid=null;
-   if(!same(inventory.columns[index],wanted[index]))throw Error('Python column grid readback differs for '+column.name+': '+JSON.stringify(inventory.columns[index]));
+   inventory=await settle(async()=>{const i=await inspect('inventory');return !i.form_open&&i.columns.length===count?i:null;});formTid=null;
+   if(!same(inventory.columns,wanted.slice(0,count)))throw Error('Python column grid readback differs after adding '+column.name);
   }
   inventory=await inspect('inventory');
   if(!same(inventory.columns,wanted))throw Error('Python declared columns readback differs');
