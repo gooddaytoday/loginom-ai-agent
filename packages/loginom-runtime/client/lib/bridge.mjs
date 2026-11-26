@@ -1124,6 +1124,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                   // binds to the account observed at workspace preparation.
                   tabTid, account:cleanupState.loginom_account??config.replayLoginUser,
                   packagePath, unsavedDraft, loginomUrl:config.loginomUrl,
+                  // Reuse the last confirmed mode for this document and workflow (Open or dock_node_apply).
                   diagnosticReadOnly: !!openedPackage && cleanupState.package_ref.read_only === true,
                   loginomBuild:session.metadata.targetIdentity?.loginom_build ?? cleanupState.target?.loginom_build,
                 };

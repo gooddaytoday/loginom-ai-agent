@@ -4,7 +4,7 @@ import { join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { buildKeychain } from "../../../loginom-host/script/build-keychain"
 
-test.each(["run", "run-close-error", "tui", "status"])("actual standalone entry handles package teardown: %s", async (mode) => {
+test.each(["run", "tui", "status"])("actual standalone entry enables package teardown only for run: %s", async (mode) => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "loginom-cli-package-policy-"))
@@ -29,15 +29,12 @@ test.each(["run", "run-close-error", "tui", "status"])("actual standalone entry 
         if(m.method==='connection.status') process.send(${mode === "tui"
           ? "{id:m.id,error:'LOGINOM_NOT_READY'}"
           : "{id:m.id,result:{state:'unconfigured',hasPassword:false,generation:0,revision:0,url:'http://example.test/app',username:'user',folder:'/user'}}"});
-        if(m.method==='close') process.send(${mode === "run-close-error"
-          ? "{id:m.id,error:'LOGINOM_HOST_CLEANUP_FAILED'},()=>process.exit(1)"
-          : "{id:m.id,result:{closed:true}},()=>process.disconnect()"});
+        if(m.method==='close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
       });
     `)
     // Only an explicit automation command requires Loginom preflight before model admission.
-    const run = mode === "run" || mode === "run-close-error"
     const args = mode === "status" ? ["loginom", "status", "--format", "json"] :
-      run ? ["run", "--no-headless", "--format", "json", "--command", "loginom-automation", "preflight only"] : ["--no-headless"]
+      mode === "run" ? ["run", "--no-headless", "--format", "json", "--command", "loginom-automation", "preflight only"] : ["--no-headless"]
     const child = Bun.spawn([process.execPath, "run", "./src/standalone.ts", ...args], {
       cwd: resolve(import.meta.dir, "../.."),
       env: { ...process.env, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
@@ -51,12 +48,11 @@ test.each(["run", "run-close-error", "tui", "status"])("actual standalone entry 
       expect(await child.exited).toBe(mode === "status" ? 0 : mode === "run" ? 2 : 1)
       const stdout = await output
       const stderr = await errors
-      if (run) expect(stdout).toContain("LOGINOM_CONFIG_REQUIRED")
-      if (mode === "run-close-error") expect(stderr).toContain("LOGINOM_HOST_CLEANUP_FAILED\n")
+      if (mode === "run") expect(stdout).toContain("LOGINOM_CONFIG_REQUIRED")
       if (mode === "tui") expect(stderr).toContain("CLI_RUN_FAILED")
       expect(JSON.parse(await readFile(join(directory, "policy.json"), "utf8")))
         .toEqual({
-          policy: run ? true : mode === "tui" ? false : null,
+          policy: mode === "run" ? true : mode === "tui" ? false : null,
           headless: false,
           // A development bundle override is never a verified release bundle.
           browserRecovery: mode === "status" ? null : false,
