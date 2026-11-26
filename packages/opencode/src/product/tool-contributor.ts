@@ -55,12 +55,7 @@ const contribute = Effect.fnUntraced(function* (input: ContributeInput) {
         }),
     )
     if (!catalog) return
-    const hasPreparedDock = catalog.tools.some((item) => {
-      if (item.name !== "dock_action_describe") return false
-      const actionKey = item.inputSchema.properties?.action_key
-      return isRecord(actionKey) && actionKey.type === "string"
-    })
-    if (profile === "loginom-automation" && hasPreparedDock) {
+    if (profile === "loginom-automation" && catalog.tools.some((item) => item.name === "dock_action_describe")) {
       const { loginomFileTools } = yield* Effect.promise(() => import("@/tool/loginom-file-profile"))
       Object.assign(tools, yield* loginomFileTools(context).pipe(Effect.provideService(Plugin.Service, plugin)))
       const { admitLoginomLocalFile, localFilePermissionFailure } = yield* Effect.promise(

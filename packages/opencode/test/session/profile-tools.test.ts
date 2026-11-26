@@ -35,11 +35,6 @@ import { provideInstance, TestInstance, testInstanceStoreLayer } from "../fixtur
 import { TestConfig } from "../fixture/config"
 import { pollWithTimeout, testEffect } from "../lib/effect"
 
-const preparedDescribe = {
-  name: "dock_action_describe",
-  inputSchema: { type: "object", properties: { action_key: { type: "string" } } },
-}
-
 const root = LayerNode.group([
   Agent.node,
   Session.node,
@@ -276,7 +271,10 @@ it.instance("local file tool permission failures retain path, typed marker and t
       }),
       async tools() {
         return {
-          tools: [preparedDescribe, { name: "dock_prepare", inputSchema: { type: "object", properties: {} } }],
+          tools: ["dock_action_describe", "dock_prepare"].map((name) => ({
+            name,
+            inputSchema: { type: "object", properties: {} },
+          })),
         }
       },
     }
@@ -688,13 +686,12 @@ for (const profile of ["default", "package-docs", "loginom-automation"] as const
         async tools() {
           expect(scopes).toHaveLength(1)
           return {
-            tools: [
-              preparedDescribe,
-              ...["find", "dock_diagnostics", "dock_prepare", "browser_click"].map((name) => ({
+            tools: ["find", "dock_diagnostics", "dock_prepare", "dock_action_describe", "browser_click"].map(
+              (name) => ({
                 name,
                 inputSchema: { type: "object", properties: {} },
-              })),
-            ],
+              }),
+            ),
           }
         },
         async reserveReference() {
@@ -795,7 +792,7 @@ function preparedLoginom(
       return scope
     },
     async tools() {
-      return { tools: [preparedDescribe] }
+      return { tools: [{ name: "dock_action_describe", inputSchema: { type: "object", properties: {} } }] }
     },
     async reserveReference() {
       throw Error("Unexpected reference reservation")

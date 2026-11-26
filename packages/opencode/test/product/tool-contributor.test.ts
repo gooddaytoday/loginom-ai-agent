@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { dockBootstrapTools } from "@loginom-ai-agent/loginom-host/dock-catalog"
 import { Effect } from "effect"
 import type { Tool as AITool } from "ai"
 import type { ListToolsResult } from "@modelcontextprotocol/sdk/types.js"
@@ -112,36 +113,21 @@ describe("toolContributor", () => {
     }
   })
 
-  test("automation keeps the Dock describe stub visible without offering any local file tools", async () => {
-    const run = setup({
-      profile: "loginom-automation",
-      catalog: [...catalogOf(["dock_prepare"]), { name: "dock_action_describe", inputSchema: { type: "object" } }],
-    })
-    await run.run()
-    expect(Object.keys(run.tools).toSorted()).toEqual(["loginom_dock_action_describe", "loginom_dock_prepare"])
-  })
-
-  test("only prepared automation receives the local file tools", async () => {
-    const withDescribe: ListToolsResult["tools"] = [
-      ...catalogOf(["find"]),
-      { name: "dock_action_describe", inputSchema: { type: "object", properties: { action_key: { type: "string" } } } },
-    ]
-    const automation = setup({ profile: "loginom-automation", catalog: withDescribe })
+  test("only automation receives local file tools alongside the Host Dock bootstrap catalog", async () => {
+    const bootstrap = dockBootstrapTools(false)
+    const automation = setup({ profile: "loginom-automation", catalog: bootstrap })
     await automation.run()
-    expect(Object.keys(automation.tools).toSorted()).toEqual([
-      "loginom_dock_action_describe",
-      "loginom_file_admit",
-      "loginom_file_profile",
-      "loginom_file_sample",
-      "loginom_file_scan",
-      "loginom_find",
-    ])
+    expect(automation.tools.loginom_dock_action_describe).toBeDefined()
+    const fileTools = Object.keys(automation.tools)
+      .filter((name) => name.startsWith("loginom_file_"))
+      .toSorted()
+    expect(fileTools).toEqual(["loginom_file_admit", "loginom_file_profile", "loginom_file_sample", "loginom_file_scan"])
     const without = setup({ profile: "loginom-automation" })
     await without.run()
-    expect(without.tools.loginom_file_admit).toBeUndefined()
-    const ordinary = setup({ profile: "default", catalog: withDescribe })
+    expect(Object.keys(without.tools).some((name) => name.startsWith("loginom_file_"))).toBe(false)
+    const ordinary = setup({ profile: "default", catalog: bootstrap })
     await ordinary.run()
-    expect(ordinary.tools.loginom_file_admit).toBeUndefined()
+    expect(Object.keys(ordinary.tools).some((name) => name.startsWith("loginom_file_"))).toBe(false)
   })
 
   test("the default profile receives only the read-only local tools", async () => {
