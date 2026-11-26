@@ -165,6 +165,11 @@ export async function createBridge(config, session, { browserTransport: managedB
   const recordExecution = createExecutionJournal({ directory: session.directory,
     metadata: session.metadata, redactor });
   const startup = catalogStartup(startupOptions);
+  const probePreparedPage = async (binding, { signal } = {}) => {
+    const response = await browser.callTool({ name: 'browser_run_code_unsafe',
+      arguments: { code: makeRecoveryPageProbeCode(binding) } }, undefined, { timeout: 15000, signal });
+    return parseRecoveryPageProbe(response, binding);
+  };
   try {
     // The product ships Loginom Help and the action catalog; only diagnostic Dock setups name a knowledge endpoint.
     const connections = await Promise.allSettled([...(config.endpoint ? [connectRemote(() => ({ client: new Client({ name: 'loginom-dock', version: session.metadata.client }), transport: remoteTransport() }), { startup }).then(client => { remote = client; })] : []), browser.connect(browserTransport)]);
@@ -195,6 +200,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         getNodeContractPins: () => ({...pinned.pins, skillRevision:session.metadata.skillRevision, loginomProfile:session.metadata.targetIdentity ?? pinned.compatibility}),
         artifactStore:session.artifactStore, allowCandidate: replay, onRecord: recordExecution, redactor,
         browserRecovery: config.browserRecovery === true && userProfile,
+        ...(userProfile ? { probePreparedPage } : {}),
         targetOrigin: config.loginomUrl ? new URL(config.loginomUrl).origin : undefined, execute: async (code, options) => {
         const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
           code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding, options?.storageSession) : code,
@@ -287,13 +293,10 @@ export async function createBridge(config, session, { browserTransport: managedB
     };
     const recovery = createBrowserRecovery({ enabled: config.browserRecovery === true && !!actionRuntime && userProfile,
       browser, executor: recoveryExecutor, gate: browserGate, record: recordExecution,
-      async probe() {
-        const binding = { origin: new URL(config.loginomUrl).origin,
+      probe() {
+        return probePreparedPage({ origin: new URL(config.loginomUrl).origin,
           documentId: session.metadata.workspacePreparation?.state?.document_id,
-          tabTid: session.metadata.workspacePreparation?.state?.workflow_ref?.tab_tid ?? null };
-        const response = await browser.callTool({ name: 'browser_run_code_unsafe',
-          arguments: { code: makeRecoveryPageProbeCode(binding) } }, undefined, { timeout: 15000 });
-        return parseRecoveryPageProbe(response, binding);
+          tabTid: session.metadata.workspacePreparation?.state?.workflow_ref?.tab_tid ?? null });
       } });
     // A Dock request may wait in the gate while a recovery action settles: recheck the lease inside it.
     const dockGate = (name, operation) => browserGate(async () => {

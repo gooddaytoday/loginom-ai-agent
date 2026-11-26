@@ -25,7 +25,7 @@ const proved = () => ({ verified: true, cleanup_complete: true, effect_possible:
 const blocked = () => { throw new NodeReleaseBlocked('A Loginom wizard of this node is open', 'Ask the user to close it with Cancel.'); };
 
 function fixture({ browserRecovery = true, release = blocked, releasePendingPhases, recoveryReleasePending,
-  nodeType = 'imports.text', stopPhase = 'finish' } = {}) {
+  nodeType = 'imports.text', stopPhase = 'finish', probePreparedPage } = {}) {
   const calls = [], events = [];
   const graph = { complete: true, document_id: 'doc', workflow_ref: workflow, nodes: [], links: [], foreign_links: [] };
   const adapter = { observe: async () => { calls.push('graph'); return structuredClone(graph); }, preflight: async () => {},
@@ -55,7 +55,7 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
     if (stopPhase === 'configure') throw Error('Managed source configuration stopped');
     return result;
   } };
-  const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery,
+  const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery, probePreparedPage,
     // Only the page receipt ledger is read through this transport.
     execute: async code => {
       if (!state.receipt || !code.includes('receipt_read')) throw Error('Unexpected public transport');
@@ -180,6 +180,35 @@ test('a changed document during configure directs the user to the original scena
   assert.equal(f.calls.filter(c => c === 'configure').length, 1);
   assert.equal(f.calls.includes('finish'), false);
 });
+
+for (const probe of [{ ok: false, reason: 'prepared document changed' }, { ok: true }]) {
+  test('configure with an unconfirmed call retains its gate after a page probe ' + JSON.stringify(probe), async () => {
+    const observations = [];
+    const f = fixture({ stopPhase: 'configure', nodeType: 'transform.filter_data',
+      probePreparedPage: async binding => { observations.push(binding); return probe; } });
+    f.runtime.startNodeApply(f.request('apply'));
+    const job = await f.runtime.waitNodeApply('apply', { timeoutMs: 1000 });
+    assert.equal(job.outcome.output.pending_phase, 'configure');
+    f.state.operation.transportUncertain = true;
+
+    const inspected = await f.runtime.inspect({ operationId: 'apply' });
+    assert.deepEqual(observations.map(b => b.documentId), ['doc']);
+    assert.equal(inspected.output.effect_state, 'unknown');
+    const recover = () => f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+    if (probe.ok) {
+      assert.equal(inspected.output.user_action, undefined);
+      await assert.rejects(recover(), /Release proof unavailable/);
+    } else {
+      const refused = await recover();
+      assert.match(inspected.output.user_action, /original scenario/i);
+      assert.equal(refused.output.user_action, inspected.output.user_action);
+      assert.equal(refused.output.next_step, undefined);
+    }
+    assert.equal(f.state.operation.transportUncertain, true);
+    assert.equal(f.runtime.hasUnsettledWork(), true);
+    assert.equal(f.calls.includes('release:configure'), false);
+  });
+}
 
 test('T1: a refused release points to browser recovery instead of asking the user', async () => {
   const f = fixture();

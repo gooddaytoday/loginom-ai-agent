@@ -2168,7 +2168,8 @@ export function parseCapabilityResult(response,{redactor}={}) {
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
-  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, getPreparationReceipt = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = true }) {
+  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, getPreparationReceipt = () => null,
+  browserRecovery = false, probePreparedPage, cacheDirectory, serverSourceCache = true }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   const executeBrowser=execute;
   execute=async(...args)=>{
@@ -2550,11 +2551,31 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       operation.cleanupConfirmed=state.receipt.cleanup_complete===true;
     }finally{running=false;}
   };
-  const inspectApply=async operation=>{
+  const refuseChangedNodeIdentity=(operation,message)=>{
+    operation.releaseRefused={message,identityChanged:true,
+      ui_blocker:'Ask the user to open the original scenario in Loginom under the original account and complete this step there.'};
+  };
+  const inspectChangedNodeDocument=async(operation,signal)=>{
+    if(operation.releaseRefused?.identityChanged)return true;
+    const state=operation.nodeApply;
+    if(!probePreparedPage||nodeJobs.busy||!operation.transportUncertain||state?.pending?.phase!=='configure')return false;
+    // A reload can interrupt the browser reply before the connection guard
+    // returns its identity error. This read can only explain a refusal.
+    running=true;
+    try{
+      const observed=await probePreparedPage({origin:targetOrigin,documentId:state.request.document_id},{signal}).catch(()=>null);
+      signal?.throwIfAborted();
+      if(observed?.ok!==false||observed.reason!=='prepared document changed')return false;
+      refuseChangedNodeIdentity(operation,'Original prepared Loginom document changed [LOGINOM_IDENTITY_CHANGED]');
+      return true;
+    }finally{running=false;}
+  };
+  const inspectApply=async(operation,signal)=>{
     // An inspection never calls configuration, execution or generic action
     // reconciliation. Unknown phases keep the gate until a phase-specific
     // verifier is available. A durable node checkpoint is safe to redeliver.
     if(running)return failed(operation,'OPERATION_STILL_PENDING','The original node operation is not yet confirmed. Inspect its operation_id after the active Dock call completes; do not repeat effects.');
+    if(await inspectChangedNodeDocument(operation,signal))return structuredClone(operation.outcome);
     if(!nodeJobs.busy)await inspectPythonInputOpening(operation);
     if(operation.storageAdmissionChild?.transportUncertain){
       const child=operation.storageAdmissionChild;
@@ -2657,9 +2678,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if(result.status!=='AMBIGUOUS'&&result.cleanup_complete===true)pending=null;
     return outcome;
   };
-  const reconcilePending = async () => {
+  const reconcilePending = async signal => {
     const operation = pending;
-    if(operation.action.capability==='node.apply')return inspectApply(operation);
+    if(operation.action.capability==='node.apply')return inspectApply(operation,signal);
     if(operation.action.capability==='node.target.internal'){try{return await inspectTarget(operation);}catch(error){return failed(operation,'RECONCILIATION_FAILED',String(error.message));}}
     if (running && operation.action.capability === 'node.configure_text_import.v1') {
       return failed(operation, 'OPERATION_STILL_PENDING', 'The bounded node procedure is still running');
@@ -2746,7 +2767,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       signal?.throwIfAborted();
       if(running||nodeJobs.busy||pending!==operation)throw new Error('The stopped Dock operation is no longer available for release');
     }
-    if(!nodeReleaseStep(operation))throw new Error('Release proof unavailable: inspect the operation; its last browser call is unconfirmed or its stopped phase has no node release verifier');
+    const releaseAvailable=nodeReleaseStep(operation);
+    if(!releaseAvailable){
+      if(!await inspectChangedNodeDocument(operation,signal))
+        throw new Error('Release proof unavailable: inspect the operation; its last browser call is unconfirmed or its stopped phase has no node release verifier');
+      if(running||nodeJobs.busy||pending!==operation)throw new Error('The stopped Dock operation is no longer available for release');
+    }
     running=true;
     try{
       const record={...operation,id:recoveryOperationId,parameters:{original_operation_id:operation.id,strategy}};
@@ -2754,6 +2780,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       observations.clear();
       let returned;
       try{
+        if(!releaseAvailable)throw Object.assign(new Error(operation.releaseRefused.message),{code:'LOGINOM_IDENTITY_CHANGED'});
         const result=await releaseNodeApply({operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,record:onRecord,signal,
           releaseBeforeTarget:earlyRelease(operation,signal)});
         operation.outcome=nodeApplyOutcome(operation,result);operation.cleanupConfirmed=true;
@@ -2765,15 +2792,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }catch(error){
         // The original operation keeps its gate. A blocker the user can clear is
         // named explicitly instead of leaving an empty recovery list.
-        const identityChanged=error?.code==='LOGINOM_IDENTITY_CHANGED';
-        const userAction=identityChanged
-          ?'Ask the user to open the original scenario in Loginom under the original account and complete this step there.'
-          :error?.userAction;
-        operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:userAction??null,identityChanged};
+        const message=String(error?.message??error).slice(0,1000);
+        if(error?.code==='LOGINOM_IDENTITY_CHANGED')refuseChangedNodeIdentity(operation,message);
+        else operation.releaseRefused={message,ui_blocker:error?.userAction??null};
+        const userAction=operation.releaseRefused.ui_blocker;
         const trigger=browserRecoveryTrigger(operation,null);
         returned={status:'AMBIGUOUS',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'release_refused',
           effect_possible:true,trace:[],recovery_operation_id:recoveryOperationId,
-          error:{code:'NODE_RELEASE_REFUSED',message:String(error?.message??error).slice(0,1000)},
+          error:{code:'NODE_RELEASE_REFUSED',message},
           // With browser recovery the agent clears the blocker itself; the user is not asked to.
           output:{original_operation_pending:pending===operation,...(userAction
             ?trigger?{ui_blocker:userAction}:{user_action:userAction}:{}),
@@ -3135,7 +3161,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }
     if (operationId && !operation) throw new Error('Operation is not known in this session');
     if (!operation || pending !== operation) return view(operation);
-    return view(operation, await reconcilePending());
+    return view(operation, await reconcilePending(signal));
   };
   const nodeResumeRefusal='Resume requires the original inspected node checkpoint without an unresolved phase';
   const nodeResumeBlocked=operation=>{
