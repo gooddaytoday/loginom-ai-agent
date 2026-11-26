@@ -1,0 +1,111 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Январь"
+    },
+    {
+      "type": "imports.text",
+      "label": "Февраль"
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "jan",
+        "type": "imports.text",
+        "label": "Январь"
+      },
+      {
+        "id": "feb",
+        "type": "imports.text",
+        "label": "Февраль"
+      }
+    ],
+    "links": []
+  },
+  "outputs": [
+    {
+      "output_node_type": "imports.text",
+      "output_node_label": "Январь",
+      "output_port": 0,
+      "column_order": "any",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "ReceiptID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Item",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "ReceiptID": 1001,
+          "Item": "Кофе, молотый",
+          "Amount": 7.25
+        },
+        {
+          "ReceiptID": 1002,
+          "Item": "Чай; чёрный",
+          "Amount": 3.75
+        },
+        {
+          "ReceiptID": 1002,
+          "Item": "Чай; чёрный",
+          "Amount": 3.75
+        }
+      ]
+    },
+    {
+      "output_node_type": "imports.text",
+      "output_node_label": "Февраль",
+      "output_port": 0,
+      "column_order": "any",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "ReceiptID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Item",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "ReceiptID": 1002,
+          "Item": "Чай; чёрный",
+          "Amount": 3.75
+        },
+        {
+          "ReceiptID": 1003,
+          "Item": "Книга",
+          "Amount": 18.5
+        },
+        {
+          "ReceiptID": 1003,
+          "Item": "Книга",
+          "Amount": 19.5
+        }
+      ]
+    }
+  ]
+}
