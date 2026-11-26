@@ -1857,7 +1857,7 @@ async function importFormatBatchFixture() {
   const field=(name,text)=>({ref:snapshot.wizard.settings.fields[name].input_ref,text});
   const action={verb:'set_wizard_fields',fields:[field('delimiter',';'),field('null_marker','\\N')]};
   const act=()=>run({mode:'act',snapshot,action});
-  return {page,input,delimiter,act,node,snapshot,action};
+  return {page,input,delimiter,act,node,snapshot,action,run};
 }
 
 test('the private validator binds batch fields, order and values to the observed page',async()=>{
@@ -1883,17 +1883,24 @@ test('the private validator binds batch fields, order and values to the observed
   }
 });
 
-test('an owned import page applies ordered fields with one settled readback',async()=>{
-  const {page,delimiter,input,act}=await importFormatBatchFixture();
+test('an owned import page verifies each individual format edit',async()=>{
+  const {page,delimiter,input,run,snapshot}=await importFormatBatchFixture();
   const writes=[];
   page.onPress=(key,element)=>{if(key==='Tab')writes.push(element);};
-  const result=await act();
+  const setField=(snapshot,name,text)=>run({mode:'act',snapshot,
+    action:{verb:'set_wizard_field',ref:snapshot.wizard.settings.fields[name].input_ref,text}});
+  const first=await setField(snapshot,'delimiter',';');
+  assert.equal(first.status,'SUCCEEDED',JSON.stringify(first.error));
+  assert.equal(first.output.wizard.settings.fields.delimiter.value,';');
+  assert.equal(first.output.wizard.settings.fields.null_marker.value,'old');
+  assert.deepEqual(writes,[delimiter]);
+  const result=await setField(first.output,'null_marker','\\N');
   assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
   assert.deepEqual(writes,[delimiter,input]);
   assert.equal(result.output.wizard.settings.fields.delimiter.value,';');
   assert.equal(result.output.wizard.settings.fields.null_marker.value,'\\N');
-  assert.equal(result.trace.filter(e=>e.event==='wizard_fields_verified').length,1);
-  assert.equal(result.trace.filter(e=>e.event==='import_format_input_settled').length,1);
+  for(const receipt of [first,result])
+    assert.ok(receipt.trace.some(e=>e.event==='wizard_draft_value_verified'&&e.settings_applied===false));
 });
 
 for(const name of ['delimiter','null_marker'])test('an owned import page refuses final readback mismatch for '+name,async()=>{
