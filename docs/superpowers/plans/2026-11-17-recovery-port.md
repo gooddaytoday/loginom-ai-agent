@@ -499,7 +499,7 @@ sudo systemctl enable --now "loginom-eval-campaign@$campaign_id.service"
 
 ### Checkpoint S6, промежуточная часть LAB-2059, 26.11.2026
 
-- Вход S6 `0a6e0a5f4e2ebbe5e8f7f69f75bcfb0fb2d96e44`, база после записи S5 `2f55590e76ffe3f5e1349b1c0e370f0244f7c8c3`, продукт `f9c2574ab5fa6f2307eaf355750476200ff5e933`. LAB-2059. Финальное ревью этой вершины и публикация ещё не выданы.
+- Вход S6 `0a6e0a5f4e2ebbe5e8f7f69f75bcfb0fb2d96e44`, база после записи S5 `2f55590e76ffe3f5e1349b1c0e370f0244f7c8c3`, продукт `f9c2574ab5fa6f2307eaf355750476200ff5e933`. Независимая приёмка LAB-2059 — `01a21777-adae-79c6-8d36-47dbe68ac11a`; `020a2243cd63fcd350a901210639c44dade4dea4` опубликован в `origin/recovery-port`. [Карточка LAB-2059](https://mas.kartamyshev.dev/lab/issues/LAB-2059).
 - Счётчик 29 жестов и finish равен 30; повтор finish списывается; следующий вызов отклоняется. Узел до 90 с, чтение экспорта до 120 с и не дольше остатка попытки, транспорт не длиннее остатка или 60 с, Save до 15 с. Проверка срок попытки не продлевает.
 - Node v24.19.0: `node --test --test-concurrency=1` recovery, matrix, budget, executor, bridge и Save-bridge — 103 pass; `text-export-virtual-storage.test.mjs` и `text-export-read-refusal.test.mjs` — 156 pass. Digest `loginom-automation` `5582ddf4a6d72781a5b5cd584983c1e0d2c5883dd7bbbe5589ebb3fbdd37ec1f`.
 - Совместный прогон `text-export-release` с fsync и ожиданием 1000 мс, а также параллельный CLI bundled-skills с exit 137, в приёмку не входят; отдельно CLI 7/7. Установленных экспериментальных пар и оценки качества этой части нет.
