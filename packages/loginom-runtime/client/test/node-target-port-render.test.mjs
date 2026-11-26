@@ -20,10 +20,11 @@ function fixture({portIndex=0}={}){
  const graph={container:root,getCellAt:()=>wrongHit?{}:port.FCell,view:{getState:cell=>extraStates.get(cell)??(cell===node.FCell?(bodyRendered?{shape:{node:body}}:null):cell===node.FLabel.FCell?(labelRendered?{text:{node:labelDom}}:null):rendered?{shape:{node:duplicateShape?alternatePortDom:portDom}}:null)}};
  const model=Object.assign(new ModelForm(),{FCreateDraggedNodeStarted:false,FDraggingOverGraph:false,FDiagram:{FmxGraph:graph,FNodes:{FCollection:[node]}}});
  const packageNode=new PackageTreeNode(),workflowNode=Object.assign(new WorkFlowTreeNode(),{ParentNode:packageNode});
- const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{Node:{data:{node:workflowNode}},FController:model}})}}}}}};
- const outside=[];
+ const activeNode={data:{node:workflowNode}};
+ const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{Node:activeNode,FController:model}})}}}}}};
+ const outside=[],windows=[];
  const nodeList=values=>Object.assign(Object.fromEntries(values.map((v,i)=>[i,v])),{length:values.length,[Symbol.iterator]:function*(){yield* values;}});
- const document={querySelectorAll:selector=>nodeList(selector.startsWith('[data-tid^=')?[crumb]:[tab,root,body,portDom,...inside,...outside,...(labelRendered?[labelDom]:[])].filter(e=>selector==='[data-tid='+JSON.stringify(e.getAttribute())+']'))};
+ const document={querySelectorAll:selector=>nodeList(selector.startsWith('[data-tid^=')?[crumb]:selector.startsWith('.x-window,')?windows:[tab,root,body,portDom,...inside,...outside,...(labelRendered?[labelDom]:[])].filter(e=>selector==='[data-tid='+JSON.stringify(e.getAttribute())+']'))};
  const preparation={id:'doc',document,receipts:new Map([['p',{phase:'verified',workflowId:'wf',packageNode,tab}]])};
  const context=vm.createContext({document,location:{origin:'http://loginom.test'},bg:{app},__loginomDockPreparationV1:preparation,getComputedStyle:()=>({visibility:'visible'}),setTimeout,clearTimeout,requestAnimationFrame:callback=>{if(pausedPaint)return;onPaint();callback(0);}});
  const page={evaluate:(fn,arg)=>vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context)};
@@ -47,6 +48,19 @@ function fixture({portIndex=0}={}){
   node.FPorts[0].FCollection.push(port);inside.push(dom);extraStates.set(port.FCell,{shape:{node:dom}});
   return {port,dom,hide:()=>{port.FCell.visible=false;extraStates.set(port.FCell,{});},unrender:()=>extraStates.set(port.FCell,{}),render:()=>extraStates.set(port.FCell,{shape:{node:dom}})};
  };
+ const reopened=(readOnly=false)=>{
+  const connection={Connected:true,UserName:'worker',Session:{}};
+  const form=app.Application.FInstance.FMainForm;
+  form.FMapTree={FServerConnection:connection,PackageNodes:{Count:1}};
+  Object.assign(packageNode,{PackageFileName:'user\\saved.lgp',ReadOnly:readOnly});
+  const record=preparation.receipts.get('p');
+  Object.assign(record,{openConnection:connection,openServerSession:connection.Session});
+  const read=()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',
+    reopened:{account:'worker',path:'/user/saved.lgp',read_only:readOnly}});
+  return {form,connection,activeNode,workflowNode,packageNode,record,read,showWindow:()=>{
+   const window=element('window');windows.push(window);return window;
+  }};
+ };
  const renameByHand=({alternate=false}={})=>{
   const suffix=portTid.slice(nodeTid.length);
   nodeTid='MF;TF-1;Graph;Renamed_Calculator';
@@ -54,8 +68,36 @@ function fixture({portIndex=0}={}){
   portTid=nodeTid+suffix;
   duplicateShape=alternate;
  };
- return {page,request,crumb,renameByHand,variable:()=>{portTid=portTid.replace('_Data-','_Var-');port.FSubType=3;},mislabeledShape:()=>{alternatePortDom.getAttribute=()=>nodeTid+';Output_Var-3';duplicateShape=true;},tree:()=>{portTid=portTid.replace('_Data-','_DataTree-');},rename:(suffix='Output_Data-'+portIndex,keys='R_Segment')=>{const factor=node.FIconCls===NODE_TYPES['research.factor_analysis'].icon_class,regression=node.FIconCls==='bg-vendor-icon-linregression',cross=node.FIconCls===NODE_TYPES['transform.cross_table'].icon_class,excel=node.FIconCls===NODE_TYPES['imports.excel'].icon_class;nodeTid='MF;TF-1;Graph;'+(excel?'%ExcelPath%':factor?'Фактор._анализ:_X_Y_Z':cross?'cols:_Category;__rows:_'+keys+';__cells:_Amount':regression?'Линрегрессия:_Y_X1_X2_X3':'Квантование:_X');node.FLabel.FRawValue=excel?'%ExcelPath%':factor?'Фактор. анализ: X Y Z':cross?'cols: Category; rows: '+keys.replaceAll('_',' ')+'; cells: Amount':regression?'Линрегрессия: Y X1 X2 X3':'Квантование: X';portTid=nodeTid+';'+suffix;duplicateShape=true;},hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{const copy=element(portTid);inside.push(copy);return ()=>inside.splice(inside.indexOf(copy),1);},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:(enabled=true)=>{wrongHit=enabled;},setPortSuffix:suffix=>{portTid=nodeTid+';'+suffix;},removeLink:link=>inside.splice(inside.indexOf(link.dom),1),losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
+ return {page,request,reopened,crumb,renameByHand,variable:()=>{portTid=portTid.replace('_Data-','_Var-');port.FSubType=3;},mislabeledShape:()=>{alternatePortDom.getAttribute=()=>nodeTid+';Output_Var-3';duplicateShape=true;},tree:()=>{portTid=portTid.replace('_Data-','_DataTree-');},rename:(suffix='Output_Data-'+portIndex,keys='R_Segment')=>{const factor=node.FIconCls===NODE_TYPES['research.factor_analysis'].icon_class,regression=node.FIconCls==='bg-vendor-icon-linregression',cross=node.FIconCls===NODE_TYPES['transform.cross_table'].icon_class,excel=node.FIconCls===NODE_TYPES['imports.excel'].icon_class;nodeTid='MF;TF-1;Graph;'+(excel?'%ExcelPath%':factor?'Фактор._анализ:_X_Y_Z':cross?'cols:_Category;__rows:_'+keys+';__cells:_Amount':regression?'Линрегрессия:_Y_X1_X2_X3':'Квантование:_X');node.FLabel.FRawValue=excel?'%ExcelPath%':factor?'Фактор. анализ: X Y Z':cross?'cols: Category; rows: '+keys.replaceAll('_',' ')+'; cells: Amount':regression?'Линрегрессия: Y X1 X2 X3':'Квантование: X';portTid=nodeTid+';'+suffix;duplicateShape=true;},hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{const copy=element(portTid);inside.push(copy);return ()=>inside.splice(inside.indexOf(copy),1);},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:(enabled=true)=>{wrongHit=enabled;},setPortSuffix:suffix=>{portTid=nodeTid+';'+suffix;},removeLink:link=>inside.splice(inside.indexOf(link.dom),1),losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
 }
+for(const readOnly of [false,true])test('reopened graph reads native bindings and the quiet package, readOnly='+readOnly,async()=>{
+ const state=fixture().reopened(readOnly);
+ state.record.openDialogElement=state.showWindow();
+ state.record.openDialog={hidden:true};
+ const graph=await state.read();
+ assert.equal(graph.complete,true);
+ assert.equal(graph.interaction_ready,true);
+ assert.equal(graph.nodes[0].ref.node_id,'n');
+});
+
+for(const [name,change] of [
+ ['active tree node is a descendant',s=>{s.activeNode.data.node={ParentNode:s.workflowNode};}],
+ ['native workflow is missing',s=>{s.activeNode.data.node=s.packageNode;}],
+ ['connection is down',s=>{s.connection.Connected=false;}],
+ ['native form is reconnecting',s=>{s.form.FReconnecting=true;}],
+ ['connection object was replaced',s=>{s.form.FMapTree.FServerConnection={...s.connection};}],
+ ['native session was replaced',s=>{s.connection.Session={};}],
+ ['account differs',s=>{s.connection.UserName='other';}],
+ ['package path differs',s=>{s.packageNode.PackageFileName='/foreign/saved.lgp';}],
+ ['another package is open',s=>{s.form.FMapTree.PackageNodes.Count=2;}],
+ ['read-only state differs',s=>{s.packageNode.ReadOnly=true;}],
+ ['an unrelated window is visible',s=>s.showWindow()],
+ ['its own picker is still open',s=>{s.record.openDialogElement=s.showWindow();s.record.openDialog={hidden:false};}],
+])test('reopened graph refuses when '+name,async()=>{
+ const state=fixture().reopened();change(state);
+ await assert.rejects(state.read(),/Reopened workspace identity changed/);
+});
+
 const stepRead=f=>readGraph(f.page,{request:f.request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',step_rebaseline:true});
 
 test('the new step commits the renamed port for subsequent strict graph reads',async()=>{

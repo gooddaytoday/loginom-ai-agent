@@ -22,6 +22,9 @@ test('managed user preparation returns local pins and dynamic knowledge without 
   const compatibility = { profile_id: `unit-${platform}-chromium`, loginom_build: '7.4.2', platform, browser: 'chromium' };
   const catalog = await createActionCatalogFixture(compatibility);
   const browserCalls=[];
+  let reopenSaved, nativeReloadReply, loseReloadOpenReply=false;
+  const nativeReloadOpens=[], modifiedReadbacks=[];
+  const reloadLogins=[];
   let connectionPage=null;
   let stepFixture=null;
   const stepJobs=createNodeOperationRunner({validate:()=> 'step-fixture',progress:()=>null,run:request=>{
@@ -44,6 +47,20 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       assert.equal(request.name, 'browser_run_code_unsafe');
       browserCalls.push(request);
       const code = request.arguments.code;
+      if(nativeReloadReply&&code.includes('"recoveryAccount":"user"')){
+        const options=JSON.parse(code.slice(code.lastIndexOf('(page, {')+7,-1));
+        nativeReloadOpens.push(options);
+        if(loseReloadOpenReply){
+          loseReloadOpenReply=false;
+          throw Error('Interrupted after the native Open gesture');
+        }
+        return {content:[{type:'text',text:JSON.stringify(nativeReloadReply)}]};
+      }
+      if(nativeReloadReply&&code.includes("action_key:'workspace.reload_graph'"))
+        return {content:[{type:'text',text:JSON.stringify({status:'SUCCEEDED',action_key:'workspace.reload_graph',
+          action_revision:'1',operation_id:'fixture-reload',phase:'observed',effect_possible:false,error:null,
+          trace:[],output:{complete:true,document_id:nativeReloadReply.document_id,
+            package_modified:modifiedReadbacks.length?modifiedReadbacks.shift():false}})}]};
       if(stepFixture&&code.includes("action_key:'workspace.step'")){
         stepFixture.reads++;
         if(stepFixture.output instanceof Error)throw stepFixture.output;
@@ -99,6 +116,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
   const executor=await import('../../lib/executor.mjs');
   mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,
     createActionRuntime:options=>{
+      reopenSaved=options.reopenNodePackage;
       const runtime=executor.createActionRuntime(options);
       return {...runtime,
         nodeApplyWorkflow:id=>stepFixture?stepJobs.workflow?.(id):runtime.nodeApplyWorkflow?.(id),
@@ -125,7 +143,10 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     loginomUrl: 'https://loginom.invalid/?testable=true', mode: 'executor-replay', resultProfile: 'user-v1',
     actionManifestUri: catalog.manifestUri, actionManifestSha256: catalog.manifestSha256,
     storageDirectories:{inputs:'/user',packages:'/user',exports:'/user'} };
-  const bridge = await createBridge(config, session);
+  const bridge = await createBridge(config, session, {reauthenticateReload:async options=>{
+    reloadLogins.push(options);
+    return true;
+  }});
   const client = new Client({ name: 'unit-agent', version: '1' });
   try {
     const [agent, server] = InMemoryTransport.createLinkedPair();
@@ -280,6 +301,15 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.equal(JSON.parse(lostStep.content[0].text).status,'NOT_APPLIED');
     assert.match(JSON.parse(lostStep.content[0].text).error.message,/Lost workspace preflight reply/);
     assert.equal(stepFixture.admissions.length,1);
+    const beforeReadOnlyStep=session.metadata.workspacePreparation;
+    stepFixture.output={status:'READY',document_id:'fixture-document',workflow_ref:nextRef,
+      package_ref:{...packageRef,read_only:true}};
+    const readOnlyStep=JSON.parse((await apply('step-read-only')).content[0].text);
+    assert.equal(readOnlyStep.status,'NOT_APPLIED');
+    assert.match(readOnlyStep.error.message,/read-only/);
+    assert.equal(stepFixture.admissions.length,1,'native read-only refresh must not start Apply');
+    assert.equal(session.metadata.workspacePreparation.state.package_ref.read_only,true);
+    session.metadata.workspacePreparation=beforeReadOnlyStep;
     stepFixture=null;
     // LAB-450: prepare -> local profile/scan/sample/admit (no browser calls)
     // -> first sample-delivery observation after native connection loss.
@@ -326,6 +356,81 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.equal(refreshed.node_types[0].type,'transform.sorting');
     assert.equal(reloadedPage.events.filter(selector=>selector.includes('OpenDialogForm;btnOpen')).length,1);
     reloadedPage=null;
+    const original=session.metadata.workspacePreparation.state;
+    const reopen=reload=>reopenSaved({documentId:original.document_id,deadline:Date.now()+5000,reload});
+    const browserBeforeReload=browserCalls.length;
+    const originalAccount=original.loginom_account;
+    original.loginom_account='other';
+    assert.deepEqual(await reopen(),{reason:'ORIGINAL_WORKSPACE_UNVERIFIED'});
+    original.loginom_account=originalAccount;
+    const originalPackage=original.package_ref;
+    original.package_ref={...originalPackage,persisted:false};
+    assert.deepEqual(await reopen(),{reason:'ORIGINAL_SAVED_PATH_UNVERIFIED'});
+    original.package_ref=originalPackage;
+    assert.equal(browserCalls.length,browserBeforeReload);
+    assert.deepEqual(reloadLogins,[]);
+
+    const nativeOpened={...original,document_id:'fixture-reloaded-doc',
+      package_ref:{...originalPackage,read_only:false}};
+    for(const reply of [
+      {...nativeOpened,document_id:original.document_id},
+      {...nativeOpened,loginom_account:'other'},
+      {...nativeOpened,package_ref:{...nativeOpened.package_ref,path:'/user/other.lgp'}},
+      {...nativeOpened,package_ref:{...nativeOpened.package_ref,read_only:undefined}},
+    ]){
+      nativeReloadReply=reply;
+      const before=browserCalls.length;
+      assert.deepEqual(await reopen(),{reloaded:true,reason:'ORIGINAL_SAVED_PACKAGE_OPEN_UNVERIFIED'});
+      assert.equal(browserCalls.length,before+1,'an invalid native Open must never observe the graph');
+    }
+    nativeReloadReply=nativeOpened;
+    const beforeVerified=browserCalls.length;
+    const verification=await reopen();
+    assert.equal(verification.readOnly,false);
+    assert.equal(verification.ref.document_id,nativeOpened.document_id);
+    assert.deepEqual(verification.first,verification.second);
+    assert.equal(browserCalls.length,beforeVerified+3,'one native Open and two reads');
+    const reload={};
+    loseReloadOpenReply=true;
+    const beforeInterruptedOpen=browserCalls.length;
+    await assert.rejects(reopen(reload),/Interrupted after the native Open gesture/);
+    assert.equal(browserCalls.length,beforeInterruptedOpen+1);
+    await reopen(reload);
+    const [open,reconcile]=nativeReloadOpens.slice(-2);
+    assert.equal(open.recoverOnly,false);
+    assert.equal(reconcile.recoverOnly,true);
+    assert.equal(reconcile.operationId,open.operationId);
+    assert.equal(reconcile.packagePath,originalPackage.path);
+    assert.equal(browserCalls.length,beforeInterruptedOpen+4,'reconcile and read twice without sending another Open');
+
+    nativeReloadReply={...nativeOpened,effect_possible:false};
+    const beforeDirty=browserCalls.length;
+    modifiedReadbacks.push(true);
+    assert.deepEqual(await reopen(),{reloaded:true,reason:'REOPENED_PACKAGE_DIRTY'});
+    assert.equal(browserCalls.length,beforeDirty+2,'dirty package must stop after the first read');
+    modifiedReadbacks.push(false,true);
+    assert.deepEqual(await reopen(),{reloaded:true,reason:'REOPENED_PACKAGE_DIRTY'});
+    modifiedReadbacks.push(null);
+    assert.deepEqual(await reopen(),{reloaded:true,reason:'REOPENED_GRAPH_UNAVAILABLE'});
+    for(const auth of reloadLogins){
+      assert.equal(auth.origin,'https://loginom.invalid');
+      assert.equal(auth.account,'user');
+      assert.equal(auth.packagePath,originalPackage.path);
+    }
+    nativeReloadReply=null;
+    original.package_ref={...originalPackage,read_only:true};
+    const beforeReadOnly=browserCalls.length;
+    for(const request of [
+      {name:'dock_node_resume',arguments:{operation_id:'interrupted-node'}},
+      {name:'dock_action_run',arguments:{operation_id:'readonly-save',action_key:'package.save_checkpoint'}},
+    ]){
+      const reply=JSON.parse((await client.callTool(request)).content[0].text);
+      assert.equal(reply.error.code,'PACKAGE_READ_ONLY',JSON.stringify(reply));
+      assert.equal(reply.effect_possible,false);
+    }
+    assert.equal(browserCalls.length,beforeReadOnly);
+    original.package_ref=originalPackage;
+
     const rejected=await client.callTool({name:'dock_action_describe',arguments:{action_key:'package.save_checkpoint',node_types:['imports.text','transform.join_data','exports.text']}});
     const failure=JSON.parse(rejected.content[0].text);
     assert.equal(failure.request_rejected,true);

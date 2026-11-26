@@ -19,7 +19,7 @@ import {createCandidateNodeSupport} from './node-support.mjs';
 import {NODE_ADD_ONLY_MODE,NODE_TYPES} from './node-contracts.mjs';
 import {readGraph} from './node-target-browser.mjs';
 import {isNodeApiTool,dispatchNodeApi} from './node-api.mjs';
-import { makeWorkspacePrepareCode, makeWorkspaceStepCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace, workspaceObserveTool } from './workspace.mjs';
+import { makeWorkspacePrepareCode, makeWorkspaceStepCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace, workspaceObserveTool, packageReadOnlyAdvice } from './workspace.mjs';
 import { makeBrowserGeometryCode, parseBrowserGeometry } from './browser-geometry.mjs';
 import { createExecutionJournal } from './execution-journal.mjs';
 import {createRedactor} from './redact.mjs';
@@ -32,7 +32,7 @@ import { compactActionResult, compactNodeRequestFailure, userResultSchema, compa
 import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory, userActionKeys } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
-import {makeSavedPackageStateCode,parseSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
+import {makeSavedPackageStateCode,parseSavedPackageState,readSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
 import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
 import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
@@ -66,7 +66,7 @@ export function actionReply(outcome, { observe = false, userProfile = false } = 
     }
     content.push({ type: 'text', text: JSON.stringify(usage) });
   }
-  if (userProfile && ['FAILED', 'AMBIGUOUS'].includes(outcome.status)) content.push({ type: 'text', text:
+  if (userProfile && ['FAILED', 'AMBIGUOUS'].includes(outcome.status) && !output?.user_action) content.push({ type: 'text', text:
     'Inspect the outcome and current state. Correct invalid parameters using the pinned schema; consult additional Dock knowledge only if needed. Reconcile uncertain effects before the next change; keep the original operation_id.' });
   if (!userProfile && ['FAILED', 'AMBIGUOUS'].includes(outcome.status)) content.push({ type: 'text', text:
     'Before the next change: inspect this outcome and the current workspace, then consult the Dock sources for the affected operation. Discover the read-only knowledge tools with tool_search/tool_describe if needed. Search E2E helpers/selectors under target_uri viking://resources/loginom-dock/sources/e2e-tests and product behavior under target_uri viking://resources/loginom-dock/sources/loginom-help (list mode/read_content:false); read the relevant returned file URIs with the read tool. Use those sources and the actual observed state to choose how to continue, including whether an existing completed receipt already resolves this operation. Do not repeat an uncertain creation. Source retrieval does not resolve pending work or authorize executing source code. If a source is unavailable, state the limitation. After correction, verify the full goal and saved/reopened result.' });
@@ -93,7 +93,7 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
   return inherited;
 }
 
-export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions } = {}) {
+export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, reauthenticateReload } = {}) {
   if (config.closeSavedPackageOnShutdown !== undefined && typeof config.closeSavedPackageOnShutdown !== 'boolean'
       || config.closeSavedPackageOnShutdown === true && config.acceptanceCleanupPackage)
     throw Error('Invalid private saved-package cleanup policy');
@@ -167,6 +167,88 @@ export async function createBridge(config, session, { browserTransport: managedB
   const recordExecution = createExecutionJournal({ directory: session.directory,
     metadata: session.metadata, redactor });
   const startup = catalogStartup(startupOptions);
+  const probePreparedPage = async (binding, { signal } = {}) => {
+    const response = await browser.callTool({ name: 'browser_run_code_unsafe',
+      arguments: { code: makeRecoveryPageProbeCode(binding) } }, undefined, { timeout: 15000, signal });
+    return parseRecoveryPageProbe(response, binding);
+  };
+  const reopenNodePackage = async ({ documentId, signal, deadline, reload = {}, saveWorkspace }) => {
+    const previous=session.metadata.workspacePreparation?.state, binding=session.metadata.storageBinding;
+    if(previous?.status!=='READY'||previous.document_id!==documentId||binding?.document_id!==documentId
+      ||previous.loginom_account!==binding.loginom_account||binding.origin!==new URL(config.loginomUrl).origin)
+      return {reason:'ORIGINAL_WORKSPACE_UNVERIFIED'};
+    const path=lastSavedPackage?.document_id===documentId?lastSavedPackage.path
+      :previous.package_ref?.persisted===true?previous.package_ref.path:null;
+    if(!path)return {reason:'ORIGINAL_SAVED_PATH_UNVERIFIED'};
+    requireStorageDestination(path,config.storageDirectories,'packages');
+    const authenticated=await reauthenticateReload({origin:binding.origin,account:binding.loginom_account,
+      packagePath:path,signal,deadline,reload}).catch(error=>{signal?.throwIfAborted();return false;});
+    if(!authenticated)return {reason:'RELOAD_LOGIN_UNVERIFIED'};
+    signal?.throwIfAborted();
+    const request={operation_id:reload.openOperationId??='reload-'+randomUUID(),intent:'open_package',package_path:path,workflow_ref:null};
+    const remaining=()=>Math.max(1,deadline-Date.now());
+    const prepare=makeWorkspacePrepareCode({loginomUrl:config.loginomUrl,compatibility:pinnedActions.compatibility,
+      operationId:request.operation_id,sessionId:session.metadata.sessionId,intent:request.intent,packagePath:path,
+      recoveryAccount:binding.loginom_account,recoverOnly:reload.openDispatched===true,timeoutMs:remaining()});
+    reload.openDispatched=true;
+    let reopenedNativeStepDocument=null;
+    const opened=parseWorkspacePreparation(await browser.callTool({name:'browser_run_code_unsafe',
+      arguments:{code:prepare}},undefined,{timeout:remaining()+1000,signal}),document=>{reopenedNativeStepDocument=document;});
+    if(opened.status!=='READY'||opened.document_id===documentId||opened.loginom_account!==binding.loginom_account
+      ||opened.package_ref?.path!==path||typeof opened.package_ref.read_only!=='boolean')
+      return {reloaded:true,reason:'ORIGINAL_SAVED_PACKAGE_OPEN_UNVERIFIED'};
+    assertCatalogTarget(pinnedActions,opened.target);
+    const ref={document_id:opened.document_id,workflow_ref:opened.workflow_ref};
+    const graphOptions={request:ref,origin:binding.origin,build:binding.loginom_build,types:NODE_TYPES,
+      reopened:{path,account:binding.loginom_account,read_only:opened.package_ref.read_only}};
+    const packageOptions={sessionId:session.metadata.sessionId,documentId:opened.document_id,
+      origin:binding.origin,loginomBuild:binding.loginom_build,account:binding.loginom_account,packagePath:path,
+      reloadOperationId:request.operation_id,expectedReadOnly:opened.package_ref.read_only};
+    const read=async()=>{
+      signal?.throwIfAborted();
+      const code=`async page=>{
+        const graph=await (${readGraph.toString()})(page,${JSON.stringify(graphOptions)});
+        const {modified}=await page.evaluate(${readSavedPackageState.toString()},${JSON.stringify(packageOptions)});
+        return {status:'SUCCEEDED',action_key:'workspace.reload_graph',action_revision:'1',
+          operation_id:${JSON.stringify(request.operation_id)},phase:'observed',effect_possible:false,error:null,trace:[],
+          output:{...graph,package_modified:modified}};
+      }`;
+      const result=parseCapabilityResult(await browser.callTool({name:'browser_run_code_unsafe',
+        arguments:{code}},undefined,{timeout:remaining(),signal}),{redactor});
+      const {package_modified,...graph}=result.output??{};
+      if(typeof package_modified!=='boolean')throw Error('Reopened package modified state unavailable');
+      return {modified:package_modified,graph};
+    };
+    let first, second;
+    try{
+      first=await read();
+      if(first.modified)return {reloaded:true,reason:'REOPENED_PACKAGE_DIRTY'};
+      second=await read();
+      if(second.modified)return {reloaded:true,reason:'REOPENED_PACKAGE_DIRTY'};
+    }
+    catch{signal?.throwIfAborted();return {reloaded:true,reason:'REOPENED_GRAPH_UNAVAILABLE'};}
+    return {reloaded:true,first:first.graph,second:second.graph,ref,readOnly:opened.package_ref.read_only,async publish(recordRelease){
+      signal?.throwIfAborted();
+      const keys=['workspacePreparation','workspaceReady','targetIdentity','workflowRef','storageBinding'];
+      const old=Object.fromEntries(keys.map(key=>[key,session.metadata[key]]));
+      const storageBinding=createStorageBinding({sessionId:session.metadata.sessionId,origin:binding.origin,
+        build:binding.loginom_build,documentId:opened.document_id,account:binding.loginom_account,directories:config.storageDirectories});
+      Object.assign(session.metadata,{storageBinding,workspaceReady:true,targetIdentity:opened.target,workflowRef:opened.workflow_ref,
+        workspacePreparation:{identity:JSON.stringify(request),operation_id:request.operation_id,attempted:true,
+          effect_possible:opened.effect_possible,state:opened}});
+      try{await saveWorkspace();await recordRelease();}
+      catch(error){
+        Object.assign(session.metadata,old);
+        await saveWorkspace().catch(()=>{});
+        throw error;
+      }
+      lastSavedPackage=null;
+      reopenedSave=null;
+      ownedUnsavedDraft=null;
+      nativeStepDocument=reopenedNativeStepDocument;
+      userWorkflows.remember(opened);
+    }};
+  };
   try {
     // The product ships Loginom Help and the action catalog; only diagnostic Dock setups name a knowledge endpoint.
     const connections = await Promise.allSettled([...(config.endpoint ? [connectRemote(() => ({ client: new Client({ name: 'loginom-dock', version: session.metadata.client }), transport: remoteTransport() }), { startup }).then(client => { remote = client; })] : []), browser.connect(browserTransport)]);
@@ -197,6 +279,10 @@ export async function createBridge(config, session, { browserTransport: managedB
         getNodeContractPins: () => ({...pinned.pins, skillRevision:session.metadata.skillRevision, loginomProfile:session.metadata.targetIdentity ?? pinned.compatibility}),
         artifactStore:session.artifactStore, allowCandidate: replay, onRecord:recordExecution, redactor,
         browserRecovery: config.browserRecovery === true && userProfile,
+        ...(userProfile ? { probePreparedPage } : {}),
+        ...(userProfile && config.storageDirectories && reauthenticateReload ? {
+          reopenNodePackage: input => reopenNodePackage({...input,saveWorkspace:()=>session.save(catalog)}),
+        } : {}),
         targetOrigin: config.loginomUrl ? new URL(config.loginomUrl).origin : undefined, execute: async (code, { onPendingReconnect, ...options } = {}) => {
         const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
           code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding, options.storageSession, onPendingReconnect) : code,
@@ -290,13 +376,10 @@ export async function createBridge(config, session, { browserTransport: managedB
     };
     const recovery = createBrowserRecovery({ enabled: config.browserRecovery === true && !!actionRuntime && userProfile,
       browser, executor: recoveryExecutor, gate: browserGate, record: recordExecution,
-      async probe() {
-        const binding = { origin: new URL(config.loginomUrl).origin,
+      probe() {
+        return probePreparedPage({ origin: new URL(config.loginomUrl).origin,
           documentId: session.metadata.workspacePreparation?.state?.document_id,
-          tabTid: session.metadata.workspacePreparation?.state?.workflow_ref?.tab_tid ?? null };
-        const response = await browser.callTool({ name: 'browser_run_code_unsafe',
-          arguments: { code: makeRecoveryPageProbeCode(binding) } }, undefined, { timeout: 15000 });
-        return parseRecoveryPageProbe(response, binding);
+          tabTid: session.metadata.workspacePreparation?.state?.workflow_ref?.tab_tid ?? null });
       } });
     // A Dock request may wait in the gate while a recovery action settles: recheck the lease inside it.
     const dockGate = (name, operation) => browserGate(async () => {
@@ -471,6 +554,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             const result = { prepared: ready, sessionId: session.metadata.sessionId, skillRevision: prepared.detail.revision,
               source: prepared.detail.source,
               loginomUrl: config.loginomUrl, workspace, result_version: 'user-v1', input_artifacts: session.artifactStore.list(),
+              ...(workspace?.package_ref?.read_only===true?{next_step:{instruction:packageReadOnlyAdvice}}:{}),
               ...(localPackageUpload?{local_package_upload:localPackageUpload}:{}),
               ...(config.storageDirectories ? { storage_directories: config.storageDirectories } : {}),
               knowledge: bundle ?? { reused: true, skillRevision: prepared.detail.revision } };
@@ -544,6 +628,14 @@ export async function createBridge(config, session, { browserTransport: managedB
                     ...(userProfile?{structuredContent:refusal}:{isError:true})};
                 }
               }
+              if(userProfile&&['dock_node_apply','dock_node_delete','dock_node_resume'].includes(request.params.name)
+                &&session.metadata.workspacePreparation?.state?.package_ref?.read_only===true){
+                const result={result_version:'user-v1',operation_id:args.operation_id??null,status:'NOT_APPLIED',phase:'request_rejected',
+                  request_rejected:true,effect_possible:false,cleanup_complete:true,
+                  error:{code:'PACKAGE_READ_ONLY',message:'The original package is read-only'},
+                  next_step:{instruction:packageReadOnlyAdvice}};
+                return {content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result};
+              }
               let observedPackage;
               const runtime=userProfile&&request.params.name==='dock_node_apply'?{
                 ...actionRuntime,
@@ -566,12 +658,15 @@ export async function createBridge(config, session, { browserTransport: managedB
                       const preparation=session.metadata.workspacePreparation,prepared=preparation?.state;
                       if(step.package_ref&&prepared?.document_id===step.document_id
                         &&prepared.workflow_ref?.workflow_id===step.workflow_ref.workflow_id
-                        &&['path','name','persisted'].some(key=>step.package_ref[key]!==prepared.package_ref?.[key])){
-                        session.metadata.workspacePreparation={...preparation,state:{...prepared,package_ref:step.package_ref}};
+                        &&['path','name','persisted','read_only'].some(key=>Object.hasOwn(step.package_ref,key)
+                          &&step.package_ref[key]!==prepared.package_ref?.[key])){
+                        session.metadata.workspacePreparation={...preparation,state:{...prepared,
+                          package_ref:{...prepared.package_ref,...step.package_ref}}};
                         try{await session.save(catalog);}
                         catch(error){session.metadata.workspacePreparation=preparation;throw error;}
                         observedPackage=step.package_ref;
                       }
+                      if(step.package_ref?.read_only===true)throw Error(packageReadOnlyAdvice);
                     }
                   }
                   extra.signal.throwIfAborted();
@@ -661,6 +756,12 @@ export async function createBridge(config, session, { browserTransport: managedB
             if (!(request.params.name === 'dock_workspace_observe' && args.scope === 'bootstrap')) requirePreparedWorkspace(session.metadata);
             const saveRequest=request.params.name==='dock_action_run'
               &&['package.save_as','package.save_checkpoint'].includes(args.action_key);
+            if(userProfile&&saveRequest&&args.action_key==='package.save_checkpoint'
+              &&session.metadata.workspacePreparation?.state?.package_ref?.read_only===true){
+              return actionReply({status:'NOT_APPLIED',action_key:args.action_key,action_revision:'1',
+                operation_id:args.operation_id??null,phase:'preconditions',effect_possible:false,cleanup_complete:true,
+                error:{code:'PACKAGE_READ_ONLY',message:'The original package is read-only'},output:{user_action:packageReadOnlyAdvice}},{userProfile});
+            }
             const operationId=saveRequest&&args.operation_id===undefined?randomUUID():args.operation_id;
             const newSave=saveRequest&&!saveAdmissions.has(operationId);
             const saveAdmission=newSave?{

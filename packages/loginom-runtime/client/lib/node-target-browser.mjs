@@ -16,7 +16,7 @@ export async function readGraph(page, task) {
     .filter(r=>r.state==='completed'&&r.outcome?.status==='SUCCEEDED'&&r.outcome.action_key==='ui.act'&&r.outcome.cleanup_complete===true)
     .map(r=>({context:r.outcome.output?.prepared_node_context,trace:r.outcome.trace}));
   return page.evaluate(({ request, types, origin, build, read_bindings=false, window_blocker_selector,
-    track_link_guids=false, finishes, step_rebaseline=false }) => {
+    track_link_guids=false, finishes, step_rebaseline=false, reopened }) => {
     const fail = message => { throw new Error(message); };
     const preparation = globalThis.__loginomDockPreparationV1;
     if (location.origin !== origin || globalThis.bg?.app?.Version !== build || preparation?.document !== document
@@ -39,6 +39,16 @@ export async function readGraph(page, task) {
       if (ancestor instanceof app.PackageTreeNode) {packageNode=ancestor;break;}
     }
     if (packageNode !== record.packageNode) fail('Prepared package identity changed');
+    if(reopened){
+      const form=app.Application.FInstance.FMainForm, map=form.FMapTree, c=map?.FServerConnection;
+      const file=packageNode?.PackageFileName;
+      const path=typeof file==='string'&&file?'/'+file.replaceAll('\\','/').replace(/^\/+/, ''):null;
+      if(!workflowNode||workflowNode!==card.Controller.Node?.data?.node||c?.Connected!==true||form.FReconnecting===true
+        ||c!==record.openConnection||c.Session!==record.openServerSession||c.UserName!==reopened.account
+        ||path!==reopened.path||map.PackageNodes?.Count!==1||packageNode.ReadOnly!==reopened.read_only
+        ||[...document.querySelectorAll('.x-window,.bg-dialog,.x-message-box,[data-tid$=";WizrdMCF;btnClose"]')].some(e=>
+          visible(e)&&!(e===record.openDialogElement&&record.openDialog?.hidden===true)))fail('Reopened workspace identity changed');
+    }
     const model = card.Controller.FController, diagram = model.FDiagram, graph = diagram?.FmxGraph;
     const containers = exact(request.workflow_ref.prefix + ';ModelForm;cmpDiagram');
     if (!(model instanceof app.ModelForm) || containers.length !== 1 || graph?.container !== containers[0] || !visible(containers[0])) fail('Graph model/DOM binding unavailable');
