@@ -32,12 +32,12 @@
     ]
   },
   "outputs": [],
-  "tables": [
+  "port_outputs": [
     {
       "output_node_type": "transform.filter_data",
       "output_node_label": "Платежи 2025",
       "output_port": 0,
-      "column_order": "exact",
+      "column_order": "any",
       "ordered": false,
       "columns": [
         {

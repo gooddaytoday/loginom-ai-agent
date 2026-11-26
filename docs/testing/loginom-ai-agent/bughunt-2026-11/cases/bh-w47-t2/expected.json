@@ -25,12 +25,12 @@
     "links": []
   },
   "outputs": [],
-  "tables": [
+  "port_outputs": [
     {
       "output_node_type": "imports.excel",
       "output_node_label": "Товары",
       "output_port": 0,
-      "column_order": "exact",
+      "column_order": "any",
       "ordered": false,
       "columns": [
         {

@@ -46,9 +46,9 @@ def node(key, kind, label=None):
     return dict(id=key, type=kind, **({'label': label} if label else {}))
 
 
-def table(owner, columns, rows):
+def table(owner, columns, rows, *, column_order='any'):
     return dict(output_node_type=owner['type'], output_node_label=owner['label'],
-                output_port=0, column_order='exact', ordered=False, columns=columns,
+                output_port=0, column_order=column_order, ordered=False, columns=columns,
                 rows=[dict(zip((field['name'] for field in columns), row, strict=True)) for row in rows])
 
 
@@ -58,7 +58,8 @@ def link(source, target, input_port=0):
 
 def expect(nodes, tables=(), links=(), outputs=()):
     return dict(nodes=[{k: v for k, v in n.items() if k != 'id'} for n in nodes],
-                graph=dict(nodes=nodes, links=list(links)), outputs=list(outputs), tables=list(tables))
+                graph=dict(nodes=nodes, links=list(links)), outputs=list(outputs),
+                **({'port_outputs': list(tables)} if tables else {}))
 
 
 def excel_chain(data):
@@ -111,13 +112,14 @@ def database_chain(data):
     source = node('orders', 'imports.database', 'Заказы')
     query = node('query', 'imports.database', 'Заказы с категориями')
     export = node('export', 'exports.text')
-    exported = table(query, JOINED, rows)
+    joined_table = table(query, JOINED, rows, column_order='exact')
+    exported = joined_table.copy()
     for key in ('output_node_label', 'output_port'):
         del exported[key]
     exported.update(output_node_type='export_input', export_destination='joined_orders.csv')
     return [
         expect([source], [table(source, ORDERS, orders)]),
-        expect([source, query], [table(query, JOINED, rows)]),
+        expect([source, query], [joined_table]),
         expect([source, query, export], links=[link(query, export)], outputs=[exported]),
     ]
 

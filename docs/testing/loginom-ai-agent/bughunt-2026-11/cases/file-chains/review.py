@@ -5,7 +5,6 @@ import argparse
 import importlib.util
 import json
 from pathlib import Path
-import subprocess
 
 
 HERE = Path(__file__).resolve().parent
@@ -45,25 +44,12 @@ def collect(run, runner):
                 checks.append(dict(case=case, code='PRESERVED_NODE_CHANGED', nodes=changes,
                                    location=graph['location']))
             previous = ids
+            if 'port_outputs' not in expected:
+                continue
             journal = folder / 'model.stdout'
             replies = runner.model_replies(runner.records(journal))
-            for table in expected['tables']:
-                selector = next(node for node in expected['graph']['nodes']
-                                if node.get('label') == table['output_node_label'])
-                node_id = ids[selector['id']]
-                candidates = [(line, port) for line, reply in replies
-                              for owner, port in runner.ports(reply)
-                              if owner.get('status') == 'SUCCEEDED'
-                              and owner.get('node', {}).get('node_id') == node_id
-                              and port.get('port') == table['output_port']
-                              and runner.port_path(owner, port)]
-                if candidates:
-                    line, port = candidates[-1]
-                    checks.append(dict(case=case, location=f'{journal}:{line}', table=table,
-                                       actual=port))
-                else:
-                    checks.append(dict(case=case, location=f'{journal}:1', table=table,
-                                       code='TYPED_PORT_EVIDENCE_MISSING'))
+            checks.extend(dict(check, case=case) for check in runner.check_case_port_outputs(
+                expected['port_outputs'], graph, replies, journal))
     return checks
 
 
@@ -71,23 +57,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run', type=Path)
     args = parser.parse_args()
-    code = """
-        import {readFileSync} from 'node:fs';
-        import {pathToFileURL} from 'node:url';
-        const {matchesExpectedOutput} = await import(pathToFileURL(process.argv[1]));
-        const results = JSON.parse(readFileSync(0, 'utf8')).map(({actual, table, code, ...evidence}) => {
-            const error = code ?? (matchesExpectedOutput(actual, table) ? null : 'TYPED_PORT_DIFFERS');
-            const schema = actual?.schema?.map(({name, type}) => ({name, type}));
-            return {...evidence, node: table?.output_node_label, code: error,
-                    rows: actual?.row_count, schema};
-        });
-        console.log(JSON.stringify(results, null, 2));
-        process.exitCode = results.some(result => result.code) ? 1 : 0;
-    """
     checks = collect(args.run.resolve(), load_runner())
-    return subprocess.run(['node', '--input-type=module', '-e', code,
-                           str(ACCEPTANCE / 'expected-outputs.mjs')],
-                          input=json.dumps(checks), text=True, check=False).returncode
+    print(json.dumps(checks, ensure_ascii=False, indent=2))
+    return int(not checks or any(check['code'] for check in checks))
 
 
 if __name__ == '__main__':

@@ -16,12 +16,12 @@
     "links": []
   },
   "outputs": [],
-  "tables": [
+  "port_outputs": [
     {
       "output_node_type": "imports.text",
       "output_node_label": "Платежи",
       "output_port": 0,
-      "column_order": "exact",
+      "column_order": "any",
       "ordered": false,
       "columns": [
         {

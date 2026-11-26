@@ -1688,6 +1688,9 @@ def expected_for(case, package, cold=False):
         expected.setdefault('nodes', [])
         if 'columns' not in expected:
             expected.setdefault('outputs', [])
+    if 'port_outputs' in expected and not (case.get('attach_all') and 'graph' in expected
+            and isinstance(expected['port_outputs'], list) and expected['port_outputs']):
+        raise ValueError('CASE_PORT_OUTPUTS_INVALID: a private case with a graph needs a nonempty port_outputs list')
     if 'outputs' not in expected:
         expected = dict(package_path=expected['package_path'], nodes=expected['nodes'],
                         outputs=[{k: v for k, v in expected.items() if k not in ['package_path', 'nodes', 'graph']}],
@@ -2307,6 +2310,41 @@ def port_path(reply, port):
             and port.get('execution_id') == execution['execution_id']):
         return 'native'
     return None
+
+
+def check_case_port_outputs(outputs, graph, replies, journal, node_binary='node'):
+    reads = [(line, owner.get('node', {}).get('node_id'), port)
+             for line, reply in replies for owner, port in ports(reply)
+             if owner.get('status') == 'SUCCEEDED' and port_path(owner, port)]
+    checks = []
+    for table in outputs:
+        nodes = [key for key, node in graph['nodes'].items() if node['type'] == table['output_node_type']
+                 and ('output_node_label' not in table or node['label'] == table['output_node_label'])]
+        if len(nodes) != 1:
+            checks.append(dict(table=table, location=graph['location'], code='TYPED_PORT_NODE_UNRESOLVED'))
+            continue
+        readback = next(((line, port) for line, node, port in reversed(reads)
+                         if node == nodes[0] and port.get('port') == table.get('output_port', 0)), None)
+        if readback is None:
+            checks.append(dict(table=table, location=f'{journal}:1', code='TYPED_PORT_EVIDENCE_MISSING'))
+            continue
+        line, port = readback
+        checks.append(dict(table=table, location=f'{journal}:{line}', actual=port))
+    result = subprocess.run([str(node_binary), '--input-type=module', '-e', """
+import {readFileSync} from 'node:fs';
+import {pathToFileURL} from 'node:url';
+const {matchesExpectedOutput} = await import(pathToFileURL(process.argv[1]));
+const checks = JSON.parse(readFileSync(0, 'utf8'));
+console.log(JSON.stringify(checks.map(({actual, table, code, location}) => ({
+    location,
+    node: table.output_node_label ?? table.output_node_type,
+    code: code ?? (matchesExpectedOutput(actual, table) ? null : 'TYPED_PORT_DIFFERS'),
+    rows: actual?.row_count,
+    schema: actual?.schema?.map(({name, type}) => ({name, type})),
+}))));
+""", str(REPO / 'scripts/node-acceptance/expected-outputs.mjs')],
+        input=json.dumps(checks), text=True, capture_output=True, timeout=60, check=True)
+    return json.loads(result.stdout)
 
 
 def port_failure(replies, journal):
@@ -3059,6 +3097,14 @@ class Runner:
             write(folder / 'graph-observed.json', observed)
             check_case_graph(expected['graph'], observed)
             self.current['graph'] = 'PASS'
+            if 'port_outputs' in expected:
+                self.current['port-values'] = 'FAIL'
+                checks = check_case_port_outputs(expected['port_outputs'], observed, replies, folder / 'model.stdout',
+                                                 build / 'resources/loginom/bin/node')
+                write(folder / 'port-values.json', checks)
+                for check in checks:
+                    assert check['code'] is None, f"{check['code']}: {check['node']} at {check['location']}"
+                self.current['port-values'] = 'PASS'
         if spec.get('two_turn'):
             self.current['execution_id'] = check_read_turns(profile, folder, spec['two_turn'])
             self.current['two-turn'] = 'PASS'
@@ -3388,7 +3434,7 @@ class Runner:
         delivered = any(ports([o for _, o in replies]))
         assert not (lgd_corrupt and delivered), 'LGD_CORRUPT_PORTS_FORBIDDEN'
         # Some graph turns assert native tables without exporting them as CSV.
-        graph_without_tables = only_graph and not expected.get('tables')
+        graph_without_tables = only_graph and not (expected.get('tables') or expected.get('port_outputs'))
         port_optional = graph_without_tables or rejection or refusal or execution_error or lgd_corrupt
         invalid = (port_failure(replies, folder / 'model.stdout')
                    if not spec.get('variable_only') and (delivered or not port_optional) else None)
@@ -3479,7 +3525,8 @@ class Runner:
             self.current.update(csv='— (expected rejection)', cold='— (expected rejection)')
             return session, expected, None, None
         if only_graph:
-            self.current.update(csv='— (graph only)', cold='— (graph only)')
+            evidence = 'native tables' if 'port_outputs' in expected else 'graph only'
+            self.current.update(csv=f'— ({evidence})', cold=f'— ({evidence})')
             return session, expected, None, None
         if spec.get('lgd') == 'roundtrip':
             if spec.get('lgd_case'): check_lgd_export_case(replies, spec['lgd_case'], lgd_destination, lgd_initial_destination)
@@ -3855,10 +3902,11 @@ class Runner:
                         turn['status'] = 'PENDING'
                         r.update(csv='—', save='—', cleanup='—')
                         r.pop('graph', None)
+                        r.pop('port-values', None)
                         stage = folder / turn['case']
                         stage.mkdir()
                         session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
-                        turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class') if k in r},
+                        turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'port-values', 'failure_class') if k in r},
                                     status='FAIL' if r.get('failure_class') else 'PASS')
                         active_turn = None
                         if spec.get('attach_all') and r.get('failure_class'):
@@ -3913,7 +3961,7 @@ class Runner:
                     else:
                         self.failure(r, error, folder)
                     if active_turn is not None:
-                        active_turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class') if k in r},
+                        active_turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'port-values', 'failure_class') if k in r},
                                            status=r['status'])
                 finally:
                     if r.get('dataset'):

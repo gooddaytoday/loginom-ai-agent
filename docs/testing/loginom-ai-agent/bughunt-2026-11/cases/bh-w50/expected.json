@@ -62,12 +62,12 @@
     ]
   },
   "outputs": [],
-  "tables": [
+  "port_outputs": [
     {
       "output_node_type": "transform.group_data",
       "output_node_label": "Уникальные строки",
       "output_port": 0,
-      "column_order": "exact",
+      "column_order": "any",
       "ordered": false,
       "columns": [
         {

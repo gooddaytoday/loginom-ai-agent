@@ -689,8 +689,14 @@ links may be present.
 }
 ```
 
-A graph-only turn checks Save, cleanup and the graph. Add `outputs` for
-CSV checks, or `refusal` for an expected refusal. `--cold` reopens the
+A graph-only turn checks Save, cleanup and the graph. To also check table values
+without exporting a CSV, set `port_outputs` to a nonempty array of table
+expectations with `output_node_type`, optional `output_node_label` and
+zero-based `output_port`, plus the usual `columns`, `rows`, `ordered` and
+`column_order`. Each table needs a verified read on that node and port in
+the current turn. Missing evidence or a mismatch fails the turn.
+The results and journal locations are in `port-values.json`.
+Add `outputs` for CSV checks, or `refusal` for an expected refusal. `--cold` reopens the
 saved package for the final turn's output checks. The scenario entry in
 `results.json` lists the turn outcomes in order. The audited graph and its
 journal location are recorded in the turn's `graph-observed.json`.

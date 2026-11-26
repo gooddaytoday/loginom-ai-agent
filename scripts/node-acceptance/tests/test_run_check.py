@@ -2076,12 +2076,16 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
         columns = [dict(name='Value', type='integer')]
         output = dict(output_node_type='imports.text', output_port=0, export_destination='/own/sales.csv',
                       columns=columns, rows=[dict(Value=1)], ordered=True)
-        for contract, read, port_status in [
-            (dict(outputs=[]), None, '— (graph only)'),
-            (dict(outputs=[]), False, 'FAIL'),
-            (dict(outputs=[], tables=[output]), None, 'FAIL'),
-            (dict(outputs=[output]), None, 'FAIL'),
-            (dict(outputs=[output]), True, 'PASS'),
+        native_output = {k: v for k, v in output.items() if k != 'export_destination'}
+        for contract, read, port_status, values_error in [
+            (dict(outputs=[]), None, '— (graph only)', None),
+            (dict(outputs=[]), False, 'FAIL', None),
+            (dict(outputs=[], tables=[output]), None, 'FAIL', None),
+            (dict(outputs=[output]), None, 'FAIL', None),
+            (dict(outputs=[output]), True, 'PASS', None),
+            (dict(outputs=[], port_outputs=[native_output]), True, 'PASS', None),
+            (dict(outputs=[], port_outputs=[native_output]), None, None, 'TYPED_PORT_EVIDENCE_MISSING'),
+            (dict(outputs=[], port_outputs=[native_output]), '2', None, 'TYPED_PORT_DIFFERS'),
         ]:
             with self.subTest(contract=list(contract), outputs=bool(contract['outputs']), read=read), \
                     tempfile.TemporaryDirectory() as directory:
@@ -2096,12 +2100,21 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                     folder.mkdir(parents=True)
                 instance = runner.Runner.__new__(runner.Runner)
                 instance.out, instance.env, instance.options, instance.current = out, {}, dict(cases=case.parent), {}
+                build = root / 'build'
+                if 'port_outputs' in contract:
+                    node_binary = build / 'resources/loginom/bin/node'
+                    node_binary.parent.mkdir(parents=True)
+                    node_binary.symlink_to(shutil.which('node'))
 
                 def phase(name, command, folder, **kwargs):
                     self.assertEqual(name, 'model')
-                    ports = [] if read is None else [dict(port=0, schema=columns, sample=[dict(Value=1)],
-                                                          freshness_basis='completed_execution_port_source')]
-                    receipts = [dict(status='SUCCEEDED', cleanup_complete=read, output=dict(ports=ports)),
+                    ports = [] if read is None else [dict(
+                        port=0, schema=[dict(columns[0], label='Value')],
+                        sample=[[dict(type='integer', value=read if isinstance(read, str) else '1', is_null=False)]],
+                        row_count=1, sample_complete=True, precision=dict(numbers_verified=True),
+                        freshness_basis='completed_execution_port_source')]
+                    receipts = [dict(status='SUCCEEDED', node=dict(node_id='sales'),
+                                     cleanup_complete=read is not False, output=dict(ports=ports)),
                                 dict(status='SUCCEEDED', action_key='package.save_checkpoint',
                                      output=dict(save_completed=True))]
                     events = [dict(type='tool_use', sessionID='chat',
@@ -2119,10 +2132,22 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                         (profile / 'run-run-bh-sales-sales.csv').write_text('Value\n1\n')
 
                 with patch.object(instance, 'phase', side_effect=phase):
+                    if values_error:
+                        with self.assertRaisesRegex(AssertionError, values_error):
+                            instance.model(case.name, stage, profile, workspace, '/own/run.lgp',
+                                           {'package_directory': '/own'}, build)
+                        self.assertEqual(instance.current['port-values'], 'FAIL')
+                        self.assertEqual(runner.read(stage / 'port-values.json')[0]['code'], values_error)
+                        continue
                     instance.model(case.name, stage, profile, workspace, '/own/run.lgp',
-                                   {'package_directory': '/own'}, root / 'build')
+                                   {'package_directory': '/own'}, build)
                 self.assertEqual(instance.current['graph'], 'PASS')
-                self.assertEqual(instance.current['csv'], 'PASS' if contract['outputs'] else '— (graph only)')
+                if 'port_outputs' in contract:
+                    self.assertEqual(instance.current['port-values'], 'PASS')
+                    self.assertIsNone(runner.read(stage / 'port-values.json')[0]['code'])
+                    self.assertEqual(instance.current['csv'], '— (native tables)')
+                else:
+                    self.assertEqual(instance.current['csv'], 'PASS' if contract['outputs'] else '— (graph only)')
                 self.assertEqual(instance.current['port-read'], port_status)
                 if port_status == 'FAIL':
                     self.assertEqual(instance.current['failure_class'], 'PORT_READ_INVALID')
