@@ -557,3 +557,31 @@ test('add_only link ownership is the native GUID recorded at drop',()=>{
  assert.equal(late.add_only_unowned_links,true);
  assert.deepEqual(late.auto_created_links,[]);
 });
+
+for(const replace of [false,true])test('add_only rechecks the drop link before preparing deletion, replaced='+replace,async()=>{
+ const f=fixture(),mutate=f.adapter.mutate;
+ const owned={source:'source',output:0,target:'target',input:0,native_link_guid:'drop-guid'};
+ const replacement={...owned,native_link_guid:'user-guid'};
+ f.operation.parameters={mode:'add_only'};
+ Object.assign(f.graph,{dom_epoch:1,interaction_ready:true,foreign_links:[]});
+ f.adapter.mutate=async effect=>{
+  const result=await mutate(effect);
+  if(effect.kind!=='create')return result;
+  f.graph.links.push(owned);
+  return {...result,after:structuredClone(f.graph),drop_link_guids:[owned.native_link_guid]};
+ };
+ const args={...request(),target:{...request().target,label:'Union'},inputs:[]};
+ const result=await prepareNodeTarget({request:args,operation:f.operation,adapter:f.adapter,record:async event=>{
+  f.events.push(event);
+  const state=event.target_state;
+  if(replace&&state?.receipts.length===1&&state.receipts[0].kind==='create'&&!state.pending)
+   f.graph.links=[replacement];
+  return event;
+ }});
+ assert.equal(result.status,replace?'AMBIGUOUS':'SUCCEEDED',result.error);
+ assert.deepEqual(f.calls,replace?['create']:['create','remove_link']);
+ const deletion=f.events.find(e=>e.phase==='node_target_effect_prepared'&&e.effect.kind==='remove_link');
+ assert.deepEqual(deletion?.effect.parameters.edge,replace?undefined:owned);
+ assert.deepEqual(f.graph.links,replace?[replacement]:[]);
+ if(replace)assert.match(result.error,/owned add-only link identity changed before deletion/i);
+});

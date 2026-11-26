@@ -2770,7 +2770,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           +(filterReconnectPending(operation)?' Release requires the original Loginom session to reconnect. If it cannot reconnect, report the operation as blocked.':'')}:null;
   const addOnlyWindowStep=operation=>{
     const effect=operation?.targetPhase?.pending,receipt=effect?.receipt;
-    if(effect?.kind!=='create'||effect.parameters.add_only!==true||receipt?.add_only_window_pending!==true
+    if(effect?.kind!=='create'||effect.parameters.add_only!==true||receipt?.status!=='AMBIGUOUS'||receipt.add_only_window_pending!==true
       ||!receipt.add_only_window_node_id||receipt.cleanup_complete!==false)return null;
     return {tool:'dock_operation_inspect',arguments:{operation_id:operation.id},
       instruction:'Ask the user to close the window for this node and wait for the graph to settle. Then inspect this same operation and use abandon_operation with a new recovery_operation_id.'};
@@ -2805,9 +2805,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const diagnostic=operationFailureDiagnostic(error);
         const waitingForLoginom=filterReconnectPending(operation)&&diagnostic.code==='LOGINOM_DISCONNECTED'
           &&diagnostic.detail==='reason=awaiting_original_attempt';
-        if(!waitingForLoginom)operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:error?.userAction??null};
+        const manualWindowStep=addOnlyWindowStep(operation);
+        // The owned window must settle before the first eligible release.
+        if(manualWindowStep)operation.releaseRefused=null;
+        else if(!waitingForLoginom)operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:error?.userAction??null};
         const trigger=waitingForLoginom?null:browserRecoveryTrigger(operation,null);
-        const nextStep=addOnlyWindowStep(operation)??(waitingForLoginom?{
+        const nextStep=manualWindowStep??(waitingForLoginom?{
           instruction:'Wait for the original Loginom session to reconnect. Then call dock_operation_recover with abandon_operation for the original operation_id and a NEW recovery_operation_id. If the original session cannot reconnect, report the operation as blocked.'
         }:trigger?browserRecoveryNext(operation,trigger):null);
         returned={status:'AMBIGUOUS',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'release_refused',
