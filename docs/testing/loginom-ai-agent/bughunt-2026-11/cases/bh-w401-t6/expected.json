@@ -129,7 +129,7 @@
         }
       ],
       "ordered": true,
-      "column_order": "exact"
+      "column_order": "any"
     }
   ],
   "excel_artifact": {

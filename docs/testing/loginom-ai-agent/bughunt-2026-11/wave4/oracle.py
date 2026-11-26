@@ -52,7 +52,7 @@ def link(source, target, *, output=0, input_port=0):
     return dict(source=source, target=target, output=output, input=input_port)
 
 
-def table(kind, schema, rows, *, ordered=False, port=0, exact_columns=False, label=None, free_labels=False):
+def table(kind, schema, rows, *, ordered=False, port=0, label=None, free_labels=False):
     converters = {"integer": int, "real": float, "string": str}
     output = dict(
         output_node_type=kind,
@@ -70,7 +70,7 @@ def table(kind, schema, rows, *, ordered=False, port=0, exact_columns=False, lab
             for row in rows
         ],
         ordered=ordered,
-        column_order="exact" if exact_columns else "any",
+        column_order="any",
     )
     if free_labels:
         for column in output["columns"]:
@@ -171,7 +171,7 @@ def regional_revenue(orders, clients):
     nodes.append(node("excel", EXCEL))
     links.append(link("sort", "excel"))
     chain.turn("Выгрузи отсортированный результат в regional-revenue.xlsx на лист «Регионы», с заголовками region и total_revenue в таком порядке. Приложи книгу и покажи строки исходной сортировки.",
-               nodes, links, [table(SORT, schema, sorted_rows, ordered=True, exact_columns=True)],
+               nodes, links, [table(SORT, schema, sorted_rows, ordered=True)],
                excel=dict(filename="regional-revenue.xlsx", sheet_name="Регионы", header="names"))
     return chain
 
