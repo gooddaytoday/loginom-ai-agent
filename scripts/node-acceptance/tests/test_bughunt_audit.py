@@ -436,6 +436,31 @@ class BughuntAuditTests(unittest.TestCase):
         build = self.dock('node_wait', dict(status='SUCCEEDED', action_key='node.apply'), operation_id='done')
         self.assertFalse(any(case['pattern'] == 'g' for case in self.patterns([blocker, build])))
 
+    def test_manual_edit_failure_is_reported_separately_from_model_journal(self):
+        root = self.temp_run([self.release_refusal('pending')])
+        for code, category in [('MANUAL_EDIT_GESTURE_FAILED', 'runner/setup'),
+                               ('MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED', 'product')]:
+            with self.subTest(category=category):
+                manual = dict(kind='rename', status='FAIL', failure_class=code, failure_category=category)
+                scenario = dict(scenario='sample', status='FAIL', failed_phase='manual-edit', failure_class=code,
+                                failure_category=category, location='checks.jsonl:1', turns=[
+                                    dict(turn=1, case='sample', status='PASS', manual_edit=manual),
+                                ])
+                (root / 'results.json').write_text(json.dumps(dict(phase='complete', runs=[scenario])))
+                _, patterns = self.report('--patterns', root)
+                run = patterns['runs'][0]
+                _, standard = self.report(root)
+                manual_edits = run['results']['manual_edits']
+                self.assertEqual(manual_edits, standard['manual_edits'])
+                self.assertEqual(len(manual_edits), 1)
+                self.assertEqual(manual_edits[0]['failure_category'], category)
+                self.assertEqual(manual_edits[0]['failure_class'], code)
+                self.assertEqual(manual_edits[0]['location'], 'checks.jsonl:1')
+                self.assertEqual(any(case['pattern'] == 'g' for case in run['cases']), category == 'product')
+                markdown = self.run_audit('--patterns', root).stdout
+                self.assertIn('### Сбои ручных правок', markdown)
+                self.assertIn(f'| sample | 1 | rename | FAIL | {category} | {code} | checks.jsonl:1 |', markdown)
+
     def test_pattern_outputs_include_each_run_even_without_matches(self):
         root = self.temp_run([dict(type='step_finish', part={})])
         output = root / 'patterns-output'

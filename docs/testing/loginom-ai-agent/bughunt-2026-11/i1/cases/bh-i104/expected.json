@@ -1,0 +1,98 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    },
+    {
+      "type": "programming.javascript",
+      "label_any": true
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "events",
+        "type": "imports.text"
+      },
+      {
+        "id": "parse",
+        "type": "programming.javascript"
+      }
+    ],
+    "links": [
+      {
+        "source": "events",
+        "target": "parse"
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-i104-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "EventId",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sku",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Quantity",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "ParseStatus",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "EventId": 11,
+          "Sku": "A-1",
+          "Quantity": 0,
+          "ParseStatus": "ok"
+        },
+        {
+          "EventId": 12,
+          "Sku": null,
+          "Quantity": null,
+          "ParseStatus": "invalid_json"
+        },
+        {
+          "EventId": 13,
+          "Sku": "C-3",
+          "Quantity": null,
+          "ParseStatus": "ok"
+        },
+        {
+          "EventId": 14,
+          "Sku": "E-5",
+          "Quantity": -2,
+          "ParseStatus": "ok"
+        },
+        {
+          "EventId": 15,
+          "Sku": "К-17",
+          "Quantity": 3,
+          "ParseStatus": "ok"
+        },
+        {
+          "EventId": 16,
+          "Sku": "D-4",
+          "Quantity": null,
+          "ParseStatus": "ok"
+        }
+      ]
+    }
+  ]
+}
