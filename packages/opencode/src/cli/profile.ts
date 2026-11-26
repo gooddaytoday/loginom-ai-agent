@@ -1,10 +1,16 @@
 import fs from "node:fs/promises"
+import os from "node:os"
 import path from "node:path"
+import { execFile } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { Product } from "@loginom-ai-agent/product"
 import { profilePaths } from "@loginom-ai-agent/product/cli-profile"
 
-export async function acquireProfile(root: string, channel: keyof typeof Product.channels) {
+export async function acquireProfile(
+  root: string,
+  channel: keyof typeof Product.channels,
+  options: WriterOptions = {},
+) {
   if (!path.isAbsolute(root)) throw new Error("PROFILE_ROOT_INVALID")
   await fs.mkdir(root, { recursive: true, mode: 0o700 })
   const canonical = await fs.realpath(root)
@@ -24,16 +30,11 @@ export async function acquireProfile(root: string, channel: keyof typeof Product
       throw new Error("PROFILE_PERMISSIONS_INVALID")
   }
   const lock = path.join(canonical, ".writer")
-  const nonce = randomUUID()
-  await fs.mkdir(lock, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "EEXIST") throw new Error("PROFILE_BUSY")
-    throw error
-  })
-  await fs.writeFile(path.join(lock, "owner"), nonce, { flag: "wx", mode: 0o600 })
+  const owner = await admitWriter(canonical, lock, options)
   const release = async () => {
-    if ((await fs.readFile(path.join(lock, "owner"), "utf8")) !== nonce) throw new Error("PROFILE_OWNER_CHANGED")
+    if ((await fs.readFile(path.join(lock, "owner"), "utf8")) !== owner) throw new Error("PROFILE_OWNER_CHANGED")
     await fs.unlink(path.join(lock, "owner"))
-    await fs.rmdir(lock)
+    await removeGuard(lock)
   }
   try {
     const marker = path.join(canonical, "cli-profile.json")
@@ -94,4 +95,393 @@ export function profileEnvironment(paths: ReturnType<typeof profilePaths>, env: 
     TMP: paths.tmp,
     TEMP: paths.tmp,
   }
+}
+
+// Writer guard (design §6.3). `.writer/owner` names the owning CLI process. A
+// guard is taken over only when that exact process is gone (pid plus start
+// time, so a reused pid is not mistaken for the owner) AND no process of the
+// previous run still uses the profile: after SIGKILL the forked host, runtime
+// and Chromium keep running their own shutdown. Anything that cannot be proven
+// (older owner format, other host or pid namespace, probe failure) stays busy.
+export type WriterOwner = {
+  format: "loginom-cli-writer"
+  version: 1
+  nonce: string
+  pid: number
+  /** Epoch ms, measured by the owner itself; not earlier than its OS creation time. */
+  start: number
+  host: string
+  linux?: { boot: string; namespace: string; ticks: string }
+}
+export type WriterSurvivor = { pid: number; command: string }
+export type WriterProbe = {
+  self(): Promise<Pick<WriterOwner, "pid" | "start" | "host" | "linux">>
+  owner(owner: WriterOwner): Promise<"alive" | "dead" | "unknown">
+  survivors(root: string, owner: WriterOwner): Promise<WriterSurvivor[]>
+}
+export type WriterOptions = {
+  probe?: Partial<WriterProbe>
+  /** How long to wait for the previous run's processes to exit. */
+  wait?: number
+  notice?: (text: string) => void
+}
+
+const WRITER_WAIT_MS = 30_000
+// The owner records its start after the OS created it. A process created
+// later than this margin is another process that reuses the pid.
+const START_MARGIN_MS = 5_000
+
+async function admitWriter(root: string, lock: string, options: WriterOptions) {
+  const probe = { ...systemWriterProbe, ...options.probe }
+  const notice = options.notice ?? terminalNotice
+  const ownerPath = path.join(lock, "owner")
+  const nonce = randomUUID()
+  const owner = JSON.stringify({ format: "loginom-cli-writer", version: 1, nonce, ...(await probe.self()) })
+  const deadline = Date.now() + (options.wait ?? WRITER_WAIT_MS)
+  let announced = false
+  for (;;) {
+    const created = await fs.mkdir(lock, { mode: 0o700 }).then(
+      () => true,
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === "EEXIST") return false
+        throw error
+      },
+    )
+    if (created) {
+      await fs.writeFile(ownerPath, owner, { flag: "wx", mode: 0o600 })
+      return owner
+    }
+    const observed = await readOwner(ownerPath)
+    let pending: string
+    if (observed === undefined) pending = `${lock} has no owner yet; it is being created or released.`
+    else {
+      const previous = parseOwner(observed)
+      if (!previous)
+        busy(
+          notice,
+          `Profile ${root} is locked by ${lock}, whose owner cannot be verified (an older CLI or a damaged guard). ` +
+            `If no ${Product.cliExecutable} process uses this profile, remove ${lock} and retry.`,
+        )
+      const state = await probe.owner(previous).catch(() => "unknown" as const)
+      if (state !== "dead") busy(notice, describeOwner(root, lock, previous, state))
+      const survivors = (
+        await probe.survivors(root, previous).catch(() =>
+          busy(
+            notice,
+            `Process ${previous.pid} that used profile ${root} has exited, but its remaining processes cannot be listed. ` +
+              `If none of them still runs, remove ${lock} and retry.`,
+          ),
+        )
+      ).filter((entry) => entry.pid !== process.pid)
+      if (survivors.length) {
+        pending =
+          `Process ${previous.pid} that used profile ${root} has exited, but processes of its run still use the profile: ` +
+          survivors.map((entry) => `${entry.pid} (${entry.command.slice(0, 120)})`).join(", ") +
+          ". Wait for them to exit or stop them, then retry."
+        if (!announced && Date.now() < deadline) notice(`Waiting for the previous run to exit. ${pending}`)
+        announced = true
+      } else {
+        const outcome = await replaceOwner(lock, observed, owner, nonce)
+        if (outcome === "taken") return owner
+        pending =
+          outcome === "claimed"
+            ? `Another process is taking over ${lock}. If this persists and no ${Product.cliExecutable} process uses the profile, remove ${lock} and retry.`
+            : `${lock} changed while it was being taken over.`
+        if (outcome === "changed" && Date.now() < deadline) continue
+      }
+    }
+    if (Date.now() >= deadline) busy(notice, pending)
+    await new Promise((resolve) => setTimeout(resolve, Math.min(200, Math.max(0, deadline - Date.now()))))
+  }
+}
+
+// Compare-and-swap of the owner: the exclusive claim file serialises
+// contenders, and the owner is replaced only if it still holds the bytes
+// that were judged stale. A claim left by a crashed contender stays busy.
+async function replaceOwner(lock: string, observed: string, owner: string, nonce: string) {
+  const claim = path.join(lock, "takeover")
+  const refused = await fs.writeFile(claim, owner, { flag: "wx", mode: 0o600 }).then(
+    () => undefined,
+    (error: NodeJS.ErrnoException) => {
+      if (error.code === "EEXIST") return "claimed" as const
+      if (error.code === "ENOENT") return "changed" as const
+      throw error
+    },
+  )
+  if (refused) return refused
+  const temporary = path.join(lock, `owner-${nonce}`)
+  try {
+    if ((await readOwner(path.join(lock, "owner"))) !== observed) return "changed" as const
+    await fs.writeFile(temporary, owner, { flag: "wx", mode: 0o600 })
+    await fs.rename(temporary, path.join(lock, "owner"))
+    return "taken" as const
+  } finally {
+    await fs.rm(temporary, { force: true })
+    await fs.unlink(claim)
+  }
+}
+
+// A contender may hold a claim for a moment while it observes a changed owner.
+async function removeGuard(lock: string) {
+  for (let attempt = 0; ; attempt++) {
+    const removed = await fs.rmdir(lock).then(
+      () => true,
+      (error: NodeJS.ErrnoException) => {
+        if (error.code !== "ENOTEMPTY" || attempt >= 40) throw error
+        return false
+      },
+    )
+    if (removed) return
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+}
+
+async function readOwner(file: string) {
+  const info = await fs.lstat(file).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  })
+  if (!info) return undefined
+  if (!info.isFile() || info.isSymbolicLink()) throw new Error("PROFILE_BUSY")
+  return fs.readFile(file, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  })
+}
+
+export function parseOwner(text: string): WriterOwner | undefined {
+  const value: unknown = (() => {
+    try {
+      return JSON.parse(text)
+    } catch {
+      return undefined
+    }
+  })()
+  if (typeof value !== "object" || value === null) return undefined
+  const owner = value as Partial<WriterOwner>
+  if (
+    owner.format !== "loginom-cli-writer" ||
+    owner.version !== 1 ||
+    typeof owner.nonce !== "string" ||
+    !Number.isSafeInteger(owner.pid) ||
+    (owner.pid ?? 0) <= 0 ||
+    !Number.isFinite(owner.start) ||
+    typeof owner.host !== "string"
+  )
+    return undefined
+  const linux = owner.linux
+  if (
+    linux !== undefined &&
+    (typeof linux !== "object" ||
+      linux === null ||
+      typeof linux.boot !== "string" ||
+      typeof linux.namespace !== "string" ||
+      typeof linux.ticks !== "string")
+  )
+    return undefined
+  return owner as WriterOwner
+}
+
+function describeOwner(root: string, lock: string, owner: WriterOwner, state: "alive" | "unknown") {
+  const holder = `process ${owner.pid} on ${owner.host}, started ${new Date(owner.start).toISOString()}`
+  if (state === "alive")
+    return (
+      `Profile ${root} is in use by ${holder}. Wait for it to finish or stop it, ` +
+      `or use another profile (LOGINOM_AI_AGENT_CLI_PROFILE).`
+    )
+  return (
+    `Profile ${root} is locked by ${holder}, which cannot be checked from here. ` +
+    `If that process and its children have exited, remove ${lock} and retry.`
+  )
+}
+
+function busy(notice: (text: string) => void, text: string): never {
+  notice(text)
+  throw new Error("PROFILE_BUSY")
+}
+
+// Machine consumers match stderr "PROFILE_BUSY" exactly; explain only to a person.
+function terminalNotice(text: string) {
+  if (process.stderr.isTTY) process.stderr.write(`${text}\n`)
+}
+
+function inside(root: string, value: string) {
+  return value === root || value.startsWith(root + path.sep)
+}
+
+async function linuxStat(pid: number | "self") {
+  const text = await fs.readFile(`/proc/${pid}/stat`, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT" || error.code === "ESRCH") return undefined
+    throw error
+  })
+  if (text === undefined) return undefined
+  const fields = text.slice(text.lastIndexOf(")") + 2).split(" ")
+  const ticks = fields[19]
+  if (!fields[0] || !ticks || !/^\d+$/.test(ticks)) throw new Error("PROFILE_OWNER_UNREADABLE")
+  return { state: fields[0], ticks }
+}
+
+async function linuxSystem() {
+  return {
+    boot: (await fs.readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim(),
+    namespace: await fs.readlink("/proc/self/ns/pid"),
+  }
+}
+
+function run(file: string, args: string[], options: { env?: NodeJS.ProcessEnv; timeout?: number } = {}) {
+  return new Promise<{ code: number; stdout: string }>((resolve, reject) => {
+    execFile(
+      file,
+      args,
+      { env: options.env, timeout: options.timeout ?? 10_000, maxBuffer: 64 * 1024 * 1024, windowsHide: true },
+      (error, stdout) => {
+        if (error && typeof error.code !== "number") return reject(error)
+        resolve({ code: typeof error?.code === "number" ? error.code : 0, stdout })
+      },
+    )
+  })
+}
+
+async function windowsProcesses() {
+  const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
+  if (!systemRoot || !path.win32.isAbsolute(systemRoot)) throw new Error("PROFILE_OWNER_UNREADABLE")
+  const { windowsPowerShellArguments, WINDOWS_POWERSHELL_TIMEOUT_MS } = await import(
+    "@loginom-ai-agent/loginom-host/windows-powershell"
+  )
+  const script = `
+$ErrorActionPreference = 'Stop'
+try {
+  $items = @(Get-CimInstance Win32_Process | ForEach-Object {
+    $created = 0
+    if ($_.CreationDate) { $created = ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() }
+    [pscustomobject]@{ p = [long]$_.ProcessId; pp = [long]$_.ParentProcessId; c = $created; l = [string]$_.CommandLine }
+  })
+  [Console]::Out.Write((ConvertTo-Json -InputObject $items -Compress -Depth 2))
+} catch { exit 1 }
+`
+  const result = await run(
+    path.win32.join(systemRoot, "System32/WindowsPowerShell/v1.0/powershell.exe"),
+    windowsPowerShellArguments(script),
+    { env: { SystemRoot: systemRoot }, timeout: WINDOWS_POWERSHELL_TIMEOUT_MS },
+  )
+  if (result.code !== 0) throw new Error("PROFILE_OWNER_UNREADABLE")
+  const value: unknown = JSON.parse(result.stdout)
+  if (!Array.isArray(value)) throw new Error("PROFILE_OWNER_UNREADABLE")
+  return value.map((entry: { p: number; pp: number; c: number; l: string | null }) => ({
+    pid: Number(entry.p),
+    parent: Number(entry.pp),
+    created: Number(entry.c),
+    command: String(entry.l ?? ""),
+  }))
+}
+
+async function linuxSurvivors(root: string) {
+  const uid = process.getuid?.()
+  const readable = <T>(operation: Promise<T>) =>
+    operation.catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "EACCES" || error.code === "EPERM") return undefined
+      throw error
+    })
+  const entries = await Promise.all(
+    (await fs.readdir("/proc"))
+      .filter((name) => /^\d+$/.test(name) && Number(name) !== process.pid)
+      .map(async (name): Promise<WriterSurvivor | undefined> => {
+        try {
+          if ((await fs.stat(`/proc/${name}`)).uid !== uid) return undefined
+          const stat = await linuxStat(Number(name))
+          if (!stat || stat.state === "Z" || stat.state === "X") return undefined
+          const args = ((await readable(fs.readFile(`/proc/${name}/cmdline`, "utf8"))) ?? "").split("\0")
+          const cwd = await readable(fs.readlink(`/proc/${name}/cwd`))
+          // The host and runtime carry the profile only through TMPDIR (a
+          // symlink alias on Linux) and cwd; Chromium through its argv.
+          const environment = ((await readable(fs.readFile(`/proc/${name}/environ`, "utf8"))) ?? "")
+            .split("\0")
+            .filter((entry) => /^(LOGINOM_AI_AGENT_CLI_ROOT|TMPDIR|TMP|TEMP)=\//.test(entry))
+            .map((entry) => entry.slice(entry.indexOf("=") + 1))
+          const resolved = await Promise.all(environment.map((value) => fs.realpath(value).catch(() => value)))
+          const uses =
+            (cwd !== undefined && inside(root, cwd)) ||
+            resolved.some((value) => inside(root, value)) ||
+            args.some((arg) => inside(root, arg) || arg.includes(root + path.sep) || arg.endsWith(`=${root}`))
+          return uses ? { pid: Number(name), command: args.filter(Boolean).join(" ") } : undefined
+        } catch (error) {
+          if (["ENOENT", "ESRCH"].includes((error as NodeJS.ErrnoException).code ?? "")) return undefined
+          throw error
+        }
+      }),
+  )
+  return entries.filter((entry) => entry !== undefined)
+}
+
+export const systemWriterProbe: WriterProbe = {
+  async self() {
+    const identity = {
+      pid: process.pid,
+      start: Math.floor(Date.now() - process.uptime() * 1000),
+      host: os.hostname(),
+    }
+    if (process.platform !== "linux") return identity
+    const [system, stat] = await Promise.all([linuxSystem(), linuxStat("self")]).catch(() => [undefined, undefined])
+    if (!system || !stat) return identity
+    return { ...identity, linux: { ...system, ticks: stat.ticks } }
+  },
+  async owner(owner) {
+    if (owner.host !== os.hostname()) return "unknown"
+    if (process.platform === "linux") {
+      if (!owner.linux) return "unknown"
+      const system = await linuxSystem()
+      if (owner.linux.boot !== system.boot) return "dead"
+      if (owner.linux.namespace !== system.namespace) return "unknown"
+      const stat = await linuxStat(owner.pid)
+      if (!stat || stat.state === "Z" || stat.state === "X" || stat.ticks !== owner.linux.ticks) return "dead"
+      return "alive"
+    }
+    if (process.platform === "win32") {
+      const entry = (await windowsProcesses()).find((item) => item.pid === owner.pid)
+      if (!entry) return "dead"
+      return entry.created > owner.start + START_MARGIN_MS ? "dead" : "alive"
+    }
+    try {
+      process.kill(owner.pid, 0)
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "ESRCH" ? "dead" : "unknown"
+    }
+    const result = await run("/bin/ps", ["-o", "lstart=", "-p", String(owner.pid)], {
+      env: { LC_ALL: "C", PATH: "/usr/bin:/bin", ...(process.env.TZ ? { TZ: process.env.TZ } : {}) },
+    })
+    if (result.code !== 0 && !result.stdout.trim()) return "dead"
+    const created = Date.parse(result.stdout.trim())
+    if (!Number.isFinite(created)) return "unknown"
+    return created > owner.start + START_MARGIN_MS ? "dead" : "alive"
+  },
+  async survivors(root, owner) {
+    if (process.platform === "linux") return linuxSurvivors(root)
+    if (process.platform === "win32") {
+      // Windows keeps ParentProcessId of orphans, so the dead owner's process
+      // tree is still discoverable; Chromium also names the profile in argv.
+      const processes = (await windowsProcesses()).filter((entry) => entry.pid !== process.pid)
+      const lower = root.toLowerCase()
+      const found = new Map<number, WriterSurvivor>()
+      for (const entry of processes)
+        if (entry.command.toLowerCase().includes(lower)) found.set(entry.pid, { pid: entry.pid, command: entry.command })
+      const queue = [owner.pid]
+      const visited = new Set(queue)
+      for (let parent = queue.shift(); parent !== undefined; parent = queue.shift())
+        for (const entry of processes)
+          if (entry.parent === parent && entry.created >= owner.start - START_MARGIN_MS && !visited.has(entry.pid)) {
+            visited.add(entry.pid)
+            found.set(entry.pid, { pid: entry.pid, command: entry.command })
+            queue.push(entry.pid)
+          }
+      return [...found.values()]
+    }
+    const result = await run("/bin/ps", ["-axww", "-o", "pid=,command="], { env: { LC_ALL: "C", PATH: "/usr/bin:/bin" } })
+    if (result.code !== 0) throw new Error("PROFILE_OWNER_UNREADABLE")
+    return result.stdout
+      .split("\n")
+      .map((line) => /^\s*(\d+)\s+(.*)$/.exec(line))
+      .filter((match): match is RegExpExecArray => match !== null)
+      .map((match) => ({ pid: Number(match[1]), command: match[2] ?? "" }))
+      .filter((entry) => entry.pid !== process.pid && entry.command.includes(root + path.sep))
+  },
 }
