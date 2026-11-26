@@ -306,8 +306,8 @@ jobs:
           } finally { Pop-Location }
           Push-Location packages/cli
           try {
-            & $env:LOGINOM_CI_BUN_PATH typecheck
-            if ($LASTEXITCODE -ne 0) { throw "Agent typecheck failed" }
+            # No `bun typecheck` here (B5.1j): the filtered install of build-windows.ps1 leaves out the root devDependencies
+            # (`@types/mime-types`) that packages/core and util need, and check.yml already type-checks this package.
             & ..\..\script\test-windows-profile.ps1 -BunPath $env:LOGINOM_CI_BUN_PATH
             if ($LASTEXITCODE -ne 0) { throw "Windows profile tests failed" }
           } finally { Pop-Location }

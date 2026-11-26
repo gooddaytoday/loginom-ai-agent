@@ -25722,3 +25722,14 @@ $ python3 -I scripts/upstream-sync/apply-identity.py --check        # would chan
 $ bun run check                                                     # код 0, Tasks: 39 successful, 39 total (Cached: 39, пакеты не менялись)
 $ prettier --check / oxlint scripts/live-profiles/live.mjs          # чисто, 0 warnings, 0 errors
 ```
+
+### B5.1j-types: typecheck агента на Windows
+
+Ветка `b51j3-windows-types` от `oc2-migration` (`89c4fecaf8`). Run 45786926746: `Agent typecheck` (`packages/cli`) упал с TS7016 для
+`mime-types` в `core/src/artifact.ts`, `tool/mcp.ts`, `read-filesystem.ts`, `util/src/fs-util.ts`. Причина: `@types/mime-types`
+объявлен в корневом `package.json`, а установка `build-windows.ps1` идёт с тремя `--filter` по пакетам и корень не ставит.
+Выбран третий вариант: `bun typecheck` пакета `cli` убран из шага Windows. Тип-проверка этого же пакета выполняется в
+`check.yml` (`bun run typecheck:tsc`, полный репозиторий) и в `bun run check`; платформенных типов у `cli` на Windows нет.
+Проверки типов `desktop` и `loginom-host` на Windows остались (прошли). Установку не менял: фильтр корня без запуска на Windows
+проверить нельзя, а расширение установки удлиняет сборку. Тест профиля `test-windows-profile.ps1` оставлен.
+Проверки: `actionlint` 0 строк; `product` 0 падений; `catalog-check.py` 0; `apply-identity --check` 0 файлов; `bun run check` 0.
