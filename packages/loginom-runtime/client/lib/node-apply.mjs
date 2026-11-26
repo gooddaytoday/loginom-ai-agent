@@ -620,11 +620,12 @@ export async function applyNode({request, operation, handlers, drivers, record,
         Object.fromEntries(['source','output','target','input'].map(f=>[f,r[k][f]]))])))}:{}),
       execution:state.execution,output:state.output,package_saved:false,cleanup_complete:true,
       warnings:request.target.type==='imports.text'&&typeof finish.node_label==='string'
-        ?['Import node '+JSON.stringify(state.node)+' has observed caption '+JSON.stringify(finish.node_label)+' after Finish. '
-          +'Loginom may replace its default caption with the source filename. If the user requested a different caption, including “Текстовый файл”, '
+        ?['Import node '+JSON.stringify(state.node)+' has observed caption '+JSON.stringify(finish.node_label)+' after Finish.'
+          +(request.target.label!==undefined&&finish.node_label!==request.target.label&&request.parameters.settings?.node_title===undefined
+          ?' If the user requested a different caption, '
           +'use a NEW dock_node_apply operation_id on this SAME existing node with target.label set to the requested caption, '
-          +'parameters:{settings:{}}, inputs:[], mappings:[], finish:"execute" and read.ports:[0]. This preserves the saved import configuration without uploading again. '
-          +'Otherwise report this actual caption.']:[],
+          +'parameters:{settings:{}}, inputs:[], mappings:[], finish:"execute" and read.ports:[0]. This preserves the saved import configuration without uploading again.'
+          :'')]:[],
       configuration:{status:readingOnly?'not_requested':request.finish==='close'?'discarded':'applied'},
       checkpoint_kind:request.finish==='close'?'local_node_cancellation':'local_node_checkpoint',persisted_package_verified:false};
     if(request.target.kind==='new'&&request.parameters.preview_only===true&&state.output?.server_profile)result.next_step={
@@ -730,7 +731,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         instruction:'FS/Fetch scripts need declared output columns before execution. Submit a NEW operation_id: configure a NEW JavaScript node with parameters.schema_mode:"declared" and complete columns, retaining the intended source and inputs, then finish:"execute". Existing-node requests cannot change schema mode. Alternatively configure the SAME target with finish:"done", read:{ports:[],sample_rows:0,require_exact_numbers:false} and no coverage. Other import admission rules still apply.'}}:{}),
       pending_phase:state.pending?.phase??null,error:state.javascript_wizard_refusal&&state.verified_refusal
         ?{code:'JAVASCRIPT_WIZARD_SOURCE_REJECTED',message:String(error.message).slice(0,1000),native:state.javascript_wizard_refusal.native}
-        :{code:state.existing_read_refusal?error.code:state.javascript_declared_output_required?JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT:error.nodeExecutionFailure?.code??/^(BINDING_PARAMETER_UNSUPPORTED|BINDING_CONFLICT|BINDING_VARIABLE_MISSING|BINDING_TYPE_MISMATCH|BINDING_NULL_UNSUPPORTED|BINDING_VALUE_INVALID|BINDING_PORT_MISMATCH|BINDING_SOURCE_UNVERIFIED|UNION_AUTO_MATCH_AMBIGUOUS|LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
+        :{code:state.existing_read_refusal?error.code:state.javascript_declared_output_required?JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT:error.nodeExecutionFailure?.code??/^(BINDING_PARAMETER_UNSUPPORTED|BINDING_CONFLICT|BINDING_VARIABLE_MISSING|BINDING_TYPE_MISMATCH|BINDING_NULL_UNSUPPORTED|BINDING_VALUE_INVALID|BINDING_PORT_MISMATCH|BINDING_SOURCE_UNVERIFIED|UNION_AUTO_MATCH_AMBIGUOUS|LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED|NODE_LABEL_NOT_PRESERVED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
         ...(typeof error.receipt?.error?.code==='string'&&typeof error.receipt.error.message==='string'?{cause:{code:error.receipt.error.code.slice(0,120),
           message:String(error.receipt.error.message??'').slice(0,240)}}:{})}};
   }
