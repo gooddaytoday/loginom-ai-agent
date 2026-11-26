@@ -568,8 +568,8 @@ there are no empty strings. Missing export evidence
 fails `CSV_NULL_MARKER_MISSING`; unsupported markers fail
 `CSV_NULL_MARKER_UNSUPPORTED`. Every NULL cell still must match the chosen marker.
 
-For types300 only, the runner selects the private `--exact-port-windows` cold
-reader. It reads every expected row through contiguous production port windows,
+For types300 and large database outputs, the runner selects the private
+`--exact-port-windows` cold reader. It reads every expected row through contiguous production port windows,
 retaining the same document, workflow, node, port and completed execution.
 Changed bindings, schema, row count, unverified precision or incomplete cleanup
 refuse the result. Each window keeps the ordinary preview budgets; the assembled
@@ -656,13 +656,59 @@ with the same profile, workspace and package. It rejects cycles before
 launching. The root attaches the files in `data/` by default, in any format.
 A continuation attaches only its listed `input_files`.
 
+A case with a following turn can set `manual_edit` in `case.json`.
+The runner waits for the current CLI to close the saved package and
+acknowledge shutdown. It then opens that same package in a separate browser
+under the worker account, performs one UI edit, saves, closes and logs out.
+A second open checks persistence. The next model turn uses the existing chat
+and package. The edit, expected graph and browser receipts stay private.
+
+| `kind` | Fields |
+|---|---|
+| `create` | `type`, optional `position` |
+| `rename` | `node`, new `label` |
+| `move` | `node`, `position` |
+| `remove_link`, `connect` | `source`, `target`, zero-based `output` and `input` |
+| `filter_threshold` | `node`, input `field`, numeric literal `value` |
+| `delete_node` | `node` |
+
+A node selector uses an exact `label`, a canonical `type` or both.
+It must identify exactly one node. A position specifies integer `x` and `y` in model
+coordinates. Create requires an unconnected drop. Threshold edits require a
+unique numeric scalar condition on the given field. The edit fails the chain
+if the gesture, graph delta, save, persistence or cleanup cannot be proved.
+The preceding model turn keeps its outcome. The summary and bughunt audit
+report the failed edit separately as `runner/setup`. An unconfirmed CLI
+package close or missing close acknowledgement is classified as `product`.
+Use `manual/execution-events.jsonl` and `manual/result.json` in the preceding
+turn's directory to read the before, after and persisted evidence.
+For native-port turns, a terminal `CLI_TOOL_FAILED` is still a failed turn.
+The runner may continue if that turn's outputs, save and fresh package
+close and logout all pass verification.
+
+Database cases can use `[[DB:DB_HOST]]`, `[[DB:DB_PASSWORD]]` and other
+`[[DB:DB_*]]` fields in `task.md`. The runner reads UTF-8
+`~/.config/loginom-run-check/db-test.conf` as literal `DB_KEY=value`
+assignments. Blank lines and lines starting with `#` are skipped. One pair
+of matching outer quotes is stripped. Missing or empty referenced fields
+fail before launch. The CLI receives the expanded task over stdin.
+The runner masks `DB_PASSWORD` in the saved task, phase output, reports
+and collected text journals. The temporary CLI chat database stays
+available across case turns and is removed when the scenario finishes.
+With `--cold`, database cases with more than 100 expected rows in an
+output use exact native port reads in windows of up to 100 rows. The
+runner verifies every row, up to 1000 per output.
+
 Any turn may add `graph` to `expected.json`. The runner checks the latest
 complete graph recorded during the turn in the existing runtime journal.
 Use a unique local `id` and the canonical `type` for each required node.
 Add `label` for an exact caption or `label_contains` for a case-sensitive
 substring. Each selector must match one distinct node. Links refer to those
-IDs, with optional zero-based `output` and `input` ports. Extra nodes and
-links may be present.
+IDs, with optional zero-based `output` and `input` ports. Setting `exact`
+to true requires both port indexes and rejects extra nodes and links. The
+optional `retain` list requires the same native node IDs from the previous
+turn or its persisted manual graph. A retained manual move must preserve the
+observed canvas position.
 
 ```json
 {
@@ -677,7 +723,16 @@ links may be present.
 ```
 
 A graph-only turn checks Save, cleanup and the graph. Add `outputs` for
-CSV checks, or `refusal` for an expected refusal. `--cold` reopens the
+CSV checks, or `refusal` for an expected refusal. A private case can set
+`"output_mode": "ports"` in `case.json` to check complete typed reads from
+the requested graph node and port. This mode uses `outputs` with
+`output_node_type`, optional `output_node_label`, and zero-based
+`output_port`. It can also check a requested downloaded Excel workbook using
+`excel_artifact` with `filename`, `sheet_name` and `header`. The first
+output supplies the workbook's typed rows in order. The oracle matches columns
+by their headings by default. Set `column_order: "exact"` on the output or
+artifact when the task specifies a column sequence. Headerless workbooks
+use positional checks. `--cold` reopens the
 saved package for the final turn's output checks. The scenario entry in
 `results.json` lists the turn outcomes in order. The audited graph and its
 journal location are recorded in the turn's `graph-observed.json`.

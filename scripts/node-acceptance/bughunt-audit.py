@@ -371,6 +371,34 @@ def cell(value):
     return str(value).replace('\\', '\\\\').replace('|', '\\|').replace('\r', '').replace('\n', '<br>')
 
 
+def manual_edit_failures(report):
+    failures = []
+    for scenario in as_dict(report).get('runs') or []:
+        for turn in as_dict(scenario).get('turns') or []:
+            edit = as_dict(as_dict(turn).get('manual_edit'))
+            if edit.get('status') not in ('FAIL', 'UNKNOWN'):
+                continue
+            code = edit.get('failure_class', scenario.get('failure_class'))
+            category = 'product' if code in ('MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED',
+                                             'MANUAL_EDIT_CLI_CLOSE_ACK_MISSING') else 'runner/setup'
+            failures.append(dict(scenario=scenario.get('scenario'), turn=turn.get('turn'), case=turn.get('case'),
+                                 kind=edit.get('kind'), status=edit['status'],
+                                 failure_category=edit.get('failure_category', category), failure_class=code,
+                                 location=edit.get('location', scenario.get('location')), journal=edit.get('journal')))
+    return failures
+
+
+def manual_edit_markdown(run_edits):
+    rows = [[run, *[edit[key] for key in ('scenario', 'turn', 'kind', 'status', 'failure_category', 'failure_class')],
+             edit['journal'] or edit['location']] for run, edits in run_edits for edit in edits]
+    if not rows:
+        return []
+    return ['', '### Сбои ручных правок', '',
+            '| Прогон | Сценарий | После хода | Правка | Итог | Класс | Код | Журнал |',
+            '|---|---|---:|---|---|---|---|---|',
+            *['| ' + ' | '.join(cell(value if value is not None else '—') for value in row) + ' |' for row in rows]]
+
+
 def markdown(report):
     lines = ['| Сценарий | Этап | Вызовы | Loginom | Ошибки | Повторы | Recovery | Узлы +/- | Чужие инструменты | Вердикт |',
              '|---|---|---:|---:|---:|---:|---|---|---|---|']
@@ -391,6 +419,7 @@ def markdown(report):
                            ('session_errors', 'Ошибки сессии'), ('delivered_files', 'Доставленные файлы')]:
             if stage[key]:
                 lines += ['', title + ':'] + ['- ' + cell(canonical(v)) for v in stage[key]]
+    lines += manual_edit_markdown([(report.get('run'), report.get('manual_edits', []))])
     return '\n'.join(lines)
 
 
@@ -1082,9 +1111,11 @@ def pattern_run(run):
                 root = object_value(root, 'results.json')
                 results = {key: root[key] for key in ('phase', 'finished') if key in root}
                 results['scenarios'] = [
-                    {key: case[key] for key in ('scenario', 'status', 'failed_phase') if key in case}
+                    {key: case[key] for key in ('scenario', 'status', 'failed_phase', 'failure_category', 'failure_class') if key in case}
                     for case in (root.get('runs') or []) if isinstance(case, dict)
                 ]
+                if edits := manual_edit_failures(root):
+                    results['manual_edits'] = edits
                 for case in root.get('runs') or []:
                     if not isinstance(case, dict) or not isinstance(case.get('scenario'), str):
                         continue
@@ -1125,6 +1156,8 @@ def pattern_run(run):
 
     cases = []
     runtime_journals = []
+    setup_failures = {edit['scenario'] for edit in results.get('manual_edits', [])
+                      if edit['failure_category'] == 'runner/setup'}
     scopes = {path.parent for path in run.glob('*/profile') if path.is_dir()}
     if (run / 'profile').is_dir():
         scopes.add(run)
@@ -1132,7 +1165,8 @@ def pattern_run(run):
         paths = sorted(path for path in (scope / 'profile').rglob('execution-events.jsonl') if path.is_file())
         runtime_journals.extend(str(path.relative_to(run)) for path in paths)
         operations, wizards = runtime_evidence(run, paths, warnings)
-        for session in grouped[str(scope.relative_to(run))].values():
+        scenario = str(scope.relative_to(run))
+        for session in grouped[scenario].values():
             calls = sorted(session, key=lambda call: (journal_turns[call.journal], call.timestamp, call.line))
             audit = PatternAudit(run, calls, operations, wizards, journal_turns)
             audit.wizard_cycles()
@@ -1140,7 +1174,7 @@ def pattern_run(run):
             audit.repeats_after_recovery()
             audit.repeated_calls()
             audit.manual_recovery()
-            if terminal_basis:
+            if terminal_basis and scenario not in setup_failures:
                 audit.deadlock(terminal_basis)
             cases.extend(audit.cases)
     counts = Counter((case['location'].rsplit(':', 1)[0], case['pattern']) for case in cases)
@@ -1194,6 +1228,7 @@ def pattern_markdown(report):
         for turn in run['turns']:
             values = [run['run'], turn['scenario'], turn['turn'], *turn['counts'].values()]
             lines.append('| ' + ' | '.join(map(cell, values)) + ' |')
+    lines += manual_edit_markdown((run['run'], (run['results'] or {}).get('manual_edits', [])) for run in report['runs'])
     return '\n'.join(lines)
 
 
@@ -1240,6 +1275,15 @@ def main():
         stages = [audit_stage(path, args.cases) for path in journals]
         exceeded = any(s['violations'] for s in stages)
         report = dict(verdict='ACTION_BUDGET_EXCEEDED' if exceeded else 'OK', stages=stages)
+        results_path = args.directory / 'results.json'
+        if results_path.is_file():
+            try:
+                results = load_json(results_path.read_text(encoding='utf-8-sig'))
+            except (OSError, ValueError) as error:
+                print(f'bughunt-audit: results.json: {error}', file=sys.stderr)
+            else:
+                if edits := manual_edit_failures(results):
+                    report.update(run=args.directory.name, manual_edits=edits)
         print(json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False) if args.json else markdown(report))
         return int(exceeded)
     except (OSError, ValueError, TypeError) as error:
