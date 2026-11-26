@@ -47,13 +47,12 @@ parameters:{}, inputs:[], variable_inputs:[], mappings:[], finish execute.
 ## GET и ответы
 
 connection.response_content_type: application/json, text/html, text/plain, */* —
-allowed response MIME. Response is a string; request Content-Type may carry charset=UTF-8.
+allowed response MIME. Response: string; request Content-Type may carry charset=UTF-8.
 GET без query: query_parameters:[], inputs:[], finish execute; no table/URL encoder.
-Query: string or integer (±9007199254740991); no real/boolean. Bind integer
+Query: string or safe integer (±2^53-1); no real/boolean. Bind integer
 limit/skip from variables.to_table directly; handler URL-encodes query. Body: string only.
-Keep JSON types: httpbin args.limit/skip echo as strings even with integer inputs;
-no coercion unless requested. Big ints/ids: read as strings (JSON.parse rounds >2^53).
-Status/errors: read.ports:[1] — HttpStatusCode/ErrorCode/ErrorDesc; port 0 — body/parsing.
+Keep JSON types: httpbin echoes integer limit/skip as strings; no coercion unless asked.
+Status/errors: read.ports:[1]; port 0 — body/parsing.
 200 ≠ body; bound select, limit/skip per API; no gzip.
 Empty Response: port 1; ErrorCode ≠ 0 → REST_RESPONSE_BODY_MISSING:
 «тело ответа не получено: повтори запрос или уменьши ответ (select, limit/skip)».
@@ -62,6 +61,8 @@ Empty result ≠ success; retry on request only.
 Объект без массива: Калькулятор → Свёртка → Кросс-таблица.
 Для разбора нескольких документов в строках REST используй один `programming.javascript`
 (JSON.parse(Response), Append per record with its RequestID); no RequestID splits. Не объединяй ответы.
+JS: JSON.parse/reviver round >2^53; quote 16+ digits first (String):
+`text.replace(/("(?:\\.|[^"\\])*")|([:,[]\s*)(-?\d{16,})(?=\s*[,}\]])/g,(m,s,p,n)=>s||p+'"'+n+'"')`
 Если пользователь просил дерево, не подменяй дерево JavaScript.
 
 ## Сведение и завершение

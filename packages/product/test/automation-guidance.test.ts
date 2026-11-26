@@ -251,7 +251,18 @@ test("REST record arrays route by document count and preserve an explicitly requ
   expect(get).toMatch(/Объект без массива: Калькулятор → Свёртка → Кросс-таблица/)
   expect(get).toMatch(/нескольких документов в строках REST.*один `programming\.javascript`[\s\S]*?JSON\.parse\(Response\), Append per record with its RequestID\); no RequestID splits/)
   expect(get).toContain("Не объединяй ответы")
-  expect(get).toContain("Big ints/ids: read as strings (JSON.parse rounds >2^53)")
+  // Live Loginom 7.4.2 JS node (l2046-bigint-1): JSON.parse and a context.source reviver both round >2^53.
+  const js = get.match(/^JS: JSON\.parse\/reviver round >2\^53; quote 16\+ digits first \(String\):\n`(text\.replace\(.+\))`$/m)
+  expect(js).not.toBeNull()
+  expect(get.indexOf("JS: ")).toBeGreaterThan(get.indexOf("один `programming.javascript`"))
+  const quote = new Function("text", "return " + js![1]) as (text: string) => string
+  const parsed = JSON.parse(quote(String.raw`{"items":[{"id":9007199254740993,"name":"a:12345678901234567"},{"id":-12345678901234567890,"w":12345678901234567.5},{"id":42}]}`))
+  expect(parsed.items.map((item: { id: unknown }) => item.id)).toEqual(["9007199254740993", "-12345678901234567890", 42])
+  expect(parsed.items[0].name).toBe("a:12345678901234567")
+  expect(typeof parsed.items[1].w).toBe("number")
+  // String values that contain long digits, including JSON nested in a string, stay untouched.
+  for (const text of [String.raw`{"a":"x:12345678901234567,y"}`, String.raw`{"note":"ids: 12345678901234567, 12345678901234568"}`,
+    String.raw`{"payload":"{\"id\":12345678901234567}"}`]) expect(JSON.parse(quote(text))).toEqual(JSON.parse(text))
   expect(json).toMatch(/Response[\s\S]*?HttpStatusCode[\s\S]*?RequestID/)
   for (const card of [rest, table, json]) {
     expect(card).toContain("не подменяй дерево JavaScript")
