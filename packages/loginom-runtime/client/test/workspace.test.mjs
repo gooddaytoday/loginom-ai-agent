@@ -252,6 +252,33 @@ test('bindOpenOnly binds the active saved package without any package gesture',a
   assert.deepEqual(fixture.events,['navigate']);
 });
 
+test('reload opens the exact saved path with its native read-only state in the authenticated account',async()=>{
+  const fixture=pageFixture({authenticated:true});
+  const locate=fixture.page.locator;
+  fixture.page.locator=selector=>{
+    const locator=locate(selector), click=locator.click;
+    if(selector.includes('OpenDialogForm;btnOpen'))locator.click=async()=>{
+      await click();
+      fixture.context.bg.app.Application.FInstance.FMainForm.Items.Workspace
+        .getActiveTab().Controller.Node.data.node.ReadOnly=true;
+    };
+    return locator;
+  };
+  const request={intent:'open_package',packagePath:'/user/B.lgp',timeoutMs:500,recoveryAccount:'test-account'};
+  const state=await execute(fixture,request);
+  assert.equal(state.status,'READY',JSON.stringify(state));
+  assert.equal(state.package_ref.read_only,true);
+  assert.equal(state.package_ref.path,request.packagePath);
+  assert.equal(fixture.events.filter(event=>event==='open_package').length,1);
+
+  for(const changed of [pageFixture({authenticated:true,workflow:true}),pageFixture({authenticated:true})]){
+    if(!changed.tabs[0].graph)changed.context.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.UserName='other-account';
+    const refused=await execute(changed,request);
+    assert.equal(refused.reason,'RELOAD_IDENTITY_UNVERIFIED');
+    assert.equal(changed.events.includes('open_package'),false);
+  }
+});
+
 test('bindOpenOnly retains an already rebound logical workflow identity',async()=>{
  const f=pageFixture({authenticated:true,workflow:true});await f.page.goto('http://loginom.example/app?testable=true');
  f.context.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node.PackageFileName='/user/B.lgp';

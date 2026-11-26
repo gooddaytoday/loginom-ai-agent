@@ -25,14 +25,15 @@ const proved = () => ({ verified: true, cleanup_complete: true, effect_possible:
 const blocked = () => { throw new NodeReleaseBlocked('A Loginom wizard of this node is open', 'Ask the user to close it with Cancel.'); };
 
 function fixture({ browserRecovery = true, release = blocked, releasePendingPhases, recoveryReleasePending,
-  nodeType = 'imports.text', stopPhase = 'finish', probePreparedPage } = {}) {
+  nodeType = 'imports.text', stopPhase = 'finish', probePreparedPage, reopenNodePackage } = {}) {
   const calls = [], events = [];
   const graph = { complete: true, document_id: 'doc', workflow_ref: workflow, nodes: [], links: [], foreign_links: [] };
+  if(reopenNodePackage)graph.interaction_ready=true;
   const adapter = { observe: async () => { calls.push('graph'); return structuredClone(graph); }, preflight: async () => {},
     positionMatches: (n, p) => JSON.stringify(n.position) === JSON.stringify(p),
     reconcile: async () => ({ verified: true, cleanup_complete: true }),
     mutate: async e => { calls.push(e.kind); if (e.kind === 'create') graph.nodes.push({ ref: node, type: e.parameters.type, label: 'Source',
-      position: e.parameters.position, inputs: [], outputs: [0] }); return { status: 'SUCCEEDED', cleanup_complete: true }; } };
+      position: e.parameters.position, inputs: [], outputs: [0],...(reopenNodePackage?{locked:false}:{}) }); return { status: 'SUCCEEDED', cleanup_complete: true }; } };
   const ok = name => async () => { calls.push(name); return { verified: true, cleanup_complete: true, effect_possible: false }; };
   const state = { release, failFinish: stopPhase === 'finish' };
   const drivers = { verifySource: ok('source'), mapPorts: ok('mapping'), openWizard: ok('open'),
@@ -55,7 +56,7 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
     if (stopPhase === 'configure') throw Error('Managed source configuration stopped');
     return result;
   } };
-  const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery, probePreparedPage,
+  const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery, probePreparedPage, reopenNodePackage,
     // Only the page receipt ledger is read through this transport.
     execute: async code => {
       if (!state.receipt || !code.includes('receipt_read')) throw Error('Unexpected public transport');
@@ -227,6 +228,35 @@ test('T1: a refused release points to browser recovery instead of asking the use
   assert.equal(basis.reason, 'NODE_RELEASE_REFUSED');
   assert.equal(basis.step.key, 'node|doc|wf|new|finish');
   assert.equal(basis.goal.ui_blocker, 'Ask the user to close it with Cancel.');
+});
+
+test('verified reopened graph ends the interrupted configure and publishes new references once',async()=>{
+  let published=0;
+  const newWorkflow={...workflow,workflow_id:'new-workflow'};
+  const ref={document_id:'new-doc',workflow_ref:newWorkflow};
+  const graph={complete:true,interaction_ready:true,...ref,nodes:[],links:[],foreign_links:[]};
+  const f=fixture({stopPhase:'configure',nodeType:'transform.filter_data',
+    probePreparedPage:async()=>({ok:false,reason:'prepared document changed'}),
+    reopenNodePackage:async()=>({first:graph,second:graph,ref,readOnly:false,reloaded:true,publish:async()=>{published++;}})});
+  f.runtime.startNodeApply(f.request('apply'));
+  await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+  f.state.operation.transportUncertain=true;
+  const inspected=await f.runtime.inspect({operationId:'apply'});
+  assert.equal(inspected.output.next_steps[0].tool,'dock_operation_recover');
+  assert.equal(published,0);
+  const options={strategy:'abandon_operation',recoveryOperationId:'reload-1'};
+  const outcome=await f.runtime.recover('apply',options);
+  assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+  assert.equal(outcome.output.goal_verified,false);
+  const original=outcome.output.original_outcome.output;
+  assert.equal(original.node,null);
+  assert.equal(original.configuration.status,'unknown');
+  assert.deepEqual(original.warnings,['Unsaved changes made before reloading were lost.']);
+  assert.equal(original.next_step.arguments.document_id,'new-doc');
+  assert.equal(f.runtime.hasUnsettledWork(),false);
+  assert.deepEqual(await f.runtime.recover('apply',options),outcome);
+  assert.equal(published,1);
+  assert.equal(f.calls.includes('finish'),false);
 });
 
 test('without the capability the existing user_action contract is unchanged', async () => {

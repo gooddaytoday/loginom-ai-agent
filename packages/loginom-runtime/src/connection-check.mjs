@@ -164,7 +164,7 @@ function trackPageNetwork(page) {
 
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
-export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase } = {}) {
+export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase, reuseLoginForm = false } = {}) {
   const started = performance.now()
   let phase = "goto", phaseStarted = started, original
   const emit = async event => { try { await onPhase?.(event) } catch { /* Diagnostics cannot change login. */ } }
@@ -187,7 +187,7 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
   }
   const network = await trackLoginNetwork(page)
   try {
-    const response = await measure("login.navigation", () => page.goto(loginomAddress(candidate.url),
+    const response = reuseLoginForm ? null : await measure("login.navigation", () => page.goto(loginomAddress(candidate.url),
       { waitUntil: "domcontentloaded", timeout: remaining(60_000) }))
     try {
       const timing = response?.request?.()?.timing?.()
@@ -220,7 +220,7 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
       }))
       if (missing !== true && missing !== "interacted") break
       themeState.failed = true
-      if (themeState.reloaded || missing === "interacted" || await avatar.isVisible()) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
+      if (reuseLoginForm || themeState.reloaded || missing === "interacted" || await avatar.isVisible()) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
       // No credential or workspace gesture has happened. Never reload a page
       // handed to MCP, and never give this recovery a fresh time allowance.
       remaining(60_000)
@@ -238,6 +238,7 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     }
     await network.close()
     phase = "form"; phaseStarted = performance.now()
+    if (reuseLoginForm && !await isReloadedLoginForm(page, candidate.url)) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
     if (!(await avatar.isVisible())) {
       phase = "submit"; phaseStarted = performance.now()
       await measure("login.username", async () => {
@@ -286,6 +287,34 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
   } finally {
     await network.close()
   }
+}
+
+async function isReloadedLoginForm(page, url) {
+  const { origin, pathname } = new URL(loginomAddress(url))
+  return page.evaluate(({ origin, pathname }) => {
+    if (location.origin !== origin || location.pathname !== pathname
+      || performance.getEntriesByType("navigation")[0]?.type !== "reload"
+      || globalThis.__loginomDockPreparationV1?.document === document) return false
+    const element = document.querySelector('[data-tid="LoginForm;Login;edtUsername"]')
+    return !!element && element.getBoundingClientRect().width > 0 && getComputedStyle(element).visibility !== "hidden"
+      && !globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName
+      && globalThis.__loginomThemeStartupInteracted !== true
+  }, { origin, pathname })
+}
+
+export async function reauthenticateReloadedPage(context, candidate, { origin, account, deadline, signal }) {
+  const target = new URL(loginomAddress(candidate.url))
+  if (target.origin !== origin || candidate.username !== account) return false
+  const pages = context.pages().filter(page => !page.isClosed())
+  if (pages.length !== 1 || !await isReloadedLoginForm(pages[0], candidate.url)) return false
+  signal?.throwIfAborted()
+  await loginPage(pages[0], candidate, { deadline, reuseLoginForm: true })
+  signal?.throwIfAborted()
+  return pages[0].evaluate(({ origin, pathname, account }) => {
+    const map = globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree
+    return location.origin === origin && location.pathname === pathname && map?.FServerConnection?.Connected === true
+      && map.FServerConnection.UserName === account && map.PackageNodes?.Count === 0
+  }, { origin, pathname: target.pathname, account })
 }
 
 function loginFailure(error, candidate, phase, duration, elapsed) {

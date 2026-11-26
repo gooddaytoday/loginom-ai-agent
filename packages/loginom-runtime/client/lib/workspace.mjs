@@ -1,3 +1,5 @@
+export const packageReadOnlyAdvice = 'The saved package is read-only and the lock owner is unverified. Ask the user for permission to use Save As with a new name before proceeding.';
+
 // Fixed local lifecycle code. Catalogs never supply executable bootstrap code.
 async function prepareWorkspace(page, options) {
   const deadline = Date.now() + options.timeoutMs;
@@ -188,6 +190,11 @@ async function prepareWorkspace(page, options) {
     const knownWorkflow = options.intent==='existing_workflow' ? [...state.receipts.values()].find(r=>r.workflowId===options.workflowRef.workflow_id && r.tab && r.phase==='verified')
       : options.bindOpenOnly ? [...state.receipts.values()].find(r=>r.phase==='verified'&&r.tab===tab&&r.packageNode===packageNode&&JSON.stringify(r.crumbs)===JSON.stringify(crumbs)) : null;
     const receipt = state.receipts.get(options.operationId);
+    if(options.recoveryAccount&&(location.origin!==options.origin||location.pathname!==options.pathname
+      ||app?.Version!==options.expectedBuild||serverConnection?.Connected!==true
+      ||serverConnection.UserName!==options.recoveryAccount||!serverConnection.Session
+      ||receipt&&(receipt.openConnection!==serverConnection||receipt.openServerSession!==serverConnection.Session)
+      ||mode==='reserve'&&mainForm.FMapTree.PackageNodes?.Count!==0))return {error:'RELOAD_IDENTITY_UNVERIFIED'};
     if (receipt && receipt.request !== request) return {error:'OPERATION_CONFLICT'};
     if (mode==='reserve' && receipt?.preserved.some(item=>!tabs.includes(item.tab)
         || !item.graph.isConnected || item.graph.innerHTML!==item.html)) return {error:'FOREIGN_WORKFLOW_CHANGED'};
@@ -353,7 +360,7 @@ async function prepareWorkspace(page, options) {
       const match=restorePrompt();
       if(match){
         // Bind-only adopts an already open package and never answers the prompt.
-        if(options.bindOpenOnly)return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:'bind_only',blocking_windows:blockingWindows};
+        if(options.bindOpenOnly||options.recoveryAccount)return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:'bind_only',blocking_windows:blockingWindows};
         const refused=restoreRefused(match.prompt);
         if(refused)return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:refused,blocking_windows:blockingWindows};
         current.restoreCandidate=match.prompt;
@@ -385,7 +392,8 @@ async function prepareWorkspace(page, options) {
       current.workflowId ??= knownWorkflow?.workflowId ?? state.id+'-'+(state.sequence=(state.sequence??0)+1);
       return {document_id:state.id,loginom_account:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
         workflow_ref:{tab_tid:tabTid,prefix,navigation_path:crumbs,workflow_id:current.workflowId},
-        package_ref:{path,name:packageNode.PackageName??null,persisted:path!==null},preserved_workflows:preserved,
+        package_ref:{path,name:packageNode.PackageName??null,persisted:path!==null,
+          ...(typeof packageNode.ReadOnly==='boolean'?{read_only:packageNode.ReadOnly}:{})},preserved_workflows:preserved,
         ownership_verified:options.intent==='new_draft',target_verified:true,
         interaction_readiness:'driver_verification_required',
         window:{width:innerWidth,height:innerHeight,outer_width:outerWidth,outer_height:outerHeight,
@@ -715,7 +723,7 @@ async function navigatePreparedGraph(page, options) {
   }
 }
 
-export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestLogin = false, testLoginUser = null, platform = process.platform, sessionId = "standalone", operationId = "prepare", intent = "new_draft", packagePath = null, workflowRef = null, graphNavigation = null, timeoutMs = 120000, recoverOnly = false, identityOnly = false, storageBinding = null, bindOpenOnly = false }) {
+export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestLogin = false, testLoginUser = null, platform = process.platform, sessionId = "standalone", operationId = "prepare", intent = "new_draft", packagePath = null, workflowRef = null, graphNavigation = null, timeoutMs = 120000, recoverOnly = false, identityOnly = false, storageBinding = null, bindOpenOnly = false, recoveryAccount = null }) {
   const url = new URL(loginomUrl);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash
       || [...url.searchParams.keys()].some(key => /token|password|secret|auth|api.?key/i.test(key))) {
@@ -730,6 +738,9 @@ export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestL
   if (intent !== 'open_package' && packagePath !== null) throw new Error('A new draft cannot specify a stored package');
   if (bindOpenOnly !== false && (bindOpenOnly !== true || intent !== 'open_package' || allowTestLogin || recoverOnly || identityOnly))
     throw new Error('Bind-only preparation requires an exact open_package binding without login or recovery');
+  if(recoveryAccount!==null&&(typeof recoveryAccount!=='string'||!recoveryAccount.trim()
+    ||intent!=='open_package'||allowTestLogin||recoverOnly||identityOnly||bindOpenOnly))
+    throw new Error('Reload requires an authenticated account and an exact saved package');
   if (intent === 'existing_workflow') {
     if (!workflowRef || Object.keys(workflowRef).some(k=>!['document_id','tab_tid','prefix','navigation_path','workflow_id'].includes(k))
         || typeof workflowRef.workflow_id !== 'string' || !workflowRef.workflow_id || workflowRef.workflow_id.length>160
@@ -749,7 +760,7 @@ export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestL
   }
   if (!compatibility?.loginom_build) throw new Error('An exact Loginom build pin is required');
   const options = { url: url.href, origin: url.origin, pathname: url.pathname,
-    sessionId, operationId, intent, packagePath, workflowRef, graphNavigation, timeoutMs, recoverOnly, identityOnly, storageBinding, bindOpenOnly,
+    sessionId, operationId, intent, packagePath, workflowRef, graphNavigation, timeoutMs, recoverOnly, identityOnly, storageBinding, bindOpenOnly, recoveryAccount,
     expectedBuild: compatibility?.loginom_build ?? null, profileId: compatibility?.profile_id,
     platform: ({ darwin: 'macos', linux: 'linux', win32: 'windows' })[platform] ?? platform,
     allowTestLogin: allowTestLogin === true, testLoginUser: allowTestLogin ? testLoginUser : null };
