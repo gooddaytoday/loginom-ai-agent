@@ -241,3 +241,35 @@ for(const mode of ['done','execute'])test('Text Import '+mode+' verifies the nat
  assert.deepEqual(steps,mode==='execute'?['execute','identify','native label']:['done','native label']);
  assert.equal(result.execution_id,mode==='execute'?'run':undefined);
 });
+
+// LAB-2050: the custom caption is checked against the saved native node after
+// Done/Execute. A changed caption is refused; Execute identifies its started
+// run before that check, so the refusal never loses the execution identity.
+for(const mode of ['done','execute'])for(const [fault,mutate] of [
+ ['collapsed spaces',n=>{n.label=n.label.replace('  ',' ');}],
+ ['another type',n=>{n.type='imports.excel';}],
+ ['foreign workflow',n=>{n.ref={...n.ref,workflow_id:'other'};}],
+])test('Text Import '+mode+' refuses a saved caption that differs from target.label: '+fault,async()=>{
+ const node={document_id:'doc',workflow_id:'wf',node_id:'import'},workflow_ref={workflow_id:'wf'};
+ const label='Продажи  '+'X'.repeat(119),steps=[];
+ const context={...node,verified:true,surface:'graph',tid:'N'};
+ const surface={prepared_node_context:context,ui:{elements:[{tid:'N;Label;Label',graph_node:{part:'label',label_text:label}}]}};
+ const saved={ref:{...node},type:'imports.text',label};mutate(saved);
+ const operation={nodeApply:{request:{target:{kind:'new',label},parameters:{}}},nodeTargetAdapter:{observe:async()=>{
+  steps.push('native label');
+  return {complete:true,document_id:node.document_id,workflow_ref,nodes:[saved]};
+ }}};
+ const method=createTextImportNodeSupport({}).nodeApplyDriverFactory({operation}).finish.toString();
+ const run=new Function('f',`return (async()=>{
+  const {operation,channel,executionDriver,read,finishedImportSurface,textImportTitleRequest,configureNodeTitle,ctx,mode}=f;
+  const sourceSwitch=null,enter=()=>{},requireValue=(v,m)=>{if(!v)throw Error(m)},one=xs=>xs[0],verified=v=>v;
+  return ({${method}}).finish(mode,ctx);
+ })()`);
+ await assert.rejects(run({mode,operation,textImportTitleRequest,ctx:{document_id:node.document_id,workflow_ref,node,deadline:1000},
+  configureNodeTitle:async()=>{},
+  read:async()=>({wizard:{root_tid:'W'},ui:{elements:[{tid:'W;btn'+(mode==='execute'?'Execute':'Done')}]}}),
+  channel:{perform:async()=>steps.push(mode),observe:async()=>surface},
+  executionDriver:{identify:async()=>{steps.push('identify');return {execution_id:'run'};}},
+  finishedImportSurface:()=>assert.fail('a refused caption has no continuation')}),/NODE_LABEL_NOT_PRESERVED/);
+ assert.deepEqual(steps,mode==='execute'?['execute','identify','native label']:['done','native label']);
+});
