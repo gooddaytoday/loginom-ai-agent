@@ -478,6 +478,34 @@ test('an unresolved started download is never dispatched again on resume',async(
 
 // LAB-2054: only the executor's settled verification without confirmed
 // cleanup is terminal. A lost verification reply may still reconcile.
+// LAB-2054 follow-up: the executor answers an upload with unconfirmed own
+// cleanup with a terminal blocker; delivery must not keep offering resume.
+for(const variant of ['cleanup','transient'])test('delivery of an upload with unconfirmed own cleanup: '+variant,async()=>{
+ const f=fixture(),inspect=f.runtime.inspect;let unconfirmed=true;
+ f.runtime.inspect=async()=>{const r=await inspect();r.output.operation_id='delivery:upload';r.output.outcome.operation_id='delivery:upload';
+  if(unconfirmed){r.output.cleanup_confirmed=false;r.output.state='pending';r.output.outcome={...r.output.outcome,status:'AMBIGUOUS',action_key:'artifact.upload',
+   error:{code:variant==='cleanup'?'CLEANUP_RECEIPT_MISSING':'BROWSER_CALL_UNCERTAIN',message:'unconfirmed'}};}
+  else r.output.outcome.cleanup_complete=true;
+  return r;};
+ const first=await f.service.deliver(request);
+ assert.equal(first.outcome.status,'AMBIGUOUS');
+ const resume=id=>f.service.resume({operation_id:'delivery',resume_id:id,budget_ms:120000});
+ if(variant==='cleanup'){
+  for(const result of [first,await resume('resume-1')]){
+   assert.match(result.error.message,/cleanup is unconfirmed.*report it as a blocker/);
+   assert.match(result.outcome.next_step.instruction,/report it as a blocker/);
+   assert.doesNotMatch(result.outcome.next_step.instruction,/Continue verification/);
+  }
+  assert.equal(f.calls.filter(c=>c==='verify').length,0);
+ }else{
+  assert.doesNotMatch(first.error.message,/report it as a blocker/);
+  assert.doesNotMatch((await resume('resume-1')).error.message,/report it as a blocker/);
+  unconfirmed=false;
+  const second=await resume('resume-2');assert.equal(second.outcome.status,'SUCCEEDED',JSON.stringify(second.error));
+ }
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);
+});
+
 for(const variant of ['unresolved','lost'])test('resume after a dispatched verification with unconfirmed cleanup: '+variant,async()=>{
  const f=fixture(variant==='unresolved'?'verify':undefined),inspect=f.runtime.inspect,verify=f.runtime.verifyDeliveredArtifact;
  let lost=false;
