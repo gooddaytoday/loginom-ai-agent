@@ -25096,6 +25096,29 @@ Run 45694260129 форка (`06ac4c97c9`): `pty (x86_64-unknown-linux-gnu)` и `
 `targets`, glibc 2.31, вход игнорируется, раннер macOS-14, нет baseline CPU) краснят по 1 тесту. `product`: 92 pass, 0 fail.
 Проверит только CI: что `fromJSON` в `strategy.matrix` и вход `targets` принимаются GitHub при `workflow_call`.
 
+### Кэш готового pty (ветка `b51f3-pty-cache`)
+
+Причина: задание `pty (aarch64-apple-darwin)` трижды отменено без шагов («not acquired by Runner of type hosted»,
+нехватка раннеров macOS arm64). Теперь `loginom-pty.yml` состоит из трёх заданий.
+- `plan` (`ubuntu-24.04`): ключ `pty-<цель>-<хеш>`, хеш — `packages/process-daemon/**`, `Cargo.lock`,
+  `.github/actions/setup-rust-pty/**`, `loginom-pty.yml` (в нём пины раннеров, glibc, zigbuild). Для каждой запрошенной
+  цели `actions/cache/restore` с `lookup-only`; выход — списки `cached` и `missing`, хеш.
+- `reuse` (`ubuntu-24.04`): для целей из `cached` восстанавливает кэш (`fail-on-cache-miss`) и грузит тот же артефакт
+  `loginom-ai-agent-pty-<цель>`; раннер macOS и Windows не нужен. Кэш общий между ОС (`enableCrossOsArchive`, путь `pty-out`
+  в рабочей копии).
+- `pty`: собирает только цели из `missing`, как раньше (проверка glibc, smoke, артефакт), и после успешного smoke
+  сохраняет `pty-out` в кэш (`cache/save`; упавшее задание кэш не пишет).
+- Smoke pty на macOS и Windows при попадании в кэш не повторяется: бинарь тот же байт в байт и проверен при сборке, в кэш
+  попадает только прошедший проверки. Шаги сборки и smoke не менялись.
+Проверено: `actionlint` 1.7.12 — 0 по `loginom-pty.yml` и трём потребителям; логику разбиения `cached`/`missing` прогнал в
+`bash`+`jq` (попадания только Linux и Windows, пустой кэш); PowerShell-шаги не менялись. Тест `pty-workflow.test.ts` (8):
+ключ содержит все входы и цель, `lookup-only`, `fail-on-cache-miss`, одинаковое имя артефакта, сохранение после smoke,
+пины раннеров, glibc 2.30, вход `targets`; десять мутаций (нет действия, `Cargo.lock` или цели в ключе, `lookup-only` выкл,
+`fail-on-cache-miss` выкл, glibc, раннер, `plan` на macOS, матрица из `cached`, вход игнорируется) краснят по 1 тесту.
+Проверит только CI: кросс-ОС восстановление кэша (Linux читает запись Windows и macOS), `hashFiles` на sparse checkout,
+`workflow_call`-итог при пропущенном `pty` или `reuse`, гонка вытеснения кэша между `plan` и `reuse` (тогда `reuse`
+краснеет, повторный запуск пересоберёт).
+
 
 ## Хвосты паритета 3
 

@@ -35,16 +35,127 @@ env:
   CARGO_TERM_COLOR: always
   GNU_GLIBC_VERSION: "2.30"
   CARGO_ZIGBUILD_VERSION: 0.23.2
+  ALL_TARGETS: '["x86_64-unknown-linux-gnu","aarch64-apple-darwin","x86_64-pc-windows-msvc"]'
 
 jobs:
+  # A finished pty is cached by what goes into it. macOS arm64 runners are scarce, so a target whose cache entry exists
+  # never starts a build job on its own runner: `reuse` restores it on ubuntu and uploads the same artifact.
+  plan:
+    name: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      hash: ${{ steps.hash.outputs.value }}
+      missing: ${{ steps.split.outputs.missing }}
+      cached: ${{ steps.split.outputs.cached }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          sparse-checkout: |
+            packages/process-daemon
+            .github/actions/setup-rust-pty
+            .github/workflows/loginom-pty.yml
+          sparse-checkout-cone-mode: false
+
+      # Every input of the binary: the sources and lockfile, the toolchain action, this workflow (pins, glibc, zigbuild)
+      # and, per entry, the target.
+      - name: Hash inputs
+        id: hash
+        run: echo "value=${{ hashFiles('packages/process-daemon/**', 'packages/process-daemon/Cargo.lock', '.github/actions/setup-rust-pty/**', '.github/workflows/loginom-pty.yml') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Targets
+        id: targets
+        env:
+          REQUESTED: ${{ inputs.targets }}
+        run: echo "all=${REQUESTED:-$ALL_TARGETS}" >> "$GITHUB_OUTPUT"
+
+      - name: Look up Linux x64
+        id: linux
+        if: contains(steps.targets.outputs.all, 'x86_64-unknown-linux-gnu')
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: pty-out
+          key: pty-x86_64-unknown-linux-gnu-${{ steps.hash.outputs.value }}
+          lookup-only: true
+          enableCrossOsArchive: true
+
+      - name: Look up macOS arm64
+        id: macos
+        if: contains(steps.targets.outputs.all, 'aarch64-apple-darwin')
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: pty-out
+          key: pty-aarch64-apple-darwin-${{ steps.hash.outputs.value }}
+          lookup-only: true
+          enableCrossOsArchive: true
+
+      - name: Look up Windows x64
+        id: windows
+        if: contains(steps.targets.outputs.all, 'x86_64-pc-windows-msvc')
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: pty-out
+          key: pty-x86_64-pc-windows-msvc-${{ steps.hash.outputs.value }}
+          lookup-only: true
+          enableCrossOsArchive: true
+
+      - name: Split targets into cached and missing
+        id: split
+        env:
+          HITS: linux=${{ steps.linux.outputs.cache-hit }} macos=${{ steps.macos.outputs.cache-hit }} windows=${{ steps.windows.outputs.cache-hit }}
+          TARGETS: ${{ steps.targets.outputs.all }}
+        run: |
+          cached='[]'; missing='[]'
+          for pair in linux:x86_64-unknown-linux-gnu macos:aarch64-apple-darwin windows:x86_64-pc-windows-msvc; do
+            target="${pair#*:}"
+            echo "$TARGETS" | jq -e --arg t "$target" 'index($t)' > /dev/null || continue
+            if [[ " $HITS " == *" ${pair%%:*}=true "* ]]; then
+              cached="$(jq -c --arg t "$target" '. + [$t]' <<< "$cached")"
+            else
+              missing="$(jq -c --arg t "$target" '. + [$t]' <<< "$missing")"
+            fi
+          done
+          echo "cached=$cached" >> "$GITHUB_OUTPUT"
+          echo "missing=$missing" >> "$GITHUB_OUTPUT"
+          echo "cached: $cached, to build: $missing"
+
+  # The binary was smoke-tested when it was built and entered the cache only after that, so a hit is not tested again.
+  reuse:
+    name: pty (${{ matrix.target }}, cached)
+    needs: plan
+    if: needs.plan.outputs.cached != '[]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.plan.outputs.cached) }}
+    steps:
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: restore
+        with:
+          path: pty-out
+          key: pty-${{ matrix.target }}-${{ needs.plan.outputs.hash }}
+          fail-on-cache-miss: true
+          enableCrossOsArchive: true
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: loginom-ai-agent-pty-${{ matrix.target }}
+          path: pty-out/*
+          if-no-files-found: error
+          retention-days: 14
+
   pty:
     name: pty (${{ matrix.target }})
+    needs: plan
+    if: needs.plan.outputs.missing != '[]'
     runs-on: ${{ contains(matrix.target, 'linux') && 'ubuntu-22.04' || contains(matrix.target, 'apple') && 'macos-15' || 'windows-2022' }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        target: ${{ fromJSON(inputs.targets || '["x86_64-unknown-linux-gnu","aarch64-apple-darwin","x86_64-pc-windows-msvc"]') }}
+        target: ${{ fromJSON(needs.plan.outputs.missing) }}
     defaults:
       run:
         shell: bash
@@ -116,14 +227,21 @@ jobs:
         run: |
           exe=""
           if [ "$RUNNER_OS" = "Windows" ]; then exe=".exe"; fi
-          mkdir -p "$RUNNER_TEMP/pty-out"
-          cp "${CARGO_TARGET_DIR:-target}/${{ matrix.target }}/release/loginom-ai-agent-pty$exe" "$RUNNER_TEMP/pty-out/"
-          (cd "$RUNNER_TEMP/pty-out" && sha256sum "loginom-ai-agent-pty$exe" > SHA256SUMS 2>/dev/null || shasum -a 256 "loginom-ai-agent-pty$exe" > SHA256SUMS)
-          cat "$RUNNER_TEMP/pty-out/SHA256SUMS"
+          mkdir -p "$GITHUB_WORKSPACE/pty-out"
+          cp "${CARGO_TARGET_DIR:-target}/${{ matrix.target }}/release/loginom-ai-agent-pty$exe" "$GITHUB_WORKSPACE/pty-out/"
+          (cd "$GITHUB_WORKSPACE/pty-out" && sha256sum "loginom-ai-agent-pty$exe" > SHA256SUMS 2>/dev/null || shasum -a 256 "loginom-ai-agent-pty$exe" > SHA256SUMS)
+          cat "$GITHUB_WORKSPACE/pty-out/SHA256SUMS"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: loginom-ai-agent-pty-${{ matrix.target }}
-          path: ${{ runner.temp }}/pty-out/*
+          path: pty-out/*
           if-no-files-found: error
           retention-days: 14
+
+      # Saved only after the build, the glibc check and the smoke test passed (a failed job saves nothing).
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: pty-out
+          key: pty-${{ matrix.target }}-${{ needs.plan.outputs.hash }}
+          enableCrossOsArchive: true
