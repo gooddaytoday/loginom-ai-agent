@@ -571,6 +571,42 @@ function processLockFixture(onProcessRead,{deadline=10000}={}) {
  return {channel,records,timeouts,state,get reads(){return reads},get gestures(){return gestures},get clock(){return clock}};
 }
 
+test('execution polling batches the native read before the scoped UI read and retains the readiness deadline',async()=>{
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'crumb',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const node={verified:true,...binding.node,surface:'graph',tid:'MF;TF-1;Graph;JS',locked:false};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,dom_epoch:{document:'dom',revision:1},
+  prepared_node_context:node,scan:{complete:true},wizard:{status:'absent'},ui:{elements:[{tid:'MF;ConsoleForm',ref:'ui-console'}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+ const records=[],transports=[];
+ let now=0,foreign=false;
+ const channel=createNodeProcedure({operation:{id:'execution',deadline:600,action:{action_key:'node.apply',revision:'1'}},
+  preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
+  now:()=>now,wait:async ms=>{now+=ms},record:async r=>{records.push(r);return structuredClone(r)},
+  execute:async code=>{
+   transports.push(code);
+   const result={status:'SUCCEEDED',output:structuredClone(state)};
+   if(code.includes('"discover_roots":true'))return result;
+   const nativeProcesses={verified:true,node_context:{...node,node_id:foreign?'foreign':node.node_id},processes:[]};
+   if(!code.includes('function workspaceUiCapability'))return nativeProcesses;
+   assert.ok(code.indexOf('async function readNodeProcesses')>=0);
+   assert.ok(code.indexOf('async function readNodeProcesses')<code.indexOf('function workspaceUiCapability'));
+   assert.match(code,/"root_ref":"ui-console"/);
+   return {result,nativeProcesses};
+  }});
+ const options={condition:'owned execution group',timeoutMs:250,readProcesses:true,pollExecution:true};
+ const ready=await channel.observe({...options,ready:()=>now>=100});
+ assert.equal(now,100);
+ assert.equal(ready.node_processes.verified,true);
+ assert.equal(transports.length,4);
+ assert.equal(records.at(-1).readiness.timeout_ms,250);
+ foreign=true;
+ await assert.rejects(channel.observe({...options,ready:()=>true}),/context changed/);
+ foreign=false;
+ await assert.rejects(channel.observe({...options,ready:()=>false}),/readiness timeout/);
+ assert.equal(now,350);
+ assert.equal(records.at(-1).phase,'node_observation_timeout');
+ assert.equal(records.at(-1).elapsed_ms,250);
+});
+
 for(const locked of [false,true])test('process observation discards a lock-only transition to '+locked+' and rereads',async()=>{
  const f=processLockFixture((n,node)=>{if(!n){node.locked=locked;node.tid='MF;TF-1;Graph;JS'};});
  f.state.prepared_node_context.locked=!locked;
