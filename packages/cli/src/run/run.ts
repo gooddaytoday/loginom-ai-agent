@@ -4,6 +4,7 @@ import { FSUtil } from "@opencode/util/fs-util"
 import { noTimeoutFetch } from "@opencode/util/no-timeout-fetch"
 import { open } from "node:fs/promises"
 import path from "node:path"
+import { pathToFileURL } from "node:url"
 import { readStdin, readStdinIfReady } from "../util/io"
 import { ServerConnection } from "../services/server-connection"
 import { createWorktreeLocation, parseSessionTargetModel, resolveSessionTarget } from "../session-target"
@@ -94,7 +95,7 @@ async function run(input: RunCommandInput, signal: AbortSignal) {
   // Loginom AI Agent (B2.9j): `run --dashboard` reads `--file` in the dashboard's folder, as 0.4 did, once it is prepared.
   const files = RunProduct.dashboarding()
     ? undefined
-    : await Promise.all(input.file.map((file) => prepareFile(file, root)))
+    : await Promise.all(input.file.map((file) => prepareFile(file, root, sharesFilesystem(input.server))))
   return execute(input, { directory, message: message ?? "", files }, client, signal)
 }
 
@@ -106,7 +107,11 @@ async function execute(input: RunCommandInput, prepared: Prepared, client: OpenC
     ? await RunProduct.dashboard({ client, location: { directory: prepared.directory }, format: input.format, signal })
     : { directory: prepared.directory, prompt: undefined }
   if (!dashboard) return
-  const files = prepared.files ?? (await Promise.all(input.file.map((file) => prepareFile(file, dashboard.directory))))
+  const files =
+    prepared.files ??
+    (await Promise.all(
+      input.file.map((file) => prepareFile(file, dashboard.directory, sharesFilesystem(input.server))),
+    ))
   const location = { directory: dashboard.directory }
   const worktree =
     input.worktree === undefined
@@ -195,7 +200,11 @@ export function parseRunModel(value?: string) {
   }
 }
 
-async function prepareFile(input: string, directory: string): Promise<FilePart> {
+// A backend of this machine (a managed service or a private server) shares its filesystem; a `--server` one may not.
+const sharesFilesystem = (server: ServerConnection.Resolved) =>
+  server.service !== undefined || server.standalone === true
+
+async function prepareFile(input: string, directory: string, local: boolean): Promise<FilePart> {
   const file = path.resolve(directory, input)
   const handle = await open(file, "r").catch(() => fail(`File not found: ${input}`))
   try {
@@ -221,6 +230,10 @@ async function prepareFile(input: string, directory: string): Promise<FilePart> 
     const name = path.basename(file)
     // Loginom AI Agent (B2.7a4): the product CLI attaches every file, as 0.4 did, so a Dock run admits it (B2.5d).
     if (mime === "text/plain" && !RunProduct.enabled()) return { text: `<file name="${name}">\n${text}\n</file>` }
+    // 0.4.2 (`59fbda9ceb`): these data formats cannot be serialized as provider file parts, so a local backend gets the
+    // path, which the product plugin takes a receipt of, instead of the bytes.
+    if (RunProduct.enabled() && local && (mime === "application/octet-stream" || mime === "application/vnd.ms-excel"))
+      return { attachment: { uri: pathToFileURL(file).href, name } }
     return { attachment: { uri: `data:${mime};base64,${bytes.toString("base64")}`, name } }
   } finally {
     await handle.close()

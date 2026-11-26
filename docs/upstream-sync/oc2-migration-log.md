@@ -25870,11 +25870,11 @@ CLI кандидата собран с версией своего пакета 
 |---|---|---|---|---|
 | 1 | `packages/app/src/constants/file-picker.ts`, `components/prompt-input/attachments.ts`, `components/prompt-input-v2.tsx`, `session-ui/src/v2/components/prompt-input/attachments.ts`, экспорт `./file-picker` в `app/package.json` | `b5b60e009b` | `.db`, `.lgd`, `.xls` при перетаскивании и вставке идут как ссылка на файл (`binaryReferenceMime`, `referenceFile`), без чтения байт; расширения добавлены в выбор файла | приложение v2 (B4): пути переехали, места нет. **Главная строка**: без неё SQLite, LGD и XLS из окна читаются байтами |
 | 2 | `packages/desktop/src/main/attachment-picker.ts`, `ipc.ts` (`referenceAttachment`) | `b5b60e009b` | выбор файла и IPC `reference-attachment` возвращают квитанцию с `mime` для бинарных данных | Desktop v2 (`packages/desktop/src/main`), нужен вместе со строкой 1 |
-| 3 | `packages/opencode/src/cli/cmd/run.ts` | `59fbda9ceb` | CLI `run` даёт квитанцию для `application/octet-stream` и `application/vnd.ms-excel` и без `--attach` | `packages/cli/src/run` |
-| 4 | `packages/opencode/src/product/attachment-resolver.ts` | `59fbda9ceb` | текст ссылки на вложение: для бинарных данных «loginom_file_admit», для остальных «loginom_file_profile» | в v2 нет резолвера вложений; вложения — `loginom-agent/src/index.ts` (B2.5d), `local-file.ts` |
+| 3 | `packages/opencode/src/cli/cmd/run.ts` | `59fbda9ceb` | CLI `run` даёт квитанцию для `application/octet-stream` и `application/vnd.ms-excel` и без `--attach` | `packages/cli/src/run` **Перенесено:** [B1.9c](#b19c-доперенос-042-cli-и-плагин) |
+| 4 | `packages/opencode/src/product/attachment-resolver.ts` | `59fbda9ceb` | текст ссылки на вложение: для бинарных данных «loginom_file_admit», для остальных «loginom_file_profile» | в v2 нет резолвера вложений; вложения — `loginom-agent/src/index.ts` (B2.5d), `local-file.ts` **Перенесено:** [B1.9c](#b19c-доперенос-042-cli-и-плагин) |
 | 5 | тесты `app/test-browser/prompt-attachments.test.ts`, `desktop/src/main/attachment-picker.test.ts`, `opencode/test/cli/run/run-process.test.ts`, `opencode/test/product/attachment-resolver.test.ts` | `b5b60e009b`, `59fbda9ceb` | покрывают строки 1–4 | вместе со строками 1–4 |
-| 6 | `packages/opencode/test/tool/loginom-local-file.test.ts` (133 строки) | `f0107e112b`, `b5b60e009b` | повторный допуск двух просканированных книг после смены только метки времени, отказ при изменённых байтах или подмене | `packages/server/test/loginom-local-file.test.ts`; код перенесён, **теста на v2 нет** |
-| 7 | `desktop/test/loginom/product-skills-smoke.mjs`, `opencode/test/cli/tui/package-docs-pty.py`, `opencode/test/cli/bundled-skills.test.ts`, `opencode/test/skill/bundled-skills.test.ts`, `opencode/test/fixture/mcp-reserved-prompts.ts` | `23a3012f44`, `af7edb0c7a`, `103387e4d1` | матрица встроенных навыков установленной приёмки и охранных тестов: четыре навыка вместо трёх | приёмка установленного Desktop и CLI (B5/B6), `loginom-host/script/skills-acceptance` |
+| 6 | `packages/opencode/test/tool/loginom-local-file.test.ts` (133 строки) | `f0107e112b`, `b5b60e009b` | повторный допуск двух просканированных книг после смены только метки времени, отказ при изменённых байтах или подмене | `packages/server/test/loginom-local-file.test.ts`; код перенесён, **теста на v2 нет** **Перенесено:** [B1.9c](#b19c-доперенос-042-cli-и-плагин) |
+| 7 | `desktop/test/loginom/product-skills-smoke.mjs`, `opencode/test/cli/tui/package-docs-pty.py`, `opencode/test/cli/bundled-skills.test.ts`, `opencode/test/skill/bundled-skills.test.ts`, `opencode/test/fixture/mcp-reserved-prompts.ts` | `23a3012f44`, `af7edb0c7a`, `103387e4d1` | матрица встроенных навыков установленной приёмки и охранных тестов: четыре навыка вместо трёх | приёмка установленного Desktop и CLI (B5/B6), `loginom-host/script/skills-acceptance` **Перенесено:** [B1.9c](#b19c-доперенос-042-cli-и-плагин) |
 
 Всего 7 строк.
 
@@ -25943,3 +25943,44 @@ CI передаёт его. Проверка «от обычного польз�
 `ParserError … Log "smoke $Name: starting …": Variable reference is not valid. ':' was not followed by a valid variable
 name character`. В PowerShell `$Name:` читается как переменная с областью; три строки журнала переписаны на `${Name}:`.
 В этом прогоне впервые зелёные `verify linux` (манифест, установщики, G5 с отрицательным контролем) и `verify macos`.
+
+## B1.9c Доперенос 0.4.2: CLI и плагин
+
+Ветка `bport1-attachments-cli` от `oc2-migration` (`45069384ab`). Строки 3, 4, 6, 7 таблицы «Не перенесено» раздела
+B1.9b; строки 1, 2 (приложение, Desktop) делает другая задача. Эталон — `v0.4.2` (В-110).
+
+| Строка | Что сделано | Где |
+|---|---|---|
+| 3 | `run` продуктового CLI передаёт `application/octet-stream` и `application/vnd.ms-excel` ссылкой `file:` (плагин берёт по ней квитанцию), а не байтами `data:`. «Без `--attach`» в v2 — локальный бэкенд (служебный сервис или частный сервер); у `--server` общего диска может не быть, там остаётся `data:` | `packages/cli/src/run/run.ts` (`prepareFile`, `sharesFilesystem`) |
+| 4 | Ядро v2 не отправляет модели ничего про файл, который не читается как текст, картинка или PDF. Хук `prompt` плагина дописывает к тексту запроса `Attached local data reference: <путь>. Use loginom_file_admit …` для бинарных данных и `Use loginom_file_profile …` для остальных (книги и т. п.); текст, картинки и PDF не затрагиваются | `packages/loginom-agent/src/local-file.ts` (`referenceText`) |
+| 6 | Тест 0.4.2 перенесён на настоящее ядро: две просканированные книги допускаются повторно после смены только метки времени (`file_id`, размер и `mtime_ns` те же, `ctime_ns` другой); отказ `LOGINOM_FILE_CHANGED` при изменённых байтах и при подмене файла; `exactScanReceipt` отказывает так же | `packages/server/test/loginom-local-file.test.ts` |
+| 7 | Матрица навыков в `server`, `cli` и `loginom-host` (в том числе `script/skills-acceptance`) уже читается из `reservedSkillNames`, там четыре навыка; перечней из трёх там нет. Добавлен охранный тест на ровно четыре навыка и каталог на диске | `packages/loginom-agent/test/skills.test.ts` |
+
+Выборы (меньший вариант):
+
+- Текст строки 4 дописан к тексту запроса (хук `prompt` меняет `event.prompt.text`), а не отдельной синтетической частью, как в 0.4: в v2 хук не создаёт частей. Пользователь видит эту строку в сообщении. Менять ядро (`to-llm-message.ts`) не стали — это правка файла OpenCode и общий контракт.
+- Тип берётся по расширению (`FSUtil.mimeType`), как в CLI; тип, который определит ядро по содержимому, плагину неизвестен.
+- Перечни из трёх навыков остались только в Desktop (`windows-sidecar-smoke.test.mjs`, ожидает два) и в `product-skills-smoke.mjs`/`package-docs-pty.py` 0.4, которых в v2 нет: файлы Desktop в этой задаче не трогали (строки 1, 2 и B5). Записано как найденное.
+- Тесты строки 5 для `app`, Desktop и `run-process` не переносились (строки 1, 2); для строк 3 и 4 написаны свои тесты на v2: `packages/cli/test/cli-run.test.ts` (два случая, `.xls` и `.db`), `packages/server/test/loginom-local-file.test.ts` (по расширениям).
+
+Мутации (каждая краснит свой тест, файл возвращён):
+
+| Мутация | Тест |
+|---|---|
+| в `prepareFile` отключена ветка ссылки | `cli-run`: `.xls`, `.db` красные |
+| `referenceText`: бинарное условие `false` / инверсия выбора инструмента | `loginom-local-file`: «an attached data file» красный |
+| `matchesExactWorkbookBytes` всегда `false` / без сверки хеша / без сверки `file_id` и размера | `loginom-local-file`: «metadata-only» красный |
+| из `reservedSkillNames` убран `package-linter` | `skills.test.ts`: «four skills» красный |
+
+Проверки (Bun 1.4.4, Node 24.19.0, `LOGINOM_AI_AGENT_TEST_NODE`):
+
+- `cli`: 80 файлов по одному; падают два, оба и на базе: `cli-dashboard` «standalone dashboard preserves explicit
+  publication approval» и `cli-loginom` «(unnamed)». Новые тесты (`cli-run`, `.xls` и `.db`) зелёные.
+- `loginom-agent`: 107 pass, 24 fail — тесты чёрновика панели без `npm ci` в `packages/dashboard/template` (среда); тест
+  навыков зелёный.
+- `server`: на базе 260 pass, 51 fail; с изменением 262 pass, 51 fail, те же имена (`package_docs_run`, `dashboard_*`,
+  пять тестов G1/G6/B2.6 и `(unnamed)`). Новые тесты зелёные.
+- `product`: 115 pass, 0 fail.
+- `catalog-check.py` код 0; `apply-identity.py --check`: would change: 0 files; `bun run check` код 0 (39 из 39).
+- Файлы OpenCode: правка `packages/cli/src/run/run.ts` минимальная; `catalog-check` новых нераскрытых расхождений
+  не показал (код 0).

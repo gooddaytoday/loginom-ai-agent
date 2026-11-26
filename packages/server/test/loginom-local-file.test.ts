@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto"
 import fs from "node:fs/promises"
 import path from "node:path"
+import { setTimeout as delay } from "node:timers/promises"
 import { pathToFileURL } from "node:url"
 import { describe, expect } from "bun:test"
 import { Agent } from "@opencode/core/agent"
@@ -25,9 +26,9 @@ import { OpenAIChat } from "../../ai/src/protocols/openai-chat"
 import { TestLLM } from "../../ai/src/testing"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
-import { fileReferences } from "../../loginom-host/src/file-reference"
+import { fileReferences, inspectReferenceFile } from "../../loginom-host/src/file-reference"
 import { fileTools } from "../../loginom-agent/src/file-profile"
-import { profileFile, sampleFile } from "../../loginom-agent/src/file-profile-core"
+import { exactScanReceipt, profileFile, sampleFile, scanFile } from "../../loginom-agent/src/file-profile-core"
 import { ServiceHost } from "../../loginom-agent/src/host"
 import { localFiles, type Lease } from "../../loginom-agent/src/local-file"
 import { createEmbeddedRoutes } from "../src/routes"
@@ -558,6 +559,155 @@ describe("loginom local file admission (B2.5a)", () => {
       timeout,
     )
 
+  // 0.4.2 (`59fbda9ceb`): the text that names the tool for an attached data file.
+  it.live(
+    "an attached data file reaches the model with the tool for its format: admit for binary data, profile for a workbook",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot
+        const names = ["data.db", "legacy.xls", "book.xlsx", "table.csv"]
+        const sessionID = yield* test.create()
+        yield* Effect.promise(() => Promise.all(names.map((name) => fs.writeFile(path.join(test.dir, name), "x"))))
+        yield* test.prompt(
+          sessionID,
+          script({ text: "attached" }),
+          names.map((name) => ({ uri: pathToFileURL(path.join(test.dir, name)).href })),
+        )
+        const sent = JSON.stringify((yield* test.requests(sessionID))[0]?.messages)
+        // `<path>. Use <tool>` follows each reference; a CSV is text and has none.
+        const tools = names.map((name) => sent.match(new RegExp(String.raw`${name}\. Use (\w+)`))?.[1])
+        expect(tools).toEqual(["loginom_file_admit", "loginom_file_admit", "loginom_file_profile", undefined])
+        expect(sent).toContain("No file bytes are included in this message.")
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  // 0.4.2 (`f0107e112b`): two scanned workbooks are admitted again after only their timestamps changed, and refused once
+  // their bytes changed or another file replaced them. The attachment receipt is the module's own, taken when the prompt
+  // is admitted (B2.5d); the scans are the real `profileFile` and `scanFile`.
+  it.live(
+    "re-admits both scanned workbooks after a metadata-only update and refuses changed bytes or replacement",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot
+        const ctx = yield* test.call()
+        const dir = path.join(test.profiles, ctx.sessionID)
+        const fixtures = path.join(
+          import.meta.dir,
+          "../../../docs/node-development/nodes/imports-excel/acceptance/fixtures",
+        )
+        const seconds = 1_700_000_000
+        const digest = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex")
+        const admitted: string[] = []
+        const host = {
+          reserveReference: async () => {
+            throw Error("Expected byte admission")
+          },
+          admitReference: async () => {
+            throw Error("Expected byte admission")
+          },
+          discardReference: async () => {
+            throw Error("Expected byte admission")
+          },
+          admit: async (_message: string, files: { name: string; data: string }[]) => {
+            const sha256 = digest(Buffer.from(files[0].data, "base64"))
+            admitted.push(sha256)
+            return [{ sha256 }]
+          },
+        }
+        const books = yield* Effect.promise(async () =>
+          Promise.all(
+            ["book-a.xlsx", "book-b.xlsx"].map(async (name) => {
+              const file = path.join(test.dir, name)
+              const bytes = await fs.readFile(path.join(fixtures, name))
+              await fs.writeFile(file, bytes)
+              await fs.utimes(file, seconds, seconds)
+              return {
+                file,
+                bytes,
+                sha256: digest(bytes),
+                before: undefined as undefined | Awaited<ReturnType<typeof inspectReferenceFile>>,
+                profileID: "",
+              }
+            }),
+          ),
+        )
+        // Both books are attached, so the module takes their receipts with the prompt.
+        yield* test.prompt(
+          ctx.sessionID,
+          script({ text: "attached" }),
+          books.map((book) => ({ uri: pathToFileURL(book.file).href })),
+        )
+        yield* Effect.promise(async () => {
+          for (const book of books) {
+            book.before = await inspectReferenceFile(book.file)
+            const profile = await profileFile(book.file, dir)
+            if (profile.format !== "xlsx") throw Error("Expected XLSX profile")
+            book.profileID = profile.profile_id
+            expect((await scanFile(profile.profile_id, dir)).sha256).toBe(book.sha256)
+          }
+        })
+        expect(books[0].sha256).not.toBe(books[1].sha256)
+        for (const book of books) {
+          const result = yield* Effect.promise(() => test.files.admit(book.file, ctx, host, "msg"))
+          expect(result.artifact).toEqual({ sha256: book.sha256 })
+        }
+
+        // The second pass uses the original attachment and on-disk scan receipts, as after reopening a package.
+        yield* Effect.promise(() => delay(30))
+        for (const book of [...books].reverse()) {
+          yield* Effect.promise(async () => {
+            await fs.utimes(book.file, seconds + 1, seconds)
+            const current = await inspectReferenceFile(book.file)
+            expect(current).toMatchObject({
+              file_id: book.before!.file_id,
+              size: book.before!.size,
+              mtime_ns: book.before!.mtime_ns,
+            })
+            expect(current.ctime_ns).not.toBe(book.before!.ctime_ns)
+            expect(digest(await fs.readFile(book.file))).toBe(book.sha256)
+          })
+          const result = yield* Effect.promise(() =>
+            test.files.admit(
+              book.file,
+              { ...ctx, id: Tool.CallID.make(`reopened_${path.basename(book.file)}`) },
+              host,
+              "msg",
+            ),
+          )
+          expect(result.artifact).toEqual({ sha256: book.sha256 })
+          expect((yield* Effect.promise(() => exactScanReceipt(book.profileID, dir)))?.sha256).toBe(book.sha256)
+        }
+
+        const authorized = yield* Effect.promise(() => test.files.authorize(books[0].file, ctx))
+        expect(message(yield* rejected(() => authorized.verifyAttachment(books[1].bytes)))).toContain(
+          "LOGINOM_FILE_CHANGED",
+        )
+
+        yield* Effect.promise(async () => {
+          const [edited, replaced] = books
+          const changed = Buffer.from(edited.bytes)
+          changed[changed.length - 1] ^= 1
+          await fs.writeFile(edited.file, changed)
+          await fs.utimes(edited.file, seconds, seconds)
+          const replacement = path.join(test.dir, "replacement.xlsx")
+          await fs.writeFile(replacement, replaced.bytes)
+          await fs.utimes(replacement, seconds, seconds)
+          await fs.rename(replacement, replaced.file)
+        })
+        for (const book of books) {
+          expect(message(yield* rejected(() => test.files.admit(book.file, ctx, host, "msg")))).toContain(
+            "LOGINOM_FILE_CHANGED",
+          )
+          expect(message(yield* rejected(() => exactScanReceipt(book.profileID, dir)))).toContain(
+            "LOGINOM_FILE_CHANGED",
+          )
+        }
+        expect(admitted).toEqual([books[0].sha256, books[1].sha256, books[1].sha256, books[0].sha256])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
   for (const mode of [
     "own",
     "other-session",
@@ -1040,8 +1190,9 @@ describe("loginom file profile tools (B2.5b1)", () => {
           })
           const ctx = yield* test.call()
           const tool = tools(test.files, test.profiles)
-          const id = content(yield* Effect.promise(() => tool.loginom_file_profile.execute({ path: file }, ctx)))
-            .profile_id
+          const id = content(
+            yield* Effect.promise(() => tool.loginom_file_profile.execute({ path: file }, ctx)),
+          ).profile_id
           yield* Effect.promise(async () => {
             if (change === "disappears") await fs.rm(file)
             if (change === "changes") await fs.writeFile(file, "region;amount\nNorth;1,25\nSouth;2,5\n")
@@ -1103,8 +1254,9 @@ describe("loginom file profile tools (B2.5b1)", () => {
         yield* Effect.promise(() => fs.writeFile(test.dir + "/input.csv", "region;amount\nNorth;25\nSouth;50\n"))
         const ctx = yield* test.call()
         const tool = tools(test.files, test.profiles)
-        const id = content(yield* Effect.promise(() => tool.loginom_file_profile.execute({ path: "input.csv" }, ctx)))
-          .profile_id
+        const id = content(
+          yield* Effect.promise(() => tool.loginom_file_profile.execute({ path: "input.csv" }, ctx)),
+        ).profile_id
         const stop = new AbortController()
         test.hooks.ask = async (action) => {
           if (action === "read") stop.abort()
@@ -1192,7 +1344,11 @@ describe("tool result size contract (B2.5b1)", () => {
         const sessionID = yield* test.create()
         yield* test.prompt(
           sessionID,
-          script({ tool: "probe_output", input: { truncated: true } }, { tool: "probe_output", input: {} }, { text: "end" }),
+          script(
+            { tool: "probe_output", input: { truncated: true } },
+            { tool: "probe_output", input: {} },
+            { text: "end" },
+          ),
         )
         const history = yield* Effect.promise(() => test.plugin.session.context({ sessionID }))
         const results = history.flatMap((message) =>

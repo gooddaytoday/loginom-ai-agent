@@ -246,6 +246,23 @@ test.each(["missing", "directory", ...(process.getuid?.() === 0 ? [] : ["denied"
   60_000,
 )
 
+// 0.4.2 (`59fbda9ceb`): `.xls` and other binary data go as a local path, not as bytes the provider cannot take, and the
+// model is told to admit them.
+test.each(["legacy.xls", "data.db"])(
+  "run --file %s sends a local reference that names loginom_file_admit",
+  async (name) => {
+    const llm = model([{ text: "Принято." }])
+    const { project } = await root(llm.url)
+    await Bun.write(path.join(project, name), Buffer.from([0, 1, 2, 3, 0xff]))
+    const result = await product(roots.at(-1)!, run(project, "--file", path.join(project, name)))
+    expect({ code: result.code, stderr: result.stderr }).toEqual({ code: 0, stderr: "" })
+    const sent = JSON.stringify(llm.requests[0]?.messages)
+    expect(sent).toContain(`${name}. Use loginom_file_admit`)
+    expect(sent).not.toContain("AAECA")
+  },
+  60_000,
+)
+
 test("--headless and --no-headless together are invalid arguments: exit code 2 before the profile opens", async () => {
   const llm = model([])
   const { project, profile } = await root(llm.url)
