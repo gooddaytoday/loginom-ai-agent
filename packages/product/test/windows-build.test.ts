@@ -4,7 +4,7 @@ import { trackedSnapshot } from "./tracked"
 
 // B5.1i: the Windows candidate builds on a runner nothing else exercises before CI. The order that Desktop requires
 // (the CLI in packages/cli/dist before the Desktop build, the unpacked app before the installer) is guarded here.
-const { read } = trackedSnapshot(resolve(import.meta.dir, "../../.."))
+const { read, paths } = trackedSnapshot(resolve(import.meta.dir, "../../.."))
 const script = read("script/build-windows.ps1")
 const doc: any = (Bun as any).YAML.parse(read(".github/workflows/loginom-windows.yml"))
 
@@ -49,5 +49,38 @@ describe("build-windows.ps1", () => {
     expect(names.indexOf("Upload short-lived unsigned candidates")).toBeLessThan(
       names.indexOf("Install, execute and remove the CLI ZIP candidate"),
     )
+  })
+})
+
+// B5.1j: the installed-product steps only ever ran on 0.4 scripts; each name they use must exist in v2.
+describe("installed-product checks", () => {
+  const steps: any[] = doc.jobs["build-package-test"].steps
+  const run = (name: string): string => steps.find((step) => step.name === name).run
+
+  test("safeStorage uses the credential codec of loginom-host, which exports `credentials`", () => {
+    const text = run("Desktop safeStorage DPAPI across Electron restarts")
+    expect(text).toContain("build packages/loginom-host/src/connection/credentials.ts")
+    expect(read("packages/loginom-host/src/connection/credentials.ts")).toContain("export function credentials")
+  })
+
+  test("package test files named by the workflow are tracked", () => {
+    const text = run("Run package-local checks")
+    const named = [...text.matchAll(/(?:test(?:\/|\\)loginom(?:\/|\\)|\btest |\s)((?:src|scripts|test)[\w./-]*\.test\.(?:ts|mjs)|electron-builder\.config\.test\.ts)/g)]
+    expect(named.length).toBeGreaterThan(8)
+    const missing = named.filter((match) => !paths.some((path) => path.endsWith(match[1]!)))
+    expect(missing.map((match) => match[1])).toEqual([])
+  })
+
+  test("the smoke wrapper passes only parameters the installed smoke declares, and the red run is a declared mutation", () => {
+    const smoke = read("packages/desktop/test/loginom/windows-installed-smoke.ps1")
+    const wrapper = read("script/run-windows-installed-smoke.ps1")
+    const declared = (text: string) => new Set([...(text.match(/param\(([\s\S]*?)\n\)/)?.[1] ?? "").matchAll(/\$([A-Za-z]+)\s*(?:=|,|\n|$)/g)].map((m) => m[1]!.toLowerCase()))
+    const passed = [...wrapper.match(/windows-installed-smoke\.ps1'\) ([^\n]*\n[^\n]*)/)![1]!.matchAll(/ -([A-Za-z]+)/g)].map((m) => m[1]!.toLowerCase())
+    expect(passed.length).toBeGreaterThan(4)
+    expect(passed.filter((name) => !declared(smoke).has(name))).toEqual([])
+    const calls = run("Install, launch and uninstall Desktop candidate")
+    const mutation = calls.match(/-Mutation (\w+)/)![1]
+    expect(smoke).toContain(`'${mutation}'`)
+    expect(calls).toContain("run-windows-installed-smoke.ps1")
   })
 })
