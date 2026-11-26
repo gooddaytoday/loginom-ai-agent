@@ -31,7 +31,7 @@ export function createTreeNodeSupport(config,{json}){
  const jsonFieldScopes=new WeakMap();
  const type=json?'trees.from_json':'trees.to_table',stage=json?'json_tree':'tree_table';
  return createTabularTransformNodeSupport(config,{
-  type,mode:json?'auto_structure':'selected_nodes',revision:'tree-stage1-v2',
+  type,mode:json?'auto_structure':'selected_nodes',revision:'tree-stage1-v3',
   parameterSchema:json?jsonToTreeParametersSchema:treeToTableParametersSchema,validate:validateTreeParameters,readback:treeConfigurationReadback,
   configurationObservation:{condition:'owned tree component wizard',ready:s=>owned(s)&&['input_mapping','tree_input_mapping',stage].includes(s.wizard?.stage)},
   async preflight(options,ctx){
@@ -45,10 +45,12 @@ export function createTreeNodeSupport(config,{json}){
    need(latest?.cleanup_confirmed&&outcome.status==='SUCCEEDED'&&outcome.cleanup_complete===true&&source?.cleanup_complete===true
     &&source.execution?.status==='completed','Read/execute the same source node successfully before tree conversion');
    let port=source.output?.ports?.find(p=>p.port===input.output);
-   const withoutPreview=!json&&!port&&input.output===0&&latest.request?.target?.type==='trees.from_json'
-    &&latest.request.read?.ports?.length===0&&source.output?.ports?.length===0;
-   if(!withoutPreview)need(port?.fresh===true&&port.sample_complete===true&&port.execution_id===source.execution.execution_id,
-    'Tree conversion requires a complete source readback from the same execution or an executed JSON tree without a requested preview');
+   const readSchema=!json&&input.output===0&&latest.request?.target?.type==='trees.from_json'
+    &&(!port&&latest.request.read?.ports?.length===0&&source.output?.ports?.length===0
+     ||port?.port_kind==='tree'&&port.fresh===true&&port.sample_complete===false&&port.tree?.complete===false
+      &&port.execution_id===source.execution.execution_id&&port.freshness_basis==='completed_execution_port_source');
+   if(!readSchema)need(port?.fresh===true&&port.sample_complete===true&&port.execution_id===source.execution.execution_id,
+    'Tree conversion requires a complete source readback from the same execution or the native port of a completed JSON tree');
    const binding={document_id:request.document_id,workflow_ref:request.workflow_ref,node:input.source};
    const readNative=code=>{
     ctx.signal?.throwIfAborted();const remaining=ctx.deadline-(options.now??Date.now)();
@@ -57,9 +59,9 @@ export function createTreeNodeSupport(config,{json}){
    };
    const inventory=await readNative(makeNodeOutputContextCode(binding));
    const observed=inventory?.ports?.find(p=>p.index===input.output);
-   need(inventory?.verified&&observed?.active&&(withoutPreview?observed.kind==='tree':observed.port_guid===port.port_guid),
+   need(inventory?.verified&&observed?.active&&(!readSchema||observed.kind==='tree')&&(!port||observed.port_guid===port.port_guid),
     'Tree source port is inactive or changed');
-   if(withoutPreview){
+   if(readSchema){
     // Link the native output from the same execution. Only its definition is
     // read here so large instance trees never travel through the preview.
     const execution=existingOutputExecution(await readNative(makeNodeProcessContextCode(binding,{existingOutput:true})),input.source);
@@ -95,12 +97,12 @@ export function createTreeNodeSupport(config,{json}){
      validateTreeJsonScope(port.sample[0][index].value);
     }
    }else{
-    need(port.port_kind==='tree'&&(withoutPreview||port.tree?.complete===true),'Tree-to-table needs the actual typed tree port');
+    need(port.port_kind==='tree'&&(readSchema||port.tree?.complete===true),'Tree-to-table needs the actual typed tree port');
     validateSelectedTreePaths(port.tree.schema,request.parameters.selected_paths??previous?.selected_paths,
      request.parameters.global_index_paths??previous?.global_index_paths,request.parameters.composite_names??previous?.composite_names??null);
    }
    const event={phase:'tree_source_scope_verified',operation_id:options.operation.id,node:input.source,port:input.output,port_guid:port.port_guid,
-    source_execution_id:source.execution.execution_id,source_kind:json?'table':'tree'};
+    source_execution_id:source.execution.execution_id,source_kind:json?'table':'tree',...(readSchema?{source_schema_only:true}:{})};
    const ack=await options.onRecord(event);
    need(same(Object.fromEntries(Object.keys(event).map(k=>[k,ack?.[k]])),event),'Tree source scope journal acknowledgement differs');
    return {verified:true,cleanup_complete:true,effect_possible:false};
@@ -229,7 +231,11 @@ export function createTreeNodeSupport(config,{json}){
   async readOutputs(channel,read,ctx,mapped){
    need(same(read.ports,[0]),'Tree stage 1 reads output 0');
    const {output}=await channel.readOutputPort({port:0,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:true});
-   if(json){need(output.port_kind==='tree'&&output.tree?.complete===true,'Complete native tree required');validateJsonTreeSchema(output.tree.schema);}
+   if(json){
+    need(output.port_kind==='tree'&&typeof output.tree?.complete==='boolean'&&output.sample_complete===output.tree.complete,
+     'Native tree preview coverage differs');
+    validateJsonTreeSchema(output.tree.schema);
+   }
    else{
     need(output.port_kind!=='tree','Tree-to-table requires a tabular output');
     const tree=mapped.configuration.nodes;
@@ -239,7 +245,7 @@ export function createTreeNodeSupport(config,{json}){
     need(output.schema.length===names.length+indexes&&extra.length===indexes&&extra.every(n=>n.type==='integer')
      &&same(output.schema.filter(n=>names.includes(n.name)).map(n=>n.name),names),'Native tree table field names or order differ');
    }
-   return {verified:true,cleanup_complete:true,effect_possible:true,status:json||output.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports:[output]};
+   return {verified:true,cleanup_complete:true,effect_possible:true,status:output.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports:[output]};
   },
  });
 }

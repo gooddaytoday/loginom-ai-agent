@@ -130,7 +130,8 @@ test("tree guidance retains the native link and documents separate Dock read lim
   expect(json).toMatch(/Response[\s\S]*?HttpStatusCode[\s\S]*?RequestID/)
   expect(json).toContain('read:{ports:[],sample_rows:0,require_exact_numbers:false}')
   expect(json).toContain("256 узлов **схемы**")
-  expect(json).toMatch(/Полное чтение Dock ограничено\s+256 экземплярами/)
+  expect(json).toMatch(/Лимиты Dock на входе — 512 КиБ/)
+  expect(json).toMatch(/sample_complete:false[\s\S]*?tree.node_count[\s\S]*?256 экземпляров/)
   expect(json).toContain("operation.recover")
   expect(table).toContain("carts[].products[]")
   expect(table).toContain("repeat_parents:true")
@@ -171,4 +172,26 @@ test("binning ties guidance keeps the rule without echoing the acceptance task",
   expect(settings).toContain("совпадения на границе остаются в текущем интервале")
   expect(settings).not.toContain('size:4,ties:"current"')
   expect(Buffer.byteLength(settings)).toBeLessThanOrEqual(6000)
+})
+
+test("REST record arrays route by document count and preserve an explicitly requested tree", async () => {
+  const nodes = new URL("../skills/loginom-automation/references/nodes/", import.meta.url)
+  const rest = await Bun.file(new URL("integration.rest_request.md", nodes)).text()
+  const table = await Bun.file(new URL("trees.to_table.md", nodes)).text()
+  const json = await Bun.file(new URL("trees.from_json.md", nodes)).text()
+  const get = rest.split("## GET и ответы\n")[1]?.split("\n## ")[0] ?? ""
+  expect(get).toMatch(/Один `Response` с массивами записей, включая вложенные.*trees\.from_json\.md.*trees\.to_table\.md/)
+  expect(get).toMatch(/Объект без массива: Калькулятор → Свёртка → Кросс-таблица/)
+  expect(get).toMatch(/нескольких документов в строках REST.*один `programming\.javascript`[\s\S]*?JSON\.parse\(Response\), Append per record with its RequestID\); no RequestID splits/)
+  expect(get).toContain("Не объединяй ответы")
+  expect(get).toContain("Big ints/ids: read as strings (JSON.parse rounds >2^53)")
+  expect(json).toMatch(/Response[\s\S]*?HttpStatusCode[\s\S]*?RequestID/)
+  for (const card of [rest, table, json]) {
+    expect(card).toContain("не подменяй дерево JavaScript")
+    expect(new TextEncoder().encode(card).length).toBeLessThanOrEqual(6000)
+  }
+  expect(json).toContain("operation.recover")
+  expect(table).toContain("operation.recover")
+  expect(json).toContain("(integration.rest_request.md)")
+  expect(table).toContain("(integration.rest_request.md)")
 })

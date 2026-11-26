@@ -36,7 +36,8 @@ export function validateTreeParameters(parameters,mode,request){
 // Inspect only the admitted JSON shape. Numeric lexemes are retained as text;
 // the native tree reader independently supplies every delivered scalar value.
 export function validateTreeJsonScope(text){
- if(typeof text!=='string'||Buffer.byteLength(text)>1024*1024)throw Error('Tree JSON input exceeds the bounded object scope');
+ if(typeof text!=='string'||Buffer.byteLength(JSON.stringify([[text]]))>512*1024)
+  throw Error('Tree JSON input exceeds the 512 KiB encoded source-row budget');
  const numbers=new WeakSet();
  const root=JSON.parse(text,(_key,value,context)=>{
   if(typeof value!=='number')return value;

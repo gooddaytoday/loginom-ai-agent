@@ -192,7 +192,7 @@ test('JSON output and table selection admit a nested object array',async()=>{
   {path:'/items/id',name:'id',type:'integer',is_container:false,is_array:false},
   {path:'/items/parts',name:'parts',type:'object',is_container:true,is_array:true},
   {path:'/items/parts/sku',name:'sku',type:'string',is_container:false,is_array:false}];
- const output={port_kind:'tree',tree:{complete:true,schema}};
+ const output={port_kind:'tree',sample_complete:true,tree:{complete:true,schema}};
  const result=await tableImplementation(true).readOutputs({readOutputPort:async()=>({output})},
   {ports:[0],sample_rows:100},{execution:{execution_id:'exec'}},{});
  assert.equal(result.verified,true);
@@ -262,7 +262,7 @@ test('LAB-1807 tree-siblings-native: JSON and tree-to-table admit sibling and ne
  const schema=[node('','object'),node('/batch','string'),node('/items','object',true),node('/items/code','string'),node('/items/qty','integer'),
   node('/tags','object',true),node('/tags/tag','string')];
  assert.equal(validateJsonTreeSchema(schema),true);
- const output={port_kind:'tree',tree:{complete:true,schema}};
+ const output={port_kind:'tree',sample_complete:true,tree:{complete:true,schema}};
  assert.equal((await tableImplementation(true).readOutputs({readOutputPort:async()=>({output})},{ports:[0],sample_rows:100},{execution:{execution_id:'exec'}},{})).verified,true);
  assert.equal(validateSelectedTreePaths(schema,['/batch','/items/code','/items/qty','/tags/tag']),true);
  assert.equal(validateSelectedTreePaths(schema,['/tags/tag'],['/tags']),true);
@@ -599,10 +599,36 @@ test('tree-to-table can prove the native schema from a JSON execution that reque
  assert.equal(calls.length,3);
  assert.equal(events[0].source_execution_id,execution_id);
  for(const [record,key,foreign] of [[port,'port_guid','foreign'],[port,'fresh',false],[response,'cleanup_complete',false],
+  [node_context,'surface','wizard'],[node_context,'node_id','foreign'],[port,'port',1],
+  [port,'execution_id','doc:root:9'],[port,'freshness_basis','unknown'],[port,'sample_complete',true],
   [history[0].outcome.output.execution,'execution_id','doc:root:6'],[history[0].request.target,'type','trees.from_table']]){
   const original=record[key];record[key]=foreign;
   await assert.rejects(check());assert.deepEqual(events,[]);
   record[key]=original;
  }
  assert.equal(options.operation.transportUncertain,true);
+ const sample={...port,tree:{schema,complete:false,instances:[{index:0,parent:null,path:''}],node_count:1}};
+ history[0].request.read.ports=[0];
+ history[0].outcome.output.output.ports=[sample];
+ assert.equal((await check()).verified,true);
+ assert.equal(events[0].source_schema_only,true);
+ sample.port_guid='foreign';
+ await assert.rejects(check(),/inactive or changed/);
+ assert.equal(calls.length,1);
+});
+
+test('a completed JSON execution exposes its incomplete tree preview to the agent',async()=>{
+ const schema=[{path:'',name:'Root',is_container:true,is_array:true},{path:'/id',name:'id',type:'integer'}];
+ const output={port_kind:'tree',sample_complete:false,tree:{complete:false,schema,instances:[{index:0,parent:null,path:''}],node_count:1}};
+ const result=await tableImplementation(true).readOutputs({readOutputPort:async()=>({output})},
+  {ports:[0],sample_rows:100},{execution:{execution_id:'exec'},receipt_id:'read'},{});
+ assert.equal(result.status,'partial');
+ assert.equal(result.execution_id,'exec');
+ assert.equal(result.ports[0],output);
+});
+
+test('JSON admission uses the tabular reader budget including encoded escapes',()=>{
+ const document=n=>JSON.stringify({items:[{name:'"'.repeat(n)}]});
+ assert.equal(validateTreeJsonScope(document(100000)).verified,true);
+ assert.throws(()=>validateTreeJsonScope(document(140000)),/512 KiB/);
 });

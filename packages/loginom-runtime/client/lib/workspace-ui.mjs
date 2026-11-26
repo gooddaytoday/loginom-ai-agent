@@ -1,5 +1,8 @@
 import {readPreparedNodeContext, validatePreparedNodeContext} from './node-context.mjs';
 import {captureProcessNodeFocus,restoreProcessNodeFocus} from './process-node-focus.mjs';
+import {NODE_TYPES} from './node-contracts.mjs';
+
+const nodeTypesByIcon=Object.fromEntries(Object.values(NODE_TYPES).map(node=>[node.icon_class,node.type]));
 
 // Execution-journal diagnostics only. Never issue refs or classify a window as
 // safe from this read; require the already observed DOM incarnation.
@@ -87,6 +90,40 @@ export function validateUiAction(action, snapshot) {
       if (action.verb==='set_checked' && elements[0].check_state?.kind==='radio' && !action.checked) throw new Error('Select the desired radio option; a radio cannot be independently unchecked');
     }
   }
+  return action;
+}
+
+// Only fixed node procedures can request a batch. The public action schema and
+// its validator continue to accept individual gestures.
+export function validateNodeUiAction(action, snapshot, preparedNodeContext) {
+  if(action?.verb!=='set_wizard_fields')return validateUiAction(action,snapshot);
+  const {wizard:w,prepared_node_context:node}=snapshot??{};
+  if(!preparedNodeContext||node?.verified!==true||node.surface!=='wizard'||w?.status!=='observed'||!w.root_ref
+    ||Object.keys(action).sort().join(',')!=='fields,verb'||!Array.isArray(action.fields)
+    ||action.fields.length<2||action.fields.length>4)
+    throw Error('Wizard field batch requires a prepared owner and two to four fields');
+  const scope=w.stage==='text_import_format'?'import_format':'output_column';
+  const names=action.fields.map(({ref,text,...extra})=>{
+    if(Object.keys(extra).length)throw Error('Unexpected wizard field batch property');
+    validateUiAction({verb:'set_wizard_field',ref,text},snapshot);
+    const {wizard_field:f}=snapshot.ui.elements.find(e=>e.ref===ref);
+    const fields=scope==='import_format'?w.settings?.fields:w.column_parameters?.fields;
+    const field=fields?.[f.name];
+    const bound=scope==='import_format'?f.root_ref===w.root_ref:
+      f.root_ref===w.column_parameters?.root_ref&&f.wizard_root_ref===w.root_ref;
+    if(f.scope!==scope||!bound||!f.owner_ref
+      ||scope==='import_format'&&f.name==='null_marker'&&['null','NULL'].includes(text)
+      ||field?.status!=='observed'||field.truncated===true||field.input_ref!==ref||field.owner_ref!==f.owner_ref)
+      throw Error('Wizard field batch contains an unbound input');
+    return f.name;
+  });
+  if(new Set(names).size!==names.length
+    ||(scope==='import_format'
+      ?w.owner_context?.status!=='observed'||names.some(name=>!['delimiter','text_qualifier','decimal_separator','null_marker'].includes(name))
+        ||names.includes('delimiter')&&names[0]!=='delimiter'
+      :!['output_mapping','input_mapping'].includes(w.stage)||names.join(',')!=='name,label'
+        ||w.column_parameters?.status!=='observed'||!w.column_parameters.root_ref))
+    throw Error('Wizard field batch contains incompatible fields or order');
   return action;
 }
 
@@ -186,7 +223,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       &&['document_id','workflow_id','node_id'].every(k=>typeof previousNode[k]==='string'&&previousNode[k]===nodeContext[k])
       &&typeof previousPort?.port_guid==='string'&&previousPort.port_guid.length>0
       &&typeof previousPort?.opening_operation_id==='string'&&previousPort.opening_operation_id.length>0;
-    const observed = await page.evaluate(({rootRef,discoverRoots,downloadToastObservation,nodeErrorToastObservation,quietGraphObservation,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedPendingWizardNode,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedPortReturn}) => {
+    const observed = await page.evaluate(({rootRef,discoverRoots,downloadToastObservation,nodeErrorToastObservation,quietGraphObservation,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedPendingWizardNode,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedPortReturn,inventoryTypes}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -855,6 +892,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // Native type, not an editable graph label, owns the extra script deny.
     // Build once per observation; unconfirmed controls never inherit permission.
     const nativeGraphControls=new Map(),nativeGraphLinks=new Set(),nativeVariablePorts=new Map(),nativeBoundaryRoles=new Map();
+    const nativeInventory=new Map(),nativeInventoryPorts=new Map(),nativeInventoryLinks=new Set();
     const nativeGraphControl=element=>ownedGraph(element)&&!nativeGraphLinks.has(element)
       ?nativeGraphControls.get(element)??{status:'unconfirmed'}:null;
     if(graphQueryable&&graphPrefix){
@@ -885,6 +923,24 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           if(typeof guid!=='string'||!guid||guid.length>128||guids.get(guid)!==1||!cell||typeof cell!=='object'||cells.get(cell)!==1
             ||typeof icon!=='string'||!/^bg-vendor-icon-[a-z0-9_-]{1,128}$/.test(icon))continue;
           const rendered=getState.call(view,cell),shape=value(value(rendered,'shape'),'node'),tid=getTid(shape);
+          if(inventoryTypes&&/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(guid)){
+            const label=value(node,'FLabel'),labelCell=value(label,'FCell'),geometry=value(cell,'geometry');
+            const caption=value(label,'parent')===node&&value(labelCell,'parent')===cell?value(label,'FRawValue'):null;
+            const connected=unique(shape)&&tid?.startsWith(graphPrefix)&&!sensitive(shape);
+            // A non-rendered native cell can be listed, but has no DOM refs.
+            // Convert its model-space geometry to the canvas' viewport.
+            const scale=value(view,'scale'),translate=value(view,'translate'),box=boxOf(graphContainer);
+            const bounds=connected?boxOf(shape):[
+              scale,translate?.x,translate?.y,geometry?.x,geometry?.y,geometry?.width,geometry?.height,
+            ].every(Number.isFinite)&&scale>0?{
+              x:box.x+(geometry.x+translate.x)*scale-(graphContainer.scrollLeft??0),
+              y:box.y+(geometry.y+translate.y)*scale-(graphContainer.scrollTop??0),
+              width:geometry.width*scale,height:geometry.height*scale,
+            }:null;
+            if(connected||!shape&&typeof caption==='string'&&caption&&!sensitivePattern.test(caption))
+              nativeInventory.set(guid,{key:connected?tid.slice(graphPrefix.length):null,
+                caption:typeof caption==='string'&&!sensitivePattern.test(caption)?caption.slice(0,240):null,bounds,icon});
+          }
           if(!unique(shape)||!tid?.startsWith(graphPrefix))continue;
           const identity=[model,diagram,graph,view,node,cell];
           const data=value(node,'data');if(data&&typeof data==='object')identity.push(data);
@@ -916,6 +972,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             if(!portTid?.startsWith(tid+';'+(type===0?'Input_':'Output_')))continue;
             const portData=value(port,'data');retain(element,[...identity,port,portCell,...(portData&&typeof portData==='object'?[portData]:[])],icon);
             const suffix=portTid.slice(tid.length+1),variable=/^(Input|Output)_Var-(\d+)$/.exec(suffix),control=suffix==='Input_ControlVar';
+            if(nativeInventory.has(guid)&&unique(element)&&!sensitive(element))
+              nativeInventoryPorts.set(port,{key:tid.slice(graphPrefix.length),suffix,type});
             if(unique(element)&&portData&&(variable&&subtype===3&&type===(variable[1]==='Input'?0:1)||control&&subtype===4&&type===0)){
               const inventory=nativeVariablePorts.get(guid)??{variable_inputs:[],variable_outputs:[]};
               inventory[type===0?'variable_inputs':'variable_outputs'].push({kind:control?'control':'variables',native_index:control?0:Number(variable[2]),port_guid:portGuid});
@@ -931,6 +989,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           if(!cell||typeof cell!=='object'||!nodes.includes(value(source,'parent'))||!nodes.includes(value(target,'parent')))continue;
           const element=value(value(getState.call(view,cell),'shape'),'node');
           if(unique(element)&&!nativeGraphControls.has(element))nativeGraphLinks.add(element);
+          const from=nativeInventoryPorts.get(source),to=nativeInventoryPorts.get(target);
+          if(from?.type===1&&to?.type===0&&!from.key.includes('|')&&!to.key.includes('|')
+            &&/^Output_[^;|]+$/.test(from.suffix)&&/^Input_[^;|]+$/.test(to.suffix))
+            nativeInventoryLinks.add(graphPrefix+from.key+'|'+from.suffix+'|'+to.key+'|'+to.suffix);
         }
       }
     }
@@ -3870,18 +3932,30 @@ function readRenderedInputMapping(observation) {
       // A saved node's GUID comes only from the existing native/DOM binding,
       // never from its editable label or an arbitrary DOM attribute.
       const native=node&&nativeGraphControl(node);
+      const inventory=native?.node_id&&nativeInventory.get(native.node_id);
       const variablePorts=native?.node_id&&nativeVariablePorts.get(native.node_id);
       if(variablePorts)for(const ports of Object.values(variablePorts))for(const kind of ['variables','control'])
         ports.filter(p=>p.kind===kind).sort((a,b)=>a.native_index-b.native_index).forEach((p,i)=>{p.port=i;});
       return { node_ref: { kind: 'node', node_label: label, workflow_ref: workflow }, bounding_box: node ? boxOf(node) : null,
         ...(native?.node_id?{node_id:native.node_id}:{}),
+        ...(inventory?{
+          type:nativeBoundaryRoles.get(native.node_id)==='output'?'control.supernode_output':inventoryTypes[native.icon]??native.icon}:{}),
+        ...(inventory?.caption?{label_text:inventory.caption}:{}),
         ...(native?.node_id&&nativeBoundaryRoles.has(native.node_id)?{boundary_role:nativeBoundaryRoles.get(native.node_id)}:{}),
         ...(native?.icon==='bg-vendor-icon-modelvariables'?{type:'variables.user',target_modes:['existing']}:{}),
         ...(variablePorts??{}),
         ports: graphElements.filter(element => (getTid(element) ?? '').startsWith(nodeTid + ';') && /;(?:Input|Output)_[^;]+$/.test(getTid(element)))
           .slice(0, 100).map(element => ({ tid: getTid(element), bounding_box: boxOf(element), ui_ref: refOf(element) })) };
     });
-    const links = [...new Set(graphElements.map(getTid).filter(tid => { const body = tid.slice(graphPrefix.length); return /^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body); }))].sort();
+    const missingNodes=[...nativeInventory].filter(([id,entry])=>!observedNodeLabels.includes(entry.key)&&!nodes.some(n=>n.node_id===id));
+    for(const [id,entry] of missingNodes.slice(0,200-nodes.length))nodes.push({
+      node_ref:{kind:'node',...(entry.key?{node_label:entry.key}:{}),workflow_ref:workflow},node_id:id,
+      ...(entry.caption?{label_text:entry.caption}:{}),
+      bounding_box:entry.bounds,type:nativeBoundaryRoles.get(id)==='output'?'control.supernode_output':inventoryTypes[entry.icon]??entry.icon,
+      ports:[],
+    });
+    const links = [...new Set([...graphElements.map(getTid).filter(tid => { const body = tid.slice(graphPrefix.length); return /^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body); }),
+      ...nativeInventoryLinks])].sort();
     let packageIdentity = null;
     try {
       const app = globalThis.bg?.app;
@@ -4338,7 +4412,7 @@ function readRenderedInputMapping(observation) {
         ...(definitionPrefix?{scope:omittedRegions.has('table_data_cells')?'node_output_controls':'node_definition_controls',omitted_regions:[...omittedRegions]}:{}) },
       nodes, links: links.slice(0, 500), workarea: workarea ? boxOf(workarea) : null,
       ui: { elements, dialogs: dialogs.slice(0, 12), messages: messages.slice(0, 30), masks: masks.slice(0, 12), table_cells: tableCells,
-        truncated: { elements: !!selectedRoot || controls.length > 240, nodes: !!selectedRoot || observedNodeLabels.length > 200, links: !!selectedRoot || links.length > 500, ports: !!selectedRoot || nodes.some(node => node.ports.length === 100), dialogs: dialogs.length > 12, messages: !!selectedRoot || messages.length > 30, masks: masks.length > 12, table_cells: definitionOnly || !!selectedRoot || cells.length > 120 } } };
+        truncated: { elements: !!selectedRoot || controls.length > 240, nodes: !!selectedRoot || observedNodeLabels.length+missingNodes.length > 200, links: !!selectedRoot || links.length > 500, ports: !!selectedRoot || nodes.some(node => node.ports.length === 100), dialogs: dialogs.length > 12, messages: !!selectedRoot || messages.length > 30, masks: masks.length > 12, table_cells: definitionOnly || !!selectedRoot || cells.length > 120 } } };
     } catch (error) {
       // Playwright serializes thrown Errors without arbitrary properties such
       // as our code. Return a small data envelope across the realm boundary;
@@ -4349,6 +4423,7 @@ function readRenderedInputMapping(observation) {
         ,...(['collect','metadata','output_definitions','import_definitions','controls','data_views'].includes(error?.scan_stage)?{scan_stage:error.scan_stage}:{})}};
     }
   },{downloadToastObservation:task.download_toast_observation===true,nodeErrorToastObservation:task.node_error_toast_observation===true,
+    inventoryTypes:!task.prepared_node_context?task.node_types_by_icon:null,
     quietGraphObservation:task.quiet_graph_observation===true,
     rootRef:rediscover ? null : postActionRoot ?? task.root_ref ?? task.snapshot?.observation_root?.ref ?? null,discoverRoots:rediscover || task.discover_roots===true,storageName:task.storage_name ?? null,
     columnPage:task.import_column_page??(task.snapshot?.wizard?.import_columns?.page?{offset:task.snapshot.wizard.import_columns.page.offset,limit:task.snapshot.wizard.import_columns.page.limit}:null),
@@ -4532,7 +4607,7 @@ function readRenderedInputMapping(observation) {
     if(!Object.values(referenceChecks).every(Boolean))record('ui_reference_precondition_refused',{checks:referenceChecks});
     if (!Object.values(referenceChecks).every(Boolean)
       || task.action.verb==='replace_expression' && !same(before.calculator_editor,current.calculator_editor)
-      || task.action.verb==='set_wizard_field' && !same(before.wizard_field,current.wizard_field)
+      || verb==='set_wizard_field' && !same(before.wizard_field,current.wizard_field)
       || task.action.verb==='cancel_expression_parameters' && !same(before.expression_cancel,current.expression_cancel)
       || task.action.verb==='apply_expression_parameters' && !same(before.expression_apply,current.expression_apply)
       || ['apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(task.action.verb) && !same(before.column_close,current.column_close)
@@ -4630,6 +4705,158 @@ function readRenderedInputMapping(observation) {
     if (isGraphLink) record('ui_link_hit_point', { ref: current.ref, source: hit.source, candidates_checked: hit.candidates_checked, point: hit.point });
     return { handle, point: hit.point };
   };
+  const readEpoch=()=>page.evaluate(() => {
+    const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+    if (!state?.observer) return null;
+    state.captureMutations(state.observer.takeRecords());
+    return {document:state.epoch,revision:state.revision};
+  });
+  const sameFieldContext=(before,fresh)=>fresh.authenticated && fresh.origin===before.origin && fresh.loginom_build===before.loginom_build
+    && fresh.active_tab_ref===before.active_tab_ref && fresh.dom_epoch.document===before.dom_epoch.document
+    && same(fresh.workflow_ref,before.workflow_ref) && same(fresh.package_identity,before.package_identity)
+    && same(fresh.active_identity,before.active_identity) && same(fresh.prepared_node_context,before.prepared_node_context)
+    && same(fresh.ui.dialogs,before.ui.dialogs) && same(fresh.ui.masks,before.ui.masks);
+
+  const clickAt=async (target,clickCount,button='left')=>{
+    timeout();mouseHeld=true;mouseButton=button;
+    await page.mouse.click(target.point.x,target.point.y,{clickCount,button});
+    mouseHeld=false;
+    if(task.action.verb==='show_process_node')processShowCompleted=true;
+  };
+
+  const writeWizardField=async(current,before,text,target)=>{
+    const first=target.handle;
+    const exportCombo=before.wizard_field.scope==='export_format' && current.ui.elements.find(item=>
+      item.wizard_combo?.kind==='picker' && item.wizard_combo.field.owner_ref===before.wizard_field.owner_ref
+      && item.wizard_combo.field.input_ref===before.ref);
+    const stillOwned=async()=>{
+      const fresh=await readUi(),field=fresh.ui.elements.find(item=>item.ref===before.ref);
+      return fresh.authenticated && fresh.origin===current.origin && fresh.loginom_build===current.loginom_build
+        &&(task.action.verb!=='set_wizard_fields'||sameFieldContext(current,fresh))
+        && same(fresh.workflow_ref,current.workflow_ref) && same(fresh.package_identity,current.package_identity)
+        && same(fresh.active_identity,current.active_identity) && same(fresh.wizard,current.wizard)
+        && same(fresh.ui.dialogs,current.ui.dialogs) && same(fresh.ui.masks,current.ui.masks)
+        && field?.allowed_actions.includes('set_wizard_field') && same(field.wizard_field,before.wizard_field)
+        && field.value===before.value && await first.evaluate(element=>document.activeElement===element);
+    };
+    await clickAt(target,1);
+    if(!await stillOwned())fail('WIZARD_FIELD_CHANGED','Wizard field changed while receiving focus; inspect before retry');
+    await first.press('ControlOrMeta+A',{timeout:timeout()});
+    if(!await stillOwned())fail('WIZARD_FIELD_CHANGED','Wizard field changed before replacement; inspect before retry');
+    timeout();
+    // Prefix keyups can highlight a preset that Tab would then select.
+    if(text && exportCombo)await page.keyboard.insertText(text);
+    else if(text)await page.keyboard.type(text,{delay:0});
+    else await first.press('Backspace',{timeout:timeout()});
+    if(['expression_parameter','output_column','reform_column','import_format','export_format'].includes(before.wizard_field.scope)) {
+      if(!await first.evaluate(element=>document.activeElement===element))fail('WIZARD_FIELD_CHANGED','Wizard field lost focus before edit completion');
+      if(exportCombo) {
+        // Loginom may keep a hidden stale list with the same test ID.
+        const list=page.locator('[data-tid='+JSON.stringify(exportCombo.tid.replace(/;trg_picker$/,';boundlist'))+']').filter({visible:true});
+        if(await list.count()) {
+          await first.press('Escape',{timeout:timeout()});
+          if(await list.count())fail('WIZARD_FIELD_CHANGED','Wizard field list stayed open before edit completion');
+          if(!await first.evaluate(element=>document.activeElement===element))
+            fail('WIZARD_FIELD_CHANGED','Wizard field lost focus before edit completion');
+        }
+      }
+      // Loginom updates a linked display label on input completion.
+      // Commit the draft input before reading coupled parameter values.
+      await first.press('Tab',{timeout:timeout()});
+    }
+  };
+
+  const applyWizardFields=async(initial,targets)=>{
+    const edits=task.action.fields.map(({ref,text})=>({text,input:initial.ui.elements.find(e=>e.ref===ref)}));
+    const scope=edits[0].input.wizard_field.scope,importFormat=scope==='import_format';
+    const fieldsOf=w=>importFormat?w.settings?.fields:w.column_parameters?.fields;
+    const expected=JSON.parse(JSON.stringify(initial.wizard));
+    const applies=(field,text)=>Object.assign(field,{value:text,value_length_utf16:text.length,truncated:false});
+    const requireDraft=(fresh,completed,verifyValues=false)=>{
+      if(!sameFieldContext(initial,fresh))fail('WIZARD_CONTEXT_CHANGED','Wizard owner, package or blockers changed during field apply');
+      if(importFormat)expected.import_columns=fresh.wizard.import_columns;
+      const fields=fieldsOf(expected),actual=fieldsOf(fresh.wizard),page=JSON.parse(JSON.stringify(fresh.wizard));
+      // A name change may update the still-linked label before its own edit.
+      if(!importFormat&&completed===1&&fieldsOf(initial.wizard).label.value===fieldsOf(initial.wizard).name.value
+        &&actual?.label?.value===fields.name.value)applies(fields.label,fields.name.value);
+      for(const {input,text} of edits.slice(0,completed)){
+        const name=input.wizard_field.name,after=fresh.ui.elements.find(e=>e.ref===input.ref);
+        const verifyValue=verifyValues||importFormat&&name==='delimiter';
+        if(!after||!same(after.identity,input.identity)||!same(after.wizard_field,input.wizard_field)
+          ||verifyValue&&(actual?.[name]?.value!==text||after.value!==text||after.value_truncated))
+          fail('WIZARD_FIELD_NOT_CONFIRMED','Wizard draft value was not confirmed: '+name);
+        // The next write still needs a fresh binding. During that preflight,
+        // draft values already written are checked together at the end.
+        if(!verifyValue&&actual?.[name])applies(fieldsOf(page)[name],fields[name].value);
+      }
+      if(!same(expected,page))fail('WIZARD_CONTEXT_CHANGED','Wizard page or unrelated settings changed during field apply');
+    };
+    const settlePreview=async()=>{
+      // A repaint or late loading mask restarts the same quiet window.
+      let epoch=await readEpoch(),stable=0;
+      for(;;){
+        if(epoch?.document!==initial.dom_epoch.document||!same(await boundNode(),initial.prepared_node_context))
+          fail('WIZARD_CONTEXT_CHANGED','Import wizard owner changed during preview settlement');
+        await page.waitForTimeout(Math.min(100,timeout()));
+        const next=await readEpoch();
+        stable=same(epoch,next)?stable+1:0;
+        epoch=next;
+        if(stable<2)continue;
+        const observed=await readUi();
+        if(!sameFieldContext(initial,observed)||same(epoch,observed.dom_epoch))return observed;
+        epoch=observed.dom_epoch;stable=0;
+      }
+    };
+    const first=edits[0];
+    const delimiterChanged=importFormat&&first.input.wizard_field.name==='delimiter'&&first.input.value!==first.text;
+    const prepareNext=async(input,text,name,index)=>{
+      for(let attempt=0;;attempt++){
+        const fresh=await (index===1&&attempt===0&&delimiterChanged?settlePreview():readUi());
+        requireDraft(fresh,index,attempt>0);
+        const before=fresh.ui.elements.find(e=>e.ref===input.ref);
+        if(!before||!same(before.identity,input.identity)||!same(before.wizard_field,input.wizard_field))
+          fail('WIZARD_FIELD_CHANGED','The observed wizard input changed: '+name);
+        // requireDraft has already checked every pending value, including
+        // a label the vendor updated to the new name while still linked.
+        const value=fieldsOf(expected)[name].value;
+        const signature=value===input.value?input.signature:
+          {...input.signature,value,value_length_utf16:value.length,value_truncated:false};
+        const target=await checkedHandle({...input,signature},before,'set_wizard_field');
+        if(before.value===text)return {fresh,before};
+        if(!same(await boundNode(),fresh.prepared_node_context))
+          fail('PREPARED_NODE_CONTEXT_CHANGED','Wizard owner changed while checking field: '+name);
+        const epoch=await readEpoch();
+        if(same(epoch,fresh.dom_epoch))return {fresh,before,target};
+        if(attempt>=2||epoch?.document!==fresh.dom_epoch.document)
+          fail('UI_EPOCH_CHANGED','Wizard changed while checking field: '+name);
+        // Preview may repaint during hit-testing. Rebind only this pending
+        // write after a full owner and draft check. Previous writes stay issued.
+        record('wizard_field_preflight_refreshed',{field:name,attempt:attempt+1});
+        await page.waitForTimeout(Math.min(100,timeout()));
+      }
+    };
+    for(const [index,{input,text}] of edits.entries()){
+      const name=input.wizard_field.name;
+      const {fresh,before,target}=index?await prepareNext(input,text,name,index):{fresh:initial,before:input,target:targets[0]};
+      if(before.value!==text){
+        timeout();phase='applying';effectPossible=true;
+        await writeWizardField(fresh,before,text,target);
+        record('ui_gesture_applied',{verb:task.action.verb,field:name});
+      }
+      applies(fieldsOf(expected)[name],text);
+    }
+    phase='observing';
+    let observed;
+    if(importFormat&&effectPossible){
+      observed=await settlePreview();
+      if(sameFieldContext(initial,observed))record('import_format_input_settled',{settings_applied:false});
+    }else observed=await readUi();
+    requireDraft(observed,edits.length,true);
+    record('wizard_fields_verified',{fields:edits.map(e=>e.input.wizard_field.name),settings_applied:false});
+    timeout();phase='completed';
+    return result('SUCCEEDED',{...observed,gesture_applied:effectPossible,verification_required:true});
+  };
+
   return (async () => {
     let outcome, cleanupComplete = true, refreshedAfterCleanup = false;
     record('ui_observation_started');
@@ -4638,8 +4865,9 @@ function readRenderedInputMapping(observation) {
       if (task.mode === 'observe') {
         phase = 'observed';
         outcome = result('SUCCEEDED', current);
-      } else {
+      } else action: {
         phase = 'preconditions';
+        const fieldBatch=task.action.verb==='set_wizard_fields';
         if(trace.some(e=>e.event==='ui_mask_wait_started'))
           fail('UI_EPOCH_CHANGED','The owned loading mask settled before the gesture; refresh the same target and intent');
         if (!task.snapshot || !same(task.snapshot.origin, current.origin) || current.origin !== task.expected_origin
@@ -4676,10 +4904,13 @@ function readRenderedInputMapping(observation) {
                 &&e.signature?.dialog_ref===current.ui.dialogs[0].ref&&e.allowed_actions.includes('click')).length===1))
             fail('WIZARD_DEACTIVATION_CONTEXT_CHANGED','The exact prepared node deactivation confirmation is unavailable');
         }
-        if(['set_wizard_field','wizard_step','select_wizard_option','apply_expression_parameters','cancel_expression_parameters','open_wizard','begin_wizard','confirm_wizard_deactivation','finish_wizard','execute_wizard','confirm_wizard_close','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(task.action.verb) && (!same(task.snapshot.wizard,current.wizard)
+        if(fieldBatch&&!sameFieldContext(task.snapshot,current))
+          fail('WIZARD_CONTEXT_CHANGED','Wizard owner, package or blockers changed before field apply');
+        if((fieldBatch||['set_wizard_field','wizard_step','select_wizard_option','apply_expression_parameters','cancel_expression_parameters','open_wizard','begin_wizard','confirm_wizard_deactivation','finish_wizard','execute_wizard','confirm_wizard_close','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(task.action.verb)) && (!same(task.snapshot.wizard,current.wizard)
           || !same(task.snapshot.active_identity,current.active_identity) || !same(task.snapshot.package_identity,current.package_identity)))
           fail('WIZARD_CONTEXT_CHANGED','Wizard settings or package changed; observe again');
-        const refs = task.action.verb === 'drag' ? [task.action.source_ref, task.action.target_ref] : [task.action.ref];
+        const refs = fieldBatch?task.action.fields.map(f=>f.ref):
+          task.action.verb === 'drag' ? [task.action.source_ref, task.action.target_ref] : [task.action.ref];
         if(refs.some(ref=>current.ui.elements.some(e=>e.ref===ref && ['graph','graph_editor'].includes(e.scope)))
           && !same(task.snapshot.graph_identity,current.graph_identity))fail('UI_CONTEXT_CHANGED','The graph container or native namespace changed; observe again');
         if (current.ui.masks.length) {
@@ -4701,7 +4932,7 @@ function readRenderedInputMapping(observation) {
           const before = task.snapshot.ui.elements.find(element => element.ref === ref);
           const item = current.ui.elements.find(element => element.ref === ref);
           if (!before) fail('UI_REFERENCE_INVALID', 'Action reference is absent from the supplied observation');
-          targets.push(await checkedHandle(before, item));
+          targets.push(await checkedHandle(before,item,fieldBatch?'set_wizard_field':task.action.verb));
         }
         const nodeBeforeGesture=await boundNode();
         if(nodeBeforeGesture && !same(current.prepared_node_context,nodeBeforeGesture)) {
@@ -4717,22 +4948,13 @@ function readRenderedInputMapping(observation) {
           const process=current.ui.elements.find(e=>e.ref===task.action.ref)?.process_menu?.process;
           if(process){processFocusTicket=await captureProcessFocus(page,{binding:task.prepared_node_context,process,origin:task.expected_origin,build:task.expected_build});handles.push(processFocusTicket);}
         }
-        const epochBeforeGesture = await page.evaluate(() => {
-          const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
-          if (!state?.observer) return null;
-          state.captureMutations(state.observer.takeRecords());
-          return {document:state.epoch,revision:state.revision};
-        });
+        const epochBeforeGesture = await readEpoch();
         if (!same(current.dom_epoch,epochBeforeGesture)) fail('UI_EPOCH_CHANGED','The document changed while checking the target; observe again');
         record('ui_preconditions_verified', { verb: task.action.verb, refs });
+        if(fieldBatch){outcome=await applyWizardFields(current,targets);break action;}
         timeout();phase = 'applying'; effectPossible = true;
         const first = targets[0].handle;
-        const clickTarget = async (clickCount, button = 'left') => {
-          timeout(); mouseHeld = true; mouseButton = button;
-          await page.mouse.click(targets[0].point.x, targets[0].point.y, { clickCount, button });
-          mouseHeld = false;
-          if(task.action.verb==='show_process_node')processShowCompleted=true;
-        };
+        const clickTarget=(clickCount,button)=>clickAt(targets[0],clickCount,button);
         if (task.action.verb === 'click' || ['execute_graph_node', 'deactivate_graph_node','wizard_step','select_wizard_option','apply_expression_parameters','cancel_expression_parameters','open_wizard','begin_wizard','confirm_wizard_deactivation','finish_wizard','execute_wizard','confirm_wizard_close','show_process_node','cancel_process','open_node_views','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(task.action.verb)) await clickTarget(1);
         else if (task.action.verb === 'double_click' || task.action.verb === 'enter_table') await clickTarget(2);
         else if (task.action.verb === 'right_click') await clickTarget(1, 'right');
@@ -4838,47 +5060,9 @@ function readRenderedInputMapping(observation) {
         }
         else if (task.action.verb === 'set_wizard_field') {
           const before=current.ui.elements.find(item=>item.ref===task.action.ref);
-          const exportCombo=before.wizard_field.scope==='export_format' && current.ui.elements.find(item=>
-            item.wizard_combo?.kind==='picker' && item.wizard_combo.field.owner_ref===before.wizard_field.owner_ref
-            && item.wizard_combo.field.input_ref===before.ref);
-          const stillOwned=async()=>{
-            const fresh=await readUi(),field=fresh.ui.elements.find(item=>item.ref===task.action.ref);
-            return fresh.authenticated && fresh.origin===current.origin && fresh.loginom_build===current.loginom_build
-              && same(fresh.workflow_ref,current.workflow_ref) && same(fresh.package_identity,current.package_identity)
-              && same(fresh.active_identity,current.active_identity) && same(fresh.wizard,current.wizard)
-              && same(fresh.ui.dialogs,current.ui.dialogs) && same(fresh.ui.masks,current.ui.masks)
-              && field?.allowed_actions.includes('set_wizard_field') && same(field.wizard_field,before.wizard_field)
-              && field.value===before.value && await first.evaluate(element=>document.activeElement===element);
-          };
           if(before.value===task.action.text) {
             effectPossible=false;record('ui_state_already_satisfied',{verb:task.action.verb});
-          } else {
-            await clickTarget(1);
-            if(!await stillOwned())fail('WIZARD_FIELD_CHANGED','Wizard field changed while receiving focus; inspect before retry');
-            await first.press('ControlOrMeta+A',{timeout:timeout()});
-            if(!await stillOwned())fail('WIZARD_FIELD_CHANGED','Wizard field changed before replacement; inspect before retry');
-            timeout();
-            // Prefix keyups can highlight a preset that Tab would then select.
-            if(task.action.text && exportCombo)await page.keyboard.insertText(task.action.text);
-            else if(task.action.text)await page.keyboard.type(task.action.text,{delay:0});
-            else await first.press('Backspace',{timeout:timeout()});
-            if(['expression_parameter','output_column','reform_column','import_format','export_format'].includes(before.wizard_field.scope)) {
-              if(!await first.evaluate(element=>document.activeElement===element))fail('WIZARD_FIELD_CHANGED','Wizard field lost focus before edit completion');
-              if(exportCombo) {
-                // Loginom may keep a hidden stale list with the same test ID.
-                const list=page.locator('[data-tid='+JSON.stringify(exportCombo.tid.replace(/;trg_picker$/,';boundlist'))+']').filter({visible:true});
-                if(await list.count()) {
-                  await first.press('Escape',{timeout:timeout()});
-                  if(await list.count())fail('WIZARD_FIELD_CHANGED','Wizard field list stayed open before edit completion');
-                  if(!await first.evaluate(element=>document.activeElement===element))
-                    fail('WIZARD_FIELD_CHANGED','Wizard field lost focus before edit completion');
-                }
-              }
-              // Loginom updates a linked display label on input completion.
-              // Commit the draft input before reading coupled parameter values.
-              await first.press('Tab',{timeout:timeout()});
-            }
-          }
+          } else await writeWizardField(current,before,task.action.text,targets[0]);
         }
         else if (task.action.verb === 'fill') {
           await clickTarget(1);
@@ -5738,8 +5922,10 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false, downloa
     if(!p || Object.keys(p).sort().join(',')!=='limit,offset' || !Number.isInteger(p.offset) || p.offset<0 || p.offset>=1000
       || !Number.isInteger(p.limit) || p.limit<1 || p.limit>8)throw new Error('Import definition page requires a bounded offset and limit');
   }
-  if (options.mode === 'act') validateUiAction(options.action, options.snapshot);
-  const task = { ...structuredClone(options), kind: 'workspace-ui', ...(downloadToastObservation?{download_toast_observation:true}:{}) };
+  if (options.mode === 'act') validateNodeUiAction(options.action,options.snapshot,options.prepared_node_context);
+  const task = { ...structuredClone(options), kind: 'workspace-ui',
+    ...(!options.prepared_node_context?{node_types_by_icon:nodeTypesByIcon}:{}),
+    ...(downloadToastObservation?{download_toast_observation:true}:{}) };
   // Trusted composite operations may supply their own fresh native read after
   // a bounded preparatory gesture. This is not a public tool parameter.
   if(snapshotArgument)return `async (page, snapshot) => (${workspaceUiCapability.toString()})(page, {...${JSON.stringify(task)},snapshot}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()})`;

@@ -52,15 +52,19 @@ export function createStorageBinding({ sessionId, origin, build, documentId, acc
 
 // Every browser operation retains the account/document observed by prepare.
 // This is an identity guard; destination existence is checked by native UI.
-export function withStorageIdentity(code, binding, storageSession) {
+export function withStorageIdentity(code, binding, storageSession, onPendingReconnect) {
   if (!binding) throw Error('Prepare Loginom before using the selected directories');
   // Private status/cancel/release controls touch the original Page-owned job.
   // Byte accounting and draining must continue while Loginom is disconnected;
   // the source is still checked against the captured session before caching.
   if(storageSession==='download-control')return code;
+  const guard=`await (${guardLoginomConnection.toString()})(page,expected,${JSON.stringify(storageSession)});`;
   return `async page=>{
     const expected=${JSON.stringify(binding)};
-    await (${guardLoginomConnection.toString()})(page,expected,${JSON.stringify(storageSession)});
+    ${onPendingReconnect?`try{ ${guard} }catch(error){
+      if(error.code!=='LOGINOM_RECONNECT_PENDING')throw error;
+      return (${onPendingReconnect})(page);
+    }`:guard}
     return (${code})(page);
   }`;
 }

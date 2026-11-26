@@ -53,7 +53,7 @@ class ExternalClient {
       await this.f.finishPreparation?.promise;
       value={status:'READY',authenticated:true,target_verified:true,
       target,loginom_account:'test-2',document_id:'own-doc',created_draft:!this.f.scenario.startsWith('opened-'),ownership_verified:!this.f.scenario.startsWith('opened-'),effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:this.f.scenario.startsWith('opened-')?{path,persisted:true}:{path:null,...(this.f.finishPreparation?{persisted:false}:{})}};
-      if(this.f.scenario.startsWith('draft-navigated')||this.f.scenario.startsWith('draft-nav-refused'))value.package_ref={path:null,persisted:false};
+      if(['draft-navigated','draft-nav-refused','draft-nav-exit'].some(p=>this.f.scenario.startsWith(p)))value.package_ref={path:null,persisted:false};
       if(this.f.native)value={status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED',phase:'exact_workflow_ready',
         target,authenticated:true,created_draft:false,effect_possible:true,operation_id:'prepare',session_id:'own-session'};
       if(this.f.failedDraft)value={...value,reason:'NATIVE_MESSAGE_BOX_BLOCKED',created_draft:true};
@@ -828,7 +828,7 @@ for(const scenario of ['generated-id','reconciled-own','reconciled-older','recon
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
 
-for(const scenario of ['draft-clean','draft-navigated','draft-navigated-ordinary','draft-navigated-foreign','draft-nav-refused','draft-nav-refused-effect','draft-nav-refused-foreign','draft-nav-refused-dirty','draft-dirty','draft-busy','draft-unsettled','draft-not-owned','draft-persisted','draft-cancelled-unverified','draft-cancelled-not-owned','draft-cancelled-no-tab','draft-cancelled-persisted'])
+for(const scenario of ['draft-clean','draft-navigated','draft-navigated-ordinary','draft-nav-exit','draft-nav-exit-foreign','draft-navigated-foreign','draft-nav-refused','draft-nav-refused-effect','draft-nav-refused-foreign','draft-nav-refused-dirty','draft-dirty','draft-busy','draft-unsettled','draft-not-owned','draft-persisted','draft-cancelled-unverified','draft-cancelled-not-owned','draft-cancelled-no-tab','draft-cancelled-persisted'])
  test('normal shutdown of an unsaved draft without Save: '+scenario,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-draft-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
@@ -851,6 +851,13 @@ for(const scenario of ['draft-clean','draft-navigated','draft-navigated-ordinary
       state.created_draft=false;
       if(scenario==='draft-navigated-foreign')state.document_id='foreign-document';
     }
+    // LAB-2054: the NEW existing_workflow admitted after a no-effect Submodel
+    // refusal keeps that refusal's owned-draft cleanup; ordinary ones do not.
+    if(scenario.startsWith('draft-nav-exit')){
+      session.metadata.workspacePreparation.identity=JSON.stringify({operation_id:'parent',intent:'existing_workflow',workflow_ref:state.workflow_ref});
+      session.metadata.workspacePreparation.after_refused_navigation=true;state.created_draft=false;
+      if(scenario==='draft-nav-exit-foreign')state.document_id='foreign-document';
+    }
     if(scenario.startsWith('draft-nav-refused')){
       const ref={document_id:state.document_id,...structuredClone(state.workflow_ref)};
       if(scenario==='draft-nav-refused-foreign')ref.document_id='foreign-document';
@@ -872,8 +879,8 @@ for(const scenario of ['draft-clean','draft-navigated','draft-navigated-ordinary
     f.busy=scenario==='draft-busy';f.unsettled=scenario==='draft-unsettled';
     const result=await bridge.close();
     assert.equal(result.browser_transport_closed,true);assert.equal(f.saves,0);
-    assert.equal(result.package_cleanup.status,['draft-clean','draft-navigated','draft-nav-refused'].includes(scenario)?'SUCCEEDED':'BLOCKED');
-    assert.equal(f.events.includes('package-cleanup'),['draft-clean','draft-navigated','draft-dirty','draft-nav-refused','draft-nav-refused-dirty'].includes(scenario));
+    assert.equal(result.package_cleanup.status,['draft-clean','draft-navigated','draft-nav-refused','draft-nav-exit'].includes(scenario)?'SUCCEEDED':'BLOCKED');
+    assert.equal(f.events.includes('package-cleanup'),['draft-clean','draft-navigated','draft-dirty','draft-nav-refused','draft-nav-refused-dirty','draft-nav-exit'].includes(scenario));
     if(scenario==='draft-navigated-ordinary')assert.equal(result.package_cleanup.reason,'CONFIRMED_SAVE_REQUIRED');
     if(f.cleanupOptions){
       assert.equal(f.cleanupOptions.unsavedDraft,true);assert.equal(f.cleanupOptions.packagePath,null);

@@ -10,8 +10,9 @@ test('model schema inventory pins W1 variable inputs and excludes private cold w
  // (+444 full, +222 compact). #1282: json_field object-array guidance adds
  // 16 bytes twice (+32 full, 0 compact). #1277 changes replies only (+0).
  // #1310 lists control input support (+272 full, +136 compact).
+ // #1383 expands composite_names guidance (+112 full, 0 compact).
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,203953,'00326113bc4946310d75934f49e1dc029673e873e17296cf7d9767c01c7670da'],
+  [nodeApiTools,204065,'b8177aa4cb78f2da4f9ef4763b5a30e0d5f5dd31d7c5962b1320fa89b37f3924'],
   [nodeApiTools.map(userNodeTool),14744,'8adf1c8913e8b9885174dd29465a2f6e1febbeb6cd22cee6f824126a90cb0a3e'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
