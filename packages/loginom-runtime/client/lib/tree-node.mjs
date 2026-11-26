@@ -1,6 +1,9 @@
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {makeNodeOutputContextCode} from './node-output-context.mjs';
-import {jsonToTreeParametersSchema,treeToTableParametersSchema,treeLabelSeparators,validateTreeParameters,validateTreeJsonScope,validateJsonTreeSchema,validateSelectedTreePaths} from './tree-parameters.mjs';
+import {existingOutputExecution} from './node-execution-evidence.mjs';
+import {makeNodeProcessContextCode} from './node-process-context.mjs';
+import {makeNodePortOutputCode} from './node-port-output.mjs';
+import {jsonToTreeParametersSchema,treeToTableParametersSchema,treeLabelSeparators,validateTreeParameters,validateTreeJsonScope,validateJsonTreeSchema,validateSelectedTreePaths,treeColumnNames} from './tree-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'
  ?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
@@ -28,7 +31,7 @@ export function createTreeNodeSupport(config,{json}){
  const jsonFieldScopes=new WeakMap();
  const type=json?'trees.from_json':'trees.to_table',stage=json?'json_tree':'tree_table';
  return createTabularTransformNodeSupport(config,{
-  type,mode:json?'auto_structure':'selected_nodes',revision:'tree-stage1-v1',
+  type,mode:json?'auto_structure':'selected_nodes',revision:'tree-stage1-v3',
   parameterSchema:json?jsonToTreeParametersSchema:treeToTableParametersSchema,validate:validateTreeParameters,readback:treeConfigurationReadback,
   configurationObservation:{condition:'owned tree component wizard',ready:s=>owned(s)&&['input_mapping','tree_input_mapping',stage].includes(s.wizard?.stage)},
   async preflight(options,ctx){
@@ -41,12 +44,40 @@ export function createTreeNodeSupport(config,{json}){
    const latest=related.at(-1),outcome=latest?.outcome,source=outcome?.output;
    need(latest?.cleanup_confirmed&&outcome.status==='SUCCEEDED'&&outcome.cleanup_complete===true&&source?.cleanup_complete===true
     &&source.execution?.status==='completed','Read/execute the same source node successfully before tree conversion');
-   const port=source.output?.ports?.find(p=>p.port===input.output);
-   need(port?.fresh===true&&port.sample_complete===true&&port.execution_id===source.execution.execution_id,'Tree stage 1 requires complete source readback from the same execution');
+   let port=source.output?.ports?.find(p=>p.port===input.output);
+   const readSchema=!json&&input.output===0&&latest.request?.target?.type==='trees.from_json'
+    &&(!port&&latest.request.read?.ports?.length===0&&source.output?.ports?.length===0
+     ||port?.port_kind==='tree'&&port.fresh===true&&port.sample_complete===false&&port.tree?.complete===false
+      &&port.execution_id===source.execution.execution_id&&port.freshness_basis==='completed_execution_port_source');
+   if(!readSchema)need(port?.fresh===true&&port.sample_complete===true&&port.execution_id===source.execution.execution_id,
+    'Tree conversion requires a complete source readback from the same execution or the native port of a completed JSON tree');
    const binding={document_id:request.document_id,workflow_ref:request.workflow_ref,node:input.source};
-   const inventory=await options.execute(makeNodeOutputContextCode(binding),{timeout:Math.max(5000,ctx.deadline-(options.now??Date.now)()+5000)});
+   const readNative=code=>{
+    ctx.signal?.throwIfAborted();const remaining=ctx.deadline-(options.now??Date.now)();
+    need(remaining>0,'Tree source proof deadline elapsed');
+    return options.execute(code,{timeout:remaining+5000});
+   };
+   const inventory=await readNative(makeNodeOutputContextCode(binding));
    const observed=inventory?.ports?.find(p=>p.index===input.output);
-   need(inventory?.verified&&observed?.active&&observed.port_guid===port.port_guid,'Tree source port is inactive or changed');
+   need(inventory?.verified&&observed?.active&&(!readSchema||observed.kind==='tree')&&(!port||observed.port_guid===port.port_guid),
+    'Tree source port is inactive or changed');
+   if(readSchema){
+    // Link the native output from the same execution. Only its definition is
+    // read here so large instance trees never travel through the preview.
+    const execution=existingOutputExecution(await readNative(makeNodeProcessContextCode(binding,{existingOutput:true})),input.source);
+    need(execution.status==='completed'&&execution.execution_id===source.execution.execution_id,'Native tree source execution changed');
+    const pendingRead=readNative(makeNodePortOutputCode(binding,{port:input.output,execution,sampleRows:0,requireExactNumbers:true,treeSchemaOnly:true},
+     {origin:config.targetOrigin,build:config.targetBuild,deadline:ctx.deadline}));
+    const read=await pendingRead.catch(error=>{options.operation.transportUncertain=true;throw error;});
+    if(read?.cleanup_complete!==true)options.operation.transportUncertain=true;
+    port=read?.output;
+    need(read?.verified&&read.cleanup_complete===true&&read.node_context?.verified&&read.node_context.surface==='graph'
+     &&['document_id','workflow_id','node_id'].every(k=>read.node_context[k]===input.source[k])
+     &&port?.port_kind==='tree'&&port.port===input.output&&port.port_guid===observed.port_guid&&port.fresh===true
+     &&port.execution_id===execution.execution_id&&port.freshness_basis==='completed_execution_port_source'&&port.sample_complete===false,
+     'Owned native tree schema could not be verified: '+(read?.reason??'binding changed'));
+    validateJsonTreeSchema(port.tree?.schema);
+   }
    const previous=request.target.kind==='existing'?history.filter(h=>same(h.outcome?.output?.node,request.target.ref)).at(-1)?.outcome?.output?.configuration?.readback:null;
    if(json){
     const field=request.parameters.json_field??previous?.json_field,index=port.schema?.findIndex(c=>c.name===field&&c.type==='string');
@@ -66,11 +97,12 @@ export function createTreeNodeSupport(config,{json}){
      validateTreeJsonScope(port.sample[0][index].value);
     }
    }else{
-    need(port.port_kind==='tree'&&port.tree?.complete===true,'Tree-to-table needs the actual complete typed tree port');
-    validateSelectedTreePaths(port.tree.schema,request.parameters.selected_paths??previous?.selected_paths,request.parameters.global_index_paths??previous?.global_index_paths);
+    need(port.port_kind==='tree'&&(readSchema||port.tree?.complete===true),'Tree-to-table needs the actual typed tree port');
+    validateSelectedTreePaths(port.tree.schema,request.parameters.selected_paths??previous?.selected_paths,
+     request.parameters.global_index_paths??previous?.global_index_paths,request.parameters.composite_names??previous?.composite_names??null);
    }
    const event={phase:'tree_source_scope_verified',operation_id:options.operation.id,node:input.source,port:input.output,port_guid:port.port_guid,
-    source_execution_id:source.execution.execution_id,source_kind:json?'table':'tree'};
+    source_execution_id:source.execution.execution_id,source_kind:json?'table':'tree',...(readSchema?{source_schema_only:true}:{})};
    const ack=await options.onRecord(event);
    need(same(Object.fromEntries(Object.keys(event).map(k=>[k,ack?.[k]])),event),'Tree source scope journal acknowledgement differs');
    return {verified:true,cleanup_complete:true,effect_possible:false};
@@ -182,7 +214,11 @@ export function createTreeNodeSupport(config,{json}){
     need(['composite_names','composite_labels','label_separator'].every(k=>p[k]===undefined||s.node_tree[k]===p[k])
      &&treeLabelSeparators.includes(s.node_tree.label_separator)
      &&(wantIndex===undefined||same(indexed(s),wantIndex))&&s.node_tree.nodes.some(n=>!n.is_container&&n.selected),'Tree table stage 1 settings differ');
-    if(p.selected_paths)need(same(s.node_tree.nodes.filter(n=>!n.is_container&&n.selected).map(n=>n.path),p.selected_paths),'Tree leaf selection did not settle');
+    const selected=s.node_tree.nodes.filter(n=>!n.is_container&&n.selected);
+    if(p.selected_paths)need(same(selected.map(n=>n.path),p.selected_paths),'Tree leaf selection did not settle');
+    need(!selected.some(n=>n.is_array)&&!s.node_tree.nodes.some(n=>n.selected_global_index&&!n.is_container),
+     'Selected scalar arrays are unsupported');
+    treeColumnNames(s.node_tree.nodes,selected,s.node_tree.composite_names);
    }
    const configuration=structuredClone(s.node_tree);
    if(json)configuration.json_field=jsonField;
@@ -195,18 +231,21 @@ export function createTreeNodeSupport(config,{json}){
   async readOutputs(channel,read,ctx,mapped){
    need(same(read.ports,[0]),'Tree stage 1 reads output 0');
    const {output}=await channel.readOutputPort({port:0,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:true});
-   if(json){need(output.port_kind==='tree'&&output.tree?.complete===true,'Complete native tree required');validateJsonTreeSchema(output.tree.schema);}
+   if(json){
+    need(output.port_kind==='tree'&&typeof output.tree?.complete==='boolean'&&output.sample_complete===output.tree.complete,
+     'Native tree preview coverage differs');
+    validateJsonTreeSchema(output.tree.schema);
+   }
    else{
-    need(output.port_kind!=='tree'&&output.sample_complete===true,'Tree table must be read completely');
-    // Native composite names join the root and every path node with _ (LAB-1807 probe: Root_items_code).
-    const tree=mapped.configuration.nodes,chain=n=>n.parent===null?[n.name]:[...chain(tree[n.parent]),n.name];
-    const names=tree.filter(n=>!n.is_container&&n.selected).map(n=>mapped.configuration.composite_names?chain(n).join('_'):n.name);
+    need(output.port_kind!=='tree','Tree-to-table requires a tabular output');
+    const tree=mapped.configuration.nodes;
+    const names=treeColumnNames(tree,tree.filter(n=>!n.is_container&&n.selected),mapped.configuration.composite_names);
     // A selected global index adds one native integer column; its generated name and position are read, not assumed.
     const indexes=mapped.configuration.nodes.filter(n=>n.is_array&&n.selected_global_index).length,extra=output.schema.filter(n=>!names.includes(n.name));
     need(output.schema.length===names.length+indexes&&extra.length===indexes&&extra.every(n=>n.type==='integer')
      &&same(output.schema.filter(n=>names.includes(n.name)).map(n=>n.name),names),'Native tree table field names or order differ');
    }
-   return {verified:true,cleanup_complete:true,effect_possible:true,status:'complete',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports:[output]};
+   return {verified:true,cleanup_complete:true,effect_possible:true,status:output.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports:[output]};
   },
  });
 }

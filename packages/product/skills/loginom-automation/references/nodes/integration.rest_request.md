@@ -3,32 +3,30 @@
 <!-- mode: request -->
 ## Описания кодов
 
-`produce_error_descriptions:false` убирает ErrorDesc из порта 1;
-остаются RequestID, ErrorCode, HttpStatusCode (integer). true — вернуть;
-пропуск — сохранить. Readback — наблюдённый флаг. Выгружай сам порт 1.
+`produce_error_descriptions:false` убирает ErrorDesc, true возвращает.
+Пропуск сохраняет. Порт 1: RequestID, ErrorCode, HttpStatusCode (integer).
+По просьбе выгружай сам порт 1.
 
 ## Имитация
 
-Доставь файл и укажи серверный путь:
+Доставь файл, укажи серверный путь
 `simulation:{enabled:true,file_path:"/своя-папка/response.json"}`.
 Передай connection, query_parameters:[], inputs:[], finish:"execute".
-GET без таблицы: один ответ. Тот же узел: смена файла;
-enabled:false — выключить, пропуск simulation — сохранить.
-Readback enabled/file_path из UI.
+GET без таблицы — один ответ. Путь меняй на том же узле.
+enabled:false выключает. Пропуск сохраняет. Readback из UI.
 
 ## Метод и тело
 
-dock_node_apply: target.type integration.rest_request, mode request, finish execute.
-connection: name/base_url/method; разным методам — разные имена подключений.
+`dock_node_apply`, mode request, finish execute.
+connection: name/base_url/method. Разные методы — разные имена.
 POST/PUT/PATCH: request_content_type application/json, text/plain или application/xml;
 body_field — наблюдённое строковое поле входа 0.
-Body: исходный UTF-8, без URL-encode; body_field нельзя также связать с query.
-DELETE запрещает body_field/request_content_type. inputs: исходник и при
-query_parameters:[]; запрос на строку. Query+Body совместимы; кодируется только query.
-Сырые ответы: импорт → REST → экспорт 0 (RequestID, Response), без JSON-разбора/
-добавления метода. Порт 1 — статусы; RequestID на обоих — индекс строки с нуля.
-Чтение и экспорт по просьбе.
-parameters:{} на существующем узле сохраняет настройки.
+Body — исходный UTF-8; query бери из других полей.
+DELETE без body_field/request_content_type. inputs нужны и при
+query_parameters:[]; запрос на строку. Query+Body совместимы.
+Сырые ответы: импорт → REST → экспорт 0 (RequestID, Response) без разбора и
+колонки метода. Чтение и экспорт по просьбе. RequestID на обоих портах —
+индекс с нуля. parameters:{} сохраняет настройки на существующем узле.
 
 ## Заголовки
 
@@ -40,11 +38,11 @@ variable_inputs:[{kind:"variables",input:0,source,output}].
 Источник выполни, имя — после mapping; Var-вход ≠ inputs[0] Body.
 Cycle из variables.user/variables.calculator. Меняй лишь Cycle, перезапусти тот же REST:
 parameters:{}, inputs:[], variable_inputs:[], mappings:[], finish execute.
-Привязка прочтёт Cycle без правки запроса; не подставляй литерал.
+Привязка прочтёт Cycle без правки запроса. Не подставляй литерал.
 Литерал: тот же REST, прежние connection/query_parameters/body_field/inputs,
 новые headers, finish execute. httpbin: Response.headers["X-Lab-Cycle"], тело Response.data.
-Ответ+исходный RequestId+порт1.HttpStatusCode сведи по правилу ниже;
-выгрузи второй результат по просьбе.
+Сведи Response, RequestID и порт 1.HttpStatusCode (см. ниже).
+Второй результат выгрузи по просьбе.
 
 ## GET и ответы
 
@@ -60,15 +58,16 @@ Status/errors: read.ports:[1] — HttpStatusCode/ErrorCode/ErrorDesc; port 0 —
 Empty Response: port 1; ErrorCode ≠ 0 → REST_RESPONSE_BODY_MISSING:
 «тело ответа не получено: повтори запрос или уменьши ответ (select, limit/skip)».
 Empty result ≠ success; retry on request only.
-Таблица: Калькулятор → Свёртка → Кросс-таблица. Tree: on request/flat records без вложенных контейнеров.
-Records arrays of several response rows: one `programming.javascript`
-(JSON.parse(Response), Append per record with its RequestID); no RequestID splits.
+Один `Response` с массивами записей, включая вложенные: [JSON в дерево](trees.from_json.md) → [Дерево в таблицу](trees.to_table.md).
+Объект без массива: Калькулятор → Свёртка → Кросс-таблица.
+Для разбора нескольких документов в строках REST используй один `programming.javascript`
+(JSON.parse(Response), Append per record with its RequestID); no RequestID splits. Не объединяй ответы.
+Если пользователь просил дерево, не подменяй дерево JavaScript.
 
 ## Сведение и завершение
 
-При 1:1, сохранённом порядке исходника и RequestID[i]=i на обоих портах
-вместо Join+Attach возьми одно transform.col_union_data (Соединение):
-входы 0=ответ, 1=статус, 2=исходная строка;
+При 1:1, исходном порядке и RequestID[i]=i на обоих портах:
+transform.col_union_data, входы 0=ответ, 1=статус, 2=исходная строка.
 parameters:{col_union:{row_count:"maximum",padding:"null"}}. Имена — из контекста, суффиксы не угадывай.
 В разборе сверь RequestID; поля/порядок/типы — по заданию.
 Нет доказанного 1:1/того же результата — Слияние по RequestID.

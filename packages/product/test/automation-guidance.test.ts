@@ -189,21 +189,26 @@ test("single chain calculation permits source activation only after a safe prefl
   expect(chain).toMatch(/Не повторяй\s+Execute вычисляющих узлов ради чтения, ответа или экспорта/)
 })
 
-test("REST JSON tables use the tabular path instead of the blanket tree instruction", async () => {
-  const settings = await Bun.file(new URL("../skills/loginom-automation/references/nodes/trees.from_json.md", import.meta.url)).text()
-  const trees = settings.split("## JSON в дерево и дерево в таблицу\n")[1]?.split("\n## ")[0] ?? ""
-  const details = settings
+test("tree guidance retains the native link and documents separate Dock read limits", async () => {
+  const references = new URL("../skills/loginom-automation/references/nodes/", import.meta.url)
+  const json = await Bun.file(new URL("trees.from_json.md", references)).text()
+  const table = await Bun.file(new URL("trees.to_table.md", references)).text()
 
-  expect(trees).toMatch(/REST[\s\S]*?Калькулятор[\s\S]*?Свёртка[\s\S]*?Кросс-таблица/)
-  expect(trees).toContain("по просьбе о дереве")
-  expect(trees).toContain("без вложенных контейнеров")
-  expect(trees).toContain("trees.from_json")
-  expect(trees).toContain("trees.to_table")
-  expect(details).toMatch(/Response[\s\S]*?RequestID[\s\S]*?HttpStatusCode/)
-  expect(details).toContain("Nested containers in repeated records")
-  expect(details).toContain("operation.recover")
-  expect(details).toContain("не останавливай")
-  expect(details).not.toContain("При отказе области поддержки\nсообщи ограничение")
+  expect(json).toMatch(/Response[\s\S]*?HttpStatusCode[\s\S]*?RequestID/)
+  expect(json).toContain('read:{ports:[],sample_rows:0,require_exact_numbers:false}')
+  expect(json).toContain("256 узлов **схемы**")
+  expect(json).toMatch(/Лимиты Dock на входе — 512 КиБ/)
+  expect(json).toMatch(/sample_complete:false[\s\S]*?tree.node_count[\s\S]*?256 экземпляров/)
+  expect(json).toContain("operation.recover")
+  expect(table).toContain("carts[].products[]")
+  expect(table).toContain("repeat_parents:true")
+  expect(table).toContain("composite_names:true")
+  expect(table).toContain("Root_carts_id")
+  expect(table).toContain("Root_carts_products_id")
+  expect(table).toMatch(/row_count[\s\S]*?sample_complete:false[\s\S]*?экспорт/)
+  for (const reference of [json, table]) {
+    expect(new TextEncoder().encode(reference).length).toBeLessThanOrEqual(6000)
+  }
 })
 
 test("relocated large-file and JavaScript rules stay reachable from the entry", async () => {
@@ -236,18 +241,24 @@ test("binning ties guidance keeps the rule without echoing the acceptance task",
   expect(Buffer.byteLength(settings)).toBeLessThanOrEqual(6000)
 })
 
-test("LAB-2046: arrays of records across several REST responses route to one JavaScript, not per-request splits", async () => {
+test("REST record arrays route by document count and preserve an explicitly requested tree", async () => {
   const nodes = new URL("../skills/loginom-automation/references/nodes/", import.meta.url)
   const rest = await Bun.file(new URL("integration.rest_request.md", nodes)).text()
   const table = await Bun.file(new URL("trees.to_table.md", nodes)).text()
   const json = await Bun.file(new URL("trees.from_json.md", nodes)).text()
   const get = rest.split("## GET и ответы\n")[1]?.split("\n## ")[0] ?? ""
-  // Both runs searched Calculator help for JSON functions (r1 :28/:38, r2 :29/:62); r2 split per RequestID.
-  expect(get).toMatch(/Калькулятор[\s\S]*?Свёртка[\s\S]*?Кросс-таблица/)
-  expect(get).toMatch(/Records arrays of several response rows: one `programming\.javascript`[\s\S]*?JSON\.parse\(Response\), Append per record with its RequestID\); no RequestID splits/)
+  expect(get).toMatch(/Один `Response` с массивами записей, включая вложенные.*trees\.from_json\.md.*trees\.to_table\.md/)
+  expect(get).toMatch(/Объект без массива: Калькулятор → Свёртка → Кросс-таблица/)
+  expect(get).toMatch(/нескольких документов в строках REST.*один `programming\.javascript`[\s\S]*?JSON\.parse\(Response\), Append per record with its RequestID\); no RequestID splits/)
+  expect(get).toContain("Не объединяй ответы")
   expect(get).toContain("Big ints/ids: read as strings (JSON.parse rounds >2^53)")
-  expect(get).toContain("Tree: on request/flat records без вложенных контейнеров")
-  expect(json).toMatch(/Кросс-таблица; массив записей нескольких ответов —\nпо \[REST\]\(integration\.rest_request\.md\)/)
-  expect(table).toMatch(/при отказе деревьев вернись к этому пути; массив записей нескольких ответов — по \[REST\]\(integration\.rest_request\.md\)/)
-  for (const card of [rest, table, json]) expect(new TextEncoder().encode(card).length).toBeLessThanOrEqual(6000)
+  expect(json).toMatch(/Response[\s\S]*?HttpStatusCode[\s\S]*?RequestID/)
+  for (const card of [rest, table, json]) {
+    expect(card).toContain("не подменяй дерево JavaScript")
+    expect(new TextEncoder().encode(card).length).toBeLessThanOrEqual(6000)
+  }
+  expect(json).toContain("operation.recover")
+  expect(table).toContain("operation.recover")
+  expect(json).toContain("(integration.rest_request.md)")
+  expect(table).toContain("(integration.rest_request.md)")
 })
