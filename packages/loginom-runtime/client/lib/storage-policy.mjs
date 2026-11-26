@@ -52,15 +52,19 @@ export function createStorageBinding({ sessionId, origin, build, documentId, acc
 
 // Every browser operation retains the account/document observed by prepare.
 // This is an identity guard; destination existence is checked by native UI.
-export function withStorageIdentity(code, binding, storageSession) {
+export function withStorageIdentity(code, binding, storageSession, onPendingReconnect) {
   if (!binding) throw Error('Prepare Loginom before using the selected directories');
   // Private status/cancel/release controls touch the original Page-owned job.
   // Byte accounting and draining must continue while Loginom is disconnected;
   // the source is still checked against the captured session before caching.
   if(storageSession==='download-control')return code;
+  const guard=`await (${guardLoginomConnection.toString()})(page,expected,${JSON.stringify(storageSession)});`;
   return `async page=>{
     const expected=${JSON.stringify(binding)};
-    await (${guardLoginomConnection.toString()})(page,expected,${JSON.stringify(storageSession)});
+    ${onPendingReconnect?`try{ ${guard} }catch(error){
+      if(error.code!=='LOGINOM_RECONNECT_PENDING')throw error;
+      return (${onPendingReconnect})(page);
+    }`:guard}
     return (${code})(page);
   }`;
 }
@@ -71,6 +75,38 @@ export function requireExportDestination(value, directories = null) {
   if (typeof value !== 'string' || !/^\/test-2\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9][A-Za-z0-9_.-]*\.(csv|tsv|txt|xls|xlsx|lgd)$/.test(value)
       || value.length > 512 || value.includes('..')) throw Error('Export requires an explicitly assigned CSV/TSV/TXT/XLS/XLSX/LGD in /test-2');
   return value;
+}
+
+// Browser-only observation of the complete FileStore in the exact active Files
+// folder. The native exporter still checks the destination when it writes.
+export async function readStorageDestination(page,task){
+ return page.evaluate(({binding,workflow,directory,destination})=>{
+  const fail=()=>({verified:false});
+  const app=globalThis.bg?.app,main=app?.Application?.FInstance?.FMainForm;
+  const connection=main?.FMapTree?.FServerConnection;
+  const form=main?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController,sender=form?.FFileSenderManager;
+  const prep=globalThis.__loginomDockPreparationV1;
+  const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
+  const tabs=exact(workflow.tab_tid),grids=exact(workflow.prefix+';FileStorageForm;pnlFileStorage;tbl');
+  if(location.origin!==binding.origin||app?.Version!==binding.loginom_build||prep?.document!==document||prep.id!==binding.document_id
+   ||connection?.Connected!==true||connection.UserName!==binding.loginom_account||main.FReconnecting===true
+   ||tabs.length!==1||!tabs[0].classList.contains('x-tab-active')||grids.length!==1
+   ||form?.constructor?.name!=='FileStorageForm'||sender?.constructor?.name!=='FileSenderManager'
+   ||sender.CurrentDirectory!==directory+'/'||!form.FView?.el?.dom?.contains(grids[0]))return fail();
+  const component=globalThis.Ext?.getCmp?.(grids[0].id),store=component?.getStore?.();
+  if(component?.el?.dom!==grids[0]||store?.$className!=='bg.filedialog.FileStore'||store.isBufferedStore||store.isLoading?.()!==false)return fail();
+  const records=store.getRange?.(),data=store.getData?.(),source=data?.getSource?.();
+  if(!Array.isArray(records)||records.length>10000||store.getCount?.()!==records.length||store.getTotalCount?.()!==records.length
+   ||!Array.isArray(data?.items)||data.items.length!==records.length||store.isFiltered?.())return fail();
+  const set=new Set(records);
+  if(set.size!==records.length||data.items.some(record=>!set.has(record))
+   ||source&&(!Array.isArray(source.items)||source.items.length!==records.length||source.items.some(record=>!set.has(record)))
+   ||records.some(record=>record?.isModel!==true||typeof record.data?.FileName!=='string'))return fail();
+  const name=destination.slice(destination.lastIndexOf('/')+1);
+  const matches=records.filter(({data:r})=>r.FileName===name||r.FilePath===destination||r.id===destination);
+  if(matches.length>1||matches.some(({data:r})=>r.FileName!==name||r.FilePath!==destination||r.id!==destination))return fail();
+  return {verified:true,destination,exists:matches.length===1};
+ },task);
 }
 
 // References are minted only from native, row-bound FileStore observations in

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {setTimeout} from 'node:timers/promises';
-import {makeWorkspacePrepareCode} from '../lib/workspace.mjs';
+import {makeWorkspacePrepareCode,prepareWorkspaceSession} from '../lib/workspace.mjs';
 import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
 import {readPreparedNodeContext} from '../lib/node-context.mjs';
 import {Page} from './support/workspace-ui-fixture.mjs';
@@ -103,6 +103,28 @@ test('NW1 refuses a foreign selection overlay without selecting or navigating',a
   const result=await f.navigate(f.ref);
   assert.equal(result.status,'NOT_READY');assert.equal(result.effect_possible,false);
   assert.equal(f.clicks(),0);assert.equal(f.selections(),0);
+});
+
+// LAB-2054 (bh-i103): the real in-page refusal carries the proof the gate
+// needs, leaves the parent receipt verified, and admits a NEW existing_workflow.
+test('NW1 a no-effect selection refusal keeps the parent receipt and admits a NEW existing_workflow ID',async()=>{
+  const f=fixture({entryOnSelection:true,foreignSelection:true,playwrightErrors:true});
+  const metadata={skillRevision:'skill'},workflow_ref={...f.ref,document_id:'doc'};
+  const args={metadata,assertAllowed(){},assertTarget(){},record:async()=>{},save:async()=>{}};
+  const enter={operation_id:'enter',intent:'existing_workflow',package_path:null,workflow_ref,
+    graph_navigation:{direction:'enter',node_ref:{document_id:'doc',workflow_id:'outer',node_id:'supernode'}}};
+  const refused=await prepareWorkspaceSession({...args,request:enter,prepare:()=>f.navigate(f.ref)});
+  assert.equal(refused.status,'NOT_READY');assert.match(refused.reason,/Submodel selection control unavailable/);
+  assert.equal(refused.effect_possible,false);assert.equal(refused.verification_required,false);assert.ok(Array.isArray(refused.trace));assert.equal(refused.trace.length,0);
+  assert.equal(f.clicks(),0);assert.equal(f.selections(),0);
+  assert.deepEqual([...f.preparation.receipts.keys()],['initial']);assert.equal(f.receipt.phase,'verified');
+  await assert.rejects(prepareWorkspaceSession({...args,request:{operation_id:'draft',intent:'new_draft',package_path:null,workflow_ref:null},
+    prepare:()=>assert.fail('must not dispatch')}),/NEW operation_id, intent existing_workflow/);
+  let calls=0;
+  const parent={operation_id:'parent',intent:'existing_workflow',package_path:null,workflow_ref};
+  const ready=await prepareWorkspaceSession({...args,request:parent,prepare:async({recoverOnly})=>{calls++;assert.equal(recoverOnly,false);
+    return {status:'READY',effect_possible:false,created_draft:false,target:{},workflow_ref};}});
+  assert.equal(ready.status,'READY');assert.equal(calls,1);assert.equal(metadata.workspaceReady,true);
 });
 
 for(const trialFail of ['throw','block'])test('NW1 fresh selection is not repeated after refused navigation trial: '+trialFail,async()=>{

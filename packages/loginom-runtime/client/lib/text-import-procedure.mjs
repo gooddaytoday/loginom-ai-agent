@@ -8,18 +8,22 @@ const types = { integer: 'Целый', real: 'Вещественный', string:
 const kinds = ['Неопределенное', 'Непрерывный', 'Дискретный'];
 function requireValue(condition, message) { if (!condition) throw new Error(message); }
 const titleModes={automatic:'Автоматическая метка',custom:'Пользовательская метка'};
-function validateNodeTitle(title) {
+function validateNodeTitle(title,maxLength=120) {
   requireValue(title&&typeof title==='object'&&!Array.isArray(title)
     &&Object.keys(title).every(k=>['mode','label'].includes(k))&&Object.hasOwn(titleModes,title.mode), 'Invalid node_title');
   requireValue(title.mode==='automatic'?!Object.hasOwn(title,'label')
-    :typeof title.label==='string'&&title.label.length<=120&&title.label.trim().length>0
+    :typeof title.label==='string'&&title.label.length<=maxLength&&title.label.trim().length>0
       &&!/[;|<>"'\\\x00-\x1f]/.test(title.label), 'Custom node_title requires a safe nonblank label; automatic forbids label');
 }
 
-export async function configureTextImportTitle(channel,title) {
-  if(title)validateNodeTitle(title);
+export function configureTextImportTitle(channel,title) {return configureNodeTitle(channel,title);}
+
+// Native Done «Описание узла» of a prepared node wizard. Text Import exposes it as
+// node_title; Grouping uses it to keep an explicit target.label (up to 200).
+export async function configureNodeTitle(channel,title,{subject='Text Import',maxLength=120}={}) {
+  if(title)validateNodeTitle(title,maxLength);
   const ready=s=>s.wizard?.status==='observed'&&s.wizard.stage==='done'&&s.wizard.completion?.ready===true;
-  let state=await channel.observe({condition:'Text Import title on Done',ready});
+  let state=await channel.observe({condition:subject+' title on Done',ready});
   const owner=state.wizard.owner_context,root=state.wizard.root_ref;
   const sameOwner=s=>ready(s)&&s.wizard.root_ref===root&&same(s.wizard.owner_context,owner);
   if(title){
@@ -35,24 +39,24 @@ export async function configureTextImportTitle(channel,title) {
           &&e.wizard_combo.field.scope==='node_title'&&e.wizard_combo.field.name==='label_mode'
           &&e.wizard_combo.field.root_ref===s.wizard.root_ref
           &&e.wizard_combo.field.owner_ref===f.owner_ref&&e.wizard_combo.field.input_ref===f.input_ref
-          &&(kind==='picker'||e.wizard_combo.label===mode)), 'Exact Text Import title '+kind+' unavailable');
+          &&(kind==='picker'||e.wizard_combo.label===mode)), 'Exact '+subject+' title '+kind+' unavailable');
       };
-      await channel.perform({condition:'Text Import title picker',initialObservation:state,ready:sameOwner,
+      await channel.perform({condition:subject+' title picker',initialObservation:state,ready:sameOwner,
         identity:s=>s.wizard.owner_context,resolve:s=>({verb:'click',ref:choice(s,'picker').ref})});
-      state=await channel.observe({condition:'Text Import title choices',ready:s=>sameOwner(s)
+      state=await channel.observe({condition:subject+' title choices',ready:s=>sameOwner(s)
         &&s.ui.elements.some(e=>e.wizard_combo?.field.scope==='node_title'&&e.wizard_combo.kind==='option'&&e.wizard_combo.label===mode)});
-      await channel.perform({condition:'Text Import title mode',initialObservation:state,ready:sameOwner,
+      await channel.perform({condition:subject+' title mode',initialObservation:state,ready:sameOwner,
         identity:s=>s.wizard.owner_context,resolve:s=>({verb:'select_wizard_option',ref:choice(s,'option').ref})});
-      state=await channel.observe({condition:'Text Import title mode readback',ready:s=>sameOwner(s)&&s.wizard.completion.fields.label_mode.value===mode&&captionReady(s)});
+      state=await channel.observe({condition:subject+' title mode readback',ready:s=>sameOwner(s)&&s.wizard.completion.fields.label_mode.value===mode&&captionReady(s)});
     }
     if(title.mode==='custom'&&state.wizard.completion.fields.label.value!==title.label){
       const labelReady=s=>sameOwner(s)&&s.wizard.completion.fields.label_mode.value===mode;
-      await channel.perform({condition:'Text Import custom title',initialObservation:state,ready:labelReady,
+      await channel.perform({condition:subject+' custom title',initialObservation:state,ready:labelReady,
         identity:s=>s.wizard.owner_context,resolve:s=>({verb:'fill',ref:s.wizard.completion.fields.label.input_ref,text:title.label})});
-      state=await channel.observe({condition:'Text Import custom title entered',ready:s=>labelReady(s)&&s.wizard.completion.fields.label.value===title.label});
-      await channel.perform({condition:'Text Import custom title commit',initialObservation:state,ready:labelReady,
+      state=await channel.observe({condition:subject+' custom title entered',ready:s=>labelReady(s)&&s.wizard.completion.fields.label.value===title.label});
+      await channel.perform({condition:subject+' custom title commit',initialObservation:state,ready:labelReady,
         identity:s=>s.wizard.owner_context,resolve:s=>({verb:'press',ref:s.wizard.completion.fields.label.input_ref,key:'Tab'})});
-      state=await channel.observe({condition:'Text Import custom title readback',ready:s=>labelReady(s)&&s.wizard.completion.fields.label.value===title.label});
+      state=await channel.observe({condition:subject+' custom title readback',ready:s=>labelReady(s)&&s.wizard.completion.fields.label.value===title.label});
     }
   }
   return structuredClone(state.wizard.completion);
@@ -431,24 +435,38 @@ export async function selectImportColumnOption(channel,initial,index,property,la
 // A delayed parse mask can invalidate a format snapshot before the gesture.
 // Only the existing proven no-effect refresh route may reacquire this field.
 export function setImportFormatField(channel,initial,name,text) {
-  requireValue(['delimiter','text_qualifier','null_marker','decimal_separator','analysis_rows'].includes(name),'Unsupported import format field');
+  return setImportFormatFields(channel,initial,[[name,text]]);
+}
+
+const importTextField=(name,text)=>['delimiter','text_qualifier','decimal_separator','null_marker'].includes(name)
+  &&!(name==='null_marker'&&['null','NULL'].includes(text));
+
+function setImportFormatFields(channel,initial,edits) {
   const describe=state=>{
-    const w=state.wizard,f=w?.settings?.fields?.[name];
-    requireValue(w?.status==='observed'&&w.stage==='text_import_format'&&w.owner_context?.status==='observed'
-      &&f?.status==='observed'&&f.truncated!==true&&typeof f.value==='string','Import format field is incomplete');
-    const input=one(state.ui.elements.filter(e=>e.ref===f.input_ref&&e.allowed_actions?.includes('set_wizard_field')
-      &&e.wizard_field?.scope==='import_format'&&e.wizard_field.name===name
-      &&e.wizard_field.owner_ref===f.owner_ref&&e.wizard_field.root_ref===w.root_ref),'Bound import format input unavailable');
+    const w=state.wizard;
+    requireValue(w?.status==='observed'&&w.stage==='text_import_format'&&w.owner_context?.status==='observed','Import format owner is incomplete');
+    const inputs=edits.map(([name])=>{
+      requireValue(['delimiter','text_qualifier','null_marker','decimal_separator','analysis_rows'].includes(name),'Unsupported import format field');
+      const f=w.settings?.fields?.[name];
+      requireValue(f?.status==='observed'&&f.truncated!==true&&typeof f.value==='string','Import format field is incomplete: '+name);
+      const input=one(state.ui.elements.filter(e=>e.ref===f.input_ref&&e.allowed_actions?.includes('set_wizard_field')
+        &&e.wizard_field?.scope==='import_format'&&e.wizard_field.name===name
+        &&e.wizard_field.owner_ref===f.owner_ref&&e.wizard_field.root_ref===w.root_ref),'Bound import format input unavailable: '+name);
+      return {name,owner_ref:f.owner_ref,tid:input.tid,value:f.value};
+    });
     requireValue(Object.values(w.settings.fields).every(field=>field.status==='observed'&&field.truncated!==true),'Import format settings are incomplete');
     return {root:w.root_tid,root_ref:w.root_ref,owner:{node:w.owner_context.node.tid,path:w.owner_context.path.map(({tid,label})=>({tid,label}))},
       native:state.prepared_node_context?Object.fromEntries(['document_id','workflow_id','node_id'].map(k=>[k,state.prepared_node_context[k]])):null,
-      field:{name,owner_ref:f.owner_ref,tid:input.tid,value:f.value},
+      inputs,
       settings:Object.fromEntries(Object.entries(w.settings.fields).map(([key,field])=>[key,field.value]))};
   };
   const expected=describe(initial);
-  return channel.perform({condition:'set bound import format '+name,initialObservation:initial,
+  return channel.perform({condition:'set bound import format '+edits.map(([name])=>name).join(', '),initialObservation:initial,
     ready:state=>same(describe(state),expected),identity:describe,
-    resolve:state=>({verb:'set_wizard_field',ref:state.wizard.settings.fields[name].input_ref,text})});
+    resolve:state=>{
+      const fields=edits.map(([name,text])=>({ref:state.wizard.settings.fields[name].input_ref,text}));
+      return fields.length===1?{verb:'set_wizard_field',...fields[0]}:{verb:'set_wizard_fields',fields};
+    }});
 }
 
 export async function previousTextImportStep(channel,{from,to,owner,read,ready=()=>true}) {
@@ -649,10 +667,22 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
   if(patch?.captureOutputLayout)await patch.captureOutputLayout();
   const formatRequested=k=>Object.hasOwn(parameters.format,k)||k==='analysis_rows'&&parameters.analysis?.rows!==undefined;
   let delimiterChanged=false;
-  // The mode is chosen after parsing settings; analysis and refresh follow it.
-  for (const [name, requested] of Object.entries(parameters.format).sort(([a],[b])=>(a==='auto_detect_columns')-(b==='auto_detect_columns'))) {
+  // Delimiter precedes the dependent layout. Detection mode and analysis
+  // remain separate because they can enable controls or replace definitions.
+  const formatOrder=name=>name==='delimiter'?-1:name==='auto_detect_columns'?1:0;
+  const formatEntries=Object.entries(parameters.format).sort(([a],[b])=>formatOrder(a)-formatOrder(b));
+  for (let index=0;index<formatEntries.length;index++) {
+    const [name,requested]=formatEntries[index];
     const text=name==='auto_detect_columns'?autoDetectLabels[requested]:requested;
     let s = await read('text_import_format'); const f = field(s, name);
+    if(s.prepared_node_context?.verified===true&&importTextField(name,text)){
+      const group=[formatEntries[index]];
+      while(formatEntries[index+1]&&importTextField(...formatEntries[index+1]))group.push(formatEntries[++index]);
+      const edits=group.filter(([key,value])=>field(s,key).value!==value);
+      if(group.some(([key])=>key==='delimiter'))delimiterChanged=f.value!==requested&&f.value!==delimiterLabels[requested];
+      if(edits.length)await setImportFormatFields(channel,s,edits);
+      continue;
+    }
     if (f.value === text) continue;
     if(name==='delimiter')delimiterChanged=f.value!==delimiterLabels[requested];
     if(name==='multiple_delimiters'||name==='variant_as_general_type'){

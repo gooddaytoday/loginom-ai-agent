@@ -476,6 +476,32 @@ test('an unresolved started download is never dispatched again on resume',async(
  assert.equal(f.calls.filter(c=>c==='verify').length,1);assert.equal(f.calls.filter(c=>c==='upload').length,1);
 });
 
+// LAB-2054: only the executor's settled verification without confirmed
+// cleanup is terminal. A lost verification reply may still reconcile.
+for(const variant of ['unresolved','lost'])test('resume after a dispatched verification with unconfirmed cleanup: '+variant,async()=>{
+ const f=fixture(variant==='unresolved'?'verify':undefined),inspect=f.runtime.inspect,verify=f.runtime.verifyDeliveredArtifact;
+ let lost=false;
+ if(variant==='lost')f.runtime.verifyDeliveredArtifact=async options=>{await verify(options);lost=true;
+  return {status:'AMBIGUOUS',cleanup_complete:false,error:{code:'BROWSER_CALL_UNCERTAIN'}};};
+ f.runtime.inspect=async()=>{const r=await inspect();r.output.operation_id='delivery:upload';r.output.outcome.operation_id='delivery:upload';
+  if(variant==='unresolved'&&f.calls.includes('verify')){r.output.cleanup_confirmed=false;r.output.outcome.error={code:'TRANSFER_VERIFICATION_UNRESOLVED'};}
+  if(lost){r.output.cleanup_confirmed=false;r.output.state='pending';r.output.outcome={...r.output.outcome,status:'AMBIGUOUS',error:{code:'BROWSER_CALL_UNCERTAIN'}};}
+  return r;};
+ assert.equal((await f.service.deliver(request)).outcome.status,'AMBIGUOUS');
+ const result=await f.service.resume({operation_id:'delivery',resume_id:'resume-1',budget_ms:120000});
+ assert.equal(result.outcome.status,'AMBIGUOUS');
+ if(variant==='unresolved'){
+  assert.match(result.error.message,/existing verification remains unresolved/);
+  assert.match(result.outcome.next_step.instruction,/existing verification remains unresolved/);
+ }else{
+  assert.doesNotMatch(result.error.message,/existing verification remains unresolved/);
+  assert.match(result.error.message,/Original delivery receipt remains uncertain/);
+  lost=false;
+  assert.equal((await f.service.resume({operation_id:'delivery',resume_id:'resume-2',budget_ms:120000})).outcome.status,'SUCCEEDED');
+ }
+ assert.equal(f.calls.filter(c=>c==='verify').length,1);assert.equal(f.calls.filter(c=>c==='upload').length,1);
+});
+
 test('folder navigation waits for the requested breadcrumb without repeating its gesture',async()=>{
  const f=fixture(undefined,'/user/another-folder'),observe=f.runtime.observe,act=f.runtime.uiAct;
  let stale,remaining=0;

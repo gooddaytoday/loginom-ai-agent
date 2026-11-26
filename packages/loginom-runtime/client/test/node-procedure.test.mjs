@@ -126,6 +126,55 @@ test('journal failure prevents mutation', async () => {
   await assert.rejects(f.channel.act({ verb: 'click', ref: 'ui-button' }), /disk failure/);
   assert.ok(!f.events.includes('mutated'));
 });
+
+for(const fault of [null,'missing verification','missing acknowledgement','foreign acknowledgement'])
+  test('batch readback requires proof and its journal acknowledgement: '+fault,async()=>{
+    const workflow={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+    const node={document_id:'doc',workflow_id:'wf',node_id:'node'};
+    const preparedNodeContext={document_id:'doc',workflow_ref:workflow,node};
+    const fields=['delimiter','null_marker'];
+    const refOf=name=>'ui-'+name.replace('_','-');
+    const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:workflow,
+      dom_epoch:{document:'dom',revision:1},scan:{complete:true},prepared_node_context:{...node,verified:true,surface:'wizard'},
+      wizard:{status:'observed',stage:'text_import_format',root_ref:'ui-root',owner_context:{status:'observed'},
+        settings:{fields:Object.fromEntries(fields.map(name=>[name,{status:'observed',input_ref:refOf(name),owner_ref:'ui-owner-'+name}]))}},
+      ui:{dialogs:[],masks:[],truncated:{dialogs:false,masks:false},
+        elements:[{ref:'ui-next',allowed_actions:['click']},...fields.map(name=>({ref:refOf(name),allowed_actions:['set_wizard_field'],
+          wizard_field:{name,scope:'import_format',root_ref:'ui-root',owner_ref:'ui-owner-'+name}}))]}};
+    let reads=0,gestures=0;
+    const channel=createNodeProcedure({operation:{id:'batch',deadline:10000,action:{action_key:'node.apply',revision:'1'}},
+      preparedNodeContext,targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>1,
+      wrapMutation:(_,ref)=>ref,execute:async ref=>{
+        if(typeof ref==='string'){reads++;return {status:'SUCCEEDED',output:structuredClone(state)};}
+        gestures++;
+        return {status:'SUCCEEDED',operation_id:ref.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,
+          output:structuredClone(state),trace:fault==='missing verification'?[]:[{event:'wizard_fields_verified'}]};
+      },record:async event=>{
+        const ack=structuredClone(event);
+        if(ack.phase==='node_step_completed'&&gestures===1){
+          if(fault==='missing acknowledgement')delete ack.outcome.output;
+          if(fault==='foreign acknowledgement')ack.outcome.operation_id='foreign';
+        }
+        return ack;
+      }});
+    const observe=()=>channel.observe({condition:'wizard ready',ready:()=>true});
+    const next=()=>channel.act({verb:'click',ref:'ui-next'});
+    await observe();
+    const initialReads=reads;
+    const batch=channel.act({verb:'set_wizard_fields',fields:fields.map((name,i)=>({ref:refOf(name),text:i?'?':';'}))});
+    if(fault){
+      await assert.rejects(batch,/durable completion receipt/);
+      await assert.rejects(next(),/fresh internal observation/);
+      assert.equal(gestures,1);
+      assert.equal(reads,initialReads);
+      await observe();
+    }else await batch;
+    const readsBeforeNext=reads;
+    await next();
+    assert.equal(gestures,2);
+    assert.equal(readsBeforeNext>initialReads,!!fault);
+    assert.equal(reads,readsBeforeNext);
+  });
 test('transport uncertainty retains unresolved cleanup', async () => {
   const f = fixture({ executeFailure: true }); await f.channel.observe({ condition: 'button usable', ready: s => s.ui.elements.some(e => e.ref === 'ui-button') });
   await assert.rejects(f.channel.act({ verb: 'click', ref: 'ui-button' }), /transport/);
@@ -570,6 +619,42 @@ function processLockFixture(onProcessRead,{deadline=10000}={}) {
   }});
  return {channel,records,timeouts,state,get reads(){return reads},get gestures(){return gestures},get clock(){return clock}};
 }
+
+test('execution polling batches the native read before the scoped UI read and retains the readiness deadline',async()=>{
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'crumb',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const node={verified:true,...binding.node,surface:'graph',tid:'MF;TF-1;Graph;JS',locked:false};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,dom_epoch:{document:'dom',revision:1},
+  prepared_node_context:node,scan:{complete:true},wizard:{status:'absent'},ui:{elements:[{tid:'MF;ConsoleForm',ref:'ui-console'}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+ const records=[],transports=[];
+ let now=0,foreign=false;
+ const channel=createNodeProcedure({operation:{id:'execution',deadline:600,action:{action_key:'node.apply',revision:'1'}},
+  preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
+  now:()=>now,wait:async ms=>{now+=ms},record:async r=>{records.push(r);return structuredClone(r)},
+  execute:async code=>{
+   transports.push(code);
+   const result={status:'SUCCEEDED',output:structuredClone(state)};
+   if(code.includes('"discover_roots":true'))return result;
+   const nativeProcesses={verified:true,node_context:{...node,node_id:foreign?'foreign':node.node_id},processes:[]};
+   if(!code.includes('function workspaceUiCapability'))return nativeProcesses;
+   assert.ok(code.indexOf('async function readNodeProcesses')>=0);
+   assert.ok(code.indexOf('async function readNodeProcesses')<code.indexOf('function workspaceUiCapability'));
+   assert.match(code,/"root_ref":"ui-console"/);
+   return {result,nativeProcesses};
+  }});
+ const options={condition:'owned execution group',timeoutMs:250,readProcesses:true,pollExecution:true};
+ const ready=await channel.observe({...options,ready:()=>now>=100});
+ assert.equal(now,100);
+ assert.equal(ready.node_processes.verified,true);
+ assert.equal(transports.length,4);
+ assert.equal(records.at(-1).readiness.timeout_ms,250);
+ foreign=true;
+ await assert.rejects(channel.observe({...options,ready:()=>true}),/context changed/);
+ foreign=false;
+ await assert.rejects(channel.observe({...options,ready:()=>false}),/readiness timeout/);
+ assert.equal(now,350);
+ assert.equal(records.at(-1).phase,'node_observation_timeout');
+ assert.equal(records.at(-1).elapsed_ms,250);
+});
 
 for(const locked of [false,true])test('process observation discards a lock-only transition to '+locked+' and rereads',async()=>{
  const f=processLockFixture((n,node)=>{if(!n){node.locked=locked;node.tid='MF;TF-1;Graph;JS'};});

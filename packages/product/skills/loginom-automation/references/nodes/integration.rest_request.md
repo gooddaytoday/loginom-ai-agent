@@ -49,19 +49,20 @@ parameters:{}, inputs:[], variable_inputs:[], mappings:[], finish execute.
 ## GET и ответы
 
 connection.response_content_type: application/json, text/html, text/plain, */* —
-допустимый MIME ответа. Response — строка; Content-Type запроса может иметь charset=UTF-8.
-GET без query: query_parameters:[], inputs:[], finish execute; без таблицы/URL-кодировщика.
+allowed response MIME. Response is a string; request Content-Type may carry charset=UTF-8.
+GET без query: query_parameters:[], inputs:[], finish execute; no table/URL encoder.
 Query: string or integer (±9007199254740991); no real/boolean. Bind integer
 limit/skip from variables.to_table directly; handler URL-encodes query. Body: string only.
 Keep JSON types: httpbin args.limit/skip echo as strings even with integer inputs;
-no coercion unless requested.
+no coercion unless requested. Big ints/ids: read as strings (JSON.parse rounds >2^53).
 Status/errors: read.ports:[1] — HttpStatusCode/ErrorCode/ErrorDesc; port 0 — body/parsing.
-200 ≠ тело; ограничь select, limit/skip по API, без gzip.
-Пустой Response: порт 1; ErrorCode ≠ 0 → REST_RESPONSE_BODY_MISSING:
+200 ≠ body; bound select, limit/skip per API; no gzip.
+Empty Response: port 1; ErrorCode ≠ 0 → REST_RESPONSE_BODY_MISSING:
 «тело ответа не получено: повтори запрос или уменьши ответ (select, limit/skip)».
-Пустой результат не успех; повтор — по просьбе.
-Таблица: Калькулятор → Свёртка → Кросс-таблица.
-Дерево: по просьбе либо ровные записи без вложенных контейнеров.
+Empty result ≠ success; retry on request only.
+Таблица: Калькулятор → Свёртка → Кросс-таблица. Tree: on request/flat records без вложенных контейнеров.
+Records arrays of several response rows: one `programming.javascript`
+(JSON.parse(Response), Append per record with its RequestID); no RequestID splits.
 
 ## Сведение и завершение
 
@@ -71,6 +72,6 @@ Status/errors: read.ports:[1] — HttpStatusCode/ErrorCode/ErrorDesc; port 0 —
 parameters:{col_union:{row_count:"maximum",padding:"null"}}. Имена — из контекста, суффиксы не угадывай.
 В разборе сверь RequestID; поля/порядок/типы — по заданию.
 Нет доказанного 1:1/того же результата — Слияние по RequestID.
-Все требуемые Export+Save подтверждены → сразу итоговый ответ.
+All required Export+Save confirmed → final answer at once.
 file_artifacts подтверждает CSV; без glob/обхода папок.
 <!-- /mode -->
