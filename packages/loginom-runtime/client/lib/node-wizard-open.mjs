@@ -1,4 +1,7 @@
 import {selectPreparedGraphNode,isPreparedBodyReplacement} from './node-graph-selection.mjs';
+import {NODE_TYPES} from './node-contracts.mjs';
+
+const joinDesignTitle=NODE_TYPES['transform.join_data'].title;
 
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const requireValue=(value,message)=>{if(!value)throw Error(message);};
@@ -152,8 +155,8 @@ export async function openPreparedWizard(channel) {
  const ownerMatches=owner.node.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+binding.opening.node.node_label
   ||normalize(binding.graph_label)!==''&&normalize(binding.graph_label)===normalize(owner.node.label)
   ||binding.variables_to_table===true&&after.wizard.stage==='variables_to_table'&&owner.node.label==='Переменные в таблицу'
-  ||binding.join_auto_caption===true&&after.wizard.stage==='join'&&owner.node.label==='Слияние'
-    &&owner.node.tid===binding.opening.workflow_path.at(-1)?.tid+'>Слияние';
+  ||binding.join_auto_caption===true&&after.wizard.stage==='join'&&owner.node.label===joinDesignTitle
+    &&owner.node.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+joinDesignTitle;
  requireValue(bound&&ownerMatches
   &&same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path),
   'Opened wizard owner differs from the prepared node');

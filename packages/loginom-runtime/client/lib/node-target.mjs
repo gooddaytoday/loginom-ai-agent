@@ -4,6 +4,7 @@ import { NODE_ADD_ONLY_MODE, NODE_TYPES, validateNodeTargetRequest } from './nod
 import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
 import {variablesColumnUnionTargetRequest} from './variables-coluniondatavar-parameters.mjs';
 
+const joinDesignTitle=NODE_TYPES['transform.join_data'].title;
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])])):value;
 const same = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 const digest = value => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
@@ -154,7 +155,9 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
 function verifyPreparedTargetEffect(effect, after, positionMatches, request, state) {
   const proof=verifyNodeTargetEffect(effect,after,positionMatches);
   if(proof||effect.kind!=='connect'||request?.target?.kind!=='new'||request.target.type!=='transform.join_data')return proof;
-  const {before,receipt,parameters:{edge}}=effect;
+  const before=effect.before;
+  const receipt=effect.receipt;
+  const edge=effect.parameters.edge;
   if(edge.kind||edge.input!==1||edge.target!==state.targetId||after.interaction_ready!==true
     ||receipt?.action_key!=='link.create'||receipt.operation_id!==effect.id||receipt.phase!=='applying'
     ||receipt.status!=='AMBIGUOUS'||receipt.effect_possible!==true||receipt.cleanup_complete!==true
@@ -164,13 +167,14 @@ function verifyPreparedTargetEffect(effect, after, positionMatches, request, sta
   // rewrites the first link's DOM TID. The native node and first edge must stay.
   const original=before.nodes.find(n=>n.ref.node_id===edge.target);
   const current=after.nodes.find(n=>n.ref.node_id===edge.target);
-  if(original?.type!=='transform.join_data'||original.label!=='Слияние'||current?.label!=='Левое'
+  if(original?.type!=='transform.join_data'||original.label!==joinDesignTitle||current?.label!=='Левое'
     ||request.target.label!==undefined&&request.target.label!==original.label)return null;
   const incoming=before.links.filter(link=>link.target===edge.target);
   if(incoming.length!==1||incoming[0].input!==0)return null;
   const prior=state.receipts.find(r=>r.verified&&r.kind==='connect'&&same(r.parameters.edge,incoming[0]));
   const priorReceipt=prior?.receipt?.receipt??prior?.receipt;
-  const firstTid=priorReceipt?.output?.link_ref?.tid,oldSuffix='|Слияние|Input_Data-0';
+  const firstTid=priorReceipt?.output?.link_ref?.tid;
+  const oldSuffix=`|${joinDesignTitle}|Input_Data-0`;
   if(priorReceipt?.status!=='SUCCEEDED'||priorReceipt.operation_id!==prior.id||typeof firstTid!=='string'
     ||!firstTid.startsWith(before.workflow_ref.prefix+';Graph;')||!firstTid.endsWith(oldSuffix))return null;
   const added=receipt.output.added_links;
@@ -595,7 +599,7 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
     // Native links derive these default captions. Preserve an explicitly
     // requested label after the owned transitions, without relinking.
     const finalTarget=node(graph,state.targetId);
-    const joinCaption=request.target.type==='transform.join_data'&&request.target.label==='Слияние'&&finalTarget.label==='Левое';
+    const joinCaption=request.target.type==='transform.join_data'&&request.target.label===joinDesignTitle&&finalTarget.label==='Левое';
     if(request.target.kind==='new'&&(joinCaption||['variables.to_table','variables.column_union'].includes(request.target.type))
       &&request.target.label!==undefined&&finalTarget.label!==request.target.label){
       graph=await change('rename',{ref:finalTarget.ref,label:request.target.label});

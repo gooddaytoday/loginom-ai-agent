@@ -5393,7 +5393,7 @@ function readRenderedInputMapping(observation) {
             // LAB-2082: the Join port wizard uses the design name in its path
             // even when the same native node has the automatic graph caption.
             const inputOwner=current.prepared_node_context;
-            const joinCaption=inputPort&&nativeBody&&expected==='Слияние'&&boundKey==='Левое'
+            const joinCaption=inputPort&&nativeBody&&expected===task.join_design_title&&boundKey==='Левое'
               &&inputOwner?.verified===true&&inputOwner.surface==='wizard'
               &&inputOwner.input_port?.node_icon_class==='bg-vendor-icon-joindata'
               &&inputOwner.navigation_node?.tid===finishOwner.node.tid&&inputOwner.navigation_node?.label===expected
@@ -5463,8 +5463,8 @@ function readRenderedInputMapping(observation) {
             const variableCaptionAlias=fresh.wizard.stage==='variables_to_table'&&owner.node.label==='Переменные в таблицу'
               &&labels.length===1&&labels[0].signature?.native_graph?.status==='non_script'
               &&labels[0].signature.native_graph.icon==='bg-vendor-icon-variablestodata';
-            const joinCaptionAlias=fresh.wizard.stage==='join'&&opening.node.node_label==='Левое'&&owner.node.label==='Слияние'
-              &&owner.node.tid===opening.workflow_path.at(-1)?.tid+'>Слияние'
+            const joinCaptionAlias=fresh.wizard.stage==='join'&&opening.node.node_label==='Левое'&&owner.node.label===task.join_design_title
+              &&owner.node.tid===opening.workflow_path.at(-1)?.tid+'>'+task.join_design_title
               &&labels.length===1&&normalizeLabel(labels[0].label)==='Левое'
               &&labels[0].signature?.native_graph?.status==='non_script'&&labels[0].signature.native_graph.icon==='bg-vendor-icon-joindata';
             const guidOwnerMatches=task.prepared_node_context&&beforeNode?.verified===true&&afterNode?.verified===true
@@ -5936,7 +5936,7 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false, downloa
       || !Number.isInteger(p.limit) || p.limit<1 || p.limit>8)throw new Error('Import definition page requires a bounded offset and limit');
   }
   if (options.mode === 'act') validateNodeUiAction(options.action,options.snapshot,options.prepared_node_context);
-  const task = { ...structuredClone(options), kind: 'workspace-ui',
+  const task = { ...structuredClone(options), kind: 'workspace-ui', join_design_title:NODE_TYPES['transform.join_data'].title,
     ...(!options.prepared_node_context?{node_types_by_icon:nodeTypesByIcon}:{}),
     ...(downloadToastObservation?{download_toast_observation:true}:{}) };
   // Trusted composite operations may supply their own fresh native read after
