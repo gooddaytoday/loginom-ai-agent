@@ -9,10 +9,10 @@
 
 ## Имитация
 
-Доставь файл; используй его серверный путь:
+Deliver the file; use its server path:
 `simulation:{enabled:true,file_path:"/своя-папка/response.json"}`.
 Передай connection, query_parameters:[], inputs:[], finish:"execute".
-GET без таблицы: один ответ. Тот же узел: смена файла;
+GET without table: one response. Same node: change the file;
 enabled:false — выключить, пропуск simulation — сохранить.
 Readback enabled/file_path из UI.
 
@@ -54,7 +54,8 @@ GET без query: query_parameters:[], inputs:[], finish execute; no table/URL e
 Query: string or integer (±9007199254740991); no real/boolean. Bind integer
 limit/skip from variables.to_table directly; handler URL-encodes query. Body: string only.
 Keep JSON types: httpbin args.limit/skip echo as strings even with integer inputs;
-no coercion unless requested. Big ints/ids: read as strings (JSON.parse rounds >2^53).
+no coercion unless requested. Big ints/ids: JSON.parse and reviver round >2^53; quote first:
+`text.replace(/([:,\[]\s*)(-?\d{16,})(?=\s*[,}\]])/g,'$1"$2"')`.
 Status/errors: read.ports:[1] — HttpStatusCode/ErrorCode/ErrorDesc; port 0 — body/parsing.
 200 ≠ body; bound select, limit/skip per API; no gzip.
 Empty Response: port 1; ErrorCode ≠ 0 → REST_RESPONSE_BODY_MISSING:
