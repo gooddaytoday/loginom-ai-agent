@@ -99,6 +99,7 @@ def run_check():
     class InterruptionRunner(runner.Runner):
         def __init__(self, directory):
             super().__init__(directory)
+            self.deadline = min(self.deadline, float(os.environ.get('LAB_2047_END_AT', self.deadline)))
             self.env['MULTICA_CLI_PATH'] = os.environ['MULTICA_CLI_PATH']
             self.interruption = None
 
