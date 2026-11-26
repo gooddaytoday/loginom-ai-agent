@@ -49,7 +49,7 @@ async function runDatabaseStep(options,ctx,kind,makeCode,parameters,config){
    if(testRefusal.tile_created&&!testRefusal.tile_removed)
     operation.preTargetWarnings.push('The unconfigured connection '+JSON.stringify(testRefusal.tile_label)+' remains in the module. Safe deletion was not verified.');
    if(!testRefusal.tile_created)
-    operation.preTargetWarnings.push('The pre-existing connection '+JSON.stringify(testRefusal.tile_label)+' remains in the module with its original settings.');
+    operation.preTargetWarnings.push('The pre-existing connection '+JSON.stringify(testRefusal.tile_label)+' remains in the module. Its original label and path were verified.');
   } else operation.preTargetWarnings=['The tested SQLite connection '+JSON.stringify(checkpoint.connection.name)
    +' remains in the module. Its graph reference and the import node were not created.'];
   operation.cleanupConfirmed=true;operation.nodeApply.cleanup_complete=true;
