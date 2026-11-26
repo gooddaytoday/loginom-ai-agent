@@ -102,6 +102,15 @@ for(const hide of [false,true])test('completion verifies the same process after 
  assert.equal(f.actions.filter(a=>a.verb==='show_process_node').length,1);
  assert.equal(f.actions.some(a=>a.verb==='execute_graph_node'),false);
 });
+
+test('an expanded loaded group reuses the terminal observation before Show Node',async()=>{
+ const f=await fixture();
+ assert.equal((await f.driver.waitCompleted()).owner_verified,true);
+ assert.ok(f.observations.some(o=>o.condition==='one new node execution group'&&o.pollExecution===true));
+ assert.ok(f.observations.some(o=>o.condition==='new node execution completed'&&o.pollExecution===true));
+ assert.ok(!f.observations.some(o=>o.condition==='execution child processes loaded'));
+ assert.equal(f.actions.filter(a=>a.verb==='show_process_node').length,1);
+});
 test('reopening cannot accept a replaced execution child',async()=>{
  const f=await fixture({replace:true});await assert.rejects(f.driver.waitCompleted(),/selected requested node process/);
  assert.equal(f.actions.filter(a=>a.ref===button).length,1);

@@ -12,6 +12,7 @@ import { createBundledSkillFixture } from './bundled-skill-fixture.mjs';
 import { createActionCatalogFixture } from './action-catalog-fixture.mjs';
 import { Page } from './workspace-ui-fixture.mjs';
 import {withStorageIdentity} from '../../lib/storage-policy.mjs';
+import {createNodeOperationRunner} from '../../lib/node-operation-runner.mjs';
 
 test('managed user preparation returns local pins and dynamic knowledge without static workflow instructions', async t => {
   const resources = await createBundledSkillFixture(t);
@@ -21,9 +22,15 @@ test('managed user preparation returns local pins and dynamic knowledge without 
   const compatibility = { profile_id: `unit-${platform}-chromium`, loginom_build: '7.4.2', platform, browser: 'chromium' };
   const catalog = await createActionCatalogFixture(compatibility);
   const browserCalls=[];
-  let reopenSaved, nativeReloadReply;
+  let reopenSaved, nativeReloadReply, loseReloadOpenReply=false;
+  const nativeReloadOpens=[], modifiedReadbacks=[];
   const reloadLogins=[];
   let connectionPage=null;
+  let stepFixture=null;
+  const stepJobs=createNodeOperationRunner({validate:()=> 'step-fixture',progress:()=>null,run:request=>{
+    stepFixture.admissions.push(request);
+    return {status:'SUCCEEDED',operation_id:request.operation_id,cleanup_complete:true};
+  }});
   const packageDeliveries=[];let expectedPackage=null,expectedOperation=null,openFailure=null,deliveryAbort=null,unconfirmedUpload=false,reloadedPage=null,identityPage=null,identityFault=null;
   class ExternalClient {
     constructor(identity) { this.browser = identity.name === 'loginom-dock-browser'; }
@@ -40,12 +47,26 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       assert.equal(request.name, 'browser_run_code_unsafe');
       browserCalls.push(request);
       const code = request.arguments.code;
-      if(nativeReloadReply&&code.includes('"recoveryAccount":"user"'))
+      if(nativeReloadReply&&code.includes('"recoveryAccount":"user"')){
+        const options=JSON.parse(code.slice(code.lastIndexOf('(page, {')+7,-1));
+        nativeReloadOpens.push(options);
+        if(loseReloadOpenReply){
+          loseReloadOpenReply=false;
+          throw Error('Interrupted after the native Open gesture');
+        }
         return {content:[{type:'text',text:JSON.stringify(nativeReloadReply)}]};
+      }
       if(nativeReloadReply&&code.includes("action_key:'workspace.reload_graph'"))
         return {content:[{type:'text',text:JSON.stringify({status:'SUCCEEDED',action_key:'workspace.reload_graph',
           action_revision:'1',operation_id:'fixture-reload',phase:'observed',effect_possible:false,error:null,
-          trace:[],output:{complete:true,document_id:nativeReloadReply.document_id}})}]};
+          trace:[],output:{complete:true,document_id:nativeReloadReply.document_id,
+            package_modified:modifiedReadbacks.length?modifiedReadbacks.shift():false}})}]};
+      if(stepFixture&&code.includes("action_key:'workspace.step'")){
+        stepFixture.reads++;
+        if(stepFixture.output instanceof Error)throw stepFixture.output;
+        return {content:[{type:'text',text:JSON.stringify({status:'SUCCEEDED',action_key:'workspace.step',action_revision:'1',
+          phase:'observed',effect_possible:false,output:stepFixture.output,error:null,trace:[]})}]};
+      }
       if(connectionPage&&code.includes('async function observeGeometry('))
         return {content:[{type:'text',text:JSON.stringify(await runInNewContext(code)(connectionPage))}]};
       if(identityPage&&code.includes('"identityOnly":true')){
@@ -66,7 +87,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
           trace:[{blocking_windows:{windows:[{message_box:{title:'Loginom',text:'UNIT-NONSECRET',buttons:[]}}]}}],
           created_draft:false,target:compatibility,effect_possible:failure.effect_possible,operation_id:expectedOperation})}]};
       }
-      const output = code.includes('"identityOnly":true')
+      let output = code.includes('"identityOnly":true')
         ? {status:'BOUND',target:compatibility,authenticated:true,created_draft:false,effect_possible:false,
           document_id:'fixture-document',loginom_account:'user',target_verified:true}
         : code.includes('async function prepareWorkspace(')
@@ -76,6 +97,13 @@ test('managed user preparation returns local pins and dynamic knowledge without 
           workflow_ref: { tab_tid: 'fixture-tab', prefix: 'fixture-prefix', workflow_id: expectedPackage?'local-workflow':'fixture-workflow', navigation_path: [] } }
         : { version: 1, source: 'prepare_same_browser_page', observed: { document_id: 'fixture-document' }, fixture: true };
       assert.ok(code.includes('async function prepareWorkspace(') || code.includes('async function observeGeometry('));
+      if(stepFixture&&code.includes('async function prepareWorkspace(')){
+        const options=JSON.parse(code.slice(code.lastIndexOf('(page, ')+7,-1));
+        stepFixture.prepares.push(options);
+        output=stepFixture.blockPrepare
+          ?{status:'NOT_READY',reason:'UI_BLOCKED',authenticated:true,created_draft:false,effect_possible:false,target:compatibility}
+          :{...output,native_step_owner:true,operation_id:options.operationId,workflow_ref:stepFixture.prepareRef};
+      }
       return { content: [{ type: 'text', text: JSON.stringify(output) }] };
     }
   }
@@ -89,16 +117,24 @@ test('managed user preparation returns local pins and dynamic knowledge without 
   mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,
     createActionRuntime:options=>{
       reopenSaved=options.reopenNodePackage;
-      return {...executor.createActionRuntime(options),async deliverPackageArtifact(request,{signal}){
-        signal.throwIfAborted();packageDeliveries.push(request);
-        const artifact=options.artifactStore.getUploadGrant(request.artifact_id,request.upload_grant_id);
-        assert.equal(session.metadata.storageBinding.document_id,'fixture-document');
-        if(unconfirmedUpload)return {outcome:{status:'AMBIGUOUS',cleanup_complete:false}};
-        deliveryAbort?.abort();deliveryAbort=null;
-        return {outcome:{status:'SUCCEEDED',destination:artifact.upload.destination,bytes:artifact.bytes,source_sha256:artifact.sha256,
-          upload_completion_verified:true,cleanup_complete:true,files_entry:{document_id:'fixture-document',tab_tid:'fixture-tab',directory:'/user'}}};
-      }};
-    }}});
+      const runtime=executor.createActionRuntime(options);
+      return {...runtime,
+        nodeApplyWorkflow:id=>stepFixture?stepJobs.workflow?.(id):runtime.nodeApplyWorkflow?.(id),
+        startNodeApply:(request,opts)=>{
+          if(!stepFixture)return runtime.startNodeApply(request,opts);
+          if(stepFixture.pending)throw Error('Resolve the pending Dock operation before applying');
+          return stepJobs.start(request,opts);
+        },
+        hasUnsettledWork:()=>stepFixture?stepFixture.pending:runtime.hasUnsettledWork(),
+        async deliverPackageArtifact(request,{signal}){
+      signal.throwIfAborted();packageDeliveries.push(request);
+      const artifact=options.artifactStore.getUploadGrant(request.artifact_id,request.upload_grant_id);
+      assert.equal(session.metadata.storageBinding.document_id,'fixture-document');
+      if(unconfirmedUpload)return {outcome:{status:'AMBIGUOUS',cleanup_complete:false}};
+      deliveryAbort?.abort();deliveryAbort=null;
+      return {outcome:{status:'SUCCEEDED',destination:artifact.upload.destination,bytes:artifact.bytes,source_sha256:artifact.sha256,
+        upload_completion_verified:true,cleanup_complete:true,files_entry:{document_id:'fixture-document',tab_tid:'fixture-tab',directory:'/user'}}};
+    }};}}});
   const { createBridge } = await import('../../lib/bridge.mjs');
   const session = { directory, browserCli: '/external/browser', browserConfig: '/external/config', browserRoot: '/external/browsers',
     artifactStore: await createArtifactStore({ directory: join(directory, 'input') }),
@@ -185,6 +221,72 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const invalidMode=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,mode:'invented'}});
     assert.equal(JSON.parse(invalidMode.content[0].text).error.code,'REQUEST_REJECTED');
     assert.equal(browserCalls.length,beforeDescription,'mode validation remains before mutation');
+
+    const initialRef={tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb',prefix:'MF;TF',
+      workflow_id:'fixture-workflow',navigation_path:[{tid:'crumb',label:'Original'}]};
+    const refreshedRef={...initialRef,navigation_path:[{tid:'crumb',label:'Manual Save'}]};
+    stepFixture={prepareRef:initialRef,prepares:[],reads:0,admissions:[],pending:false};
+    const firstStep=await client.callTool({name:'dock_prepare',arguments:{}});
+    assert.equal(JSON.parse(firstStep.content[0].text).prepared,true);
+    const priorPrepare={operation_id:'step-prepare',intent:'existing_workflow',
+      workflow_ref:{...initialRef,document_id:'fixture-document'}};
+    stepFixture.prepareRef=refreshedRef;
+    const preparedStep=await client.callTool({name:'dock_prepare',arguments:priorPrepare});
+    assert.equal(JSON.parse(preparedStep.content[0].text).prepared,true);
+    const samePrepare=await client.callTool({name:'dock_prepare',arguments:priorPrepare});
+    assert.equal(samePrepare.isError,undefined,JSON.stringify(samePrepare));
+    assert.equal(JSON.parse(samePrepare.content[0].text).prepared,true);
+    assert.deepEqual(stepFixture.prepares.at(-1).workflowRef,priorPrepare.workflow_ref);
+    assert.equal(stepFixture.prepares.at(-1).refreshVerified,true);
+    stepFixture.blockPrepare=true;
+    const blockedPrepare=await client.callTool({name:'dock_prepare',arguments:priorPrepare});
+    assert.equal(JSON.parse(blockedPrepare.content[0].text).workspace.reason,'UI_BLOCKED');
+    stepFixture.blockPrepare=false;
+    const recoveredPrepare=await client.callTool({name:'dock_prepare',arguments:priorPrepare});
+    assert.equal(JSON.parse(recoveredPrepare.content[0].text).prepared,true,JSON.stringify(recoveredPrepare));
+    assert.deepEqual(stepFixture.prepares.at(-1).workflowRef,priorPrepare.workflow_ref);
+    await client.callTool({name:'dock_action_describe',arguments:{node_types:['transform.sorting'],modes:['keys']}});
+    const nextRef={...refreshedRef,navigation_path:[{tid:'crumb',label:'Current browser navigation'}]};
+    const packageRef={path:'/user/manual-save.lgp',name:'manual-save',persisted:true};
+    stepFixture.output={status:'READY',document_id:'fixture-document',workflow_ref:nextRef,package_ref:packageRef};
+    const apply=(id,args={})=>client.callTool({name:'dock_node_apply',arguments:{...undescribed,operation_id:id,...args}});
+    const accepted=await apply('step-apply');
+    assert.equal(accepted.isError,undefined,JSON.stringify(accepted));
+    assert.equal(stepFixture.reads,1);
+    assert.deepEqual(stepFixture.admissions[0].workflow_ref,nextRef);
+    assert.deepEqual(session.metadata.workspacePreparation.state.package_ref,packageRef);
+    assert.ok(accepted.content.some(block=>JSON.parse(block.text).package_ref?.path===packageRef.path));
+    assert.equal((await apply('step-apply')).isError,undefined);
+    assert.equal(stepFixture.reads,1,'replay retains its original scope without another preflight');
+    assert.equal(stepFixture.admissions.length,1);
+    const changed=await apply('step-apply',{target:{...undescribed.target,label:'different'}});
+    assert.match(JSON.parse(changed.content[0].text).error.message,/different parameters/);
+    assert.equal(stepFixture.admissions.length,1);
+    stepFixture.pending=true;
+    const pending=await apply('step-pending');
+    assert.equal(JSON.parse(pending.content[0].text).request_rejected,true);
+    assert.equal(stepFixture.reads,1,'pending work forbids a new preflight');
+    stepFixture.pending=false;
+    stepFixture.output={status:'NOT_READY',reason:'WORKFLOW_CHANGED'};
+    const unready=await apply('step-unready');
+    assert.equal(JSON.parse(unready.content[0].text).status,'NOT_APPLIED');
+    assert.match(JSON.parse(unready.content[0].text).error.message,/WORKFLOW_CHANGED/);
+    assert.equal(stepFixture.admissions.length,1);
+    stepFixture.output=Error('Lost workspace preflight reply');
+    const lostStep=await apply('step-lost');
+    assert.equal(JSON.parse(lostStep.content[0].text).status,'NOT_APPLIED');
+    assert.match(JSON.parse(lostStep.content[0].text).error.message,/Lost workspace preflight reply/);
+    assert.equal(stepFixture.admissions.length,1);
+    const beforeReadOnlyStep=session.metadata.workspacePreparation;
+    stepFixture.output={status:'READY',document_id:'fixture-document',workflow_ref:nextRef,
+      package_ref:{...packageRef,read_only:true}};
+    const readOnlyStep=JSON.parse((await apply('step-read-only')).content[0].text);
+    assert.equal(readOnlyStep.status,'NOT_APPLIED');
+    assert.match(readOnlyStep.error.message,/read-only/);
+    assert.equal(stepFixture.admissions.length,1,'native read-only refresh must not start Apply');
+    assert.equal(session.metadata.workspacePreparation.state.package_ref.read_only,true);
+    session.metadata.workspacePreparation=beforeReadOnlyStep;
+    stepFixture=null;
     // LAB-450: prepare -> local profile/scan/sample/admit (no browser calls)
     // -> first sample-delivery observation after native connection loss.
     connection.Connected=false;form.FReconnecting=true;
@@ -229,7 +331,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.equal(reloadedPage.events.filter(selector=>selector.includes('OpenDialogForm;btnOpen')).length,1);
     reloadedPage=null;
     const original=session.metadata.workspacePreparation.state;
-    const reopen=()=>reopenSaved({documentId:original.document_id,deadline:Date.now()+5000});
+    const reopen=reload=>reopenSaved({documentId:original.document_id,deadline:Date.now()+5000,reload});
     const browserBeforeReload=browserCalls.length;
     const originalAccount=original.loginom_account;
     original.loginom_account='other';
@@ -262,6 +364,28 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.equal(verification.ref.document_id,nativeOpened.document_id);
     assert.deepEqual(verification.first,verification.second);
     assert.equal(browserCalls.length,beforeVerified+3,'one native Open and two reads');
+    const reload={};
+    loseReloadOpenReply=true;
+    const beforeInterruptedOpen=browserCalls.length;
+    await assert.rejects(reopen(reload),/Interrupted after the native Open gesture/);
+    assert.equal(browserCalls.length,beforeInterruptedOpen+1);
+    await reopen(reload);
+    const [open,reconcile]=nativeReloadOpens.slice(-2);
+    assert.equal(open.recoverOnly,false);
+    assert.equal(reconcile.recoverOnly,true);
+    assert.equal(reconcile.operationId,open.operationId);
+    assert.equal(reconcile.packagePath,originalPackage.path);
+    assert.equal(browserCalls.length,beforeInterruptedOpen+4,'reconcile and read twice without sending another Open');
+
+    nativeReloadReply={...nativeOpened,effect_possible:false};
+    const beforeDirty=browserCalls.length;
+    modifiedReadbacks.push(true);
+    assert.deepEqual(await reopen(),{reloaded:true,reason:'REOPENED_PACKAGE_DIRTY'});
+    assert.equal(browserCalls.length,beforeDirty+2,'dirty package must stop after the first read');
+    modifiedReadbacks.push(false,true);
+    assert.deepEqual(await reopen(),{reloaded:true,reason:'REOPENED_PACKAGE_DIRTY'});
+    modifiedReadbacks.push(null);
+    assert.deepEqual(await reopen(),{reloaded:true,reason:'REOPENED_GRAPH_UNAVAILABLE'});
     for(const auth of reloadLogins){
       assert.equal(auth.origin,'https://loginom.invalid');
       assert.equal(auth.account,'user');
