@@ -1,8 +1,8 @@
-import { afterEach, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireProfile, systemWriterProbe } from "../../src/cli/profile"
+import { acquireProfile, systemWriterProbe, windowsSurvivors } from "../../src/cli/profile"
 
 const roots: string[] = []
 const children: { kill(signal?: number | NodeJS.Signals): void }[] = []
@@ -208,9 +208,7 @@ test("an owner that cannot be checked here is never taken over", async () => {
   ]) {
     await fs.writeFile(file, JSON.stringify(replaced))
     const notices: string[] = []
-    await expect(acquireProfile(root, "prod", { notice: (text) => notices.push(text) })).rejects.toThrow(
-      "PROFILE_BUSY",
-    )
+    await expect(acquireProfile(root, "prod", { notice: (text) => notices.push(text) })).rejects.toThrow("PROFILE_BUSY")
     expect(notices.join("\n")).toContain("cannot be checked")
     expect(await fs.readFile(file, "utf8")).toBe(JSON.stringify(replaced))
   }
@@ -294,9 +292,9 @@ test.skipIf(process.platform !== "linux")(
     const { text } = await abandoned(root, { SURVIVOR_TMP: path.join(root, "cache", "tmp") })
     const survivor = Number(/survivor (\d+)/.exec(text)?.[1])
     const notices: string[] = []
-    await expect(acquireProfile(root, "prod", { timing: FAST, notice: (value) => notices.push(value) })).rejects.toThrow(
-      "PROFILE_BUSY",
-    )
+    await expect(
+      acquireProfile(root, "prod", { timing: FAST, notice: (value) => notices.push(value) }),
+    ).rejects.toThrow("PROFILE_BUSY")
     expect(notices.join("\n")).toContain(`${survivor} (sleep 600)`)
     expect(() => process.kill(survivor, 0)).not.toThrow()
     // Bounded wait: the takeover follows as soon as the last process exits.
@@ -327,7 +325,9 @@ test.skipIf(process.platform !== "linux")(
     for (
       let caught = 0n;
       !(caught & (1n << 14n));
-      caught = BigInt(`0x${/SigCgt:\s*([0-9a-f]+)/.exec(await fs.readFile(`/proc/${survivor}/status`, "utf8"))?.[1] ?? "0"}`)
+      caught = BigInt(
+        `0x${/SigCgt:\s*([0-9a-f]+)/.exec(await fs.readFile(`/proc/${survivor}/status`, "utf8"))?.[1] ?? "0"}`,
+      )
     )
       await Bun.sleep(20)
     const signals: string[] = []
@@ -452,3 +452,70 @@ test.skipIf(process.platform !== "linux")(
   },
   30000,
 )
+
+describe("Windows survivors (process list only, nothing is stopped)", () => {
+  const root = "C:\\Users\\u\\Profile"
+  const owner = { pid: 100, start: 1_000_000 }
+  const self = { pid: 900, parent: 901 }
+  const install = "C:\\Program Files\\Loginom CLI\\resources\\loginom"
+  const node = `"${install}\\bin\\node.exe" --use-system-ca`
+
+  test("an orphaned runtime whose host died first keeps the profile busy", () => {
+    // The host (pid 200) is gone; the runtime names neither the profile nor the owner.
+    const runtime = {
+      pid: 300,
+      parent: 200,
+      created: 1_000_500,
+      command: `${node} ${install}\\runtime\\src\\managed-entry.mjs`,
+    }
+    const survivors = windowsSurvivors(
+      [runtime, { pid: 900, parent: 901, created: 2_000_000, command: "cli" }],
+      root,
+      owner,
+      self,
+    )
+    expect(survivors).toEqual([{ pid: 300, command: runtime.command, recognised: false }])
+  })
+
+  test("a runtime whose parent pid was reused by a later process is an orphan", () => {
+    const runtime = {
+      pid: 300,
+      parent: 200,
+      created: 1_000_500,
+      command: `${node} ${install}\\runtime\\src\\knowledge-entry.mjs`,
+    }
+    const reuser = { pid: 200, parent: 1, created: 1_500_000, command: "notepad.exe" }
+    expect(windowsSurvivors([runtime, reuser], root, owner, self).map((entry) => entry.pid)).toEqual([300])
+  })
+
+  test("a live CLI's own host and runtime are not orphans; other profiles stay untouched", () => {
+    const cli = { pid: 500, parent: 1, created: 1_100_000, command: "loginom-ai-agent-cli.exe run" }
+    const host = { pid: 501, parent: 500, created: 1_100_100, command: `${node} ${install}\\host\\node-host.mjs` }
+    const runtime = {
+      pid: 502,
+      parent: 501,
+      created: 1_100_200,
+      command: `${node} ${install}\\runtime\\src\\managed-entry.mjs`,
+    }
+    expect(windowsSurvivors([cli, host, runtime], root, owner, self)).toEqual([])
+  })
+
+  test("children of a process that reuses the owner pid are not the owner's", () => {
+    const reuser = { pid: 100, parent: 1, created: 1_200_000, command: "other-cli.exe" }
+    const child = { pid: 101, parent: 100, created: 1_200_100, command: "other-child.exe" }
+    const orphan = { pid: 102, parent: 100, created: 1_000_100, command: "conhost.exe" }
+    expect(windowsSurvivors([reuser, child, orphan], root, owner, self).map((entry) => entry.pid)).toEqual([102])
+  })
+
+  test("Chromium is found by the profile in its command line, case-insensitively", () => {
+    const chrome = {
+      pid: 400,
+      parent: 1,
+      created: 1_000_900,
+      command: `"${install}\\browsers\\chrome.exe" --user-data-dir=c:\\users\\u\\profile\\loginom\\x\\browser-profile`,
+    }
+    expect(windowsSurvivors([chrome], root, owner, self)).toEqual([
+      { pid: 400, command: chrome.command, recognised: false },
+    ])
+  })
+})

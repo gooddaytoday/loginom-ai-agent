@@ -500,7 +500,9 @@ async function linuxSurvivors(root: string) {
           const resolved = await Promise.all(environment.map((value) => fs.realpath(value).catch(() => value)))
           const temporary = resolved.some((value) => inside(root, value))
           const directory = cwd !== undefined && inside(root, cwd)
-          const named = args.some((arg) => inside(root, arg) || arg.includes(root + path.sep) || arg.endsWith(`=${root}`))
+          const named = args.some(
+            (arg) => inside(root, arg) || arg.includes(root + path.sep) || arg.endsWith(`=${root}`),
+          )
           if (!temporary && !directory && !named) return undefined
           const entry = args.slice(1).some((arg) => RUNTIME_ENTRIES.includes(path.basename(arg)))
           const browser = args.some(
@@ -519,6 +521,49 @@ async function linuxSurvivors(root: string) {
       }),
   )
   return entries.filter((entry) => entry !== undefined)
+}
+
+export type WindowsProcess = { pid: number; parent: number; created: number; command: string }
+
+// Windows keeps ParentProcessId of orphans, so the dead owner's process tree
+// is still discoverable; Chromium also names the profile in argv. The runtime
+// names neither the profile nor its owner, so any orphaned host, runtime,
+// help or warm-up process counts too (a false busy is safe). Nothing is
+// stopped on Windows: survivors are only reported and keep the profile busy.
+export function windowsSurvivors(
+  all: WindowsProcess[],
+  root: string,
+  owner: Pick<WriterOwner, "pid" | "start">,
+  self = { pid: process.pid, parent: process.ppid },
+): WriterSurvivor[] {
+  const processes = all.filter((entry) => entry.pid !== self.pid && entry.pid !== self.parent)
+  const lower = root.toLowerCase()
+  const found = new Map<number, WindowsProcess>()
+  for (const entry of processes) {
+    const command = entry.command.toLowerCase()
+    if (command.includes(lower)) found.set(entry.pid, entry)
+    if (!RUNTIME_ENTRIES.some((name) => command.includes(name))) continue
+    const parent = all.find((item) => item.pid === entry.parent)
+    if (!parent || parent.created > entry.created) found.set(entry.pid, entry)
+  }
+  // A process that reuses the owner's pid has its own children; only
+  // children created before it can be orphans of the owner.
+  const reuser = all.find((entry) => entry.pid === owner.pid)
+  const queue = [owner.pid]
+  const visited = new Set(queue)
+  for (let parent = queue.shift(); parent !== undefined; parent = queue.shift())
+    for (const entry of processes)
+      if (
+        entry.parent === parent &&
+        entry.created >= owner.start - START_MARGIN_MS &&
+        (parent !== owner.pid || !reuser || entry.created < reuser.created) &&
+        !visited.has(entry.pid)
+      ) {
+        visited.add(entry.pid)
+        found.set(entry.pid, entry)
+        queue.push(entry.pid)
+      }
+  return [...found.values()].map((entry) => ({ pid: entry.pid, command: entry.command, recognised: false }))
 }
 
 export const systemWriterProbe: WriterProbe = {
@@ -570,36 +615,7 @@ export const systemWriterProbe: WriterProbe = {
   },
   async survivors(root, owner) {
     if (process.platform === "linux") return linuxSurvivors(root)
-    if (process.platform === "win32") {
-      // Windows keeps ParentProcessId of orphans, so the dead owner's process
-      // tree is still discoverable; Chromium also names the profile in argv.
-      // Nothing is stopped here: the tree cannot be tied to this profile
-      // reliably, so survivors are only reported and keep the profile busy.
-      const processes = (await windowsProcesses()).filter(
-        (entry) => entry.pid !== process.pid && entry.pid !== process.ppid,
-      )
-      const lower = root.toLowerCase()
-      const found = new Map<number, (typeof processes)[number]>()
-      for (const entry of processes) if (entry.command.toLowerCase().includes(lower)) found.set(entry.pid, entry)
-      // A process that reuses the owner's pid has its own children; only
-      // children created before it can be orphans of the owner.
-      const reuser = processes.find((entry) => entry.pid === owner.pid)
-      const queue = [owner.pid]
-      const visited = new Set(queue)
-      for (let parent = queue.shift(); parent !== undefined; parent = queue.shift())
-        for (const entry of processes)
-          if (
-            entry.parent === parent &&
-            entry.created >= owner.start - START_MARGIN_MS &&
-            (parent !== owner.pid || !reuser || entry.created < reuser.created) &&
-            !visited.has(entry.pid)
-          ) {
-            visited.add(entry.pid)
-            found.set(entry.pid, entry)
-            queue.push(entry.pid)
-          }
-      return [...found.values()].map((entry) => ({ pid: entry.pid, command: entry.command, recognised: false }))
-    }
+    if (process.platform === "win32") return windowsSurvivors(await windowsProcesses(), root, owner)
     // macOS: no environment or cwd of other processes, and the host names no
     // profile, so an orphaned host or runtime cannot be attributed: it is
     // reported, never stopped.
