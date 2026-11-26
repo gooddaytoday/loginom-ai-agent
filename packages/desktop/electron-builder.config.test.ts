@@ -98,7 +98,7 @@ test.each(channels)("channel identity for $channel", ({ channel, appId, name, sl
   // The packages install the channel's metainfo and no other file of their own.
   for (const fpm of [config.deb?.fpm, config.rpm?.fpm]) {
     expect(fpm?.filter((entry) => entry.includes("=/"))).toEqual([
-      expect.stringMatching(new RegExp(`/${appId}\\.metainfo\\.xml=/usr/share/metainfo/${appId}\\.metainfo\\.xml$`)),
+      expect.stringMatching(new RegExp(`[\\\\/]${appId}\\.metainfo\\.xml=/usr/share/metainfo/${appId}\\.metainfo\\.xml$`)),
     ])
   }
 

@@ -490,3 +490,15 @@ packages/core/test/config/config.test.ts:personal-windows-home-path:1620
 packages/desktop/src/main/native/install-cli-machine.test.ts:personal-home-path:32
 packages/desktop/src/main/native/install-cli-machine.test.ts:personal-home-path:35
 packages/gui-plugins/src/details/config-file.test.ts:personal-home-path:4
+# The same #1231 fixtures in the first-parent diff of the v0.4.0 merge into loginom.
+5f79f57f8d11539fa7307f1e55ba39414c1afe6e:packages/loginom-runtime/client/test/artifact-download.test.mjs:personal-windows-home-path:464
+5f79f57f8d11539fa7307f1e55ba39414c1afe6e:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-home-path:16
+5f79f57f8d11539fa7307f1e55ba39414c1afe6e:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:15
+5f79f57f8d11539fa7307f1e55ba39414c1afe6e:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:16
+5f79f57f8d11539fa7307f1e55ba39414c1afe6e:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:34
+# The same #1231 fixtures in the first-parent diff of the #1249 merge commit.
+11ed9673f809c97f7e8f13b6d54873f5302d23cd:packages/loginom-runtime/client/test/artifact-download.test.mjs:personal-windows-home-path:464
+11ed9673f809c97f7e8f13b6d54873f5302d23cd:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-home-path:16
+11ed9673f809c97f7e8f13b6d54873f5302d23cd:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:15
+11ed9673f809c97f7e8f13b6d54873f5302d23cd:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:16
+11ed9673f809c97f7e8f13b6d54873f5302d23cd:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:34

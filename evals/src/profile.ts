@@ -10,7 +10,13 @@ import { archiveDiagnostics } from "./diagnostics"
 import { sandboxCommand, assertNoDebuggers } from "./sandbox"
 import { writeLeaseReceipt } from "./lease"
 
-type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean; url?: string; username?: string }
+type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean; hasPassword?: boolean; url?: string; username?: string }
+
+// Native CLI reports password presence; legacy clients report their MCP key.
+const passwordMatches = (view: View, expected?: boolean) => view.hasPassword === undefined ||
+  typeof view.hasPassword === "boolean" && (expected === undefined || view.hasPassword === expected)
+const connectionConfigured = (view: View, expected?: boolean) => passwordMatches(view, expected) &&
+  (view.hasApiKey === true || view.hasApiKey === undefined && typeof view.hasPassword === "boolean")
 
 // Without its 0.4.0 migration marker the next Host removes a connection to any stand but app.loginom.ai.
 const retainedProfileFiles = new Set([
@@ -312,7 +318,7 @@ export async function verifyProfile(config: EvalConfig, command: AgentCommand) {
   const view = parseView(observed.stdout)
   // `configured`: a saved connection whose Help this status's own Host has not loaded yet (B2.7b); the built-in knowledge
   // key left no `hasApiKey` in the status.
-  if (observed.exitCode !== 0 || !view || !["ready", "starting", "configured"].includes(view.state) || view.failure || view.recoveries?.length ||
+  if (observed.exitCode !== 0 || !view || !["ready", "starting", "configured"].includes(view.state) || view.failure || view.recoveries?.length || !(view.hasApiKey === undefined && view.hasPassword === undefined ? passwordMatches : connectionConfigured)(view, Boolean(config.loginom.password)) ||
     view.url !== config.loginom.url || view.username !== config.loginom.username)
     throw new EvalFailure("PROFILE_NOT_PREPARED", 2)
   const saved = await Bun.file(path.join(config.profileDir, "config/loginom-ai-agent.json")).json().catch(() => undefined)
@@ -333,9 +339,10 @@ export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
   }
   if (config.slotsFile && observed.exitCode !== 0) throw new EvalFailure("PROFILE_STATUS_FAILED", 2)
   const view = parseView(observed.stdout)
+  if (view && !passwordMatches(view)) throw new EvalFailure("PROFILE_STATUS_INVALID", 2)
   if (config.slotsFile && (!view || view.state !== "unconfigured" && (view.url !== config.loginom.url || view.username !== config.loginom.username)))
     throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
-  const fresh = !view || view.state === "unconfigured" || view.hasApiKey === false
+  const fresh = !view || view.state === "unconfigured" || view.hasApiKey === false || !passwordMatches(view, Boolean(config.loginom.password))
   if (fresh) await setupProfile(config, command)
   await Bun.write(
     path.join(config.profileDir, "config", "loginom-ai-agent.json"),
@@ -364,11 +371,13 @@ export async function setupProfile(config: EvalConfig, command: AgentCommand) {
     const prepared = parseView(setup.stdout)
     if (!prepared || prepared.url !== config.loginom.url || prepared.username !== config.loginom.username)
       throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
+    if (!passwordMatches(prepared, Boolean(config.loginom.password))) throw new EvalFailure("PROFILE_PASSWORD_MISMATCH", 2)
     const checked = await management(command, ["loginom", "status", "--format", "json"])
     if (checked.exitCode !== 0) throw new EvalFailure("PROFILE_STATUS_FAILED", 2)
     const saved = parseView(checked.stdout)
     if (!saved || saved.url !== config.loginom.url || saved.username !== config.loginom.username)
       throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
+    if (!passwordMatches(saved, Boolean(config.loginom.password))) throw new EvalFailure("PROFILE_PASSWORD_MISMATCH", 2)
   }
 }
 
@@ -410,7 +419,7 @@ async function refuseAuth(config: EvalConfig, message: string, historyDir?: stri
   throw new EvalFailure(message, 2)
 }
 
-export async function recoverIfNeeded(command: AgentCommand, exitCode: 1 | 2) {
+export async function recoverIfNeeded(command: AgentCommand, exitCode: 1 | 2, expectedHasPassword?: boolean) {
   const first = await status(command, exitCode)
   const acknowledged = Boolean(first.recoveries?.length)
   if (acknowledged) {
@@ -419,9 +428,11 @@ export async function recoverIfNeeded(command: AgentCommand, exitCode: 1 | 2) {
       throw new EvalFailure(`loginom recover завершился кодом ${recover.exitCode}:\n${recover.stderr.trim()}`, exitCode)
   }
   const restored = acknowledged ? await status(command, exitCode) : first
+  if (["ready", "starting"].includes(restored.state) && (restored.hasApiKey !== undefined || restored.hasPassword !== undefined) &&
+    !connectionConfigured(restored, expectedHasPassword)) throw new EvalFailure("PROFILE_NOT_PREPARED", exitCode)
   // Each standalone status has its own Help startup. Polling another process
   // cannot finish that startup; an explicit check proves readiness in one host.
-  const checked = (restored.state === "configured" || restored.state === "starting" && restored.hasApiKey === true) &&
+  const checked = (restored.state === "configured" || restored.state === "starting" && connectionConfigured(restored, expectedHasPassword)) &&
     !restored.failure && !restored.recoveries?.length
     ? await checkStarting(command, exitCode) : false
   const view = checked ? restored : await settle(command, restored, exitCode)
@@ -437,7 +448,8 @@ export async function recoverIfNeeded(command: AgentCommand, exitCode: 1 | 2) {
 async function checkStarting(command: AgentCommand, exitCode: 1 | 2) {
   const result = await management(command, ["loginom", "check", "--format", "json"])
   const receipt = parseJson(result.stdout.trim().split("\n").at(-1) ?? "") as
-    { ok?: unknown; code?: unknown; help?: { state?: unknown } } | null | undefined
+    { ok?: unknown; code?: unknown; help?: { state?: unknown }; browser?: { state?: unknown } } | null | undefined
+  if (receipt?.browser?.state === "failed") throw new EvalFailure("LOGINOM_BROWSER_NOT_READY", exitCode)
   if (result.exitCode !== 0 || result.sandboxError || result.timedOut || result.interrupted ||
     receipt?.ok !== true || receipt.code !== "LOGINOM_CONNECTION_VALID" || receipt.help?.state !== "ready")
     throw new EvalFailure("loginom check не подтвердил готовность Help в текущем CLI-процессе", exitCode)

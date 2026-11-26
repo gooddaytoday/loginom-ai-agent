@@ -148,12 +148,21 @@ test('the call and time budget is shared by the step across operation IDs and re
   const refused = await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-3' });
   assert.equal(refused.isError, true);
   assert.match(refused.content[0].text, /exhausted/);
+  // Remaining ms_left must not read as a wait-and-retry hint: the refusal names the final exit.
+  const final = body(refused).next_step;
+  assert.equal(final.tool, undefined);
+  assert.match(final.instruction, /never renews/);
+  assert.match(final.instruction, /Do not call dock_browser_recovery start again or dock_operation_recover/);
+  assert.match(final.instruction, /blocker/);
 
   const timed = harness();
   await timed.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
   timed.clock.value += 600_000;
   assert.equal(body(await timed.recovery.call('browser_click', { target: 'e1' })).stopped.code, 'budget_exhausted');
   assert.deepEqual(timed.calls, []);
+  const timedOut = body(await timed.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-2' }));
+  assert.equal(timedOut.budget.ms_left, 0);
+  assert.match(timedOut.next_step.instruction, /never renews/);
 });
 
 test('a late action reply after stop is not evidence and does not regain the page', async () => {

@@ -76,7 +76,9 @@ async function readRestOutputs(channel,read,ctx){
  const readPort=async port=>{
   const {output}=await channel.readOutputPort({port,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
   const expected=port===1&&output.schema.length===3?outputs[1].filter(field=>field.name!=='ErrorDesc'):outputs[port];
-  need(output.schema.length===expected.length&&output.schema.every((field,index)=>field.name===expected[index].name),'output field order differs from the native REST schema');
+  // Loginom appends ErrorDesc after HttpStatusCode when descriptions are reenabled.
+  // Both ports keep the first two columns fixed. alignReadSchema checks every field by name, label and type.
+  need(output.schema[0]?.name===expected[0].name&&output.schema[1]?.name===expected[1].name,'output field order differs from the native REST schema');
   const aligned=alignReadSchema(output.schema,expected);
   output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
   observed.set(port,output);return output;

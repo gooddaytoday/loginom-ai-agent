@@ -216,3 +216,21 @@ test('tree Variant leaves use the tagged reader exclusively and preserve exact s
  assert.equal(validate(port).valid,true);
  assert.deepEqual(compactNodeResult({operation_id:'op',state:'settled',outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{output:{status:'complete',execution_id:'exec',evidence_ref:'receipt',ports:[port]}}}}).output.ports,[port]);
 });
+
+test('root object arrays enumerate the native root rows without querying a nonexistent parent range',async()=>{
+ const leaf={get_Name:async()=> 'code',get_DisplayName:async()=> 'code',get_IsContainer:async()=>false,get_IsArray:async()=>false,get_DataType:async()=>5};
+ const root={get_Name:async()=> 'Root',get_DisplayName:async()=> 'Root',get_IsContainer:async()=>true,get_IsArray:async()=>true,
+  get_SubNodes:async()=>({get_Count:async()=>1,getItem:async()=>leaf})};
+ const source={get_RootNodeDef:async()=>root,GetReader:async definitions=>({
+  GetRowCount:async index=>{assert.equal(index,0);return 2;},
+  GetRowRange:async()=>{throw Error('root has no parent row');},
+  GetContainerExists:async()=>{throw Error('root rows exist by GetRowCount');},
+  AsVariant:async(index,row)=>{assert.equal(definitions[index],leaf);return ['A','B'][row];}
+ })};
+ const tree=await readTreePortSource(source,async fn=>fn(),p=>p,decodePortCell);
+ assert.equal(tree.complete,true);assert.equal(tree.schema[0].is_array,true);
+ assert.deepEqual(tree.instances.map(n=>n.path),['','/0','/0/code','/1','/1/code']);
+ assert.deepEqual(tree.instances.filter(n=>n.type==='string').map(n=>n.value),['A','B']);
+ const validate=new AjvJsonSchemaValidator().getValidator(nodeTreeOutputPortSchema);
+ assert.equal(validate({port:0,port_guid:'port',port_kind:'tree',fresh:true,execution_id:'exec',freshness_basis:'completed_execution_port_source',tree,sample_complete:true}).valid,true);
+});

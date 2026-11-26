@@ -24,7 +24,8 @@ const workspace = restart ? savedPath : directory
 const profile = join(workspace, "profile")
 const previous = restart
   ? (() => {
-      const db = new Database(join(profile, "data/loginom-ai-agent.db"), { readonly: true })
+      const db = new Database(join(profile, "data/loginom-ai-agent.db"))
+      db.run("PRAGMA query_only = ON")
       try {
         const sessions = db.query("select id from session").all() as { id: string }[]
         if (sessions.length !== 1) throw Error("PERMISSION_SESSION_AMBIGUOUS")
@@ -144,7 +145,8 @@ try {
         .map((line) => JSON.parse(line))
   const tools = tui
     ? (() => {
-        const db = new Database(join(profile, "data/loginom-ai-agent.db"), { readonly: true })
+        const db = new Database(join(profile, "data/loginom-ai-agent.db"))
+        db.run("PRAGMA query_only = ON")
         try {
           return (db.query("select data from part order by time_created, id").all() as { data: string }[])
             .map((row) => ({ part: JSON.parse(row.data) }))

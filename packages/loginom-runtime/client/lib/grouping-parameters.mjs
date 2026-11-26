@@ -38,8 +38,9 @@ export function validateGroupingParameters(p,mode,r) {
  requireValue(preserved||r.inputs.length===1,'Complete grouping configuration requires one explicit input');
  requireValue(r.inputs.length<=1&&r.inputs.every(i=>i.input===0),'Grouping accepts one input');
  requireValue(r.read.ports.every(i=>i===0),'Grouping has one output');
- requireValue(r.mappings.length<=2&&r.mappings.every(m=>m.port===0),'Grouping has one input/output mapping');
- for(const mapping of r.mappings){
+ const tableMappings=r.mappings.filter(m=>m.kind===undefined);
+ requireValue(tableMappings.length<=2&&tableMappings.every(m=>m.port===0),'Grouping has one input/output mapping');
+ for(const mapping of tableMappings){
   if(mapping.fields||mapping.changes){
    const sourceNames=new Set(),outputNames=new Set();
    for(const item of mapping.fields??mapping.changes){

@@ -91,7 +91,8 @@ for(const saved of [false,true])test('JSON tree configure confirms '+(saved?'sav
   assert.equal(action.verb,'wizard_step');assert.ok(Array.isArray(action.expected_stage)?action.expected_stage.includes(next):action.expected_stage===next);
   steps.push(next);state.wizard.stage=next;
  }};
- const result=await implementation.configure(channel,{json_field:'Document'},{request:{finish:'execute'}});
+ const result=await implementation.configure(channel,{json_field:'Document'},{request:{finish:'execute'},inputMapping:{verified:true,inventory_complete:true,
+  source_identity_verified:true,node_context:{verified:true},target_fields:[{name:'Document',label:'Document',type:'string',source:{name:'Document'}}]}});
  assert.equal(result.verified,true);assert.equal(result.validation.status,'accepted_by_loginom_next');
  assert.deepEqual(steps,saved?['done']:['tree_output_mapping','done']);
 });
@@ -144,6 +145,46 @@ function tableImplementation(json=false){
  });
  return factory({}, {json});
 }
+
+function restJsonColumn({selected='',option='Ответ сервера',fault}={}){
+ const root='MF;TF-1;WizrdMCF',base=root+';JSONToTreeWizard;',list=base+'pedSourceColumn;ValueControl;boundlist';
+ const node={document_id:'doc',workflow_id:'wf',node_id:'json'};
+ const mapping={verified:true,inventory_complete:true,source_identity_verified:true,node_context:{...node,verified:true},
+  target_fields:[{name:'Response',label:'Ответ сервера',type:'string',source:{name:'Response'}},
+   {name:'Other',label:'Response',type:'string',source:{name:'Other'}}]};
+ if(fault==='duplicate-label')mapping.target_fields[1].label='Ответ сервера';
+ if(fault==='foreign-mapping')mapping.node_context.node_id='foreign';
+ const state={prepared_node_context:{...node,verified:true,surface:'wizard'},wizard:{status:'observed',stage:'json_tree',root_tid:root,root_ref:'wizard'},
+  node_tree:{verified:true,inventory_complete:true,base,json_field:selected,auto_structure:true,strict:true,exclude_root:false,root_mode:'auto'},ui:{elements:[]}};
+ const actions=[];let open=false;
+ const refresh=()=>{
+  state.observation_root={ref:open?'list':'wizard',identity:{anchor_tid:open?(fault==='foreign-list'?'foreign;boundlist':list):root}};
+  state.ui.elements=open?[{tid:list+';'+option.replaceAll(' ','_'),label:option,role:'option',ref:'option',allowed_actions:['click','press']}]:
+   [{tid:base+'pedSourceColumn;ValueControl;trg_picker',ref:'picker',allowed_actions:['click']},
+    {tid:root+';btnNext',ref:'next',allowed_actions:['wizard_step']}];
+ };
+ const channel={observe:async options=>{refresh();assert.ok(options.ready(state),'Unready '+options.condition);return structuredClone(state);},
+  perform:async options=>{refresh();assert.ok(options.ready(state));const a=options.resolve(state);actions.push(a);
+   if(a.ref==='picker')open=true;
+   else if(a.ref==='option'){open=false;state.node_tree.json_field=fault==='wrong-readback'?'Response':option;}
+   else if(a.ref==='next')state.wizard.stage='done';
+  }};
+ return {actions,run:p=>tableImplementation(true).configure(channel,p??{json_field:'Response'},
+  {request:{finish:'execute',target:{kind:'existing'}},inputMapping:mapping})};
+}
+
+for(const selected of ['', 'Ответ сервера'])test('JSON source selection binds technical Response to the verified input label (selected='+selected+')',async()=>{
+ const f=restJsonColumn({selected}),result=await f.run();
+ assert.equal(result.configuration.json_field,'Response');
+ assert.deepEqual(f.actions.map(a=>a.ref),selected?['next']:['picker','option','next']);
+});
+for(const fault of ['duplicate-label','foreign-mapping','foreign-list','wrong-readback'])test('JSON source selection refuses '+fault+' without committing Next',async()=>{
+ const f=restJsonColumn({fault});await assert.rejects(f.run());assert.ok(!f.actions.some(a=>a.ref==='next'));
+ if(['duplicate-label','foreign-mapping'].includes(fault))assert.deepEqual(f.actions,[]);
+});
+test('JSON column options use only the verified display label, never a technical-name fallback',async()=>{
+ const f=restJsonColumn({option:'Response'});await assert.rejects(f.run());assert.deepEqual(f.actions.map(a=>a.ref),['picker']);
+});
 
 test('JSON output admits nested object arrays while tree-to-table retains its one-array scope',async()=>{
  const schema=[{path:'',name:'Root',type:'object',is_container:true,is_array:false},
@@ -445,7 +486,8 @@ function jsonConfigure(implementation,native,p,request){
   node_tree:{verified:true,inventory_complete:true,json_field:native,auto_structure:true,strict:true,exclude_root:false,root_mode:'auto'},
   ui:{elements:[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']}]}};
  const channel={observe:async()=>structuredClone(state),perform:async()=>{state.wizard.stage='done';}};
- return implementation.configure(channel,p,{request});
+ return implementation.configure(channel,p,{request,inputMapping:{verified:true,inventory_complete:true,source_identity_verified:true,node_context:{verified:true},
+  target_fields:['Document','Name'].map(name=>({name,label:name,type:'string',source:{name}}))}});
 }
 const doc='{"items":[{"sku":"A"}]}',columns=[['Name','string','note'],['Document','string',doc],['Count','integer',1]];
 test('existing JSON tree without json_field binds the native field to the JSON input columns',async()=>{
@@ -468,4 +510,19 @@ test('existing JSON tree with explicit json_field keeps the exact-field prefligh
  assert.equal(result.verified,true);
  await assert.rejects(existingJsonPreflight([['Name','string',doc]],{json_field:'Document'}),/one non-NULL JSON string row in the exact input field/);
  assert.equal((await jsonConfigure(implementation,'Document',{json_field:'Document'},request)).verified,true);
+});
+
+test('a single JSON string containing a root object array reaches native tree inference',async()=>{
+ const text='[{"Region":"A","Amount":1.25},{"Region":"B","Amount":0}]';
+ assert.equal(validateTreeJsonScope(text).verified,true);
+ assert.equal((await jsonPreflight([text])).verified,true);
+ const schema=[{path:'',name:'Root',is_container:true,is_array:true},
+  {path:'/Region',name:'Region',type:'string',is_container:false,is_array:false},
+  {path:'/Amount',name:'Amount',type:'real',is_container:false,is_array:false}];
+ assert.equal(validateJsonTreeSchema(schema),true);
+ assert.equal(validateSelectedTreePaths(schema,['/Region','/Amount']),true);
+ assert.throws(()=>validateSelectedTreePaths(schema,['/0/Region']));
+ assert.throws(()=>validateSelectedTreePaths([...schema,{path:'/items',name:'items',is_container:true,is_array:true}]));
+ for(const unsupported of ['[]','[1,2]','[null,{"Region":"A"}]','[{"v":1},2]','[[{"v":1}]]','[{"v":9223372036854775808}]'])
+  assert.throws(()=>validateTreeJsonScope(unsupported),unsupported);
 });

@@ -1,0 +1,172 @@
+name: Loginom Linux
+
+# Linux x64 candidate: the product CLI (tar.gz) and Desktop (AppImage, deb, rpm), unsigned. The pty comes from
+# loginom-pty.yml; CLI and Desktop embed it through LOGINOM_AI_AGENT_PTY_BIN. loginom-release.yml calls this workflow
+# (B5.2b); the standalone push trigger of B5.1h is gone, so a branch push builds Linux once, inside the release run.
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: loginom-linux-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  pty:
+    uses: ./.github/workflows/loginom-pty.yml
+    with:
+      targets: '["x86_64-unknown-linux-gnu"]'
+    permissions:
+      contents: read
+
+  linux:
+    name: linux (x64)
+    needs: pty
+    # Only the Linux pty artifact matters here: a red macOS or Windows pty job must not hide this build. A missing
+    # Linux artifact still fails the download step.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    env:
+      LOGINOM_AI_AGENT_CHANNEL: dev
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # rpm and squashfs-tools: electron-builder (rpm target, AppImage). xvfb and the GTK/NSS libraries: Electron for
+      # the Desktop tests and the safeStorage smoke.
+      - name: Install Linux packaging and display dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rpm squashfs-tools xvfb xauth dbus-x11 libgtk-3-0t64 libnss3 libgbm1 libasound2t64
+
+      - uses: ./.github/actions/setup-bun
+
+      - uses: ./.github/actions/setup-loginom-inputs
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: loginom-ai-agent-pty-x86_64-unknown-linux-gnu
+          path: ${{ runner.temp }}/pty
+
+      - name: Select the product pty
+        run: |
+          set -euo pipefail
+          chmod +x "$RUNNER_TEMP/pty/loginom-ai-agent-pty"
+          (cd "$RUNNER_TEMP/pty" && sha256sum -c SHA256SUMS)
+          "$RUNNER_TEMP/pty/loginom-ai-agent-pty" --version
+          echo "LOGINOM_AI_AGENT_PTY_BIN=$RUNNER_TEMP/pty/loginom-ai-agent-pty" >> "$GITHUB_ENV"
+
+      - name: Build the product CLI
+        run: |
+          mkdir -p "$RUNNER_TEMP/cli"
+          bun packages/loginom-host/script/build-cli.ts "$RUNNER_TEMP/cli/loginom-ai-agent-cli-linux-x64"
+          ls -la "$RUNNER_TEMP/cli"
+
+      - name: Verify the CLI candidate and run it
+        run: |
+          set -euo pipefail
+          bun packages/loginom-host/script/verify-cli-candidate.ts "$RUNNER_TEMP/cli/loginom-ai-agent-cli-linux-x64" "$GITHUB_WORKSPACE"
+          archives=("$RUNNER_TEMP"/cli/loginom-ai-agent-cli-*-linux-x64.tar.gz)
+          test "${#archives[@]}" = 1
+          (cd "$RUNNER_TEMP/cli" && sha256sum -c "$(basename "${archives[0]}").sha256")
+          extracted="$RUNNER_TEMP/cli-smoke/extracted"
+          mkdir -p "$extracted" "$RUNNER_TEMP/cli-smoke/home"
+          tar --same-permissions -xzf "${archives[0]}" -C "$extracted"
+          expected="$(jq -er .metadata.version "$extracted/cli-manifest.json")"
+          actual="$(HOME="$RUNNER_TEMP/cli-smoke/home" XDG_CONFIG_HOME="$RUNNER_TEMP/cli-smoke/home/config" XDG_DATA_HOME="$RUNNER_TEMP/cli-smoke/home/data" XDG_STATE_HOME="$RUNNER_TEMP/cli-smoke/home/state" XDG_CACHE_HOME="$RUNNER_TEMP/cli-smoke/home/cache" "$extracted/bin/loginom-ai-agent-cli" --version)"
+          echo "loginom-ai-agent-cli --version: $actual (manifest $expected)"
+          test "$actual" = "$expected"
+
+      # Desktop takes its CLI from packages/cli/dist and never from npm: without it the build must fail.
+      - name: Desktop build refuses to run without the CLI
+        working-directory: packages/desktop
+        run: |
+          rm -rf ../cli/dist
+          if bun ./script/build.ts > "$RUNNER_TEMP/no-cli.log" 2>&1; then
+            echo "::error::Desktop build succeeded without packages/cli/dist"
+            exit 1
+          fi
+          grep -q 'Desktop bundles the CLI built from packages/cli' "$RUNNER_TEMP/no-cli.log"
+
+      - name: Build the CLI that Desktop bundles
+        working-directory: packages/cli
+        env:
+          LOGINOM_AI_AGENT_TARGET: linux-x64-baseline
+        run: |
+          bun run build --skip-install --skip-web-ui
+          test -x dist/cli-linux-x64-baseline/bin/opencode
+
+      - name: Build Desktop
+        working-directory: packages/desktop
+        env:
+          # electron-vite bundles the whole backend into the main process; give V8 room for that bundle.
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: bun run build
+
+      - name: Desktop tests under a virtual display
+        working-directory: packages/desktop
+        run: xvfb-run -a bun test --timeout 30000
+
+      - name: Package Desktop
+        working-directory: packages/desktop
+        run: bun run pack
+
+      - name: Desktop safeStorage smoke
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/desktop-safe-storage-smoke"
+          mkdir -p "$root/profile" "$root/evidence"
+          node packages/desktop/node_modules/electron/install.js
+          bun build packages/loginom-host/src/connection/credentials.ts --target=node --format=cjs --outfile="$root/credentials.cjs"
+          electron="$GITHUB_WORKSPACE/packages/desktop/node_modules/electron/dist/electron"
+          test -x "$electron"
+          for mode in write read unavailable; do
+            data="$root/credentials.json"
+            if [ "$mode" = unavailable ]; then data="$root/must-not-exist.json"; fi
+            # The runner has no setuid chrome-sandbox for this Electron copy; the packaged app keeps its own.
+            LOGINOM_SAFE_STORAGE_MODE="$mode" \
+            LOGINOM_SAFE_STORAGE_DATA="$data" \
+            LOGINOM_SAFE_STORAGE_EVIDENCE="$root/evidence/safe-storage-$mode.json" \
+            LOGINOM_SAFE_STORAGE_CODEC="$root/credentials.cjs" \
+            LOGINOM_SAFE_STORAGE_PROFILE="$root/profile" \
+              timeout 60 xvfb-run -a "$electron" --no-sandbox "$GITHUB_WORKSPACE/packages/desktop/test/loginom/safe-storage-smoke.cjs"
+            cat "$root/evidence/safe-storage-$mode.json"
+          done
+
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/upload"
+          mkdir -p "$out/cli" "$out/desktop"
+          cp "$RUNNER_TEMP"/cli/loginom-ai-agent-cli-*-linux-x64.tar.gz "$RUNNER_TEMP"/cli/loginom-ai-agent-cli-*-linux-x64.tar.gz.sha256 "$out/cli/"
+          cp "$RUNNER_TEMP/cli/loginom-ai-agent-cli-linux-x64/cli-manifest.json" "$out/cli/"
+          cp dist/desktop/*.AppImage dist/desktop/*.deb dist/desktop/*.rpm "$out/desktop/"
+          for dir in cli desktop; do
+            (cd "$out/$dir" && sha256sum $(ls | grep -v -e '^SHA256SUMS$' -e '\.sha256$') > SHA256SUMS && cat SHA256SUMS)
+          done
+          cp "$RUNNER_TEMP/desktop-safe-storage-smoke/evidence/"*.json "$out/desktop/"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: loginom-linux-x64-cli
+          path: ${{ runner.temp }}/upload/cli/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: loginom-linux-x64-desktop
+          path: ${{ runner.temp }}/upload/desktop/*
+          if-no-files-found: error
+          retention-days: 14

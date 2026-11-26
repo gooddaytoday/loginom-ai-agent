@@ -1,0 +1,72 @@
+{
+  "task_id": "benjamini-hochberg-fdr-detailed",
+  "dataset_sha256": {
+    "bh_families.csv": "75ead72a34c2f51f85e5bde0dcc5c03bec209b906d4e45f0c31cb67f05584244",
+    "bh_tests.csv": "f5fec70ca22a808ca79c6ad19330f23c424039913347a31429d52085b31ced55"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "6e1876a8c52d4b0fe5893efa11535e7ec30de88450ba6e943b30265611899d39"
+  },
+  "reference_sha256": "1012ca2832d5bd04e9f1a629d10f2a76b5ddc4ce2dc7f1c7d89c5b7b64af3af6",
+  "cli": {
+    "binary": "PRIVATE_QUALIFIED_CLI",
+    "version": "0.3.9-eval.20261113.29ea34.palette",
+    "profile": "PRIVATE_AUTHORING_PROFILE"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "PRIVATE_AUTHORING_URL",
+    "build": "7.4.2-test",
+    "container": "PRIVATE_AUTHORING_CONTAINER",
+    "package": "PRIVATE_AUTHORING_STORAGE/reference.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "bh_families.csv",
+        "matches": true
+      },
+      {
+        "input": "bh_tests.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_e21a4b895ffedMWrdeeekA4iYB",
+    "skill_revision": "926a45ac279dc6aebdf34ccb4e7b8245601488b9b3384a3247b87b521d6513b2",
+    "exit_code": 0,
+    "started_at": "2026-11-15T08:38:04+00:00",
+    "duration_s": 1043,
+    "tokens": {
+      "input": 126130,
+      "output": 8199,
+      "reasoning": 1727
+    },
+    "tool_calls": 53,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": "PRIVATE_DIAGNOSTICS"
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "PRIVATE_SCENARIO_URL",
+  "reference_origin": {
+    "form": "business",
+    "shared_reference": true,
+    "detailed_cli_attempt": false,
+    "blind_context": true
+  },
+  "source_task": "benjamini-hochberg-fdr-business"
+}

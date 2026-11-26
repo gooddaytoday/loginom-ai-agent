@@ -8,6 +8,28 @@
 
 После merge `a6048e756` на GitHub был только успешный macOS candidate; полный набор не падал, а не запускался из-за прежних branch filters. Полная сборка новым annotated-тегом `v0.1.6` завершилась успешно: [CI report](reports/2026-09-21-ci-release/report.md). Создан draft с 30 assets; существующий `v0.1.5` остался на прежнем commit.
 
+## Кандидат выпуска v2: `loginom-release.yml` (B5.2b)
+
+Выше описан выпуск 0.1.x через `release.yml`; для ветки переноса `oc2-migration` кандидат собирает
+[loginom-release.yml](../../../.github/workflows/loginom-release.yml). `release.yml` upstream выключен и не правится.
+
+- Запуск: `workflow_dispatch` (кандидат любого ref), push в `oc2-migration` при изменении самого workflow, трёх платформенных
+  workflow или `packages/desktop/scripts/release/**`, push тега `v*` (тег обязан быть `v<версия packages/desktop/package.json>`).
+  Выпуск, подпись ленты, зеркало S3 и draft — этап G, отдельная команда владельца; секретов в workflow нет.
+- `plan` читает версию Desktop; `linux`, `windows`, `macos` вызывают `loginom-linux.yml`, `loginom-windows.yml`,
+  `loginom-macos.yml` через `workflow_call` (macOS получает `version`). Отдельный push Linux убран: Linux собирается один раз внутри этого запуска.
+- `verify-linux/-windows/-macos` на своём раннере скачивают артефакты (`loginom-linux-x64-*`, `loginom-windows-unsigned-<run_id>`,
+  `loginom-macos15-arm64-<run_number>`) и запускают `packages/desktop/scripts/release/candidate.ts prepare`: полезная нагрузка
+  берётся из самого установщика (DEB `dpkg-deb`, NSIS `7z`, ZIP `ditto`), `git archive HEAD` даёт `*-source.tar.gz`,
+  `write-manifest.ts` пишет `release-manifest.json` (`windows-`, `macos-`), `verify-artifact.ts` сверяет SHA256 каждого установщика с манифестом.
+- **G5**: `candidate.ts g5` проверяет `cli-manifest.json` распакованного CLI и дерево ресурсов Desktop, затем убирает файл
+  (`host/node-host.mjs` у CLI, управляемый Node у Desktop) и требует красной проверки, возвращает файл и требует зелёной.
+  Шаг «G5 mutation» запускает то же с `--undamaged` и ждёт ненулевой код: контроль умеет краснеть. На Linux дополнительно `cli-resources.test.ts`
+  (на других системах он пропускается, их комплектность проверяет `candidate.ts g5` на настоящем архиве).
+- `collect` скачивает `loginom-release-*`, `sums.ts` сверяет файлы с тремя манифестами и пишет `SHA256SUMS.txt`; итог — артефакт `loginom-candidate-<sha>` (14 дней).
+- Не входит: `.rpm` (манифест его не знает), `latest*.yml` и blockmap (лента — этап G), матрица DEB `linux-matrix.json`
+  (`script/release-notes.ts` вызывает этап G и по-прежнему требует её).
+
 ## Последний проверенный выпуск
 
 [v0.1.14](https://github.com/gooddaytoday/loginom-ai-agent/releases/tag/v0.1.14)

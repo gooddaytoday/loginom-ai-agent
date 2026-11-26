@@ -1,0 +1,10 @@
+account_id,plan_id,fixed_fee
+A01,P_LOW,7
+A02,P_LOW,7
+A03,P_LOW,7
+A04,P_LOW,7
+A05,P_HIGH,5
+A06,P_HIGH,0
+A07,P_HIGH,11
+A08,P_HIGH,3
+A09,P_LOW,9

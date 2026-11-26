@@ -10,24 +10,39 @@ export function makeSavedPackageStateCode(options) {
 }
 export function readSavedPackageState(o) {
  return (async()=>{
-  const app=globalThis.bg?.app,f=app?.Application?.FInstance?.FMainForm,m=f?.FMapTree,prep=globalThis.__loginomDockPreparationV1;
   const need=(v,message)=>{if(!v)throw Error(message);};
-  need(location.origin===o.origin&&app?.Version===o.loginomBuild&&prep?.document===document&&prep.id===o.documentId,'Saved package document changed');
-  need(prep.receipts instanceof Map&&[...prep.receipts.values()].some(r=>{try{return JSON.parse(r.request).session===o.sessionId;}catch{return false;}}),'Saved package session changed');
   const normalize=p=>typeof p==='string'&&p?'/'+p.replaceAll('\\','/').replace(/^\/+/, ''):null;
   const snapshot=()=>{
+   const app=globalThis.bg?.app,f=app?.Application?.FInstance?.FMainForm,m=f?.FMapTree,prep=globalThis.__loginomDockPreparationV1;
+   need(location.origin===o.origin&&app?.Version===o.loginomBuild&&prep?.document===document&&prep.id===o.documentId,'Saved package document changed');
+   need(prep.receipts instanceof Map&&[...prep.receipts.values()].some(r=>{try{return JSON.parse(r.request).session===o.sessionId;}catch{return false;}}),'Saved package session changed');
    need(m?.FServerConnection?.Connected===true&&m.FServerConnection.UserName===o.account,'Saved package account changed');
    const card=f.Items.Workspace.getActiveTab();let n=card?.Controller?.Node?.data?.node,pack;const seen=new Set();
    for(let i=0;n&&i<32&&!seen.has(n);i++,n=n.ParentNode){seen.add(n);if(n instanceof app.PackageTreeNode){pack=n;break;}}
    need(pack&&normalize(pack.PackageFileName)===o.packagePath&&pack.ReadOnly===false,'Active saved package changed');
    const matches=Array.from({length:m.PackageNodes.Count},(_,i)=>m.PackageNodes.Items(i)).filter(p=>p===pack);
    need(matches.length===1&&pack.HasRunningNodes()===false,'Saved package inventory or execution changed');
-   return {card,pack,proxy:pack.Package,connection:m.FServerConnection,session:m.FServerConnection.Session,count:m.PackageNodes.Count};
+   return {prep,card,pack,proxy:pack.Package,connection:m.FServerConnection,session:m.FServerConnection.Session,count:m.PackageNodes.Count};
   };
   const before=snapshot();
-  const modified=await before.session.IsPackageModified(before.proxy);
-  const after=snapshot();need(Object.keys(before).every(k=>before[k]===after[k]),'Saved package changed during read');
-  need(typeof modified==='boolean','Saved package modified state unavailable');
+  const checkOwner=()=>{
+   const after=snapshot();
+   need(Object.keys(before).every(k=>before[k]===after[k]),'Saved package changed during read');
+  };
+  const read=async()=>{
+   const value=await before.session.IsPackageModified(before.proxy);
+   checkOwner();
+   need(typeof value==='boolean','Saved package modified state unavailable');
+   return value;
+  };
+  let modified=await read();
+  // The Save menu can disappear before the server clears the modified flag.
+  while(modified&&o.cleanDeadline!==undefined&&Date.now()<o.cleanDeadline){
+   await new Promise(resolve=>setTimeout(resolve,Math.min(100,o.cleanDeadline-Date.now())));
+   if(Date.now()>=o.cleanDeadline)break;
+   checkOwner();
+   modified=await read();
+  }
   return {version:1,session_id:o.sessionId,document_id:o.documentId,account:o.account,package_path:o.packagePath,
    modified,observation:'after_confirmed_save',read_only:true,persisted_content_verified:false};
  })();
@@ -49,5 +64,6 @@ export function savedPackageStateAdvice(state,outcome) {
  return {kind:'dock_saved_package_state',save_operation_id:outcome.operation_id,package_path:path,modified:state.modified,
   persisted_content_verified:false,
   ...(state.modified?{next_step:{tool:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path,conflict_policy:'replace'}},
-   instruction:'Loginom reports unsaved changes after this completed save/reopen. Before finishing, save this same owned package using the checkpoint operation with a NEW operation_id. Do not discard the changes or repeat save_as. This read does not audit persisted calculations.'}}:{})};
+   instruction:'Loginom reports unsaved changes after this completed save/reopen. Before finishing, save this same owned package using the checkpoint operation with a NEW operation_id. Do not discard the changes or repeat save_as. This read does not audit persisted calculations.'}}
+   :{instruction:'The saved package is clean. If the analysis is complete, report from the verified outcome receipts and exports. Reopening can clear active outputs. Execute again only for a requested fresh calculation.'})};
 }

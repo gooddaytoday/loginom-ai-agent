@@ -33,6 +33,12 @@ export const browserRecoveryLimits = Object.freeze({ calls: 30, ms: 600_000, tex
 const leaseReadOnlyTools = new Set(['dock_diagnostics', 'dock_action_describe', 'dock_node_status', 'dock_node_wait',
   'dock_artifact_delivery_status', 'find', 'search', 'read', 'grep', 'glob', 'list', 'tree']);
 
+// Calls and time are spent per step for the whole session; a remaining ms_left never reopens it.
+const exhaustedStep = Object.freeze({ instruction: 'Final for this step: its browser recovery budget never renews; waiting '
+  + 'or a remaining ms_left does not restore it. Do not call dock_browser_recovery start again or dock_operation_recover '
+  + 'for this operation; other Dock changes keep returning it as pending. Report the operation_id, phase and reason '
+  + 'as a blocker and stop.' });
+
 const text = maxLength => ({ type: 'string', minLength: 1, maxLength });
 export const browserRecoveryTool = {
   name: browserRecoveryToolName,
@@ -112,7 +118,8 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
       if (basis instanceof Error) return { refused: refusal(basis.message) };
       const budget = budgets.get(basis.step.key) ?? { calls: 0, started_at: null, closed: false };
       if (budget.closed) return { refused: refusal('This step was already completed or stopped without a safe retry; continue through Dock.') };
-      if (exhausted(budget)) return { refused: refusal('The browser recovery budget for this step is exhausted.', { budget: remaining(budget) }) };
+      if (exhausted(budget)) return { refused: refusal('The browser recovery budget for this step is exhausted.',
+        { budget: remaining(budget), next_step: exhaustedStep }) };
       budgets.set(basis.step.key, budget);
       Object.assign(current, { step: basis.step, reason: basis.reason, budget });
       // Every hand-over starts on a confirmed page: a lost boundary is never inherited by a new attempt.

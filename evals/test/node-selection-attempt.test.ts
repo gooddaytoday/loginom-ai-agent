@@ -192,7 +192,9 @@ test("a session of OpenCode 2 reads in the snapshot shape that model start, rece
   }
 })
 
-// B2.7a4b: a run --command refused before the model leaves an empty session, and its error event carries that ID.
+// B2.7a4b: a run --command refused before the model left an empty session, and its error event carried that ID.
+// Since B2.7a4c the CLI refuses before any session exists (its error event has no session ID, so the attempt ends with
+// SELECTION_SESSION_INCOMPLETE, as in 0.4); this keeps the reader right for a database that does hold an empty session.
 test("the empty session of a run refused before the model is no model start", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "selection-snapshot-empty-"))
   const filename = path.join(root, "snapshot.db")

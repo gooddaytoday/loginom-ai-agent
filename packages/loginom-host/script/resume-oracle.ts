@@ -21,7 +21,8 @@ const config = await Bun.file(configPath).json()
 if (config.workflow_profile?.passwordless_login !== true) throw Error("TEST_PASSWORD_UNAVAILABLE")
 const evidence = await mkdtemp(join(tmpdir(), "loginom-live-resume-"))
 console.log(`Private resume evidence: ${evidence}`)
-const db = new Database(join(profile, "data/loginom-ai-agent.db"), { readonly: true })
+const db = new Database(join(profile, "data/loginom-ai-agent.db"))
+db.run("PRAGMA query_only = ON")
 try {
   const sessions = db.query("select id from session").all() as { id: string }[]
   if (sessions.length !== 1) throw Error("RESUME_ORACLE_SESSION_AMBIGUOUS")

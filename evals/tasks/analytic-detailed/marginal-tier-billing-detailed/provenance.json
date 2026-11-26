@@ -1,0 +1,70 @@
+{
+  "task_id": "marginal-tier-billing-detailed",
+  "dataset_sha256": {
+    "tier_accounts.csv": "81bde7e31fcb690a715d71353521e8073ebb4600ae374ca138035bf4ed10dbe4",
+    "tier_rates.csv": "9f7ad9422c87a03e857d72dfd18a1cb37a049dea8a1bc271dd315f4834ca2963",
+    "tier_readings.csv": "8784035cd0e94c47a2835800d2668617aeacfd25793016b0991f7aa950b6151c"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "87cdc91922e8b24995dfbf8b367ae7efbb96c97b89c5fb91cb9aa04b70296ad7"
+  },
+  "reference_sha256": "755b0c437b032d5db66816a81129234620f84d33310a2b866ae284821184eefe",
+  "cli": {
+    "binary": "PRIVATE_QUALIFIED_CLI",
+    "version": "0.3.9-eval.20261113.29ea34.palette",
+    "profile": "PRIVATE_AUTHORING_PROFILE"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "PRIVATE_AUTHORING_URL",
+    "build": "7.4.2-test",
+    "container": "PRIVATE_AUTHORING_CONTAINER",
+    "package": "PRIVATE_AUTHORING_STORAGE/reference.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "tier_accounts.csv",
+        "matches": true
+      },
+      {
+        "input": "tier_rates.csv",
+        "matches": true
+      },
+      {
+        "input": "tier_readings.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_e22615ea3ffekz2g3NGKfij0K4",
+    "skill_revision": "926a45ac279dc6aebdf34ccb4e7b8245601488b9b3384a3247b87b521d6513b2",
+    "exit_code": 0,
+    "started_at": "2026-11-15T05:12:00+00:00",
+    "duration_s": 662,
+    "tokens": {
+      "input": 114160,
+      "output": 6575,
+      "reasoning": 549
+    },
+    "tool_calls": 41,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": "PRIVATE_DIAGNOSTICS"
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "PRIVATE_SCENARIO_URL"
+}

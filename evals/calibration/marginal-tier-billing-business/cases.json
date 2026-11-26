@@ -1,0 +1,191 @@
+{
+  "sources": {
+    "SPEC.md": "6dd7bce41c7c5813215b84cee00d77c43a35330143d221a4d335d4de76c4e0ee",
+    "acceptance.json": "4696b4d97890ffbbef08cf334ac43f32852291b51e5c6622829539f4e35d3b5b",
+    "data/tier_accounts.csv": "81bde7e31fcb690a715d71353521e8073ebb4600ae374ca138035bf4ed10dbe4",
+    "data/tier_rates.csv": "9f7ad9422c87a03e857d72dfd18a1cb37a049dea8a1bc271dd315f4834ca2963",
+    "data/tier_readings.csv": "8784035cd0e94c47a2835800d2668617aeacfd25793016b0991f7aa950b6151c",
+    "oracle.csv": "87cdc91922e8b24995dfbf8b367ae7efbb96c97b89c5fb91cb9aa04b70296ad7",
+    "oracle.py": "efad5defd79918d120aeab446fcac18bfb13ce67ba8ce3f15baea1d0a6e2f83f",
+    "provenance.json": "0c7a9bc76124663fddf893f6ec9eb5f3ce78b67313293cc31aad8f0dc5c7bd28",
+    "reference.lgp": "755b0c437b032d5db66816a81129234620f84d33310a2b866ae284821184eefe",
+    "task.json": "39babcf70f4504e14912b27ceff08ed7def430eccaa89c5430ad2b3fe59f6fa4"
+  },
+  "cases": [
+    {
+      "id": "whole-quantity-at-last-rate",
+      "kind": "aggregate",
+      "expected_failed": [
+        "marginal-tiers",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        output.append([account['account_id']] + [format(value, '.6f') for value in [quantity, cost, fee, cost + fee]])",
+            "to": "        cost = quantity * next((price for lower, upper, price in rates[account['plan_id']] if lower < quantity <= upper), Decimal(0))\n        output.append([account['account_id']] + [format(value, '.6f') for value in [quantity, cost, fee, cost + fee]])",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "whole-quantity-at-last-rate.csv",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(quantity &lt;= lower_qty, 0, IFF(quantity &gt;= upper_qty, upper_qty-lower_qty, quantity-lower_qty))\"",
+          "to": "Expression=\"IFF(quantity &gt; lower_qty, IFF(quantity &lt;= upper_qty, quantity, 0), 0)\"",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "fee-per-tier",
+      "kind": "aggregate",
+      "expected_failed": [
+        "single-fixed-fee",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "quantity, cost, fee, cost + fee",
+            "to": "quantity, cost, fee, cost + fee * len(rates[account['plan_id']])",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "fee-per-tier.csv",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Round(variable_charge + fixed_fee, 6)\"",
+          "to": "Expression=\"Round(variable_charge + 3*fixed_fee, 6)\"",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "omit-unread-account",
+      "kind": "filter",
+      "expected_failed": [
+        "account-quantity",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        output.append([account['account_id']] + [format(value, '.6f') for value in [quantity, cost, fee, cost + fee]])",
+            "to": "        if not any(row['account_id'] == account['account_id'] for row in read('tier_readings.csv')):\n            continue\n        output.append([account['account_id']] + [format(value, '.6f') for value in [quantity, cost, fee, cost + fee]])",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "omit-unread-account.csv",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" JoinType=\"jtJoin\" DisplayNamePrefix=\"Соединение\">",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "descending-accounts",
+      "kind": "sort",
+      "expected_failed": [
+        "final-export",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "sort": {
+          "column": "account_id",
+          "descending": true
+        }
+      },
+      "result_csv": "descending-accounts.csv",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"account_id\"/>",
+          "to": "<Item Name=\"account_id\" SortDirection=\"sdDesc\"/>",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "mean-instead-of-total-quantity",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"quantity\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"quantity\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdSum\" Order=\"0\"/>",
+          "to": "<Item Name=\"quantity\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"quantity\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdAvg\" Order=\"0\"/>",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Mapping Source=\"quantity_Sum\"/>",
+          "to": "<Mapping Source=\"quantity_Avg\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "account-quantity",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "mean-instead-of-total-quantity.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        quantity = quantities[account['account_id']]",
+            "to": "        quantity = quantities[account['account_id']]\n        count = sum(row['account_id'] == account['account_id'] for row in read('tier_readings.csv'))\n        quantity = quantity / count if count else Decimal(0)",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "per-reading-grain",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"reading_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" InputColumnInfoName=\"reading_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>",
+          "to": "<Item Name=\"reading_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utGroup\" InputColumnInfoName=\"reading_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" Order=\"1\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "account-quantity",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "per-reading-grain.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "    accounts = read('tier_accounts.csv')",
+            "to": "    source_accounts = read('tier_accounts.csv')\n    accounts = [{**account, '_quantity': value} for account in source_accounts for value in (sorted(Decimal(row['quantity']) for row in read('tier_readings.csv') if row['account_id'] == account['account_id']) or [Decimal(0)])]",
+            "count": 1
+          },
+          {
+            "from": "    assert len({row['account_id'] for row in accounts}) == len(accounts)",
+            "to": "    assert len({row['account_id'] for row in source_accounts}) == len(source_accounts)",
+            "count": 1
+          },
+          {
+            "from": "        quantity = quantities[account['account_id']]",
+            "to": "        quantity = account['_quantity']",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

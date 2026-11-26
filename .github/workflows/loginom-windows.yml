@@ -1,6 +1,8 @@
 name: Loginom Windows candidate
 
 on:
+  # Run with `gh workflow run loginom-windows.yml --ref oc2-migration`; release workflows call it through workflow_call.
+  workflow_call:
   workflow_dispatch:
     inputs:
       updater-fixtures:
@@ -18,7 +20,12 @@ on:
       - "bun.lock"
       - "package.json"
       - "script/build-windows.ps1"
-      - "packages/opencode/**"
+      - ".github/workflows/loginom-pty.yml"
+      - ".github/actions/setup-rust-pty/**"
+      - "packages/cli/**"
+      - "packages/core/**"
+      - "packages/server/**"
+      - "packages/process-daemon/**"
       - "packages/app/**"
       - "packages/desktop/**"
       - "packages/loginom-host/**"
@@ -50,9 +57,17 @@ jobs:
           bun test electron.vite.config.test.ts src/main/update-policy.test.ts src/main/update-sources.test.ts src/main/updater-controller.test.ts
           bun typecheck
 
+  # loginom-ai-agent-pty.exe for the CLIs. The reusable workflow builds only the target asked for here.
+  pty:
+    if: ${{ !inputs.updater-fixtures && (github.event_name != 'pull_request' || startsWith(github.head_ref, 'v040-batch-') || contains(fromJSON('["dev","loginom"]'), github.base_ref)) }}
+    uses: ./.github/workflows/loginom-pty.yml
+    with:
+      targets: '["x86_64-pc-windows-msvc"]'
+
   build-package-test:
     # Owner decision v040-ci-platform-batches: pull requests build platform candidates only for integration
     # batches and release PRs; node PRs skip (a skipped job still satisfies required checks).
+    needs: pty
     if: ${{ !inputs.updater-fixtures && (github.event_name != 'pull_request' || startsWith(github.head_ref, 'v040-batch-') || contains(fromJSON('["dev","loginom"]'), github.base_ref)) }}
     runs-on: windows-2022
     timeout-minutes: 120
@@ -108,9 +123,18 @@ jobs:
           $browser = Join-Path $env:PLAYWRIGHT_BROWSERS_PATH "chromium-$($release.chromiumRevision)\chrome-win64\chrome.exe"
           if (-not (Test-Path -LiteralPath $browser -PathType Leaf)) { throw "Pinned Chromium executable is missing: $browser" }
 
+      - name: Download pty
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: loginom-ai-agent-pty-x86_64-pc-windows-msvc
+          path: ${{ runner.temp }}/pty
+
       - name: Build Desktop and CLI from a clean checkout
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }} # read-only; raises the rate limit for the Bun runtime download
         run: |
+          $env:LOGINOM_AI_AGENT_PTY_BIN = Join-Path $env:RUNNER_TEMP "pty\loginom-ai-agent-pty.exe"
           & .\script\build-windows.ps1 `
             -Product Both `
             -OutputDirectory (Join-Path $env:RUNNER_TEMP "loginom-windows") `
@@ -118,6 +142,50 @@ jobs:
             -BrowserSource $env:LOGINOM_AI_AGENT_BROWSER_SOURCE `
             -BunPath $env:LOGINOM_CI_BUN_PATH `
             -Channel dev
+
+      # Candidates are verified and uploaded before the installed-product checks below (B5.1j), so a red check there
+      # still leaves the build artifacts.
+      - name: Verify unsigned candidate outputs
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP "loginom-windows"
+          $installer = @(Get-ChildItem -LiteralPath (Join-Path $output "desktop") -Filter "*-win-x64.exe" -File)
+          $archive = @(Get-ChildItem -LiteralPath $output -Filter "loginom-ai-agent-cli-*-win32-x64.zip" -File)
+          if ($installer.Count -ne 1) { throw "Expected exactly one Desktop installer, found $($installer.Count)" }
+          if ($archive.Count -ne 1) { throw "Expected exactly one CLI archive, found $($archive.Count)" }
+          $signature = Get-AuthenticodeSignature -LiteralPath $installer[0].FullName
+          if ($signature.Status -ne "NotSigned") { throw "Expected an unsigned development installer, got $($signature.Status)" }
+          $checksumPath = $archive[0].FullName + ".sha256"
+          if (-not (Test-Path -LiteralPath $checksumPath -PathType Leaf)) { throw "CLI checksum is missing" }
+          $expected = ((Get-Content -LiteralPath $checksumPath -Raw).Trim() -split "\s+")[0]
+          $actual = (Get-FileHash -LiteralPath $archive[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($expected -ne $actual) { throw "CLI archive checksum mismatch" }
+          $summary = [ordered]@{
+            commit = $env:GITHUB_SHA
+            runner = "windows-2022"
+            channel = "dev"
+            signed = $false
+            node = (& $env:LOGINOM_CI_NODE_SOURCE --version)
+            bun = (& $env:LOGINOM_CI_BUN_PATH --version)
+            chromium_revision = (Get-Content -LiteralPath packages/product/loginom-release.json -Raw | ConvertFrom-Json).chromiumRevision
+            desktop = [ordered]@{ name = $installer[0].Name; bytes = $installer[0].Length; sha256 = (Get-FileHash -LiteralPath $installer[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+            cli = [ordered]@{ name = $archive[0].Name; bytes = $archive[0].Length; sha256 = $actual }
+          }
+          $summary | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $output "ci-summary.json") -Encoding utf8
+
+      - name: Upload short-lived unsigned candidates
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: loginom-windows-unsigned-${{ github.run_id }}
+          path: |
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/desktop/*-win-x64.exe
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/loginom-ai-agent-cli-*-win32-x64.zip
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/loginom-ai-agent-cli-*-win32-x64.zip.sha256
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/ci-summary.json
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/cli-installed-smoke.json
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/safe-storage-*.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Install, execute and remove the CLI ZIP candidate
         shell: pwsh
@@ -181,7 +249,7 @@ jobs:
           if (Test-Path -LiteralPath $root) { throw "safeStorage smoke directory must be new" }
           New-Item -ItemType Directory -Path $root | Out-Null
           $env:LOGINOM_SAFE_STORAGE_CODEC = Join-Path $root "credentials.cjs"
-          & $env:LOGINOM_CI_BUN_PATH build packages/desktop/src/main/loginom/credentials.ts --target=node --format=cjs --outfile=$env:LOGINOM_SAFE_STORAGE_CODEC
+          & $env:LOGINOM_CI_BUN_PATH build packages/loginom-host/src/connection/credentials.ts --target=node --format=cjs --outfile=$env:LOGINOM_SAFE_STORAGE_CODEC
           if ($LASTEXITCODE -ne 0) { throw "Production Desktop credential codec bundling failed" }
           $electron = Join-Path $env:GITHUB_WORKSPACE "node_modules\electron\dist\electron.exe"
           if (-not (Test-Path -LiteralPath $electron -PathType Leaf)) { throw "Installed Electron is missing" }
@@ -225,7 +293,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Committed hash attributes / installed sidecar probe regression tests failed" }
             & $env:LOGINOM_CI_BUN_PATH typecheck
             if ($LASTEXITCODE -ne 0) { throw "Desktop typecheck failed" }
-            & $env:LOGINOM_CI_BUN_PATH test electron-builder.config.test.ts scripts/copy-icons.test.ts scripts/release/artifact.test.ts src/main/apps.test.ts
+            & $env:LOGINOM_CI_BUN_PATH test electron-builder.config.test.ts scripts/copy-icons.test.ts scripts/release/artifact.test.ts src/main/app-identity.test.ts
             if ($LASTEXITCODE -ne 0) { throw "Desktop Windows package tests failed" }
           } finally { Pop-Location }
           Push-Location packages/loginom-host
@@ -236,41 +304,13 @@ jobs:
             & $env:LOGINOM_CI_BUN_PATH test test/environment.test.ts test/cli-credentials.test.ts test/cli-install-windows.test.ts test/cli-manifest.test.ts test/process.test.ts test/native-resource-candidates.test.ts
             if ($LASTEXITCODE -ne 0) { throw "CLI Windows package tests failed" }
           } finally { Pop-Location }
-          Push-Location packages/opencode
+          Push-Location packages/cli
           try {
-            & $env:LOGINOM_CI_BUN_PATH typecheck
-            if ($LASTEXITCODE -ne 0) { throw "Agent typecheck failed" }
+            # No `bun typecheck` here (B5.1j): the filtered install of build-windows.ps1 leaves out the root devDependencies
+            # (`@types/mime-types`) that packages/core and util need, and check.yml already type-checks this package.
             & ..\..\script\test-windows-profile.ps1 -BunPath $env:LOGINOM_CI_BUN_PATH
             if ($LASTEXITCODE -ne 0) { throw "Windows profile tests failed" }
           } finally { Pop-Location }
-
-      - name: Verify unsigned candidate outputs
-        shell: pwsh
-        run: |
-          $output = Join-Path $env:RUNNER_TEMP "loginom-windows"
-          $installer = @(Get-ChildItem -LiteralPath (Join-Path $output "desktop") -Filter "*-win-x64.exe" -File)
-          $archive = @(Get-ChildItem -LiteralPath $output -Filter "loginom-ai-agent-cli-*-win32-x64.zip" -File)
-          if ($installer.Count -ne 1) { throw "Expected exactly one Desktop installer, found $($installer.Count)" }
-          if ($archive.Count -ne 1) { throw "Expected exactly one CLI archive, found $($archive.Count)" }
-          $signature = Get-AuthenticodeSignature -LiteralPath $installer[0].FullName
-          if ($signature.Status -ne "NotSigned") { throw "Expected an unsigned development installer, got $($signature.Status)" }
-          $checksumPath = $archive[0].FullName + ".sha256"
-          if (-not (Test-Path -LiteralPath $checksumPath -PathType Leaf)) { throw "CLI checksum is missing" }
-          $expected = ((Get-Content -LiteralPath $checksumPath -Raw).Trim() -split "\s+")[0]
-          $actual = (Get-FileHash -LiteralPath $archive[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($expected -ne $actual) { throw "CLI archive checksum mismatch" }
-          $summary = [ordered]@{
-            commit = $env:GITHUB_SHA
-            runner = "windows-2022"
-            channel = "dev"
-            signed = $false
-            node = (& $env:LOGINOM_CI_NODE_SOURCE --version)
-            bun = (& $env:LOGINOM_CI_BUN_PATH --version)
-            chromium_revision = (Get-Content -LiteralPath packages/product/loginom-release.json -Raw | ConvertFrom-Json).chromiumRevision
-            desktop = [ordered]@{ name = $installer[0].Name; bytes = $installer[0].Length; sha256 = (Get-FileHash -LiteralPath $installer[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
-            cli = [ordered]@{ name = $archive[0].Name; bytes = $archive[0].Length; sha256 = $actual }
-          }
-          $summary | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $output "ci-summary.json") -Encoding utf8
 
       - name: Install, launch and uninstall Desktop candidate
         shell: pwsh
@@ -279,32 +319,27 @@ jobs:
           $installer = @(Get-ChildItem -LiteralPath (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "desktop") -Filter "*-win-x64.exe" -File)
           if ($installer.Count -ne 1) { throw "Expected exactly one Desktop installer" }
           $version = (Get-Content -LiteralPath packages/desktop/package.json -Raw | ConvertFrom-Json).version
-          # Negative control: same installer and smoke, one declared skill removed
-          # from the disposable installed payload. No source/product substitutions.
-          $redRoot = Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke-missing-skill"
-          & .\packages\desktop\test\loginom\windows-installed-smoke.ps1 `
-            -Installer $installer[0].FullName -RunRoot $redRoot `
-            -ExpectedVersion $version -Channel dev -AllowServer -KeepProxy -PayloadMutation MissingSkill
+          $smoke = ".\script\run-windows-installed-smoke.ps1"
+          # Negative control (B4.14c M4): same installer and smoke, one bit of the installed loginom-automation skill
+          # flipped in the disposable installation. The smoke runs as a throw-away standard user, because the hosted
+          # runner account is an elevated administrator.
+          $redOut = Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke-skill-byte"
+          & $smoke -Installer $installer[0].FullName -ExpectedVersion $version -Channel dev -Mutation SkillByte -OutputDirectory $redOut
           $redExit = $LASTEXITCODE
-          $red = Get-Content -LiteralPath (Join-Path $redRoot "report.json") -Raw | ConvertFrom-Json
-          # Always observe the pristine candidate too, including after an
-          # unexpected negative-control failure, without accepting either failure.
-          & .\packages\desktop\test\loginom\windows-installed-smoke.ps1 `
-            -Installer $installer[0].FullName `
-            -RunRoot (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke") `
-            -ExpectedVersion $version -Channel dev -AllowServer -KeepProxy
+          # Always observe the pristine candidate too, including after an unexpected negative-control result,
+          # without accepting either failure.
+          & $smoke -Installer $installer[0].FullName -ExpectedVersion $version -Channel dev -OutputDirectory (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke")
           $greenExit = $LASTEXITCODE
-          if ($redExit -ne 1 -or $red.status -ne 'FAIL' -or
-              @($red.checks | Where-Object { $_.id -eq 'sidecar-bundled-skills' -and $_.status -eq 'FAIL' -and $_.detail -match 'names/count differ' }).Count -ne 1) {
-            throw "Missing installed skill was not rejected by the sidecar catalog check"
-          }
-          if (@($red.checks | Where-Object { $_.id -eq 'sidecar-local-help' -and $_.status -eq 'PASS' }).Count -ne 1) {
-            throw "Negative control must still execute local Help successfully"
+          $redReport = Join-Path $redOut "report.json"
+          if ($redExit -ne 1 -or -not (Test-Path -LiteralPath $redReport -PathType Leaf)) { throw "Negative control must exit 1 with a report, got $redExit" }
+          $red = Get-Content -LiteralPath $redReport -Raw | ConvertFrom-Json
+          if ($red.status -ne 'FAIL' -or @($red.checks | Where-Object { $_.id -eq 'verify-resources' -and $_.status -eq 'FAIL' -and $_.detail -match 'LOGINOM_RESOURCE_HASH_MISMATCH' }).Count -ne 1) {
+            throw "A changed installed skill was not rejected by the resource hash check"
           }
           if (@($red.checks | Where-Object { $_.id -eq 'cleanup' -and $_.status -eq 'PASS' }).Count -ne 1) {
             throw "Mutated candidate cleanup failed"
           }
-          Write-Host 'PASS negative control: missing installed loginom-automation makes smoke FAIL'
+          Write-Host 'PASS negative control: a flipped byte of the installed loginom-automation skill makes the smoke FAIL'
           if ($greenExit -ne 0) { throw "Pristine installed Desktop smoke failed with exit $greenExit" }
 
       - name: Upload installed Desktop smoke diagnostics
@@ -314,26 +349,12 @@ jobs:
           name: loginom-windows-installed-smoke-${{ github.run_id }}
           path: |
             ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke/report.json
-            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke/sidecar.json
             ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke/logs.zip
-            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke-missing-skill/report.json
-            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke-missing-skill/sidecar.json
-            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke-missing-skill/logs.zip
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload short-lived unsigned candidates
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: loginom-windows-unsigned-${{ github.run_id }}
-          path: |
-            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/desktop/*-win-x64.exe
-            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/loginom-ai-agent-cli-*-win32-x64.zip
-            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/loginom-ai-agent-cli-*-win32-x64.zip.sha256
-            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/ci-summary.json
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke-skill-byte/report.json
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke-skill-byte/logs.zip
             ${{ env.LOGINOM_WINDOWS_OUTPUT }}/cli-installed-smoke.json
             ${{ env.LOGINOM_WINDOWS_OUTPUT }}/safe-storage-*.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
 
   updater-fixtures:

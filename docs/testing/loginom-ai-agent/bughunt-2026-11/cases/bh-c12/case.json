@@ -1,0 +1,17 @@
+{
+  "budget": {
+    "max_tool_calls": 8,
+    "max_errors": 0,
+    "max_nodes": 0,
+    "forbid": [
+      "sqlite3",
+      "convert",
+      "pandas",
+      "openpyxl",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  },
+  "notes": "Do not run through --cases on the initial runner revision: it appends Save/CSV and ignores upload-only semantics. Use prepare-upload.py and the documented --case-root upload_only contract. Budget requires zero node creations."
+}

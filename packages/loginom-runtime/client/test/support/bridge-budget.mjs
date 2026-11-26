@@ -19,15 +19,18 @@ import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 test('user-v1 final reply budgets and prepare knowledge admission over real MCP',async t=>{
  const directory=await mkdtemp(join(tmpdir(),'loginom-bridge-budget-'));
  const resources=await createBundledSkillFixture(t);
- const compatibility={profile_id:'loginom-7.4.2-linux-chromium-ru',loginom_build:'7.4.2',platform:'linux',browser:'chromium'};
+ const platform={darwin:'macos',linux:'linux',win32:'windows'}[process.platform];
+ const compatibility={profile_id:`loginom-7.4.2-${platform}-chromium-ru`,loginom_build:'7.4.2',platform,browser:'chromium'};
  const catalog=await createActionCatalogFixture(compatibility);
  const openPackage=process.env.LOGINOM_TEST_OPEN_PACKAGE==='1';
  const threeFiles=process.env.LOGINOM_TEST_THREE_FILES;
- const smoothingHp=process.env.LOGINOM_TEST_SMOOTHING_HP==='1',fullWorkspace=openPackage||smoothingHp;
+ const sevenFiles=process.env.LOGINOM_TEST_SEVEN_FILES==='1';
+ const smoothingHp=process.env.LOGINOM_TEST_SMOOTHING_HP==='1',fullWorkspace=openPackage||smoothingHp||sevenFiles;
+ const describeBatch=process.env.LOGINOM_TEST_DESCRIBE_BATCH==='1',applied=[];
  const account=(smoothingHp?'lab111-3-reviewer-':'lab-66-monkey-')+'a'.repeat(36),documentId='d'.repeat(36),operationId=smoothingHp?'prepare':'o'.repeat(36);
  let packageArtifact;
  const workflow=()=>({tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-2',prefix:'MF;TF-2',
-  navigation_path:['Сервер','Пакеты',(smoothingHp?'Package1':packageArtifact.name.replace(/[.-]/g,'_')),'Модуль1','Сценарий'].map((label,index,labels)=>({
+  navigation_path:['Сервер','Пакеты',(smoothingHp||sevenFiles?'Package1':packageArtifact.name.replace(/[.-]/g,'_')),'Модуль1','Сценарий'].map((label,index,labels)=>({
    tid:'MF;TF-2;cnrNaviMode;b.s_'+labels.slice(0,index+1).join('>'),label:index===0?'':label})),workflow_id:documentId+'-1'});
  let browserCalls=0,prepareDebug=false;
  class ExternalClient {
@@ -44,13 +47,13 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
    assert.equal(this.browser,true);assert.equal(request.name,'browser_run_code_unsafe');browserCalls++;
    const code=request.arguments.code;
    if(fullWorkspace){
-    const value=code.includes('"identityOnly":true')?{status:'BOUND',target:compatibility,authenticated:true,
+   const value=code.includes('"identityOnly":true')?{status:'BOUND',target:compatibility,authenticated:true,
       created_draft:false,effect_possible:false,document_id:documentId,loginom_account:account,target_verified:true}
      :code.includes('async function prepareWorkspace(')?{status:'READY',reason:null,phase:'exact_workflow_ready',target:compatibility,
-      authenticated:true,created_draft:smoothingHp,effect_possible:true,operation_id:operationId,session_id:'s'.repeat(36),
+      authenticated:true,created_draft:smoothingHp||sevenFiles,effect_possible:true,operation_id:operationId,session_id:'s'.repeat(36),
       trace:['ui_build','login_or_workspace','workspace_entry_ready','package_menu_ready','open_package_dialog','exact_workflow_ready']
        .map(condition=>({condition,satisfied:true})),document_id:documentId,loginom_account:account,workflow_ref:workflow(),
-      package_ref:smoothingHp?{path:null,name:'Package1',persisted:false}:{path:packageArtifact.upload.destination,name:packageArtifact.name.replace(/[.-]/g,'_'),persisted:true},
+      package_ref:smoothingHp||sevenFiles?{path:null,name:'Package1',persisted:false}:{path:packageArtifact.upload.destination,name:packageArtifact.name.replace(/[.-]/g,'_'),persisted:true},
       preserved_workflows:[],ownership_verified:false,target_verified:true,interaction_readiness:'driver_verification_required',
       window:{width:1280,height:800,outer_width:1280,outer_height:800,available_width:1280,available_height:800}}
      :{version:1,source:'prepare_same_browser_page',session_id:'s'.repeat(36),operation_id:operationId,document_id:documentId,
@@ -59,6 +62,7 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
     return {content:[{type:'text',text:JSON.stringify(value)}]};
    }
    const value=code.includes('async function prepareWorkspace(')?{status:'READY',target:compatibility,
+     operation_id:'prepare',
      authenticated:true,created_draft:true,effect_possible:true,target_verified:true,loginom_account:'protocol-fixture',
      ...(prepareDebug?{trace:[{condition:'exact_workflow_ready',satisfied:true,blocking_windows:{windows:[{tid:'native-loading',class_name:'x'.repeat(12000)}]}}]}:{}),
      document_id:'fixture-document',package_ref:{path:null,persisted:false},workflow_ref:{workflow_id:'fixture-workflow',
@@ -78,19 +82,21 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
  const nodeApi=await import('../../lib/node-api.mjs');
  mock.module('../../lib/node-api.mjs',{namedExports:{...nodeApi,
   dispatchNodeApi:async(runtime,name,args,options)=>['dock_node_wait','dock_node_status'].includes(name)
-   ?worker:nodeApi.dispatchNodeApi(runtime,name,args,options)}});
+   ?worker:describeBatch&&name==='dock_node_apply'
+     ?(applied.push(args),{...worker,operation_id:args.operation_id}):nodeApi.dispatchNodeApi(runtime,name,args,options)}});
  const inspection={operation_id:worker.operation_id,status:'SUCCEEDED',action_key:'operation.inspect',effect_possible:false,
   output:{state:'resolved',cleanup_confirmed:true,effect_state:'verified',outcome:worker.outcome}};
  const executor=await import('../../lib/executor.mjs');
- mock.module('../../lib/executor.mjs',{namedExports:{...executor,createActionRuntime:options=>({
-  ...executor.createActionRuntime(options),inspect:async()=>inspection,
+ mock.module('../../lib/executor.mjs',{namedExports:{...executor,createActionRuntime:options=>{
+  const runtime=executor.createActionRuntime(options);
+  return {...runtime,inspect:async args=>args.operationId===worker.operation_id?inspection:runtime.inspect(args),
   ...(openPackage?{async deliverPackageArtifact(request){
    const artifact=options.artifactStore.getUploadGrant(request.artifact_id,request.upload_grant_id);
    return {outcome:{status:'SUCCEEDED',artifact_id:artifact.artifact_id,destination:artifact.upload.destination,bytes:artifact.bytes,
     bytes_source:'native_file_store',upload_completion_verified:true,load_count:3,
     files_entry:{document_id:documentId,tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb',directory:'/'+account},
     source_sha256:artifact.sha256,cleanup_complete:true}};
-  }}:{})})}});
+  }}:{})};}}});
  mock.module('@modelcontextprotocol/sdk/client/index.js',{namedExports:{Client:ExternalClient}});
  mock.module('@modelcontextprotocol/sdk/client/stdio.js',{namedExports:{StdioClientTransport:ExternalTransport,getDefaultEnvironment:()=>({})}});
  mock.module('@modelcontextprotocol/sdk/client/streamableHttp.js',{namedExports:{StreamableHTTPClientTransport:ExternalTransport}});
@@ -113,6 +119,74 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   const inventory=await call('dock_action_describe');
   assert.ok(parse(inventory).available_node_types.includes('programming.javascript'));
   assert.equal(browserCalls,0);
+
+  if(describeBatch){
+   const prepared=parse(await call('dock_prepare'));
+   assert.equal(prepared.prepared,true);
+   const before=browserCalls;
+   const apply=type=>call('dock_node_apply',{operation_id:'apply-'+applied.length,contract_revision:'1.0.0',
+    document_id:'fixture-document',workflow_ref:{workflow_id:'fixture-workflow'},target:{kind:'new',type},
+    inputs:[],mode:type==='transform.sorting'?'keys':'expression',parameters:{},finish:'execute'});
+   await call('dock_action_describe',{node_types:['transform.sorting'],modes:['keys']});
+   assert.equal(parse(await apply('transform.sorting')).status,'SUCCEEDED');
+   assert.equal(applied.length,1);
+   const args={node_types:['imports.text','programming.javascript','integration.rest_request','transform.calculator'],
+    modes:['delimited','script','request','expression']};
+   const refused=await call('dock_action_describe',args);
+   assert.equal(refused.isError,true);
+   assert.equal(parse(refused).error.code,'USER_RESPONSE_BUDGET');
+   assert.equal(parse(await apply('transform.calculator')).error.code,'NODE_TYPE_NOT_DESCRIBED');
+   assert.equal(applied.length,1,'refused cards must not authorize node application');
+   assert.equal(parse(await apply('transform.sorting')).status,'SUCCEEDED');
+   assert.equal(applied.length,2,'earlier descriptions survive a later delivery refusal');
+   const next=parse(refused).next_step;
+   assert.deepEqual([next.arguments,...next.remaining_requests],args.node_types.map((type,index)=>({node_types:[type],modes:[args.modes[index]]})));
+   for(const request of [next.arguments,...next.remaining_requests]){
+    const delivered=await call(next.tool,request);
+    assert.notEqual(delivered.isError,true,JSON.stringify(delivered));
+    assert.ok(size(delivered)<=46000);
+    assert.equal(parse(delivered).node_types[0].type,request.node_types[0]);
+    assert.ok(parse(delivered).node_types[0].parameter_schema);
+    assert.ok(parse(delivered).node_types[0].guidance);
+   }
+   assert.equal(parse(await apply('transform.calculator')).status,'SUCCEEDED');
+   assert.equal(applied.length,3);
+   assert.equal(browserCalls,before);
+   return;
+  }
+
+  if(sevenFiles){
+   const sourcePath=join(directory,'source.csv');await writeFile(sourcePath,'Branch,Amount\nA,1\n');
+   for(let index=1;index<=7;index++)await session.artifactStore.admit({sourcePath,
+    name:'a'.repeat(64)+'-'+index+'-branch-0'+index+'.csv',bytes:18,
+    sha256:createHash('sha256').update('Branch,Amount\nA,1\n').digest('hex'),upload:{directory:'/'+account,overwrite:'reject'}});
+   const prepared=await call('dock_prepare',{intent:'new_draft',operation_id:operationId});
+   const diagnosticPath=join(directory,'diagnostics',createHash('sha256').update('dock:'+session.metadata.sessionId).digest('hex'),'events.jsonl');
+   const retained=JSON.parse((await readFile(diagnosticPath,'utf8')).trim().split('\n')[0]).result;
+   t.diagnostic('seven-file full prepare envelope bytes: '+size({content:[{type:'text',text:JSON.stringify(retained)}]}));
+   t.diagnostic('seven-file prepare envelope bytes: '+size(prepared));
+   assert.notEqual(prepared.isError,true,JSON.stringify(prepared));
+   const delivered=parse(prepared);
+   assert.equal(delivered.prepared,true);assert.equal(delivered.workspace.status,'READY');
+   assert.equal(delivered.workspace.operation_id,operationId);
+   assert.equal(delivered.workspace.document_id,documentId);
+   assert.deepEqual(delivered.input_artifacts,session.artifactStore.list());
+   assert.ok(size(prepared)<=46000);
+   assert.deepEqual(delivered.knowledge.node_types.map(node=>node.type),retained.knowledge.node_types.map(node=>node.type));
+   assert.equal(delivered.next_step.tool,'dock_action_describe');
+   assert.ok(retained.knowledge.node_types.some(node=>node.limitations?.length));
+   for(const node of delivered.knowledge.node_types){
+    const full=retained.knowledge.node_types.find(item=>item.type===node.type);
+    assert.deepEqual(node.modes,full.modes);
+    assert.equal(node.candidate_node_apply_available,full.candidate_node_apply_available);
+   }
+   const described=parse(await call('dock_action_describe',{node_types:['imports.text'],modes:['delimited']}));
+   assert.ok(described.node_types[0].parameter_schema);
+   const reused=await call('dock_prepare',{intent:'new_draft',operation_id:operationId});
+   assert.notEqual(reused.isError,true);assert.equal(parse(reused).knowledge.reused,true);
+   assert.equal(parse(reused).workspace.document_id,documentId);
+   return;
+  }
 
   if(threeFiles||smoothingHp){
    const root=new URL('../../../../../',import.meta.url);
@@ -197,6 +271,21 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   const refusedPrepare=await call('dock_prepare');
   assert.equal(refusedPrepare.isError,true);assert.equal(parse(refusedPrepare).result_delivery,'refused');
   assert.ok(size(refusedPrepare)<2000);
+  assert.equal(parse(refusedPrepare).original_operation_id,'prepare');
+  assert.deepEqual(parse(refusedPrepare).next_step.arguments,{operation_id:'prepare'});
+  assert.match(parse(refusedPrepare).next_step.instruction,/without the input artifact list or knowledge bundle/);
+  const beforeInspect=browserCalls,preparationBefore=structuredClone(session.metadata.workspacePreparation);
+  const receipt=await call('dock_operation_inspect',{operation_id:'prepare'});
+  assert.notEqual(receipt.isError,true,JSON.stringify(receipt));assert.ok(size(receipt)<=46000);
+  assert.equal(parse(receipt).phase,'retained_preparation_receipt');
+  assert.deepEqual(parse(receipt).output.receipt,preparationBefore.state);
+  assert.equal(parse(receipt).effect_possible,false);
+  assert.equal(browserCalls,beforeInspect);
+  assert.deepEqual(session.metadata.workspacePreparation,preparationBefore);
+  session.metadata.workspacePreparation.state.operation_id='foreign-preparation';
+  const foreignReceipt=parse(await call('dock_operation_inspect',{operation_id:'prepare'}));
+  assert.equal(foreignReceipt.status,'FAILED');assert.equal(foreignReceipt.request_rejected,true);
+  session.metadata.workspacePreparation=preparationBefore;
   await session.artifactStore.discardUnpublished(artifacts.map(artifact=>artifact.artifact_id));
   prepareDebug=true;
   const prepared=await call('dock_prepare'),full=parse(prepared);

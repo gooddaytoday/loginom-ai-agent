@@ -23,7 +23,7 @@ import { makeWorkspaceUiCode, validateUiAction, uiActionSchema } from './workspa
 import { createObservationPages } from './observation-pages.mjs';
 import { makeWorkspaceBootstrapCode } from './workspace.mjs';
 import { createNodeProcedure } from './node-procedure.mjs';
-import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow, releaseNodeApply } from './node-apply.mjs';
+import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow, releaseNodeApply, NodeVariableInputError } from './node-apply.mjs';
 import {reconcileOutputMappingPhase} from './node-output-mapping-recovery.mjs';
 import {reconcileInputMappingPhase} from './node-input-mapping-recovery.mjs';
 import { createNodeOperationRunner } from './node-operation-runner.mjs';
@@ -821,8 +821,15 @@ export async function readNodeTargetLinkValidation(page, context, parameters) {
     };
     const source=bind(context.nodes[0],'Output',parameters.source_port),target=bind(context.nodes[1],'Input',parameters.target_port);
     const handler=graph.connectionHandler;
-    if(!graph.isMouseDown||!handler.first||handler.previous?.cell!==source.port.FCell
-      ||diagram.FHandlers?.FConnectionHandler?.FDelegationHandler?.FMouseDown!==true)throw Error('Link validation drag owner changed');
+    const ownership={graph_mouse_down:!!graph.isMouseDown,connection_first:!!handler.first,source_cell:handler.previous?.cell===source.port.FCell,
+      delegation_mouse_down:diagram.FHandlers?.FConnectionHandler?.FDelegationHandler?.FMouseDown===true};
+    const failed=Object.keys(ownership).filter(key=>!ownership[key]);
+    if(failed.length){
+      const flag=value=>typeof value==='boolean'||value===null?value:typeof value;
+      const observed={...ownership,graph_mouse_down_value:flag(graph.isMouseDown),
+        delegation_mouse_down_value:flag(diagram.FHandlers?.FConnectionHandler?.FDelegationHandler?.FMouseDown)};
+      throw Error('Link validation drag owner changed: '+failed.join(',')+'; observed='+JSON.stringify(observed));
+    }
     const value=diagram.FValidatedConnectionsCache?.FCache?.[source.port.FCell.id]?.[target.port.FCell.id];
     if(value!==undefined&&value!==null&&typeof value!=='boolean')throw Error('Unknown link validation state');
     const box=target.element.getBoundingClientRect();
@@ -921,13 +928,13 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if (!(name in bindings)) throw new Error(`Missing selector binding ${name}`);
     return encode(bindings[name], definition.parameters[name], name === 'node_label' ? graph?.nodes.map(node => node.label) : undefined);
   });
-  const ownedGraph = async prefix => {
+  const ownedGraph = async (prefix, saveSnapshot = false) => {
     if(await activePrefix()!==prefix)throw new Error('Graph workflow changed');
     const containerTid=prefix+';ModelForm;cmpDiagram',container=tid('',containerTid);
     if(await container.count()!==1 || !(await container.isVisible()))throw new Error('Unique visible owned graph container is required');
     const box=await container.boundingBox(),viewport=page.viewportSize();
     if(!box || box.x+box.width<=0 || box.y+box.height<=0 || viewport && (box.x>=viewport.width || box.y>=viewport.height))throw new Error('Graph container is outside the visible viewport');
-    const data=await container.evaluate((element,ownerPrefix)=>{
+    const data=await container.evaluate((element,{ownerPrefix,saveSnapshot})=>{
       const started=Date.now();let work=0;
       const charge=()=>{if(++work>250000 || Date.now()-started>500)throw new Error('Graph scan budget exceeded');};
       const visible=e=>{
@@ -960,14 +967,29 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         throw new Error(('Duplicate actionable graph identifiers: '+duplicates.slice(0,3).map(t=>{const items=graph.filter(e=>e.getAttribute('data-tid')===t);
           return t+' x'+items.length+' {'+items.slice(0,2).map(describe).join('; ')+'}';}).join(' | ')).slice(0,1600));
       }
-      return {native_prefix:native,nodes:labels.map(label=>({label,ports:tids.filter(t=>t.startsWith(native+label+';') && /;(?:Input|Output)_[^;]+$/.test(t)).sort()})),
+      const nodeKeys=[];
+      const diagram=saveSnapshot&&globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab()?.Controller?.FController?.FDiagram;
+      if(diagram?.FmxGraph?.container===element&&Array.isArray(diagram.FNodes?.FCollection)){
+        // Open can add or remove suffixes of rendered node TIDs. Keep the
+        // cached label and GUID of each node we can bind to this graph's DOM.
+        for(const node of diagram.FNodes.FCollection){
+          charge();
+          const label=node.FLabel;
+          if(typeof label?.FRawValue!=='string'||label.parent!==node||!node.FCell||label.FCell?.parent!==node.FCell
+            ||typeof node.FGuid!=='string'||!/^[A-Za-z0-9-]{1,128}$/.test(node.FGuid))continue;
+          const dom=diagram.FmxGraph.view?.getState?.(node.FCell)?.shape?.node,tid=dom?.getAttribute('data-tid');
+          if(!graph.includes(dom)||!tid?.startsWith(native)||!labels.includes(tid.slice(native.length)))continue;
+          nodeKeys.push([tid.slice(native.length),'@'+node.FGuid+':'+encodeURIComponent(label.FRawValue)]);
+        }
+      }
+      return {native_prefix:native,node_keys:nodeKeys,nodes:labels.map(label=>({label,ports:tids.filter(t=>t.startsWith(native+label+';') && /;(?:Input|Output)_[^;]+$/.test(t)).sort()})),
         links:tids.filter(t=>{const body=t.slice(native.length);return /^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body);}).sort()};
-    },prefix);
+    },{ownerPrefix:prefix,saveSnapshot});
     const binding={container_tid:containerTid,native_prefix:data.native_prefix};
     if(graphBinding && (graphBinding.container_tid!==containerTid || graphBinding.native_prefix!==null && graphBinding.native_prefix!==binding.native_prefix))
       throw new Error('Native graph binding changed after preflight');
     graphBinding=binding;
-    return {container,binding,nodes:data.nodes,links:data.links};
+    return {container,binding,nodes:data.nodes,links:data.links,node_keys:data.node_keys};
   };
   const graphPrefixFor=async prefix=>{const native=(await ownedGraph(prefix)).binding.native_prefix;if(!native)throw new Error('No observed native graph namespace');return native;};
   const resolve = async (symbol, bindings = {}, options = {}) => {
@@ -1051,9 +1073,13 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
   const graphLinks=async prefix=>(await ownedGraph(prefix)).links;
   const rawGraph=async prefix=>{const graph=await ownedGraph(prefix);return {nodes:graph.nodes,links:graph.links};};
   const graphSnapshot = async prefix => {
-    const captured=await rawGraph(prefix),nodes=captured.nodes.map(node=>node.label);
+    const captured=await ownedGraph(prefix,true),nodeKeys=new Map(captured.node_keys);
+    if(nodeKeys.size!==captured.node_keys.length)throw Error('Saved graph native node binding is ambiguous');
+    const key=node=>nodeKeys.get(node)??node;
+    const nodes=captured.nodes.map(node=>node.label);
+    if(new Set(nodes.map(key)).size!==nodes.length)throw Error('Saved graph node keys are ambiguous');
     const mappings = new Map();
-    const canonicalPorts = [];
+    const canonicalPorts = new Map();
     for (const node of nodes) {
       const rawPorts = captured.nodes.find(item=>item.label===node).ports.map(value => value.split(';Graph;')[1].slice((node+';').length));
       const groups = new Map(), mapping = new Map();
@@ -1068,7 +1094,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         group.forEach((port, ordinal) => mapping.set(port.raw, `${kind}[${ordinal}]`));
       }
       mappings.set(node, mapping);
-      canonicalPorts.push({ node_label: node, tids: sorted([...mapping.values()].map(port => `${node};${port}`)) });
+      canonicalPorts.set(key(node),{ node_label: key(node), tids: sorted([...mapping.values()].map(port => `${key(node)};${port}`)) });
     }
     // Loginom recreates live port indices on reopen (observed 0,1,3 -> 0,1,2).
     // Preserve type/direction/count and ordinal, and remap each link endpoint
@@ -1077,9 +1103,10 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       const [source, output, target, input] = value.split(';Graph;')[1].split('|');
       const sourcePort = mappings.get(source)?.get(output), targetPort = mappings.get(target)?.get(input);
       if (!sourcePort || !targetPort) throw new Error('Graph link endpoint is absent from its node port snapshot');
-      return `${source}|${sourcePort}|${target}|${targetPort}`;
+      return `${key(source)}|${sourcePort}|${key(target)}|${targetPort}`;
     });
-    return { nodes, ports: canonicalPorts, links: sorted(canonicalLinks) };
+    const ordered=sorted(nodes.map(key));
+    return { nodes:ordered, ports:ordered.map(node=>canonicalPorts.get(node)), links:sorted(canonicalLinks) };
   };
   const nodeRef = nodeLabel => ({ kind: 'node', node_label: nodeLabel, workflow_ref: { ...workflow } });
   const checkNodeRef = node => {
@@ -1868,9 +1895,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if(normalizeRest)try {
       const binding = task.storage_binding;
       if (!binding) throw Error('REST package normalization requires its prepared session storage identity');
-      const read = async () => (await page.evaluate(readSavedState, {
+      const read = async cleanDeadline => (await page.evaluate(readSavedState, {
         sessionId: binding.session_id, documentId: binding.document_id, account: binding.loginom_account,
-        packagePath: before.path, origin: binding.origin, loginomBuild,
+        packagePath: before.path, origin: binding.origin, loginomBuild, cleanDeadline,
       })).modified;
       modifiedBefore = await read();
       modifiedAfter = modifiedBefore;
@@ -1887,9 +1914,13 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         await poll(async () => !await button.isVisible());
         await waitForNoMask(60000);
         transientDialog = false;
-        modifiedAfter = await read();
+        ensureDeadline();
+        // Bound the transient modified-flag race and keep five seconds for
+        // verified continuation binding after a confirmed Save.
+        modifiedAfter = await read(Math.min(deadline - 5000, Date.now() + 5000));
       }
       if (modifiedAfter !== false) throw Error('REST_PACKAGE_NORMALIZATION_STILL_MODIFIED: package is still modified after the one additional Save; no retry was sent');
+      ensureDeadline();
     } finally {
       record('rest_package_normalization', { path: before.path, modified_before: modifiedBefore,
         modified_after: modifiedAfter, additional_save: additionalSave,
@@ -2137,7 +2168,7 @@ export function parseCapabilityResult(response,{redactor}={}) {
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
-  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = true }) {
+  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, getPreparationReceipt = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = true }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   const executeBrowser=execute;
   execute=async(...args)=>{
@@ -2531,7 +2562,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         }
       }finally{running=false;}
     }
-    if(operation.nodeApply?.pending?.phase==='target' && operation.targetPhase){
+    if(operation.nodeApply?.pending?.phase==='target'&&!operation.nodeApply.pending.boundary_settled&&operation.targetPhase){
       running=true;
       try{
         const state=operation.nodeApply;
@@ -2653,7 +2684,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const deadline=now()+NODE_RELEASE_BUDGET_MS;
     await operation.nodeApplyDrivers?.releaseBeforeTarget?.({signal,deadline});
     return releaseNodeTarget({operation,adapter:operation.nodeTargetAdapter,
-      record:nodeTargetRecord,readReceipt:ref=>readReceipt(operation,ref),deadline,signal,now});
+      record:nodeTargetRecord,readReceipt:ref=>readReceipt(operation,ref),
+      settleChild:operation.nodeApplyDrivers?.settleBeforeTarget,deadline,signal,now});
   }:undefined;
   const nodeReleaseStep=operation=>!operation.transportUncertain&&!nodeJobs.busy&&(earlyNodePhase(operation)
     ||operation.nodeApply?.pending&&(!operation.nodeApplyDrivers?.releasePendingPhases||operation.nodeApplyDrivers.releasePendingPhases.includes(operation.nodeApply.pending.phase))
@@ -2664,7 +2696,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       instruction:earlyNodePhase(operation)?'Release this early source/workflow/target failure with a NEW recovery_operation_id. Dock only reads the original receipts and quiet graph, proving that the target was not created or finding its exact partial node. Unknown effects remain blocked. Follow the released next_step; do not replay creation.'
         :'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'}:null;
   const releaseApply=async(operation,{strategy,recoveryOperationId,signature,signal})=>{
-    if(strategy!=='abandon_operation')throw new Error('Use the enclosing node procedure to resume this internal phase; only abandon_operation can release a stopped node operation');
+    if(strategy!=='abandon_operation')throw new Error('Only abandon_operation can release a stopped node operation; every other strategy is refused for it. If abandon_operation is refused too, follow its next_step instead of another strategy');
     if(running||nodeJobs.busy)throw new Error('Another Dock action is still running');
     if(!nodeReleaseStep(operation))throw new Error('Release proof unavailable: inspect the operation; its last browser call is unconfirmed or its stopped phase has no node release verifier');
     running=true;
@@ -2854,7 +2886,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     return { tool: 'dock_browser_recovery', arguments: { action: 'start', operation_id: operation.id },
       reason: trigger.reason, step: structuredClone(trigger.step),
       instruction: 'Dock recovery for this step is exhausted. Start browser recovery for this operation and complete only this '
-        + 'step yourself in the same Loginom tab. Do not ask the user to close wizards or fix the interface.' };
+        + 'step yourself in the same Loginom tab. Do not ask the user to close wizards or fix the interface. If '
+        + 'dock_browser_recovery refuses start for this step, the operation stays blocked: do not repeat dock_operation_recover or start; '
+        + 'report it as a blocker.' };
   }
   const browserRecoveryApi = {
     browserRecoveryBasis(operationId) {
@@ -3037,6 +3071,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const inspect = async ({ operationId, signal } = {}) => {
     signal?.throwIfAborted();
     const operation = operationId ? operations.get(operationId) : pending;
+    if(operationId&&!operation&&!auxiliary.has(operationId)&&!nodeJobs.has(operationId)&&!sourceReads.has(operationId)){
+      const receipt=getPreparationReceipt(operationId);
+      if(receipt)return {status:'SUCCEEDED',action_key:'operation.inspect',action_revision:'1',operation_id:operationId,
+        phase:'retained_preparation_receipt',effect_possible:false,output:{state:'resolved',receipt:structuredClone(receipt),
+          next_steps:[{tool:'dock_action_describe',instruction:'Request selected node_types and modes for complete rules. This is the retained preparation receipt, not a fresh workspace observation.'}]},error:null,trace:[]};
+    }
     if (operationId && !operation) throw new Error('Operation is not known in this session');
     if (!operation || pending !== operation) return view(operation);
     return view(operation, await reconcilePending());
@@ -3061,7 +3101,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         ||['workflow','target'].includes(phase))return;
       if(nodeResumeBlocked(operation))throw new Error(nodeResumeRefusal);
     },
-    validate:request=>{const h=validateNodeApplyRequest(request,nodeApplyHandlers).handler;return h.output_wizard==='separate'?JSON.stringify({revision:h.revision,output_wizard:'separate'}):h.revision;},
+    validate:(request,{fresh})=>{
+      const {handler}=validateNodeApplyRequest(request,nodeApplyHandlers,{fresh:fresh&&!operations.has(request.operation_id)});
+      return handler.output_wizard==='separate'?JSON.stringify({revision:handler.revision,output_wizard:'separate'}):handler.revision;
+    },
     progress:id=>{
       const state=operations.get(id)?.nodeApply;
       return state?structuredClone({node:state.node,execution:state.execution,
@@ -3416,7 +3459,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return { action: structuredClone(action), session_manifest: structuredClone(pinned.pins) };
     },
     requestFailure(error) {
-      return { status: pending ? 'AMBIGUOUS' : 'FAILED', action_key: pending?.action.action_key ?? 'request.validate',
+      const variableError=error?.cause instanceof NodeVariableInputError?error.cause:error;
+      const variableInputRefusal=!pending&&!nodeJobs.active&&variableError instanceof NodeVariableInputError;
+      return { status: pending ? 'AMBIGUOUS' : variableInputRefusal ? 'NOT_APPLIED' : 'FAILED', action_key: pending?.action.action_key ?? 'request.validate',
         action_revision: pending?.action.revision ?? '1', operation_id: pending?.id ?? null,
         phase: 'request_rejected', effect_possible: !!pending, request_rejected: true,
         output: { available_actions: pending ? [] : [...pinned.actions.keys()], ui_action_tool: 'dock_ui_action', operation: view(pending).output,
@@ -3424,6 +3469,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           ...(error?.code==='ARTIFACT_GRANT_NOT_FOUND' && allowCandidate && artifactStore ? {input_artifacts:artifactStore.list()} : {}) },
         ...(!pending&&!nodeJobs.active&&error?.message==='Choose a single action or a batch description'
           ?{next_step:{tool:'dock_action_describe',instruction:'Use action_key alone for one action, OR action_keys:[...] with optional node_types:[...] for a batch. For example: {"action_keys":["package.save_checkpoint"],"node_types":["imports.text","transform.join_data","exports.text"]}. Remove action_key from the batch request; do not combine it with action_keys or node_types. This is a description request; no browser mutation or recovery is needed.'}}:{}),
+        ...(variableInputRefusal?{cleanup_complete:true,next_step:variableError.nextStep}:{}),
         error: { code: 'REQUEST_REJECTED', message: String(error?.message ?? error).slice(0, 1000) }, trace: [] };
     },
     inspect,
@@ -4037,14 +4083,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // phases own the same runtime gate; they cannot re-enter public run/act.
     async runNodeApply(request,{signal,stopSignal,resume=false,scanReceipt}={}) {
       request=structuredClone(request);
-      signal?.throwIfAborted();checkId(request.operation_id);
-      const {handler}=validateNodeApplyRequest(request,nodeApplyHandlers);
+      signal?.throwIfAborted();
+      const operationId=request.operation_id;
+      checkId(operationId);
+      let operation=operations.get(operationId);
+      const {handler}=validateNodeApplyRequest(request,nodeApplyHandlers,{fresh:!operation&&!resume});
       if(typeof nodeApplyDriverFactory!=='function')throw new Error('Local node drivers are not installed');
       if(running)throw new Error('Another Dock action is still running');
       const signature=fingerprint('node.apply',{request,handler_revision:handler.revision,...(handler.output_wizard==='separate'?{output_wizard:'separate'}:{})});
-      const operationId=request.operation_id;
       if(auxiliary.has(operationId))throw new Error('Operation ID conflicts with a recovery or UI operation');
-      let operation=operations.get(operationId);
       if(operation&&operation.signature!==signature)throw new Error('operation_id was already used with different parameters or handler');
       if(pending&&pending!==operation)throw new Error('Another Dock operation remains pending');
       if(operation&&!resume)return inspectApply(operation);
@@ -4257,6 +4304,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                 && operation.targetPhase?.effect_possible===false && !operation.targetPhase?.pending){
                 if(preflight?.effect_possible!==true)
                   error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+                else if(preflight.verified===true&&preflight.cleanup_complete===true&&preflight.settings_changed===false
+                  &&typeof operation.nodeApplyDrivers.refuseUnappliedTarget==='function')
+                  await operation.nodeApplyDrivers.refuseUnappliedTarget(ctx,error.message);
                 else if(preflight.verified===true && preflight.cleanup_complete===true && preflight.settings_changed===false
                   && ['missing_values_preflight_completed','crosstable_preflight_completed'].includes(preflight.target_refusal?.verification))
                   // Source inspection has a known activity effect, but no

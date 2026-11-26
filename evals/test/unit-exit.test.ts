@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rename, rm } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
 import { observeUnitExit } from "../src/process-supervisor"
-import { reconcileStartupCleanup } from "../src/startup-reconciliation"
+import { readStartupManagement, reconcileStartupCleanup } from "../src/startup-reconciliation"
 import { reopenEnvironmentLeases } from "../src/slots"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
@@ -26,7 +26,9 @@ for (const delegate of ["no", "yes"] as const) test.skipIf(process.env.EVAL_SYST
 for (const refusal of ["UID", "ENOENT"]) test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")(`unit exit recovery never signals a live producer and preserves the original failed receipt across reentry: ${refusal}`, async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-unit-exit-")), fixture = await parallelFixture(root)
   const profile = fixture.slots.slots[0]!.profileDir
-  const unit = `loginom-evals-exit-${crypto.randomUUID()}.service`, sourceFile = path.join(root, "cleanup.json")
+  const unit = `loginom-evals-exit-${crypto.randomUUID()}.service`
+  const peerUnit = `loginom-evals-peer-${crypto.randomUUID()}.service`
+  const sourceFile = path.join(fixture.slots.controller.stateDir, "management-unit-exit-a/status/cleanup.json")
   const ready = path.join(root, "ready.json"), release = path.join(root, "release"), heartbeat = path.join(root, "heartbeat")
   const identity = { containerId: "a".repeat(64), startedAt: "original", serverEpoch: "b".repeat(64), studioContainerId: "c".repeat(64),
     studioStartedAt: "original", configurationHash: "d".repeat(64) }
@@ -35,7 +37,8 @@ for (const refusal of ["UID", "ENOENT"]) test.skipIf(process.env.EVAL_SYSTEMD_TE
   const script = `
     const {captureUnitBinding,superviseProcess}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/process-supervisor.ts"))});
     const {writeLeaseReceipt}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
-    const {writeFile}=await import("node:fs/promises");
+    const {mkdir,writeFile}=await import("node:fs/promises");
+    await mkdir(${JSON.stringify(path.dirname(sourceFile))},{recursive:true,mode:0o700});
     const {acquireEnvironmentLeases}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/slots.ts"))});
     const binding=await captureUnitBinding();
     await writeLeaseReceipt(${JSON.stringify(journal)},{version:2,kind:"unactivated-preparation",commandId:"unit-exit",identity:${JSON.stringify(identity)},slotIds:["a"],phase:"cli_admitted",unitBinding:binding});
@@ -55,6 +58,9 @@ for (const refusal of ["UID", "ENOENT"]) test.skipIf(process.env.EVAL_SYSTEMD_TE
     process.exit(1);
   `
   try {
+    const peer = Bun.spawn(["systemd-run", "--user", "--quiet", `--unit=${peerUnit}`, "--property=Delegate=no", process.execPath, "-e", "await Bun.sleep(30000)"],
+      { stdout: "ignore", stderr: "pipe" })
+    expect(await peer.exited).toBe(0)
     const launch = Bun.spawn(["systemd-run", "--user", "--quiet", `--unit=${unit}`, "--property=Delegate=no", process.execPath, "-e", script],
       { stdout: "ignore", stderr: "pipe" })
     expect(await launch.exited).toBe(0)
@@ -92,7 +98,10 @@ for (const refusal of ["UID", "ENOENT"]) test.skipIf(process.env.EVAL_SYSTEMD_TE
     expect(await Bun.file(`${profile}.process-group`).exists()).toBe(true)
     reopened = await reopenEnvironmentLeases(fixture.slots, identity, fixture.lockRoot)
     const recovery = { unitBinding: saved.binding, owner: reopened!.server.reservation.owner, server: reopened!.server, lease: reopened!.slots[0]! }
-    expect((await reconcileStartupCleanup(sourceFile, saved.owner.pid, recovery)).status).toBe("confirmed")
+    const management = { stateDir: fixture.slots.controller.stateDir, commandId: "unit-exit", slotId: "a", producerPid: saved.owner.pid }
+    await expect(readStartupManagement(management)).rejects.toThrow("STARTUP_PROCESS_CLEANUP_UNCONFIRMED")
+    expect((await readStartupManagement({ ...management, recovery }))?.status).toBe("confirmed")
+    expect((await Bun.$`systemctl --user show ${peerUnit} --property=ActiveState --value`.quiet()).text().trim()).toBe("active")
     expect(await Bun.file(`${profile}.process-group`).exists()).toBe(false)
     expect((await reconcileStartupCleanup(sourceFile, saved.owner.pid, recovery)).status).toBe("confirmed")
     expect(await Bun.file(sourceFile).text()).toBe(original)
@@ -102,6 +111,8 @@ for (const refusal of ["UID", "ENOENT"]) test.skipIf(process.env.EVAL_SYSTEMD_TE
   } finally {
     await Promise.all([reopened?.server.close(), ...reopened?.slots.map(slot => slot.close()) ?? []])
     await Bun.write(release, "finish")
+    await Bun.$`systemctl --user stop ${peerUnit}`.quiet().nothrow()
+    await Bun.$`systemctl --user reset-failed ${peerUnit}`.quiet().nothrow()
     await Bun.$`systemctl --user stop ${unit}`.quiet().nothrow()
     await Bun.$`systemctl --user reset-failed ${unit}`.quiet().nothrow()
     await rm(root, { recursive: true, force: true })

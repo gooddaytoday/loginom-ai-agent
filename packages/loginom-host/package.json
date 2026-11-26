@@ -8,7 +8,7 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
-    "test": "bun test",
+    "test": "bun run ../util/script/isolated-test.ts",
     "typecheck": "bun check --no-script",
     "typecheck:tsc": "tsc --noEmit"
   },

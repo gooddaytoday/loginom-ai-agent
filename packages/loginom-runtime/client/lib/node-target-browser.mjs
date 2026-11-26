@@ -246,11 +246,27 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
     const p=await locator.evaluate(e=>{const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2;
       const hit=document.elementFromPoint(x,y);if(x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit)))throw new Error('Target is covered');return{x,y};});return p;
   };
-  const drag=async(source,to)=>{const from=await point(source);remaining();const current=await read(page,task);
+  const drag=async(source,to,paletteTid)=>{
+    let previous;
+    // The accordion can keep scrolling after the selected palette row becomes visible.
+    const from=paletteTid?await wait('stable_palette_row',async()=>{
+      const next=await point(source);
+      const stable=previous?.x===next.x&&previous.y===next.y;
+      previous=next;
+      return stable?next:null;
+    }):await point(source);
+    remaining();const current=await read(page,task);
     // Deselection can replace node SVG after its first readback. Only moves
     // permit fresh node drawing epochs; root/document and all graph data match.
     if(task.effect.kind==='move'?!sameGraph(gestureBefore,current):JSON.stringify(current)!==JSON.stringify(gestureBefore))throw new Error('Graph or DOM epoch changed before drag');
-    await page.mouse.move(from.x,from.y);held=true;effectPossible=true;
+    await page.mouse.move(from.x,from.y);
+    if(paletteTid){
+      placementNavigation.palette_source={tid:paletteTid,point:from};
+      await ensureContext();
+      if(!await source.evaluate((row,p)=>row.contains(document.elementFromPoint(p.x,p.y)),from))
+        throw Error('Palette row moved before mouse down');
+    }
+    remaining();held=true;effectPossible=true;
     try{remaining();await page.mouse.down();for(let step=1;step<=24;step++){remaining();await ensureContext();await page.mouse.move(from.x+(to.x-from.x)*step/24,from.y+(to.y-from.y)*step/24);}}finally{await page.mouse.up();held=false;}};
   try {
     const before=await read(page,task);
@@ -339,7 +355,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         const currentOrigin=await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').boundingBox();
         if(JSON.stringify(currentOrigin)!==JSON.stringify(origin)||!await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').evaluate((e,p)=>{const b=e.getBoundingClientRect(),hit=document.elementFromPoint(p.x,p.y);return p.x>=b.x&&p.x<b.right&&p.y>=b.y&&p.y<b.bottom&&p.x>=0&&p.y>=0&&p.x<innerWidth&&p.y<innerHeight&&!!hit&&(hit===e||e.contains(hit));},target))throw Error('Export drop changed after palette reveal');
       }
-      await drag(find(palette),target);
+      await drag(find(palette),target,palette);
     }else if(kind==='rename'){
       const tid=await targetTid(p.ref);await point(find(tid+';Label;Label'));effectPossible=true;
       await find(tid+';Label;Label').dblclick({timeout:remaining()});transient=true;
@@ -509,8 +525,8 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       if((await message.textContent()).trim()!=='Удалить выделенную связь?')throw new Error('Single-link confirmation changed');
       await yes.click({timeout:remaining()});transient=false;
     }else if(kind==='delete_node'){
-      // Select exactly this node cell by a body pixel owned by it (never its
-      // Setting/Launch controls), then the native Delete-selected command.
+      // Reuse the exact node selection, or select it by an owned body pixel
+      // (never its Setting/Launch controls) before the Delete-selected command.
       const selection=()=>page.evaluate(id=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;
         const ns=d.FNodes.FCollection.filter(n=>n.FGuid===id),cells=d.FmxGraph.getSelectionCells();
         return ns.length===1&&ns[0].FLocked!==true&&cells.length===1&&cells[0]===ns[0].FCell&&cells[0].edge!==true;},p.ref.node_id);
@@ -523,7 +539,9 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         const ns=d.FNodes.FCollection.filter(n=>n.FGuid===id);if(ns.length!==1||ns[0].FLocked)throw Error('Exact unlocked node to delete required');
         const edges=new Set([...(ns[0].FCell.edges??[]),...(ns[0].FPorts??[]).flatMap(list=>list.FCollection??[]).flatMap(port=>port.FCell?.edges??[])]);
         if(edges.size!==known)throw Error('Node to delete has a connection Dock cannot verify ('+edges.size+' native, '+known+' recognized); nothing was deleted');
-        const n=ns[0],dom=g.view.getState(n.FCell)?.shape?.node,gb=g.container.getBoundingClientRect(),box=dom?.getBoundingClientRect();
+        const n=ns[0],cells=g.getSelectionCells();
+        if(cells.length===1&&cells[0]===n.FCell&&cells[0].edge!==true)return null;
+        const dom=g.view.getState(n.FCell)?.shape?.node,gb=g.container.getBoundingClientRect(),box=dom?.getBoundingClientRect();
         if(!dom||!g.container.contains(dom)||!box?.width||!box.height)throw Error('Node body to delete unavailable');
         for(const dx of [.5,.25,.75,.1,.9])for(const dy of [.5,.25,.75,.1,.9]){
           const x=box.x+box.width*dx,y=box.y+box.height*dy,hit=document.elementFromPoint(x,y),cell=g.getCellAt(x-gb.x+g.container.scrollLeft,y-gb.y+g.container.scrollTop);
@@ -531,18 +549,38 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         }
         throw Error('Native node body hit unavailable');
       },{id:p.ref.node_id,known});
-      if(remaining()<=1000)throw new Error('Insufficient deadline for owned node selection');
-      // Selection alone is not a graph effect; only the Delete command is.
-      await ensureContext();await page.mouse.click(body.x,body.y);
+      if(body){
+        if(remaining()<=1000)throw new Error('Insufficient deadline for owned node selection');
+        // Selection alone is not a graph effect; only the Delete command is.
+        await ensureContext();await page.mouse.click(body.x,body.y);
+      }
       await wait('owned_node_selection',selection,1000);
-      const remove=find(task.request.workflow_ref.prefix+';ModelForm;btnRemoveSelected');
-      await wait('single_node_delete_toolbar_reachable',async()=>{try{await point(remove);return true;}catch{return false;}});
+      const modelTid=task.request.workflow_ref.prefix+';ModelForm';
+      const remove=find(modelTid+';btnRemoveSelected'),canvas=find(modelTid+';cmpDiagram');
+      const deleteCommand=async()=>{
+        if(await remove.count()!==1||!await remove.isEnabled())return null;
+        if(await remove.isVisible()){
+          try{await point(remove);return 'toolbar';}catch{return null;}
+        }
+        const hidden=await remove.evaluate((button,toolbarTid)=>{
+          const toolbar=button.ownerDocument.querySelectorAll('[data-tid='+JSON.stringify(toolbarTid)+']');
+          const box=button.getBoundingClientRect();
+          return toolbar.length===1&&button.parentElement?.closest('[data-tid]')===toolbar[0]
+            &&button.matches('a.x-btn.x-toolbar-item')&&!button.matches('.x-item-disabled,.x-btn-disabled,[aria-disabled="true"]')
+            &&button.getAttribute('data-qtip')==='Удалить выбранное... (Delete)'&&box.width===0&&box.height===0;
+        },modelTid+';tlbModel',{timeout:remaining()});
+        return hidden&&await canvas.evaluate(element=>element.ownerDocument.activeElement===element,undefined,{timeout:remaining()})?'delete_key':null;
+      };
+      const command=await wait('single_node_delete_toolbar_reachable',deleteCommand);
       const selectedGraph=await wait('owned_node_selection_graph_ready',async()=>{
         try{return await read(page,task);}catch(error){if(String(error.message).includes('Graph is blocked'))return null;throw error;}
       },1000);
-      if(!await selection()||!sameGraph(before,selectedGraph))throw new Error('Owned node selection or graph changed before deletion');
+      if(!sameGraph(before,selectedGraph)||await deleteCommand()!==command||!await selection())throw new Error('Owned node selection, graph or Delete command changed before deletion');
+      await ensureContext();const timeout=remaining();
       gestureBefore=selectedGraph;
-      effectPossible=true;await remove.click({timeout:remaining()});transient='delete';
+      effectPossible=true;transient='delete';
+      if(command==='delete_key')await canvas.press('Delete',{timeout});
+      else await remove.click({timeout});
       const message=find('msgbox;cnt;cnt;cmp');
       await message.waitFor({state:'visible',timeout:Math.min(15000,remaining())});
       // Observed Loginom 7.4.2 single-node text only; any other dialog is cancelled.
@@ -586,7 +624,11 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const created=after.nodes.filter(n=>!before.nodes.some(b=>b.ref.node_id===n.ref.node_id));
       if(created.length!==1)throw Error('Created node visibility owner is ambiguous');
       const baseline=after,node=created[0],canvas=find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram');
-      if(settleJavascript && (node.type!==p.type || pendingNode && node.ref.node_id!==pendingNode))throw Error('Created JavaScript rendering owner changed');
+      if(node.type!==p.type){
+        outcome={after,create_mismatch:{expected:p.type,actual:node.type}};
+        throw Error('Created node type mismatch: expected '+p.type+', observed '+node.type);
+      }
+      if(settleJavascript && pendingNode && node.ref.node_id!==pendingNode)throw Error('Created JavaScript rendering owner changed');
       const visibility=await revealPosition({page,root:canvas,nodeId:node.ref.node_id,position:node.position,prefix:task.request.workflow_ref.prefix,
         remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();if(!sameGraph(baseline,await read(page,task)))throw Error('Graph changed while revealing created node');}});
       placementNavigation.node_visibility=visibility;
@@ -595,7 +637,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       if(!sameGraph(baseline,after))throw Error('Created node graph changed after viewport navigation');
     }
     outcome={status:'SUCCEEDED',effect_possible:true,after};
-  }catch(error){if(error.placement_navigation_unverified){effectPossible=true;placementNavigationUncertain=true;}outcome={status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,error:String(error.message),...(placementRefusal?{placement_refusal:placementRefusal}:{})};}
+  }catch(error){if(error.placement_navigation_unverified){effectPossible=true;placementNavigationUncertain=true;}outcome={...outcome,status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,error:String(error.message),...(placementRefusal?{placement_refusal:placementRefusal}:{})};}
   finally{try{if(held){await page.mouse.up();held=false;}if(transient==='delete'){const cancel=find('msgbox;tlb;no');if(await cancel.isVisible())await cancel.click({timeout:3000});}else if(transient)await page.keyboard.press('Escape');transient=false;outcome.cleanup_complete=true;}catch(error){outcome={...outcome,status:'AMBIGUOUS',cleanup_complete:false,cleanup_error:String(error.message)};}}
   if(paletteScroll)outcome.palette_scroll=paletteScroll;
   if(placementNavigation)outcome.placement_navigation=placementNavigation;

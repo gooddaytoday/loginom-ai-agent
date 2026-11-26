@@ -24642,6 +24642,1277 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   macOS — только Linux (pty и процессные тесты — только Linux, как в 0.4).
 - Двойная обработка вопроса (выше, «Найдено») — по коду.
 
+## Чистая установка: зависимости
+
+База: `oc2-migration` (тесты — на `5d0e3f83c1`, ветка `byaml-clean-install` затем приведена к `950e5da9ce`; между ними только CI и `scripts/node-acceptance`, зависимостей не менялось). Дерево `.claude/worktrees/byaml`, Bun 1.4.4, Node 24.19.0, `HOME=/root`, root.
+
+**Находка не воспроизводится.** На `950e5da9ce` с B4.16 (влит как `c91d769f9f`) на чистой установке не воспроизводится: `node_modules` удалены, `bun install --frozen-lockfile` и два `npm ci`, `credential-migration` 15 pass, `desktop` целиком 644 теста, 0 fail. Первые прогоны ниже сделаны на `5d0e3f83c1`, до влития B4.16. `yaml` импортируют только `loginom-host/src/bundled-skills.ts` и `loginom-runtime/client/lib/bundled-skill-manifest.mjs`, оба объявляют `yaml@2.9.1`. Зависимости и `bun.lock` не менялись.
+
+**Чистая установка.** `bun install --frozen-lockfile` (1607 пакетов, `.husky/_` есть), `npm ci` в `packages/loginom-runtime/client` и `packages/dashboard/template` — без ошибок.
+
+| Пакет | Результат |
+|---|---|
+| `desktop` | 626 тестов, 0 fail, 4 skip |
+| `loginom-host` | 563 теста, 2 fail, 13 skip |
+| `loginom-agent` | 125 pass, 0 fail |
+| `server` | 318 тестов, 1 fail, 3 skip |
+| `cli` | 622 теста, 0 fail, 9 skip |
+| `product` | ровно три известных: `workspace packages`, `CI triggers`, `path literals` |
+| `dashboard` | падают 2 теста `a partial source copy is retried completely` (new project, known project) |
+
+Падений «не найден модуль» и «не объявлена зависимость» нет (`Cannot find`/`Could not resolve` в логах — 0). Статический обход импортов `src`, `test`, `script` восьми пакетов дал только тестовые и запускаемые отдельно: `@modelcontextprotocol/sdk` и `playwright-core` в `desktop/test/loginom` (приёмочные стенды, не в `bun test`), `@opencode/util` в `service-identity.test.ts` (тест проходит, разрешается через workspace). Не объявлял: не падают.
+
+**Падения не про зависимости (не чинились).**
+- права root: `dashboard` — ожидаемый `EACCES` не наступает (root читает всё); `loginom-host` `archive verification preserves manifest modes under a private umask` — `Expected promise that rejects`, тот же признак;
+- `loginom-host` `actual managed entry reads live bridge work…` (`managed-work-entry.test.ts:239`, «Expected refusal») — причина не разбиралась, возможно тоже права root;
+- таймаут под нагрузкой: `server` `skill.test.ts` `lists configured skills` (5000 мс, три набора шли параллельно).
+Новых падений относительно базы нет: код не менялся, база — это и есть этот прогон.
+
+## B5.1d — изоляция XDG в тестах
+
+База `569014e83b`, ветка `b51d-test-xdg`. Проверка: `bun test` пакета с подменённым `HOME` и XDG на пустой каталог,
+затем поиск по каталогам запускающего (`find -newer`).
+
+### Что нашла проба
+
+Без изоляции тесты создают каталоги данных продукта в `HOME` запускающего: `server` — `tool-output`, `shell`,
+`artifacts`, `repos`, `log`; `sdk`, `simulation`, `tui` — `repos`, `log`, `config`; `loginom-host` — файлы
+`attachment-receipts-v1` в каталоге состояния (`os.homedir()`, а не XDG). `cli` собирает свою среду в
+`isolatedEnv` и пишет только пустые каталоги; `ai`, `client`, `codemode`, `product`, `protocol`, `schema`, `util` и др. —
+ничего, кроме кэша Bun.
+
+### Что сделано
+
+- `packages/util/test/isolated-home.ts` — preload: если `LOGINOM_AI_AGENT_TEST_HOME` не задан, создаёт временный
+  каталог, ставит `HOME`, `LOGINOM_AI_AGENT_TEST_HOME`, четыре `XDG_*`, `TMPDIR` и удаляет его в `afterAll`. Нужен до
+  первого импорта `@opencode/util/global`: `Global.Path` считается при импорте. Раннер, уже изолировавший среду
+  (`packages/core/script/test.ts`), не затрагивается.
+- Подключён в `[test]` `bunfig.toml` пакетов `server`, `sdk`, `simulation`, `tui`, `loginom-host`.
+- `packages/util/script/isolated-test.ts` и `loginom-host`: `"test": "bun run ../util/script/isolated-test.ts"`. Bun читает
+  `os.homedir()` при старте процесса, подмена `process.env.HOME` в preload её не меняет (проверено), поэтому для кода с
+  `homedir()` нужен внешний `HOME`.
+- Тест на preload: `packages/server/test/preload.test.ts`.
+
+### Выбор по неоднозначным местам
+
+- `check-test.yml` не менялся: `bun turbo test` запускает скрипты пакетов, preload действует и в CI; `env` задания
+  поверх него ничего не добавляет. Windows (`APPDATA`, `LOCALAPPDATA`) — в `loginom-windows` (i), как в строке.
+- `cli` не подключён: `debug-paths.test.ts` берёт `process.env` целиком, и унаследованный `LOGINOM_AI_AGENT_TEST_HOME`
+  меняет ожидаемый `home` (2 новых падения при пробе). Пишет `cli` только пустые каталоги; правка тестов `cli` — не B5.1d.
+- Каталог upstream: `catalog-check.py` код 0 без новых записей.
+
+### Проверки
+
+- `server`: `bun test` с внешним временным домом (аналог базы) 256 pass / 53 fail; с preload 258 / 51. Различия только
+  в нестабильных тестах (расписания, `vcs`: `serves lazy review bases` проходит 2 из 2 отдельно). База пишет в дом:
+  `tool-output`, `repos`, `log`, `artifacts`, `shell`. Каталоги данных продукта запускающего после прогона `server` с
+  preload не менялись (`find -newer`; менялись только чужие `.cache/loginom-run-check` и `.config/herdr-web-ui`).
+- `sdk`, `simulation`, `tui`, `loginom-host`: список падений до и после совпадает; у `loginom-host` 40 падений есть и в базе.
+- `loginom-host` с обёрткой: каталоги состояния и данных продукта запускающего не менялись, временных каталогов не осталось.
+- Мутации: пустой `bunfig.toml` — тест на preload красный; удалена строка `XDG_DATA_HOME` из preload — красный.
+- `catalog-check.py` 0, `apply-identity --check` 0 файлов.
+
+### Не проверено
+
+- Windows (`USERPROFILE` задан, не запускал); `app`, `dashboard` (браузер, сборка) не пробовал; `desktop` по пробе пишет
+  только кэш `electron`.
+- Падения `server` (около 50) и `loginom-host` (40) есть и в базе; причину не искал.
+
+## B5.1e-ci Проверка Windows на GitHub
+
+Первый прогон `Windows native checks` на опубликованной `oc2-migration` (`950e5da9ce`, run 45675480080 форка), windows-2022
+и windows-2025:
+
+- `Verify native host` и `Verify native profile` прошли. ACL профиля CLI на настоящем Windows: `profile-windows.test.ts`
+  3 pass, 1 skip (случай «fails closed on other platforms»), 0 fail.
+- `Assert system proxy in sidecar` упал: `system-proxy-smoke.ts --assert-windows` импортирует
+  `desktop/src/main/proxy-env` 0.4, которого в v2 нет. Системный прокси службы — после шлюза B (В-97, п. 6).
+  Шаги WinINET-прокси и проверка прокси службы убраны из задания `native` с комментарием, они вернутся вместе с
+  прокси службы. Задание `timings` (только `workflow_dispatch`) не менялось.
+
+## B2.7a4c Порядок проверок run
+
+25.11.2026. Ветка `b27a4c-run-order` от `oc2-migration` (`950e5da9ce`), рабочее дерево `.claude/worktrees/b27a4c`. Bun 1.4.4
+и Node 24.19.0 первыми в `PATH` только для своих команд; `bun install --frozen-lockfile`, `npm ci --ignore-scripts`
+клиента `loginom-runtime` и шаблона дашборда. Хвост B2.7a4b («Порядок проверок не как в 0.4»; строка 5 в B4.8a «Пустая сессия
+после отказа `run --command`»). Правок upstream нет, `catalog.json` и `catalog.md` не менялись; новых контрактов нет.
+
+### Что изменено (`packages/cli/src/run/`)
+
+| Пункт | Итог |
+|---|---|
+| 1. `--command <навык>` без сообщения | `run.ts`: «You must provide a message» не выдаётся, если продуктовый CLI получил `--command` (`RunProduct.skills()`); сервер принимает промпт с пустым текстом и навыком (проверено процессом с подставной моделью). Без `--command` код 1 и текст прежние |
+| 2. Host раньше файлов и сообщения | `run.ts`: клиент создаётся в `run()`, `RunProduct.preflight` — сразу после чтения stdin, до проверки сообщения и `--file`. Ненастроенный профиль с `--command loginom-automation` и отсутствующим `--file` даёт 2 (`LOGINOM_CONFIG_REQUIRED`), строгий журнал — 4 |
+| 3. Нет пустой сессии | `preflight` идёт до `resolveSessionTarget`, ядро не менялось. Вызов убран из `runNonInteractivePrompt` (после создания сессии) и из `RunProduct.dashboard`: теперь он один на запуск. В JSON-событии отказа `sessionID` пуст, как у отказа `dashboard` с B2.9i |
+| 4. `run --dashboard` | Порядок «Host, подготовка папки, сессия» прежний: проверка идёт раньше `loginom.dashboard`, строгий журнал отказывает до траты разового снимка; тесты `cli-dashboard` проходят |
+
+### Потребитель `evals/script/run-node-selection-attempt.ts`
+
+Код не менялся. Событие отказа теперь без `sessionID`, `sessions.length !== 1` при непустых событиях даёт
+`SELECTION_SESSION_INCOMPLETE` (код 2) — тот же итог, что в 0.4 (там сессии при отказе тоже не было). Раньше (одна пустая
+сессия) было `SELECTION_DISPATCH_UNCONFIRMED`. Читатель `readSelectionSnapshot` для пустой сессии оставлен и проверяется
+прежним тестом; в тесте изменён только комментарий.
+
+### Тесты
+
+`packages/cli/test/cli-loginom.test.ts`, «run checks the Host before files and the message, leaves no session after a
+refusal, and takes --command alone»: процесс CLI из исходников, настоящий Host на Node, подставная модель; код и stderr
+каждого отказа, число строк `session_v2` в базе профиля (0), число запросов к модели (0), `--command package-docs` без
+сообщения — код 0 и ответ модели.
+
+Мутации (файл `run.ts` возвращался из копии после каждой):
+
+| Мутация | Результат теста |
+|---|---|
+| база (`git checkout src/run`) | красный |
+| убрано исключение для `--command` из проверки сообщения | красный |
+| `preflight` после проверки сообщения | красный |
+| `preflight` после чтения `--file` | красный |
+| `preflight` после создания сессии | красный (код 1 раньше; отдельно утверждение о числе сессий этой мутацией не проверено) |
+
+Прогоны (`LOGINOM_AI_AGENT_TEST_NODE`, база `950e5da9ce` в отдельном дереве для сравнения):
+
+| Набор | Итог |
+|---|---|
+| `packages/cli` `bun test --timeout 60000` | 624 pass, 11 skip, 0 fail (635 тестов, 83 файла) |
+| `packages/loginom-agent` | 125 pass, 0 fail |
+| `packages/product` | 71 pass, 3 fail — ровно известные: `workspace packages`, `CI triggers`, `path literals` |
+| `evals` `test:unit` (полный) | 1328 pass, 31 fail. Файлы с падениями повторены на базе и на ветке с `--timeout 60000`: на базе 22 падения, на ветке 21 (подмножество базы; общие — запись под `root`, `EACCES`/readonly и cleanup, `near-miss`, `text-import-evidence`, `campaign-*`); остальные 10 из полного прогона прошли при повторе на ветке (нагрузка машины) |
+| `bun typecheck` в `packages/cli` | без ошибок |
+| `catalog-check.py` / `apply-identity.py --check` | код 0 / 0 файлов |
+
+### Найдено, не чинил
+
+- `--command=` с пустым значением и `RunProduct.skills()`: пустой ID считается навыком, сообщение не требуется, сервер
+  ответит `Skill not found`. В 0.4 пустая `--command` была обычным промптом (запись B2.7a4b не менялась).
+- Коды 2 для «нет сообщения»/`--fork` без `--continue` у продуктового CLI в 0.4 (`cmd/run.ts`) — в v2 по-прежнему 1.
+
+### Не проверено
+
+- Собранный CLI (`build-cli.ts`), Windows и macOS; `run` через работающую службу профиля.
+- Реальная модель не вызывалась: все запросы шли в подставной сервер `127.0.0.1`.
+
+## B5.1m — тесты продукта на Linux
+
+25.11.2026. Ветка `b51m-product-checks` от `oc2-migration` (`b2ed31b6f6`), дерево `.claude/worktrees/b51m`. Строка B5.0:
+«Тесты продукта на Linux». Workflow не запускались (раннеров GitHub здесь нет), модель не вызывалась; Bun 1.4.4 первым в
+`PATH`, Node 24.19.0, `HOME` и `XDG_*` — во временный каталог.
+
+### Что изменено
+
+- `.github/workflows/test.yml` (имя `loginom-checks`), одно задание `unit` на `ubuntu-24.04`, 60 минут. Запуск: `push` в
+  `oc2-migration` и `loginom` (без фильтра путей), `pull_request` в `loginom`, `workflow_dispatch`. Шаги: `setup-bun`,
+  `setup-loginom-inputs` (закреплённый Node, Chromium), `npm ci` шаблона дашборда, `install-deps chromium`, `xvfb` и
+  `sysctl kernel.apparmor_restrict_unprivileged_userns=0`; затем `bun test` в `product`, `bun run test` в `loginom-agent`,
+  `loginom-host` (под `xvfb-run`), `dashboard`, `cli` (под `xvfb-run`), контракты адресов и ссылок узлов клиента (список
+  из `test.yml` 0.4) и полный набор `packages/loginom-runtime/test/*.test.mjs` с закреплённым Node в точности как в 0.4:
+  `timeout --kill-after=10s 5m nice -n 19 "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-timeout=60000 --test-concurrency=2`.
+- `.github/workflows/check-test.yml`: оба вызова `bun turbo test` (affected и полный) получили `--filter='!…'` для пяти
+  пакетов `test.yml`; шаг `npm ci` шаблона дашборда оттуда убран (дашборд исключён). `turbo test --dry` — 43 пакета до, 38 после.
+- `packages/product/test/loginom-checks.test.ts` (4 теста): `test.yml` запускается на `push` в `oc2-migration`, состав
+  пакетов `test.yml` (по шагам `bun test` / `bun run test` в `packages/<имя>`) равен пяти ожидаемым, оба вызова `turbo test`
+  исключают ровно этот набор.
+- `packages/product/test/ci-workflows.test.ts`: `test` добавлен в список своих workflow.
+- `catalog.json` не менялся: `.github/**` уже в `CAT-02`; `catalog-check.py` код 0.
+
+### Выбор меньшего (записано)
+
+- **Имя файла.** Задание называет `loginom-checks.yml`, но `bridge.test.mjs` (без правки теста) читает бюджет набора из
+  `.github/workflows/test.yml` и ищет там `timeout --kill-after=… nice -n 19 … --test --test-timeout=…`. Файла `test.yml`
+  в форке не было, тест красный. Выбран один файл `test.yml` с именем `loginom-checks` (без второго «заглушечного» файла).
+  Переименование в `loginom-checks.yml` потребует правки `bridge.test.mjs` — решение владельца.
+- `evals` unit не включён: у `evals` свой `bun.lock` и отдельная установка, а в строке B5.0 это «при наличии»; задача B5.1m
+  на него не опирается.
+- Весь клиент `loginom-runtime/client` (594 файла) не дублируется: его гонит `loginom-client-full.yml`. В `test.yml` — как в 0.4:
+  набор `packages/loginom-runtime/test` и 12 контрактных файлов.
+- Проверки, которые 0.4 держал в этом же задании (`environment-proxy`, `no-proxy-contract`, `update-feed`, HttpApi) не переносились:
+  не в строке B5.1m.
+
+### Проверки (реальный вывод)
+
+- YAML: `python3 -c 'import yaml'` разобрал оба workflow; `Bun.YAML.parse` — в тесте.
+- `packages/product`: 75 pass, 3 fail — ровно `workspace packages`, `CI triggers`, `path literals` (В-95, B5.1; причины — в
+  `loginom-macos.yml` и `loginom-windows.yml`, не в новых файлах). До правки: 71 pass, 3 fail.
+- Мутации `loginom-checks.test.ts` (каждая краснит, затем откат): убран один `--filter` из `check-test.yml`; в `test.yml` убрана
+  ветка `oc2-migration`; в `test.yml` один пакет подменён другим; в `check-test.yml` добавлен лишний `--filter`.
+- Те же команды, что в шагах (пользователь root, Chromium без песочницы невозможен):
+  `loginom-agent` 125 pass, 0 fail; `cli` (под `xvfb-run`) 623 pass, 11 skip, 0 fail; `loginom-host` 548 pass, 2 fail
+  (`archive verification preserves manifest modes under a private umask`, `actual managed entry reads live bridge work`:
+  права и отказ в правах, ожидаемо для root; в B5.1c то же: 546 pass, 3 fail); `dashboard` Node-часть 90 pass, 4 fail, 1 отмена
+  (EACCES и таймаут, как в B5.1c); контракты клиента 0 fail; набор `loginom-runtime/test` 116 pass, 5 fail, 1 отмена: 6 тестов
+  «Chromium sandboxing failed» (запуск от root) и таймаут `managed-login-diagnostics`. Код пакетов в этой задаче не менялся,
+  база и дерево совпадают по SHA кода; красные — те же классы (root), что в B5.1c.
+- `bridge.test.mjs`: 18 pass, 0 fail, без правки теста, закреплённым Node, `timeout --kill-after=10s 5m` без `nice`
+  (54 с). С `nice -n 19` на нагруженной машине (load 12–38) дочерние процессы (40 с бюджета, один ~12 с в покое) не укладываются:
+  `exit 124`. Это нагрузка машины, а не код.
+- `catalog-check.py` код 0; `apply-identity.py --check` — 0 файлов; `bun run check` код 0 (39 из 39 задач turbo).
+
+### Только CI
+
+Не root: проверки прав (`EACCES`, `private umask`, отказ в правах) и запуск Chromium с песочницей; Chromium
+(`install-deps`, закреплённая ревизия) и `sysctl` для user namespaces; `xvfb-run` для `cli` и `loginom-host` (`resume-oracle`
+без дисплея пропускается локально, в CI он обязателен); время под `nice -n 19` и 5 минут на набор runtime; `npm ci` шаблона и
+клиента; первый настоящий прогон на `push` в `oc2-migration` в форке.
+
+## B5.1m-ci Первый прогон loginom-checks на GitHub
+
+Run 45688737120 форка на `oc2-migration` `df77bb443a`: `secrets` — success; `loginom-checks` — failure на шаге
+`Test product guards`. Упали ровно три известных теста (`workspace packages`, `CI triggers`, `path literals`, В-95/B5.1),
+74 pass. Все следующие шаги (`loginom-agent`, `loginom-host`, `dashboard`, `cli`, контракты и набор `loginom-runtime`)
+были пропущены, потому что шаги задания идут до первого красного.
+
+Правка: у шага `Configure git identity` появился `id: ready`, а у шагов пакетов после охранных тестов условие
+`!cancelled() && steps.ready.outcome == 'success'`. Каждый пакет теперь показывает свой результат, задание остаётся
+красным, пока красный любой шаг. Охранные тесты `loginom-checks`, `ci-base` и `ci-workflows` — 12 pass.
+
+## B5.1m-ci2 CLI на GitHub: flag-identity
+
+Run 45689615930 форка (`fe60098d89`), задание `loginom-checks` с независимыми шагами. Прошли `loginom-agent`,
+`loginom-host`, `dashboard`, контракты и полный набор `loginom-runtime` с закреплённым Chromium — на раннере не от root.
+Значит, локальные красные этих пакетов — запуск от root (B5.1c, B5.1m). `Test product guards` — ровно три известных (В-95).
+
+`Test CLI`: 622 pass, 1 fail — `flag-identity.test.ts`: `debug paths` создаёт каталог конфигурации, а тест подставлял
+`LOGINOM_AI_AGENT_CONFIG_DIR=/product/config-dir`. На раннере `EACCES: mkdir '/product'`. Локально под root тест молча
+создал `/product/config-dir` в корне машины 22.11; пустой каталог удалён. Правка: пути продукта в тесте — внутри
+временного домашнего каталога пробы (`{root}`). 3 pass, `/product` больше не появляется. Восемь падений CLI после
+слияния B2.7a4c локально — таймауты под нагрузкой: на раннере их нет.
+
+## B5.1f — pty под платформы
+
+25.11.2026. Ветка `b51f-pty-platforms` от `oc2-migration` (`569014e83b`). Меньший вариант: без правок Rust и `build.rs`, без
+сборки в `release-process-daemon.yml` (остаётся выключенным задачей a).
+
+### Что сделано
+
+- `.github/workflows/loginom-pty.yml` — вызов: `workflow_call` (для сборок h, i, k), `workflow_dispatch`, `pull_request` по
+  `packages/process-daemon/**`, действию и самому файлу. Входов нет. Матрица: `ubuntu-22.04` / `x86_64-unknown-linux-gnu`
+  (`cargo zigbuild --target …gnu.2.30`, cargo-zigbuild 0.23.2, проверка `readelf` ≤ 2.30), `macos-15` / `aarch64-apple-darwin`,
+  `windows-2022` / `x86_64-pc-windows-msvc` (`+crt-static`, `OPENCODE_ZIG_CPU=baseline`). Каждое задание: `--version` =
+  `loginom-ai-agent-pty <версия> (protocol <N>)`, сессия `play`, артефакт.
+- Артефакты (имя → файлы): `loginom-ai-agent-pty-x86_64-unknown-linux-gnu`, `loginom-ai-agent-pty-aarch64-apple-darwin`,
+  `loginom-ai-agent-pty-x86_64-pc-windows-msvc`; внутри `loginom-ai-agent-pty[.exe]` и `SHA256SUMS`. Потребитель скачивает
+  артефакт, на Linux и macOS делает `chmod +x` (upload-artifact теряет бит) и ставит `LOGINOM_AI_AGENT_PTY_BIN`.
+- `.github/actions/setup-rust-pty/action.yml` — вход `target`; Zig 0.16.0, `release-bin/zig` (Unix) или переменные Windows,
+  Rust 1.90.0, `Swatinem/rust-cache`.
+- `check-process-daemon.yml`: macOS на `macos-15` вместо `blacksmith-*`; проверка версии Windows и имя тестового exe теперь
+  `loginom-ai-agent-pty` (прежний шаблон `opencode-pty` не совпал бы с продуктовым именем).
+- Тест `packages/product/test/pty-workflow.test.ts` (5 тестов). Каталог: `.github/**` уже в CAT-12/`.github`, записей не надо.
+
+### Проверки
+
+- Linux x64 здесь, Zig 0.16.0 (только чтение), CARGO_HOME/цели во временном каталоге: `readelf --version-info` — максимум
+  `GLIBC_2.29` (≤ 2.30); `--version` = `loginom-ai-agent-pty 0.5.2 (protocol 8)`; `play`: `release-smoke` и `checkpoint` есть.
+- Оговорка: на этой машине glibc 2.39, и обычный `cargo zigbuild …2.30` падает при линковке (`undefined symbol:
+  arc4random_buf`: Ghostty собирается под нативный glibc 2.39, `build.rs` даёт `-Dtarget` только при HOST≠TARGET). Рабочий
+  результат получен с временной обёрткой zig, добавляющей `-Dtarget=x86_64-linux-gnu.2.30` (в коммит не входит). На
+  `ubuntu-22.04` (glibc 2.35) нативная цель ниже 2.36, как в upstream `release-process-daemon.yml`; проверит CI. Если красно —
+  вынести `-Dtarget=…2.30` в `release-bin/zig`.
+- Мутации теста (glibc 2.31, убран `readelf`, убран baseline CPU, Rust 1.89, `blacksmith`, `windows-2025`): каждая даёт 1 fail.
+- YAML трёх файлов разобран `python3 yaml`. `product`: 68 pass, 3 fail — известные (`workspace packages`, `CI triggers`,
+  `path literals`). `catalog-check.py` код 0; `apply-identity --check` 0 файлов; `bun run check` код 0 (39 задач).
+
+### Проверит только CI на GitHub
+
+Работа workflow и действия целиком; Linux-сборка на 22.04 без обёртки; macOS arm64; Windows MSVC (`+crt-static`, Zig на
+Windows, первый прогон `daemon/windows.rs`, `play` с `cmd.exe`); кэш Cargo; `check-process-daemon` на `macos-15`.
+
+## B5.1k — сборка macOS
+
+25.11.2026. Ветка `b51k-macos-build` от `oc2-migration` (`840be7c3bb`). Эталон — `v0.4.0`.
+
+### Выбор меньшего варианта
+
+- **Артефакт Desktop — `.app.tar`, не DMG/ZIP.** `pack.ts` на macOS строит `.app` (`--dir`, `identity=null`) и пакует его в
+  `loginom-ai-agent-mac-arm64.app.tar`; цели `dmg` и `zip` в конфиге есть, но `pack.ts` их не вызывает. DMG/ZIP и подпись
+  `.app` — B5.1l (и `.github/release/sign-desktop-macos.sh`, он пока на именах upstream). Поэтому приёмка «`.dmg`/`.zip`» не
+  выполнена: в артефакте `.app.tar`, CLI `tar.gz`, `SHA256SUMS`.
+- **`check-macos.ts` и `build-macos.ts` не портированы.** Тесты `product`, `loginom-host` и `desktop` на Linux гоняет B5.1m;
+  сборку целиком заменяют шаги workflow. Тесты `macos-smoke*`, `release/verify-macos.ts` — этап G (по таблице B4).
+- **Установка зависимостей без `--filter`:** полный `bun install --frozen-lockfile`. Имена пакетов в фильтрах 0.4 не
+  существуют в v2, а урезанный набор фильтров не проверить без macOS.
+- **pty — из reusable `loginom-pty.yml` целиком** (собирает все три платформы; выбрать одну цель нельзя). Красный Windows pty
+  блокирует macOS, пока `loginom-pty.yml` не позеленеет.
+
+### Что сделано
+
+- `.github/workflows/loginom-macos.yml`: добавлен `workflow_call` (входы `version`, `browser_recovery`), `workflow_dispatch`
+  сохранён. Задания: `pty` (вызов `loginom-pty.yml`) и `macos` (`macos-15`, arm64). Шаги: pinned Node и Chromium
+  (`setup-loginom-inputs`), `bun install`, `electron/install.js`, скачивание `loginom-ai-agent-pty-aarch64-apple-darwin`,
+  `chmod +x`, проверка `SHA256SUMS`, `LOGINOM_AI_AGENT_PTY_BIN`, `system-proxy-smoke.ts`, CLI
+  (`loginom-host/script/build-cli.ts` → `tar.gz` + `.sha256`, ad-hoc подпись внутри скрипта), CLI для Desktop
+  (`packages/cli` `build --skip-install --skip-web-ui`, `LOGINOM_AI_AGENT_TARGET=darwin-arm64` → `packages/cli/dist`),
+  Desktop `build` и `pack`, проверка: `loginom-ai-agent-cli --version` = версия, `verify-cli-candidate.ts`, `SHA256SUMS`;
+  артефакт `loginom-macos15-arm64-<run_number>`. Секретов нет.
+- `loginom-host/script/{resume-oracle,tui-multichat-acceptance,cli-permission-acceptance}.ts`: `{ readonly: true }` заменён
+  на `PRAGMA query_only = ON` (4 места).
+- `product/test/ci-workflows.test.ts` не менялся: `loginom-macos` уже в `PRODUCT`, нового файла нет. `catalog.json` не менялся.
+
+### Проверки (Linux, Bun 1.4.4)
+
+- YAML разобран `python3 yaml`. `uptime` 10, поэтому тяжёлые сборки не запускались.
+- `packages/product`: 81 pass, 2 fail — `CI triggers` и `path literals`, оба про `loginom-windows.yml` (задача i). Закрыт
+  `workspace packages` (`--filter` в `loginom-macos.yml`); `repo-paths` теперь 7/2.
+- `packages/loginom-host` `bun typecheck` — 0 ошибок. `catalog-check.py` код 0; `apply-identity --check` 0 файлов;
+  `bun run check` код 0 (39 задач).
+
+### Проверит только CI на GitHub
+
+Всё выполнение на macOS 15 arm64: сборка pty (зависит от `loginom-pty.yml`); `build-cli.ts` (`Bun.revision` против notice,
+`codesign`, Keychain-помощник); сборка `packages/cli` с `--skip-web-ui` — хватит ли Desktop такого CLI; `electron-builder
+--dir`; `verify-cli-candidate.ts` (дерево исходников не должно стать грязным после сборки Desktop); кучи `NODE_OPTIONS` 4 ГБ;
+время.
+
+## B5.1i — Windows CAND: сборка
+
+25.11.2026. Ветка `b51i-windows-build` от `oc2-migration` (`840be7c3bb`). Меньший вариант: шаги проверок установленного продукта
+(B5.1j) не менялись; `catalog.json` не менялся (`script/` и `.github/**` уже в каталоге; файлов OpenCode не правил).
+
+### Запуск
+
+`gh workflow run loginom-windows.yml --ref oc2-migration` (workflow_dispatch сохранён, добавлен `workflow_call`).
+
+### Что сделано
+
+- `script/build-windows.ps1`: фильтры установки `@opencode/desktop`, `@opencode/cli`, `@loginom-ai-agent/loginom-host`
+  (были `@opencode-ai/desktop` и `opencode`); вместо `package:win` — порядок: CLI Desktop (`packages/cli/script/build.ts
+  --skip-install --skip-web-ui`, цель `windows-x64-baseline`, в `packages/cli/dist`) → `desktop build` → `desktop pack`
+  (распакованное приложение, переносится в `<out>/desktop/win-unpacked`, потому что каждый `pack` очищает `dist/desktop`) →
+  второй `pack` с `LOGINOM_AI_AGENT_DESKTOP_APP` (NSIS) → установщик в `<out>/desktop/` → `loginom-host/script/build-cli.ts`
+  (CLI ZIP). Новый параметр `-PtyBinary` (или `LOGINOM_AI_AGENT_PTY_BIN`), без него сборка отказывает. Переменные среды
+  восстанавливаются в `finally`.
+- `loginom-windows.yml`: `workflow_call`; `paths` вместо `packages/opencode/**` — `packages/cli`, `core`, `server`,
+  `process-daemon`, `loginom-pty.yml`, `setup-rust-pty`; задание `pty` (вызов `loginom-pty.yml`, то же условие запуска, что у
+  сборки) и `build-package-test.needs: pty`; шаг скачивания артефакта `loginom-ai-agent-pty-x86_64-pc-windows-msvc`;
+  «Verify unsigned candidate outputs» и «Upload short-lived unsigned candidates» перенесены сразу после сборки, чтобы красный
+  шаг проверок (j) не лишал артефактов; в шаге j `Push-Location packages/opencode` заменён на `packages/cli` (иначе `path
+  literals` остаётся красным). `updater-fixtures` — по-прежнему только dispatch.
+- Тест `packages/product/test/windows-build.test.ts` (4 теста): фильтры, порядок «CLI → Desktop → pack → pack с приложением →
+  CLI ZIP», pty, dispatch/call и порядок выгрузки. `PRODUCT` в `ci-workflows.test.ts` не менялся: `loginom-windows` там уже есть.
+
+### Проверки
+
+- YAML `loginom-windows.yml` разобран `python3 yaml` (5 заданий, триггеры `workflow_call`, `workflow_dispatch`, `pull_request`).
+  Сборка здесь не выполнялась (машина перегружена: load average около 10, и нужен Windows).
+- `packages/product`: 86 pass, 1 fail — `workspace packages` (`loginom-macos.yml`, закроет B5.1k). Закрыты `CI triggers` и
+  `path literals`. Новых падений нет.
+- `catalog-check.py` код 0; `apply-identity.py --check` — 0 файлов; `bun run check` код 0 (2 мин 19 с).
+
+### Выборы и находки
+
+- `loginom-pty.yml` без входов собирает три платформы; вызывающий берёт только Windows. Входа «только эта цель» не добавлял
+  (файл строки f).
+- Артефакты шагов j (`cli-installed-smoke.json`, `safe-storage-*.json`) раньше шли в тот же `upload-artifact`; теперь выгрузка
+  идёт до них, и в артефакт они не попадают. Задача j должна добавить свою выгрузку.
+- `updater-fixtures` вызывает `build-windows.ps1 -Product Desktop` без pty: теперь он откажет. Не чинил (dispatch-only).
+- `test-windows-profile.ps1` собирает `packages/cli/test/profile-windows.test.ts`, которого нет (порт ACL не сделан): шаг j
+  `Run package-local checks` красный независимо от сборки.
+
+### Проверит только CI на GitHub
+
+Всё выполнение на `windows-2022`: сборка CLI Desktop с `BUN_COMPILE_RELEASE=bun-v1.4.4` (нужен `unzip` из `Git\usr\bin`;
+если распаковка Bun на Windows сломана, как отмечено в `build-cli.ts`, упадёт здесь); `bun install --filter` трёх пакетов;
+два вызова `pack` и NSIS; встраивание pty `.exe` в оба CLI (`resolveProductPty` запускает его `--version`); `build-cli.ts` с
+baseline-средой; скачивание артефакта pty из вызванного workflow; шаги j.
+
+### B5.1i-ci: `.bun-cache` в снимке исходников
+
+Проверки: `product` 92 pass, 0 fail; `catalog-check.py` 0; `apply-identity --check` 0 файлов; `bun run check` 0.
+
+Run 45715939494 (`fa731fbffd`): сборка CLI Desktop с `BUN_COMPILE_RELEASE` скачала baseline-Bun в `packages/cli/.bun-cache/`
+(дерево исходников), и `build-cli.ts` отказал с `LOGINOM_SOURCE_CHANGED_DURING_BUILD`. На Linux и macOS каталога нет: цель
+совпадает с запущенным Bun, среду скачивать не нужно (на Windows baseline отличается от запущенного AVX2-Bun).
+`cliSourceSnapshot` берёт `git ls-files --cached --others --exclude-standard`, то есть уважает `.gitignore`. Правка:
+`.bun-cache` в корневой `.gitignore` (кэш среды выполнения, не исходники); проверку `SOURCE_CHANGED` не менял, она по-прежнему
+отказывает при изменении любого неигнорируемого файла. Проверит только CI.
+
+## B5.1h — сборка Linux: CLI и Desktop
+
+25.11.2026. Ветка `b51h-linux-build` от `oc2-migration` (`840be7c3bb`). Меньший вариант: без новых скриптов, правка только
+файлов строки.
+
+### Что сделано
+
+- `.github/workflows/loginom-linux.yml`. Запуск: `workflow_call`, `workflow_dispatch` и `push` в `oc2-migration` по
+  `packages/**`, `patches/**`, `bun.lock`, `package.json`, `.github/actions/**` и самому файлу (B5.2b заменит push вызовом из
+  `loginom-release.yml`). Задание `pty` вызывает `loginom-pty.yml`; `linux` (ubuntu-24.04, 120 мин) идёт после него с
+  `if: !cancelled()`, чтобы красный pty macOS или Windows не скрыл сборку Linux; без артефакта Linux падает шаг загрузки.
+- Шаги: зависимости (`rpm`, `squashfs-tools`, `xvfb`, GTK/NSS) → `setup-bun` → `setup-loginom-inputs` → артефакт pty
+  (`sha256sum -c`, `LOGINOM_AI_AGENT_PTY_BIN`) → `build-cli.ts` → `verify-cli-candidate.ts` и запуск
+  `bin/loginom-ai-agent-cli --version` из распакованного `tar.gz` с изолированными `HOME` и `XDG_*` (сверка с
+  `cli-manifest.json`) → отрицательный контроль: `desktop/script/build.ts` без `packages/cli/dist` обязан упасть с
+  «Desktop bundles the CLI built from packages/cli» → CLI для Desktop (`LOGINOM_AI_AGENT_TARGET=linux-x64-baseline`,
+  `--skip-install --skip-web-ui`) → Desktop `build` (`NODE_OPTIONS=--max-old-space-size=6144`) → `xvfb-run bun test` в
+  `packages/desktop` → `pack` (AppImage, deb, rpm) → `safe-storage-smoke.cjs` в трёх режимах под `xvfb-run` с
+  `--no-sandbox` → артефакты `loginom-linux-x64-cli` (tar.gz, `.sha256`, `cli-manifest.json`, `SHA256SUMS`) и
+  `loginom-linux-x64-desktop` (AppImage, deb, rpm, `SHA256SUMS`, три файла `safe-storage-*.json`).
+- `ci-workflows.test.ts`: `loginom-linux` в `PRODUCT`. Новый `linux-workflow.test.ts` (4 теста): триггеры, pty, порядок шагов,
+  кодек и отсутствие секретов. Секретов и подписи нет.
+
+### Выбор вместо буквы задания
+
+- В задании «CLI `build-cli.ts` → `packages/cli/dist`». Фактически `build-cli.ts` пишет продуктовый CLI в свой каталог, а
+  Desktop берёт из `packages/cli/dist/cli-linux-x64-baseline` CLI, собранный `bun run build` пакета `cli` (не `--standalone`).
+  Сделаны обе сборки; `build-cli.ts` даёт артефакт `tar.gz`, вторая — вход Desktop.
+- pty: вызов `loginom-pty.yml` целиком (три платформы), без правок файла строки f и без второй сборки pty в этом файле.
+- Без `pull_request` (у macOS и Windows условия по батчам; для этапа B хватает push и dispatch). Без `bun typecheck` в
+  workflow: он в `check`.
+
+### Находка (чужая строка, не правил)
+
+- `loginom-windows.yml` (B5.1j) собирает для `safe-storage-smoke.cjs` кодек из `packages/desktop/src/main/loginom/credentials.ts`.
+  Это слой Desktop без экспорта `credentials`, в бандле `import.meta`, и Electron падает на «Cannot use 'import.meta' outside a
+  module». Скрипт ждёт `credentials` из `packages/loginom-host/src/connection/credentials.ts` (так сказано в его комментарии);
+  здесь взят он. Проверено локально: Electron из `packages/desktop/node_modules`, режимы `write`, `read`, `unavailable` — код 0.
+
+### Проверки
+
+- YAML разобран (`python3 yaml`). Локально выполнены: отрицательный контроль (`build.ts` без CLI — код 1 и нужное
+  сообщение, дерево чистое), шаг `safeStorage` целиком (временные `HOME`, `XDG_*`, `RUNNER_TEMP`; три записи evidence).
+- Тяжёлые сборки (pty, `build-cli.ts`, CLI и Desktop, `pack`) не запускались: `uptime` 10–15 (порог 8). Проверит CI.
+- `packages/product`: 84 pass, 3 fail — известные (`workspace packages`, `CI triggers`, `path literals`), `loginom-linux` в
+  выводе падений нет; эту строку они не закрывают.
+
+### Проверит только CI на GitHub
+
+Весь прогон: `setup-loginom-inputs` на Linux, `build-cli.ts` с baseline Bun, `--version` CLI, сборка CLI для Desktop с
+`--skip-web-ui`, память Desktop `build`, `xvfb-run bun test` Desktop (может оказаться красным на тестах, которым нужен не
+виртуальный дисплей), AppImage, deb, rpm, время (лимит 120 мин), `safeStorage` на раннере без setuid `chrome-sandbox`.
+
+## B5.1f-ci Первая сборка pty на GitHub
+
+Run 45694260129 форка (`06ac4c97c9`): `pty (x86_64-unknown-linux-gnu)` и `pty (aarch64-apple-darwin)` — success,
+`pty (x86_64-pc-windows-msvc)` — failure: `build.rs` скачивает Ghostty через git в глубокий `OUT_DIR` Cargo, git
+отвечает `unable to open loose object …: Filename too long`. Upstream (`check-process-daemon.yml`,
+`release-process-daemon.yml`) включает `core.longpaths` перед сборкой на Windows; то же добавлено в ветку Windows действия
+`setup-rust-pty`.
+
+### Цель pty по платформам (ветка `b51f2-pty-target`)
+
+Вход `targets` у `workflow_call` в `loginom-pty.yml`: JSON-список целей, пусто — все три (так же для `push`,
+`pull_request`, `workflow_dispatch`). Матрица — `fromJSON(inputs.targets || '[три цели]')`, `runs-on` выводится из цели
+(`linux` → `ubuntu-22.04`, `apple` → `macos-15`, иначе `windows-2022`). `loginom-linux.yml`, `loginom-macos.yml` и
+`loginom-windows.yml` просят только свою цель, поэтому нехватка раннера macOS или красная цель другой ОС их не блокирует.
+Тест `pty-workflow.test.ts` (6): матрица, выбор раннера, вход, потребители; мутации (чужая цель у потребителя, нет
+`targets`, glibc 2.31, вход игнорируется, раннер macOS-14, нет baseline CPU) краснят по 1 тесту. `product`: 92 pass, 0 fail.
+Проверит только CI: что `fromJSON` в `strategy.matrix` и вход `targets` принимаются GitHub при `workflow_call`.
+
+
+## Хвосты паритета 3
+
+25.11.2026. Ветка `btails3-parity` от `oc2-migration` (`64199aa641`), дерево `.claude/worktrees/btails3`. Эталон — `v0.4.0` (В-99).
+Bun 1.4.4 и Node 24.19.0 первыми в `PATH` только для своих команд; `npm ci --ignore-scripts` клиента `loginom-runtime` и шаблона
+дашборда. Правок upstream-логики нет; `catalog.json` не менялся (файлы `packages/cli`, `packages/loginom-agent` под прежними записями,
+`catalog-check.py` код 0). Модель не вызывалась: процесс CLI ходил в подставной сервер `127.0.0.1`.
+
+### 1. Коды выхода `run` как в 0.4
+
+- `packages/cli/src/run/run.ts`: «нет сообщения» и `--fork` без `--continue` или `--session` у продуктового CLI дают код 2
+  (`v0.4.0:packages/opencode/src/cli/cmd/run.ts:518-525`: `exitCli(LOGINOM_AI_AGENT_CLI_ROOT ? 2 : 1)`); у OpenCode 2 без
+  продуктового профиля остаётся 1. Текст и событие `error` прежние.
+- Выбор меньшего (расхождение с заданием): задание называет пустую `--command=` ошибкой разбора аргументов. В `v0.4.0`
+  проверка была `!args.command`, то есть пустая строка — обычный запрос без навыка (в `standalone-run.ts` разбора пустого значения нет).
+  Сделано как в 0.4: `packages/cli/src/standalone.ts` не записывает пустой `--command` в `LOGINOM_AI_AGENT_RUN_COMMAND`
+  (раньше пустой ID уходил в ядро и давал `Skill not found`). Без сообщения такой запуск — код 2, с сообщением — обычный запрос.
+  Если владельцу нужна именно ошибка разбора (код 2, `CLI_ARGUMENT_INVALID`), это одна строка в `forward`. Живой `yargs` 0.4 не запускался
+  (его нет в дереве v2): вывод по коду `v0.4.0`.
+
+### 2. Вопрос `local-file` снимается при остановке вызова
+
+- Снятие вопроса вынесено из `dashboard-tools.ts` в `askWithdrawn` (`packages/loginom-agent/src/permissions.ts`): остановленный
+  вызов отвечает `once` только на свой вопрос (`reject` снял бы все вопросы сессии). `local-file.ts` (`ask`) использует его же.
+- Проверка остановки после ответа осталась у `dashboard-tools.ts`, а не в общей функции: порт теста 0.4 «остановка во время
+  вопроса — авторизация завершается, резервирования нет (`LOGINOM_UPLOAD_CANCELLED`)» требует, чтобы `local-file` не бросал на ответе.
+  Первая версия с общей проверкой краснила два теста (`loginom-local-file`, `loginom-file-profile`) — исправлена до коммита.
+
+### Тесты и мутации
+
+| Тест | Мутация | Итог |
+|---|---|---|
+| `cli-loginom.test.ts` «run checks the Host before files…»: код 2 для «нет сообщения», `--fork` без `--continue`, пустая `--command=` и `--command ""`; процесс CLI, настоящий Host, подставная модель | `--fork` обратно в 1 | красный |
+| то же | «нет сообщения» обратно в 1 | красный |
+| то же | пустая `--command` в навык | красный |
+| `server/test/loginom-local-file.test.ts` «a stop withdraws only the stopped call's read question…»: настоящее ядро, второй вопрос сессии остаётся | `local-file` без снятия вопроса | красный |
+| то же | `decision: "reject"` | красный |
+
+### Прогоны (нагрузка 6.8–7.5)
+
+```
+packages/cli            bun test --timeout 60000   624 pass, 11 skip, 0 fail
+packages/loginom-agent  bun test                   125 pass, 0 fail
+packages/server         bun test                   318 pass, 3 skip, 0 fail
+packages/product        bun test                    75 pass, 3 fail — workspace packages, CI triggers, path literals (известные)
+```
+
+### Найдено, не чинил
+
+- `v0.4.0:standalone-run.ts` отвечал кодом 2 (`CLI_ARGUMENT_INVALID`) на `--attach`, `--mini`, `--interactive`; в v2 не проверялось.
+
+После `core.longpaths` (run 45697721689, `5d344c1bfb`) Windows упал дальше: `run exe uucode_generate (tables.zig)` —
+`failed to spawn … uucode_generate.exe: FileNotFound`, рабочий каталог генератора внутри
+`target\…\build\loginom-ai-agent-pty-<hash>\out\ghostty-<sha>\zig-pkg\uucode-0.2.0-<hash>` длиннее MAX_PATH: путь
+`D:\a\loginom-ai-agent-test\loginom-ai-agent-test` на 30 символов длиннее upstream. Каталог Cargo на Windows перенесён в
+`$RUNNER_TEMP/pt` (`CARGO_TARGET_DIR` из `setup-rust-pty`), шаги pty берут бинарник из `${CARGO_TARGET_DIR:-target}`.
+
+После короткого `CARGO_TARGET_DIR` (run 45704778951, `8fd8e7d022`) pty Windows собирается; упал `Smoke test`:
+`loginom-ai-agent-pty client transport is not implemented on this platform` — у клиента `play` нет транспорта Windows.
+Smoke Windows сделан как в upstream `release-process-daemon.yml`: настоящий `daemon --runtime-dir --name smoke` по именованному
+каналу, ждём `smoke/service.json` 10 с, незанятый демон сам останавливается за 15 с и убирает каталог. `play` — только
+Linux и macOS.
+
+## Версия CLI как в 0.4
+
+25.11.2026. Ветка `bversion-bare` от `oc2-migration` (`b2fcfe5239`), дерево `.claude/worktrees/bversion`. Эталон — `v0.4.0` (В-99).
+Bun 1.4.4 и Node 24.19.0 первыми в `PATH` только для своих команд; `npm ci --ignore-scripts` клиента `loginom-runtime` и шаблона
+дашборда. Модель не вызывалась. `catalog.json` не менялся: правка в `packages/cli` (пакет форка).
+
+- Находка: `--version` печатал `loginom-ai-agent-cli v… (manifest …)` — формат библиотеки CLI Effect; в `v0.4.0`
+  (`packages/opencode/src/cli/standalone.ts`) — голый номер и перевод строки, для шагов сборок и скриптов.
+- Правка: `packages/cli/src/standalone.ts` (`early`, до профиля и до `Runtime.run`) печатает `LOGINOM_AI_AGENT_VERSION\n` и
+  выходит с кодом 0 для `--version` и `-v`. Справка по-прежнему из дерева команд.
+- Выбор меньшего: в 0.4 `--version` действовал при любой команде (`run --version` — тоже номер) и уступал `--help`; сделано так же.
+  Настройки в библиотеке для голого номера не нашлось, перехват — одна проверка в уже существующем месте.
+- Тест: `cli-standalone.test.ts` «version prints the bare number, as in 0.4» — процесс CLI, вывод ровно номер, `--version`, `-v`,
+  `run --version`, `--version --headless`; код 0, `stderr` пуст, временный корень пуст. Мутация «`--version` обратно в `help()`»
+  красная (лишний вывод `name vX`), без неё зелёная.
+
+```
+packages/cli      bun test --timeout 60000 (LOGINOM_AI_AGENT_TEST_NODE)   625 pass, 11 skip, 0 fail
+packages/product  bun test                                               91 pass, 0 fail
+catalog-check.py код 0; apply-identity.py --check: would change: 0 files
+```
+
+- Примечание: без `npm ci` клиента и шаблона дашборда и без `LOGINOM_AI_AGENT_TEST_NODE` в `cli` падают 8–9 тестов
+  (`cli-loginom`, `cli-dashboard`, `standalone`) — среда, не правка. С таймаутом 5 с тесты `cli` на этой машине тоже
+  нестабильны; проверено `--timeout 60000`.
+
+### B5.1h-fix — `Build Desktop` на GitHub (run 45711720063)
+
+- Причина: `electron.vite.config.ts` импортирует `script/utils.ts`, а там `exists` из `node:fs/promises` (только Bun; добавлен
+  форком в `4c1cad89ce`, в upstream v2.3.0 строки нет). `bunx electron-vite` грузит конфиг реальным Node из `PATH`
+  (`setup-node` на раннере): `SyntaxError ... does not provide an export named 'exists'`.
+- Выбор: убрать Bun-only импорт (`existsSync` из `node:fs`), а не прятать Node из `PATH` на шаге: правка в файле форка, не
+  upstream; `catalog.md` дополнен. Тест `script/bundled-cli.test.ts` «utils.ts loads under Node» (нужен
+  `LOGINOM_AI_AGENT_TEST_NODE`): до правки красный, после зелёный.
+- Воспроизведение (Node 24.19.0 первым в `PATH`, `uptime` 4): `node node_modules/.bin/electron-vite build` до правки — `failed to
+  load config ... SyntaxError`; после — vite начинает сборку. Полная сборка Desktop здесь не гонялась.
+- Windows и macOS: та же ловушка (`setup-node` в `loginom-windows.yml` и `loginom-macos.yml`, сборка через `desktop/script/build.ts`
+  -> `bunx electron-vite`); отдельных правок не нужно, лечит эта же правка. Чужих файлов не менял.
+
+## B5.1l — подпись и пакеты macOS
+
+25.11.2026. Ветка `b51l-macos-sign` от `oc2-migration` (`fa731fbffd`). Эталон — `v0.4.0`. Подпись — вариант A (ad-hoc, как в 0.4);
+Developer ID и нотаризация — этап G. Первый прогон `loginom-macos.yml` до этой задачи (run 45715943370, `fa731fbffd`): `pty` и
+`macos` зелёные, в артефакте `.app.tar`.
+
+### Выбор меньшего варианта
+
+- **Подпись делает `electron-builder`, не отдельный скрипт.** Как в 0.4: `identity "-"` и `mac.signIgnore` (`loginom/bin`,
+  `browsers`, `ripgrep`, `dashboard`). Node, Chromium, `loginom-keychain` и pty подписаны до укладки в ресурсы (Node — поставщиком,
+  остальные — ad-hoc при сборке), builder их не переподписывает, поэтому хеши `resource-manifest.json` не меняются и обновлять их
+  не нужно. Это проверяет шаг CI. `sign-desktop-macos.sh` (Developer ID, имена upstream) не трогался: он для этапа G.
+- **`pack.ts` на macOS:** без `--dir` и `identity=null`; `-c.mac.identity=- -c.dmg.sign=false`; в `dist/desktop` кладутся `.dmg`,
+  `.zip` и по-прежнему `.app.tar` (вход для подписи этапа G). `writeUpdateConfig` на macOS не вызывается: для целей `dmg` и `zip`
+  `app-update.yml` пишет сам builder. В артефакт CI `.app.tar` больше не идёт.
+- **`check-macos.ts` и `build-macos.ts` не портировались** (как в B5.1k). Нужная проверка — новый `script/check-macos-signature.ts`.
+- **Модель «обновления» для помощника:** запись создаётся копией помощника, затем копия переподписывается `codesign --force --sign -`
+  (тот же код, тот же хеш) и читает запись: обязательная проверка. Второй вариант (другой хеш кода, флаг `--options runtime`) только
+  печатается: ad-hoc подпись не обещает доступа к записи после смены хеша.
+
+### Что сделано
+
+- `packages/desktop/script/pack.ts` — macOS: DMG, ZIP, `.app.tar` (выше).
+- `packages/desktop/script/check-macos-signature.ts` (новый): `codesign --verify --deep --strict`; `verifyResources` (хеши всех
+  файлов `resource-manifest.json` внутри подписанного `.app`); создание, повторная подпись и чтение записи Keychain.
+- `loginom-macos.yml`: шаг «Check the signature» после `pack`; в кандидат и артефакт идут `.dmg`, `.zip`, CLI `tar.gz`,
+  `SHA256SUMS`. Код: 2 файла из 5.
+
+### Проверки (Linux, Bun 1.4.4)
+
+- YAML разобран `python3 yaml`; `bun build` нового скрипта проходит; ввод помощника через `Bun.spawn` проверен на `/bin/cat`.
+- `packages/product`: 92 pass, 0 fail.
+
+### Проверит только CI на macOS 15
+
+Что `electron-builder` без `--dir` собирает `dmg` и `zip` с ad-hoc подписью и signIgnore; что `codesign --verify --deep --strict`
+проходит; что хеши ресурсов сходятся; что копия помощника читает запись после `codesign --force`; доступность Keychain на
+раннере; шаг `Verify and collect` (`verify-cli-candidate.ts` не должен видеть грязное дерево).
+
+## B5.1j — Windows CAND: проверки после сборки
+
+25.11.2026. Ветка `b51j-windows-checks` от `oc2-migration` (`9e20d6cf53`). Меньший вариант: только `loginom-windows.yml`, один новый
+скрипт и тест продукта; `catalog.json` не менялся (`script/` и `.github/**` уже в каталоге, файлов OpenCode не правил). Выполнение
+на `windows-2022` здесь невозможно; последний прогон (run 45715939494, `fa731fbffd`) остановился на сборке (`.bun-cache`,
+B5.1i-ci), поэтому шаги после неё ещё ни разу не выполнялись. Исправлено то, что видно по коду v2.
+
+### Что нашёл и исправил
+
+- **Кодек safeStorage.** Шаг собирал `packages/desktop/src/main/loginom/credentials.ts`, а `safe-storage-smoke.cjs` ждёт
+  `credentials` из `packages/loginom-host/src/connection/credentials.ts` (находка B5.1h). Шаг собирает теперь его (путь
+  Electron `node_modules\\electron\\dist\\electron.exe` в корне — тот же, что ставит `build-windows.ps1`).
+- **Установленный smoke Desktop писался под 0.4.** Шаг вызывал `windows-installed-smoke.ps1` с `-KeepProxy` и
+  `-PayloadMutation MissingSkill`, ждал `sidecar.json` и проверки `sidecar-bundled-skills`. В v2 (B4.14c) этих параметров и
+  проверок нет: есть `-Mutation SkillByte`, а красной становится `verify-resources` (`LOGINOM_RESOURCE_HASH_MISMATCH`).
+  Шаг переписан на них; выгрузка диагностики — `installed-smoke/` и `installed-smoke-skill-byte/` (`report.json`, `logs.zip`).
+- **Администратор раннера.** Smoke требует обычную учётную запись (`ordinary-user`), а раннер GitHub — повышенный администратор.
+  Новый `script/run-windows-installed-smoke.ps1` создаёт одноразового локального пользователя группы Users (как
+  `test-windows-profile.ps1`), копирует установщик и два скрипта smoke в `%PUBLIC%`, запускает smoke через `Start-Process
+  -Credential` (окно закрывается `WM_CLOSE`, `-AllowServer`), копирует `report.json` и `logs.zip`, удаляет учётную запись.
+  Отказывает вне GitHub-hosted раннера. Код возврата — код smoke (1 — FAIL).
+- **Отрицательный контроль.** Красный прогон должен дать код 1, `status` FAIL, `verify-resources` FAIL с
+  `LOGINOM_RESOURCE_HASH_MISMATCH` и `cleanup` PASS; чистый прогон должен дать 0. Оба выполняются всегда.
+- **Артефакты шагов j.** `cli-installed-smoke.json` и `safe-storage-*.json` добавлены в выгрузку диагностики (`if: always()`),
+  потому что выгрузка кандидатов идёт раньше (B5.1i).
+- **Тесты Desktop.** `src/main/apps.test.ts` в v2 нет; вместо него `src/main/app-identity.test.ts`.
+- **`profile-windows.test.ts`.** Файл есть (порт B5.1e: ACL профиля, 3 pass на GitHub в run 45675480080), `test-windows-profile.ps1`
+  собирает его по `$PSScriptRoot\..`, не по рабочему каталогу. Замечание B5.1i «файла нет» устарело; правок не нужно.
+- Тест `packages/product/test/windows-build.test.ts` (3 новых): кодек из `loginom-host`, существование всех файлов тестов в
+  шаге, параметры вызова smoke объявлены в нём, а красная мутация входит в `ValidateSet`. Проверено мутациями: `apps.test.ts`
+  и `-Mutation PayloadX` дают красный.
+
+### Проверки
+
+- YAML разобран `python3 yaml`. `packages/product`: 95 pass, 0 fail.
+- `catalog-check.py` код 0; `apply-identity.py --check` — 0 файлов; `bun run check` код 0 (39 задач, 1 мин 5 с).
+
+### Проверит только CI на GitHub
+
+Весь шаг запуска от одноразового пользователя (`New-LocalUser`, `Start-Process -Credential`, права `icacls`, профиль, `TEMP`,
+размер argv до 1024 символов); `install.cmd` / `verify-cli-candidate` на Windows; DPAPI Electron 44; что окно приложения в
+сеансе без интерактивной станции даёт `app-window` PASS; что версия `packages/desktop/package.json` совпадает с версией
+установщика (`LOGINOM_AI_AGENT_VERSION` не задаётся). Задание `updater-fixtures` (только dispatch) по-прежнему вызывает
+`-KeepProxy` и `build-windows.ps1 -Product Desktop` без pty; не чинил.
+
+## B6.2-S План проверок кандидата
+
+25.11.2026. Ветка `b62s-gate-plan` от `oc2-migration` (`9e20d6cf53`), рабочее дерево `.claude/worktrees/b62s`. Только чтение и план; коммиты — этот раздел и
+скрипт `scripts/candidate-check/fetch-linux.sh`. Код продукта, `catalog.json` и `catalog.md` не менялись (`scripts/` не входит в upstream). Настоящая модель не
+вызывалась, на `winstand` ничего не ставилось и не запускалось. Эталон 0.4 — `v0.4.2` (В-110); B3.3 и B4.14 шли на `v0.4.0`, различие для этого плана не важно:
+профиль 0.4 пишет установленный Desktop 0.4.x, а `v0.4.2` берётся вторым профилем, если владелец не оставит `v0.4.0`. Прочитано: план этапа B («Цель и шлюз», B6),
+общий раздел B1, В-86, `guarantees.md`, `windows-release-coverage.md` (раздел 4), журнал — B3.3, B4.14a, B4.14b, B4.14c, B6.0, B5.1i, B5.1l, B5.1m-ci;
+`test.yml`, `check-test.yml`, `loginom-linux.yml`, `loginom-windows.yml`, `loginom-macos.yml`; `gh run list`/`view` форка (только чтение).
+
+### Выбор меньшего варианта
+
+- **SEC-01 и В-86.** План: «SEC-01 и чек-лист Windows в объёме В-86»; В-86: «SEC-01 в установленном Desktop — в шлюзе C». Беру выбор B6.0 (вопрос 3, ответа в `decisions.md` нет):
+  в B входит SEC-01 уровня B4.14a (кодек `safeStorage`, Linux плюс DPAPI Electron 44 в CI и под обычным пользователем), а журналы, UI API и экспорт диагностики
+  установленного Desktop (B4.14a, «Не проверено») — шлюз C. Чек-лист Windows: шаги 1–3, 4 (PKG-01/02, подпись, BRAND-01; UI-01 отменён В-10), 5 только SEC-01 и перезапуск,
+  8, 10. Шаги 6, 7 и 9 (форма Desktop, прокси, обновление с 0.4.x) — шлюз C. Новых критериев не ввожу.
+- **«На итоговом SHA только перезапустить».** Это достижимо для CI и Linux. Windows-часть вручную не исчезает: её минимум — один прогон B3.3 и одна установка на стенде.
+- **Скрипт один.** `fetch-linux.sh` только скачивает и сверяет артефакты и распаковывает CLI; запуск G1–G6 и `live.mjs` остаётся командами из `guarantees.md` и B3.3.
+  Обвязку «всё одной кнопкой» не делал.
+
+### Что уже закрывает CI
+
+| Проверка | Где | Что закрыто |
+|---|---|---|
+| Полные `bun test` `loginom-host` (xvfb), `loginom-agent`, `dashboard`, `cli` | `test.yml` (`loginom-checks`, `push` на `oc2-migration`, Linux, раннер не от root) | да, пакеты независимы; три красных `product` (В-95) не прячут остальные (B5.1m-ci) |
+| Полный `node --test` клиента `loginom-runtime` с закреплённым Chromium | `test.yml`, два шага | да |
+| `packages/server` и остальные пакеты (в них G1, G3, G4, G6: `loginom-access`, `loginom-local-file`, `loginom-dashboard-files`, `loginom-package-docs`, `loginom-dock-catalog`, `loginom-host-lease`) | `check-test.yml` (`bun turbo test`, в check-run — `test`) | да, если задание `test` зелёное; перед повтором убедиться, что именно эти файлы там идут, а не падают молча (проверка — шаг 2 задачи 1) |
+| Охранные `repo-paths`, `names`, `loginom-checks`, `windows-build` | `packages/product` в `test.yml` | да; известных падений три (В-95), на `9e20d6cf53` их закрывает B5.1l — в итоге ожидаем 0 |
+| Сборка Linux CLI и Desktop, DEB/AppImage/RPM, `SHA256SUMS`, safeStorage Linux (`write`/`read`/`unavailable`) | `loginom-linux.yml`, артефакты `loginom-linux-x64-cli`, `loginom-linux-x64-desktop` (в нём `safe-storage-*.json`) | да; ≈10–11 мин (run 45713215463) |
+| Сборка macOS: DMG, ZIP, `codesign --verify`, хеши ресурсов, Keychain helper | `loginom-macos.yml`, артефакт `loginom-macos15-arm64-<n>` | да; ≈11 мин (run 45715943370). Установленная macOS — этап G (В-86) |
+| Windows CAND: установка CLI ZIP и удаление, DPAPI `safeStorage` Electron 44 между запусками, `windows-installed-smoke` (установка, окно, LIFE-01 `WM_CLOSE`, нет процессов, REMOVE-01 на раннере) | `loginom-windows.yml`, артефакты `loginom-windows-unsigned-<run>`, `loginom-windows-installed-smoke-<run>` | **ещё ни разу не зелёный на `oc2-migration`**: все 4 прогона до `fa731fbffd` красные; run 45777982967 на `9e20d6cf53` идёт (`build-package-test` in progress) |
+| `secrets` | `secrets.yml` | да |
+
+Не закрыто CI: G2 под Windows (порт ACL профиля CLI не сделан, `profile.ts:192`, вопрос 2 B6.0), мутации G1–G6, B3.3, шаги чек-листа Windows 4–5 и 8 под обычным
+пользователем в интерактивном сеансе, вопрос SEC-01 уровня шлюза C.
+
+### Таблица проверок
+
+Время — оценка по журналу (длительности B3.3, B4.14b/c и CI), не измерение на кандидате; стенд Linux — `labsync`, 6 vCPU, 11 ГБ, нагрузка соседних агентов растит его вдвое.
+
+| № | Проверка | Где и чем | Время | Автоматизировано | Вручную |
+|---|---|---|---|---|---|
+| 1 | Пункт 1 шлюза: G1–G6 зелёные | Linux: команды раздела «Как запускать» `guarantees.md` (Bun 1.4.4, Node 24.19.0, `LOGINOM_AI_AGENT_TEST_NODE`, `npm ci` клиента и шаблона дашбордов, `xvfb-run`); часть — CI (`test`, `loginom-checks`) | CI ≈16 мин; локально 25–40 мин | CI на push; список команд в документе | перезапуск на SHA, сверка числа pass/fail с эталоном; базовые падения стенда (root) записать |
+| 2 | G1–G6 проверены мутацией | Linux, копия дерева: мутации из последнего столбца `guarantees.md`; на v2 перемерены не все (G2 `flag-identity`, G3 `process.test.ts`, G4 `recovery`/`host-port`, G5 `stage-resources` и `ci-inputs`, `repo-paths` и `names`) | 1–1,5 ч на 12–16 мутаций | нет | каждую правит агент, красный → откат → зелёный; цель — по одной свежей мутации на каждую гарантию на SHA |
+| 3 | Полные `bun test` `loginom-host`, `node --test` `loginom-runtime` | CI `loginom-checks` | ≈8–16 мин | да, закрыто CI | только прочитать итог run для SHA |
+| 4 | B3.3 Linux: профили 0.3.9 и 0.4.x → кандидат | Linux, `scripts/live-profiles/live.mjs old` с установленным AppImage 0.3.9 и 0.4.x (`gh release download`), затем `live.mjs v2 --bin <bin/loginom-ai-agent-cli кандидата> --path serve` и `--path migrate`; подставная модель, свой `HOME` | 30–45 мин (профили `old` по 3–5 мин, четыре `v2`-прогона по 1–2 мин) | `live.mjs` целиком; артефакт CLI — `fetch-linux.sh` | запуск, чтение отчёта; `old`-профили можно сделать заранее (раздел «Уже сейчас») |
+| 5 | B3.3 Windows | `winstand`, обычная учётная запись, `scripts/live-profiles/windows.ps1`, `stand.sh user`, `wipe.ps1`; установщики 0.3.9 и 0.4.x в `C:\lab` (есть с B3.3), `loginom-ai-agent-cli.exe` из ZIP кандидата | 1–1,5 ч (учётная запись, установка двух релизов, 4 прогона, уборка) | `live.mjs` одна для обеих ОС | вход SSH по паролю, перенос ZIP, уборка; **стенд** |
+| 6 | SEC-01 Linux (кодек `safeStorage`, Electron 42 → 44) | CI `loginom-linux.yml`, шаг «Desktop safeStorage smoke», `safe-storage-*.json` в артефакте | 0 мин (в CI) | да | прочитать три JSON |
+| 7 | SEC-01 Windows (DPAPI, шифротекст, перенос между запусками) | CI `loginom-windows.yml`, шаг DPAPI (`safe-storage-*.json` в `loginom-windows-unsigned-<run>`); обычный пользователь — `winstand`, как в B4.14a/c | CI ≈2 мин; стенд 20 мин | CI | стенд: смоук под `Проверка Б…`; **стенд**. Повреждение шифротекста и перенос ключа 42 → 44 — только здесь (B4.14a, «Не проверено») |
+| 8 | Чек-лист Windows 1–3: CAND, REL, SHA256 | `gh run` `loginom-windows.yml` и release-workflow (B5.2) на SHA; сверка с manifest | ≈15–40 мин ожидания | да | сверить SHA256 установщика с manifest |
+| 9 | Чек-лист Windows 4, 5 (SEC-01, перезапуск), 8, 10 | `winstand`, чистая установка NSIS из артефакта, `windows-installed-smoke.py --login --password-file` (B4.14c), CLI из ZIP, REMOVE-01 | 1,5–2 ч | `windows-installed-smoke.{ps1,py}`, `loginom-windows-installed-smoke` в CI | видимое окно в интерактивном сеансе (B4.14c: в сеансе 0 нет), подпись (её нет, как в 0.4), вход CLI и одна задача (шаг 8 — нужна живая модель или подставная); **стенд** |
+| 10 | Установленный Linux: PKG-01/02, LIFE-01, матрица DEB (Ubuntu 22.04/24.04/26.04, Debian 12/13) и AppImage | `packages/desktop/test/loginom/docker/run-matrix.ts` (B4.14b), артефакт `loginom-linux-x64-desktop` | 35–50 мин (сборка в B4.14b — 6 мин, матрица 10 целей) | скрипт `run-matrix.ts`; CI собирает, но матрицу не гоняет | запуск Docker, чтение отчётов |
+| 11 | Отчёт по `report-template.md`: установленные артефакты отдельно от исходников | вручную | 30 мин | нет | да |
+
+### Что требует Windows-стенда
+
+`winstand` (Windows 11 Pro 25H2, QEMU CPU без AVX2, только baseline-сборки; вход администратором по ключу, обычной учётной записью — по паролю через `SSH_ASKPASS`, B3.3/B4.14c).
+Нужны: строки 5, 7 (часть под обычным пользователем), 9. Всё остальное идёт на раннере `windows-2022`.
+
+**Как артефакты попадают на стенд.** Не собирать на стенде и не кросс-собирать (как в B3.3 и B4.14c): брать артефакт CI кандидата.
+
+```text
+gh run list -R kartamyshev-dev/loginom-ai-agent-test --commit <полный SHA> --json databaseId,workflowName,conclusion
+gh run download <run Loginom Windows candidate> -R kartamyshev-dev/loginom-ai-agent-test -D <каталог> \
+    -n loginom-windows-unsigned-<run>            # установщик NSIS, CLI ZIP, SHA256SUMS, safe-storage-*.json
+gh run download <run> -R … -n loginom-windows-installed-smoke-<run>   # диагностика smoke раннера
+sha256sum -c SHA256SUMS                                    # на Linux; затем те же хеши — на стенде
+```
+
+- Передача на стенд — `scp`/туннель кусками по 20 МБ с повторами (B4.14c: установщик ушёл за 7,4–26 мин, скорость 0,12–2 МБ/с); CLI в B3.3 (73 МБ) — 76 с.
+  Закладываю 15–30 мин на установщик и 5 мин на ZIP CLI.
+- Установщик NSIS ставится под обычную учётную запись с `/S /currentuser /D=C:\lab\b62s\u\…`; ничего вне `C:\lab\b62s` и этой учётной записи.
+- **Ограничения стенда:** первый вход обычной записи создаёт профиль; Планировщик с паролем не работает (нет права пакетного входа); окно в сеансе 0 невидимо;
+  нет git (сессия `repo` на Windows не проверяется); интернет есть, трафик не снимается. Сборка Windows кросс-сборкой не годится для кандидата: её хеши не равны CI.
+- Пока `Loginom Windows candidate` красный на `oc2-migration`, Windows-артефакта кандидата нет: строки 5, 7, 9 ждут зелёного CI.
+
+### Что сделать уже сейчас (на последних зелёных артефактах)
+
+Последний зелёный Linux — run 45713215463, `fa731fbffd` (`loginom-linux-x64-cli` 493 МБ, `loginom-linux-x64-desktop` 1,8 ГБ, свежесть 14 дней);
+macOS — run 45715943370, `fa731fbffd` (1,1 ГБ). Это не кандидат, но показывает, что именно придётся повторить.
+
+1. `scripts/candidate-check/fetch-linux.sh <полный SHA> <каталог>` — скачивает артефакты Linux, macOS и Windows этого SHA, сверяет `SHA256SUMS` и запускает
+   `bin/loginom-ai-agent-cli --version` под пустым `HOME`. Полный прогон на `fa731fbffd`: 6 мин 37 с, 5,3 ГБ (Linux CLI, Desktop DEB, AppImage и RPM, macOS, pty), все `SHA256SUMS` — OK, версия `0.0.0-dev-4`; Windows-запуска у этого SHA нет (красный), скрипт это печатает. Архив CLI плоский: `bin/loginom-ai-agent-cli`, `resources/`, `cli-manifest.json`. Нужен полный SHA (40 знаков): `gh run list --commit` короткий не принимает.
+2. B3.3 Linux, подготовка. Скачать AppImage 0.3.9 и 0.4.x, запустить `live.mjs old` для каждого и оставить `pristine` — профили не зависят от кандидата. На итоговом SHA останется
+   `live.mjs v2` с новым `--bin`. Раздельные `HOME` в каталоге `<scratchpad>`; `labsync`, без sudo, `xvfb-run`, `--no-sandbox`, как в B3.3.
+3. B3.3 на CLI `fa731fbffd` по этим профилям — репетиция: `live.mjs v2 --bin <cli> --path serve|migrate`. Она проверит, что `live.mjs` (имя бинарника, `loginom-ai-agent:` как пользователь Basic, B2.7a11) работает с `loginom-ai-agent-cli`: в B3.3 CLI назывался `opencode`.
+4. G1–G6: прогнать команды «Как запускать» на `9e20d6cf53`, записать числа pass/fail и базовые падения под root. На SHA кандидата сравнить.
+5. Мутации: составить список, по одной на гарантию, с точной правкой (файл, строка, что ожидаем: `N/M → K/L`), чтобы на SHA это был прогон по таблице, а не поиск; те, что перестали краснеть на v2, — записать как находки.
+6. Windows: подготовить на стенде каталог `C:\lab\b62s`, учётную запись, проверить, что установщики 0.3.9 и 0.4.x из `C:\lab` на месте (хеши из B3.3: 0.4.0 `f75e780f…be4b`, 0.3.9 `d26120da…142d`). Не запускать.
+7. Дождаться зелёного `Loginom Windows candidate` на `oc2-migration`. Это условие строк 5, 7, 8, 9; до него Windows-часть не начинается. Первый зелёный прогон — отдельная находка B5.1j.
+
+### Нарезка на задачи субагентам
+
+| Задача | Объём | Приёмка | Время |
+|---|---|---|---|
+| **1. Гарантии (G1–G6)** — Linux | пункты 1–3 таблицы: полный прогон по `guarantees.md`, свежий список мутаций (по гарантии ≥ 1; G2, G3, G4, G5 — те, что на v2 не перемерены), прогон каждой на копии дерева с откатом; сверка с CI `test` и `loginom-checks` (какие файлы реально выполнились) | таблица «команда → pass/fail → базовые падения»; каждая мутация: красная и после отката зелёная, числа записаны; `packages/product` — 0 падений (допустимы три известные, если B5.1 не влит); реальные `HOME`/`XDG_*` не тронуты | 2–2,5 ч; без CAND-артефактов, можно начинать сейчас |
+| **2. B3.3 Linux + SEC-01 Linux + установленный Linux** | строки 4, 6, 10: `fetch-linux.sh`, `live.mjs old/v2` для 0.3.9 и 0.4.x (подставная модель, `--network none` или проверка, что запрос идёт к своему серверу), `run-matrix.ts` и чтение `safe-storage-*.json` | как в B3.3: сессии, сообщения, вложения, навык, провайдер без потерь; резерв = исходная база (SHA-256); повторный `migrate` ничего не меняет; DEB/AppImage матрица зелёная; ни одного вызова настоящей модели (счётчик) | 1,5–2 ч; репетиция — сейчас на `fa731fbffd`, повтор — на SHA |
+| **3. Windows: B3.3, SEC-01, чек-лист 4/5/8/10** | строки 5, 7, 8, 9 на `winstand` из артефактов CI; начинать только при зелёном `Loginom Windows candidate` | как B3.3 и B4.14c: таблица 2 ОС × 2 релиза × 2 пути, SEC-01 под обычным пользователем (запись, чтение, повреждение, `unavailable`), PKG-01/02, LIFE-01, REMOVE-01, CLI из ZIP; хеши артефакта на стенде = CI; уборка стенда и снимок «до/после»; ничего вне `C:\lab\b62s` | 3–4 ч, не считая передачи 15–30 мин; **не раньше, чем зелёный CI** |
+| **4. Отчёт** (по желанию, можно сделать самому оркестратору) | сводка по `report-template.md`: установленные артефакты отдельно от проверок по исходникам, что закрыто CI | в таблице у каждой строки указан SHA, run и артефакт | 30–45 мин |
+
+Задачи 1 и 2 независимы и идут параллельно; 3 зависит от зелёного Windows CAND. Итого на итоговом SHA: параллельно 1 и 2 — около 2,5 ч, затем 3 — около 4 ч, отчёт — 45 мин: ≈7–8 ч календарно, из них Windows ≈ 4 ч.
+
+### Риски
+
+- **Windows CAND красный** на `oc2-migration` с самого начала (4 прогона), `fa731fbffd` упал на `.bun-cache` (исправлено, B5.1i-ci), run на `9e20d6cf53` ещё идёт. Без зелёного артефакта Windows-часть нечем кормить; кросс-сборка B4.14c даёт другие хеши.
+- **G2 на Windows без проверки.** ACL профиля CLI (`profile-windows.ts` 0.4) не портирован, тест `profile-windows.test.ts` отсутствует (B6.0, вопрос 2). Шлюз пункт 2 («G1–G6 зелёные») для Windows-части G2 формально не закрыт; решает владелец.
+- **Мутации не везде перемерены на v2:** часть строк `guarantees.md` — числа 0.4. Мутация, которая больше не краснит тест, — находка, а не успех.
+- **Базовые падения под root** (`bundled-ripgrep` 3, `cli-manifest` umask, `managed-work-entry`, `folder.test.mjs`): на Linux-стенде красные независимо от кандидата. CI на раннере не от root их показывает зелёными; сравнивать надо с ним.
+- **Нагрузка стенда** (load average около 10 при соседних агентах) даёт таймауты (CLI — восемь, B5.1m-ci2) и исключает прогоны; гонять тяжёлое при load1 ниже 4.
+- **Срок хранения артефактов — 14 дней** (`retention-days: 14`); итоговый SHA надо скачать сразу после CI и сохранить хеши в журнал.
+- **`live.mjs` на `loginom-ai-agent-cli`** ни разу не гонялся: в B3.3 бинарник звался `opencode`. Возможная находка в первой репетиции (шаг 3).
+- **Стенд Windows:** интернет есть, трафик не снимается; окно в сеансе 0 невидимо, «видимое окно» остаётся непроверенным (B4.14c); вход только по паролю; прокси и обновление с 0.4.x — шлюз C.
+- **Вопрос SEC-01** остаётся владельцу: объём шлюза B vs C (В-86 против плана). Принят меньший вариант выше; при выборе большего добавляются журналы, UI API и экспорт диагностики установленного Desktop (+1,5–2 ч).
+- **Эталон.** `v0.4.2` пока не влит (B1.9b); профили B3.3 писала `v0.4.0`. Повторить `old` на 0.4.2 — ещё ≈15 мин на ОС, различий данных не ожидается.
+
+## B5.2b — `loginom-release.yml` и G5
+
+26.11.2026. Ветка `b52b-release` от `oc2-migration` (`9e20d6cf53`). Эталон — `v0.4.2` (В-110); поведение выпуска брал из
+`v0.4.0`-порта B5.2a. Настоящая модель не вызывалась, Actions не запускались (push делает оркестратор): прогон
+на GitHub не выполнен, workflow проверен разбором YAML и охранными тестами.
+
+### Что сделано
+
+- `.github/workflows/loginom-release.yml`: `workflow_dispatch` (кандидат любого ref), push в `oc2-migration` (фильтр: сам файл,
+  три платформенных workflow, `packages/desktop/scripts/release/**`, `script/release-notes.ts`) и push тега `v*`. Задания:
+  `plan` (версия из `packages/desktop/package.json`; тег обязан быть `v<версия>`), `linux`/`windows`/`macos` (вызов
+  одноимённых workflow через `workflow_call`, macOS получает `version`), `verify-linux/-windows/-macos` на своём раннере,
+  `collect`. Публикации, draft, подписи ленты, зеркала S3 и секретов нет.
+- `packages/desktop/scripts/release/candidate.ts`: `prepare` достаёт полезную нагрузку из самого установщика (DEB — `dpkg-deb`,
+  NSIS — `7z` дважды, ZIP — `ditto`), делает `git archive HEAD` как `*-source.tar.gz`, вызывает `write-manifest.ts` и
+  `verify-artifact.ts` для каждого установщика; `g5` проверяет `cli-manifest.json` распакованного CLI и дерево ресурсов Desktop,
+  убирает файл (`resources/loginom/host/node-host.mjs` у CLI, управляемый Node у Desktop), требует красной проверки, возвращает
+  файл и требует зелёной; `--undamaged` оставляет файл на месте, и тогда контроль обязан упасть (шаг «G5 mutation»).
+- `sums.ts`: сверяет файлы со всеми тремя манифестами (хеш, наличие, один коммит и версия) и пишет `SHA256SUMS.txt`.
+- `loginom-linux.yml`: убран собственный `push` (его заменяет вызов из `loginom-release.yml`, как обещал комментарий B5.1h;
+  иначе две сборки Linux делили бы одну `concurrency`-группу). Тест `linux-workflow.test.ts` обновлён.
+- `ci-workflows.test.ts`: `loginom-release` в `PRODUCT`. Новый `release-workflow.test.ts`: состав вызовов, порядок шагов G5,
+  имена скачиваемых артефактов (сверка с загрузкой в платформенных workflow), `collect` после трёх проверок, нет секретов и публикации.
+- `ci-release.md`: раздел про кандидат v2.
+
+### Выбор меньшего варианта
+
+- Путь скриптов в задании `scripts/release/**` не существует: они в `packages/desktop/scripts/release/`.
+- Версия кандидата — версия Desktop; `workflow_dispatch` без ввода версии (Linux и Windows версию не принимают, а Debian-пакет
+  и `verify-artifact` проверяют её). Смена версии выпуска — правка `package.json`.
+- Манифест пишется на том же раннере из установщика (Windows: `7z`), а не из каталога сборки: платформенные workflow его не
+  выкладывают, а Windows-файл правит B5.1j. Следствие: `resourcesSha256` — хеш манифеста ресурсов внутри самого установщика.
+- Отрицательный контроль Desktop убирает файл из распакованной копии и возвращает его (копия 400+ МБ не нужна). Для DEB и
+  AppImage `verify-artifact.ts` запускается на целых установщиках, контроль — на дереве ресурсов (то, что проверяет `verifyResourceTree`).
+- `cli-resources.test.ts` на Linux запускается как есть; на Windows и macOS он пропускается самим тестом, их комплектность CLI
+  проверяет `candidate.ts g5` на настоящем архиве.
+
+### Хвосты B5.2a
+
+- `.dmg`, `.zip`: `write-manifest.ts` их знает (после B5.1l `.app.tar` исчез); `.rpm` Linux остаётся вне манифеста (схема его не знает).
+- `*-source.tar.gz`: создаёт `candidate.ts prepare` (`git archive HEAD`, имена `-source`, `-windows-source`, `-macos-source`).
+- `linux-matrix.json` в `release-notes.ts`: не менялся. Матрица DEB и сами заметки выпуска — этап G, B5.2b их не вызывает;
+  требование матрицы остаётся для публикации.
+
+### Команды и вывод
+
+```text
+$ cd packages/desktop && bun test scripts/release            # 15 pass, 2 skip (macOS), 0 fail
+$ cd packages/desktop && LOGINOM_AI_AGENT_TEST_NODE=<node 24.19.0> bun test   # 643 pass, 0 fail (без переменной: 2 известных падения окружения)
+$ cd packages/product && bun test                            # 101 pass, 0 fail
+$ cd packages/cli && bun test test/cli-resources.test.ts     # 13 pass
+$ мутации (product release-workflow.test.ts): вызов macOS заменён / verify без needs сборки / шаг G5 mutation переименован /
+  флаг --undamaged убран / collect без двух проверок / имя артефакта / secrets.  — 1–3 fail каждая
+$ мутации (candidate.test.ts): убрана сверка хеша в sums.ts / убрана проверка «контроль не покраснел» — 1 fail каждая
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check   # would change: 0 files
+$ bun run check                                              # 39 successful, 0 failed
+```
+
+### Только CI и не проверено
+
+- Весь прогон: `candidate.ts` ни разу не запускался на настоящих артефактах. Рискованное: распаковка NSIS (`7z`, внутренний
+  `app-64.7z`), `unpacked` для `verifyWindowsApplication`, `bun install --frozen-lockfile` через `setup-bun` на Windows,
+  запуск Electron на Windows и macOS из `write-manifest.ts`, имена файлов `*-win-x64.exe` и CLI-архивов в сборках.
+- Параллельные `concurrency`: группа Windows содержит `github.workflow` (в вызове это имя вызывающего workflow); при повторном
+  запуске на том же ref `cancel-in-progress: true` отменит предыдущий вызов Windows.
+- Мутация G5 «красная» доказана тестом `expectRed` и шагом «G5 mutation» внутри запуска; красный прогон целиком — только в CI.
+
+## B5.1l — подпись и пакеты macOS
+
+25.11.2026. Ветка `b51l-macos-sign` от `oc2-migration` (`fa731fbffd`). Эталон — `v0.4.0`. Подпись — вариант A (ad-hoc, как в 0.4);
+Developer ID и нотаризация — этап G. Первый прогон `loginom-macos.yml` до этой задачи (run 45715943370, `fa731fbffd`): `pty` и
+`macos` зелёные, в артефакте `.app.tar`.
+
+### Выбор меньшего варианта
+
+- **Подпись делает `electron-builder`, не отдельный скрипт.** Как в 0.4: `identity "-"` и `mac.signIgnore` (`loginom/bin`,
+  `browsers`, `ripgrep`, `dashboard`). Node, Chromium, `loginom-keychain` и pty подписаны до укладки в ресурсы (Node — поставщиком,
+  остальные — ad-hoc при сборке), builder их не переподписывает, поэтому хеши `resource-manifest.json` не меняются и обновлять их
+  не нужно. Это проверяет шаг CI. `sign-desktop-macos.sh` (Developer ID, имена upstream) не трогался: он для этапа G.
+- **`pack.ts` на macOS:** без `--dir` и `identity=null`; `-c.mac.identity=- -c.dmg.sign=false`; в `dist/desktop` кладутся `.dmg`,
+  `.zip` и по-прежнему `.app.tar` (вход для подписи этапа G). `writeUpdateConfig` на macOS не вызывается: для целей `dmg` и `zip`
+  `app-update.yml` пишет сам builder. В артефакт CI `.app.tar` больше не идёт.
+- **`check-macos.ts` и `build-macos.ts` не портировались** (как в B5.1k). Нужная проверка — новый `script/check-macos-signature.ts`.
+- **Модель «обновления» для помощника:** запись создаётся копией помощника, затем копия переподписывается `codesign --force --sign -`
+  (тот же код, тот же хеш) и читает запись: обязательная проверка. Второй вариант (другой хеш кода, флаг `--options runtime`) только
+  печатается: ad-hoc подпись не обещает доступа к записи после смены хеша.
+
+### Что сделано
+
+- `packages/desktop/script/pack.ts` — macOS: DMG, ZIP, `.app.tar` (выше).
+- `packages/desktop/script/check-macos-signature.ts` (новый): `codesign --verify --deep --strict`; `verifyResources` (хеши всех
+  файлов `resource-manifest.json` внутри подписанного `.app`); создание, повторная подпись и чтение записи Keychain.
+- `loginom-macos.yml`: шаг «Check the signature» после `pack`; в кандидат и артефакт идут `.dmg`, `.zip`, CLI `tar.gz`,
+  `SHA256SUMS`. Код: 2 файла из 5.
+
+### Проверки (Linux, Bun 1.4.4)
+
+- YAML разобран `python3 yaml`; `bun build` нового скрипта проходит; ввод помощника через `Bun.spawn` проверен на `/bin/cat`.
+- `packages/product`: 92 pass, 0 fail.
+
+### Проверит только CI на macOS 15
+
+Что `electron-builder` без `--dir` собирает `dmg` и `zip` с ad-hoc подписью и signIgnore; что `codesign --verify --deep --strict`
+проходит; что хеши ресурсов сходятся; что копия помощника читает запись после `codesign --force`; доступность Keychain на
+раннере; шаг `Verify and collect` (`verify-cli-candidate.ts` не должен видеть грязное дерево).
+
+## B5.1j — Windows CAND: проверки после сборки
+
+25.11.2026. Ветка `b51j-windows-checks` от `oc2-migration` (`9e20d6cf53`). Меньший вариант: только `loginom-windows.yml`, один новый
+скрипт и тест продукта; `catalog.json` не менялся (`script/` и `.github/**` уже в каталоге, файлов OpenCode не правил). Выполнение
+на `windows-2022` здесь невозможно; последний прогон (run 45715939494, `fa731fbffd`) остановился на сборке (`.bun-cache`,
+B5.1i-ci), поэтому шаги после неё ещё ни разу не выполнялись. Исправлено то, что видно по коду v2.
+
+### Что нашёл и исправил
+
+- **Кодек safeStorage.** Шаг собирал `packages/desktop/src/main/loginom/credentials.ts`, а `safe-storage-smoke.cjs` ждёт
+  `credentials` из `packages/loginom-host/src/connection/credentials.ts` (находка B5.1h). Шаг собирает теперь его (путь
+  Electron `node_modules\\electron\\dist\\electron.exe` в корне — тот же, что ставит `build-windows.ps1`).
+- **Установленный smoke Desktop писался под 0.4.** Шаг вызывал `windows-installed-smoke.ps1` с `-KeepProxy` и
+  `-PayloadMutation MissingSkill`, ждал `sidecar.json` и проверки `sidecar-bundled-skills`. В v2 (B4.14c) этих параметров и
+  проверок нет: есть `-Mutation SkillByte`, а красной становится `verify-resources` (`LOGINOM_RESOURCE_HASH_MISMATCH`).
+  Шаг переписан на них; выгрузка диагностики — `installed-smoke/` и `installed-smoke-skill-byte/` (`report.json`, `logs.zip`).
+- **Администратор раннера.** Smoke требует обычную учётную запись (`ordinary-user`), а раннер GitHub — повышенный администратор.
+  Новый `script/run-windows-installed-smoke.ps1` создаёт одноразового локального пользователя группы Users (как
+  `test-windows-profile.ps1`), копирует установщик и два скрипта smoke в `%PUBLIC%`, запускает smoke через `Start-Process
+  -Credential` (окно закрывается `WM_CLOSE`, `-AllowServer`), копирует `report.json` и `logs.zip`, удаляет учётную запись.
+  Отказывает вне GitHub-hosted раннера. Код возврата — код smoke (1 — FAIL).
+- **Отрицательный контроль.** Красный прогон должен дать код 1, `status` FAIL, `verify-resources` FAIL с
+  `LOGINOM_RESOURCE_HASH_MISMATCH` и `cleanup` PASS; чистый прогон должен дать 0. Оба выполняются всегда.
+- **Артефакты шагов j.** `cli-installed-smoke.json` и `safe-storage-*.json` добавлены в выгрузку диагностики (`if: always()`),
+  потому что выгрузка кандидатов идёт раньше (B5.1i).
+- **Тесты Desktop.** `src/main/apps.test.ts` в v2 нет; вместо него `src/main/app-identity.test.ts`.
+- **`profile-windows.test.ts`.** Файл есть (порт B5.1e: ACL профиля, 3 pass на GitHub в run 45675480080), `test-windows-profile.ps1`
+  собирает его по `$PSScriptRoot\..`, не по рабочему каталогу. Замечание B5.1i «файла нет» устарело; правок не нужно.
+- Тест `packages/product/test/windows-build.test.ts` (3 новых): кодек из `loginom-host`, существование всех файлов тестов в
+  шаге, параметры вызова smoke объявлены в нём, а красная мутация входит в `ValidateSet`. Проверено мутациями: `apps.test.ts`
+  и `-Mutation PayloadX` дают красный.
+
+### Проверки
+
+- YAML разобран `python3 yaml`. `packages/product`: 95 pass, 0 fail.
+- `catalog-check.py` код 0; `apply-identity.py --check` — 0 файлов; `bun run check` код 0 (39 задач, 1 мин 5 с).
+
+### Проверит только CI на GitHub
+
+Весь шаг запуска от одноразового пользователя (`New-LocalUser`, `Start-Process -Credential`, права `icacls`, профиль, `TEMP`,
+размер argv до 1024 символов); `install.cmd` / `verify-cli-candidate` на Windows; DPAPI Electron 44; что окно приложения в
+сеансе без интерактивной станции даёт `app-window` PASS; что версия `packages/desktop/package.json` совпадает с версией
+установщика (`LOGINOM_AI_AGENT_VERSION` не задаётся). Задание `updater-fixtures` (только dispatch) по-прежнему вызывает
+`-KeepProxy` и `build-windows.ps1 -Product Desktop` без pty; не чинил.
+
+### B5.1l2 — доступ помощника Keychain после повторной подписи
+
+26.11.2026. Ветка `b51l2-keychain` от `oc2-migration` (`ca9d9bc1c6`). Run 45777986405 (`9e20d6cf53`): сборка, `.dmg`, `.zip`,
+`codesign --verify --deep --strict` и хеши ресурсов зелёные; `check-macos-signature.ts:44` `KEYCHAIN_READ_AFTER_RESIGN_FAILED`
+(запись создалась, чтение после `codesign --force --sign -` — нет).
+
+- **Причина, найденная по коду (подтверждает следующий прогон):** ошибка в самой проверке. `build-keychain.ts` подписывает помощник
+  с `--identifier com.loginom.aiagent.cli.keychain`, а повторная подпись в проверке шла без `--identifier`: идентификатор
+  становился `loginom-keychain`, менялся `cdhash`, а ACL записи у ad-hoc подписи привязан к хешу кода. Это реальное поведение
+  ad-hoc подписи, не раннер: `create` в том же запуске уже читает запись после записи, значит связка ключей раннера доступна.
+- **Паритет с 0.4:** в `v0.4.2` проверки доступа после повторной подписи не было. `macos.md` прямо говорит: «доступ Keychain
+  после изменённой ad-hoc подписи требует отдельной проверки; замена идентичными signed bytes этого не доказывает»;
+  `keychain-acceptance.ts` проверяет только замену копией. `security create-keychain` в 0.4 был лишь в архивном
+  `publish-upstream.yml` (подпись Developer ID).
+- **Исправлено:** контроль «чтение сразу после записи» (обязателен: падение означает проблему связки ключей раннера); печать
+  `cdhash` до и после; повторная подпись с тем же идентификатором (хеш должен совпасть, иначе `KEYCHAIN_RESIGN_NOT_DETERMINISTIC`;
+  чтение обязательно); подпись с изменённым хешем (`--options runtime`) только печатает «readable / NOT readable».
+- **Риск для этапа G:** обновление приложения, где помощник собран заново (другой `cdhash`), с ad-hoc подписью может потерять
+  доступ к записи профиля (запрос Keychain или `LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE`). Выход — Developer ID: ACL
+  привязывается к Team ID и идентификатору, а не к хешу.
+- **Проверка:** только прогон на macOS 15; на Linux `bun build` скрипта проходит.
+
+### B5.2b-fix — запуск workflow на GitHub
+
+Run 45781034385 (`83133f7968`) не создал заданий: в `env:` уровня задания контекст `runner` недоступен (`actionlint`, 9 ошибок
+в строках `WORK`, `INPUT`, `RELEASE`). Ветка `b52b2-release`: пути задаются шагом «Set the work paths»
+(`echo "WORK=$RUNNER_TEMP/work" >> "$GITHUB_ENV"` и т. д.) в трёх `verify-*`. `actionlint` 1.7.7 по пяти workflow
+(release, linux, windows, macos, pty) — 0 строк; `product` 0 падений; `catalog-check` 0; `apply-identity --check` 0 файлов.
+
+### B5.1j-fix: разделитель пути в тесте electron-builder
+
+Ветка `b51j2-windows-fix` от `oc2-migration` (`3613dc28ed`). Run 45779602282 (`ca9d9bc1c6`): сборка, проверка кандидатов, CLI ZIP и
+safeStorage прошли; `Run package-local checks` упал в `electron-builder.config.test.ts` (3 из 44, «channel identity»): путь
+источника `fpm` для metainfo на Windows идёт с `\`, а регулярное выражение ждало `/`. deb и rpm собираются только на Linux,
+продукт не менялся; локально шаг Desktop даёт 44 теста, 0 fail (после `npm ci` клиента `loginom-runtime`); в тесте перед именем допустимы оба разделителя (`[\\/]`). Локально тест 27 pass.
+Следующий шаг (`Install, launch and uninstall Desktop candidate`): тот же класс ошибки искал в `windows-installed-smoke.ps1`
+и `windows-sidecar-smoke.mjs` — сравнение путей навыков уже приводит `\` к `/` (`key()`), родные пути идут через `Join-Path`;
+правок не нужно. Шаг выполнится впервые, остальное проверит CI.
+Проверки: `product` 104 pass, 0 fail; `actionlint` для `loginom-windows.yml` 0 строк; `catalog-check.py` 0; `apply-identity
+--check` 0 файлов; `bun run check` 0.
+
+### B5.2b-fix2 — первый настоящий прогон (run 45781698569)
+
+- `verify-*`: не было зависимостей клиента `loginom-runtime` (`Cannot find package 'yaml'`). Во всех трёх добавлен шаг
+  «Install locked client dependencies» (`npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false` в
+  `packages/loginom-runtime/client`) перед записью манифеста; охранный тест держит порядок.
+- macOS: убран `push` из `loginom-macos.yml` (кандидат на push даёт release). Замечание: он слушал `macos-build` и `loginom`, не
+  `oc2-migration`, так что двойную сборку на этой ветке давал не он. Второй источник macOS-раннера на push в `oc2-migration` —
+  `loginom-pty.yml` (`push` на `packages/process-daemon/**`, собирает все три цели) вместе с вызовом из release; его не менял.
+  Отмена `verify-macos` после 15 минут ожидания раннера — очередь GitHub, шаги не начинались. Облегчить без отказа от
+  `hdiutil` и `codesign` нельзя: задание выдаёт раннер только после сборки; число занимаемых раннеров уже минимально
+  (один на сборку, один на проверку). Повтор запуска — единственный способ, если очередь снова не выдаст раннер.
+- `actionlint` 1.7.7 по пяти workflow — 0 строк.
+
+## B6.2b Перенос профилей, SEC-01 и установленный Linux на артефакте CI
+
+26.11.2026. Ветка `b62b-linux-data` от `oc2-migration` (`abb6374106`), рабочее дерево `.claude/worktrees/b62b`. Эталон 0.4 — `v0.4.2` (В-110).
+Это задача 2 плана B6.2-S. Код продукта не менялся; изменены только `scripts/live-profiles/live.mjs` (опция `--profile`) и добавлены два скрипта в
+`scripts/candidate-check/`. Настоящая модель не вызывалась: профили писала подставная модель обвязки на `127.0.0.1` (10 вызовов на профиль, 2 на каждый `serve`
+с вопросом), матрица Docker идёт с `--network none`. Протоколы без секретов — `~/.local/share/loginom-evidence/b62b/` (`live/`, `matrix/`, `sec01/`,
+`artifact-sha256.txt`, `fetch.log`).
+
+### Артефакт
+
+`scripts/candidate-check/fetch-linux.sh 9e20d6cf53cd33b96a25c47d5cc5afa57872a854 <каталог>` — run `Loginom Linux` 45777962664 (последний зелёный Linux; `Loginom Windows
+candidate` и macOS на этом SHA без успешного run, скрипт это печатает). Все `SHA256SUMS` — OK. `cli-manifest.json`: версия `0.0.0-dev-5`, канал `dev`,
+`sourceCommit` `9e20d6cf53…`, `sourceDirty: false`.
+
+| Файл | SHA-256 |
+|---|---|
+| `loginom-ai-agent-cli-0.0.0-dev-5-linux-x64.tar.gz` | `2c8d4ed4…116fc` |
+| `loginom-ai-agent-linux-amd64.deb` | `cbf23604…e062` |
+| `loginom-ai-agent-linux-x86_64.AppImage` | `22067036…3f75` |
+| `loginom-ai-agent-linux-x86_64.rpm` | `6e2ed3c3…4e9b` |
+
+Профили писали выпущенные AppImage из `gooddaytoday/loginom-ai-agent`: `v0.3.9` (`d7e64fa0…`, как в B3.3) и `v0.4.2` (`53372997…d107`; в B3.3 был `v0.4.0`). Оба совпали с `SHA256SUMS.txt`.
+
+### Что выбрано меньшим вариантом
+
+- **CLI не принимает каталог Desktop.** В B3.3 бинарник `opencode` читал `~/.local/share/loginom-ai-agent`. `loginom-ai-agent-cli` работает в своём профиле
+  (`~/.config/com.loginom.aiagent.dev/cli/profiles/default/{data,config,…}`, `packages/cli/src/profile.ts`: каталог Desktop — `PROFILE_DESKTOP_ROOT`, чужие данные — `PROFILE_FORMAT_INVALID`),
+  а канал артефакта — `dev`. Поэтому на «чужой» профиль `serve` просто создаёт пустой. Выбрано: `live.mjs v2 --profile <корень>` кладёт данные и конфиг, записанные AppImage, в профиль CLI,
+  который CLI считает своим (`cli-profile.json`, `0700`), и запускает CLI с `LOGINOM_AI_AGENT_CLI_PROFILE`. Это перенос базы 0.3.9/0.4 защитой B3.1b и командой `migrate` в профиле CLI. Приём каталога
+  Desktop 0.4 самим Desktop v2 проверен отдельно, на установленном DEB (матрица ниже, профиль `v0.4.2`).
+- **Матрица Docker — от root.** `lrun` не в группе `docker`. Всё остальное (профили, CLI, SEC-01) — от `lrun` (uid 1001), не root.
+- **SEC-01 — уровень B4.14a (В-86):** кодек `safeStorage`, Linux. Журналы, UI API и экспорт диагностики установленного Desktop — шлюз C.
+- **Установленный CLI.** `install.sh` требует sudo ради `chrome-sandbox`. Распаковано как у `INSTALL.md` (`tar --same-permissions` от `lrun`), затем `chrome-sandbox` — `root:root 4755`, как делает установщик.
+
+### Результаты
+
+**B3.3 Linux** (`b62b-linux.sh`; AppImage в `rel/<версия>/squashfs-root`, Node из ресурсов приложения, `xvfb-run --no-sandbox`, свой `HOME` на профиль; CLI — из артефакта).
+
+| | 0.3.9 `serve` | 0.3.9 `migrate` | 0.4.2 `serve` | 0.4.2 `migrate` |
+|---|---|---|---|---|
+| Профиль `old`: сессии / сообщения / части; миграций; вызовов модели | 4 / 11 / 26; 38; 10 | то же | 4 / 11 / 26; 38; 10 | то же |
+| Сессии в `GET /api/session` | 4/4 | 4/4 | 4/4 | 4/4 |
+| Сообщения v1 по ID | 2/2, 3/3, 4/4, 2/2; пропавших 0 | то же | то же | то же |
+| Сессии каталога в своём проекте (`Анализ продаж`, `repo`) | 3/3, 1/1 | 3/3, 1/1 | 3/3, 1/1 | 3/3, 1/1 |
+| Навык `b33-sales-summary` из конфига; провайдер | да; да | да; да | да; да | да; да |
+| Запрос к модели без ввода ключа: ключ старого профиля, вызовов | да, 2 | да, 2 | да, 2 | да, 2 |
+| `v1-backup.db` = исходная база (SHA-256) | да, `cdce7a82…` | да | да, `47a8b3e1…` | да |
+| Второй `serve`: те же сессии; резерв тот же; второй копии, `.migrating`, блокировки нет | да | да | да | да |
+| `migrate`: код; повтор | — | 0, «Source 4/11/26», «Written 4 sessions, 13 messages»; повтор — «Already migrated», 0, файлы базы те же | — | то же |
+| `migrate` после двух `serve`: «Already migrated», код 0, `.db`/`-wal` те же | да | да | да | да |
+| Конфиг с навыком, `auth.json`, userData Desktop — побайтно те же | да | да | да | да |
+| Готовность первого `serve`, мс | 4564 | 4072 | 5178 | 4943 |
+
+Числа как в B3.3 (4/11/26, 38 миграций, 13 сообщений v2 вместо 11, 10 вызовов модели). Готовность 4–5 с вместо 0,4 с B3.3 — нагрузка соседей (load 7–10) и проверка ресурсов
+пакета при старте; не сравнивалось.
+Журнал `migrated a Loginom AI Agent 0.3.9/0.4 database before opening it` — по одной строке на путь `serve`, на пути `migrate` её нет.
+
+**SEC-01 Linux (B4.14a).** `b62b-sec01-linux.sh`: кодек `loginom-host/src/connection/credentials.ts` в Electron 44.9.1, три режима `safe-storage-smoke.cjs`, обычный пользователь, свой `HOME`.
+Журналы CI из артефакта (`loginom-linux-x64-desktop`) и локальный прогон совпали, кроме `pid`:
+
+```text
+write:       {"mode":"write","platform":"linux","plaintext":true,"roundtrip":true,"protectionAvailable":false,"encryptedRejected":true}
+read:        {"mode":"read", … те же поля}
+unavailable: {"mode":"unavailable","platform":"linux","plaintext":true,"encryptedRejected":true,"forcedPlatformsRejected":["win32","darwin"]}   must-not-exist.json: absent
+```
+
+Повреждённый шифротекст и перенос ключа Electron 42 → 44 на Linux не проверяются (шифротекста нет, B4.14a «Не проверено»).
+
+**Установленный Linux** (`run-matrix.ts`, DEB и AppImage артефакта, `--shutdown 3 --profile <профиль 0.4.2, переименованный в имена канала dev, владелец UID 1200>`):
+
+| | Итог |
+|---|---|
+| PKG-02: хеши, `--verify-resources` 0, Chromium с песочницей | PASS на 10 целях (Ubuntu 22.04/24.04/26.04, Debian 12/13; DEB и AppImage); `--verify-resources` 4,5–8,1 с |
+| PKG-01: окно, renderer без мастера («Projects Add project Settings Help»), служба `0.0.0-dev-5` | PASS на 10 целях; окно 538–885 мс |
+| LIFE-01 (5 образов DEB): закрытие 3/3 и `SIGTERM` 3/3 на образ; повторный запуск 5/5 на образ | 30 из 30, выход 236–525 мс, код 0, после выхода процессов и регистрации нет |
+| Перенос 0.4.2 → Desktop v2 на DEB: подключение | один `moved`, поколение 2; остальные запуски — `current` (31 запуск) |
+| База 0.4.2: перенос при первом запуске, `v1-backup.db` = исходная | да, одна строка журнала, `47a8b3e1…` |
+
+`ubuntu22-appimage` в общем прогоне — FAIL 126 по моей ошибке (`chown -R` оставил AppImage `0700`, UID 1200 его не читает; артефакты `gh` приходят `0600`). После `chmod 755` повтор —
+первый раз FAIL на `apt-get update` (зеркало, фаза `install`, код 100, сеть), второй раз PASS. Остальные девять целей — PASS с первого раза.
+
+### Как перезапустить на итоговом SHA
+
+```text
+# root, gh (6–7 мин, 5 ГБ; артефакты живут 14 дней)
+sh scripts/candidate-check/fetch-linux.sh <40-знаковый SHA> <art>
+chmod a+rx <art>/*/loginom-linux-x64-desktop/*.AppImage; chmod a+r <art>/*/loginom-linux-x64-desktop/*.deb   # UID 1200 в Docker
+# CLI для lrun: не chown -R и не chmod после распаковки, иначе пропадает 4755 и CLI отвечает LOGINOM_BUNDLE_INCOMPLETE
+mkdir <cli>; chown lrun <cli>; runuser -u lrun -- tar --same-permissions -xzf <art>/*/loginom-linux-x64-cli/*.tar.gz -C <cli>
+chown root:root <cli>/resources/loginom/browsers/chromium-1246/chrome-linux64/chrome-sandbox; chmod 4755 <та же>
+# B3.3: <rels>/0.3.9 и <rels>/0.4.2 — squashfs-root от AppImage (gh release download -R gooddaytoday/loginom-ai-agent); <work> с состоянием `old` уже есть,
+# повтор делает только `v2` (~8 мин); скрипты скопировать туда, куда lrun может войти (/root закрыт)
+runuser -u lrun -- bash scripts/candidate-check/b62b-linux.sh <cli>/bin/loginom-ai-agent-cli <rels> <work>
+# SEC-01 (Bun 1.4.4, Node 24.19.0 в PATH; Electron 44: node packages/desktop/node_modules/electron/install.js)
+scripts/candidate-check/b62b-sec01-linux.sh <work-sec01>; diff с <art>/*/loginom-linux-x64-desktop/safe-storage-*.json (без pid)
+# установленный Linux (root, Docker; ~45 мин; TMPDIR — свой каталог; профиль — копия профиля 0.4.2 с именами канала dev, chown 1200)
+cd packages/desktop && bun test/loginom/docker/run-matrix.ts --artifact <deb> --appimage <AppImage> --output <out> --image-prefix b62b-matrix --shutdown 3 --profile <profile>
+```
+
+### Найдено, не чинил
+
+1. **`fetch-linux.sh`** распаковывает CLI без `--same-permissions` и без `chrome-sandbox` `root:root 4755`; под не-root с umask 077 манифест не сойдётся
+   (`LOGINOM_MANIFEST_PAYLOAD_MISMATCH`). Его `--version` под root проходит. Скрипт не менял (чужая задача), порядок — выше.
+2. **CLI не продолжает профиль Desktop 0.3.9/0.4** (по замыслу, `profile.ts`). План B6.2-S («профили 0.3.9 и 0.4.x → кандидат» через `live.mjs v2`) для CLI в этой форме неисполним; для Desktop v2 перенос проверяет матрица.
+3. **Заголовок окна X** в smoke — «Loginom AI Agent» или «Loginom AI Agent Dev» вперемешку (5 из 10 целей), документ — всегда «Loginom AI Agent». В B4.14b было только без `Dev`. Smoke проходит в обоих случаях; причину не искал (гонка заголовка окна и документа?).
+
+### Не проверено
+
+Windows (стенд, DPAPI) и macOS — вне задачи 2. Мутации G1–G6 — задача 1. SEC-01 уровня шлюза C. `live.mjs old` на Windows. Сессии с живой моделью.
+Повторный прогон на итоговом SHA не делался: артефакт — `9e20d6cf53`, не итоговый.
+
+### Проверки дерева
+
+```text
+$ cd packages/product && bun test                                   # 95 pass, 0 fail
+$ python3 -I scripts/upstream-sync/catalog-check.py                 # код 0 (625 divergent upstream files)
+$ python3 -I scripts/upstream-sync/apply-identity.py --check        # would change: 0 files
+$ bun run check                                                     # код 0, Tasks: 39 successful, 39 total (Cached: 39, пакеты не менялись)
+$ prettier --check / oxlint scripts/live-profiles/live.mjs          # чисто, 0 warnings, 0 errors
+```
+
+### B5.1j-types: typecheck агента на Windows
+
+Ветка `b51j3-windows-types` от `oc2-migration` (`89c4fecaf8`). Run 45786926746: `Agent typecheck` (`packages/cli`) упал с TS7016 для
+`mime-types` в `core/src/artifact.ts`, `tool/mcp.ts`, `read-filesystem.ts`, `util/src/fs-util.ts`. Причина: `@types/mime-types`
+объявлен в корневом `package.json`, а установка `build-windows.ps1` идёт с тремя `--filter` по пакетам и корень не ставит.
+Выбран третий вариант: `bun typecheck` пакета `cli` убран из шага Windows. Тип-проверка этого же пакета выполняется в
+`check.yml` (`bun run typecheck:tsc`, полный репозиторий) и в `bun run check`; платформенных типов у `cli` на Windows нет.
+Проверки типов `desktop` и `loginom-host` на Windows остались (прошли). Установку не менял: фильтр корня без запуска на Windows
+проверить нельзя, а расширение установки удлиняет сборку. Тест профиля `test-windows-profile.ps1` оставлен.
+Проверки: `actionlint` 0 строк; `product` 0 падений; `catalog-check.py` 0; `apply-identity --check` 0 файлов; `bun run check` 0.
+
+B5.2b-fix3 — run 45786926746
+
+`candidate.ts prepare` копировал `release-manifest.json.sha256` в `output`, куда `write-manifest.ts` его уже записал:
+`cp` на самого себя дал EINVAL. Из списка копирования убран `${manifest}.sha256` (манифест в `output` уже есть). Остальные
+копии идут из `dist` и из каталога скачанного CLI, `sums.ts` ничего не копирует; код общий, поэтому исправление относится к
+трём `verify-*` сразу. Повторять на каждой платформе вживую это не удалось — только CI.
+
+Предложение по числу заданий macOS (не внедрено): сейчас три раннера macOS в прогоне — pty, сборка, проверка. Pty можно не
+собирать заново, если хеш `packages/process-daemon/**` и `Cargo.lock` совпал с прошлым успешным (кэш артефакта
+`actions/cache` по этому хешу в `loginom-pty.yml`) — это минус один раннер без потери проверок. Сборку и проверку слить нельзя:
+первая внутри reusable workflow, а вторую нужно запускать после её артефакта.
+
+## B6.2a Охранные тесты G1–G6 с мутациями (Linux, репетиция)
+
+26.11.2026. Ветка `b62a-guarantees` от `oc2-migration` (`abb6374106`), дерево `.claude/worktrees/b62a`. Код продукта, `catalog.json` и `catalog.md` не менялись; добавлен
+`scripts/candidate-check/guarantees.ts`. Настоящая модель не вызывалась; `HOME`, `XDG_*` и `TMPDIR` дочерних процессов — во временном корне. Стенд: Linux, root, Bun 1.4.4,
+Node 24.19.0, `npm ci` клиента `loginom-runtime` и шаблона дашбордов, `xvfb-run`; запуск начат при load average 3. Протоколы без окружения:
+`/root/.local/share/loginom-evidence/b62a/467a730448/` (`table.md`, `results.json`, `base-*.log`, `mut-*.log`, `rev-*.log`) и `.../rerun-dashboard-g2/`.
+
+### Как перезапустить на итоговом SHA
+
+```bash
+git worktree add .claude/worktrees/<имя> -b <ветка> <SHA кандидата>   # дерево без правок: скрипт это проверяет
+cd .claude/worktrees/<имя> && bun install --frozen-lockfile          # Bun 1.4.4 первым в PATH
+# npm ci в packages/loginom-runtime/client и packages/dashboard/template закреплённым Node (см. guarantees.md)
+export LOGINOM_AI_AGENT_TEST_NODE=<node 24.19.0>/bin/node
+bun scripts/candidate-check/guarantees.ts all [--out <каталог>] [--only <id,id>]   # run | mutate | all
+```
+
+Один запуск: таблица команд (pass/fail, код выхода, секунды), затем таблица мутаций «база → мутация → после отката» с вердиктом; `table.md` и `results.json` — в `--out`
+(по умолчанию `/root/.local/share/loginom-evidence/b62a/<SHA>`). Мутация правит файл этого дерева, прогоняет набор, откатывает `git checkout -- .` и проверяет чистоту дерева.
+Полный запуск на репетиции — около 1,5 ч (`loginom-host` ≈ 5 мин на каждый из 5 прогонов; перед мутацией и после неё). Сверка с эталоном — ниже, колонка «Репетиция».
+
+### G1–G6: числа (репетиция, `abb6374106` + скрипт)
+
+| Набор | Гарантия | pass/fail |
+|---|---|---|
+| `packages/product` | G2, names, repo-paths | 95/0 |
+| `cli` flag-identity + service-identity | G2 | 8/0 |
+| `cli` cli-profile, cli-profile-service, legacy-profile | G2 | 11/0 |
+| `loginom-agent` (весь пакет) | G1, G4, G6 | 125/0 |
+| `server` loginom-access | G1, G6 | 12/0 |
+| `server` loginom-dashboard-files / local-file / package-docs / dock-catalog | G1 | 13/0 / 42/0 / 42/0 / 19/0 |
+| `server` loginom-host-lease | G3, G4 | 8/0 |
+| `cli` loginom-host | G3 | 1/0 |
+| `cli` cli-resources | G5 | 13/0 |
+| `loginom-host` (`xvfb-run`) | G3, G4, G5, G6 | 548/2 |
+| `dashboard` `bun run test` | G1 | прерван: 49/1 в `test:coverage:web` |
+| `scripts/upstream-sync/selftest.sh` | миграция | код 0 |
+
+`packages/product`: 0 падений (известные три — `workspace packages`, `CI triggers`, `path literals` — не воспроизводятся, B5.1 влит). Базовые падения `loginom-host` — два, оба под root:
+`archive verification preserves manifest modes under a private umask` и `actual managed entry reads live bridge work and dispatching over private IPC`; `bundled-ripgrep` и прочие из
+`guarantees.md` («Базовые падения») не вернулись. На кандидате сравнить: те же два.
+
+### Мутации (красный → откат → зелёный)
+
+| Мутация (файл, правка) | Набор | База | Мутация | После отката | Репетиция |
+|---|---|---|---|---|---|
+| G1 `loginom-agent/src/access.ts`: `permits` всегда `true` | loginom-agent | 125/0 | 119/6 | 125/0 | красная |
+| G1 то же | server loginom-access | 12/0 | 4/8 | 12/0 | красная |
+| G2 `util/src/global.ts`: `home` читает `OPENCODE_TEST_HOME` | cli flag-identity + service-identity | 8/0 | 7/1 | 8/0 | красная |
+| G2 `product/src/cli-profile.ts`: один блок портов на все каналы | product | 95/0 | 94/1 | 95/0 | красная |
+| G3 `loginom-host/src/supervisor.ts`: ненулевой код выхода принят | loginom-host | 548/2 | 546/4 | 548/2 | красная |
+| G3 `loginom-agent/src/index.ts`: аренда не освобождается по событиям конца | server host-lease | 8/0 | 4/4 | 8/0 | красная |
+| G4 `connection/recovery-store.ts`: `if (!strict)` → `if (false)` | loginom-host | 548/2 | 547/3 | 548/2 | красная |
+| G5 `cli-manifest.ts`: обязательный файл не требуется | loginom-host | 548/2 | 547/3 | 548/2 | красная |
+| G5 то же | cli-resources | 13/0 | 11/2 | 13/0 | красная |
+| G5 `script/stage-resources.ts`: `win32` берёт каталог `linux-x64` | loginom-host | 548/2 | 547/3 | 548/2 | красная |
+| G5 `.github/actions/setup-loginom-inputs/action.yml`: `if: always()` на шаге установки | loginom-host | 548/2 | 547/3 | 548/2 | красная |
+| G6 `loginom-agent/src/skills.ts`: `admits` всегда `true` | loginom-agent | 125/0 | 121/4 | 125/0 | красная |
+| G6 то же | server loginom-access | 12/0 | 10/2 | 12/0 | красная |
+| repo-paths `turbo.json`: ключ задачи `@opencode/clx#…` | product | 95/0 | 94/1 | 95/0 | красная |
+| names `product/package.json`: имя `@opencode/product` | product | 95/0 | 92/3 | 95/0 | красная |
+
+15 мутаций, все красные и после отката равны базе. G2 `flag-identity` в первой версии (чтение `OPENCODE_CONFIG_DIR` в `Global.layerWith`-пути `global.ts`) не краснела: тест
+проверяет `home`, а `config` задаётся иначе; правка скрипта — мутация на `home` (`OPENCODE_TEST_HOME` есть в `inherited` теста). Это ошибка выбора мутации, не дефект продукта.
+Мутации G3 `process.test.ts` проверены через набор `loginom-host`, число падений — по пакету, а не по файлу.
+
+### Находки (продукт не правился)
+
+1. **`packages/dashboard`, `test/web/log.test.mjs`, «the stdout sink counts events dropped across full logging windows without queueing them».** Падает детерминированно
+   (2 запуска из каталога `dashboard`, 2 через скрипт), `bun run test` останавливается на `test:coverage:web`, `test:coverage:workers` и последующие тесты не выполняются.
+   Тест пишет 1 МиБ в `process.stdout` дочернего процесса и ждёт `writableNeedDrain === true`; на этом ядре (Linux 6.8) `assert.ok(process.stdout.writableNeedDrain)` ложен
+   (`actual: false`). Не связано с G1; похоже на зависимость от размера канала стенда. Не проверено, есть ли падение в CI (`test`/`loginom-checks`) — сверить по логу CI.
+   Часть `dashboard` (G1: пути и черновик) этим прогоном не покрыта; в `guarantees.md` это падение не записано.
+2. Мутации `G5-stage-resources` и `G5-ci-inputs` на v2 раньше не мерялись — теперь красные (`loginom-host` 547/3).
+
+### Не сделано
+
+Шаг 2 плана (сверка с CI: какие файлы реально выполнились в `test` и `loginom-checks`), G2 на Windows, мутации по G1 для `local-file`, `package-docs`, `dock-catalog` и `dashboard-files`
+(там по-прежнему числа B2.5/B2.9). Прогон не на итоговом SHA кандидата. Тяжёлые прогоны шли при load average 3–9, часть времени до этого — ожидание (load 11–16, около 13 мин).
+
+B5.2b-fix4 — версия CLI в G5 (run 45792809424)
+
+`plan` берёт версию Desktop (`2.3.0`, номер upstream из B1.9; в продукт он не выпускается — версию выпуска задаёт этап G), а
+CLI кандидата собран с версией своего пакета (`0.0.0-dev-N`); G5 передавал `2.3.0` в `verifyCliManifest` и получал
+`LOGINOM_MANIFEST_TARGET_MISMATCH`. Выбран меньший путь без изменения входов `workflow_call`: G5 больше не сравнивает CLI с версией
+манифеста Desktop, а требует, чтобы имя архива содержало `-cli-<версия из cli-manifest.json>-` (`RELEASE_CLI_VERSION_MISMATCH`);
+проверка платформы, архитектуры, хешей файлов и коммита сохранена. Единая версия на весь прогон — отдельное решение этапа G.
+
+## B1.9b Слияние v0.4.2
+
+26.11.2026. Ветка `b19b-v042-sync` от `oc2-migration` (`fa731fbffd`), рабочее дерево `.claude/worktrees/b19b`. Основание — В-110:
+эталон 0.4 — выпуск `v0.4.2` (`2b328b36dd`) вместо `v0.4.0`. Bun 1.4.4 переносной, Node 24.19.0, `npm ci` клиента
+`loginom-runtime` и шаблона дашбордов; `LOGINOM_AI_AGENT_TEST_NODE` задан. Настоящая модель не вызывалась.
+
+**Итог: `v0.4.2` в истории ветки (`git merge-base --is-ancestor v0.4.2 HEAD` — код 0).** Клиент `packages/loginom-runtime`
+побайтно равен `v0.4.2` (`git diff v0.4.2 HEAD -- packages/loginom-runtime` пуст), в том числе чтение скрытой строки
+«Подключение» мастера импорта при `bg.app.IsFileConnectionHidden` в `workspace-ui.mjs`, нужное приёмке B6.1.
+Слияние: 292 коммита 0.4.0..0.4.2, `git diff fa731fbffd HEAD --stat` — 764 файла (334 `evals`, 208 `docs/testing/loginom-ai-agent`,
+140 `loginom-runtime`, 25 `product`, 12 `scripts`, 11 `.agents`, остальное мелочь). Версии остались v2 (`package.json`,
+`packages/desktop/package.json`, `bun.lock`, `packages/app/package.json` — `--ours`).
+
+### Решения по конфликтам
+
+| Файл 0.4.2 | Правка 0.4.1–0.4.2 | Решение |
+|---|---|---|
+| `package.json`, `bun.lock`, `packages/desktop/package.json` | версия 0.4.2 | как в v2 (B1.9, В-99) |
+| `.gitattributes`, `.gitleaksignore` | `package-linter/** -text`; игнор отпечатков #1231 в слияниях 0.4 | обе стороны |
+| `packages/loginom-agent/src/file-profile-core.ts`, `file-xlsx.ts`, `file-profile.ts`, тесты `file-profile-core`, `file-xlsx` | точные идентичности в профилях, SQLite/LGD как нативный импорт (`format_detected`), `MAX_BYTE_ADMISSION` | перенесено; пути `../../../loginom-runtime` -> `../../loginom-runtime`, `./loginom-file-xlsx` -> `./file-xlsx` |
+| `packages/loginom-agent/src/local-file.ts` (из `opencode/src/tool/loginom-local-file.ts`) | `MAX_BYTE_ADMISSION` вместо 16 МиБ; `verifyAttachment(bytes)` принимает книгу XLSX с изменившейся меткой времени, если точный скан и байты совпадают (`matchesExactWorkbookBytes`, `f0107e112b`) | перенесено вручную; квитанция вложения читается целиком (`canonical_path`, `size`, `mtime`, `ctime`, `file_id`), чтобы передать её в `exactFileDigest` |
+| `packages/loginom-agent/src/dock.ts` (из `turn-lifecycle.ts`) | системная строка: оценка качества пакета — `package-linter`, документация — `package-docs` (`541f530d32`) | перенесено, текст 0.4.2 дословно |
+| `packages/server/test/loginom-{access,dock-catalog,dashboard-files,permissions}.test.ts` | в 0.4.2 четыре встроенных навыка (`package-linter`) | список `bundled` дополнен; в `dock-catalog` три проверки текста вместо теста `turn-lifecycle` |
+| `packages/loginom-host/script/stage-resources.ts`, тест | `stageProductSkills` без `__pycache__`, `.pytest_cache`, `*.pyc` | обе стороны: функции v2 (`stageCrateNotices`) и 0.4.2 |
+| `evals/src/profile.ts`, `run.ts` | `hasPassword` в статусе, `expectedHasPassword` в `recoverIfNeeded` | порядок и `configured` из v2 (B2.7b), добавлены `passwordMatches`, `connectionConfigured` и аргумент `expectedHasPassword` |
+| `scripts/node-acceptance/run-check.py` | `--variant` | `--variant` добавлен к команде v2, настройка провайдера `openai` и ссылка на `auth.json` не возвращены |
+
+### Не перенесено
+
+Файлы удалены в v2 (пакет `opencode` заменён в `39a5ee597b`, приложение и Desktop переписаны); конфликт `modify/delete` решён
+в пользу v2 (`git rm`). Каждая строка — отдельная задача.
+
+| # | Файл 0.4.2 | Коммит | Что делает | Куда в v2 |
+|---|---|---|---|---|
+| 1 | `packages/app/src/constants/file-picker.ts`, `components/prompt-input/attachments.ts`, `components/prompt-input-v2.tsx`, `session-ui/src/v2/components/prompt-input/attachments.ts`, экспорт `./file-picker` в `app/package.json` | `b5b60e009b` | `.db`, `.lgd`, `.xls` при перетаскивании и вставке идут как ссылка на файл (`binaryReferenceMime`, `referenceFile`), без чтения байт; расширения добавлены в выбор файла | приложение v2 (B4): пути переехали, места нет. **Главная строка**: без неё SQLite, LGD и XLS из окна читаются байтами |
+| 2 | `packages/desktop/src/main/attachment-picker.ts`, `ipc.ts` (`referenceAttachment`) | `b5b60e009b` | выбор файла и IPC `reference-attachment` возвращают квитанцию с `mime` для бинарных данных | Desktop v2 (`packages/desktop/src/main`), нужен вместе со строкой 1 |
+| 3 | `packages/opencode/src/cli/cmd/run.ts` | `59fbda9ceb` | CLI `run` даёт квитанцию для `application/octet-stream` и `application/vnd.ms-excel` и без `--attach` | `packages/cli/src/run` |
+| 4 | `packages/opencode/src/product/attachment-resolver.ts` | `59fbda9ceb` | текст ссылки на вложение: для бинарных данных «loginom_file_admit», для остальных «loginom_file_profile» | в v2 нет резолвера вложений; вложения — `loginom-agent/src/index.ts` (B2.5d), `local-file.ts` |
+| 5 | тесты `app/test-browser/prompt-attachments.test.ts`, `desktop/src/main/attachment-picker.test.ts`, `opencode/test/cli/run/run-process.test.ts`, `opencode/test/product/attachment-resolver.test.ts` | `b5b60e009b`, `59fbda9ceb` | покрывают строки 1–4 | вместе со строками 1–4 |
+| 6 | `packages/opencode/test/tool/loginom-local-file.test.ts` (133 строки) | `f0107e112b`, `b5b60e009b` | повторный допуск двух просканированных книг после смены только метки времени, отказ при изменённых байтах или подмене | `packages/server/test/loginom-local-file.test.ts`; код перенесён, **теста на v2 нет** |
+| 7 | `desktop/test/loginom/product-skills-smoke.mjs`, `opencode/test/cli/tui/package-docs-pty.py`, `opencode/test/cli/bundled-skills.test.ts`, `opencode/test/skill/bundled-skills.test.ts`, `opencode/test/fixture/mcp-reserved-prompts.ts` | `23a3012f44`, `af7edb0c7a`, `103387e4d1` | матрица встроенных навыков установленной приёмки и охранных тестов: четыре навыка вместо трёх | приёмка установленного Desktop и CLI (B5/B6), `loginom-host/script/skills-acceptance` |
+
+Всего 7 строк.
+
+### Проверки
+
+Node 24.19.0 первым в `PATH`, `LOGINOM_AI_AGENT_TEST_NODE` задан, `bun test --timeout 60000`, `HOME=/root`, пробы только во временных корнях.
+
+```
+packages/product        bun test                           99 pass, 0 fail (трёх известных падений В-95 на этом дереве нет)
+packages/loginom-agent  bun test                           130 pass, 0 fail
+packages/server         bun test test/loginom-*.test.ts    174 pass, 2 skip, 0 fail
+packages/cli            bun test                           625 pass, 11 skip, 0 fail
+packages/desktop        bun test                           639 pass, 6 skip, 0 fail
+packages/loginom-host   bun test                           549 pass, 13 skip, 2 fail
+packages/loginom-runtime/client  node --test test/*.test.mjs   10278 pass, 40 fail, 107 skip
+evals                   bun test (test/profile.test.ts)    114 pass, 0 fail
+catalog-check.py код 0; apply-identity.py --check: would change: 0 files
+```
+
+- `loginom-host`: `archive verification preserves manifest modes under a private umask` и `actual managed entry reads live bridge
+  work and dispatching over private IPC` — те же два на базе `fa731fbffd` (запуск под root).
+- Клиент: 40 падений — все без Chromium (`browserType.launch: Executable doesn't exist`, `LOGINOM_DOCK_TEST_BROWSER must name the pinned Chromium executable`);
+  код клиента побайтно равен `v0.4.2`, правок v2 в нём нет. Приёмка B6.1 (импорт текстового файла) этим прогоном не проверена.
+- `evals` целиком: на базе 42 падения (root, Docker, systemd), после слияния были новые `verifyProfile credentials boundary 2–6`,
+  `modern password presence` и `recoverIfNeeded: unconfigured` — тесты 0.4.2 про `hasPassword`. Исправлено в `evals/src/profile.ts`:
+  проверка `connectionConfigured` при наличии `hasApiKey` или `hasPassword` в статусе, статус v2 без обоих полей принимается как раньше;
+  `profile.test.ts` — 114 зелёных. Новый тест 0.4.2 `prejournal budget refusal uses original evidence across authorization restart`
+  красный только под root (`_UID`/`getuid` в `analytics-measurements`, код `evals/src` равен `v0.4.2`); перепроверить не под root.
+- Находка в серверных тестах: в 0.4.2 четыре встроенных навыка, а фикстуры `server` держали три — `loginom-dock-catalog` «a task that grants
+  itself automation» падал, пока `package-linter` не добавлен в списки `bundled`.
+
+### Прочее, замеченное при слиянии
+
+- `.agents/`, `.claude/`, `.cursor/`: слились без конфликтов навыки `branch-cleaner` и перенос `harmonize-docs`, `design-cleanup` (инструменты разработки, не продукт).
+- `.gitleaksignore` получил отпечатки слияний 0.4 (`5f79f57f8d`, `11ed9673f8`) — они нужны `secrets range`.
+- `packages/product` (вместе с навыком `package-linter`) : 20 файлов отличаются от `v0.4.2` правками v2 (B1–B5), конфликтов не было.
+- `guarantees.md`, `catalog.md`: `v0.4.0` -> `v0.4.2` и «В-99» -> «В-110» там, где это эталон 0.4 для сравнения.
+
 ## B6.1-A Калибровка группы A
 
 25.11.2026. Ветка `b61a-calibration` от `oc2-migration` (`950e5da9ce`), рабочее дерево `.claude/worktrees/b61a`. Bun 1.4.4 и Node 24.19.0 —

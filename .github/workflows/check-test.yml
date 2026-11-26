@@ -109,11 +109,6 @@ jobs:
       - name: Setup Loginom pinned inputs
         uses: ./.github/actions/setup-loginom-inputs
 
-      # The dashboard tests build the template with its own lockfile.
-      - name: Install dashboard template
-        working-directory: packages/dashboard/template
-        run: npm ci --no-audit --no-fund
-
       - name: Test Effect simplification rules
         if: runner.os == 'Linux'
         run: bun run test:effect-simplification-rules
@@ -131,11 +126,13 @@ jobs:
         timeout-minutes: 20
         run: |
           # The runners have four vCPUs, and each Bun test process performs its own concurrent work.
+          # The product packages run in test.yml (loginom-checks) with the pinned Node, Chromium and a display.
+          # Keep the filters in step with the jobs there: packages/product/test/loginom-checks.test.ts.
           if [ "$AFFECTED" = "true" ]; then
-            GITHUB_ACTIONS=false bun turbo test --affected --concurrency=3
+            GITHUB_ACTIONS=false bun turbo test --affected --concurrency=3 --filter='!@loginom-ai-agent/product' --filter='!@loginom-ai-agent/loginom-agent' --filter='!@loginom-ai-agent/loginom-host' --filter='!@loginom-ai-agent/dashboard' --filter='!@opencode/cli'
             exit 0
           fi
-          GITHUB_ACTIONS=false bun turbo test --concurrency=3
+          GITHUB_ACTIONS=false bun turbo test --concurrency=3 --filter='!@loginom-ai-agent/product' --filter='!@loginom-ai-agent/loginom-agent' --filter='!@loginom-ai-agent/loginom-host' --filter='!@loginom-ai-agent/dashboard' --filter='!@opencode/cli'
         env:
           LOGINOM_AI_AGENT_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}
 

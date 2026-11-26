@@ -1854,6 +1854,33 @@ test('replacement type portal exposes only items owned by the selected field and
  }
 });
 
+for(const mode of ['owned','hidden','foreign','transient'])
+test('Python Next reports only a stable error from the owned wizard: '+mode,async()=>{
+ const page=new Page(),c=wizardStepFixture(page);
+ c.marker.attrs['data-tid']=c.base+';PythonCodeWizard;cmpCodeCM';
+ const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_step);
+ let error,waits=0;
+ const click=page.mouse.click;
+ page.mouse.click=async(...args)=>{
+  await click(...args);
+  error=page.add('button',c.base+';btnError','Подробнее',undefined,mode==='foreign'?undefined:c.form);
+  error.attrs['data-qtip']='Исполняемый файл python3 не найден';
+  if(mode==='hidden')error.style.display='none';
+ };
+ page.waitForTimeout=async ms=>{
+  page.clock.advance(ms);waits++;
+  if(mode==='transient'&&waits===1){error.remove();c.marker.remove();page.add('div',c.base+';DoneWizard;edtDisplayName','',undefined,c.form);}
+ };
+ const result=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:'done'},snapshot);
+ assert.equal(page.events.filter(e=>e==='click').length,1);
+ if(mode==='owned'){
+  assert.equal(result.error.code,'WIZARD_PYTHON_VALIDATION_FAILED');
+  assert.equal(result.error.message,'Исполняемый файл python3 не найден');
+  assert.equal(waits,1);
+ }else if(mode==='transient')assert.equal(result.status,'SUCCEEDED');
+ else assert.equal(result.error.code,'WIZARD_STEP_NOT_CONFIRMED');
+});
+
 test('calculator Preview rejects a native formula error before Next or Done',async()=>{
  const page=new Page(),c=wizardStepFixture(page);
  c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
@@ -1932,7 +1959,7 @@ test('calculator Preview accepts only its native modal and closes with an observ
  }
 });
 
-test('observed Preview parse-error msgbox is read and dismissed before a typed refusal',async()=>{
+test('Journal C Preview parse-error with nested quotes is read and dismissed before a typed refusal',async()=>{
  for(const tid of ['msgbox','msgbox-1','msgbox-12']) for(const fault of ['none','foreign_message','other_field','changed_owner']) {
   const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
   page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.form);
@@ -1961,6 +1988,43 @@ test('observed Preview parse-error msgbox is read and dismissed before a typed r
   assert.equal(page.events.filter(e=>e==='click').length,fault==='none'?2:1);
   if(fault==='none') {
    assert.equal(result.output.wizard.calculator_validation.field_name,'id');
+   assert.equal(result.output.wizard.calculator_validation.message,message);
+   assert.equal(result.output.ui.dialogs.length,0);
+  }
+ }
+});
+
+test('observed Preview parse-error msgbox is read and dismissed before a typed refusal',async()=>{
+ for(const tid of ['msgbox','msgbox-1','msgbox-12']) for(const fault of ['none','display_label','ambiguous_label','foreign_message','other_field','changed_owner']) {
+  const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
+  page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.form);
+  const usesLabel=['display_label','ambiguous_label'].includes(fault);
+  const label='Стандартная ошибка доли A';
+  const message='Loginom '+build+' Настройка прервана 1. Ошибка разбора выражения "'+(usesLabel?label:'id')+'" 1.1. Неправильно расставлены скобки Технические подробности OK';
+  const components={};page.context.Ext={getCmp:id=>components[id]};let dialog;
+  const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},
+   async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base}));
+  const snapshot=(await execute({mode:'observe'})).output;
+  snapshot.node_calculator={verified:true,expressions:[{name:usesLabel?'se_A':fault==='other_field'?'Other':'id',label,
+   formula:'Sqrt(1/2'},...(fault==='ambiguous_label'?[{name:'se_B',label,formula:'Sqrt(1/3)'}]:[])]};
+  const button=snapshot.ui.elements.find(e=>e.tid.endsWith(';btnPreview')),click=page.mouse.click;
+  page.mouse.click=async(...args)=>{await click(...args);
+   if(dialog){dialog.remove();return;}
+   dialog=page.add('div',tid,'',{x:300,y:200,width:400,height:200});dialog.attrs.class='x-window x-message-box';dialog.id='error-box';dialog.innerText=message;
+   page.add('h1',null,'Loginom '+build,undefined,dialog).attrs.role='heading';
+   page.add('div',null,message,undefined,dialog);
+   page.add('a',tid+';tlb;ok','OK',{x:450,y:350,width:60,height:30},dialog);
+   const box={el:{dom:dialog}};components['error-box']=fault==='changed_owner'?{}:box;
+   page.context.bg.ext={errormessage:{ErrorMsg:{FInstance:{FMessageBox:fault==='foreign_message'?{}:box}}}};
+  };
+  page.waitForTimeout=async ms=>page.clock.advance(ms);
+  const result=await execute({mode:'act',snapshot,action:{verb:'click',ref:button.ref}});
+  const owned=['none','display_label'].includes(fault);
+  assert.equal(result.error.code,owned?'WIZARD_CALCULATOR_VALIDATION_FAILED':'WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,owned?2:1);
+  if(owned) {
+   assert.equal(result.output.wizard.calculator_validation.field_name,usesLabel?'se_A':'id');
    assert.equal(result.output.wizard.calculator_validation.message,message);
    assert.equal(result.output.ui.dialogs.length,0);
   }
@@ -3889,6 +3953,32 @@ function importSourceFixture(page) {
   const display=page.add('span',base+'edtFirstLineAsTitle;ValueControl;DisplayEl','',undefined,header);display.attrs.class='x-form-checkbox';
   return {base,form,inputs,owners,header,native,display};
 }
+
+test('text import observes native local storage when Loginom hides its connection row',async()=>{
+  for(const mode of ['local','external','unverified','duplicate']) {
+    const page=new Page(),c=importSourceFixture(page);
+    const row=page.add('div',c.base+'cntConnection','',undefined,c.form);
+    row.id='connection-row';
+    row.style={display:'none'};
+    c.owners.connection.remove();
+    row.append(c.owners.connection);
+    if(mode==='external')c.inputs.connection.value='FTP';
+    if(mode==='duplicate')page.add('div',c.base+'edtConnection','',undefined,row);
+    page.context.bg.app.IsFileConnectionHidden=true;
+    page.context.Ext={getCmp:id=>id===row.id?{hidden:mode!=='unverified',el:{dom:row}}:null};
+
+    const snapshot=await page.observe();
+    const field=snapshot.wizard.import_source.fields.connection;
+    if(mode!=='local'){
+      assert.notEqual(field.status,'observed',mode);
+      continue;
+    }
+    assert.equal(field.status,'observed');
+    assert.equal(field.value,'Локальное');
+    assert.equal(field.enabled,false);
+    assert.equal(field.input_ref,undefined);
+  }
+});
 
 test('source code page selection verifies the original field after one native choice',async()=>{
   for(const mode of ['applied','delayed','unchanged','replaced']) {
@@ -5871,13 +5961,64 @@ test('native-owned export keeps its hidden node breadcrumb through input, settin
   }
 });
 
+for(const [icon,wizardIndex] of [['exporttextfile',0],['exportexcelfile',1],['exportnative',1]])
+test(icon+' input0/native0 retains guarded Done with overflowing ancestry',async()=>{
+ for(const fault of ['valid','node','port','workflow','opening','index','icon','caption','folder','duplicate','sensitive','hidden']) {
+  const {page,binding,crumbs,panel,opening,preparation}=await exportInputPortOverflowFixture();
+  opening.nativeIndex=opening.port.FPortIndex=0;
+  opening.wizardIndex=wizardIndex;
+  opening.portTree.FIndex=null;
+  opening.node.FIconCls='bg-vendor-icon-'+icon;
+  crumbs[5].children[0].attrs.class=opening.node.FIconCls;
+  const group=opening.portTree.ParentNode,wizardTree=page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node;
+  const collection={FParentNode:group,FItems:wizardIndex===0?[opening.portTree]:[{FModelNodePort:{}},opening.portTree]};
+  group.FSubNodes=opening.portCollection=collection;opening.portTree.FCollection=collection;
+  opening.nodeTree.FInputPortsRootNode=group;
+  const components=new Map(crumbs.slice(5).map((e,i)=>{
+   e.id='export-ancestry-'+i;e.attrs.id=e.id;
+   return [e.id,{el:{dom:e},_node:{data:{node:[opening.nodeTree,group,opening.portTree,wizardTree][i]}}}];
+  }));
+  page.context.Ext={getCmp:id=>components.get(id)};
+  const wizard=opening.wizard.FView.el.dom;
+  page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;btnAddMappingColumn"]')[0].remove();
+  const definition=mappingCoverageFixture(page);
+  for(const e of page.document.all())if(e.attrs['data-tid']?.startsWith(definition.base))
+   e.attrs['data-tid']=e.attrs['data-tid'].replace(definition.base,'MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;').replace('colDefaultUsageType_','colUsageType_');
+  for(const e of [...definition.form.children]){e.remove();wizard.append(e);}
+  definition.form.remove();
+  page.context.innerWidth=1280;page.context.innerHeight=800;
+  page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',undefined,wizard);
+  for(const i of [5,6]){
+   crumbs[i].style.display='none';crumbs[i].box={x:0,y:0,width:0,height:0};
+   for(const icon of crumbs[i].children)icon.box={x:0,y:0,width:0,height:0};
+  }
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(fault==='node')opening.node.FGuid='foreign';
+  if(fault==='port')opening.port.FGuid='foreign';
+  if(fault==='workflow')opening.workflow={};
+  if(fault==='opening')preparation.inputPortOpenReceipts.clear();
+  if(fault==='index')opening.port.FPortIndex=1;
+  if(fault==='icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-calcdata';
+  if(fault==='caption')crumbs[7].ownText='Other source';
+  if(fault==='folder')crumbs[6].ownText='Выходные порты';
+  if(fault==='duplicate')page.add('a',crumbs[5].getAttribute('data-tid'),crumbs[5].ownText,crumbs[5].box,panel);
+  if(fault==='sensitive')crumbs[5].attrs['aria-label']='password';
+  if(fault==='hidden')panel.style.display='none';
+  const result=await page.execute({mode:'observe',prepared_node_context:binding});
+  assert.equal(result.output?.wizard?.input_port_context?.status==='observed',fault==='valid',fault);
+  assert.equal(result.output?.ui?.elements.some(e=>e.allowed_actions.includes('finish_wizard'))??false,fault==='valid',fault);
+  if(fault==='valid')assert.equal(result.output.prepared_node_context.input_port.wizard_index,wizardIndex);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('owned text export input observes its actual hidden data-source caption',async()=>{
   const {page,binding,expectedPort}=await exportInputPortOverflowFixture();
   const full=await page.execute({mode:'observe',prepared_node_context:binding});
   assert.equal(full.status,'SUCCEEDED',JSON.stringify(full.error));
   assert.equal(full.output.wizard.input_port_context.status,'observed');
   assert.equal(full.output.wizard.input_port_context.port_display_label,'Источник данных');
-  assert.deepEqual(full.output.prepared_node_context.input_port,expectedPort);
+  assert.deepEqual(full.output.prepared_node_context.input_port,{...expectedPort,wizard_index:expectedPort.native_index});
   const narrow=await page.execute({mode:'observe',root_ref:full.output.wizard.root_ref,prepared_node_context:binding});
   assert.deepEqual(narrow.output.wizard.input_port_context,full.output.wizard.input_port_context);
   assert.equal(narrow.output.wizard.input_port_context.opening_verified,false);
@@ -7306,15 +7447,16 @@ test('initial wrong-delimiter layout can be ready without accepting an overlong 
  assert.equal(pending.output.wizard.import_columns.initial_layout.status,'unverified');
 });
 
-function bufferedMappingFixture(fault) {
- const page=new Page(),c=mappingCoverageFixture(page,20);
- const records=c.rows.map((row,i)=>{row.attrs['data-recordid']=String(100+i);return {isModel:true,internalId:100+i,
-  data:{Index:i,Name:'Field'+i,DisplayName:'Field'+i,DataType:4,DataKind:1,DefaultUsageType:0}};});
+function bufferedMappingFixture(fault,{clock,count=20}={}) {
+ const page=new Page({clock}),c=mappingCoverageFixture(page,20);
+ const records=Array.from({length:count},(_,i)=>({isModel:true,internalId:100+i,
+  data:{Index:i,Name:'Field'+i,DisplayName:'Field'+i,DataType:4,DataKind:1,DefaultUsageType:0}}));
+ c.rows.forEach((row,i)=>{row.attrs['data-recordid']=String(records[i].internalId);});
  for(const row of c.rows.slice(12))row.remove();c.container.box.height=12*25;
  const source={items:records},collection={items:records,getSource:()=>source};
- const store={$className:'Ext.data.Store',isLoading:()=>false,getData:()=>collection,getCount:()=>20,getTotalCount:()=>20};
+ const store={$className:'Ext.data.Store',isLoading:()=>false,getData:()=>collection,getCount:()=>count,getTotalCount:()=>count};
  page.context.Ext={getCmp:()=>({el:{dom:c.body},getStore:()=>store})};
- const evaluate=page.evaluate.bind(page);page.evaluate=(fn,arg)=>evaluate(fn,arg&&Object.hasOwn(arg,'mappingPage')?{...arg,definitionPrefix:'MF;TF-1;WizrdMCF'}:arg);
+ const evaluate=page.evaluate.bind(page);page.evaluate=(fn,arg)=>evaluate(fn,arg&&Object.hasOwn(arg,'mappingPage')?{...arg,definitionPrefix:arg.definitionPrefix??'MF;TF-1'}:arg);
  if(fault==='missing_source')c.rows[2].children[2].remove();
  if(fault==='foreign_record')c.rows[2].attrs['data-recordid']='999';
  if(fault==='name_mismatch')records[2].data.Name='Different';
@@ -7339,6 +7481,60 @@ for(const fault of ['foreign_record','name_mismatch','filtered_store','incomplet
   const {page}=bufferedMappingFixture(fault),r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
   assert.equal(r.output.wizard.output_columns.page.status,'unverified_definition_page');
  });
+
+for(const cost of ['hit tests','descendant selectors','buffered row refs'])test('wide text import keeps output paging within budget for '+cost,async()=>{
+ const clock=fixtureClock(),{page,c}=bufferedMappingFixture(null,{clock:clock.Date,count:1000});
+ const root=c.form.getAttribute('data-tid');
+ page.add('div',root+';ImportTextFileParamsWizard','',undefined,c.form).attrs.class='x-hidden-offsets';
+ c.body.box.height=c.body.clientHeight=150;
+ c.body.scrollHeight=25000;c.body.style.overflowY='auto';
+ page.add('div','Overlay','',{x:100,y:200,width:100,height:25});
+ const hit=page.document.elementFromPoint.bind(page.document);
+ page.document.elementFromPoint=(x,y)=>{
+   if(x>=100&&x<300&&y>=350&&y<400){if(cost==='hit tests')clock.advance(24);return c.form;}
+   return hit(x,y);
+ };
+ const read=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,mode:'observe',
+    prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},
+   async()=>({verified:true,surface:'wizard',node_id:'node',tid:root}));
+ const roots=await read({discover_roots:true});
+ assert.equal(roots.status,'SUCCEEDED',JSON.stringify(roots.trace));
+ const request={root_ref:roots.output.wizard.root_ref,output_column_page:{offset:0,limit:8}};
+ if(cost==='descendant selectors'){
+   const query=page.document.querySelectorAll.bind(page.document);
+   page.document.querySelectorAll=selector=>{
+     if(selector.includes('] [data-tid]'))clock.advance(501);
+     return query(selector);
+   };
+ }
+ if(cost==='buffered row refs'){
+   const initial=await read(request);
+   assert.equal(initial.status,'SUCCEEDED');
+   const state=vm.runInContext("globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')]",page.context);
+   const rootRef=state.refs.get(request.root_ref);
+   state.refs.delete(request.root_ref);
+   state.refs.delete(initial.output.wizard.output_columns.auto_sync.ref);
+   state.refs=new Map([[request.root_ref,rootRef],...state.refs]);
+   // Model the cached refs of rows from earlier windows. The next scan
+   // allocates a ref after observing the root, then a fresh read needs it.
+   for(let i=state.refs.size;i<4096;i++)state.refs.set('buffered-'+i,rootRef);
+   assert.equal((await read(request)).status,'SUCCEEDED');
+ }
+ const result=await read(request);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.trace));
+ const cols=result.output.wizard.output_columns;
+ assert.equal(cols.page.status,'complete_definition_page');
+ assert.equal(cols.page.total_columns,1000);
+ const control=ref=>result.output.ui.elements.find(e=>e.ref===ref);
+ assert.ok(control(cols.definition_scroll_ref).allowed_actions.includes('scroll'));
+ assert.ok(control(cols.fields[1].name_ref).allowed_actions.includes('click'));
+ for(const field of [cols.fields[0],cols.fields[7]]) {
+   const cell=control(field.name_ref);
+   assert.equal(cell.interaction.state,'point_not_observed');
+   assert.deepEqual(Array.from(cell.allowed_actions),[]);
+ }
+});
 
 for(const property of ['name','label'])for(const scoped of [false,true])test('import text editor separates the hidden original from the uncommitted draft: '+property+' (scoped='+scoped+')',async()=>{
  const page=new Page(),c=importCoverageFixture(page,3),row=property==='name'?0:1,cell=c.cols[0].cells[row];
@@ -7916,6 +8112,17 @@ test('graph launch only exposes typed execution for the exact native selected no
  assert.equal(e.graph_execution.node_id,'node-a');assert.throws(()=>validateUiAction({verb:'click',ref:e.ref},r.output));
  const done=await f.execute({mode:'act',action:{verb:'execute_graph_node',ref:e.ref},snapshot:r.output});assert.equal(done.status,'SUCCEEDED');assert.equal(f.page.events.filter(e=>e==='click').length,1);
 });
+test('graph launch geometry drift is refused before the gesture',async()=>{
+ const fixture=graphLaunchFixture(),observed=await fixture.execute({mode:'observe'});
+ const control=observed.output.ui.elements.find(element=>element.tid===fixture.button.attrs['data-tid']);
+ fixture.page.beforeHandleGeometry=element=>{if(element===fixture.button)element.box.x+=2;};
+ const outcome=await fixture.execute({mode:'act',action:{verb:'execute_graph_node',ref:control.ref},snapshot:observed.output});
+ assert.equal(outcome.status,'NOT_APPLIED');assert.equal(outcome.phase,'preconditions');
+ assert.equal(outcome.error.code,'UI_REFERENCE_STALE');assert.equal(outcome.error.message,'Observed control geometry changed');
+ assert.equal(outcome.effect_possible,false);assert.equal(outcome.cleanup_complete,true);
+ assert.equal(outcome.trace.some(entry=>['ui_preconditions_verified','ui_gesture_applied'].includes(entry.event)),false);
+ assert.equal(fixture.page.events.filter(event=>event==='click').length,0);
+});
 test('graph launch refuses a repainted body of the same selected node before the execution gesture',async()=>{
  const f=graphLaunchFixture(),view=f.model.FDiagram.FmxGraph.view,original=view.getState;let reads=0;
  view.getState=()=>{
@@ -7950,6 +8157,7 @@ test('prepared 1000-column import keeps page refs and rejects hidden or sensitiv
  const first=await read(0),last=await read(992);
  assert.equal(first.status,'SUCCEEDED');assert.equal(last.status,'SUCCEEDED');
  assert.equal(first.output.wizard.import_columns.page.total_columns,1000);assert.equal(last.output.wizard.import_columns.page.status,'complete_definition_page');
+ assert.equal(last.output.scan.max_ms,4500);
  assert.equal(first.output.wizard.import_columns.page.schema_id,last.output.wizard.import_columns.page.schema_id);
  assert.deepEqual(last.output.wizard.import_columns.fields.map(f=>f.index),[992,993,994,995,996,997,998,999]);
  assert.ok(last.output.scan.visited_elements<6000);
@@ -7961,6 +8169,80 @@ test('prepared 1000-column import keeps page refs and rejects hidden or sensitiv
  c.cols[999].cells[1].style.display='none';assert.equal((await read(0)).output.wizard.import_columns.page.status,'unverified');
  c.cols[999].cells[1].style.display='block';c.cols[999].cells[1].attrs['aria-label']='password';
  assert.equal((await read(0)).output.wizard.import_columns.page.status,'unverified');
+ page.add('div',c.base+';normalHeaderCt;1000','',undefined,c.header);
+ const overflow=await read(0);
+ assert.equal(overflow.status,'NOT_APPLIED');assert.equal(overflow.effect_possible,false);
+ assert.equal(overflow.error.code,'UI_SCAN_LIMIT');
+ assert.ok(overflow.trace.some(entry=>entry.event==='ui_scan_limit'&&entry.limit_kind==='elements'));
+});
+
+test('wide import configuration and recovery avoid checking the full guards on preview cells',async()=>{
+ const clock=fixtureClock(),page=new Page({clock:clock.Date}),fixture=importCoverageFixture(page,400);
+ const preview=page.add('div',fixture.base.replace(/;grdSettings;.*/,';grdData'),'',undefined,fixture.form);
+ for(let row=0;row<12;row++)for(let column=0;column<400;column++){
+  const tid=preview.attrs['data-tid']+';colValue_'+row+'_'+column;
+  const cell=page.add('div',tid,'',undefined,preview);page.add('span',tid+';Value','1',undefined,cell);
+ }
+ const close=page.add('button','MF;TF-1;WizrdMCF;btnClose','Закрыть',undefined,fixture.form);
+ const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+ const read=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:binding,mode:'observe',...options},
+  async()=>({verified:true,surface:'wizard',node_id:'node'}));
+ const matches=Element.prototype.matches;
+ Element.prototype.matches=function(selector){
+  if(selector.startsWith('[data-tid*=";WizrdMCF;PythonColumnsWizard;')&&selector.includes('[role="alert"]'))clock.advance(0.08);
+  return matches.call(this,selector);
+ };
+ try {
+  const roots=await read({discover_roots:true});
+  assert.equal(roots.status,'SUCCEEDED',JSON.stringify(roots.trace));
+  const root_ref=roots.output.wizard.root_ref;
+  const configured=await read({root_ref,import_column_page:{offset:392,limit:8}});
+  assert.equal(configured.status,'SUCCEEDED',JSON.stringify(configured.trace));
+  assert.equal(configured.output.wizard.settings.fields.null_marker.value,'old');
+  assert.equal(configured.output.wizard.import_columns.page.total_columns,400);
+  const recovery=await read({root_ref});
+  assert.equal(recovery.status,'SUCCEEDED',JSON.stringify(recovery.trace));
+  assert.ok(recovery.output.ui.elements.some(element=>element.tid===close.attrs['data-tid']&&element.allowed_actions.includes('click')));
+  const hit=page.document.elementFromPoint.bind(page.document);
+  page.document.elementFromPoint=(x,y)=>x===close.box.x+close.box.width/2&&y===close.box.y+close.box.height/2
+    ?fixture.form:hit(x,y);
+  const coveredCenter=await read({root_ref});
+  assert.equal(coveredCenter.status,'SUCCEEDED');
+  assert.equal(coveredCenter.output.ui.elements.find(element=>element.tid===close.attrs['data-tid']).interaction.state,'point_not_observed');
+  page.document.elementFromPoint=hit;
+  const blocker=page.add('div',null,'Warning',undefined,preview);blocker.attrs.role='dialog';blocker.attrs['aria-label']='Warning';
+  const blocked=await read({root_ref});
+  assert.equal(blocked.status,'SUCCEEDED');assert.deepEqual(Array.from(blocked.output.ui.dialogs,dialog=>dialog.title),['Warning']);
+  blocker.remove();
+  page.add('button',close.attrs['data-tid'],'Duplicate Close',undefined,preview);
+  const ambiguous=await read({root_ref});
+  assert.equal(ambiguous.status,'SUCCEEDED');
+  assert.equal(ambiguous.output.wizard.controls.btnClose.status,'ambiguous');
+ } finally {Element.prototype.matches=matches;}
+});
+
+test('paged import probes native points only inside the rendered definition viewport',async()=>{
+ const clock=fixtureClock(),page=new Page({clock:clock.Date}),fixture=importCoverageFixture(page,400);
+ fixture.body.box.height=50;
+ fixture.body.style.overflowY='hidden';
+ const hit=page.document.elementFromPoint.bind(page.document);
+ page.document.elementFromPoint=(x,y)=>{
+  if(x>=100&&y>=275&&y<350){clock.advance(24);return fixture.form;}
+  return hit(x,y);
+ };
+ const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+ const read=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:binding,mode:'observe',...options},
+  async()=>({verified:true,surface:'wizard',node_id:'node'}));
+ const roots=await read({discover_roots:true});
+ const result=await read({root_ref:roots.output.wizard.root_ref,import_column_page:{offset:0,limit:8}});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.trace));
+ assert.equal(result.output.wizard.import_columns.page.total_columns,400);
+ const refs=result.output.wizard.import_columns.fields[0].cell_refs;
+ const control=property=>result.output.ui.elements.find(element=>element.ref===refs[property]);
+ assert.equal(control('name').interaction.state,'point_observed');
+ assert.equal(control('type').interaction.state,'point_not_observed');
 });
 
 test('a populated console scans nested cell wrappers without quadratic work',async()=>{
@@ -8635,6 +8917,41 @@ for(const suffix of ['', '-1'])test('reform literal node cache picker uses the e
  const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);list.remove();input.value='Выбранные поля';};
  const r=await page.act({verb:'select_wizard_option',ref:selected.ref},narrow.output);
  assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));assert.equal(page.events.filter(e=>e==='click').length,1);
+});
+
+test('date string-format editor sets the exact draft without invoking preset search',async()=>{
+ const page=new Page(),base='MF;TF-1;WizrdMCF;DateReformWizard;';
+ page.context.innerWidth=1000;page.context.innerHeight=800;page.viewportSize=()=>({width:1000,height:800});
+ const form=page.add('div','MF;TF-1;WizrdMCF','',{x:10,y:80,width:900,height:500});
+ const root=page.add('div',base.slice(0,-1),'',{x:20,y:90,width:850,height:470},form);
+ const panel=page.add('div',base+'grdDataFormat','',{x:40,y:100,width:710,height:300},root);
+ panel.id='matrix';
+ page.add('div',base+'grdDataFormat;tbl','',{x:40,y:100,width:710,height:280},panel);
+ const editor=page.add('div',base+'grdDataFormat;tbl;celleditor;FormatStrEditor;cbx','',{x:450,y:126,width:180,height:25},panel);
+ editor.id='format-combo';
+ const input=page.add('input',null,'',{x:452,y:128,width:160,height:20},editor);
+ input.attrs.type='text';input.value='';
+ let record={isModel:true,internalId:'r0',data:{Func:18,ISO8601:false}};
+ const grid={el:{dom:panel},findPlugin:()=>({editing:true,context:{column:{dataIndex:'DoString'},record}})};
+ const combo={el:{dom:editor},inputEl:{dom:input},forceSelection:false,
+  setValue:text=>{page.events.push('format_set');input.value=text;}};
+ page.context.Ext={getCmp:id=>({'matrix':grid,'format-combo':combo})[id]};
+
+ const before=await page.observe();
+ const owned=before.ui.elements.find(e=>e.date_time_cell?.role==='format_editor');
+ assert.ok(owned?.allowed_actions.includes('fill'),JSON.stringify({stage:before.wizard.stage,field:owned}));
+ const result=await page.act({verb:'fill',ref:owned.ref,text:'%Y-%m'},before);
+ assert.equal(result.status,'SUCCEEDED');
+ assert.equal(input.value,'%Y-%m');
+ assert.deepEqual(page.events.filter(e=>e==='format_set'||e==='keyboard_type'),['format_set']);
+
+ const click=page.mouse.click;
+ page.mouse.click=async(...args)=>{await click(...args);record={...record,internalId:'other'};};
+ const after=await page.observe();
+ const changed=await page.act({verb:'fill',ref:owned.ref,text:'%Y'},after);
+ assert.equal(changed.error?.code,'DATE_FORMAT_EDITOR_CHANGED');
+ assert.equal(input.value,'%Y-%m');
+ assert.equal(page.events.filter(e=>e==='format_set').length,1);
 });
 
 test('date string-format cell is clicked away from its checkbox image, never on it',async()=>{

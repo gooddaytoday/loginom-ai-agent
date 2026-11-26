@@ -382,7 +382,10 @@ const variableMappingReadback=object({kind:values('variables','control'),directi
  source_identity_verified:{const:true},independent_readback:{const:true},count:integer,store_count:integer,unique_ids:integer,autosync:bool,
  fields:array(object({id:integer,index:integer,name:str,label:str,type:integer,origin_type:integer,usage:integer,description:str,
   value:{type:['string','number','boolean','null']},is_null:bool,source:nullable(object({id:integer,name:str,label:str,type:integer}))}))});
+const linkEndpoint=object({source:str,output:integer,target:str,input:integer});
+export const replacedLinksSchema=array(object({removed:linkEndpoint,created:linkEndpoint}));
 export const nodeApplyResultSchema=object({operation_id:str,status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),
+ replaced_links:replacedLinksSchema,
  effect_possible:bool,phases:array(receipt),node:nullable(ref),execution,output,
  package_saved:{type:'boolean',const:false},cleanup_complete:bool,warnings:array(str),
  configuration:object({status:values('applied','discarded','not_requested','unknown'),readback:configurationReadback,variable_mappings:array(variableMappingReadback),bindings:{...array(parameterBindingReadback),maxItems:32}},['status']),

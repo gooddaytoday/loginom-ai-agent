@@ -5,6 +5,7 @@ import {join,win32} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {createServerDownloadRegistry,serverDownloadBudget} from '../lib/storage-policy.mjs';
+import {fileStatIdentity} from '../lib/file-reference.mjs';
 import {Page,runtime,actions,selectors,build} from './support/executor-fixture.mjs';
 import {createActionRuntime} from '../lib/executor.mjs';
 import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
@@ -360,12 +361,12 @@ test('download writes a private cache, binds its receipt to native identity and 
  const path=result.output.path;await assertPrivateCache(join(f.root,'cache'));
  assert.equal((await stat(path)).size,3);
  const receipt={basis:'backend_exact_scan',profile_id:'p',records:1,bytes:3,sha256:'a'.repeat(64),
-  identity:{canonical_path:path,size:3,file_id:`${(await stat(path)).dev}:${(await stat(path)).ino}`,
-   mtime:(await stat(path)).mtimeMs,ctime:(await stat(path)).ctimeMs}};
+  identity:{canonical_path:path,...fileStatIdentity(await stat(path,{bigint:true}))}};
  assert.equal((await f.registry.bind(source(),receipt)).sha256,receipt.sha256);
  assert.equal((await f.registry.bind({...source(),server_source_ref:'refreshed-native-ref'},receipt)).sha256,receipt.sha256);
  assert.equal((await f.registry.bind({...source(),account:'foreign'},receipt)).sha256,undefined);
  assert.equal((await f.registry.bind(source(),{...receipt,identity:{...receipt.identity,canonical_path:'/foreign'}})).sha256,undefined);
+ assert.equal((await f.registry.bind(source(),{...receipt,identity:{...receipt.identity,file_id:'0:0'}})).sha256,undefined);
  assert.equal((await f.registry.bind({...source(),mtime:'changed'},receipt)).sha256,undefined);
  await f.registry.cleanup();assert.deepEqual(await readdir(join(f.root,'cache')),[]);
 });

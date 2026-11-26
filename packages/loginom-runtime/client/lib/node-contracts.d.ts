@@ -8,8 +8,8 @@ export interface Position { x: number; y: number }
 export type NodeTarget<T extends NodeType = NodeType> =
   | {kind: 'new'; type: T; label?: string; position: Position}
   | {kind: 'existing'; type: T; ref: NodeRef; label?: string; position?: Position};
-export interface InputLink { source: NodeRef; output: number; input: number }
-export interface VariableInputLink extends InputLink { kind: 'variables' | 'control' }
+export interface InputLink { source: NodeRef; output: number; input: number; replace_existing?: boolean }
+export interface VariableInputLink extends Omit<InputLink, 'replace_existing'> { kind: 'variables' | 'control' }
 export interface VariableBinding { parameter: string; variable: {kind: 'variables' | 'control'; input: number; name: string} }
 export interface VariableBindingReadback extends VariableBinding {
   mode: 'variable'; row_id: string;
@@ -65,6 +65,7 @@ export interface PhaseReceipt { phase: PhaseName; receipt_id: string; status: 'p
 export interface NodeApplyResult {
   operation_id: string; status: 'SUCCEEDED' | 'FAILED' | 'NOT_APPLIED' | 'AMBIGUOUS'; effect_possible: boolean;
   phases: PhaseReceipt[]; node: NodeRef | null;
+  replaced_links?: {removed: {source: string; output: number; target: string; input: number}; created: {source: string; output: number; target: string; input: number}}[];
   execution: NodeExecution; output: NodeOutput;
   /** A local node checkpoint never proves that the package was saved. */
   package_saved: false; cleanup_complete: boolean; warnings: string[];

@@ -382,6 +382,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       ...['GroupDataWizard;pedSortResult','SortingWizard;SortingColumnCollection;chkLocaleAware'].flatMap(base=>['SwitchButton','VariableControl','VariableControl;trg_picker','VariableControl;boundlist'].flatMap(part=>{const owner='[data-tid$=";WizrdMCF;'+base+';'+part+'"]';return [owner,owner+' input',owner+' [data-recordid]'];})),
       ...['edtConnection','edtFileName;ValueControl','edtCodePage;ValueControl','edtRowsToSkip;ValueControl','cbbFileInfoColumnsType;ValueControl','cbbMaxThreadCount;ValueControl'].flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;'+name+'"]';return [owner,owner+' input',owner+' textarea'];}),
+      '[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;cntConnection"]',
       '[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFirstLineAsTitle;ValueControl"]',
       '[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFirstLineAsTitle;ValueControl;DisplayEl"]',
       ...['',';DisplayEl'].map(suffix=>'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;chkParallelProcessing;ValueControl'+suffix+'"]'),
@@ -420,17 +421,47 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // cannot be preempted; charge immediately after each native operation.
       const guardSelector=wizardSelectors+',[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"],.x-tab-active[data-tid],[role="dialog"],.x-window,.bg-dialog,.bg-mask-message,.x-mask-msg,[role="alert"],[role="status"],.bg-message,.x-message-box,.x-form-invalid-under,[data-tid$="FileStorageForm;pnlFileStorage;tbl"]';
       // Checking all ~570 parts against every document element took 114 of
-      // 306 ms per Files read (LAB-1188 profile). A part led by a WizrdMCF tid
-      // matches only that element or its descendant: prefilter those once,
-      // keep other parts verbatim, then apply the full list to candidates.
-      // Same elements, same document order.
-      const guardParts=guardSelector.split(','),plain=value=>value.replace(/"[^"]*"/g,'');
-      const owned=part=>/^\[data-tid[\^$*]?="[^"]*WizrdMCF[^"]*"\]/.test(part)&&!/[>+~:]/.test(plain(part));
-      const guards=guardParts.every(part=>(part.match(/"/g)?.length??0)%2===0)
-        ? [...document.querySelectorAll(['[data-tid*="WizrdMCF"]','[data-tid*="WizrdMCF"] *',...guardParts.filter(part=>!owned(part))].join(','))]
-          .filter(element=>element.matches(guardSelector))
-        : document.querySelectorAll(guardSelector);
-      charge();for (const element of guards)if(addressedImportField(element))include(element);
+      // 306 ms per Files read (LAB-1188 profile). Broaden the wizard tid,
+      // but retain the descendant's selector so preview cells aren't candidates.
+      const guardParts=guardSelector.split(','),wizardTid='[data-tid*="WizrdMCF"]';
+      const guardCandidate=part=>{
+        const leading=/^\[data-tid[\^$*]?="[^"\\]*WizrdMCF[^"\\]*"\]/.exec(part);
+        if(!leading)return part;
+        const tail=part.slice(leading[0].length);
+        if(/^(?:\[data-tid[\^$*]?="[^"\\]*"\])*$/.test(tail))return wizardTid;
+        return /^ [a-z.#][\w.#-]*$/i.test(tail)?wizardTid+tail:part;
+      };
+      const tidPatterns=[],descendantOwners=[],nativeGuards=[],candidateSelectors=new Set();
+      for(const part of guardParts){
+        const literal=preparedNodeWizard&&/^\[data-tid([\^$*]?)="([^"\\\r\n\f\0]+)"\]( \[data-tid\])?$/.exec(part);
+        const descendants=literal?.[3];
+        candidateSelectors.add(descendants?'[data-tid]':guardCandidate(part));
+        if(!literal){nativeGuards.push(part);continue;}
+        const [,operator,value]=literal,escaped=value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+        (descendants?descendantOwners:tidPatterns).push((operator===''||operator==='^'?'^':'')+escaped
+          +(operator===''||operator==='$'?'(?![\\s\\S])':''));
+      }
+      const tidGuard=tidPatterns.length?new RegExp(tidPatterns.join('|')):null,nativeGuard=nativeGuards.join(',');
+      const ownerGuard=descendantOwners.length?new RegExp(descendantOwners.join('|')):null;
+      const splitGuards=guardParts.every(part=>(part.match(/"/g)?.length??0)%2===0);
+      const nativeMatches=splitGuards&&(tidGuard||ownerGuard)?new Set(document.querySelectorAll(nativeGuard)):null;
+      charge();
+      const guards=splitGuards
+        ? [...document.querySelectorAll([...candidateSelectors].join(','))]
+          .filter(element=>{
+            const tid=element.getAttribute('data-tid')??'';
+            // querySelectorAll is in document order. Collect typed descendants
+            // from their matching owner before visiting those descendants.
+            // A global "owner [data-tid]" union repeatedly walks the large,
+            // still-mounted import preview to find these unrelated controls.
+            if(ownerGuard?.test(tid)){
+              charge();for(const child of element.querySelectorAll('[data-tid]')){charge();nativeMatches.add(child);}
+            }
+            return addressedImportField(element)
+              &&(nativeMatches?nativeMatches.has(element)||tidGuard?.test(tid):element.matches(nativeGuard));
+          })
+        : [...document.querySelectorAll(guardSelector)].filter(addressedImportField);
+      charge();for (const element of guards)include(element);
       // Ext renders Table modals in a portal outside the owning BrowseView.
       // Include exact view roots as global identity guards, never their trees.
       const tableOwners=document.querySelectorAll('[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid*=";ViewsForm;BrowseView-"]');
@@ -1204,7 +1235,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       else if(panels.length===1&&inside(panels[0],panels[0])) {
         const panel=panels[0],crumbs=all.filter(e=>{charge();return panel.contains(e)&&/;cnrNaviMode;b\.s_/.test(getTid(e)??'');});
         const singleInputOverflow=preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===0
-          &&['bg-vendor-icon-ungroupdata','bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-columnflipping','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-clusterization','bg-vendor-icon-linregression','bg-vendor-icon-corranalysis','bg-vendor-icon-logregression','bg-vendor-icon-coarseclasses','bg-vendor-icon-assnrules'].includes(preparedInputPort.node_icon_class)
+          &&['bg-vendor-icon-ungroupdata','bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-columnflipping','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-clusterization','bg-vendor-icon-linregression','bg-vendor-icon-corranalysis','bg-vendor-icon-logregression','bg-vendor-icon-coarseclasses','bg-vendor-icon-assnrules',
+            'bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile','bg-vendor-icon-exportnative'].includes(preparedInputPort.node_icon_class)
           &&crumbs.length===workflowDepth+4&&crumbs[workflowDepth].querySelectorAll('.'+preparedInputPort.node_icon_class).length===1;
         const hiddenInputNode=e=>singleInputOverflow&&inputOverflowOwner(e)
           &&(!globalThis.bg?.app?.ModelNodeTreeNode||nativeOverflowNode(e))
@@ -1478,6 +1510,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     }
     scanStage='output_definitions';
     const factorLoadingsMapping=factorWizard&&wizard.stage==='binning_ranges_mapping';
+    let wideTextOutputGrid=null;
     if(wizard.status==='observed' && (['output_mapping','input_mapping','field_parameters'].includes(wizard.stage)||factorLoadingsMapping)) {
       const reform=wizard.stage==='field_parameters',columnsKey=reform?'reform_columns':'output_columns';
       const mappingForms=[...[1,2,3,4].map(port=>'DerivedDataSourceMappingEngineOutputPortWizard-'+port),'ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard'].filter(name=>
@@ -1534,6 +1567,26 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       const body=unique('grdTargetColumns;tbl'),filter=unique('TargetFilter'),tableMode=unique('rbTable'),linksMode=unique('rbLinks');
       const roleGrid=forms[0]==='TuneDataSourceInputPortWizard';
       const auto=unique('btnAutoSyncThroughColumns');
+      const boundId=body?.getAttribute('id');
+      const textOutput=preparedNodeWizard && wizard.stage==='output_mapping' && forms[0]==='ColumnsMappingEngineOutputPortWizard';
+      const view=definitionPrefix&&(mappingPage||textOutput)&&boundId?globalThis.Ext?.getCmp?.(boundId):null;
+      const store=view?.el?.dom===body?view.getStore?.():null;
+      const localStore=store?.$className==='Ext.data.Store' && !store.isBufferedStore && !store.isLoading?.();
+      if(textOutput && localStore) {
+        const count=store.getCount?.();
+        if(Number.isInteger(count) && count>64 && count<=1000) {
+          const importForms=document.querySelectorAll('[data-tid='+JSON.stringify(wizard.root_tid+';ImportTextFileParamsWizard')+']');charge();
+          if(importForms.length===1 && wizardForms[0].contains(importForms[0])) {
+            wideTextOutputGrid=body;
+            if(requestedRoot===wizardForms[0]) {
+              // Buffered rows can exhaust the ref cache during a read. Keep
+              // the still-owned root available for the bounded read retry.
+              const liveRef=new WeakRef(requestedRoot);
+              state.refs.delete(rootRef);state.refs.set(rootRef,liveRef);
+            }
+          }
+        }
+      }
       wizard.output_columns.auto_sync=auto?{status:'observed',value:auto.classList.contains('x-btn-pressed'),ref:refOf(auto)}:{status:'unobserved'};
       if(body && filter && tableMode && linksMode) {
         const containers=[...body.querySelectorAll('.x-grid-item-container')];charge();
@@ -1558,7 +1611,6 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const container=containers[0],cb=boxOf(container),bb=boxOf(body);
           const direct=[...container.children];charge();
           const bodyChildren=[...body.children];charge();
-          const boundId=body.getAttribute('id');
           const valid=boundId && inside(container,body) && geometryCheck(cb.y,bb.y,'container_top',container) && geometryCheck(cb.x,bb.x,'container_left',container)
             && direct.length===rows.length && direct.every(e=>rows.includes(e))
             && bodyChildren.every(e=>e===container || !visible(e))
@@ -1595,7 +1647,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const b=boxOf(e),p=boxOf(parent);
           return b.width>0 && b.height>0 && geometryInside(b,p,e,rightTolerance);
         };
-        const container=containers[0],boundId=body?.getAttribute('id');
+        const container=containers[0];
         const noEditors=!all.some(e=>{charge();return ((getTid(e)??'').startsWith(base+'grdTargetColumns;tbl;celleditor')
           || (['EditColumnDefForm','EditTuneColumnDefForm'].some(form=>getTid(e)===wizard.root_tid+';'+form||getTid(e)===form)))&&visible(e);});
         let complete=body && container && containers.length===1 && rows.length>0 && rows.length<=1000 && rows.length===fields.length
@@ -1632,9 +1684,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           && rows.length<=1000 && inputs.length===1 && String(inputs[0].value??'')===''
           && (roleGrid||tableMode?.classList.contains('x-form-cb-checked')) && !linksMode?.classList.contains('x-form-cb-checked')
           && noEditors && !dialogs.length && !select('.bg-mask-message,.x-mask-msg').some(visible)) {
-          const view=globalThis.Ext?.getCmp?.(boundId),store=view?.el?.dom===body?view.getStore?.():null;
-          const records=store?.$className==='Ext.data.Store' && !store.isBufferedStore && !store.isLoading?.()
-            ?store.getData?.()?.items:null;
+          const records=localStore?store.getData?.()?.items:null;
           const grouped=['DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','DerivedDataSourceMappingEngineOutputPortWizard-1'].includes(forms[0]),groupIndices=new Map();
           // Grouped CollectionProxy totals count active fields or retain the
           // last load after a local removal. Accept only a complete unfiltered
@@ -1761,6 +1811,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       }));
       wizard.completion={fields,ready:Object.values(fields).every(f=>f.status==='observed' && !f.truncated && f.enabled && f.value && !/[\0\r\n]/.test(f.value))
         && ['Автоматическая метка','Пользовательская метка'].includes(fields.label_mode.value),settings_applied:false};
+    }
+    if(wizard.status==='observed' && wizard.stage==='python_code') {
+      const buttons=(tids.get(wizard.root_tid+';btnError')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e)&&enabled(e)&&!sensitive(e));
+      const message=buttons.length===1?buttons[0].getAttribute('data-qtip'):null;
+      if(typeof message==='string'&&message.length>0&&message.length<=4096)
+        wizard.python_validation={status:'observed',root_ref:wizard.root_ref,message,source:'loginom_wizard_error_tooltip'};
     }
     if(wizard.status==='observed' && wizard.stage==='calculator') {
       const base=wizard.root_tid+';CalcDataWizard;';
@@ -2070,6 +2126,24 @@ function readRenderedInputMapping(observation) {
       const base=wizard.root_tid+';ImportTextFilePreviewWizard;';
       const fields=Object.fromEntries(Object.entries({source_path:'edtFileName;ValueControl',connection:'edtConnection',
         encoding:'edtCodePage;ValueControl',rows_to_skip:'edtRowsToSkip;ValueControl',file_info:'cbbFileInfoColumnsType;ValueControl',max_threads:'cbbMaxThreadCount;ValueControl'}).map(([name,key])=>{
+        if(name==='connection' && globalThis.bg?.app?.IsFileConnectionHidden===true){
+          const rows=tids.get(base+'cntConnection')??[];
+          const owners=tids.get(base+key)??[];
+          const row=rows[0],owner=owners[0];
+          if(rows.length===1 && owners.length===1 && wizardForms[0].contains(row) && row.contains(owner)
+            && !sensitive(owner) && getComputedStyle(row).display==='none'){
+            const native=globalThis.Ext?.getCmp?.(row.id);
+            const inputs=[...owner.querySelectorAll('input:not([type="hidden"])')];
+            charge(inputs.length);
+            const input=inputs[0];
+            // Loginom hides this native row for the default local file storage.
+            if(native?.el?.dom===row && native.hidden===true && inputs.length===1
+              && !sensitive(input) && input.readOnly && input.value==='Локальное'){
+              return [name,{status:'observed',value:'Локальное',value_length_utf16:'Локальное'.length,
+                truncated:false,enabled:false,read_only:true,value_kind:'default_local_storage'}];
+            }
+          }
+        }
         if(name==='source_path'){
           const switches=(tids.get(base+'edtFileName;SwitchButton')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e));
           const sw=switches.length===1?globalThis.Ext?.getCmp?.(switches[0].id):null;
@@ -2353,9 +2427,9 @@ function readRenderedInputMapping(observation) {
       if(importFieldBase===columnBase&&definitionElements.length>6000) {
         const error=new Error('Import definition inventory exceeds 1000 fields');error.code='UI_SCAN_LIMIT';error.limit_kind='elements';throw error;
       }
-      // Full native schema validation adds at most 1000 ms for 1000 fields.
-      // Generic scans retain 500 ms, and the element/work limits stay fixed.
-      if(importFieldBase===columnBase)maxMs+=Math.ceil(definitionElements.length/6);
+      // Native hit-testing also scales with the rendered preview. Allow up
+      // to 4 ms per field; generic time and the element/work limits stay fixed.
+      if(importFieldBase===columnBase)maxMs+=4*Math.ceil(definitionElements.length/6);
       const definitionTids=new Map();
       for(const element of definitionElements) {
         const tid=getTid(element),matches=definitionTids.get(tid)??[];matches.push(element);definitionTids.set(tid,matches);
@@ -3457,16 +3531,32 @@ function readRenderedInputMapping(observation) {
       const parent=horizontalOwner(element);
       return parent ? {ref:refOf(parent),left:parent.scrollLeft,max_left:parent.scrollWidth-parent.clientWidth} : null;
     };
-    const interactionOf = (element, accept) => {
+    const scrollHitBounds=memoRead(parent=>{
+      if(!parent||parent===document.body)return {left:-Infinity,right:Infinity,top:-Infinity,bottom:Infinity};
+      const bounds=scrollHitBounds(parent.parentElement),style=getComputedStyle(parent);
+      const clipsX=['auto','scroll','hidden'].includes(style.overflowX);
+      const clipsY=['auto','scroll','hidden'].includes(style.overflowY);
+      if(!clipsX&&!clipsY)return bounds;
+      const box=boxOf(parent);
+      if(![box.x,box.y,box.width,box.height].every(Number.isFinite))return bounds;
+      return {left:clipsX?Math.max(bounds.left,box.x):bounds.left,right:clipsX?Math.min(bounds.right,box.x+box.width):bounds.right,
+        top:clipsY?Math.max(bounds.top,box.y):bounds.top,bottom:clipsY?Math.min(bounds.bottom,box.y+box.height):bounds.bottom};
+    });
+    const interactionOf = (element, accept, clip, centerOnly=false) => {
       const box=boxOf(element), width=globalThis.innerWidth ?? document.documentElement.clientWidth,
         height=globalThis.innerHeight ?? document.documentElement.clientHeight;
       if (![width,height].every(Number.isFinite)) return { state:'unverified', point:null };
       if (box.x>=width || box.y>=height || box.x+box.width<=0 || box.y+box.height<=0) return {state:'outside_viewport',point:null};
-      const left=Math.max(0,box.x),right=Math.min(width,box.x+box.width),top=Math.max(0,box.y),bottom=Math.min(height,box.y+box.height);
+      const left=Math.max(0,box.x,clip?.left??0),right=Math.min(width,box.x+box.width,clip?.right??width),
+        top=Math.max(0,box.y,clip?.top??0),bottom=Math.min(height,box.y+box.height,clip?.bottom??height);
+      if(clip&&(left>=right||top>=bottom))return {state:'point_not_observed',point:null,covering:[]};
       const covering=[],seenCovering=new Set();
-      for (const y of [0.5,0.25,0.75]) for (const x of [0.5,0.25,0.75]) {
+      const fractions=centerOnly?[0.5]:[0.5,0.25,0.75];
+      for (const y of fractions) for (const x of fractions) {
         charge();
-        const point={x:left+(right-left)*x,y:top+(bottom-top)*y},hit=document.elementFromPoint(point.x,point.y);
+        const point=centerOnly?{x:box.x+box.width/2,y:box.y+box.height/2}:{x:left+(right-left)*x,y:top+(bottom-top)*y};
+        if(centerOnly&&(point.x<0||point.x>=width||point.y<0||point.y>=height))break;
+        const hit=document.elementFromPoint(point.x,point.y);
         if (hit && (hit===element || element.contains(hit)) && (!accept || accept(hit))) return {state:'point_observed',point};
         if(hit && !seenCovering.has(hit) && covering.length<3) {
           seenCovering.add(hit);
@@ -3574,18 +3664,26 @@ function readRenderedInputMapping(observation) {
         ||preparedGraphTid&&getTid(element)?.startsWith(preparedGraphTid+';')
           &&/^(?:Input|Output)_(?:Data|Var)-[0-9]+$/.test(getTid(element).slice(preparedGraphTid.length+1))).slice(0,240):[]);
     const retainedControls=new Set([...requiredControls,...controls.filter(element=>!requiredControls.has(element)).slice(0,240-requiredControls.size)]);
+    const wideImport=preparedNodeWizard&&wizard.stage==='text_import_format'&&wizard.import_columns?.truncated===true;
     const elements = controls.filter(element=>retainedControls.has(element)).map(element => {
       const identity = identityOf(element), tag = element.tagName.toLowerCase(), tid = getTid(element);
       const editable = element.matches('textarea,input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),[contenteditable="true"]') && !element.readOnly;
-      // Data-preview scrollers carry navigation identity, never row values.
-      const label = tableScrollers.has(state.ids.get(element))||importScroller(element)?'':short(element.getAttribute('aria-label') || element.getAttribute('placeholder') || element.getAttribute('title') || textOf(element));
+      // Scrollers carry navigation identity. The wide mapping grid's label
+      // would otherwise walk every buffered row.
+      const label = tableScrollers.has(state.ids.get(element))||importScroller(element)||element===wideTextOutputGrid?'':short(element.getAttribute('aria-label') || element.getAttribute('placeholder') || element.getAttribute('title') || textOf(element));
       const role = element.getAttribute('role'), kind = /;(?:Input|Output)_/.test(tid ?? '') ? 'port' : editable ? 'field' : /;Graph;/.test(tid ?? '') ? 'graph' : 'control';
       const isEnabled = enabled(element), allowed = identity && isEnabled && !dangerous(element);
       const scroll = scrollOf(element);
       const horizontalScroll=horizontalScrollOf(element);
       // A date string-format cell also holds the flag checkbox image: never
       // choose a point on that image, it would toggle the flag instead of editing.
-      const interaction = interactionOf(element, dateTimeCells.get(state.ids.get(element))?.role==='format_cell' ? hit=>!hit.closest('img.x-grid-checkcolumn') : undefined);
+      const importCell=preparedNodeWizard&&importColumnCellRefs.has(state.ids.get(element));
+      const wideOutputCell=wideTextOutputGrid&&outputColumnCells.has(state.ids.get(element))&&wideTextOutputGrid.contains(element);
+      // The action guard already requires the center for the wizard's fixed
+      // controls. Native hit-testing of addressed cells uses their clipped box.
+      const centerOnly=(wideImport&&!importCell||wideTextOutputGrid&&!wideOutputCell)&&wizardForms[0].contains(element);
+      const interaction = interactionOf(element, dateTimeCells.get(state.ids.get(element))?.role==='format_cell' ? hit=>!hit.closest('img.x-grid-checkcolumn') : undefined,
+        importCell||wideOutputCell?scrollHitBounds(element.parentElement):undefined,centerOnly);
       const checkState=checkStateOf(element);
       const calculatorEditor=calculatorEditorOf(element);
       const combo=comboPart(element);
@@ -4770,13 +4868,34 @@ function readRenderedInputMapping(observation) {
         }
         else if (task.action.verb === 'fill') {
           await clickTarget(1);
-          await first.press('ControlOrMeta+A', { timeout: timeout() });
-          if (!(await first.evaluate(element => document.activeElement === element))) fail('UI_FOCUS_CHANGED', 'The observed editor lost keyboard focus');
-          timeout();
-          // Loginom's transient rename editor commits real keyboard input; fill()
-          // alone did not update its component model in live acceptance.
-          if (task.action.text) await page.keyboard.type(task.action.text, { delay: 0 });
-          else await first.press('Backspace', { timeout: timeout() });
+          const dateEditor=current.ui.elements.find(item=>item.ref===task.action.ref)?.date_time_cell;
+          if(dateEditor?.role==='format_editor'){
+            // Input events query the preset list and can expand a valid custom format.
+            const applied=await first.evaluate((input,{text,recordId})=>{
+              const suffix=';tbl;celleditor;FormatStrEditor;cbx';
+              const owner=input.closest('[data-tid$="'+suffix+'"]');
+              if(!owner||document.activeElement!==input||input.readOnly)return false;
+              const gridTid=owner.getAttribute('data-tid').slice(0,-suffix.length);
+              const panel=owner.closest('[data-tid='+JSON.stringify(gridTid)+']');
+              const getCmp=id=>globalThis.Ext?.getCmp?.(id);
+              const grid=panel&&getCmp(panel.id),combo=getCmp(owner.id);
+              const editor=grid?.findPlugin?.('cellediting');
+              const record=editor?.context?.record;
+              if(grid?.el?.dom!==panel||editor?.editing!==true||editor.context.column?.dataIndex!=='DoString'
+                ||!record?.isModel||String(record.internalId)!==recordId||record.data.Func!==18||record.data.ISO8601!==false
+                ||combo?.el?.dom!==owner||combo.inputEl?.dom!==input||combo.forceSelection!==false||typeof combo.setValue!=='function')return false;
+              combo.setValue(text);
+              return input.value===text;
+            },{text:task.action.text,recordId:dateEditor.record_id});
+            if(!applied)fail('DATE_FORMAT_EDITOR_CHANGED','The native date format editor or its exact value changed');
+          } else {
+            await first.press('ControlOrMeta+A', { timeout: timeout() });
+            if (!(await first.evaluate(element => document.activeElement === element))) fail('UI_FOCUS_CHANGED', 'The observed editor lost keyboard focus');
+            timeout();
+            // Transient rename editors need real keyboard input to update their model.
+            if (task.action.text) await page.keyboard.type(task.action.text, { delay: 0 });
+            else await first.press('Backspace', { timeout: timeout() });
+          }
         } else if (task.action.verb === 'drag') {
           await page.mouse.move(targets[0].point.x, targets[0].point.y);
           timeout(); mouseHeld = true;
@@ -4972,10 +5091,13 @@ function readRenderedInputMapping(observation) {
                   const text=root.innerText;
                   return typeof text==='string'&&text.length>0&&text.length<=4096&&!text.includes('\0')?text:null;
                 },dialogTid);
-                const message=await readError(),field=/Ошибка разбора выражения\s*["«]([A-Za-z_][A-Za-z0-9_]{0,127})["»]/.exec(message??'')?.[1];
+                const message=await readError();
+                const quoted=/Ошибка разбора выражения\s*(?:"([^"\r\n]{1,256})"|«([^»\r\n]{1,256})»)/.exec(message??'');
+                const nameOrLabel=quoted?.[1]??quoted?.[2];
+                const expressions=task.snapshot.node_calculator?.expressions?.filter(e=>e.name===nameOrLabel||e.label===nameOrLabel);
                 if(!owned(popup)||popup.ui.masks.length||popup.ui.dialogs.length!==1||popup.ui.dialogs[0].ref!==dialog.ref
                   ||popup.ui.dialogs[0].title!=='Loginom '+current.loginom_build||buttons.length!==1
-                  ||task.snapshot.node_calculator?.verified!==true||!task.snapshot.node_calculator.expressions.some(e=>e.name===field))break;
+                  ||!nameOrLabel||task.snapshot.node_calculator?.verified!==true||expressions?.length!==1)break;
                 const checked=await readUi();
                 if(!owned(checked)||checked.ui.masks.length||!same(checked.ui.dialogs,popup.ui.dialogs)
                   ||!same(checked.dom_epoch,popup.dom_epoch)||await readError()!==message)break;
@@ -4985,7 +5107,7 @@ function readRenderedInputMapping(observation) {
                   state.captureMutations(state.observer.takeRecords());return {document:state.epoch,revision:state.revision};});
                 if(!same(checked.dom_epoch,epoch))fail('UI_EPOCH_CHANGED','Calculator preview error changed before OK');
                 timeout();mouseHeld=true;await page.mouse.click(target.point.x,target.point.y,{clickCount:1,button:'left'});mouseHeld=false;
-                calculatorDialogFailure={status:'observed',root_ref:current.wizard.root_ref,message,field_name:field,source:'loginom_calculator_preview_error_dialog'};
+                calculatorDialogFailure={status:'observed',root_ref:current.wizard.root_ref,message,field_name:expressions[0].name,source:'loginom_calculator_preview_error_dialog'};
                 record('wizard_calculator_preview_error_dismissed',{root_ref:current.wizard.root_ref,message});
               } finally {postActionRoot=wizardRoot;}
               if(calculatorDialogFailure) {
@@ -5427,16 +5549,17 @@ function readRenderedInputMapping(observation) {
           // a timeout never grants another gesture or an applied claim.
           for(let attempt=0;attempt<(task.opening_timeout_ms?225:24) && unchangedContext(observed)
             && (!destination(observed.wizard.stage) || observed.ui.masks.length);attempt++) {
-            const calculatorValidation=current.wizard.stage==='calculator';
-            const validation=calculatorValidation?observed.wizard.calculator_validation:observed.wizard.source_validation;
+            const kind=current.wizard.stage==='calculator'?'calculator':current.wizard.stage==='python_code'?'python':'source';
+            const validationKey=kind+'_validation',validation=observed.wizard[validationKey];
             if(!observed.ui.masks.length && observed.wizard.stage===current.wizard.stage
-              && validation?.status==='observed' && validation.root_ref===current.wizard.root_ref) {
+              && validation?.status==='observed' && validation.root_ref===current.wizard.root_ref
+              &&(kind!=='python'||!same(current.wizard.python_validation,validation))) {
               // Confirm the owned error once more without issuing another gesture.
               timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await readStepUi(await readUi());
               if(unchangedContext(fresh) && !fresh.ui.masks.length && fresh.wizard.stage===current.wizard.stage
-                && same(calculatorValidation?fresh.wizard.calculator_validation:fresh.wizard.source_validation,validation)) {
-                observed=fresh;record(calculatorValidation?'wizard_calculator_validation_failed':'wizard_source_validation_failed',validation);
-                fail(calculatorValidation?'WIZARD_CALCULATOR_VALIDATION_FAILED':'WIZARD_SOURCE_VALIDATION_FAILED',validation.message);
+                && same(fresh.wizard[validationKey],validation)) {
+                observed=fresh;record('wizard_'+kind+'_validation_failed',validation);
+                fail('WIZARD_'+kind.toUpperCase()+'_VALIDATION_FAILED',validation.message);
               }
               observed=fresh;
             } else { timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readStepUi(await readUi()); }

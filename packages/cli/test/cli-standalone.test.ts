@@ -26,6 +26,21 @@ test("help and version create neither the profile nor Desktop storage", async ()
   }
 })
 
+test("version prints the bare number, as in 0.4", async () => {
+  const root = await temporary()
+  const { LOGINOM_AI_AGENT_VERSION } = await import("../src/version")
+  for (const args of [["--version"], ["-v"], ["run", "--version"], ["--version", "--headless"]]) {
+    const result = await product(root, args)
+    expect({ args, code: result.code, stdout: result.stdout, stderr: result.stderr }).toEqual({
+      args,
+      code: 0,
+      stdout: `${LOGINOM_AI_AGENT_VERSION}\n`,
+      stderr: "",
+    })
+  }
+  expect(await fs.readdir(root)).toEqual([])
+})
+
 test("the profile selector alone does not move Desktop's paths", async () => {
   const root = await temporary()
   const child = Bun.spawn(

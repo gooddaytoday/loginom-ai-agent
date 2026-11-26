@@ -60,7 +60,7 @@ for(const phase of ['configure','open','input_mapping'])test('script JS releases
  const checked=validate(r);assert.equal(checked.valid,true,checked.errorMessage);
  assert.deepEqual(f.gestures,[{verb:'click',ref:'ui-close'}]);assert.equal(f.operation.nodeApply.pending,null);
  assert.ok(f.events.some(e=>e.phase==='node_operation_released'&&e.receipt.proof.cleanup.wizard_closed));
- assert.deepEqual(f.drivers.releasePendingPhases,['input_mapping','open','configure','materialization_start']);
+ assert.deepEqual(f.drivers.releasePendingPhases,['target','input_mapping','open','configure','materialization_start']);
 });
 for(const fault of ['foreign','graph','transport','receipt','cleanup','lost'])test('script JS release refuses '+fault+' and retains the pending operation',async()=>{
  const f=fixture('configure',fault);await assert.rejects(f.run());

@@ -1,0 +1,45 @@
+name: "Setup Rust and Zig for loginom-ai-agent-pty"
+description: >-
+  Install the pinned Rust 1.90.0 and Zig 0.16.0 and make Ghostty build for a portable (baseline) CPU, as the
+  release builds of packages/process-daemon do. Windows links its C runtime statically.
+inputs:
+  target:
+    description: "Rust target triple the binary is built for"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - uses: mlugg/setup-zig@8d6198c65fb0feaa111df26e6b467fea8345e46f # v2.0.5
+      with:
+        version: 0.16.0
+        cache-key: ${{ inputs.target }}
+
+    - name: Configure baseline Zig builds
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          # The shell wrapper below cannot run on Windows; build.rs reads this instead.
+          echo "OPENCODE_ZIG_CPU=baseline" >> "$GITHUB_ENV"
+          echo "RUSTFLAGS=-C target-feature=+crt-static" >> "$GITHUB_ENV"
+          # build.rs fetches Ghostty with git under the deep Cargo OUT_DIR; without long paths git stops with
+          # "Filename too long" (as check-process-daemon.yml and release-process-daemon.yml do).
+          git config --global core.longpaths true
+          # Zig runs its generators with a working directory deep inside OUT_DIR; under the repository's checkout path
+          # that passes MAX_PATH and the spawn fails with FileNotFound. A short Cargo target directory keeps it below.
+          echo "CARGO_TARGET_DIR=$(cygpath -m "$RUNNER_TEMP")/pt" >> "$GITHUB_ENV"
+        else
+          chmod +x "$GITHUB_WORKSPACE/packages/process-daemon/script/release-bin/zig"
+          echo "OPENCODE_REAL_ZIG=$(command -v zig)" >> "$GITHUB_ENV"
+          echo "$GITHUB_WORKSPACE/packages/process-daemon/script/release-bin" >> "$GITHUB_PATH"
+        fi
+
+    - name: Install Rust
+      shell: bash
+      run: rustup toolchain install 1.90.0 --profile minimal --target "${{ inputs.target }}"
+
+    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      with:
+        key: pty-${{ inputs.target }}-zig-0.16.0
+        workspaces: packages/process-daemon -> target
+        cache-workspace-crates: true

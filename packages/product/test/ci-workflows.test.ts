@@ -16,9 +16,13 @@ const PRODUCT = new Set([
   "check-test",
   "check",
   "loginom-client-full",
+  "loginom-linux",
   "loginom-macos",
+  "loginom-pty",
+  "loginom-release",
   "loginom-windows",
   "secrets",
+  "test",
   "windows-native-check",
 ])
 // Upstream workflows that are not gated job by job: `bot-nix-hashes` starts only on a push to `dev`, and its publish job is gated.

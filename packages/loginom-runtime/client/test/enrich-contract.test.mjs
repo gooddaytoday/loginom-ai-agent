@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {NODE_TYPES,describeNodeTypes} from '../lib/node-contracts.mjs';
 import {nodeApplyInputSchema,nodeApiTools} from '../lib/node-api.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
+import {createEnrichNodeSupport} from '../lib/enrich-node.mjs';
 import {isUnchangedTransformExecution} from '../lib/node-read-contract.mjs';
 import {userNodeTool} from '../lib/user-workflow.mjs';
 import {readFileSync} from 'node:fs';
@@ -34,6 +35,24 @@ test('unchanged enrich execution preserves settings; source or mapping edits can
  // Existing Join and Union retain their original unchanged-execution routing.
  assert.equal(isUnchangedTransformExecution({...r,target:{kind:'existing',type:'transform.join_data'}}),true);
  assert.equal(isUnchangedTransformExecution({...r,target:{kind:'existing',type:'transform.union_data'},mode:'append_all'}),false);
+});
+
+test('existing enrichment opens input mapping from the completed graph without a graph mutation',async()=>{
+ const ref=node_id=>({document_id:'doc',workflow_id:'wf',node_id});
+ const node=ref('enrich'),main=ref('main'),lookup=ref('lookup');
+ const final_graph={complete:true,nodes:[{ref:node,type:'transform.enrich_data',inputs:[0,1]},
+  {ref:main,outputs:[0]},{ref:lookup,outputs:[0]}],links:[
+  {source:main.node_id,output:0,target:node.node_id,input:0},{source:lookup.node_id,output:0,target:node.node_id,input:1},
+ ]};
+ const request={target:{kind:'existing',type:'transform.enrich_data',ref:node},finish:'execute',inputs:[],mappings:[],parameters:{}};
+ const operation={id:'enrich',targetPhase:{completed:true,final_graph,receipts:[]},nodeApply:{request,node}};
+ const reachedGraphRead=Error('First native graph observation');
+ const drivers=createEnrichNodeSupport({targetOrigin:'https://loginom.test',targetBuild:'7.4.2'}).nodeApplyDriverFactory({
+  operation,execute:async()=>{throw reachedGraphRead;},onRecord:async event=>event,now:()=>0,
+ });
+ const workflow_ref={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb',prefix:'MF;TF',navigation_path:[{tid:'crumb',label:'Scenario'}]};
+ await assert.rejects(drivers.mapPorts([],{receipt_id:'enrich:input_mapping',document_id:'doc',workflow_ref,node,deadline:1000}),
+  error=>error===reachedGraphRead);
 });
 
 test('enrich model contract stays within apply, type card and node-reference budgets',()=>{

@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { Database } from "bun:sqlite"
 import { existsSync, readFileSync } from "node:fs"
 import fs from "node:fs/promises"
 import os from "node:os"
@@ -725,6 +726,75 @@ describe.skipIf(process.platform !== "linux")("loginom commands with the real No
     expect(llm.hits.count).toBe(hits)
   }, 180_000)
 
+  // B2.7a4c, 0.4 `cmd/run.ts:518` and `standalone-run.ts`: the Host's checks come before the message and `--file`, and a
+  // refusal before the model leaves no session in the profile; `--command <skill>` needs no message.
+  test("run checks the Host before files and the message, leaves no session after a refusal, and takes --command alone", async () => {
+    const fixture = await setupFixture(undefined, true)
+    const llm = model([{ text: "Готово." }])
+    await productProfile(fixture.profile, llm.url)
+    const base = ["--format", "json", "--model", "test/test-model", "--dir", fixture.root]
+    const automation = [...base, "--command", "loginom-automation"]
+    // An unconfigured profile: the connection is refused first (2), not a missing file or message (1).
+    for (const args of [
+      [...automation, "--file", path.join(fixture.root, "no-such-file"), "--", "hi"],
+      [...automation],
+      [...automation, "--", "hi"],
+    ]) {
+      const refused = await run(fixture, args)
+      expect({ args, code: refused.code, stderr: refused.stderr }).toEqual({
+        args,
+        code: 2,
+        stderr: "LOGINOM_CONFIG_REQUIRED\n",
+      })
+    }
+    expect(await sessions(fixture)).toBe(0)
+    expect(llm.hits.count).toBe(0)
+
+    // The same before the message and files without a skill: strict recovery refuses first (4), whatever else is missing.
+    const journal = await recoveryStore(path.join(fixture.profile, "loginom/recovery"), { strict: true })
+    await journal.settle(await journal.begin("a".repeat(64), 1), false)
+    const strict = { LOGINOM_AI_AGENT_STRICT_RECOVERY: "1" }
+    for (const args of [[...base], [...base, "--file", path.join(fixture.root, "no-such-file"), "--", "hi"]]) {
+      const refused = await run(fixture, args, { env: strict })
+      expect({ args, code: refused.code, stderr: refused.stderr }).toEqual({
+        args,
+        code: 4,
+        stderr: "LOGINOM_RECOVERY_REQUIRED\n",
+      })
+    }
+    expect(await sessions(fixture)).toBe(0)
+
+    // Without the Host's checks the order stays: no message is 1, and so is a missing file.
+    const noMessage = await run(fixture, [...base])
+    // Usage errors of the product CLI exit 2, as in 0.4 (`cmd/run.ts:518-525`); a refused file stays 1.
+    expect({ code: noMessage.code, stderr: noMessage.stderr }).toMatchObject({ code: 2 })
+    expect(noMessage.events.at(-1)).toMatchObject({ type: "error", error: { message: "You must provide a message" } })
+    const forkAlone = await run(fixture, [...base, "--fork", "--", "hi"])
+    expect(forkAlone.code).toBe(2)
+    expect(forkAlone.events.at(-1)).toMatchObject({
+      type: "error",
+      error: { message: "--fork requires --continue or --session" },
+    })
+    // An empty `--command=` names no skill (0.4 tested `!args.command`): no message is still 2, a message is a plain prompt.
+    for (const args of [[...base, "--command="], [...base, "--command", ""]]) {
+      const empty = await run(fixture, args)
+      expect({ code: empty.code, message: empty.events.at(-1)?.error?.message }).toEqual({
+        code: 2,
+        message: "You must provide a message",
+      })
+    }
+    const noFile = await run(fixture, [...base, "--file", path.join(fixture.root, "no-such-file"), "--", "hi"])
+    expect(noFile.code).toBe(1)
+    expect(await sessions(fixture)).toBe(0)
+
+    // Another skill needs no message either, and runs.
+    const skill = await run(fixture, [...base, "--command", "package-docs"])
+    expect({ code: skill.code, stderr: skill.stderr }).toEqual({ code: 0, stderr: "" })
+    expect(skill.events.filter((event) => event.type === "text").at(-1)?.part.text).toBe("Готово.")
+    expect(llm.hits.count).toBeGreaterThan(0)
+    expect(await sessions(fixture)).toBe(1)
+  }, 180_000)
+
   // 0.4 `standalone-status`, phase `cancellation`. Ctrl+C while the Host still checks Help is a case of
   // `run/product.test.ts`: from outside, the test cannot see that the run already waits for that answer.
   test.if(process.platform !== "win32")(
@@ -955,6 +1025,19 @@ async function run(
     }
   } finally {
     clearTimeout(timer)
+  }
+}
+
+// Sessions the profile's database holds; none while the profile has no database.
+async function sessions(fixture: { profile: string }) {
+  const data = path.join(fixture.profile, "data")
+  const file = (await fs.readdir(data).catch(() => [])).find((name) => name.endsWith(".db"))
+  if (!file) return 0
+  const database = new Database(path.join(data, file), { readonly: true })
+  try {
+    return database.query<{ count: number }, []>("select count(*) as count from session_v2").get()!.count
+  } finally {
+    database.close()
   }
 }
 

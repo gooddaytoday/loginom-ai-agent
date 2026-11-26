@@ -14,7 +14,8 @@ test('browser recovery tools follow the private capability through the managed b
   const resources = await createBundledSkillFixture(t);
   const directory = await mkdtemp(join(tmpdir(), 'loginom-recovery-bridge-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
-  const compatibility = { profile_id: 'unit-linux-chromium', loginom_build: '7.4.2', platform: 'linux', browser: 'chromium' };
+  const platform = { darwin: 'macos', linux: 'linux', win32: 'windows' }[process.platform];
+  const compatibility = { profile_id: `unit-${platform}-chromium`, loginom_build: '7.4.2', platform, browser: 'chromium' };
   const catalog = await createActionCatalogFixture(compatibility);
   const browserCalls = [];
   class ExternalClient {

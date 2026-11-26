@@ -1,4 +1,5 @@
-import { chmod, copyFile, exists } from "node:fs/promises"
+import { existsSync } from "node:fs"
+import { chmod, copyFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { Option, Schema } from "effect"
 import { Product } from "@loginom-ai-agent/product"
@@ -88,7 +89,7 @@ export async function copyBuiltCliToResources(root: string, dest = windowsify(`r
   const cli = getCurrentCli()
   const directory = cli.package.replace("@opencode/", "")
 
-  if (!(await exists(join(root, directory))))
+  if (!existsSync(join(root, directory)))
     throw new Error(
       `Desktop bundles the CLI built from packages/cli, and ${join(root, directory)} is missing. Build it first: ` +
         `LOGINOM_AI_AGENT_TARGET=${directory.replace("cli-", "")} bun run --cwd packages/cli build`,

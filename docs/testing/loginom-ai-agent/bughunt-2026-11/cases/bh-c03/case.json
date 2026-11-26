@@ -1,0 +1,19 @@
+{
+  "budget": {
+    "max_tool_calls": 65,
+    "max_errors": 0,
+    "max_nodes": 2,
+    "forbid": [
+      "sqlite3",
+      "convert",
+      "pandas",
+      "openpyxl",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  },
+  "notes": "Two new nodes this turn: sorting and Excel export. CSV is checked by stock matcher; Excel delivery and retained GUIDs need transcript audit.",
+  "base": "bh-c01",
+  "input_files": []
+}

@@ -1,0 +1,224 @@
+{
+  "sources": {
+    "SPEC.md": "015fbde54315a1c8157a66cc5c73c6070d38962d570f4c27622ee661d8413b64",
+    "acceptance.json": "0987058172cc10b134c2a845f4bbe7a3d727e0086e155b3d5787011c969daa1e",
+    "data/mase_forecasts.csv": "6e7fd1186c6fb7759763b33f72097283ca45bf089d7d95fbdd498c7573c9ee20",
+    "data/mase_training.csv": "65f386f79c9ed6d02ce67af6adcef167294b8ae22a5300b26abb6a534d8fa796",
+    "oracle.csv": "35f3d6ab820b551ac9e98760e5087d7a7c3b02ca1d8778f0ca828432d566b394",
+    "oracle.py": "d3951838e347777a65847327887ac426d98b1e1af51c57b233cbff0aa69c2060",
+    "provenance.json": "84db94b0a734549e395a10f3f7606c8ecf83e1089bc29730dd92be5b3a41340d",
+    "reference.lgp": "9e444017718109daee89944358204e930d97c548692e982389889e9890a2caf9",
+    "task.json": "041624c44c8ff4909490e287c570ae4a39f5c1e74f927be689874fc5214ac719"
+  },
+  "cases": [
+    {
+      "id": "test-only-scale-leakage",
+      "kind": "aggregate",
+      "expected_failed": [
+        "train-only-scale",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Engine xsi:type=\"TBGImportTextFile\" FileName=\"/analytics-auto-author/8e8f3d75712922c773a504c5ea440e793bd24e7f1b92afc7b2d1bd5e2716cb6b-0-mase_training.csv\" CodePage=\"65001\" DelimiterChar=\",\" DecimalSeparator=\".\" ValueNull=\"\">\n\t\t\t\t\t\t<ColumnDefs>\n\t\t\t\t\t\t\t<Item Name=\"series_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utActive\"/>\n\t\t\t\t\t\t\t<Item Name=\"t\" DataType=\"dtInteger\" DataKind=\"dkContinuous\" UsageType=\"utActive\"/>\n\t\t\t\t\t\t\t<Item Name=\"value\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utActive\"/>\n\t\t\t\t\t\t</ColumnDefs>\n\t\t\t\t\t</Engine>",
+          "to": "<Engine xsi:type=\"TBGImportTextFile\" FileName=\"/analytics-auto-author/8e8f3d75712922c773a504c5ea440e793bd24e7f1b92afc7b2d1bd5e2716cb6b-1-mase_forecasts.csv\" CodePage=\"65001\" DelimiterChar=\",\" DecimalSeparator=\".\" ValueNull=\"\">\n\t\t\t\t\t\t<ColumnDefs>\n\t\t\t\t\t\t\t<Item Name=\"series_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utActive\"/>\n\t\t\t\t\t\t\t<Item Name=\"t\" DataType=\"dtInteger\" DataKind=\"dkContinuous\" UsageType=\"utActive\"/>\n\t\t\t\t\t\t\t<Item Name=\"value\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utActive\"/>\n\t\t\t\t\t\t<Item Name=\"predicted\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utActive\"/></ColumnDefs>\n\t\t\t\t\t</Engine>",
+          "count": 1
+        }
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "for r in read('mase_training.csv'): training[r['series_id']].append((int(r['t']),Fraction(r['value'])))",
+            "to": "for r in read('mase_forecasts.csv'): training[r['series_id']].append((int(r['t']),Fraction(r['actual'])))",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "test-only-scale-leakage.csv"
+    },
+    {
+      "id": "divide-by-train-points",
+      "kind": "aggregate",
+      "expected_failed": [
+        "train-only-scale",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Round(train_naive_mae,6)\"",
+          "to": "Expression=\"Round(train_naive_mae*train_pairs/(train_pairs+1),6)\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IF(train_naive_mae=0, Null, test_mae/train_naive_mae)\"",
+          "to": "Expression=\"IF(train_naive_mae=0, Null, test_mae/(train_naive_mae*train_pairs/(train_pairs+1)))\"",
+          "count": 1
+        }
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "scale=sum(diffs,Fraction(0))/len(diffs)",
+            "to": "scale=sum(diffs,Fraction(0))/(len(diffs)+1)",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "divide-by-train-points.csv"
+    },
+    {
+      "id": "signed-training-change",
+      "kind": "aggregate",
+      "expected_failed": [
+        "train-only-scale",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Abs(value-previous_value)\"",
+          "to": "Expression=\"value-previous_value\"",
+          "count": 1
+        }
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "diffs=[abs(b[1]-a[1]) for a,b in zip(points,points[1:])]",
+            "to": "diffs=[b[1]-a[1] for a,b in zip(points,points[1:])]",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "signed-training-change.csv"
+    },
+    {
+      "id": "rmse-instead-of-test-mae",
+      "kind": "aggregate",
+      "expected_failed": [
+        "test-mae",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Abs(actual-predicted)\"",
+          "to": "Expression=\"(actual-predicted)*(actual-predicted)\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Round(test_mae,6)\"",
+          "to": "Expression=\"Round(Sqrt(test_mae),6)\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IF(train_naive_mae=0, Null, test_mae/train_naive_mae)\"",
+          "to": "Expression=\"IF(train_naive_mae=0, Null, Sqrt(test_mae)/train_naive_mae)\"",
+          "count": 1
+        }
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "errors=[abs(Fraction(r['actual'])-Fraction(r['predicted'])) for r in tests[series]]",
+            "to": "errors=[(Fraction(r['actual'])-Fraction(r['predicted']))**2 for r in tests[series]]",
+            "count": 1
+          },
+          {
+            "from": "mae=sum(errors,Fraction(0))/len(errors)",
+            "to": "mae=Fraction(str(__import__(\"math\").sqrt(float(sum(errors,Fraction(0))/len(errors)))))",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "rmse-instead-of-test-mae.csv"
+    },
+    {
+      "id": "neighbor-join-without-series",
+      "kind": "aggregate",
+      "expected_failed": [
+        "train-only-scale",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Guid=\"35549933-b975-4913-9764-59bf787ac380\">\n\t\t\t\t\t\t\t\t<Left Name=\"series_id\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"series_id\"/>\n\t\t\t\t\t\t\t</Item>",
+          "to": "",
+          "count": 1
+        }
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "diffs=[abs(b[1]-a[1]) for a,b in zip(points,points[1:])]",
+            "to": "diffs=[abs(value-previous) for t,value in points for other in training.values() for previous_t,previous in other if previous_t==t-1]",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "neighbor-join-without-series.csv"
+    },
+    {
+      "id": "zero-for-undefined-mase",
+      "kind": "column",
+      "expected_failed": [
+        "mase-status",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IF(train_naive_mae=0, Null, test_mae/train_naive_mae)\"",
+          "to": "Expression=\"IF(train_naive_mae=0, 0, test_mae/train_naive_mae)\"",
+          "count": 1
+        }
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "fmt(mase)",
+            "to": "fmt(Fraction(0) if mase is None else mase)",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "zero-for-undefined-mase.csv"
+    },
+    {
+      "id": "descending-series",
+      "kind": "sort",
+      "expected_failed": [
+        "final-export",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"series_id\"/>",
+          "to": "<Item Name=\"series_id\" SortDirection=\"sdDesc\"/>",
+          "count": 1
+        }
+      ],
+      "reproduce": {
+        "sort": {
+          "column": "series_id",
+          "descending": true
+        }
+      },
+      "result_csv": "descending-series.csv"
+    }
+  ]
+}

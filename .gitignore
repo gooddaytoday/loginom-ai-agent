@@ -1,5 +1,8 @@
 .DS_Store
 node_modules
+__pycache__/
+*.pyc
+.pytest_cache/
 .worktrees
 .env
 .env.local
@@ -26,6 +29,7 @@ a.out
 target
 .scripts
 .cache
+.bun-cache
 .direnv/
 
 # Local dev files

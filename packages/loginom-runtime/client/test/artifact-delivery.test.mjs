@@ -98,6 +98,8 @@ for(const error of ['Request timed out',{code:'RECEIPT_READ_FAILED',message:'Ori
  assert.equal(first.error.cause_code,error?.code==null?undefined:String(error.code));
  assert.equal(first.outcome.next_step.tool,'dock_artifact_delivery_resume');
  assert.equal(first.outcome.next_step.original_operation_id,request.operation_id);
+ // The resume refusal of an unresolved verification is final: the hint must not invite another deliver/resume.
+ assert.match(first.outcome.next_step.instruction,/remains unresolved, the delivery stays unconfirmed: do not call deliver or resume again/);
  clock=200000;
  const retry={operation_id:request.operation_id,resume_id:'inspect-completed',budget_ms:1000};
  const promise=f.service.resume(retry),result=await promise;

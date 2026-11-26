@@ -1,0 +1,8 @@
+{
+  "base": "bh-base",
+  "budget": {
+    "max_tool_calls": 1,
+    "max_errors": 0,
+    "max_nodes": 0
+  }
+}

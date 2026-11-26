@@ -36,7 +36,14 @@ class ExternalClient {
     }
     const code=request.arguments.code;
     let value;
-    if(this.f.native && !code.includes('async function prepareWorkspace')){
+    if(this.f.connectionTimeline && code.includes('__loginomConnectionTimelineV1')){
+      this.f.events.push('connection-timeline');
+      const read=vm.runInNewContext('('+code+')');
+      value=await read({evaluate:fn=>vm.runInNewContext('('+fn.toString()+')()',{
+        __loginomConnectionTimelineV1:this.f.connectionTimeline,
+      })});
+    }
+    else if(this.f.native && !code.includes('async function prepareWorkspace')){
       this.f.events.push('failed-open-browser');
       value=await this.f.native.runCode(code);
     }
@@ -364,6 +371,27 @@ for(const scenario of ['opened-clean','opened-dirty','opened-uncertain'])
     await rm(directory,{recursive:true,force:true});
   }
  });
+
+test('managed shutdown records the native connection timeline before closing the browser',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'connection-timeline-'));
+ const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+ const samples=[{at:1000,connected:true,reconnecting:false,remote_session:true,local_session:true,restore_prompt:false},
+   {at:2000,connected:false,reconnecting:true,remote_session:true,local_session:true,restore_prompt:true}];
+ const f=current={events:[],catalog,connectionTimeline:{samples,dropped:1}};
+ const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+   metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+   artifactStore:{list:()=>[],async releaseUploads(){}}};
+ const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+   mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+   loginomUrl:'http://loginom.invalid/app',storageDirectories:{packages:'/test-2',inputs:'/test-2',exports:'/test-2'}},session);
+ try{
+   await bridge.close();
+   assert.deepEqual(f.events.filter(event=>['connection-timeline','browser-close'].includes(event)),['connection-timeline','browser-close']);
+   const journal=await readFile(join(directory,'execution-events.jsonl'),'utf8');
+   const entry=journal.trim().split('\n').map(line=>JSON.parse(line)).find(event=>event.phase==='native_connection_timeline');
+   assert.deepEqual(entry?.timeline,{resolution_ms:1000,dropped:1,samples});
+ }finally{await bridge.close();await rm(directory,{recursive:true,force:true});}
+});
 
 for(const scenario of ['opened-clean','opened-dirty','opened-path-mismatch','opened-busy','opened-unsettled','opened-not-persisted'])
  test('normal shutdown of an opened package without Save: '+scenario,async t=>{

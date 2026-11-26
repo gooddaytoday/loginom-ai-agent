@@ -39,6 +39,19 @@ test('enrich supports one lookup with composite keys and different technical nam
  assert.equal(mappings[0].pairs.length,2);
 });
 
+test('enrich continues the native numeric suffix across duplicate lookup fields',()=>{
+ const main=[field('Key','integer'),field('metric_1','real')];
+ const shared=[field('metric_1','real'),field('metric_2','real'),field('metric_3','real'),field('flag','integer')];
+ const lookups=[[main[0],...shared],[main[0],...shared]];
+ const parameters=valid();
+ parameters.enrichment.prefixes={enabled:true,name:'F_',label:'F_'};
+ const result=validateEnrichSchemas({...request,parameters},[main,...lookups]);
+ assert.deepEqual(result.fields.slice(main.length).map(({name,label,type})=>({name,label,type})),[
+  ...shared.map(f=>({name:'F_'+f.name,label:'F_'+f.label,type:f.type})),
+  ...['metric_4','metric_5','metric_6','flag_1'].map((name,i)=>({name:'F_'+name,label:'F_'+shared[i].label,type:shared[i].type})),
+ ]);
+});
+
 test('enrich rejects unsupported modes, missing keys, non-contiguous lookups and ambiguous declarations before effects',()=>{
  for(const edit of [
   p=>delete p.enrichment,p=>p.extra=true,p=>p.enrichment.extra=true,

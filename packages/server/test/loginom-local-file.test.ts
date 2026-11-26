@@ -589,6 +589,7 @@ describe("loginom local file admission (B2.5a)", () => {
             const source = path.join(test.dir, "input.csv")
             await fs.writeFile(source, "region;amount\nNorth;25\nSouth;50\n")
             const profile = await profileFile(source, dir)
+            if (profile.format !== "csv") throw Error("expected CSV")
             return sampleFile(profile.profile_id, dir, { max_records: 1 })
           })
           yield* test.sampled(owner, mode === "malformed" ? "invalid JSON" : JSON.stringify(sample))
@@ -746,6 +747,61 @@ describe("loginom local file admission (B2.5a)", () => {
         expect(message(corrected)).toContain("через --file")
         expect((corrected as Tool.Error).metadata).toEqual({ permissionDenied: true })
         expect(yield* answer()).toBeInstanceOf(Permission.DeclinedError)
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "a stop withdraws only the stopped call's read question, not the session's other open questions",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot
+        // The build agent asks before reading a secrets file; the session has no rules, so the read waits for the user.
+        const file = test.dir + "/secret.env"
+        yield* Effect.promise(() => fs.writeFile(file, "TOKEN=x\n"))
+        const ctx = yield* test.call(yield* test.create([]))
+        const stopped = new AbortController()
+        const reading = test.files.authorize(file, { ...ctx, signal: stopped.signal }).then(
+          () => undefined,
+          (error: unknown) => error,
+        )
+        const own = yield* until(() =>
+          Effect.promise(() => test.plugin.permission.list({ sessionID: ctx.sessionID })).pipe(
+            Effect.map((requests) => requests[0]),
+          ),
+        )
+        // Another open question of the same session, as a parallel sub-agent's or another tool's would be.
+        const settled = test.plugin.permission
+          .assert({
+            sessionID: ctx.sessionID,
+            agent: ctx.agent,
+            source: { type: "tool", messageID: ctx.messageID, id: Tool.CallID.make("call_other") },
+            action: "read",
+            resources: ["other.env"],
+          })
+          .then(
+            () => undefined,
+            (error: unknown) => error,
+          )
+        yield* until(() =>
+          Effect.promise(() => test.plugin.permission.list({ sessionID: ctx.sessionID })).pipe(
+            Effect.map((requests) => (requests.length === 2 ? requests : undefined)),
+          ),
+        )
+        stopped.abort()
+        // The withdrawn question is answered `once`, so authorization completes; the admission that follows checks the stop.
+        expect(yield* Effect.promise(() => reading)).toBeUndefined()
+        // The stopped call's own question is gone; the other one is still waiting.
+        const left = yield* until(() =>
+          Effect.promise(() => test.plugin.permission.list({ sessionID: ctx.sessionID })).pipe(
+            Effect.map((requests) => (requests.some((item) => item.id === own.id) ? undefined : requests)),
+          ),
+        )
+        expect(left.map((item) => item.resources)).toEqual([["other.env"]])
+        yield* Effect.promise(() =>
+          test.plugin.permission.reply({ sessionID: ctx.sessionID, requestID: left[0].id, decision: "once" }),
+        )
+        expect(yield* Effect.promise(() => settled)).toBeUndefined()
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
