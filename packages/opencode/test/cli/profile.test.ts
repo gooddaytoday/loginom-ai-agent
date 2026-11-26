@@ -518,4 +518,18 @@ describe("Windows survivors (process list only, nothing is stopped)", () => {
       { pid: 400, command: chrome.command, recognised: false },
     ])
   })
+
+  test("a live CLI on a profile whose name continues the crashed one is not a survivor", () => {
+    const cli = { pid: 600, parent: 1, created: 1_100_000, command: "loginom-ai-agent-cli.exe run" }
+    const chrome = {
+      pid: 601,
+      parent: 1,
+      created: 1_100_900,
+      command: `"${install}\\browsers\\chrome.exe" --user-data-dir=C:\\Users\\u\\Profile-2\\loginom\\x\\browser-profile`,
+    }
+    const slashed = { ...chrome, pid: 602, command: chrome.command.replaceAll("\\", "/") }
+    expect(windowsSurvivors([cli, chrome, slashed], root, owner, self)).toEqual([])
+    const own = { ...chrome, pid: 603, command: chrome.command.replace("Profile-2", "Profile") }
+    expect(windowsSurvivors([cli, chrome, own], root, owner, self).map((entry) => entry.pid)).toEqual([603])
+  })
 })

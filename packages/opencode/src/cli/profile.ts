@@ -541,7 +541,8 @@ export function windowsSurvivors(
   const found = new Map<number, WindowsProcess>()
   for (const entry of processes) {
     const command = entry.command.toLowerCase()
-    if (command.includes(lower)) found.set(entry.pid, entry)
+    // Inside the profile only: a sibling such as `<root>-2` must not match.
+    if (command.includes(lower + "\\") || command.includes(lower + "/")) found.set(entry.pid, entry)
     if (!RUNTIME_ENTRIES.some((name) => command.includes(name))) continue
     const parent = all.find((item) => item.pid === entry.parent)
     if (!parent || parent.created > entry.created) found.set(entry.pid, entry)
