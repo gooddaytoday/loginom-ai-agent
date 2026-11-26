@@ -70,6 +70,23 @@ test.each([undefined, false, true])(
         mode: "bind",
         scope: { taskMessageID: "msg_original", profile: "loginom-automation" },
       })
+      const beforePrepare = (await client.request("tools", { run: "one" })) as { tools: { name: string }[] }
+      const dock = beforePrepare.tools.filter((tool) => tool.name.startsWith("dock_"))
+      expect(Buffer.byteLength(JSON.stringify({ tools: dock }), "utf8")).toBeLessThanOrEqual(6_000)
+      const bootstrapNames = beforePrepare.tools.map((tool) => tool.name)
+      expect(bootstrapNames.includes("dock_browser_recovery")).toBe(capability === true)
+      expect(bootstrapNames).not.toContain("browser_click")
+      const earlyRecovery = client.request("call", {
+        run: "one",
+        name: "dock_browser_recovery",
+        args: { action: "start", operation_id: "op" },
+        userMessage: "msg_original",
+      })
+      if (capability === true)
+        await expect(earlyRecovery).resolves.toMatchObject({
+          structuredContent: { code: "NOT_PREPARED", next_step: "dock_prepare" },
+        })
+      if (capability !== true) await expect(earlyRecovery).rejects.toThrow("LOGINOM_SCOPE_DENIED")
       await client.request("call", { run: "one", name: "dock_prepare", args: {}, userMessage: "msg_original" })
       const listed = (await client.request("tools", { run: "one" })) as { tools: { name: string }[] }
       const names = listed.tools.map((tool) => tool.name)
