@@ -108,6 +108,9 @@ const samplingBaseline=sampling?JSON.parse(await readFile(args['sampling-baselin
 const {multiple,outputs:expectedOutputs}=sampling??parseExpectedOutputs(expected,{
  ...(args['exact-port-windows']?{maxRows:MAX_COLD_WINDOW_ROWS}:{}),
 })
+const nodeIds=rawExpected.case_port_node_ids;
+if(nodeIds!==undefined&&(!Array.isArray(nodeIds)||nodeIds.length!==expectedOutputs.length
+ ||!nodeIds.every(id=>typeof id==='string'&&id.length>0)))throw Error('CASE_PORT_NODE_IDS_INVALID');
 if(!['names','labels'].includes(args['csv-header']))throw Error('COLD_EXPORT_CSV_HEADER_MODE_INVALID')
 // --csv is the actual runtime-downloaded export, already checked in full by
 // the scenario's file oracle. It supplies order only, never cold cell values.
@@ -331,7 +334,7 @@ page = context.pages()[0]
 
   const reads=expectedOutputs.length===0&&(Array.isArray(expected.tree_outputs)&&expected.tree_outputs.length>0
    ||state.variableInventory?.outputs.length===variableInventory?.outputs.length&&state.variableInventory.outputs.length>0)
-   ?[]:selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node});
+   ?[]:selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node,nodeIds});
   if(expected.tree_outputs){
    for(const contract of expected.tree_outputs){
     const matches=graph.nodes.filter(n=>n.type===contract.output_node_type&&(contract.output_node_label===undefined||n.label===contract.output_node_label));
@@ -629,7 +632,7 @@ page = context.pages()[0]
    checkGmeansRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
   }
   if(expected.clustering_normalized)checkClusteringRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
-  const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv,factorSigns:expected.factor_signs});
+  const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv,factorSigns:expected.factor_signs,nodeIds});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
 
   if(variableInventory?.outputs.length===0){

@@ -3703,7 +3703,8 @@ class Runner:
                 if live and (spec.get('manual_edit') or case == self.current['scenario']):
                     self.close_live(live)
                 write(folder / 'case-port-expected.json', dict(package_path=package, nodes=expected['nodes'],
-                    outputs=[target['output'] for target in readback]))
+                    outputs=[target['output'] for target in readback],
+                    case_port_node_ids=[target['node_id'] for target in readback]))
                 write(folder / 'case-port-config.json', dict(loginom_url=login['url'], workflow_profile=dict(
                     loginom_user=login['username'], password=login['password'], passwordless_login=login.get('passwordless_login', False))))
                 self.phase('case-port-readback', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs',

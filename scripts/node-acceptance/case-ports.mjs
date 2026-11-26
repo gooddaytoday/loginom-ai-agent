@@ -13,7 +13,7 @@ export function checkCasePorts(expected, candidates) {
       && row.port === (want.output_port ?? 0));
     if (!observed) throw Error('CASE_PORT_OUTPUT_MISSING: ' + want.output_node_type);
     if (observed.data.sample_complete === false) {
-      readback.push({node_id: observed.node_id, output: {...want, output_node_label: observed.label}});
+      readback.push({node_id: observed.node_id, output: want});
       continue;
     }
     if (!matchesExpectedOutput(observed.data, want)) throw Error('CASE_PORT_OUTPUT_MISMATCH: ' + want.output_node_type);
