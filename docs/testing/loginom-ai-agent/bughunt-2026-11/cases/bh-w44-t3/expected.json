@@ -1,0 +1,111 @@
+{
+  "graph": {
+    "exact": true,
+    "retain": [
+      "scenario_vars",
+      "source",
+      "monthly"
+    ],
+    "nodes": [
+      {
+        "id": "scenario_vars",
+        "type": "variables.user"
+      },
+      {
+        "id": "source",
+        "type": "imports.text",
+        "label": "Позиции к сверке"
+      },
+      {
+        "id": "monthly",
+        "type": "programming.python"
+      }
+    ],
+    "links": [
+      {
+        "source": "source",
+        "target": "monthly",
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "programming.python",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "any",
+      "rows": [
+        {
+          "month": "2025-01",
+          "revenue": 37672.0,
+          "moving_avg": 37672.0
+        },
+        {
+          "month": "2025-02",
+          "revenue": 469221.62,
+          "moving_avg": 253446.81
+        },
+        {
+          "month": "2025-03",
+          "revenue": 16439.8,
+          "moving_avg": 174444.47
+        },
+        {
+          "month": "2025-04",
+          "revenue": 33278.51,
+          "moving_avg": 172979.98
+        },
+        {
+          "month": "2025-05",
+          "revenue": 260998.01,
+          "moving_avg": 103572.11
+        },
+        {
+          "month": "2025-06",
+          "revenue": 77700.13,
+          "moving_avg": 123992.22
+        },
+        {
+          "month": "2025-07",
+          "revenue": 135185.7,
+          "moving_avg": 157961.28
+        },
+        {
+          "month": "2025-08",
+          "revenue": 20966.75,
+          "moving_avg": 77950.86
+        },
+        {
+          "month": "2025-09",
+          "revenue": 3555.84,
+          "moving_avg": 53236.1
+        }
+      ],
+      "columns": [
+        {
+          "name": "month",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "revenue",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-06
+          }
+        },
+        {
+          "name": "moving_avg",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-06
+          }
+        }
+      ]
+    }
+  ]
+}

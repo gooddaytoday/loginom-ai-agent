@@ -1,0 +1,77 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.filter_data"
+    },
+    {
+      "type": "transform.sorting"
+    },
+    {
+      "type": "variables.user"
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "sales",
+        "type": "imports.text"
+      },
+      {
+        "id": "filter",
+        "type": "transform.filter_data"
+      },
+      {
+        "id": "sort",
+        "type": "transform.sorting"
+      },
+      {
+        "id": "variables",
+        "type": "variables.user"
+      }
+    ],
+    "links": [
+      {
+        "source": "sales",
+        "target": "filter",
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": "filter",
+        "target": "sort",
+        "output": 0,
+        "input": 0
+      }
+    ],
+    "retain": [
+      "sales",
+      "filter",
+      "sort"
+    ],
+    "exact": true
+  },
+  "outputs": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 0,
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Revenue",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Revenue": 290
+        },
+        {
+          "Revenue": 410
+        }
+      ]
+    }
+  ]
+}

@@ -23,6 +23,13 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_stock_runner_rejects_cases_that_require_interventions(self):
+        cases = runner.DATA / 'bughunt-2026-11/cases'
+        for number in (1, 2, 4, 5, 6, 7):
+            name = f'bh-x{number:02d}'
+            with self.subTest(case=name), self.assertRaisesRegex(ValueError, 'case requires an intervention.*interruptions/run.py'):
+                runner.scenario_steps(name, cases=cases)
+
     def test_enrich_cold_columns_by_name_is_scoped_and_strict(self):
         expected = runner.expected_for(runner.scenario('enrich-data-left'), '/test/enrich.lgp')
         before = copy.deepcopy(expected)

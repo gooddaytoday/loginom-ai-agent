@@ -1,0 +1,7 @@
+{
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 2
+  },
+  "base": "bh-w402-t4"
+}
