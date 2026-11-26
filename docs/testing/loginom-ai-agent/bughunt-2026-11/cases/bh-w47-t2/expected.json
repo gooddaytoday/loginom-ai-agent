@@ -24,8 +24,7 @@
     ],
     "links": []
   },
-  "outputs": [],
-  "port_outputs": [
+  "outputs": [
     {
       "output_node_type": "imports.excel",
       "output_node_label": "Товары",

@@ -5,6 +5,7 @@ import argparse
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 
 
 HERE = Path(__file__).resolve().parent
@@ -30,7 +31,8 @@ def collect(run, runner):
                 continue
             case = turn['case']
             folder = run / scenario['scenario'] / case
-            expected = runner.read(HERE.parent / case / 'expected.json')
+            case_spec = runner.scenario(case, cases=HERE.parent)
+            expected = runner.expected_for(case_spec, scenario['package'])
             graph = runner.read(folder / 'graph-observed.json')
             ids = {}
             for selector in expected['graph']['nodes']:
@@ -44,12 +46,19 @@ def collect(run, runner):
                 checks.append(dict(case=case, code='PRESERVED_NODE_CHANGED', nodes=changes,
                                    location=graph['location']))
             previous = ids
-            if 'port_outputs' not in expected:
+            if case_spec.get('output_mode') != 'ports':
                 continue
             journal = folder / 'model.stdout'
             replies = runner.model_replies(runner.records(journal))
-            checks.extend(dict(check, case=case) for check in runner.check_case_port_outputs(
-                expected['port_outputs'], graph, replies, journal))
+            candidates = []
+            for line, reply in replies:
+                for owner, port in runner.ports(reply):
+                    node = graph['nodes'].get(owner.get('node', {}).get('node_id'))
+                    if node and owner.get('status') == 'SUCCEEDED' and runner.port_path(owner, port):
+                        candidates.append(dict(node, port=port.get('port'), data=port, line=line))
+            for table in expected['outputs']:
+                checks.append(dict(case=case, location=str(journal),
+                                   expected=dict(expected, outputs=[table]), candidates=candidates))
     return checks
 
 
@@ -58,8 +67,28 @@ def main():
     parser.add_argument('run', type=Path)
     args = parser.parse_args()
     checks = collect(args.run.resolve(), load_runner())
-    print(json.dumps(checks, ensure_ascii=False, indent=2))
-    return int(not checks or any(check['code'] for check in checks))
+    code = """
+import {readFileSync} from 'node:fs';
+import {pathToFileURL} from 'node:url';
+const {checkCasePorts} = await import(pathToFileURL(process.argv[2]));
+const checks = JSON.parse(readFileSync(0, 'utf8'));
+const results = checks.map(({expected, candidates, ...evidence}) => {
+    if (!expected) return evidence;
+    const [want] = expected.outputs;
+    const observed = candidates.findLast(row => row.type === want.output_node_type
+        && row.label === want.output_node_label && row.port === (want.output_port ?? 0));
+    let code = null;
+    try { checkCasePorts(expected, candidates); }
+    catch (error) { code = error.message.split(':')[0]; }
+    return {...evidence, location: evidence.location + ':' + (observed?.line ?? 1),
+            node: want.output_node_label, code, rows: observed?.data.row_count};
+});
+console.log(JSON.stringify(results, null, 2));
+process.exitCode = results.length === 0 || results.some(result => result.code) ? 1 : 0;
+"""
+    return subprocess.run(['node', '--input-type=module', '-e', code, 'file-chains-review',
+                           str(ACCEPTANCE / 'case-ports.mjs')],
+                          input=json.dumps(checks), text=True, check=False).returncode
 
 
 if __name__ == '__main__':

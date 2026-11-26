@@ -56,10 +56,9 @@ def link(source, target, input_port=0):
     return dict(source=source['id'], target=target['id'], output=0, input=input_port)
 
 
-def expect(nodes, tables=(), links=(), outputs=()):
+def expect(nodes, outputs, links=()):
     return dict(nodes=[{k: v for k, v in n.items() if k != 'id'} for n in nodes],
-                graph=dict(nodes=nodes, links=list(links)), outputs=list(outputs),
-                **({'port_outputs': list(tables)} if tables else {}))
+                graph=dict(nodes=nodes, links=list(links)), outputs=list(outputs))
 
 
 def excel_chain(data):
@@ -120,7 +119,7 @@ def database_chain(data):
     return [
         expect([source], [table(source, ORDERS, orders)]),
         expect([source, query], [joined_table]),
-        expect([source, query, export], links=[link(query, export)], outputs=[exported]),
+        expect([source, query, export], [exported], [link(query, export)]),
     ]
 
 

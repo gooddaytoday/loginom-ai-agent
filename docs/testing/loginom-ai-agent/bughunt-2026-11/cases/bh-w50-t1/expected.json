@@ -24,8 +24,7 @@
     ],
     "links": []
   },
-  "outputs": [],
-  "port_outputs": [
+  "outputs": [
     {
       "output_node_type": "imports.text",
       "output_node_label": "Январь",

@@ -61,8 +61,7 @@
       }
     ]
   },
-  "outputs": [],
-  "port_outputs": [
+  "outputs": [
     {
       "output_node_type": "transform.group_data",
       "output_node_label": "Выручка по категориям",

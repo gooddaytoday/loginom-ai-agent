@@ -4,5 +4,6 @@
     "max_errors": 0
   },
   "base": "bh-w47-t2",
-  "input_files": []
+  "input_files": [],
+  "output_mode": "ports"
 }

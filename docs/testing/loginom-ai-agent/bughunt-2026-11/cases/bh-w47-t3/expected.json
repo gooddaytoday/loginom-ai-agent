@@ -46,8 +46,7 @@
       }
     ]
   },
-  "outputs": [],
-  "port_outputs": [
+  "outputs": [
     {
       "output_node_type": "transform.join_data",
       "output_node_label": "Заказы с категориями",

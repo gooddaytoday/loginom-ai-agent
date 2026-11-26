@@ -2,5 +2,6 @@
   "budget": {
     "max_nodes": 1,
     "max_errors": 0
-  }
+  },
+  "output_mode": "ports"
 }

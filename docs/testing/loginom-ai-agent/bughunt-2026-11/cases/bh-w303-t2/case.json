@@ -1,0 +1,15 @@
+{
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 0
+  },
+  "base": "bh-w303-t1",
+  "manual_edit": {
+    "kind": "filter_threshold",
+    "node": {
+      "type": "transform.filter_data"
+    },
+    "field": "Revenue",
+    "value": 200
+  }
+}
