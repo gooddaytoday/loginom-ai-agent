@@ -25231,6 +25231,34 @@ catalog-check.py код 0; apply-identity.py --check: would change: 0 files
 
 Всего 7 строк.
 
+### Проверки
+
+Node 24.19.0 первым в `PATH`, `LOGINOM_AI_AGENT_TEST_NODE` задан, `bun test --timeout 60000`, `HOME=/root`, пробы только во временных корнях.
+
+```
+packages/product        bun test                           99 pass, 0 fail (трёх известных падений В-95 на этом дереве нет)
+packages/loginom-agent  bun test                           130 pass, 0 fail
+packages/server         bun test test/loginom-*.test.ts    174 pass, 2 skip, 0 fail
+packages/cli            bun test                           625 pass, 11 skip, 0 fail
+packages/desktop        bun test                           639 pass, 6 skip, 0 fail
+packages/loginom-host   bun test                           549 pass, 13 skip, 2 fail
+packages/loginom-runtime/client  node --test test/*.test.mjs   10278 pass, 40 fail, 107 skip
+evals                   bun test (test/profile.test.ts)    114 pass, 0 fail
+catalog-check.py код 0; apply-identity.py --check: would change: 0 files
+```
+
+- `loginom-host`: `archive verification preserves manifest modes under a private umask` и `actual managed entry reads live bridge
+  work and dispatching over private IPC` — те же два на базе `fa731fbffd` (запуск под root).
+- Клиент: 40 падений — все без Chromium (`browserType.launch: Executable doesn't exist`, `LOGINOM_DOCK_TEST_BROWSER must name the pinned Chromium executable`);
+  код клиента побайтно равен `v0.4.2`, правок v2 в нём нет. Приёмка B6.1 (импорт текстового файла) этим прогоном не проверена.
+- `evals` целиком: на базе 42 падения (root, Docker, systemd), после слияния были новые `verifyProfile credentials boundary 2–6`,
+  `modern password presence` и `recoverIfNeeded: unconfigured` — тесты 0.4.2 про `hasPassword`. Исправлено в `evals/src/profile.ts`:
+  проверка `connectionConfigured` при наличии `hasApiKey` или `hasPassword` в статусе, статус v2 без обоих полей принимается как раньше;
+  `profile.test.ts` — 114 зелёных. Новый тест 0.4.2 `prejournal budget refusal uses original evidence across authorization restart`
+  красный только под root (`_UID`/`getuid` в `analytics-measurements`, код `evals/src` равен `v0.4.2`); перепроверить не под root.
+- Находка в серверных тестах: в 0.4.2 четыре встроенных навыка, а фикстуры `server` держали три — `loginom-dock-catalog` «a task that grants
+  itself automation» падал, пока `package-linter` не добавлен в списки `bundled`.
+
 ### Прочее, замеченное при слиянии
 
 - `.agents/`, `.claude/`, `.cursor/`: слились без конфликтов навыки `branch-cleaner` и перенос `harmonize-docs`, `design-cleanup` (инструменты разработки, не продукт).

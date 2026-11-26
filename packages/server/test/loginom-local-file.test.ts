@@ -589,6 +589,7 @@ describe("loginom local file admission (B2.5a)", () => {
             const source = path.join(test.dir, "input.csv")
             await fs.writeFile(source, "region;amount\nNorth;25\nSouth;50\n")
             const profile = await profileFile(source, dir)
+            if (profile.format !== "csv") throw Error("expected CSV")
             return sampleFile(profile.profile_id, dir, { max_records: 1 })
           })
           yield* test.sampled(owner, mode === "malformed" ? "invalid JSON" : JSON.stringify(sample))
