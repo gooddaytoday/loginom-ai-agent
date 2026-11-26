@@ -5,6 +5,7 @@ import { uuid } from "@opencode/util/uuid"
 import type { ComposerPrompt } from "../types"
 import type { ImageAttachmentPart, PathAttachmentPart } from "../state"
 import type { AttachmentDestination } from "./destination"
+import { binaryReferenceMime } from "./binary-reference"
 import { uploads } from "./uploads"
 
 type PromptTarget = {
@@ -65,7 +66,8 @@ export function createComposerAttachments(
   // tools open; those bytes never enter the store, and never get base64-encoded into the request.
   const add = async (file: File, target = capture(), clipboard = false) => {
     if (!target) return false
-    const mime = await attachmentMime(file)
+    // A binary data file keeps its type without sniffing, which would read its bytes.
+    const mime = binaryReferenceMime(file.name) ?? (await attachmentMime(file))
     const destination = input.destination()
 
     if (native(mime, destination.input) && file.size <= MAX_INLINE_BYTES) return addInline(file, mime, target, clipboard)

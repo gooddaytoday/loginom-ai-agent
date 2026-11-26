@@ -25868,8 +25868,8 @@ CLI кандидата собран с версией своего пакета 
 
 | # | Файл 0.4.2 | Коммит | Что делает | Куда в v2 |
 |---|---|---|---|---|
-| 1 | `packages/app/src/constants/file-picker.ts`, `components/prompt-input/attachments.ts`, `components/prompt-input-v2.tsx`, `session-ui/src/v2/components/prompt-input/attachments.ts`, экспорт `./file-picker` в `app/package.json` | `b5b60e009b` | `.db`, `.lgd`, `.xls` при перетаскивании и вставке идут как ссылка на файл (`binaryReferenceMime`, `referenceFile`), без чтения байт; расширения добавлены в выбор файла | приложение v2 (B4): пути переехали, места нет. **Главная строка**: без неё SQLite, LGD и XLS из окна читаются байтами |
-| 2 | `packages/desktop/src/main/attachment-picker.ts`, `ipc.ts` (`referenceAttachment`) | `b5b60e009b` | выбор файла и IPC `reference-attachment` возвращают квитанцию с `mime` для бинарных данных | Desktop v2 (`packages/desktop/src/main`), нужен вместе со строкой 1 |
+| 1 | `packages/app/src/constants/file-picker.ts`, `components/prompt-input/attachments.ts`, `components/prompt-input-v2.tsx`, `session-ui/src/v2/components/prompt-input/attachments.ts`, экспорт `./file-picker` в `app/package.json` | `b5b60e009b` | `.db`, `.lgd`, `.xls` при перетаскивании и вставке идут как ссылка на файл (`binaryReferenceMime`, `referenceFile`), без чтения байт; расширения добавлены в выбор файла | приложение v2 (B4): пути переехали, места нет. **Главная строка**: без неё SQLite, LGD и XLS из окна читаются байтами. **Перенесено в B1.9d**: [`## B1.9d Доперенос 0.4.2: вложения в интерфейсе`](#b19d-доперенос-042-вложения-в-интерфейсе) |
+| 2 | `packages/desktop/src/main/attachment-picker.ts`, `ipc.ts` (`referenceAttachment`) | `b5b60e009b` | выбор файла и IPC `reference-attachment` возвращают квитанцию с `mime` для бинарных данных | Desktop v2 (`packages/desktop/src/main`), нужен вместе со строкой 1. **Закрыта в B1.9d без кода Desktop**: IPC `reference-attachment` в v2 не нужен, см. [`## B1.9d Доперенос 0.4.2: вложения в интерфейсе`](#b19d-доперенос-042-вложения-в-интерфейсе) |
 | 3 | `packages/opencode/src/cli/cmd/run.ts` | `59fbda9ceb` | CLI `run` даёт квитанцию для `application/octet-stream` и `application/vnd.ms-excel` и без `--attach` | `packages/cli/src/run` |
 | 4 | `packages/opencode/src/product/attachment-resolver.ts` | `59fbda9ceb` | текст ссылки на вложение: для бинарных данных «loginom_file_admit», для остальных «loginom_file_profile» | в v2 нет резолвера вложений; вложения — `loginom-agent/src/index.ts` (B2.5d), `local-file.ts` |
 | 5 | тесты `app/test-browser/prompt-attachments.test.ts`, `desktop/src/main/attachment-picker.test.ts`, `opencode/test/cli/run/run-process.test.ts`, `opencode/test/product/attachment-resolver.test.ts` | `b5b60e009b`, `59fbda9ceb` | покрывают строки 1–4 | вместе со строками 1–4 |
@@ -25943,3 +25943,59 @@ CI передаёт его. Проверка «от обычного польз�
 `ParserError … Log "smoke $Name: starting …": Variable reference is not valid. ':' was not followed by a valid variable
 name character`. В PowerShell `$Name:` читается как переменная с областью; три строки журнала переписаны на `${Name}:`.
 В этом прогоне впервые зелёные `verify linux` (манифест, установщики, G5 с отрицательным контролем) и `verify macos`.
+
+## B1.9d Доперенос 0.4.2: вложения в интерфейсе
+
+Ветка `bport2-attachments-ui` от `oc2-migration` (`45069384ab`). Эталон — `b5b60e009b` (`v0.4.2`, В-110). Закрывает строки 1 и 2 таблицы
+«Не перенесено» раздела B1.9b и их тесты из строки 5.
+
+### Что нашёл в v2
+
+- Единственный composer вложений — `packages/app/src/composer/attachments/attachments.ts`. В `packages/session-ui/src/v2` поля ввода с
+  вложениями нет (только просмотр файлов и diff), поэтому часть 0.4.2 про `session-ui` переносить некуда.
+- v2 уже кладёт файл с известным путём в промпт как part `path` без байт; на сервере квитанцию (идентичность файла) берёт хук `prompt`
+  в `loginom-agent/src/local-file.ts` (B2.5d). Отдельные `local_reference`, `referenceAttachment` на платформе и IPC `reference-attachment`
+  в v2 не существуют, и в 0.4.2 они нужны были только для порога 16 МБ и чтения байт.
+- Что не делал v2: для `.db`, `.lgd`, `.xls` определение типа читало первые 4096 байт файла (`attachmentMime`) и выводило тип по
+  содержимому (для `.lgd` и текстоподобного `.db` мог получиться `text/plain`).
+
+### Что сделано
+
+- `packages/app/src/composer/attachments/binary-reference.ts` (новый): `binaryReferenceMime(name)` — `.db`, `.lgd` → `application/octet-stream`,
+  `.xls` → `application/vnd.ms-excel`, регистр расширения не важен.
+- `attachments.ts`: `add` берёт тип из `binaryReferenceMime` и не читает байты; дальше прежний путь v2 (локальный сервер и путь файла —
+  ссылка `path`; удалённый сервер — загрузка файла как раньше). Правка одной строки.
+- Тест `packages/app/test-browser/composer-binary-reference.test.tsx`: имена и типы; локальный сброс `.DB`, `.lgd`, `.xls` даёт part `path`
+  с типом, `File.slice` бросает при чтении, загрузок нет; удалённый сервер по-прежнему загружает файл с типом.
+
+### Выбор (меньший вариант)
+
+1. **Desktop: кода нет.** Выбор файла в v2 возвращает `{ path, name, size }` и токен чтения; тип в приложении выводится из имени тем же
+   `binaryReferenceMime`, квитанция строится на сервере. Возвращать `mime` из выбора или заводить IPC `reference-attachment` значило бы
+   дублировать это и менять схему `ipc-rpc` (больше пяти файлов кода).
+2. **Остаток, не перенесён:** выбор файла через окно Desktop по-прежнему читает байты `.db`, `.lgd`, `.xls` (до лимита 20 МБ на выбор;
+   больший файл выбором отклоняется, перетаскиванием проходит). Пропуск чтения в выборе небезопасен для удалённого сервера (пустой `File`
+   загрузился бы вместо данных): нужно знать назначение в `platform.openAttachmentPickerDialog`; это решение для этапа C (интерфейс по В-97).
+3. Расширения `.db`, `.lgd`, `.xls` в фильтр выбора не добавлял: composer не передаёт `extensions` (выбор без фильтра).
+4. Тест строки 5 `attachment-picker.test.ts` не переносился: поведения Desktop нет. Тест `prompt-attachments.test.ts` (в v2 — каталога
+   `test-browser`, двух реализаций composer там нет) заменён новым файлом выше.
+
+### Проверки
+
+Bun 1.4.4 и Node 24.19.0 первыми в `PATH`, `LOGINOM_AI_AGENT_TEST_NODE` задан.
+
+```
+packages/app   bun run test:browser   377 pass, 0 fail  (база: 369 pass, 0 fail; +8 новых)
+packages/app   bun run test:unit      2720 pass, 0 fail
+packages/app   bun typecheck          No type errors in 2,235 files
+packages/desktop bun test             643 pass, 0 fail  (код не менялся; база 643/0)
+packages/desktop bun typecheck        No type errors in 3,372 files
+packages/session-ui bun run test      599 pass, 0 fail
+packages/product   bun test           115 pass, 0 fail
+```
+
+Мутация: в `add` возвращено `await attachmentMime(file)` без `binaryReferenceMime` — красные 4 из 8 тестов (три локальных сброса и
+загрузка с типом). После возврата правки 8 pass.
+
+Замечание по среде: в свежем дереве `packages/loginom-runtime/client` нужен свой `bun install --frozen-lockfile` (иначе `yaml` не
+находится и `desktop` падает на `artifact.test.ts` и сборке хоста); корневой установки недостаточно.
