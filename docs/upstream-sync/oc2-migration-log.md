@@ -25014,6 +25014,17 @@ Windows, первый прогон `daemon/windows.rs`, `play` с `cmd.exe`); к
 два вызова `pack` и NSIS; встраивание pty `.exe` в оба CLI (`resolveProductPty` запускает его `--version`); `build-cli.ts` с
 baseline-средой; скачивание артефакта pty из вызванного workflow; шаги j.
 
+### B5.1i-ci: `.bun-cache` в снимке исходников
+
+Проверки: `product` 92 pass, 0 fail; `catalog-check.py` 0; `apply-identity --check` 0 файлов; `bun run check` 0.
+
+Run 45715939494 (`fa731fbffd`): сборка CLI Desktop с `BUN_COMPILE_RELEASE` скачала baseline-Bun в `packages/cli/.bun-cache/`
+(дерево исходников), и `build-cli.ts` отказал с `LOGINOM_SOURCE_CHANGED_DURING_BUILD`. На Linux и macOS каталога нет: цель
+совпадает с запущенным Bun, среду скачивать не нужно (на Windows baseline отличается от запущенного AVX2-Bun).
+`cliSourceSnapshot` берёт `git ls-files --cached --others --exclude-standard`, то есть уважает `.gitignore`. Правка:
+`.bun-cache` в корневой `.gitignore` (кэш среды выполнения, не исходники); проверку `SOURCE_CHANGED` не менял, она по-прежнему
+отказывает при изменении любого неигнорируемого файла. Проверит только CI.
+
 ## B5.1h — сборка Linux: CLI и Desktop
 
 25.11.2026. Ветка `b51h-linux-build` от `oc2-migration` (`840be7c3bb`). Меньший вариант: без новых скриптов, правка только
