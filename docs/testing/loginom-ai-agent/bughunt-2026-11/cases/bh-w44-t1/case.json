@@ -1,0 +1,13 @@
+{
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 1
+  },
+  "manual_edit": {
+    "kind": "rename",
+    "node": {
+      "type": "imports.text"
+    },
+    "label": "Позиции к сверке"
+  }
+}

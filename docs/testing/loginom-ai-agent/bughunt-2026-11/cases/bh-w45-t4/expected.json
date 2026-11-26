@@ -1,0 +1,93 @@
+{
+  "graph": {
+    "exact": false,
+    "retain": [
+      "scenario_vars",
+      "source",
+      "limit",
+      "filter"
+    ],
+    "nodes": [
+      {
+        "id": "scenario_vars",
+        "type": "variables.user"
+      },
+      {
+        "id": "source",
+        "type": "imports.text"
+      },
+      {
+        "id": "limit",
+        "type": "variables.calculator"
+      },
+      {
+        "id": "filter",
+        "type": "transform.filter_data"
+      }
+    ],
+    "links": [
+      {
+        "source": "source",
+        "target": "filter",
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "any",
+      "rows": [
+        {
+          "order_id": 1001
+        },
+        {
+          "order_id": 1300
+        },
+        {
+          "order_id": 1500
+        }
+      ],
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "integer",
+          "label_any": true
+        }
+      ]
+    }
+  ],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.calculator"
+        },
+        "port": 0,
+        "variables": [
+          {
+            "name": "Limit",
+            "type": "integer",
+            "value": 1000
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.calculator"
+        },
+        "output": 0,
+        "target": {
+          "type": "transform.filter_data"
+        },
+        "input": 0,
+        "kind": "control"
+      }
+    ]
+  }
+}

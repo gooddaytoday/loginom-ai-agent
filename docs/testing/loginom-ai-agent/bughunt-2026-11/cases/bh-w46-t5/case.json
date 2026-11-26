@@ -1,0 +1,8 @@
+{
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 0
+  },
+  "base": "bh-w46-t4",
+  "input_files": []
+}
