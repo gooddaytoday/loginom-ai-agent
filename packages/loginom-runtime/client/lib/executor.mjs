@@ -2838,6 +2838,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     })};
   };
   const addOnlyWindowStep=operation=>{
+    if(operation?.releaseRefused?.identityChanged)return null;
     const effect=operation?.targetPhase?.pending,receipt=effect?.receipt;
     if(effect?.kind!=='create'||effect.parameters.add_only!==true||receipt?.add_only_window_pending!==true
       ||!receipt.add_only_window_node_id||receipt.cleanup_complete!==false)return null;
@@ -2906,7 +2907,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const retry=reloaded&&canReleaseAfterReload(operation)?dockRecoveryAdvice(operation):null;
         const userAction=waitingForLoginom?error?.userAction:operation.releaseRefused.ui_blocker;
         const trigger=retry||waitingForLoginom?null:browserRecoveryTrigger(operation,null);
-        const windowStep=reloaded?null:addOnlyWindowStep(operation);
+        const windowStep=addOnlyWindowStep(operation);
         const nextStep=windowStep??(waitingForLoginom?{
           instruction:'Wait for the original Loginom session to reconnect. Then call dock_operation_recover with abandon_operation for the original operation_id and a NEW recovery_operation_id. If the original session cannot reconnect, report the operation as blocked.'
         }:trigger?browserRecoveryNext(operation,trigger):null);
@@ -3136,7 +3137,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         try{await verifyPendingWorkflowReceipt({operation,adapter:operation.nodeTargetAdapter,deadline:now()+10000,now});}
         catch(error){return {stopped:false,reason:String(error.message).slice(0,1000)};}
       }
-      if(addOnlyWindowStep(operation))return {stopped:false,reason:addOnlyWindowStep(operation).instruction};
+      const windowStep=addOnlyWindowStep(operation);
+      if(windowStep)return {stopped:false,reason:windowStep.instruction};
       if(operation.targetPhase?.pending){
         // Target gestures use their own page ledger, not parent lastReceipt.
         // Read only that original effect; graph repair cannot settle its call.
