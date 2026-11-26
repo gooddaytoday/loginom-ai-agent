@@ -199,8 +199,8 @@ async function editOutputField(channel,field,initial) {
   const bound=s=>nativeMappingReady(s)&&s.wizard.root_ref===initial.wizard.root_ref
     &&s.wizard.root_tid===initial.wizard.root_tid&&s.wizard.stage===initial.wizard.stage;
   const ready=s=>bound(s)&&same(mappingSemantics(s.node_mapping),mappingSemantics(baseline));
-  // The addressed rendered page and the complete native mapping must come from
-  // the same observation. Other pages are checked in the final definition read.
+  // Observe the addressed rendered page together with the complete native mapping.
+  // The native mapping comparison covers fields outside the rendered page.
   let state=await observeOutputDefinitionPage(channel,{offset,total:baseline.target_fields.length,field:original,
     fieldAction:'double_click',readMappings:true,ready});
   const rowOf=s=>s.wizard?.output_columns?.fields?.find(f=>f.index===original.index&&f.name===original.name&&f.label===original.label);

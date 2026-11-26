@@ -7,6 +7,12 @@ export function userActionTool(tool) {
   const copy=structuredClone(tool),p=copy.inputSchema.properties;
   p.action_key.enum=[...userActionKeys];
   if(p.action_keys)p.action_keys.items.enum=[...userActionKeys];
+  if(tool.name==='dock_action_describe'){
+    p.refresh={type:'boolean',description:'With node_types, set true to return full cards even if they were already delivered.'};
+    const batch=copy.inputSchema.allOf[0].oneOf[1];
+    batch.properties.refresh={type:'boolean'};
+    batch.dependencies={refresh:['node_types']};
+  }
   copy.description=tool.name==='dock_action_run'
     ? 'Save the completed scenario with package.save_checkpoint. REST connection references require Close/Open and at most one extra Save; the application rebinds issued workflow/node identities for continued work. Use package.save_as for explicitly requested reopen. Request missing parameters with dock_action_describe; create/configure nodes through dock_node_apply.'
     : 'List nodes with {}. Single: action_key alone; never combine action_key with a batch. Pass JSON arrays directly for action_keys, node_types and modes, even for one item. For example: {"action_keys":["package.save_checkpoint"],"node_types":["imports.text"]}. Cards contain parameter_schema and prepared skill guidance. Without modes get common guidance and guidance_modes; request selected modes for their rules before applying. Read-only.';
