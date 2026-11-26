@@ -476,6 +476,20 @@ test('an unresolved started download is never dispatched again on resume',async(
  assert.equal(f.calls.filter(c=>c==='verify').length,1);assert.equal(f.calls.filter(c=>c==='upload').length,1);
 });
 
+// LAB-2054: a verification download without its event leaves upload cleanup
+// unconfirmed. Resume must give the terminal answer its own next_step names.
+test('resume after a dispatched verification with unconfirmed cleanup answers the terminal blocker',async()=>{
+ const f=fixture('verify'),inspect=f.runtime.inspect;
+ await f.service.deliver(request);
+ f.runtime.inspect=async()=>{const r=await inspect();r.output.operation_id='delivery:upload';r.output.outcome.operation_id='delivery:upload';
+  r.output.cleanup_confirmed=false;return r;};
+ const result=await f.service.resume({operation_id:'delivery',resume_id:'resume-unconfirmed',budget_ms:120000});
+ assert.equal(result.outcome.status,'AMBIGUOUS');
+ assert.match(result.error.message,/existing verification remains unresolved/);
+ assert.match(result.outcome.next_step.instruction,/existing verification remains unresolved/);
+ assert.equal(f.calls.filter(c=>c==='verify').length,1);assert.equal(f.calls.filter(c=>c==='upload').length,1);
+});
+
 test('folder navigation waits for the requested breadcrumb without repeating its gesture',async()=>{
  const f=fixture(undefined,'/user/another-folder'),observe=f.runtime.observe,act=f.runtime.uiAct;
  let stale,remaining=0;

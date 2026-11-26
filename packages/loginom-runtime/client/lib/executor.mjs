@@ -298,6 +298,9 @@ export async function browserServerDownloadProgress(page,task) {
   }
 }
 
+const UNRESOLVED_UPLOAD_VERIFICATION='Server-copy verification of this upload ended without a confirmed download; '
+  +'the upload stays unconfirmed. Do not recover, resume, verify, upload or download it again; report it as a blocker.';
+
 async function browserArtifactDownload(page,task,observe,act,reveal,track) {
   let browserStep='preconditions';
   const failureEvidence=error=>{
@@ -437,7 +440,11 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
     let eventPending=true;
     // Large server files can emit the event after the small artifact window.
     // Consume the host job's existing deadline; do not start a new allowance.
-    const eventTimeout=task.server_source_binding?task.deadline_at-Date.now():15000;
+    // Upload verification reads one tiny file, but Loginom can emit its event
+    // ~30 s after the gesture (LAB-2054). Use its own deadline minus a reserve
+    // for save and post-download settlement; never less than the old window.
+    const eventTimeout=task.server_source_binding?task.deadline_at-Date.now()
+      :!task.output_binding&&Number.isFinite(task.deadline_at)?Math.max(15000,task.deadline_at-Date.now()-15000):15000;
     if(eventTimeout<=0)return result(gesture?'AMBIGUOUS':'NOT_APPLIED','LOGINOM_DOWNLOAD_DEADLINE');
     event=page.waitForEvent('download',{timeout:eventTimeout}).then(value=>{
       eventPending=false;
@@ -2697,6 +2704,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return { ...operation.outcome, cleanup_complete: operation.cleanupConfirmed === true };
       if (operation.storageDownloadNavigation) return operation.cleanupConfirmed===true ? operation.outcome
         : failed(operation, 'CLEANUP_RECEIPT_MISSING', 'The original storage navigation has no confirmed browser cleanup.');
+      // A settled server-copy download without confirmed cleanup cannot be
+      // restored or abandoned (LAB-2054). Name the one terminal step instead.
+      if (operation.cleanupConfirmed === false && operation.action.capability === 'artifact.upload' && operation.verification?.settled === true)
+        return failed(operation, 'TRANSFER_VERIFICATION_UNRESOLVED', UNRESOLVED_UPLOAD_VERIFICATION);
       if (operation.cleanupConfirmed === false && !(['package.save_as','package.save_checkpoint'].includes(operation.action.action_key)
           && operation.outcome?.output?.connection_recovery_pending === true)) return failed(operation, 'CLEANUP_RECEIPT_MISSING',
         'The browser call finished but cleanup is unconfirmed. Inspect and restore_control before further mutations.');
@@ -3654,7 +3665,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (!operation || pending !== operation) throw new Error('Recovery requires the pending operation of this session');
       if(operation.action.capability==='node.target.internal')throw new Error('Use the enclosing node procedure to resume this internal phase');
       if(operation.action.capability==='node.apply')return releaseApply(operation,{strategy,recoveryOperationId,signature,signal});
-      if(operation.action.capability==='artifact.upload')throw new Error('Upload requires server transfer verification before recovery or abandonment');
+      if(operation.action.capability==='artifact.upload')throw new Error(operation.cleanupConfirmed===false&&operation.verification?.settled===true
+        ?UNRESOLVED_UPLOAD_VERIFICATION:'Upload requires server transfer verification before recovery or abandonment');
       if (!['complete_link', 'restore_control', 'accept_observed_state', 'abandon_operation'].includes(strategy)) throw new Error('Unsupported recovery strategy');
       if (operation.storageDownloadNavigation && !['accept_observed_state', 'abandon_operation'].includes(strategy))
         throw new Error('Inspect the pending download navigation and resolve it with a fresh observation');

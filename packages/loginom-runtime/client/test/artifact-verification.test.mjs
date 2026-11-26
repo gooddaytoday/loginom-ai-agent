@@ -173,6 +173,30 @@ test('unconfirmed cleanup preserves the pending gate despite matching bytes',asy
   } finally {await f.cleanup();}
 });
 
+// LAB-2054: inspect advised restore_control, recover refused it for uploads,
+// and the model cycled. Both now name one terminal step and stay fail-closed.
+test('verification without a download event leaves one terminal blocker, not a recovery cycle',async()=>{
+  const f=await fixture();
+  try {
+    const request=await f.request();
+    // The gesture lands; Loginom emits no download event inside the window.
+    let expire;const clicked=f.page.mouse.click;
+    f.page.waitForEvent=async()=>new Promise((_,reject)=>{expire=()=>reject(Object.assign(new Error('Timeout 15000ms exceeded'),{name:'TimeoutError'}));});
+    f.page.mouse.click=async(...args)=>{await clicked(...args).catch(()=>{});expire();};
+    const result=await f.rt.verifyArtifact(request);
+    assert.equal(result.status,'AMBIGUOUS');assert.equal(result.error.code,'DOWNLOAD_EVENT_MISSING');
+    const inspected=await f.rt.inspect({operationId:'upload'});
+    assert.equal(inspected.output.state,'pending');
+    const refusal=inspected.output.outcome.error;
+    assert.equal(refusal.code,'TRANSFER_VERIFICATION_UNRESOLVED');
+    assert.doesNotMatch(refusal.message,/restore_control/);assert.match(refusal.message,/report it as a blocker/);
+    for(const strategy of ['restore_control','abandon_operation'])
+      await assert.rejects(f.rt.recover('upload',{recoveryOperationId:'recover-'+strategy,strategy}),/report it as a blocker/);
+    assert.throws(()=>f.rt.assertPreparationAllowed(),/action/);
+    assert.deepEqual(f.counts,{uploads:1,downloads:0,verifications:0});
+  } finally {await f.cleanup();}
+});
+
 test('same-sized wrong downloaded content fails SHA without repeating upload',async()=>{
   const f=await fixture();
   try {

@@ -218,6 +218,22 @@ test('download binds the checked file gesture to its page event and exact privat
   assert.ok(!JSON.stringify(result).includes('not-for-output'));
 });
 
+// LAB-2054: a 77-byte server-copy verification emitted its download event
+// ~30 s after the gesture, after a fixed 15 s window had already expired.
+test('upload verification waits for its download event within its own deadline, keeping a reserve',async()=>{
+  const f=fixture(),wait=f.page.waitForEvent;let timeout;
+  f.options.deadline_at=f.page.clock+60000;
+  f.page.waitForEvent=(type,options)=>{timeout=options.timeout;return wait(type,options);};
+  const result=await f.run();
+  assert.equal(result.status,'SUCCEEDED');
+  assert.ok(timeout>30000,'the event window must cover a slow native download: '+timeout);
+  assert.ok(timeout<=60000-15000,'post-download settlement keeps its reserve: '+timeout);
+  const short=fixture(),shortWait=short.page.waitForEvent;let shortTimeout;
+  short.options.deadline_at=short.page.clock+20000;
+  short.page.waitForEvent=(type,options)=>{shortTimeout=options.timeout;return shortWait(type,options);};
+  assert.equal((await short.run()).status,'SUCCEEDED');assert.equal(shortTimeout,15000);
+});
+
 test('download preserves bounded stale-reference reason/checks without replaying the denied gesture',async()=>{
   const f=fixture('javascript-native-input-real.csv'),snapshot=f.page.uiSnapshot.bind(f.page);
   f.page.uiSnapshot=()=>{const s=snapshot();s.ui.elements=s.ui.elements.map(e=>e.ref===f.options.file_ref?{...e,allowed_actions:[]}:e);return s;};
