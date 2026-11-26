@@ -6,8 +6,8 @@ import { Product } from "@loginom-ai-agent/product"
 import { getConfig } from "../electron-builder.config"
 import { getCurrentCli, resolveChannel } from "./utils"
 
-// Packages the built app (out/) for LOGINOM_AI_AGENT_TARGET into dist/desktop at the repository root, unsigned:
-// macOS: the .app as a tarball. Windows: the unpacked app in app/, or with LOGINOM_AI_AGENT_DESKTOP_APP, the NSIS
+// Packages the built app (out/) for LOGINOM_AI_AGENT_TARGET into dist/desktop at the repository root, unsigned except macOS (ad-hoc):
+// macOS: ad-hoc signed DMG and ZIP, and the .app as a tarball. Windows: the unpacked app in app/, or with LOGINOM_AI_AGENT_DESKTOP_APP, the NSIS
 // installer around that (signed) app. Linux: AppImage, deb and rpm. The release workflow signs afterwards.
 const dir = path.resolve(import.meta.dir, "..")
 
@@ -47,12 +47,16 @@ if (!app && os === "linux") {
 }
 
 if (!app && os === "mac") {
-  await $`bunx electron-builder ${flags} --dir -c.mac.identity=null`
+  // Ad-hoc signature as in 0.4: electron-builder signs the app but skips the staged resources (`mac.signIgnore`), so
+  // their resource-manifest hashes stay valid. Developer ID and notarization are stage G. The DMG is not signed itself.
+  await $`bunx electron-builder ${flags} -c.mac.identity=- -c.dmg.sign=false`
   const parent = path.join("dist", cli.cpu === "arm64" ? "mac-arm64" : "mac")
   const bundles = (await readdir(parent)).filter((file) => file.endsWith(".app"))
 
   if (bundles.length !== 1) throw new Error(`Expected one .app bundle in ${parent}, found ${bundles.join(", ")}`)
-  await writeUpdateConfig(path.join(parent, bundles[0], "Contents", "Resources"))
+  const files = (await readdir("dist")).filter((file) => /\.(dmg|zip)$/.test(file))
+  if (files.length !== 2) throw new Error(`Expected one dmg and one zip in dist, found ${files.join(", ")}`)
+  await Promise.all(files.map((file) => cp(path.join("dist", file), path.join(out, file))))
   await $`tar -cf ${path.join(out, `${Product.slug}-mac-${cli.cpu}.app.tar`)} -C ${parent} ${bundles[0]}`
 }
 
