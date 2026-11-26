@@ -25236,3 +25236,48 @@ Developer ID и нотаризация — этап G. Первый прогон
 Что `electron-builder` без `--dir` собирает `dmg` и `zip` с ad-hoc подписью и signIgnore; что `codesign --verify --deep --strict`
 проходит; что хеши ресурсов сходятся; что копия помощника читает запись после `codesign --force`; доступность Keychain на
 раннере; шаг `Verify and collect` (`verify-cli-candidate.ts` не должен видеть грязное дерево).
+
+## B5.1j — Windows CAND: проверки после сборки
+
+25.11.2026. Ветка `b51j-windows-checks` от `oc2-migration` (`9e20d6cf53`). Меньший вариант: только `loginom-windows.yml`, один новый
+скрипт и тест продукта; `catalog.json` не менялся (`script/` и `.github/**` уже в каталоге, файлов OpenCode не правил). Выполнение
+на `windows-2022` здесь невозможно; последний прогон (run 45715939494, `fa731fbffd`) остановился на сборке (`.bun-cache`,
+B5.1i-ci), поэтому шаги после неё ещё ни разу не выполнялись. Исправлено то, что видно по коду v2.
+
+### Что нашёл и исправил
+
+- **Кодек safeStorage.** Шаг собирал `packages/desktop/src/main/loginom/credentials.ts`, а `safe-storage-smoke.cjs` ждёт
+  `credentials` из `packages/loginom-host/src/connection/credentials.ts` (находка B5.1h). Шаг собирает теперь его (путь
+  Electron `node_modules\\electron\\dist\\electron.exe` в корне — тот же, что ставит `build-windows.ps1`).
+- **Установленный smoke Desktop писался под 0.4.** Шаг вызывал `windows-installed-smoke.ps1` с `-KeepProxy` и
+  `-PayloadMutation MissingSkill`, ждал `sidecar.json` и проверки `sidecar-bundled-skills`. В v2 (B4.14c) этих параметров и
+  проверок нет: есть `-Mutation SkillByte`, а красной становится `verify-resources` (`LOGINOM_RESOURCE_HASH_MISMATCH`).
+  Шаг переписан на них; выгрузка диагностики — `installed-smoke/` и `installed-smoke-skill-byte/` (`report.json`, `logs.zip`).
+- **Администратор раннера.** Smoke требует обычную учётную запись (`ordinary-user`), а раннер GitHub — повышенный администратор.
+  Новый `script/run-windows-installed-smoke.ps1` создаёт одноразового локального пользователя группы Users (как
+  `test-windows-profile.ps1`), копирует установщик и два скрипта smoke в `%PUBLIC%`, запускает smoke через `Start-Process
+  -Credential` (окно закрывается `WM_CLOSE`, `-AllowServer`), копирует `report.json` и `logs.zip`, удаляет учётную запись.
+  Отказывает вне GitHub-hosted раннера. Код возврата — код smoke (1 — FAIL).
+- **Отрицательный контроль.** Красный прогон должен дать код 1, `status` FAIL, `verify-resources` FAIL с
+  `LOGINOM_RESOURCE_HASH_MISMATCH` и `cleanup` PASS; чистый прогон должен дать 0. Оба выполняются всегда.
+- **Артефакты шагов j.** `cli-installed-smoke.json` и `safe-storage-*.json` добавлены в выгрузку диагностики (`if: always()`),
+  потому что выгрузка кандидатов идёт раньше (B5.1i).
+- **Тесты Desktop.** `src/main/apps.test.ts` в v2 нет; вместо него `src/main/app-identity.test.ts`.
+- **`profile-windows.test.ts`.** Файл есть (порт B5.1e: ACL профиля, 3 pass на GitHub в run 45675480080), `test-windows-profile.ps1`
+  собирает его по `$PSScriptRoot\..`, не по рабочему каталогу. Замечание B5.1i «файла нет» устарело; правок не нужно.
+- Тест `packages/product/test/windows-build.test.ts` (3 новых): кодек из `loginom-host`, существование всех файлов тестов в
+  шаге, параметры вызова smoke объявлены в нём, а красная мутация входит в `ValidateSet`. Проверено мутациями: `apps.test.ts`
+  и `-Mutation PayloadX` дают красный.
+
+### Проверки
+
+- YAML разобран `python3 yaml`. `packages/product`: 95 pass, 0 fail.
+- `catalog-check.py` код 0; `apply-identity.py --check` — 0 файлов; `bun run check` код 0 (39 задач, 1 мин 5 с).
+
+### Проверит только CI на GitHub
+
+Весь шаг запуска от одноразового пользователя (`New-LocalUser`, `Start-Process -Credential`, права `icacls`, профиль, `TEMP`,
+размер argv до 1024 символов); `install.cmd` / `verify-cli-candidate` на Windows; DPAPI Electron 44; что окно приложения в
+сеансе без интерактивной станции даёт `app-window` PASS; что версия `packages/desktop/package.json` совпадает с версией
+установщика (`LOGINOM_AI_AGENT_VERSION` не задаётся). Задание `updater-fixtures` (только dispatch) по-прежнему вызывает
+`-KeepProxy` и `build-windows.ps1 -Product Desktop` без pty; не чинил.

@@ -249,7 +249,7 @@ jobs:
           if (Test-Path -LiteralPath $root) { throw "safeStorage smoke directory must be new" }
           New-Item -ItemType Directory -Path $root | Out-Null
           $env:LOGINOM_SAFE_STORAGE_CODEC = Join-Path $root "credentials.cjs"
-          & $env:LOGINOM_CI_BUN_PATH build packages/desktop/src/main/loginom/credentials.ts --target=node --format=cjs --outfile=$env:LOGINOM_SAFE_STORAGE_CODEC
+          & $env:LOGINOM_CI_BUN_PATH build packages/loginom-host/src/connection/credentials.ts --target=node --format=cjs --outfile=$env:LOGINOM_SAFE_STORAGE_CODEC
           if ($LASTEXITCODE -ne 0) { throw "Production Desktop credential codec bundling failed" }
           $electron = Join-Path $env:GITHUB_WORKSPACE "node_modules\electron\dist\electron.exe"
           if (-not (Test-Path -LiteralPath $electron -PathType Leaf)) { throw "Installed Electron is missing" }
@@ -293,7 +293,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Committed hash attributes / installed sidecar probe regression tests failed" }
             & $env:LOGINOM_CI_BUN_PATH typecheck
             if ($LASTEXITCODE -ne 0) { throw "Desktop typecheck failed" }
-            & $env:LOGINOM_CI_BUN_PATH test electron-builder.config.test.ts scripts/copy-icons.test.ts scripts/release/artifact.test.ts src/main/apps.test.ts
+            & $env:LOGINOM_CI_BUN_PATH test electron-builder.config.test.ts scripts/copy-icons.test.ts scripts/release/artifact.test.ts src/main/app-identity.test.ts
             if ($LASTEXITCODE -ne 0) { throw "Desktop Windows package tests failed" }
           } finally { Pop-Location }
           Push-Location packages/loginom-host
@@ -319,32 +319,27 @@ jobs:
           $installer = @(Get-ChildItem -LiteralPath (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "desktop") -Filter "*-win-x64.exe" -File)
           if ($installer.Count -ne 1) { throw "Expected exactly one Desktop installer" }
           $version = (Get-Content -LiteralPath packages/desktop/package.json -Raw | ConvertFrom-Json).version
-          # Negative control: same installer and smoke, one declared skill removed
-          # from the disposable installed payload. No source/product substitutions.
-          $redRoot = Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke-missing-skill"
-          & .\packages\desktop\test\loginom\windows-installed-smoke.ps1 `
-            -Installer $installer[0].FullName -RunRoot $redRoot `
-            -ExpectedVersion $version -Channel dev -AllowServer -KeepProxy -PayloadMutation MissingSkill
+          $smoke = ".\script\run-windows-installed-smoke.ps1"
+          # Negative control (B4.14c M4): same installer and smoke, one bit of the installed loginom-automation skill
+          # flipped in the disposable installation. The smoke runs as a throw-away standard user, because the hosted
+          # runner account is an elevated administrator.
+          $redOut = Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke-skill-byte"
+          & $smoke -Installer $installer[0].FullName -ExpectedVersion $version -Channel dev -Mutation SkillByte -OutputDirectory $redOut
           $redExit = $LASTEXITCODE
-          $red = Get-Content -LiteralPath (Join-Path $redRoot "report.json") -Raw | ConvertFrom-Json
-          # Always observe the pristine candidate too, including after an
-          # unexpected negative-control failure, without accepting either failure.
-          & .\packages\desktop\test\loginom\windows-installed-smoke.ps1 `
-            -Installer $installer[0].FullName `
-            -RunRoot (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke") `
-            -ExpectedVersion $version -Channel dev -AllowServer -KeepProxy
+          # Always observe the pristine candidate too, including after an unexpected negative-control result,
+          # without accepting either failure.
+          & $smoke -Installer $installer[0].FullName -ExpectedVersion $version -Channel dev -OutputDirectory (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke")
           $greenExit = $LASTEXITCODE
-          if ($redExit -ne 1 -or $red.status -ne 'FAIL' -or
-              @($red.checks | Where-Object { $_.id -eq 'sidecar-bundled-skills' -and $_.status -eq 'FAIL' -and $_.detail -match 'names/count differ' }).Count -ne 1) {
-            throw "Missing installed skill was not rejected by the sidecar catalog check"
-          }
-          if (@($red.checks | Where-Object { $_.id -eq 'sidecar-local-help' -and $_.status -eq 'PASS' }).Count -ne 1) {
-            throw "Negative control must still execute local Help successfully"
+          $redReport = Join-Path $redOut "report.json"
+          if ($redExit -ne 1 -or -not (Test-Path -LiteralPath $redReport -PathType Leaf)) { throw "Negative control must exit 1 with a report, got $redExit" }
+          $red = Get-Content -LiteralPath $redReport -Raw | ConvertFrom-Json
+          if ($red.status -ne 'FAIL' -or @($red.checks | Where-Object { $_.id -eq 'verify-resources' -and $_.status -eq 'FAIL' -and $_.detail -match 'LOGINOM_RESOURCE_HASH_MISMATCH' }).Count -ne 1) {
+            throw "A changed installed skill was not rejected by the resource hash check"
           }
           if (@($red.checks | Where-Object { $_.id -eq 'cleanup' -and $_.status -eq 'PASS' }).Count -ne 1) {
             throw "Mutated candidate cleanup failed"
           }
-          Write-Host 'PASS negative control: missing installed loginom-automation makes smoke FAIL'
+          Write-Host 'PASS negative control: a flipped byte of the installed loginom-automation skill makes the smoke FAIL'
           if ($greenExit -ne 0) { throw "Pristine installed Desktop smoke failed with exit $greenExit" }
 
       - name: Upload installed Desktop smoke diagnostics
@@ -354,11 +349,11 @@ jobs:
           name: loginom-windows-installed-smoke-${{ github.run_id }}
           path: |
             ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke/report.json
-            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke/sidecar.json
             ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke/logs.zip
-            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke-missing-skill/report.json
-            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke-missing-skill/sidecar.json
-            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke-missing-skill/logs.zip
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke-skill-byte/report.json
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke-skill-byte/logs.zip
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/cli-installed-smoke.json
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/safe-storage-*.json
           if-no-files-found: warn
           retention-days: 7
 
