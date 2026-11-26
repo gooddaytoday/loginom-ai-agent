@@ -791,8 +791,9 @@ export async function prepareWorkspaceSession({ metadata, assertAllowed, prepare
   if (metadata.workspaceReady === true && !request) {
     throw new Error('Workspace is already prepared. Use dock_workspace_observe for the current UI and dock_action_describe to reread input_artifacts. Preparation has not changed the workspace.');
   }
+  let afterRefusedNavigation = false;
   const identity = request ? JSON.stringify(request) : null;
-  let previous = metadata.workspacePreparation, afterRefusedNavigation = false;
+  let previous = metadata.workspacePreparation;
   if (previous && previous.identity !== identity) {
     // A verified no-effect refusal permits a new explicit package; a proven
     // missing package also permits a new draft. Uncertain attempts keep their ID.
