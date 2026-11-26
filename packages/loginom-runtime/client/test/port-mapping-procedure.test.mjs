@@ -37,6 +37,13 @@ test('output rename freezes native layout unless the request explicitly keeps au
   assert.equal(f.mutations(),gestures);
  }
 });
+test('a fields-only output order freezes the layout',async()=>{
+ const f=fixture(),changes=[];
+ const fields=['Amount','Id'].map(name=>({source:{kind:'configured_field',name}}));
+ await configureRequestedOutputAutosync(f.channel,{direction:'output',port:0,fields},changes);
+ assert.equal(f.mutations(),1);
+ assert.deepEqual(changes.map(change=>change.autosync),[{before:true,value:false}]);
+});
 
 test('configured mapping resolves duplicate labels by source name with explicit order and exclusion',async()=>{
  const {resolveConfiguredOutputMapping:resolve}=await import('../lib/port-mapping-procedure.mjs');

@@ -23,8 +23,8 @@ export async function configureSamplingOutputs(channel,c,p,mappings,finishWizard
    const s=await channel.observe({condition:'sequential output '+port+' schema',readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true});
    const m=s.node_mapping;
    validateSamplingOutputMapping(c,m,port);
-   const schema=m.target_fields.filter(f=>!f.excluded).map(({name,label,type,data_kind})=>({name,label,type,data_kind}));
-   if(c.new_node)alignSamplingOutput(schema,samplingOutputColumns(c,port));
+   const schema=m.target_fields.filter(f=>!f.excluded).map(({name,label,type,data_kind},index)=>({index,name,label,type,data_kind}));
+   if(c.new_node)alignSamplingOutput(schema,samplingOutputColumns(c,port),m.autosync);
    const definition=await readOutputDefinitionPages(channel,{expectedCount:m.target_fields.length});
    if(!definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===m.target_fields[i][k])))throw Error('Sequential output definition differs');
    const finish=await finishWizard('done',true,definition);

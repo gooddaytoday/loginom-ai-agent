@@ -1,4 +1,3 @@
-import {configureRequestedOutputAutosync} from './port-mapping-procedure.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 import {reconcileCollapseOutput} from './collapse-output-reconcile.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
@@ -35,24 +34,21 @@ export function factorAnalysisInlineSources(c,native,port=0){
  need(retained.every(f=>native.target_fields.some(t=>t.name===f.name&&t.source)),'original PCA input or loadings metadata fields must remain linked');
  return obsolete;
 }
-export async function configureFactorAnalysisOutputs(channel,c,p,mappings,finishWizard){
+export async function configureFactorAnalysisOutputs(channel,c,_parameters,mappings,finishWizard){
  need(mappings.length===0,'output overrides unsupported');
  const ports=[];
  for(const port of [0,1]){
   await channel.openOutputPort(port);
   const observe=condition=>channel.observe({condition,readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true});
-  let s=await observe('complete PCA port '+port+' mapping');const expected=factorAnalysisOutputColumns(c,port);
-  let baseline=s.node_mapping;
-  if(baseline.target_fields.length!==expected.length&&(c.output_cap||c.output_schema_changed)){
+  const s=await observe('complete PCA port '+port+' mapping'),expected=factorAnalysisOutputColumns(c,port);
+  let mapping=s.node_mapping;
+  if(mapping.target_fields.length!==expected.length&&(c.output_cap||c.output_schema_changed)){
    const full=factorAnalysisOutputColumns({...c,output_cap:false},port);
-   need(baseline.target_fields.every(f=>!f.excluded&&!f.inherited&&f.required===false&&full.some(e=>['name','label','type'].every(k=>f[k]===e[k])))
-    &&expected.filter(f=>!/^Factor[1-9][0-9]*$/.test(f.name)).every(e=>baseline.target_fields.some(f=>f.name===e.name)),'only intrinsic PCA factor width may change');
-   s=await reconcileCollapseOutput(channel,s,expected);baseline=s.node_mapping;
+   need(mapping.target_fields.every(f=>!f.excluded&&!f.inherited&&f.required===false&&full.some(e=>['name','label','type'].every(k=>f[k]===e[k])))
+    &&expected.filter(f=>!/^Factor[1-9][0-9]*$/.test(f.name)).every(e=>mapping.target_fields.some(f=>f.name===e.name)),'only intrinsic PCA factor width may change');
+   mapping=(await reconcileCollapseOutput(channel,s,expected)).node_mapping;
   }
-  need(baseline.target_fields.length===expected.length&&expected.every(e=>baseline.target_fields.filter(f=>f.name===e.name&&f.label===e.label&&f.type===e.type&&!f.excluded).length===1),'native output fields differ');
-  const changes=[];
-  await configureRequestedOutputAutosync(channel,{},changes,p.factor_analysis?.output_factors!==undefined);
-  const mapping=changes.length?(await observe('PCA output after requested width')).node_mapping:baseline;
+  need(mapping.target_fields.length===expected.length&&expected.every(e=>mapping.target_fields.filter(f=>f.name===e.name&&f.label===e.label&&f.type===e.type&&!f.excluded).length===1),'native output fields differ');
   const schema=mapping.target_fields.map(f=>expected.find(e=>e.name===f.name));
   alignFactorAnalysisOutput(mapping.target_fields,schema);
   const definition=await readOutputDefinitionPages(channel,{expectedCount:expected.length});

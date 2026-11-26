@@ -132,25 +132,27 @@ test('observed PCA radio DisplayEl controls select fixed count and no rotation',
 test('intrinsic PCA mappings keep native autosync and source order',async()=>{
  const {configureFactorAnalysisOutputs}=await import('../lib/factor-analysis-output.mjs');
  const {runInNewContext}=await import('node:vm');
- const config={fields},closed=[],autosyncRequests=[];let port,current;
+ const closed=[];let config={fields},port,current;
  const channel={async openOutputPort(p){port=p;current={verified:true,inventory_complete:true,source_identity_verified:false,source_fields:[],autosync:true,
   target_fields:factorAnalysisOutputColumns(config,p).map((f,i)=>({...f,record_id:'r'+i}))};},
   async observe({ready}){const s={wizard:{stage:'output_mapping'},node_mapping:current};assert.equal(ready(s),true);return s;}};
  const execute=runInNewContext('('+configureFactorAnalysisOutputs.toString()+')',{
   need:(v,m)=>{if(!v)throw Error(m);},factorAnalysisOutputColumns,alignFactorAnalysisOutput,
   configureRequestedOutputAutosync:async(c,mapping,changes,edited)=>{
-   assert.equal(c,channel);autosyncRequests.push(edited);
+   assert.equal(c,channel);
    if(edited){current={...current,autosync:false};changes.push({verified:true});}
   },
   readOutputDefinitionPages:async()=>({fields:current.target_fields}),
  });
  const result=await execute(channel,config,{},[],async(mode,isPort)=>{assert.equal(mode,'done');assert.equal(isPort,true);closed.push(port);});
- assert.deepEqual(autosyncRequests,[false,false]);assert.deepEqual(closed,[0,1]);assert.equal(result.ports.length,2);
+ assert.deepEqual(closed,[0,1]);assert.equal(result.ports.length,2);
  assert.ok(result.ports.every(p=>p.mapping.autosync===true));
  const original=channel.openOutputPort;
  channel.openOutputPort=async p=>{await original(p);[current.target_fields[0],current.target_fields[1]]=[current.target_fields[1],current.target_fields[0]];};
  const swapped=await execute(channel,config,{},[],async()=>{});
  for(const result of swapped.ports)assert.deepEqual(Array.from(result.schema,f=>f.name),result.mapping.target_fields.map(f=>f.name));
+ config={fields,output_cap:true,output_factors:1};
  const narrowed=await execute(channel,config,{factor_analysis:{output_factors:1}},[],async()=>{});
- assert.ok(narrowed.ports.every(p=>p.mapping.autosync===false));
+ assert.ok(narrowed.ports.every(p=>p.mapping.autosync===true));
+ assert.deepEqual(Array.from(narrowed.ports[1].schema,f=>f.name),['ColumnDisplayName','ColumnName','Factor1']);
 });

@@ -405,7 +405,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     const materialized=implementation?.type==='transform.cross_table'&&implementation.materializedSchema
      ?implementation.materializedSchema(output.schema,configured,{node:ctx.node,execution:ctx.execution}):null;
     const expected=materialized?(configured.output_mapping?.target_fields??materialized.columns):columns;
-    if(mapping?.autosync!==true||operation.nodeApply.request.mappings.some(m=>m.direction==='output'&&m.fields?.length))
+    if(mapping?.autosync!==true)
      requireValue(output.schema.every((field,index)=>field.name===expected[index]?.name),'Output field order differs from the configured output');
     const aligned=alignReadSchema(output.schema,expected);
     output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
