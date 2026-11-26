@@ -26,9 +26,9 @@ test('minute and second validate through the production contract and resolve by 
  const result=resolveDateTimeOutput({input_fields:['A','B'].map(name=>({name,label:'Дата',type:'datetime'}))},p,native);
  assert.deepEqual(result.map(r=>r.name),['B_second','B_minute','A_second','A_minute']);
 });
-test('explicit date output layout refuses autosync before changing a node',()=>{
+test('explicit autosync remains valid with a requested date output layout',()=>{
  const mappings=[{direction:'output',port:0,autosync:true,fields:[{source:{kind:'configured_field',name:'A'}}]}];
- assert.throws(()=>validateDateTimeParameters({},'calendar',{target:{kind:'existing'},mappings}),/layout requires autosync disabled/);
+ validateDateTimeParameters({},'calendar',{target:{kind:'existing'},mappings});
  mappings[0].autosync=false;validateDateTimeParameters({},'calendar',{target:{kind:'existing'},mappings});
  delete mappings[0].autosync;validateDateTimeParameters({},'calendar',{target:{kind:'existing'},mappings});
 });

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { withBrowserReceipt, makeCapabilityCode } from './executor.mjs';
 import { NODE_TYPES, NODE_POSITION_MIN } from './node-contracts.mjs';
 import {activatePreparedWorkflow,needsPreparedWorkflowActivation} from './node-workflow-activation.mjs';
+import {bindAddOnlyDrop,readAddOnlyDrop,settleAddOnlyDrop} from './node-add-only-window.mjs';
 import {exportPaletteScroll} from './text-export-palette.mjs';
 import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlacementGap,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from './node-placement.mjs';
 
@@ -14,7 +15,8 @@ export async function readGraph(page, task) {
   const finishes=[...(page[Symbol.for('loginom-dock.operation-receipts.v1')]?.values()??[])]
     .filter(r=>r.state==='completed'&&r.outcome?.status==='SUCCEEDED'&&r.outcome.action_key==='ui.act'&&r.outcome.cleanup_complete===true)
     .map(r=>({context:r.outcome.output?.prepared_node_context,trace:r.outcome.trace}));
-  return page.evaluate(({ request, types, origin, build, read_bindings=false, finishes, step_rebaseline=false, reopened }) => {
+  return page.evaluate(({ request, types, origin, build, read_bindings=false, window_blocker_selector,
+    track_link_guids=false, finishes, step_rebaseline=false, reopened }) => {
     const fail = message => { throw new Error(message); };
     const preparation = globalThis.__loginomDockPreparationV1;
     if (location.origin !== origin || globalThis.bg?.app?.Version !== build || preparation?.document !== document
@@ -23,11 +25,13 @@ export async function readGraph(page, task) {
     const exact = value => document.querySelectorAll('[data-tid=' + JSON.stringify(value) + ']');
     const active = exact(request.workflow_ref.tab_tid);
     if (!record || active.length !== 1 || active[0] !== record.tab || !active[0].classList.contains('x-tab-active')) fail('Prepared workflow changed');
+    const visible = e => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0 && getComputedStyle(e).visibility !== 'hidden';
+    const blocked = selector => [...document.querySelectorAll(selector)].some(visible);
+    // An embedded wizard has its own breadcrumbs in the original tab.
+    if (window_blocker_selector && blocked(window_blocker_selector)) fail('Graph is blocked by a native window');
     const crumbs = [...document.querySelectorAll('[data-tid^=' + JSON.stringify(request.workflow_ref.prefix + ';cnrNaviMode;b.s_') + ']')].map(e => ({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
     if (crumbs.length!==request.workflow_ref.navigation_path.length || crumbs.some((c,i)=>c.tid!==request.workflow_ref.navigation_path[i].tid||c.label!==request.workflow_ref.navigation_path[i].label)) fail('Workflow navigation changed');
-    const visible = e => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0 && getComputedStyle(e).visibility !== 'hidden';
-    const blockers = [...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].filter(visible);
-    if (blockers.length) fail('Graph is blocked');
+    if (blocked('[role="dialog"],.bg-mask-message,.x-mask-msg')) fail('Graph is blocked');
     const app = bg.app, card = app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
     let ancestor = card.Controller.Node?.data?.node, packageNode = null, workflowNode = null;
     for (let i=0;ancestor && i<32;i++,ancestor=ancestor.ParentNode) {
@@ -208,9 +212,19 @@ export async function readGraph(page, task) {
         other_ports:allPorts.filter(p=>! /^(Input|Output)_Data(?:Tree)?-\d+$/.test(p)).sort(),locked:n.FLocked===true};
     }).sort((a,b)=>a.ref.node_id.localeCompare(b.ref.node_id));
     const links=[],variable_links=[],foreign_links=[],rest_connection_links=[];
+    const linkGuids=new Map();
+    const nativeLinks=diagram.FLinks?.FCollection;
+    if(track_link_guids&&Array.isArray(nativeLinks)&&nativeLinks.length<=400){
+      for(const link of nativeLinks){
+        const shape=link.FCell&&graph.view.getState(link.FCell)?.shape?.node;
+        if(!shape||typeof link.FGuid!=='string'||!link.FGuid)continue;
+        linkGuids.set(shape,linkGuids.has(shape)?null:link.FGuid);
+      }
+    }
     for(const e of containers[0].querySelectorAll('[data-tid]')) {
       const tid=e.getAttribute('data-tid'), parts=tid.split(';Graph;'); if(parts.length!==2)continue;
       const body=parts[1];if(!/^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body))continue;
+      const nativeIdentity=linkGuids.get(e)?{native_link_guid:linkGuids.get(e)}:{};
       const endpoints=body.split('|');
       const prefix=parts[0]+';Graph;',s=byTid.get(prefix+endpoints[0]+';'+endpoints[1]),t=byTid.get(prefix+endpoints[2]+';'+endpoints[3]);
       const vs=variableByTid.get(prefix+endpoints[0]+';'+endpoints[1]),vt=variableByTid.get(prefix+endpoints[2]+';'+endpoints[3]);
@@ -220,8 +234,8 @@ export async function readGraph(page, task) {
           &&vt.port.FCell.edges?.includes(edge)&&graph.view.getState(edge)?.shape?.node===e);
         if(edges?.length!==1)fail('Variable link native reciprocity changed');
         variable_links.push({source:vs.node,output:vs.descriptor.port,target:vt.node,input:vt.descriptor.port,kind:vt.kind,
-          source_port_guid:vs.port.FGuid,target_port_guid:vt.port.FGuid});
-      }else if(s&&t){if(s.kind!==t.kind)fail('Incompatible tree/table link');links.push({source:s.node,output:s.index,target:t.node,input:t.index});}else {
+          source_port_guid:vs.port.FGuid,target_port_guid:vt.port.FGuid,...nativeIdentity});
+      }else if(s&&t){if(s.kind!==t.kind)fail('Incompatible tree/table link');links.push({source:s.node,output:s.index,target:t.node,input:t.index,...nativeIdentity});}else {
         foreign_links.push(tid);
         const source=connectionPorts.get(prefix+endpoints[0]+';'+endpoints[1]),target=connectionPorts.get(prefix+endpoints[2]+';'+endpoints[3]);
         if(endpoints[1]==='Output_Connection-0' && endpoints[3]==='Input_Connection-0'
@@ -229,7 +243,7 @@ export async function readGraph(page, task) {
             || source?.node.FIconCls==='bg-vendor-icon-sqliteunidacdbconnection' && target?.node.FIconCls==='bg-vendor-icon-dbimport')
           && source.port.FCell.edges?.filter(edge=>edge.source===source.port.FCell && edge.target===target.port.FCell
             && graph.view.getState(edge)?.shape?.node===e).length===1)
-          rest_connection_links.push({tid,source:source.node.FGuid,target:target.node.FGuid,output:'connection:0',input:'connection:0'});
+          rest_connection_links.push({tid,source:source.node.FGuid,target:target.node.FGuid,output:'connection:0',input:'connection:0',...nativeIdentity});
       }
     }
     links.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));foreign_links.sort();
@@ -244,9 +258,11 @@ export async function readGraph(page, task) {
 
 // Fixed UI gestures used only through the enclosing graph phase. The complete
 // pre-effect graph must still match immediately before the gesture.
-export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph, overflow, gap) {
+export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph, overflow, gap, addOnlyWindow) {
   let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false,moveGeometry,deletion;
   let gestureBefore=task.effect.before;
+  let dropBinding,ownedWindowNodeId;
+  const addOnly=task.effect.kind==='create'&&task.effect.parameters.add_only===true;
   const remaining=()=>{if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw new Error('Node target cancelled');const value=task.deadline-Date.now();if(value<=0)throw new Error('Graph deadline');return value;};
   const ensureContext=()=>page.evaluate(({request,epoch})=>{
     const p=globalThis.__loginomDockPreparationV1;
@@ -377,6 +393,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         const currentOrigin=await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').boundingBox();
         if(JSON.stringify(currentOrigin)!==JSON.stringify(origin)||!await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').evaluate((e,p)=>{const b=e.getBoundingClientRect(),hit=document.elementFromPoint(p.x,p.y);return p.x>=b.x&&p.x<b.right&&p.y>=b.y&&p.y<b.bottom&&p.x>=0&&p.y>=0&&p.x<innerWidth&&p.y<innerHeight&&!!hit&&(hit===e||e.contains(hit));},target))throw Error('Export drop changed after palette reveal');
       }
+      if(addOnly)dropBinding=await page.evaluateHandle(addOnlyWindow.bind,task);
       await drag(find(palette),target,palette);
     }else if(kind==='rename'){
       const tid=await targetTid(p.ref);await point(find(tid+';Label;Label'));effectPossible=true;
@@ -545,6 +562,16 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const yes=find('msgbox;tlb;yes');
       await wait('single_link_confirmation_reachable',async()=>{try{await point(yes);return true;}catch{return false;}});
       if((await message.textContent()).trim()!=='Удалить выделенную связь?')throw new Error('Single-link confirmation changed');
+      if(p.edge.native_link_guid){
+        const exactSelected=await page.evaluate(({tid,guid})=>{
+          const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;
+          const cells=d.FmxGraph.getSelectionCells();
+          return cells.length===1&&d.FmxGraph.view.getState(cells[0])?.shape?.node?.getAttribute('data-tid')===tid
+            &&d.FLinks.FCollection.some(link=>link.FGuid===guid&&link.FCell===cells[0]);
+        },{tid:linkTid,guid:p.edge.native_link_guid});
+        if(!exactSelected||JSON.stringify(await nativeLinks())!==JSON.stringify(linkIdentities))
+          throw Error('Owned link identity changed before native confirmation');
+      }
       await yes.click({timeout:remaining()});transient=false;
     }else if(kind==='delete_node'){
       // Reuse the exact node selection, or select it by an owned body pixel
@@ -624,7 +651,16 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
     const settleJavascript=kind==='create' && p.type==='programming.javascript';
     const maskDeadline=Math.min(task.deadline,Date.now()+15000);
     let pendingNode;
-    let after=await wait('graph_effect_visible_and_drag_idle',async()=>{
+    let after=addOnly?await addOnlyWindow.settle(page,dropBinding,{
+      readSurface:addOnlyWindow.read,remaining,onOwnedWindow:id=>{ownedWindowNodeId=id;},readQuietGraph:async()=>{
+        try{return await read(page,task);}
+        catch(error){
+          if(['Graph is blocked','Workflow navigation changed','Visible port identity is not rendered','Node identity is not rendered']
+            .some(reason=>String(error.message).includes(reason)))return null;
+          throw error;
+        }
+      },
+    }):await wait('graph_effect_visible_and_drag_idle',async()=>{
       try{const g=await read(page,task);return g.interaction_ready&&JSON.stringify(g)!==JSON.stringify(before)?g:null;}
       catch(error){
         if(!settleJavascript)return null;
@@ -642,6 +678,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         pendingNode=id;return null;
       }
     },0,settleJavascript);
+    ownedWindowNodeId=undefined;
     if(kind==='create'){
       const created=after.nodes.filter(n=>!before.nodes.some(b=>b.ref.node_id===n.ref.node_id));
       if(created.length!==1)throw Error('Created node visibility owner is ambiguous');
@@ -658,14 +695,27 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       after=await read(page,task);
       if(!sameGraph(baseline,after))throw Error('Created node graph changed after viewport navigation');
     }
-    outcome={status:'SUCCEEDED',effect_possible:true,after};
+    let dropLinkGuids;
+    if(addOnly){
+      const handle=await dropBinding.getProperty('createdLinkGuids');
+      try{dropLinkGuids=await handle.jsonValue();}finally{await handle.dispose();}
+    }
+    outcome={status:'SUCCEEDED',effect_possible:true,after,...(addOnly?{drop_link_guids:dropLinkGuids}:{})};
   }catch(error){if(error.placement_navigation_unverified){effectPossible=true;placementNavigationUncertain=true;}outcome={...outcome,status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,error:String(error.message),...(placementRefusal?{placement_refusal:placementRefusal}:{})};}
   finally{try{if(held){await page.mouse.up();held=false;}if(transient==='delete'){const cancel=find('msgbox;tlb;no');if(await cancel.isVisible())await cancel.click({timeout:3000});}else if(transient)await page.keyboard.press('Escape');transient=false;outcome.cleanup_complete=true;}catch(error){outcome={...outcome,status:'AMBIGUOUS',cleanup_complete:false,cleanup_error:String(error.message)};}}
+  if(dropBinding)await dropBinding.dispose().catch(()=>{});
   if(paletteScroll)outcome.palette_scroll=paletteScroll;
   if(placementNavigation)outcome.placement_navigation=placementNavigation;
   if(moveGeometry)outcome.move_geometry=moveGeometry;
   if(deletion)outcome.deletion=deletion;
   if(paletteScrollUncertain||placementNavigationUncertain)outcome.cleanup_complete=false;
+  if(ownedWindowNodeId){
+    if(outcome.cleanup_complete===true){
+      outcome.add_only_window_pending=true;
+      outcome.add_only_window_node_id=ownedWindowNodeId;
+    }
+    outcome.cleanup_complete=false;
+  }
   return outcome;
 }
 
@@ -866,10 +916,13 @@ export async function prepareLinkHover(page,task,read,sameGraph,reveal,readViewp
   return after;
 }
 
-export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,record=async()=>{}}) {
+export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,record=async()=>{},requireNoNativeWindow=false}) {
   if(build!=='7.4.2')throw new Error('Node target browser profile is verified only for Loginom 7.4.2');
   let request;
-  const task = extra => ({request,types:NODE_TYPES,origin,build,...extra});
+  const graphBlockers='[role="dialog"],.bg-mask-message,.x-mask-msg';
+  const nativeWindowBlockers='[role="dialog"],.x-window,[role="alertdialog"],[aria-modal="true"],[data-tid$=";WizrdMCF"]';
+  const task = extra => ({request,types:NODE_TYPES,origin,build,
+    ...(requireNoNativeWindow?{window_blocker_selector:nativeWindowBlockers,track_link_guids:true}:{}),...extra});
   const readCode = t => `async page => (${readGraph.toString()})(page,${JSON.stringify(t)})`;
   const call = (code,deadline) => execute(code,{timeout:Math.max(1,deadline-Date.now())});
   const observeGraph=async(value,deadline,{readBindings=false}={})=>{
@@ -890,11 +943,14 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
             await new Promise(resolve=>setTimeout(resolve,80));
             continue;
           }
+          if(requireNoNativeWindow&&message.includes('Graph is blocked by a native window'))
+            throw Object.assign(Error('Graph is blocked by a native window. Close it, wait for the graph to settle, then inspect the same operation.'),
+              {code:'NODE_ADD_ONLY_GRAPH_BLOCKED'});
           if(maskRefresh++>=2 || !message.includes('Graph is blocked') || Date.now()>=deadline)throw error;
           // Observe only: a transient loading mask may arrive after the prior
           // graph receipt. Wait for its disappearance, then recheck the complete
           // original preparation identity; never retry a possible gesture.
-          await call(`async page => {await page.waitForFunction(()=>![...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].some(e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden'),null,{timeout:${Math.max(1,Math.min(15000,deadline-Date.now()))}});return true;}`,deadline);
+          await call(`async page => {await page.waitForFunction(selector=>![...document.querySelectorAll(selector)].some(e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden'),${JSON.stringify(graphBlockers)},{timeout:${Math.max(1,Math.min(15000,deadline-Date.now()))}});return true;}`,deadline);
         }
       }
   };
@@ -1086,8 +1142,20 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
       }
       const options={receipt_namespace:'node-target:'+request.document_id,receipt_id:effect.id,
         operation_id:effect.id,receipt_signature:createHash('sha256').update(JSON.stringify(effect)).digest('hex')};
-      return await call(withBrowserReceipt(`(${mutateGraph.toString()})(page,${JSON.stringify(t)},${readGraph.toString()},${exportPaletteScroll.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${revealNodePlacement.toString()},${samePlacementGraph.toString()},${nodePlacementOverflow.toString()},${nodePlacementGap.toString()})`,options),deadline);
+      return await call(withBrowserReceipt(`(${mutateGraph.toString()})(page,${JSON.stringify(t)},${readGraph.toString()},${exportPaletteScroll.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${revealNodePlacement.toString()},${samePlacementGraph.toString()},${nodePlacementOverflow.toString()},${nodePlacementGap.toString()},{bind:${bindAddOnlyDrop.toString()},read:${readAddOnlyDrop.toString()},settle:${settleAddOnlyDrop.toString()}})`,options),deadline);
       }finally{signal?.removeEventListener('abort',cancel);if(cancellation){await cancellation;await call(`async page=>{page[Symbol.for('loginom-dock.node-target-cancel')]?.delete(${JSON.stringify(effect.id)});return true;}`,Date.now()+3000);}}
+    },
+    async verifyAddOnlyCleanup(graph,deadline){
+      const scoped={document_id:graph.document_id,workflow_ref:graph.workflow_ref};
+      const probe=task({request:scoped,window_blocker_selector:nativeWindowBlockers});
+      return call(`async page=>{
+        const read=${readGraph.toString()},probe=${JSON.stringify(probe)},expected=${JSON.stringify(graph)};
+        const first=await read(page,probe);
+        if(!first.interaction_ready||JSON.stringify(first)!==JSON.stringify(expected))return false;
+        await page.waitForTimeout(200);
+        const second=await read(page,probe);
+        return Date.now()<${deadline}&&JSON.stringify(second)===JSON.stringify(first);
+      }`,deadline);
     },
     async reconcile(effect,graph,deadline){
       const options={receipt_namespace:'node-target:'+request.document_id,receipt_id:effect.id,

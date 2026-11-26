@@ -1,5 +1,5 @@
 import {ensureJoinOutputComplete} from './join-output-sync.mjs';
-import {resolveConfiguredOutputMapping,configureOutputFields,reorderOutputFields,configureOutputAutosync} from './port-mapping-procedure.mjs';
+import {resolveConfiguredOutputMapping,configureOutputFields,reorderOutputFields,configureOutputAutosync,configureRequestedOutputAutosync} from './port-mapping-procedure.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {resolveJoinKeys,joinOutputFields} from './join-parameters.mjs';
@@ -91,7 +91,7 @@ export async function configureJoinOutput(channel,configuration,parameters,mappi
   const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
   changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));
  }
- if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
+ await configureRequestedOutputAutosync(channel,requested,changes);
  s=await channel.observe({condition:'join output mapping readback',readMappings:true,ready});
  resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
  return {verified:true,cleanup_complete:true,effect_possible:changes.length>0,source_identity_verified:true,native_mapping:s.node_mapping,changes};
