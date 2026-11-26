@@ -1,0 +1,98 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "trees.from_json"
+    },
+    {
+      "type": "trees.to_table"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "graph": {
+    "exact": true,
+    "nodes": [
+      {
+        "id": "variables",
+        "type": "variables.user"
+      },
+      {
+        "id": "source",
+        "type": "imports.text"
+      },
+      {
+        "id": "tree",
+        "type": "trees.from_json"
+      },
+      {
+        "id": "table",
+        "type": "trees.to_table"
+      },
+      {
+        "id": "csv",
+        "type": "exports.text"
+      }
+    ],
+    "links": [
+      {
+        "source": "source",
+        "output": 0,
+        "target": "tree",
+        "input": 0
+      },
+      {
+        "source": "tree",
+        "output": 0,
+        "target": "table",
+        "input": 0
+      },
+      {
+        "source": "table",
+        "output": 0,
+        "target": "csv",
+        "input": 0
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Root_carts_id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Root_carts_products_id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Root_carts_products_quantity",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Root_carts_id": 1,
+          "Root_carts_products_id": 162,
+          "Root_carts_products_quantity": 4
+        },
+        {
+          "Root_carts_id": 1,
+          "Root_carts_products_id": 113,
+          "Root_carts_products_quantity": 3
+        }
+      ]
+    }
+  ]
+}

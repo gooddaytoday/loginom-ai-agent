@@ -280,3 +280,20 @@ Excel. Раннер включает явную просьбу сохранит�
 ```sh
 python3 -B docs/testing/loginom-ai-agent/bughunt-2026-11/cases/wave3-oracle.py --check
 ```
+
+### GitHub #1381 — JSON в дерево → Дерево в таблицу
+
+Кейсы `bh-1381-minimal`, `bh-1381-flat`, `bh-1381-carts`, `bh-1381-products`
+проверяют прямую связь дерева, точный порядок полей и строк в CSV и повторное
+выполнение сохранённого пакета. В больших кейсах холодная проверка читает
+порт порциями и проверяет привязку каждой порции к одному выполнению.
+У каждого входного CSV один столбец `Document` и одна строка с JSON.
+
+Офлайн-данные корзин и товаров взяты из `database/carts.json` и
+`database/products.json` DummyJSON на коммите
+[`3d78fed5f35b7f1087db1c162edc412f2a736722`](https://github.com/Ovi/DummyJSON/tree/3d78fed5f35b7f1087db1c162edc412f2a736722/database).
+Данные DummyJSON распространяются по [лицензии MIT](https://github.com/Ovi/DummyJSON/blob/3d78fed5f35b7f1087db1c162edc412f2a736722/LICENSE).
+Для локальной имитации `limit=0` массивы обёрнуты в объект с
+`total = limit = len(массив)` и `skip = 0`. Oracle читает тот же исходный JSON,
+проверяет поля пагинации и считает строки разворачивания через исходные записи.
+Для проверки зафиксированных ожиданий запусти `python3 <case>/oracle.py --check`.
