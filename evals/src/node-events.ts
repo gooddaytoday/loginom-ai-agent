@@ -56,7 +56,7 @@ export function successful(call: NodeCall) {
 }
 
 export function operationReceipts(events: NodeEvents, isRequest = (call: NodeCall) =>
-  call.tool.endsWith("node_apply") || call.tool.endsWith("node_read")) {
+  call.tool.endsWith("node_apply") || call.tool.endsWith("node_read"), include = successful) {
   const requests = new Map<string, NodeCall>()
   const receipts: { request: NodeCall; receipt: NodeCall }[] = []
   const failures = [...events.failures]
@@ -69,7 +69,7 @@ export function operationReceipts(events: NodeEvents, isRequest = (call: NodeCal
       else if (!previous) requests.set(op, call)
     }
     const request = requests.get(call.output.operation_id)
-    if (request && successful(call) && call.output.state === "settled") receipts.push({ request, receipt: call })
+    if (request && include(call) && call.output.state === "settled") receipts.push({ request, receipt: call })
   }
   return { receipts, failures }
 }

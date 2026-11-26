@@ -47,6 +47,7 @@ async function judgeEvidence(id: string, change = (calls: Fixture) => {}) {
     readExecution: execution_id,
     readMode: undefined,
     secondImport: undefined,
+    renameSample: false,
     laterReceipts: 0,
   }
   change(calls)
@@ -55,6 +56,8 @@ async function judgeEvidence(id: string, change = (calls: Fixture) => {}) {
       status: "completed", input, output: JSON.stringify(output), time: { start: seq * 10, end: seq * 10 + 1 },
     } },
   })
+  const rename = calls.secondImport === "rename"
+  const nextExecution = `${node.document_id}:142:1`
   const updatedNode = calls.secondImport === "distinct" ? anotherNode : node
   const events = [
     tool(1, "prepare", {}, calls.prepare),
@@ -77,13 +80,23 @@ async function judgeEvidence(id: string, change = (calls: Fixture) => {}) {
     ...(calls.secondImport ? [
       tool(6, "node_apply", {
         operation_id: "another-import", document_id: node.document_id, workflow_ref: { workflow_id: node.workflow_id },
-        target: calls.secondImport === "distinct" ? { kind: "new", type: "imports.text" } : { kind: "existing", type: "imports.text", ref: node },
-        parameters: { source: { kind: "verified_delivery", artifact_id, upload_operation_id: "delivery:upload" } },
+        target: calls.secondImport === "distinct" ? { kind: "new", type: "imports.text" } :
+          { kind: "existing", type: "imports.text", ref: node, ...(rename ? { label: "Source rows" } : {}) },
+        ...(rename ? { parameters: { settings: {} }, mode: "delimited", finish: "execute", inputs: [], mappings: [], read: { ports: [0] } } :
+          { parameters: { source: { kind: "verified_delivery", artifact_id, upload_operation_id: "delivery:upload" } } }),
       }, { operation_id: "another-import", state: "running" }),
       tool(7, "node_wait", { operation_id: "another-import" }, {
         ...success, operation_id: "another-import", node: updatedNode,
-        configuration: { status: "applied", readback: { ...calls.readback, node: updatedNode } },
-        execution: { ...calls.execution, execution_id: `${node.document_id}:142:1` },
+        configuration: rename ? { status: "not_requested" } : calls.secondImport === "failed" ? { status: "applied" } :
+          { status: "applied", readback: { ...calls.readback, node: updatedNode } },
+        ...(calls.secondImport === "failed" ? {
+          status: "FAILED", error: { code: "NODE_EXECUTION_FAILED" },
+          execution: { status: "failed", execution_id: nextExecution, failure_verified: true },
+        } : {
+          execution: { ...calls.execution, execution_id: nextExecution },
+          output: calls.renameSample ? { ...calls.output, execution_id: nextExecution,
+            ports: calls.output.ports.map(port => ({ ...port, execution_id: nextExecution })) } : undefined,
+        }),
       }),
     ] : []),
     ...Array.from({ length: calls.laterReceipts }, (_, index) =>
@@ -120,7 +133,8 @@ type Fixture = {
   separateRead: boolean
   readExecution: string
   readMode?: "existing" | "execute"
-  secondImport?: "distinct" | "reconfigure"
+  secondImport?: "distinct" | "reconfigure" | "failed" | "rename"
+  renameSample: boolean
   laterReceipts: number
   extra: string
 }
@@ -232,4 +246,20 @@ test("settled Dock status and resume results are bound to their original operati
     calls.deliveryStatusOperation = "another-upload"
   })
   expect(foreign.proof).toBeUndefined()
+})
+
+test("an applied reconfiguration invalidates an old proof even if execution then fails", async () => {
+  const { proof } = await judgeEvidence(cohort, calls => { calls.secondImport = "failed" })
+  expect(proof).toBeUndefined()
+})
+
+test("a native label-only apply retains the verified source and uses its own execution and sample", async () => {
+  const actual = await judgeEvidence(cohort, calls => { calls.secondImport = "rename" })
+  expect(actual.proof).toEqual({ ...actual.expected, execution_id: `${node.document_id}:142:1` })
+  const read = await judgeEvidence(cohort, calls => {
+    calls.secondImport = "rename"
+    calls.renameSample = true
+  })
+  expect(read.proof?.execution_id).toBe(`${node.document_id}:142:1`)
+  expect(read.proof?.cohort_sample?.customer_id).toEqual({ type: "string", value: null, is_null: true, precision: "exact_null" })
 })
