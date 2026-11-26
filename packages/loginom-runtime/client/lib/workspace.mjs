@@ -815,9 +815,23 @@ export async function prepareWorkspaceSession({ metadata, assertAllowed, prepare
       && previous.state.authenticated === true && (previous.state.connection_restore === 'session_replaced'
         || previous.state.connection_restore === 'restore_unresolved' && previous.state.effect_possible === false
           && previous.state.created_draft === false && previous.effect_possible === false);
+    // A Submodel navigation refused before any gesture left the page on its
+    // prepared workflow (LAB-2054). A NEW ID may prepare the same document.
+    const held = JSON.parse(previous.identity ?? 'null');
+    const navigationExit = previous.effect_possible === false && !restorePressed
+      && previous.state?.status === 'NOT_READY' && previous.state.phase === 'graph_navigation'
+      && previous.state.effect_possible === false && previous.state.created_draft === false
+      && previous.state.authenticated === true && previous.state.verification_required === false
+      && Array.isArray(previous.state.trace) && previous.state.trace.length === 0
+      && held?.intent === 'existing_workflow' && !!held.graph_navigation && typeof held.workflow_ref?.document_id === 'string';
+    const refusedNavigation = navigationExit && request?.intent === 'existing_workflow'
+      && request.workflow_ref?.document_id === held.workflow_ref.document_id;
     if (previous.operation_id === request?.operation_id
-        || !replaceRefusal && !sessionReplaced && (metadata.workspaceReady !== true || previous.state?.status !== 'READY')) {
-      throw new Error('Preparation operation conflict: reconcile the existing request first');
+        || !replaceRefusal && !sessionReplaced && !refusedNavigation && (metadata.workspaceReady !== true || previous.state?.status !== 'READY')) {
+      throw new Error('Preparation operation conflict: reconcile the existing request first. ' + (navigationExit
+        ? 'The held operation_id ' + previous.operation_id + ' was a Submodel navigation refused before any gesture; call dock_prepare with a NEW operation_id, '
+          + 'intent existing_workflow and the workflow_ref of the same document it was given, without graph_navigation.'
+        : 'Repeat dock_prepare with operation_id ' + previous.operation_id + ' and exactly its original parameters.'));
     }
     previous = null;
   }
