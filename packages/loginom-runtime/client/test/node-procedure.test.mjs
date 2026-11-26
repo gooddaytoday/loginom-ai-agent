@@ -626,10 +626,11 @@ test('execution polling batches the native read before the scoped UI read and re
  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,dom_epoch:{document:'dom',revision:1},
   prepared_node_context:node,scan:{complete:true},wizard:{status:'absent'},ui:{elements:[{tid:'MF;ConsoleForm',ref:'ui-console'}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
  const records=[],transports=[];
- let now=0,foreign=false;
- const channel=createNodeProcedure({operation:{id:'execution',deadline:650,action:{action_key:'node.apply',revision:'1'}},
-  preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
-  now:()=>now,wait:async ms=>{now+=ms},record:async r=>{records.push(r);return structuredClone(r)},
+ const controller=new AbortController();
+ let now=0,foreign=false,lastRead,retryAt,afterWait;
+ const channel=createNodeProcedure({operation:{id:'execution',deadline:1600,action:{action_key:'node.apply',revision:'1'}},
+  preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,signal:controller.signal,
+  now:()=>now,wait:async ms=>{now+=ms;afterWait?.()},record:async r=>{records.push(r);return structuredClone(r)},
   execute:async code=>{
    transports.push(code);
    const result={status:'SUCCEEDED',output:structuredClone(state)};
@@ -643,6 +644,9 @@ test('execution polling batches the native read before the scoped UI read and re
    assert.ok(code.indexOf('async function readNodeProcesses')>=0);
    assert.ok(code.indexOf('async function readNodeProcesses')<code.indexOf('function workspaceUiCapability'));
    assert.match(code,/"root_ref":"ui-console"/);
+   if(now===retryAt)return {result:{status:'NOT_APPLIED',action_key:'workspace.observe',phase:'observing',
+    effect_possible:false,cleanup_complete:true,error:{code:'UI_ROOT_STALE'}},nativeProcesses};
+   lastRead=result;
    return {result,nativeProcesses};
   }});
  const options={condition:'owned execution group',timeoutMs:350,readProcesses:true,pollExecution:true};
@@ -652,11 +656,13 @@ test('execution polling batches the native read before the scoped UI read and re
  assert.equal(transports.length,8);
  const samples=records.filter(e=>e.phase==='node_observation_sample');
  assert.deepEqual(samples.map(e=>e.sample),[0,1,2]);
+ assert.deepEqual(samples.map(e=>e.attempts),[1,3,4]);
  assert.deepEqual(samples.map(e=>e.outcome.output.dom_epoch.revision),[0,200,300]);
  assert.equal(samples[0].outcome.output.node_processes.processes[0].owner,undefined);
  assert.equal(samples[1].outcome.output.node_processes.processes[0].owner.node_id,node.node_id);
  assert.equal(records.at(-1).readiness.timeout_ms,350);
  assert.equal(records.at(-1).outcome.output.dom_epoch.revision,300);
+ assert.equal(records.at(-1).attempts,4);
  foreign=true;
  await assert.rejects(channel.observe({...options,ready:()=>true}),/context changed/);
  foreign=false;
@@ -667,7 +673,40 @@ test('execution polling batches the native read before the scoped UI read and re
  assert.equal(records.at(-1).phase,'node_observation_timeout');
  assert.equal(records.at(-1).elapsed_ms,250);
  assert.equal(records.at(-1).outcome.output.dom_epoch.revision,500);
+ assert.equal(records.at(-1).attempts,3);
  await assert.rejects(channel.act({verb:'click',ref:'ui-console'}),/fresh internal observation/);
+
+ const waitError=Error('Execution group replaced while waiting');
+ await assert.rejects(channel.observe({...options,ready:()=>{
+  if(now===750)throw waitError;
+  return false;
+ }}),error=>error===waitError);
+ assert.equal(records.at(-1).phase,'node_observation_failed');
+ assert.equal(records.at(-1).sample,1);
+ assert.equal(records.at(-1).attempts,3);
+ assert.equal(records.at(-1).outcome.output.dom_epoch.revision,650);
+
+ retryAt=950;
+ const beforeRetry=records.length;
+ await assert.rejects(channel.observe({...options,ready:()=>{if(now===1050)throw waitError;return false}}),error=>error===waitError);
+ const afterRetry=records.slice(beforeRetry);
+ assert.deepEqual(afterRetry.map(e=>[e.phase,e.sample,e.attempts]),[
+  ['node_observation_sample',0,1],['node_observation_root_refreshed',1,3],
+ ]);
+
+ afterWait=()=>{
+  if(now!==1250)return;
+  lastRead.output.dom_epoch.revision=-1;
+  controller.abort(Error('local cancel after duplicate sample'));
+ };
+ const beforeCancel=records.length;
+ await assert.rejects(channel.observe({...options,ready:()=>false}),error=>error===controller.signal.reason);
+ assert.deepEqual(records.slice(beforeCancel).map(e=>e.phase),['node_observation_sample','node_observation_interrupted']);
+ const interrupted=records.at(-1);
+ assert.equal(interrupted.sample,1);
+ assert.equal(interrupted.attempts,2);
+ assert.equal(interrupted.outcome.output.dom_epoch.revision,1150);
+ assert.equal(interrupted.effect_possible,false);
 });
 
 for(const locked of [false,true])test('process observation discards a lock-only transition to '+locked+' and rereads',async()=>{

@@ -630,30 +630,34 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw Error('Original wizard receipt context changed');
       };
       let result, lastGeometry, observedAt, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, settlingWizard, settlingDefinition, settlingErrorToast, sampleStarted = observationNow();
-      let lastJournaledPollState, lastUnjournaledPollSample, skippedPollSamples = 0;
+      let lastJournaledPollState, lastUnjournaledPollSample, skippedPollSamples = 0, attempts = 0;
       const pollInterval=pollExecution?100:200;
       const sampleLimit=pollExecution?Math.ceil(timeoutMs/pollInterval)+1:80;
+      // Cumulative per observation, including retries and reads omitted from the journal.
+      const pollAttemptDetails = () => pollExecution ? { attempts } : {};
+      const resetPollSample = () => { lastJournaledPollState = lastUnjournaledPollSample = undefined; };
       try {
-      for (let attempt = 0; settleOutputPort || settleProcessConsole || settlingWizard || settlingDefinition || attempt < sampleLimit; attempt++) {
-        // The journal's sample sequence must remain contiguous after compaction.
-        const sample = attempt - skippedPollSamples;
+      while (settleOutputPort || settleProcessConsole || settlingWizard || settlingDefinition || attempts < sampleLimit) {
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
         // Count the observation itself toward the polling interval. A ready
         // identity still gets the 200 ms pause before its second confirmation.
         const pause = satisfied ? 200 : Math.max(0, pollInterval - (observationNow() - sampleStarted));
-        if (attempt && pause > 0) await wait(Math.min(pause, Math.max(0, deadline - observationNow())));
+        if (attempts && pause > 0) await wait(Math.min(pause, Math.max(0, deadline - observationNow())));
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
         sampleStarted = observationNow();
+        // Keep journal sample indices contiguous even when the poll is omitted.
+        const sample = attempts++ - skippedPollSamples;
         // Rediscover the root: wizard transitions and combo portals can replace it.
         const roots = await readUi({ mode: 'observe', operation_id: id,
           ...boundOptions,
           discover_roots: true, expected_origin: targetOrigin, expected_build: targetBuild });
         if (roots.status !== 'SUCCEEDED') {
           if (timeScanRefusal(roots,'workspace.observe')) {
+            resetPollSample();
             await entry('node_observation_scan_retried',{step,sample,internal_operation_id:id,
-              condition,stage:'roots',outcome:structuredClone(roots)});
+              ...pollAttemptDetails(),condition,stage:'roots',outcome:structuredClone(roots)});
             satisfied=false;confirmations=0;previousIdentity=undefined;
             continue;
           }
@@ -772,8 +776,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           // work/element limits and uncertain gestures are never retried here.
           if (timeScanRefusal(result,'workspace.observe')) {
             assertContext(roots.output,true,tableDialog,true);
+            resetPollSample();
             await entry('node_observation_scan_retried',{step,sample,internal_operation_id:id,
-              condition,stage:'detail',outcome:structuredClone(result)});
+              ...pollAttemptDetails(),condition,stage:'detail',outcome:structuredClone(result)});
             satisfied=false;confirmations=0;previousIdentity=undefined;
             continue;
           }
@@ -784,8 +789,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             && result.error?.code === 'UI_ROOT_STALE' && result.effect_possible === false
             && result.cleanup_complete === true) {
             assertContext(roots.output, true, tableDialog, true);
+            resetPollSample();
             await entry('node_observation_root_refreshed', {step, sample, internal_operation_id:id,
-              refresh:++rootRefreshes, condition, outcome:structuredClone(result)});
+              ...pollAttemptDetails(),refresh:++rootRefreshes, condition, outcome:structuredClone(result)});
             confirmations=0;previousIdentity=undefined;
             continue;
           }
@@ -931,7 +937,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             if(nativeOwner.verified===true&&nativeOwner.surface==='graph'
               &&typeof nativeLocked==='boolean'&&typeof uiLocked==='boolean'&&nativeLocked!==uiLocked
               &&JSON.stringify(canonical(nativeOwner))===JSON.stringify(canonical(uiOwner))) {
+              resetPollSample();
               await entry('node_observation_lock_retried',{step,sample,internal_operation_id:id,condition,
+                ...pollAttemptDetails(),
                 native_node_context:structuredClone(nativeProcesses.node_context),
                 ui_node_context:structuredClone(result.output.prepared_node_context)});
               satisfied=false;confirmations=0;previousIdentity=undefined;
@@ -1229,11 +1237,12 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         ]) : undefined;
         if (pollExecution && !satisfied && pollState === lastJournaledPollState) {
           skippedPollSamples++;
-          lastUnjournaledPollSample = sampleDetails;
+          lastUnjournaledPollSample = structuredClone(sampleDetails);
         } else {
-          await acknowledge('node_observation_sample', { step, internal_operation_id: id, ...structuredClone(sampleDetails) });
-          lastJournaledPollState = pollState;
           lastUnjournaledPollSample = undefined;
+          await acknowledge('node_observation_sample', { step, internal_operation_id: id,
+            ...pollAttemptDetails(), ...structuredClone(sampleDetails) });
+          lastJournaledPollState = pollState;
         }
         // The action transport checks the exact document epoch again before
         // the gesture. Repeating already satisfied observations adds latency
@@ -1243,12 +1252,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (!satisfied || confirmations < (confirmIdentity ? 2 : 1)) {
         const timedOut=await entry('node_observation_timeout',{step,internal_operation_id:id,condition,
           ...(lastGeometry?{geometry:lastGeometry}:{}),
-          ...lastUnjournaledPollSample,
+          ...lastUnjournaledPollSample, ...pollAttemptDetails(),
           elapsed_ms:observationNow()-started,effect_possible:false});
+        lastUnjournaledPollSample = undefined;
         if(timedOut?.condition!==condition||timedOut.effect_possible!==false)throw Error('Observation timeout was not durably acknowledged');
         throw new NodeReadinessTimeout(condition);
       }
       const persisted = await acknowledge('node_observation_completed', { step, internal_operation_id: id,
+        ...pollAttemptDetails(),
         readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: previousIdentity, condition, satisfied: true, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), ...(settleProcessConsole?.quiet?{console_epoch_settlement:true,deadline}:{}), elapsed_ms: observedAt - started }, outcome: structuredClone(result) });
       if (!persisted?.outcome?.output) throw new Error('Node observation requires a durable journal acknowledgement');
       evidenceSnapshot = structuredClone(persisted.outcome.output);
@@ -1260,10 +1271,15 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       } catch(error) {
         if(signal?.aborted&&error===signal.reason) {
           const interrupted=await entry('node_observation_interrupted',{step,internal_operation_id:id,
-            ...lastUnjournaledPollSample,condition,reason:'local_cancel',effect_possible:false,cleanup_complete:true});
+            ...lastUnjournaledPollSample,...pollAttemptDetails(),condition,reason:'local_cancel',effect_possible:false,cleanup_complete:true});
           if(interrupted?.step!==step||interrupted.internal_operation_id!==id||interrupted.condition!==condition
             ||interrupted.reason!=='local_cancel'||interrupted.effect_possible!==false||interrupted.cleanup_complete!==true)
             throw Error('Interrupted observation was not durably acknowledged');
+        } else if (lastUnjournaledPollSample) {
+          try {
+            await entry('node_observation_failed',{step,internal_operation_id:id,condition,
+              ...lastUnjournaledPollSample,...pollAttemptDetails()});
+          } catch { /* Keep the original error if diagnostic journaling fails. */ }
         }
         throw error;
       }
