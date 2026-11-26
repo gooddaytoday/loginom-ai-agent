@@ -1,0 +1,25 @@
+customer_id,region,email
+109,Новосибирск,client109@example.ru
+118,Казань,client118@example.ru
+122,Санкт-Петербург,client122@example.ru
+142,Алтай,client142@example.ru
+161,Казань,client161@example.ru
+167,Санкт-Петербург,client167@example.ru
+173,Самара,client173@example.ru
+412,Москва,client412@example.ru
+425,Екатеринбург,client425@example.ru
+446,Новосибирск,client446@example.ru
+527,Екатеринбург,client527@example.ru
+563,Самара,client563@example.ru
+566,Санкт-Петербург,client566@example.ru
+598,Санкт-Петербург,client598@example.ru
+786,Самара,client786@example.ru
+795,Самара,
+882,Санкт-Петербург,client882@example.ru
+883,Санкт-Петербург,client883@example.ru
+897,Самара,client897@example.ru
+907,Самара,client907@example.ru
+908,Екатеринбург,client908@example.ru
+921,Нижний Новгород,client921@example.ru
+932,Алтай,client932@example.ru
+988,Алтай,client988@example.ru
