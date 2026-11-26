@@ -382,7 +382,7 @@ test('browser recovery refuses a graph that changes after manual cleanup',async(
 const request=()=>({operation_id:'apply',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
  target:{kind:'new',type:'imports.text',label:'Source',position:{x:320,y:280}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'execute',
  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
-function fixture({release:releaseDriver,type='imports.text',execute=async()=>{throw Error('Unexpected public transport');}}={}) {
+function fixture({release:releaseDriver,type='imports.text',browserRecovery=false,execute=async()=>{throw Error('Unexpected public transport');}}={}) {
  const calls=[],events=[],graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[],links:[],foreign_links:[]};
  const adapter={observe:async()=>structuredClone(graph),preflight:async()=>{},positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),
   reconcile:async()=>({verified:true,cleanup_complete:true}),mutate:async e=>{calls.push(e.kind);if(e.kind==='create')graph.nodes.push({ref:node,
@@ -396,7 +396,7 @@ function fixture({release:releaseDriver,type='imports.text',execute=async()=>{th
   ...(releaseDriver?{releasePending:async state=>{calls.push('release:'+state.pending.phase);return releaseDriver(state);}}:{})};
  const handler={revision:'1',modes:['delimited'],validate:()=>{},configure:ok('configure')};
  let context;
- const runtime=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,execute,
+ const runtime=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,execute,browserRecovery,
   nodeTargetAdapterFactory:()=>adapter,nodeApplyHandlers:new Map([[type,handler]]),nodeApplyDriverFactory:value=>{context=value;return drivers;},
   onRecord:async e=>{events.push(e);return e;}});
  return {runtime,calls,events,drivers,handler,context:()=>context};
@@ -412,7 +412,7 @@ const stop=async(f,phase)=>{
  return job;
 };
 
-for(const fault of [null,'foreign wizard','lost browser reply'])test('release after the filter value fill stops: '+fault,async()=>{
+for(const fault of [null,'foreign wizard','lost browser reply','changed connection owner'])test('release after the filter value fill stops: '+fault,async()=>{
  const type='transform.filter_data',origin='http://test',build='7.4.2';
  const connection={Connected:true,UserName:'test',FRemoteSession:{},FSession:{}};
  const form={FReconnecting:false,FMapTree:{FServerConnection:connection,PackageNodes:{Count:0}}};
@@ -430,7 +430,7 @@ for(const fault of [null,'foreign wizard','lost browser reply'])test('release af
   wizard:{status:'observed',root_tid:'W',root_ref:'wizard',stage:'row_filter'},
   ui:{elements:[{ref:'ui-filter-value',allowed_actions:['fill']}],dialogs:[],masks:[],truncated:{dialogs:false,masks:false}}};
  const ui=surface({wizard:true,foreign:fault==='foreign wizard'});
- const f=fixture({type,execute:async(code,options)=>{
+ const f=fixture({type,browserRecovery:true,execute:async(code,options)=>{
   const reading=code.includes('"receipt_read":true'),acting=code.includes('"mode":"act"');
   if(reading)assert.ok(options.timeout>10000);
   if(acting&&fault==='lost browser reply'){fills++;throw Error('Browser response lost after fill');}
@@ -460,11 +460,21 @@ for(const fault of [null,'foreign wizard','lost browser reply'])test('release af
  }
  assert.equal(restores,1,JSON.stringify(job.outcome.error));
  assert.equal(fills,0);
+ if(fault==='changed connection owner')connection.FSession={};
  const waiting=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-before-reconnect'});
  assert.equal(waiting.status,'AMBIGUOUS');
- assert.match(waiting.output.next_step.instruction,/original Loginom session to reconnect/);
  assert.equal(f.runtime.hasUnsettledWork(),true);
  assert.deepEqual(ui.gestures,[]);
+ assert.equal(restores,1);
+ if(fault==='changed connection owner'){
+  assert.match(waiting.error.message,/reason=owner/);
+  assert.equal(waiting.output.next_step.tool,'dock_browser_recovery');
+  assert.equal(waiting.output.next_step.reason,'NODE_RELEASE_REFUSED');
+  assert.deepEqual(waiting.output.next_step.arguments,{action:'start',operation_id:'apply'});
+  return;
+ }
+ assert.equal(waiting.output.next_step.tool,undefined);
+ assert.match(waiting.output.next_step.instruction,/original Loginom session to reconnect/);
  connection.Connected=true;form.FReconnecting=false;
  const inspected=await f.runtime.inspect({operationId:'apply'});
  assert.deepEqual(inspected.output.recovery_options,['abandon_operation']);

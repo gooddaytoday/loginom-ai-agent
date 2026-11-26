@@ -2772,7 +2772,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }catch(error){
         // The original operation keeps its gate. A blocker the user can clear is
         // named explicitly instead of leaving an empty recovery list.
-        const waitingForLoginom=filterReconnectPending(operation)&&operationFailureDiagnostic(error).code==='LOGINOM_DISCONNECTED';
+        const diagnostic=operationFailureDiagnostic(error);
+        const waitingForLoginom=filterReconnectPending(operation)&&diagnostic.code==='LOGINOM_DISCONNECTED'
+          &&diagnostic.detail==='reason=awaiting_original_attempt';
         if(!waitingForLoginom)operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:error?.userAction??null};
         const trigger=waitingForLoginom?null:browserRecoveryTrigger(operation,null);
         const nextStep=waitingForLoginom?{
