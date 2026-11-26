@@ -30,14 +30,6 @@ class RunCheckTests(unittest.TestCase):
             with self.subTest(case=name), self.assertRaisesRegex(ValueError, 'case requires an intervention.*interruptions/run.py'):
                 runner.scenario_steps(name, cases=cases)
 
-    def test_summary_displays_intervention_setup_failure_category(self):
-        report = {'head': 'a' * 40, 'tree': 'b' * 40, 'runs': [
-            {'scenario': 'fixture', 'status': 'FAIL', 'failure_category': 'runner/setup',
-             'failure_class': 'INTERVENTION_GATE_NOT_REACHED'},
-        ]}
-        self.assertIn('| fixture | FAIL (runner/setup) |', runner.summary(report))
-        self.assertIn('INTERVENTION_GATE_NOT_REACHED', runner.summary(report))
-
     def test_enrich_cold_columns_by_name_is_scoped_and_strict(self):
         expected = runner.expected_for(runner.scenario('enrich-data-left'), '/test/enrich.lgp')
         before = copy.deepcopy(expected)

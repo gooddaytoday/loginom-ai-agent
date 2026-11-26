@@ -1694,8 +1694,6 @@ def summary(report):
         load = r.get('start_load', [])
         outcome = ('подготовка' if r.get('status') == 'NOT_RUN' and r.get('reason') == 'PREPARE_ONLY' else
                    'не запущен (бюджет пакета)' if r.get('status') == 'NOT_RUN' else r.get('status', 'RUNNING'))
-        if category := r.get('failure_category'):
-            outcome += f' ({category})'
         rows.append('| ' + ' | '.join([r['scenario'], outcome,
                     *[r.get(k, '—') for k in ['csv', 'save', 'cold', 'cleanup', 'port-read', 'read-path']],
                     '/'.join(f'{v:.2f}' for v in load[:2]) or '—']) + ' |')

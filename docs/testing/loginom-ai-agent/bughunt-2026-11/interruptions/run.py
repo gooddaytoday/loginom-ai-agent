@@ -84,16 +84,8 @@ class ObservedTurn(Exception):
     pass
 
 
-class InterventionSetupError(RuntimeError):
-    pass
-
-
-def run_check():
-    path = Path(os.environ.get('LAB_2047_RUNNER', Path.home() / 'bughunt/runner')).resolve()
-    spec = importlib.util.spec_from_file_location('run_check', path / 'scripts/node-acceptance/run-check.py')
-    runner = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(runner)
-    if not hasattr(runner.Runner, 'manual_edit') or not hasattr(runner, 'case_intervention'):
+def install_interruption_runner(runner):
+    if not hasattr(runner, 'PackageCloseUnconfirmed') or not hasattr(runner, 'case_intervention'):
         raise SystemExit('Use bughunt-runner with the LAB-2032 and LAB-2047 runner changes.')
 
     interventions = {}
@@ -141,23 +133,17 @@ def run_check():
             config = interventions.get(self.current['scenario'])
             return config if config and config['turn'] == turn else None
 
-        def failure(self, result, error, folder):
-            if isinstance(error, InterventionSetupError):
-                result['failure_category'] = 'runner/setup'
-            super().failure(result, error, folder)
-
         def phase(self, name, command, folder, **kwargs):
             if self.interruption and name == 'model':
                 kind, profile, build = self.interruption
                 resources = build / 'resources/loginom'
                 try:
                     daemon_pid = runner.daemon_pid()
-                    super().phase(name, [sys.executable, HERE / 'run.py', '_model', kind, str(daemon_pid),
-                                         resources / 'bin/node', resources, profile, folder, *command], folder, **kwargs)
-                except (AssertionError, OSError, TimeoutError, ValueError, subprocess.CalledProcessError) as error:
-                    if not observation(folder / 'intervention.jsonl', kind)[0]:
-                        raise InterventionSetupError(str(error)) from error
-                    raise
+                except (OSError, ValueError, subprocess.CalledProcessError) as error:
+                    self.current['failure_category'] = 'runner/setup'
+                    raise RuntimeError('INTERVENTION_DAEMON_CHECK_FAILED') from error
+                super().phase(name, [sys.executable, HERE / 'run.py', '_model', kind, str(daemon_pid),
+                                     resources / 'bin/node', resources, profile, folder, *command], folder, **kwargs)
                 raise ObservedTurn
             return super().phase(name, command, folder, **kwargs)
 
@@ -173,7 +159,8 @@ def run_check():
                 if not after:
                     error = next((event['code'] for event in events if event['phase'] == 'fixture_error'),
                                  'INTERVENTION_GATE_NOT_REACHED')
-                    raise InterventionSetupError(f'{error}: {log}') from None
+                    self.current['failure_category'] = 'runner/setup'
+                    raise RuntimeError(f'{error}: {log}') from None
                 latest = events[-1]
                 model_session = next((event.get('sessionID') for _, event in runner.records(folder / 'model.stdout')
                                       if event.get('sessionID')), None)
@@ -188,14 +175,11 @@ def run_check():
 
         def manual_edit(self, edit, stage, profile, package, login, build, before, **kwargs):
             config = self.intervention_for(stage.name)
-            try:
-                baseline = super().manual_edit(edit, stage, profile, package, login, build, before, **kwargs)
-                if config and config['kind'] == 'manual-edit':
-                    (stage / 'manual').rename(stage / ('manual-' + edit['kind']))
-                    baseline = super().manual_edit(config['edit'], stage, profile, package, login, build, before, **kwargs)
-                recorded_at = (stage / 'manual/result.json').stat().st_mtime
-            except (AssertionError, OSError, TimeoutError, ValueError) as error:
-                raise InterventionSetupError(str(error)) from error
+            baseline = super().manual_edit(edit, stage, profile, package, login, build, before, **kwargs)
+            if config and config['kind'] == 'manual-edit':
+                (stage / 'manual').rename(stage / ('manual-' + edit['kind']))
+                baseline = super().manual_edit(config['edit'], stage, profile, package, login, build, before, **kwargs)
+            recorded_at = (stage / 'manual/result.json').stat().st_mtime
             self.current['intervention'] = dict(kind=edit['kind'], at=recorded_at,
                                                 journal=str(stage / 'manual/execution-events.jsonl'))
             return baseline
@@ -203,6 +187,14 @@ def run_check():
     runner.case_intervention = register_intervention
     runner.scenario_steps = scenario_steps
     runner.Runner = InterruptionRunner
+
+
+def run_check():
+    path = Path(os.environ.get('LAB_2047_RUNNER', Path.home() / 'bughunt/runner')).resolve()
+    spec = importlib.util.spec_from_file_location('run_check', path / 'scripts/node-acceptance/run-check.py')
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+    install_interruption_runner(runner)
     runner.__file__ = str(Path(__file__).resolve())
     return runner.main()
 
