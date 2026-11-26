@@ -25463,3 +25463,109 @@ $ bun run check                                              # 39 successful, 0 
 - Параллельные `concurrency`: группа Windows содержит `github.workflow` (в вызове это имя вызывающего workflow); при повторном
   запуске на том же ref `cancel-in-progress: true` отменит предыдущий вызов Windows.
 - Мутация G5 «красная» доказана тестом `expectRed` и шагом «G5 mutation» внутри запуска; красный прогон целиком — только в CI.
+
+## B5.1l — подпись и пакеты macOS
+
+25.11.2026. Ветка `b51l-macos-sign` от `oc2-migration` (`fa731fbffd`). Эталон — `v0.4.0`. Подпись — вариант A (ad-hoc, как в 0.4);
+Developer ID и нотаризация — этап G. Первый прогон `loginom-macos.yml` до этой задачи (run 45715943370, `fa731fbffd`): `pty` и
+`macos` зелёные, в артефакте `.app.tar`.
+
+### Выбор меньшего варианта
+
+- **Подпись делает `electron-builder`, не отдельный скрипт.** Как в 0.4: `identity "-"` и `mac.signIgnore` (`loginom/bin`,
+  `browsers`, `ripgrep`, `dashboard`). Node, Chromium, `loginom-keychain` и pty подписаны до укладки в ресурсы (Node — поставщиком,
+  остальные — ad-hoc при сборке), builder их не переподписывает, поэтому хеши `resource-manifest.json` не меняются и обновлять их
+  не нужно. Это проверяет шаг CI. `sign-desktop-macos.sh` (Developer ID, имена upstream) не трогался: он для этапа G.
+- **`pack.ts` на macOS:** без `--dir` и `identity=null`; `-c.mac.identity=- -c.dmg.sign=false`; в `dist/desktop` кладутся `.dmg`,
+  `.zip` и по-прежнему `.app.tar` (вход для подписи этапа G). `writeUpdateConfig` на macOS не вызывается: для целей `dmg` и `zip`
+  `app-update.yml` пишет сам builder. В артефакт CI `.app.tar` больше не идёт.
+- **`check-macos.ts` и `build-macos.ts` не портировались** (как в B5.1k). Нужная проверка — новый `script/check-macos-signature.ts`.
+- **Модель «обновления» для помощника:** запись создаётся копией помощника, затем копия переподписывается `codesign --force --sign -`
+  (тот же код, тот же хеш) и читает запись: обязательная проверка. Второй вариант (другой хеш кода, флаг `--options runtime`) только
+  печатается: ad-hoc подпись не обещает доступа к записи после смены хеша.
+
+### Что сделано
+
+- `packages/desktop/script/pack.ts` — macOS: DMG, ZIP, `.app.tar` (выше).
+- `packages/desktop/script/check-macos-signature.ts` (новый): `codesign --verify --deep --strict`; `verifyResources` (хеши всех
+  файлов `resource-manifest.json` внутри подписанного `.app`); создание, повторная подпись и чтение записи Keychain.
+- `loginom-macos.yml`: шаг «Check the signature» после `pack`; в кандидат и артефакт идут `.dmg`, `.zip`, CLI `tar.gz`,
+  `SHA256SUMS`. Код: 2 файла из 5.
+
+### Проверки (Linux, Bun 1.4.4)
+
+- YAML разобран `python3 yaml`; `bun build` нового скрипта проходит; ввод помощника через `Bun.spawn` проверен на `/bin/cat`.
+- `packages/product`: 92 pass, 0 fail.
+
+### Проверит только CI на macOS 15
+
+Что `electron-builder` без `--dir` собирает `dmg` и `zip` с ad-hoc подписью и signIgnore; что `codesign --verify --deep --strict`
+проходит; что хеши ресурсов сходятся; что копия помощника читает запись после `codesign --force`; доступность Keychain на
+раннере; шаг `Verify and collect` (`verify-cli-candidate.ts` не должен видеть грязное дерево).
+
+## B5.1j — Windows CAND: проверки после сборки
+
+25.11.2026. Ветка `b51j-windows-checks` от `oc2-migration` (`9e20d6cf53`). Меньший вариант: только `loginom-windows.yml`, один новый
+скрипт и тест продукта; `catalog.json` не менялся (`script/` и `.github/**` уже в каталоге, файлов OpenCode не правил). Выполнение
+на `windows-2022` здесь невозможно; последний прогон (run 45715939494, `fa731fbffd`) остановился на сборке (`.bun-cache`,
+B5.1i-ci), поэтому шаги после неё ещё ни разу не выполнялись. Исправлено то, что видно по коду v2.
+
+### Что нашёл и исправил
+
+- **Кодек safeStorage.** Шаг собирал `packages/desktop/src/main/loginom/credentials.ts`, а `safe-storage-smoke.cjs` ждёт
+  `credentials` из `packages/loginom-host/src/connection/credentials.ts` (находка B5.1h). Шаг собирает теперь его (путь
+  Electron `node_modules\\electron\\dist\\electron.exe` в корне — тот же, что ставит `build-windows.ps1`).
+- **Установленный smoke Desktop писался под 0.4.** Шаг вызывал `windows-installed-smoke.ps1` с `-KeepProxy` и
+  `-PayloadMutation MissingSkill`, ждал `sidecar.json` и проверки `sidecar-bundled-skills`. В v2 (B4.14c) этих параметров и
+  проверок нет: есть `-Mutation SkillByte`, а красной становится `verify-resources` (`LOGINOM_RESOURCE_HASH_MISMATCH`).
+  Шаг переписан на них; выгрузка диагностики — `installed-smoke/` и `installed-smoke-skill-byte/` (`report.json`, `logs.zip`).
+- **Администратор раннера.** Smoke требует обычную учётную запись (`ordinary-user`), а раннер GitHub — повышенный администратор.
+  Новый `script/run-windows-installed-smoke.ps1` создаёт одноразового локального пользователя группы Users (как
+  `test-windows-profile.ps1`), копирует установщик и два скрипта smoke в `%PUBLIC%`, запускает smoke через `Start-Process
+  -Credential` (окно закрывается `WM_CLOSE`, `-AllowServer`), копирует `report.json` и `logs.zip`, удаляет учётную запись.
+  Отказывает вне GitHub-hosted раннера. Код возврата — код smoke (1 — FAIL).
+- **Отрицательный контроль.** Красный прогон должен дать код 1, `status` FAIL, `verify-resources` FAIL с
+  `LOGINOM_RESOURCE_HASH_MISMATCH` и `cleanup` PASS; чистый прогон должен дать 0. Оба выполняются всегда.
+- **Артефакты шагов j.** `cli-installed-smoke.json` и `safe-storage-*.json` добавлены в выгрузку диагностики (`if: always()`),
+  потому что выгрузка кандидатов идёт раньше (B5.1i).
+- **Тесты Desktop.** `src/main/apps.test.ts` в v2 нет; вместо него `src/main/app-identity.test.ts`.
+- **`profile-windows.test.ts`.** Файл есть (порт B5.1e: ACL профиля, 3 pass на GitHub в run 45675480080), `test-windows-profile.ps1`
+  собирает его по `$PSScriptRoot\..`, не по рабочему каталогу. Замечание B5.1i «файла нет» устарело; правок не нужно.
+- Тест `packages/product/test/windows-build.test.ts` (3 новых): кодек из `loginom-host`, существование всех файлов тестов в
+  шаге, параметры вызова smoke объявлены в нём, а красная мутация входит в `ValidateSet`. Проверено мутациями: `apps.test.ts`
+  и `-Mutation PayloadX` дают красный.
+
+### Проверки
+
+- YAML разобран `python3 yaml`. `packages/product`: 95 pass, 0 fail.
+- `catalog-check.py` код 0; `apply-identity.py --check` — 0 файлов; `bun run check` код 0 (39 задач, 1 мин 5 с).
+
+### Проверит только CI на GitHub
+
+Весь шаг запуска от одноразового пользователя (`New-LocalUser`, `Start-Process -Credential`, права `icacls`, профиль, `TEMP`,
+размер argv до 1024 символов); `install.cmd` / `verify-cli-candidate` на Windows; DPAPI Electron 44; что окно приложения в
+сеансе без интерактивной станции даёт `app-window` PASS; что версия `packages/desktop/package.json` совпадает с версией
+установщика (`LOGINOM_AI_AGENT_VERSION` не задаётся). Задание `updater-fixtures` (только dispatch) по-прежнему вызывает
+`-KeepProxy` и `build-windows.ps1 -Product Desktop` без pty; не чинил.
+
+### B5.1l2 — доступ помощника Keychain после повторной подписи
+
+26.11.2026. Ветка `b51l2-keychain` от `oc2-migration` (`ca9d9bc1c6`). Run 45777986405 (`9e20d6cf53`): сборка, `.dmg`, `.zip`,
+`codesign --verify --deep --strict` и хеши ресурсов зелёные; `check-macos-signature.ts:44` `KEYCHAIN_READ_AFTER_RESIGN_FAILED`
+(запись создалась, чтение после `codesign --force --sign -` — нет).
+
+- **Причина, найденная по коду (подтверждает следующий прогон):** ошибка в самой проверке. `build-keychain.ts` подписывает помощник
+  с `--identifier com.loginom.aiagent.cli.keychain`, а повторная подпись в проверке шла без `--identifier`: идентификатор
+  становился `loginom-keychain`, менялся `cdhash`, а ACL записи у ad-hoc подписи привязан к хешу кода. Это реальное поведение
+  ad-hoc подписи, не раннер: `create` в том же запуске уже читает запись после записи, значит связка ключей раннера доступна.
+- **Паритет с 0.4:** в `v0.4.2` проверки доступа после повторной подписи не было. `macos.md` прямо говорит: «доступ Keychain
+  после изменённой ad-hoc подписи требует отдельной проверки; замена идентичными signed bytes этого не доказывает»;
+  `keychain-acceptance.ts` проверяет только замену копией. `security create-keychain` в 0.4 был лишь в архивном
+  `publish-upstream.yml` (подпись Developer ID).
+- **Исправлено:** контроль «чтение сразу после записи» (обязателен: падение означает проблему связки ключей раннера); печать
+  `cdhash` до и после; повторная подпись с тем же идентификатором (хеш должен совпасть, иначе `KEYCHAIN_RESIGN_NOT_DETERMINISTIC`;
+  чтение обязательно); подпись с изменённым хешем (`--options runtime`) только печатает «readable / NOT readable».
+- **Риск для этапа G:** обновление приложения, где помощник собран заново (другой `cdhash`), с ad-hoc подписью может потерять
+  доступ к записи профиля (запрос Keychain или `LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE`). Выход — Developer ID: ACL
+  привязывается к Team ID и идентификатору, а не к хешу.
+- **Проверка:** только прогон на macOS 15; на Linux `bun build` скрипта проходит.
