@@ -53,6 +53,7 @@ class ExternalClient {
       await this.f.finishPreparation?.promise;
       value={status:'READY',authenticated:true,target_verified:true,
       target,loginom_account:'test-2',document_id:'own-doc',created_draft:!this.f.scenario.startsWith('opened-'),ownership_verified:!this.f.scenario.startsWith('opened-'),effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:this.f.scenario.startsWith('opened-')?{path,persisted:true}:{path:null,...(this.f.finishPreparation?{persisted:false}:{})}};
+      if(this.f.scenario==='opened-read-only')value.package_ref.read_only=true;
       if(['draft-navigated','draft-nav-refused','draft-nav-exit'].some(p=>this.f.scenario.startsWith(p)))value.package_ref={path:null,persisted:false};
       if(this.f.native)value={status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED',phase:'exact_workflow_ready',
         target,authenticated:true,created_draft:false,effect_possible:true,operation_id:'prepare',session_id:'own-session'};
@@ -396,7 +397,7 @@ test('managed shutdown records the native connection timeline before closing the
  }finally{await bridge.close();await rm(directory,{recursive:true,force:true});}
 });
 
-for(const scenario of ['opened-clean','opened-dirty','opened-path-mismatch','opened-busy','opened-unsettled','opened-not-persisted'])
+for(const scenario of ['opened-clean','opened-read-only','opened-dirty','opened-path-mismatch','opened-busy','opened-unsettled','opened-not-persisted'])
  test('normal shutdown of an opened package without Save: '+scenario,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-opened-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
@@ -418,13 +419,14 @@ for(const scenario of ['opened-clean','opened-dirty','opened-path-mismatch','ope
     const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
     assert.equal(result.browser_transport_closed,true);assert.equal(f.saves,0);
     assert.equal(cleanup.save_operation_id,null);
-    assert.equal(cleanup.status,scenario==='opened-clean'?'SUCCEEDED':'BLOCKED');
-    assert.equal(f.events.includes('package-cleanup'),['opened-clean','opened-dirty'].includes(scenario));
+    const closed=['opened-clean','opened-read-only'].includes(scenario);
+    assert.equal(cleanup.status,closed?'SUCCEEDED':'BLOCKED');
+    assert.equal(f.events.includes('package-cleanup'),closed||scenario==='opened-dirty');
     if(scenario==='opened-dirty')assert.equal(cleanup.reason,'UNSAVED_CHANGES');
-    if(scenario==='opened-clean'){
+    if(closed){
       assert.equal(cleanup.package_closed,true);assert.equal(cleanup.logged_out,true);
       assert.equal(cleanup.policy,'opened_saved_package');assert.equal(cleanup.package_path,path);
-      assert.equal(f.cleanupOptions.diagnosticDiscard,false);assert.equal(f.cleanupOptions.diagnosticReadOnly,false);
+      assert.equal(f.cleanupOptions.diagnosticDiscard,false);assert.equal(f.cleanupOptions.diagnosticReadOnly,scenario==='opened-read-only');
       assert.equal(f.cleanupOptions.documentId,'own-doc');assert.equal(f.cleanupOptions.tabTid,'own-tab');
     }
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}

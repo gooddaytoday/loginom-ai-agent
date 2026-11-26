@@ -1124,6 +1124,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                   // binds to the account observed at workspace preparation.
                   tabTid, account:cleanupState.loginom_account??config.replayLoginUser,
                   packagePath, unsavedDraft, loginomUrl:config.loginomUrl,
+                  diagnosticReadOnly: !!openedPackage && cleanupState.package_ref.read_only === true,
                   loginomBuild:session.metadata.targetIdentity?.loginom_build ?? cleanupState.target?.loginom_build,
                 };
                 const response = await browser.callTool({name:'browser_run_code_unsafe', arguments:{code:makePackageCleanupCode(cleanupOptions)}}, undefined, {timeout:30000});

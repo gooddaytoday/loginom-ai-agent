@@ -73,7 +73,16 @@ export async function acquireProfile(
       )
         throw new Error("PROFILE_PERMISSIONS_INVALID")
     }
-    return { paths, release }
+    return {
+      paths,
+      release,
+      async hasNoSurvivors() {
+        const identity = parseOwner(owner)
+        if (!identity) return false
+        const survivors = options.probe?.survivors ?? systemWriterProbe.survivors
+        return (await survivors(canonical, identity)).length === 0
+      },
+    }
   } catch (error) {
     await release()
     throw error

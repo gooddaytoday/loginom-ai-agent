@@ -7,6 +7,12 @@ import { withStandaloneCancellation } from "./standalone-cancellation"
 import { acquireProfile, profileEnvironment } from "./profile"
 import { notifyUpdate } from "./update-notifier"
 
+export class StandaloneRunCloseError extends Error {
+  constructor(cause: unknown) {
+    super("LOGINOM_HOST_CLEANUP_FAILED", { cause })
+  }
+}
+
 export async function standalone(
   args: string[],
   execute: (args: string[], paths: ReturnType<typeof cliProfile>) => Promise<void>,
@@ -96,14 +102,18 @@ async function executeProfile(
   Object.assign(process.env, environment, { LOGINOM_AI_AGENT_CHANNEL: channel })
   const notifier = new AbortController()
   const notification = notifyUpdate({ ...profile.paths, signal: notifier.signal })
-  // Only the private launcher's acknowledged cleanup can release a failed start.
-  // Other callback failures retain the guard for offline recovery.
+  // Failed startup still requires a cleanup ACK. A failed close after run may
+  // release the local guard once the host and all profile processes are gone.
   const failure = await execute(args, profile.paths)
     .finally(async () => {
       notifier.abort()
       await notification
     })
     .catch(async (error: unknown) => {
+      if (error instanceof StandaloneRunCloseError) {
+        if (await profile.hasNoSurvivors().catch(() => false)) return error
+        throw error
+      }
       const { NodeHostStartupError } = await import("@loginom-ai-agent/loginom-host/node-client")
       if (!(error instanceof NodeHostStartupError)) throw error
       if (error.cleanupError !== undefined) process.stderr.write("LOGINOM_HOST_CLEANUP_FAILED\n")
@@ -118,12 +128,16 @@ async function executeProfile(
     await profile.release()
   } catch (error) {
     if (!failure) throw error
-    const { NodeHostStartupError } = await import("@loginom-ai-agent/loginom-host/node-client")
-    process.stderr.write(
+    const code =
       error instanceof Error && error.message === "PROFILE_OWNER_CHANGED"
-        ? "PROFILE_OWNER_CHANGED\n"
-        : "LOGINOM_HOST_CLEANUP_FAILED\n",
-    )
+        ? "PROFILE_OWNER_CHANGED"
+        : "LOGINOM_HOST_CLEANUP_FAILED"
+    if (failure instanceof StandaloneRunCloseError) {
+      if (code !== failure.message) process.stderr.write(`${code}\n`)
+      throw failure
+    }
+    const { NodeHostStartupError } = await import("@loginom-ai-agent/loginom-host/node-client")
+    process.stderr.write(`${code}\n`)
     throw new NodeHostStartupError(failure.cause, false, error)
   }
   if (failure) throw failure

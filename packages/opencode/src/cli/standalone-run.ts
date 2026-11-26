@@ -13,6 +13,7 @@ import { dashboardDataRoot } from "@loginom-ai-agent/product/dashboard-root"
 import { dashboardPrompt } from "@loginom-ai-agent/dashboard/contract/prompt"
 import { hostError, hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { dashboardFlag } from "./standalone-dashboard"
+import { StandaloneRunCloseError } from "./standalone"
 
 export async function standaloneRun(args: string[], paths: ReturnType<typeof cliProfile>, mode: "run" | "tui" = "run") {
   const signal = mode === "run" ? standaloneCancellation() : undefined
@@ -244,7 +245,12 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     } finally {
       cleanup.detach?.()
       LoginomHost.disconnect()
-      await host.close()
+      await host.close().catch(async (error: unknown) => {
+        // A teardown deadline can expire with the host still alive. Only use
+        // exit evidence that is already available within the existing budget.
+        if (mode === "run" && (await Promise.race([host.exited, undefined]))) throw new StandaloneRunCloseError(error)
+        throw error
+      })
       if (signal?.aborted && process.exitCode !== 130 && process.exitCode !== 4) failure("CLI_CANCELLED", 130)
     }
   }
