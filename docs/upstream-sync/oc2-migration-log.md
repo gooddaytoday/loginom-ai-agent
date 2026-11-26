@@ -26273,3 +26273,55 @@ setup 50 с, model 1803 с; s3 queue 908 с, setup 50 с, model 1805 с. Нез�
 - Чужая нагрузка на машине (load до 29) и очередь `--host-load-max`: один раунд группы A занял больше часа.
 - Два барьера обвязки: нерешённая политика `closeSavedPackageOnShutdown` (находка 2) и дубль `VARIANT` в `run-check.py` (находка 1); оба проявятся на каждом из 25 узлов.
 - Запуск только от не-root пользователя с копией сборки; `parallel-calls-live.ts` устарел (находка, не правилась).
+
+## B6.1-D Потеря подтверждения закрытия дочерних процессов Host при выходе `run`
+
+26.11.2026. Ветка `b61d-close-ack` от `oc2-migration` (`b8a67d48a1`). Bun 1.4.4, Node 24.19.0. Модель не вызывалась.
+
+### Петля
+
+Сборка `<домашний каталог lrun>/b61a/cli4` (`b8a67d48a1`), копия профиля q2/s1, от `lrun`, подставной OpenAI-совместимый сервер (отвечает текстом без вызовов
+инструментов), `run --headless --model test/test-model`. Knowledge-ребёнок поднимается при старте Host, стенд не нужен. Проверка: `closed_ack` в
+`profile/loginom/knowledge/1/runtime-close-*.json` после выхода `run`. Время около 10 с, детерминирована.
+
+```
+$ loop.sh <домашний каталог lrun>/b61a/cli4        # до правки
+{"version":1,"pid":1083755,...,"request_error":"LOGINOM_RUNTIME_DISCONNECTED","closed_ack":false,"exit_code":0,"exit_signal":null}
+$ loop.sh <исходники с правкой>       # после
+{"version":1,"pid":1089498,...,"request_error":null,"closed_ack":true,"exit_code":0,"exit_signal":null}
+```
+
+### Гипотезы
+
+1. CLI не ждёт мягкого закрытия Host, дети теряют родителя до ACK: подтверждена в уточнённом виде. Трассировка (`strace -f -e kill`, трассы в supervisor и в
+   `knowledge-entry.mjs` отладочной копии сборки): `kill(-<pgid частного сервера>, SIGTERM)` от процесса CLI приходит ребёнку на 11 мс раньше, чем supervisor
+   отправляет `close`; затем `disconnect`.
+2. Node Host закрывает транспорт раньше ACK детей: опровергнута, `close` детям отправляется, а сигнал приходит раньше него.
+3. Ребёнок выходит, не доставив ACK: опровергнута, ребёнок получает SIGTERM до запроса `close`.
+
+### Причина
+
+`packages/cli/src/services/standalone.ts`: частный сервер `run` запускается через `CrossSpawnSpawner` (`detached`, своя группа процессов, в ней же Node Host и
+его дети). При закрытии области спаунер шлёт SIGTERM всей группе и через `forceKillAfter: 3 seconds` SIGKILL. Мягкий путь сервера (EOF на stdin, затем
+`ServiceHost.close()` с бюджетом до 90 с) не получает времени: дети получают SIGTERM напрямую и отключаются без ACK. Прогон q2 s1 выжил до `SUCCEEDED`
+пакета только потому, что сервер успел начать своё закрытие; q1 s3 (закрытие через 260 мс) оборвался на 3-секундном SIGKILL. До B6.1-C картина та же.
+Эталон `v0.4.2` закрывал Host в процессе `await host.close()`, группового сигнала не было.
+
+### Правка и тест
+
+- `packages/cli/src/services/standalone.ts`: финализатор после spawn закрывает stdin сервера (конец аренды) и ждёт выхода до 100 с; затем действуют
+  прежние сигналы спаунера. Файл относится к CAT-08 (`pending: B2.7`), отдельной записи в `catalog.json` не требует (`catalog-check.py` 0).
+- Регрессионный тест `packages/cli/test/standalone-close.test.ts` и `test/fixture/standalone-slow-server.mjs`: сервер с закрытием 1,5 с, до правки получает
+  `sigterm`, после правки `graceful`. Шов правильный для механизма (порядок сигналов); связку с Runtime-детьми Host тест не воспроизводит, её закрывает петля.
+
+### Числа
+
+`product` 118 pass, 0 fail; `catalog-check.py` 0; `apply-identity --check` 0 файлов; `bun run check` 0. `packages/cli` полностью: 594 pass, 10 fail, 2 errors; без
+`LOGINOM_AI_AGENT_TEST_NODE` часть падений от среды (нет Node, нет пакета `yaml` в `loginom-runtime`). С Node и файлами `cli-dashboard`, `cli-loginom`: те же 2 падения,
+что и на `b8a67d48a1` без правки (`loginom commands with the real Node host`, `standalone dashboard preserves explicit publication approval`), чужие, не правились.
+`cli-dashboard.test.ts` ожидал в журнале Host без `close`: это и была потеря закрытия; ожидание дополнено `close`.
+
+### Не проверено
+
+Закрытие chat-runtime с пакетом на стенде (путь `dock_prepare`) и `run-check` с моделью: делает оркестратор. Своя сборка CLI не делалась (петля шла от
+исходников дерева с ресурсами `cli4`); отладочные копии удалены.

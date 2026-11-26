@@ -38,6 +38,14 @@ const makeEndpoint = Effect.fn("cli.standalone.endpoint")(
     const password = randomBytes(32).toString("base64url")
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const proc = yield* spawner.spawn(command(password, options))
+    // Loginom AI Agent (B6.1-D): closing the scope would SIGTERM the server's whole process group, which also holds the
+    // Host and its Runtime children, and SIGKILL it after 3 seconds; the children then disconnect before their close
+    // acknowledgement. Registered after the spawn, this finalizer runs first: EOF on stdin is the lease end, so the
+    // server closes its Host (up to the 90 s teardown of `loginom-host`) and exits. A server still alive after that
+    // gets the spawner's signals.
+    yield* Effect.addFinalizer(() =>
+      Stream.empty.pipe(Stream.run(proc.stdin), Effect.andThen(proc.exitCode), Effect.timeoutOption("100 seconds"), Effect.ignore),
+    )
     const readyLine = yield* Deferred.make<string, Error>()
     // The end of the server's stderr, drained for its whole life: a server that fails to start says why there.
     const stderr = yield* proc.stderr.pipe(
