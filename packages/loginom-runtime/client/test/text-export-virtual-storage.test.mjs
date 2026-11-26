@@ -256,3 +256,47 @@ test('an absent file in a 10000-entry folder stops before the deadline, returns 
   assert.ok(ctx.deadline-clock>=60000-750,String(ctx.deadline-clock));assert.ok(scrolls>100,String(scrolls));
  }finally{Date.now=realNow;}
 });
+
+test('export file transport does not start after the deadline and stays within the remaining read time',async()=>{
+ const realNow=Date.now,node={document_id:'doc',workflow_id:'wf',node_id:'node'};
+ const workflow={prefix:'MF;TF-1',tab_tid:'tab',workflow_id:'wf'};
+ const configuration={destination:'/user/wanted.csv',configured:{destination_check:{verified:true,destination:'/user/wanted.csv',existed:false}}};
+ const execution={verified:true,owner_verified:true,status:'completed',execution_id:'exec'};
+ const reader=execute=>({
+  operation:{id:'export'},targetOrigin:'https://export.test',targetBuild:'7.4',
+  storageDirectories:{packages:'/user',inputs:'/user',exports:'/user'},receiptOptions:()=>({}),
+  onRecord:async event=>event,execute,
+  artifactStore:{outputSessionId:'session',stageOutput:async()=>({artifact_id:'artifact',path:'/private/wanted.csv',
+   release:async()=>{},verify:async()=>{throw Error('no verify');},retain:async()=>{}})},
+ });
+ const context=deadline=>({...node,node,workflow_ref:workflow,execution:{execution_id:'exec'},deadline});
+ let now=10_000;
+ Date.now=()=>now;
+ try{
+  const expired=[];
+  await assert.rejects(readNativeExportFile(reader(async(code,options)=>{expired.push(options);return {};}),context(now),configuration,execution),/Export file read deadline elapsed/);
+  assert.equal(expired.length,0);
+  now=10_000;
+  const spent=[];
+  await assert.rejects(readNativeExportFile(reader(async(code,options)=>{
+   spent.push(options);now=14_000;
+   return {...node,verified:true,surface:'graph',locked:false};
+  }),context(14_000),configuration,execution),/Export file read deadline elapsed/);
+  assert.equal(spent.length,1);
+  assert.equal(spent[0].timeout,4_000);
+  for(const [left,cap] of [[4_000,4_000],[120_000,60_000]]){
+   now=10_000;
+   const calls=[];
+   await assert.rejects(readNativeExportFile(reader(async(code,options)=>{
+    const kind=code.startsWith('async page=>(')?'context':'page';
+    calls.push({kind,timeout:options?.timeout});
+    if(kind==='context'&&calls.filter(call=>call.kind==='context').length>=2)throw Error('return captured');
+    if(kind==='context')return {...node,verified:true,surface:'graph',locked:false};
+    throw Error('page captured');
+   }),context(now+left),configuration,execution));
+   const contexts=calls.filter(call=>call.kind==='context');
+   assert.equal(contexts.length,2,JSON.stringify(calls));
+   assert.ok(calls.every(call=>call.timeout===cap),JSON.stringify(calls));
+  }
+ }finally{Date.now=realNow;}
+});

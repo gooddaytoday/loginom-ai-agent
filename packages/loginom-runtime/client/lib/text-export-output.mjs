@@ -193,6 +193,8 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard,fold
  throw exhausted();
 }
 const EXPORT_RETURN_RESERVE_MS=60000;
+// Вызов execute без options ждёт DEFAULT_REQUEST_TIMEOUT_MSEC клиента MCP.
+const EXPORT_TRANSPORT_MS=60000;
 // Navigates only the assigned storage path using the existing observed UI
 // controls. Downloads use the shared artifact primitive, never a network API.
 export async function readNativeExportFile(options,ctx,configuration,execution){
@@ -203,7 +205,9 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   &&execution?.verified&&execution.owner_verified&&execution.status==='completed'&&execution.execution_id===ctx.execution.execution_id,'Native export provenance incomplete');
  requireExportDestination(destination,options.storageDirectories);
  const binding={document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node};
- const owner=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
+ // Новый вызов не начинается на истёкшем сроке. Ожидание не длиннее остатка deadline и прежнего предела транспорта.
+ const transport=async code=>{const left=ctx.deadline-Date.now();need(left>0,'Export file read deadline elapsed');return execute(code,{timeout:Math.min(EXPORT_TRANSPORT_MS,left)});};
+ const owner=await transport(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
  need(owner.verified&&owner.surface==='graph','Export graph changed before file read');
  const fileBinding={session_id:artifactStore.outputSessionId,document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,node_id:ctx.node.node_id,execution_id:ctx.execution.execution_id,destination};
  const lease=await artifactStore.stageOutput(fileBinding),name=destination.split('/').at(-1),directory=destination.slice(0,-name.length-1);
@@ -224,7 +228,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
     const matches=roots.ui.elements.filter(e=>e.ref===options.root_ref);
     need(matches.length===1&&roots.ui.elements.filter(e=>e.tid===matches[0].tid).length===1,'Export observation root changed during scan refresh');
    }
-   guard();const r=await execute(makeWorkspaceUiCode({mode:'observe',...base,...options}));
+   guard();const r=await transport(makeWorkspaceUiCode({mode:'observe',...base,...options}));
    if(r.status!=='SUCCEEDED'){
     const limits=r.trace?.filter(t=>t.event==='ui_scan_limit'),scan=limits?.at(-1);
     const timeRefusal=observationDocument!==null&&readStep==='storage_navigation'&&r.status==='NOT_APPLIED'&&r.action_key==='workspace.observe'&&r.phase==='observing'
@@ -272,7 +276,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   if(!allowed){navigationOnly=false;throw Error('Export read contains an unknown or mutating storage gesture');}
   const id=operation.id+':export-file-'+(++sequence),action={verb,ref:e.ref,...extra},signature=createHash('sha256').update(JSON.stringify({action,snapshot:s})).digest('hex');
   await record('export_file_step_prepared',{id,action,signature});uncertain=true;
-  const r=await execute(withBrowserReceipt('('+makeWorkspaceUiCode({mode:'act',operation_id:id,snapshot:s,action,...base})+')(page)',{...receiptOptions(id,'ui.act',signature),operation_id:id}));
+  const r=await transport(withBrowserReceipt('('+makeWorkspaceUiCode({mode:'act',operation_id:id,snapshot:s,action,...base})+')(page)',{...receiptOptions(id,'ui.act',signature),operation_id:id}));
   if(r.action_key&&r.action_key!=='ui.act'||r.operation_id&&r.operation_id!==id)navigationOnly=false;
   await record('export_file_step_completed',{id,outcome:r});need(navigationOnly,'Export gesture receipt identity differs');uncertain=r.cleanup_complete!==true;
   if(r.status==='NOT_APPLIED'&&r.effect_possible===false&&r.cleanup_complete===true&&r.error?.code==='UI_EPOCH_CHANGED'&&attempt<2){
@@ -304,7 +308,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  const row=(name,folder)=>findNativeStorageRow({name,folder,read,roots,ready,act,guard:searchGuard});
  const returnToWorkflow=async(refreshTabs=false,beforeReturn=null)=>{
   readStep='return_node_context';
-  const current=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
+  const current=await transport(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
   if(current.verified&&current.surface==='graph'&&current.locked===false)return {continuation:null,node_context:current};
   // A fresh tab observation precedes the sole return gesture. Never open a
   // second package or guess a tab after an uncertain navigation.
@@ -337,7 +341,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   // proves restoration, even when that click's post-observation failed.
   for(let i=0;i<50;i++){
    readStep='return_graph_context';
-   guard();const actual=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
+   guard();const actual=await transport(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
    if(actual.verified&&actual.surface==='graph')return {continuation,node_context:actual};
    await new Promise(r=>setTimeout(r,100));
   }
@@ -359,7 +363,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   r=await roots();const refreshRoot=one(r.ui.elements.filter(e=>e.tid===r.workflow_ref.prefix+';FileStorageForm;btnRefresh'));
   const details=await read({root_ref:refreshRoot.ref}),refresh=one(details.ui.elements.filter(e=>e.tid===details.workflow_ref.prefix+';FileStorageForm;btnRefresh'));
   if(refresh.interaction?.state==='outside_viewport'){
-   const geometry=await execute(`async page=>page.evaluate(({tid,ref})=>{
+   const geometry=await transport(`async page=>page.evaluate(({tid,ref})=>{
     const elements=document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
     const element=elements.length===1?elements[0]:null;
     if(!element||globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')]?.ids.get(element)!==ref)return null;
@@ -397,7 +401,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
    const signature=createHash('sha256').update(JSON.stringify({...task,download_path:undefined})).digest('hex');
    await record('export_file_download_prepared',{binding:fileBinding,artifact_id:lease.artifact_id,bytes,id,signature});
    guard();uncertain=true;
-   const result=await execute(withBrowserReceipt('('+makeNativeOutputDownloadCode(task)+')(page)',{...receiptOptions(id,'artifact.download',signature),operation_id:id}));
+   const result=await transport(withBrowserReceipt('('+makeNativeOutputDownloadCode(task)+')(page)',{...receiptOptions(id,'artifact.download',signature),operation_id:id}));
    if(result.action_key!=='artifact.download'||result.operation_id!==id)navigationOnly=false;
    await record('export_file_download_completed',{id,outcome:result});need(navigationOnly,'Export download receipt identity differs');uncertain=result.cleanup_complete!==true;return result;
   }});
