@@ -55,7 +55,7 @@ export const browserRecoveryTool = {
 };
 
 export function createBrowserRecovery({ enabled, browser, executor, gate, record, probe, now = Date.now,
-  limits = browserRecoveryLimits }) {
+  limits = browserRecoveryLimits, owner = () => ({ chat: null, generation: null }) }) {
   const budgets = new Map();
   let attempt = null;
   // A browser action with an unknown outcome blocks Dock until the session is recovered.
@@ -85,6 +85,16 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     },
     unsettled() {
       return !!uncertain || holding();
+    },
+    leaseTicket,
+    sameLease,
+    // The reply reports only whether this owner still held the attempt. It is not an exit or cleanup receipt.
+    async runReleased() {
+      const who = owner() ?? {};
+      if (!holding() || attempt.chat !== (who.chat ?? null) || attempt.generation !== (who.generation ?? null))
+        return { released: false };
+      await stopAttempt('run_released', 'The agent run ended during browser recovery.');
+      return { released: true };
     },
     async call(name, args, extra) {
       const pending = dispatch(name, args, extra);
@@ -118,7 +128,9 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
       return refusal(`Browser recovery for operation ${attempt.operation_id} is already in phase ${attempt.phase}.`, view());
     // The attempt holds the page from its first moment; basis and handoff run in one gate turn.
     const previous = attempt;
+    const who = owner() ?? {};
     const current = attempt = { id: randomUUID(), operation_id: input.operation_id, phase: 'handoff', step: null, reason: null,
+      chat: who.chat ?? null, generation: who.generation ?? null,
       budget: { calls: 0, started_at: null, closed: false } };
     const outcome = await track(gate(async () => {
       if (attempt !== current || uncertain) return { refused: refusal('Browser recovery state changed before its start.') };
@@ -169,8 +181,10 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     if (refused) return refused;
     if (exhausted(attempt.budget)) return stopAttempt('budget_exhausted', 'The browser recovery budget for this step is exhausted.');
     const current = attempt;
+    const ticket = leaseTicket();
     const outcome = await track(gate(async () => {
       // A gesture queued behind another one is admitted only against the state that one left.
+      if (!sameLease(ticket)) return { refused: refusal('The queued browser command is no longer current.') };
       const late = admission(name, current) ?? (exhausted(current.budget) ? refusal('The browser recovery budget for this step is exhausted.') : null);
       if (late) return { refused: late };
       current.budget.calls++;
@@ -214,11 +228,13 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     if (attempt.operation_id !== input.operation_id) return refusal('finish requires the browser phase of this operation.', view());
     if (exhausted(attempt.budget)) return stopAttempt('budget_exhausted', 'The browser recovery budget for this step is exhausted.');
     const current = attempt;
+    const ticket = leaseTicket();
     const attested = { actions_performed: input.actions_performed ?? [], expected_result: input.expected_result ?? null,
       browser_settings: input.browser_settings ?? [] };
     // Admission, the phase change and the verifier share one gate turn: a finish queued behind an
     // unknown outcome or a lost page never runs the verifier or its release.
     const outcome = await track(gate(async () => {
+      if (!sameLease(ticket)) return { late: refusal('The queued browser command is no longer current.') };
       const late = admission(browserRecoveryToolName, current);
       if (late) return { late };
       if (exhausted(current.budget)) return { exhausted: true };
@@ -273,10 +289,16 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     return stopAttempt('model_stopped', reason);
   }
 
-  async function stopAttempt(code, reason, extra = {}) {
+  function stopAttempt(code, reason, extra = {}) {
     const current = attempt;
+    if (current.stop) return current.stop;
     // Still holding: a dispatched action or verification settles first and decides whether the page may return to Dock.
     current.phase = 'stopping';
+    current.stop = finishStop(current, code, reason, extra);
+    return current.stop;
+  }
+
+  async function finishStop(current, code, reason, extra) {
     if (inflight) await inflight.catch(() => undefined);
     // Safe completion only: the runtime may cancel its own unapplied draft; unknown effects stay locked.
     const cleanup = await Promise.resolve().then(() => executor.stopBrowserRecovery({ operationId: current.operation_id,
@@ -318,6 +340,17 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     return ['handoff', 'browser', 'verify', 'stopping'].includes(attempt?.phase);
   }
 
+  function leaseTicket() {
+    const who = owner() ?? {};
+    return { attempt: attempt?.id ?? null, generation: who.generation ?? null, phase: attempt?.phase ?? 'dock' };
+  }
+
+  function sameLease(ticket) {
+    if (!ticket || typeof ticket !== 'object') return false;
+    const live = leaseTicket();
+    return ticket.attempt === live.attempt && ticket.generation === live.generation && ticket.phase === live.phase;
+  }
+
   // One rule for every entry: an unknown outcome or a lost page boundary admits nothing more.
   function blocked(current) {
     return !!uncertain || !!current?.pageLost || attempt !== current;
@@ -355,6 +388,17 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     return { calls_left: Math.max(0, limits.calls - budget.calls),
       ms_left: budget.started_at === null ? limits.ms : Math.max(0, limits.ms - (now() - budget.started_at)) };
   }
+}
+
+export function admitQueuedDock(recovery, name, operation) {
+  const ticket = recovery.leaseTicket();
+  return async () => {
+    if (!recovery.sameLease(ticket))
+      throw new Error('The queued Dock command is no longer current.');
+    if (recovery.refusesDock(name))
+      throw new Error('Browser recovery holds the page. Finish or stop dock_browser_recovery before further Dock actions.');
+    return operation();
+  };
 }
 
 function requireInput(args) {

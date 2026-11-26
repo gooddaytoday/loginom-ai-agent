@@ -8,7 +8,7 @@ import { HostTaskScope } from "./task-scope"
 import { DashboardDelete, DashboardRead, DashboardPublish } from "./dashboard"
 import { Schema } from "effect"
 import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
-import { browserRecoveryToolName, isBrowserRecoveryTool } from "../../loginom-runtime/client/lib/browser-recovery.mjs"
+import { isBrowserRecoveryTool } from "../../loginom-runtime/client/lib/browser-recovery.mjs"
 
 const knowledgeTools = new Set(["find", "search", "read", "grep", "glob", "list", "tree"])
 const Admissions = Schema.Array(
@@ -83,8 +83,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       admitted: Set<string>
       packagePreparation?: AbortController
       dashboardController?: AbortController
-      // Operation of a browser recovery attempt that still holds the page.
-      recovery?: string
+      recoveryNotified?: boolean
     }
   >()
   const acquiring = new Map<string, string>()
@@ -98,29 +97,21 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     run.lease.holdRecovery()
     service.recoveries.set(run.chat, run.lease)
   }
-  async function release(id: string, run: NonNullable<ReturnType<typeof runs.get>>) {
-    // A run that ends or is cancelled mid-recovery stops its attempt instead of
-    // leaving the page leased until the budget expires (design §6).
+  async function notifyReleased(run: NonNullable<ReturnType<typeof runs.get>>) {
+    if (run.recoveryNotified) return
+    run.recoveryNotified = true
+    if (run.scope?.profile !== "loginom-automation") return
     const generation = run.lease?.generation
-    if (run.recovery && generation !== undefined && service.hasRuntime(generation, run.chat))
-      await service
-        .runtime(generation, run.chat)
-        .then((runtime) =>
-          runtime.request(
-            "call",
-            {
-              name: browserRecoveryToolName,
-              arguments: {
-                action: "stop",
-                operation_id: run.recovery,
-                reason: "The agent run ended during browser recovery.",
-              },
-            },
-            runtimeCallTimeout(browserRecoveryToolName, undefined) + 15_000,
-          ),
-        )
-        .catch(() => undefined)
-    run.recovery = undefined
+    // A missing child stays missing: asking runtime() here would launch one.
+    if (generation === undefined || !service.hasRuntime(generation, run.chat)) return
+    await service
+      .runtime(generation, run.chat)
+      .then((runtime) => runtime.request("run-released", { chat: run.chat, generation }, 15_000))
+      .catch(() => undefined)
+  }
+  async function release(id: string, run: NonNullable<ReturnType<typeof runs.get>>) {
+    // The runtime ends its own attempt. This notice is not exit or cleanup evidence.
+    await notifyReleased(run)
     await abandon(run)
     run.lease?.release()
     runs.delete(id)
@@ -257,9 +248,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         run.released = true
         run.packagePreparation?.abort()
         run.dashboardController?.abort()
-        if (!run.calls) {
-          await release(input.run, run)
-        }
+        if (!run.calls) await release(input.run, run)
+        else await notifyReleased(run)
         reply({ id: data.id, result: true })
         return
       }
@@ -674,7 +664,6 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
               service.recoveries.delete(run.chat)
             }
           }
-          if (isBrowserRecoveryTool(input.name)) run.recovery = recoveryPhase(result.result, run.recovery)
           reply({ id: data.id, result: result.result }, lease.generation)
         } catch (error) {
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE") throw error
@@ -732,13 +721,4 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       await stop()
     },
   }
-}
-
-// Recovery replies report the lease phase; an ordinary browser action reply has none.
-function recoveryPhase(result: unknown, current: string | undefined) {
-  if (!result || typeof result !== "object" || !("structuredContent" in result)) return current
-  const value = result.structuredContent
-  if (!value || typeof value !== "object" || !("phase" in value) || typeof value.phase !== "string") return current
-  if (!["handoff", "browser", "verify"].includes(value.phase)) return undefined
-  return "operation_id" in value && typeof value.operation_id === "string" ? value.operation_id : current
 }

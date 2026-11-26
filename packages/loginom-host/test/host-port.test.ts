@@ -47,6 +47,7 @@ test.each(["finish", "reject", "release", "close", "uncertain", "disconnect", "k
         if (m.operation === 'close') { owner.port1.close(); owner.port2.close(); process.send({id:m.id,result:{closed:true}},()=>process.disconnect()); }
         if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
         if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
+        if (m.operation === 'run-released') return process.send({id:m.id,result:{released:false}});
         if (m.operation !== 'call') return;
         const action = m.input.arguments.action;
         appendFileSync(${JSON.stringify(join(directory, "calls.jsonl"))}, JSON.stringify({ action }) + '\\n');
@@ -243,7 +244,8 @@ test("an uncertain call leaves the same run free to continue", async () => {
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
       if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
-      if (m.operation !== 'call') return;
+      if (m.operation === 'run-released') return process.send({id:m.id,result:{released:false}});
+        if (m.operation !== 'call') return;
       const action = m.input.arguments.action;
       appendFileSync(${JSON.stringify(join(directory, "calls.jsonl"))}, JSON.stringify({ action }) + '\\n');
       process.send({id:m.id,result:{result:{action},recoveryPending:action!=='finish',activeWork:false}});
@@ -319,7 +321,8 @@ test.each(["local", "leased"])(
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
       if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
-      if (m.operation !== 'call') return;
+      if (m.operation === 'run-released') return process.send({id:m.id,result:{released:false}});
+        if (m.operation !== 'call') return;
       const action = m.input.arguments.action;
       process.send({id:m.id,result:{result:{action},recoveryPending:action!=='finish',activeWork:false}});
     });
@@ -443,7 +446,8 @@ test("restarting the host drops an uncertain record without replaying it", async
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
       if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
-      if (m.operation !== 'call') return;
+      if (m.operation === 'run-released') return process.send({id:m.id,result:{released:false}});
+        if (m.operation !== 'call') return;
       appendFileSync(${JSON.stringify(join(directory, "calls.jsonl"))}, JSON.stringify({ action: m.input.arguments.action }) + '\\n');
       process.send({id:m.id,result:{result:{action:m.input.arguments.action},recoveryPending:false,activeWork:false}});
     });
@@ -522,7 +526,8 @@ test("a killed runtime requires an explicit prepare before the next scenario cal
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
       if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
-      if (m.operation !== 'call') return;
+      if (m.operation === 'run-released') return process.send({id:m.id,result:{released:false}});
+        if (m.operation !== 'call') return;
       const action = m.input.arguments.action;
       appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ action }) + '\\n');
       if (action === 'kill') { process.kill(process.pid, 'SIGKILL'); return; }
@@ -616,7 +621,8 @@ test.each(["after-call", "during-admission", "disconnect-before-exit", "strict-b
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
       if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
-      if (m.operation !== 'call') return;
+      if (m.operation === 'run-released') return process.send({id:m.id,result:{released:false}});
+        if (m.operation !== 'call') return;
       const action = m.input.arguments.action;
       appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ action }) + '\\n');
       if (action === 'kill') {
@@ -762,7 +768,8 @@ test("the next turn replaces a runtime that cannot continue", async () => {
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
       if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
-      if (m.operation !== 'call') return;
+      if (m.operation === 'run-released') return process.send({id:m.id,result:{released:false}});
+        if (m.operation !== 'call') return;
       const action = m.input.arguments.action;
       process.send({id:m.id,result:{result:{action},recoveryPending:action!=='finish',activeWork:false}});
     });
@@ -846,7 +853,8 @@ test("the next turn keeps a runtime that still has active work", async () => {
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
       if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
-      if (m.operation !== 'call') return;
+      if (m.operation === 'run-released') return process.send({id:m.id,result:{released:false}});
+        if (m.operation !== 'call') return;
       const action = m.input.arguments.action;
       const active = action === 'pending';
       process.send({id:m.id,result:{result:{action},recoveryPending:active,activeWork:active}});
@@ -937,7 +945,8 @@ test("Help and diagnostics never use a browser runtime, including after chat pre
         return;
       }
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
-      if (m.operation !== 'call') return;
+      if (m.operation === 'run-released') return process.send({id:m.id,result:{released:false}});
+        if (m.operation !== 'call') return;
       appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ chat, name: m.input.name }) + '\\n');
       process.send({id:m.id,result:{result:{name:m.input.name},recoveryPending:false,activeWork:false}});
     });

@@ -33,6 +33,7 @@ test.each([undefined, false, true])(
             JSON.stringify({ chat: m.input.chat, browserRecovery: m.input.browserRecovery ?? null }) + '\\n');
           process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
         }
+        if (m.operation === 'run-released') process.send({id:m.id,result:{released:false}});
         if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
         if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,
           tools:['dock_node_wait','dock_browser_recovery','browser_click'].map(name=>({name,inputSchema:{type:'object'}}))}});
@@ -96,7 +97,7 @@ test.each([undefined, false, true])(
   30_000,
 )
 
-test("releasing a run during browser recovery stops the attempt in the runtime", async () => {
+test("an automation release notifies the existing runtime and does not send a public stop", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "loginom-browser-recovery-release-"))
@@ -110,13 +111,23 @@ test("releasing a run during browser recovery stops the attempt in the runtime",
     join(resources, "runtime/src/managed-entry.mjs"),
     `
     import { appendFileSync } from 'node:fs';
+    const note = value => appendFileSync(${JSON.stringify(join(directory, "calls.jsonl"))}, JSON.stringify(value) + '\\n');
     process.on('message', m => {
-      if (m.operation === 'start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
+      if (m.operation === 'start') {
+        note({ operation: 'start', chat: m.input.chat, generation: m.input.generation });
+        process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
+        return;
+      }
+      if (m.operation === 'run-released') {
+        note({ operation: 'run-released', chat: m.input && m.input.chat, generation: m.input && m.input.generation });
+        process.send({id:m.id,result:{released:false}});
+        return;
+      }
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,
         tools:['dock_browser_recovery','browser_click'].map(name=>({name,inputSchema:{type:'object'}}))}});
       if (m.operation !== 'call') return;
-      appendFileSync(${JSON.stringify(join(directory, "calls.jsonl"))}, JSON.stringify(m.input) + '\\n');
+      note({ operation: 'call', name: m.input.name, arguments: m.input.arguments });
       const action = m.input.arguments?.action;
       const phase = action === 'start' ? 'browser' : action === 'stop' ? 'stopped' : undefined;
       const result = phase ? {content:[{type:'text',text:'{}'}],structuredContent:{phase,operation_id:'op-1'}}
@@ -160,7 +171,6 @@ test("releasing a run during browser recovery stops the attempt in the runtime",
       const start = { action: "start", operation_id: "op-1" }
       await client.request("call", { run, name: "dock_browser_recovery", args: start, userMessage: "msg_" + run })
       await client.request("call", { run, name: "browser_click", args: { target: "e1" }, userMessage: "msg_" + run })
-      // The second run stops its attempt itself before ending, so release adds nothing.
       if (run === "two")
         await client.request("call", {
           run,
@@ -170,15 +180,28 @@ test("releasing a run during browser recovery stops the attempt in the runtime",
         })
       await client.request("release", { run })
     }
-    const recovery = (await calls())
-      .filter((call) => call.name === "dock_browser_recovery")
-      .map((call) => call.arguments.action)
-    expect(recovery).toEqual(["start", "stop", "start", "stop"])
-    expect((await calls()).find((call) => call.arguments.action === "stop").arguments).toEqual({
+    const noted = await calls()
+    const starts = noted.filter((item) => item.operation === "start")
+    const notified = noted.filter((item) => item.operation === "run-released")
+    const recovery = noted
+      .filter((item) => item.operation === "call" && item.name === "dock_browser_recovery")
+      .map((item) => item.arguments.action)
+    expect(notified).toHaveLength(2)
+    for (const item of notified)
+      expect(starts.some((start) => start.chat === item.chat && start.generation === item.generation)).toBe(true)
+    expect(recovery).toEqual(["start", "start", "stop"])
+    expect(noted.find((item) => item.operation === "call" && item.arguments?.action === "stop")?.arguments).toEqual({
       action: "stop",
       operation_id: "op-1",
-      reason: "The agent run ended during browser recovery.",
     })
+    await client.request("acquire", { run: "idle", session: "idle" })
+    await client.request("scope", {
+      run: "idle",
+      mode: "bind",
+      scope: { taskMessageID: "msg_idle", profile: "loginom-automation" },
+    })
+    await client.request("release", { run: "idle" })
+    expect(await calls()).toEqual(noted)
   } finally {
     await host.close()
     await rm(directory, { recursive: true, force: true })

@@ -503,3 +503,11 @@ sudo systemctl enable --now "loginom-eval-campaign@$campaign_id.service"
 - Node v24.19.0: `node --test --test-concurrency=1` recovery, matrix, budget, executor, bridge и Save-bridge — 103 pass; `text-export-virtual-storage.test.mjs` и `text-export-read-refusal.test.mjs` — 156 pass. Digest `loginom-automation` `5582ddf4a6d72781a5b5cd584983c1e0d2c5883dd7bbbe5589ebb3fbdd37ec1f`.
 - Совместный прогон `text-export-release` с fsync и ожиданием 1000 мс, а также параллельный CLI bundled-skills с exit 137, в приёмку не входят; отдельно CLI 7/7. Установленных экспериментальных пар и оценки качества этой части нет.
 - В LAB-2058 у первого цикла сохранён RED. Итоговый C и приёмка всего S6 впереди.
+
+### Checkpoint S6, владение и очереди, 26.11.2026
+
+- Промежуточный срез поверх `f0f8fbabc21eaecb5ffa48abcfcabb8918f3a381`. Бюджет и сроки `f9c2574ab5fa6f2307eaf355750476200ff5e933` не менялись. Полный C открыт.
+- Runtime завершает попытку своего чата и поколения по private `run-released`. Host не хранит фазу recovery и не шлёт публичный stop. Уведомление не запускает runtime, не трогает отдельный Dashboard и не является доказательством exit или cleanup.
+- Очередь выполняет обычную Dock-команду только при той же попытке, поколении и фазе. Допуск проверяется синтетическим gate. Неопределённость сохраняется.
+- Фильтр Host `85d3f4333480e30b463132eb2198b12148716d8c` не перенесён: он оставлял копию фазы и публичный stop.
+- Тест, где уже начатый жест ожидал ответа в момент runReleased, снят из дерева. Его прогон на прежнем дереве не засчитывается. Узкая строка `01a21728-5709-7969-b372-aaf302fc2cb1` и полный S6 открыты. Позднее содержимое ожидающего браузерного вызова не проверялось. S7, слияние и выпуск не начинались.

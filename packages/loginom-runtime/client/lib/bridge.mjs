@@ -34,7 +34,7 @@ import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBindi
 import {makeSavedPackageStateCode,parseSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
 import {savedPackageRecoveryTimeout} from './recovery-time.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
-import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
+import { admitQueuedDock, createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
 import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
 
 // Keep the runtime receipt byte-for-byte meaningful to reconciliation/journal
@@ -93,7 +93,7 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
   return inherited;
 }
 
-export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, browserSecrets = [] } = {}) {
+export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, browserSecrets = [], owner } = {}) {
   if (config.closeSavedPackageOnShutdown !== undefined && typeof config.closeSavedPackageOnShutdown !== 'boolean'
       || config.closeSavedPackageOnShutdown === true && config.acceptanceCleanupPackage)
     throw Error('Invalid private saved-package cleanup policy');
@@ -294,7 +294,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       },
     };
     const recovery = createBrowserRecovery({ enabled: config.browserRecovery === true && !!actionRuntime && userProfile,
-      browser, executor: recoveryExecutor, gate: browserGate, record: recordExecution,
+      browser, executor: recoveryExecutor, gate: browserGate, record: recordExecution, owner,
       async probe() {
         const binding = { origin: new URL(config.loginomUrl).origin,
           documentId: session.metadata.workspacePreparation?.state?.document_id,
@@ -304,11 +304,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         return parseRecoveryPageProbe(response, binding);
       } });
     // A Dock request may wait in the gate while a recovery action settles: recheck the lease inside it.
-    const dockGate = (name, operation) => browserGate(async () => {
-      if (recovery.refusesDock(name))
-        throw new Error('Browser recovery holds the page. Finish or stop dock_browser_recovery before further Dock actions.');
-      return operation();
-    });
+    const dockGate = (name, operation) => browserGate(admitQueuedDock(recovery, name, operation));
     const server = new Server({ name: 'loginom-dock', version: session.metadata.client }, {
       capabilities: { tools: {} },
       instructions: 'To create, change or execute a scenario, first activate the bundled loginom-automation skill. Browser Loginom tools are available after activation. Help, diagnostics, and package reports do not require dock_prepare; use package-docs for local package reports. ' + (userProfile ? 'Call dock_prepare, then get the selected node parameter schema with dock_action_describe. Use dock_artifact_deliver for attachments and dock_node_apply for each complete node lifecycle. Keep issued identities and wait on the original operation_id. Follow next_step on failure; inspect uncertain effects before continuing. Save the package at the end. Low-level UI actions are unavailable in this profile.' : ['executor-preview', 'executor-replay'].includes(config.mode)
@@ -801,6 +797,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         requireStorageDestination(artifact.upload.destination,config.storageDirectories,'packages');
         return callTool({params:{name:'dock_prepare',arguments:args}},extra,artifact);
       },
+      runReleased: () => recovery.runReleased(),
       hasActiveWork: () => !clipboardUncertain && (!!actionRuntime?.hasActiveWork() || recovery.unsettled()),
       cancelArtifactDeliveries: () => actionRuntime?.cancelArtifactDeliveries(),
       hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0, close() {

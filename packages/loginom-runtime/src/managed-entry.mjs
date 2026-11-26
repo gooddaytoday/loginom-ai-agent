@@ -248,6 +248,7 @@ async function handle(message) {
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+        owner: () => state.owner,
         browserSecrets: [input.connection.username, input.connection.password, input.connection.apiKey],
         startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {
           state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error,
@@ -352,6 +353,17 @@ async function handle(message) {
       state.bridge?.cancelArtifactDeliveries?.()
       state.controller?.abort()
       send({ id: message.id, result: { interrupted: true } })
+      return
+    }
+    if (message.operation === "run-released") {
+      const input = message.input ?? {}
+      const owner = state.owner
+      if (!owner || input.chat !== owner.chat || input.generation !== owner.generation) {
+        send({ id: message.id, result: { released: false } })
+        return
+      }
+      const released = state.bridge?.runReleased ? await state.bridge.runReleased() : { released: false }
+      send({ id: message.id, result: { released: released?.released === true } })
       return
     }
     if (message.operation !== "call" || state.controller) throw Error("LOGINOM_REQUEST_INVALID")

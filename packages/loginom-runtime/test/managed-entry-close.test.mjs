@@ -27,8 +27,11 @@ for (const heldSocket of [true, false]) test(`checked managed close ${heldSocket
     "client/lib/execution-journal.mjs": "export const createExecutionJournal=()=>async()=>{}",
     "client/lib/catalog.mjs": "export const startupDiagnostic=()=>undefined",
     "client/lib/artifacts.mjs": "export const admitStartupArtifacts=async()=>[]; export const artifactFailure=()=>undefined",
-    "client/lib/bridge.mjs": `export async function createBridge(){return {
-      server:{connect:async()=>{}},close:async()=>({browser_transport_closed:true,
+    "client/lib/bridge.mjs": `import { appendFileSync } from 'node:fs';
+      export async function createBridge(){return {
+      server:{connect:async()=>{}},
+      runReleased(){ appendFileSync(${JSON.stringify(join(directory, "released"))}, '1'); return {released:true}; },
+      close:async()=>({browser_transport_closed:true,
       browser_process_terminated:true,clipboard_leases_retained:0})}}`,
     "client/node_modules/@modelcontextprotocol/sdk/package.json": '{"type":"commonjs"}',
     "client/node_modules/@modelcontextprotocol/sdk/client/index.js": "exports.Client=class {async connect(){} async close(){}}",
@@ -59,6 +62,12 @@ for (const heldSocket of [true, false]) test(`checked managed close ${heldSocket
     stateDir: join(directory, "state"), resources: directory, endpoint: "http://example.test",
     connection: { url: "http://example.test", username: "fixture", password: "", apiKey: "fixture" } } })
   assert.equal((await ready)[0].result?.ready, true)
+  for (const [id, generation, callsBridge] of [["owner", 1, true], ["other", 2, false]]) {
+    const released = once(child, "message", { signal: AbortSignal.timeout(5000) })
+    child.send({ id, operation: "run-released", input: { chat: "fixture", generation } })
+    assert.deepEqual((await released)[0], { id, result: { released: callsBridge } })
+  }
+  assert.equal(await readFile(join(directory, "released"), "utf8"), "1")
   const reply = once(child, "message", { signal: AbortSignal.timeout(5000) })
   const exited = once(child, "exit", { signal: AbortSignal.timeout(4500) })
   const started = performance.now()

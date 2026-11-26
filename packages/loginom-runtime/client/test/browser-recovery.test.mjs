@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createSerialGate } from '../lib/clipboard.mjs';
-import { createBrowserRecovery, parseRecoveryPageProbe, recoveryBrowserTools } from '../lib/browser-recovery.mjs';
+import { admitQueuedDock, createBrowserRecovery, parseRecoveryPageProbe, recoveryBrowserTools } from '../lib/browser-recovery.mjs';
 import { createExecutionJournal } from '../lib/execution-journal.mjs';
 import { createRedactor } from '../lib/redact.mjs';
 
@@ -15,13 +15,13 @@ const catalog = [...recoveryBrowserTools, 'browser_navigate', 'browser_run_code_
 
 function harness({ basis = () => ({ step, reason: 'NODE_RELEASE_REFUSED', goal: 'Close the wizard' }),
   handoff = () => ({ stopped: true, proof: { receipt: 'completed' } }), verify = () => ({ status: 'completed', facts: ['released'] }),
-  probe = () => ({ ok: true }), callTool, now, record } = {}) {
+  probe = () => ({ ok: true }), callTool, now, record, owner } = {}) {
   const events = [], calls = [], stops = [], verifies = [];
   const clock = { value: 1_000 };
   const recovery = createBrowserRecovery({
     enabled: true, gate: createSerialGate(), now: now ?? (() => clock.value),
     record: record ?? (async event => { events.push(event); return event; }),
-    probe: async () => probe(),
+    probe: async () => probe(), owner,
     browser: { callTool: callTool ?? (async request => { calls.push(request);
       return { content: [{ type: 'text', text: 'ok ' + request.name }] }; }) },
     executor: {
@@ -624,4 +624,123 @@ test('an unknown outcome inside verification blocks like an unknown browser acti
   assert.equal(h.recovery.refusesDock('dock_node_apply'), true);
   assert.equal((await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' })).isError, true);
   assert.equal(calls, 0);
+});
+
+test('runReleased of the current owner ends the attempt and drops browser tools', async () => {
+  const who = { chat: 'chat', generation: 1 };
+  const h = harness({ owner: () => who });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const released = await h.recovery.runReleased();
+  assert.equal(released.released, true);
+  assert.equal(Object.hasOwn(released, 'exited'), false);
+  assert.equal(h.recovery.active(), false);
+  assert.equal(h.stops.at(-1).reason, 'run_released');
+  assert.equal(h.stops.at(-1).uncertain, false);
+  assert.deepEqual(names(h.recovery.listTools(catalog)), ['dock_browser_recovery']);
+});
+
+test('runReleased for another generation leaves the attempt and its tools', async () => {
+  const who = { chat: 'chat', generation: 1 };
+  const h = harness({ owner: () => who });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  who.generation = 2;
+  const released = await h.recovery.runReleased();
+  assert.equal(released.released, false);
+  assert.equal(h.stops.length, 0);
+  assert.equal(h.recovery.active(), true);
+  assert.equal(names(h.recovery.listTools(catalog)).includes('browser_click'), true);
+});
+
+test('runReleased during handoff does not activate browser tools', async () => {
+  let release;
+  const handoff = new Promise(resolve => { release = resolve; });
+  const h = harness({ handoff: () => handoff.then(() => ({ stopped: true, proof: {} })) });
+  const starting = h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  await new Promise(resolve => setImmediate(resolve));
+  const stopping = h.recovery.runReleased();
+  release();
+  const released = await stopping;
+  await starting;
+  assert.equal(released.released, true);
+  assert.equal(h.recovery.active(), false);
+  assert.deepEqual(names(h.recovery.listTools(catalog)), ['dock_browser_recovery']);
+});
+
+test('runReleased during verification stops without clearing an unknown outcome', async () => {
+  let release;
+  const delayed = new Promise(resolve => { release = resolve; });
+  const h = harness({ verify: () => delayed.then(() => ({ status: 'unresolved', facts: [], reason: 'timed out', uncertain: true })) });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const finishing = h.recovery.call('dock_browser_recovery', { action: 'finish', operation_id: 'op-1', actions_performed: ['Clicked'] });
+  await new Promise(resolve => setImmediate(resolve));
+  const stopping = h.recovery.runReleased();
+  release();
+  const released = await stopping;
+  await finishing;
+  assert.equal(released.released, true);
+  assert.equal(Object.hasOwn(released, 'exited'), false);
+  assert.equal(h.stops.at(-1).uncertain, true);
+  assert.equal(h.recovery.unsettled(), true);
+  assert.equal(h.recovery.active(), false);
+});
+
+test('a queued gesture runs only while its attempt and generation stay current', async () => {
+  let release;
+  const blocked = new Promise(resolve => { release = resolve; });
+  let calls = 0;
+  const who = { chat: 'chat', generation: 1 };
+  const h = harness({ owner: () => who, callTool: async () => {
+    calls++;
+    if (calls === 1) await blocked;
+    return { content: [{ type: 'text', text: 'ok' }] };
+  } });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const first = h.recovery.call('browser_click', { target: 'e1' });
+  await new Promise(resolve => setImmediate(resolve));
+  const second = h.recovery.call('browser_click', { target: 'e2' });
+  who.generation = 2;
+  release();
+  await first;
+  const queued = await second;
+  assert.equal(queued.isError, true);
+  assert.equal(calls, 1);
+  who.generation = 1;
+  const third = h.recovery.call('browser_click', { target: 'e3' });
+  assert.equal((await third).isError, undefined);
+  assert.equal(calls, 2);
+});
+
+test('a queued Dock command runs only while its ticket is still current', async () => {
+  const h = harness();
+  const gate = createSerialGate();
+  let release;
+  const blocked = new Promise(resolve => { release = resolve; });
+  const held = gate(async () => { await blocked; });
+  let ran = 0;
+  const current = gate(admitQueuedDock(h.recovery, 'dock_node_apply', async () => { ran++; return 'done'; }));
+  release();
+  await held;
+  assert.equal(await current, 'done');
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const heldAgain = gate(async () => { await new Promise(resolve => setImmediate(resolve)); });
+  const stale = gate(admitQueuedDock(h.recovery, 'dock_node_apply', async () => { ran++; }));
+  await h.recovery.runReleased();
+  await heldAgain;
+  await assert.rejects(stale, /no longer current/);
+  assert.equal(ran, 1);
+});
+
+test('a Dock command queued before a new attempt does not run after that attempt starts', async () => {
+  const h = harness();
+  const gate = createSerialGate();
+  let release;
+  const blocked = new Promise(resolve => { release = resolve; });
+  const held = gate(async () => { await blocked; });
+  let ran = false;
+  const queued = gate(admitQueuedDock(h.recovery, 'dock_node_apply', async () => { ran = true; }));
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  release();
+  await held;
+  await assert.rejects(queued, /no longer current/);
+  assert.equal(ran, false);
 });

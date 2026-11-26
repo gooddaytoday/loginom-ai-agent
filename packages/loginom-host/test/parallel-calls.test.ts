@@ -57,6 +57,7 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
           active = undefined;
           return reply(m.id, true);
         }
+        if (m.operation === 'run-released') return process.send({id:m.id,result:{released:false}});
         if (m.operation !== 'call') return;
         if (active) return process.send({id:m.id,error:'LOGINOM_REQUEST_INVALID'});
         calls.push(m.input.name);
