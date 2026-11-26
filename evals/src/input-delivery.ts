@@ -117,10 +117,10 @@ export async function inputDelivery(task: Task, artifactDir: string, sessionId: 
 function preservesImportSource(request: NodeCall) {
   const input = request.input
   const parameters = input.parameters
-  return input.target.kind === "existing" && typeof input.target.label === "string" && input.target.label.trim().length > 0 &&
+  return input.target.type === "imports.text" && input.target.kind === "existing" &&
     input.mode === "delimited" && input.finish === "execute" && !input.bindings?.length &&
     Array.isArray(input.inputs) && input.inputs.length === 0 && Array.isArray(input.mappings) && input.mappings.length === 0 &&
-    parameters && Object.keys(parameters).join() === "settings" && parameters.settings && typeof parameters.settings === "object" &&
+    parameters && Object.keys(parameters).join(",") === "settings" && parameters.settings && typeof parameters.settings === "object" &&
     !Array.isArray(parameters.settings) && Object.keys(parameters.settings).length === 0 &&
     Array.isArray(input.read?.ports) && input.read.ports.length === 1 && input.read.ports[0] === 0
 }

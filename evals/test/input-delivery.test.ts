@@ -48,6 +48,7 @@ async function judgeEvidence(id: string, change = (calls: Fixture) => {}) {
     readMode: undefined,
     secondImport: undefined,
     renameSample: false,
+    omitLabel: false,
     laterReceipts: 0,
   }
   change(calls)
@@ -81,7 +82,7 @@ async function judgeEvidence(id: string, change = (calls: Fixture) => {}) {
       tool(6, "node_apply", {
         operation_id: "another-import", document_id: node.document_id, workflow_ref: { workflow_id: node.workflow_id },
         target: calls.secondImport === "distinct" ? { kind: "new", type: "imports.text" } :
-          { kind: "existing", type: "imports.text", ref: node, ...(rename ? { label: "Source rows" } : {}) },
+          { kind: "existing", type: "imports.text", ref: node, ...(rename && !calls.omitLabel ? { label: "Source rows" } : {}) },
         ...(rename ? { parameters: { settings: {} }, mode: "delimited", finish: "execute", inputs: [], mappings: [], read: { ports: [0] } } :
           { parameters: { source: { kind: "verified_delivery", artifact_id, upload_operation_id: "delivery:upload" } } }),
       }, { operation_id: "another-import", state: "running" }),
@@ -135,6 +136,7 @@ type Fixture = {
   readMode?: "existing" | "execute"
   secondImport?: "distinct" | "reconfigure" | "failed" | "rename"
   renameSample: boolean
+  omitLabel: boolean
   laterReceipts: number
   extra: string
 }
@@ -262,4 +264,12 @@ test("a native label-only apply retains the verified source and uses its own exe
   })
   expect(read.proof?.execution_id).toBe(`${node.document_id}:142:1`)
   expect(read.proof?.cohort_sample?.customer_id).toEqual({ type: "string", value: null, is_null: true, precision: "exact_null" })
+})
+
+test("an empty text import patch without a label uses only the newest execution", async () => {
+  const { proof, expected } = await judgeEvidence(cohort, calls => {
+    calls.secondImport = "rename"
+    calls.omitLabel = true
+  })
+  expect(proof).toEqual({ ...expected, execution_id: `${node.document_id}:142:1` })
 })
