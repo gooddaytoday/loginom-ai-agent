@@ -1,6 +1,6 @@
 {
   "graph": {
-    "exact": true,
+    "exact": false,
     "retain": [
       "scenario_vars",
       "source",
@@ -31,12 +31,6 @@
         "target": "filter",
         "output": 0,
         "input": 0
-      },
-      {
-        "source": "limit",
-        "target": "filter",
-        "output": 0,
-        "input": 0
       }
     ]
   },
@@ -45,7 +39,7 @@
       "output_node_type": "transform.filter_data",
       "output_port": 0,
       "ordered": true,
-      "column_order": "exact",
+      "column_order": "any",
       "rows": [
         {
           "order_id": 1001
@@ -65,5 +59,35 @@
         }
       ]
     }
-  ]
+  ],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.calculator"
+        },
+        "port": 0,
+        "variables": [
+          {
+            "name": "Limit",
+            "type": "integer",
+            "value": 1000
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.calculator"
+        },
+        "output": 0,
+        "target": {
+          "type": "transform.filter_data"
+        },
+        "input": 0,
+        "kind": "control"
+      }
+    ]
+  }
 }

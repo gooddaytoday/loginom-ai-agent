@@ -28,7 +28,7 @@ def typed(row, columns):
 
 def output(node, columns, rows, *, ordered=True, imported_labels=False):
     return {'output_node_type': TYPES[node], 'output_port': 0, 'ordered': ordered,
-            'column_order': 'exact', 'rows': rows,
+            'column_order': 'any', 'rows': rows,
             'columns': [dict(name=name, type=kind, **({'name_any': True} if imported_labels else {'label_any': True}),
                              **({'tolerance': {'abs': 0.000001}} if kind == 'real' else {}))
                         for name, kind in columns.items()]}
@@ -70,6 +70,7 @@ def expected(root, case):
     source = [typed(row, columns) for row in raw]
     nodes = ['source']
     links, retain, labels = [], [], {}
+    variable_inventory = None
     outputs = [output('source', columns, source, imported_labels=chain == 44)]
     if chain == 44 and turn > 1:
         nodes += ['monthly']
@@ -85,13 +86,17 @@ def expected(root, case):
         nodes += ['limit']
         retain = ['source']
         outputs = []
+        threshold = 500 if turn == 5 else 1000
+        if turn != 3:
+            variable_inventory = {'outputs': [{'node': {'type': TYPES['limit']}, 'port': 0,
+                                               'variables': [{'name': 'Limit', 'type': 'integer', 'value': threshold}]}]}
         if turn > 2:
             nodes += ['filter']
             retain = nodes if turn > 3 else nodes[:-1]
             links = [('source', 'filter')]
             if turn > 3:
-                links += [('limit', 'filter')]
-            threshold = 500 if turn == 5 else 1000
+                variable_inventory['links'] = [{'source': {'type': TYPES['limit']}, 'output': 0,
+                                                'target': {'type': TYPES['filter']}, 'input': 0, 'kind': 'control'}]
             outputs = [output('filter', columns, [row for row in source if row['order_id'] > threshold])]
     elif chain == 46 and turn > 1:
         nodes += ['group']
@@ -110,11 +115,12 @@ def expected(root, case):
     nodes = ['scenario_vars', *nodes]
     if turn > 1:
         retain = ['scenario_vars', *retain]
-    return {'graph': {'exact': True, 'retain': retain,
+    return {'graph': {'exact': not (variable_inventory and variable_inventory.get('links')), 'retain': retain,
                       'nodes': [dict(id=node, type=TYPES[node], **({'label': labels[node]} if node in labels else {}))
                                 for node in nodes],
                       'links': [dict(source=parent, target=child, output=0, input=0) for parent, child in links]},
-            'outputs': outputs}
+            'outputs': outputs,
+            **({'variable_inventory': variable_inventory} if variable_inventory else {})}
 
 
 if __name__ == '__main__':

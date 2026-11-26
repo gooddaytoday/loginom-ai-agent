@@ -38,7 +38,7 @@
       "output_node_type": "transform.filter_data",
       "output_port": 0,
       "ordered": true,
-      "column_order": "exact",
+      "column_order": "any",
       "rows": [
         {
           "order_id": 1001

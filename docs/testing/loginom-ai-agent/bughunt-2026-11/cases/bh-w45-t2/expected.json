@@ -21,5 +21,22 @@
     ],
     "links": []
   },
-  "outputs": []
+  "outputs": [],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.calculator"
+        },
+        "port": 0,
+        "variables": [
+          {
+            "name": "Limit",
+            "type": "integer",
+            "value": 1000
+          }
+        ]
+      }
+    ]
+  }
 }
