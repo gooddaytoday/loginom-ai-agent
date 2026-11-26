@@ -599,7 +599,8 @@ test('tree-to-table can prove the native schema from a JSON execution that reque
  assert.equal(calls.length,3);
  assert.equal(events[0].source_execution_id,execution_id);
  for(const [record,key,foreign] of [[port,'port_guid','foreign'],[port,'fresh',false],[response,'cleanup_complete',false],
-  [response.node_context,'surface','wizard'],[response.node_context,'node_id','foreign'],[port,'port',1],
+  [response.node_context,'surface','wizard'],[response.node_context,'document_id','foreign-doc'],
+  [response.node_context,'workflow_id','foreign-wf'],[response.node_context,'node_id','foreign'],[port,'port',1],
   [port,'execution_id','doc:root:9'],[port,'freshness_basis','unknown'],[port,'sample_complete',true],
   [history[0].outcome.output.execution,'execution_id','doc:root:6'],[history[0].request.target,'type','trees.from_table']]){
   const original=record[key];record[key]=foreign;
@@ -607,6 +608,11 @@ test('tree-to-table can prove the native schema from a JSON execution that reque
   record[key]=original;
  }
  assert.equal(options.operation.transportUncertain,true);
+ schema.push({path:'/ignored',name:'ignored',type:'variant',is_array:true,is_container:false});
+ await assert.rejects(check(),/JSON tree requires supported types/);
+ assert.equal(calls.length,3);
+ assert.deepEqual(events,[]);
+ schema.pop();
  const sample={...port,tree:{schema,complete:false,instances:[{index:0,parent:null,path:''}],node_count:1}};
  history[0].request.read.ports=[0];
  history[0].outcome.output.output.ports=[sample];
