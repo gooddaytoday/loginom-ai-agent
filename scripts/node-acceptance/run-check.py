@@ -1780,6 +1780,7 @@ def arguments(argv=None):
     start.add_argument('--prepare-only', action='store_true', help='Prepare/verify the build without starting Loginom or the model')
     start.add_argument('--cases', type=Path, help='Private external task/expected/oracle/data case directory')
     start.add_argument('--cold', action='store_true')
+    start.add_argument('--live-chain', action='store_true', help='Keep a CLI and browser open across --cases turns')
     start.add_argument('--viewport', choices=['1024x633', '1366x633', '1280x665', '1280x800', '1920x945'], default='1280x800')
     start.add_argument('--case-root', type=Path, help='Private external task.md/expected.json/case.json fixtures; oracle is never sent')
     start.add_argument('--host-load-max', type=float, default=8)
@@ -2618,9 +2619,10 @@ class Runner:
         result['location'] = str(journal) + ':1'
         journal.write_text(json.dumps(self.db_prompt.mask_value(result) if self.db_case_active else result, ensure_ascii=False) + '\n')
 
-    def phase(self, name, command, folder, timeout=1800, stdin=None, env=None, cwd=None, check_exit=True):
+    @contextmanager
+    def timed_phase(self, name, folder, spacing=True):
         timing = dict(name=name, scenario=self.current['scenario'] if self.current else None,
-                      queued=time.time(), started=None)
+                      case_folder=str(folder), queued=time.time(), started=None)
         self.report.setdefault('phase_timings', []).append(timing)
         self.report['phase'] = 'gate:' + name
         self.report['phase_folder'] = str(folder)
@@ -2628,14 +2630,24 @@ class Runner:
         try:
             while True:
                 if time.time() >= self.deadline: raise TimeoutError('load/spacing budget')
-                if load_ready(os.getloadavg(), self.options['host_load_max']) and time.time() - self.last_start >= self.options['spacing']: break
+                if load_ready(os.getloadavg(), self.options['host_load_max']) and (not spacing or time.time() - self.last_start >= self.options['spacing']): break
                 time.sleep(1)
             self.last_start = timing['started'] = time.time()
+            timing['load1'] = os.getloadavg()[0]
             self.report['phase'] = name
             if self.current is not None:
                 self.current.setdefault('started', timing['started'])
                 self.current.setdefault('start_load', list(os.getloadavg()))
             self.save()
+            yield
+        finally:
+            timing['finished'] = time.time()
+            timing['queue_seconds'] = (timing['started'] if timing['started'] is not None else timing['finished']) - timing['queued']
+            timing['duration_seconds'] = timing['finished'] - timing['started'] if timing['started'] is not None else 0
+            self.save()
+
+    def phase(self, name, command, folder, timeout=1800, stdin=None, env=None, cwd=None, check_exit=True):
+        with self.timed_phase(name, folder):
             stdout_path, stderr_path = (folder / (name + suffix) for suffix in ('.stdout', '.stderr'))
             stdout_log = self.db_prompt.phase_log(stdout_path, enabled=self.db_case_active)
             stderr_log = self.db_prompt.phase_log(stderr_path, enabled=self.db_case_active)
@@ -2672,11 +2684,6 @@ class Runner:
                 if check_exit:
                     assert child.returncode == 0, f'{name} exit={child.returncode}: {folder / (name + ".stderr")}:1'
                 return child.returncode
-        finally:
-            timing['finished'] = time.time()
-            timing['queue_seconds'] = (timing['started'] if timing['started'] is not None else timing['finished']) - timing['queued']
-            timing['duration_seconds'] = timing['finished'] - timing['started'] if timing['started'] is not None else 0
-            self.save()
 
     def build(self):
         cache = Path.home() / '.cache/loginom-run-check' / socket.gethostname() / self.report['head']
@@ -2879,7 +2886,7 @@ class Runner:
         assert all(delivered['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'TEXT_MASK_INPUT_CLEANUP_MISSING'
         return books
 
-    def model(self, case, folder, profile, workspace, package, login, build, session=None, baseline=None):
+    def model(self, case, folder, profile, workspace, package, login, build, session=None, baseline=None, live=None):
         spec = (self.prepared_case if isinstance(case, str) and case in D87 and not getattr(self, 'options', {}).get('case_root') else
                 dict(source=case, prompt=case / 'task.md', data=case / 'data')
                 if isinstance(case, Path) else scenario(case, getattr(self, 'options', {}).get('case_root'),
@@ -3120,6 +3127,7 @@ class Runner:
             delivered = read(folder / 'text-folder-inputs' / 'result.json')
             assert [d['destination'] for d in delivered['delivered']] == [b['destination'] for b in books], 'TEXT_FOLDER_INPUT_DELIVERY_MISSING'
             files = []
+        attachments = []
         for file in files:
             if not file.is_file(): continue
             target = workspace / file.name
@@ -3135,6 +3143,7 @@ class Runner:
                 prompt += f'\nИсходный файл LGD: {target}.'
             else:
                 command += ['--file', target]
+                attachments.append(target)
         db_task = DB_FIELD.search(prompt)
         if db_task:
             self.db_case_active = True
@@ -3144,7 +3153,13 @@ class Runner:
         graph_start = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
         cli_before = cli_cleanup_paths(profile) if port_output else None
         exit_status = 0
-        if spec.get('two_turn'):
+        if live:
+            assert not db_task, 'DB_PROMPT_REQUIRES_STANDARD_CASE_TRANSPORT'
+            timeout = spec.get('model_timeout', 1800)
+            with self.timed_phase('model', folder, spacing=live.child is None):
+                deadline = time.monotonic() + max(0, min(timeout, self.deadline - time.time()))
+                session = live.turn(folder, command[0], env, session, prompt, attachments, deadline)
+        elif spec.get('two_turn'):
             assert not db_task, 'DB_PROMPT_REQUIRES_STANDARD_CASE_TRANSPORT'
             assert session is None, 'TWO_TURN_REQUIRES_FRESH_CHAT'
             assert MODEL == 'openai/gpt-6.1-sol', 'TWO_TURN_REQUIRES_DEFAULT_MODEL'
@@ -3550,13 +3565,16 @@ class Runner:
                 matched_trees += 1
             assert matched_trees, 'TREE_SELECTED_READ_MISSING'
             self.current['tree-read'] = 'PASS'
-        cleanups = [read(p) for p in profile.rglob('package-cleanup.json' if spec.get('two_turn') else 'saved-package-cleanup.json')]
-        acks = [read(p) for p in profile.rglob('runtime-close-*.json')]
-        assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
-        known_ack = spec.get('two_turn') and (folder / 'shutdown-signature.json').exists() and read(folder / 'shutdown-signature.json').get('kind') == 'known_two_turn_shutdown_ack_timeout'
-        assert acks and all(a.get('closed_ack') is True or known_ack and a.get('closed_ack') is False and a.get('request_error') == 'LOGINOM_RUNTIME_TIMEOUT' and a.get('exit_code') == 0 and a.get('exit_signal') is None for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
-        if known_ack: self.current['shutdown-signature'] = 'known_two_turn_shutdown_ack_timeout; cleanup confirmed'
-        self.current['cleanup'] = 'main PASS'
+        if live:
+            self.current['cleanup'] = 'pending live shutdown'
+        else:
+            cleanups = [read(p) for p in profile.rglob('package-cleanup.json' if spec.get('two_turn') else 'saved-package-cleanup.json')]
+            acks = [read(p) for p in profile.rglob('runtime-close-*.json')]
+            assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
+            known_ack = spec.get('two_turn') and (folder / 'shutdown-signature.json').exists() and read(folder / 'shutdown-signature.json').get('kind') == 'known_two_turn_shutdown_ack_timeout'
+            assert acks and all(a.get('closed_ack') is True or known_ack and a.get('closed_ack') is False and a.get('request_error') == 'LOGINOM_RUNTIME_TIMEOUT' and a.get('exit_code') == 0 and a.get('exit_signal') is None for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
+            if known_ack: self.current['shutdown-signature'] = 'known_two_turn_shutdown_ack_timeout; cleanup confirmed'
+            self.current['cleanup'] = 'main PASS'
         if spec.get('reopened_cleanup'):
             # #986: the final cleanup must bind the package reopened by Save As.
             assert any(save_confirmed(spec, o, package) and o.get('action_key') == 'package.save_as'
@@ -3957,8 +3975,11 @@ class Runner:
         self.current['csv'] = D76_STATUS if any(self.current.get('d76', {}).values()) else 'PASS'
         return session, expected, actual, delimiter
 
-    def manual_edit(self, edit, stage, profile, package, login, build, before, *, prior=None, expected_graph=None):
-        check_fresh_cli_close(profile, package, before)
+    def manual_edit(self, edit, stage, profile, package, login, build, before, *, prior=None, expected_graph=None, live=None):
+        if live:
+            self.close_live(live)
+        else:
+            check_fresh_cli_close(profile, package, before)
         output = stage / 'manual'
         output.mkdir()
         config = dict(login=login, packagePath=package, edit=edit)
@@ -3977,6 +3998,28 @@ class Runner:
         if edit['kind'] == 'move':
             baseline['moved_node_id'] = result['delta']['changed_nodes'][0]['node_id']
         return baseline
+
+    def close_live(self, live):
+        if live.child is None:
+            return
+        browser, saved = live.browser, live.saved
+        live.close()
+        if not browser:
+            raise RuntimeError('LIVE_CHAIN_BROWSER_CLEANUP_UNCONFIRMED')
+        attempt = browser[2]
+        receipt_path = attempt / 'package-cleanup.json'
+        receipt = read(receipt_path) if receipt_path.is_file() else {}
+        assert (saved and receipt.get('status') == 'SUCCEEDED' and receipt.get('package_closed') is True
+                and receipt.get('logged_out') is True and receipt.get('unsaved_changes_discarded') is False
+                and receipt.get('account') == live.account and receipt.get('package_path') == live.package
+                and receipt.get('document_id') == saved.get('document_id')), 'LIVE_CHAIN_PACKAGE_CLEANUP_UNCONFIRMED'
+        acks = [read(path) for path in (live.profile / 'loginom/runtime').glob('runtime-close-*.json')
+                if path not in live.previous_acks]
+        assert len(acks) == 1 and acks[0].get('closed_ack') is True, 'LIVE_CHAIN_RUNTIME_ACK_MISSING'
+        self.current['cleanup'] = 'main PASS'
+        for turn in self.current['turns']:
+            if turn.get('cleanup') == 'pending live shutdown':
+                turn['cleanup'] = 'main PASS'
 
     def run(self):
         try:
@@ -4000,7 +4043,7 @@ class Runner:
                 workspace.mkdir()
                 r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp', model=MODEL + ('/' + VARIANT if VARIANT else ''))
                 env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile))
-                active_turn = None
+                active_turn = live = None
                 try:
                     case = r['scenario']
                     steps = scenario_steps(case, self.options.get('case_root'), cases=self.options.get('cases'))
@@ -4019,6 +4062,13 @@ class Runner:
                         write(folder / 'source-config.json', dict(login=login, package=r['package']))
                         self.phase('source-package', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/variables-column-union.mjs', 'prepare', build / 'resources/loginom', folder / 'source-config.json', spec['source_package'], folder / 'source'], folder, timeout=300)
                     session = None
+                    if self.options.get('live_chain'):
+                        from run_check_live import LiveChain
+                        config_path = profile / 'config/loginom-ai-agent.json'
+                        write(config_path, {**read(config_path), 'model': MODEL})
+                        if VARIANT:
+                            write(profile / 'state/model.json', dict(recent=[], favorite=[], variant={MODEL: VARIANT}))
+                        live = LiveChain(profile, workspace, folder, login['username'], r['package'], MODEL, VARIANT, daemon_pid)
                     baseline = None
                     for (step, step_spec), turn in zip(steps, r['turns']):
                         active_turn = turn
@@ -4030,16 +4080,21 @@ class Runner:
                         stage.mkdir()
                         prior = baseline
                         manual = step_spec.get('manual_edit')
-                        cli_before = cli_cleanup_paths(profile) if manual else None
-                        session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session,
-                            **({'baseline': baseline} if baseline is not None else {}))
+                        cli_before = cli_cleanup_paths(profile) if manual and not live else None
+                        model_options = {}
+                        if baseline is not None:
+                            model_options['baseline'] = baseline
+                        if live:
+                            model_options['live'] = live
+                        session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'],
+                            login, build, session, **model_options)
                         observed_graph = stage / 'graph-observed.json'
                         if observed_graph.is_file():
                             baseline = read(observed_graph)
                         if manual and not r.get('failure_class'):
                             turn['manual_edit'] = dict(kind=manual['kind'], status='FAIL', journal=str(stage / 'manual/execution-events.jsonl'))
                             baseline = self.manual_edit(manual, stage, profile, r['package'], login, build, cli_before,
-                                prior=prior, expected_graph=expected.get('graph'))
+                                prior=prior, expected_graph=expected.get('graph'), live=live)
                             turn['manual_edit']['status'] = 'PASS'
                         turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class', 'cli_exit') if k in r},
                                     status='FAIL' if r.get('failure_class') or r.get('cli_exit') else 'PASS')
@@ -4048,6 +4103,8 @@ class Runner:
                         active_turn = None
                         if spec.get('attach_all') and r.get('failure_class'):
                             break
+                    if live:
+                        self.close_live(live)
                     if spec.get('attach_all') and r.get('failure_class'):
                         r['status'] = 'FAIL'
                         self.save()
@@ -4106,7 +4163,16 @@ class Runner:
                     if active_turn is not None:
                         active_turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class', 'cli_exit') if k in r},
                                            status=r['status'])
+                    if isinstance(error, InterruptedError):
+                        raise
                 finally:
+                    if live and live.child is not None:
+                        try:
+                            self.close_live(live)
+                        except Exception as error:
+                            r['live_cleanup_error'] = str(error)
+                            if r['status'] not in ('FAIL', 'UNKNOWN'):
+                                self.failure(r, error, folder)
                     if r.get('dataset'):
                         try: self.cleanup_d87(folder, login, build)
                         except Exception as error:
@@ -4132,7 +4198,20 @@ class Runner:
 def main():
     os.umask(0o077)
     args = arguments()
-    if args.command == '_worker': return Runner(args.directory.resolve()).run()
+    if args.command == '_worker':
+        runner = Runner(args.directory.resolve())
+        if runner.options.get('live_chain'):
+            interrupted_once = False
+
+            def interrupted(signum, frame):
+                nonlocal interrupted_once
+                if not interrupted_once:
+                    interrupted_once = True
+                    raise InterruptedError('LIVE_CHAIN_CANCELLED')
+
+            signal.signal(signal.SIGINT, interrupted)
+            signal.signal(signal.SIGTERM, interrupted)
+        return runner.run()
     if args.command == 'wait':
         end = time.monotonic() + args.timeout
         while True:
@@ -4148,13 +4227,16 @@ def main():
             time.sleep(min(1, max(0, end - time.monotonic())))
     head = git('rev-parse', '--verify', args.head + '^{commit}')
     names = scenario_names(args.scenarios, args.case_root)
+    assert not args.live_chain or args.cases and not args.case_root, 'LIVE_CHAIN_REQUIRES_CASES'
     db_preflight = DatabasePrompt()
     assert 'types300' not in names or args.cold, 'TYPES300_COLD_REQUIRED'
     for name in names:
         for step, spec in scenario_steps(name, args.case_root, cases=args.cases):
             if spec.get('generated') or isinstance(step, Path): continue
             assert spec['prompt'].is_file(), 'Scenario prompt missing'
-            db_preflight.render(spec['prompt'].read_text())
+            prompt = spec['prompt'].read_text()
+            assert not args.live_chain or not DB_FIELD.search(prompt), 'DB_PROMPT_REQUIRES_STANDARD_CASE_TRANSPORT'
+            db_preflight.render(prompt)
             assert args.case_root or spec.get('oracle', spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
             expected_for(spec, '/preflight/package.lgp')
     pair = args.pair.expanduser().resolve()

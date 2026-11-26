@@ -696,6 +696,28 @@ For native-port turns, a terminal `CLI_TOOL_FAILED` is still a failed turn.
 The runner may continue if that turn's outputs, save and fresh package
 close and logout all pass verification.
 
+Use `--live-chain` with `--cases` on Linux to measure a chain in the
+bundled CLI's interactive TUI. The runner supplies new messages and file
+mentions through a private terminal. It uses the same profile, chat, Host
+and Chromium process across ordinary turns. The case's graph, Save and
+output checks still run per turn. The runner verifies the profile guard
+and Chromium process identity before continuation, and verifies the expected
+Loginom account and package path in each turn's fresh Save observation.
+`live-turns.jsonl` records message boundaries, PIDs and owner checks.
+The per-turn `model.stdout` is reconstructed read-only from persisted chat
+parts, with timestamps from the parts and tool states. Process exit and
+the cleanup receipt are checked before a cold run.
+
+At a `manual_edit` boundary, `--live-chain` exits the live TUI and requires
+verified package close, logout and runtime close ACK. It then runs the
+same verified browser edit described above and resumes the existing chat
+in a new live segment. The shipped standalone CLI on the reference build
+has no managed `serve` or attach mode. A scripted edit within one live
+browser needs a supported way to take temporary control of its owned Studio
+page while the model is idle. A headless replacement for the TUI transport
+needs prompt submission and structured events throughout a managed session.
+Database prompt substitutions require the standard stdin transport.
+
 Any turn may add `graph` to `expected.json`. The runner checks the latest
 complete graph recorded during the turn in the existing runtime journal.
 Use a unique local `id` and the canonical `type` for each required node.
