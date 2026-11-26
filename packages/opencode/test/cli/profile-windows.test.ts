@@ -85,3 +85,58 @@ test.skipIf(process.platform !== "win32")(
   },
   60000,
 )
+
+test.skipIf(process.platform !== "win32")(
+  "native ACL protection accepts Chromium capability access only in caches a killed CLI leaves",
+  async () => {
+    const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
+    if (!systemRoot) throw Error("SystemRoot required")
+    const icacls = async (target: string, grant: string) => {
+      const child = Bun.spawn([join(systemRoot, "System32/icacls.exe"), target, "/grant", grant], {
+        stdout: "ignore",
+        stderr: "ignore",
+      })
+      expect(await child.exited).toBe(0)
+    }
+    const capability =
+      "*S-1-15-3-1024-1528657515-1944437972-2795272136-1227674495-293963776-353393192-4060142787-1908764039:"
+    const temporary = await mkdtemp(join(tmpdir(), "loginom-acl-cache-test-"))
+    let count = 0
+    const profile = async (...directories: string[]) => {
+      const root = join(temporary, `profile ${count++}`)
+      await mkdir(root)
+      await protectWindowsProfile(root)
+      for (const directory of directories) await mkdir(join(root, directory), { recursive: true })
+      return root
+    }
+    try {
+      // Paths observed on Windows after the CLI was killed during login: the
+      // runtime's mkdtemp user-data-dir and the validation login disk cache.
+      const network = join("cache", "tmp", "lbC1wMfr", "Default", "Network")
+      const httpCache = join("loginom", "validation", "http-cache", "Default", "Cache")
+      const root = await profile(network, httpCache)
+      await icacls(join(root, network), capability + "(OI)(CI)M")
+      await icacls(join(root, httpCache), capability + "(OI)(CI)M")
+      await writeFile(join(root, network, "Cookies"), "test")
+      await writeFile(join(root, httpCache, "index"), "test")
+      await protectWindowsProfile(root)
+      for (const [directory, grant] of [
+        [join("cache", "tmp", "other", "Default", "Network"), capability + "(OI)(CI)M"],
+        [join("cache", "tmp"), capability + "M"],
+        [join("cache", "tmp", "lbC1wMfr"), capability + "M"],
+        [join("loginom", "validation", "http-cache"), capability + "M"],
+        [join("loginom", "validation", "other", "Default"), capability + "(OI)(CI)M"],
+        [join("config", "Default"), capability + "(OI)(CI)M"],
+        [network, capability + "(OI)(CI)F"],
+        [network, "*S-1-15-2-1:(OI)(CI)M"],
+      ]) {
+        const rejected = await profile(directory)
+        await icacls(join(rejected, directory), grant)
+        await expect(protectWindowsProfile(rejected)).rejects.toThrow("PROFILE_PERMISSIONS_INVALID")
+      }
+    } finally {
+      await rm(temporary, { recursive: true, force: true })
+    }
+  },
+  100000,
+)
