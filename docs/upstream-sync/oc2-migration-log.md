@@ -26129,3 +26129,14 @@ B1.9b; строки 1, 2 (приложение, Desktop) делает друга
 - `catalog-check.py` код 0; `apply-identity.py --check`: would change: 0 files; `bun run check` код 0 (39 из 39).
 - Файлы OpenCode: правка `packages/cli/src/run/run.ts` минимальная; `catalog-check` новых нераскрытых расхождений
   не показал (код 0).
+
+### B5.1j-profile: `clean-profile` на раннере
+
+Ветка `b51j6-clean-profile` от `oc2-migration` (`68b307ff3b`). Run 45829605804: отрицательный контроль красный как задумано, чистый smoke —
+запуски 1–3 PASS; упала одна проверка `clean-profile`: `%APPDATA%\com.loginom.aiagent.dev` и `%USERPROFILE%\.local\share\loginom-ai-agent-dev`
+уже существовали, их создали предыдущие шаги задания (красный прогон, safeStorage, CLI ZIP). Проверка не менялась.
+Шаг перед каждым прогоном smoke теперь вызывает `Clear-Profile`: удаляет эти два каталога (`$userData` и `$serviceData`
+smoke для канала `dev`) и пишет в журнал, что удалено или что каталога не было. В тесте продукта сверяется, что пути
+совпадают с теми, что читает `clean-profile`. Каталог состояния `.local\state\loginom-ai-agent-dev` проверка не читает, не трогал.
+Проверки: `actionlint` 0 строк; разбор PowerShell `errors: 0`; Desktop 44 теста 0 падений; `product` 118 pass, 0 fail;
+`catalog-check.py` 0; `apply-identity --check` 0 файлов; `bun run check` 0. Проверит только CI.

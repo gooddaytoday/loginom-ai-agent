@@ -85,4 +85,15 @@ describe("installed-product checks", () => {
     expect(calls).toContain("Remove-Leftover \"before $Name\"")
     expect(smoke).toContain("if ($observation.status -ne 'PASS') { break }")
   })
+
+  test("the profile directories cleared before a smoke run are the ones its clean-profile check reads", () => {
+    const smoke = read("packages/desktop/test/loginom/windows-installed-smoke.ps1")
+    const calls = run("Install, launch and uninstall Desktop candidate")
+    expect(smoke).toContain("$userData = Join-Path $env:APPDATA $appId")
+    expect(smoke).toContain('$serviceData = Join-Path $env:USERPROFILE ".local\\share\\$slug"')
+    expect(calls).toContain("(Join-Path $env:APPDATA 'com.loginom.aiagent.dev')")
+    expect(calls).toContain("'.local\\share\\loginom-ai-agent-dev'")
+    expect(calls).toContain('Clear-Profile "before $Name"')
+    expect(smoke).toContain("Check 'clean-profile' (-not (Test-Path -LiteralPath $userData) -and -not (Test-Path -LiteralPath $serviceData))")
+  })
 })
