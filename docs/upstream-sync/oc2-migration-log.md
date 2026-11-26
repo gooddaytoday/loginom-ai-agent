@@ -25936,3 +25936,10 @@ CI передаёт его. Проверка «от обычного польз�
 что параметры вызова объявлены в smoke, а красная мутация входит в `ValidateSet`.
 Проверки: `actionlint` 0 строк; `product` 108 pass, 0 fail; `catalog-check.py` 0; `apply-identity --check` 0 файлов; `bun run check` 0.
 Проверит только CI: поведение NSIS и Electron на раннере под администратором.
+
+### B5.1j-ps Разбор PowerShell в smoke Windows
+
+Прогон release 45814367924 (`73b792e781`): шаг `Install, launch and uninstall Desktop candidate` упал до запуска —
+`ParserError … Log "smoke $Name: starting …": Variable reference is not valid. ':' was not followed by a valid variable
+name character`. В PowerShell `$Name:` читается как переменная с областью; три строки журнала переписаны на `${Name}:`.
+В этом прогоне впервые зелёные `verify linux` (манифест, установщики, G5 с отрицательным контролем) и `verify macos`.
