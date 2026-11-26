@@ -8,7 +8,8 @@ function fixture(fault) {
  const snapshot={authenticated:true,origin:'https://test',loginom_build:'7.4.2',workflow_ref:{prefix},dom_epoch:{document:'doc',revision:1},
   active_tab_ref:'tab',package_identity:null,file_storage:{status:'observed',directory:'/user/dock-p3'},observation_root:{ref:'nav'},ui:{elements:[],masks:[],dialogs:[]}};
  const task={snapshot,artifact:{name,bytes:42,upload:{directory:'/user/dock-p3'}},expected_origin:'https://test',expected_build:'7.4.2',operation_id:'verify'};
- const owner={isConnected:true,scrollHeight:2500,clientHeight:500,contains:e=>e===owner,
+ const staticListing=fault==='late_row'||fault==='missing_row';
+ const owner={isConnected:true,scrollHeight:staticListing?500:2500,clientHeight:500,contains:e=>e===owner,
   getBoundingClientRect:()=>({x:0,y:100,width:800,height:500}),get scrollTop(){return top;},set scrollTop(v){moves.push(v);top=v;}};
  const state={observer:{takeRecords:()=>[]},epoch:'doc',revision:1};
  const context=vm.createContext({document:{querySelectorAll:()=>fault==='owner'?[{}]:[owner],elementFromPoint:()=>fault==='blocked'?{}:owner},getComputedStyle:()=>({display:'block',visibility:'visible'})});
@@ -29,7 +30,7 @@ function fixture(fault) {
   if(fault==='refresh_busy_owner'&&directoryReads>=3)s.active_tab_ref='foreign';
   if(fault==='refresh_context'&&directoryReads>1||fault==='refresh_native_context'&&nativeChecks>0)s.active_tab_ref='foreign';
   if(fault==='directory'&&moves.length)s.file_storage.directory='/foreign';
-  if(options.discover_roots&&(top>=1400||(fault==='empty'||fault?.startsWith('refresh_busy')||fault?.startsWith('refresh_native'))&&refreshes>0)&&fault!=='absent')s.ui.elements=[{tid:fileTid,ref:'file'}];
+  if(options.discover_roots&&(top>=1400||(fault==='empty'||fault==='late_row'||fault?.startsWith('refresh_busy')||fault?.startsWith('refresh_native'))&&refreshes>0)&&fault!=='absent')s.ui.elements=[{tid:fileTid,ref:'file'}];
   if(options.root_ref==='file')s.ui.elements=[{tid:fileTid,ref:'file',label:name,storage_entry:{bytes:fault==='pending_size'&&refreshes===0?0:42}}];
   return {status:'SUCCEEDED',output:s};
  };
@@ -46,7 +47,7 @@ function fixture(fault) {
   if(refresh)await refresh(async()=>{nativeChecks++;return fault!=='refresh_native_limit'&&(!fault?.startsWith('refresh_native')||nativeChecks>1);});
   if(fault==='readiness_timeout'||fault==='refresh_timeout'&&refreshes)throw Error('Readiness timeout');
   if(minimum!==null)assert.ok(refreshes>=minimum);
-  return {load_count:refreshes,empty_native_store:(fault==='empty'||fault?.startsWith('refresh_'))&&refreshes===0};
+  return {load_count:refreshes,complete:staticListing,empty_native_store:(fault==='empty'||fault?.startsWith('refresh_'))&&refreshes===0};
  };
  return {run:()=>discoverArtifactAndDownload(page,task,ui,download,()=>{},ready),moves,deadlines,get settlements(){return settlements;},get downloads(){return downloads;},get refreshes(){return refreshes;},get waits(){return waits;}};
 }
@@ -130,6 +131,24 @@ for(const fault of ['owner','blocked','directory','absent','lost_scroll','lost_d
  if(['lost_scroll','lost_download'].includes(fault)){assert.equal(r.status,'AMBIGUOUS');assert.equal(r.cleanup_complete,false);}
 });
 
+test('discovery refreshes a nonempty directory when the uploaded row is late',async()=>{
+ const f=fixture('late_row'),r=await f.run();
+ assert.equal(r.status,'SUCCEEDED',r.error?.code);
+ assert.equal(f.refreshes,1);
+ assert.equal(f.downloads,1);
+ assert.deepEqual(f.moves,[]);
+ assert.equal(new Set(f.deadlines).size,1);
+});
+
+test('discovery refuses a missing row after one refresh of the complete directory',async()=>{
+ const f=fixture('missing_row'),r=await f.run();
+ assert.equal(r.error?.code,'DISCOVERY_FILE_NOT_FOUND');
+ assert.equal(f.refreshes,1);
+ assert.equal(f.downloads,0);
+ assert.equal(r.cleanup_complete,true);
+ assert.equal(new Set(f.deadlines).size,1);
+});
+
 test('host accepts a discovered reference only for the prepared document tab workflow and file',async()=>{
  const {verifiedDiscoveryReference}=await import('../lib/artifact-discovery.mjs');
  const artifact={name:'input.csv',upload:{directory:'/user/dock-p3'}};
@@ -180,9 +199,10 @@ function nativeFixture({empty=false,parent=false,blocked=false,loading=false,mas
  const realm=vm.createContext({document:doc,location:{origin:'https://test'},getComputedStyle:()=>({visibility:'visible'}),
   bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>active}},FMapTree:{FServerConnection:{UserName:'operator'}}}}}}},Ext:{getCmp:()=>view}});
  realm.__loginomDockPreparationV1={document:doc,id:'prep-doc'};
- realm[Symbol.for('loginom-dock.workspace-ui.identity.v1')]={epoch:'doc'};
+ realm[Symbol.for('loginom-dock.workspace-ui.identity.v1')]={epoch:'doc',revision:1,observer:{takeRecords:()=>[]}};
  const invoke=(fn,args)=>vm.runInContext('('+fn.toString()+')',realm)(args);
- let disposed=0,waits=0,onWait=()=>{loading=false;mask=false;root.className='test';if(!blocked)hit=empty||parent?placeholder:grid;store.loadCount++;};
+ const settle=()=>{loading=false;mask=false;root.className='test';if(!blocked)hit=empty||parent?placeholder:grid;store.loadCount++;};
+ let disposed=0,waits=0,onWait=settle;
  const timeouts=[],waitDisposals=[];let evaluations=0,onEvaluate=()=>{},elapsed=0;
  const started=Date.now();realm.Date=class extends Date {static now(){return started+elapsed;}};
  const page={evaluateHandle:async(fn,arg)=>{const value=invoke(fn,arg);value.dispose=async()=>{disposed++;};return value;},
@@ -194,8 +214,11 @@ function nativeFixture({empty=false,parent=false,blocked=false,loading=false,mas
   }};
  const task={snapshot:{workflow_ref:{prefix,tab_tid:'tab'},dom_epoch:{document:'doc'}},expected_origin:'https://test',expected_build:'7.4.2',artifact:{name:'source.csv'}};
  const trace=[];
+ grid.evaluate=async(fn,arg)=>vm.runInContext('('+fn.toString()+')',realm)(grid,arg);
+ grid.dispose=async()=>{};
+ grid.scrollTop=0;grid.scrollHeight=1500;grid.clientHeight=500;
  return {run:(minimum=null,refresh=null,deadline=started+5000)=>vm.runInContext('('+waitArtifactDiscoveryReady.toString()+')',realm)(page,task,deadline,trace,minimum,refresh),trace,task,page,
-  native:{form,store,card},
+  native:{form,store,card,grid},deadline:started+5000,settle,
   publishFile:({name,path,bytes,type=0})=>{records.splice(0,records.length,{data:{FileName:name,FilePath:path,id:path,Size:bytes,Type:type}});store.loadCount++;hit=grid;},
   onEvaluate:fn=>{onEvaluate=fn;},elapse:ms=>{elapsed+=ms;},waitDisposals,
   showDialog:()=>{dialog=true;},changeContext:()=>{realm.location.origin='https://foreign';},
@@ -207,6 +230,48 @@ function nativeFixture({empty=false,parent=false,blocked=false,loading=false,mas
   advanceLoad:()=>{store.loadCount++;},
   changeOwner:()=>{onWait=()=>{active={...card};};},get waits(){return waits;},get disposed(){return disposed;}};
 }
+
+test('discovery settles a same-directory load that covers the grid after readiness',async()=>{
+ for(const fault of [null,'already_settled','same_generation','foreign','owner','directory','deadline']){
+  const f=nativeFixture(),{grid,store}=f.native;let downloads=0,rootReads=0;
+  const snapshot={...f.task.snapshot,authenticated:true,origin:'https://test',loginom_build:'7.4.2',
+   dom_epoch:{document:'doc',revision:1},active_tab_ref:'tab',package_identity:null,
+   observation_root:{ref:'nav'},file_storage:{status:'observed',directory:'/user'},ui:{elements:[],masks:[],dialogs:[]}};
+  const task={...f.task,snapshot,deadline_at:f.deadline,operation_id:'verify',
+   artifact:{...f.task.artifact,bytes:42,upload:{directory:'/user'}}};
+  const tid='MF;TF-2;FileStorageForm;colName_source.csv';
+  const row={tid,ref:'file',label:'source.csv',storage_entry:{bytes:42}};
+  const assertNoScroll=()=>assert.equal(grid.scrollTop,0);
+  const page={...f.page,locator:selector=>{
+   assert.match(selector,/pnlFileStorage;tbl/);
+   return {count:async()=>1,isVisible:async()=>true,elementHandle:async()=>grid};
+  }};
+  if(fault==='owner')f.changeOwner();
+  if(fault==='deadline')f.failWait();
+  const observe=async(_page,options)=>{
+   const output=structuredClone(snapshot);
+   if(fault==='directory'&&store.loadCount===2)output.file_storage.directory='/foreign';
+   if(options.discover_roots&&++rootReads===1){
+    f.startBusy(fault==='foreign');
+    if(fault==='already_settled'||fault==='same_generation')f.onEvaluate(n=>{
+     if(n!==3)return;
+     f.settle();if(fault==='same_generation')store.loadCount--;
+    });
+   } else if(options.root_ref==='file'||options.discover_roots&&store.loadCount>=2)output.ui.elements=[row];
+   return {status:'SUCCEEDED',output};
+  };
+  const download=async(_page,verified)=>{
+   assertNoScroll();assert.equal(verified.file_ref,'file');downloads++;
+   return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true,trace:[]};
+  };
+  const result=await discoverArtifactAndDownload(page,task,observe,download);
+  const success=fault===null||fault==='already_settled';
+  assert.equal(result.status,success?'SUCCEEDED':'NOT_APPLIED',JSON.stringify({fault,error:result.error,trace:result.trace}));
+  assert.equal(result.cleanup_complete,true);assert.equal(downloads,success?1:0);
+  assertNoScroll();assert.equal(f.waits,['foreign','already_settled','same_generation'].includes(fault)?0:1);
+  if(fault==='foreign'||fault==='same_generation')assert.equal(result.error.code,'DISCOVERY_GRID_BLOCKED');
+ }
+});
 for(const fault of [null,'size','path','kind','owner','sender','pending','generation','unknown','conflict'])test('private package completion retains native owner, exact row and original receipt: '+fault,async()=>{
  const {completePackageUpload}=await import('../lib/artifact-discovery.mjs');
  const f=nativeFixture({empty:true});

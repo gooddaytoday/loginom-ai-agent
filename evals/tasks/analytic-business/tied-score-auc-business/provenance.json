@@ -1,0 +1,86 @@
+{
+  "task_id": "tied-score-auc-business",
+  "dataset_sha256": {
+    "auc_models.csv": "591d9de73bfebdb6c41ed22b1043bc4c77c995a0c3230ca02d1c55bf1f2602f2",
+    "auc_scores.csv": "8634f8ec5da591944b048b35118ff3daa65efb764df25d342b98880dd8f23e9e"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "62016421efbc32788029d777ca7c172937a1ca9e3147827b7b11ea0561ba08ac"
+  },
+  "reference_sha256": "cea01b1b92df2078f0aae469d8bcca8a7e9c61c1abcab49b0caa6f729ce57a4a",
+  "cli": {
+    "binary": "PRIVATE_QUALIFIED_CLI",
+    "version": "0.3.9-eval.20261113.29ea34.palette",
+    "profile": "PRIVATE_AUTHORING_PROFILE"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "PRIVATE_AUTHORING_URL",
+    "build": "7.4.2-test",
+    "container": "PRIVATE_AUTHORING_CONTAINER",
+    "package": "PRIVATE_AUTHORING_STORAGE/reference.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/auc_models.csv",
+        "storage": "PRIVATE_AUTHORING_STORAGE/1aca5303f5521609bf78f5409283dc520c02d302b0ae94b7b60c863d0b22964b-0-auc_models.csv",
+        "matches": true
+      },
+      {
+        "input": "data/auc_scores.csv",
+        "storage": "PRIVATE_AUTHORING_STORAGE/1aca5303f5521609bf78f5409283dc520c02d302b0ae94b7b60c863d0b22964b-1-auc_scores.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_e292a05f9ffeLipj3LdWM2F7Hv",
+    "skill_revision": "926a45ac279dc6aebdf34ccb4e7b8245601488b9b3384a3247b87b521d6513b2",
+    "exit_code": 0,
+    "started_at": "2026-11-13T21:35:07+00:00",
+    "duration_s": 1015,
+    "tokens": {
+      "input": 113608,
+      "output": 8728,
+      "reasoning": 594
+    },
+    "tool_calls": 52,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "PRIVATE_SCENARIO_URL",
+  "build_provenance": {
+    "base_commit": "29ea34e27b8f96ed27b744f639c9f48933f52443",
+    "reviewed_palette_patch": "54d5afd358",
+    "qualified_source_tree_sha256": "8960de91493f645f21010fccead6e5d41b7fdf9f6d08ebcda3ee7f32b280e59b",
+    "dirty_reviewed_palette_only": true
+  },
+  "authoring_budget": {
+    "global_started": 1,
+    "global_remaining": 2,
+    "attempt1": "unassisted shared detailed reference",
+    "business_authoring_attempts": 0
+  },
+  "cold": {
+    "first": "failed after15of18; UI_REFERENCE_OBSCURED, no settings/Save, cleanup confirmed; original retained",
+    "accepted": "cold2 viewport-only private caller change; all18 native nodes, new full CSV/check-rerun PASS, unchanged server LGP SHA, NoSave, cleanup confirmed"
+  },
+  "source_task": "tied-score-auc-detailed",
+  "shared_reference": true,
+  "authoring_form": "detailed"
+}

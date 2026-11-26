@@ -32,3 +32,6 @@ docs/node-development/**/fixtures/** -text
 docs/node-development/**/acceptance/**/data/** -text
 # Upstream recordings commit the SHA256 of these audio files.
 packages/ai/test/fixtures/audio/** -text
+
+# Product linter manifests describe byte-exact exported runtime files.
+packages/product/skills/package-linter/** -text

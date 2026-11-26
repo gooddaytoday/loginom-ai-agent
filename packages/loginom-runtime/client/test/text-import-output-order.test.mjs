@@ -146,7 +146,7 @@ console.log(JSON.stringify({trace,verified:mapped.verified}));
  assert.equal(result.status,0,result.stderr+result.stdout);
  assert.equal(JSON.parse(result.stdout).verified,true);
 });
-for(const mode of ['no-path','explicit-path','verified-path','auto-path','multiple-paths','mismatched-path'])test('existing import without a saved source skips layout capture: '+mode,()=>{
+for(const mode of ['no-path','explicit-path','verified-path','auto-path','multiple-paths','mismatched-path','stale-path'])test('existing import without a saved source skips layout capture: '+mode,()=>{
  // A discarded first configuration leaves no source and no output layout. Next
  // on an empty path opens a native error; refuse first or fill the path first.
  const result=spawnSync(process.execPath,['--experimental-test-module-mocks','--input-type=module','-e',`
@@ -157,7 +157,7 @@ const real=async name=>({...await import(href(name)+'?empty-source-real')});
 const {resolveTextImportEncoding}=await import(href('text-import-encoding.mjs'));
 const mode=process.argv[1],actions=[],utf8=resolveTextImportEncoding('UTF-8').label;
 const owner={status:'observed',node:{tid:'N'},path:[{tid:'wf',label:'Scenario'}]};
-let stage='graph',path='';
+let stage='graph',path=mode==='stale-path'?'/test/missing.csv':'';
 const field=value=>({status:'observed',value,input_ref:'path',display_ref:'path',owner_ref:'o'});
 const state=()=>({dom_epoch:{document:'doc',revision:1},prepared_node_context:{verified:true,surface:stage==='graph'?'graph':'wizard',tid:'N'},
  wizard:stage==='graph'?{status:'absent'}:{status:'observed',stage,root_ref:'W',root_tid:'W',owner_context:structuredClone(owner),
@@ -206,7 +206,7 @@ if(mode==='no-path'||mode==='multiple-paths'){
  assert.deepEqual(actions,[['close','text_import_file']]);
 } else {
  await assert.rejects(driver.configureTextImport(ctx,p),/STOP_AFTER_NEXT/);
- assert.deepEqual(actions,[['fill','text_import_file','/test/upload.csv',''],['press','text_import_file','Tab','/test/upload.csv'],
+ assert.deepEqual(actions,[['fill','text_import_file','/test/upload.csv',mode==='stale-path'?'/test/missing.csv':''],['press','text_import_file','Tab','/test/upload.csv'],
   ['wizard_step','text_import_file','text_import_format','/test/upload.csv']]);
 }
 assert.deepEqual(settings,original,'caller settings must remain unchanged');

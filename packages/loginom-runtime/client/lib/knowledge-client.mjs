@@ -28,7 +28,8 @@ const TOOLS = [
   { name: 'find', description: 'Search Loginom Help offline. Returns ranked fragments with their page URI, section breadcrumb and an excerpt; read the page with the read tool.', inputSchema: query },
   { name: 'search', description: 'Same as find: offline keyword search over Loginom Help with synonyms for Calculator functions.', inputSchema: query },
   { name: 'read', description: 'Read one or more Loginom Help pages by URI (.html links are mapped to the shipped .md pages). A directory URI returns its README page.', inputSchema: {
-    type: 'object', properties: { uris: { anyOf: [uri, { type: 'array', items: uri, minItems: 1, maxItems: 10 }] } }, required: ['uris'] } },
+    type: 'object', properties: { uris: { description: 'Pass a URI string for one page or a JSON array of URI strings for multiple pages.',
+      anyOf: [uri, { type: 'array', items: uri, minItems: 1, maxItems: 10 }] } }, required: ['uris'] } },
   { name: 'list', description: 'List pages and subdirectories under a Loginom Help directory URI, with page titles.', inputSchema: {
     type: 'object', properties: { uri, recursive: { type: 'boolean' } }, required: ['uri'] } },
   { name: 'tree', description: 'Show the Loginom Help directory tree with page titles, indented by depth.', inputSchema: {
@@ -239,7 +240,12 @@ function excerpt(body, words) {
 }
 
 function read(help, args) {
-  const list = Array.isArray(args.uris) ? args.uris : [args.uris];
+  let uris = args.uris;
+  // Some models stringify the array even though the tool accepts it directly.
+  if (typeof uris === 'string' && uris.trimStart().startsWith('[')) {
+    try { uris = JSON.parse(uris); } catch { /* Preserve scalar path handling. */ }
+  }
+  const list = Array.isArray(uris) ? uris : [uris];
   if (!list.length || list.length > 10 || list.some(item => typeof item !== 'string')) return failure('read: uris must be a URI or a list of up to 10 URIs.');
   const blocks = [];
   let found = 0;

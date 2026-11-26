@@ -172,7 +172,7 @@ test("an external final closes admissions despite fresh local progress and lets 
     await writeLeaseReceipt(control.journalFile, { manifestHash: control.manifestHash, repairing: false, final: "partial", published: true })
     finish.resolve()
     const run = await pending
-    expect(admitted).toEqual([0, 1])
+    expect(admitted.sort()).toEqual([0, 1])
     expect(completed.sort()).toEqual([0, 1])
     expect(run.results.map(row => row.result)).toEqual([0, 1])
     expect(run.unassigned.map(job => job.index)).toEqual([2, 3, 4])

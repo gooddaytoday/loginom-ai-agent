@@ -1,0 +1,59 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "programming.python"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "result.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "SKU",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Qty",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 41,
+          "SKU": "AB-12",
+          "Qty": 7
+        },
+        {
+          "Id": 42,
+          "SKU": "ZX-9",
+          "Qty": 0
+        },
+        {
+          "Id": 43,
+          "SKU": null,
+          "Qty": null
+        },
+        {
+          "Id": 44,
+          "SKU": "QQ-100",
+          "Qty": 12
+        }
+      ]
+    }
+  ]
+}

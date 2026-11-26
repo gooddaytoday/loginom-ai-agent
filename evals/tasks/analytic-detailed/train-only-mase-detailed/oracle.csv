@@ -1,0 +1,5 @@
+series_id,train_pairs,test_points,train_naive_mae,test_mae,mase,status
+T01,3,2,2.333333,1.500000,0.642857,ok
+T02,3,2,10.000000,1.500000,0.150000,ok
+T03,2,2,0.000000,4.500000,,undefined
+T04,2,3,1.000000,0.000000,0.000000,ok

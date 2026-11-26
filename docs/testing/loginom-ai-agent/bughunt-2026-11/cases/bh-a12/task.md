@@ -1,0 +1,1 @@
+В sales.db находится таблица sales с полями Region, Amount, Active. Прочитайте её SQL-запросом, включив только Active=1 и Amount>=10. Рассчитайте сумму Amount по Region. Итоговые поля Region и Total (вещественное), порядок по Region по возрастанию.

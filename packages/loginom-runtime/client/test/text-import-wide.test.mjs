@@ -211,6 +211,37 @@ for(const [observed,requested] of [[1,2],[9,2],[9,10]])test(`complete ${observed
  assert.equal(f.gestures,1,'only source-to-format transition; no column edits');
 });
 
+for(const layout of ['stale','already current','settled before refresh','still wrong'])test('changing delimiter in one wizard with '+layout+' definitions',async()=>{
+ const f=fixture(8),observe=f.channel.observe,act=f.channel.act;
+ f.parameters.format.delimiter=',';
+ let delimiter=';',refreshes=0,settled=layout==='already current';
+ f.channel.observe=async options=>{
+  const state=await observe({...options,ready:()=>true}),wizard=state.wizard;
+  if(layout==='settled before refresh'&&options.condition.includes('refresh available'))settled=true;
+  Object.assign(wizard.settings.fields.delimiter,{value:delimiter,owner_ref:'delimiter-owner',input_ref:'delimiter-input'});
+  state.ui.elements.push(
+   {tid:'delimiter-input',ref:'delimiter-input',allowed_actions:['set_wizard_field'],
+    wizard_field:{scope:'import_format',name:'delimiter',owner_ref:'delimiter-owner',root_ref:'wizard-ref'}},
+   {tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;btnRefreshAll',ref:'refresh-all',allowed_actions:['click']});
+  if(delimiter===';'||layout==='still wrong'||!settled&&!refreshes){
+   const definitions=wizard.import_columns;
+   definitions.fields=definitions.fields.slice(0,1);
+   Object.assign(definitions.page,{schema_id:'one',returned:1,total_columns:1,next_offset:null});
+  }
+  assert.equal(options.ready(state),true,options.condition);
+  return state;
+ };
+ f.channel.act=async action=>{
+  if(action.verb==='set_wizard_field'&&action.ref==='delimiter-input'){delimiter=action.text;return;}
+  if(action.verb==='click'&&action.ref==='refresh-all'){assert.equal(delimiter,',');refreshes++;return;}
+  return act(action);
+ };
+ const configure=()=>configureTextImportFields(f.channel,f.parameters,f.owner);
+ if(layout==='still wrong')await assert.rejects(configure,ImportColumnCountError);
+ else assert.equal((await configure()).columns.length,8);
+ assert.equal(refreshes,settled?0:1);
+});
+
 for(const fault of ['incomplete','changing','foreign_owner','transport'])test(`${fault} page is not converted to a typed count refusal`,async()=>{
  const f=fixture(9,{editLabels:true}),observe=f.channel.observe;
  f.parameters.columns=f.parameters.columns.slice(0,2);

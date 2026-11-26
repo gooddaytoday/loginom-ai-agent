@@ -1,0 +1,81 @@
+{
+  "task_id": "symmetric-revenue-bridge-business",
+  "dataset_sha256": {
+    "bridge_observations.csv": "43765c094c067595f5fbacc2160fb012e9f98bce4fe216489a0408c521d68fdf"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "2139d455586c13a9e38d37b4975ef6ff6e365b718f0ea30afc166a4c91ad3a94"
+  },
+  "reference_sha256": "cb33026a37e97b44ad054b726967926ba0c0a1cdddc0921447f713c3f5e2a649",
+  "cli": {
+    "binary": "PRIVATE_QUALIFIED_CLI",
+    "version": "0.3.9-eval.20261113.29ea34.palette",
+    "profile": "PRIVATE_AUTHORING_PROFILE"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "PRIVATE_AUTHORING_URL",
+    "build": "7.4.2-test",
+    "container": "PRIVATE_AUTHORING_CONTAINER",
+    "package": "PRIVATE_AUTHORING_STORAGE/reference.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/bridge_observations.csv",
+        "storage": "PRIVATE_AUTHORING_STORAGE/a748a0847e860f2caaf8dfb2ded7c0071d04edde3b41ca7856cf6783d642cc70-0-bridge_observations.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 2,
+    "total": 2,
+    "assisted": true,
+    "hint": "Сделай промежуточное штатное сохранение LGP после успешного расчёта и сортировки, до создания узла экспорта. Используй путь пакета из основного задания. Затем создай native-экспорт, получи полный итоговый CSV и выполни финальное сохранение. При неизвестном исходе операции используй её штатные inspect/recover, сохраняя исходный operation_id и результат.",
+    "session_id": "ses_e29c5a1d3ffeoBw0nOzwG7wv1c",
+    "skill_revision": "926a45ac279dc6aebdf34ccb4e7b8245601488b9b3384a3247b87b521d6513b2",
+    "exit_code": 0,
+    "started_at": "2026-11-13T18:45:09+00:00",
+    "duration_s": 719,
+    "tokens": {
+      "input": 97353,
+      "output": 5104,
+      "reasoning": 736
+    },
+    "tool_calls": 31,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "PRIVATE_SCENARIO_URL",
+  "build_provenance": {
+    "base_commit": "29ea34e27b8f96ed27b744f639c9f48933f52443",
+    "reviewed_palette_patch": "54d5afd358",
+    "qualified_source_tree_sha256": "8960de91493f645f21010fccead6e5d41b7fdf9f6d08ebcda3ee7f32b280e59b",
+    "dirty_reviewed_palette_only": true
+  },
+  "authoring_budget": {
+    "global_started": 2,
+    "global_remaining": 1,
+    "attempt1": "failed; no LGP/CSV; private evidence retained",
+    "attempt2": "shared detailed reference; assisted technical Save hint",
+    "business_authoring_attempts": 0
+  },
+  "cold": {
+    "first": "failed before native execution; private evidence retained",
+    "accepted": "cold2; all 9 native nodes; new full CSV; server LGP SHA unchanged; NoSave; cleanup confirmed"
+  },
+  "source_task": "symmetric-revenue-bridge-detailed",
+  "shared_reference": true,
+  "authoring_form": "detailed"
+}

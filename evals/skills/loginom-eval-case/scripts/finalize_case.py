@@ -3,6 +3,7 @@
 import datetime
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -56,8 +57,7 @@ def main(case_dir, attempt_dir, scenario_url):
         },
         "attempt": {
             "number": number,
-            # номера попыток идут подряд, а ранние попытки перестройки могут отсутствовать в WORK_ROOT
-            "total": max(number, sum(path.is_dir() for path in attempt.parent.glob("attempt-*"))),
+            "total": sum((path / "started-at").is_file() for path in attempt.parent.glob("attempt-*")),
             "assisted": hint_path.is_file(),
             "hint": hint_path.read_text(encoding="utf-8").strip() if hint_path.is_file() else None,
             "session_id": summary.get("sessionId"),
@@ -83,6 +83,18 @@ def main(case_dir, attempt_dir, scenario_url):
         }
     elif previous and previous.get("supersedes"):
         provenance["supersedes"] = previous["supersedes"]
+    private = os.open(attempt / "provenance.private.json", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(private, "w", encoding="utf-8") as output:
+        os.fchmod(output.fileno(), 0o600)
+        output.write(json.dumps(provenance, ensure_ascii=False, indent=2) + "\n")
+    provenance["cli"].update(binary="PRIVATE_QUALIFIED_CLI", profile="PRIVATE_AUTHORING_PROFILE")
+    provenance["loginom"].update(
+        url="PRIVATE_AUTHORING_URL", container="PRIVATE_AUTHORING_CONTAINER",
+        package="PRIVATE_AUTHORING_STORAGE/reference.lgp",
+        inputs=[{"input": path.name, "matches": True} for path in sorted((case / "data").glob("*"))],
+    )
+    provenance["attempt"].update(hint="PRIVATE_ASSISTANCE" if hint_path.is_file() else None, errors="PRIVATE_DIAGNOSTICS")
+    provenance["scenario_url"] = "PRIVATE_SCENARIO_URL"
     (case / "provenance.json").write_text(json.dumps(provenance, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(case / "provenance.json")
     return 0

@@ -44,7 +44,7 @@ const probe = "loginom_probe"
 // real one-second wake: about 1–2 s each locally, too close to the server package's 5 s default on a loaded runner.
 const timeout = 30_000
 const denied = "LOGINOM_SCOPE_DENIED"
-const bundled = ["loginom-automation", "package-docs", "loginom-dashboard"]
+const bundled = ["loginom-automation", "package-docs", "loginom-dashboard", "package-linter"]
 
 type PluginContext = Parameters<Parameters<typeof define>[0]["effect"]>[0]
 

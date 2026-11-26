@@ -18,7 +18,7 @@ import type { Info, ToolContext } from "@opencode/plugin/promise/tool"
 import { Tool } from "@opencode/schema/tool"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Option, Schema } from "effect"
-import { exactFileDigest } from "./file-profile-core"
+import { exactFileDigest, matchesExactWorkbookBytes, MAX_BYTE_ADMISSION } from "./file-profile-core"
 import { fileSnapshot } from "./file-snapshot"
 import { askWithdrawn } from "./permissions"
 
@@ -30,7 +30,15 @@ const sampleReceipt = Schema.decodeUnknownOption(
 const receiptKey = (sessionID: string, messageID: string, uri: string) =>
   `attachment-receipt:${sessionID}:${messageID}:${uri}`
 const carriedKey = (sessionID: string, compactionID: string) => `compacted-attachments:${sessionID}:${compactionID}`
-const decodeReceipt = Schema.decodeUnknownOption(Schema.Struct({ canonical_path: Schema.String }))
+const decodeReceipt = Schema.decodeUnknownOption(
+  Schema.Struct({
+    canonical_path: Schema.String,
+    size: Schema.Number,
+    mtime: Schema.Number,
+    ctime: Schema.Number,
+    file_id: Schema.String,
+  }),
+)
 const decodeCarried = Schema.decodeUnknownOption(
   Schema.Array(Schema.Struct({ message: Schema.String, uri: Schema.String })),
 )
@@ -39,7 +47,6 @@ const attachmentHint = ". Для CLI передайте файл через --fi
 // Metadata key of a rules-only check (0.4 `checkDeny`): this module's `permission.evaluate` hook settles it without
 // asking. A configured deny is decided before plugin hooks run, so it still fails the check.
 const check = "loginom.local-file.check"
-const limit = 16 * 1024 * 1024
 
 export type ReferenceHost = {
   reserveReference(userMessage: string, name: string, snapshot: ReferenceSnapshot): Promise<FileReference>
@@ -51,7 +58,7 @@ export type AdmitHost = ReferenceHost & {
 }
 /** The Host run that serves a session's current task, and the task's user message (0.4 `turnLifecycle`; B2.3). */
 export type Lease = { host: AdmitHost & { readonly generation: number }; userMessage: string }
-type Authorized = { sourcePath: string; canonicalPath: string; verifyAttachment?: () => Promise<unknown> }
+type Authorized = { sourcePath: string; canonicalPath: string; verifyAttachment?: (bytes?: Buffer) => Promise<unknown> }
 
 const admittedReferences = new WeakMap<ReferenceHost, Map<string, { sourcePath: string; artifact: unknown }>>()
 
@@ -148,7 +155,7 @@ export async function localFiles(
     const identity = await inspectReferenceFile(source.canonicalPath).catch((error) => {
       throw Error(hostErrorText(fileError(error)) + " Путь: " + source.sourcePath)
     })
-    if (identity.size > limit) {
+    if (identity.size > MAX_BYTE_ADMISSION) {
       const key = JSON.stringify([call.sessionID, userMessage, identity])
       const cache = admittedReferences.get(host) ?? new Map()
       admittedReferences.set(host, cache)
@@ -158,10 +165,10 @@ export async function localFiles(
       cache.set(key, result)
       return result
     }
-    const bytes = await fileSnapshot(source.canonicalPath, limit).catch((error) => {
+    const bytes = await fileSnapshot(source.canonicalPath, MAX_BYTE_ADMISSION).catch((error) => {
       throw Error(hostErrorText(error) + " Путь: " + source.sourcePath)
     })
-    await source.verifyAttachment()
+    await source.verifyAttachment(bytes)
     const artifacts = await host
       .admit(JSON.stringify(["local-file", call.messageID, call.id]), [
         { name: basename(source.canonicalPath), data: bytes.toString("base64") },
@@ -175,7 +182,7 @@ export async function localFiles(
 
   const snapshot = async (path: string, call: ToolContext) => {
     const source = await authorize(path, call)
-    const bytes = await fileSnapshot(source.canonicalPath, limit).catch((error) => {
+    const bytes = await fileSnapshot(source.canonicalPath, MAX_BYTE_ADMISSION).catch((error) => {
       throw Error(hostErrorText(error) + " Путь: " + source.sourcePath)
     })
     return {
@@ -268,23 +275,33 @@ export async function localFiles(
         const identity = Option.getOrUndefined(decodeReceipt(receipt))
         if (!identity)
           return (await realpath(path).catch(() => undefined)) === canonicalPath
-            ? { verify: async () => {} }
+            ? { verify: async (_bytes?: Buffer) => {} }
             : undefined
         if (path !== sourcePath && identity.canonical_path !== canonicalPath) return
         await checkDeny(path)
         await checkDeny(identity.canonical_path)
         return {
-          verify: async () => {
+          verify: async (bytes?: Buffer) => {
             const current = await inspectReferenceFile(path).catch((error) => {
               throw Error(hostErrorText(fileError(error)) + " Путь: " + path)
             })
-            if (JSON.stringify(current) !== JSON.stringify(receipt))
-              throw Error(hostErrorText("LOGINOM_FILE_CHANGED") + " Путь: " + path)
+            if (JSON.stringify(current) === JSON.stringify(receipt)) return
+            // 0.4.2: an exact scan of the same small workbook resolves a timestamp-only change.
+            if (
+              await matchesExactWorkbookBytes(
+                path,
+                identity,
+                () => exactFileDigest(identity, join(profiles, call.sessionID), "xlsx"),
+                bytes,
+              )
+            )
+              return
+            throw Error(hostErrorText("LOGINOM_FILE_CHANGED") + " Путь: " + path)
           },
         }
       }),
     )
-    const verifyAttachment = () => Promise.all(attached.map((entry) => entry?.verify()))
+    const verifyAttachment = (bytes?: Buffer) => Promise.all(attached.map((entry) => entry?.verify(bytes)))
     await verifyAttachment()
     if (!sampled && !attached.some(Boolean))
       await (async () => {

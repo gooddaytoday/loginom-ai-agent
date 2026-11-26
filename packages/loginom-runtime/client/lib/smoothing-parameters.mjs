@@ -4,6 +4,7 @@ export function validateSmoothingParameters(p,mode,request){
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>k==='smoothing'),'only smoothing rules supported; no variable bindings');
  need(request.target.kind!=='new'||Array.isArray(p.smoothing),'new node requires smoothing');
  need(request.mappings.every(m=>(m.fields??m.changes??[]).every(f=>f.source?.kind==='configured_field'&&(m.direction==='output'||f.excluded!==true))),'mappings require configured fields; input exclusions unsupported');
+ need(request.finish!=='close'||request.mappings.every(m=>m.direction!=='input'),'Close cannot commit input mappings');
  if(p.smoothing===undefined)return;
  need(Array.isArray(p.smoothing)&&p.smoothing.length<=128,'smoothing must contain at most 128 rules');
  const names=new Set();

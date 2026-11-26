@@ -25,8 +25,8 @@ test('validation reuses HTTP bytes with fresh cookies and authenticates every ne
     if(!request.url.startsWith('/app/')){response.statusCode=404;response.end();return;}
     cookies.push(request.headers.cookie??'');
     response.setHeader('Content-Type','text/html');
-    response.end(`<script src="/static.js"></script><div data-tid="LoginForm;Login;edtUsername"><input id="user"></div><div data-tid="LoginForm;Login;edtPassword"><input id="password" type="password"></div><button data-tid="LoginForm;Login;btnLogin" onclick="login()">Login</button><script>
-      async function login(){const r=await fetch('/login',{method:'POST',body:JSON.stringify({password:document.getElementById('password').value})});if(!r.ok)return;
+    response.end(`<script src="/static.js"></script><div data-tid="LoginForm;Login;edtUsername"><input id="user"></div><div id="password-field" data-tid="LoginForm;Login;edtPassword"><input id="password" type="password"></div><button data-tid="LoginForm;Login;btnLogin" onclick="login()">Login</button><script>
+      async function login(){const r=await fetch('/login',{method:'POST',body:JSON.stringify({password:document.getElementById('password').value})});if(!r.ok){window.Ext={getCmp:id=>id==='password-field'?{isVisible:()=>true,getActiveErrors:()=>['Invalid credentials']}:undefined};return;}
       window.bg={app:{Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:{UserName:document.getElementById('user').value}}}}}}};
       const a=document.createElement('div');a.dataset.tid='MF;cntMain;tlbMainToolbar;btnAvatar';a.textContent='user';document.body.append(a);}
       </script>`);

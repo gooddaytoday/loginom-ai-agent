@@ -1,0 +1,54 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "result.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 21,
+          "Amount": 12.5,
+          "Note": "Привет & + /"
+        },
+        {
+          "Id": 22,
+          "Amount": -3.25,
+          "Note": "возврат"
+        },
+        {
+          "Id": 23,
+          "Amount": 0.0,
+          "Note": ""
+        }
+      ]
+    }
+  ]
+}

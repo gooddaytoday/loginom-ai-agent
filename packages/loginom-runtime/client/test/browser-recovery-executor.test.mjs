@@ -167,6 +167,8 @@ test('T1: a refused release points to browser recovery instead of asking the use
   assert.equal(refused.output.ui_blocker, 'Ask the user to close it with Cancel.');
   assert.deepEqual(refused.output.next_step.arguments, { action: 'start', operation_id: 'apply' });
   assert.equal(refused.output.next_step.reason, 'NODE_RELEASE_REFUSED');
+  // A refused start is the end of this loop: the model must not bounce between release and start.
+  assert.match(refused.output.next_step.instruction, /refuses start.*do not repeat dock_operation_recover or start/);
   const advice = (await f.runtime.inspect({ operationId: 'apply' })).output;
   assert.equal(advice.next_steps[0].tool, 'dock_browser_recovery');
   const basis = f.runtime.browserRecoveryBasis('apply');

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readImportDefinitionPages,readOutputDefinitionPages} from '../lib/import-definition-pages.mjs';
+import {observeOutputDefinitionPage,readImportDefinitionPages,readOutputDefinitionPages} from '../lib/import-definition-pages.mjs';
 function fixture(count=12){const reads=[];return {reads,channel:{observe:async options=>{
  reads.push(options.importColumnPage.offset);const {offset,limit}=options.importColumnPage;
  const fields=Array.from({length:Math.min(limit,count-offset)},(_,i)=>({index:offset+i,status:'observed',name:'Field'+(offset+i)}));
@@ -56,7 +56,6 @@ test('output paging refuses an exhausted scroll boundary without a gesture',asyn
 });
 
 test('an addressed but clipped output field is scrolled into view before interaction',async()=>{
- const {observeOutputDefinitionPage}=await import('../lib/import-definition-pages.mjs');
  for(const fault of ['none','stalled','schema','lost']){
   let top=500,calls=0;
   const make=()=>({wizard:{stage:'output_mapping',output_columns:{definition_scroll_ref:'grid',fields:[{index:0,name:'A',label:'A',name_ref:'cell'}],page:{status:'complete_definition_page',schema_id:fault==='schema'&&calls?'other':'schema',offset:0,total_columns:80}}},ui:{elements:[
@@ -68,4 +67,67 @@ test('an addressed but clipped output field is scrolled into view before interac
   if(fault==='none'){const s=await request;assert.ok(s.ui.elements[1].allowed_actions.includes('click'));}else await assert.rejects(request);
   assert.equal(calls,1);
  }
+});
+
+function coveredFieldFixture({top=24,contentY=438,afterScroll,afterRead}={}) {
+ const field={index:2,name:'Amount',label:'Amount'};
+ const actions=[];
+ let reads=0;
+ const make=({root='wizard',covered=true}={})=>({
+  wizard:{stage:'output_mapping',root_ref:root,root_tid:'output-wizard',output_columns:{
+   definition_scroll_ref:'grid',fields:[{...field,name_ref:'amount'}],
+   page:{status:'complete_definition_page',schema_id:'schema',offset:0,total_columns:33}}},
+  ui:{elements:[
+   {ref:'grid',scroll:{ref:'grid',top,max_top:100},bounding_box:{y:300,height:150},
+    interaction:{state:'point_observed',point:{x:200,y:360}},allowed_actions:['scroll']},
+   {ref:'amount',bounding_box:{y:contentY-top,height:20},interaction:{state:covered?'point_not_observed':'point_observed'},
+    allowed_actions:covered?[]:['double_click']}
+  ]}
+ });
+ const channel={
+  observe:async options=>{
+   assert.deepEqual(options.outputColumnPage,{offset:0,limit:8});
+   reads++;
+   const state=make(actions.length?afterScroll:reads>1?afterRead:undefined);
+   if(!options.ready(state))throw Error('Observation deadline reached');
+   return state;
+  },
+  perform:async options=>{
+   assert.ok(options.ready(options.initialObservation));
+   const action=options.resolve(options.initialObservation);
+   assert.equal(action.verb,'scroll');
+   assert.equal(action.ref,'grid');
+   actions.push(action);
+   top+=action.delta_y;
+  }
+ };
+ return {actions,request:()=>observeOutputDefinitionPage(channel,{offset:0,field,fieldAction:'double_click'})};
+}
+
+test('a covered output field inside the grid box is revealed through its owned scroll grid',async()=>{
+ const f=coveredFieldFixture({afterScroll:{covered:false}});
+ const state=await f.request();
+ assert.deepEqual(f.actions,[{verb:'scroll',ref:'grid',delta_y:64}]);
+ assert.ok(state.ui.elements[1].allowed_actions.includes('double_click'));
+});
+
+test('an output field at the scroll boundary waits for a fresh unobscured observation',async()=>{
+ const f=coveredFieldFixture({top:100,contentY:500,afterRead:{covered:false}});
+ const state=await f.request();
+ assert.deepEqual(f.actions,[]);
+ assert.ok(state.ui.elements[1].allowed_actions.includes('double_click'));
+});
+
+test('a still-covered field or a replaced wizard cannot authorize the output gesture',async()=>{
+ for(const afterRead of [{covered:true},{root:'replacement-wizard',covered:false}]){
+  const f=coveredFieldFixture({top:100,contentY:500,afterRead});
+  await assert.rejects(f.request(),/Observation deadline reached/);
+  assert.deepEqual(f.actions,[]);
+ }
+});
+
+test('progress in the scroll grid alone does not authorize an output gesture',async()=>{
+ const f=coveredFieldFixture({afterScroll:{covered:true}});
+ await assert.rejects(f.request(),/Observation deadline reached/);
+ assert.deepEqual(f.actions,[{verb:'scroll',ref:'grid',delta_y:64}]);
 });

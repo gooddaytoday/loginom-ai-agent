@@ -1,0 +1,22 @@
+{
+  "required_type_fragments": [
+    "TBGImportTextFile",
+    "TBGCalcData",
+    "TBGExportTextFile"
+  ],
+  "linked_nodes": true,
+  "path": {
+    "from": "TBGImportTextFile",
+    "to": "TBGExportTextFile"
+  },
+  "inputs": {
+    "type_fragment": "TBGImportTextFile",
+    "suffixes": [
+      "bh_families.csv",
+      "bh_tests.csv"
+    ]
+  },
+  "forbidden_literals": [
+    "TBGJavaScript"
+  ]
+}

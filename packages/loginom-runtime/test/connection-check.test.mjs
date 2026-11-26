@@ -194,6 +194,9 @@ for (const [initial, password, expected] of [
         async waitFor() {},
       })
       const page = {
+        async waitForFunction() {
+          return { jsonValue: async () => "authenticated", dispose: async () => {} }
+        },
         async goto(url) {
           assert.equal(url, "http://example.test/app/?testable=true")
         },

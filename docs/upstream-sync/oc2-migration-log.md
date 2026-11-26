@@ -25833,3 +25833,82 @@ CLI кандидата собран с версией своего пакета 
 `LOGINOM_MANIFEST_TARGET_MISMATCH`. Выбран меньший путь без изменения входов `workflow_call`: G5 больше не сравнивает CLI с версией
 манифеста Desktop, а требует, чтобы имя архива содержало `-cli-<версия из cli-manifest.json>-` (`RELEASE_CLI_VERSION_MISMATCH`);
 проверка платформы, архитектуры, хешей файлов и коммита сохранена. Единая версия на весь прогон — отдельное решение этапа G.
+
+## B1.9b Слияние v0.4.2
+
+26.11.2026. Ветка `b19b-v042-sync` от `oc2-migration` (`fa731fbffd`), рабочее дерево `.claude/worktrees/b19b`. Основание — В-110:
+эталон 0.4 — выпуск `v0.4.2` (`2b328b36dd`) вместо `v0.4.0`. Bun 1.4.4 переносной, Node 24.19.0, `npm ci` клиента
+`loginom-runtime` и шаблона дашбордов; `LOGINOM_AI_AGENT_TEST_NODE` задан. Настоящая модель не вызывалась.
+
+**Итог: `v0.4.2` в истории ветки (`git merge-base --is-ancestor v0.4.2 HEAD` — код 0).** Клиент `packages/loginom-runtime`
+побайтно равен `v0.4.2` (`git diff v0.4.2 HEAD -- packages/loginom-runtime` пуст), в том числе чтение скрытой строки
+«Подключение» мастера импорта при `bg.app.IsFileConnectionHidden` в `workspace-ui.mjs`, нужное приёмке B6.1.
+Слияние: 292 коммита 0.4.0..0.4.2, `git diff fa731fbffd HEAD --stat` — 764 файла (334 `evals`, 208 `docs/testing/loginom-ai-agent`,
+140 `loginom-runtime`, 25 `product`, 12 `scripts`, 11 `.agents`, остальное мелочь). Версии остались v2 (`package.json`,
+`packages/desktop/package.json`, `bun.lock`, `packages/app/package.json` — `--ours`).
+
+### Решения по конфликтам
+
+| Файл 0.4.2 | Правка 0.4.1–0.4.2 | Решение |
+|---|---|---|
+| `package.json`, `bun.lock`, `packages/desktop/package.json` | версия 0.4.2 | как в v2 (B1.9, В-99) |
+| `.gitattributes`, `.gitleaksignore` | `package-linter/** -text`; игнор отпечатков #1231 в слияниях 0.4 | обе стороны |
+| `packages/loginom-agent/src/file-profile-core.ts`, `file-xlsx.ts`, `file-profile.ts`, тесты `file-profile-core`, `file-xlsx` | точные идентичности в профилях, SQLite/LGD как нативный импорт (`format_detected`), `MAX_BYTE_ADMISSION` | перенесено; пути `../../../loginom-runtime` -> `../../loginom-runtime`, `./loginom-file-xlsx` -> `./file-xlsx` |
+| `packages/loginom-agent/src/local-file.ts` (из `opencode/src/tool/loginom-local-file.ts`) | `MAX_BYTE_ADMISSION` вместо 16 МиБ; `verifyAttachment(bytes)` принимает книгу XLSX с изменившейся меткой времени, если точный скан и байты совпадают (`matchesExactWorkbookBytes`, `f0107e112b`) | перенесено вручную; квитанция вложения читается целиком (`canonical_path`, `size`, `mtime`, `ctime`, `file_id`), чтобы передать её в `exactFileDigest` |
+| `packages/loginom-agent/src/dock.ts` (из `turn-lifecycle.ts`) | системная строка: оценка качества пакета — `package-linter`, документация — `package-docs` (`541f530d32`) | перенесено, текст 0.4.2 дословно |
+| `packages/server/test/loginom-{access,dock-catalog,dashboard-files,permissions}.test.ts` | в 0.4.2 четыре встроенных навыка (`package-linter`) | список `bundled` дополнен; в `dock-catalog` три проверки текста вместо теста `turn-lifecycle` |
+| `packages/loginom-host/script/stage-resources.ts`, тест | `stageProductSkills` без `__pycache__`, `.pytest_cache`, `*.pyc` | обе стороны: функции v2 (`stageCrateNotices`) и 0.4.2 |
+| `evals/src/profile.ts`, `run.ts` | `hasPassword` в статусе, `expectedHasPassword` в `recoverIfNeeded` | порядок и `configured` из v2 (B2.7b), добавлены `passwordMatches`, `connectionConfigured` и аргумент `expectedHasPassword` |
+| `scripts/node-acceptance/run-check.py` | `--variant` | `--variant` добавлен к команде v2, настройка провайдера `openai` и ссылка на `auth.json` не возвращены |
+
+### Не перенесено
+
+Файлы удалены в v2 (пакет `opencode` заменён в `39a5ee597b`, приложение и Desktop переписаны); конфликт `modify/delete` решён
+в пользу v2 (`git rm`). Каждая строка — отдельная задача.
+
+| # | Файл 0.4.2 | Коммит | Что делает | Куда в v2 |
+|---|---|---|---|---|
+| 1 | `packages/app/src/constants/file-picker.ts`, `components/prompt-input/attachments.ts`, `components/prompt-input-v2.tsx`, `session-ui/src/v2/components/prompt-input/attachments.ts`, экспорт `./file-picker` в `app/package.json` | `b5b60e009b` | `.db`, `.lgd`, `.xls` при перетаскивании и вставке идут как ссылка на файл (`binaryReferenceMime`, `referenceFile`), без чтения байт; расширения добавлены в выбор файла | приложение v2 (B4): пути переехали, места нет. **Главная строка**: без неё SQLite, LGD и XLS из окна читаются байтами |
+| 2 | `packages/desktop/src/main/attachment-picker.ts`, `ipc.ts` (`referenceAttachment`) | `b5b60e009b` | выбор файла и IPC `reference-attachment` возвращают квитанцию с `mime` для бинарных данных | Desktop v2 (`packages/desktop/src/main`), нужен вместе со строкой 1 |
+| 3 | `packages/opencode/src/cli/cmd/run.ts` | `59fbda9ceb` | CLI `run` даёт квитанцию для `application/octet-stream` и `application/vnd.ms-excel` и без `--attach` | `packages/cli/src/run` |
+| 4 | `packages/opencode/src/product/attachment-resolver.ts` | `59fbda9ceb` | текст ссылки на вложение: для бинарных данных «loginom_file_admit», для остальных «loginom_file_profile» | в v2 нет резолвера вложений; вложения — `loginom-agent/src/index.ts` (B2.5d), `local-file.ts` |
+| 5 | тесты `app/test-browser/prompt-attachments.test.ts`, `desktop/src/main/attachment-picker.test.ts`, `opencode/test/cli/run/run-process.test.ts`, `opencode/test/product/attachment-resolver.test.ts` | `b5b60e009b`, `59fbda9ceb` | покрывают строки 1–4 | вместе со строками 1–4 |
+| 6 | `packages/opencode/test/tool/loginom-local-file.test.ts` (133 строки) | `f0107e112b`, `b5b60e009b` | повторный допуск двух просканированных книг после смены только метки времени, отказ при изменённых байтах или подмене | `packages/server/test/loginom-local-file.test.ts`; код перенесён, **теста на v2 нет** |
+| 7 | `desktop/test/loginom/product-skills-smoke.mjs`, `opencode/test/cli/tui/package-docs-pty.py`, `opencode/test/cli/bundled-skills.test.ts`, `opencode/test/skill/bundled-skills.test.ts`, `opencode/test/fixture/mcp-reserved-prompts.ts` | `23a3012f44`, `af7edb0c7a`, `103387e4d1` | матрица встроенных навыков установленной приёмки и охранных тестов: четыре навыка вместо трёх | приёмка установленного Desktop и CLI (B5/B6), `loginom-host/script/skills-acceptance` |
+
+Всего 7 строк.
+
+### Проверки
+
+Node 24.19.0 первым в `PATH`, `LOGINOM_AI_AGENT_TEST_NODE` задан, `bun test --timeout 60000`, `HOME=/root`, пробы только во временных корнях.
+
+```
+packages/product        bun test                           99 pass, 0 fail (трёх известных падений В-95 на этом дереве нет)
+packages/loginom-agent  bun test                           130 pass, 0 fail
+packages/server         bun test test/loginom-*.test.ts    174 pass, 2 skip, 0 fail
+packages/cli            bun test                           625 pass, 11 skip, 0 fail
+packages/desktop        bun test                           639 pass, 6 skip, 0 fail
+packages/loginom-host   bun test                           549 pass, 13 skip, 2 fail
+packages/loginom-runtime/client  node --test test/*.test.mjs   10278 pass, 40 fail, 107 skip
+evals                   bun test (test/profile.test.ts)    114 pass, 0 fail
+catalog-check.py код 0; apply-identity.py --check: would change: 0 files
+```
+
+- `loginom-host`: `archive verification preserves manifest modes under a private umask` и `actual managed entry reads live bridge
+  work and dispatching over private IPC` — те же два на базе `fa731fbffd` (запуск под root).
+- Клиент: 40 падений — все без Chromium (`browserType.launch: Executable doesn't exist`, `LOGINOM_DOCK_TEST_BROWSER must name the pinned Chromium executable`);
+  код клиента побайтно равен `v0.4.2`, правок v2 в нём нет. Приёмка B6.1 (импорт текстового файла) этим прогоном не проверена.
+- `evals` целиком: на базе 42 падения (root, Docker, systemd), после слияния были новые `verifyProfile credentials boundary 2–6`,
+  `modern password presence` и `recoverIfNeeded: unconfigured` — тесты 0.4.2 про `hasPassword`. Исправлено в `evals/src/profile.ts`:
+  проверка `connectionConfigured` при наличии `hasApiKey` или `hasPassword` в статусе, статус v2 без обоих полей принимается как раньше;
+  `profile.test.ts` — 114 зелёных. Новый тест 0.4.2 `prejournal budget refusal uses original evidence across authorization restart`
+  красный только под root (`_UID`/`getuid` в `analytics-measurements`, код `evals/src` равен `v0.4.2`); перепроверить не под root.
+- Находка в серверных тестах: в 0.4.2 четыре встроенных навыка, а фикстуры `server` держали три — `loginom-dock-catalog` «a task that grants
+  itself automation» падал, пока `package-linter` не добавлен в списки `bundled`.
+
+### Прочее, замеченное при слиянии
+
+- `.agents/`, `.claude/`, `.cursor/`: слились без конфликтов навыки `branch-cleaner` и перенос `harmonize-docs`, `design-cleanup` (инструменты разработки, не продукт).
+- `.gitleaksignore` получил отпечатки слияний 0.4 (`5f79f57f8d`, `11ed9673f8`) — они нужны `secrets range`.
+- `packages/product` (вместе с навыком `package-linter`) : 20 файлов отличаются от `v0.4.2` правками v2 (B1–B5), конфликтов не было.
+- `guarantees.md`, `catalog.md`: `v0.4.0` -> `v0.4.2` и «В-99» -> «В-110» там, где это эталон 0.4 для сравнения.

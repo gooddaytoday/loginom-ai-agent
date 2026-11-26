@@ -29,6 +29,19 @@ test('managed Close point requires the exact owned code page and uncovered butto
     getComputedStyle:()=>({visibility:'visible'}),innerWidth:100,innerHeight:100};
   const inspect=()=>vm.runInNewContext('('+inspectManagedJavascriptClosePoint.toString()+')(args,read)',context);
   assert.deepEqual({...inspect()},point);
+  for(const [name,index,count] of [['TuneDataSourceInputPortWizard',0,5],['JavaScriptColumnsWizard',1,5],['JavaScriptColumnsWizard',0,4]]){
+    const page={tid:'MF;TF-1;WizrdMCF;'+name,index,indicator_count:count,visible_editors:0};
+    context.args.task={...task,error_stage:'admission',admission_page:page,...(count===5?{inputPage:true}:{})};
+    context.read=()=>({ready:true,node_guid:'node',page:{...page}});
+    assert.deepEqual({...inspect()},{...point,page_tid:page.tid});
+    context.read=()=>({ready:true,node_guid:'node',page:{...page,index:index+1}});
+    assert.throws(inspect,/owner unavailable/);
+    context.read=()=>({ready:true,node_guid:'foreign',page:{...page}});
+    assert.throws(inspect,/owner unavailable/);
+    assert.equal(typeof vm.runInNewContext('('+makeJavascriptManagedClosePointCode(context.args.task)+')'),'function');
+  }
+  context.args.task=task;
+  context.read=()=>({ready:true,node_guid:'node',page:{tid:point.page_tid,visible_editors:1}});
   context.document.elementFromPoint=()=>null;
   assert.throws(inspect,/covered/);
 });

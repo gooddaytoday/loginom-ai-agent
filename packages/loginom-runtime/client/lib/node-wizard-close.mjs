@@ -61,10 +61,16 @@ const closeControl=s=>s.wizard?.status==='observed'
  &&s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnClose'&&e.allowed_actions?.includes('click')).length===1;
 // An open combo list of this wizard is read as the sole observation root and
 // hides btnClose. Only options proved by tid and root_ref to belong to it count.
-const ownedListOptions=(s,owner=s.wizard)=>s.wizard?.status==='observed'&&s.wizard.root_ref===owner?.root_ref
- &&s.wizard.root_tid===owner.root_tid?s.ui.elements.filter(e=>e.wizard_combo?.kind==='option'
-  &&e.wizard_combo.field?.root_ref===owner.root_ref&&e.tid?.startsWith(owner.root_tid+';')
-  &&e.allowed_actions?.includes('press')):[];
+const ownedListOptions=(s,owner=s.wizard)=>{
+ if(s.wizard?.status!=='observed'||s.wizard.root_ref!==owner?.root_ref||s.wizard.root_tid!==owner.root_tid)return [];
+ // JSON source-column options have no wizard_combo metadata in 7.4.2.
+ // Bind only the observed source-column portal of this exact owned wizard.
+ const jsonList=owner.root_tid+';JSONToTreeWizard;pedSourceColumn;ValueControl;boundlist';
+ const json=s.wizard.stage==='json_tree'&&s.observation_root?.identity?.anchor_tid===jsonList;
+ return s.ui.elements.filter(e=>e.allowed_actions?.includes('press')
+  &&(e.wizard_combo?.kind==='option'&&e.wizard_combo.field?.root_ref===owner.root_ref&&e.tid?.startsWith(owner.root_tid+';')
+   ||json&&e.role==='option'&&e.tid?.startsWith(jsonList+';')&&e.tid.slice(jsonList.length+1).length>0&&!e.tid.slice(jsonList.length+1).includes(';')));
+};
 
 export async function closePreparedWizard(channel,{initialObservation}={}) {
  let s=initialObservation??await channel.observe({condition:'prepared wizard can be cancelled',

@@ -1,0 +1,3 @@
+Status,Url
+404,https://httpbin.org/status/404
+500,https://httpbin.org/status/500

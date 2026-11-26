@@ -1,0 +1,73 @@
+{
+  "package_path": "/bughunt/bh-c01.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.group_data"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "transform.calculator"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": false,
+      "export_destination": "/bughunt/bh-c01.csv",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string"
+        },
+        {
+          "name": "Revenue",
+          "label": "Revenue",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "Север",
+          "Category": "Офис",
+          "Revenue": 18.75
+        },
+        {
+          "Region": "Север",
+          "Category": "Техника",
+          "Revenue": 60.25
+        },
+        {
+          "Region": "Центр",
+          "Category": "Офис",
+          "Revenue": 127.0
+        },
+        {
+          "Region": "Центр",
+          "Category": "Техника",
+          "Revenue": 391.5
+        },
+        {
+          "Region": "Юг",
+          "Category": "Офис",
+          "Revenue": 12.5
+        },
+        {
+          "Region": "Юг",
+          "Category": "Техника",
+          "Revenue": 101.0
+        }
+      ]
+    }
+  ]
+}

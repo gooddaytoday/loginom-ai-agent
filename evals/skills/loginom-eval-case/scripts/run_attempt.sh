@@ -17,7 +17,7 @@ if [ -z "${MODEL:-}" ]; then
   echo "в настройках нет MODEL" >&2
   exit 2
 fi
-if [ -e "$work/events.jsonl" ]; then
+if [ -e "$work" ]; then
   echo "попытка уже запускалась: $work" >&2
   exit 2
 fi
@@ -42,7 +42,11 @@ if [ -n "$existing" ]; then
   exit 2
 fi
 
-mkdir -p "$work"
+mkdir -p "$(dirname "$work")"
+if ! mkdir "$work" 2>/dev/null; then
+  echo "попытка уже запускалась: $work" >&2
+  exit 2
+fi
 printf '%s\n' "$name" > "$work/name"
 printf '%s\n' "$case_dir" > "$work.case"
 if ! bun "$here/prepare_attempt.ts" "$AGENT_REPO" "$case_dir" "$work" "/$LOGINOM_USERNAME/$name.lgp" "$name.result.csv"; then

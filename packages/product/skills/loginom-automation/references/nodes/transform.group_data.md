@@ -6,6 +6,7 @@
 В output mapping `configured_field.name` — текущее выходное имя: после apply с `measures` это `name` меры (например `Metric`) или имя ключа; не составляй имя из поля и функции (`Amount_Median`), если узел его не выдал.
 
 Для каждой меры задай `field: {kind: "input_field", name: "имя"}`, `function`, выходные `name`/`label`. Две меры одного поля могут иметь разные имена. Агрегаты выполняй Группировкой, не Калькулятором/JS.
+Долю внутри группы считай как `promoters / respondents`. Для доли от всех ответов используй `Stat("respondents", "Sum")` в знаменателе.
 
 - `median`: integer/real → real; без NULL, полностью NULL → NULL.
 - `mode`: integer/string/real/boolean/datetime/variant → тот же тип; без NULL, полностью NULL → 0/пустая строка/False/1899-12-30/NULL (Variant). Для скалярных типов при ничьей — наименьшее значение (Boolean → False; строки — по кодовым точкам, например Beta < alpha).

@@ -1,0 +1,80 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "programming.python"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "result.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Group",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Seq",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Value",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Mean2",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Group": "A",
+          "Seq": 1,
+          "Value": 10.0,
+          "Mean2": 10.0
+        },
+        {
+          "Group": "A",
+          "Seq": 2,
+          "Value": 6.0,
+          "Mean2": 8.0
+        },
+        {
+          "Group": "A",
+          "Seq": 3,
+          "Value": 18.0,
+          "Mean2": 12.0
+        },
+        {
+          "Group": "B",
+          "Seq": 1,
+          "Value": 4.0,
+          "Mean2": 4.0
+        },
+        {
+          "Group": "B",
+          "Seq": 2,
+          "Value": 20.0,
+          "Mean2": 12.0
+        },
+        {
+          "Group": "B",
+          "Seq": 3,
+          "Value": 9.0,
+          "Mean2": 14.5
+        }
+      ]
+    }
+  ]
+}

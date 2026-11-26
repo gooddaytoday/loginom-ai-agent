@@ -6,8 +6,14 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 const fail = code => { throw Error(code); };
 const milliseconds = ns => Number(ns/1000000000n)*1000+Number(ns%1000000000n)/1000000;
-const identity = (canonical_path,s) => ({canonical_path,size:Number(s.size),mtime:milliseconds(s.mtimeNs),ctime:milliseconds(s.ctimeNs),
-  mtime_ns:String(s.mtimeNs),ctime_ns:String(s.ctimeNs),file_id:`${s.dev}:${s.ino}`});
+// Keep the device and inode from bigint stats exact in JSON.
+export const fileStatIdentity = s => ({
+  size:Number(s.size),mtime:milliseconds(s.mtimeNs),ctime:milliseconds(s.ctimeNs),file_id:`${s.dev}:${s.ino}`,
+});
+const identity = (canonical_path,s) => {
+  const {size,mtime,ctime,file_id}=fileStatIdentity(s);
+  return {canonical_path,size,mtime,ctime,mtime_ns:String(s.mtimeNs),ctime_ns:String(s.ctimeNs),file_id};
+};
 const same = (a,b) => ['canonical_path','size','mtime','ctime','mtime_ns','ctime_ns','file_id'].every(k=>a[k]===b[k]);
 const checkAbort = signal => { if(signal?.aborted)fail('LOGINOM_UPLOAD_CANCELLED'); };
 const mapError = (error,granted=false) => {
@@ -82,7 +88,24 @@ export async function openReferenceFile(snapshot,{signal}={}) {
     checkAbort(signal);
     file=await open(snapshot.canonical_path,constants.O_RDONLY|(constants.O_NOFOLLOW??0)|(constants.O_NONBLOCK??0));
     await verify();
-    return {verify,close:()=>file.close()};
+    return {
+      verify,
+      async readBytes(maxBytes) {
+        if(!Number.isSafeInteger(maxBytes)||maxBytes<0)fail('LOGINOM_INPUT_INVALID');
+        if(snapshot.size>maxBytes)fail('LOGINOM_FILE_TOO_LARGE');
+        const bytes=Buffer.alloc(snapshot.size);
+        let offset=0;
+        while(offset<bytes.length) {
+          checkAbort(signal);
+          const {bytesRead}=await file.read(bytes,offset,bytes.length-offset,offset);
+          if(!bytesRead)fail('LOGINOM_FILE_CHANGED');
+          offset+=bytesRead;
+        }
+        await verify();
+        return bytes;
+      },
+      close:()=>file.close(),
+    };
   } catch(error) { await file?.close();mapError(error,true); }
 }
 

@@ -44,7 +44,15 @@ test('each supported regression selection mode delivers complete import and outp
  assert.match(enter.guidance,/Сводка качества модели с F\/p — `statistics:"coefficients"`/);
  assert.match(enter.guidance,/F\/p сводки \(порт 2\) не требует `full`/);
  assert.match(enter.guidance,/SE\/t\/p\/95% границы \*\*коэффициентов\*\* — по запросу: `mode:"enter"`, `linear_regression:\{statistics:"full"\}` — порт 1/);
+ assert.match(enter.guidance,/значимость фактора по `<target>_PValue` порта 1\. При расхождении укажи `ModelPValue` отдельно/);
  assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/datamining.lin_regression.md')))<=6000);
+});
+
+test('Pearson guidance uses one node for pairs from the same input',async t=>{
+ const source=await createBundledSkillFixture(t);
+ const loader=createSkillLoader({resources:source.resources});
+ const [description]=await loader.describeNodes([{type:'research.corr_analysis',modes:NODE_TYPES['research.corr_analysis'].modes}],['pearson']);
+ assert.match(description.guidance,/Для пар из одной таблицы используй один узел/);
 });
 
 test('text Import delimited guidance keeps every rule in compact English',async t=>{

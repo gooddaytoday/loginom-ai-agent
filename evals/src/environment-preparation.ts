@@ -9,6 +9,7 @@ import { prepareUserStorage, readServerObservation, verifyParallelPair } from ".
 import { checkIsolatedLoginom } from "./preflight"
 import { assertAuth, ensureProfile, management, parseView, setupProfile, verifyProfile } from "./profile"
 import { assertSessionBackupEmpty, cleanupSlotStorage } from "./slot-storage"
+import { captureUnitBinding } from "./process-supervisor"
 import { acquireEnvironmentLeases, loadSlots, type SlotFile, type SlotLease } from "./slots"
 import { reconcileEnvironment } from "./startup-reconciliation"
 import { readUserConfiguration, readUserOwnership, readUserPreparation, stageUserPreparation } from "./user-environment"
@@ -62,7 +63,7 @@ async function checkEnvironment(input: { slotsFile: string; parallel: number; co
   const commandId = crypto.randomUUID(), journal = path.join(file.controller.stateDir, `${operation}-command-${commandId}.json`)
   const receipt = path.join(file.controller.stateDir, `${operation === "prepare" ? "preparation" : "verification"}-${commandId}.json`)
   const record = { version: 2, kind: "unactivated-preparation", commandId, identity,
-    slotIds: file.slots.slice(0, input.parallel).map(slot => slot.id), phase: "unactivated" }
+    unitBinding: await captureUnitBinding(), slotIds: file.slots.slice(0, input.parallel).map(slot => slot.id), phase: "unactivated" }
   await writeLeaseReceipt(journal, record)
   const environment = await acquireEnvironmentLeases(file, input.parallel, identity, journal, lockRoot)
   try {

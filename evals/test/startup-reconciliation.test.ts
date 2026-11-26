@@ -36,6 +36,23 @@ test("startup uses supervisor cleanup and refuses unknown prior processes before
   } finally { await rm(root, { recursive: true }) }
 })
 
+test("legacy management without a unit binding retains a known cleanup denial", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-startup-legacy-denial-"))
+  const directory = path.join(root, "management-command-a/status")
+  const source = path.join(directory, "cleanup.json")
+  try {
+    await mkdir(directory, { recursive: true, mode: 0o700 })
+    await writeLeaseReceipt(source, { processes: { status: "failed", capture_complete: true, observation_mode: "continuous",
+      error: "Cannot inspect process identity PID 42: Process UID changed (proc_uid=0, starttime=unknown, state=unknown)",
+      unknownProcesses: [], lifetime: { producer_pid: 12 } } })
+    const original = await Bun.file(source).text()
+    await expect(readStartupManagement({ stateDir: root, commandId: "command", slotId: "a", producerPid: 12 }))
+      .rejects.toThrow("STARTUP_PROCESS_CLEANUP_UNCONFIRMED")
+    expect(await Bun.file(source).text()).toBe(original)
+    expect(await Bun.file(`${source}.unit-exit.json`).exists()).toBe(false)
+  } finally { await rm(root, { recursive: true }) }
+})
+
 test("startup retains unknown prior admin ownership and refuses proof-only release", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-startup-unknown-")), fixture = await parallelFixture(root)
   const identity = { containerId: "a".repeat(64), startedAt: "2026-10-16T10:00:00Z", serverEpoch: "b".repeat(64),

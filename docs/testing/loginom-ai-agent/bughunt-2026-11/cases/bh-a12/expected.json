@@ -1,0 +1,42 @@
+{
+  "nodes": [
+    {
+      "type": "imports.database",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-a12-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Total",
+          "label": "Total",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "Total": 537.0
+        },
+        {
+          "Region": "South",
+          "Total": 547.08
+        }
+      ]
+    }
+  ]
+}
