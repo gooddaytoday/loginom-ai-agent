@@ -25576,3 +25576,15 @@ Run 45781034385 (`83133f7968`) не создал заданий: в `env:` ур�
 в строках `WORK`, `INPUT`, `RELEASE`). Ветка `b52b2-release`: пути задаются шагом «Set the work paths»
 (`echo "WORK=$RUNNER_TEMP/work" >> "$GITHUB_ENV"` и т. д.) в трёх `verify-*`. `actionlint` 1.7.7 по пяти workflow
 (release, linux, windows, macos, pty) — 0 строк; `product` 0 падений; `catalog-check` 0; `apply-identity --check` 0 файлов.
+
+### B5.1j-fix: разделитель пути в тесте electron-builder
+
+Ветка `b51j2-windows-fix` от `oc2-migration` (`3613dc28ed`). Run 45779602282 (`ca9d9bc1c6`): сборка, проверка кандидатов, CLI ZIP и
+safeStorage прошли; `Run package-local checks` упал в `electron-builder.config.test.ts` (3 из 44, «channel identity»): путь
+источника `fpm` для metainfo на Windows идёт с `\`, а регулярное выражение ждало `/`. deb и rpm собираются только на Linux,
+продукт не менялся; локально шаг Desktop даёт 44 теста, 0 fail (после `npm ci` клиента `loginom-runtime`); в тесте перед именем допустимы оба разделителя (`[\\/]`). Локально тест 27 pass.
+Следующий шаг (`Install, launch and uninstall Desktop candidate`): тот же класс ошибки искал в `windows-installed-smoke.ps1`
+и `windows-sidecar-smoke.mjs` — сравнение путей навыков уже приводит `\` к `/` (`key()`), родные пути идут через `Join-Path`;
+правок не нужно. Шаг выполнится впервые, остальное проверит CI.
+Проверки: `product` 104 pass, 0 fail; `actionlint` для `loginom-windows.yml` 0 строк; `catalog-check.py` 0; `apply-identity
+--check` 0 файлов; `bun run check` 0.
