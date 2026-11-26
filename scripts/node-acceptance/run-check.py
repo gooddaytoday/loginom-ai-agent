@@ -2602,6 +2602,7 @@ class Runner:
         self.current = None
         self.db_prompt = DatabasePrompt()
         self.db_case_active = False
+        self.closing_live = self.cancel_requested = False
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(('MULTICA_', 'CODEX_'))}
         self.env['LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT'] = self.options.get('viewport', '1280x800')
         self.env.update(LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS='false', HTTP_PROXY='http://127.0.0.1:2080', HTTPS_PROXY='http://127.0.0.1:2080', NO_PROXY='localhost,127.0.0.1,::1,app.loginom.ai,mcp.loginom.ai,mas.kartamyshev.dev')
@@ -3218,6 +3219,16 @@ class Runner:
                                      **({'stdin': prompt} if db_task else {}),
                                      **({'check_exit': False} if port_output else {}))
         events = list(records(folder / 'model.stdout'))
+        if live:
+            terminal = next(((line, event['error']['name']) for line, event in reversed(events)
+                             if event.get('source') == 'standalone_tool_outcome'), None)
+            if terminal:
+                line, code = terminal
+                location = f'{folder / "model.stdout"}:{line}'
+                if not (port_output and code == 'CLI_TOOL_FAILED' and live.turn_saved):
+                    raise RuntimeError(f'{code}: {location}')
+                self.current['cli_exit'] = dict(code=code, location=location)
+                self.close_live(live)
         if exit_status:
             cli_error = next((line for line, event in reversed(events)
                               if event.get('type') == 'error' and (event.get('error') or {}).get('name') == 'CLI_TOOL_FAILED'), None)
@@ -3597,7 +3608,8 @@ class Runner:
             assert matched_trees, 'TREE_SELECTED_READ_MISSING'
             self.current['tree-read'] = 'PASS'
         if live:
-            self.current['cleanup'] = 'pending live shutdown'
+            if live.child is not None:
+                self.current['cleanup'] = 'pending live shutdown'
         else:
             cleanups = [read(p) for p in profile.rglob('package-cleanup.json' if spec.get('two_turn') else 'saved-package-cleanup.json')]
             acks = [read(p) for p in profile.rglob('runtime-close-*.json')]
@@ -4033,32 +4045,79 @@ class Runner:
     def close_live(self, live):
         if live.child is None:
             return
-        browser, saved = live.browser, live.saved
+        cancellation_pending = getattr(self, 'cancel_requested', False)
+        self.closing_live = True
         cleanup = 'FAIL'
         try:
+            close_error = None
             try:
                 live.close()
-            except AssertionError as error:
-                raise PackageCloseUnconfirmed(str(error)) from error
-            if not browser:
-                raise PackageCloseUnconfirmed('LIVE_CHAIN_BROWSER_CLEANUP_UNCONFIRMED')
-            receipt_path = browser[2] / 'package-cleanup.json'
-            receipt = read(receipt_path) if receipt_path.is_file() else {}
-            if not (saved and receipt.get('status') == 'SUCCEEDED' and receipt.get('package_closed') is True
-                    and receipt.get('logged_out') is True and receipt.get('unsaved_changes_discarded') is False
-                    and receipt.get('account') == live.account and receipt.get('package_path') == live.package
-                    and receipt.get('document_id') == saved.get('document_id')):
-                raise PackageCloseUnconfirmed('LIVE_CHAIN_PACKAGE_CLEANUP_UNCONFIRMED')
-            acks = [read(path) for path in (live.profile / 'loginom/runtime').glob('runtime-close-*.json')
+            except InterruptedError:
+                raise
+            except (AssertionError, OSError) as error:
+                if live.child is not None:
+                    raise PackageCloseUnconfirmed(str(error)) from error
+                close_error = 'LIVE_CHAIN_CLI_CLOSE_UNCONFIRMED'
+
+            def close_evidence(path):
+                try:
+                    value = read(path)
+                except (OSError, ValueError):
+                    return {}
+                return value if isinstance(value, dict) else {}
+
+            attempts = live.segment_attempts()
+            acks = [close_evidence(path) for path in (live.profile / 'loginom/runtime').glob('runtime-close-*.json')
                     if path not in live.previous_acks]
-            if len(acks) != 1 or acks[0].get('closed_ack') is not True:
+            ack = len(acks) >= len(attempts) and all(
+                item.get('closed_ack') is True and item.get('exit_code') == 0 and item.get('exit_signal') is None
+                for item in acks)
+            try:
+                end = time.monotonic() + 5
+                remaining = live.remaining_browsers()
+                while remaining and time.monotonic() < end:
+                    time.sleep(0.1)
+                    remaining = live.remaining_browsers()
+                chromium_exited = not remaining and (not attempts or bool(live.browsers_seen) or ack)
+            except OSError:
+                chromium_exited = False
+
+            package_closed = logged_out = None
+            if attempts:
+                package_closed = logged_out = True
+                for attempt in attempts:
+                    path = attempt / 'package-cleanup.json'
+                    receipt = close_evidence(path)
+                    owned = (receipt.get('account') == live.account and receipt.get('package_path') == live.package
+                             and bool(receipt.get('document_id')))
+                    if live.saved and live.browser and attempt == live.browser[2]:
+                        owned = owned and receipt.get('document_id') == live.saved.get('document_id')
+                    package_closed &= (owned and receipt.get('package_closed') is True
+                                       and receipt.get('unsaved_changes_discarded') is False)
+                    logged_out &= owned and receipt.get('logged_out') is True and receipt.get('status') == 'SUCCEEDED'
+
+            proof = dict(cli_exited=True, cli_shutdown_confirmed=close_error is None, chromium_exited=chromium_exited,
+                         package_closed=package_closed, logged_out=logged_out,
+                         runtime_ack=ack if acks or attempts else None, attempts=len(attempts))
+            with live.turn_log.open('a') as log:
+                print(json.dumps(dict(event='cleanup_verified', at=time.time(), **proof)), file=log)
+            if not chromium_exited:
+                raise PackageCloseUnconfirmed('LIVE_CHAIN_CHROMIUM_EXIT_UNCONFIRMED')
+            if package_closed is False or logged_out is False:
+                raise PackageCloseUnconfirmed('LIVE_CHAIN_PACKAGE_CLEANUP_UNCONFIRMED')
+            if not ack:
                 raise PackageCloseUnconfirmed('LIVE_CHAIN_RUNTIME_ACK_MISSING')
-            cleanup = 'main PASS'
+            if close_error:
+                raise PackageCloseUnconfirmed(close_error)
+            cleanup = 'main PASS' if attempts else 'no workspace started'
         finally:
             self.current['cleanup'] = cleanup
             for turn in self.current['turns']:
                 if turn.get('cleanup') == 'pending live shutdown':
                     turn['cleanup'] = cleanup
+            self.closing_live = False
+            if not cancellation_pending and getattr(self, 'cancel_requested', False):
+                raise InterruptedError('LIVE_CHAIN_CANCELLED')
 
     def run(self):
         try:
@@ -4219,10 +4278,15 @@ class Runner:
                     if live and live.child is not None:
                         try:
                             self.close_live(live)
+                        except InterruptedError as error:
+                            self.failure(r, error, folder)
+                            raise
                         except Exception as error:
                             r['live_cleanup_error'] = str(error)
                             if r['status'] not in ('FAIL', 'UNKNOWN'):
                                 self.failure(r, error, folder)
+                            if live.child is not None:
+                                raise  # Do not start another scenario with a live CLI.
                     if r.get('dataset'):
                         try: self.cleanup_d87(folder, login, build)
                         except Exception as error:
@@ -4251,13 +4315,11 @@ def main():
     if args.command == '_worker':
         runner = Runner(args.directory.resolve())
         if runner.options.get('live_chain'):
-            interrupted_once = False
-
             def interrupted(signum, frame):
-                nonlocal interrupted_once
-                if not interrupted_once:
-                    interrupted_once = True
-                    raise InterruptedError('LIVE_CHAIN_CANCELLED')
+                if not runner.cancel_requested:
+                    runner.cancel_requested = True
+                    if not runner.closing_live:
+                        raise InterruptedError('LIVE_CHAIN_CANCELLED')
 
             signal.signal(signal.SIGINT, interrupted)
             signal.signal(signal.SIGTERM, interrupted)

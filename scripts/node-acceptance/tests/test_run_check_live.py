@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from run_check_live import LiveChain, browser_owner, write_events
+from run_check_live import LiveChain, browser_owner, tool_failure, write_events
 
 
 class LiveChainTest(unittest.TestCase):
@@ -62,9 +62,13 @@ class LiveChainTest(unittest.TestCase):
                 self.assertIsNone(browser_owner(-1, profile, executable))
                 self.assertIsNotNone(found)
                 self.assertEqual((found[0], found[2]), (children[0], browser_dir.parent))
+                live = LiveChain(profile, profile, profile, 'test-user', '/test-user/sample.lgp',
+                                 'p/m', '', lambda: 99, executable)
+                self.assertEqual(live.remaining_browsers(), {children[0]})
             finally:
                 released.set()
                 task.result()
+            self.assertEqual(live.remaining_browsers(), set())
 
     def test_live_turn_stops_as_soon_as_operator_input_is_required(self):
         with TemporaryDirectory() as directory:
@@ -102,15 +106,282 @@ class LiveChainTest(unittest.TestCase):
                 status='SUCCEEDED', package_closed=True, logged_out=True, unsaved_changes_discarded=False,
                 account=live.account, package_path=live.package, document_id='document'
             )))
+            live.segment_attempts.return_value = {attempt}
+            live.browsers_seen = {live.browser}
+            live.remaining_browsers.return_value = set()
+            live.turn_log = profile / 'live-turns.jsonl'
             runner.current = {'turns': [{'cleanup': 'pending live shutdown'}]}
             with self.assertRaisesRegex(runner_module['PackageCloseUnconfirmed'], 'LIVE_CHAIN_RUNTIME_ACK_MISSING'):
                 runner.close_live(live)
             self.assertEqual(runner.current['turns'][0]['cleanup'], 'FAIL')
             ack = attempt.parent / 'runtime-close-current.json'
-            ack.write_text(json.dumps({'closed_ack': True}))
+            ack.write_text(json.dumps({'closed_ack': True, 'exit_code': 0, 'exit_signal': None}))
             runner.current['turns'][0]['cleanup'] = 'pending live shutdown'
             runner.close_live(live)
             self.assertEqual(runner.current['turns'][0]['cleanup'], 'main PASS')
+
+    def test_interrupted_close_retains_handle_and_drains_on_retry(self):
+        with TemporaryDirectory() as directory:
+            profile = Path(directory)
+            live = LiveChain(profile, profile, profile, 'test-user', '/test-user/sample.lgp', 'p/m', '',
+                             Mock(side_effect=OSError('daemon unavailable')), Path(sys.executable))
+            child = live.child = Mock(pid=42, returncode=None)
+            child.poll.side_effect = lambda: child.returncode
+            terminal = live.terminal = Mock()
+            live.master, slave = os.openpty()
+            master = live.master
+            try:
+                with patch.object(live, 'send', side_effect=InterruptedError('cancelled')):
+                    with self.assertRaises(InterruptedError):
+                        live.close()
+                self.assertIs(live.child, child)
+                self.assertEqual(live.master, master)
+                terminal.close.assert_not_called()
+                os.fstat(master)
+
+                # The daemon PID was verified at startup. Shutdown does not
+                # depend on contacting the daemon again.
+                live.checked_daemon_pid = 99
+                child.terminate.side_effect = lambda: setattr(child, 'returncode', 0)
+                with patch.object(live, 'send', side_effect=OSError('terminal gone')):
+                    live.close()
+                child.terminate.assert_called_once()
+                live.daemon_pid.assert_not_called()
+                self.assertIsNone(live.child)
+                self.assertIsNone(live.master)
+                terminal.close.assert_called_once()
+            finally:
+                os.close(slave)
+                if live.master is not None:
+                    os.close(live.master)
+
+    def test_daemon_lookup_failure_prevents_spawn(self):
+        with TemporaryDirectory() as directory:
+            profile = Path(directory)
+            live = LiveChain(profile, profile, profile, 'test-user', '/test-user/sample.lgp', 'p/m', '',
+                             Mock(side_effect=OSError('daemon unavailable')), Path(sys.executable))
+            with patch('run_check_live.subprocess.Popen') as spawn:
+                with self.assertRaises(OSError):
+                    live.start('unused', None, {}, time.monotonic() + 10)
+            spawn.assert_not_called()
+            self.assertIsNone(live.child)
+            self.assertIsNone(live.master)
+
+    def test_failed_first_turn_checks_native_cleanup_and_chromium_without_a_completed_turn(self):
+        module = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'run-check.py'))
+        runner = module['Runner'].__new__(module['Runner'])
+        runner.current = {'turns': [{'cleanup': 'pending live shutdown'}]}
+        with TemporaryDirectory() as directory:
+            profile = Path(directory)
+            attempt = profile / 'loginom/runtime/attempt'
+            attempt.mkdir(parents=True)
+            live = Mock(profile=profile, browser=None, saved=None, previous_acks=set(),
+                        account='test-user', package='/test-user/sample.lgp', turn_log=profile / 'live-turns.jsonl')
+            live.segment_attempts.return_value = {attempt}
+            live.remaining_browsers.return_value = {42}
+            receipt = attempt / 'package-cleanup.json'
+            body = dict(status='SUCCEEDED', package_closed=True, logged_out=True, unsaved_changes_discarded=False,
+                        account=live.account, package_path=live.package, document_id='document')
+            receipt.write_text(json.dumps(body))
+            (attempt.parent / 'runtime-close-current.json').write_text(json.dumps(dict(closed_ack=True, exit_code=0)))
+            with patch.object(module['time'], 'monotonic', side_effect=[0, 6]):
+                with self.assertRaisesRegex(module['PackageCloseUnconfirmed'], 'LIVE_CHAIN_CHROMIUM_EXIT_UNCONFIRMED'):
+                    runner.close_live(live)
+            proof = json.loads(live.turn_log.read_text().splitlines()[-1])
+            self.assertEqual([proof[key] for key in ('chromium_exited', 'package_closed', 'logged_out')], [False, True, True])
+            live.remaining_browsers.return_value = set()
+            receipt.write_text(json.dumps(dict(body, logged_out=False)))
+            with self.assertRaisesRegex(module['PackageCloseUnconfirmed'], 'LIVE_CHAIN_PACKAGE_CLEANUP_UNCONFIRMED'):
+                runner.close_live(live)
+            receipt.write_text(json.dumps(body))
+            runner.close_live(live)
+            self.assertEqual(runner.current['cleanup'], 'main PASS')
+
+            def cancel_during_close():
+                self.assertTrue(runner.closing_live)
+                runner.cancel_requested = True
+
+            live.close.side_effect = cancel_during_close
+            with self.assertRaisesRegex(InterruptedError, 'LIVE_CHAIN_CANCELLED'):
+                runner.close_live(live)
+            self.assertEqual(runner.current['cleanup'], 'main PASS')
+            self.assertTrue(json.loads(live.turn_log.read_text().splitlines()[-1])['logged_out'])
+
+    def test_cli_failure_policy_matches_standalone_for_current_tool_events(self):
+        def event(tool, *, status='completed', args=None, error=None, metadata=None, id='tool'):
+            return dict(type='tool_use', part=dict(tool=tool, id=id, sessionID='chat',
+                state=dict(status=status, input=args or {}, error=error, metadata=metadata or {})))
+
+        refused = event('loginom_dock_prepare', status='error', args={'intent': 'open_package'},
+                        error='LOGINOM_ACCOUNT_MISMATCH')
+        config = event('loginom_dock_prepare', status='error', error='LOGINOM_CONFIG_REQUIRED')
+        retry = event('loginom_dock_prepare', args={'intent': 'open_package'})
+        pending = event('loginom_dock_prepare', args={'intent': 'open_package'}, metadata={'loginomPending': True})
+        invalid = event('invalid')
+        denied = event('loginom_node', status='error', metadata={'permissionDenied': True})
+        model_error = event('loginom_node', status='error', error='REQUEST_REJECTED')
+        old = {'filePath': '/test/missing.txt', 'limit': 4}
+        new = {'filePath': '/test/found.txt', 'limit': 4}
+        read_error = event('read', status='error', args=old, error='File not found: /test/missing.txt')
+        for events, expected in [
+            ([invalid, retry], 'CLI_TOOL_FAILED'),
+            ([refused, invalid, pending], 'LOGINOM_CONNECTION_NOT_READY'),
+            ([refused, event('loginom_dock_prepare')], 'LOGINOM_CONNECTION_NOT_READY'),
+            ([config], 'LOGINOM_CONFIG_REQUIRED'),
+            ([refused, retry], None),
+            ([refused, denied, retry], 'CLI_PERMISSION_REJECTED'),
+            ([model_error], None),
+            ([read_error, event('read', args=new)], None),
+            ([read_error, event('read', args=dict(new, limit=3))], 'CLI_TOOL_FAILED'),
+        ]:
+            with self.subTest(expected=expected, events=events):
+                self.assertEqual(tool_failure(events), expected)
+
+    def test_manual_edit_exits_verified_segment_and_resumes_same_chat(self):
+        module = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'run-check.py'))
+        Runner, write = module['Runner'], module['write']
+        edit = dict(kind='rename', node=dict(label='Before'), label='After')
+        persisted = dict(complete=True, links=[], nodes=[
+            dict(ref=dict(node_id='node'), label='After', type='imports.text', position=dict(x=64, y=64))])
+        for acknowledged in (True, False):
+            with self.subTest(acknowledged=acknowledged), TemporaryDirectory() as directory:
+                root = Path(directory)
+                pair, cases = root / 'pair', root / 'cases'
+                pair.mkdir()
+                write(pair / 'worker.json', dict(url='https://example.invalid', username='test-user',
+                                                password='synthetic', package_directory='/test-user'))
+                for name, config in [('first', dict(manual_edit=edit)), ('second', dict(base='first'))]:
+                    case = cases / name
+                    case.mkdir(parents=True)
+                    (case / 'task.md').write_text(name)
+                    write(case / 'case.json', config)
+                resources = root / 'build/resources/loginom'
+                resources.mkdir(parents=True)
+                (resources / 'chromium').touch()
+                write(resources / 'resource-manifest.json', {'browser': 'chromium'})
+
+                runner = Runner.__new__(Runner)
+                runner.out, runner.env = root, {}
+                runner.options = dict(pair=str(pair), cases=str(cases), cold=False, live_chain=True)
+                runner.report = dict(runs=[dict(scenario='second', status='PENDING')])
+                runner.deadline = time.time() + 60
+                calls, commands = [], []
+
+                def phase(name, command, folder, **kwargs):
+                    calls.append(name)
+                    if name == 'setup':
+                        for child in ('data', 'config', 'state'):
+                            (folder / 'profile' / child).mkdir(parents=True)
+                        write(folder / 'setup.stdout', dict(browser=dict(state='verified')))
+                        return
+                    self.assertEqual(name, 'manual-edit')
+                    proof = json.loads((folder.parent / 'live-turns.jsonl').read_text().splitlines()[-1])
+                    self.assertEqual(proof['event'], 'cleanup_verified')
+                    self.assertTrue(all(proof[name] for name in
+                                        ('cli_exited', 'chromium_exited', 'package_closed', 'logged_out', 'runtime_ack')))
+                    closed = dict(package_closed=True, logged_out=True, unsaved_changes_discarded=False)
+                    write(folder / 'manual/result.json',
+                          dict(status='PASS', persisted=persisted, cleanup=closed, reopen_cleanup=closed))
+
+                def spawn(command, **kwargs):
+                    commands.append(command)
+                    child = Mock(pid=len(commands) + 100, returncode=None)
+                    child.poll.side_effect = lambda: child.returncode
+                    return child
+
+                def model(case, stage, profile, workspace, package, login, build, session, *, live, baseline=None):
+                    calls.append(case)
+                    self.assertIsNone(live.child)
+                    if case == 'second':
+                        self.assertEqual(session, 'same-chat')
+                        self.assertEqual(baseline['nodes']['node']['label'], 'After')
+                    live.start('cli', session, {'LOGINOM_AI_AGENT_CLI_PROFILE': str(profile)}, time.monotonic() + 10)
+                    attempt = profile / f'loginom/runtime/generations/1/chats/chat/attempts/{case}'
+                    attempt.mkdir(parents=True)
+                    live.browser = (200, 'start', attempt)
+                    live.browsers_seen.add(live.browser)
+                    live.saved = dict(document_id='document')
+                    runner.current['cleanup'] = 'pending live shutdown'
+                    return 'same-chat', dict(graph={}, outputs=[]), None, None
+
+                def send(live, key):
+                    if key != b'\x04':
+                        return
+                    calls.append('exit')
+                    live.child.returncode = 0
+                    write(live.browser[2] / 'package-cleanup.json',
+                          dict(status='SUCCEEDED', package_closed=True, logged_out=True, unsaved_changes_discarded=False,
+                               account=live.account, package_path=live.package, document_id='document'))
+                    if acknowledged:
+                        ack = live.profile / 'loginom/runtime' / f'runtime-close-{live.child.pid}.json'
+                        write(ack, dict(closed_ack=True, exit_code=0, exit_signal=None))
+
+                with patch.dict(module['daemon_pid'].__globals__, daemon_pid=lambda: 99), \
+                        patch.object(runner, 'build', return_value=root / 'build'), patch.object(runner, 'save'), \
+                        patch.object(runner, 'phase', side_effect=phase), patch.object(runner, 'model', side_effect=model), \
+                        patch.object(LiveChain, 'send', autospec=True, side_effect=send), patch.object(LiveChain, 'pump'), \
+                        patch.object(LiveChain, 'wait_for', return_value=b'nonce'), patch('run_check_live.process_alive', return_value=False), \
+                        patch('run_check_live.subprocess.Popen', side_effect=spawn):
+                    runner.run()
+
+                result = runner.report['runs'][0]
+                self.assertNotIn('--session', commands[0])
+                if acknowledged:
+                    self.assertEqual(calls, ['setup', 'first', 'exit', 'manual-edit', 'second', 'exit'])
+                    self.assertEqual(commands[1][-2:], ['--session', 'same-chat'])
+                    self.assertEqual(result['status'], 'PASS')
+                    self.assertEqual(result['turns'][0]['manual_edit']['status'], 'PASS')
+                else:
+                    self.assertEqual(calls, ['setup', 'first', 'exit'])
+                    self.assertEqual(result['turns'][0]['status'], 'PASS')
+                    self.assertEqual(result['turns'][0]['manual_edit']['failure_category'], 'product')
+                    self.assertEqual(result['turns'][1]['status'], 'NOT_RUN')
+
+    def test_terminal_tool_failure_is_scoped_to_the_completed_turn(self):
+        def tool(message):
+            return dict(type='tool', id=message + '-tool', messageID=message, sessionID='chat',
+                        tool='invalid', state=dict(status='completed'))
+
+        with TemporaryDirectory() as directory:
+            folder = Path(directory)
+            current = [dict(id='current')]
+            history = [(1, 1, tool('previous'))]
+            self.assertIsNone(write_events(folder, current, history, finished_session='chat'))
+            self.assertEqual((folder / 'model.stdout').read_text(), '')
+            self.assertEqual(write_events(folder, current, history + [(2, 2, tool('current'))],
+                                          finished_session='chat'), 'CLI_TOOL_FAILED')
+            events = [json.loads(line) for line in (folder / 'model.stdout').read_text().splitlines()]
+            self.assertEqual([event['type'] for event in events], ['tool_use', 'error'])
+            self.assertEqual(events[-1]['error']['name'], 'CLI_TOOL_FAILED')
+
+    def test_runner_stops_graph_only_turn_on_reconstructed_cli_failure(self):
+        from contextlib import nullcontext
+
+        module = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'run-check.py'))
+        Runner = module['Runner']
+        with TemporaryDirectory() as directory:
+            folder = Path(directory)
+            workspace = folder / 'workspace'
+            workspace.mkdir()
+            runner = Runner.__new__(Runner)
+            runner.options = {'cases': module['DATA'] / 'bughunt-2026-11/cases'}
+            runner.current = {'scenario': 'bh-g101-t4'}
+            runner.out, runner.env = folder, {}
+            runner.deadline = time.time() + 60
+            live = Mock()
+
+            def turn(*args):
+                (folder / 'model.stdout').write_text(json.dumps(
+                    dict(type='error', sessionID='chat', error=dict(name='CLI_TOOL_FAILED'),
+                         source='standalone_tool_outcome')) + '\n')
+                return 'chat'
+
+            live.turn.side_effect = turn
+            login = {'username': 'test-user', 'package_directory': '/test-user'}
+            with patch.object(runner, 'timed_phase', return_value=nullcontext()):
+                with self.assertRaisesRegex(RuntimeError, 'CLI_TOOL_FAILED: .*model.stdout:1'):
+                    runner.model('bh-g101-t1', folder, folder / 'profile', workspace, '/test-user/sample.lgp',
+                                 login, folder / 'build', live=live)
 
     def test_turn_events_exclude_previous_turn_and_pending_tool(self):
         def part(kind, message, **fields):

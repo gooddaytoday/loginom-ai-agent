@@ -695,9 +695,13 @@ and Chromium process identity before continuation, and verifies the expected
 Loginom account and package path in each turn's fresh Save observation.
 `live-turns.jsonl` records message boundaries, PIDs and owner checks.
 The per-turn `model.stdout` is reconstructed read-only from persisted chat
-parts, with timestamps from the parts and tool states. Process exit and
-the cleanup receipt are checked before a cold run. A model question that
-needs operator input stops the unattended chain and triggers cleanup.
+parts, with timestamps from the parts and tool states. Terminal tool,
+permission and connection failures follow the standalone CLI's verdict
+rules for the current turn. A model question that needs operator input
+stops the unattended chain and triggers cleanup.
+The runner keeps the CLI handle until the process is reaped. Shutdown
+records Chromium exit, the owned package close, logout and the runtime
+acknowledgement independently, including when the first turn fails.
 
 At a `manual_edit` boundary, `--live-chain` exits the live TUI and requires
 verified package close, logout and runtime close ACK. It then runs the
