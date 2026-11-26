@@ -174,12 +174,14 @@ export async function createBridge(config, session, { browserTransport: managedB
   const reopenNodePackage = async ({ documentId, signal, deadline }) => {
     const previous=session.metadata.workspacePreparation?.state, binding=session.metadata.storageBinding;
     if(previous?.status!=='READY'||previous.document_id!==documentId||binding?.document_id!==documentId
-      ||previous.loginom_account!==binding.loginom_account||binding.origin!==new URL(config.loginomUrl).origin)return null;
+      ||previous.loginom_account!==binding.loginom_account||binding.origin!==new URL(config.loginomUrl).origin)
+      return {reason:'ORIGINAL_WORKSPACE_UNVERIFIED'};
     const path=lastSavedPackage?.document_id===documentId?lastSavedPackage.path
       :previous.package_ref?.persisted===true?previous.package_ref.path:null;
-    if(!path)return null;
+    if(!path)return {reason:'ORIGINAL_SAVED_PATH_UNVERIFIED'};
     requireStorageDestination(path,config.storageDirectories,'packages');
-    if(!await reauthenticateReload({origin:binding.origin,account:binding.loginom_account,signal,deadline}))return null;
+    if(!await reauthenticateReload({origin:binding.origin,account:binding.loginom_account,signal,deadline}))
+      return {reason:'RELOAD_LOGIN_UNVERIFIED'};
     signal?.throwIfAborted();
     const request={operation_id:'reload-'+randomUUID(),intent:'open_package',package_path:path,workflow_ref:null};
     const remaining=()=>Math.max(1,deadline-Date.now());
@@ -189,7 +191,8 @@ export async function createBridge(config, session, { browserTransport: managedB
     const opened=parseWorkspacePreparation(await browser.callTool({name:'browser_run_code_unsafe',
       arguments:{code:prepare}},undefined,{timeout:remaining()+1000,signal}));
     if(opened.status!=='READY'||opened.document_id===documentId||opened.loginom_account!==binding.loginom_account
-      ||opened.package_ref?.path!==path||typeof opened.package_ref.read_only!=='boolean')return {reloaded:true};
+      ||opened.package_ref?.path!==path||typeof opened.package_ref.read_only!=='boolean')
+      return {reloaded:true,reason:'ORIGINAL_SAVED_PACKAGE_OPEN_UNVERIFIED'};
     assertCatalogTarget(pinnedActions,opened.target);
     const ref={document_id:opened.document_id,workflow_ref:opened.workflow_ref};
     const graphOptions={request:ref,origin:binding.origin,build:binding.loginom_build,types:NODE_TYPES,
@@ -204,7 +207,7 @@ export async function createBridge(config, session, { browserTransport: managedB
     };
     let first, second;
     try{first=await read();second=await read();}
-    catch{signal?.throwIfAborted();return {reloaded:true};}
+    catch{signal?.throwIfAborted();return {reloaded:true,reason:'REOPENED_GRAPH_UNAVAILABLE'};}
     return {reloaded:true,first,second,ref,readOnly:opened.package_ref.read_only,async publish(){
       signal?.throwIfAborted();
       const keys=['workspacePreparation','workspaceReady','targetIdentity','workflowRef','storageBinding'];

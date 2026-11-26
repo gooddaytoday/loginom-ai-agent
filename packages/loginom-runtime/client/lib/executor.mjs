@@ -2770,9 +2770,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     let reopened;
     try{reopened=await reopenNodePackage({documentId:request.document_id,deadline,signal});}
     catch{signal?.throwIfAborted();}
+    signal?.throwIfAborted();
     operation.reloadReauthenticated=reopened?.reloaded===true;
-    const proof=proveReloadedNode(operation,reopened?.first,reopened?.second);
-    if(!proof)throw Object.assign(new Error('The original saved graph could not be verified after reloading'),{code:'LOGINOM_IDENTITY_CHANGED'});
+    const proof=proveReloadedNode(operation,reopened?.first,reopened?.second,{readOnly:reopened?.readOnly===true});
+    if(!proof||now()>=deadline){
+      const reason=reopened?.reason??'REOPENED_GRAPH_UNVERIFIED';
+      throw Object.assign(new Error('The original saved graph could not be verified after reloading ['+reason+']'),{code:'LOGINOM_IDENTITY_CHANGED'});
+    }
     const {ref}=reopened;
     const target=proof.node?{kind:'existing',type:request.target.type,ref:proof.node}:request.target;
     const inputs=proof.node?[]:request.inputs.map(input=>({...input,

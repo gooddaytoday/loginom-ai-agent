@@ -12,7 +12,7 @@ const digest = value => createHash('sha256').update(JSON.stringify(canonical(val
 const domainNode=({dom_epoch,...value})=>value.type==='control.supernode_output'&&value.boundary_role==='output'&&Number.isFinite(value.position?.x)?{...value,position:{...value.position,x:0}}:value;
 const sameDomainGraph=(a,b)=>same({...a,nodes:a.nodes.map(domainNode)},{...b,nodes:b.nodes.map(domainNode)});
 
-export function proveReloadedNode(operation, first, second) {
+export function proveReloadedNode(operation, first, second, {readOnly=false}={}) {
   const state=operation.nodeApply, target=operation.targetPhase;
   const original=target?.final_graph, id=state?.node?.node_id, type=state?.request.target.type;
   const exact=g=>g?.complete===true&&g.workflow_ref&&Array.isArray(g.nodes)&&Array.isArray(g.links)&&Array.isArray(g.foreign_links)
@@ -24,9 +24,10 @@ export function proveReloadedNode(operation, first, second) {
     ||first.document_id===original.document_id||first.workflow_ref.workflow_id===original.workflow_ref.workflow_id
     ||first.interaction_ready!==true||first.nodes.some(n=>n.locked!==false)||!same(first,second))return null;
   const localTid=(tid,prefix)=>tid.startsWith(prefix+';')?tid.slice(prefix.length):tid;
-  const content=({document_id,workflow_ref,dom_epoch,interaction_ready,nodes,foreign_links,rest_connection_links,...edges})=>{
+  const content=({document_id,workflow_ref,dom_epoch,interaction_ready,nodes,foreign_links,rest_connection_links,...edges},readOnly)=>{
     const tid=value=>localTid(value,workflow_ref.prefix);
-    return {path:workflow_ref.navigation_path.map(part=>({...part,tid:tid(part.tid)})),
+    return {path:workflow_ref.navigation_path.map((part,i)=>({tid:tid(part.tid),
+      label:i===2&&readOnly?part.label.replace(/ \(только чтение\)$/,''):part.label})),
       nodes:nodes.map(({ref,...n})=>domainNode({...n,node_id:ref.node_id})),
       foreign_links:foreign_links.map(tid),rest_connection_links:(rest_connection_links??[]).map(link=>({...link,tid:tid(link.tid)})),...edges};
   };
@@ -34,7 +35,7 @@ export function proveReloadedNode(operation, first, second) {
   // A missing target can only be explained by reverting this operation's
   // creation. Compare the whole pre-create graph, including unrelated links.
   const expected=node?original:state.request.target.kind==='new'&&target.baseline;
-  if(!exact(expected)||!same(content(expected),content(first)))return null;
+  if(!exact(expected)||!same(content(expected,false),content(first,readOnly)))return null;
   return {node:node?.ref??null,target_state:node?'retained':'absent'};
 }
 

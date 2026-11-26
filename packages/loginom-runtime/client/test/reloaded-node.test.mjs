@@ -39,3 +39,18 @@ test('reload proof refuses wrong workflow, a foreign edit, an unstable or locked
   const missing=graph('new',['source']);
   assert.equal(proveReloadedNode(existing,missing,missing),null);
 });
+
+test('the native read-only package suffix does not change graph identity',()=>{
+  const old=structuredClone(operation);
+  const path=[
+    {tid:'MF;TF;server',label:'Server'},{tid:'MF;TF;packages',label:'Packages'},
+    {tid:'MF;TF;package',label:'Original'},{tid:'MF;TF;scenario',label:'Scenario'},
+  ];
+  old.targetPhase.final_graph.workflow_ref.navigation_path=path;
+  old.targetPhase.baseline.workflow_ref.navigation_path=path;
+  const fresh=graph('new',['source']);
+  fresh.workflow_ref.navigation_path=structuredClone(path);
+  fresh.workflow_ref.navigation_path[2].label+=' (только чтение)';
+  assert.equal(proveReloadedNode(old,fresh,fresh),null);
+  assert.deepEqual(proveReloadedNode(old,fresh,fresh,{readOnly:true}),{node:null,target_state:'absent'});
+});

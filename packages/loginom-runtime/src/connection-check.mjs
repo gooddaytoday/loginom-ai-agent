@@ -185,6 +185,12 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     if (left <= 0) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
     return Math.min(limit, left)
   }
+  const requireLoginAddress = () => {
+    if (!reuseLoginForm) return
+    const expected = new URL(loginomAddress(candidate.url))
+    const current = new URL(page.url())
+    if (current.origin !== expected.origin || current.pathname !== expected.pathname) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
+  }
   const network = await trackLoginNetwork(page)
   try {
     const response = reuseLoginForm ? null : await measure("login.navigation", () => page.goto(loginomAddress(candidate.url),
@@ -242,15 +248,20 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     if (!(await avatar.isVisible())) {
       phase = "submit"; phaseStarted = performance.now()
       await measure("login.username", async () => {
+        requireLoginAddress()
         await field("edtUsername").locator("input").fill(candidate.username, { timeout: remaining(30_000) })
         await field("edtUsername").locator("input").press("Tab", { timeout: remaining(30_000) })
       })
       const password = field("edtPassword").locator("input")
       // Passwordless accounts may make an already empty field readonly after username lookup.
       await measure("login.password", async () => {
+        requireLoginAddress()
         if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password, { timeout: remaining(30_000) })
       })
-      await measure("login.submit", () => field("btnLogin").click({ timeout: remaining(30_000) }))
+      await measure("login.submit", () => {
+        requireLoginAddress()
+        return field("btnLogin").click({ timeout: remaining(30_000) })
+      })
       const response = await measure("login.response", () => page.waitForFunction(function loginResponse() {
         const avatar = document.querySelector('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
         if (avatar && avatar.getBoundingClientRect().width > 0 && avatar.getBoundingClientRect().height > 0 && getComputedStyle(avatar).visibility !== "hidden") return "authenticated"
@@ -310,11 +321,14 @@ export async function reauthenticateReloadedPage(context, candidate, { origin, a
   signal?.throwIfAborted()
   await loginPage(pages[0], candidate, { deadline, reuseLoginForm: true })
   signal?.throwIfAborted()
-  return pages[0].evaluate(({ origin, pathname, account }) => {
-    const map = globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree
+  const receipt = await pages[0].waitForFunction(({ origin, pathname, account }) => {
+    const form = globalThis.bg?.app?.Application?.FInstance?.FMainForm, map = form?.FMapTree
     return location.origin === origin && location.pathname === pathname && map?.FServerConnection?.Connected === true
-      && map.FServerConnection.UserName === account && map.PackageNodes?.Count === 0
-  }, { origin, pathname: target.pathname, account })
+      && form.FReconnecting !== true && map.FServerConnection.UserName === account && map.PackageNodes?.Count === 0
+  }, { origin, pathname: target.pathname, account }, { timeout: Math.max(1, Math.min(8000, deadline - Date.now())) })
+  await receipt.dispose()
+  signal?.throwIfAborted()
+  return Date.now() < deadline
 }
 
 function loginFailure(error, candidate, phase, duration, elapsed) {
