@@ -430,12 +430,15 @@ def scenario(name, case_root=None, *, cases=None):
             # Optional case.json: `base` continues a sibling case in the same chat;
             # `input_files` limits attachments; `budget` is read only by bughunt-audit.py.
             extra = read(src / 'case.json') if (src / 'case.json').is_file() else {}
-            if not isinstance(extra, dict) or set(extra) - {'base', 'input_files', 'budget', 'notes', 'manual_edit', 'output_mode'}:
-                raise ValueError(f'{name}/case.json: allowed keys are base, input_files, budget, notes, manual_edit, output_mode')
+            if not isinstance(extra, dict) or set(extra) - {'base', 'input_files', 'budget', 'notes', 'manual_edit', 'output_mode', 'cold_port_windows'}:
+                raise ValueError(f'{name}/case.json: allowed keys are base, input_files, budget, notes, cold_port_windows, manual_edit, output_mode')
             if 'manual_edit' in extra:
                 validate_manual_edit(extra['manual_edit'], name)
             if 'output_mode' in extra and extra['output_mode'] != 'ports':
                 raise ValueError(f'{name}/case.json: output_mode must be ports')
+            cold_port_windows = extra.get('cold_port_windows', False)
+            if type(cold_port_windows) is not bool:
+                raise ValueError(f'{name}/case.json: cold_port_windows must be a boolean')
             base = extra.get('base')
             if base == name:
                 raise ValueError(f'Case base cycle: {name} → {name}')
@@ -446,6 +449,7 @@ def scenario(name, case_root=None, *, cases=None):
                 raise ValueError(f'{name}/case.json: input_files must list files in data/')
             return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=base, external=True,
                         attach_all=True, manual_edit=extra.get('manual_edit'), output_mode=extra.get('output_mode'),
+                        cold_port_windows=cold_port_windows,
                         **({'input_files': files} if files is not None else {}))
     if case_root is not None:
         if name not in SCENARIOS and not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,31}', name):
@@ -4109,7 +4113,7 @@ class Runner:
                             cold_expected = stage / 'expected-cold.json'
                             write(cold_expected, cold_columns_by_name(expected, case))
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        read_windows = case == 'types300' or (
+                        read_windows = spec.get('cold_port_windows') or case == 'types300' or (
                             self.db_case_active and any(len(output['rows']) > 100 for output in expected['outputs']))
                         self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') or spec.get('output_mode') == 'ports' else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if read_windows else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
