@@ -17,6 +17,9 @@ const observed = (values, complete = true) => ({
     sample: values.map(value => [{type: 'integer', value: String(value), is_null: false}]),
   },
 });
+const readback = data => ({
+  outputs: [{node: {node_id: 'selected-node'}, output: {ports: [{...data, port: 0}]}}],
+});
 
 test('the latest partial sample requires a full cold read of its own node and port', () => {
   const finalSample = observed([1], false);
@@ -49,4 +52,48 @@ test('complete mismatches and missing reads refuse without a cold fallback', () 
   assert.deepEqual(checkCasePorts(expected, [partial, observed([1, 2])]), []);
   assert.throws(() => checkCasePorts(expected, [partial, observed([1, 9])]), /CASE_PORT_OUTPUT_MISMATCH/);
   assert.throws(() => checkCasePorts(expected, [{...partial, port: 1}]), /CASE_PORT_OUTPUT_MISSING/);
+});
+
+test('a correct saved table cannot hide a different last partial read on an ordered port', () => {
+  const saved = observed([1, 2]);
+  assert.doesNotThrow(() => checkCasePorts(expected, [observed([1], false)], readback(saved.data)));
+  for (const latest of [observed([9], false), observed([2], false), observed([], false)]) {
+    assert.throws(() => checkCasePorts(expected, [saved, latest], readback(saved.data)), /CASE_PORT_SAMPLE_MISMATCH/);
+  }
+  const differentCount = observed([1], false);
+  differentCount.data.row_count = 3;
+  assert.throws(() => checkCasePorts(expected, [differentCount], readback(saved.data)), /CASE_PORT_SAMPLE_MISMATCH/);
+});
+
+test('an unordered sample can start anywhere but must respect row multiplicities', () => {
+  const unordered = {...expected, outputs: [{
+    ...output, ordered: false, rows: [{Key: 1}, {Key: 1}, {Key: 2}],
+  }]};
+  const rows = (values, complete) => {
+    const port = observed(values, complete);
+    port.data.row_count = 3;
+    return port;
+  };
+  const saved = readback(rows([1, 2, 1], true).data);
+  assert.doesNotThrow(() => checkCasePorts(unordered, [rows([2, 1], false)], saved));
+  assert.throws(() => checkCasePorts(unordered, [rows([2, 2], false)], saved), /CASE_PORT_SAMPLE_MISMATCH/);
+});
+
+test('partial rows compare typed values across native and cold display formats', () => {
+  const realOutput = {...expected, outputs: [{
+    ...output, columns: [{name: 'Key', type: 'real'}], rows: [{Key: 14742.29}, {Key: 0}],
+  }]};
+  const convert = (values, complete) => {
+    const port = observed([], complete);
+    port.data.schema[0].type = 'real';
+    port.data.sample = values.map(decimal => [{
+      type: 'real', value: Number(decimal), decimal, is_null: false, precision: '17_significant_digits',
+    }]);
+    return port;
+  };
+  const saved = readback(convert(['1.474229E+04', '0E+00'], true).data);
+  assert.doesNotThrow(() => checkCasePorts(realOutput, [convert(['14742.29'], false)], saved));
+  const negativeZero = readback(convert(['-0E+00', '0E+00'], true).data);
+  const zeroOutput = {...realOutput, outputs: [{...realOutput.outputs[0], rows: [{Key: 0}, {Key: 0}]}]};
+  assert.throws(() => checkCasePorts(zeroOutput, [convert(['0'], false)], negativeZero), /CASE_PORT_SAMPLE_MISMATCH/);
 });
