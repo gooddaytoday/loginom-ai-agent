@@ -1,0 +1,7 @@
+plan_id,lower_qty,upper_qty,unit_rate
+P_HIGH,200,500,2
+P_LOW,100,250,1
+P_HIGH,0,50,1
+P_LOW,250,500,0.5
+P_HIGH,50,200,3
+P_LOW,0,100,2

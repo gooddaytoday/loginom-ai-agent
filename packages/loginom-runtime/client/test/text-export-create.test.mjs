@@ -6,14 +6,17 @@ import {mutateGraph} from '../lib/node-target-browser.mjs';
 import {exportPaletteScroll} from '../lib/text-export-palette.mjs';
 import {nodePlacementPoint,revealNodePlacement,samePlacementGraph} from '../lib/node-placement.mjs';
 function fixture(mode={}){
- const prefix='MF;TF-1',ownerTid=prefix+';ModelForm;pnlVendors;tree',palette=prefix+';ModelForm;colVendors_Компоненты>Экспорт>Текстовый_файл;TreeText',rootTid=prefix+';ModelForm;cmpDiagram',tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';
+ const type=mode.rest?'integration.rest_request':'exports.text';
+ const component=NODE_TYPES[type];
+ const prefix='MF;TF-1',ownerTid=prefix+';ModelForm;pnlVendors;tree',palette=prefix+';ModelForm;colVendors_Компоненты>'+component.palette_group+'>'+component.title.replaceAll(' ','_')+';TreeText',rootTid=prefix+';ModelForm;cmpDiagram',tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';
  let top=0,scrolls=0,drags=0,held=false,created=false;
+ let paletteTop=mode.visible?200:1800, pointer, pressedType;
  const rect=(x,y,width,height)=>({x,y,width,height,right:x+width,bottom:y+height});
  const canvas={getBoundingClientRect:()=>rect(300,100,1100,720),contains:e=>e===canvas},tab={classList:{contains:()=>true}};
  const row={contains:e=>e===item,querySelectorAll:()=>mode.icon?[]:[{}]};
  const owner={isConnected:true,contains:e=>e===row||e===item,checkVisibility:()=>true,getBoundingClientRect:()=>rect(10,100,280,600),clientHeight:600,scrollHeight:2001,
   get scrollTop(){return top;},set scrollTop(v){scrolls++;top=v;mode.afterScroll?.(graph,view);if(mode.cancelAfterScroll)page[Symbol.for('loginom-dock.node-target-cancel')]=new Set(['effect']);if(mode.scrollFailure)throw Error('scroll failed');}};
- const item={textContent:'Текстовый файл',checkVisibility:()=>true,closest:()=>null,contains:e=>e===item,getBoundingClientRect:()=>rect(50,(mode.visible?200:1800)-top,100,20)};
+ const item={textContent:component.title,checkVisibility:()=>true,closest:()=>null,contains:e=>e===item,getBoundingClientRect:()=>rect(50,paletteTop-top,100,20)};
  const exact=new Map([[ownerTid,mode.owner?[{}]:[owner]],[palette,mode.duplicate?[item,item]:[item]],[palette.replace(/;TreeText$/,''),[row]],[rootTid,[canvas]],[tabTid,[tab]]]);
  const document={querySelectorAll:selector=>exact.get(JSON.parse(selector.slice(10,-1)))??[],elementFromPoint:(x,y)=>mode.overlay?{}:x>=300?canvas:x===100&&y===item.getBoundingClientRect().y+10?item:owner};
  const before={dom_epoch:1,document_id:'doc',workflow_ref:{workflow_id:'wf',prefix,tab_tid:tabTid},interaction_ready:true,
@@ -23,13 +26,19 @@ function fixture(mode={}){
  const p={document,id:'doc',receipts:new Map([['r',{phase:'verified',workflowId:'wf',tab}]]),nodeTargetDomEpochs:{objects:new Map([[canvas,1]])}};
  const globals={document,innerWidth:1508,innerHeight:862,__loginomDockPreparationV1:p,view,structuredClone};
  const evaluate=(fn,args,element)=>vm.runInNewContext('('+fn.toString()+')('+(element?'element,args':'args')+')',{...globals,args,element});
- const page={evaluate:(fn,args)=>evaluate(fn,args),waitForTimeout:async()=>{},locator:selector=>{
+ const page={evaluate:(fn,args)=>evaluate(fn,args),waitForTimeout:async()=>{if(mode.scrolling)paletteTop=264;},locator:selector=>{
   const elements=exact.get(JSON.parse(selector.slice(10,-1)))??[],element=elements[0];
   return {count:async()=>elements.length,isVisible:async()=>true,isEnabled:async()=>true,boundingBox:async()=>{const {right,bottom,...b}=element.getBoundingClientRect();return b;},evaluate:async(fn,args)=>evaluate(fn,args,element),elementHandle:async()=>({evaluate:async(fn,args)=>evaluate(fn,args,element),dispose:async()=>{}})};},
-  mouse:{move:async()=>{},down:async()=>{held=true;drags++;},up:async()=>{if(held)created=true;held=false;}},keyboard:{press:async()=>{}}};
- const task={deadline:Date.now()+10000,request:{document_id:'doc',workflow_ref:{workflow_id:'wf',prefix,tab_tid:tabTid}},types:NODE_TYPES,effect:{id:'effect',kind:'create',before,parameters:{type:'exports.text',position:{x:mode.drop?5000:600,y:380}}}};
+  mouse:{move:async(x,y)=>{
+   pointer={x,y};
+   if(x===100 && (mode.shiftOnHover || mode.scrolling))paletteTop=264;
+  },down:async()=>{
+   held=true;drags++;
+   pressedType=document.elementFromPoint(pointer.x,pointer.y)===item?type:'bg-vendor-icon-jointree';
+  },up:async()=>{if(held)created=true;held=false;}},keyboard:{press:async()=>{}}};
+ const task={deadline:Date.now()+10000,request:{document_id:'doc',workflow_ref:{workflow_id:'wf',prefix,tab_tid:tabTid}},types:NODE_TYPES,effect:{id:'effect',kind:'create',before,parameters:{type,position:{x:mode.drop?5000:600,y:380}}}};
  if(mode.cancel)page[Symbol.for('loginom-dock.node-target-cancel')]=new Set(['effect']);
- const read=async()=>created||scrolls&&mode.graphChange?{...structuredClone(graph),nodes:[...structuredClone(graph.nodes),{ref:{node_id:'changed'},position:{x:600,y:380}}]}:structuredClone(graph);
+ const read=async()=>created||scrolls&&mode.graphChange?{...structuredClone(graph),nodes:[...structuredClone(graph.nodes),{ref:{node_id:'changed'},type:mode.foreignDrop?'bg-vendor-icon-jointree':pressedType,position:{x:600,y:380}}]}:structuredClone(graph);
  const viewport=()=>structuredClone(view);
  return {run:()=>mutateGraph(page,task,read,exportPaletteScroll,viewport,nodePlacementPoint,revealNodePlacement,samePlacementGraph),counts:()=>({scrolls,drags})};
 }
@@ -70,4 +79,26 @@ test('export creation cannot drag after invalid owner, overlay, graph, drop, can
   const f=fixture(mode),r=await f.run();assert.notEqual(r.status,'SUCCEEDED',JSON.stringify(mode));assert.equal(f.counts().drags,0,JSON.stringify(mode));
   if(f.counts().scrolls)assert.equal(r.effect_possible,true);if(mode.scrollFailure)assert.equal(r.cleanup_complete,false);
  }
+});
+
+test('#1247 a scrolling palette settles before dragging the REST row',async()=>{
+ const f=fixture({rest:true,visible:true,scrolling:true}),receipt=await f.run();
+ assert.equal(receipt.status,'SUCCEEDED',receipt.error);
+ assert.equal(receipt.after.nodes.at(-1).type,'integration.rest_request');
+ assert.equal(f.counts().drags,1);
+});
+test('#1247 a row displaced on hover is refused before mouse down',async()=>{
+ const f=fixture({rest:true,visible:true,shiftOnHover:true}),receipt=await f.run();
+ assert.equal(receipt.status,'NOT_APPLIED',receipt.error);
+ assert.equal(receipt.effect_possible,false);
+ assert.equal(f.counts().drags,0);
+});
+test('#1247 an unexpected native node is reported as an uncertain effect',async()=>{
+ const f=fixture({rest:true,visible:true,foreignDrop:true}),receipt=await f.run();
+ assert.equal(receipt.status,'AMBIGUOUS',receipt.error);
+ assert.equal(receipt.effect_possible,true);
+ assert.equal(receipt.cleanup_complete,true);
+ assert.deepEqual(receipt.create_mismatch,{expected:'integration.rest_request',actual:'bg-vendor-icon-jointree'});
+ assert.equal(receipt.after.nodes.at(-1).type,receipt.create_mismatch.actual);
+ assert.equal(f.counts().drags,1);
 });

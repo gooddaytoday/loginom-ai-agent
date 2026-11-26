@@ -23,6 +23,18 @@ export function calculatorVariableMappingRefusal(operation,receipt){
   &&/(?:^|Error: )(?:Foreign variable mapping mask|Unique connected variable source required:|Complete connected field layout required;|Requested variable names collide)/.test(receipt.error.message??'');
 }
 
+// A REST variable-port refusal completed before any gesture (LAB-1963):
+// no wizard draft exists, so only the existing proof-based release applies.
+export function restVariableMappingNoEffectRefusal(operation,receipt){
+ const state=operation.nodeApply,ref=operation.lastReceipt;
+ return !operation.transportUncertain&&state?.request?.target?.type==='integration.rest_request'&&state.pending?.phase==='input_mapping'
+  &&ref?.action_key==='node.variables.variable_mapping.internal'&&typeof ref.operation_id==='string'
+  &&receipt?.operation_id===ref.operation_id&&receipt.action_key===ref.action_key&&receipt.phase==='variable_mapping'
+  &&receipt.status==='NOT_APPLIED'&&receipt.effect_possible===false&&receipt.cleanup_complete===true
+  &&receipt.output?.status==='NOT_APPLIED'&&receipt.output.verified===false&&receipt.output.effect_possible===false&&receipt.output.cleanup_complete===true
+  &&receipt.error?.code==='CROSSTABLE_VARIABLE_STEP_UNCONFIRMED';
+}
+
 // Only a completed single opening click may settle into this node's own
 // union wizard for cancellation. It never permits configure/Done/Execute.
 export function unionWizardOpeningRefusal(operation,receipt){
@@ -71,6 +83,30 @@ export class NodeReleaseBlocked extends Error {
  constructor(message,userAction) {super(message);this.userAction=userAction;}
 }
 
+// A variable mapping read can deactivate the Import and leave its draft open.
+// A completed read receipt and the original native graph prove cleanup after
+// Cancel. The failed read itself remains ambiguous.
+export async function settleImportMappingRead({operation,channel,receipt}) {
+ const state=operation.nodeApply,request=state?.request,ref=operation.lastReceipt;
+ if(!['imports.text','imports.excel'].includes(request?.target?.type)||!state.pending||operation.transportUncertain)return;
+ const node=state.node??(state.pending.phase==='target'&&request.target.kind==='existing'?request.target.ref:null);
+ const opening=receipt?.output?.read_opening;
+ if(!node||!ref||ref.action_key!=='node.variables.variable_mapping_read.internal'
+   ||typeof ref.id!=='string'||ref.id!==ref.operation_id||!ref.id.startsWith(operation.id+':n')
+   ||receipt?.operation_id!==ref.id||receipt.action_key!==ref.action_key||receipt.action_revision!=='1'
+   ||receipt.phase!=='variable_mapping_read'||receipt.status!=='AMBIGUOUS'||receipt.effect_possible!==true
+   ||receipt.cleanup_complete!==false||receipt.output.verified!==false||receipt.output.cleanup_complete!==false
+   ||receipt.error?.code!=='CROSSTABLE_VARIABLE_STEP_UNCONFIRMED'
+   ||!opening||!['document_id','workflow_id','node_id'].every(k=>opening.node?.[k]===node[k])
+   ||typeof opening.port_guid!=='string'||!opening.port_guid
+   ||![ref.id+':port',ref.id+':readback:port'].includes(opening.opening_operation_id))return;
+ try{return await channel.releaseImportMappingRead(opening);}
+ catch(error){
+  throw new NodeReleaseBlocked('Import mapping read cleanup is unconfirmed: '+String(error.message).slice(0,300),
+   'Warn the user about discarding unsaved wizard settings. Cancel only this Import input wizard when its owner is identified, then return to the original scenario graph.'+retry);
+ }
+}
+
 // Proves that a stopped node operation no longer holds the workspace: the last
 // browser call settled, only this operation's own draft
 // or output Table view was cleaned up, and the same unlocked node rests on an
@@ -82,7 +118,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  requireValue(state?.pending&&node&&!state.result,'Release requires an unresolved phase of a known node');
  requireValue(Number.isFinite(deadline),'Release requires an explicit finite deadline');
  requireValue(!operation.transportUncertain,'The last browser call has not confirmed completion; inspect the operation again later');
- let settleWizard,beforeSettlement,openingConfirmation,draftReceipt=false,variableDraft=false;
+ let settleWizard,beforeSettlement,openingConfirmation,portOpening,draftReceipt=false,variableDraft=false;
  if(operation.portReadCleanupComplete!==undefined)requireValue(operation.portReadCleanupComplete===true,
   'The last output-port read has no confirmed settled cleanup');
  if(operation.lastReceipt){
@@ -109,9 +145,19 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
    &&['wizard_step','set_wizard_field'].includes(gestures[0].verb)
    &&['WIZARD_STEP_NOT_CONFIRMED','WIZARD_FIELD_NOT_CONFIRMED'].includes(r.error?.code);
   variableDraft=calculatorVariableMappingRefusal(operation,r);
-  const draft=restDraft||exportDraft||wizardDraft||variableDraft;
+  const ref=operation.lastReceipt,portTrace=r?.trace??[];
+  const inputOpening=state.pending.phase==='input_mapping'&&['exports.text','exports.excel','exports.lgd'].includes(state.request.target?.type)
+   &&ref.action_key==='node.input_port.open.internal'&&ref.id===ref.operation_id&&typeof ref.operation_id==='string'
+   &&ref.operation_id.startsWith(operation.id+':n')&&r?.operation_id===ref.operation_id&&r.action_key===ref.action_key
+   &&r.phase==='port_open'&&r.status==='AMBIGUOUS'&&r.effect_possible===true&&r.cleanup_complete===false
+   &&r.output?.verified===false&&r.output.cleanup_complete===false&&r.error?.code==='OUTPUT_PORT_OPEN_UNCONFIRMED'
+   &&portTrace.filter(e=>e.event==='input_port_reserved'&&e.native_index===0&&typeof e.port_guid==='string'&&e.port_guid).length===1
+   &&portTrace.filter(e=>e.event==='input_port_open_issued').length===1
+   &&portTrace.filter(e=>e.event==='input_port_open_returned').length===1;
+  const draft=restDraft||exportDraft||wizardDraft||variableDraft||inputOpening;
   draftReceipt=draft;
-  requireValue(response?.state==='completed'&&(r?.cleanup_complete===true||draft),
+  const mappingReadCleanup=response?.state==='completed'&&await settleImportMappingRead({operation,channel,receipt:r});
+  requireValue(response?.state==='completed'&&(r?.cleanup_complete===true||draft||mappingReadCleanup?.cleanup_complete===true),
    'The last browser gesture of this operation has no confirmed cleanup');
   if(operation.lastReceipt.operation_id)requireValue(response.receipt.operation_id===operation.lastReceipt.operation_id,
    'The last wizard receipt identity changed');
@@ -122,6 +168,11 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   if(draft){
    requireValue(typeof operation.lastReceipt.operation_id==='string'&&r.operation_id===operation.lastReceipt.operation_id,
     'The completed draft receipt identity changed');
+  }
+  if(inputOpening){
+   portOpening=await channel.reconcileInputPortOpening(ref);
+   requireValue(portOpening.port_guid===portTrace.find(e=>e.event==='input_port_reserved').port_guid,
+    'The stopped input opening port identity changed');
   }
   const graphReturn=n?.surface==='graph'&&w?.status==='absent'
     &&['confirm_wizard_close','finish_wizard','execute_wizard'].includes(gestures[0]?.verb);
@@ -164,6 +215,11 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   &&current.prepared_node_context?.input_port?.node_icon_class==='bg-vendor-icon-calcdata'
   &&current.prepared_node_context.input_port.opening_operation_id===operation.lastReceipt.operation_id+':port',
   'The stopped Calculator variable port owner changed');
+ if(portOpening)requireValue(current.wizard?.status==='observed'&&current.wizard.stage==='input_mapping'
+  &&sameNode(current.prepared_node_context,node)&&current.prepared_node_context.surface==='wizard'
+  &&['direction','port','native_index','port_guid','opening_operation_id'].every(key=>
+   current.prepared_node_context.input_port?.[key]===(key==='direction'?'input':portOpening[key])),
+  'The stopped export input port owner changed');
  if(current.wizard.status==='observed'){
   if(current.prepared_node_context?.surface!=='wizard'||!sameNode(current.prepared_node_context,node))
    throw new NodeReleaseBlocked('A Loginom wizard of another node is open',

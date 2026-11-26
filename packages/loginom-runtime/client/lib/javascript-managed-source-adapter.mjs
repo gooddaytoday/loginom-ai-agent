@@ -11,6 +11,7 @@ import {dispatchManagedJavascriptCodeNext} from './javascript-managed-code-next.
 import {dispatchManagedJavascriptDone} from './javascript-managed-done.mjs';
 import {waitManagedJavascriptDoneSettlement} from './javascript-managed-done-settlement.mjs';
 import {dispatchManagedJavascriptDeclared,validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
+import {isUnconfiguredJavascriptSchema} from './javascript-declared-schema.mjs';
 import {javascriptSourceSettingsDigest} from './javascript-source-admission.mjs';
 import {makeJavascriptManagedStageCode} from './javascript-managed-stage.mjs';
 import {waitManagedJavascriptCodeSettlement} from './javascript-managed-code-settlement.mjs';
@@ -164,8 +165,23 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
     error.javascriptWizardRefusal={diagnostic,closed};
     throw error;
   };
+  const discardAdmission=async(task,page,error)=>{
+    // Only an explicit refusal of returned settings reaches this path. Opening,
+    // read, transition and Close transport failures keep their original lease.
+    const closed=await driver.closeManagedJavascriptWizard({task:{...task,error_stage:'admission',
+      admission_page:page,cleanup_deadline:Math.min(task.deadline,Date.now()+60000)},execute,record,receiptOptions,wait});
+    need(closed?.verified===true&&closed.closed===true&&closed.node_id===node.node_id
+      &&closed.draft_discarded===true&&closed.settings_applied===false&&closed.execution_started===false,
+      'Managed JavaScript admission discard unconfirmed');
+    const {prepared:ignoredPrepared,allowDeactivation:ignoredDeactivation,inputPage:ignoredInputPage,...selectionTask}=task;
+    await execute(driver.makeJavascriptManagedSelectionReadCode({...selectionTask,mode:'dispose'}));
+    await journalManagedJavascriptError({record,deadline:task.deadline},{phase:'javascript_managed_admission_discarded',
+      operation_id:task.operation_id,owner:task.owner,closed,deadline:task.deadline});
+    uncertain=false;
+    throw error;
+  };
   return {
-    async open({owner, deadline: operationDeadline, schemaMode = 'preserve', columns}) {
+    async open({owner, deadline: operationDeadline, schemaMode = 'preserve', columns, expectedSettings}) {
       check(owner, operationDeadline);
       need(['preserve', 'code', 'declared'].includes(schemaMode), 'Managed JavaScript schema mode unavailable');
       if(schemaMode==='declared')validateJavascriptDeclaredPrimitiveColumns(columns);
@@ -191,11 +207,22 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
       const task = opened.task;
       need(same(task.owner, {document_id: node.document_id, workflow_id: node.workflow_id, node_id: node.node_id}),
         'Managed JavaScript opened another node');
-      const firstPage=await execute(driver.makeJavascriptManagedPageCode(task));
+      let firstPage=await execute(driver.makeJavascriptManagedPageCode(task));
       if(firstPage.page?.tid===task.workflow_ref.prefix+';WizrdMCF;TuneDataSourceInputPortWizard'){
         need(firstPage.ready===true&&firstPage.page.index===0&&firstPage.page.indicator_count===5,
           'Managed JavaScript empty input page changed');
         task.inputPage=true;
+        const input=await execute(driver.makeJavascriptSchemaContextCode(task.prepared));
+        need(input?.node_context?.verified===true&&input.node_context.surface==='wizard'
+          &&['document_id','workflow_id','node_id'].every(key=>input.node_context[key]===task.owner[key]),
+          'Managed JavaScript source schema owner changed',()=>sourceSettingsDiagnostic(input,task.owner));
+        try{
+          need(input.verified===true&&Array.isArray(input.grids)&&input.grids.length===2
+            &&['grdSourceColumns','grdTargetColumns'].every(name=>{
+              const grids=input.grids.filter(grid=>grid.tid===firstPage.page.tid+';'+name+';tbl');
+              return grids.length===1&&Array.isArray(grids[0].fields)&&grids[0].fields.length===0;
+            }),'Managed JavaScript input settings are not complete and empty',()=>sourceSettingsDiagnostic(input));
+        }catch(error){return discardAdmission(task,firstPage.page,error);}
         const next=await driver.dispatchManagedJavascriptNext({task,execute,record,receiptOptions,input:true});
         need(next?.status==='SUCCEEDED'&&next.output?.next_gesture_returned===true,
           'Managed JavaScript empty input Next refused');
@@ -205,7 +232,7 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
             throw error;
           });
           if(page?.page?.tid===task.workflow_ref.prefix+';WizrdMCF;JavaScriptColumnsWizard'
-            &&page.page.index===1&&page.page.indicator_count===5)break;
+            &&page.page.index===1&&page.page.indicator_count===5){firstPage=page;break;}
           if(page)need(page.page?.tid===task.workflow_ref.prefix+';WizrdMCF;TuneDataSourceInputPortWizard'
             &&page.page.index===0&&page.page.indicator_count===5,'Managed JavaScript empty input Next page changed');
           need(Date.now()<task.deadline,'Managed JavaScript empty input Next deadline');
@@ -213,10 +240,16 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
         }
       }
       const schema = await execute(driver.makeJavascriptSchemaContextCode(task.prepared));
-      need(schema?.verified === true && schema.node_context?.verified === true
+      need(schema?.node_context?.verified === true
         && schema.node_context.surface === 'wizard'
         && ['document_id', 'workflow_id', 'node_id'].every(key => schema.node_context[key] === task.owner[key]),
       'Managed JavaScript source schema owner changed',()=>sourceSettingsDiagnostic(schema,task.owner));
+      try{
+        const settings=javascriptManagedSourceSettings(schema);
+        if(expectedSettings!==undefined)need(isUnconfiguredJavascriptSchema(schema)
+          &&javascriptSourceSettingsDigest(settings)===expectedSettings,'Managed JavaScript unconfigured settings changed');
+      }
+      catch(error){return discardAdmission(task,firstPage.page,error);}
       const generation = schemaMode === 'code'
         ? await driver.dispatchManagedJavascriptGeneration({task, execute, record, receiptOptions}) : null;
       if (generation) need(generation.status === 'SUCCEEDED'

@@ -76,7 +76,7 @@ export function createTreeNodeSupport(config,{json}){
    return {verified:true,cleanup_complete:true,effect_possible:false};
   },
   ...(!json?{async configureInputs(_channel,mappings){need(mappings.length===0,'Tree mapping edits are deferred');return {verified:true,cleanup_complete:true,effect_possible:false,default_tree_mapping:true};}}:{}),
-  async configure(channel,p,{request}){
+  async configure(channel,p,{request,inputMapping}){
    const observe=condition=>channel.observe({condition,readTrees:true,ready});
    const step=async(s,destination)=>channel.perform({condition:'advance owned tree wizard',initialObservation:s,ready:owned,identity:s=>s.prepared_node_context,
     resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'),'Tree Next unavailable').ref,expected_stage:destination})});
@@ -98,18 +98,32 @@ export function createTreeNodeSupport(config,{json}){
     s=await observe('tree checkbox readback');need(s.node_tree[fields[key]]===value,'Tree checkbox did not settle');
    };
    if(request.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:false,configuration:s.node_tree};
+   let jsonField;
    if(json){
+    // The picker displays native input labels (REST: Response → Ответ сервера),
+    // while json_field and its receipt must keep the technical field name.
+    need(inputMapping?.verified===true&&inputMapping.inventory_complete===true&&inputMapping.source_identity_verified===true&&inputMapping.node_context?.verified===true
+     &&['document_id','workflow_id','node_id'].every(k=>inputMapping.node_context?.[k]===s.prepared_node_context[k]),'Verified JSON input mapping of the same node required');
+    const fields=inputMapping.target_fields.filter(f=>f.type==='string'&&f.source);
+    const matches=fields.filter(f=>p.json_field===undefined?f.label===s.node_tree.json_field:f.name===p.json_field);
+    const field=matches[0];
     const jsonFields=jsonFieldScopes.get(request);
-    if(p.json_field===undefined&&jsonFields)need(jsonFields.fields.includes(s.node_tree.json_field),'Existing JSON-to-tree node field «'+s.node_tree.json_field
+    if(p.json_field===undefined&&jsonFields)need(matches.length===1&&jsonFields.fields.includes(field.name),'Existing JSON-to-tree node field «'+s.node_tree.json_field
      +'» is not a supported JSON input field; pass parameters.json_field (string input fields: '+(jsonFields.strings.join(', ')||'none')+')');
-    if(p.json_field!==undefined&&s.node_tree.json_field!==p.json_field){
+    need(matches.length===1&&typeof field.label==='string'&&field.label.length>0&&fields.filter(f=>f.label===field.label).length===1,
+     'Unique JSON input field and display label required; pass parameters.json_field');
+    jsonField=field.name;
+    if(s.node_tree.json_field!==field.label){
+     const list=s.node_tree.base+'pedSourceColumn;ValueControl;boundlist';
+     const option=e=>e.role==='option'&&e.tid?.startsWith(list+';')&&e.label===field.label&&e.allowed_actions.includes('click');
+     const bound=s=>ready(s)&&s.wizard.stage==='json_tree'&&s.observation_root?.identity?.anchor_tid===list;
      await click(s.node_tree.base+'pedSourceColumn;ValueControl;trg_picker','open JSON input column');
-     s=await channel.observe({condition:'JSON column option',readTrees:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.label===p.json_field&&e.allowed_actions.includes('click'))});
-     await channel.perform({condition:'choose exact JSON input field',initialObservation:s,ready,identity:s=>s.prepared_node_context,
-      resolve:s=>({verb:'click',ref:one(s,e=>e.label===p.json_field&&e.allowed_actions.includes('click')&&(e.role==='option'||e.tid?.includes(';boundlist;')),'Unique JSON column option required').ref})});
+     s=await channel.observe({condition:'JSON column option',readTrees:true,ready:s=>bound(s)&&s.ui.elements.filter(option).length===1});
+     await channel.perform({condition:'choose exact JSON input field',initialObservation:s,ready:bound,identity:s=>s.prepared_node_context,
+      resolve:s=>({verb:'click',ref:one(s,option,'Unique JSON column option required').ref})});
     }
     await setBool('pedBuildTreeAuto',true);await setBool('pedStrictMode',true);await setBool('pedRootExcluded',false);
-    s=await observe('complete JSON tree settings');need(s.node_tree.json_field&&(p.json_field===undefined||s.node_tree.json_field===p.json_field)
+    s=await observe('complete JSON tree settings');need(s.node_tree.json_field===field.label
      &&s.node_tree.auto_structure&&s.node_tree.strict&&!s.node_tree.exclude_root&&s.node_tree.root_mode==='auto','JSON tree stage 1 settings differ');
    }else{
     for(let attempt=0;attempt<16&&!s.node_tree.inventory_complete;attempt++){
@@ -171,6 +185,7 @@ export function createTreeNodeSupport(config,{json}){
     if(p.selected_paths)need(same(s.node_tree.nodes.filter(n=>!n.is_container&&n.selected).map(n=>n.path),p.selected_paths),'Tree leaf selection did not settle');
    }
    const configuration=structuredClone(s.node_tree);
+   if(json)configuration.json_field=jsonField;
    await step(s,json?['tree_output_mapping','done']:['output_mapping','done']);
    s=await channel.observe({condition:'tree output mapping or completion',ready:s=>owned(s)&&['tree_output_mapping','output_mapping','done'].includes(s.wizard?.stage)});
    if(s.wizard.stage!=='done'){await step(s,'done');s=await channel.observe({condition:'tree completion',ready:s=>owned(s)&&s.wizard?.stage==='done'});}

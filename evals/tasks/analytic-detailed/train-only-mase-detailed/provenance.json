@@ -1,0 +1,65 @@
+{
+  "task_id": "train-only-mase-detailed",
+  "dataset_sha256": {
+    "mase_forecasts.csv": "6e7fd1186c6fb7759763b33f72097283ca45bf089d7d95fbdd498c7573c9ee20",
+    "mase_training.csv": "65f386f79c9ed6d02ce67af6adcef167294b8ae22a5300b26abb6a534d8fa796"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "35f3d6ab820b551ac9e98760e5087d7a7c3b02ca1d8778f0ca828432d566b394"
+  },
+  "reference_sha256": "9e444017718109daee89944358204e930d97c548692e982389889e9890a2caf9",
+  "cli": {
+    "binary": "PRIVATE_QUALIFIED_CLI",
+    "version": "0.3.9-eval.20261113.29ea34.palette",
+    "profile": "PRIVATE_AUTHORING_PROFILE"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "PRIVATE_AUTHORING_URL",
+    "build": "7.4.2-test",
+    "container": "PRIVATE_AUTHORING_CONTAINER",
+    "package": "PRIVATE_AUTHORING_STORAGE/reference.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "mase_forecasts.csv",
+        "matches": true
+      },
+      {
+        "input": "mase_training.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_e21c8c634ffeBMu2XlmJxSFF22",
+    "skill_revision": "926a45ac279dc6aebdf34ccb4e7b8245601488b9b3384a3247b87b521d6513b2",
+    "exit_code": 0,
+    "started_at": "2026-11-15T07:58:41+00:00",
+    "duration_s": 780,
+    "tokens": {
+      "input": 100668,
+      "output": 6588,
+      "reasoning": 893
+    },
+    "tool_calls": 40,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": "PRIVATE_DIAGNOSTICS"
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "PRIVATE_SCENARIO_URL"
+}

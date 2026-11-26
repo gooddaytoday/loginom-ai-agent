@@ -1,4 +1,5 @@
 import {NodeReadinessTimeout} from './node-procedure.mjs';
+import {isPreparedBodyReplacement} from './node-graph-selection.mjs';
 import {captureExecutionBaseline,identifyNewExecution,verifyCompletedExecution,verifyFailedExecution,selectFailedExecutionChild,verifyFailedChildExecution,selectExecutionChild,expectedExecutionStopProof,verifyCancelledExecution,verifyExecutionReadWait} from './node-execution-evidence.mjs';
 
 const requireValue=(v,m)=>{if(!v)throw new Error(m);};
@@ -248,6 +249,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       if(!s.node_outputs.node_selected) {
         const tid=s.prepared_node_context.tid;
         await channel.perform({condition:'select the configured node for execution',initialObservation:s,
+          refreshReplacedBody:isPreparedBodyReplacement,
           ready:s=>same(s)&&s.ui.elements.some(e=>e.tid===tid&&e.graph_node?.part==='body'&&e.allowed_actions.includes('click')),
           resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===tid&&e.graph_node?.part==='body'),'Exact graph body required').ref}),identity:()=>({node})});
       }

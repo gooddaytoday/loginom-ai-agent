@@ -70,10 +70,12 @@ test('clustering reads Cluster Distance and permitted passthrough order on reque
  await assert.rejects(()=>readClusteringOutputs(absent.channel,{...read,ports:[0]},ctx,mapped),/Clustering output/);
 });
 
-test('REST actual support reads its fixed schemas without repeating execution or HTTP configuration',async()=>{
+for(const appended of [false,true])test('REST reads native fields after '+(appended?'reenabling descriptions':'initial configuration')+' without repeating HTTP',async()=>{
  const node={document_id:'doc',workflow_id:'flow',node_id:'rest'},calls=[];
  const schemas=[[['RequestID','Идентификатор запроса','integer'],['Response','Ответ сервера','string']],
-  [['RequestID','Идентификатор запроса','integer'],['ErrorCode','Код завершения','integer'],['ErrorDesc','Описание ошибки','string'],['HttpStatusCode','Код состояния HTTP','integer']]]
+  [['RequestID','Идентификатор запроса','integer'],['ErrorCode','Код завершения','integer'],...(appended
+   ?[['HttpStatusCode','Код состояния HTTP','integer'],['ErrorDesc','Описание ошибки','string']]
+   :[['ErrorDesc','Описание ошибки','string'],['HttpStatusCode','Код состояния HTTP','integer']])]]
   .map(schema=>schema.map(([name,label,type],index)=>({index,name,label,type})));
  let httpRequests=0,configurations=0,reading=false;
  const channel={async observe(){if(reading)throw Error('REST reader must not open UI');return {prepared_node_context:node,wizard:{root_tid:'wizard'},ui:{elements:[]}};},

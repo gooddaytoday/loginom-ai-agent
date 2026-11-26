@@ -1,0 +1,22 @@
+{
+  "required_type_fragments": [
+    "TBGImportTextFile",
+    "TBGCalcData",
+    "TBGExportTextFile"
+  ],
+  "linked_nodes": true,
+  "path": {
+    "from": "TBGImportTextFile",
+    "to": "TBGExportTextFile"
+  },
+  "inputs": {
+    "type_fragment": "TBGImportTextFile",
+    "suffixes": [
+      "auc_models.csv",
+      "auc_scores.csv"
+    ]
+  },
+  "forbidden_literals": [
+    "TBGJavaScript"
+  ]
+}

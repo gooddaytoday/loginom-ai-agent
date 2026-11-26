@@ -1,10 +1,16 @@
 import { expect, test } from "bun:test"
-import { cp, mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
+import { cp, mkdtemp, mkdir, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
-import { actionCatalogForPlatform, catalogForTarget, setLinuxSandboxMode, stageResources } from "../script/stage-resources"
+import {
+  actionCatalogForPlatform,
+  catalogForTarget,
+  setLinuxSandboxMode,
+  stageProductSkills,
+  stageResources,
+} from "../script/stage-resources"
 import release from "../../product/loginom-release.json"
-import { productHelpDirectory, productSkillsDirectory } from "@loginom-ai-agent/product/skills"
+import { productHelpDirectory, productSkillsDirectory, reservedSkillNames } from "@loginom-ai-agent/product/skills"
 import { dashboardResources } from "../../dashboard/src/agent/resources"
 import { buildDashboard } from "../../dashboard/src/agent/build"
 import { verifyBundledSkills } from "../src/bundled-skills"
@@ -132,6 +138,32 @@ test.skipIf(process.platform !== "linux")("linux sandbox mode keeps the setuid b
   }
 })
 
+test("product skill staging excludes Python caches recursively", async () => {
+  const root = await mkdtemp(join(tmpdir(), "loginom-stage-python-cache-"))
+  try {
+    const source = join(root, "source")
+    const destination = join(root, "skills")
+    const scripts = join("package-linter", "scripts")
+    for (const file of [
+      join(scripts, "package_linter.py"),
+      join(scripts, "__pycache__", "package_linter.cpython-312.pyc"),
+      join(scripts, "legacy.pyc"),
+      join(scripts, ".pytest_cache", "README.md"),
+    ]) {
+      const path = join(source, file)
+      await mkdir(dirname(path), { recursive: true })
+      await writeFile(path, "fixture")
+    }
+
+    await stageProductSkills(source, destination)
+
+    expect(await readdir(join(destination, scripts))).toEqual(["package_linter.py"])
+    expect(await readFile(join(destination, scripts, "package_linter.py"), "utf8")).toBe("fixture")
+  } finally {
+    await removeFixture(root)
+  }
+})
+
 // Full staging uses the same pinned Node distribution and Chromium as release builds.
 // Release/acceptance runners provide these paths; the small boundary tests above do not need them.
 // It stages the Desktop set: the CLI artifact build verifies its own (cli-manifest.ts), Desktop has no such build.
@@ -174,12 +206,17 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
       const build = await buildDashboard({ work, template: dashboard.template, node: dashboard.node, out: join(root, "builds") })
       expect(build.ok, build.output).toBe(true)
       const skills = await verifyBundledSkills(destination)
-      expect(skills.map((skill) => skill.name).toSorted()).toEqual(["loginom-automation", "loginom-dashboard", "package-docs"])
+      expect(skills.map((skill) => skill.name).toSorted()).toEqual([...reservedSkillNames].toSorted())
       const manifest = await Bun.file(join(destination, "resource-manifest.json")).json()
       // Desktop's service keeps its Loginom connection with the Keychain helper on macOS (B4.8c), as the CLI does.
       expect(manifest.files.some((file: { path: string }) => file.path === "bin/loginom-keychain")).toBe(
         process.platform === "darwin",
       )
+      const linterFiles: string[] = manifest.files
+        .map((file: { path: string }) => file.path)
+        .filter((path: string) => path.startsWith("skills/package-linter/"))
+      expect(linterFiles).toContain("skills/package-linter/scripts/package_linter.py")
+      expect(linterFiles.filter((path) => /(?:^|\/)(?:__pycache__|\.pytest_cache)(?:\/|$)|\.pyc$/.test(path))).toEqual([])
       expect(manifest.files.some((file: { path: string }) => file.path === "skills/package-docs/scripts/package-docs.mjs")).toBe(true)
       expect(manifest.files.some((file: { path: string }) => file.path === "help/help-manifest.json")).toBe(true)
       expect(manifest.files.some((file: { path: string }) => file.path === "knowledge-key")).toBe(false)

@@ -320,6 +320,10 @@ describe("loginom.product Dock catalog (B2.5d, 0.4 toolContributor)", () => {
         const [plain] = yield* test.requests(ordinary)
         expect(loginom(plain)).toEqual(["loginom_find"])
         expect(system(plain)).toContain("Loginom is available through the bundled loginom_* tools.")
+        // 0.4.2: quality reviews go to package-linter, scenario documentation stays with package-docs.
+        expect(system(plain)).toContain("use package-linter if available")
+        expect(system(plain)).toContain("If package-linter is unavailable, report that it is missing; do not substitute package-docs")
+        expect(system(plain)).toContain("other than quality assessment or linting, always activate package-docs")
 
         const automation = yield* test.create("automation")
         yield* test.wizard(automation, script({ text: "end" }))

@@ -1,0 +1,69 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-a01-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string"
+        },
+        {
+          "name": "Total",
+          "label": "Total",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "Category": "Office",
+          "Total": 240223.42
+        },
+        {
+          "Region": "North",
+          "Category": "Tech",
+          "Total": 239852.79
+        },
+        {
+          "Region": "South",
+          "Category": "Office",
+          "Total": 239804.58
+        },
+        {
+          "Region": "South",
+          "Category": "Tech",
+          "Total": 240433.21
+        },
+        {
+          "Region": "West",
+          "Category": "Office",
+          "Total": 240643.0
+        },
+        {
+          "Region": "West",
+          "Category": "Tech",
+          "Total": 240014.0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "nodes": [
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "result.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Active",
+          "type": "boolean",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Code": "A",
+          "Amount": 17.5,
+          "Active": true
+        },
+        {
+          "Code": "Б",
+          "Amount": 0.0,
+          "Active": false
+        },
+        {
+          "Code": "C",
+          "Amount": -2.25,
+          "Active": true
+        }
+      ]
+    }
+  ]
+}

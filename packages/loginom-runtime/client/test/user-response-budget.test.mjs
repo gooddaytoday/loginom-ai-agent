@@ -11,6 +11,8 @@ import {nodeResultReply} from '../lib/node-result-reply.mjs';
 import {compactNodeResult,compactActionResult,userResultSchema} from '../lib/user-results.mjs';
 import {actionReply} from '../lib/bridge.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
+import {createSkillLoader} from '../lib/skill.mjs';
+import {createBundledSkillFixture} from './support/bundled-skill-fixture.mjs';
 
 const reply=value=>({content:[{type:'text',text:JSON.stringify(value)}]});
 const bytes=value=>Buffer.byteLength(JSON.stringify(value),'utf8');
@@ -111,6 +113,55 @@ function catalog(types) {
  return userActionInventory({actions:[],node_types:describeNodeTypes(types??[...[...handlers.keys()].filter(t=>t!=='programming.javascript').slice(0,31),'programming.javascript'],
    {...pins,skillRevision:'e'.repeat(64),loginomProfile:pins.compatibilityProfile},new Map(),handlers,'7.4.2'),session_manifest:pins});
 }
+
+test('oversized real node cards supply exact individually deliverable retries with only matching modes',async t=>{
+ const resources=await createBundledSkillFixture(t),skill=createSkillLoader({resources:resources.resources});
+ const types=['imports.text','programming.javascript','integration.rest_request','transform.calculator'];
+ const modes=['delimited','script','request','expression'];
+ const description=catalog(types);
+ description.node_types=await skill.describeNodes(description.node_types,modes);
+ const original=reply(description),before=JSON.stringify(original);
+ t.diagnostic('four-card envelope bytes: '+bytes(original));
+ assert.ok(bytes(original)>46000);
+ const refused=boundedUserToolReply(original,{tool:'dock_action_describe',modes});
+ assert.equal(refused.isError,true);
+ const recovery=JSON.parse(refused.content[0].text).next_step;
+ assert.deepEqual(recovery.arguments,{node_types:[types[0]],modes:[modes[0]]});
+ const requests=[recovery.arguments,...recovery.remaining_requests];
+ assert.deepEqual(requests,types.map((type,index)=>({node_types:[type],modes:[modes[index]]})));
+ for(const request of requests){
+  const single=catalog(request.node_types);
+  single.node_types=await skill.describeNodes(single.node_types,request.modes);
+  const delivered=reply(single);
+  assert.notEqual(boundedUserToolReply(delivered,{tool:'dock_action_describe',modes:request.modes}).isError,true);
+  assert.ok(bytes(delivered)<=46000);
+  assert.deepEqual(single.node_types[0],description.node_types.find(card=>card.type===request.node_types[0]));
+ }
+ assert.equal(JSON.stringify(original),before);
+});
+
+test('an oversized single card is reported without an identical retry or lost modes',()=>{
+ const description=catalog(['imports.text']);
+ description.node_types[0].guidance='"'.repeat(24000);
+ const original=reply(description),before=JSON.stringify(original);
+ const refused=boundedUserToolReply(original,{tool:'dock_action_describe',modes:['delimited']});
+ const next=JSON.parse(refused.content[0].text).next_step;
+ assert.equal(refused.isError,true);assert.equal(next.tool,undefined);assert.equal(next.arguments,undefined);
+ assert.deepEqual(next.undeliverable_requests,[{node_types:['imports.text'],modes:['delimited']}]);
+ assert.equal(JSON.stringify(original),before);
+});
+
+test('mixed overflow splits saving actions from nodes, omits absent modes and does not retry oversized cards',()=>{
+ const description=catalog(['imports.text','transform.calculator']);
+ description.node_types[0].guidance='"'.repeat(24000);
+ description.actions=[{action_key:'package.save_checkpoint',revision:'1',description:'Save the package'}];
+ const refused=boundedUserToolReply(reply(description),{tool:'dock_action_describe'});
+ const next=JSON.parse(refused.content[0].text).next_step;
+ assert.deepEqual(next.arguments,{node_types:['transform.calculator']});
+ assert.deepEqual(next.remaining_requests,[{action_keys:['package.save_checkpoint']}]);
+ assert.deepEqual(next.undeliverable_requests,[{node_types:['imports.text']}]);
+ assert.ok(bytes(refused)<2000);
+});
 
 test('model descriptions retain JS schema/pins and route detailed knowledge to the prepared reference',()=>{
  for(const types of [['programming.javascript'],['imports.text','programming.javascript']]){
@@ -226,6 +277,13 @@ test('real bridge MCP protocol retains knowledge after a refused prepare and con
  assert.match(result.stdout,/# fail 0/);
 });
 
+test('bridge describe retries fit and preserve session description admission after a refused batch',async()=>{
+ const result=await promisify(execFile)(process.execPath,['--test','--test-reporter=tap','--experimental-test-module-mocks',
+   new URL('./support/bridge-budget.mjs',import.meta.url).pathname],{maxBuffer:200000,
+   env:{...process.env,NODE_TEST_CONTEXT:undefined,LOGINOM_TEST_DESCRIBE_BATCH:'1'}});
+ assert.match(result.stdout,/# pass 1/);assert.match(result.stdout,/# fail 0/);
+});
+
 test('local open_package delivers its first full knowledge bundle and retains geometry only locally',async()=>{
  const result=await promisify(execFile)(process.execPath,['--test','--test-reporter=tap','--experimental-test-module-mocks',
    new URL('./support/bridge-budget.mjs',import.meta.url).pathname],{maxBuffer:200000,
@@ -247,5 +305,13 @@ test('smoothing HP two-file prepare delivers full knowledge and native workspace
   new URL('./support/bridge-budget.mjs',import.meta.url).pathname],{maxBuffer:200000,
   env:{...process.env,NODE_TEST_CONTEXT:undefined,LOGINOM_TEST_SMOOTHING_HP:'1'}});
  t.diagnostic(result.stdout.match(/smoothing-hp prepare envelope bytes: [0-9]+/)[0]);
+ assert.match(result.stdout,/# pass 1/);assert.match(result.stdout,/# fail 0/);
+});
+
+test('seven-file prepare delivers readiness, original operation and all authorized inputs',async t=>{
+ const result=await promisify(execFile)(process.execPath,['--test','--test-reporter=tap','--experimental-test-module-mocks',
+  new URL('./support/bridge-budget.mjs',import.meta.url).pathname],{maxBuffer:200000,
+  env:{...process.env,NODE_TEST_CONTEXT:undefined,LOGINOM_TEST_SEVEN_FILES:'1'}});
+ t.diagnostic(result.stdout.match(/seven-file prepare envelope bytes: [0-9]+/)[0]);
  assert.match(result.stdout,/# pass 1/);assert.match(result.stdout,/# fail 0/);
 });

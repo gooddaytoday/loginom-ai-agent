@@ -1,0 +1,84 @@
+{
+  "package_path": "/bughunt/bh-c04.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.group_data"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "transform.calculator"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": false,
+      "export_destination": "/bughunt/bh-c04.csv",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string"
+        },
+        {
+          "name": "RevenueMean",
+          "label": "RevenueMean",
+          "type": "real"
+        },
+        {
+          "name": "RevenueMedian",
+          "label": "RevenueMedian",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "Север",
+          "Category": "Офис",
+          "RevenueMean": 18.75,
+          "RevenueMedian": 18.75
+        },
+        {
+          "Region": "Север",
+          "Category": "Техника",
+          "RevenueMean": 60.25,
+          "RevenueMedian": 60.25
+        },
+        {
+          "Region": "Центр",
+          "Category": "Офис",
+          "RevenueMean": 31.75,
+          "RevenueMedian": 15.5
+        },
+        {
+          "Region": "Центр",
+          "Category": "Техника",
+          "RevenueMean": 130.5,
+          "RevenueMedian": 100.5
+        },
+        {
+          "Region": "Юг",
+          "Category": "Офис",
+          "RevenueMean": 12.5,
+          "RevenueMedian": 12.5
+        },
+        {
+          "Region": "Юг",
+          "Category": "Техника",
+          "RevenueMean": 50.5,
+          "RevenueMedian": 50.5
+        }
+      ]
+    }
+  ]
+}

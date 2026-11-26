@@ -1,5 +1,5 @@
 import {javascriptSourceSettingsDigest} from './javascript-source-admission.mjs';
-import {readObservedJavascriptDeclaredColumns} from './javascript-declared-schema.mjs';
+import {isUnconfiguredJavascriptSchema,readObservedJavascriptDeclaredColumns} from './javascript-declared-schema.mjs';
 import {javascriptManagedSourceSettings} from './javascript-managed-source-adapter.mjs';
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
@@ -27,6 +27,8 @@ export function javascriptExistingLifecycleBaseline({receipt,snapshot,parameters
     &&(parameters.expected_source_sha256===undefined
       ||parameters.expected_source_sha256===receipt.previous_source.source_sha256),
   'JavaScript existing source digest baseline differs');
-  return {schema_mode,settings_sha256:receipt.settings_sha256,
+  const settings_sha256=receipt.settings_sha256;
+  if(isUnconfiguredJavascriptSchema(snapshot.schema))return {schema_mode,settings_sha256,unconfigured:true};
+  return {schema_mode,settings_sha256,
     ...(schema_mode==='declared'?{columns:readObservedJavascriptDeclaredColumns(snapshot.schema)}:{})};
 }

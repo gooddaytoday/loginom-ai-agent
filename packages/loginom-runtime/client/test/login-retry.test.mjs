@@ -43,7 +43,7 @@ test('production browser login retry: '+mode+', keepOpen='+keepOpen,{skip:!brows
           if(mode==='deadline')await new Promise(resolve=>setTimeout(resolve,10500));
           if(['mismatch','rejected'].includes(mode)){
             await route.fulfill({contentType:'text/html',body:mode==='mismatch'?html('foreign'):
-              '<div data-tid="LoginForm;Login;edtUsername"><input></div><div data-tid="LoginForm;Login;edtPassword"><input></div><button data-tid="LoginForm;Login;btnLogin">Login</button>'});
+              '<div data-tid="LoginForm;Login;edtUsername"><input></div><div id="password" data-tid="LoginForm;Login;edtPassword"><input></div><button data-tid="LoginForm;Login;btnLogin">Login</button><script>window.Ext={getCmp:id=>id==="password"?{isVisible:()=>true,getActiveErrors:()=>["Invalid credentials"]}:undefined};</script>'});
           }else if((contexts.length===1&&mode!=='normal')||mode==='twice')await route.abort('connectionrefused');
           else await route.fulfill({contentType:'text/html',body:html('worker')});
         });

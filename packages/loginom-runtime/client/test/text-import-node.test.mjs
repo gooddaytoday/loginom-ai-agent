@@ -123,6 +123,21 @@ test('an explicit old upload ID still requires current-session verified upload e
   execute:async()=>assert.fail('No browser call before source verification')});
  await assert.rejects(drivers.verifySource(r.parameters),/Verified upload operation is missing/);
 });
+test('a delivery request ID is refused before browser access and points to the upload receipt field',async()=>{
+ const r=persistedImport();r.parameters.source={...params().source,upload_operation_id:'delivery'};
+ const upload=uploaded();upload.operation_id='delivery:upload';upload.outcome.operation_id=upload.operation_id;
+ const support=createCandidateNodeSupport({targetOrigin:'https://loginom.invalid',targetBuild:'7.4.2'});
+ validateNodeApplyRequest(r,support.nodeApplyHandlers);
+ const drivers=support.nodeApplyDriverFactory({operation:{id:r.operation_id,parameters:r},verifiedUploads:()=>[upload],
+  execute:async()=>assert.fail('No browser call before source verification')});
+ await assert.rejects(drivers.verifySource(r.parameters),error=>{
+  assert.match(error.message,/output\.upload_operation_id/);
+  assert.deepEqual(error.nodePhaseRefusal,{phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});
+  return true;
+ });
+ assert.equal((await drivers.verifySource({...r.parameters,source:{...r.parameters.source,upload_operation_id:upload.operation_id}}))
+  .source.verification_id,'verification');
+});
 test('public Import discovery and dispatch admit the unchanged existing execution request',async()=>{
  const handlers=createTextImportNodeSupport({}).nodeApplyHandlers,r=persistedImport();let received;
  assert.deepEqual(textImportParametersSchema.required,['settings']);

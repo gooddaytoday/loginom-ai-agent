@@ -145,6 +145,15 @@ test('explicit types refresh in none keeps the structure and takes native types 
  assert.equal(first,f.channel.act);
 });
 
+test('replacing a source with requested type analysis refreshes definitions only once',async()=>{
+ const f=fixture();
+ const result=await configureTextImportPatch(f.channel,{
+  source:{source_path:'/test/replacement.csv'},format:{auto_detect_columns:'new'},analysis:{rows:2,refresh:'types'},
+ },f.owner,'/test/replacement.csv');
+ assert.deepEqual(f.gestures.map(g=>g.ref).filter(ref=>['rows-input','refresh-all','refresh-data'].includes(ref)),['rows-input','refresh-all']);
+ assert.equal(brief(result.columns),brief(native()));
+});
+
 test('new import takes all fields from the observed native schema without declared columns',async()=>{
  const f=fixture({existing:false});
  const result=await configureTextImportFields(f.channel,{source,format:{...format,auto_detect_columns:'all'},analysis:{rows:2,refresh:'all'}},f.owner);

@@ -147,3 +147,41 @@ test('D56c slow Open diagnostics cannot hold cleanup beyond the remaining read b
  assert.equal(snapshot.status,'unavailable');assert.equal(snapshot.reason,'diagnostic_timeout');
  assert.equal(writes.get('cold/result.json').cleanup.package_closed,true);
 });
+
+// LAB-1995 bh-v02 cold-1: COLD_OUTPUT_NOT_UNIQUELY_MATCHED after the cold
+// Execute left cleanup BLOCKED/UNSAVED_CHANGES and the account's lock open, so
+// every following cold Open of this package was readonly. After an owned cold
+// execution a failed check discards (never saves) and logs out; its outcome stays.
+for(const scenario of ['executed writer','executed readonly','not executed','executed cancelled'])test('cold failure after execution discards without save: '+scenario,async()=>{
+ const state={prepared:structuredClone(prepared),closed:false,cleanupAttempted:false,
+  failure:scenario==='executed cancelled'?'COLD_CANCELLED':'COLD_OUTPUT_NOT_UNIQUELY_MATCHED',
+  executionDispatched:scenario!=='not executed',...(scenario==='executed cancelled'?{cancelled:'SIGTERM'}:{})};
+ if(scenario!=='executed readonly')state.prepared.workflow_ref.navigation_path[0].label='Saved';
+ const writes=new Map(),calls=[];
+ await run({state,saved:{path},session:'own-session',config:{loginom_url:'https://loginom.invalid/app/',workflow_profile:{loginom_user:'own'}},
+  makePackageCleanupCode,rawExecute:async code=>{
+   const [options]=JSON.parse('['+code.slice(code.lastIndexOf(')(page,')+7,-1)+']');calls.push(options);
+   const discarded=options.diagnosticDiscard===true;
+   return {status:discarded?'SUCCEEDED':'BLOCKED',reason:discarded?null:'UNSAVED_CHANGES',
+    package_closed:discarded,logged_out:discarded,unsaved_changes_discarded:discarded};
+  },writeFile:async(name,body)=>writes.set(name,JSON.parse(body)),join:(...p)=>p.join('/'),args:{output:'cold'},context:{close:async()=>{}}});
+ const discard=scenario==='executed writer';
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].diagnosticDiscard,discard);assert.equal(calls[0].diagnosticWaitForIdle,discard);
+ assert.equal(calls[0].diagnosticReadOnly,scenario==='executed readonly');
+ const result=writes.get('cold/result.json');
+ assert.equal(result.status,'FAIL');assert.equal(result.error,state.failure);
+ assert.equal(result.cleanup.package_closed,discard);assert.equal(result.cleanup.logged_out,discard);
+ assert.equal(writes.get('cold/cleanup.json').unsaved_changes_discarded,discard);
+});
+
+test('every cold execution entry marks the run as executed before dispatch',()=>{
+ const calls=[...source.matchAll(/runColdExecution\(|verifyN18JavascriptStep\(/g)].map(m=>m.index);
+ const wrapper=source.indexOf('const runColdExecution=options=>{state.executionDispatched=true;');
+ assert.ok(wrapper>source.indexOf('const state = {'),'execution marker wrapper is defined after state');
+ assert.ok(calls.length>=5);
+ for(const at of calls){
+  if(source.startsWith('verifyN18JavascriptStep(',at))assert.match(source.slice(at-80,at),/state\.executionDispatched=true;/);
+  else assert.ok(at>wrapper,'runColdExecution call precedes its execution marker');
+ }
+});

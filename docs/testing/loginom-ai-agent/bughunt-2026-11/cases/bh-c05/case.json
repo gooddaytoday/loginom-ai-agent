@@ -1,0 +1,19 @@
+{
+  "budget": {
+    "max_tool_calls": 65,
+    "max_errors": 0,
+    "max_nodes": 0,
+    "forbid": [
+      "sqlite3",
+      "convert",
+      "pandas",
+      "openpyxl",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  },
+  "notes": "Zero new nodes, one deletion, import must reconnect to retained grouping. Base is c01, independent of c02-c04.",
+  "base": "bh-c01",
+  "input_files": []
+}

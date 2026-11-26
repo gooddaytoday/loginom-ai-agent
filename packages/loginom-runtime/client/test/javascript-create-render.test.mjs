@@ -21,7 +21,9 @@ function fixture(t, fault) {
   bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:{FDiagram:{FNodes:{FCollection:created?[native]:[]}}}}})}}}}}}}};
  const evaluate=(fn,args,element)=>runInNewContext('('+fn.toString()+')',globals)(...(element?[element,args]:[args]));
  const page={evaluate:async(fn,args)=>evaluate(fn,args),waitForTimeout:async ms=>{
-  t.mock.timers.tick(ms);if(fault==='cancel')page[Symbol.for('loginom-dock.node-target-cancel')]=new Set(['effect']);
+  t.mock.timers.tick(ms);
+  // Cancel during port settlement follows the drop; cancel_before lands on the first pre-gesture wait.
+  if(fault==='cancel'&&created||fault==='cancel_before'&&!created)page[Symbol.for('loginom-dock.node-target-cancel')]=new Set(['effect']);
  },locator:selector=>{
   const element=elements.get(JSON.parse(selector.slice(10,-1)));
   return {count:async()=>element?1:0,isVisible:async()=>true,isEnabled:async()=>true,boundingBox:async()=>rect,evaluate:async(fn,args)=>evaluate(fn,args,element)};
@@ -54,4 +56,8 @@ for(const fault of ['foreign_type','foreign_owner','changed_owner','deadline','c
  if(fault==='deadline')assert.equal(f.now(),40000);
  if(fault==='cancel')assert.match(r.error,/cancelled/);
  if(fault==='persistent_mask'){assert.match(r.error,/Graph is blocked/);assert.ok(f.now()>=25000&&f.now()<26000);}
+});
+test('JavaScript create cancelled before the gesture has no possible effect',async t=>{
+ const f=fixture(t,'cancel_before'),r=await f.run();assert.equal(r.status,'NOT_APPLIED',r.error);assert.equal(r.effect_possible,false);
+ assert.equal(f.counts().drags,0);assert.equal(r.cleanup_complete,true);assert.match(r.error,/cancelled/);assert.equal(r.after,undefined);
 });

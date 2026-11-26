@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {readNodeTargetLinkValidation} from '../lib/executor.mjs';
+import {createExecutionJournal} from '../lib/execution-journal.mjs';
 import {makeRestLinkCode} from '../lib/rest-request.mjs';
 import {linkPage,linkParameters,run} from './support/executor-fixture.mjs';
 function fixture(value,kind='data'){
@@ -77,6 +81,45 @@ test('existing REST service edge remains a gesture-free verified continuation',a
 });
 for(const [value,state] of [[undefined,'pending'],[null,'pending'],[true,'ready'],[false,'rejected']])test('cached validation '+value,async()=>{const r=await fixture(value).read();assert.equal(r.state,state);assert.equal(r.target_ready,true);assert.deepEqual(JSON.parse(JSON.stringify(r.point)),{x:106,y:212});});
 for(const [name,change] of Object.entries({document:f=>f.preparation.id='other',root:f=>f.context.dom_epoch=2,node:f=>f.context.nodes[1].id='other',port:f=>f.target.port.parent={},released:f=>f.graph.isMouseDown=false,source:f=>f.handler.previous.cell={},owner:f=>f.diagram.FHandlers.FConnectionHandler.FDelegationHandler.FMouseDown=false,cache:f=>f.diagram.FValidatedConnectionsCache.FCache.s.t='yes'}))test('validation refuses changed '+name,async()=>{const f=fixture(true);change(f);await assert.rejects(f.read());});
+for(const [condition,change,observed] of [
+ ['graph_mouse_down',f=>{f.graph.isMouseDown=false;},{graph_mouse_down:false}],
+ ['connection_first',f=>{f.handler.first=null;},{connection_first:false}],
+ ['source_cell',f=>{f.handler.previous.cell={id:'private caption'};},{source_cell:false}],
+ ['delegation_mouse_down',f=>{f.diagram.FHandlers.FConnectionHandler.FDelegationHandler.FMouseDown=undefined;},{delegation_mouse_down:false}],
+])test('drag owner refusal names the failed condition: '+condition,async()=>{
+ const f=fixture(true);change(f);
+ await assert.rejects(f.read(),error=>{
+  assert.match(error.message,new RegExp('Link validation drag owner changed: '+condition+'; observed='));
+  const state=JSON.parse(error.message.split('; observed=')[1]);
+  for(const name of ['graph_mouse_down','connection_first','source_cell','delegation_mouse_down'])assert.equal(state[name],observed[name]??true);
+  assert.doesNotMatch(error.message,/private caption/);
+  return true;
+ });
+});
+test('drag owner condition and safe observations survive the browser receipt and durable journal',async()=>{
+ const f=fixture(true),page=linkPage(),evaluate=page.evaluate.bind(page);
+ f.handler.first=null;f.graph.isMouseDown=false;
+ page.onDrop=()=>{};
+ page.evaluate=async(fn,arg)=>{
+  if(fn.toString().includes('Link validation workflow changed'))return f.read();
+  if(fn.toString().includes('Node target link context changed'))return;
+  return evaluate(fn,arg);
+ };
+ const result=await run(page,'link.create',linkParameters(page,'data'),{node_target_context:{},mode:'apply',operation_id:'drag',
+  receipt_namespace:'test',receipt_signature:'signature',deadline_at:page.clock+30000});
+ assert.equal(result.status,'AMBIGUOUS');assert.equal(result.effect_possible,true);
+ assert.equal(page.upCalls,1);assert.equal(page.down,false);
+ assert.match(result.error.message,/changed: graph_mouse_down,connection_first; observed=/);
+ assert.equal(result.trace.find(e=>e.event==='action_failed').message,result.error.message);
+ const receipt=page[Symbol.for('loginom-dock.operation-receipts.v1')].get('test/drag');
+ assert.equal(receipt.state,'completed');assert.equal(receipt.outcome.error.message,result.error.message);
+ const directory=await mkdtemp(join(tmpdir(),'drag-owner-'));
+ try{
+  await createExecutionJournal({directory,metadata:{sessionId:'test'}})({phase:'completed',outcome:receipt.outcome});
+  const event=JSON.parse(await readFile(join(directory,'execution-events.jsonl'),'utf8'));
+  assert.equal(event.outcome.error.message,result.error.message);
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
 test('cache is not a drop marker proof',async()=>{const f=fixture(true);f.handler.marker.validState=null;assert.equal((await f.read()).target_ready,false);});
 for(const mode of ['delayed','rejected','expired','foreign','marker','cancelled'])test('serialized held drag '+mode,async()=>{
  const page=linkPage(),evaluate=page.evaluate.bind(page),start=page.clock;let reads=0;

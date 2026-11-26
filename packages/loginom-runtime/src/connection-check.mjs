@@ -250,10 +250,25 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
         if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password, { timeout: remaining(30_000) })
       })
       await measure("login.submit", () => field("btnLogin").click({ timeout: remaining(30_000) }))
-      await measure("login.response", () => avatar.waitFor({ state: "visible", timeout: remaining(30_000) })).catch((error) => {
+      const response = await measure("login.response", () => page.waitForFunction(function loginResponse() {
+        const avatar = document.querySelector('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
+        if (avatar && avatar.getBoundingClientRect().width > 0 && avatar.getBoundingClientRect().height > 0 && getComputedStyle(avatar).visibility !== "hidden") return "authenticated"
+        // ShowAuthError marks these native Loginom fields. Read only the
+        // presence of an error, never return its text across the boundary.
+        try {
+          return ["edtUsername", "edtPassword", "pnlLoginFormFields"].some(name => {
+            const element = document.querySelector(`[data-tid="LoginForm;Login;${name}"]`)
+            const field = element && globalThis.Ext?.getCmp(element.id)
+            return field?.isVisible?.(true) === true && field.getActiveErrors?.().some(message => typeof message === "string" && message.trim().length > 0)
+          }) ? "rejected" : false
+        } catch { return false }
+      }, null, { timeout: remaining(30_000) })).catch(error => {
         original = error
-        throw Error("LOGINOM_LOGIN_REJECTED")
+        throw Error("LOGINOM_LOGIN_UNAVAILABLE")
       })
+      try {
+        if (await response.jsonValue() === "rejected") throw Error("LOGINOM_LOGIN_REJECTED")
+      } finally { await response.dispose() }
     }
     phase = "identity"; phaseStarted = performance.now()
     const identity = await measure("login.identity", () => page.evaluate(
