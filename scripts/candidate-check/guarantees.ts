@@ -15,7 +15,7 @@ import { join, resolve } from "node:path"
 const repo = resolve(import.meta.dir, "../..")
 const argv = process.argv.slice(2)
 const mode = argv.find((item) => ["run", "mutate", "all"].includes(item)) ?? "all"
-const option = (name: string) => argv[argv.indexOf(name) + 1]
+const option = (name: string) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined)
 const only = argv.includes("--only") ? new Set(option("--only")!.split(",")) : undefined
 
 const git = (...args: string[]) => Bun.spawnSync(["git", ...args], { cwd: repo }).stdout.toString().trim()
