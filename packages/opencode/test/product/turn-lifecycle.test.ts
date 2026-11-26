@@ -15,7 +15,7 @@ const digest = "a".repeat(64)
 
 type Request = { method: string; input: unknown }
 
-function connect(options: { acquire?: "ready" | "refused" } = {}) {
+function connect(options: { acquire?: "ready" | "refused"; scope?: "request" | "apply" } = {}) {
   const requests: Request[] = []
   let receive: ((event: { data: unknown }) => void) | undefined
   LoginomHost.connect({
@@ -28,6 +28,8 @@ function connect(options: { acquire?: "ready" | "refused" } = {}) {
       requests.push({ method, input })
       if (method === "acquire" && options.acquire === "refused")
         return receive?.({ data: { id, error: "LOGINOM_HOST_NOT_READY" } })
+      if (method === "scope" && (input as { mode?: string }).mode === options.scope)
+        return receive?.({ data: { id, error: "LOGINOM_SCOPE_DENIED" } })
       const result =
         method === "acquire" ? { generation: 4 } : method === "scope" ? (input as { scope: unknown }).scope : {}
       receive?.({ data: { id, generation: 4, result } })
@@ -109,6 +111,158 @@ describe("turnLifecycle", () => {
     expect(prompt).toContain("Do not activate package-docs or loginom-automation merely to produce a quality review")
     expect(prompt).toContain("other than quality assessment or linting, always activate package-docs")
   })
+
+  test("only a catalog with loginom_dock_prepare but no browser Dock tools tells the model to prepare first", async () => {
+    connect()
+    const { run } = acquire()
+    const line =
+      "Для работы со сценарием начни с loginom_dock_prepare: остальные loginom_dock_* появятся после подготовки; из истории их не вызывай."
+    const systems = await Effect.runPromise(
+      Effect.scoped(
+        run.pipe(
+          Effect.map((turn) => [
+            turn.system(["read", "loginom_find", "loginom_dock_diagnostics", "loginom_dock_prepare"]),
+            turn.system(["loginom_dock_diagnostics", "loginom_dock_prepare", "loginom_dock_action_describe"]),
+            turn.system(["read", "skill", "loginom_find", "loginom_dock_diagnostics"]),
+            turn.system(),
+          ]),
+        ),
+      ),
+    )
+    expect(systems.map((system) => system.includes(line))).toEqual([true, false, false, false])
+    LoginomHost.disconnect()
+    const { run: offline } = acquire()
+    expect(
+      await Effect.runPromise(Effect.scoped(offline.pipe(Effect.map((turn) => turn.system(["loginom_dock_prepare"]))))),
+    ).toEqual([])
+  })
+
+  for (const failure of ["write", "permission", "request", "apply", "revert", "image", "applied"] as const)
+    test(
+      failure === "write"
+        ? "an inherited grant whose DB write fails after the Host applied it stops the loop"
+        : failure === "image"
+          ? "an image-only message inherits the grant on an ignored synthetic carrier part"
+          : failure === "applied"
+            ? "an inherited grant carries the current bundled skill digest"
+            : failure === "revert"
+              ? "an activation behind the revert boundary is not inherited"
+              : `a ${failure === "permission" ? "permission" : "host " + failure} refusal leaves the inherited task on default without a write or a retry`,
+      async () => {
+        const requests = connect({ scope: failure === "request" || failure === "apply" ? failure : undefined })
+        const first = MessageID.ascending()
+        const answer = MessageID.ascending()
+        const next = MessageID.ascending()
+        const text = (messageID: MessageID, created: number, value: string): SessionV1.WithParts => ({
+          info: { ...user, id: messageID, time: { created } } as SessionV1.User,
+          parts: [{ id: PartID.ascending(), sessionID, messageID, type: "text", text: value }],
+        })
+        const history: SessionV1.WithParts[] = [
+          text(first, 1, "Построй сценарий"),
+          {
+            info: { id: answer, sessionID, role: "assistant", parentID: first, time: { created: 2 } } as SessionV1.Assistant,
+            parts: [
+              {
+                id: PartID.ascending(),
+                sessionID,
+                messageID: answer,
+                type: "tool",
+                tool: "skill",
+                callID: "activation",
+                state: {
+                  status: "completed",
+                  input: { name: "loginom-automation" },
+                  output: "Loaded skill",
+                  title: "Skill",
+                  metadata: { activation: { name: "loginom-automation", profile: "loginom-automation", digest } },
+                  time: { start: 2, end: 2 },
+                },
+              },
+            ],
+          },
+          failure === "image"
+            ? {
+                info: { ...user, id: next, time: { created: 3 } } as SessionV1.User,
+                parts: [
+                  {
+                    id: PartID.ascending(),
+                    sessionID,
+                    messageID: next,
+                    type: "file",
+                    mime: "image/png",
+                    filename: "chart.png",
+                    url: "data:image/png;base64,iVBORw0KGgo=",
+                  },
+                ],
+              }
+            : text(next, 3, "Добавь узел"),
+        ]
+        const asked: unknown[] = []
+        const written: unknown[] = []
+        const current = "b".repeat(64)
+        const { input } = fakes()
+        const run = turnLifecycle.acquireRun({
+          ...(input as object),
+          sessions: {
+            getForExecution: () => Effect.succeed({ id: sessionID, directory: "/fixture/project" }),
+            updatePart: (part: unknown) =>
+              failure === "write" ? Effect.die(Error("DB_WRITE_FAILED")) : Effect.sync(() => (written.push(part), part)),
+          },
+          agents: { get: () => Effect.succeed({ permission: [] }) },
+          skills: {
+            require: (name: string) =>
+              Effect.succeed({ name, source: "bundled", digest: current, location: "/skills/" + name + "/SKILL.md" }),
+          },
+          permission: {
+            ask: (request: unknown) =>
+              Effect.suspend(() => {
+                asked.push(request)
+                return failure === "permission" ? Effect.fail(Error("permission denied")) : Effect.void
+              }),
+          },
+        } as never)
+        const exit = await Effect.runPromiseExit(
+          Effect.scoped(
+            Effect.gen(function* () {
+              const turn = yield* run
+              const session = {
+                id: sessionID,
+                ...(failure === "revert" ? { revert: { messageID: answer } } : {}),
+              } as never
+              yield* turn.beforeTurn({ session, history })
+              yield* turn.beforeTurn({ session, history })
+            }),
+          ),
+        )
+        const modes = requests
+          .filter((request) => request.method === "scope")
+          .map((request) => (request.input as { mode: string }).mode)
+        const grant = { name: "loginom-automation", profile: "loginom-automation", digest: current }
+        expect(asked).toHaveLength(failure === "revert" ? 0 : 1)
+        if (failure === "write") {
+          expect(Exit.isFailure(exit)).toBe(true)
+          if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("DB_WRITE_FAILED")
+          expect(modes).toEqual(["bind", "request", "apply"])
+          return
+        }
+        expect(Exit.isSuccess(exit)).toBe(true)
+        if (failure === "image" || failure === "applied") {
+          expect(modes).toEqual(["bind", "request", "apply"])
+          expect(written).toHaveLength(1)
+          const carrier = history[2].parts.find((part) => part.type === "text")
+          expect(carrier).toMatchObject(
+            failure === "image"
+              ? { type: "text", text: "", synthetic: true, ignored: true, messageID: next, metadata: { skill_activation: grant } }
+              : { type: "text", text: "Добавь узел", metadata: { skill_activation: grant } },
+          )
+          expect(history[2].parts).toHaveLength(failure === "image" ? 2 : 1)
+          return
+        }
+        expect(modes).toEqual(failure === "request" ? ["bind", "request"] : failure === "apply" ? ["bind", "request", "apply"] : [])
+        expect(written).toEqual([])
+        expect(history[2].parts.some((part) => part.type === "text" && part.metadata?.skill_activation)).toBe(false)
+      },
+    )
 
   test("the Host lease is released when the run's scope closes, however it ends", async () => {
     for (const end of ["success", "failure"] as const) {

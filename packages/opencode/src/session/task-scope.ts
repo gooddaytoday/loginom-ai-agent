@@ -41,8 +41,20 @@ export function visible(input: Input) {
 }
 
 export function derive(input: Input): Info | undefined {
+  return walk(input).scope
+}
+
+/** An earlier task's applied loginom-automation grant, carried to a current task that has no activation yet. */
+export function inherited(input: Input): Activation | undefined {
+  const { scope, automation } = walk(input)
+  if (scope?.profile === "default" && automation && automation.taskMessageID !== scope.taskMessageID)
+    return automation.grant
+}
+
+function walk(input: Input) {
   const tasks = new Map<MessageID, MessageID | undefined>()
   let scope: Info | undefined
+  let automation: { taskMessageID: MessageID; grant: Activation } | undefined
   for (const message of visible(input)) {
     if (message.info.role === "user") {
       const replay = replayOf(message)
@@ -71,10 +83,12 @@ export function derive(input: Input): Info | undefined {
             ? part.state.metadata.activation
             : undefined,
       )
-      if (next && HostTaskScope.permits(scope.profile, next.profile)) scope = { ...scope, profile: next.profile }
+      if (!next || !HostTaskScope.permits(scope.profile, next.profile)) continue
+      scope = { ...scope, profile: next.profile }
+      if (next.profile === "loginom-automation") automation = { taskMessageID: scope.taskMessageID, grant: next }
     }
   }
-  return scope
+  return { scope, automation }
 }
 
 export function replayOf(message: History): MessageID | undefined {

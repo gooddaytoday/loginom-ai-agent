@@ -12,7 +12,7 @@ Native «Соединение (переменные)»: `dock_node_apply`,
 Порядок: вход 0, затем 1, затем подключённый 2. Native имена уникальны:
 a0/a0/a1 → a0/a1/a2, title → title_1; читай фактические имена, метки без нумерации.
 Integer/real/string/boolean, до 128 переменных; типизированный NULL отличается
-от пустой строки, false и нуля. После чтения — `package.save_checkpoint`.
+от пустой строки, false и нуля.
 Источник меняй его собственным типом. В patch `variables.calculator` передай
 только изменяемые `parameters.expressions`:
 `target:{kind:"existing",name:"saved_name"},formula:"новое_выражение"`.
@@ -51,7 +51,7 @@ Runtime один раз нажмёт Input_Add, подключит вход 2, �
 `parameters:{column_union:{mapping:"automatic",disconnect_input:2}}`,
 `variable_inputs:[]`, `inputs:[]`, `mappings:[]`, `finish:"execute"` и read выше.
 Порт остаётся; пустой список БЕЗ disconnect_input сохраняет все связи.
-Прочитай весь новый вывод и сохрани пакет. Максимум три разных источника;
+Прочитай запрошенный вывод. Максимум три разных источника;
 control, четвёртый вход, builtin-создание и отдельные редакторы портов запрещены.
 При смене входов runtime один раз выбирает «Удалить и продолжить» для точного
 native-вопроса; после того же Yes и точного предупреждения «Всё равно далее»
