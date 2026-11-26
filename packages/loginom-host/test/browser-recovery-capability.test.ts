@@ -71,6 +71,8 @@ test.each([undefined, false, true])(
         scope: { taskMessageID: "msg_original", profile: "loginom-automation" },
       })
       const beforePrepare = (await client.request("tools", { run: "one" })) as { tools: { name: string }[] }
+      const dock = beforePrepare.tools.filter((tool) => tool.name.startsWith("dock_"))
+      expect(Buffer.byteLength(JSON.stringify({ tools: dock }), "utf8")).toBeLessThanOrEqual(6_000)
       const bootstrapNames = beforePrepare.tools.map((tool) => tool.name)
       expect(bootstrapNames.includes("dock_browser_recovery")).toBe(capability === true)
       expect(bootstrapNames).not.toContain("browser_click")

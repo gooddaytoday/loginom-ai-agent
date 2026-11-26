@@ -32,6 +32,7 @@ async function fixture(configured = false, admissionResult?: unknown) {
     const work = { activeWork: false, unsettledWork: false, dispatching: false };
     let prepared = false;
     let holdWork = false, pendingWork, observer;
+    let holdList = false, pendingList, listObserver;
     process.on('disconnect', () => process.exit(0));
     process.on('message', message => {
       const send = result => process.send({ id: message.id, result });
@@ -39,7 +40,27 @@ async function fixture(configured = false, admissionResult?: unknown) {
         appendFileSync(${JSON.stringify(marker)}, JSON.stringify({ operation: 'start', pid: process.pid }) + '\\n');
         send({ protocol: 1, generation: message.input.generation, chat: message.input.chat, ready: true });
       }
-      if (message.operation === 'list') send({ prepared, tools: ['dock_prepare','dock_node_wait'].map(name => ({ name, inputSchema: { type: 'object' } })) });
+      if (message.operation === 'list') {
+        const result = { prepared, tools: [{
+          name: 'dock_node_wait',
+          inputSchema: { type: 'object', properties: { operation_id: { type: 'string' } }, required: ['operation_id'] },
+        }] };
+        if (!holdList) send(result);
+        if (holdList) {
+          pendingList = { id: message.id, result };
+          if (listObserver) process.send({ id: listObserver, result: true });
+        }
+      }
+      if (message.operation === 'fixture.hold_list') { holdList = true; send(true); }
+      if (message.operation === 'fixture.wait_list') {
+        if (pendingList) send(true);
+        if (!pendingList) listObserver = message.id;
+      }
+      if (message.operation === 'fixture.release_list') {
+        holdList = false;
+        if (pendingList) process.send(pendingList);
+        send(true);
+      }
       if (message.operation === 'work') {
         if (!holdWork) send(work);
         if (holdWork) {
@@ -438,7 +459,9 @@ test("automation cannot implicitly create a runtime with a non-prepare call or s
     const listed = (await f.client.request("tools", { run: "one" })) as {
       tools: { name: string; description: string; inputSchema: { type: string } }[]
     }
-    const names = listed.tools.map((tool) => tool.name).filter((name) => name.startsWith("dock_"))
+    const dock = listed.tools.filter((tool) => tool.name.startsWith("dock_"))
+    const names = dock.map((tool) => tool.name)
+    expect(Buffer.byteLength(JSON.stringify({ tools: dock }), "utf8")).toBeLessThanOrEqual(6_000)
     expect(names.sort()).toEqual([
       "dock_action_describe",
       "dock_action_run",
@@ -467,12 +490,12 @@ test("automation cannot implicitly create a runtime with a non-prepare call or s
       "dock_storage_source",
       "dock_workspace_observe",
     ])
-    for (const tool of listed.tools.filter((tool) => tool.name.startsWith("dock_"))) {
+    for (const tool of dock) {
       expect(tool.description).not.toBeEmpty()
       expect(tool.inputSchema.type).toBe("object")
-      if (tool.name === "dock_node_apply")
-        expect(Buffer.byteLength(JSON.stringify(tool), "utf8")).toBeLessThanOrEqual(20_000)
       if (tool.name === "dock_prepare" || tool.name === "dock_diagnostics") continue
+      expect(tool.inputSchema).toEqual({ type: "object" })
+      expect(tool.description).toBe("Call dock_prepare.")
       const result = { code: "NOT_PREPARED", next_step: "dock_prepare" }
       const reply = await f.call(tool.name)
       expect(reply).toMatchObject({
@@ -546,15 +569,28 @@ test("a failed prepare keeps the existing runtime unavailable to other Dock call
     })
     expect(await readdir(join(f.root, "recovery"))).toEqual([])
     await f.call("dock_prepare")
-    expect(JSON.stringify(await f.client.request("tools", { run: "one" }))).toContain("dock_node_wait")
-    await f.call("dock_node_wait")
-    await f.client.request("call", {
-      run: "one",
-      name: "dock_prepare",
-      userMessage: "msg_original",
-      args: { fixtureFailure: true },
+    expect(await f.client.request("tools", { run: "one" })).toMatchObject({
+      tools: expect.arrayContaining([{
+        name: "dock_node_wait",
+        inputSchema: { type: "object", properties: { operation_id: { type: "string" } }, required: ["operation_id"] },
+      }]),
     })
-    // A failed repeat prepare must take effect even before the model refreshes its catalog.
+    await f.call("dock_node_wait")
+    const runtime = await f.host.runtime(1, createHash("sha256").update("chat").digest("hex"))
+    await runtime.request("fixture.hold_list")
+    const staleList = f.client.request("tools", { run: "one" })
+    try {
+      await runtime.request("fixture.wait_list")
+      await f.client.request("call", {
+        run: "one",
+        name: "dock_prepare",
+        userMessage: "msg_original",
+        args: { fixtureFailure: true },
+      })
+    } finally {
+      await runtime.request("fixture.release_list")
+      await staleList
+    }
     await expect(f.call("dock_node_wait")).resolves.toMatchObject({
       structuredContent: { code: "NOT_PREPARED", next_step: "dock_prepare" },
     })
