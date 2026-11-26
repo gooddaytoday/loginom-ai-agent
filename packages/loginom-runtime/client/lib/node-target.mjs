@@ -151,6 +151,39 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
   return null;
 }
 
+function verifyPreparedTargetEffect(effect, after, positionMatches, request, state) {
+  const proof=verifyNodeTargetEffect(effect,after,positionMatches);
+  if(proof||effect.kind!=='connect'||request?.target?.kind!=='new'||request.target.type!=='transform.join_data'
+    ||request.target.label!==undefined)return proof;
+  const {before,receipt,parameters:{edge}}=effect;
+  if(edge.kind||edge.input!==1||edge.target!==state.targetId||after.interaction_ready!==true
+    ||receipt?.action_key!=='link.create'||receipt.operation_id!==effect.id||receipt.phase!=='applying'
+    ||receipt.status!=='AMBIGUOUS'||receipt.effect_possible!==true||receipt.cleanup_complete!==true
+    ||receipt.output?.reason!=='unrelated graph changed'||!same(receipt.output.added_ports,[]))return null;
+
+  // LAB-2082: the second native Join link changes its default caption and
+  // rewrites the first link's DOM TID. The native node and first edge must stay.
+  const original=before.nodes.find(n=>n.ref.node_id===edge.target);
+  const current=after.nodes.find(n=>n.ref.node_id===edge.target);
+  if(original?.type!=='transform.join_data'||original.label!=='Слияние'||current?.label!=='Левое')return null;
+  const incoming=before.links.filter(link=>link.target===edge.target);
+  if(incoming.length!==1||incoming[0].input!==0)return null;
+  const prior=state.receipts.find(r=>r.verified&&r.kind==='connect'&&same(r.parameters.edge,incoming[0]));
+  const priorReceipt=prior?.receipt?.receipt??prior?.receipt;
+  const firstTid=priorReceipt?.output?.link_ref?.tid,oldSuffix='|Слияние|Input_Data-0';
+  if(priorReceipt?.status!=='SUCCEEDED'||priorReceipt.operation_id!==prior.id||typeof firstTid!=='string'
+    ||!firstTid.startsWith(before.workflow_ref.prefix+';Graph;')||!firstTid.endsWith(oldSuffix))return null;
+  const added=receipt.output.added_links;
+  if(!Array.isArray(added)||added.length!==2
+    ||!added.includes(firstTid.slice(0,-oldSuffix.length)+'|Левое|Input_Data-0')
+    ||!added.some(tid=>typeof tid==='string'&&tid.startsWith(before.workflow_ref.prefix+';Graph;')
+      &&tid.endsWith('|Левое|Input_Data-1')))return null;
+
+  const links=after.links.filter(link=>edgeKey(link)!==edgeKey(edge));
+  const nodes=after.nodes.map(n=>n===current?{...n,label:original.label}:n);
+  return after.links.length===links.length+1 && sameDomainGraph(before,{...after,nodes,links})?{}:null;
+}
+
 function nativeRestServiceEdge(graph,edge){
   const source=graph.nodes.filter(n=>n.ref.node_id===edge.source),target=graph.nodes.filter(n=>n.ref.node_id===edge.target);
   return edge.output==='connection:0'&&edge.input==='connection:0'&&graph.foreign_links?.filter(tid=>tid===edge.tid).length===1
@@ -252,7 +285,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       &&graph.links.filter(e=>e.target===p.encoder.node_id&&e.input===0).length===1
       &&graph.links.some(e=>e.source===raw.source.node_id&&e.output===raw.output&&e.target===p.encoder.node_id&&e.input===0);
   };
-  const change = async (kind, parameters, verify) => {
+  const change = async (kind, parameters, verify = () => true) => {
     let original = await observe();
     for(let refresh=0;refresh<3;refresh++){
       budget();
@@ -299,7 +332,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       await commit();
       const after = await observe();
       if(await settleMoveMismatch({operation,state,effect,receipt,graph:after,adapter,record}))throw Error(state.result.error);
-      const proof=verifyNodeTargetEffect({...effect,receipt},after,adapter.positionMatches);
+      const proof=verifyPreparedTargetEffect({...effect,receipt},after,adapter.positionMatches,request,state);
       if (receipt?.cleanup_complete !== true || !proof || !verify(before, after, effect,proof)) {
         if(kind==='connect'&&receipt?.error?.message==='Validated link target is no longer ready'){
           // Omit user captions and foreign tids; hashes still expose changes.
@@ -351,7 +384,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         state.pending=null;state.last_graph=structuredClone(graph);state.effect_possible=state.receipts.length>0;
         await commit();graph=await observe();
       }else{
-      const proof=verifyNodeTargetEffect({...state.pending,receipt:recovery.receipt},graph,adapter.positionMatches);
+      const proof=verifyPreparedTargetEffect({...state.pending,receipt:recovery.receipt},graph,adapter.positionMatches,request,state);
       if (!recovery?.verified || recovery.cleanup_complete !== true || !proof) throw new Error('Pending graph effect is unresolved');
       state.receipts.push({ id: state.pending.id, kind: state.pending.kind, parameters: state.pending.parameters, verified: true, receipt: recovery,...(state.pending.kind==='move'?{before:state.pending.before}:{}) });
       if (state.pending.kind === 'create') rememberCreatedTarget(state,proof);
@@ -521,8 +554,7 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
             && unchangedExcept(before, after, [state.targetId]);
         });
       }
-      graph = await change('connect', { edge }, (before, after) => after.links.some(e => edgeKey(e) === edgeKey(edge))
-        && unchangedExcept(before, after, [], [edgeKey(edge)]));
+      graph = await change('connect', { edge });
     }
     const variableDesired=(request.variable_inputs??[]).map(i=>({source:i.source.node_id,output:i.output,target:state.targetId,input:i.input,kind:i.kind}));
     if(request.target.type==='variables.column_union'){
@@ -608,7 +640,7 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
       (state.refusals??=[]).push({id:effect.id,kind:effect.kind,receipt:structuredClone(refused)});
       state.pending=null;state.last_graph=structuredClone(graph);state.effect_possible=state.receipts.length>0;
     }else{
-    const proof=verifyNodeTargetEffect({...effect,receipt:recovery.receipt},graph,adapter.positionMatches);
+    const proof=verifyPreparedTargetEffect({...effect,receipt:recovery.receipt},graph,adapter.positionMatches,request,state);
     if(!recovery.verified || recovery.cleanup_complete!==true || !proof)return {status:'AMBIGUOUS',phase:'target_incomplete',cleanup_complete:recovery.cleanup_complete===true,pending:effect.id};
     if(effect.kind==='create')rememberCreatedTarget(state,proof);
     state.receipts.push({id:effect.id,kind:effect.kind,parameters:effect.parameters,verified:true,receipt:recovery,...(effect.kind==='move'?{before:effect.before}:{})});
