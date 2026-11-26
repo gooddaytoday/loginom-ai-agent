@@ -458,12 +458,13 @@ export async function createBridge(config, session, { browserTransport: managedB
               && preparationRequest.package_path === null) preparationRequest = JSON.parse(undeliveredDraft);
           if (config.storageDirectories && preparationRequest.package_path)
             requireStorageDestination(preparationRequest.package_path, config.storageDirectories, 'packages');
-          const workspaceOptions = actionRuntime ? { loginomUrl: config.loginomUrl,
+          const workspaceOptions = ({
+            operation_id: operationId, intent, package_path: packagePath, workflow_ref: workflowRef, graph_navigation: graphNavigation,
+          }) => ({ loginomUrl: config.loginomUrl,
             compatibility: pinnedActions.compatibility, sessionId: session.metadata.sessionId,
-            operationId: preparationRequest.operation_id, intent: preparationRequest.intent,
-            packagePath: preparationRequest.package_path, workflowRef: preparationRequest.workflow_ref, graphNavigation: preparationRequest.graph_navigation, timeoutMs: args.timeout_ms ?? 120000,
-            allowTestLogin: config.mode === 'executor-replay' && config.replayBootstrap, testLoginUser: config.replayLoginUser } : null;
-          if (workspaceOptions) makeWorkspacePrepareCode(workspaceOptions);
+            operationId, intent, packagePath, workflowRef, graphNavigation, timeoutMs: args.timeout_ms ?? 120000,
+            allowTestLogin: config.mode === 'executor-replay' && config.replayBootstrap, testLoginUser: config.replayLoginUser });
+          if (actionRuntime) makeWorkspacePrepareCode(workspaceOptions(preparationRequest));
           const prepared = await skill.prepare();
           session.metadata.skillRevision = prepared.detail.revision;
           session.metadata.skillPath = prepared.directory;
@@ -478,10 +479,11 @@ export async function createBridge(config, session, { browserTransport: managedB
               },
               async prepare({ recoverOnly, refreshVerified, request: originalRequest }) {
                 if (!config.loginomUrl) throw new Error('Workspace preparation requires the configured Loginom URL');
+                const options = workspaceOptions(originalRequest);
                 if(privatePackage){
                   if(recoverOnly)throw Error('Reconcile the original package preparation using its server package_path; do not upload again');
                   extra.signal.throwIfAborted();
-                  const identityCode=makeWorkspacePrepareCode({...workspaceOptions,intent:'new_draft',packagePath:null,identityOnly:true,timeoutMs:remaining()});
+                  const identityCode=makeWorkspacePrepareCode({...options,intent:'new_draft',packagePath:null,identityOnly:true,timeoutMs:remaining()});
                   const identity=parseWorkspacePreparation(await browser.callTool({name:'browser_run_code_unsafe',arguments:{code:identityCode}},undefined,{timeout:remaining()+1000}));
                   if(identity.status==='NOT_READY'&&identity.effect_possible===false&&identity.created_draft===false)return identity;
                   if(identity.status!=='BOUND')throw Error('Local package storage identity is not ready: '+identity.reason);
@@ -500,8 +502,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                     reason:extra.signal.aborted?'CANCELLED':'DEADLINE',effect_possible:false,created_draft:false,authenticated:true,
                     operation_id:preparationRequest.operation_id,target:identity.target};
                 }
-                const code = makeWorkspacePrepareCode({ ...workspaceOptions, recoverOnly, refreshVerified,
-                  workflowRef: originalRequest.workflow_ref, graphNavigation: originalRequest.graph_navigation,
+                const code = makeWorkspacePrepareCode({ ...options, recoverOnly, refreshVerified,
                   storageBinding:privatePackage?session.metadata.storageBinding??null:null,
                   ...(privatePackage?{timeoutMs:remaining()}:{}) });
                 const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
