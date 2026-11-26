@@ -81,10 +81,10 @@ function fixture({loseReply=false,foreignOwner=false,block=false,trialFail=null,
     }clicks++;if(selector.includes('GenericEnterLabel')){current=inner;crumbs.push('Подмодель','Модуль','Сценарий');if(foreignOwner)owner.FGuid='foreign';}else if(selector.includes('LeaveSubmodelLabel')){current=outer;crumbs=crumbs.slice(0,5).concat('Подмодель');}else if(selector.includes('cnrNaviMode'))crumbs=crumbs.slice(0,5);else throw Error('Unexpected click');masked=true;if(loseReply){loseReply=false;throw Error('lost click reply');}}}),
     waitForTimeout:async()=>{masked=false;},mouse:{up:async()=>{}}};
   const adapter=createNodeTargetBrowserAdapter({origin:'https://app.loginom.ai',build:'7.4.2',pinned:{},execute:code=>vm.runInNewContext('('+code+')')(page)});
-  const navigate=(wf,direction='enter',operationId='enter',{timeoutMs=120000,recoverOnly=false}={})=>vm.runInNewContext('('+makeWorkspacePrepareCode({
+  const navigate=(wf,direction='enter',operationId='enter',{timeoutMs=120000,recoverOnly=false,graphNavigation}={})=>vm.runInNewContext('('+makeWorkspacePrepareCode({
     loginomUrl:'https://app.loginom.ai/app/?testable=true',compatibility:{profile_id:'native',loginom_build:'7.4.2',platform:'linux',browser:'chromium'},
     intent:'existing_workflow',workflowRef:{...wf,document_id:'doc'},operationId,timeoutMs,recoverOnly,
-    graphNavigation:{direction,...(direction==='enter'?{node_ref:{document_id:'doc',workflow_id:wf.workflow_id,node_id:'supernode'}}:{})},
+    graphNavigation:graphNavigation??{direction,...(direction==='enter'?{node_ref:{document_id:'doc',workflow_id:wf.workflow_id,node_id:'supernode'}}:{})},
   })+')')(page);
   return {navigate,ref,receipt,preparation,read:wf=>adapter.observe({document_id:'doc',workflow_ref:wf},Date.now()+2000),
     context:wf=>readPreparedNodeContext(page,{document_id:'doc',workflow_ref:wf,node:{document_id:'doc',workflow_id:wf.workflow_id,node_id:'calc'}}),
@@ -104,6 +104,47 @@ test('NW1 refuses a foreign selection overlay without selecting or navigating',a
   assert.equal(result.status,'NOT_READY');assert.equal(result.effect_possible,false);
   assert.equal(f.clicks(),0);assert.equal(f.selections(),0);
 });
+
+for (const refused of [false, true]) {
+  test('prepare replays reordered request keys after ' + (refused ? 'a no-effect refusal' : 'verified navigation'), async () => {
+    const f = fixture({ entryOnSelection: refused, foreignSelection: refused });
+    const metadata = { skillRevision: 'skill' };
+    const request = {
+      operation_id: 'enter',
+      intent: 'existing_workflow',
+      package_path: null,
+      workflow_ref: { ...f.ref, document_id: 'doc' },
+      graph_navigation: { direction: 'enter', node_ref: { document_id: 'doc', workflow_id: 'outer', node_id: 'supernode' } },
+    };
+    const reordered = {
+      ...request,
+      workflow_ref: { ...request.workflow_ref, navigation_path: f.ref.navigation_path.map(({ tid, label }) => ({ label, tid })) },
+      graph_navigation: { node_ref: { node_id: 'supernode', workflow_id: 'outer', document_id: 'doc' }, direction: 'enter' },
+    };
+    const run = input => prepareWorkspaceSession({
+      metadata, request: input, assertAllowed() {}, assertTarget() {}, record: async () => {}, save: async () => {},
+      prepare: ({ request: original = input, recoverOnly }) => f.navigate(original.workflow_ref, 'enter', original.operation_id,
+        { recoverOnly, graphNavigation: original.graph_navigation }),
+    });
+    const first = await run(request);
+    assert.equal(first.status, refused ? 'NOT_READY' : 'READY', first.reason);
+    const second = await run(reordered);
+    assert.equal(second.status, first.status, second.reason);
+    assert.equal(second.reason, first.reason);
+    assert.equal(metadata.workspacePreparation.identity, JSON.stringify(request));
+    if (!refused) {
+      assert.equal(second.replayed, true);
+      assert.equal(second.workflow_ref.workflow_id, first.workflow_ref.workflow_id);
+    }
+    assert.equal(f.clicks(), refused ? 0 : 1);
+    await assert.rejects(run({ ...reordered, workflow_ref: {
+      ...reordered.workflow_ref, navigation_path: [...reordered.workflow_ref.navigation_path].reverse(),
+    } }), /Preparation operation conflict/);
+    await assert.rejects(run({ ...reordered, graph_navigation: {
+      ...reordered.graph_navigation, node_ref: { ...reordered.graph_navigation.node_ref, node_id: 'other-node' },
+    } }), /Preparation operation conflict/);
+  });
+}
 
 // LAB-2054 (bh-i103): the real in-page refusal carries the proof the gate
 // needs, leaves the parent receipt verified, and admits a NEW existing_workflow.

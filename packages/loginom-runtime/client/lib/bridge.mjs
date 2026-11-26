@@ -476,7 +476,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                 extra.signal.throwIfAborted(); actionRuntime.assertPreparationAllowed();
                 userWorkflows.resetDescriptions();
               },
-              async prepare({ recoverOnly, refreshVerified }) {
+              async prepare({ recoverOnly, refreshVerified, request: originalRequest }) {
                 if (!config.loginomUrl) throw new Error('Workspace preparation requires the configured Loginom URL');
                 if(privatePackage){
                   if(recoverOnly)throw Error('Reconcile the original package preparation using its server package_path; do not upload again');
@@ -501,6 +501,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                     operation_id:preparationRequest.operation_id,target:identity.target};
                 }
                 const code = makeWorkspacePrepareCode({ ...workspaceOptions, recoverOnly, refreshVerified,
+                  workflowRef: originalRequest.workflow_ref, graphNavigation: originalRequest.graph_navigation,
                   storageBinding:privatePackage?session.metadata.storageBinding??null:null,
                   ...(privatePackage?{timeoutMs:remaining()}:{}) });
                 const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
