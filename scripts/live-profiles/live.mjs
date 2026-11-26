@@ -6,7 +6,7 @@
 // Windows, as the ordinary user whose profile it is, without XDG or database overrides. The provider key is made up; it
 // is compared, never printed. The Desktop backend password stays in memory.
 //   node live.mjs old --app <Desktop executable> --label <release> --state <dir>
-//   node live.mjs v2 --bin <opencode> --state <dir> --path serve|migrate
+//   node live.mjs v2 --bin <opencode> --state <dir> --path serve|migrate [--profile <absolute CLI profile root> [--channel dev]]
 import { spawn, spawnSync } from "node:child_process"
 import crypto from "node:crypto"
 import fs from "node:fs"
@@ -195,10 +195,26 @@ async function v2() {
   const kind = required("path")
   const bin = required("bin")
   const old = JSON.parse(fs.readFileSync(path.join(state, "old.json"), "utf8"))
+  // B6.2b: the product CLI never adopts a Desktop directory (`profile.ts`: PROFILE_DESKTOP_ROOT, "unknown data is never
+  // adopted"); it works in its own profile whose data and config are `<root>/data` and `<root>/config`. With `--profile
+  // <root>` the old data and config go there, into a profile the CLI marks as its own (`cli-profile.json`), as a 0.4 CLI left it.
+  if (args.profile) {
+    fs.rmSync(args.profile, { recursive: true, force: true })
+    fs.mkdirSync(args.profile, { recursive: true, mode: 0o700 })
+    fs.writeFileSync(
+      path.join(args.profile, "cli-profile.json"),
+      JSON.stringify({ format: "loginom-cli", version: 1, channel: args.channel ?? "dev" }),
+      { mode: 0o600 },
+    )
+    places.data = path.join(args.profile, "data")
+    places.config = path.join(args.profile, "config")
+    process.env.LOGINOM_AI_AGENT_CLI_PROFILE = args.profile
+  }
   // Both paths start from the same copy of the old profile.
   for (const name of ["data", "config"]) {
     fs.rmSync(places[name], { recursive: true, force: true })
     fs.cpSync(path.join(state, "pristine", name), places[name], { recursive: true })
+    if (args.profile) fs.chmodSync(places[name], 0o700)
   }
   const before = snapshot()
   const original = before.data["loginom-ai-agent.db"]
