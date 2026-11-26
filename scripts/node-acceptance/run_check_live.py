@@ -11,6 +11,7 @@ import pty
 import re
 import select
 import signal
+import socket
 import sqlite3
 import struct
 import subprocess
@@ -64,24 +65,28 @@ def write_events(folder, assistants, parts):
             print(json.dumps(event, ensure_ascii=False), file=log)
 
 
-def browser_owner(pid, profile):
-    """Read the process tree of this exact CLI, including Chromium's profile argument."""
-    todo = [pid]
+def browser_owner(cli_pid, profile, executable):
+    """Bind Chromium's own profile lock to the shipped binary and the CLI's process tree."""
+    locks = (profile / 'loginom/runtime').glob('generations/*/chats/*/attempts/*/browser-profile/SingletonLock')
     owners = []
-    while todo:
-        child = todo.pop()
-        proc = Path('/proc') / str(child)
+    for lock in locks:
         try:
-            args = (proc / 'cmdline').read_bytes().split(b'\0')
-            todo.extend(map(int, (proc / 'task' / str(child) / 'children').read_text().split()))
-            started = (proc / 'stat').read_text().rsplit(')', 1)[1].split()[19]
-        except OSError:
-            continue
-        for arg in args:
-            if arg.startswith(b'--user-data-dir=') and b'--remote-debugging-pipe' in args:
-                browser_profile = Path(os.fsdecode(arg.split(b'=', 1)[1]))
-                if browser_profile.name == 'browser-profile' and browser_profile.is_relative_to(profile / 'loginom/runtime'):
-                    owners.append((child, started, browser_profile.parent))
+            host, _, pid_text = os.readlink(lock).rpartition('-')
+            if host != socket.gethostname() or not pid_text.isdecimal():
+                continue
+            pid = int(pid_text)
+            process = Path('/proc') / pid_text
+            if (process / 'exe').resolve(strict=True) != executable:
+                continue
+            state = (process / 'stat').read_text().rsplit(')', 1)[1].split()
+            parent = int(state[1])
+            while parent > 1 and parent != cli_pid:
+                parent_stat = (Path('/proc') / str(parent) / 'stat').read_text().rsplit(')', 1)[1].split()
+                parent = int(parent_stat[1])
+            if parent == cli_pid and state[0] != 'Z':
+                owners.append((pid, state[19], lock.parent.parent))
+        except (OSError, ValueError):
+            continue  # A transient browser attempt may have closed.
     assert len(owners) <= 1, 'LIVE_CHAIN_BROWSER_AMBIGUOUS'
     return owners[0] if owners else None
 
@@ -96,11 +101,12 @@ def json_lines(path):
 
 
 class LiveChain:
-    def __init__(self, profile, workspace, folder, account, package, model, variant, daemon_pid):
+    def __init__(self, profile, workspace, folder, account, package, model, variant, daemon_pid, browser_executable):
         self.profile, self.workspace = profile, workspace
         self.account, self.package = account, package
         self.model, self.variant = model, variant
         self.daemon_pid = daemon_pid
+        self.browser_executable = browser_executable
         self.child = None
         self.terminal = None
         self.master = None
@@ -186,7 +192,7 @@ class LiveChain:
             nonce = None
         assert self.child.poll() is None and self.owner and nonce == self.owner, 'LIVE_CHAIN_PROFILE_OWNER_CHANGED'
         if self.browser:
-            assert browser_owner(self.child.pid, self.profile) == self.browser, 'LIVE_CHAIN_BROWSER_OWNER_CHANGED'
+            assert browser_owner(self.child.pid, self.profile, self.browser_executable) == self.browser, 'LIVE_CHAIN_BROWSER_OWNER_CHANGED'
 
     def paste(self, text):
         assert all(char in '\n\t' or ord(char) >= 32 and ord(char) != 127 for char in text), 'LIVE_CHAIN_CONTROL_IN_PROMPT'
@@ -266,7 +272,7 @@ class LiveChain:
                     break
 
             session = self.wait_for(completed, deadline, 'MODEL')
-            current_browser = browser_owner(self.child.pid, self.profile)
+            current_browser = browser_owner(self.child.pid, self.profile, self.browser_executable)
             assert current_browser and self.browser in (None, current_browser), 'LIVE_CHAIN_BROWSER_OWNER_CHANGED'
             self.browser = current_browser
             receipts = list(json_lines(self.browser[2] / 'execution-events.jsonl'))

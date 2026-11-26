@@ -4068,7 +4068,10 @@ class Runner:
                         write(config_path, {**read(config_path), 'model': MODEL})
                         if VARIANT:
                             write(profile / 'state/model.json', dict(recent=[], favorite=[], variant={MODEL: VARIANT}))
-                        live = LiveChain(profile, workspace, folder, login['username'], r['package'], MODEL, VARIANT, daemon_pid)
+                        resources = build / 'resources/loginom'
+                        browser_executable = (resources / read(resources / 'resource-manifest.json')['browser']).resolve(strict=True)
+                        live = LiveChain(profile, workspace, folder, login['username'], r['package'],
+                                         MODEL, VARIANT, daemon_pid, browser_executable)
                     baseline = None
                     for (step, step_spec), turn in zip(steps, r['turns']):
                         active_turn = turn
