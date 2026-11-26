@@ -164,7 +164,7 @@ function trackPageNetwork(page) {
 
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
-export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase, reuseLoginForm = false } = {}) {
+export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase, reload, signal } = {}) {
   const started = performance.now()
   let phase = "goto", phaseStarted = started, original
   const emit = async event => { try { await onPhase?.(event) } catch { /* Diagnostics cannot change login. */ } }
@@ -186,14 +186,15 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     return Math.min(limit, left)
   }
   const requireLoginAddress = () => {
-    if (!reuseLoginForm) return
+    if (!reload) return
+    signal?.throwIfAborted()
     const expected = new URL(loginomAddress(candidate.url))
     const current = new URL(page.url())
     if (current.origin !== expected.origin || current.pathname !== expected.pathname) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
   }
   const network = await trackLoginNetwork(page)
   try {
-    const response = reuseLoginForm ? null : await measure("login.navigation", () => page.goto(loginomAddress(candidate.url),
+    const response = reload ? null : await measure("login.navigation", () => page.goto(loginomAddress(candidate.url),
       { waitUntil: "domcontentloaded", timeout: remaining(60_000) }))
     try {
       const timing = response?.request?.()?.timing?.()
@@ -226,7 +227,7 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
       }))
       if (missing !== true && missing !== "interacted") break
       themeState.failed = true
-      if (reuseLoginForm || themeState.reloaded || missing === "interacted" || await avatar.isVisible()) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
+      if (reload || themeState.reloaded || missing === "interacted" || await avatar.isVisible()) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
       // No credential or workspace gesture has happened. Never reload a page
       // handed to MCP, and never give this recovery a fresh time allowance.
       remaining(60_000)
@@ -244,8 +245,14 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     }
     await network.close()
     phase = "form"; phaseStarted = performance.now()
-    if (reuseLoginForm && !await isReloadedLoginForm(page, candidate.url)) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
-    if (!(await avatar.isVisible())) {
+    let alreadyAuthenticated = false
+    if (reload) {
+      const fresh = await observeReloadedLoginPage(page, candidate.url, reload)
+      if (!fresh || fresh.account && fresh.account !== candidate.username
+        || !fresh.account && (!fresh.formVisible || fresh.interacted)) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
+      alreadyAuthenticated = fresh.account === candidate.username
+    }
+    if (!alreadyAuthenticated && !(await avatar.isVisible())) {
       phase = "submit"; phaseStarted = performance.now()
       await measure("login.username", async () => {
         requireLoginAddress()
@@ -260,6 +267,7 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
       })
       await measure("login.submit", () => {
         requireLoginAddress()
+        if (reload) reload.loginSubmitted = true
         return field("btnLogin").click({ timeout: remaining(30_000) })
       })
       const response = await measure("login.response", () => page.waitForFunction(function loginResponse() {
@@ -300,35 +308,48 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
   }
 }
 
-async function isReloadedLoginForm(page, url, formRequired = true) {
+async function observeReloadedLoginPage(page, url, reload) {
   const { origin, pathname } = new URL(loginomAddress(url))
-  return page.evaluate(({ origin, pathname, formRequired }) => {
+  return page.evaluate(({ origin, pathname, timeOrigin, openDispatched }) => {
     if (location.origin !== origin || location.pathname !== pathname
       || performance.getEntriesByType("navigation")[0]?.type !== "reload"
-      || globalThis.__loginomDockPreparationV1?.document === document
-      || globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName
-      || globalThis.__loginomThemeStartupInteracted === true) return false
-    if (!formRequired) return true
+      || !Number.isFinite(performance.timeOrigin) || timeOrigin !== undefined && performance.timeOrigin !== timeOrigin
+      || globalThis.__loginomDockPreparationV1?.document === document && !openDispatched) return null
     const element = document.querySelector('[data-tid="LoginForm;Login;edtUsername"]')
-    return !!element && element.getBoundingClientRect().width > 0 && getComputedStyle(element).visibility !== "hidden"
-  }, { origin, pathname, formRequired })
+    return { timeOrigin: performance.timeOrigin,
+      account: globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName || null,
+      interacted: globalThis.__loginomThemeStartupInteracted === true,
+      formVisible: !!element && element.getBoundingClientRect().width > 0 && getComputedStyle(element).visibility !== "hidden" }
+  }, { origin, pathname, timeOrigin: reload.timeOrigin, openDispatched: reload.openDispatched })
 }
 
-export async function reauthenticateReloadedPage(context, candidate, { origin, account, deadline, signal }) {
+export async function reauthenticateReloadedPage(context, candidate, { origin, account, packagePath, deadline, signal, reload = {} }) {
   const target = new URL(loginomAddress(candidate.url))
+  signal?.throwIfAborted()
   if (target.origin !== origin || candidate.username !== account) return false
   const pages = context.pages().filter(page => !page.isClosed())
+  if (pages.length !== 1) return false
+  const page = pages[0]
   // The old call can fail as soon as the new document commits. loginPage
   // waits for the new form and checks it again immediately before filling it.
-  if (pages.length !== 1 || !await isReloadedLoginForm(pages[0], candidate.url, false)) return false
+  const observed = await observeReloadedLoginPage(page, candidate.url, reload)
+  if (!observed) return false
+  reload.timeOrigin = observed.timeOrigin
   signal?.throwIfAborted()
-  await loginPage(pages[0], candidate, { deadline, reuseLoginForm: true })
+  if (observed.account && observed.account !== account) return false
+  if (!observed.account && !observed.interacted && !reload.loginSubmitted)
+    await loginPage(page, candidate, { deadline, reload, signal })
   signal?.throwIfAborted()
-  const receipt = await pages[0].waitForFunction(({ origin, pathname, account }) => {
+  const receipt = await page.waitForFunction(({ origin, pathname, account, packagePath, timeOrigin }) => {
     const form = globalThis.bg?.app?.Application?.FInstance?.FMainForm, map = form?.FMapTree
-    return location.origin === origin && location.pathname === pathname && map?.FServerConnection?.Connected === true
-      && form.FReconnecting !== true && map.FServerConnection.UserName === account && map.PackageNodes?.Count === 0
-  }, { origin, pathname: target.pathname, account }, { timeout: Math.max(1, Math.min(8000, deadline - Date.now())) })
+    if (location.origin !== origin || location.pathname !== pathname || performance.timeOrigin !== timeOrigin
+      || map?.FServerConnection?.Connected !== true || form.FReconnecting === true
+      || map.FServerConnection.UserName !== account) return false
+    if (map.PackageNodes?.Count === 0) return true
+    const file = map.PackageNodes?.Count === 1 && map.PackageNodes.Items?.(0)?.PackageFileName
+    return typeof file === "string" && "/" + file.replaceAll("\\", "/").replace(/^\/+/, "") === packagePath
+  }, { origin, pathname: target.pathname, account, packagePath, timeOrigin: reload.timeOrigin },
+  { timeout: Math.max(1, Math.min(8000, deadline - Date.now())) })
   await receipt.dispose()
   signal?.throwIfAborted()
   return Date.now() < deadline

@@ -279,6 +279,38 @@ test('reload opens the exact saved path with its native read-only state in the a
   }
 });
 
+test('reload binds the exact package already opened by the user without opening it again',async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true});
+  await fixture.page.goto('http://loginom.example/app?testable=true');
+  const active=fixture.context.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
+  Object.assign(active.Controller.Node.data.node,{PackageFileName:'/user/B.lgp',ReadOnly:true});
+  const request={intent:'open_package',operationId:'manual-package',packagePath:'/user/B.lgp',
+    timeoutMs:500,recoveryAccount:'test-account'};
+  const state=await execute(fixture,request);
+  assert.equal(state.status,'READY',JSON.stringify(state));
+  assert.equal(state.package_ref.path,request.packagePath);
+  assert.equal(state.package_ref.read_only,true);
+  assert.equal(state.effect_possible,false);
+  assert.deepEqual(fixture.events,['navigate']);
+});
+
+test('interrupted reload Open uses the exact receipt with no second gesture',async()=>{
+  const fixture=pageFixture({authenticated:true,loseReply:true});
+  const request={intent:'open_package',operationId:'lost-open',packagePath:'/user/B.lgp',
+    timeoutMs:500,recoveryAccount:'test-account'};
+  const interrupted=await execute(fixture,request);
+  assert.equal(interrupted.reason,'PREPARATION_INTERRUPTED');
+  assert.equal(interrupted.effect_possible,true);
+  const before=structuredClone(fixture.events);
+  const lost=await execute(fixture,{...request,operationId:'foreign',recoverOnly:true});
+  assert.equal(lost.reason,'RECEIPT_LOST');
+  const recovered=await execute(fixture,{...request,recoverOnly:true});
+  assert.equal(recovered.status,'READY',JSON.stringify(recovered));
+  assert.equal(recovered.package_ref.path,request.packagePath);
+  assert.equal(recovered.replayed,true);
+  assert.deepEqual(fixture.events,before);
+});
+
 test('bindOpenOnly retains an already rebound logical workflow identity',async()=>{
  const f=pageFixture({authenticated:true,workflow:true});await f.page.goto('http://loginom.example/app?testable=true');
  f.context.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node.PackageFileName='/user/B.lgp';

@@ -273,6 +273,104 @@ for(const failPublish of [false,true])test('verified reopened graph releases con
   assert.equal(f.calls.includes('finish'),false);
 });
 
+const reloadProbe = { ok: false, reason: 'prepared document changed', reloaded: true };
+const loss = 'Unsaved changes made before reloading were lost.';
+const retryOptions = id => ({strategy:'abandon_operation',recoveryOperationId:id});
+
+function reopenedGraphReceipt(publish) {
+  const ref = {document_id:'reloaded-doc', workflow_ref:{...workflow,workflow_id:'reloaded-wf'}};
+  const graph = {complete:true,interaction_ready:true,...ref,nodes:[],links:[],foreign_links:[]};
+  return {first:graph,second:structuredClone(graph),ref,readOnly:false,reloaded:true,publish};
+}
+
+async function stopForReload(f) {
+  f.runtime.startNodeApply(f.request('apply'));
+  const job = await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+  assert.equal(job.outcome.status,'AMBIGUOUS');
+  f.state.operation.transportUncertain=true;
+}
+
+for(const stage of ['probe','login','open','manual login required'])test('reload keeps its warning and accepts a later verified login after '+stage,async()=>{
+  const controller=new AbortController();
+  let attempts=0,published=0,progress;
+  const f=fixture({stopPhase:'configure',nodeType:'transform.filter_data',
+    probePreparedPage:async()=>reloadProbe,
+    reopenNodePackage:async({signal,reload})=>{
+      attempts++;
+      if(attempts===1){
+        progress=reload;
+        if(stage!=='probe')reload.timeOrigin=42;
+        if(stage==='open'){
+          reload.openDispatched=true;
+          reload.openOperationId='first-native-open';
+        }
+        if(stage==='manual login required')return {reason:'RELOAD_LOGIN_UNVERIFIED'};
+        controller.abort();
+        signal.throwIfAborted();
+      }
+      assert.equal(reload,progress);
+      if(stage==='open')assert.equal(reload.openOperationId,'first-native-open');
+      return reopenedGraphReceipt(async record=>{await record();published++;});
+    },
+  });
+  await stopForReload(f);
+  const interrupted=await f.runtime.recover('apply',{...retryOptions('interrupted'),signal:controller.signal});
+  assert.equal(interrupted.output.original_operation_pending,true);
+  assert.ok(interrupted.output.user_action?.includes(loss),JSON.stringify(interrupted));
+  assert.equal(published,0);
+  const advice=(await f.runtime.inspect({operationId:'apply'})).output;
+  assert.equal(advice.next_steps[0].tool,'dock_operation_recover');
+  if(stage==='manual login required')assert.match(advice.user_action,/Sign in to the original Loginom account/);
+  else assert.deepEqual(advice.warnings,[loss]);
+  const outcome=await f.runtime.recover('apply',retryOptions('manual-login-verified'));
+  assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+  assert.deepEqual(outcome.output.original_outcome.output.warnings,[loss]);
+  assert.equal(published,1);
+  assert.equal(f.runtime.hasUnsettledWork(),false);
+  assert.equal(f.calls.filter(call=>call==='configure').length,1);
+});
+
+for(const [name,change] of [
+  ['wrong node type',{}],
+  ['wrong phase',{stopPhase:'finish',nodeType:'transform.filter_data'}],
+  ['target did not complete',{nodeType:'transform.filter_data',unverifiedTarget:true}],
+  ['probe saw the prepared document',{nodeType:'transform.filter_data',probe:{...reloadProbe,ok:true}}],
+  ['probe saw an unrelated change',{nodeType:'transform.filter_data',probe:{...reloadProbe,reason:'storage identity changed'}}],
+])test('reload recovery is unavailable for '+name,async()=>{
+  let attempted=0;
+  const f=fixture({stopPhase:'configure',...change,probePreparedPage:async()=>change.probe??reloadProbe,
+    reopenNodePackage:async()=>{attempted++;return reopenedGraphReceipt(async()=>{});}});
+  await stopForReload(f);
+  if(change.unverifiedTarget)f.state.operation.targetPhase.completed=false;
+  const inspection=await f.runtime.inspect({operationId:'apply'});
+  assert.equal(inspection.output.next_steps.some(step=>step.tool==='dock_operation_recover'),false);
+  if(change.probe||change.stopPhase)await assert.rejects(f.runtime.recover('apply',retryOptions('refused')),/Release proof unavailable/);
+  else {
+    const refusal=await f.runtime.recover('apply',retryOptions('refused'));
+    assert.equal(refusal.output.original_operation_pending,true);
+  }
+  assert.equal(attempted,0);
+});
+
+test('reopened graphs need a stable second read before any release is published',async()=>{
+  let published=0,attempts=0;
+  const f=fixture({stopPhase:'configure',nodeType:'transform.filter_data',probePreparedPage:async()=>reloadProbe,
+    reopenNodePackage:async()=>{
+      attempts++;
+      const opened=reopenedGraphReceipt(async()=>{published++;});
+      opened.second.interaction_ready=false;
+      return opened;
+    }});
+  await stopForReload(f);
+  const outcome=await f.runtime.recover('apply',retryOptions('inconsistent'));
+  assert.match(outcome.error.message,/REOPENED_GRAPH_UNVERIFIED/);
+  assert.equal(outcome.output.original_operation_pending,true);
+  assert.ok(outcome.output.user_action.includes(loss));
+  assert.equal(published,0);
+  assert.equal((await f.runtime.inspect({operationId:'apply'})).output.next_steps.length,0);
+  assert.equal(attempts,1);
+});
+
 test('without the capability the existing user_action contract is unchanged', async () => {
   const f = fixture({ browserRecovery: false });
   await stopAtFinish(f);

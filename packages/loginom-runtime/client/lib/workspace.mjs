@@ -191,10 +191,11 @@ async function prepareWorkspace(page, options) {
       : options.bindOpenOnly ? [...state.receipts.values()].find(r=>r.phase==='verified'&&r.tab===tab&&r.packageNode===packageNode&&JSON.stringify(r.crumbs)===JSON.stringify(crumbs)) : null;
     const receipt = state.receipts.get(options.operationId);
     if(options.recoveryAccount&&(location.origin!==options.origin||location.pathname!==options.pathname
-      ||app?.Version!==options.expectedBuild||serverConnection?.Connected!==true
+      ||app?.Version!==options.expectedBuild||serverConnection?.Connected!==true||mainForm.FReconnecting===true
       ||serverConnection.UserName!==options.recoveryAccount||!serverConnection.Session
       ||receipt&&(receipt.openConnection!==serverConnection||receipt.openServerSession!==serverConnection.Session)
-      ||mode==='reserve'&&mainForm.FMapTree.PackageNodes?.Count!==0))return {error:'RELOAD_IDENTITY_UNVERIFIED'};
+      ||mode==='reserve'&&mainForm.FMapTree.PackageNodes?.Count!==0
+        &&!(mainForm.FMapTree.PackageNodes?.Count===1&&ready&&path===options.packagePath)))return {error:'RELOAD_IDENTITY_UNVERIFIED'};
     if (receipt && receipt.request !== request) return {error:'OPERATION_CONFLICT'};
     if (mode==='reserve' && receipt?.preserved.some(item=>!tabs.includes(item.tab)
         || !item.graph.isConnected || item.graph.innerHTML!==item.html)) return {error:'FOREIGN_WORKFLOW_CHANGED'};
@@ -445,10 +446,15 @@ async function prepareWorkspace(page, options) {
     if (old.error) return result('NOT_READY',old.error,{authenticated:true});
     if (old.missing) return missingPackage(old);
     // A confirmed pre-open refusal may continue without replacing its original receipt.
-    if (old.phase==='reserved' && (options.intent!=='open_package' || options.recoverOnly))
+    if (old.phase==='reserved' && (options.intent!=='open_package' || options.recoverOnly&&!options.recoveryAccount))
       return result('NOT_READY','PREVIOUS_ATTEMPT_NOT_COMPLETED',{authenticated:true});
     if (options.bindOpenOnly && old.exists) return result('NOT_READY','OPERATION_CONFLICT',{authenticated:true});
-    if (old.exists && old.phase!=='reserved') {
+    if(options.recoveryAccount&&options.recoverOnly){
+      // The interrupted Open keeps its reservation. Re-read only; even a
+      // reserved or missing gesture receipt cannot authorize another Open.
+      if(!old.exists)return result('NOT_READY','RECEIPT_LOST',{authenticated:true});
+      effectPossible=packageGesture;
+    } else if (old.exists && old.phase!=='reserved') {
       if (old.tab_tid) await tid(old.tab_tid).click({timeout:remaining()});
       effectPossible=true;
     } else {
@@ -739,7 +745,7 @@ export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestL
   if (bindOpenOnly !== false && (bindOpenOnly !== true || intent !== 'open_package' || allowTestLogin || recoverOnly || identityOnly))
     throw new Error('Bind-only preparation requires an exact open_package binding without login or recovery');
   if(recoveryAccount!==null&&(typeof recoveryAccount!=='string'||!recoveryAccount.trim()
-    ||intent!=='open_package'||allowTestLogin||recoverOnly||identityOnly||bindOpenOnly))
+    ||intent!=='open_package'||allowTestLogin||identityOnly||bindOpenOnly))
     throw new Error('Reload requires an authenticated account and an exact saved package');
   if (intent === 'existing_workflow') {
     if (!workflowRef || Object.keys(workflowRef).some(k=>!['document_id','tab_tid','prefix','navigation_path','workflow_id'].includes(k))

@@ -1,4 +1,5 @@
 import test from "node:test"
+import { createContext, runInContext } from "node:vm"
 import assert from "node:assert/strict"
 import { loginPage, reauthenticateReloadedPage } from "../src/connection-check.mjs"
 
@@ -26,23 +27,155 @@ test("successful login separates network, form, credentials and server response 
     assert.ok(!JSON.stringify(phases).includes(secret))
 })
 
-test("reload recovery waits for its login form on the original page without navigating", async () => {
-  const f = fixture()
-  let formVisible = false
-  const { locator, evaluate, waitForFunction } = f.page
-  f.page.url = () => candidate.url
-  f.page.isClosed = () => false
-  f.page.locator = selector => selector.includes("btnAvatar")
-    ? { ...locator(selector), or: () => ({ first: () => ({ waitFor: async () => { formVisible = true } }) }) }
-    : locator(selector)
-  f.page.evaluate = async (fn, args) => args?.pathname ? args.formRequired === false || formVisible : evaluate(fn)
-  f.page.waitForFunction = async (fn, args, options) => args?.pathname
-    ? { dispose: async () => {} } : waitForFunction(fn, args, options)
-  const context = { pages: () => [f.page] }
-  const binding = { origin: "https://example.test", account: candidate.username, deadline: Date.now() + 120_000 }
-  assert.equal(await reauthenticateReloadedPage(context, candidate, binding), true)
-  assert.equal(formVisible, true)
-  assert.equal(f.calls.some(call => call.phase === "goto"), false)
+const packagePath = "/cases/saved.lgp"
+const reloadBinding = { origin: "https://example.test", account: candidate.username, packagePath }
+
+function reloadedPage() {
+  const calls = []
+  const state = { formVisible: false, avatarVisible: false, url: candidate.url, navigation: "reload", epoch: 42 }
+  const connection = { Connected: true }
+  const packages = []
+  const map = { FServerConnection: connection, PackageNodes: {
+    get Count() { return packages.length },
+    Items: i => ({ PackageFileName: packages[i] }),
+  } }
+  const form = { FMapTree: map }
+  const visible = { getBoundingClientRect: () => ({ width: 10, height: 10 }) }
+  const document = {
+    querySelectorAll: () => [],
+    querySelector: selector => selector.includes("edtUsername") && state.formVisible
+      || selector.includes("btnAvatar") && state.avatarVisible ? visible : null,
+  }
+  const browser = createContext({ document, getComputedStyle: () => ({ visibility: "visible" }),
+    bg: { app: { Application: { FInstance: { FMainForm: form } } } },
+    performance: { get timeOrigin() { return state.epoch }, getEntriesByType: () => [{ type: state.navigation }] },
+  })
+  const evaluate = async (fn, arg) => {
+    browser.location = new URL(state.url)
+    browser.arg = arg
+    return runInContext("(" + fn.toString() + ")(arg)", browser)
+  }
+  const signIn = (account = candidate.username) => {
+    connection.UserName = account
+    state.formVisible = false
+    state.avatarVisible = true
+  }
+  const page = {
+    isClosed: () => false,
+    url: () => state.url,
+    locator: selector => {
+      const name = selector.split(";").at(-1).split('"')[0]
+      const field = {
+        locator: () => field,
+        or: () => ({ first: () => ({ waitFor: async () => {
+          state.formVisible = true
+          state.onForm?.()
+        } }) }),
+        isVisible: async () => state.avatarVisible,
+        fill: async () => { calls.push(name); state.onFill?.(name) },
+        press: async () => { state.onTab?.() },
+        click: async () => { calls.push(name); signIn(); state.onSubmit?.() },
+      }
+      return field
+    },
+    evaluate,
+    waitForFunction: async (fn, arg) => {
+      state.onPoll?.(arg)
+      const result = await evaluate(fn, arg)
+      if (!result) throw Error("Fixture condition did not become true")
+      return { jsonValue: async () => result, dispose: async () => {} }
+    },
+  }
+  const context = { pages: () => [page] }
+  return { calls, state, connection, form, packages, browser, signIn, context,
+    recover: (options = {}, saved = candidate) => reauthenticateReloadedPage(context, saved,
+      { ...reloadBinding, deadline: Date.now() + 120_000, ...options }) }
+}
+
+test("reload waits for the native form and authenticates on the original document", async () => {
+  const f = reloadedPage()
+  assert.equal(await f.recover(), true)
+  assert.deepEqual(f.calls, ["edtUsername", "edtPassword", "btnLogin"])
+})
+
+for (const [name, change, options, saved] of [
+  ["saved server differs", () => {}, { origin: "https://other.test" }],
+  ["saved account differs", () => {}, {}, { ...candidate, username: "other" }],
+  ["live origin differs", f => { f.state.url = "https://other.test/app/" }],
+  ["live pathname differs", f => { f.state.url = "https://example.test/other/" }],
+  ["navigation is not reload", f => { f.state.navigation = "navigate" }],
+  ["reload document already changed", () => {}, { reload: { timeOrigin: 41 } }],
+  ["prepared by another call", f => { f.browser.__loginomDockPreparationV1 = { document: f.browser.document } }],
+  ["manual account differs", f => f.signIn("other")],
+]) test("reload refuses before credentials when " + name, async () => {
+  const f = reloadedPage()
+  change(f)
+  assert.equal(await f.recover(options, saved), false)
+  assert.deepEqual(f.calls, [])
+})
+
+for (const [name, change, calls] of [
+  ["form disappeared", f => { f.state.onForm = () => { f.state.formVisible = false } }, []],
+  ["human touched the form during the wait", f => { f.state.onForm = () => { f.browser.__loginomThemeStartupInteracted = true } }, []],
+  ["document changed during the wait", f => { f.state.onForm = () => { f.state.epoch++ } }, []],
+  ["same-server path changed before password", f => { f.state.onTab = () => { f.state.url = "https://example.test/other/" } }, ["edtUsername"]],
+  ["origin changed before submit", f => { f.state.onFill = name => {
+    if (name === "edtPassword") f.state.url = "https://other.test/app/"
+  } }, ["edtUsername", "edtPassword"]],
+]) test("reload stops credential gestures when " + name, async () => {
+  const f = reloadedPage()
+  change(f)
+  await assert.rejects(f.recover(), /LOGINOM_LOGIN_UNAVAILABLE/)
+  assert.deepEqual(f.calls, calls)
+})
+
+test("reload adopts verified manual login and an already open exact saved package", async () => {
+  const f = reloadedPage()
+  f.browser.__loginomThemeStartupInteracted = true
+  f.signIn()
+  f.packages.push("cases\\saved.lgp")
+  assert.equal(await f.recover(), true)
+  assert.deepEqual(f.calls, [])
+})
+
+for (const [name, change] of [
+  ["foreign open package", f => f.packages.push("/other/saved.lgp")],
+  ["more than one open package", f => f.packages.push(packagePath, "/other.lgp")],
+  ["disconnected native account", f => { f.connection.Connected = false }],
+  ["reconnecting native account", f => { f.form.FReconnecting = true }],
+  ["account changed before receipt", f => { f.connection.UserName = "other" }],
+  ["document changed before receipt", f => { f.state.epoch++ }],
+  ["origin changed before receipt", f => { f.state.url = "https://other.test/app/" }],
+  ["pathname changed before receipt", f => { f.state.url = "https://example.test/other/" }],
+]) test("manual login refuses " + name, async () => {
+  const f = reloadedPage()
+  f.signIn()
+  f.state.onPoll = () => change(f)
+  await assert.rejects(f.recover(), /Fixture condition/)
+  assert.deepEqual(f.calls, [])
+})
+
+test("a canceled reload retains the document and accepts later manual sign-in", async () => {
+  const f = reloadedPage()
+  const signal = new AbortController(), reload = {}
+  f.state.onForm = () => signal.abort()
+  await assert.rejects(f.recover({ reload, signal: signal.signal }))
+  assert.deepEqual(reload, { timeOrigin: 42 })
+  assert.deepEqual(f.calls, [])
+  f.signIn()
+  assert.equal(await f.recover({ reload }), true)
+  assert.deepEqual(f.calls, [])
+})
+
+test("cancellation after submit never submits a second time", async () => {
+  const f = reloadedPage()
+  const signal = new AbortController(), reload = {}
+  f.state.onSubmit = () => { f.connection.UserName = undefined; signal.abort() }
+  await assert.rejects(f.recover({ reload, signal: signal.signal }))
+  assert.deepEqual(reload, { timeOrigin: 42, loginSubmitted: true })
+  f.state.onPoll = () => f.signIn()
+  assert.equal(await f.recover({ reload }), true)
+  assert.deepEqual(f.calls, ["edtUsername", "edtPassword", "btnLogin"])
 })
 
 function fixture(failure, error, authenticated = false, rejected = false) {

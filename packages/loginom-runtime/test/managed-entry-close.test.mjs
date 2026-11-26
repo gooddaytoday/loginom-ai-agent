@@ -19,7 +19,7 @@ for (const heldSocket of [true, false]) test(`checked managed close ${heldSocket
   await copyFile(new URL("../client/lib/browser-downloads.mjs", import.meta.url), join(directory, "client/lib/browser-downloads.mjs"))
   const files = {
     "src/resources.mjs": "export async function verifyResources() { return {manifestHash:'fixture',manifest:{}} }",
-    "src/connection-check.mjs": "export const loginomAddress=value=>value; export async function loginBrowser(){return {context:{close:async()=>{}}}}",
+    "src/connection-check.mjs": "export const loginomAddress=value=>value; export async function loginBrowser(){return {context:{close:async()=>{}}}} export async function reauthenticateReloadedPage(){throw Error('close fixture does not log in again')}",
     "client/package.json": '{"type":"module"}',
     "client/lib/session.mjs": `export async function createSession(config,{managed}) { return {
       directory:managed.directory,browserConfig:${JSON.stringify(join(directory, "browser.json"))},

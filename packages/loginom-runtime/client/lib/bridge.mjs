@@ -171,7 +171,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       arguments: { code: makeRecoveryPageProbeCode(binding) } }, undefined, { timeout: 15000, signal });
     return parseRecoveryPageProbe(response, binding);
   };
-  const reopenNodePackage = async ({ documentId, signal, deadline, saveWorkspace }) => {
+  const reopenNodePackage = async ({ documentId, signal, deadline, reload = {}, saveWorkspace }) => {
     const previous=session.metadata.workspacePreparation?.state, binding=session.metadata.storageBinding;
     if(previous?.status!=='READY'||previous.document_id!==documentId||binding?.document_id!==documentId
       ||previous.loginom_account!==binding.loginom_account||binding.origin!==new URL(config.loginomUrl).origin)
@@ -180,14 +180,16 @@ export async function createBridge(config, session, { browserTransport: managedB
       :previous.package_ref?.persisted===true?previous.package_ref.path:null;
     if(!path)return {reason:'ORIGINAL_SAVED_PATH_UNVERIFIED'};
     requireStorageDestination(path,config.storageDirectories,'packages');
-    if(!await reauthenticateReload({origin:binding.origin,account:binding.loginom_account,signal,deadline}))
-      return {reason:'RELOAD_LOGIN_UNVERIFIED'};
+    const authenticated=await reauthenticateReload({origin:binding.origin,account:binding.loginom_account,
+      packagePath:path,signal,deadline,reload}).catch(error=>{signal?.throwIfAborted();return false;});
+    if(!authenticated)return {reason:'RELOAD_LOGIN_UNVERIFIED'};
     signal?.throwIfAborted();
-    const request={operation_id:'reload-'+randomUUID(),intent:'open_package',package_path:path,workflow_ref:null};
+    const request={operation_id:reload.openOperationId??='reload-'+randomUUID(),intent:'open_package',package_path:path,workflow_ref:null};
     const remaining=()=>Math.max(1,deadline-Date.now());
     const prepare=makeWorkspacePrepareCode({loginomUrl:config.loginomUrl,compatibility:pinnedActions.compatibility,
       operationId:request.operation_id,sessionId:session.metadata.sessionId,intent:request.intent,packagePath:path,
-      recoveryAccount:binding.loginom_account,timeoutMs:remaining()});
+      recoveryAccount:binding.loginom_account,recoverOnly:reload.openDispatched===true,timeoutMs:remaining()});
+    reload.openDispatched=true;
     const opened=parseWorkspacePreparation(await browser.callTool({name:'browser_run_code_unsafe',
       arguments:{code:prepare}},undefined,{timeout:remaining()+1000,signal}));
     if(opened.status!=='READY'||opened.document_id===documentId||opened.loginom_account!==binding.loginom_account

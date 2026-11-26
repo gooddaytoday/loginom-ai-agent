@@ -2551,10 +2551,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       operation.cleanupConfirmed=state.receipt.cleanup_complete===true;
     }finally{running=false;}
   };
+  const reloadLoss='Unsaved changes made before reloading were lost.';
+  const reloadObserved=operation=>operation.reloadObserved===true||Number.isFinite(operation.reloadProgress?.timeOrigin);
   const refuseChangedNodeIdentity=(operation,message)=>{
+    const instruction=operation.reloadAwaitingLogin
+      ?'Sign in to the original Loginom account, then ask Dock to recover the original operation.'
+      :'Ask the user to open the original scenario in Loginom under the original account and complete this step there.';
     operation.releaseRefused={message,identityChanged:true,
-      ui_blocker:'Ask the user to open the original scenario in Loginom under the original account and complete this step there.'
-        +(operation.reloadReauthenticated?' Unsaved changes made before reloading were lost.':'')};
+      ui_blocker:instruction+(reloadObserved(operation)?' '+reloadLoss:'')};
   };
   const canReleaseAfterReload=operation=>reopenNodePackage&&!operation.reloadAttempted&&operation.targetPhase?.completed===true
     &&operation.nodeApply?.pending?.phase==='configure'&&operation.nodeApply.request.target.type==='transform.filter_data';
@@ -2570,6 +2574,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const observed=await probePreparedPage({origin:targetOrigin,documentId:state.request.document_id},{signal}).catch(()=>null);
       signal?.throwIfAborted();
       if(observed?.ok!==false||observed.reason!=='prepared document changed')return false;
+      if(observed.reloaded===true)operation.reloadObserved=true;
       refuseChangedNodeIdentity(operation,'Original prepared Loginom document changed [LOGINOM_IDENTITY_CHANGED]');
       return true;
     }finally{running=false;}
@@ -2764,16 +2769,19 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       instruction:earlyNodePhase(operation)?'Release this early source/workflow/target failure with a NEW recovery_operation_id. Dock only reads the original receipts and quiet graph, proving that the target was not created or finding its exact partial node. Unknown effects remain blocked. Follow the released next_step; do not replay creation.'
         :'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'}:null;
   const releaseAfterReload=async(operation,signal)=>{
-    operation.reloadAttempted=true;
     const state=operation.nodeApply, request=state.request;
     const deadline=now()+NODE_RELEASE_BUDGET_MS;
+    const reload=operation.reloadProgress??={};
+    signal?.throwIfAborted();
     let reopened;
-    try{reopened=await reopenNodePackage({documentId:request.document_id,deadline,signal});}
+    try{reopened=await reopenNodePackage({documentId:request.document_id,deadline,signal,reload});}
     catch{signal?.throwIfAborted();}
     signal?.throwIfAborted();
-    operation.reloadReauthenticated=reopened?.reloaded===true;
+    if(reopened?.reloaded===true)operation.reloadObserved=true;
+    operation.reloadAwaitingLogin=reopened?.reason==='RELOAD_LOGIN_UNVERIFIED'&&reloadObserved(operation)&&!reload.openDispatched;
     const proof=proveReloadedNode(operation,reopened?.first,reopened?.second,{readOnly:reopened?.readOnly===true});
     if(!proof||now()>=deadline){
+      operation.reloadAttempted=!operation.reloadAwaitingLogin;
       const reason=reopened?.reason??'REOPENED_GRAPH_UNVERIFIED';
       throw Object.assign(new Error('The original saved graph could not be verified after reloading ['+reason+']'),{code:'LOGINOM_IDENTITY_CHANGED'});
     }
@@ -2781,10 +2789,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const target=proof.node?{kind:'existing',type:request.target.type,ref:proof.node}:request.target;
     const inputs=proof.node?[]:request.inputs.map(input=>({...input,
       source:{document_id:ref.document_id,workflow_id:ref.workflow_ref.workflow_id,node_id:input.source.node_id}}));
-    const loss='Unsaved changes made before reloading were lost.';
     const result={operation_id:operation.id,status:'FAILED',effect_possible:state.effect_possible,cleanup_complete:true,
       node:proof.node,configuration:{status:'unknown'},execution:state.execution,output:state.output,
-      phases:state.phases.map(({value,...phase})=>phase),warnings:[loss],package_saved:false,persisted_package_verified:false,
+      phases:state.phases.map(({value,...phase})=>phase),warnings:[reloadLoss],package_saved:false,persisted_package_verified:false,
       checkpoint_kind:'local_node_released',pending_phase:null,released_phase:'configure',
       error:{code:'NODE_OPERATION_RELEASED',message:'The original saved graph was verified in a new Loginom session. The stopped configuration was abandoned.'},
       next_step:reopened.readOnly?{instruction:packageReadOnlyAdvice}:{
@@ -2838,6 +2845,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           try{await reload.publish(()=>remember(operation,'operation_abandoned',outcome));}
           catch{
             signal?.throwIfAborted();
+            operation.reloadAttempted=true;
             throw Object.assign(new Error('The verified saved graph could not be bound to the Dock workspace'),{code:'LOGINOM_IDENTITY_CHANGED'});
           }
           Object.assign(operation.nodeApply,{pending:null,cleanup_complete:true,result:structuredClone(reload.result)});
@@ -2852,7 +2860,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         // The original operation keeps its gate. A blocker the user can clear is
         // named explicitly instead of leaving an empty recovery list.
         const message=String(error?.message??error).slice(0,1000);
-        if(error?.code==='LOGINOM_IDENTITY_CHANGED')refuseChangedNodeIdentity(operation,message);
+        if(error?.code==='LOGINOM_IDENTITY_CHANGED'||signal?.aborted&&operation.reloadProgress)refuseChangedNodeIdentity(operation,message);
         else operation.releaseRefused={message,ui_blocker:error?.userAction??null};
         const userAction=operation.releaseRefused.ui_blocker;
         const trigger=browserRecoveryTrigger(operation,null);
@@ -2879,7 +2887,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if(operation.releaseRefused?.identityChanged){
       if(canReleaseAfterReload(operation))return {recovery_options:['abandon_operation'],next_steps:[{
         tool:'dock_operation_recover',arguments:{operation_id:operation.id,strategy:'abandon_operation'},
-        required_fields:['recovery_operation_id'],instruction:'Use a new recovery_operation_id. Dock can sign in again and verify the original saved graph before abandoning this configuration.'}]};
+        required_fields:['recovery_operation_id'],instruction:'Use a new recovery_operation_id. Dock can verify the original saved graph before abandoning this configuration.'}],
+        ...(operation.reloadAwaitingLogin?{user_action:operation.releaseRefused.ui_blocker}
+          :reloadObserved(operation)?{warnings:[reloadLoss]}:{})};
       return {recovery_options:[],next_steps:[],user_action:operation.releaseRefused.ui_blocker};
     }
     base.unshift({ tool: 'dock_operation_inspect', arguments: { operation_id: operation.id },
