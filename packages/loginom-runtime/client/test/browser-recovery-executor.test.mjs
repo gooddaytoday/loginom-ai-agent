@@ -753,8 +753,48 @@ test('unconfirmed calls are never a trigger and stop keeps the original gate', a
   assert.equal(f.runtime.hasUnsettledWork(), true);
 });
 
-function exportFixture() {
-  const events = [], reads = [];
+test('node verification stays inside the remaining attempt time and the 90s release cap', async () => {
+  let clock = 50_000;
+  const spent = fixture({ now: () => clock });
+  await stopAtFinish(spent);
+  await spent.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+  const spentBasis = spent.runtime.browserRecoveryBasis('apply');
+  await spent.runtime.browserRecoveryHandoff('apply');
+  let released = 0;
+  spent.state.release = () => { released++; return proved(); };
+  const stopped = await spent.runtime.verifyBrowserRecovery({ operationId: 'apply', step: spentBasis.step,
+    attested: { actions_performed: ['Closed the wizard'] }, remainingMs: 0 });
+  assert.equal(stopped.status, 'unresolved');
+  assert.match(stopped.reason, /deadline/);
+  assert.equal(released, 0);
+
+  clock = 50_000;
+  const capped = fixture({ now: () => clock });
+  await stopAtFinish(capped);
+  await capped.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+  const cappedBasis = capped.runtime.browserRecoveryBasis('apply');
+  await capped.runtime.browserRecoveryHandoff('apply');
+  capped.state.release = () => { clock += 90_001; return proved(); };
+  const over = await capped.runtime.verifyBrowserRecovery({ operationId: 'apply', step: cappedBasis.step,
+    attested: { actions_performed: ['Closed the wizard'] }, remainingMs: 600_000 });
+  assert.equal(over.status, 'unresolved');
+  assert.match(over.reason, /deadline/);
+
+  clock = 50_000;
+  const ordinary = fixture({ now: () => clock });
+  await stopAtFinish(ordinary);
+  await ordinary.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+  const ordinaryBasis = ordinary.runtime.browserRecoveryBasis('apply');
+  await ordinary.runtime.browserRecoveryHandoff('apply');
+  ordinary.state.release = proved;
+  const verified = await ordinary.runtime.verifyBrowserRecovery({ operationId: 'apply', step: ordinaryBasis.step,
+    attested: { actions_performed: ['Closed the wizard'] }, remainingMs: 600_000 });
+  assert.equal(verified.status, 'continuable');
+  assert.deepEqual(verified.facts, ['node_released_on_quiet_graph', 'no_wizard_dialog_or_mask']);
+});
+
+function exportFixture({ now = Date.now } = {}) {
+  const events = [], reads = [], readOptions = [];
   const graph = { complete: true, document_id: 'doc', workflow_ref: workflow, nodes: [], links: [], foreign_links: [] };
   const adapter = { observe: async () => structuredClone(graph), preflight: async () => {},
     positionMatches: (n, p) => JSON.stringify(n.position) === JSON.stringify(p),
@@ -774,16 +814,16 @@ function exportFixture() {
     readOutput: async () => { operationRef.cleanupConfirmed = true; throw refusal(operationRef.id); },
     verifyContinuation: async () => true,
     releasePending: async () => { throw Error('not used'); },
-    recoveryReadExport: async state => { reads.push(state.node.node_id);
+    recoveryReadExport: async (state, options) => { reads.push(state.node.node_id); readOptions.push(options ?? {});
       return { artifact_id: 'file-1', destination: '/user/out.csv', bytes: 42, sha256: 'a'.repeat(64), execution_id: 'exec' }; } };
   const handler = { revision: '1', fileOutput: true, modes: ['delimited'], validate: () => {}, configure: ok };
   const state = {};
-  const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery: true,
+  const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery: true, now,
     execute: async () => { throw Error('Unexpected public transport'); },
     nodeTargetAdapterFactory: () => adapter, nodeApplyHandlers: new Map([['exports.text', handler]]),
     nodeApplyDriverFactory: ({ operation }) => { operationRef = operation; return drivers; },
     onRecord: async e => { events.push(e); return state.ack ? state.ack(e) : e; } });
-  return { runtime, events, reads, state };
+  return { runtime, events, reads, readOptions, state };
 }
 
 test('T4: an unconfirmed export download is recovered by a verified re-read without a new export', async () => {
@@ -806,6 +846,29 @@ test('T4: an unconfirmed export download is recovered by a verified re-read with
   assert.equal(settled.status, 'FAILED');
   assert.equal(settled.output.browser_recovery.file_artifacts[0].sha256, 'a'.repeat(64));
   assert.equal(settled.output.next_step.tool, 'dock_action_run');
+});
+
+test('export verification forwards the remaining attempt time and keeps the 120s read when time allows', async () => {
+  const tight = exportFixture({ now: () => 8_000_000 });
+  tight.runtime.startNodeApply({ ...request('export'), target: { kind: 'new', type: 'exports.text', label: 'Export', position: { x: 320, y: 280 } } });
+  assert.equal((await tight.runtime.waitNodeApply('export', { timeoutMs: 1000 })).outcome.status, 'FAILED');
+  const tightBasis = tight.runtime.browserRecoveryBasis('export');
+  await tight.runtime.browserRecoveryHandoff('export');
+  const tightResult = await tight.runtime.verifyBrowserRecovery({ operationId: 'export', step: tightBasis.step,
+    attested: { actions_performed: ['Closed a dialog'] }, remainingMs: 4_000 });
+  assert.equal(tightResult.status, 'completed');
+  assert.equal(tight.readOptions[0].remainingMs, 4_000);
+  assert.equal(tightResult.file_artifacts[0].sha256, 'a'.repeat(64));
+
+  const wide = exportFixture({ now: () => 8_000_000 });
+  wide.runtime.startNodeApply({ ...request('export-wide'), target: { kind: 'new', type: 'exports.text', label: 'Export', position: { x: 320, y: 280 } } });
+  assert.equal((await wide.runtime.waitNodeApply('export-wide', { timeoutMs: 1000 })).outcome.status, 'FAILED');
+  const wideBasis = wide.runtime.browserRecoveryBasis('export-wide');
+  await wide.runtime.browserRecoveryHandoff('export-wide');
+  const wideResult = await wide.runtime.verifyBrowserRecovery({ operationId: 'export-wide', step: wideBasis.step,
+    attested: { actions_performed: ['Closed a dialog'] }, remainingMs: 600_000 });
+  assert.equal(wideResult.status, 'completed');
+  assert.equal(wide.readOptions[0].remainingMs, 600_000);
 });
 
 test('a timely exact journal acknowledgement accepts the original export file', async t => {

@@ -9,6 +9,7 @@ import {validateLgdExportParameters,lgdExportParametersSchema} from './lgd-param
 import {configureLgdExport} from './lgd-export-procedure.mjs';
 import {synchronizeTextExportInput} from './text-export-node.mjs';
 import {readNativeExportFile} from './text-export-output.mjs';
+import {exportRecoveryReadDeadline} from './recovery-time.mjs';
 import {exportContinuationSurface,verifyExportContinuation} from './text-export-continuation.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);},one=xs=>{need(xs.length===1,'Unique export control required');return xs[0];};
@@ -146,10 +147,10 @@ export function createLgdExportNodeSupport({targetOrigin,targetBuild,storageDire
    },
    // Browser recovery T4: after the model cleared what blocked the download, the
    // runtime repeats only the idempotent file read of the same completed export.
-   async recoveryReadExport(state,{signal:recoverySignal}={}){
+   async recoveryReadExport(state,{signal:recoverySignal,remainingMs}={}){
     need(state.export_download_refusal===true&&state.node&&configuration&&execution?.verified&&execution.owner_verified
      &&state.execution?.execution_id===execution.execution_id,'Export recovery requires the original configured and executed export');
-    const ctx={signal:recoverySignal,deadline:now()+120000,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,
+    const ctx={signal:recoverySignal,deadline:exportRecoveryReadDeadline(now,remainingMs),document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,
      node:state.node,execution:{execution_id:execution.execution_id}};
     enter(ctx);
     // Fresh child receipt IDs: the refused read's ledger entries are never reused.

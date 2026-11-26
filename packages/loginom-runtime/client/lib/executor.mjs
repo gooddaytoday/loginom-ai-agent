@@ -2960,10 +2960,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         cleanup_complete: state.receipt?.cleanup_complete ?? null,
         ...(operation.recoveryBaseline?{execution_baseline:structuredClone(operation.recoveryBaseline)}:{}) } };
     },
-    async verifyBrowserRecovery({ operationId, step, attested, signal, remainingMs=NODE_RELEASE_BUDGET_MS }) {
+    async verifyBrowserRecovery({ operationId, step, attested, signal, remainingMs }) {
       const operation = operations.get(operationId);
       if (!operation || leased !== operationId) throw new Error('The browser lease does not belong to this operation');
-      if (step.kind === 'export') return verifyRecoveredExport(operation, step, attested, signal);
+      if (step.kind === 'export') return verifyRecoveredExport(operation, step, attested, signal, remainingMs);
       if (pending !== operation) throw new Error('The browser lease does not belong to this pending operation');
       const code = failureCode(operation), reason = operation.browserRecoveryReason;
       running = true;
@@ -2971,7 +2971,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const receiptBefore = operation.lastReceipt;
       const journal = { started: false };
       const checkOutput=Object.hasOwn(operation,'recoveryBaseline');
-      const deadline=now()+Math.min(remainingMs,NODE_RELEASE_BUDGET_MS);
+      const releaseMs=Number.isFinite(remainingMs)?Math.min(Math.max(0,remainingMs),NODE_RELEASE_BUDGET_MS):NODE_RELEASE_BUDGET_MS;
+      const deadline=now()+releaseMs;
       // Keep release private until the browser recovery receipt is acknowledged.
       const releaseOperation={...operation,nodeApply:{...operation.nodeApply}};
       const verifyBoundary=()=>{
@@ -3062,12 +3063,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     },
   };
   // The original export stays FAILED; the recovery receipt carries the byte-verified file.
-  async function verifyRecoveredExport(operation, step, attested, signal) {
+  async function verifyRecoveredExport(operation, step, attested, signal, remainingMs) {
     running = true;
     let file;
     try {
       observations.clear();
-      file = await operation.nodeApplyDrivers.recoveryReadExport(operation.nodeApply, { signal });
+      file = await operation.nodeApplyDrivers.recoveryReadExport(operation.nodeApply, { signal, remainingMs });
     } catch (error) {
       // Only a refusal that restored the quiet graph is settled; any other failure leaves storage gestures unknown.
       return { status: 'unresolved', facts: [], reason: String(error?.message ?? error).slice(0, 1000),

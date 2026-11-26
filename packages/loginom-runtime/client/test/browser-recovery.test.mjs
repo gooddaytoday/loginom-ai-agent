@@ -190,6 +190,64 @@ test('a private text write failure preserves the action and its ordinary reply',
   assert.equal(action.budget.calls_left, 29);
 });
 
+const recoveryBudget = reply => JSON.parse(reply.content.at(-1).text).browser_recovery;
+
+test('finish spends one of the thirty calls and stays available after twenty-nine gestures', async () => {
+  const h = harness({ verify: () => ({ status: 'continuable', facts: ['released'] }) });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  let edge;
+  for (let i = 0; i < 29; i++) edge = await h.recovery.call('browser_hover', { target: 'e1' });
+  const left = recoveryBudget(edge);
+  assert.equal(left.calls_left, 1);
+  assert.match(left.hint, /finish/);
+  const done = body(await h.recovery.call('dock_browser_recovery', { action: 'finish', operation_id: 'op-1',
+    actions_performed: ['Closed the wizard'] }));
+  assert.equal(done.phase, 'dock');
+  assert.equal(done.verification.status, 'continuable');
+  assert.deepEqual(done.verification.facts, ['released']);
+  assert.equal(done.budget.calls_left, 0);
+  assert.equal(h.verifies.length, 1);
+  const again = await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-2' });
+  assert.equal(again.isError, true);
+  assert.match(again.content[0].text, /exhausted/);
+
+  const retry = harness({ verify: () => ({ status: 'unresolved', facts: [], reason: 'wizard still open' }) });
+  await retry.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const more = body(await retry.recovery.call('dock_browser_recovery', { action: 'finish', operation_id: 'op-1',
+    actions_performed: ['Clicked Cancel'] }));
+  assert.equal(more.phase, 'browser');
+  assert.equal(more.verification.status, 'unresolved');
+  assert.match(more.instruction, /not established/);
+  assert.equal(more.budget.calls_left, 29);
+  const repeated = body(await retry.recovery.call('dock_browser_recovery', { action: 'finish', operation_id: 'op-1',
+    actions_performed: ['Clicked Cancel again'] }));
+  assert.equal(repeated.phase, 'browser');
+  assert.equal(repeated.verification.status, 'unresolved');
+  assert.equal(repeated.budget.calls_left, 28);
+  assert.equal(retry.verifies.length, 2);
+});
+
+test('finish verification uses the remaining attempt time and does not start after it is gone', async () => {
+  const open = harness();
+  await open.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  open.clock.value += 600_000 - 5_000;
+  const done = body(await open.recovery.call('dock_browser_recovery', { action: 'finish', operation_id: 'op-1',
+    actions_performed: ['Closed the wizard'] }));
+  assert.equal(done.phase, 'dock');
+  assert.equal(done.verification.status, 'completed');
+  assert.equal(open.verifies[0].remainingMs, 5_000);
+  assert.ok(open.verifies[0].remainingMs <= 90_000);
+
+  const closed = harness();
+  await closed.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  closed.clock.value += 600_000;
+  const stopped = body(await closed.recovery.call('dock_browser_recovery', { action: 'finish', operation_id: 'op-1',
+    actions_performed: ['Closed the wizard'] }));
+  assert.equal(stopped.stopped.code, 'budget_exhausted');
+  assert.equal(closed.verifies.length, 0);
+  assert.equal(closed.calls.length, 0);
+});
+
 test('the call and time budget is shared by the step across operation IDs and re-entries', async () => {
   const h = harness({ verify: () => ({ status: 'continuable', facts: ['released'] }) });
   await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
@@ -201,11 +259,11 @@ test('the call and time budget is shared by the step across operation IDs and re
   assert.deepEqual(verified.verification.attested_by_model.actions_performed, ['Closed the wizard']);
   // T3: the same phase failed again under a new operation ID; the budget continues.
   const resumed = body(await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-2' }));
-  assert.equal(resumed.budget.calls_left, 10);
-  for (let i = 0; i < 10; i++) assert.equal((await h.recovery.call('browser_hover', { target: 'e1' })).isError, undefined);
+  assert.equal(resumed.budget.calls_left, 9);
+  for (let i = 0; i < 9; i++) assert.equal((await h.recovery.call('browser_hover', { target: 'e1' })).isError, undefined);
   const exhausted = body(await h.recovery.call('browser_hover', { target: 'e1' }));
   assert.equal(exhausted.stopped.code, 'budget_exhausted');
-  assert.equal(h.calls.length, 30);
+  assert.equal(h.calls.length, 29);
   const refused = await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-3' });
   assert.equal(refused.isError, true);
   assert.match(refused.content[0].text, /exhausted/);

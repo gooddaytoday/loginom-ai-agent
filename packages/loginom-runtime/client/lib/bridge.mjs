@@ -32,6 +32,7 @@ import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
+import {savedPackageRecoveryTimeout} from './recovery-time.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
 import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
 import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
@@ -246,13 +247,13 @@ export async function createBridge(config, session, { browserTransport: managedB
       const save = currentSave(operationId);
       if (save?.recoveryPending) return save;
     };
-    const readSavedState = async save => {
+    const readSavedState = async (save, timeout = savedPackageRecoveryTimeout()) => {
       const prepared = session.metadata.workspacePreparation?.state;
       const options = { sessionId: session.metadata.sessionId, documentId: prepared?.document_id,
         account: prepared?.loginom_account ?? config.replayLoginUser, packagePath: save.path,
         loginomUrl: config.loginomUrl, loginomBuild: session.metadata.targetIdentity.loginom_build };
       const response = await browser.callTool({ name: 'browser_run_code_unsafe',
-        arguments: { code: makeSavedPackageStateCode(options) } }, undefined, { timeout: 15000 });
+        arguments: { code: makeSavedPackageStateCode(options) } }, undefined, { timeout });
       return parseSavedPackageState(response, options);
     };
     const recoveryExecutor = actionRuntime && {
@@ -274,7 +275,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         if (input.step.kind !== 'save') return actionRuntime.verifyBrowserRecovery(input);
         const save = pendingSaveRecovery(input.operationId);
         if (!save) return { status: 'unresolved', facts: [], reason: 'The saved package recovery no longer owns the prepared workspace' };
-        const state = await readSavedState(save).catch(error => ({ error: String(error.message).slice(0, 500) }));
+        const state = await readSavedState(save, savedPackageRecoveryTimeout(input.remainingMs)).catch(error => ({ error: String(error.message).slice(0, 500) }));
         if (state.error || typeof state.modified !== 'boolean')
           return { status: 'unresolved', facts: [], reason: state.error ?? 'Saved package state unavailable' };
         const receipt = { id: input.operationId + ':br-save', kind: 'browser_recovery', status: state.modified ? 'continuable' : 'completed',

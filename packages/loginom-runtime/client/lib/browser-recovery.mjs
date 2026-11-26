@@ -41,7 +41,8 @@ export const browserRecoveryTool = {
   description: 'Temporary browser recovery for one failed Dock step. Call start only when a Dock result names this tool in next_step. '
     + 'While the phase is browser, use the listed browser_* tools in the same Loginom tab to complete exactly that step, '
     + 'one action per response, reading subtrees with browser_snapshot target/depth or browser_find. Then call finish with '
-    + 'what you did; the runtime verifies the result and returns control to Dock. Call stop when no justified next action remains.',
+    + 'what you did; finish counts as one of the 30 calls. The runtime verifies the result and returns control to Dock. '
+    + 'When calls_left is 1, finish instead of another gesture. Call stop when no justified next action remains.',
   inputSchema: { type: 'object', additionalProperties: false, required: ['action', 'operation_id'], properties: {
     action: { enum: ['start', 'finish', 'stop'] },
     operation_id: text(200),
@@ -203,7 +204,7 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     if (outcome.error) return stopAttempt('browser_unavailable', 'The browser action outcome is unknown: ' + outcome.error.message);
     if (current.pageLost) return stopAttempt('page_changed', `The Loginom page changed outside recovery bounds: ${current.pageLost}.`);
     const result = boundText(outcome.value, limits.textBytes);
-    result.content.push({ type: 'text', text: JSON.stringify({ browser_recovery: remaining(current.budget) }) });
+    result.content.push({ type: 'text', text: JSON.stringify({ browser_recovery: publishedBudget(current.budget) }) });
     return result;
   }
 
@@ -211,6 +212,7 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     const refused = admission(browserRecoveryToolName, attempt);
     if (refused) return refused;
     if (attempt.operation_id !== input.operation_id) return refusal('finish requires the browser phase of this operation.', view());
+    if (exhausted(attempt.budget)) return stopAttempt('budget_exhausted', 'The browser recovery budget for this step is exhausted.');
     const current = attempt;
     const attested = { actions_performed: input.actions_performed ?? [], expected_result: input.expected_result ?? null,
       browser_settings: input.browser_settings ?? [] };
@@ -219,6 +221,9 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     const outcome = await track(gate(async () => {
       const late = admission(browserRecoveryToolName, current);
       if (late) return { late };
+      if (exhausted(current.budget)) return { exhausted: true };
+      // Допущенный finish — один из 30 вызовов, включая повтор после unresolved.
+      current.budget.calls++;
       current.phase = 'verify';
       await journal({ phase: 'browser_recovery_attested', attempt_id: current.id, operation_id: current.operation_id,
         attested_by_model: attested });
@@ -240,6 +245,7 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
       }
       return { verification, status };
     }));
+    if (outcome.exhausted) return stopAttempt('budget_exhausted', 'The browser recovery budget for this step is exhausted.');
     if (outcome.late) {
       if (attempt !== current || !(uncertain || current.pageLost)) return outcome.late;
       return uncertain ? stopAttempt('browser_unavailable', 'A browser action outcome is unknown: ' + uncertain.reason)
@@ -328,7 +334,14 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
 
   function view(of = attempt) {
     if (!of) return { phase: 'dock' };
-    return { phase: of.phase, operation_id: of.operation_id, reason: of.reason, step: of.step, budget: remaining(of.budget) };
+    return { phase: of.phase, operation_id: of.operation_id, reason: of.reason, step: of.step, budget: publishedBudget(of.budget) };
+  }
+
+  function publishedBudget(budget) {
+    const left = remaining(budget);
+    if (left.calls_left === 1)
+      left.hint = 'One call remains. Use it for dock_browser_recovery finish; another gesture leaves no finish.';
+    return left;
   }
 
   function exhausted(budget) {
