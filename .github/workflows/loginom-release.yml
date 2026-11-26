@@ -89,6 +89,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends squashfs-tools xvfb xauth dbus-x11 libgtk-3-0t64 libnss3 libgbm1 libasound2t64
       - uses: ./.github/actions/setup-bun
+      # The Loginom client keeps its dependencies (yaml, Playwright) in its own lock file; verifyProductSkills needs them.
+      - name: Install locked client dependencies
+        working-directory: packages/loginom-runtime/client
+        run: npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
       # write-manifest.ts reads the Electron version from the installed binary; Bun skips the download script.
       - name: Install Electron
         run: node packages/desktop/node_modules/electron/install.js
@@ -139,6 +143,10 @@ jobs:
           echo "INPUT=$RUNNER_TEMP/in" >> "$GITHUB_ENV"
           echo "RELEASE=$RUNNER_TEMP/release" >> "$GITHUB_ENV"
       - uses: ./.github/actions/setup-bun
+      # The Loginom client keeps its dependencies (yaml, Playwright) in its own lock file; verifyProductSkills needs them.
+      - name: Install locked client dependencies
+        working-directory: packages/loginom-runtime/client
+        run: npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
       # write-manifest.ts reads the Electron version from the installed binary; Bun skips the download script.
       - name: Install Electron
         run: node packages/desktop/node_modules/electron/install.js
@@ -184,6 +192,10 @@ jobs:
           echo "INPUT=$RUNNER_TEMP/in" >> "$GITHUB_ENV"
           echo "RELEASE=$RUNNER_TEMP/release" >> "$GITHUB_ENV"
       - uses: ./.github/actions/setup-bun
+      # The Loginom client keeps its dependencies (yaml, Playwright) in its own lock file; verifyProductSkills needs them.
+      - name: Install locked client dependencies
+        working-directory: packages/loginom-runtime/client
+        run: npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
       # write-manifest.ts reads the Electron version from the installed binary; Bun skips the download script.
       - name: Install Electron
         run: node packages/desktop/node_modules/electron/install.js

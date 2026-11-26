@@ -64,6 +64,18 @@ describe("loginom-release workflow", () => {
     expect(workflow).toContain("name: loginom-macos15-arm64-${{ github.run_number }}")
   })
 
+  test.each(platforms)("%s installs the client's locked dependencies before the manifest is written", (_, job) => {
+    const names = stepNames(job)
+    expect(names.indexOf("Install locked client dependencies")).toBeGreaterThan(-1)
+    expect(names.indexOf("Install locked client dependencies")).toBeLessThan(
+      names.indexOf("Write the manifest and verify every installer against it"),
+    )
+  })
+
+  test("macOS is built once per branch push: the release run calls it, it has no push trigger", () => {
+    expect(Object.keys((Bun as any).YAML.parse(read(".github/workflows/loginom-macos.yml")).on)).not.toContain("push")
+  })
+
   test("the Linux job also runs cli-resources.test.ts", () => {
     expect(workflow).toContain("bun test --timeout 60000 test/cli-resources.test.ts")
   })

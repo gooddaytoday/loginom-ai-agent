@@ -1,7 +1,8 @@
 name: Loginom macOS candidate
 
 # Builds the ad-hoc signed macOS arm64 candidate: the product CLI (tar.gz) and the Desktop app (DMG and ZIP) from one commit.
-# Run it with workflow_dispatch, or call it from a release workflow (workflow_call). Signing is ad-hoc only, as in 0.4;
+# Run it with workflow_dispatch, or call it from a release workflow (workflow_call); a branch push builds macOS once, inside
+# loginom-release.yml, because macOS runners are scarce. Signing is ad-hoc only, as in 0.4;
 # Developer ID and notarization are stage G.
 
 on:
@@ -23,9 +24,6 @@ on:
         description: Bake temporary browser recovery into this candidate (demo and acceptance builds)
         type: boolean
         default: false
-  push:
-    branches: [macos-build, loginom]
-    paths: ["packages/**", "patches/**", "bun.lock", "package.json", ".github/workflows/loginom-macos.yml"]
   pull_request:
     paths: ["packages/**", "patches/**", "bun.lock", "package.json", ".github/workflows/loginom-macos.yml"]
 
