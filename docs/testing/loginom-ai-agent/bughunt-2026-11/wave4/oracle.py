@@ -183,21 +183,28 @@ def item_totals(items):
         ("quantity", "integer"), ("unit_price", "real"), ("discount_pct", "integer"),
     ]
     nodes = [node("items", IMPORT)]
+
+    def item_output(kind, rows):
+        output = table(kind, schema, rows)
+        discount = next(column for column in output["columns"] if column["name"] == "discount_pct")
+        discount["types"] = ["integer", "real"]
+        return output
+
     chain.turn("Импортируй order_items.csv, оставь пустые скидки как NULL и проверь импорт запуском.",
-               nodes, outputs=[table(IMPORT, schema, items)])
+               nodes, outputs=[item_output(IMPORT, items)])
     nodes.append(node("calc", CALC))
     links = [link("items", "calc")]
     calculated = [dict(row, amount=item_amount(row)) for row in items]
     schema += [("amount", "real")]
     caption = "Расчёт суммы"
     chain.turn("Добавь после импорта калькулятор amount = quantity × unit_price × (1 − discount_pct / 100), считая NULL-скидку нулевой, и выполни его.",
-               nodes, links, [table(CALC, schema, calculated)], manual=rename(CALC, caption))
+               nodes, links, [item_output(CALC, calculated)], manual=rename(CALC, caption))
     nodes[-1] = node("calc", CALC, label=caption)
     nodes.append(node("filter", FILTER))
     links.append(link("calc", "filter"))
     selected = [row for row in calculated if row["amount"] > 5000]
     chain.turn("Добавь после «Расчёт суммы» фильтр amount > 5000 и выполни его.",
-               nodes, links, [table(FILTER, schema, selected)])
+               nodes, links, [item_output(FILTER, selected)])
     nodes.append(node("group", GROUP))
     links.append(link("filter", "group"))
     totals = defaultdict(Decimal)

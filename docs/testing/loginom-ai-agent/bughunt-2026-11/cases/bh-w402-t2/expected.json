@@ -60,7 +60,11 @@
         },
         {
           "name": "discount_pct",
-          "type": "integer"
+          "type": "integer",
+          "types": [
+            "integer",
+            "real"
+          ]
         },
         {
           "name": "amount",
