@@ -33,7 +33,10 @@ expected = {
     "nodes": [{"type": node_type} for node_type in node_types],
     "graph": {
         "exact": True,
-        "nodes": [{"id": node_id, "type": node_type} for node_id, node_type in zip(ids, node_types)],
+        "nodes": [
+            {"id": "variables", "type": "variables.user"},
+            *[{"id": node_id, "type": node_type} for node_id, node_type in zip(ids, node_types)],
+        ],
         "links": [
             {"source": upstream, "output": 0, "target": downstream, "input": 0}
             for upstream, downstream in zip(ids, ids[1:])
