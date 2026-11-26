@@ -44,7 +44,7 @@ try {
       $relative = @($entry.FullName.Substring($prefix.Length).Split([IO.Path]::DirectorySeparatorChar))
     }
     $chromiumCache = $relative.Count -ge 4 -and (
-      ($relative[0] -eq 'cache' -and $relative[1] -eq 'tmp' -and $relative[2] -cmatch '^lb[A-Za-z0-9]{6}$') -or
+      ($relative[0] -eq 'cache' -and $relative[1] -eq 'tmp' -and $relative[2] -cmatch '^lb[A-Za-z0-9]{6}\\z') -or
       ($relative[0] -eq 'loginom' -and $relative[1] -eq 'validation' -and $relative[2] -eq 'http-cache')
     )
     $rules = $security.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])

@@ -129,6 +129,15 @@ test.skipIf(process.platform !== "win32")(
         [join("config", "Default"), capability + "(OI)(CI)M"],
         [network, capability + "(OI)(CI)F"],
         [network, "*S-1-15-2-1:(OI)(CI)M"],
+        // Another principal inside an anchor is what the check exists for.
+        [network, "*S-1-1-0:(OI)(CI)R"],
+        // The anchors hold only relative to the profile root, never deeper.
+        [join("config", "cache", "tmp", "lbC1wMfr", "Default", "Network"), capability + "(OI)(CI)M"],
+        [join("data", "loginom", "validation", "http-cache", "Default"), capability + "(OI)(CI)M"],
+        // Only the exact mkdtemp name shape: lb plus six characters, lowercase prefix.
+        [join("cache", "tmp", "lbC1wMf", "Default", "Network"), capability + "(OI)(CI)M"],
+        [join("cache", "tmp", "lbC1wMfr0", "Default", "Network"), capability + "(OI)(CI)M"],
+        [join("cache", "tmp", "LBC1wMfr", "Default", "Network"), capability + "(OI)(CI)M"],
       ]) {
         const rejected = await profile(directory)
         await icacls(join(rejected, directory), grant)
