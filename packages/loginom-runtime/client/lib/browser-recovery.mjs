@@ -227,8 +227,11 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
       current.phase = 'verify';
       await journal({ phase: 'browser_recovery_attested', attempt_id: current.id, operation_id: current.operation_id,
         attested_by_model: attested });
+      // Запись attestation может дойти ровно до deadline. Счётчик вызовов здесь уже увеличен и не годится как проверка времени.
+      const msLeft = remaining(current.budget).ms_left;
+      if (msLeft === 0) return { exhausted: true };
       const verification = await Promise.resolve().then(() => executor.verifyBrowserRecovery({ operationId: current.operation_id,
-        step: current.step, attested, signal: extra?.signal, remainingMs:remaining(current.budget).ms_left })).catch(error => ({ status: 'unresolved', facts: [],
+        step: current.step, attested, signal: extra?.signal, remainingMs: msLeft })).catch(error => ({ status: 'unresolved', facts: [],
           reason: error.message, uncertain: true }));
       // The verifier's own release gestures may end with an unknown outcome too.
       if (verification.uncertain) uncertain ??= { operation_id: current.operation_id, tool: browserRecoveryToolName,

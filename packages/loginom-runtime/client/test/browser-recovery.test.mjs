@@ -227,6 +227,31 @@ test('finish spends one of the thirty calls and stays available after twenty-nin
   assert.equal(retry.verifies.length, 2);
 });
 
+test('an attestation journal that ends on the attempt deadline does not start verification', async () => {
+  let msAtJournal;
+  const h = harness({
+    record: async event => {
+      if (event.phase === 'browser_recovery_attested') {
+        msAtJournal = 600_000 - (h.clock.value - 1_000);
+        h.clock.value = 1_000 + 600_000;
+      }
+      h.events.push(event);
+      return event;
+    },
+  });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const stopped = body(await h.recovery.call('dock_browser_recovery', { action: 'finish', operation_id: 'op-1',
+    actions_performed: ['Closed the wizard'] }));
+  assert.ok(msAtJournal > 0);
+  assert.equal(h.clock.value - 1_000, 600_000);
+  assert.equal(h.verifies.length, 0);
+  assert.equal(stopped.phase, 'stopped');
+  assert.equal(stopped.stopped.code, 'budget_exhausted');
+  assert.equal(stopped.verification, undefined);
+  assert.equal(h.events.some(event => event.phase === 'browser_recovery_attested'), true);
+  assert.equal(stopped.budget.ms_left, 0);
+});
+
 test('finish verification uses the remaining attempt time and does not start after it is gone', async () => {
   const open = harness();
   await open.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
