@@ -1,0 +1,88 @@
+{
+  "graph": {
+    "exact": true,
+    "retain": [
+      "scenario_vars",
+      "source",
+      "group"
+    ],
+    "nodes": [
+      {
+        "id": "scenario_vars",
+        "type": "variables.user"
+      },
+      {
+        "id": "source",
+        "type": "imports.text"
+      },
+      {
+        "id": "group",
+        "type": "transform.group_data",
+        "label": "Свод цен для закупок"
+      },
+      {
+        "id": "filter",
+        "type": "transform.filter_data"
+      }
+    ],
+    "links": [
+      {
+        "source": "source",
+        "target": "filter",
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": "filter",
+        "target": "group",
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "any",
+      "rows": [
+        {
+          "category": "Бытовая техника",
+          "metric": 80693.48
+        },
+        {
+          "category": "Книги",
+          "metric": 3058.6
+        },
+        {
+          "category": "Одежда",
+          "metric": 36235.36
+        },
+        {
+          "category": "Продукты",
+          "metric": 3236.22
+        },
+        {
+          "category": "Электроника",
+          "metric": 163664.7
+        }
+      ],
+      "columns": [
+        {
+          "name": "category",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "metric",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-06
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "sales",
+        "type": "imports.text"
+      }
+    ],
+    "links": []
+  },
+  "outputs": []
+}

@@ -1,0 +1,161 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "workflow",
+        "type": "variables.user",
+        "label": "Переменные сценария"
+      },
+      {
+        "id": "products",
+        "type": "imports.text",
+        "label": "Каталог для ранжирования"
+      },
+      {
+        "id": "rank",
+        "type": "programming.javascript"
+      }
+    ],
+    "links": [
+      {
+        "source": "products",
+        "target": "rank",
+        "output": 0,
+        "input": 0
+      }
+    ],
+    "exact": true,
+    "retain": [
+      "workflow",
+      "products",
+      "rank"
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "programming.javascript",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "category",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "product_id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "rank",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "category": "Продукты",
+          "product_id": 6,
+          "rank": 1
+        },
+        {
+          "category": "Продукты",
+          "product_id": 1,
+          "rank": 2
+        },
+        {
+          "category": "Продукты",
+          "product_id": 4,
+          "rank": 3
+        },
+        {
+          "category": "Продукты",
+          "product_id": 9,
+          "rank": 4
+        },
+        {
+          "category": "Одежда",
+          "product_id": 3,
+          "rank": 1
+        },
+        {
+          "category": "Одежда",
+          "product_id": 7,
+          "rank": 2
+        },
+        {
+          "category": "Одежда",
+          "product_id": 2,
+          "rank": 3
+        },
+        {
+          "category": "Одежда",
+          "product_id": 17,
+          "rank": 4
+        },
+        {
+          "category": "Бытовая техника",
+          "product_id": 27,
+          "rank": 1
+        },
+        {
+          "category": "Бытовая техника",
+          "product_id": 21,
+          "rank": 2
+        },
+        {
+          "category": "Бытовая техника",
+          "product_id": 15,
+          "rank": 3
+        },
+        {
+          "category": "Бытовая техника",
+          "product_id": 5,
+          "rank": 4
+        },
+        {
+          "category": "Электроника",
+          "product_id": 11,
+          "rank": 1
+        },
+        {
+          "category": "Электроника",
+          "product_id": 8,
+          "rank": 2
+        },
+        {
+          "category": "Электроника",
+          "product_id": 10,
+          "rank": 3
+        },
+        {
+          "category": "Электроника",
+          "product_id": 12,
+          "rank": 4
+        },
+        {
+          "category": "Книги",
+          "product_id": 25,
+          "rank": 1
+        },
+        {
+          "category": "Книги",
+          "product_id": 26,
+          "rank": 2
+        },
+        {
+          "category": "Книги",
+          "product_id": 20,
+          "rank": 3
+        },
+        {
+          "category": "Книги",
+          "product_id": 18,
+          "rank": 4
+        }
+      ],
+      "ordered": false,
+      "column_order": "any"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "base": "bh-x06-t1",
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 1
+  },
+  "manual_edit": {
+    "kind": "connect",
+    "source": {
+      "type": "transform.filter_data"
+    },
+    "target": {
+      "type": "transform.sorting"
+    },
+    "output": 0,
+    "input": 0
+  }
+}

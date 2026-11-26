@@ -1,0 +1,172 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "workflow",
+        "type": "variables.user",
+        "label": "Переменные сценария"
+      },
+      {
+        "id": "orders",
+        "type": "imports.text",
+        "label": "Заказы"
+      },
+      {
+        "id": "customers",
+        "type": "imports.text",
+        "label": "Клиенты"
+      }
+    ],
+    "links": [],
+    "exact": true,
+    "retain": [
+      "workflow",
+      "orders"
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "imports.text",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "customer_id",
+          "type": "integer"
+        },
+        {
+          "name": "region",
+          "type": "string"
+        },
+        {
+          "name": "email",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "customer_id": 109,
+          "region": "Новосибирск",
+          "email": "client109@example.ru"
+        },
+        {
+          "customer_id": 118,
+          "region": "Казань",
+          "email": "client118@example.ru"
+        },
+        {
+          "customer_id": 122,
+          "region": "Санкт-Петербург",
+          "email": "client122@example.ru"
+        },
+        {
+          "customer_id": 142,
+          "region": "Алтай",
+          "email": "client142@example.ru"
+        },
+        {
+          "customer_id": 161,
+          "region": "Казань",
+          "email": "client161@example.ru"
+        },
+        {
+          "customer_id": 167,
+          "region": "Санкт-Петербург",
+          "email": "client167@example.ru"
+        },
+        {
+          "customer_id": 173,
+          "region": "Самара",
+          "email": "client173@example.ru"
+        },
+        {
+          "customer_id": 412,
+          "region": "Москва",
+          "email": "client412@example.ru"
+        },
+        {
+          "customer_id": 425,
+          "region": "Екатеринбург",
+          "email": "client425@example.ru"
+        },
+        {
+          "customer_id": 446,
+          "region": "Новосибирск",
+          "email": "client446@example.ru"
+        },
+        {
+          "customer_id": 527,
+          "region": "Екатеринбург",
+          "email": "client527@example.ru"
+        },
+        {
+          "customer_id": 563,
+          "region": "Самара",
+          "email": "client563@example.ru"
+        },
+        {
+          "customer_id": 566,
+          "region": "Санкт-Петербург",
+          "email": "client566@example.ru"
+        },
+        {
+          "customer_id": 598,
+          "region": "Санкт-Петербург",
+          "email": "client598@example.ru"
+        },
+        {
+          "customer_id": 786,
+          "region": "Самара",
+          "email": "client786@example.ru"
+        },
+        {
+          "customer_id": 795,
+          "region": "Самара",
+          "email": null
+        },
+        {
+          "customer_id": 882,
+          "region": "Санкт-Петербург",
+          "email": "client882@example.ru"
+        },
+        {
+          "customer_id": 883,
+          "region": "Санкт-Петербург",
+          "email": "client883@example.ru"
+        },
+        {
+          "customer_id": 897,
+          "region": "Самара",
+          "email": "client897@example.ru"
+        },
+        {
+          "customer_id": 907,
+          "region": "Самара",
+          "email": "client907@example.ru"
+        },
+        {
+          "customer_id": 908,
+          "region": "Екатеринбург",
+          "email": "client908@example.ru"
+        },
+        {
+          "customer_id": 921,
+          "region": "Нижний Новгород",
+          "email": "client921@example.ru"
+        },
+        {
+          "customer_id": 932,
+          "region": "Алтай",
+          "email": "client932@example.ru"
+        },
+        {
+          "customer_id": 988,
+          "region": "Алтай",
+          "email": "client988@example.ru"
+        }
+      ],
+      "ordered": false,
+      "column_order": "any",
+      "output_node_label": "Клиенты"
+    }
+  ]
+}

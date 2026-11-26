@@ -1,0 +1,14 @@
+{
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 1
+  },
+  "base": "bh-w402-t1",
+  "manual_edit": {
+    "kind": "rename",
+    "node": {
+      "type": "transform.calculator"
+    },
+    "label": "Расчёт суммы"
+  }
+}
