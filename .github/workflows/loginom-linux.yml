@@ -1,23 +1,12 @@
 name: Loginom Linux
 
 # Linux x64 candidate: the product CLI (tar.gz) and Desktop (AppImage, deb, rpm), unsigned. The pty comes from
-# loginom-pty.yml; CLI and Desktop embed it through LOGINOM_AI_AGENT_PTY_BIN. B5.2b calls this workflow from
-# loginom-release.yml.
+# loginom-pty.yml; CLI and Desktop embed it through LOGINOM_AI_AGENT_PTY_BIN. loginom-release.yml calls this workflow
+# (B5.2b); the standalone push trigger of B5.1h is gone, so a branch push builds Linux once, inside the release run.
 
 on:
   workflow_call:
   workflow_dispatch:
-  # Stage B: the workflow is not on the default branch yet, so workflow_dispatch cannot reach it. B5.2b replaces this
-  # push with a call from loginom-release.yml.
-  push:
-    branches: [oc2-migration]
-    paths:
-      - packages/**
-      - patches/**
-      - bun.lock
-      - package.json
-      - .github/actions/**
-      - .github/workflows/loginom-linux.yml
 
 permissions:
   contents: read

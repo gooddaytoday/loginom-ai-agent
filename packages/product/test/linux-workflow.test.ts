@@ -10,9 +10,8 @@ const doc: any = (Bun as any).YAML.parse(workflow)
 const steps: string[] = doc.jobs.linux.steps.map((step: any) => step.name ?? step.uses)
 
 describe("loginom-linux workflow", () => {
-  test("can be started on the migration branch and called from the release workflow", () => {
-    expect(Object.keys(doc.on)).toEqual(expect.arrayContaining(["workflow_call", "workflow_dispatch", "push"]))
-    expect(doc.on.push.branches).toEqual(["oc2-migration"])
+  test("is called from the release workflow and does not also build on its own push", () => {
+    expect(Object.keys(doc.on).sort()).toEqual(["workflow_call", "workflow_dispatch"])
   })
 
   test("takes the pty from loginom-pty.yml and embeds it", () => {

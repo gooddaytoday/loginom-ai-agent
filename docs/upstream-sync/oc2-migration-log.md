@@ -25395,3 +25395,71 @@ macOS — run 45715943370, `fa731fbffd` (1,1 ГБ). Это не кандидат
 - **Стенд Windows:** интернет есть, трафик не снимается; окно в сеансе 0 невидимо, «видимое окно» остаётся непроверенным (B4.14c); вход только по паролю; прокси и обновление с 0.4.x — шлюз C.
 - **Вопрос SEC-01** остаётся владельцу: объём шлюза B vs C (В-86 против плана). Принят меньший вариант выше; при выборе большего добавляются журналы, UI API и экспорт диагностики установленного Desktop (+1,5–2 ч).
 - **Эталон.** `v0.4.2` пока не влит (B1.9b); профили B3.3 писала `v0.4.0`. Повторить `old` на 0.4.2 — ещё ≈15 мин на ОС, различий данных не ожидается.
+
+## B5.2b — `loginom-release.yml` и G5
+
+26.11.2026. Ветка `b52b-release` от `oc2-migration` (`9e20d6cf53`). Эталон — `v0.4.2` (В-110); поведение выпуска брал из
+`v0.4.0`-порта B5.2a. Настоящая модель не вызывалась, Actions не запускались (push делает оркестратор): прогон
+на GitHub не выполнен, workflow проверен разбором YAML и охранными тестами.
+
+### Что сделано
+
+- `.github/workflows/loginom-release.yml`: `workflow_dispatch` (кандидат любого ref), push в `oc2-migration` (фильтр: сам файл,
+  три платформенных workflow, `packages/desktop/scripts/release/**`, `script/release-notes.ts`) и push тега `v*`. Задания:
+  `plan` (версия из `packages/desktop/package.json`; тег обязан быть `v<версия>`), `linux`/`windows`/`macos` (вызов
+  одноимённых workflow через `workflow_call`, macOS получает `version`), `verify-linux/-windows/-macos` на своём раннере,
+  `collect`. Публикации, draft, подписи ленты, зеркала S3 и секретов нет.
+- `packages/desktop/scripts/release/candidate.ts`: `prepare` достаёт полезную нагрузку из самого установщика (DEB — `dpkg-deb`,
+  NSIS — `7z` дважды, ZIP — `ditto`), делает `git archive HEAD` как `*-source.tar.gz`, вызывает `write-manifest.ts` и
+  `verify-artifact.ts` для каждого установщика; `g5` проверяет `cli-manifest.json` распакованного CLI и дерево ресурсов Desktop,
+  убирает файл (`resources/loginom/host/node-host.mjs` у CLI, управляемый Node у Desktop), требует красной проверки, возвращает
+  файл и требует зелёной; `--undamaged` оставляет файл на месте, и тогда контроль обязан упасть (шаг «G5 mutation»).
+- `sums.ts`: сверяет файлы со всеми тремя манифестами (хеш, наличие, один коммит и версия) и пишет `SHA256SUMS.txt`.
+- `loginom-linux.yml`: убран собственный `push` (его заменяет вызов из `loginom-release.yml`, как обещал комментарий B5.1h;
+  иначе две сборки Linux делили бы одну `concurrency`-группу). Тест `linux-workflow.test.ts` обновлён.
+- `ci-workflows.test.ts`: `loginom-release` в `PRODUCT`. Новый `release-workflow.test.ts`: состав вызовов, порядок шагов G5,
+  имена скачиваемых артефактов (сверка с загрузкой в платформенных workflow), `collect` после трёх проверок, нет секретов и публикации.
+- `ci-release.md`: раздел про кандидат v2.
+
+### Выбор меньшего варианта
+
+- Путь скриптов в задании `scripts/release/**` не существует: они в `packages/desktop/scripts/release/`.
+- Версия кандидата — версия Desktop; `workflow_dispatch` без ввода версии (Linux и Windows версию не принимают, а Debian-пакет
+  и `verify-artifact` проверяют её). Смена версии выпуска — правка `package.json`.
+- Манифест пишется на том же раннере из установщика (Windows: `7z`), а не из каталога сборки: платформенные workflow его не
+  выкладывают, а Windows-файл правит B5.1j. Следствие: `resourcesSha256` — хеш манифеста ресурсов внутри самого установщика.
+- Отрицательный контроль Desktop убирает файл из распакованной копии и возвращает его (копия 400+ МБ не нужна). Для DEB и
+  AppImage `verify-artifact.ts` запускается на целых установщиках, контроль — на дереве ресурсов (то, что проверяет `verifyResourceTree`).
+- `cli-resources.test.ts` на Linux запускается как есть; на Windows и macOS он пропускается самим тестом, их комплектность CLI
+  проверяет `candidate.ts g5` на настоящем архиве.
+
+### Хвосты B5.2a
+
+- `.dmg`, `.zip`: `write-manifest.ts` их знает (после B5.1l `.app.tar` исчез); `.rpm` Linux остаётся вне манифеста (схема его не знает).
+- `*-source.tar.gz`: создаёт `candidate.ts prepare` (`git archive HEAD`, имена `-source`, `-windows-source`, `-macos-source`).
+- `linux-matrix.json` в `release-notes.ts`: не менялся. Матрица DEB и сами заметки выпуска — этап G, B5.2b их не вызывает;
+  требование матрицы остаётся для публикации.
+
+### Команды и вывод
+
+```text
+$ cd packages/desktop && bun test scripts/release            # 15 pass, 2 skip (macOS), 0 fail
+$ cd packages/desktop && LOGINOM_AI_AGENT_TEST_NODE=<node 24.19.0> bun test   # 643 pass, 0 fail (без переменной: 2 известных падения окружения)
+$ cd packages/product && bun test                            # 101 pass, 0 fail
+$ cd packages/cli && bun test test/cli-resources.test.ts     # 13 pass
+$ мутации (product release-workflow.test.ts): вызов macOS заменён / verify без needs сборки / шаг G5 mutation переименован /
+  флаг --undamaged убран / collect без двух проверок / имя артефакта / secrets.  — 1–3 fail каждая
+$ мутации (candidate.test.ts): убрана сверка хеша в sums.ts / убрана проверка «контроль не покраснел» — 1 fail каждая
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check   # would change: 0 files
+$ bun run check                                              # 39 successful, 0 failed
+```
+
+### Только CI и не проверено
+
+- Весь прогон: `candidate.ts` ни разу не запускался на настоящих артефактах. Рискованное: распаковка NSIS (`7z`, внутренний
+  `app-64.7z`), `unpacked` для `verifyWindowsApplication`, `bun install --frozen-lockfile` через `setup-bun` на Windows,
+  запуск Electron на Windows и macOS из `write-manifest.ts`, имена файлов `*-win-x64.exe` и CLI-архивов в сборках.
+- Параллельные `concurrency`: группа Windows содержит `github.workflow` (в вызове это имя вызывающего workflow); при повторном
+  запуске на том же ref `cancel-in-progress: true` отменит предыдущий вызов Windows.
+- Мутация G5 «красная» доказана тестом `expectRed` и шагом «G5 mutation» внутри запуска; красный прогон целиком — только в CI.

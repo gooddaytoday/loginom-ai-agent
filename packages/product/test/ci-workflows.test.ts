@@ -19,6 +19,7 @@ const PRODUCT = new Set([
   "loginom-linux",
   "loginom-macos",
   "loginom-pty",
+  "loginom-release",
   "loginom-windows",
   "secrets",
   "test",

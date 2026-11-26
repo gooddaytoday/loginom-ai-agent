@@ -1,0 +1,227 @@
+name: Loginom release candidate
+
+# B5.2b. Builds the Linux, Windows and macOS candidates of one commit by calling their workflows, takes the Desktop
+# payload out of each installer, writes the release manifest from it, verifies every installer and CLI archive against
+# the manifest, proves the G5 resource checks go red when a file is missing, and writes SHA256SUMS.txt.
+#
+# Candidate: workflow_dispatch on any ref, or a push to oc2-migration that touches this workflow or the release scripts.
+# Release: a push of a v* tag (the tag must be v<version of packages/desktop/package.json>). Neither mode creates a
+# release, signs the update feed or mirrors to S3: that is stage G, a separate owner command. No secrets are used.
+#
+# The version of the candidate is the Desktop package version, so the Debian package, the macOS bundle and the
+# manifest agree; the channel is dev, as in the platform workflows.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [oc2-migration]
+    tags: ["v*"]
+    paths:
+      - .github/workflows/loginom-release.yml
+      - .github/workflows/loginom-linux.yml
+      - .github/workflows/loginom-windows.yml
+      - .github/workflows/loginom-macos.yml
+      - packages/desktop/scripts/release/**
+      - script/release-notes.ts
+
+permissions:
+  contents: read
+
+concurrency:
+  group: loginom-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Read the candidate version
+        id: version
+        run: |
+          version="$(jq -er .version packages/desktop/package.json)"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match Desktop version $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  linux:
+    needs: plan
+    uses: ./.github/workflows/loginom-linux.yml
+
+  windows:
+    needs: plan
+    uses: ./.github/workflows/loginom-windows.yml
+
+  macos:
+    needs: plan
+    uses: ./.github/workflows/loginom-macos.yml
+    with:
+      version: ${{ needs.plan.outputs.version }}
+
+  verify-linux:
+    name: verify linux
+    needs: [plan, linux]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    env:
+      WORK: ${{ runner.temp }}/work
+      INPUT: ${{ runner.temp }}/in
+      RELEASE: ${{ runner.temp }}/release
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install the tools that unpack and run Linux packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends squashfs-tools xvfb xauth dbus-x11 libgtk-3-0t64 libnss3 libgbm1 libasound2t64
+      - uses: ./.github/actions/setup-bun
+      # write-manifest.ts reads the Electron version from the installed binary; Bun skips the download script.
+      - name: Install Electron
+        run: node packages/desktop/node_modules/electron/install.js
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: loginom-linux-x64-*
+          path: ${{ runner.temp }}/in
+      # The payload is taken out of the installer itself, so the manifest describes the bytes that are published.
+      - name: Write the manifest and verify every installer against it
+        run: bun packages/desktop/scripts/release/candidate.ts prepare --platform linux --version "$VERSION" --channel dev --downloads "$INPUT" --work "$WORK" --output "$RELEASE"
+      - name: G5, resources are complete and the check is red without a file
+        run: bun packages/desktop/scripts/release/candidate.ts g5 --platform linux --work "$WORK" --output "$RELEASE"
+      # The control must be able to fail: on an undamaged copy it reports a green check as an error, so this step has to exit non-zero.
+      - name: G5 mutation, an undamaged copy turns the control red
+        run: |
+          if bun packages/desktop/scripts/release/candidate.ts g5 --platform linux --work "$WORK" --output "$RELEASE" --undamaged; then
+            echo "::error::The G5 control stayed green on an undamaged copy"
+            exit 1
+          fi
+      # cli-resources.test.ts builds its fixture on Linux and skips elsewhere; the other platforms run the same
+      # completeness check on their real CLI archive in the G5 step.
+      - name: G5, cli-resources.test.ts
+        working-directory: packages/cli
+        run: bun test --timeout 60000 test/cli-resources.test.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: loginom-release-linux
+          path: ${{ runner.temp }}/release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  verify-windows:
+    name: verify windows
+    needs: [plan, windows]
+    runs-on: windows-2022
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    env:
+      WORK: ${{ runner.temp }}/work
+      INPUT: ${{ runner.temp }}/in
+      RELEASE: ${{ runner.temp }}/release
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: ./.github/actions/setup-bun
+      # write-manifest.ts reads the Electron version from the installed binary; Bun skips the download script.
+      - name: Install Electron
+        run: node packages/desktop/node_modules/electron/install.js
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: loginom-windows-unsigned-${{ github.run_id }}
+          path: ${{ runner.temp }}/in
+      # The payload is taken out of the installer itself, so the manifest describes the bytes that are published.
+      - name: Write the manifest and verify every installer against it
+        run: bun packages/desktop/scripts/release/candidate.ts prepare --platform windows --version "$VERSION" --channel dev --downloads "$INPUT" --work "$WORK" --output "$RELEASE"
+      - name: G5, resources are complete and the check is red without a file
+        run: bun packages/desktop/scripts/release/candidate.ts g5 --platform windows --work "$WORK" --output "$RELEASE"
+      # The control must be able to fail: on an undamaged copy it reports a green check as an error, so this step has to exit non-zero.
+      - name: G5 mutation, an undamaged copy turns the control red
+        run: |
+          if bun packages/desktop/scripts/release/candidate.ts g5 --platform windows --work "$WORK" --output "$RELEASE" --undamaged; then
+            echo "::error::The G5 control stayed green on an undamaged copy"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: loginom-release-windows
+          path: ${{ runner.temp }}/release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  verify-macos:
+    name: verify macos
+    needs: [plan, macos]
+    runs-on: macos-15
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    env:
+      WORK: ${{ runner.temp }}/work
+      INPUT: ${{ runner.temp }}/in
+      RELEASE: ${{ runner.temp }}/release
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: ./.github/actions/setup-bun
+      # write-manifest.ts reads the Electron version from the installed binary; Bun skips the download script.
+      - name: Install Electron
+        run: node packages/desktop/node_modules/electron/install.js
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: loginom-macos15-arm64-${{ github.run_number }}
+          path: ${{ runner.temp }}/in
+      # The payload is taken out of the installer itself, so the manifest describes the bytes that are published.
+      - name: Write the manifest and verify every installer against it
+        run: bun packages/desktop/scripts/release/candidate.ts prepare --platform macos --version "$VERSION" --channel dev --downloads "$INPUT" --work "$WORK" --output "$RELEASE"
+      - name: G5, resources are complete and the check is red without a file
+        run: bun packages/desktop/scripts/release/candidate.ts g5 --platform macos --work "$WORK" --output "$RELEASE"
+      # The control must be able to fail: on an undamaged copy it reports a green check as an error, so this step has to exit non-zero.
+      - name: G5 mutation, an undamaged copy turns the control red
+        run: |
+          if bun packages/desktop/scripts/release/candidate.ts g5 --platform macos --work "$WORK" --output "$RELEASE" --undamaged; then
+            echo "::error::The G5 control stayed green on an undamaged copy"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: loginom-release-macos
+          path: ${{ runner.temp }}/release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  collect:
+    name: SHA256SUMS
+    needs: [verify-linux, verify-windows, verify-macos]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: ./.github/actions/setup-bun
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: loginom-release-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/candidate
+      # Every file the three manifests list must have the hash its manifest holds; then SHA256SUMS.txt covers them all.
+      - name: Write SHA256SUMS.txt
+        run: |
+          bun packages/desktop/scripts/release/sums.ts "$RUNNER_TEMP/candidate"
+          cat "$RUNNER_TEMP/candidate/SHA256SUMS.txt"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: loginom-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/candidate/*
+          if-no-files-found: error
+          retention-days: 14
