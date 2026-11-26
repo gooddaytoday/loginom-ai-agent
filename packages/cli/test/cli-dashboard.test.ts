@@ -121,14 +121,15 @@ describe.skipIf(process.platform !== "linux")("run --dashboard with the server's
     expect({ code: created.code, stderr: created.stderr }).toEqual({ code: 0, stderr: "" })
     expect(created.events.find((event) => event.type === "text")?.part.text).toBe("Создаю dashboard.")
     // The server's Host was asked as 0.4's CLI asked its own: the status, readiness, then the latest publication with the
-    // captured origin and generation.
+    // captured origin and generation. The server then closes its Host itself, as it is given time to (B6.1-D).
     expect((await fixture.host()).slice(asked).map((entry) => entry.method)).toEqual([
       "start",
       "connection.status",
       "connection.ready",
       "dashboard.read",
+      "close",
     ])
-    expect((await fixture.host()).at(-1)?.input).toEqual({ origin: fixture.studio.origin, generation: 1, binding })
+    expect((await fixture.host()).findLast((entry) => entry.method === "dashboard.read")?.input).toEqual({ origin: fixture.studio.origin, generation: 1, binding })
     const work = path.join(
       fixture.profile,
       "data/dashboards",
