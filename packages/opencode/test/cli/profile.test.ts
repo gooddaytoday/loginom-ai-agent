@@ -96,7 +96,9 @@ const { spawn } = await import("node:child_process")
 try {
   const held = await acquireProfile(process.env.PROFILE_ROOT, "prod")
   if (process.env.SURVIVOR_TMP) {
-    const child = spawn("sleep", ["600"], {
+    // SURVIVOR_HOST imitates the forked host (an entry named node-host.mjs).
+    const argv = process.env.SURVIVOR_HOST ? [process.execPath, process.env.SURVIVOR_HOST] : ["sleep", "600"]
+    const child = spawn(argv[0], argv.slice(1), {
       env: { ...process.env, TMPDIR: process.env.SURVIVOR_TMP },
       stdio: "ignore",
       detached: true,
@@ -181,14 +183,28 @@ test("a live owner keeps the profile and is named in the refusal", async () => {
   expect(await fs.readFile(path.join(root, ".writer", "owner"), "utf8")).toBe(before)
 }, 30000)
 
+const FAST = { grace: 100, terminate: 200, confirm: 300 }
+
 test("an owner that cannot be checked here is never taken over", async () => {
   const root = await temporary()
   const { owner } = await abandoned(root)
   const file = path.join(root, ".writer", "owner")
   const recorded = JSON.parse(owner)
+  const { linux, ...withoutLinux } = recorded
   for (const replaced of [
     { ...recorded, host: "another-host" },
-    ...(process.platform === "linux" ? [{ ...recorded, linux: { ...recorded.linux, namespace: "pid:[1]" } }] : []),
+    { ...recorded, platform: process.platform === "linux" ? "darwin" : "linux" },
+    { ...recorded, machine: "another-machine" },
+    { ...recorded, machine: undefined },
+    // Another boot of another installation is not proof that the owner is gone.
+    { ...recorded, machine: "another-machine", linux: linux && { ...linux, boot: "another-boot" } },
+    ...(process.platform === "linux"
+      ? [
+          withoutLinux,
+          { ...recorded, linux: { ...linux, namespace: "pid:[1]" } },
+          { ...recorded, linux: { ...linux, namespace: "pid:[1]", boot: "another-boot" } },
+        ]
+      : []),
   ]) {
     await fs.writeFile(file, JSON.stringify(replaced))
     const notices: string[] = []
@@ -201,26 +217,191 @@ test("an owner that cannot be checked here is never taken over", async () => {
 }, 30000)
 
 test.skipIf(process.platform !== "linux")(
-  "processes of the killed run keep the profile until they exit",
+  "an owner from an earlier boot of this installation is gone",
+  async () => {
+    const root = await temporary()
+    const { owner } = await abandoned(root)
+    const recorded = JSON.parse(owner)
+    await fs.writeFile(
+      path.join(root, ".writer", "owner"),
+      JSON.stringify({ ...recorded, linux: { ...recorded.linux, boot: "earlier-boot" } }),
+    )
+    const next = await acquireProfile(root, "prod")
+    await next.release()
+  },
+  30000,
+)
+
+test("a failing probe keeps the guard", async () => {
+  const root = await temporary()
+  const { owner } = await abandoned(root)
+  for (const probe of [
+    {
+      owner: async () => {
+        throw new Error("probe failed")
+      },
+    },
+    {
+      survivors: async () => {
+        throw new Error("probe failed")
+      },
+    },
+  ]) {
+    const notices: string[] = []
+    await expect(
+      acquireProfile(root, "prod", { probe, timing: FAST, notice: (text) => notices.push(text) }),
+    ).rejects.toThrow("PROFILE_BUSY")
+    expect(notices.join("\n")).toContain("remove")
+    expect(await fs.readFile(path.join(root, ".writer", "owner"), "utf8")).toBe(owner)
+  }
+}, 30000)
+
+test("a guard without an owner or with a crashed contender's claim stays busy and says what to do", async () => {
+  const ownerless = await temporary()
+  await fs.mkdir(path.join(ownerless, ".writer"), { mode: 0o700 })
+  const claimed = await temporary()
+  const { owner } = await abandoned(claimed)
+  await fs.writeFile(path.join(claimed, ".writer", "takeover"), "crashed contender")
+  for (const root of [ownerless, claimed]) {
+    const notices: string[] = []
+    await expect(acquireProfile(root, "prod", { timing: FAST, notice: (text) => notices.push(text) })).rejects.toThrow(
+      "PROFILE_BUSY",
+    )
+    expect(notices.join("\n")).toContain(`remove ${path.join(await fs.realpath(root), ".writer")} and retry`)
+  }
+  expect(await fs.readFile(path.join(claimed, ".writer", "owner"), "utf8")).toBe(owner)
+}, 30000)
+
+test("a release blocked by a leftover claim fails with an instruction", async () => {
+  const root = await temporary()
+  const notices: string[] = []
+  const held = await acquireProfile(root, "prod", { notice: (text) => notices.push(text) })
+  await fs.writeFile(path.join(root, ".writer", "takeover"), "crashed contender")
+  await expect(held.release()).rejects.toThrow("PROFILE_RELEASE_INCOMPLETE")
+  expect(notices.join("\n")).toContain("takeover")
+}, 30000)
+
+test.skipIf(process.platform !== "linux")(
+  "an unrecognised process of the killed run is never stopped and keeps the profile",
   async () => {
     const root = await temporary()
     await fs.mkdir(path.join(root, "cache", "tmp"), { recursive: true, mode: 0o700 })
-    await fs.writeFile(path.join(root, "cli-profile.json"), JSON.stringify({ format: "loginom-cli", version: 1, channel: "prod" }), { mode: 0o600 })
+    await fs.writeFile(
+      path.join(root, "cli-profile.json"),
+      JSON.stringify({ format: "loginom-cli", version: 1, channel: "prod" }),
+      { mode: 0o600 },
+    )
     const { text } = await abandoned(root, { SURVIVOR_TMP: path.join(root, "cache", "tmp") })
     const survivor = Number(/survivor (\d+)/.exec(text)?.[1])
     const notices: string[] = []
-    await expect(acquireProfile(root, "prod", { wait: 500, notice: (value) => notices.push(value) })).rejects.toThrow(
+    await expect(acquireProfile(root, "prod", { timing: FAST, notice: (value) => notices.push(value) })).rejects.toThrow(
       "PROFILE_BUSY",
     )
     expect(notices.join("\n")).toContain(`${survivor} (sleep 600)`)
+    expect(() => process.kill(survivor, 0)).not.toThrow()
     // Bounded wait: the takeover follows as soon as the last process exits.
     const timer = setTimeout(() => process.kill(survivor, "SIGKILL"), 300)
-    const next = await acquireProfile(root, "prod", { wait: 10_000, notice: () => {} })
+    const next = await acquireProfile(root, "prod", { timing: { grace: 10_000 }, notice: () => {} })
     clearTimeout(timer)
     await next.release()
   },
   30000,
 )
+
+test.skipIf(process.platform !== "linux")(
+  "offline cleanup stops a recognised host that ignores SIGTERM, then takes over",
+  async () => {
+    const root = await temporary()
+    const scripts = await temporary()
+    const host = path.join(scripts, "node-host.mjs")
+    await fs.writeFile(host, `process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)`)
+    await fs.mkdir(path.join(root, "cache", "tmp"), { recursive: true, mode: 0o700 })
+    await fs.writeFile(
+      path.join(root, "cli-profile.json"),
+      JSON.stringify({ format: "loginom-cli", version: 1, channel: "prod" }),
+      { mode: 0o600 },
+    )
+    const { text } = await abandoned(root, { SURVIVOR_TMP: path.join(root, "cache", "tmp"), SURVIVOR_HOST: host })
+    const survivor = Number(/survivor (\d+)/.exec(text)?.[1])
+    // Wait until the imitated host has installed its SIGTERM handler (SigCgt bit 15).
+    for (
+      let caught = 0n;
+      !(caught & (1n << 14n));
+      caught = BigInt(`0x${/SigCgt:\s*([0-9a-f]+)/.exec(await fs.readFile(`/proc/${survivor}/status`, "utf8"))?.[1] ?? "0"}`)
+    )
+      await Bun.sleep(20)
+    const signals: string[] = []
+    const next = await acquireProfile(root, "prod", {
+      timing: { grace: 200, terminate: 500, confirm: 5000 },
+      notice: () => {},
+      probe: {
+        async signal(entry, signal) {
+          signals.push(`${entry.pid} ${signal}`)
+          return systemWriterProbe.signal(entry, signal)
+        },
+      },
+    })
+    expect(signals).toEqual([`${survivor} SIGTERM`, `${survivor} SIGKILL`])
+    expect(() => process.kill(survivor, 0)).toThrow()
+    await next.release()
+  },
+  30000,
+)
+
+test("a contender with a stale verdict never signals the fresh owner's processes", async () => {
+  const root = await temporary()
+  await abandoned(root)
+  let intruder: Awaited<ReturnType<typeof acquireProfile>> | undefined
+  const signals: number[] = []
+  await expect(
+    acquireProfile(root, "prod", {
+      timing: { grace: 0, terminate: 0, confirm: 300 },
+      notice: () => {},
+      probe: {
+        async survivors() {
+          // Another start completes the cleanup and takes over meanwhile.
+          intruder ??= await acquireProfile(root, "prod", { probe: { survivors: async () => [] } })
+          return [{ pid: 2 ** 22 + 1, command: "node node-host.mjs", recognised: true, identity: "1" }]
+        },
+        async signal(entry) {
+          signals.push(entry.pid)
+          return false
+        },
+      },
+    }),
+  ).rejects.toThrow("PROFILE_BUSY")
+  expect(signals).toEqual([])
+  await intruder!.release()
+}, 30000)
+
+test("contenders released together at the swap admit exactly one writer", async () => {
+  const root = await temporary()
+  await abandoned(root)
+  const count = 6
+  let arrived = 0
+  const barrier = Promise.withResolvers<void>()
+  const outcomes = await Promise.allSettled(
+    Array.from({ length: count }, () =>
+      acquireProfile(root, "prod", {
+        timing: FAST,
+        notice: () => {},
+        probe: {
+          async survivors() {
+            if (++arrived === count) barrier.resolve()
+            await barrier.promise
+            return []
+          },
+        },
+      }),
+    ),
+  )
+  const admitted = outcomes.filter((outcome) => outcome.status === "fulfilled")
+  expect(admitted.length).toBe(1)
+  expect(
+    outcomes.filter((outcome) => outcome.status === "rejected" && outcome.reason.message === "PROFILE_BUSY").length,
+  ).toBe(count - 1)
+  await (admitted[0] as PromiseFulfilledResult<Awaited<ReturnType<typeof acquireProfile>>>).value.release()
+}, 30000)
 
 test("concurrent starts on an abandoned guard admit exactly one writer", async () => {
   const root = await temporary()
