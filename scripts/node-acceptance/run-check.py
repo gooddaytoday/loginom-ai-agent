@@ -1810,6 +1810,8 @@ def summary(report):
         load = r.get('start_load', [])
         outcome = ('подготовка' if r.get('status') == 'NOT_RUN' and r.get('reason') == 'PREPARE_ONLY' else
                    'не запущен (бюджет пакета)' if r.get('status') == 'NOT_RUN' else r.get('status', 'RUNNING'))
+        if r.get('failure_category'):
+            outcome += f" ({r['failure_category']})"
         rows.append('| ' + ' | '.join([r['scenario'], outcome,
                     *[r.get(k, '—') for k in ['csv', 'save', 'cold', 'cleanup', 'port-read', 'read-path']],
                     '/'.join(f'{v:.2f}' for v in load[:2]) or '—']) + ' |')
@@ -1823,6 +1825,16 @@ def summary(report):
             rows.append(f"\nFAIL {r['scenario']}: {r.get('failure_class')}; {r.get('detail')}; "
                         f"журнал: {r.get('location')}; load при отказе: {r.get('failure_load')}; "
                         f"профиль: {r.get('profile')}")
+    failed_edits = [(r['scenario'], turn['case'], edit)
+                    for r in report['runs'] for turn in r.get('turns', [])
+                    if (edit := turn.get('manual_edit')) and edit.get('failure_category')]
+    if failed_edits:
+        rows += ['\n### Сбои ручных правок', '', '| Сценарий | После хода | Правка | Итог | Класс | Код | Журнал |',
+                 '|---|---|---|---|---|---|---|']
+        for scenario, case, edit in failed_edits:
+            values = [scenario, case, *[edit[key] for key in ('kind', 'status', 'failure_category', 'failure_class')],
+                      edit.get('journal', edit['location'])]
+            rows.append('| ' + ' | '.join(values) + ' |')
     timings = report.get('phase_timings', [])
     if timings:
         rows += ['\n| сценарий | фаза | queue, с | выполнение, с |', '|---|---|---|---|']
@@ -2542,13 +2554,19 @@ def cli_cleanup_paths(profile):
             set((profile / 'loginom/runtime').glob('runtime-close-*.json')))
 
 
+class PackageCloseUnconfirmed(AssertionError):
+    pass
+
+
 def check_fresh_cli_close(profile, package, before):
     cleanup_paths, ack_paths = cli_cleanup_paths(profile)
     receipts = [read(path) for path in cleanup_paths - before[0]]
     acks = [read(path) for path in ack_paths - before[1]]
-    assert receipts and all(r.get('package_closed') is True and r.get('logged_out') is True and r.get('package_path') == package
-                            and not r.get('unsaved_changes_discarded') for r in receipts), 'MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED'
-    assert acks and all(a.get('closed_ack') is True for a in acks), 'MANUAL_EDIT_CLI_CLOSE_ACK_MISSING'
+    if not receipts or not all(r.get('package_closed') is True and r.get('logged_out') is True and r.get('package_path') == package
+                               and not r.get('unsaved_changes_discarded') for r in receipts):
+        raise PackageCloseUnconfirmed('MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED')
+    if not acks or not all(a.get('closed_ack') is True for a in acks):
+        raise PackageCloseUnconfirmed('MANUAL_EDIT_CLI_CLOSE_ACK_MISSING')
 
 
 def check_case_excel_artifact(replies, profile, folder, artifact, output):
@@ -2561,7 +2579,9 @@ def check_case_excel_artifact(replies, profile, folder, artifact, output):
     shutil.copyfile(downloaded_csv(profile, destination), actual)
     oracle = runpy.run_path(str(REPO / 'docs/node-development/nodes/exports-excel/acceptance/oracle.py'))
     columns = output['columns']
+    default_order = 'exact' if artifact['header'] == 'none' else output.get('column_order', 'any')
     oracle['verify'](actual, dict(artifact, filename=actual.name, output_port=None, ordered=output['ordered'],
+        column_order=artifact.get('column_order', default_order),
         columns=columns, rows=[[row[col['name']] for col in columns] for row in output['rows']], row_count=len(output['rows'])))
 
 
@@ -2611,11 +2631,22 @@ class Runner:
         write(self.out / 'results.json', report)
         (self.out / 'summary.md').write_text(summary(report))
 
-    def failure(self, result, error, folder):
+    def failure(self, result, error, folder, *, manual_edit=None):
         detail = self.db_prompt.mask(str(error)) if self.db_case_active else str(error)
-        result.update(status='UNKNOWN' if isinstance(error, TimeoutError) else 'FAIL', failure_class=detail.split(':')[0] or type(error).__name__, detail=detail, failure_load=list(os.getloadavg()), failed_phase=self.report['phase'], failed_at=time.time())
+        phase = 'manual-edit' if manual_edit is not None else self.report['phase']
+        result.update(status='UNKNOWN' if isinstance(error, TimeoutError) else 'FAIL',
+                      failure_class=detail.split(':')[0] or type(error).__name__, detail=detail,
+                      failure_load=list(os.getloadavg()), failed_phase=phase, failed_at=time.time())
+        if isinstance(error, PackageCloseUnconfirmed):
+            result['failure_category'] = 'product'
+        elif manual_edit is not None:
+            result['failure_category'] = 'runner/setup'
         journal = folder / (result['scenario'] + '-checks.jsonl')
         result['location'] = str(journal) + ':1'
+        if manual_edit is not None:
+            manual_edit.update({key: result[key] for key in ('status', 'failure_category', 'failure_class', 'detail', 'location')})
+            if not Path(manual_edit['journal']).is_file():
+                manual_edit.pop('journal')
         journal.write_text(json.dumps(self.db_prompt.mask_value(result) if self.db_case_active else result, ensure_ascii=False) + '\n')
 
     def phase(self, name, command, folder, timeout=1800, stdin=None, env=None, cwd=None, check_exit=True):
@@ -4036,20 +4067,26 @@ class Runner:
                         observed_graph = stage / 'graph-observed.json'
                         if observed_graph.is_file():
                             baseline = read(observed_graph)
-                        if manual and not r.get('failure_class'):
-                            turn['manual_edit'] = dict(kind=manual['kind'], status='FAIL', journal=str(stage / 'manual/execution-events.jsonl'))
-                            baseline = self.manual_edit(manual, stage, profile, r['package'], login, build, cli_before,
-                                prior=prior, expected_graph=expected.get('graph'))
-                            turn['manual_edit']['status'] = 'PASS'
-                        turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class', 'cli_exit') if k in r},
+                        turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class', 'failure_category', 'cli_exit') if k in r},
                                     status='FAIL' if r.get('failure_class') or r.get('cli_exit') else 'PASS')
                         if 'cli_exit' in turn:
                             turn.setdefault('failure_class', turn['cli_exit']['code'])
                         active_turn = None
+                        if manual and not r.get('failure_class'):
+                            edit_result = turn['manual_edit'] = dict(kind=manual['kind'], status='PENDING',
+                                journal=str(stage / 'manual/execution-events.jsonl'))
+                            try:
+                                baseline = self.manual_edit(manual, stage, profile, r['package'], login, build, cli_before,
+                                    prior=prior, expected_graph=expected.get('graph'))
+                            except Exception as error:
+                                self.failure(r, error, folder, manual_edit=edit_result)
+                                break
+                            edit_result['status'] = 'PASS'
                         if spec.get('attach_all') and r.get('failure_class'):
                             break
                     if spec.get('attach_all') and r.get('failure_class'):
-                        r['status'] = 'FAIL'
+                        if r['status'] == 'PENDING':
+                            r['status'] = 'FAIL'
                         self.save()
                         continue
                     if spec.get('fs_case'):
@@ -4104,7 +4141,7 @@ class Runner:
                     else:
                         self.failure(r, error, folder)
                     if active_turn is not None:
-                        active_turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class', 'cli_exit') if k in r},
+                        active_turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class', 'failure_category', 'cli_exit') if k in r},
                                            status=r['status'])
                 finally:
                     if r.get('dataset'):

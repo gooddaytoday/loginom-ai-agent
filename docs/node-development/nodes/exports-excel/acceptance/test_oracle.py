@@ -73,6 +73,20 @@ class OracleTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'CELL_VALUE_OR_TYPE_A1'):
             self.result()
 
+    def test_columns_by_heading_keep_cell_types_and_values(self):
+        self.expected['column_order'] = 'any'
+        for left, right in self.sheet.iter_rows(max_col=2):
+            left_value, left_type = left.value, left.data_type
+            left.value, left.data_type = right.value, right.data_type
+            right.value, right.data_type = left_value, left_type
+        self.assertEqual(self.result()['status'], 'PASS')
+        self.sheet['B2'] = '1'
+        with self.assertRaisesRegex(ValueError, 'CELL_VALUE_OR_TYPE_B2'):
+            self.result()
+        self.sheet['B1'] = self.sheet['A1'].value
+        with self.assertRaisesRegex(ValueError, 'COLUMN_HEADERS'):
+            self.result()
+
     def test_extra_sheet(self):
         self.book.create_sheet('Extra')
         with self.assertRaisesRegex(ValueError, 'EXACTLY_ONE_SHEET'):

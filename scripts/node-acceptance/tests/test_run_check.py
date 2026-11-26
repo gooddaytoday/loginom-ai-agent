@@ -1999,10 +1999,8 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
             pair.mkdir()
             worker = dict(url='https://example.invalid', username='worker', password='synthetic', package_directory='/test')
             runner.write(pair / 'worker.json', worker)
-            proof = dict(package_closed=True, logged_out=True, package_path=f'/test/{root.name}-second.lgp')
             persisted = dict(complete=True, links=[], nodes=[
                 dict(ref=dict(node_id='node'), label='After', type='imports.text', position=dict(x=64,y=64))])
-            calls = []
 
             def phase(name, command, folder, **kwargs):
                 calls.append(name)
@@ -2015,6 +2013,9 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                 self.assertEqual(name, 'manual-edit')
                 self.assertEqual(folder.name, 'first')
                 self.assertEqual(json.loads(kwargs['stdin']), dict(login=worker, packagePath=proof['package_path'], edit=edit))
+                if mode == 'edit-failure':
+                    (folder / 'manual/execution-events.jsonl').write_text('{}\n')
+                    raise AssertionError('MANUAL_EDIT_GESTURE_FAILED')
                 runner.write(folder / 'manual/result.json', dict(status='PASS', persisted=persisted, cleanup=proof, reopen_cleanup=proof))
 
             def model(name, stage, profile, workspace, package, login, build, session, baseline=None):
@@ -2023,30 +2024,54 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                 ack = profile / 'loginom/runtime/runtime-close-current.json'
                 if name == 'first':
                     self.assertIsNone(session)
-                    runner.write(cleanup, proof)
-                    runner.write(ack, dict(closed_ack=True))
-                    instance.current['cli_exit'] = dict(code='CLI_TOOL_FAILED', location='first/model.stdout:1')
-                    with self.assertRaisesRegex(AssertionError, 'MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED'):
-                        instance.manual_edit(edit, stage, profile, package, login, build, ({cleanup}, {ack}))
+                    if mode != 'close-failure':
+                        runner.write(cleanup, proof)
+                        runner.write(ack, dict(closed_ack=True))
+                    if mode == 'continue':
+                        instance.current['cli_exit'] = dict(code='CLI_TOOL_FAILED', location='first/model.stdout:1')
+                        with self.assertRaisesRegex(AssertionError, 'MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED'):
+                            instance.manual_edit(edit, stage, profile, package, login, build, ({cleanup}, {ack}))
                 else:
                     self.assertEqual(session, 'same-session')
                     self.assertEqual(baseline['nodes']['node']['label'], 'After')
                 return 'same-session', dict(graph={}, outputs=[]), None, None
 
-            instance = runner.Runner.__new__(runner.Runner)
-            instance.out, instance.env = root, {}
-            instance.options = dict(pair=str(pair), cases=str(cases), cold=False)
-            instance.report = dict(runs=[dict(scenario='second', status='PENDING')])
-            instance.deadline = time.time() + 60
-            with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'save'), \
-                    patch.object(instance, 'phase', side_effect=phase), patch.object(instance, 'model', side_effect=model):
-                instance.run()
-            self.assertEqual(calls, ['setup', 'first', 'manual-edit', 'second'])
-            result = instance.report['runs'][0]
-            self.assertEqual(result['status'], 'FAIL')
-            self.assertEqual(result['failure_class'], 'CLI_TOOL_FAILED')
-            self.assertEqual([turn['status'] for turn in result['turns']], ['FAIL','PASS'])
-            self.assertEqual(result['turns'][0]['manual_edit']['status'], 'PASS')
+            for mode, code, category, followup in [
+                ('continue', 'CLI_TOOL_FAILED', None, ['manual-edit', 'second']),
+                ('edit-failure', 'MANUAL_EDIT_GESTURE_FAILED', 'runner/setup', ['manual-edit']),
+                ('close-failure', 'MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED', 'product', []),
+            ]:
+                with self.subTest(mode=mode):
+                    calls = []
+                    out = root / mode
+                    out.mkdir()
+                    proof = dict(package_closed=True, logged_out=True, package_path=f'/test/{out.name}-second.lgp')
+                    instance = runner.Runner.__new__(runner.Runner)
+                    instance.out, instance.env = out, {}
+                    instance.options = dict(pair=str(pair), cases=str(cases), cold=False)
+                    instance.report = dict(head='head', tree='tree', runs=[dict(scenario='second', status='PENDING')])
+                    instance.deadline = time.time() + 60
+                    with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'save'), \
+                            patch.object(instance, 'phase', side_effect=phase), patch.object(instance, 'model', side_effect=model):
+                        instance.run()
+                    self.assertEqual(calls, ['setup', 'first', *followup])
+                    result = instance.report['runs'][0]
+                    first, second = result['turns']
+                    manual = first['manual_edit']
+                    self.assertEqual(result['status'], 'FAIL')
+                    self.assertEqual(result['failure_class'], code)
+                    if category is None:
+                        self.assertEqual((first['status'], manual['status'], second['status']), ('FAIL', 'PASS', 'PASS'))
+                    else:
+                        self.assertEqual((first['status'], manual['status'], second['status']), ('PASS', 'FAIL', 'NOT_RUN'))
+                        self.assertNotIn('failure_class', first)
+                        self.assertEqual(result['failed_phase'], 'manual-edit')
+                        self.assertEqual(result['failure_category'], category)
+                        self.assertEqual((manual['failure_class'], manual['failure_category']), (code, category))
+                        self.assertEqual('journal' in manual, mode == 'edit-failure')
+                        summary = runner.summary(instance.report)
+                        self.assertIn('### Сбои ручных правок', summary)
+                        self.assertIn(f'| second | first | rename | FAIL | {category} | {code} |', summary)
 
     def test_exact_graph_detects_replaced_moved_and_extra_nodes_or_edges(self):
         want = dict(nodes=[dict(id='tag', type='imports.text', label='Sales')], exact=True, retain=['tag'])

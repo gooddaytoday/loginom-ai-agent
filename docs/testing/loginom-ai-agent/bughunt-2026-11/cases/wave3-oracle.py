@@ -37,7 +37,7 @@ def expected(chain, turn):
         return dict(output_node_type=node[1], output_port=port,
                     **({'output_node_label': node[2]} if node[2] is not None else {}),
                     columns=[dict(name=name, type=kind) for name, kind in columns],
-                    column_order='exact', ordered=True, rows=rows)
+                    column_order='any', ordered=True, rows=rows)
 
     if turn == 1:
         return dict(graph=graph(), outputs=[output(SOURCE, sales)])

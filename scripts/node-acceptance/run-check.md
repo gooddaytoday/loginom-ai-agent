@@ -677,6 +677,9 @@ It must identify exactly one node. A position specifies integer `x` and `y` in m
 coordinates. Create requires an unconnected drop. Threshold edits require a
 unique numeric scalar condition on the given field. The edit fails the chain
 if the gesture, graph delta, save, persistence or cleanup cannot be proved.
+The preceding model turn keeps its outcome. The summary and bughunt audit
+report the failed edit separately as `runner/setup`. An unconfirmed CLI
+package close or missing close acknowledgement is classified as `product`.
 Use `manual/execution-events.jsonl` and `manual/result.json` in the preceding
 turn's directory to read the before, after and persisted evidence.
 For native-port turns, a terminal `CLI_TOOL_FAILED` is still a failed turn.
@@ -726,7 +729,10 @@ the requested graph node and port. This mode uses `outputs` with
 `output_node_type`, optional `output_node_label`, and zero-based
 `output_port`. It can also check a requested downloaded Excel workbook using
 `excel_artifact` with `filename`, `sheet_name` and `header`. The first
-output supplies the workbook's typed rows in order. `--cold` reopens the
+output supplies the workbook's typed rows in order. The oracle matches columns
+by their headings by default. Set `column_order: "exact"` on the output or
+artifact when the task specifies a column sequence. Headerless workbooks
+use positional checks. `--cold` reopens the
 saved package for the final turn's output checks. The scenario entry in
 `results.json` lists the turn outcomes in order. The audited graph and its
 journal location are recorded in the turn's `graph-observed.json`.

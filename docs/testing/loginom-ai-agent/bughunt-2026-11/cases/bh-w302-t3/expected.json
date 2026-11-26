@@ -56,7 +56,7 @@
           "type": "real"
         }
       ],
-      "column_order": "exact",
+      "column_order": "any",
       "ordered": true,
       "rows": [
         {

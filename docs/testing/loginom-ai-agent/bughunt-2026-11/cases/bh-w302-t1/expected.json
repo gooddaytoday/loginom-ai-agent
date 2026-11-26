@@ -28,7 +28,7 @@
           "type": "integer"
         }
       ],
-      "column_order": "exact",
+      "column_order": "any",
       "ordered": true,
       "rows": [
         {
