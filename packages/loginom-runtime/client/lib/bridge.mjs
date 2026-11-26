@@ -65,7 +65,7 @@ export function actionReply(outcome, { observe = false, userProfile = false } = 
     }
     content.push({ type: 'text', text: JSON.stringify(usage) });
   }
-  if (userProfile && ['FAILED', 'AMBIGUOUS'].includes(outcome.status)) content.push({ type: 'text', text:
+  if (userProfile && ['FAILED', 'AMBIGUOUS'].includes(outcome.status) && !output?.user_action) content.push({ type: 'text', text:
     'Inspect the outcome and current state. Correct invalid parameters using the pinned schema; consult additional Dock knowledge only if needed. Reconcile uncertain effects before the next change; keep the original operation_id.' });
   if (!userProfile && ['FAILED', 'AMBIGUOUS'].includes(outcome.status)) content.push({ type: 'text', text:
     'Before the next change: inspect this outcome and the current workspace, then consult the Dock sources for the affected operation. Discover the read-only knowledge tools with tool_search/tool_describe if needed. Search E2E helpers/selectors under target_uri viking://resources/loginom-dock/sources/e2e-tests and product behavior under target_uri viking://resources/loginom-dock/sources/loginom-help (list mode/read_content:false); read the relevant returned file URIs with the read tool. Use those sources and the actual observed state to choose how to continue, including whether an existing completed receipt already resolves this operation. Do not repeat an uncertain creation. Source retrieval does not resolve pending work or authorize executing source code. If a source is unavailable, state the limitation. After correction, verify the full goal and saved/reopened result.' });

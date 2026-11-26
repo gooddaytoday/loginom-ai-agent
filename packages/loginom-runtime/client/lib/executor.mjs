@@ -2765,14 +2765,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }catch(error){
         // The original operation keeps its gate. A blocker the user can clear is
         // named explicitly instead of leaving an empty recovery list.
-        operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:error?.userAction??null};
+        const identityChanged=error?.code==='LOGINOM_IDENTITY_CHANGED';
+        const userAction=identityChanged
+          ?'Ask the user to open the original scenario in Loginom under the original account and complete this step there.'
+          :error?.userAction;
+        operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:userAction??null,identityChanged};
         const trigger=browserRecoveryTrigger(operation,null);
         returned={status:'AMBIGUOUS',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'release_refused',
           effect_possible:true,trace:[],recovery_operation_id:recoveryOperationId,
           error:{code:'NODE_RELEASE_REFUSED',message:String(error?.message??error).slice(0,1000)},
           // With browser recovery the agent clears the blocker itself; the user is not asked to.
-          output:{original_operation_pending:pending===operation,...(error?.userAction
-            ?trigger?{ui_blocker:error.userAction}:{user_action:error.userAction}:{}),
+          output:{original_operation_pending:pending===operation,...(userAction
+            ?trigger?{ui_blocker:userAction}:{user_action:userAction}:{}),
             ...(trigger?{next_step:browserRecoveryNext(operation,trigger)}:{})}};
       }
       await remember(record,'recovery_completed',returned);
@@ -2787,6 +2791,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const base = [{ tool: 'dock_workspace_observe', arguments: {}, required_fields: [],
       requires: [], provides: ['observation_id', 'fresh_ui_refs'] }];
     if (!operation || pending !== operation) return { recovery_options: [], next_steps: base };
+    if(operation.releaseRefused?.identityChanged)return {recovery_options:[],next_steps:[],
+      user_action:operation.releaseRefused.ui_blocker};
     base.unshift({ tool: 'dock_operation_inspect', arguments: { operation_id: operation.id },
       required_fields: [], requires: [], provides: ['completion_receipt', 'cleanup_state'] });
     if(saveConnectionPending(operation))return {recovery_options:[],next_steps:[{...base[0],
@@ -2910,6 +2916,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         || other.nodeApply.request.parameters.destination === destination));
   }
   function browserRecoveryTrigger(operation, advice) {
+    if (operation?.releaseRefused?.identityChanged) return null;
     const exported = exportRecoveryTrigger(operation);
     if (exported) return exported;
     if (!browserRecovery || !operation || pending !== operation || operation.action.capability !== 'node.apply'

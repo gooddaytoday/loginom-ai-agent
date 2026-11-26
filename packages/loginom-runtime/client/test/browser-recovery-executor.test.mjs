@@ -158,6 +158,29 @@ test('Excel inherits the recovery-only release verifier without dispatching an u
  await assert.rejects(drivers.recoveryReleasePending(operation.nodeApply),/last browser call has not confirmed completion/);
 });
 
+test('a changed document during configure directs the user to the original scenario', async () => {
+  const f = fixture({ stopPhase: 'configure', nodeType: 'transform.filter_data', release: () => {
+    throw Object.assign(new Error('Pinned browser capability call failed [LOGINOM_IDENTITY_CHANGED]'),
+      { code: 'LOGINOM_IDENTITY_CHANGED' });
+  } });
+  f.runtime.startNodeApply(f.request('apply'));
+  const job = await f.runtime.waitNodeApply('apply', { timeoutMs: 1000 });
+  assert.equal(job.outcome.output.pending_phase, 'configure');
+
+  const outcome = await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+  assert.equal(outcome.error.code, 'NODE_RELEASE_REFUSED');
+  assert.equal(outcome.output.original_operation_pending, true);
+  assert.match(outcome.output.user_action, /original scenario/i);
+  assert.equal(outcome.output.next_step, undefined);
+  const inspected = await f.runtime.inspect({ operationId: 'apply' });
+  assert.deepEqual(inspected.output.next_steps, []);
+  assert.equal(inspected.output.user_action, outcome.output.user_action);
+  assert.throws(() => f.runtime.browserRecoveryBasis('apply'), /No browser recovery trigger/);
+  assert.equal(f.runtime.hasUnsettledWork(), true);
+  assert.equal(f.calls.filter(c => c === 'configure').length, 1);
+  assert.equal(f.calls.includes('finish'), false);
+});
+
 test('T1: a refused release points to browser recovery instead of asking the user', async () => {
   const f = fixture();
   await stopAtFinish(f);
