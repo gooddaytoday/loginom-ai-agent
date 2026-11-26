@@ -312,7 +312,8 @@ try {
         result.busy ||
         retryState !== "recoverable-error"
       : signal === "SIGKILL"
-        ? code !== (killHost || killRuntime ? 1 : 137) || !guarded || retryCode !== 3 || !result.busy
+        ? // The crash keeps the guard; once every process of that run is gone the retry takes it over.
+          code !== (killHost || killRuntime ? 1 : 137) || !guarded || retryCode !== 0 || result.busy
         : code !== (activeImport ? 4 : 130) || guarded || retryCode !== 0 || result.busy) ||
     (activeImport &&
       (!recoveryEntries.length ||
