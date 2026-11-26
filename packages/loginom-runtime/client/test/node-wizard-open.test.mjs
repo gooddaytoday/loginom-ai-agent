@@ -102,18 +102,30 @@ test('deactivation gestures cannot run without a native prepared-node binding',(
 
 
 test('wizard opening reconciles duplicate native keys through the exact prepared GUID and label',async()=>{
- for(const fault of [null,'node','document','workflow','label','path']){
+ for(const fault of [null,'node','document','workflow','label','path','receipt','receipt-owner']){
   const {state}=fixture();state.ui={masks:[],dialogs:[],elements:[
    {ref:'settings',tid:state.prepared_node_context.tid+';Setting',allowed_actions:['begin_wizard'],wizard_open:{node:{node_label:'Import@1'},workflow_path:[{tid:'flow',label:'Scenario'}]}},
    {tid:state.prepared_node_context.tid+';Label;Label',label:'Import',graph_node:{part:'label'}}]};
   const after=structuredClone(state);after.prepared_node_context.surface='wizard';
-  after.wizard={status:'observed',owner_context:{status:'observed',node:{tid:'flow>Import-3',label:'Import'},path:[{tid:'flow',label:'Scenario'},{tid:'flow>Import-3',label:'Import'},{tid:'flow>Import-3>Settings',label:'Settings'}]}};
+  after.wizard={status:'observed',root_ref:'wizard',owner_context:{status:'observed',node:{tid:'flow>Import-3',label:'Import'},path:[{tid:'flow',label:'Scenario'},{tid:'flow>Import-3',label:'Import'},{tid:'flow>Import-3>Settings',label:'Settings'}]}};
   if(['node','document','workflow'].includes(fault))after.prepared_node_context[fault+'_id']='foreign';
+  if(fault==='receipt-owner')after.prepared_node_context.node_id='foreign';
   if(fault==='label')after.wizard.owner_context.node.label='Foreign';if(fault==='path')after.wizard.owner_context.path[0].tid='foreign';
-  let opened=false,gestures=0;const channel={observe:async()=>opened?after:state,perform:async()=>{opened=true;gestures++;}};
-  if(fault)await assert.rejects(openPreparedWizard(channel),/owner differs/);
+  let opened=false,gestures=0,observations=0;
+  const channel={observe:async options=>{
+   observations++;const current=opened?after:state;
+   assert.ok(options.ready(current));return current;
+  },perform:async()=>{
+   opened=true;gestures++;
+   if(fault?.startsWith('receipt'))return {status:'SUCCEEDED',action_key:'ui.act',action_revision:'1',
+    cleanup_complete:true,output:{...after,gesture_applied:true},trace:[{event:'wizard_open_verified',settings_applied:false,
+     wizard_root_ref:after.wizard.root_ref,owner_node:after.wizard.owner_context.node,workflow_path:state.navigation_context.path}]};
+  }};
+  if(fault&&fault!=='receipt')await assert.rejects(openPreparedWizard(channel),/owner differs/);
   else assert.equal((await openPreparedWizard(channel)).verified,true);
   assert.equal(gestures,1);
+  assert.equal(observations,fault?.startsWith('receipt')?1:2,
+   'the receipted wizard is already observed; otherwise take one post-open observation');
  }
 });
 

@@ -228,6 +228,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             additionalProperties:false,oneOf:[userResultSchema,javascriptSourceReceiptSchema,javascriptContextReceiptSchema]}:userResultSchema}:isServerDownloadTool(tool.name)?{...tool,outputSchema:userResultSchema}:userActionTool(tool));
     }
     const catalog = combineCatalogs(groups);
+    const describeTool=catalog.tools.find(tool=>tool.name==='dock_action_describe');
     if (actionRuntime) {
       catalog.routes.set('dock_action_describe', 'action');
       catalog.routes.set('dock_action_run', 'action');
@@ -608,21 +609,41 @@ export async function createBridge(config, session, { browserTransport: managedB
                 const keys=args.action_keys??(args.action_key?[args.action_key]:[]);
                 if(keys.some(key=>!userActionKeys.includes(key)))throw Error('Use dock_node_apply for supported nodes; request node_types for the selected parameter schema. Low-level actions require the diagnostic profile.');
               }
-              const description=actionRuntime.describe(Object.fromEntries(Object.entries(args).filter(([key])=>key!=='modes')));
-              if(args.modes!==undefined&&!args.node_types)throw Error('modes requires node_types');
+              const {modes,...query}=args;
+              const refresh=userProfile&&query.refresh===true;
+              if(userProfile&&Object.hasOwn(query,'refresh')){
+                validateActionParameters(describeTool.inputSchema.properties.refresh,query.refresh,'parameters.refresh');
+                if(!query.node_types)throw Error('refresh requires node_types');
+                delete query.refresh;
+              }
+              const description=actionRuntime.describe(query);
+              if(modes!==undefined&&!query.node_types)throw Error('modes requires node_types');
               if(userProfile&&description.node_types?.length){
                 requirePreparedWorkspace(session.metadata);
-                description.node_types=await skill.describeNodes(description.node_types,args.modes);
+                description.node_types=await skill.describeNodes(description.node_types,modes);
               }
               const delivered=userProfile?userActionInventory(description):description;
+              if(userProfile&&!refresh&&delivered.node_types?.length){
+                const cards=[],reused=[];
+                for(const card of delivered.node_types){
+                  if(userWorkflows.hasDescription(card,modes))reused.push({type:card.type,cache_key:card.cache_key});
+                  else cards.push(card);
+                }
+                if(reused.length){
+                  delivered.node_types=cards;
+                  delivered.reused_node_types=reused;
+                  delivered.description_notice='Description already delivered. Use the earlier node card with the matching cache_key. If you no longer have it, repeat with the same node_types and modes and add refresh: true.';
+                }
+              }
               const content={content:[{type:'text',text:JSON.stringify(delivered)}]};
-              const reply=userProfile?boundedUserToolReply(content,{tool:'dock_action_describe',modes:args.modes}):content;
-              if(userProfile&&reply.isError!==true&&description.node_types?.length){
-                await recordExecution({phase:'node_types_described',node_types:args.node_types,modes:args.modes??[],
+              const reply=userProfile?boundedUserToolReply(content,{tool:'dock_action_describe',modes,refresh}):content;
+              if(userProfile&&reply.isError!==true&&delivered.node_types?.length){
+                await recordExecution({phase:'node_types_described',node_types:delivered.node_types.map(card=>card.type),modes:modes??[],
+                  receipts:delivered.node_types.map(({type,cache_key})=>({type,cache_key})),
                   skill_revision:(await skill.prepare()).detail.revision});
               }
               await logResult('dock_action_describe',reply.isError===true?JSON.parse(reply.content[0].text):delivered);
-              if(userProfile&&reply.isError!==true)userWorkflows.rememberDescriptions(description,args.modes);
+              if(userProfile&&reply.isError!==true)userWorkflows.rememberDescriptions(delivered,modes);
               return reply;
             };
             return await (userProfile?dockGate(request.params.name,invoke):invoke());

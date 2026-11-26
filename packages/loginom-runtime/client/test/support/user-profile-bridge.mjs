@@ -170,14 +170,38 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const actual=await describe(encodedArgs);
     const decoded=JSON.parse(actual.content[0].text);
     assert.equal(decoded.error,undefined,JSON.stringify(decoded.error));
-    assert.deepEqual(decoded,JSON.parse((await describe(nativeArgs)).content[0].text));
-    for(const args of [{action_keys:'['},{action_keys:'null'},{node_types:'"imports.text"'},{modes:'[1]',node_types:'["imports.text"]'},{action_keys:'["node.add"]'}]){
+    const repeated=JSON.parse((await describe(nativeArgs)).content[0].text);
+    assert.deepEqual(repeated.actions,decoded.actions);
+    assert.deepEqual(repeated.node_types,[]);
+    assert.deepEqual(repeated.reused_node_types.map(({type,cache_key})=>({type,cache_key})),
+      decoded.node_types.map(({type,cache_key})=>({type,cache_key})));
+    const mixed=JSON.parse((await describe({node_types:['imports.text','transform.group_data'],modes:['delimited','aggregate']})).content[0].text);
+    assert.deepEqual(mixed.reused_node_types.map(card=>card.type),['imports.text']);
+    assert.deepEqual(mixed.node_types.map(card=>card.type),['transform.group_data']);
+    const refreshReply=await describe({...nativeArgs,refresh:true});
+    assert.notEqual(refreshReply.isError,true,refreshReply.content[0].text);
+    assert.deepEqual(JSON.parse(refreshReply.content[0].text),decoded);
+    assert.match(repeated.description_notice,/refresh: true/);
+    assert.equal(describeTool.inputSchema.properties.refresh.type,'boolean');
+    assert.deepEqual(JSON.parse((await describe({...nativeArgs,refresh:false})).content[0].text),repeated);
+    for(const args of [{action_keys:'['},{action_keys:'null'},{node_types:'"imports.text"'},{modes:'[1]',node_types:'["imports.text"]'},{action_keys:'["node.add"]'},
+      {...nativeArgs,refresh:'true'},{refresh:true},{action_key:'package.save_checkpoint',refresh:true}]){
       const denied=await describe(args);
       assert.equal(JSON.parse(denied.content[0].text).error.code,'REQUEST_REJECTED');
     }
     const oversized=await client.callTool({name:'dock_action_describe',arguments:{node_types:result.knowledge.node_types.map(card=>card.type)}});
     assert.equal(oversized.isError,true);
     assert.equal(JSON.parse(oversized.content[0].text).error.code,'USER_RESPONSE_BUDGET');
+    const refreshBatch=await describe({node_types:result.knowledge.node_types.map(card=>card.type),refresh:true});
+    assert.equal(refreshBatch.isError,true);
+    const refusedRefresh=JSON.parse(refreshBatch.content[0].text);
+    assert.equal(refusedRefresh.error.code,'USER_RESPONSE_BUDGET');
+    const {arguments:firstRetry,remaining_requests}=refusedRefresh.next_step;
+    assert.ok([firstRetry,...remaining_requests].every(args=>args.refresh===true));
+    const importRetry=[firstRetry,...remaining_requests].find(args=>args.node_types.includes('imports.text'));
+    const recovered=await describe(importRetry);
+    assert.notEqual(recovered.isError,true,recovered.content[0].text);
+    assert.ok(JSON.parse(recovered.content[0].text).node_types.find(card=>card.type==='imports.text')?.parameter_schema);
     const undescribed={operation_id:'without-description',contract_revision:'1.0.0',
       document_id:result.workspace.document_id,workflow_ref:{workflow_id:result.workspace.workflow_ref.workflow_id},
       target:{kind:'new',type:'transform.sorting'},inputs:[],mode:'keys',parameters:{},finish:'done'};
@@ -298,6 +322,8 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const afterPrepare=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,
       document_id:rebound.workspace.document_id,workflow_ref:{workflow_id:rebound.workspace.workflow_ref.workflow_id}}});
     assert.equal(JSON.parse(afterPrepare.content[0].text).error.code,'NODE_TYPE_NOT_DESCRIBED');
+    const refreshed=JSON.parse((await describe({node_types:['transform.sorting'],modes:['keys']})).content[0].text);
+    assert.equal(refreshed.node_types[0].type,'transform.sorting');
     assert.equal(reloadedPage.events.filter(selector=>selector.includes('OpenDialogForm;btnOpen')).length,1);
     reloadedPage=null;
     const rejected=await client.callTool({name:'dock_action_describe',arguments:{action_key:'package.save_checkpoint',node_types:['imports.text','transform.join_data','exports.text']}});
