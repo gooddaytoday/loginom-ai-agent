@@ -2434,7 +2434,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if (!reference) return { state: 'missing' };
     const code = `async (page) => (${browserReceipt.toString()})(page, ${JSON.stringify({ receipt_namespace: receiptNamespace,
       receipt_id: reference.id, receipt_signature: reference.signature, receipt_read: true, operation_id: operation.id })})`;
-    const value = await execute(code, { timeout: 10000,
+    // Leave time for the original Loginom reconnect guard to return its verdict.
+    const value = await execute(code, { timeout: filterReconnectPending(operation) ? 20000 : 10000,
       ...(['package.save_as','package.save_checkpoint'].includes(operation.action.action_key) ? { storageSession: 'save-reconcile' } : {}) });
     assertActionOutcome(value);
     const state = value.output;
@@ -2724,6 +2725,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const earlyNodePhase=operation=>!operation?.nodeApply?.node&&!operation?.nodeApply?.result
     &&(['source','workflow','target'].includes(operation?.nodeApply?.pending?.phase)
       ||operation?.nodeApply?.target_reconciled===true);
+  const filterConfigure=operation=>operation.nodeApply?.pending?.phase==='configure'
+    &&operation.nodeApply.request.target.type==='transform.filter_data';
+  const filterReconnectPending=operation=>filterConfigure(operation)
+    &&operation.outcome?.error?.cause?.code==='LOGINOM_RECONNECT_PENDING';
   const earlyRelease=(operation,signal)=>earlyNodePhase(operation)?async()=>{
     const deadline=now()+NODE_RELEASE_BUDGET_MS;
     await operation.nodeApplyDrivers?.releaseBeforeTarget?.({signal,deadline});
@@ -2738,7 +2743,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       id_roles:{operation_id:'original_pending_operation',recovery_operation_id:'new_unique_request'},
       requires:['runtime_release_proof'],provides:['released_node_operation','unblocked_workspace'],
       instruction:earlyNodePhase(operation)?'Release this early source/workflow/target failure with a NEW recovery_operation_id. Dock only reads the original receipts and quiet graph, proving that the target was not created or finding its exact partial node. Unknown effects remain blocked. Follow the released next_step; do not replay creation.'
-        :'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'}:null;
+        :'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'
+          +(filterReconnectPending(operation)?' Release requires the original Loginom session to reconnect. If it cannot reconnect, report the operation as blocked.':'')}:null;
   const releaseApply=async(operation,{strategy,recoveryOperationId,signature,signal})=>{
     if(strategy!=='abandon_operation')throw new Error('Only abandon_operation can release a stopped node operation; every other strategy is refused for it. If abandon_operation is refused too, follow its next_step instead of another strategy');
     if(running||nodeJobs.busy)throw new Error('Another Dock action is still running');
@@ -2766,15 +2772,21 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }catch(error){
         // The original operation keeps its gate. A blocker the user can clear is
         // named explicitly instead of leaving an empty recovery list.
-        operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:error?.userAction??null};
-        const trigger=browserRecoveryTrigger(operation,null);
+        const diagnostic=operationFailureDiagnostic(error);
+        const waitingForLoginom=filterReconnectPending(operation)&&diagnostic.code==='LOGINOM_DISCONNECTED'
+          &&diagnostic.detail==='reason=awaiting_original_attempt';
+        if(!waitingForLoginom)operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:error?.userAction??null};
+        const trigger=waitingForLoginom?null:browserRecoveryTrigger(operation,null);
+        const nextStep=waitingForLoginom?{
+          instruction:'Wait for the original Loginom session to reconnect. Then call dock_operation_recover with abandon_operation for the original operation_id and a NEW recovery_operation_id. If the original session cannot reconnect, report the operation as blocked.'
+        }:trigger?browserRecoveryNext(operation,trigger):null;
         returned={status:'AMBIGUOUS',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'release_refused',
           effect_possible:true,trace:[],recovery_operation_id:recoveryOperationId,
           error:{code:'NODE_RELEASE_REFUSED',message:String(error?.message??error).slice(0,1000)},
           // With browser recovery the agent clears the blocker itself; the user is not asked to.
           output:{original_operation_pending:pending===operation,...(error?.userAction
             ?trigger?{ui_blocker:error.userAction}:{user_action:error.userAction}:{}),
-            ...(trigger?{next_step:browserRecoveryNext(operation,trigger)}:{})}};
+            ...(nextStep?{next_step:nextStep}:{})}};
       }
       await remember(record,'recovery_completed',returned);
       auxiliary.set(recoveryOperationId,{signature,outcome:structuredClone(returned)});
@@ -2821,7 +2833,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const release=!recovery.available&&nodeReleaseStep(operation);
       return {recovery_options:release?['abandon_operation']:[],next_steps:recovery.available?[base.at(-1)]:release?[release,base[0]]:[base[0]],output_mapping_recovery:structuredClone(recovery),internal_resume_available:false};
     }
-    if (operation.transportUncertain) return { recovery_options: [], next_steps: base };
+    if (operation.transportUncertain) return { recovery_options: [], next_steps: filterConfigure(operation)?[{...base[0],
+      instruction:'The browser did not confirm whether the Filter gesture ran. Keep the original operation_id. If its receipt is still unconfirmed after inspection, report this operation as blocked and leave the wizard and package untouched.'}]:base };
     if(operation.action.capability==='node.apply'){
       const release=nodeReleaseStep(operation);
       return {recovery_options:release?['abandon_operation']:[],next_steps:release?[release,...base]:base,
@@ -4383,9 +4396,19 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           // Internal node readers return both typed action outcomes and plain
           // native observations. The real bridge accepts typed envelopes only;
           // unwrap their value locally, preserving the driver's original data.
-          const executeNodeScript=async(code,options)=>{
-            const wrapped='async page => {const base={action_key:"node.apply.transport",action_revision:"1",operation_id:'+JSON.stringify(operation.id)+',phase:"transport",effect_possible:true,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('+code+')(page)}};}catch(error){return {...base,status:"FAILED",cleanup_complete:false,output:{},error:{code:"NODE_APPLY_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
-            const response=await execute(wrapped,options);
+          const executeNodeScript=async(code,{fillOperationId,...options}={})=>{
+            const wrap=script=>'async page => {const base={action_key:"node.apply.transport",action_revision:"1",operation_id:'+JSON.stringify(operation.id)+',phase:"transport",effect_possible:true,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('+script+')(page)}};}catch(error){return {...base,status:"FAILED",cleanup_complete:false,output:{},error:{code:"NODE_APPLY_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
+            const reference=operation.lastReceipt;
+            if(fillOperationId&&filterConfigure(operation)&&reference?.id===fillOperationId&&reference.action_key==='ui.act'){
+              // The bridge invokes this fallback only when the native guard
+              // stops before calling the gesture. A lost browser reply remains uncertain.
+              const refusal={status:'NOT_APPLIED',action_key:'ui.act',action_revision:'1',operation_id:fillOperationId,
+                phase:'preconditions',effect_possible:false,cleanup_complete:true,output:{},trace:[],
+                error:{code:'LOGINOM_RECONNECT_PENDING',message:'The original Loginom session is still reconnecting. The filter value was not sent.'}};
+              options.onPendingReconnect=wrap(withBrowserReceipt('('+JSON.stringify(refusal)+')',{receipt_namespace:receiptNamespace,
+                receipt_id:reference.id,receipt_signature:reference.signature,operation_id:reference.operation_id}));
+            }
+            const response=await execute(wrap(code),options);
             if(response.status!=='SUCCEEDED')throw new Error(response.error?.message??'Node driver transport failed');
             return response.output.value;
           };
