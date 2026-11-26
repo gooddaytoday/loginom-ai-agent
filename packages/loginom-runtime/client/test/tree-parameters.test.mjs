@@ -588,7 +588,7 @@ test('tree-to-table can prove the native schema from a JSON execution that reque
   ]};
  const port={port:0,port_kind:'tree',port_guid:'port',fresh:true,execution_id,
   freshness_basis:'completed_execution_port_source',sample_complete:false,tree:{schema}};
- const response={verified:true,cleanup_complete:true,output:port,node_context};
+ const response={verified:true,cleanup_complete:true,output:port,node_context:{...node_context}};
  let events=[],calls=[];
  const options={operation:{id:'op',parameters:request,nodeTargetAdapter:{observe:async()=>({nodes:[],links:[]})}},
   nodeHistory:()=>history,now:Date.now,onRecord:async event=>{events.push(event);return event;},
@@ -599,7 +599,7 @@ test('tree-to-table can prove the native schema from a JSON execution that reque
  assert.equal(calls.length,3);
  assert.equal(events[0].source_execution_id,execution_id);
  for(const [record,key,foreign] of [[port,'port_guid','foreign'],[port,'fresh',false],[response,'cleanup_complete',false],
-  [node_context,'surface','wizard'],[node_context,'node_id','foreign'],[port,'port',1],
+  [response.node_context,'surface','wizard'],[response.node_context,'node_id','foreign'],[port,'port',1],
   [port,'execution_id','doc:root:9'],[port,'freshness_basis','unknown'],[port,'sample_complete',true],
   [history[0].outcome.output.execution,'execution_id','doc:root:6'],[history[0].request.target,'type','trees.from_table']]){
   const original=record[key];record[key]=foreign;
