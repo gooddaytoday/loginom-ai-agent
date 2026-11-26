@@ -159,14 +159,14 @@ def regional_revenue(orders, clients):
         totals[row["region"]] += Decimal(row["revenue"])
     grouped = [dict(region=region, total_revenue=total) for region, total in totals.items()]
     schema = [("region", "string"), ("total_revenue", "real")]
-    caption = "Итоги по регионам"
+    caption = "Региональная сводка для согласования"
     chain.turn("Добавь после слияния группировку по region с суммой revenue в total_revenue и выполни её.",
                nodes, links, [table(GROUP, schema, grouped)], manual=rename(GROUP, caption))
     nodes[-1] = node("group", GROUP, label=caption)
     nodes.append(node("sort", SORT))
     links.append(link("group", "sort"))
     sorted_rows = sorted(grouped, key=lambda row: -row["total_revenue"])
-    chain.turn("Добавь после «Итоги по регионам» сортировку по total_revenue по убыванию и выполни её.",
+    chain.turn("Добавь после «Региональная сводка для согласования» сортировку по total_revenue по убыванию и выполни её.",
                nodes, links, [table(SORT, schema, sorted_rows, ordered=True)])
     nodes.append(node("excel", EXCEL))
     links.append(link("sort", "excel"))
@@ -223,7 +223,7 @@ def product_ranks(products):
               ("list_price", "real"), ("quantity", "integer")]
     caption = "Каталог для ранжирования"
     chain.turn("Импортируй products.csv со столбцом list_price вещественного типа и проверь импорт запуском.",
-               nodes, outputs=[table(IMPORT, schema, products)],
+               nodes, outputs=[table(IMPORT, schema, products, free_labels=True)],
                manual=rename(IMPORT, caption))
     nodes[0] = node("products", IMPORT, label=caption)
     nodes.append(node("rank", JS))
@@ -244,11 +244,11 @@ def product_ranks(products):
     by_price = rank("list_price")
     assert by_quantity != by_price
     chain.turn("Добавь узел JavaScript после «Каталог для ранжирования» и посчитай ранг товара внутри category: list_price по убыванию, при равенстве меньший product_id выше. Выведи category, product_id и целочисленный rank с единицы, выполни узел.",
-               nodes, links, [table(JS, schema, by_price)])
+               nodes, links, [table(JS, schema, by_price, free_labels=True)])
     chain.turn("Поменяй в том же узле критерий ранга с цены на quantity по убыванию и проверь запуском.",
-               nodes, links, [table(JS, schema, by_quantity)])
+               nodes, links, [table(JS, schema, by_quantity, free_labels=True)])
     chain.turn("Выполни ещё раз узел ранжирования с текущими настройками и покажи все строки.",
-               nodes, links, [table(JS, schema, by_quantity)])
+               nodes, links, [table(JS, schema, by_quantity, free_labels=True)])
     return chain
 
 

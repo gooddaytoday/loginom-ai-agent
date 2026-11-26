@@ -22,11 +22,13 @@
       "columns": [
         {
           "name": "product_id",
-          "type": "integer"
+          "type": "integer",
+          "label_any": true
         },
         {
           "name": "category",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "list_price",
@@ -34,11 +36,13 @@
           "tolerance": {
             "abs": 1e-08,
             "rel": 1e-12
-          }
+          },
+          "label_any": true
         },
         {
           "name": "quantity",
-          "type": "integer"
+          "type": "integer",
+          "label_any": true
         }
       ],
       "rows": [

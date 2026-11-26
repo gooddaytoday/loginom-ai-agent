@@ -23,7 +23,7 @@
       {
         "id": "group",
         "type": "transform.group_data",
-        "label": "Итоги по регионам"
+        "label": "Региональная сводка для согласования"
       },
       {
         "id": "sort",

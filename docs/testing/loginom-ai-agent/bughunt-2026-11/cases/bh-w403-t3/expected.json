@@ -38,15 +38,18 @@
       "columns": [
         {
           "name": "category",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "product_id",
-          "type": "integer"
+          "type": "integer",
+          "label_any": true
         },
         {
           "name": "rank",
-          "type": "integer"
+          "type": "integer",
+          "label_any": true
         }
       ],
       "rows": [
