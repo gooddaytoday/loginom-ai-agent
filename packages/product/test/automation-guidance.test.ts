@@ -122,21 +122,25 @@ test("single chain calculation permits source activation only after a safe prefl
   expect(chain).toMatch(/Не повторяй\s+Execute вычисляющих узлов ради чтения, ответа или экспорта/)
 })
 
-test("REST JSON tables use the tabular path instead of the blanket tree instruction", async () => {
-  const settings = await Bun.file(new URL("../skills/loginom-automation/references/nodes/trees.from_json.md", import.meta.url)).text()
-  const trees = settings.split("## JSON в дерево и дерево в таблицу\n")[1]?.split("\n## ")[0] ?? ""
-  const details = settings
+test("tree guidance retains the native link and documents separate Dock read limits", async () => {
+  const references = new URL("../skills/loginom-automation/references/nodes/", import.meta.url)
+  const json = await Bun.file(new URL("trees.from_json.md", references)).text()
+  const table = await Bun.file(new URL("trees.to_table.md", references)).text()
 
-  expect(trees).toMatch(/REST[\s\S]*?Калькулятор[\s\S]*?Свёртка[\s\S]*?Кросс-таблица/)
-  expect(trees).toContain("по просьбе о дереве")
-  expect(trees).toContain("без вложенных контейнеров")
-  expect(trees).toContain("trees.from_json")
-  expect(trees).toContain("trees.to_table")
-  expect(details).toMatch(/Response[\s\S]*?RequestID[\s\S]*?HttpStatusCode/)
-  expect(details).toContain("Nested containers in repeated records")
-  expect(details).toContain("operation.recover")
-  expect(details).toContain("не останавливай")
-  expect(details).not.toContain("При отказе области поддержки\nсообщи ограничение")
+  expect(json).toMatch(/Response[\s\S]*?HttpStatusCode[\s\S]*?RequestID/)
+  expect(json).toContain('read:{ports:[],sample_rows:0,require_exact_numbers:false}')
+  expect(json).toContain("256 узлов **схемы**")
+  expect(json).toMatch(/Полное чтение Dock ограничено\s+256 экземплярами/)
+  expect(json).toContain("operation.recover")
+  expect(table).toContain("carts[].products[]")
+  expect(table).toContain("repeat_parents:true")
+  expect(table).toContain("composite_names:true")
+  expect(table).toContain("Root_carts_id")
+  expect(table).toContain("Root_carts_products_id")
+  expect(table).toMatch(/row_count[\s\S]*?sample_complete:false[\s\S]*?экспорт/)
+  for (const reference of [json, table]) {
+    expect(new TextEncoder().encode(reference).length).toBeLessThanOrEqual(6000)
+  }
 })
 
 test("relocated large-file and JavaScript rules stay reachable from the entry", async () => {

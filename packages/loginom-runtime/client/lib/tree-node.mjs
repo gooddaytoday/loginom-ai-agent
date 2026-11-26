@@ -64,11 +64,15 @@ export function createTreeNodeSupport(config,{json}){
     // read here so large instance trees never travel through the preview.
     const execution=existingOutputExecution(await readNative(makeNodeProcessContextCode(binding,{existingOutput:true})),input.source);
     need(execution.status==='completed'&&execution.execution_id===source.execution.execution_id,'Native tree source execution changed');
-    const read=await readNative(makeNodePortOutputCode(binding,{port:input.output,execution,sampleRows:0,requireExactNumbers:true,treeSchemaOnly:true},
+    const pendingRead=readNative(makeNodePortOutputCode(binding,{port:input.output,execution,sampleRows:0,requireExactNumbers:true,treeSchemaOnly:true},
      {origin:config.targetOrigin,build:config.targetBuild,deadline:ctx.deadline}));
+    const read=await pendingRead.catch(error=>{options.operation.transportUncertain=true;throw error;});
+    if(read?.cleanup_complete!==true)options.operation.transportUncertain=true;
     port=read?.output;
-    need(read?.verified&&read.cleanup_complete&&read.node_context?.verified&&['document_id','workflow_id','node_id'].every(k=>read.node_context[k]===input.source[k])
-     &&port?.port_kind==='tree'&&port.port===input.output&&port.port_guid===observed.port_guid&&port.fresh===true&&port.execution_id===execution.execution_id,
+    need(read?.verified&&read.cleanup_complete===true&&read.node_context?.verified&&read.node_context.surface==='graph'
+     &&['document_id','workflow_id','node_id'].every(k=>read.node_context[k]===input.source[k])
+     &&port?.port_kind==='tree'&&port.port===input.output&&port.port_guid===observed.port_guid&&port.fresh===true
+     &&port.execution_id===execution.execution_id&&port.freshness_basis==='completed_execution_port_source'&&port.sample_complete===false,
      'Owned native tree schema could not be verified: '+(read?.reason??'binding changed'));
     validateJsonTreeSchema(port.tree?.schema);
    }

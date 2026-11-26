@@ -586,7 +586,8 @@ test('tree-to-table can prove the native schema from a JSON execution that reque
    {process_id:'7.1',record_id:'child',parent_id:'7',error:false,owner:{verified:true,node_id:'source',source:'native_process_model_identity'},
     progress_state:{verified:true,source:'native_progress_record',state:'completed'}},
   ]};
- const port={port:0,port_kind:'tree',port_guid:'port',fresh:true,execution_id,tree:{schema}};
+ const port={port:0,port_kind:'tree',port_guid:'port',fresh:true,execution_id,
+  freshness_basis:'completed_execution_port_source',sample_complete:false,tree:{schema}};
  const response={verified:true,cleanup_complete:true,output:port,node_context};
  let events=[],calls=[];
  const options={operation:{id:'op',parameters:request,nodeTargetAdapter:{observe:async()=>({nodes:[],links:[]})}},
@@ -603,4 +604,5 @@ test('tree-to-table can prove the native schema from a JSON execution that reque
   await assert.rejects(check());assert.deepEqual(events,[]);
   record[key]=original;
  }
+ assert.equal(options.operation.transportUncertain,true);
 });
