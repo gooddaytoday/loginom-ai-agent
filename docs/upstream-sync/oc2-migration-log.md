@@ -25869,7 +25869,7 @@ CLI кандидата собран с версией своего пакета 
 | # | Файл 0.4.2 | Коммит | Что делает | Куда в v2 |
 |---|---|---|---|---|
 | 1 | `packages/app/src/constants/file-picker.ts`, `components/prompt-input/attachments.ts`, `components/prompt-input-v2.tsx`, `session-ui/src/v2/components/prompt-input/attachments.ts`, экспорт `./file-picker` в `app/package.json` | `b5b60e009b` | `.db`, `.lgd`, `.xls` при перетаскивании и вставке идут как ссылка на файл (`binaryReferenceMime`, `referenceFile`), без чтения байт; расширения добавлены в выбор файла | приложение v2 (B4): пути переехали, места нет. **Главная строка**: без неё SQLite, LGD и XLS из окна читаются байтами. **Перенесено в B1.9d**: [`## B1.9d Доперенос 0.4.2: вложения в интерфейсе`](#b19d-доперенос-042-вложения-в-интерфейсе) |
-| 2 | `packages/desktop/src/main/attachment-picker.ts`, `ipc.ts` (`referenceAttachment`) | `b5b60e009b` | выбор файла и IPC `reference-attachment` возвращают квитанцию с `mime` для бинарных данных | Desktop v2 (`packages/desktop/src/main`), нужен вместе со строкой 1. **Закрыта в B1.9d без кода Desktop**: IPC `reference-attachment` в v2 не нужен, см. [`## B1.9d Доперенос 0.4.2: вложения в интерфейсе`](#b19d-доперенос-042-вложения-в-интерфейсе) |
+| 2 | `packages/desktop/src/main/attachment-picker.ts`, `ipc.ts` (`referenceAttachment`) | `b5b60e009b` | выбор файла и IPC `reference-attachment` возвращают квитанцию с `mime` для бинарных данных | Desktop v2 (`packages/desktop/src/main`), нужен вместе со строкой 1. **Перенесена в B1.9d** в виде v2 (выбор файла без чтения и без лимита 20 МБ для `.db`, `.lgd`, `.xls` на локальном сервере; IPC `reference-attachment` не нужен), см. [`## B1.9d Доперенос 0.4.2: вложения в интерфейсе`](#b19d-доперенос-042-вложения-в-интерфейсе) |
 | 3 | `packages/opencode/src/cli/cmd/run.ts` | `59fbda9ceb` | CLI `run` даёт квитанцию для `application/octet-stream` и `application/vnd.ms-excel` и без `--attach` | `packages/cli/src/run` |
 | 4 | `packages/opencode/src/product/attachment-resolver.ts` | `59fbda9ceb` | текст ссылки на вложение: для бинарных данных «loginom_file_admit», для остальных «loginom_file_profile» | в v2 нет резолвера вложений; вложения — `loginom-agent/src/index.ts` (B2.5d), `local-file.ts` |
 | 5 | тесты `app/test-browser/prompt-attachments.test.ts`, `desktop/src/main/attachment-picker.test.ts`, `opencode/test/cli/run/run-process.test.ts`, `opencode/test/product/attachment-resolver.test.ts` | `b5b60e009b`, `59fbda9ceb` | покрывают строки 1–4 | вместе со строками 1–4 |
@@ -25963,21 +25963,23 @@ name character`. В PowerShell `$Name:` читается как переменн
 
 - `packages/app/src/composer/attachments/binary-reference.ts` (новый): `binaryReferenceMime(name)` — `.db`, `.lgd` → `application/octet-stream`,
   `.xls` → `application/vnd.ms-excel`, регистр расширения не важен.
-- `attachments.ts`: `add` берёт тип из `binaryReferenceMime` и не читает байты; дальше прежний путь v2 (локальный сервер и путь файла —
+- `attachments.ts`: `pick` передаёт выбору `reference`; `add` берёт тип из `binaryReferenceMime` и не читает байты; дальше прежний путь v2 (локальный сервер и путь файла —
   ссылка `path`; удалённый сервер — загрузка файла как раньше). Правка одной строки.
 - Тест `packages/app/test-browser/composer-binary-reference.test.tsx`: имена и типы; локальный сброс `.DB`, `.lgd`, `.xls` даёт part `path`
   с типом, `File.slice` бросает при чтении, загрузок нет; удалённый сервер по-прежнему загружает файл с типом.
 
 ### Выбор (меньший вариант)
 
-1. **Desktop: кода нет.** Выбор файла в v2 возвращает `{ path, name, size }` и токен чтения; тип в приложении выводится из имени тем же
-   `binaryReferenceMime`, квитанция строится на сервере. Возвращать `mime` из выбора или заводить IPC `reference-attachment` значило бы
-   дублировать это и менять схему `ipc-rpc` (больше пяти файлов кода).
-2. **Остаток, не перенесён:** выбор файла через окно Desktop по-прежнему читает байты `.db`, `.lgd`, `.xls` (до лимита 20 МБ на выбор;
-   больший файл выбором отклоняется, перетаскиванием проходит). Пропуск чтения в выборе небезопасен для удалённого сервера (пустой `File`
-   загрузился бы вместо данных): нужно знать назначение в `platform.openAttachmentPickerDialog`; это решение для этапа C (интерфейс по В-97).
+1. **Desktop: без IPC `reference-attachment` и без `mime` в ответе выбора.** По указанию координатора выбор файла получил то же правило, что
+   перетаскивание. `platform.openAttachmentPickerDialog` принимает необязательный `reference(name)`; composer отвечает `true` для `.db`,
+   `.lgd`, `.xls`, если сервер локальный (`destination().local`). Тогда `desktop/src/renderer/platform/files.ts` не вызывает
+   `readPickedFile`, а отдаёт пустой `File` с типом по имени; путь остаётся в `getPathForFile` (карта выбора), и `add` делает part `path`.
+   `main/files/attachment-picker.ts`: `assertAttachmentBudget` не считает такие имена, поэтому `.lgd` больше 20 МБ проходит. Удалённый
+   сервер или иное имя — прежний путь с чтением и лимитом (на удалённом сервере большой `.lgd` по-прежнему отклоняется при чтении).
+   Экспорт `./binary-reference` добавлен в `app/package.json` для главного процесса. Квитанция по-прежнему строится на сервере.
+2. **Остаток снят** (в первой редакции раздела он был записан как отложенный на этап C).
 3. Расширения `.db`, `.lgd`, `.xls` в фильтр выбора не добавлял: composer не передаёт `extensions` (выбор без фильтра).
-4. Тест строки 5 `attachment-picker.test.ts` не переносился: поведения Desktop нет. Тест `prompt-attachments.test.ts` (в v2 — каталога
+4. Тесты строки 5: `attachment-picker.test.ts` (бюджет), `renderer/platform/files.test.ts` (`.LGD` 40 МБ не читается, путь сохранён) и composer (`reference` только для локального сервера). Тест `prompt-attachments.test.ts` (в v2 — каталога
    `test-browser`, двух реализаций composer там нет) заменён новым файлом выше.
 
 ### Проверки
@@ -25985,10 +25987,10 @@ name character`. В PowerShell `$Name:` читается как переменн
 Bun 1.4.4 и Node 24.19.0 первыми в `PATH`, `LOGINOM_AI_AGENT_TEST_NODE` задан.
 
 ```
-packages/app   bun run test:browser   377 pass, 0 fail  (база: 369 pass, 0 fail; +8 новых)
+packages/app   bun run test:browser   379 pass, 0 fail  (база 369/0; +10 новых)
 packages/app   bun run test:unit      2720 pass, 0 fail
 packages/app   bun typecheck          No type errors in 2,235 files
-packages/desktop bun test             643 pass, 0 fail  (код не менялся; база 643/0)
+packages/desktop bun test             644 pass, 0 fail  (база 643/0; +1 тест выбора) и 1 тест бюджета
 packages/desktop bun typecheck        No type errors in 3,372 files
 packages/session-ui bun run test      599 pass, 0 fail
 packages/product   bun test           115 pass, 0 fail
@@ -25999,3 +26001,6 @@ packages/product   bun test           115 pass, 0 fail
 
 Замечание по среде: в свежем дереве `packages/loginom-runtime/client` нужен свой `bun install --frozen-lockfile` (иначе `yaml` не
 находится и `desktop` падает на `artifact.test.ts` и сборке хоста); корневой установки недостаточно.
+
+Мутации выбора (каждая краснит ровно один тест): `reference` в `files.ts` заменён на `false`; бюджет без исключения имён; `reference` composer без
+проверки `destination().local`.

@@ -5,7 +5,11 @@ import { binaryReferenceMime } from "@/composer/attachments/binary-reference"
 import { createComposerAttachments } from "@/composer/attachments/attachments"
 import type { ComposerPrompt } from "@/composer/types"
 
-function setup(local: boolean, getPathForFile?: (file: File) => string) {
+function setup(
+  local: boolean,
+  getPathForFile?: (file: File) => string,
+  picker?: NonNullable<Parameters<typeof createComposerAttachments>[0]["picker"]>,
+) {
   const [store, setStore] = createStore<{ prompt: ComposerPrompt }>({ prompt: [] })
   const uploads: string[] = []
   let attachments!: ReturnType<typeof createComposerAttachments>
@@ -40,6 +44,7 @@ function setup(local: boolean, getPathForFile?: (file: File) => string) {
         throw error
       },
       getPathForFile,
+      picker,
     })
 
     return null
@@ -102,6 +107,21 @@ describe("binary data attachments", () => {
     expect(plain(store.prompt)).toEqual([
       { type: "path", filename: "legacy.xls", mime: "application/vnd.ms-excel", path: "/tmp/uploads/legacy.xls" },
     ])
+    dispose()
+  })
+
+  test.each([
+    [true, true],
+    [false, false],
+  ])("the picker is asked to skip the bytes of a binary data file only on a local server (%s)", async (local, skip) => {
+    const asked: boolean[] = []
+    const { attachments, dispose } = setup(local, undefined, async (options) => {
+      asked.push(Boolean(options.reference?.("big.LGD")), Boolean(options.reference?.("notes.txt")))
+    })
+    const done = new Promise<void>((resolve) => attachments.pick(() => {}, resolve))
+
+    await done
+    expect(asked).toEqual([skip, false])
     dispose()
   })
 })

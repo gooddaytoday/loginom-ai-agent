@@ -22,6 +22,11 @@ describe("attachment size limit", () => {
     expect(() => assertAttachmentBudget([{ size: MAX_ATTACHMENT_BYTES }, { size: 1 }])).toThrow("20 MB limit")
   })
 
+  test("does not count binary data files, which are attached by path, against the limit", () => {
+    expect(() => assertAttachmentBudget([{ name: "big.LGD", size: MAX_ATTACHMENT_BYTES * 5 }])).not.toThrow()
+    expect(() => assertAttachmentBudget([{ name: "big.zip", size: MAX_ATTACHMENT_BYTES + 1 }])).toThrow("20 MB limit")
+  })
+
   test("reads an approved file and rejects an oversized one before allocating its contents", async () => {
     const directory = await mkdtemp(join(tmpdir(), "opencode-attachment-"))
     const file = join(directory, "example.txt")

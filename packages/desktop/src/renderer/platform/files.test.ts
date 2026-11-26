@@ -80,4 +80,30 @@ describe("desktop attachment files", () => {
     ).rejects.toThrow("attachment rejected")
     expect(events.at(-1)).toBe("release:selection")
   })
+
+  test("a binary data file over the size limit is handed over by path without being read", async () => {
+    const events: string[] = []
+    const api = {
+      ...fileApi(events),
+      openFilePicker: async () => ({
+        token: "selection",
+        files: [
+          { path: "C:\\big.LGD", name: "big.LGD", size: 40 * 1024 * 1024 },
+          { path: "C:\\notes.txt", name: "notes.txt", size: 5 },
+        ],
+      }),
+    }
+    const files = createDesktopFiles(api, "windows")
+    const picked: File[] = []
+
+    await files.openAttachmentPickerDialog({ reference: (name) => name.toLowerCase().endsWith(".lgd") }, async (file) => {
+      picked.push(file)
+    })
+
+    expect(events).toEqual(["read:C:\\notes.txt", "release:selection"])
+    expect(picked.map((file) => [file.name, file.type, files.getPathForFile(file)])).toEqual([
+      ["big.LGD", "application/octet-stream", "C:\\big.LGD"],
+      ["notes.txt", "", "C:\\notes.txt"],
+    ])
+  })
 })

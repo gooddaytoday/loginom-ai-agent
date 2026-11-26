@@ -18,7 +18,12 @@ type PromptTarget = {
 
 export type ComposerAttachmentConfig = {
   picker?: (
-    options: { defaultPath?: string; multiple?: boolean; accept?: string[] },
+    options: {
+      defaultPath?: string
+      multiple?: boolean
+      accept?: string[]
+      reference?: (name: string) => boolean
+    },
     onFile: (file: File) => Promise<boolean>,
   ) => Promise<void>
   directory: () => string
@@ -262,7 +267,15 @@ export function createComposerAttachments(
       }
 
       void input
-        .picker({ defaultPath: input.directory(), multiple: true }, (file) => add(file))
+        .picker(
+          {
+            defaultPath: input.directory(),
+            multiple: true,
+            // A local server resolves the original path, so binary data files need no bytes.
+            reference: (name) => input.destination().local && Boolean(binaryReferenceMime(name)),
+          },
+          (file) => add(file),
+        )
         .then(done)
         .catch(input.onError)
     },

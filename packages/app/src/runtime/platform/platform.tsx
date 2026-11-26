@@ -15,6 +15,8 @@ type OpenAttachmentPickerOptions = {
   accept?: string[]
   extensions?: string[]
   defaultPath?: string
+  /** Files that are attached by their path: the picker hands them over without reading their bytes. */
+  reference?: (name: string) => boolean
 }
 
 type OpenFilePathPickerOptions = { title?: string; multiple?: boolean; extensions?: string[] }
