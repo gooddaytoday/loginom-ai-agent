@@ -1,0 +1,9 @@
+{
+  "budget": {
+    "max_nodes": 1
+  },
+  "manual_edit": {
+    "kind": "create",
+    "type": "transform.sorting"
+  }
+}

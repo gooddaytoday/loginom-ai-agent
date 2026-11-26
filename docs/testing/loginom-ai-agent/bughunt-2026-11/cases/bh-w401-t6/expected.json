@@ -1,0 +1,141 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "workflow",
+        "type": "variables.user",
+        "label": "Переменные сценария"
+      },
+      {
+        "id": "orders",
+        "type": "imports.text",
+        "label": "Заказы"
+      },
+      {
+        "id": "customers",
+        "type": "imports.text",
+        "label": "Клиенты"
+      },
+      {
+        "id": "join",
+        "type": "transform.join_data"
+      },
+      {
+        "id": "group",
+        "type": "transform.group_data",
+        "label": "Региональная сводка для согласования"
+      },
+      {
+        "id": "sort",
+        "type": "transform.sorting"
+      },
+      {
+        "id": "excel",
+        "type": "exports.excel"
+      }
+    ],
+    "links": [
+      {
+        "source": "orders",
+        "target": "join",
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": "customers",
+        "target": "join",
+        "output": 0,
+        "input": 1
+      },
+      {
+        "source": "join",
+        "target": "group",
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": "group",
+        "target": "sort",
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": "sort",
+        "target": "excel",
+        "output": 0,
+        "input": 0
+      }
+    ],
+    "exact": true,
+    "retain": [
+      "workflow",
+      "orders",
+      "customers",
+      "join",
+      "group",
+      "sort"
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "transform.sorting",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "region",
+          "type": "string"
+        },
+        {
+          "name": "total_revenue",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-12
+          }
+        }
+      ],
+      "rows": [
+        {
+          "region": "Самара",
+          "total_revenue": 1334687.349
+        },
+        {
+          "region": "Алтай",
+          "total_revenue": 1159743.8145
+        },
+        {
+          "region": "Екатеринбург",
+          "total_revenue": 464270.9345
+        },
+        {
+          "region": "Санкт-Петербург",
+          "total_revenue": 282485.718
+        },
+        {
+          "region": "Нижний Новгород",
+          "total_revenue": 214019.4075
+        },
+        {
+          "region": "Новосибирск",
+          "total_revenue": 171334.886
+        },
+        {
+          "region": "Казань",
+          "total_revenue": 135320.105
+        },
+        {
+          "region": "Москва",
+          "total_revenue": 12547.84
+        }
+      ],
+      "ordered": true,
+      "column_order": "any"
+    }
+  ],
+  "excel_artifact": {
+    "filename": "regional-revenue.xlsx",
+    "sheet_name": "Регионы",
+    "header": "names",
+    "column_order": "exact"
+  }
+}

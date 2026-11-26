@@ -73,6 +73,10 @@ def read(path):
     return json.loads(Path(path).read_text())
 
 
+def case_intervention(path):
+    raise ValueError(f'{path}: case requires an intervention. Run it with interruptions/run.py.')
+
+
 def write(path, value):
     path = Path(path)
     temporary = path.with_suffix(path.suffix + '.tmp')
@@ -427,6 +431,10 @@ def scenario(name, case_root=None, *, cases=None):
         if (src / 'task.md').is_file():
             if src.resolve().parent != Path(cases).resolve():
                 raise ValueError('Case must stay in its assigned directory')
+            declaration = src / 'intervention.json'
+            if declaration.is_file():
+                case_intervention(declaration)
+
             # Optional case.json: `base` continues a sibling case in the same chat;
             # `input_files` limits attachments; `budget` is read only by bughunt-audit.py.
             extra = read(src / 'case.json') if (src / 'case.json').is_file() else {}
