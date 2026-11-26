@@ -8,7 +8,7 @@ import {verifiedNativeReadRefusal,verifiedExportReadRefusal,verifiedJavascriptUi
 import {verifiedJavascriptExistingSchemaRefusal} from './javascript-existing-schema-refusal.mjs';
 import {verifiedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs';
 import {verifiedJavascriptSourcePolicyRefusal,verifiedJavascriptEffectsSourceRefusal,JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT} from './javascript-source-policy-refusal.mjs';
-import {NODE_CONTRACT_REVISION, validateNodeTargetRequest} from './node-contracts.mjs';
+import {NODE_ADD_ONLY_MODE, NODE_CONTRACT_REVISION, validateNodeTargetRequest} from './node-contracts.mjs';
 import {NODE_READ_MODE,nodeReadHandler,isUnchangedTextImportExecution,isUnchangedTransformExecution} from './node-read-contract.mjs';
 
 const stable = v => Array.isArray(v) ? v.map(stable) : v && typeof v === 'object'
@@ -17,6 +17,7 @@ const hash = v => createHash('sha256').update(JSON.stringify(stable(v))).digest(
 const requireValue = (v, message) => { if (!v) throw Error(message); };
 const object = (v, keys) => requireValue(v && typeof v === 'object' && !Array.isArray(v)
   && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v,k)), 'Invalid node.apply contract');
+const addOnlyHandler=Object.freeze({revision:'add-only-v1'});
 const id = v => typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);
 
 export class NodeVariableInputError extends Error {
@@ -66,6 +67,21 @@ export function validateNodeApplyRequest(request, handlers, {fresh=false}={}) {
     'Unsupported node.apply operation ID or contract revision');
   const graph = Object.fromEntries(['document_id','workflow_ref','target','inputs',...(Object.hasOwn(request,'variable_inputs')?['variable_inputs']:[])].map(k=>[k,request[k]]));
   validateNodeTargetRequest(graph);
+  object(request.budgets, ['configure_ms','execute_ms','total_ms']);
+  requireValue(Object.values(request.budgets).every(v=>Number.isInteger(v) && v>=1 && v<=1800000)
+    && request.budgets.total_ms>=Math.max(request.budgets.configure_ms,request.budgets.execute_ms), 'Invalid node budgets');
+  if(request.mode===NODE_ADD_ONLY_MODE){
+    object(request.parameters,[]);
+    object(request.read,['ports','sample_rows','require_exact_numbers',...(Object.hasOwn(request.read??{},'variable_ports')?['variable_ports']:[])]);
+    requireValue(request.target.kind==='new'&&request.finish==='done'
+      &&!request.inputs.length&&!request.variable_inputs?.length&&!request.bindings?.length
+      &&Array.isArray(request.mappings)&&!request.mappings.length
+      &&Array.isArray(request.read.ports)&&!request.read.ports.length&&request.read.sample_rows===0
+      &&request.read.require_exact_numbers===false
+      &&(request.read.variable_ports===undefined||Array.isArray(request.read.variable_ports)&&!request.read.variable_ports.length),
+      'Invalid add_only request: use a new target, finish:"done", parameters:{}, and no links, mappings or reads');
+    return {graph,handler:addOnlyHandler};
+  }
   const installed = handlers.get(request.target.type);
   requireValue(!request.bindings?.length||installed?.binding_schema&&request.mode!==NODE_READ_MODE,'BINDING_PARAMETER_UNSUPPORTED: bindings require a registered configuration mode');
   const handler = installed && request.mode===NODE_READ_MODE ? nodeReadHandler(installed) : installed;
@@ -129,9 +145,6 @@ export function validateNodeApplyRequest(request, handlers, {fresh=false}={}) {
     &&new Set(request.read.variable_ports).size===request.read.variable_ports.length&&request.read.variable_ports.every(p=>Number.isInteger(p)&&p>=0&&p<100)
     &&(request.finish==='execute'||request.mode===NODE_READ_MODE||request.target.type==='variables.user'||request.read.variable_ports.length===0),'Invalid variable output read request');
   requireValue(request.finish==='execute'||request.mode===NODE_READ_MODE||request.read.ports.length===0, 'Invalid parameters.read.ports: Done and Close require an empty list; choose finish=execute to read fresh output');
-  object(request.budgets, ['configure_ms','execute_ms','total_ms']);
-  requireValue(Object.values(request.budgets).every(v=>Number.isInteger(v) && v>=1 && v<=1800000)
-    && request.budgets.total_ms>=Math.max(request.budgets.configure_ms,request.budgets.execute_ms), 'Invalid node budgets');
   const legacyRequest=hasVariableMappings?{...request,mappings:request.mappings.filter(m=>m.kind===undefined)}:request;
   const capabilities=variableInputCapabilities(handler,request.mode);
   if(fresh)validateFreshVariableInputs(request,capabilities,request.mappings.filter(m=>m.kind!==undefined));
@@ -518,9 +531,22 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // driver checks an already completed upload/inspect/verify receipt chain.
     await phase('source',ctx=>drivers.verifySource(request.parameters,ctx),{mutation:false});
     if(drivers.activateWorkflow)await phase('workflow',ctx=>drivers.activateWorkflow(ctx));
-    const target=await phase('target',ctx=>drivers.prepareTarget(graph,ctx),{verify:value=>requireValue(
-      value.node?.document_id===request.document_id && value.node.workflow_id===request.workflow_ref.workflow_id
-      && id(value.node.node_id), 'Target phase returned a foreign node')});state.node=target.node;
+    const target=await phase('target',ctx=>drivers.prepareTarget(graph,ctx),{verify:value=>{
+      requireValue(value.node?.document_id===request.document_id&&value.node.workflow_id===request.workflow_ref.workflow_id
+        &&id(value.node.node_id), 'Target phase returned a foreign node');
+      if(request.mode===NODE_ADD_ONLY_MODE)requireValue(value.target?.created===true&&value.target.configured===false
+        &&value.target.executed===false&&value.target.unconnected_verified===true,
+        'Creation without configuration was not verified');
+    }});state.node=target.node;
+    if(request.mode===NODE_ADD_ONLY_MODE){
+      const result={operation_id:operation.id,status:'SUCCEEDED',effect_possible:state.effect_possible,
+        phases:state.phases.map(({value,...p})=>p),node:state.node,execution:state.execution,output:state.output,
+        package_saved:false,cleanup_complete:true,warnings:[],configuration:{status:'not_requested'},
+        checkpoint_kind:'local_node_checkpoint',persisted_package_verified:false};
+      await acknowledge({phase:'node_checkpoint',signature,result});
+      state.result=structuredClone(result);
+      return result;
+    }
     if(!readingOnly){
     await phase('input_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='input'),ctx));
     await phase('open',ctx=>openRecovery?.wizard_open?openRecovery.value:drivers.openWizard(ctx));
@@ -753,7 +779,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
         &&proof.node?.workflow_id===request.workflow_ref.workflow_id&&id(proof.node.node_id)), 'Pre-target release proof differs');
     const result={operation_id:operation.id,status:'FAILED',effect_possible:state.effect_possible,
       phases:state.phases.map(({value,...p})=>p),node:proof.node,execution:state.execution,output:state.output,
-      package_saved:false,cleanup_complete:true,configuration:{status:'not_requested'},warnings:proof.warnings??[],
+      package_saved:false,cleanup_complete:true,configuration:{status:request.mode===NODE_ADD_ONLY_MODE&&proof.node?'unknown':'not_requested'},warnings:proof.warnings??[],
       checkpoint_kind:'local_node_released',persisted_package_verified:false,pending_phase:null,released_phase:pending.phase,
       error:{code:'NODE_OPERATION_RELEASED',message:'Early node phase released after confirmed browser completion and a quiet original graph; the stopped phase was not repeated.'},
       next_step:request.mode===NODE_READ_MODE?{tool:'dock_node_read',original_operation_id:operation.id,

@@ -16,7 +16,7 @@ import { diagnoseConnection } from './diagnostics.mjs';
 import { actionDescribeTool, pinActionCatalog, assertCatalogTarget, validateActionParameters, BUNDLED_CATALOG_RELEASES } from './action-catalog.mjs';
 import { createActionRuntime, parseCapabilityResult } from './executor.mjs';
 import {createCandidateNodeSupport} from './node-support.mjs';
-import {NODE_TYPES} from './node-contracts.mjs';
+import {NODE_ADD_ONLY_MODE,NODE_TYPES} from './node-contracts.mjs';
 import {readGraph} from './node-target-browser.mjs';
 import {isNodeApiTool,dispatchNodeApi} from './node-api.mjs';
 import { makeWorkspacePrepareCode, makeWorkspaceStepCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace, workspaceObserveTool } from './workspace.mjs';
@@ -195,7 +195,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             &&preparation.state?.status==='READY'&&preparation.state.operation_id===operationId?preparation.state:null;
         },
         getNodeContractPins: () => ({...pinned.pins, skillRevision:session.metadata.skillRevision, loginomProfile:session.metadata.targetIdentity ?? pinned.compatibility}),
-        artifactStore:session.artifactStore, allowCandidate: replay, onRecord: recordExecution, redactor,
+        artifactStore:session.artifactStore, allowCandidate: replay, onRecord:recordExecution, redactor,
         browserRecovery: config.browserRecovery === true && userProfile,
         targetOrigin: config.loginomUrl ? new URL(config.loginomUrl).origin : undefined, execute: async (code, { onPendingReconnect, ...options } = {}) => {
         const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
@@ -534,7 +534,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                 if(request.params.name==='dock_node_delete')args=userWorkflows.expandNodeDelete(args);
               }
               if(userProfile&&request.params.name==='dock_node_apply'){
-                validateActionParameters({type:'string',enum:NODE_TYPES[args.target.type].modes},args.mode,'parameters.mode');
+                if(args.mode!==NODE_ADD_ONLY_MODE)validateActionParameters({type:'string',enum:NODE_TYPES[args.target.type].modes},args.mode,'parameters.mode');
                 const refusal=userWorkflows.checkNodeDescription(args);
                 if(refusal){
                   await recordExecution({phase:'node_type_not_described',operation_id:args.operation_id,

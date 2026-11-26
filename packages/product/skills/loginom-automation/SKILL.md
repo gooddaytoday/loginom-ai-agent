@@ -275,6 +275,10 @@ New REST, unique label; delete old REST, its URL encoder, unused connection ref 
 `loginom_dock_action_describe`. Узлы и связи создаёт `loginom_dock_node_apply`;
 `loginom_dock_action_run` используется только для объявленных операций сохранения.
 
+Для добавления без подключения используй `dock_node_apply` с `mode:"add_only"`,
+`target.kind:"new"`, `finish:"done"` и пустыми параметрами, входами, mappings и read.
+Для настройки укажи `target.kind:"existing"`, полученную ссылку и все нужные параметры явно.
+
 ## Браузер и владение операцией
 
 `target.label` необязателен: используй короткую подпись словами без `; | < >`, кавычек, обратной косой черты и управляющих символов; сравнения и формулы передавай только в `parameters`.
@@ -282,14 +286,11 @@ New REST, unique label; delete old REST, its URL encoder, unused connection ref 
 Вход, ожидание и неопределённый результат — [Подготовка и отмена](references/browser.md);
 вставка узла и замена входа — [Граф](references/canvas.md).
 
-Сессия работает в одном аутентифицированном контексте Loginom. Не вызывай
-Playwright, raw UI, clipboard, DOM/JavaScript или прямые методы сервера для обхода
-отказов управляемого runtime. Единственное исключение — временное восстановление
-через `loginom_dock_browser_recovery`, когда `next_step` Dock называет этот
-инструмент ([Подготовка и отмена](references/browser.md)). Не создавай узлы через
-`node.add` и связи через `link.create` в action API. В одном браузере запускай
+Не обходи отказ рантайма через Playwright, raw UI, clipboard, DOM/JavaScript или сервер.
+`loginom_dock_browser_recovery` используй только по `next_step` Dock.
+Узлы и связи создавай через `loginom_dock_node_apply`. В одном браузере запускай
 по одной операции с узлом, даже если узлы независимы. Дождись итогового статуса
-через `loginom_dock_node_wait` перед следующей операцией.
+через `loginom_dock_node_wait`.
 
 `LOGINOM_FILE_CHANGED` требует нового вложения; `LOGINOM_FILE_NOT_FOUND` — восстановления
 исходника или нового пути. Не обновляй старый отпечаток и не обходи явный deny.
