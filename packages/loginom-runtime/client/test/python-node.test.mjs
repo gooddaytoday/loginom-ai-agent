@@ -292,7 +292,7 @@ test('f-string literal text, escaped braces and nested specs stay admitted; only
 // Fake columns page: Add → EditColumnDefForm → type picker → Apply. After each
 // Apply, `cover` probes of elementFromPoint hit a foreign mask (closing editor),
 // as on mas3 (LAB-1640: second Add refused 'Python column control covered').
-function columnsPage({initialColumns=[],cover=0,coverAfterApply=false,missingType=null,deadline=Date.now()+20000}={}){
+function columnsPage({initialColumns=[],cover=0,coverAfterApply=false,missingType=null,afterApply,afterGridRead,deadline=Date.now()+20000}={}){
  const root='MF;TF;WizrdMCF',base=root+';PythonColumnsWizard',form=root+';EditColumnDefForm',els=new Map(),cmps=new Map();
  const names={1:'Логический',2:'Дата/Время',3:'Вещественный',4:'Целый',5:'Строковый'};
  const codes={integer:4,real:3,string:5,boolean:1,datetime:2};
@@ -301,7 +301,12 @@ function columnsPage({initialColumns=[],cover=0,coverAfterApply=false,missingTyp
  const el=(tid,x,y,visible=()=>true)=>{const e={id:'e'+(++ids),tid,getAttribute:k=>k==='data-tid'?tid:null,checkVisibility:()=>visible(),
   getBoundingClientRect:()=>({x:x-5,y:y-5,width:10,height:10}),contains:o=>o===e,closest:()=>e};if(tid)els.set(tid,e);at.set(x+','+y,e);return e;};
  const mask={className:'x-mask',closest:()=>null};
- const grid=el(base+';grdTargetColumns;tbl',300,300);cmps.set(grid.id,{el:{dom:grid},getStore:()=>({isLoading:()=>false,getData:()=>({items:records.map(data=>({data}))})})});
+ const grid=el(base+';grdTargetColumns;tbl',300,300);
+ cmps.set(grid.id,{el:{dom:grid},getStore:()=>({isLoading:()=>false,getData:()=>{
+  const items=records.map(data=>({data:{...data}}));
+  afterGridRead?.(records);
+  return {items};
+ }})});
  el(base+';btnAddMappingColumn',10,10);
  const formEl=el(form,500,500,()=>open);
  const field=(key,get)=>{const e=el(form+';'+key,500,400+ids,()=>open);cmps.set(e.id,{el:{dom:e},getValue:get,getRawValue:get});};
@@ -324,7 +329,12 @@ function columnsPage({initialColumns=[],cover=0,coverAfterApply=false,missingTyp
    count:async()=>open&&['edtName','edtDisplayName'].includes(key)?1:0,
    fill:async v=>{draft[key==='edtName'?'name':'label']=v;},press:async()=>{},
    click:async()=>{if(!open)throw Error('hidden');if(key==='cbxDataType;trg_picker')pickerShown=true;
-    else if(key==='btnApply'){records.push({Name:draft.name,DisplayName:draft.label,DataType:draft.type});open=false;draft=null;if(coverAfterApply)covering=cover;}
+    else if(key==='btnApply'){
+     records.push({Name:draft.name,DisplayName:draft.label,DataType:draft.type});
+     open=false;draft=null;
+     afterApply?.(records);
+     if(coverAfterApply)covering=cover;
+    }
     else if(key==='btnCancel'){open=false;draft=null;}},
    waitFor:async()=>{}};}};
  const task={binding:{workflow_ref:{prefix:'MF;TF'}},columns:declared.map(c=>({...c,code:codes[c.type]})),deadline};
@@ -353,10 +363,40 @@ test('declared column extension refuses to remove, reorder or modify existing co
   const original=structuredClone(fixture.records);
   const result=await fixture.run();
   assert.equal(result.status,'NOT_APPLIED');
+  assert.ok(result.error.endsWith(': '+initialColumns.map(c=>c.name).join(',')),result.error);
   assert.equal(result.effect_possible,false);
   assert.deepEqual(fixture.records,original);
   assert.equal(fixture.probes,0);
  }
+});
+
+test('declared columns refuse a grid change during Add before adding another column',async()=>{
+ const fixture=columnsPage({
+  initialColumns:declared.slice(0,2),
+  afterApply:records=>{records[0].DisplayName='Changed during Add';},
+ });
+ const result=await fixture.run();
+ assert.equal(result.status,'AMBIGUOUS');
+ assert.equal(result.verified,false);
+ assert.equal(result.effect_possible,true);
+ assert.equal(result.cleanup_complete,true);
+ assert.match(result.error,/grid readback differs after adding AmountScaled/);
+ assert.deepEqual(fixture.records.map(record=>record.Name),['Id','Amount','AmountScaled']);
+});
+
+test('declared columns refuse a grid change between the last Add readback and the final read',async()=>{
+ const fixture=columnsPage({
+  initialColumns:declared.slice(0,-1),
+  afterGridRead:records=>{
+   if(records.length===declared.length)records[0].DisplayName='Changed before final read';
+  },
+ });
+ const result=await fixture.run();
+ assert.equal(result.status,'AMBIGUOUS');
+ assert.equal(result.verified,false);
+ assert.equal(result.effect_possible,true);
+ assert.equal(result.cleanup_complete,true);
+ assert.match(result.error,/^Python declared columns readback differs$/);
 });
 
 test('declared columns wait out a transient cover over Add after Apply and still refuse a lasting one',{timeout:30000},async()=>{

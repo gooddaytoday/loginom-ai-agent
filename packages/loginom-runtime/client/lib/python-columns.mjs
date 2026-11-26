@@ -59,7 +59,7 @@ export async function configurePythonColumnsPage(page,task,readNode){
   const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b),wanted=task.columns.map(({name,label,type})=>({name,label,type}));
   const existingCount=inventory.columns.length;
   if(!same(inventory.columns,wanted.slice(0,existingCount)))
-   throw Error('Existing declared columns must match the start of the requested schema in order, name, type and label');
+   throw Error('Existing declared columns must match the start of the requested schema in order, name, type and label: '+inventory.columns.map(c=>c.name).join(','));
   for(const [offset,column] of task.columns.slice(existingCount).entries()){
    const count=existingCount+offset+1;
    const add=await settle(()=>inspect('button',{name:'btnAddMappingColumn'}),10000);effect=true;await page.mouse.click(add.x,add.y);
