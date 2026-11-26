@@ -211,10 +211,12 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
    const retained=JSON.parse((await readFile(diagnosticPath,'utf8')).trim().split('\n')[0]).result;
    assert.deepEqual(delivered.knowledge,retained.knowledge);
    assert.ok(delivered.knowledge.session_manifest.actionManifestDigest);
+   let importCard;
    for(const node of delivered.knowledge.node_types){
     assert.equal(node.cache_key,undefined);
     const described=parse(await call('dock_action_describe',{node_types:[node.type]})).node_types[0];
     assert.match(described.cache_key,/^[a-f0-9]{64}$/);
+    if(node.type==='imports.text')importCard=described;
     for(const key of Object.keys(node)){
      // Prepare retains its compact limitations; describe routes details to the
      // verified reference without duplicating the diagnostic knowledge asset.
@@ -223,8 +225,10 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
      assert.deepEqual(node[key],expected,node.type+': '+key);
     }
    }
-   const imported=parse(await call('dock_action_describe',{node_types:['imports.text']})).node_types[0];
-   assert.ok(imported.parameter_schema);
+   assert.ok(importCard?.parameter_schema);
+   const repeated=parse(await call('dock_action_describe',{node_types:['imports.text']}));
+   assert.deepEqual(repeated.node_types,[]);
+   assert.deepEqual(repeated.reused_node_types,[{type:'imports.text',cache_key:importCard.cache_key}]);
    return;
   }
 
@@ -362,8 +366,12 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   const all=await call('dock_action_describe',{node_types:[...parse(inventory).available_node_types.filter(t=>t!=='programming.javascript').slice(0,31),'programming.javascript']});
   assert.equal(all.isError,true);assert.equal(parse(all).error.scope,'whole_response');assert.ok(size(all)<2000);
   const pair=await call('dock_action_describe',{node_types:['imports.text','programming.javascript']});
-  assert.notEqual(pair.isError,true);assert.equal(parse(pair).node_types.length,2);assert.ok(size(pair)<=46000);
-  assert.deepEqual(parse(pair).node_types[1].parameter_schema,js.parameter_schema);assert.equal(browserCalls,before);
+  assert.notEqual(pair.isError,true);assert.ok(size(pair)<=46000);
+  const mixed=parse(pair);
+  assert.deepEqual(mixed.node_types.map(node=>node.type),['imports.text']);
+  assert.ok(mixed.node_types[0].parameter_schema);
+  assert.deepEqual(mixed.reused_node_types,[{type:'programming.javascript',cache_key:js.cache_key}]);
+  assert.equal(browserCalls,before);
 
   session.metadata.stress='"'.repeat(24000);
   const diagnostic=await call('dock_diagnostics',{checkConnections:false});
