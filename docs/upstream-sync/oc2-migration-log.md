@@ -25745,3 +25745,83 @@ B5.2b-fix3 — run 45786926746
 собирать заново, если хеш `packages/process-daemon/**` и `Cargo.lock` совпал с прошлым успешным (кэш артефакта
 `actions/cache` по этому хешу в `loginom-pty.yml`) — это минус один раннер без потери проверок. Сборку и проверку слить нельзя:
 первая внутри reusable workflow, а вторую нужно запускать после её артефакта.
+
+## B6.2a Охранные тесты G1–G6 с мутациями (Linux, репетиция)
+
+26.11.2026. Ветка `b62a-guarantees` от `oc2-migration` (`abb6374106`), дерево `.claude/worktrees/b62a`. Код продукта, `catalog.json` и `catalog.md` не менялись; добавлен
+`scripts/candidate-check/guarantees.ts`. Настоящая модель не вызывалась; `HOME`, `XDG_*` и `TMPDIR` дочерних процессов — во временном корне. Стенд: Linux, root, Bun 1.4.4,
+Node 24.19.0, `npm ci` клиента `loginom-runtime` и шаблона дашбордов, `xvfb-run`; запуск начат при load average 3. Протоколы без окружения:
+`/root/.local/share/loginom-evidence/b62a/467a730448/` (`table.md`, `results.json`, `base-*.log`, `mut-*.log`, `rev-*.log`) и `.../rerun-dashboard-g2/`.
+
+### Как перезапустить на итоговом SHA
+
+```bash
+git worktree add .claude/worktrees/<имя> -b <ветка> <SHA кандидата>   # дерево без правок: скрипт это проверяет
+cd .claude/worktrees/<имя> && bun install --frozen-lockfile          # Bun 1.4.4 первым в PATH
+# npm ci в packages/loginom-runtime/client и packages/dashboard/template закреплённым Node (см. guarantees.md)
+export LOGINOM_AI_AGENT_TEST_NODE=<node 24.19.0>/bin/node
+bun scripts/candidate-check/guarantees.ts all [--out <каталог>] [--only <id,id>]   # run | mutate | all
+```
+
+Один запуск: таблица команд (pass/fail, код выхода, секунды), затем таблица мутаций «база → мутация → после отката» с вердиктом; `table.md` и `results.json` — в `--out`
+(по умолчанию `/root/.local/share/loginom-evidence/b62a/<SHA>`). Мутация правит файл этого дерева, прогоняет набор, откатывает `git checkout -- .` и проверяет чистоту дерева.
+Полный запуск на репетиции — около 1,5 ч (`loginom-host` ≈ 5 мин на каждый из 5 прогонов; перед мутацией и после неё). Сверка с эталоном — ниже, колонка «Репетиция».
+
+### G1–G6: числа (репетиция, `abb6374106` + скрипт)
+
+| Набор | Гарантия | pass/fail |
+|---|---|---|
+| `packages/product` | G2, names, repo-paths | 95/0 |
+| `cli` flag-identity + service-identity | G2 | 8/0 |
+| `cli` cli-profile, cli-profile-service, legacy-profile | G2 | 11/0 |
+| `loginom-agent` (весь пакет) | G1, G4, G6 | 125/0 |
+| `server` loginom-access | G1, G6 | 12/0 |
+| `server` loginom-dashboard-files / local-file / package-docs / dock-catalog | G1 | 13/0 / 42/0 / 42/0 / 19/0 |
+| `server` loginom-host-lease | G3, G4 | 8/0 |
+| `cli` loginom-host | G3 | 1/0 |
+| `cli` cli-resources | G5 | 13/0 |
+| `loginom-host` (`xvfb-run`) | G3, G4, G5, G6 | 548/2 |
+| `dashboard` `bun run test` | G1 | прерван: 49/1 в `test:coverage:web` |
+| `scripts/upstream-sync/selftest.sh` | миграция | код 0 |
+
+`packages/product`: 0 падений (известные три — `workspace packages`, `CI triggers`, `path literals` — не воспроизводятся, B5.1 влит). Базовые падения `loginom-host` — два, оба под root:
+`archive verification preserves manifest modes under a private umask` и `actual managed entry reads live bridge work and dispatching over private IPC`; `bundled-ripgrep` и прочие из
+`guarantees.md` («Базовые падения») не вернулись. На кандидате сравнить: те же два.
+
+### Мутации (красный → откат → зелёный)
+
+| Мутация (файл, правка) | Набор | База | Мутация | После отката | Репетиция |
+|---|---|---|---|---|---|
+| G1 `loginom-agent/src/access.ts`: `permits` всегда `true` | loginom-agent | 125/0 | 119/6 | 125/0 | красная |
+| G1 то же | server loginom-access | 12/0 | 4/8 | 12/0 | красная |
+| G2 `util/src/global.ts`: `home` читает `OPENCODE_TEST_HOME` | cli flag-identity + service-identity | 8/0 | 7/1 | 8/0 | красная |
+| G2 `product/src/cli-profile.ts`: один блок портов на все каналы | product | 95/0 | 94/1 | 95/0 | красная |
+| G3 `loginom-host/src/supervisor.ts`: ненулевой код выхода принят | loginom-host | 548/2 | 546/4 | 548/2 | красная |
+| G3 `loginom-agent/src/index.ts`: аренда не освобождается по событиям конца | server host-lease | 8/0 | 4/4 | 8/0 | красная |
+| G4 `connection/recovery-store.ts`: `if (!strict)` → `if (false)` | loginom-host | 548/2 | 547/3 | 548/2 | красная |
+| G5 `cli-manifest.ts`: обязательный файл не требуется | loginom-host | 548/2 | 547/3 | 548/2 | красная |
+| G5 то же | cli-resources | 13/0 | 11/2 | 13/0 | красная |
+| G5 `script/stage-resources.ts`: `win32` берёт каталог `linux-x64` | loginom-host | 548/2 | 547/3 | 548/2 | красная |
+| G5 `.github/actions/setup-loginom-inputs/action.yml`: `if: always()` на шаге установки | loginom-host | 548/2 | 547/3 | 548/2 | красная |
+| G6 `loginom-agent/src/skills.ts`: `admits` всегда `true` | loginom-agent | 125/0 | 121/4 | 125/0 | красная |
+| G6 то же | server loginom-access | 12/0 | 10/2 | 12/0 | красная |
+| repo-paths `turbo.json`: ключ задачи `@opencode/clx#…` | product | 95/0 | 94/1 | 95/0 | красная |
+| names `product/package.json`: имя `@opencode/product` | product | 95/0 | 92/3 | 95/0 | красная |
+
+15 мутаций, все красные и после отката равны базе. G2 `flag-identity` в первой версии (чтение `OPENCODE_CONFIG_DIR` в `Global.layerWith`-пути `global.ts`) не краснела: тест
+проверяет `home`, а `config` задаётся иначе; правка скрипта — мутация на `home` (`OPENCODE_TEST_HOME` есть в `inherited` теста). Это ошибка выбора мутации, не дефект продукта.
+Мутации G3 `process.test.ts` проверены через набор `loginom-host`, число падений — по пакету, а не по файлу.
+
+### Находки (продукт не правился)
+
+1. **`packages/dashboard`, `test/web/log.test.mjs`, «the stdout sink counts events dropped across full logging windows without queueing them».** Падает детерминированно
+   (2 запуска из каталога `dashboard`, 2 через скрипт), `bun run test` останавливается на `test:coverage:web`, `test:coverage:workers` и последующие тесты не выполняются.
+   Тест пишет 1 МиБ в `process.stdout` дочернего процесса и ждёт `writableNeedDrain === true`; на этом ядре (Linux 6.8) `assert.ok(process.stdout.writableNeedDrain)` ложен
+   (`actual: false`). Не связано с G1; похоже на зависимость от размера канала стенда. Не проверено, есть ли падение в CI (`test`/`loginom-checks`) — сверить по логу CI.
+   Часть `dashboard` (G1: пути и черновик) этим прогоном не покрыта; в `guarantees.md` это падение не записано.
+2. Мутации `G5-stage-resources` и `G5-ci-inputs` на v2 раньше не мерялись — теперь красные (`loginom-host` 547/3).
+
+### Не сделано
+
+Шаг 2 плана (сверка с CI: какие файлы реально выполнились в `test` и `loginom-checks`), G2 на Windows, мутации по G1 для `local-file`, `package-docs`, `dock-catalog` и `dashboard-files`
+(там по-прежнему числа B2.5/B2.9). Прогон не на итоговом SHA кандидата. Тяжёлые прогоны шли при load average 3–9, часть времени до этого — ожидание (load 11–16, около 13 мин).
