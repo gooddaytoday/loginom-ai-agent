@@ -3568,8 +3568,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                 ||!same(owner(fresh).slice(0,3),owner(workflowBeforeFiles).slice(0,3))
                 ||!tabsBeforeFiles.some(tab=>tabMatches(tab,fresh))
                 ||tabs.ui.elements.filter(tab=>tabMatches(tab,fresh)).length!==1
-                ||tabsBeforeFiles.some(tab=>tab.tid===previous.workflow_ref.tab_tid||tab.ref===previous.active_tab_ref)
-                ||tabs.ui.elements.some(tab=>tab.tid===previous.workflow_ref.tab_tid||tab.ref===previous.active_tab_ref))
+                ||tabsBeforeFiles.some(tab=>tab.tid===previous.workflow_ref.tab_tid||tab.ref===previous.active_tab_ref))
                 throw Error('Original Files owner could not be verified');
               filesEntered=fresh;
             }

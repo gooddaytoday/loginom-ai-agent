@@ -300,7 +300,7 @@ async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,exte
   if(returnFault==='clipped')scenario.interaction={state:'point_not_observed',point:null};
   state.ui.elements=!inFiles?(rootRef===page.uiReference(strip)?[scenario,...(restored?[element(originalFiles.tab_tid,'worker')]:[])]:[element(button,'',['click'])])
    :rootRef===scenario.ref?[scenario]
-   :rootRef===page.uiReference(strip)?[scenario,element(files.tab_tid,'Файлы')]
+   :rootRef===page.uiReference(strip)?[scenario,element(files.tab_tid,'Файлы'),...(restored&&files===originalFiles?[element(temporary.tab_tid,'Файлы')]:[])]
    :directory==='/'?[{...element(folder,'worker',['double_click']),storage_entry:{kind:'folder'}}]
    :rootRef===page.uiReference(table)?[up,...(top&&fault!=='missing'?[csv]:[])]:rootRef===page.uiReference(file)?[csv]:[];
   if(rootRef)state.observation_root={ref:rootRef,identity:element(rootRef===page.uiReference(strip)?strip:inFiles
