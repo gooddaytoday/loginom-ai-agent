@@ -93,7 +93,7 @@ const jsCallStackFeature = "DocumentPolicyIncludeJSCallStacksInCrashReports"
 let logger: ReturnType<typeof initLogging>
 let server: SidecarListener | null = null
 
-const deepLinks = createDeepLinkQueue(process.platform === "linux" ? process.argv : [])
+const deepLinks = createDeepLinkQueue(process.argv)
 
 function restoreWithDeepLinks() {
   const windows = restoreMainWindows()
@@ -239,7 +239,8 @@ const main = Effect.gen(function* () {
   const relaunch = () => {
     setAppQuitting()
     void stopSidecars().finally(() => {
-      app.relaunch()
+      // A restart must not reopen the one-time dashboard link the app was launched with.
+      app.relaunch({ args: process.argv.slice(1).filter((arg) => !arg.startsWith("loginom-ai-agent://")) })
       app.quit()
     })
   }
@@ -301,7 +302,7 @@ const main = Effect.gen(function* () {
   app.on("open-url", (event: Event, url: string) => {
     event.preventDefault()
     logger.log("deep link received via open-url", { url })
-    emitDeepLinks([url])
+    emitDeepLinks(protocolUrls([url]))
   })
 
   let updater: ReturnType<typeof setupAutoUpdater> | undefined
@@ -622,6 +623,16 @@ const main = Effect.gen(function* () {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length > 0) return
     restoreWithDeepLinks()
+  })
+  // Registered after startup, so a link that launched the app stays queued for the first window.
+  app.on("open-url", () => {
+    const win = getLastFocusedWindow() ?? BrowserWindow.getAllWindows().at(-1)
+    if (!win) {
+      restoreWithDeepLinks()
+      return
+    }
+    win.show()
+    win.focus()
   })
 
   const windows = restoreWithDeepLinks()
