@@ -1,6 +1,7 @@
 // The parts of the SDK only the app's built-in plugins use, for workspace imports only: `tsconfig.build.json` leaves it
 // out of `dist`, and `script/pack.ts` exports it as `null`. Public SDK modules never import it.
 
+import type { SessionMessageAssistant } from "@opencode/client/promise"
 import type { Schema } from "effect"
 import type { Context } from "./context.js"
 import { Registry, type Catalog, type Messages, type Persisted, type StoreDeclaration, type StoreFrom } from "./core.js"
@@ -36,7 +37,7 @@ export function onIdle(fn: () => void) {
 
 /** The live state and display options of a tool call in the timeline. */
 export interface ToolRendererProps {
-  /** The tool's name in the transcript. */
+  /** The exact tool name in the transcript, even when the renderer registered a prefix. */
   readonly tool: string
   /** The registered display title, which can follow the window's locale. */
   readonly title: string
@@ -60,12 +61,17 @@ export interface ToolRendererProps {
 
 /** A built-in plugin's renderer for one tool it owns. */
 export interface ToolRenderer {
-  /** The exact tool name in the transcript. OpenCode's own names are reserved. */
+  /**
+   * The exact tool name, or a namespace prefix ending in `*`. Native names are reserved.
+   * The timeline picks an exact renderer first, then the longest matching prefix.
+   */
   readonly tool: string
   /** A display title. Use a getter for a localized title. */
   readonly title: string
   /** Keep visible calls on their own rows, even when tool activity is grouped. */
   readonly separate?: boolean
+  /** Draw failed calls as well. Defaults to the timeline's standard tool error card. */
+  readonly handlesFailure?: boolean
   /**
    * Draws a call under the plugin context. The host shows its tool error card if this throws.
    * @param props - Live call data and the timeline's display options.
@@ -81,6 +87,77 @@ export interface ToolRenderer {
  * ```
  */
 export const ToolRenderer = Registry.define<ToolRenderer>("tool.renderer")
+
+/** A task from the latest todo list recorded in a turn. */
+export interface TurnTodo {
+  /** The task text supplied by the agent. */
+  readonly content: string
+  /** The agent's recorded state: waiting, underway, done, or cancelled. */
+  readonly status: "pending" | "in_progress" | "completed" | "cancelled"
+}
+
+/** A completed or active turn as seen by a timeline contribution. */
+export type TurnPresentationInput = {
+  /** Assistant messages in transcript order. */
+  readonly messages: readonly SessionMessageAssistant[]
+} & (
+  | {
+      /** The agent is still working. */
+      readonly phase: "working"
+      /** The latest todo list in this turn, or an empty list before the agent sets it. */
+      readonly todos: readonly TurnTodo[]
+    }
+  | {
+      /** The turn completed successfully. */
+      readonly phase: "completed"
+      /** Elapsed milliseconds from the opening prompt to the last assistant message. */
+      readonly durationMs: number
+    }
+)
+
+/** Localized content before the turn's activity or after its answer. */
+export type TurnPresentationValue =
+  | {
+      /** Display an ordered plan without changing the live activity rows. */
+      readonly kind: "plan"
+      /** Accessible name of the ordered list. */
+      readonly label: string
+      /** Tasks in display order. */
+      readonly items: readonly {
+        /** The task text to display. */
+        readonly text: string
+        /** An accessible description of the task's state. */
+        readonly statusLabel: string
+        /** Which of the completed, current, or upcoming markers to show. */
+        readonly status: "completed" | "in_progress" | "pending"
+      }[]
+    }
+  | {
+      /** A disclosure button for the completed turn's activity rows. */
+      readonly kind: "summary"
+      /** The localized summary shown on the disclosure button, when there is activity to disclose. */
+      readonly label?: string
+      /** Optional localized text after the answer. */
+      readonly footer?: string
+    }
+
+/** Supplies optional plan and summary rows for a built-in plugin's turns. */
+export interface TurnPresentation {
+  /**
+   * Describes a turn owned by this plugin. Return undefined to leave the timeline's presentation in place.
+   * @param input - The turn's messages and state.
+   */
+  describe(input: TurnPresentationInput): TurnPresentationValue | undefined
+}
+
+/**
+ * Registry for built-in turn presentations. The first contribution to describe a turn supplies its row.
+ * @example
+ * ```ts
+ * ctx.add(TurnPresentation, { describe })
+ * ```
+ */
+export const TurnPresentation = Registry.define<TurnPresentation>("turn.presentation")
 
 /** A `Command` with the fields only built-ins set. */
 export interface BuiltinCommand extends Command {
@@ -171,6 +248,8 @@ export const Page = Registry.define<Page>("page")
 
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
+  /** Actions beside the session location on narrow screens, while the conversation is visible. */
+  readonly "session.header.mobile": Pick<SlotMap["session.header"], "session" | "screen">
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */
   readonly "session.location.branch.menu": SlotMap["session.location.menu"]
   /** Items after the host's copy and reveal actions in the session directory's path submenu. Requires an owning screen. */
@@ -362,6 +441,20 @@ export interface BuiltinLocale extends Locale {
   setDirection(direction: "ltr" | "rtl"): void
 }
 
+/** Shortcuts to the app's persisted timeline detail presets. */
+export interface BuiltinTimeline {
+  /**
+   * The effective two-mode display preference. Detailed and Everything expand details
+   * and other presets and custom settings use compact renderer details.
+   */
+  detail(): "compact" | "detailed"
+  /**
+   * Sets the app's shared timeline preset for all sessions, persisted by the app.
+   * @param mode - Compact or Detailed, as offered by the app's settings.
+   */
+  setDetail(mode: "compact" | "detailed"): void
+}
+
 /** The window context as the app's host builds it for every plugin, with the members only built-ins use. */
 export interface BuiltinContext extends Context {
   /** Desktop-only abilities, `forceFocus` included; undefined on the web. */
@@ -372,6 +465,15 @@ export interface BuiltinContext extends Context {
   readonly layout: BuiltinLayout
   /** Stores whose older homes may be parts of shared app keys. */
   readonly storage: BuiltinStorage
+  /**
+   * The current timeline detail preset. Use the app's saved setting for plugin tool details.
+   * @example
+   * ```ts
+   * const timeline = builtinContext(ctx).timeline
+   * timeline.setDetail(timeline.detail() === "compact" ? "detailed" : "compact")
+   * ```
+   */
+  readonly timeline: BuiltinTimeline
 }
 
 /**

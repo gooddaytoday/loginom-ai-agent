@@ -36,7 +36,13 @@ import {
   type StorageScope,
   type Tabs,
 } from "@opencode/plugin/gui"
-import { BuiltinPanel, type BuiltinStoreFrom, type BuiltinStoreOptions } from "@opencode/plugin/gui/builtin"
+import {
+  BuiltinPanel,
+  type BuiltinStoreFrom,
+  type BuiltinStoreOptions,
+  type BuiltinTimeline,
+} from "@opencode/plugin/gui/builtin"
+import { timelinePreset, timelinePresets } from "@opencode/session-ui/timeline/detail"
 import { usePlatform } from "@/runtime/platform/platform"
 import { same } from "@/runtime/persistence/equality"
 import { Persist, persisted, removePersisted } from "@/runtime/persistence/storage"
@@ -110,6 +116,7 @@ type Attached = {
     side: Layout["side"]
   }
   settings: (page?: string) => void
+  timeline: BuiltinTimeline
   project: (server: string, title: string) => void
   draft: Layout["draft"]
   command: (id: string) => void
@@ -323,7 +330,7 @@ export function createHostApis() {
             os: platform.os ?? "linux",
             zoom: () => platform.webviewZoom?.() ?? 1,
             launch: (path, app) => platform.openPath?.(path, app) ?? Promise.resolve(),
-            reveal: (path) => platform.revealPath?.(path) ?? Promise.resolve(false),
+            reveal: (path, options) => platform.revealPath?.(path, options) ?? Promise.resolve(false),
             installed: (app) => platform.checkAppExists?.(app) ?? Promise.resolve(false),
             forceFocus: (enabled) => platform.setForceFocus?.(enabled) ?? Promise.resolve(),
             async pick(options) {
@@ -483,6 +490,10 @@ export function createHostApis() {
       project: (server, title) => write((value) => value.project(server, title)),
       draft: (input) => write((value) => value.draft(input)),
       command: (id) => write((value) => value.command(id)),
+    }),
+    timeline: () => ({
+      detail: () => current()?.timeline.detail() ?? "compact",
+      setDetail: (mode) => write((value) => value.timeline.setDetail(mode)),
     }),
     embeds: () => embeds,
     ui: () => ui,
@@ -1179,6 +1190,18 @@ export function createPluginAttachment(apis: HostApis) {
     server,
     // SAFETY: a plugin names a page it contributed through `SettingsPage`, which settings lists as a plugin tab.
     settings: (page) => surface.open(page as Parameters<typeof surface.open>[0]),
+    timeline: {
+      detail: () => {
+        const preset = timelinePreset(settings.general.timelineDetail())?.id
+
+        return preset === "detailed" || preset === "everything" ? "detailed" : "compact"
+      },
+      setDetail: (mode) => {
+        const preset = timelinePresets.find(({ id }) => id === mode)
+
+        if (preset) settings.general.setTimelineDetail(preset.value)
+      },
+    },
     layout: {
       ready: layout.ready,
       open,

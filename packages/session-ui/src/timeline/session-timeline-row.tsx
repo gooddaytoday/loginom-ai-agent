@@ -107,6 +107,8 @@ export function createSessionTimelineRowRenderer(input: {
     set: (key: string, open: boolean) => void
     patchGroupKeys?: Map<string, string>
   }
+  /** Whether the host disclosed the turn's activity groups together. */
+  activityOpen?: (userMessageID: string) => true | undefined
   centered?: Accessor<boolean>
   padding?: Accessor<string>
   anchor?: (messageID: string) => string | undefined
@@ -428,7 +430,7 @@ export function createSessionTimelineRowRenderer(input: {
               input.disclosure.value(`patch:${path}`) ?? input.timelineDetail?.().edit.details === "expanded"
             }
             onFileOpenChange={(path, open) => input.disclosure.set(`patch:${path}`, open)}
-            open={input.disclosure.value(key()) === true}
+            open={(input.disclosure.value(key()) ?? input.activityOpen?.(row().userMessageID)) === true}
             busy={
               phase(row().userMessageID).live &&
               input.projection.lastAssistantGroupKey().get(row().userMessageID) === row().group.key
@@ -457,7 +459,7 @@ export function createSessionTimelineRowRenderer(input: {
       return (
         <SessionReadToolGroup
           tools={tools()}
-          open={input.disclosure.value(row().group.key)}
+          open={input.disclosure.value(row().group.key) ?? input.activityOpen?.(row().userMessageID)}
           onOpenChange={(open) => input.disclosure.set(row().group.key, open)}
           onSizeChange={onSizeChange}
         />

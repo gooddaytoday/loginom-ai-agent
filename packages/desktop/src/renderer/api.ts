@@ -56,7 +56,7 @@ export const api: ElectronAPI = {
   openBrowser: (url) => invoke("FilesOpenBrowser", { url }),
   openLocalFile: (url) => send("FilesOpenLocalFile", { url }),
   openPath: (path, app) => invoke("FilesOpenPath", { path, application: app }).then((value) => value ?? undefined),
-  revealPath: (path) => invoke("FilesRevealPath", { path }),
+  revealPath: (path, options) => invoke("FilesRevealPath", { path, checkOnly: options?.checkOnly }),
   readClipboardImage: () =>
     invoke("FilesReadClipboardImage").then((image) =>
       image ? { ...image, buffer: toArrayBuffer(image.buffer) } : null,

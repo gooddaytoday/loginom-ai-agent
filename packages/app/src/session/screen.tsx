@@ -23,7 +23,7 @@ import type { SessionModel } from "@/session/model"
 import { SESSION_PANEL_WIDTH_MIN } from "@/session/session-panel-width"
 import { useLayout } from "@/shell/state/layout"
 import { SessionPanelFrame } from "@/session/session-frame"
-import { PluginLinks } from "@/runtime/plugin/render"
+import { PluginLinks, PluginSlot } from "@/runtime/plugin/render"
 import { createPanelSidebar, createRegion, MobilePanel } from "@/runtime/plugin/panels"
 import { createMobileViews, MobileViewTabs } from "@/runtime/plugin/mobile"
 import { usePluginAttachment } from "@/runtime/plugin/host-apis"
@@ -352,11 +352,11 @@ function SessionScreenContent(props: {
       />
       <TimelineQuote controller={quote} />
       <Show when={!isDesktop() && !!session.identity.params.id && !bottomMobileTabs()}>{mobileTabs()}</Show>
-      {/* Narrow screens hide the timeline header, so the session's location gets its own bar. */}
+      {/* Narrow screens keep the location and header actions above the conversation. */}
       <Show when={!isDesktop() && !!session.identity.params.id && mobileView() === "session"}>
         <div
           data-slot="session-location-bar"
-          class="flex h-9 shrink-0 items-center border-b border-v2-border-border-base px-2"
+          class="flex h-9 shrink-0 items-center gap-2 border-b border-v2-border-border-base px-2"
         >
           <SessionLocation
             project={location.project()}
@@ -369,6 +369,17 @@ function SessionScreenContent(props: {
               screen: props.screen,
             }}
           />
+          <div class="ms-auto flex shrink-0 items-center">
+            <PluginSlot
+              at="session.header.mobile"
+              input={{
+                get session() {
+                  return props.view()
+                },
+                screen: props.screen,
+              }}
+            />
+          </div>
         </div>
       </Show>
       {/* Surface query errors without suspending session metadata while messages load. */}

@@ -3,7 +3,7 @@ import { createSignal, Show } from "solid-js"
 import { render } from "solid-js/web"
 import { AppBaseProviders, AppInterface, preloadRoute } from "../../src/app"
 import { useLanguage, type Direction } from "../../src/runtime/i18n/language"
-import { PlatformProvider } from "../../src/runtime/platform/platform"
+import { PlatformProvider, type Platform } from "../../src/runtime/platform/platform"
 import { createWebPlatform } from "../../src/runtime/platform/web"
 import { ServerConnection } from "../../src/runtime/server/registry"
 import { Command } from "@opencode/plugin/gui"
@@ -15,13 +15,38 @@ import { useCommand } from "../../src/shell/commands/command"
  * mounts only when "Start app" is pressed, over its preloaded route, as the desktop shell mounts it once its server is up.
  * One plugin's load also waits for "Finish startup", so the attachment can mount before the routes render.
  */
-export function mount(input: { server: string; route: string; direction: Direction; held?: boolean }) {
+export function mount(input: {
+  server: string
+  route: string
+  direction: Direction
+  held?: boolean
+  desktopReveal?: boolean
+}) {
   const root = document.getElementById("root")
 
   if (!root) throw new Error("Missing fixture root")
   const history = createMemoryHistory()
   history.set({ value: input.route, replace: true, scroll: false })
   const server: ServerConnection.Http = { type: "http", http: { url: input.server } }
+  const web = createWebPlatform("test").platform
+
+  const platform: Platform = input.desktopReveal
+    ? {
+        ...web,
+        platform: "desktop",
+        windowID: "app-direction-test",
+        openDirectoryPickerDialog: async () => null,
+        async revealPath(path, options) {
+          const response = await fetch("/e2e/reveal-path", {
+            method: "POST",
+            body: JSON.stringify({ path, checkOnly: options?.checkOnly ?? false }),
+          })
+
+          return response.ok
+        },
+      }
+    : web
+
   const [started, setStarted] = createSignal(!input.held)
   const [finished, setFinished] = createSignal(false)
   const held = Promise.withResolvers<void>()
@@ -94,7 +119,7 @@ export function mount(input: { server: string; route: string; direction: Directi
 
   render(
     () => (
-      <PlatformProvider value={createWebPlatform("test").platform}>
+      <PlatformProvider value={platform}>
         <AppBaseProviders locale="en">
           <Startup />
         </AppBaseProviders>

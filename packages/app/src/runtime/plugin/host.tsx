@@ -23,7 +23,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import { LifetimeContext, liveAccessor, PluginContext, type Bridge, type Entry } from "@opencode/plugin/gui/host"
-import { ToolRenderer, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
+import { ToolRenderer, TurnPresentation, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
 import { Predicate } from "effect"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { pluralCategory, resolveTemplate } from "@opencode/ui/context/i18n"
@@ -821,6 +821,9 @@ function createHost(input: HostInput) {
         if (toolRenderer && !input.builtins?.has(plugin))
           throw new Error("Only built-in plugins can add tool renderers")
 
+        if (registry.id === TurnPresentation.id && !input.builtins?.has(plugin))
+          throw new Error("Only built-in plugins can add turn presentations")
+
         let active = toolRenderer
         let claimed: string | undefined
 
@@ -838,7 +841,16 @@ function createHost(input: HostInput) {
           if (name === claimed) return value
 
           if (name !== undefined) {
-            if (nativeToolNames.has(name)) throw new Error(`Cannot register a renderer for native tool "${name}"`)
+            const prefix = name.endsWith("*") ? name.slice(0, -1) : undefined
+
+            if (prefix === "" || (prefix ?? name).includes("*")) throw new Error(`Invalid tool renderer name "${name}"`)
+
+            if (
+              prefix === undefined
+                ? nativeToolNames.has(name)
+                : [...nativeToolNames].some((tool) => tool.startsWith(prefix))
+            )
+              throw new Error(`Cannot register a renderer for native tool "${name}"`)
 
             if (toolRendererNames.has(name)) throw new Error(`A renderer is already registered for tool "${name}"`)
           }

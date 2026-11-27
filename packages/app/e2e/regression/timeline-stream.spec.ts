@@ -3402,3 +3402,172 @@ function summaryDiff(index: number) {
     patch: `@@ -1 +1 @@\n-export const value = ${index}\n+export const value = ${index + 1}`,
   }
 }
+
+for (const width of [1280, 390]) {
+  test(`Loginom shows live, completed and failed steps in both detail modes at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    const now = 1700000012000
+    await page.clock.setFixedTime(now)
+
+    await setupTimeline(page, {
+      locale: "ru",
+      viewport: { width, height: 900 },
+      settings: { newTimeline: width === 1280 },
+      messages: [
+        userMessage([userText("Собери и сохрани ABC-анализ.")]),
+        assistantMessage(
+          [
+            toolPart(
+              "prt_loginom_import",
+              "loginom_dock_node_apply",
+              "completed",
+              {},
+              {
+                title: "MODEL_GENERATED_TITLE",
+                output: "MODEL_GENERATED_RESULT",
+                metadata: {
+                  loginom: {
+                    v: 1,
+                    operationId: "import",
+                    state: "settled",
+                    status: "SUCCEEDED",
+                    kind: "import",
+                    sourceName: "sales-demo.csv",
+                    ports: [{ index: 0, guid: "table", rowCount: 2400, columnCount: 6 }],
+                  },
+                },
+              },
+            ),
+            toolPart(
+              "prt_loginom_failure",
+              "loginom_dock_node_resume",
+              "error",
+              {},
+              {
+                error: "RAW_TOOL_FAILURE",
+                metadata: {
+                  loginom: {
+                    v: 1,
+                    operationId: "build",
+                    state: "settled",
+                    status: "FAILED",
+                    kind: "build",
+                    attempt: 1,
+                    maxAttempts: 2,
+                    error: { message: "RAW_TIMEOUT", timeoutMs: 30000 },
+                  },
+                  loginomStep: {
+                    version: 1,
+                    phase: "reading",
+                    startedAt: now - 12000,
+                    lastReplyAt: null,
+                    stalledSince: null,
+                    substep: { kind: "fields", index: 7, total: 8 },
+                  },
+                },
+              },
+            ),
+            toolPart(
+              "prt_loginom_live",
+              "loginom_dock_node_apply",
+              "running",
+              {},
+              {
+                metadata: {
+                  loginomStep: {
+                    version: 1,
+                    phase: "waiting",
+                    nodeType: "transform.group_data",
+                    startedAt: now - 12000,
+                    lastReplyAt: null,
+                    stalledSince: null,
+                    substep: null,
+                  },
+                },
+              },
+            ),
+          ],
+          { completed: false },
+        ),
+      ],
+    })
+
+    const brief = page.getByRole("button", { name: "Кратко", exact: true })
+    const full = page.getByRole("button", { name: "Подробно", exact: true })
+    const imported = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_import")}"]`)
+    const running = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_live")}"]`)
+    const failure = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_failure")}"]`)
+    const details = imported.getByText("Выход 1: 2400 строк, 6 столбцов", { exact: true })
+    const more = imported.getByLabel("Показать детали шага", { exact: true })
+
+    await expect(brief).toHaveAttribute("aria-pressed", "true")
+    await expect(imported.getByText("Прочитал таблицу «sales-demo.csv»", { exact: true })).toBeVisible()
+    await expect(running.getByText("Жду Loginom 12 с", { exact: true })).toBeVisible()
+    await expect(running.locator('[data-component="spinner"]')).toBeVisible()
+    await expect(failure).toHaveText(
+      "Не удалось собрать сценарий в Loginom · Loginom не ответил за 30 с · попытка 1 из 2",
+    )
+    await expect(failure.locator('[data-component="spinner"]')).toHaveCount(0)
+    await expect(more).toHaveText("…")
+    await expect(details).toBeHidden()
+    await page.screenshot({ path: testInfo.outputPath(`loginom-${width}-compact.png`), animations: "disabled" })
+
+    await more.click()
+    await expect(details).toBeVisible()
+    await more.click()
+    await expect(details).toBeHidden()
+
+    await full.click()
+    await expect(full).toHaveAttribute("aria-pressed", "true")
+    await expect(details).toBeVisible()
+    await expect(more).toHaveCount(0)
+    await expect(failure.getByText("Поле 7 из 8")).toHaveCount(0)
+    await expect(page.getByText(/MODEL_GENERATED|RAW_TOOL_FAILURE|RAW_TIMEOUT/)).toHaveCount(0)
+    await expect
+      .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("settings.v3") ?? "{}").general?.timelineDetail))
+      .toEqual(timelinePresets[1].value)
+    await page.screenshot({ path: testInfo.outputPath(`loginom-${width}-detailed.png`), animations: "disabled" })
+  })
+}
+
+test("Loginom updates the current step when live progress arrives", async ({ page }) => {
+  const timeline = await setupTimeline(page, {
+    locale: "ru",
+    messages: [userMessage(), assistantMessage([], { completed: false })],
+  })
+
+  await expect(page.getByRole("button", { name: "Остановить", exact: true })).toBeVisible()
+
+  const id = "prt_loginom_progress"
+  const name = "loginom_dock_node_apply"
+  const progress = page.locator(`[data-timeline-part-id="${id}"]`)
+
+  await timeline.send(partUpdated(toolPart(id, name, "streaming", {})))
+  await expect(progress.getByText("Работаю в Loginom…", { exact: true })).toBeVisible()
+
+  await timeline.send(
+    partUpdated(
+      toolPart(
+        id,
+        name,
+        "running",
+        {},
+        {
+          metadata: {
+            loginomStep: {
+              version: 1,
+              phase: "configuring",
+              nodeType: "transform.group_data",
+              startedAt: Date.now(),
+              lastReplyAt: null,
+              stalledSince: null,
+              substep: { kind: "fields", index: 2, total: 3 },
+            },
+          },
+        },
+      ),
+    ),
+  )
+  await expect(progress.getByText("Собираю сценарий в Loginom…", { exact: true })).toBeVisible()
+})

@@ -74,8 +74,31 @@
       ]
     },
     {
+      "id": "CAT-16",
+      "title": "Turn footer and Desktop file availability (LAB-2233)",
+      "paths": [
+        "packages/app/e2e/regression/loginom-export-cards.spec.ts",
+        "packages/app/e2e/utils/app-direction.fixture.tsx",
+        "packages/app/e2e/utils/app-direction.html",
+        "packages/app/e2e/utils/timeline.ts",
+        "packages/app/src/runtime/platform/platform.tsx",
+        "packages/app/src/runtime/plugin/host-apis.tsx",
+        "packages/app/src/session/timeline/turn-presentation.tsx",
+        "packages/desktop/src/main/files/index.ts",
+        "packages/desktop/src/main/ipc-handlers/files.ts",
+        "packages/desktop/src/renderer/api-types.ts",
+        "packages/desktop/src/renderer/api.ts",
+        "packages/desktop/src/renderer/platform/files.ts",
+        "packages/desktop/src/shared/ipc-rpc/files.ts",
+        "packages/plugin/src/gui/builtin.ts",
+        "packages/plugin/src/gui/host-apis.ts",
+        "packages/session-ui/src/timeline/timeline-row.ts",
+        "packages/session-ui/src/timeline/turn-presentation.ts"
+      ]
+    },
+    {
       "id": "CAT-14",
-      "title": "Built-in GUI tool renderers (C3.0, accepted timeline row exception)",
+      "title": "Built-in GUI tool renderers (C3.0, C3.18)",
       "paths": [
         "packages/app/component-tests/plugin-host.fixture.tsx",
         "packages/app/src/runtime/plugin/host.tsx",
@@ -94,7 +117,32 @@
         "packages/session-ui/src/timeline-next/tools/tool-display.tsx",
         "packages/session-ui/src/timeline/projection.ts",
         "packages/session-ui/src/tools/tool-renderer.tsx",
-        "packages/ui/src/i18n/en.ts"
+        "packages/ui/src/i18n/en.ts",
+        "packages/app/src/session/screen.tsx",
+        "packages/app/src/runtime/plugin/host-apis.tsx",
+        "packages/app/src/session/timeline/tool-renderers.tsx",
+        "packages/app/component-tests/tool-renderer.fixture.tsx",
+        "packages/app/e2e/regression/timeline-stream.spec.ts",
+        "packages/app/test-browser/builtin-plugins.test.ts",
+        "packages/gui-plugins/src/main.ts",
+        "packages/gui-plugins/src/renderer.ts"
+      ]
+    },
+    {
+      "id": "CAT-15",
+      "title": "Built-in GUI turn presentation (C3.19)",
+      "paths": [
+        "packages/app/e2e/regression/session-timeline-tool-projection.spec.ts",
+        "packages/app/src/session/timeline/message-timeline.tsx",
+        "packages/app/src/session/timeline/turn-presentation.tsx",
+        "packages/app/src/session/timeline/virtualizer.tsx",
+        "packages/app/test-browser/builtin-plugins.test.ts",
+        "packages/gui-plugins/src/main.ts",
+        "packages/gui-plugins/src/renderer.ts",
+        "packages/session-ui/src/timeline-next/row.tsx",
+        "packages/session-ui/src/timeline/session-timeline-row.tsx",
+        "packages/session-ui/src/timeline/timeline-row.ts",
+        "packages/session-ui/src/timeline/turn-presentation.ts"
       ]
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },

@@ -224,6 +224,7 @@ export async function setupTimeline(
     deviceScaleFactor?: number
     seedHistory?: boolean
     focusCard?: boolean
+    desktopReveal?: boolean
     // Session IDs to open as titlebar tabs.
     tabs?: string[]
   } & TimelineServerInput = {},
@@ -299,10 +300,13 @@ export async function setupTimeline(
 
   const route = sessionHref(sessionID)
 
-  if (input.focusCard) {
-    await page.goto(
-      `/e2e/utils/app-direction.html?${new URLSearchParams({ server: SERVER, route, direction: "ltr", "focus-card": "" })}`,
-    )
+  if (input.focusCard || input.desktopReveal) {
+    const query = new URLSearchParams({ server: SERVER, route, direction: "ltr" })
+
+    if (input.focusCard) query.set("focus-card", "")
+
+    if (input.desktopReveal) query.set("desktop-reveal", "")
+    await page.goto(`/e2e/utils/app-direction.html?${query}`)
     await expectSessionTitle(page, title)
   } else {
     await page.goto(route)
