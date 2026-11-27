@@ -508,9 +508,12 @@ The pair must contain `worker.json` and `reviewer.json` with the established
 `loginom` and either `package_directory` or `personal_folder` fields (when both
 exist, `package_directory` wins). Unknown formats fail before detach and name
 the file, required fields and supplied keys; credential values are never printed.
-Runs use the worker account. The model is `deepseek/deepseek-flash` (constant
-`MODEL` in `run-check.py`, no variant); the key is read from `DEEPSEEK_API_KEY`
-in the environment, shared OAuth is not used. `make-pair.py` builds the pair in a
+Runs use the worker account. The default is `deepseek/deepseek-flash` without a
+variant, using `DEEPSEEK_API_KEY`. Set `RUN_CHECK_MODEL` to select another model
+and `RUN_CHECK_VARIANT` for a `run` variant (not supported by the two-turn TUI
+cases). Set `RUN_CHECK_AUTH` to the path of a legacy `auth.json` to copy it into
+the fresh CLI profile for import, without writing back to the source.
+`make-pair.py` builds the pair in a
 0700 temporary directory from `LOGINOM_{WORKER,REVIEWER}_{USER,PASS}` (see its
 docstring); remove it with `make-pair.py --remove DIR` after `wait`. Requires git, Python 3.9+, the pinned Bun/Node/browser bootstrap cache,
 and network access for the locked dependencies. Build inputs can be overridden
@@ -656,8 +659,7 @@ A private case may add `case.json` with `base` (another case in the same
 `bughunt-audit.py`). The first turn of a private case attaches every file in
 `data/`, any format; a continuation attaches only its `input_files`.
 
-The model under test is the constant `MODEL` of `run-check.py` (`deepseek/deepseek-flash`, no variant); it is
-recorded per run in `results.json`.
+The model and any explicit variant are recorded per run in `results.json`.
 
 Each output may declare `header: false` in private `expected.json` for a CSV
 without a header (including a single JSON cell). Columns then declare CSV

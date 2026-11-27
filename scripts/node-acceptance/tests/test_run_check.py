@@ -1922,16 +1922,25 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
             model = next(command for name, command in commands if name == 'model')
             attached = sorted(Path(model[i + 1]).name for i, arg in enumerate(model) if arg == '--file')
             self.assertEqual(attached, ['notes.txt', 'orders.json', 'orders.xml'])
-            self.assertEqual(model[model.index('--model') + 1], runner.MODEL)
+            self.assertEqual(model[model.index('--model') + 1], 'deepseek/deepseek-flash')
             self.assertNotIn('--variant', model)
 
-    def test_model_is_one_constant_without_variant_or_shared_auth(self):
-        source = (Path(__file__).resolve().parents[1] / 'run-check.py').read_text()
-        self.assertEqual(runner.MODEL, 'deepseek/deepseek-flash')
-        self.assertFalse(hasattr(runner, 'VARIANT') or hasattr(runner, 'AUTH'))
-        self.assertEqual(len(re.findall(r'^MODEL = ', source, re.M)), 1)
-        for stale in ('gpt-6.1-sol', 'shared-oauth', 'RUN_CHECK_MODEL', 'RUN_CHECK_VARIANT', 'RUN_CHECK_AUTH', "'--variant'"):
-            self.assertNotIn(stale, source)
+    def test_model_variant_and_oauth_are_applied_to_the_run_profile(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            auth = root / 'auth.json'
+            payload = '{"openai":{"type":"oauth","refresh":"test-refresh"}}'
+            auth.write_text(payload)
+            commands = []
+            with patch.dict(os.environ, RUN_CHECK_MODEL='openai/gpt-6.1-terra', RUN_CHECK_VARIANT='medium', RUN_CHECK_AUTH=str(auth)):
+                self.refusal_run(root, commands=commands)
+            model = next(command for name, command in commands if name == 'model')
+            self.assertEqual(model[model.index('--model') + 1], 'openai/gpt-6.1-terra')
+            self.assertEqual(model[model.index('--variant') + 1], 'medium')
+            copied = root / 'run/safe-refusal/profile/data/auth.json'
+            self.assertEqual(copied.read_text(), payload)
+            copied.write_text('{}')
+            self.assertEqual(auth.read_text(), payload)
 
     def test_flat_pair_preserves_the_assigned_account(self):
         config = {'username': 'test', 'url': 'https://app.loginom.ai', 'api_key': 'private', 'password': 'private', 'package_directory': '/test'}

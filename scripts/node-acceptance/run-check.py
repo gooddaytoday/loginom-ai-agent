@@ -33,8 +33,7 @@ CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential', 'logreg-partitio
 # LAB-1869: native Enrich autosync reorders RowID/Key on cold Execute.
 COLD_COLUMNS_BY_NAME_SCENARIOS = ('enrich-data-left',)
 D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week', 'tree-to-table-typed')
-# Acceptance model (B-106). No variant: models.json gives deepseek-flash none. Key comes from DEEPSEEK_API_KEY in the environment.
-MODEL = 'deepseek/deepseek-flash'  # the only place that names the model; `--variant` is never passed
+MODEL = 'deepseek/deepseek-flash'
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
@@ -2667,7 +2666,10 @@ class Runner:
                 parameter='/sort_result' if grouping else '/compare_with_locale', mode='variable',
                 variable=dict(kind='control', input=0, name='Flag', type='boolean', is_null=False), source=dict(type='variables.user', output=4))]
         write(folder / 'expected.json', expected)
-        command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', MODEL, '--dangerously-skip-permissions']
+        model_id = self.env.get('RUN_CHECK_MODEL') or MODEL
+        variant = self.env.get('RUN_CHECK_VARIANT')
+        command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', model_id, '--dangerously-skip-permissions']
+        if variant: command += ['--variant', variant]
         if session: command += ['--session', session]
         # Initial requests need their inputs even when the prose omits names.
         # Continuations only admit new, explicitly requested files (r3/r4).
@@ -2742,6 +2744,7 @@ class Runner:
         (folder / 'task.md').write_text(prompt)
         env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile), LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG='1', LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE='1', LOGINOM_AI_AGENT_PURE='1')
         if spec.get('two_turn'):
+            assert not variant, 'TWO_TURN_VARIANT_UNSUPPORTED'
             assert session is None, 'TWO_TURN_REQUIRES_FRESH_CHAT'
             # Unique physical name prevents collisions with prior attempts (#1157).
             source = workspace / 'rows.csv'
@@ -2753,12 +2756,12 @@ class Runner:
             second += '\n' + prompt[prompt.rfind('\nСохрани пакет как '):]
             config_path = profile / 'config/loginom-ai-agent.json'
             config = read(config_path)
-            config['model'] = MODEL
+            config['model'] = model_id
             write(config_path, config)
             (profile / 'state').mkdir(exist_ok=True)
             write(profile / 'state/model.json', dict(recent=[], favorite=[], variant={}))
             write(folder / 'two-turn.json', dict(executable=str(command[0]), workspace=str(workspace),
-                  profile=str(profile), folder=str(folder), kind=spec['two_turn'], prompts=[first, second], model=MODEL, daemon_pid=daemon_pid()))
+                  profile=str(profile), folder=str(folder), kind=spec['two_turn'], prompts=[first, second], model=model_id, daemon_pid=daemon_pid()))
             self.phase('model', [sys.executable, '-B', REPO / 'scripts/node-acceptance/run-check-two-turn.py',
                        folder / 'two-turn.json'], folder, timeout=1800, env=env, cwd=workspace)
         else:
@@ -3516,6 +3519,8 @@ class Runner:
                 return
             account = read(Path(self.options['pair']) / 'worker.json')
             login = pair_login(account, 'worker.json')
+            model_id = self.env.get('RUN_CHECK_MODEL') or MODEL
+            variant = self.env.get('RUN_CHECK_VARIANT')
             for r in self.report['runs']:
                 self.current = r
                 if time.time() >= self.deadline:
@@ -3526,14 +3531,17 @@ class Runner:
                 folder.mkdir()
                 profile, workspace = folder / 'profile', folder / 'workspace'
                 workspace.mkdir()
-                r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp', model=MODEL)
+                r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp', model=model_id)
+                if variant: r['variant'] = variant
                 env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile))
                 try:
                     if r['scenario'] in D87 and not self.options.get('case_root'):
                         self.prepared_case = self.prepare_d87(r['scenario'], folder)
                     self.phase('setup', [build / 'bin/loginom-ai-agent-cli', 'loginom', 'setup', '--headless', '--stdin-json', '--format', 'json'], folder, timeout=180, env=env, stdin=json.dumps(dict(url=login['url'], username=login['username'], password=login['password'])))
                     assert read(folder / 'setup.stdout').get('browser', {}).get('state') == 'verified', 'SETUP_NOT_VERIFIED'
-                    write(profile / 'config/loginom-ai-agent.json', dict(model=MODEL))
+                    if auth := self.env.get('RUN_CHECK_AUTH'):
+                        shutil.copyfile(Path(auth).expanduser(), profile / 'data/auth.json')
+                    write(profile / 'config/loginom-ai-agent.json', dict(model=model_id))
                     case = r['scenario']
                     spec = scenario(case, self.options.get('case_root'), cases=self.options.get('cases'))
                     if spec.get('fs_case') == 'paths':
