@@ -2810,6 +2810,7 @@ export interface ConfigApi<E = never> {
 export type ExperimentalConfigUpdateInput = {
   readonly shell?: string | null | undefined
   readonly permissions?: Permission.Ruleset | undefined
+  readonly removePermissions?: ReadonlyArray<{ readonly action: string; readonly resource: string }> | undefined
 }
 export type ExperimentalConfigUpdateOutput = void
 export type ExperimentalConfigUpdateOperation<E = never> = (

@@ -17,7 +17,7 @@
 //   applies in its `permission.evaluate` hook after every rule and before the product's. The product never lifts it
 //   (`settle`), refuses the conversation grant for a kind it touches, and tells the model who denied (`refusal`).
 import { setTimeout } from "node:timers/promises"
-import { permissionTable, wildcard, type Kind } from "@loginom-ai-agent/product/permissions"
+import { permissionTable, settingRules, wildcard, type Kind } from "@loginom-ai-agent/product/permissions"
 import type { Plugin } from "@opencode/plugin"
 import type { ToolContext } from "@opencode/plugin/promise/tool"
 import type { Permission } from "@opencode/schema/permission"
@@ -67,10 +67,8 @@ export function classify(action: string, resources: readonly string[]) {
  * The kinds a conversation grant may cover: where the product asks by default, except the terminal (В-31) and a
  * dashboard's deletion (В-102), which ask every time.
  */
-export function grantable(entry: Entry | undefined) {
-  return (
-    entry !== undefined && entry.kind !== "terminal" && entry.action !== "dashboard_delete" && entry.effect === "ask"
-  )
+export function grantable(entry: Entry | undefined, effect = entry?.effect) {
+  return entry !== undefined && entry.kind !== "terminal" && entry.action !== "dashboard_delete" && effect === "ask"
 }
 
 type Request = {
@@ -85,7 +83,13 @@ type Request = {
  * for a subagent's request, `granted` holds the session's conversation grants, `own` marks a read in the product's own
  * directories (`ownRead`).
  */
-export function settle(request: Request, subagent: boolean, granted: ReadonlySet<Kind>, own = false) {
+export function settle(
+  request: Request,
+  subagent: boolean,
+  granted: ReadonlySet<Kind>,
+  own = false,
+  eligible = grantable,
+) {
   // A deny reaches this hook only from an earlier one: the administrator's policy (B2.6c). Nothing the product allows
   // lifts it, and its text stays.
   if (request.effect === "deny") return { effect: "deny" as const }
@@ -105,7 +109,7 @@ export function settle(request: Request, subagent: boolean, granted: ReadonlySet
     return { effect: request.effect === "allow" ? ("ask" as const) : request.effect }
   // A subagent's own rules (`explore` allows sites and reading outside the project) do not loosen the defaults.
   const effect = subagent && entry.effect === "ask" && request.effect === "allow" ? "ask" : request.effect
-  if (effect === "ask" && grantable(entry) && granted.has(entry.kind)) return { effect: "allow" as const }
+  if (effect === "ask" && eligible(entry) && granted.has(entry.kind)) return { effect: "allow" as const }
   return { effect }
 }
 
@@ -167,15 +171,13 @@ export function deniedKinds(rules: readonly Permission.Rule[]) {
   return (Object.keys(kinds) as Kind[]).filter(
     (kind) =>
       kind !== "terminal" &&
-      table
-        .filter((entry) => entry.kind === kind)
-        .every(
-          (entry) =>
-            rules.findLast(
-              (rule) =>
-                wildcard(entry.action, rule.action, ignoreCase) && wildcard(entry.resource, rule.resource, ignoreCase),
-            )?.effect === "deny",
-        ),
+      settingRules(kind).every(
+        (entry) =>
+          rules.findLast(
+            (rule) =>
+              wildcard(entry.action, rule.action, ignoreCase) && wildcard(entry.resource, rule.resource, ignoreCase),
+          )?.effect === "deny",
+      ),
   )
 }
 
@@ -273,7 +275,9 @@ export async function askWithdrawn(
         open
           .filter((item) => item.source?.messageID === call.messageID && item.source.id === call.id)
           .map((item) =>
-            permission.reply({ sessionID: call.sessionID, requestID: item.id, decision: "once" }).catch(() => undefined),
+            permission
+              .reply({ sessionID: call.sessionID, requestID: item.id, decision: "once" })
+              .catch(() => undefined),
           ),
       )
       await setTimeout(50)

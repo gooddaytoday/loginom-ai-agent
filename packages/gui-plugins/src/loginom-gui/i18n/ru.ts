@@ -55,7 +55,5 @@ export default {
   permission_terminal: "Терминал",
   permissionTerminalToggle: "Разрешить агенту терминал",
   permission_terminal_hint: "Если включить, агент спросит про каждую команду и покажет её целиком.",
-  permissionDefault: "По умолчанию",
-  permissionChanged: "Вы изменили · по умолчанию «{{effect}}»",
-  permissionManaged: "Задано администратором",
+  permissionsProjectOverride: "Это разрешения профиля. В настройках проекта могут быть заданы другие правила.",
 }

@@ -55,7 +55,5 @@ export default {
   permission_terminal: "Terminal",
   permissionTerminalToggle: "Allow the agent to use the terminal",
   permission_terminal_hint: "When enabled, the agent shows every command in full and asks before running it.",
-  permissionDefault: "Default",
-  permissionChanged: "Changed · default: “{{effect}}”",
-  permissionManaged: "Set by your administrator",
+  permissionsProjectOverride: "These are profile permissions. Project settings may override them.",
 }

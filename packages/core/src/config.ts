@@ -186,13 +186,15 @@ export const layer = (options?: Options) =>
         // Logging out drops the saved remote config, so the source supplies nothing until a fresh fetch succeeds.
         if (!variables) return yield* wellknown.clearCached(entry.origin).pipe(Effect.as([]))
         // A failed refresh keeps the last resolved config so remote providers and allowlists do not disappear.
-        const configs = yield* wellknown.resolve(entry, variables).pipe(
-          Effect.catch((error) =>
-            Effect.logWarning("failed to load wellknown config", { source: entry.origin, error }).pipe(
-              Effect.andThen(wellknown.cached(entry.origin)),
+        const configs = yield* wellknown
+          .resolve(entry, variables)
+          .pipe(
+            Effect.catch((error) =>
+              Effect.logWarning("failed to load wellknown config", { source: entry.origin, error }).pipe(
+                Effect.andThen(wellknown.cached(entry.origin)),
+              ),
             ),
-          ),
-        )
+          )
         return yield* Effect.forEach(configs, (config) =>
           ConfigVariable.substitute({
             type: "virtual",
@@ -468,17 +470,27 @@ export const layer = (options?: Options) =>
 
       const update = Effect.fn("Config.update")(
         function* (patch: Patch) {
-          if (patch.shell === undefined && !patch.permissions?.length) return
+          if (patch.shell === undefined && !patch.permissions?.length && !patch.removePermissions?.length) return
           const directory = initial.global ?? AbsolutePath.make(globalService.config)
           const candidates = ConfigDiscovery.names.map((name) => path.join(directory, name))
           const filepath =
             (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "loginom-ai-agent.jsonc")
-          const text = (yield* fs.readFileStringSafe(filepath)) ?? "{}\n"
-          const updated = yield* Effect.try({
-            try: () => patchDocument(text, patch),
-            catch: (cause) => new FSUtil.FileSystemError({ method: "config.update", cause }),
-          })
-          yield* fs.writeWithDirs(filepath, updated.endsWith("\n") ? updated : `${updated}\n`)
+          const files = patch.removePermissions?.length
+            ? [...new Set([...(yield* Effect.filter(candidates, fs.isFile)), filepath])]
+            : [filepath]
+          const edits = yield* Effect.forEach(files, (file) =>
+            Effect.gen(function* () {
+              const text = (yield* fs.readFileStringSafe(file)) ?? "{}\n"
+              const updated = yield* Effect.try({
+                try: () =>
+                  patchDocument(text, file === filepath ? patch : { removePermissions: patch.removePermissions }),
+                catch: (cause) => new FSUtil.FileSystemError({ method: "config.update", cause }),
+              })
+              return { file, text, updated }
+            }),
+          )
+          for (const { file, text, updated } of edits)
+            if (text !== updated) yield* fs.writeWithDirs(file, updated.endsWith("\n") ? updated : `${updated}\n`)
           yield* requestReload
         },
         (effect) => updateLock.withPermit(effect),
@@ -536,14 +548,27 @@ function patchDocument(text: string, patch: Patch) {
     throw new Error("Invalid configuration document")
   const shell =
     patch.shell === undefined ? text : applyEdits(text, modify(text, ["shell"], patch.shell ?? undefined, options))
-  if (!patch.permissions?.length) return shell
+  if (!patch.permissions?.length && !patch.removePermissions?.length) return shell
   const permissions = document && "permissions" in document ? document.permissions : undefined
   if (permissions !== undefined && !Array.isArray(permissions)) throw new Error("Invalid configuration permissions")
-  const replaced = new Set(patch.permissions.map((rule) => JSON.stringify([rule.action, rule.resource])))
-  const remaining = (permissions ?? []).filter(
-    (rule) => !rule || !replaced.has(JSON.stringify([rule.action, rule.resource])),
-  )
-  return applyEdits(shell, modify(shell, ["permissions"], [...remaining, ...patch.permissions], options))
+  const key = (rule: { action?: unknown; resource?: unknown }) => JSON.stringify([rule.action, rule.resource])
+  const incoming = new Map(patch.permissions?.map((rule) => [key(rule), rule]))
+  const removed = new Set(patch.removePermissions?.map(key))
+  const existing = permissions ?? []
+  const remaining = existing.flatMap((rule) => {
+    if (!rule) return [rule]
+    const pair = key(rule)
+    if (removed.has(pair)) return []
+    const replacement = incoming.get(pair)
+    return [replacement ?? rule]
+  })
+  const present = new Set(existing.filter(Boolean).map(key))
+  const updated = [
+    ...remaining,
+    ...[...incoming].filter(([pair]) => !present.has(pair) || removed.has(pair)).map(([, rule]) => rule),
+  ]
+  if (isDeepStrictEqual(existing, updated)) return shell
+  return applyEdits(shell, modify(shell, ["permissions"], updated, options))
 }
 
 export const node = configured()

@@ -1,10 +1,4 @@
-import {
-  permissionDefaults,
-  permissionKinds,
-  settingEffect,
-  settingRules,
-  type Kind,
-} from "@loginom-ai-agent/product/permissions"
+import { permissionKinds, settingEffect, settingRules, type Kind } from "@loginom-ai-agent/product/permissions"
 import { usePlugin } from "@opencode/plugin/gui"
 import type { Permission } from "@opencode/schema/permission"
 import { createResource, createSignal, For, onCleanup, Show } from "solid-js"
@@ -14,7 +8,6 @@ import { useProfileClient } from "./profile-client"
 const effects = ["allow", "ask", "deny"] as const
 type Settings = {
   rules: Permission.Ruleset
-  policy?: Partial<Record<Kind, Permission.Effect>>
 }
 
 export default function PermissionsPage() {
@@ -42,9 +35,24 @@ export default function PermissionsPage() {
     if (!server || !current || !permissions.length || saving()) return
     setFailed(false)
     setSaving(true)
-    mutate({ ...current, rules: [...current.rules, ...permissions] })
+    const same = (left: Permission.Rule, right: Permission.Rule) =>
+      left.action === right.action && left.resource === right.resource
+    const removePermissions = permissions.filter((rule) =>
+      permissionKinds.some((kind) =>
+        settingRules(kind).some((entry) => same(entry, rule) && entry.effect === rule.effect),
+      ),
+    )
+    const updates = permissions.filter((rule) => !removePermissions.includes(rule))
+    mutate({
+      rules: [
+        ...current.rules
+          .filter((rule) => !removePermissions.some((entry) => same(entry, rule)))
+          .map((rule) => updates.find((entry) => same(entry, rule)) ?? rule),
+        ...updates.filter((rule) => !current.rules.some((entry) => same(entry, rule))),
+      ],
+    })
     try {
-      await server.experimental.config.update({ permissions }, { signal: signal() })
+      await server.experimental.config.update({ permissions: updates, removePermissions }, { signal: signal() })
     } catch {
       if (client() === server && !lifetime.signal.aborted) {
         mutate(current)
@@ -56,20 +64,13 @@ export default function PermissionsPage() {
     }
   }
 
-  const policy = (kind: Kind) => settings()?.policy?.[kind]
-  const current = (kind: Kind) => policy(kind) ?? settingEffect(kind, settings()?.rules ?? [])
+  const current = (kind: Kind) => settingEffect(kind, settings()?.rules ?? [])
   const label = (effect: ReturnType<typeof current>) => ctx.t(`permission_${effect}`)
-  const mark = (kind: Kind) => {
-    if (policy(kind)) return ctx.t("permissionManaged")
-    if (!settings()?.policy) return
-    return current(kind) === permissionDefaults[kind]
-      ? ctx.t("permissionDefault")
-      : ctx.t("permissionChanged", { effect: label(permissionDefaults[kind]) })
-  }
-  const disabled = (kind: Kind) => saving() || settings.loading || !!policy(kind)
+  const disabled = () => saving() || settings.loading
 
   return (
     <ui.SettingsLayout title={ctx.t("permissionsTitle")} description={ctx.t("permissionsDescription")}>
+      <p class="text-12-regular text-text-base">{ctx.t("permissionsProjectOverride")}</p>
       <Show when={settings.loading || saving()}>
         <p role="status">{ctx.t(saving() ? "saving" : "permissionsLoading")}</p>
       </Show>
@@ -92,9 +93,7 @@ export default function PermissionsPage() {
             <div class="pt-3">
               <ui.Button
                 disabled={saving() || settings.loading}
-                onClick={() =>
-                  void save(permissionKinds.filter((kind) => !policy(kind)).flatMap((kind) => settingRules(kind)))
-                }
+                onClick={() => void save(permissionKinds.flatMap((kind) => settingRules(kind)))}
               >
                 {ctx.t("permissionsReset")}
               </ui.Button>
@@ -108,8 +107,7 @@ export default function PermissionsPage() {
                   <select
                     class="max-w-full cursor-pointer rounded-md border border-border-base bg-surface-raised-base px-2 py-1 text-text-strong"
                     aria-label={ctx.t(`permission_${kind}`)}
-                    aria-describedby={mark(kind) ? `permission-${kind}-mark` : undefined}
-                    disabled={disabled(kind)}
+                    disabled={disabled()}
                     onChange={(event) => {
                       const effect = effects.find((value) => value === event.currentTarget.value)
                       if (effect) void save(settingRules(kind, effect))
@@ -128,9 +126,6 @@ export default function PermissionsPage() {
                       )}
                     </For>
                   </select>
-                  <Show when={mark(kind)}>
-                    <small id={`permission-${kind}-mark`}>{mark(kind)}</small>
-                  </Show>
                 </div>
               </ui.SettingsRow>
             )}
@@ -141,8 +136,7 @@ export default function PermissionsPage() {
             <ui.Switch
               label={ctx.t("permissionTerminalToggle")}
               hideLabel
-              description={mark("terminal")}
-              disabled={disabled("terminal")}
+              disabled={disabled()}
               checked={current("terminal") === "ask"}
               onChange={(checked) => void save(settingRules("terminal", checked ? "ask" : "deny"))}
             />

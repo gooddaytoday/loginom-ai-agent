@@ -69,7 +69,7 @@
 
 ## CAT-14 Разрешения профиля (C2.3)
 
-`schema/src/config.ts` и `core/src/config.ts`: `/api/config` помечает документы пользовательского профиля, а существующий `PATCH /api/experimental/config` принимает правила `permissions` в дополнение к `shell`. Сервер заменяет совпадающие пары «действие / ресурс» и добавляет новые правила в конец с сохранением прочих настроек и порядка сторонних правил. Promise- и Effect-клиенты перегенерированы (`bun run generate` в `packages/client`).
+`schema/src/config.ts` и `core/src/config.ts`: `/api/config` помечает документы пользовательского профиля, а существующий `PATCH /api/experimental/config` принимает `permissions` и `removePermissions`. Сервер заменяет пары «действие / ресурс» на их месте, добавляет только новые пары в конец, а при сбросе удаляет пары из файлов профиля, не затрагивая встроенные правила агента. Promise- и Effect-клиенты перегенерированы (`bun run generate` в `packages/client`).
 
 Виды действий и значения установки общие для серверного плагина и страницы «Разрешения»: `packages/product/src/permissions.ts`. Строка чтения не меняет разрешение `external_directory`; включение терминала сохраняет `ask`. Запрет сохранения покрывает `package.save_as` и `package.save_checkpoint` (`loginom_dock_action_run`), загрузку копии локального пакета и публикацию и удаление дашбордов. Экспорт проверяется по ресурсу `exports.*` инструмента `loginom_dock_node_apply`. Политика из `policy.json` подключается на этапе F.
 

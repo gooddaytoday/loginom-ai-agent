@@ -4,6 +4,7 @@
 import { join } from "node:path"
 import { Definition as ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
+import { settingEffect } from "@loginom-ai-agent/product/permissions"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
@@ -184,15 +185,15 @@ export default Plugin.define({
       const lease = dashboard()
         ? Promise.resolve(undefined)
         : ServiceHost.acquire(sessionID).then(
-          (lease) => {
-            refused.delete(sessionID)
-            return lease
-          },
-          (error) => {
-            refused.set(sessionID, "acquire: " + hostErrorText(error))
-            return undefined
-          },
-        )
+            (lease) => {
+              refused.delete(sessionID)
+              return lease
+            },
+            (error) => {
+              refused.set(sessionID, "acquire: " + hostErrorText(error))
+              return undefined
+            },
+          )
       runs.set(sessionID, { lease, endTurn })
       return lease
     }
@@ -264,6 +265,15 @@ export default Plugin.define({
     const offered = new Map<string, Set<string>>()
     // The product's defaults and settings: the rules of the default agent `build`, which has none of its own (B2.6b2).
     const settings: Permission.Rule[] = []
+    const eligible = (entry: ReturnType<typeof classify>) =>
+      grantable(
+        entry,
+        entry?.action === "external_directory" || !entry
+          ? entry?.effect
+          : settingEffect(entry.kind, settings) === "ask"
+            ? "ask"
+            : "allow",
+      )
     await ctx.agent.transform((editor) => {
       subagents.clear()
       editor.list().forEach((agent) => {
@@ -328,6 +338,7 @@ export default Plugin.define({
         event.agent !== undefined && subagents.has(event.agent),
         conversation.get(event.sessionID) ?? new Set(),
         ownRead(tool, event, own),
+        eligible,
       )
       event.effect = settled.effect
       if (settled.message) event.message = settled.message
@@ -525,7 +536,7 @@ export default Plugin.define({
         const input = value as { sessionID: string; requestID: string }
         const request = await ctx.permission.get(input)
         const entry = classify(request.action, request.resources)
-        if (!entry || !grantable(entry))
+        if (!entry || !eligible(entry))
           return call.error("not_grantable", `${request.action} is asked for every time`, { action: request.action })
         // A kind the administrator's policy denies, whole or in one of its entries, is a locked row: its requests are
         // answered one at a time (B2.6c, ux-spec «строки с замком в разговоре не разрешить»).
@@ -549,7 +560,7 @@ export default Plugin.define({
           open
             .filter((item) => {
               const other = classify(item.action, item.resources)
-              return item.id === request.id || (grantable(other) && other?.kind === entry.kind)
+              return item.id === request.id || (eligible(other) && other?.kind === entry.kind)
             })
             .map((item) => ctx.permission.reply({ sessionID: input.sessionID, requestID: item.id, decision: "once" })),
         )

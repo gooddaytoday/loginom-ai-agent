@@ -119,8 +119,9 @@ export class Info extends Schema.Class<Info>("Config.Info")({
 export const Patch = Schema.Struct({
   shell: Schema.NullOr(Schema.String).pipe(optional),
   permissions: Permission.Ruleset.pipe(optional).annotate({
-    description: "Replace rules with the same action and resource, appending the supplied rules in order",
+    description: "Replace matching rules in place and append new rules in order",
   }),
+  removePermissions: Schema.Array(Schema.Struct({ action: Schema.String, resource: Schema.String })).pipe(optional),
 }).annotate({ identifier: "Config.Patch" })
 export interface Patch extends Schema.Schema.Type<typeof Patch> {}
 

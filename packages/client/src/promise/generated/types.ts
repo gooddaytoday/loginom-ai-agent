@@ -4913,6 +4913,7 @@ export type ExperimentalConfigUpdateInput = {
   readonly permissions?:
     | ReadonlyArray<{ readonly action: string; readonly resource: string; readonly effect: "allow" | "deny" | "ask" }>
     | undefined
+  readonly removePermissions?: ReadonlyArray<{ readonly action: string; readonly resource: string }> | undefined
 }
 
 export type ExperimentalConfigUpdateOutput = void

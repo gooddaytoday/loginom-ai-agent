@@ -277,13 +277,23 @@ describe("loginom.product permissions (B2.6a)", () => {
         const profile = path.join(test.dir, "global", "config", "loginom-ai-agent.jsonc")
         const at = `location[directory]=${encodeURIComponent(test.dir)}`
         const other = { action: "other_tool", resource: "*", effect: "deny" }
+        const edit = { action: "edit", resource: "*", effect: "deny" }
+        const exception = { action: "edit", resource: "docs/*", effect: "allow" }
+        const agents = () =>
+          test.call(`/api/agent?${at}`).pipe(
+            Effect.map((response) => {
+              expect(response.status).toBe(200)
+              return response.body.data
+            }),
+          )
+        const installed = yield* agents()
         yield* Effect.promise(() =>
           Bun.write(
             profile,
             `{
   // keep this comment
   "shell": "bash",
-  "permissions": [${JSON.stringify(other)}]
+  "permissions": ${JSON.stringify([other, edit, exception])}
 }\n`,
           ),
         )
@@ -291,7 +301,9 @@ describe("loginom.product permissions (B2.6a)", () => {
           Effect.gen(function* () {
             const patch = yield* test.call(
               `/api/experimental/config?${at}`,
-              { permissions: settingRules("save", effect) },
+              effect === "ask"
+                ? { removePermissions: settingRules("save") }
+                : { permissions: settingRules("save", effect) },
               "PATCH",
             )
             expect(patch.status).toBe(204)
@@ -316,12 +328,52 @@ describe("loginom.product permissions (B2.6a)", () => {
         expect(commits).toEqual(["allowed.lgp"])
         expect(yield* test.open(id)).toEqual([])
         expect(yield* test.tools(id)).toMatchObject([{ state: { status: "error" } }])
-        expect(denied.permissions).toEqual([other, ...settingRules("save", "deny")])
+        expect(denied.permissions).toEqual([other, edit, exception, ...settingRules("save", "deny")])
         expect(denied.shell).toBe("bash")
         expect(yield* Effect.promise(() => Bun.file(profile).text())).toContain("// keep this comment")
 
         const reset = yield* rules("ask")
-        expect(reset.permissions).toEqual([other, ...settingRules("save")])
+        expect(reset.permissions).toEqual([other, edit, exception])
+        const patch = (body: object) =>
+          test
+            .call(`/api/experimental/config?${at}`, body, "PATCH")
+            .pipe(Effect.map((response) => expect(response.status).toBe(204)))
+        for (const effect of ["ask", "deny"]) {
+          yield* patch({ permissions: [{ ...edit, effect }] })
+          const current = yield* until(() =>
+            test.call(`/api/config?${at}`).pipe(
+              Effect.map((response) => {
+                const rules = response.body.find((entry: { profile?: boolean }) => entry.profile)?.info.permissions
+                return rules?.some(
+                  (rule: { action: string; resource: string; effect: string }) =>
+                    rule.action === "edit" && rule.resource === "*" && rule.effect === effect,
+                )
+                  ? rules
+                  : undefined
+              }),
+            ),
+          )
+          expect(current).toEqual([other, { ...edit, effect }, exception])
+        }
+        yield* patch({ removePermissions: [edit, exception, other] })
+        yield* until(() =>
+          agents().pipe(
+            Effect.map((current) => (JSON.stringify(current) === JSON.stringify(installed) ? true : undefined)),
+          ),
+        )
+        yield* patch({ permissions: [...settingRules("read", "ask"), ...settingRules("terminal", "allow")] })
+        yield* until(() =>
+          agents().pipe(
+            Effect.map((current) => (JSON.stringify(current) !== JSON.stringify(installed) ? true : undefined)),
+          ),
+        )
+        const reader = yield* test.create("read asks")
+        const read = { action: "read", resources: ["inside.txt"], source }
+        const first = yield* test.ask(reader, read)
+        expect(first.effect).toBe("ask")
+        expect((yield* test.conversation(reader, first.id)).body).toEqual({ output: { kind: "read" } })
+        expect((yield* test.ask(reader, read)).effect).toBe("allow")
+        expect((yield* test.ask(reader, { action: "shell", resources: ["echo test"], source })).effect).toBe("ask")
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
