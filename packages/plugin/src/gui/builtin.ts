@@ -169,6 +169,14 @@ export interface Page {
  */
 export const Page = Registry.define<Page>("page")
 
+export interface ComposerAddItem {
+  readonly title: string
+  readonly icon?: IconName
+  run(openPage: (id: string) => void): void
+}
+
+export const ComposerAddItem = Registry.define<ComposerAddItem>("composer-add-item")
+
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */

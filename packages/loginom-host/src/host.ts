@@ -17,7 +17,8 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
-import { decodeFolderListing, type FolderListing, ReadFolder } from "./package-folder"
+import { decodeFolderListing, Package, ReadFolder } from "./package-folder"
+import { UploadInput, validUpload } from "./package-upload"
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
 export async function verifyInstallationResources(options: {
@@ -366,7 +367,7 @@ export async function createLoginomHost(options: {
   async function launch(
     connection: ActiveConnection,
     chat: string,
-    purpose: "validation" | "dashboard" | "chat" | { packageFolder: string },
+    purpose: "validation" | "dashboard" | "chat" | { packageFolder: string; upload?: UploadInput },
     signal?: AbortSignal,
     deadline?: number,
     validationHttpCache = false,
@@ -469,6 +470,7 @@ export async function createLoginomHost(options: {
         connection,
         validation,
         packageFolder,
+        packageUpload: typeof purpose === "object" ? purpose.upload : undefined,
         validationHttpCache: httpCache,
         validationLogout,
         // CLI supplies its explicit browser policy for background launches too.
@@ -639,10 +641,17 @@ export async function createLoginomHost(options: {
       lease.release()
     }
   }
-  const packageReads = new Map<AbortController, Promise<FolderListing>>()
-  async function performFolderRead(input: ReadFolder, signal: AbortSignal) {
+  const packageReads = new Map<AbortController, Promise<unknown>>()
+  function packageStorage(input: ReadFolder | UploadInput, signal?: AbortSignal) {
+    const controller = new AbortController()
+    const pending = performPackageStorage(input, signal ? AbortSignal.any([signal, controller.signal]) : controller.signal)
+    packageReads.set(controller, pending)
+    void pending.finally(() => packageReads.delete(controller)).catch(() => undefined)
+    return pending
+  }
+  async function performPackageStorage(input: ReadFolder | UploadInput, signal: AbortSignal) {
     signal.throwIfAborted()
-    if (!Schema.is(ReadFolder)(input)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+    const purpose = "folder" in input ? { packageFolder: input.folder } : { packageFolder: "/user", upload: input }
     const chat = randomUUID()
     const lease = service.acquire(chat)
     if (!lease) throw Error("LOGINOM_CONNECTION_NOT_READY")
@@ -650,12 +659,12 @@ export async function createLoginomHost(options: {
     try {
       const current = generations.get(input.generation)
       if (!current || lease.generation !== input.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
-      const runtime = await launch(current.connection, chat, { packageFolder: input.folder }, signal)
+      const runtime = await launch(current.connection, chat, purpose, signal)
       cleanupConfirmed = false
       await runtime.close()
       cleanupConfirmed = true
       signal.throwIfAborted()
-      return decodeFolderListing("listing" in runtime.ready ? runtime.ready.listing : undefined, input.folder)
+      return "listing" in runtime.ready ? runtime.ready.listing : "uploaded" in runtime.ready ? runtime.ready.uploaded : undefined
     } catch (error) {
       if (error instanceof Error && error.message === "LOGINOM_RUNTIME_CLEANUP_FAILED") cleanupConfirmed = false
       if (!cleanupConfirmed) shutdown.failed = true
@@ -713,12 +722,16 @@ export async function createLoginomHost(options: {
     },
     browserRecovery: options.browserRecovery === true,
     references,
-    readPackageFolder(input: ReadFolder, signal?: AbortSignal) {
-      const controller = new AbortController()
-      const pending = performFolderRead(input, signal ? AbortSignal.any([signal, controller.signal]) : controller.signal)
-      packageReads.set(controller, pending)
-      void pending.finally(() => packageReads.delete(controller)).catch(() => undefined)
-      return pending
+    async readPackageFolder(input: ReadFolder, signal?: AbortSignal) {
+      if (!Schema.is(ReadFolder)(input)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      return decodeFolderListing(await packageStorage(input, signal), input.folder)
+    },
+    async uploadPackage(input: UploadInput, signal?: AbortSignal) {
+      if (!Schema.is(UploadInput)(input) || !validUpload(input)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      const result = await packageStorage(input, signal)
+      if (!Schema.is(Package)(result) || result.path !== `/user/${input.name}` || result.name !== input.name)
+        throw Error("LOGINOM_REPLY_INVALID")
+      return result
     },
     async readDashboard(input: DashboardRead, signal?: AbortSignal): Promise<PublicationSource | null> {
       if (!Schema.is(DashboardRead)(input)) throw new Error("DASHBOARD_INPUT_INVALID")

@@ -11,6 +11,7 @@ import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
 import { decodeFolderListing, type ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
+import type { UploadInput } from "@loginom-ai-agent/loginom-host/package-upload"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { Option, Schema } from "effect"
@@ -165,6 +166,22 @@ export const packageFolders = {
     return generation
   },
   async read(input: ReadFolder, signal: AbortSignal) {
+    return decodeFolderListing(await packageRequest("packages.list", input, signal), input.folder)
+  },
+}
+
+export async function uploadPackage(input: UploadInput, signal: AbortSignal) {
+  const view = await connectionView()
+  if (view.generation !== input.generation) throw Error("LOGINOM_CONNECTION_NOT_READY")
+  if (connectionSettings.deviceOnly()) {
+    const hostname = new URL(view.url).hostname
+    if (hostname !== "localhost" && hostname !== "[::1]" && !/^127(?:\.\d{1,3}){3}$/.test(hostname))
+      throw Error("LOGINOM_CONNECTION_NOT_READY")
+  }
+  return packageRequest("packages.upload", input, signal)
+}
+
+async function packageRequest(method: "packages.list" | "packages.upload", input: ReadFolder | UploadInput, signal: AbortSignal) {
     signal.throwIfAborted()
     const current = state.current
     const connection = await current?.ready
@@ -175,13 +192,12 @@ export const packageFolders = {
     const cancel = () => { void request("packages.cancel", { requestId }).catch(() => undefined) }
     signal.addEventListener("abort", cancel, { once: true })
     try {
-      const result = await request("packages.list", { ...input, requestId })
+      const result = await request(method, { ...input, requestId }, 145_000)
       signal.throwIfAborted()
-      return decodeFolderListing(result, input.folder)
+      return result
     } finally {
       signal.removeEventListener("abort", cancel)
     }
-  },
 }
 
 async function request(method: string, input: unknown, timeout?: number) {

@@ -5,6 +5,7 @@ import { TextField } from "@opencode/ui/text-field"
 import { createMemo, createSignal, onCleanup, Show, untrack } from "solid-js"
 import type definition from "./index"
 import { initial, transition, view } from "./machine"
+import { loginomClient } from "./package-rpc"
 
 export default function Page() {
   const ctx = usePlugin<typeof definition>()
@@ -14,15 +15,7 @@ export default function Page() {
 
   const errorText = (issue: Issue | undefined) => (issue ? ctx.t(issue) : undefined)
 
-  const client = createMemo(() => {
-    const servers = ctx.servers.list().flatMap((id) => ctx.servers.get(id) ?? [])
-    // Desktop owns the sidecar. Web uses the serving origin, or the single local service in development.
-    if (ctx.desktop) return servers.find((server) => server.builtin)?.client
-    const serving = ctx.servers.get(location.origin)
-    if (serving) return serving.client
-    const local = servers.filter((server) => server.local)
-    if (local.length === 1) return local.at(0)?.client
-  })
+  const client = createMemo(() => loginomClient(ctx))
 
   let controller: AbortController | undefined
   let timer: ReturnType<typeof setTimeout> | undefined

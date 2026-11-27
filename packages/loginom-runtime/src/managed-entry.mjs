@@ -202,13 +202,18 @@ async function handle(message) {
         return
       }
       if (packageReader) {
-        const { listing, readMs } = await packageReader.withPackageFolderSession({
+        const storage = {
           login: () => loginBrowser({ ...login, keepOpen: true, reportSessionLimit: true }),
-          folder: input.packageFolder,
           origin: new URL(input.connection.url).origin,
           username: input.connection.username,
           signal: state.startupController.signal,
-        })
+        }
+        if (input.packageUpload) {
+          const uploaded = await packageReader.withPackageUploadSession({ ...storage, upload: input.packageUpload, temporary: input.chat })
+          send({ id: message.id, result: { uploaded, protocol: 1, generation: input.generation } })
+          return
+        }
+        const { listing, readMs } = await packageReader.withPackageFolderSession({ ...storage, folder: input.packageFolder })
         await startupPhase({ phase: "packages.read", status: "ready", duration_ms: readMs })
         send({ id: message.id, result: { listing, protocol: 1, generation: input.generation } })
         return

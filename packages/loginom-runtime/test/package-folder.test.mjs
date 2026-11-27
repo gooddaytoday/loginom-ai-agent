@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { runInNewContext } from "node:vm"
-import { withPackageFolderSession } from "../src/package-folder.mjs"
+import { withPackageFolderSession, withPackageUploadSession } from "../src/package-folder.mjs"
 
 const origin = "https://stand.example.test"
 const folder = "/user"
@@ -67,7 +67,7 @@ function fixture() {
     },
   }
   const evaluate = (fn, input) => runInNewContext(`(${fn})(input)`, {
-    Date, input, location: new URL(origin),
+    Date, atob, input, location: new URL(origin),
     ReleaseObject: (value, awaited) => { assert.equal(awaited, true); released.push(value) },
     bg: {
       app: { Application: { FInstance: app } },
@@ -94,7 +94,7 @@ function fixture() {
   const login = async () => ({
     context: { pages: () => [page], close: async () => { events.push(["close browser"]) } },
   })
-  return { events, fileList, released, form, app, read: (signal, path = folder) => withPackageFolderSession({
+  return { events, fileList, released, form, app, storage, login, read: (signal, path = folder) => withPackageFolderSession({
     login, folder: path, origin, username, signal,
   }) }
 }
@@ -142,4 +142,41 @@ test("a Files window for a different folder does not become a successful empty r
   f.form.SetCurrentDirLockWrapper = async () => {}
   await assert.rejects(f.read(), { message: "LOGINOM_PACKAGE_FOLDER_UNAVAILABLE" })
   assert.deepEqual(f.events, [["open Files"], ["logout"], ["close browser"]])
+})
+
+test("uploads exact bytes as a copy and never overwrites an existing package", async () => {
+  const files = new Map()
+  const bytes = Buffer.concat([Buffer.alloc(512 * 1024, 47), Buffer.from("demo")])
+  const path = "/user/Продажи.lgp"
+  const date = new Date("2026-11-25T15:11:00Z")
+  for (const exists of [false, true]) {
+    const f = fixture()
+    Object.assign(f.storage, {
+      CreateFile(name) {
+        const chunks = []
+        files.set(name, chunks)
+        return { WriteBuffer: (chunk) => chunks.push(Buffer.from(chunk)) }
+      },
+      MoveFile(from, to, overwrite) {
+        if (!overwrite && files.has(to)) return false
+        files.set(to, files.get(from))
+        files.delete(from)
+        return true
+      },
+      GetFileInfo(name) {
+        return files.has(name) ? { Size: Buffer.concat(files.get(name)).length, Time: date } : null
+      },
+      DeleteFile(name) { files.delete(name) },
+    })
+    const copy = (content) => withPackageUploadSession({
+      login: f.login, origin, username, temporary: "fixture", upload: { name: "Продажи.lgp", content },
+    })
+    if (exists) await assert.rejects(copy(Buffer.from("other").toString("base64")), { message: "LOGINOM_PACKAGE_UPLOAD_UNCONFIRMED" })
+    else assert.deepEqual({ ...(await copy(bytes.toString("base64"))) }, {
+      kind: "package", name: "Продажи.lgp", path, sizeBytes: bytes.length, modifiedAt: date.toISOString(),
+    })
+    assert.deepEqual([...files.keys()], [path])
+    assert.deepEqual(Buffer.concat(files.get(path)), bytes)
+    assert.deepEqual(f.events, [["logout"], ["close browser"]])
+  }
 })

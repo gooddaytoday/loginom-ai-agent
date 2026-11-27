@@ -4,6 +4,9 @@
 import { join } from "node:path"
 import { Definition as ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
+import { Package } from "@loginom-ai-agent/loginom-host/package-folder"
+import { UploadRpc } from "@loginom-ai-agent/loginom-host/package-upload"
+import { Schema } from "effect"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
@@ -523,6 +526,17 @@ export default Plugin.define({
       find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),
     })
     await ctx.rpc.register(Packages, packageListHandlers())
+    await ctx.rpc.register(UploadRpc, {
+      async upload(input, call) {
+        try {
+          const result = await ServiceHost.uploadPackage(input, call.signal)
+          if (Schema.is(Package)(result)) return result
+        } catch {
+          call.signal.throwIfAborted()
+        }
+        return call.error("unavailable", "Package upload not confirmed")
+      },
+    })
     await ctx.rpc.register(permission, {
       conversation: async (value, call) => {
         const input = value as { sessionID: string; requestID: string }

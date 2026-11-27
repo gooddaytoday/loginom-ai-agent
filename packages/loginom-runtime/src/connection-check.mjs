@@ -515,7 +515,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
     await phase({ phase: "login", status: "starting", attempt: attempt + 1 })
     const page = context.pages()[0] ?? (await context.newPage())
     const result = await loginPage(page, candidate, { deadline, themeState, onThemeReload: record, onPhase: phase,
-      sameOrigin: validationLogout, reportSessionLimit })
+      sameOrigin: validationLogout || reportSessionLimit, reportSessionLimit })
       .then(async result => {
         await phase({ phase: "login", status: "ready", attempt: attempt + 1, duration_ms: Math.round(performance.now() - loginStarted) })
         return result

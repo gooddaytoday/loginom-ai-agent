@@ -5,6 +5,7 @@ import { isAbsolute, join } from "node:path"
 import { hostError, hostException } from "./errors"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { recordLocalDiagnostics } from "../../loginom-runtime/client/lib/local-diagnostics.mjs"
+import type { UploadInput } from "./package-upload"
 
 export type Launch = {
   node: string
@@ -18,6 +19,7 @@ export type Launch = {
   actionManifestSha256?: string
   validation?: boolean
   packageFolder?: string
+  packageUpload?: UploadInput
   // Host-owned HTTP cache only; browser profiles and authentication remain fresh.
   validationHttpCache?: boolean
   validationLogout?: boolean
@@ -126,7 +128,7 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
   const ready = runtime.ready
   if (
     input.packageFolder !== undefined
-      ? !("listing" in ready)
+      ? !((input.packageUpload ? "uploaded" : "listing") in ready)
       : input.validation
         ? !("checked" in ready) || ready.checked !== true
         : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat

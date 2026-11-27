@@ -147,12 +147,63 @@ async function readPackageFolder(page, input, signal) {
 }
 
 export async function withPackageFolderSession({ login, folder, origin, username, signal }) {
-  const { context } = await login()
-  const page = context.pages()[0]
-  try {
+  return withPackageStorage({ login, origin, username }, async page => {
     const started = performance.now()
     const listing = await readPackageFolder(page, { folder, origin, username }, signal)
     return { listing, readMs: Math.round(performance.now() - started) }
+  })
+}
+
+export async function withPackageUploadSession({ login, origin, username, signal, upload, temporary }) {
+  return withPackageStorage({ login, origin, username }, async page => {
+    const saved = await bounded(() => page.evaluate(async ({ origin, username, name, content, temporary }) => {
+      const mapTree = () => globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree
+      const connection = mapTree()?.FServerConnection
+      const session = connection?.Session
+      const ownsSession = () => location.origin === origin && connection?.Connected === true
+        && connection.UserName === username && mapTree()?.FServerConnection === connection && connection.Session === session
+      if (!session || !ownsSession()) return null
+      const storage = await session.get_FileStorage()
+      const bytes = Uint8Array.from(atob(content), character => character.charCodeAt(0))
+      if (!ownsSession()) return null
+      const path = `/user/${name}`
+      const staged = `/user/.loginom-agent-${temporary}.part`
+      let moved = false
+      const stream = await storage.CreateFile(staged)
+      try {
+        try {
+          for (let offset = 0; offset < bytes.length; offset += 512 * 1024)
+            await stream.WriteBuffer(bytes.subarray(offset, offset + 512 * 1024))
+        } finally {
+          await ReleaseObject(stream, true)
+        }
+        if (!ownsSession() || await storage.MoveFile(staged, path, false) !== true) return null
+        moved = true
+        const info = await storage.GetFileInfo(path)
+        if (!info) return null
+        try {
+          const sizeBytes = await info.Size
+          const time = await info.Time
+          return sizeBytes === bytes.length && ownsSession()
+            ? { kind: "package", name, path, modifiedAt: time instanceof Date ? time.toISOString() : time, sizeBytes }
+            : null
+        } finally {
+          await ReleaseObject(info, true)
+        }
+      } finally {
+        if (!moved && ownsSession()) await storage.DeleteFile(staged)
+      }
+    }, { origin, username, name: upload.name, content: upload.content, temporary }), 60_000, signal)
+    if (!saved) throw Error("LOGINOM_PACKAGE_UPLOAD_UNCONFIRMED")
+    return saved
+  })
+}
+
+async function withPackageStorage({ login, origin, username }, work) {
+  const { context } = await login()
+  const page = context.pages()[0]
+  try {
+    return await work(page)
   } finally {
     try {
       const loggedOut = await bounded(() => page.evaluate(async ({ origin, username }) => {
