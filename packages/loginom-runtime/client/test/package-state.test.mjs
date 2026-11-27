@@ -29,6 +29,7 @@ function fixture() {
   const receipt = {
     phase: 'verified', request: JSON.stringify({ session: 'chat' }), packageNode: owned,
     openConnection: connection, openServerSession: session,
+    stepSession: { connection, nativeSession: session },
   };
   const globals = {
     document, location: { origin },
@@ -44,19 +45,24 @@ function fixture() {
   };
   const page = { url: () => origin, evaluate: (read, input) => runInNewContext(`(${read})(input)`, { ...globals, input, setTimeout, clearTimeout }) };
   const read = createPackageStateReader(metadata, origin, () => data.time);
-  const snapshot = (save) => read({ pages: () => [page] }, save);
-  return { snapshot, data, owned, packages, connection };
+  const snapshot = (save, busy) => read({ pages: () => [page] }, save, busy);
+  const stepRefresh = () => {
+    const { phase, request, packageNode, stepSession } = receipt;
+    globals.__loginomDockPreparationV1.receipts.set('refresh', { phase, request, packageNode, stepSession, stepRefresh: true });
+    metadata.workspacePreparation = { ...metadata.workspacePreparation, operation_id: 'refresh' };
+  };
+  return { snapshot, data, owned, packages, connection, page, stepRefresh };
 }
 
 test('reads the conversation draft even when another package is active', async () => {
   const { snapshot, data } = fixture();
   assert.deepEqual(await snapshot(), {
-    open: true, path: null, modified: false, modifiedDetectedAt: null, lastSave: null,
+    open: true, path: null, modified: false, modifiedDetectedAt: null, lastSave: null, staleForSeconds: null,
   });
   data.time = 200;
   data.modified = true;
   assert.deepEqual(await snapshot(), {
-    open: true, path: null, modified: true, modifiedDetectedAt: 200, lastSave: null,
+    open: true, path: null, modified: true, modifiedDetectedAt: 200, lastSave: null, staleForSeconds: null,
   });
   data.time = 300;
   assert.equal((await snapshot()).modifiedDetectedAt, 200);
@@ -71,15 +77,15 @@ test('reports confirmed Save independently of current dirty state and package cl
   owned.PackageFileName = 'user\\result.lgp';
   const lastSave = { path: '/user/result.lgp', confirmedAt: 90 };
   assert.deepEqual(await snapshot(lastSave), {
-    open: true, path: '/user/result.lgp', modified: false, modifiedDetectedAt: null, lastSave,
+    open: true, path: '/user/result.lgp', modified: false, modifiedDetectedAt: null, lastSave, staleForSeconds: null,
   });
   data.modified = true;
   assert.deepEqual(await snapshot(lastSave), {
-    open: true, path: '/user/result.lgp', modified: true, modifiedDetectedAt: 100, lastSave,
+    open: true, path: '/user/result.lgp', modified: true, modifiedDetectedAt: 100, lastSave, staleForSeconds: null,
   });
   packages.shift();
   assert.deepEqual(await snapshot(lastSave), {
-    open: false, path: null, modified: null, modifiedDetectedAt: null, lastSave,
+    open: false, path: null, modified: null, modifiedDetectedAt: null, lastSave, staleForSeconds: null,
   });
 });
 
@@ -87,11 +93,56 @@ test('keeps open state when dirty status is unavailable and rejects a changed na
   const { snapshot, data, connection } = fixture();
   data.modified = 'false';
   assert.deepEqual(await snapshot(), {
-    open: true, path: null, modified: null, modifiedDetectedAt: null, lastSave: null,
+    open: true, path: null, modified: null, modifiedDetectedAt: null, lastSave: null, staleForSeconds: null,
   });
   data.modified = false;
   data.onRead = () => { connection.Session = {}; };
   assert.deepEqual(await snapshot(), {
-    open: null, path: null, modified: null, modifiedDetectedAt: null, lastSave: null,
+    open: null, path: null, modified: null, modifiedDetectedAt: null, lastSave: null, staleForSeconds: null,
   });
+});
+
+test('reads the same package after existing_workflow replaces the preparation receipt', async () => {
+  const { snapshot, data, owned, stepRefresh } = fixture();
+  owned.PackageFileName = 'user/result.lgp';
+  data.modified = true;
+  const before = await snapshot();
+  assert.equal(before.open, true);
+  stepRefresh();
+  data.time = 200;
+  assert.deepEqual(await snapshot(), before);
+});
+
+test('returns the last confirmed observation with its age while the runtime is busy', async () => {
+  const { snapshot, data, owned, page } = fixture();
+  owned.PackageFileName = 'user/result.lgp';
+  data.modified = true;
+  assert.equal((await snapshot(undefined, true)).open, null);
+  const confirmed = await snapshot();
+  const evaluate = page.evaluate;
+  page.evaluate = () => assert.fail('busy snapshot must not read the page');
+  const lastSave = { path: '/user/result.lgp', confirmedAt: 150 };
+  data.time = 200;
+  assert.deepEqual(await snapshot(lastSave, true), { ...confirmed, lastSave, staleForSeconds: 0 });
+  data.time = 2650;
+  assert.deepEqual(await snapshot(lastSave, true), { ...confirmed, lastSave, staleForSeconds: 2 });
+  page.evaluate = evaluate;
+  data.modified = false;
+  assert.deepEqual(await snapshot(lastSave), {
+    ...confirmed, modified: false, modifiedDetectedAt: null, lastSave, staleForSeconds: null,
+  });
+});
+
+test('bounds a stalled browser evaluation and permits the next read', async t => {
+  const { snapshot, page } = fixture();
+  const evaluate = page.evaluate;
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  page.evaluate = () => new Promise(() => {});
+  const pending = snapshot();
+  t.mock.timers.tick(4999);
+  assert.deepEqual(await pending, {
+    open: null, path: null, modified: null, modifiedDetectedAt: null, lastSave: null, staleForSeconds: null,
+  });
+  page.evaluate = evaluate;
+  assert.equal((await snapshot()).open, true);
 });

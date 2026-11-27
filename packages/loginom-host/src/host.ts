@@ -319,6 +319,7 @@ export async function createLoginomHost(options: {
       },
     )
   type Runtime = Awaited<ReturnType<typeof supervise>>
+  const readyRuntimes = new WeakMap<Promise<Runtime>, Runtime>()
   function retain(generation: { children: Map<string, Promise<Runtime>> }, chat: string, child: Promise<Runtime>) {
     const tracked = child.then((runtime) => {
       const closing: { requested: boolean; promise?: Promise<void> } = { requested: false }
@@ -328,7 +329,7 @@ export async function createLoginomHost(options: {
         lost.add(chat)
         generation.children.delete(chat)
       })
-      return {
+      const ready = {
         ...runtime,
         close() {
           closing.requested = true
@@ -339,6 +340,8 @@ export async function createLoginomHost(options: {
           return closing.promise
         },
       }
+      readyRuntimes.set(tracked, ready)
+      return ready
     })
     generation.children.set(chat, tracked)
     tracked.catch(() => {
@@ -808,14 +811,17 @@ export async function createLoginomHost(options: {
     async packageState(sessionID: string) {
       const chat = createHash("sha256").update(sessionID).digest("hex")
       const { generation } = await service.api.status()
+      if (lost.has(chat) || stale.has(chat)) return null
       const child = generations.get(generation)?.children.get(chat)
       if (!child) {
-        if (lost.has(chat) || stale.has(chat) || [...generations.values()].some((entry) => entry.children.has(chat)))
-          return null
-        return { open: false, path: null, modified: null, modifiedDetectedAt: null, lastSave: null }
+        if ([...generations.values()].some((entry) => entry.children.has(chat))) return null
+        return { open: false, path: null, modified: null, modifiedDetectedAt: null, lastSave: null, staleForSeconds: null }
       }
-      const result = await (await child).request("packageState", undefined, 5000)
-      if ((await service.api.status()).generation !== generation || generations.get(generation)?.children.get(chat) !== child)
+      const ready = readyRuntimes.get(child)
+      if (!ready) return null
+      const result = await ready.request("packageState", undefined, 5000).catch(() => null)
+      if ((await service.api.status()).generation !== generation || generations.get(generation)?.children.get(chat) !== child
+        || lost.has(chat) || stale.has(chat))
         return null
       return result
     },
