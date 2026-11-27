@@ -2,10 +2,15 @@ export * as PluginProduct from "./product.js"
 
 // Fork seam U1 (catalog CAT-07): the Loginom AI Agent product plugin is built in, runs last in `post`, and its ID is
 // guarded against config removals and reserved against packages that claim it.
-import LoginomAgent, { Dashboard } from "@loginom-ai-agent/loginom-agent"
+import LoginomAgent, { Dashboard, modelServerHandlers, ModelServerRpc } from "@loginom-ai-agent/loginom-agent"
+import { Integration } from "@opencode/schema/integration"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { Context, Effect, Layer } from "effect"
+import { FetchHttpClient } from "effect/http"
+import { Config } from "../config.js"
+import { Credential } from "../credential.js"
 import { Formatter } from "../formatter.js"
+import { ManagedPolicy } from "../managed-policy.js"
 import type { InternalPlugin } from "./internal.js"
 import { PluginPromise } from "./promise.js"
 
@@ -25,6 +30,39 @@ export const plugins: readonly InternalPlugin[] = [
           if (dashboard()) editor.list().forEach((name) => editor.remove(name))
         })
         yield* product.effect(ctx)
+        const config = yield* Config.Service
+        const credential = yield* Credential.Service
+        const fetch = yield* FetchHttpClient.Fetch
+        yield* ctx.rpc
+          .register(
+            ModelServerRpc,
+            modelServerHandlers({
+              fetch,
+              allowed: (id) =>
+                config
+                  .entries()
+                  .pipe(
+                    Effect.map(
+                      (entries) =>
+                        ManagedPolicy.decision(ManagedPolicy.statements(entries), "integration.connect", id) !== "deny",
+                    ),
+                  ),
+              save: (id, provider, key) =>
+                Effect.gen(function* () {
+                  if (!config.update) return yield* Effect.fail("Config updates are unavailable")
+                  const stored = key
+                    ? yield* credential.create({
+                        integrationID: Integration.ID.make(id),
+                        value: Credential.Key.make({ type: "key", key }),
+                      })
+                    : undefined
+                  yield* config
+                    .update({ providers: { [id]: provider } })
+                    .pipe(Effect.onError(() => (stored ? credential.remove(stored.id) : Effect.void)))
+                }).pipe(Effect.uninterruptible),
+            }),
+          )
+          .pipe(Effect.orDie)
       }),
   },
 ]

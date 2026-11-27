@@ -4,6 +4,7 @@ import { useDialog } from "@opencode/ui/context/dialog"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Menu } from "@opencode/ui/menu"
+import { BuiltinProviderSetup } from "@opencode/plugin/gui/builtin"
 import { OpenCodeLogo } from "@/providers/opencode-logo"
 import { showToast } from "@/shell/notifications/toast"
 import { popularProviders, useProviders } from "@/providers/catalog/providers"
@@ -11,6 +12,7 @@ import { consoleProviderGroup } from "@/providers/catalog/console"
 import { useIntegrations } from "@/providers/catalog/integrations"
 import { createEffect, createMemo, createSignal, on, untrack, type Component, For, type JSX, Show } from "solid-js"
 import { useLanguage } from "@/runtime/i18n/language"
+import { usePluginHost } from "@/runtime/plugin/host"
 import { useServerSDK } from "@/runtime/server/client"
 import { formatServerError } from "@/runtime/server/errors"
 import { CONSOLE_INTEGRATION } from "@/providers/connect/dialog-machine"
@@ -53,6 +55,8 @@ export const SettingsProviders: Component<{
   headerAction?: JSX.Element
 }> = (props) => {
   const dialog = useDialog()
+  const host = usePluginHost()
+  const setups = () => host.list(BuiltinProviderSetup)
   const language = useLanguage()
   const serverSdk = useServerSDK()
   const providers = useProviders(() => props.directory)
@@ -75,13 +79,15 @@ export const SettingsProviders: Component<{
   // Results that arrive after Settings closes still report through a toast, as the user asked for the change.
   const run = (effect: SettingsProvidersEffect) => {
     if (effect.type === "dialog.open") {
-      providerConnect.select(effect.provider)
+      const setup = setups().find((entry) => entry.id === effect.provider)?.id
+      providerConnect.select(setup ? undefined : effect.provider)
       void dialog.show(
         () => (
           <DialogConnectProvider
             directory={props.directory}
             defaultLocation={props.directory === undefined}
             controller={providerConnect}
+            setup={setup}
             onConnected={(providerID) => dispatch({ type: "provider.reconnected", providerID })}
           />
         ),
@@ -224,6 +230,12 @@ export const SettingsProviders: Component<{
 
     return connected().filter((item) => !grouped.has(item.id))
   })
+
+  const local = (id: string) =>
+    ["ollama", "lmstudio", "vllm"].includes(id) || setups().some((entry) => entry.matchesProvider?.(id))
+  const displayedBySource = createMemo(() =>
+    displayed().toSorted((left, right) => Number(local(left.id)) - Number(local(right.id))),
+  )
 
   const popular = createMemo(() => {
     const connectedIDs = new Set(connected().map((p) => p.id))
@@ -458,10 +470,10 @@ export const SettingsProviders: Component<{
           <h3 class="settings-section-title">{language.t("settings.providers.section.connected")}</h3>
           <SettingsList variant="catalog">
             <Show
-              when={displayed().length > 0}
+              when={displayedBySource().length > 0}
               fallback={<div class="settings-provider-empty">{language.t("settings.providers.connected.empty")}</div>}
             >
-              <For each={displayed()}>
+              <For each={displayedBySource()}>
                 {(item) => {
                   const managedGroup = () => (consoleGroup()?.root.id === item.id ? consoleGroup() : undefined)
 
@@ -484,9 +496,11 @@ export const SettingsProviders: Component<{
                               <Show
                                 when={canDisconnect(item)}
                                 fallback={
-                                  <span class="settings-provider-env-hint">
-                                    {language.t("settings.providers.connected.environmentDescription")}
-                                  </span>
+                                  <Show when={source(item) === "env"}>
+                                    <span class="settings-provider-env-hint">
+                                      {language.t("settings.providers.connected.environmentDescription")}
+                                    </span>
+                                  </Show>
                                 }
                               >
                                 <Button size="normal" variant="ghost-muted" onClick={() => disconnect(item, item.name)}>
@@ -594,6 +608,22 @@ export const SettingsProviders: Component<{
                 }}
               </For>
             </Show>
+            <For each={setups()}>
+              {(entry) => (
+                <div class="settings-provider-row">
+                  <div class="settings-provider-lead">
+                    <ProviderModelIcon
+                      provider={{ id: entry.id, name: entry.title }}
+                      class="settings-provider-icon shrink-0"
+                    />
+                    <span class="settings-provider-name">{entry.title}</span>
+                  </div>
+                  <Button size="normal" variant="neutral" icon="plus" onClick={() => connect(entry.id)}>
+                    {language.t("common.connect")}
+                  </Button>
+                </div>
+              )}
+            </For>
           </SettingsList>
         </div>
 

@@ -138,6 +138,8 @@ export const dict = {
   "dialog.provider.search.placeholder": "Поиск провайдеров",
   "dialog.provider.empty": "Провайдеры не найдены",
   "dialog.provider.group.popular": "Популярные",
+  "dialog.provider.group.services": "Остальные",
+  "provider.connect.setup.modelUnavailable": "Провайдер сохранён, но выбранная модель ещё недоступна.",
   "dialog.provider.tag.recommended": "Рекомендуемые",
   "dialog.provider.opencode.note": "Отобранные модели, включая Claude, GPT, Gemini и другие",
   "dialog.provider.opencode.tagline": "Надёжные оптимизированные модели",

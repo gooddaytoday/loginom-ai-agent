@@ -30,6 +30,8 @@ export function latest<K extends keyof Info>(entries: readonly Entry[], key: K):
     ?.info[key]
 }
 
+type ProfilePatch = Partial<Patch> & Pick<Info, "providers">
+
 export interface Interface {
   /** Returns location config documents and discovery sources from lowest to highest priority. */
   readonly entries: () => Effect.Effect<Entry[]>
@@ -45,7 +47,7 @@ export interface Interface {
    */
   readonly changes: () => Stream.Stream<Watcher.Update>
   /** Updates supported global config fields while preserving unrelated JSONC content. */
-  readonly update?: (patch: Patch) => Effect.Effect<void, FSUtil.Error>
+  readonly update?: (patch: ProfilePatch) => Effect.Effect<void, FSUtil.Error>
   /**
    * Replaces, or clears with `undefined`, the document an integration connection contributes. It loads right after
    * managed policies: its settings layer below remote, user, and project config, while its policies outrank theirs.
@@ -467,20 +469,22 @@ export const layer = (options?: Options) =>
       yield* reloadLock.withPermit(reconcile(initial))
 
       const update = Effect.fn("Config.update")(
-        function* (patch: Patch) {
+        function* (patch: ProfilePatch) {
           const directory = initial.global ?? AbsolutePath.make(globalService.config)
           const candidates = ConfigDiscovery.names.map((name) => path.join(directory, name))
           const filepath =
             (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "loginom-ai-agent.jsonc")
           const text = (yield* fs.readFileStringSafe(filepath)) ?? "{}\n"
           const updated = yield* Effect.try({
-            try: () =>
-              applyEdits(
-                text,
-                modify(text, ["shell"], patch.shell ?? undefined, {
-                  formattingOptions: { tabSize: 2, insertSpaces: true },
-                }),
-              ),
+            try: () => {
+              const formattingOptions = { tabSize: 2, insertSpaces: true }
+              let next = text
+              if ("shell" in patch)
+                next = applyEdits(next, modify(next, ["shell"], patch.shell ?? undefined, { formattingOptions }))
+              for (const [id, provider] of Object.entries(patch.providers ?? {}))
+                next = applyEdits(next, modify(next, ["providers", id], provider, { formattingOptions }))
+              return next
+            },
             catch: (cause) => new FSUtil.FileSystemError({ method: "config.update", cause }),
           })
           yield* fs.writeWithDirs(filepath, updated.endsWith("\n") ? updated : `${updated}\n`)

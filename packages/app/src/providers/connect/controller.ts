@@ -22,6 +22,7 @@ import {
   createProviderDialogState,
   selectProviderDialogView,
   transitionProviderDialog,
+  type ModelChoice,
   type ProviderAccounts,
   type ProviderDialogEffect,
   type ProviderDialogEvent,
@@ -260,14 +261,18 @@ export function createProviderDialogController(options: {
 
     if (effect.type === "dialog.close") return dialog.close()
 
-    if (options.selection) return options.selection.set(effect.selection)
+    return applyModel(effect.selection)
+  }
+
+  const applyModel = (selection: ModelChoice) => {
+    if (options.selection) return options.selection.set(selection)
     void tabs.newDraft(
       {
         server: ServerConnection.key(serverSDK.server),
         directory: options.directory ?? data.location.default().directory,
       },
       undefined,
-      effect.selection,
+      selection,
     )
   }
 
@@ -539,6 +544,22 @@ export function createProviderDialogController(options: {
       .catch(() => false)
   }
 
+  const [pendingSetup, setPendingSetup] = createSignal<ModelChoice>()
+  const setupSettler = createConsoleCatalogSettler({
+    isLoaded: () => {
+      const pending = pendingSetup()
+      return (
+        !!pending &&
+        providers
+          .connected()
+          .some((provider) => provider.id === pending.providerID && Object.hasOwn(provider.models, pending.modelID))
+      )
+    },
+    sync: async () => {
+      await sync()
+    },
+  })
+
   // The server loads the Console workspace's providers after the grant lands, so the first refresh
   // can still show only the free catalog. Wait briefly for the workspace providers before moving on.
   const refresh = async (
@@ -619,6 +640,22 @@ export function createProviderDialogController(options: {
 
   return {
     view,
+    completeSetup: async (providerID: string, models: readonly string[], modelID: string, signal: AbortSignal) => {
+      const selection = { providerID, modelID }
+      setPendingSetup(selection)
+      signal.addEventListener("abort", setupSettler.cancel, { once: true })
+      const outcome = await setupSettler.settle()
+      signal.removeEventListener("abort", setupSettler.cancel)
+      if (signal.aborted) return false
+      global.models.show(models.map((id) => ({ providerID, modelID: id })))
+      options.onConnected?.(providerID)
+      if (outcome !== "loaded") {
+        showToast({ variant: "error", title: language.t("provider.connect.setup.modelUnavailable") })
+        return false
+      }
+      applyModel(selection)
+      return true
+    },
     dispatch,
     providerName,
     connectionModels,

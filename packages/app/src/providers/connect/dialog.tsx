@@ -9,11 +9,25 @@ import { TextField } from "@opencode/ui/text-field"
 import { DialogBody, DialogHeader, DialogTitle, DialogTitleGroup, Dialog } from "@opencode/ui/dialog"
 import { RedirectPasteForm } from "@opencode/ui/redirect-paste"
 import { TextInput } from "@opencode/ui/text-input"
-import { type Component, createMemo, createUniqueId, For, type JSX, Match, onMount, Show, Switch } from "solid-js"
+import { BuiltinProviderSetup, type ProviderSetup } from "@opencode/plugin/gui/builtin"
+import {
+  type Component,
+  createMemo,
+  createSignal,
+  createUniqueId,
+  For,
+  type JSX,
+  Match,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
+} from "solid-js"
 import { createStore } from "solid-js/store"
 import { useParams } from "@solidjs/router"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
+import { usePluginHost } from "@/runtime/plugin/host"
 import { useServerSDK } from "@/runtime/server/client"
 import { consoleProviderName } from "@/providers/catalog/console"
 import { useIntegrations } from "@/providers/catalog/integrations"
@@ -68,6 +82,7 @@ export const DialogConnectProvider: Component<{
   /** Connects at the server's default Location instead of the current route's directory. */
   defaultLocation?: boolean
   controller?: ReturnType<typeof useProviderConnectController>
+  setup?: string
   /** Opened for one provider from another flow, with no way back to the provider list. */
   standalone?: boolean
   selection?: ModelSelection
@@ -79,6 +94,12 @@ export const DialogConnectProvider: Component<{
   const language = useLanguage()
   const dialog = useDialog()
   const params = useParams()
+  const sdk = useServerSDK()
+  const host = usePluginHost()
+  const setups = () => host.list(BuiltinProviderSetup)
+  const [setupID, setSetupID] = createSignal(props.setup)
+  const setup = createMemo(() => setups().find((entry) => entry.id === setupID()))
+  const [setupCompleted, setSetupCompleted] = createSignal(false)
 
   const [welcome, setWelcome, , welcomeReady] = persisted(
     Persist.global("chatgpt-plan-welcome.v1"),
@@ -97,7 +118,7 @@ export const DialogConnectProvider: Component<{
   })
 
   const view = controller.view
-  const frame = () => view().frame
+  const frame = () => (setup() ? "provider" : view().frame)
   const consoleSelected = () => view().provider === CONSOLE_INTEGRATION
   let focusHost: HTMLDivElement | undefined
   const holdFocus = () => focusHost?.focus({ preventScroll: true })
@@ -128,7 +149,7 @@ export const DialogConnectProvider: Component<{
         FRAME_HEIGHT[frame()]
       }`}
       onCloseAutoFocus={(event) => {
-        if (view().completed && props.selection && props.onDone) {
+        if ((view().completed || setupCompleted()) && props.selection && props.onDone) {
           event.preventDefault()
           props.onDone()
         }
@@ -150,6 +171,21 @@ export const DialogConnectProvider: Component<{
     >
       <DialogHeader closeLabel={language.t("common.close")}>
         <Switch>
+          <Match when={setup()}>
+            {(entry) => (
+              <div class="flex min-w-0 items-center gap-2">
+                <Show when={!props.setup}>
+                  <IconButton
+                    icon={<Icon name="arrow-left" size="small" />}
+                    variant="ghost"
+                    aria-label={language.t("common.goBack")}
+                    onClick={() => setSetupID(undefined)}
+                  />
+                </Show>
+                <DialogTitle>{entry().title}</DialogTitle>
+              </div>
+            )}
+          </Match>
           <Match when={frame() === "models" && view().provider}>
             {(provider) => (
               <div class="flex items-center gap-2">
@@ -218,10 +254,38 @@ export const DialogConnectProvider: Component<{
         <div ref={focusHost} tabIndex={-1} class="flex min-h-0 flex-1 flex-col outline-none">
           <Show
             keyed
-            when={view().provider}
-            fallback={<ProviderPicker directory={props.directory} onSelect={controller.select} onPrepare={holdFocus} />}
+            when={setup()}
+            fallback={
+              <Show
+                keyed
+                when={view().provider}
+                fallback={
+                  <ProviderPicker
+                    directory={props.directory}
+                    setups={setups()}
+                    onSelect={(id) => {
+                      if (setups().some((entry) => entry.id === id)) setSetupID(id)
+                      else controller.select(id)
+                    }}
+                    onPrepare={holdFocus}
+                  />
+                }
+              >
+                {(provider) => <ProviderSteps provider={provider} controller={controller} />}
+              </Show>
+            }
           >
-            {(provider) => <ProviderSteps provider={provider} controller={controller} />}
+            {(entry) =>
+              entry.render({
+                client: sdk.api,
+                onConnected: async (providerID, models, selected, signal) => {
+                  const completed = await controller.completeSetup(providerID, models, selected, signal)
+                  if (signal.aborted) return
+                  setSetupCompleted(completed)
+                  dialog.close()
+                },
+              })
+            }
           </Show>
         </div>
       </DialogBody>
@@ -234,9 +298,25 @@ const CLAUDE_CODE_SETUP_URL = "https://code.claude.com/docs/en/setup"
 // The TUI's integration groups and order, with connected integrations pulled up into their own group first.
 const POPULAR = ["opencode", "opencode-go", "openai", "github-copilot", "anthropic", "google"]
 
-function ProviderPicker(props: { directory?: string; onSelect: (provider: string) => void; onPrepare?: () => void }) {
+function ProviderPicker(props: {
+  directory?: string
+  setups: readonly ProviderSetup[]
+  onSelect: (provider: string) => void
+  onPrepare?: () => void
+}) {
   const integrations = useIntegrations(() => props.directory)
   const language = useLanguage()
+  const [offline, setOffline] = createSignal(false)
+  onMount(() => {
+    const update = () => setOffline(!navigator.onLine)
+    update()
+    window.addEventListener("online", update)
+    window.addEventListener("offline", update)
+    onCleanup(() => {
+      window.removeEventListener("online", update)
+      window.removeEventListener("offline", update)
+    })
+  })
 
   const [store, setStore] = createStore<{
     filter: string
@@ -275,16 +355,31 @@ function ProviderPicker(props: { directory?: string; onSelect: (provider: string
       .toSorted((a, b) => a.name.localeCompare(b.name)),
   )
 
+  const actions = createMemo(() => {
+    const query = store.filter.trim().toLowerCase()
+    return props.setups
+      .filter((entry) => !query || entry.title.toLowerCase().includes(query))
+      .map((entry) => ({ id: entry.id, name: entry.title, connections: undefined }))
+  })
   const groups = () => [
+    ...(offline() ? [{ title: "", items: actions }] : []),
     { title: language.t("dialog.provider.connected"), items: connected },
     { title: language.t("dialog.provider.group.popular"), items: popular },
-    { title: language.t("dialog.provider.group.services"), items: services },
+    {
+      title: language.t("dialog.provider.group.services"),
+      items: () => (offline() ? services() : [...actions(), ...services()]),
+    },
   ]
 
   // An integration that only reads environment variables has nothing to connect from here.
-  const disabled = (row: IntegrationInfo) => connectMethods(row).length === 0 && providerAccounts(row).length === 0
+  const disabled = (row: IntegrationInfo | { connections: undefined }) =>
+    row.connections !== undefined && connectMethods(row).length === 0 && providerAccounts(row).length === 0
 
-  const rows = createMemo(() => [...connected(), ...popular(), ...services()].filter((row) => !disabled(row)))
+  const rows = createMemo(() =>
+    groups()
+      .flatMap((group) => group.items())
+      .filter((row) => !disabled(row)),
+  )
 
   let picker: HTMLDivElement | undefined
   let search: HTMLInputElement | undefined
@@ -314,7 +409,7 @@ function ProviderPicker(props: { directory?: string; onSelect: (provider: string
 
     if (event.key === "ArrowUp") return move(event, -1)
 
-    if (event.key !== "Enter" || !store.active) return
+    if (event.key !== "Enter" || event.target !== search || !store.active) return
     connect(store.active)
     event.preventDefault()
   }
@@ -341,12 +436,14 @@ function ProviderPicker(props: { directory?: string; onSelect: (provider: string
             {(group) => (
               <Show when={group.items().length > 0}>
                 <section class="flex flex-col gap-0.5">
-                  <div class="px-2 pt-2.5 pb-0.5 text-[12px] font-[440] leading-[18px] tracking-[0.05px] text-v2-text-text-faint">
-                    {group.title}
-                  </div>
+                  <Show when={group.title}>
+                    <div class="px-2 pt-2.5 pb-0.5 text-[12px] font-[440] leading-[18px] tracking-[0.05px] text-v2-text-text-faint">
+                      {group.title}
+                    </div>
+                  </Show>
                   <For each={group.items()}>
                     {(provider) => {
-                      const connection = () => provider.connections[0]
+                      const connection = () => provider.connections?.[0]
 
                       // The server lists the active account first.
                       const account = () => {
@@ -408,7 +505,7 @@ function ProviderPicker(props: { directory?: string; onSelect: (provider: string
               </Show>
             )}
           </For>
-          <Show when={all().length === 0}>
+          <Show when={all().length === 0 && actions().length === 0}>
             <div class="flex h-24 items-center justify-center text-[13px] font-[440] text-v2-text-text-muted">
               {language.t("dialog.provider.empty")}
             </div>

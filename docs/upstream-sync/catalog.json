@@ -50,7 +50,8 @@
         "packages/sdk/test/embedded.test.ts", "packages/core/src/schedule/check.ts",
         "packages/core/src/tool/plugin/shell.ts", "packages/core/src/tool.ts", "packages/core/src/formatter.ts",
         "packages/core/src/session/execution/restart.ts", "packages/core/test/session-execution.test.ts",
-        "packages/core/test/subagent-idle-e2e.test.ts"
+        "packages/core/test/subagent-idle-e2e.test.ts", "packages/core/src/config.ts",
+        "packages/core/src/plugin/product.ts", "packages/server/test/loginom-model-server.test.ts"
       ]
     },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7" },
@@ -79,7 +80,8 @@
       "title": "Web app, UI kit, session UI",
       "paths": [
         "packages/app/**", "packages/ui/**", "packages/session-ui/**",
-        "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**"
+        "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**",
+        "packages/plugin/src/gui/builtin.ts"
       ]
     },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },

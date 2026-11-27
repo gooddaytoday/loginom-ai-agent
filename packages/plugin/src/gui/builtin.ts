@@ -2,12 +2,41 @@
 // out of `dist`, and `script/pack.ts` exports it as `null`. Public SDK modules never import it.
 
 import type { Schema } from "effect"
+import type { OpenCodeClient } from "@opencode/client/promise"
 import type { Context } from "./context.js"
 import { Registry, type Catalog, type Messages, type Persisted, type StoreDeclaration, type StoreFrom } from "./core.js"
 import type { Desktop, Layout, Locale, StorageScope, StoreOptions } from "./host-apis.js"
 import type { MainContext } from "./main.js"
 import type { Command, IconName, Panel, PanelTab, SlotMap } from "./registries.js"
 import { type JSX } from "solid-js"
+
+/** Host capabilities for a built-in form in the provider dialog. */
+export interface ProviderSetupProps {
+  /** Client for the server whose provider profile the form edits. */
+  readonly client: OpenCodeClient
+  /** Refreshes the catalog and selects a model after the form saves a provider. */
+  readonly onConnected: (
+    providerID: string,
+    models: readonly string[],
+    selected: string,
+    signal: AbortSignal,
+  ) => Promise<void>
+}
+
+/** A form that connects a provider not yet present in the integration catalog. */
+export interface ProviderSetup {
+  /** Stable identifier for the setup action. */
+  readonly id: string
+  /** Localized label for the action and dialog. */
+  readonly title: string
+  /** Identifies configured providers to place alongside the action in Settings. */
+  readonly matchesProvider?: (id: string) => boolean
+  /** Renders the form inside the host's provider dialog. */
+  readonly render: (props: ProviderSetupProps) => JSX.Element
+}
+
+/** Setup actions contributed by the app's built-in plugins. */
+export const BuiltinProviderSetup = Registry.define<ProviderSetup>("builtin-provider-setup")
 
 /**
  * Runs fn when the main thread is idle (a short timeout where requestIdleCallback is missing, e.g. Safari). Load lazy

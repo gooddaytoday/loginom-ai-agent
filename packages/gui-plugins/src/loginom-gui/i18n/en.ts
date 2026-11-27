@@ -30,4 +30,18 @@ export default {
   changed: "The connection changed. Reload it before trying again.",
   expired: "The check expired. Check the connection again.",
   saveFailed: "The service could not save the connection. Reload it to check what was saved.",
+  modelServerTitle: "Custom server (OpenAI-compatible)",
+  modelServerDescription: "Connect models on this computer or on your organization’s network.",
+  modelServerKey: "Key (optional)",
+  modelServerFind: "Find models",
+  modelServerFinding: "Finding models…",
+  modelServerSelect: "All models found will be connected. Which one should we start with?",
+  modelServerConnect: "Connect",
+  modelServerAddressInvalid:
+    "Enter a server address starting with http:// or https://, without credentials or URL parameters.",
+  modelServerDiscoveryFailed: "Could not find models. Check the address, key, and access to the server.",
+  modelServerNoModels: "The server did not return any available models.",
+  modelServerSaveFailed: "Could not save the model server.",
+  modelServerDenied: "Your organization does not allow connecting a custom server.",
+  modelServerDeviceOnly: "In this mode, you can only connect to a server on this computer.",
 }

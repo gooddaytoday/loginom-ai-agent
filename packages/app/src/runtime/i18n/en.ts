@@ -138,6 +138,7 @@ export const dict = {
   "dialog.provider.empty": "No providers found",
   "dialog.provider.group.popular": "Popular",
   "dialog.provider.group.services": "Services",
+  "provider.connect.setup.modelUnavailable": "The provider was saved, but the selected model is not available yet.",
   "dialog.provider.environmentOnly": "Environment only",
   "dialog.provider.signInRequired": "Sign in required →",
   "dialog.provider.needsSignIn": "Needs sign-in",
