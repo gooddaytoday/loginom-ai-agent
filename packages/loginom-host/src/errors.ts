@@ -63,7 +63,6 @@ const codes = new Set([
   "LOGINOM_FILE_ACCESS_DENIED",
   "LOGINOM_FILE_CHANGED",
   "LOGINOM_UPLOAD_CANCELLED",
-  "LOGINOM_TRAINING_UPLOAD_CONSENT_REQUIRED",
   "LOGINOM_UPLOAD_UNCERTAIN",
 ])
 
@@ -93,7 +92,6 @@ const reasons: Record<string, string> = {
   LOGINOM_FILE_ACCESS_DENIED: "Доступ к файлу запрещён. Не повторяйте чтение обходным путём.",
   LOGINOM_FILE_CHANGED: "Файл изменился. Заново выберите и подтвердите актуальный файл.",
   LOGINOM_UPLOAD_CANCELLED: "Загрузка отменена.",
-  LOGINOM_TRAINING_UPLOAD_CONSENT_REQUIRED: "Для передачи файла на учебный сервер нужно согласие пользователя.",
   LOGINOM_UPLOAD_UNCERTAIN: "Остановка или уборка загрузки не подтверждена. Не отправляйте файл повторно.",
 }
 

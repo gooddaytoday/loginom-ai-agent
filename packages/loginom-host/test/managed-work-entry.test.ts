@@ -266,7 +266,6 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         session: { context: async () => [] },
       },
       files: { ask: async () => undefined, snapshot: async () => { throw Error("Unexpected file snapshot") } },
-      uploadConsent: async () => { throw Error("Unexpected upload consent") },
       profiles: directory,
       ready: () => true,
       lease: async () => run,

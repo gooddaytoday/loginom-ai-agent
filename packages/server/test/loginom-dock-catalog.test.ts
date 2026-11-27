@@ -10,7 +10,6 @@ import { SdkPlugins } from "@opencode/core/plugin/sdk"
 import { Session } from "@opencode/core/session"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { define } from "@opencode/plugin/effect/plugin"
-import { Form } from "@opencode/schema/form"
 import { Location } from "@opencode/schema/location"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Global } from "@opencode/util/global"
@@ -249,7 +248,7 @@ const boot = (
     const question = (sessionID: Session.ID) =>
       until(() =>
         call(`/api/session/${sessionID}/permission`).pipe(
-          Effect.map((response) => (response.body.data as { id: string; action: string }[])[0]),
+          Effect.map((response) => (response.body.data as { id: string; action: string; metadata?: unknown }[])[0]),
         ),
       )
     const told = (sessionID: Session.ID) =>
@@ -308,67 +307,6 @@ const boot = (
   })
 
 describe("loginom.product Dock catalog (B2.5d, 0.4 toolContributor)", () => {
-  it.live(
-    "a training upload asks before package permission, remembers approval in the chat and stops on refusal",
-    () =>
-      Effect.gen(function* () {
-        const host = scriptedHost({ training: true, catalog: () => [tool("dock_prepare", { intent: { type: "string" } })] })
-        const test = yield* boot(host)
-        for (const name of ["first.lgp", "second.lgp"])
-          yield* Effect.promise(() => fs.writeFile(path.join(test.dir, name), "LGP fixture"))
-        const prepare = (name: string) =>
-          script({ tool: "loginom_dock_prepare", input: { intent: "open_package", local_package_path: name } }, { text: "end" })
-        const form = (id: Session.ID) =>
-          until(() =>
-            test.call(`/api/session/${id}/form`).pipe(
-              Effect.map(({ body }) => Schema.decodeUnknownSync(Schema.Array(Form.Info))(body.data)[0]),
-            ),
-          )
-        const approvePackage = (id: Session.ID) =>
-          Effect.gen(function* () {
-            const pending = yield* test.question(id)
-            expect(pending.action).toBe("loginom_dock_prepare")
-            expect(
-              (yield* test.call(`/api/session/${id}/permission/${pending.id}/reply`, { decision: "once" })).status,
-            ).toBe(204)
-            yield* test.sessions.wait(id)
-          })
-
-        const allowed = yield* test.create("training upload", true)
-        yield* test.wizard(allowed, prepare("first.lgp"), false)
-        const first = yield* form(allowed)
-        expect(first.fields[0]?.description).toBe("Передать файл «first.lgp» на учебный сервер Loginom в интернете?")
-        expect((yield* test.call(`/api/session/${allowed}/permission`)).body.data).toEqual([])
-        expect(host.requests("call")).toHaveLength(0)
-        expect(
-          (yield* test.call(`/api/session/${allowed}/form/${first.id}/reply`, { answer: { q0: "Передать" } })).status,
-        ).toBe(204)
-        yield* approvePackage(allowed)
-        yield* test.wizard(allowed, prepare("second.lgp"), false)
-        yield* approvePackage(allowed)
-        expect(host.requests("call").map((request) => request.uploadConsent)).toEqual([1, 1])
-
-        const refused = yield* test.create("training refusal", true)
-        yield* test.prompt(refused, script({ text: "attached" }), [
-          { uri: "data:text/csv;base64,YQo=", name: "refused.csv" },
-        ])
-        const draft = { tool: "loginom_dock_prepare", input: { intent: "new_draft" } }
-        yield* test.wizard(refused, script(draft, draft, { text: "end" }), false)
-        const third = yield* form(refused)
-        expect(third.fields[0]?.description).toContain("refused.csv")
-        expect(host.requests("call")).toHaveLength(2)
-        expect(
-          (yield* test.call(`/api/session/${refused}/form/${third.id}/reply`, { answer: { q0: "Не передавать" } })).status,
-        ).toBe(204)
-        yield* test.sessions.wait(refused)
-        expect((yield* test.told(refused)).join(" ")).toContain("LOGINOM_TRAINING_UPLOAD_DECLINED")
-        const calls = host.requests("call")
-        expect(calls).toHaveLength(3)
-        expect(calls[2].admissions).toBeUndefined()
-      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
-    timeout,
-  )
-
   it.live(
     "the default profile receives only the read-only local tools; automation the whole catalog without the host token",
     () =>
@@ -664,7 +602,7 @@ describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () =
   )
 
   it.live(
-    "a local package prepare snapshots bytes into its private input and strips the OS path; invalid combinations stop before the Host",
+    "the ordinary permission names the local package and its exact destination before upload",
     () =>
       Effect.gen(function* () {
         const prepare = {
@@ -681,12 +619,23 @@ describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () =
             required: ["host_context_token", "intent"],
           },
         }
-        const host = scriptedHost({ catalog: () => [prepare] })
+        const destination = `/user/${"a".repeat(64)}-0-Демо.lgp`
+        const receipt = {
+          status: "SUCCEEDED",
+          upload_operation_id: "package:upload",
+          destination,
+          upload_completion_verified: true,
+          cleanup_complete: true,
+        }
+        const host = scriptedHost({
+          catalog: () => [prepare],
+          call: () => ({ content: [{ type: "text", text: JSON.stringify({ local_package_upload: receipt }) }] }),
+        })
         const test = yield* boot(host)
         const bytes = Buffer.from("LGP package bytes")
         yield* Effect.promise(() => fs.writeFile(path.join(test.dir, "Демо.lgp"), bytes))
         yield* Effect.promise(() => fs.writeFile(path.join(test.dir, "data.csv"), "a\n1\n"))
-        const id = yield* test.create("local package")
+        const id = yield* test.create("local package", true)
         yield* test.wizard(
           id,
           script(
@@ -698,9 +647,26 @@ describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () =
             { tool: "loginom_dock_prepare", input: { intent: "open_package", local_package_path: "data.csv" } },
             { text: "end" },
           ),
+          false,
         )
+        const pending = yield* test.question(id)
+        expect(pending).toMatchObject({
+          action: "loginom_dock_prepare",
+          metadata: { input: { Файл: "Демо.lgp", "Место назначения": destination } },
+        })
+        expect((yield* test.call(`/api/session/${id}/form`)).body.data).toEqual([])
+        expect(host.requests("call")).toHaveLength(0)
+        expect(
+          (yield* test.call(`/api/session/${id}/permission/${pending.id}/reply`, { decision: "once" })).status,
+        ).toBe(204)
+        yield* test.sessions.wait(id)
         const [prepared, combined, other] = yield* test.calls(id)
-        expect(prepared.state.status).toBe("completed")
+        if (prepared.state.status !== "completed") throw Error("expected a completed local upload")
+        expect(prepared.state.metadata?.loginom).toMatchObject({
+          kind: "upload",
+          operationId: "package:upload",
+          upload: { name: "Демо.lgp", folder: "/user", destination },
+        })
         const calls = host.requests("call")
         expect(calls).toHaveLength(1)
         const args = calls[0].args as Record<string, unknown>

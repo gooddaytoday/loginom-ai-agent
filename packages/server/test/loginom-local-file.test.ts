@@ -50,7 +50,6 @@ const timeout = 30_000
 const limit = 16 * 1024 * 1024
 const check = "loginom.local-file.check"
 const root = process.getuid?.() === 0
-const ownServer = { uploadTarget: async () => ({ generation: 1, training: false }) }
 const admitDescription =
   "Register one local data file by its literal path (relative to the session directory or absolute), including files of several GiB. Files over 16 MiB use a private streaming snapshot, without sending bytes through IPC. Returns an input artifact for dock_artifact_deliver; does not upload it. Register each source separately, including equal filenames in different folders. For a local .lgp use loginom_dock_prepare with local_package_path."
 
@@ -293,7 +292,6 @@ describe("loginom local file admission (B2.5a)", () => {
           const owner = { chat: ctx.sessionID, userMessage: "msg_original", generation: 1, run: "run" }
           const ipc: unknown[] = []
           const host = {
-            ...ownServer,
             reserveReference: (userMessage: string, name: string, snapshot: Parameters<typeof references.reserve>[2]) =>
               references.reserve({ ...owner, userMessage }, name, snapshot),
             discardReference: (grant: string) => references.discard(owner, grant),
@@ -336,7 +334,6 @@ describe("loginom local file admission (B2.5a)", () => {
             source,
             ctx,
             {
-              ...ownServer,
               reserveReference: (userMessage, name, snapshot) =>
                 references.reserve({ ...owner, userMessage }, name, snapshot),
               discardReference: (grant) => references.discard(owner, grant),
@@ -373,7 +370,6 @@ describe("loginom local file admission (B2.5a)", () => {
             test.dir + "/private.csv",
             ctx,
             {
-              ...ownServer,
               reserveReference: async () => {
                 throw Error("Must not reserve before authorization")
               },
@@ -621,7 +617,6 @@ describe("loginom local file admission (B2.5a)", () => {
         const digest = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex")
         const admitted: string[] = []
         const host = {
-          ...ownServer,
           reserveReference: async () => {
             throw Error("Expected byte admission")
           },
@@ -800,7 +795,6 @@ describe("loginom local file admission (B2.5a)", () => {
               file,
               ctx,
               {
-                ...ownServer,
                 admit: async () => [{ artifact_id: "sample" }],
                 reserveReference: async () => {
                   throw Error("Small sample must use byte admission")
@@ -836,7 +830,6 @@ describe("loginom local file admission (B2.5a)", () => {
         const lease: Lease = {
           userMessage: "msg_task",
           host: {
-            ...ownServer,
             generation: 7,
             admit: async (userMessage, files) => {
               admitted.push({ userMessage, name: files[0].name })
@@ -1000,7 +993,6 @@ describe("loginom local file admission (B2.5a)", () => {
         const reserved: string[] = []
         const discarded: string[] = []
         const host = {
-          ...ownServer,
           reserveReference: async () => {
             reserved.push("reserve")
             reserving.abort()

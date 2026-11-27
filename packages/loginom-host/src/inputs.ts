@@ -4,6 +4,23 @@ import { basename, join } from "node:path"
 import { hostException } from "./errors"
 
 export type InputFile = { name: string; data: string }
+
+const inputIdentity = (chat: string, userMessage: string) =>
+  createHash("sha256").update(JSON.stringify([chat, userMessage])).digest("hex")
+
+const inputName = (identity: string, index: number, name: string) =>
+  `${identity}-${index}-${name.replace(/[\\/:<>"|?*%#\x00-\x1f\x7f]|[. ]+$/g, "_").slice(-120)}`
+
+export function packageUploadDestination(input: {
+  generation: number
+  chat: string
+  admissionID: string
+  name: string
+  folder: string
+}) {
+  const identity = inputIdentity(`${input.generation}:${input.chat}`, input.admissionID)
+  return `${input.folder}/${inputName(identity, 0, basename(input.name.replaceAll("\\", "/")))}`
+}
 // Only backend-authorized inputs reach this entrypoint. It accepts bytes, never model-selected OS paths.
 export function inputStore(root: string) {
   return {
@@ -49,9 +66,7 @@ export function inputStore(root: string) {
           error: "LOGINOM_FILE_TOO_LARGE",
           details: { actual: total.bytes, limit: 64 * 1024 * 1024 },
         })
-      const identity = createHash("sha256")
-        .update(JSON.stringify([chat, userMessage]))
-        .digest("hex")
+      const identity = inputIdentity(chat, userMessage)
       const directory = join(root, identity)
       await mkdir(directory, { recursive: true, mode: 0o700 })
       const manifest = JSON.stringify(
@@ -80,7 +95,7 @@ export function inputStore(root: string) {
           )
           return {
             sourcePath,
-            name: `${identity}-${index}-${file.name.replace(/[\\/:<>"|?*%#\x00-\x1f\x7f]|[. ]+$/g, "_").slice(-120)}`,
+            name: inputName(identity, index, file.name),
             bytes: file.bytes.length,
             sha256: file.sha256,
             upload: { directory: folder, overwrite: "reject" },

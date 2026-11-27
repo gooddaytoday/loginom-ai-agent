@@ -51,7 +51,7 @@ test("private IPC admits only a reserved original-input reference and retains th
   await connections.stage({
     generation: 1,
     revision: 1,
-    url: "https://app.loginom.ai/app/",
+    url: "http://example.test",
     username: "user",
     apiKey: "fixture",
     password: "",
@@ -80,21 +80,6 @@ test("private IPC admits only a reserved original-input reference and retains th
       mode: "bind",
       scope: { taskMessageID: "msg_original", profile: "loginom-automation" },
     })
-    expect(await client.request("uploadTarget", { run: "run" })).toEqual({ generation: 1, training: true })
-    const prepare = { run: "run", name: "dock_prepare", args: {}, userMessage: "msg_original" }
-    await expect(
-      client.request("call", {
-        ...prepare,
-        admissions: [{ userMessage: "msg_original", files: [{ name: "data.csv", data: "YQo=" }] }],
-      }),
-    ).rejects.toThrow("LOGINOM_TRAINING_UPLOAD_CONSENT_REQUIRED")
-    await expect(
-      client.request("call", {
-        ...prepare,
-        args: { intent: "open_package" },
-        packageInput: { admissionID: "local", file: { name: "source.lgp", data: "YQo=" } },
-      }),
-    ).rejects.toThrow("LOGINOM_TRAINING_UPLOAD_CONSENT_REQUIRED")
     await client.request("call", { run: "run", name: "dock_prepare", args: {}, userMessage: "msg_original" })
     await expect(
       client.request("referenceReserve", { run: "run", userMessage: "msg_other", name: "data.csv" }),
@@ -108,25 +93,17 @@ test("private IPC admits only a reserved original-input reference and retains th
       name: "data.csv",
       snapshot,
     })) as FileReference
-    await expect(
-      client.request("admit", { run: "run", userMessage: "msg_original", files: [{ name: "data.csv", data: "YQo=" }] }),
-    ).rejects.toThrow("LOGINOM_TRAINING_UPLOAD_CONSENT_REQUIRED")
-    for (const uploadConsent of [undefined, 2])
-      await expect(client.request("referenceAdmit", { run: "run", reference, uploadConsent })).rejects.toThrow(
-        "LOGINOM_TRAINING_UPLOAD_CONSENT_REQUIRED",
-      )
-    expect(await readdir(directory)).not.toContain("incoming.jsonl")
     for (const changed of [
       { ...reference, chat: "other" },
       { ...reference, generation: 2 },
       { ...reference, userMessage: "msg_other" },
       { ...reference, snapshot: { ...reference.snapshot, canonical_path: join(directory, "foreign.csv") } },
     ])
-      await expect(client.request("referenceAdmit", { run: "run", reference: changed, uploadConsent: 1 })).rejects.toThrow(
+      await expect(client.request("referenceAdmit", { run: "run", reference: changed })).rejects.toThrow(
         "LOGINOM_INPUT_INVALID",
       )
-    const result = await client.request("referenceAdmit", { run: "run", reference, uploadConsent: 1 })
-    expect(await client.request("referenceAdmit", { run: "run", reference, uploadConsent: 1 })).toEqual(result)
+    const result = await client.request("referenceAdmit", { run: "run", reference })
+    expect(await client.request("referenceAdmit", { run: "run", reference })).toEqual(result)
     await expect(client.request("referenceDiscard", { run: "run", grant: reference.grant })).rejects.toThrow(
       "LOGINOM_INPUT_IDENTITY_CONFLICT",
     )

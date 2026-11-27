@@ -308,13 +308,25 @@ test("private package prepare stages exact bytes and forwards only one admitted 
     await f.scope("bind", "loginom-automation")
     const bytes = Buffer.from([0, 255, 128, 10])
     const args = { intent: "open_package", operation_id: "open-local-1" }
-    await f.client.request("call", {
+    const admissionID = "local-package-1"
+    const file = { name: "План #2.lgp", data: bytes.toString("base64") }
+    const target = await f.client.request("packageUploadTarget", { run: "one", admissionID, name: file.name })
+    const call = {
       run: "one",
       name: "dock_prepare",
       userMessage: "msg_original",
       args,
-      packageInput: { admissionID: "local-package-1", file: { name: "План #2.lgp", data: bytes.toString("base64") } },
-    })
+      packageInput: { admissionID, file, target },
+    }
+    await expect(f.client.request("call", {
+      ...call,
+      packageInput: { admissionID, file, target: { generation: 1, destination: "/other/План _2.lgp" } },
+    })).rejects.toThrow("LOGINOM_INPUT_INVALID")
+    await expect(f.client.request("call", {
+      ...call,
+      packageInput: { admissionID, file, target: { generation: 2, destination: "/user/План _2.lgp" } },
+    })).rejects.toThrow("LOGINOM_CONNECTION_NOT_READY")
+    await f.client.request("call", call)
     const events = (await readFile(f.marker, "utf8"))
       .trim()
       .split("\n")
@@ -322,6 +334,7 @@ test("private package prepare stages exact bytes and forwards only one admitted 
     expect(events.map((event) => event.operation)).toEqual(["start", "admit", "call"])
     expect(events[1].userMessage).toBe("local-package-1")
     expect(events[1].files).toHaveLength(1)
+    expect(target).toEqual({ generation: 1, destination: "/user/" + events[1].files[0].name })
     expect(events[1].files[0]).toMatchObject({
       name: expect.stringMatching(/-0-План _2\.lgp$/),
       bytes: bytes.length,

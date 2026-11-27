@@ -7,7 +7,7 @@
 // (`registry`), reloads it when the catalog changes, and each session sees only what its own Host run offers
 // (`catalogs`); the access gate (B2.2) still decides by the task's profile.
 import { randomUUID } from "node:crypto"
-import { mkdir, writeFile } from "node:fs/promises"
+import { mkdir, realpath, writeFile } from "node:fs/promises"
 import { basename, extname, join, resolve } from "node:path"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { SessionV1 } from "@loginom-ai-agent/loginom-host/session-v1"
@@ -24,7 +24,6 @@ import { exactScanReceipt } from "./file-profile-core"
 import type { ServiceHost } from "./host"
 import { permissionFailure, type localFiles } from "./local-file"
 import { loginomResultState, loginomResultSummary, verifiedUpload } from "./loginom-result"
-import { trainingUploadDeclined, type trainingUploadConsent } from "./training-upload"
 
 type Lease = ServiceHost.Lease
 type Files = Awaited<ReturnType<typeof localFiles>>
@@ -68,7 +67,6 @@ export async function dockTools(input: {
     session: Pick<Plugin.Context["session"], "context">
   }
   files: Pick<Files, "ask" | "snapshot">
-  uploadConsent: ReturnType<typeof trainingUploadConsent>
   profiles: string
   /** The execution's Host lease (B2.3) and why it is missing, if acquiring it failed. */
   lease: (sessionID: string) => Promise<Lease | undefined>
@@ -86,7 +84,6 @@ export async function dockTools(input: {
   const catalogs = new Map<string, { names: Set<string>; failure?: string }>()
   // The task and profile each Host run is bound to; a new run is bound to nothing.
   const bound = new WeakMap<Lease, { task: string; profile: Profile }>()
-  const declinedAttachments = new WeakMap<Lease, string>()
 
   await plugin.tool.transform((editor) => registry.tools.forEach((definition) => editor.add(tool(definition))))
 
@@ -246,33 +243,40 @@ export async function dockTools(input: {
         )
     }
     const packagePath = localPackage ? (args.local_package_path as string) : undefined
-    const task = bound.get(lease)?.task ?? (await input.task(call.sessionID))
-    const attached =
-      local.has(key) || declinedAttachments.get(lease) === task ? undefined : await admissions(call.sessionID)
-    const filename = packagePath ?? attached?.[0]?.files[0]?.name
-    const consent = filename
-      ? await input.uploadConsent(call, lease, basename(filename.replaceAll("\\", "/")))
+    const packagePermission = packagePath
+      ? await (async () => {
+          call.signal.throwIfAborted()
+          const sourcePath = resolve(directory, packagePath)
+          const name = basename(await realpath(sourcePath).catch(() => sourcePath))
+          if (extname(name).toLowerCase() !== ".lgp")
+            throw Error("local_package_path requires a .lgp file. Путь: " + sourcePath)
+          const admissionID = JSON.stringify(["local-file", call.messageID, call.id])
+          const target = await lease.packageUploadTarget(admissionID, name)
+          return { admissionID, name, target }
+        })()
       : undefined
-    if (consent === false) {
-      declinedAttachments.set(lease, task)
-      throw trainingUploadDeclined()
-    }
     // The resource tells the product's permission kinds apart (B2.6a): an uploaded local package is a save, an export
     // node writes outside the package.
-    const target = name === "dock_node_apply" ? (args.target as { type?: unknown } | undefined)?.type : undefined
-    const resource = localPackage ? "local_package" : typeof target === "string" ? target : "*"
-    await input.files.ask(call, { action: key, resources: [resource], save: ["*"] }).catch((error) => {
+    const nodeType = name === "dock_node_apply" ? (args.target as { type?: unknown } | undefined)?.type : undefined
+    const resource = localPackage ? "local_package" : typeof nodeType === "string" ? nodeType : "*"
+    await input.files.ask(call, {
+      action: key,
+      resources: [resource],
+      save: ["*"],
+      ...(packagePermission
+        ? { metadata: { input: { Файл: packagePermission.name, "Место назначения": packagePermission.target.destination } } }
+        : {}),
+    }).catch((error) => {
       throw packagePath ? permissionFailure(resolve(directory, packagePath), error) : error
     })
     const forwarded = { ...args }
-    const packageInput = packagePath
+    const packageInput = packagePermission && packagePath
       ? await (async () => {
           const source = await input.files.snapshot(packagePath, call)
-          if (extname(source.file.name).toLowerCase() !== ".lgp")
-            throw Error("local_package_path requires a .lgp file. Путь: " + source.sourcePath)
+          if (source.file.name !== packagePermission.name) throw Error("LOGINOM_FILE_CHANGED: " + source.sourcePath)
           delete forwarded.local_package_path
           if (forwarded.operation_id === undefined) forwarded.operation_id = randomUUID()
-          return { admissionID: JSON.stringify(["local-file", call.messageID, call.id]), file: source.file }
+          return { admissionID: packagePermission.admissionID, file: source.file, target: packagePermission.target }
         })()
       : undefined
     const parameters = args.parameters as { source_switch?: { profile_id?: unknown } } | undefined
@@ -281,6 +285,8 @@ export async function dockTools(input: {
       typeof profileID === "string"
         ? await exactScanReceipt(profileID, join(input.profiles, call.sessionID)).catch(() => undefined)
         : undefined
+    // The task the run is bound to, as 0.4 dispatched with the turn's task.
+    const task = bound.get(lease)?.task ?? (await input.task(call.sessionID))
     const signal = call.signal
     let publishing = Promise.resolve()
     const result = await lease
@@ -289,7 +295,8 @@ export async function dockTools(input: {
         forwarded,
         task,
         signal,
-        attached,
+        // Help and connection diagnostics carry no attachments (0.4 `toolPolicy.isLocalLoginom`).
+        local.has(key) ? undefined : await admissions(call.sessionID),
         packageInput,
         scanReceipt,
         (update) => {
@@ -299,7 +306,6 @@ export async function dockTools(input: {
             })
             .catch(() => undefined)
         },
-        consent,
       )
       .finally(() => publishing)
       .then(decodeReply)
@@ -311,7 +317,7 @@ export async function dockTools(input: {
       .join("\n\n")
     const state = loginomResultState(result as Parameters<typeof loginomResultState>[0])
     const upload = verifiedUpload(name, result)
-    const metadata = { generation: lease.generation, ...(upload ? { loginom: upload } : {}) }
+    const resultMetadata = { generation: lease.generation, ...(upload ? { loginom: upload } : {}) }
     const summary = oversized(text)
       ? loginomResultSummary(result as Parameters<typeof loginomResultSummary>[0])
       : undefined
@@ -323,7 +329,7 @@ export async function dockTools(input: {
     if (state === "failed")
       throw new Tool.Error({
         message: content || "LOGINOM_TOOL_FAILED",
-        metadata: { ...metadata, isError: true },
+        metadata: { ...resultMetadata, isError: true },
       })
     const images = result.content.flatMap((block) =>
       block.type === "image" && typeof block.data === "string" && typeof block.mimeType === "string"
@@ -333,7 +339,7 @@ export async function dockTools(input: {
     return {
       content: images.length ? [{ type: "text", text: content }, ...images] : content,
       metadata: {
-        ...metadata,
+        ...resultMetadata,
         ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
         // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
         ...(outputPath ? { truncated: true, outputPath } : {}),

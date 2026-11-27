@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from "node:crypto"
-import { isTrainingServer } from "@loginom-ai-agent/product"
 import type { createLoginomHost } from "./host"
-import type { InputFile } from "./inputs"
+import { packageUploadDestination, type InputFile } from "./inputs"
 import type { FileReference } from "./file-reference"
 import { hostException, hostFailure } from "./errors"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
@@ -21,7 +20,9 @@ const Admissions = Schema.Array(
 const PackageInput = Schema.Struct({
   admissionID: Schema.NonEmptyString,
   file: Schema.Struct({ name: Schema.String, data: Schema.String }),
+  target: Schema.optional(Schema.Struct({ generation: Schema.Int, destination: Schema.NonEmptyString })),
 })
+const PackagePreview = Schema.Struct({ admissionID: Schema.NonEmptyString, name: Schema.NonEmptyString })
 const PackageAdmission = Schema.Tuple([
   Schema.Struct({ artifact_id: Schema.NonEmptyString, upload: Schema.Struct({ grant_id: Schema.NonEmptyString }) }),
 ])
@@ -177,16 +178,6 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     run.lease = lease
     return lease
   }
-  async function uploadTarget(generation?: number) {
-    const status = await service.api.status()
-    if (!status.generation) throw Error("LOGINOM_CONFIG_REQUIRED")
-    if (generation !== undefined && status.generation !== generation) throw Error("LOGINOM_CONNECTION_NOT_READY")
-    return { generation: status.generation, training: isTrainingServer(status.url) }
-  }
-  async function requireUploadConsent(generation: number, consent: unknown) {
-    if ((await uploadTarget(generation)).training && consent !== generation)
-      throw Error("LOGINOM_TRAINING_UPLOAD_CONSENT_REQUIRED")
-  }
   async function handle(data: unknown) {
     const started = Date.now()
     if (state.closed) return
@@ -264,11 +255,20 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       }
       const run = runs.get(input.run)
       if (!run || run.released) throw new Error("LOGINOM_RUN_INVALID")
-      if (data.method === "uploadTarget") {
-        if (run.scope?.profile !== "loginom-automation") throw Error("LOGINOM_SCOPE_DENIED")
-        const target = await uploadTarget(run.lease?.generation)
+      if (data.method === "packageUploadTarget") {
+        if (run.scope?.profile !== "loginom-automation" || run.applyingScope) throw Error("LOGINOM_SCOPE_DENIED")
+        const preview = Schema.decodeUnknownSync(PackagePreview)(input)
+        const connection = await service.api.status()
+        if (!connection.generation) throw Error("LOGINOM_CONFIG_REQUIRED")
         if (state.closed || run.released) throw Error("LOGINOM_RUN_ABORTED")
-        reply({ id: data.id, result: target }, target.generation)
+        if (run.lease && run.lease.generation !== connection.generation) throw Error("LOGINOM_CONNECTION_NOT_READY")
+        const destination = packageUploadDestination({
+          ...preview,
+          generation: connection.generation,
+          chat: run.chat,
+          folder: connection.folder,
+        })
+        reply({ id: data.id, result: { generation: connection.generation, destination } }, connection.generation)
         return
       }
       if (data.method === "release") {
@@ -387,7 +387,6 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         !knowledgeTools.has(input.name) &&
         input.name !== diagnosticTool.name
       const referenceCall = ["referenceReserve", "referenceAdmit", "referenceDiscard"].includes(data.method)
-      const uploadConsent = "uploadConsent" in input ? input.uploadConsent : undefined
       if (
         (data.method === "admit" || referenceCall || browserCall) &&
         (run.applyingScope ||
@@ -490,7 +489,6 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           if (input.files.some((file) => file.name.toLowerCase().endsWith(".lgp")))
             throw new Error("LOGINOM_SCOPE_DENIED")
           const lease = await connectionLease(input.run, run)
-          if (input.files.length) await requireUploadConsent(lease.generation, uploadConsent)
           const runtime = await service.runtime(lease.generation, run.chat)
           const files = await service.inputs(lease.generation, run.chat, input.userMessage, input.files)
           if (run.admitted.has(input.userMessage)) {
@@ -542,7 +540,6 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           }
           if (!("reference" in input) || !input.reference || typeof input.reference !== "object")
             throw Error("LOGINOM_INPUT_INVALID")
-          await requireUploadConsent(lease.generation, uploadConsent)
           const reference = await service.references.commit(owner, input.reference as FileReference)
           if (state.closed || run.released) throw Error("LOGINOM_HOST_CLOSED")
           const runtime = await service.runtime(lease.generation, run.chat)
@@ -607,8 +604,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         if (admissions.some((admission) => admission.files.some((file) => file.name.toLowerCase().endsWith(".lgp"))))
           throw new Error("LOGINOM_SCOPE_DENIED")
         const lease = await connectionLease(input.run, run, preparation)
-        if (packageInput || admissions.some((admission) => admission.files.length))
-          await requireUploadConsent(lease.generation, uploadConsent)
+        if (packageInput?.target && packageInput.target.generation !== lease.generation)
+          throw Error("LOGINOM_CONNECTION_NOT_READY")
         if (input.name !== prepareTool.name && !service.hasRuntime(lease.generation, run.chat))
           throw new Error("LOGINOM_SCOPE_DENIED")
         const recovery = { id: undefined as string | undefined }
@@ -619,6 +616,12 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
                 files: await service.inputs(lease.generation, run.chat, packageInput.admissionID, [packageInput.file]),
               }
             : undefined
+          const stagedPackage = packageAdmission?.files[0]
+          if (
+            packageInput?.target &&
+            (!stagedPackage || packageInput.target.destination !== `${stagedPackage.upload.directory}/${stagedPackage.name}`)
+          )
+            throw Error("LOGINOM_INPUT_INVALID")
           if (packageAborted()) throw new Error("LOGINOM_RUN_ABORTED")
           // A dead runtime is replaced before admission. Past the relaunch limit this
           // is a known refusal, not an uncertain dispatch.

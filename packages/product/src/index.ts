@@ -49,10 +49,6 @@ export function productChannel(value: string | undefined) {
   return value === "prod" || value === "beta" ? value : "dev"
 }
 
-export function isTrainingServer(address: string) {
-  return URL.parse(address)?.hostname.replace(/\.$/, "") === new URL(Product.connection.url).hostname
-}
-
 export function productSlug(channel: keyof typeof Product.channels) {
   return channel === "prod" ? Product.slug : `${Product.slug}-${channel}`
 }

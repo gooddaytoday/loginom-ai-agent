@@ -8,7 +8,11 @@ import { access, realpath, stat } from "node:fs/promises"
 import { basename, dirname, join, parse, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { fileError, hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
-import { inspectReferenceFile } from "@loginom-ai-agent/loginom-host/file-reference"
+import {
+  inspectReferenceFile,
+  type FileReference,
+  type ReferenceSnapshot,
+} from "@loginom-ai-agent/loginom-host/file-reference"
 import type { Plugin } from "@opencode/plugin"
 import type { Info, ToolContext } from "@opencode/plugin/promise/tool"
 import { Tool } from "@opencode/schema/tool"
@@ -16,9 +20,7 @@ import { FSUtil } from "@opencode/util/fs-util"
 import { Option, Schema } from "effect"
 import { exactFileDigest, matchesExactWorkbookBytes, MAX_BYTE_ADMISSION } from "./file-profile-core"
 import { fileSnapshot } from "./file-snapshot"
-import type { ServiceHost } from "./host"
 import { askWithdrawn } from "./permissions"
-import { trainingUploadConsent, trainingUploadDeclined } from "./training-upload"
 
 const sampleReceipt = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ path: Schema.String, manifest: Schema.Struct({ sha256: Schema.String }) })),
@@ -46,8 +48,14 @@ const attachmentHint = ". Для CLI передайте файл через --fi
 // asking. A configured deny is decided before plugin hooks run, so it still fails the check.
 const check = "loginom.local-file.check"
 
-export type ReferenceHost = Pick<ServiceHost.Lease, "reserveReference" | "admitReference" | "discardReference" | "uploadTarget">
-export type AdmitHost = ReferenceHost & Pick<ServiceHost.Lease, "admit">
+export type ReferenceHost = {
+  reserveReference(userMessage: string, name: string, snapshot: ReferenceSnapshot): Promise<FileReference>
+  admitReference(reference: FileReference): Promise<unknown>
+  discardReference(grant: string): Promise<unknown>
+}
+export type AdmitHost = ReferenceHost & {
+  admit(userMessage: string, files: { name: string; data: string }[]): Promise<unknown>
+}
 /** The Host run that serves a session's current task, and the task's user message (0.4 `turnLifecycle`; B2.3). */
 export type Lease = { host: AdmitHost & { readonly generation: number }; userMessage: string }
 type Authorized = { sourcePath: string; canonicalPath: string; verifyAttachment?: (bytes?: Buffer) => Promise<unknown> }
@@ -56,10 +64,9 @@ const admittedReferences = new WeakMap<ReferenceHost, Map<string, { sourcePath: 
 
 /** Local file admission for one plugin instance; `profiles` holds `file-profiles/<session>` of the file tools. */
 export async function localFiles(
-  plugin: Pick<Plugin.Context, "location" | "permission" | "session" | "storage" | "tool">,
+  plugin: Pick<Plugin.Context, "location" | "permission" | "session" | "storage">,
   profiles: string,
 ) {
-  const uploadConsent = trainingUploadConsent(plugin)
   const token = randomUUID()
   await plugin.permission.hook("evaluate", (event) => {
     if (event.metadata?.[check] === token && event.effect === "ask") event.effect = "allow"
@@ -136,8 +143,6 @@ export async function localFiles(
       if (identity.canonical_path !== source.canonicalPath) throw Error("LOGINOM_FILE_CHANGED")
       const sha256 = await exactFileDigest(identity, join(profiles, call.sessionID))
       if (call.signal.aborted) throw Error("LOGINOM_UPLOAD_CANCELLED")
-      const consent = await uploadConsent(call, host, basename(source.canonicalPath))
-      if (consent === false) throw trainingUploadDeclined()
       const reference = await host.reserveReference(userMessage, basename(source.canonicalPath), {
         ...identity,
         sha256: sha256 ?? null,
@@ -148,10 +153,9 @@ export async function localFiles(
       }
       // Once commit starts its reply may be lost. Retain the grant for an
       // exact retry or confirmed Host shutdown rather than discarding it here.
-      const artifact = await host.admitReference(reference, consent)
+      const artifact = await host.admitReference(reference)
       return { sourcePath: source.sourcePath, artifact }
     })().catch((error) => {
-      if (error instanceof Tool.Error) throw error
       throw Error(hostErrorText(fileError(error)) + " Путь: " + source.sourcePath)
     })
     if (source.verifyAttachment) await source.verifyAttachment()
@@ -175,19 +179,14 @@ export async function localFiles(
       cache.set(key, result)
       return result
     }
-    const consent = await uploadConsent(call, host, basename(source.canonicalPath))
-    if (consent === false) throw trainingUploadDeclined()
     const bytes = await fileSnapshot(source.canonicalPath, MAX_BYTE_ADMISSION).catch((error) => {
       throw Error(hostErrorText(error) + " Путь: " + source.sourcePath)
     })
     await source.verifyAttachment(bytes)
-    call.signal.throwIfAborted()
     const artifacts = await host
-      .admit(
-        JSON.stringify(["local-file", call.messageID, call.id]),
-        [{ name: basename(source.canonicalPath), data: bytes.toString("base64") }],
-        consent,
-      )
+      .admit(JSON.stringify(["local-file", call.messageID, call.id]), [
+        { name: basename(source.canonicalPath), data: bytes.toString("base64") },
+      ])
       .catch((error) => {
         throw Error(hostErrorText(error))
       })
@@ -370,7 +369,7 @@ export async function localFiles(
     },
   })
 
-  return { ask, authorize, admit, admitReference, snapshot, admitTool, uploadConsent }
+  return { ask, authorize, admit, admitReference, snapshot, admitTool }
 }
 
 /**

@@ -18,7 +18,6 @@ export function scriptedHost(
     call?: (request: Record<string, unknown>) => unknown
     acquire?: () => string | undefined
     tools?: () => string | undefined
-    training?: boolean
     /** Runs start with a browser runtime, as after `dock_prepare`. */
     prepared?: boolean
     /** Answers a dashboard storage request (`publications`); a thrown error's message is the Host's error code. */
@@ -45,8 +44,8 @@ export function scriptedHost(
     const run = runs.get(input.run)
     if (!run) return fail("LOGINOM_RUN_INVALID")
     if (request.method === "release" || request.method === "interrupt") return reply(true)
-    if (request.method === "uploadTarget")
-      return reply({ generation: state.generation, training: options.training === true })
+    if (request.method === "packageUploadTarget")
+      return reply({ generation: state.generation, destination: `/user/${"a".repeat(64)}-0-${input.name}` })
     if (request.method === "scope") {
       const mode = input.mode
       const scope = input.scope as Scope
