@@ -161,7 +161,11 @@ try {
   if (storageOnly) {
     for (let index = 1; index <= repeats && !blocked; index++) {
       const listed = await timed(`storage-list-${index}`, () =>
-        invoke("dock_storage_list", { operation_id: `fn-${label}-list-${index}`, path: storagePath }),
+        invoke("dock_storage_list", {
+          operation_id: `fn-${label}-list-${index}`,
+          path: storagePath,
+          pattern: `*fn-${label}*`,
+        }),
       )
       blocked = listed.status !== "SUCCEEDED"
     }
