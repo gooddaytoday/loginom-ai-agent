@@ -946,16 +946,18 @@ export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestL
   return `async (page) => ${implementation}(page, ${JSON.stringify(options)})`;
 }
 
-export function makeWorkspaceStepCode({loginomUrl,build,sessionId,workflowRef,readGraph,types}) {
+export function makeWorkspaceStepCode({loginomUrl,build,sessionId,workflowRef,readGraph,types,snapshotOnly=false}) {
   const url=new URL(loginomUrl);
   const options={origin:url.origin,pathname:url.pathname,expectedBuild:build,sessionId,workflowRef};
   const icons=Object.values(types).map(({type,icon_class})=>({type,icon_class}));
   return `async page=>{
     const options=${JSON.stringify(options)};
     const state=await (${captureWorkspaceStep.toString()})(page,options);
-    if(state.status==='READY'&&state.refresh_ports){
-      await (${readGraph.toString()})(page,{request:{document_id:state.document_id,workflow_ref:state.workflow_ref},
-        types:${JSON.stringify(icons)},origin:options.origin,build:options.expectedBuild,step_rebaseline:true});
+    const snapshotOnly=${snapshotOnly};
+    if(state.status==='READY'&&(snapshotOnly||state.refresh_ports)){
+      const graph=await (${readGraph.toString()})(page,{request:{document_id:state.document_id,workflow_ref:state.workflow_ref},
+        types:${JSON.stringify(icons)},origin:options.origin,build:options.expectedBuild,step_rebaseline:!snapshotOnly,snapshot_only:snapshotOnly});
+      if(snapshotOnly)state.snapshot=graph;
     }
     return {status:'SUCCEEDED',phase:'observed',action_key:'workspace.step',action_revision:'1',
       effect_possible:false,error:null,trace:[],output:state};

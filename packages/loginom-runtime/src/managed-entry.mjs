@@ -365,6 +365,8 @@ async function handle(message) {
         signal: controller.signal,
         timeout: runtimeCallTimeout(message.input.name, message.input.arguments),
       }
+      const snapshot = () => state.bridge.graphSnapshot(controller.signal).catch(() => null)
+      const graphBefore = message.input.graphBefore === true ? await snapshot() : null
       const result = message.input.packageArtifact !== undefined
         ? await state.bridge.prepareLocalPackage(message.input.arguments, message.input.packageArtifact, {
             signal: AbortSignal.any([controller.signal, AbortSignal.timeout(options.timeout)]),
@@ -373,12 +375,15 @@ async function handle(message) {
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
           : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options)
       const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
+      const graphAfter = await snapshot()
       send({
         id: message.id,
         result: {
           result: outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result,
           recoveryPending: state.bridge.hasUnsettledWork(),
           activeWork: state.bridge.hasActiveWork(),
+          ...(graphBefore ? { graphBefore } : {}),
+          ...(graphAfter ? { graphAfter } : {}),
         },
       })
     } finally {

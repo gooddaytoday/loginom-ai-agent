@@ -85,6 +85,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
+        graphSnapshot: async () => work().graph ?? null,
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
           return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
@@ -215,6 +216,45 @@ test("actual managed entry reads live bridge work and dispatching over private I
   }
   try {
     await waitForKnowledge(host)
+    for (const [task, label] of [
+      ["msg_step_one", "Импорт"],
+      ["msg_step_two", "Продажи"],
+    ] as const) {
+      const turn = await LoginomHost.acquire("manual-edits")
+      if (!turn) throw Error("Adapter unavailable")
+      await turn.scope(
+        "bind",
+        Schema.decodeUnknownSync(HostTaskScope.Info)({
+          taskMessageID: task,
+          profile: "loginom-automation",
+        }),
+      )
+      await Bun.write(
+        work,
+        JSON.stringify({
+          activeWork: false,
+          unsettledWork: false,
+          prepared: true,
+          graph: {
+            document: "doc",
+            workflow: "wf",
+            nodes: [{ guid: "import", label, type: "import", position: { x: 0, y: 0 } }],
+            links: [],
+          },
+        }),
+      )
+      expect(await turn.call("dock_prepare", {}, task)).toEqual(
+        task === "msg_step_one"
+          ? { content: [] }
+          : {
+              content: [],
+              _meta: { loginomManualEdits: [{ kind: "node_renamed", guid: "import", from: "Импорт", to: "Продажи" }] },
+            },
+      )
+      await turn.tools()
+      expect(await turn.call("fixture", {}, task)).toEqual({ content: [] })
+      await turn.release()
+    }
     const run = await LoginomHost.acquire("file-errors")
     if (!run) throw Error("Adapter unavailable")
     await run.scope(

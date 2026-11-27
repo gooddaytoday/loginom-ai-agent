@@ -24,6 +24,7 @@ import { exactScanReceipt } from "./file-profile-core"
 import type { ServiceHost } from "./host"
 import { permissionFailure, type localFiles } from "./local-file"
 import { loginomResultState, loginomResultSummary } from "./loginom-result"
+import { manualEditNotice } from "./manual-edits"
 
 type Lease = ServiceHost.Lease
 type Files = Awaited<ReturnType<typeof localFiles>>
@@ -291,10 +292,18 @@ export async function dockTools(input: {
       summary && outputPath
         ? `${summary}\n\nTable data and verbose details were omitted by the backend response limit. The complete original result is retained at ${outputPath}. Do not infer unread data or repeat mutations solely to retrieve omitted text.`
         : text
+    const notice = manualEditNotice(
+      result._meta?.loginomManualEdits,
+      typeof forwarded.operation_id === "string" && forwarded.operation_id
+        ? forwarded.operation_id
+        : (call.id ?? randomUUID()),
+      state === "pending" ? "running" : "settled",
+    )
+    const output = notice ? `${notice.text}\n\n${content}` : content
     if (state === "failed")
       throw new Tool.Error({
-        message: content || "LOGINOM_TOOL_FAILED",
-        metadata: { generation: lease.generation, isError: true },
+        message: output || "LOGINOM_TOOL_FAILED",
+        metadata: { generation: lease.generation, isError: true, ...(notice ? { loginom: notice.loginom } : {}) },
       })
     const images = result.content.flatMap((block) =>
       block.type === "image" && typeof block.data === "string" && typeof block.mimeType === "string"
@@ -302,9 +311,10 @@ export async function dockTools(input: {
         : [],
     )
     return {
-      content: images.length ? [{ type: "text", text: content }, ...images] : content,
+      content: images.length ? [{ type: "text", text: output }, ...images] : output,
       metadata: {
         generation: lease.generation,
+        ...(notice ? { loginom: notice.loginom } : {}),
         ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
         // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
         ...(outputPath ? { truncated: true, outputPath } : {}),
