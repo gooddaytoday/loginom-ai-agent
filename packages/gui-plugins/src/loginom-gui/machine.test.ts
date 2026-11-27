@@ -75,3 +75,45 @@ test("a finding opens its nested saved workflow, not an identically labelled nod
     status: "empty",
   })
 })
+
+test("switches to the original workflow and keeps the selected node by GUID", () => {
+  const original = { guid: nodeGuid, label: "Original", position: null, type: "TBGFilterDataEngine", ports: [] }
+  const added = { ...original, guid: "added", label: "Added" }
+  const workflow = { key: ["module"], label: "Module", links: [], submodels: [], nodes: [original] }
+
+  const before = {
+    source: "saved",
+    scope: "package",
+    complete: true,
+    observed_at: "2026-11-27T00:00:00.000Z",
+    package: { name: "Sales", guid: packageGuid },
+    workflows: [workflow],
+  } satisfies Snapshot
+
+  const state = transition(
+    { status: "closed" },
+    {
+      type: "open-changes",
+      request,
+      changes: {
+        v: 1,
+        sessionID: request.sessionID,
+        turnID: "msg_changes",
+        packageName: "Sales",
+        copyPath: "Sales — agent copy.lgp",
+        edits: [],
+        schemaDiff: {
+          before,
+          after: { ...before, workflows: [{ ...workflow, nodes: [added, { ...original, label: "Renamed" }] }] },
+        },
+      },
+    },
+  )
+
+  const showOriginal = (index: number) =>
+    transition(transition(state, { type: "select", index }), { type: "mode", mode: "before" })
+
+  expect(showOriginal(1)).toMatchObject({ status: "ready", path: [{ nodes: [original] }], selected: 0 })
+  expect(showOriginal(0)).toMatchObject({ status: "ready", selected: undefined })
+  expect(transition(showOriginal(1), { type: "mode", mode: "after" })).toMatchObject({ status: "ready", selected: 1 })
+})

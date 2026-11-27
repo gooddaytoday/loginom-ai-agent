@@ -1,5 +1,6 @@
 import type { JsonValue } from "@opencode/client/promise"
 import type { Page } from "@playwright/test"
+import { packageSchemaDiffFixture } from "./loginom-schema"
 import { MockRpcError } from "./mock-api"
 import {
   assistantID,
@@ -122,7 +123,14 @@ function changeFacts() {
 
 export async function setupPackageChanges(
   page: Page,
-  options: { width?: number; busy?: boolean; stale?: boolean; schema?: boolean; facts?: boolean } = {},
+  options: {
+    width?: number
+    busy?: boolean
+    stale?: boolean
+    schema?: boolean
+    facts?: boolean
+    diagram?: boolean
+  } = {},
 ) {
   const calls: { method: string; input: unknown }[] = []
   const oldLink = { source: "import", output: "old", target: "filter", input: "in" }
@@ -160,6 +168,8 @@ export async function setupPackageChanges(
 
   if (options.facts) Object.assign(changes, changeFacts())
 
+  if (options.diagram) Object.assign(changes, { edits: [], schemas: packageSchemaDiffFixture() })
+
   if (options.schema) Object.assign(changes, { schemaUrl })
   const metadata = { loginom: { packageChanges: changes } }
 
@@ -184,7 +194,7 @@ export async function setupPackageChanges(
   await page.context().route("https://loginom.example/**", (route) => route.fulfill({ body: "Пакет Loginom" }))
   await setupTimeline(page, {
     locale: "ru",
-    viewport: { width: options.width ?? 1280, height: 900 },
+    viewport: { width: options.width ?? 1280, height: options.diagram ? (options.width === 390 ? 844 : 1024) : 900 },
     messages,
     rpc({ id, method, input }) {
       if (id !== "loginom.package-copy") return

@@ -1,4 +1,5 @@
 import { Effect, Option, Schema } from "effect"
+import { SchemaPair } from "./contract"
 import type en from "./i18n/en"
 
 const direction = Schema.Literals(["input", "output"])
@@ -52,9 +53,15 @@ const saved = Schema.Struct({
   workflows: Schema.Array(workflow),
 })
 
-export const packageChangeSchemas = Schema.UndefinedOr(Schema.Struct({ before: saved, after: saved })).pipe(
-  Schema.catchDecoding(() => Effect.succeed(Option.some(undefined))),
-)
+export const packageChangeSchemas = Schema.UndefinedOr(
+  Schema.Union([SchemaPair, Schema.Struct({ before: saved, after: saved })]),
+).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(undefined))))
+
+export function diagramSchemas(schemas: typeof packageChangeSchemas.Type): SchemaPair | undefined {
+  if (schemas && "package" in schemas.before && "package" in schemas.after) {
+    return { before: schemas.before, after: schemas.after }
+  }
+}
 
 export type TranslateFacts = (key: keyof typeof en, params?: Record<string, string>) => string
 

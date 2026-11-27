@@ -1,6 +1,9 @@
 import { Schema } from "effect"
+import { schemaNodeChanges } from "./compare-schemas"
+import type { SchemaPair } from "./contract"
 import {
   compareFacts,
+  diagramSchemas,
   packageChangeSchemas,
   portFact,
   snapshotFacts,
@@ -76,6 +79,8 @@ const metadata = Schema.Struct({
 })
 
 export type PackageChanges = typeof metadata.Type.loginom.packageChanges
+
+export type ChangesWithSchema = PackageChanges & { schemaDiff: SchemaPair }
 
 export const decodePackageChanges = Schema.decodeUnknownOption(metadata)
 
@@ -154,6 +159,16 @@ export function nodeRows(changes: PackageChanges, t: TranslateFacts) {
     }
   }
 
+  const pair = diagramSchemas(changes.schemas)
+
+  if (pair) {
+    for (const change of schemaNodeChanges(pair).values()) {
+      const current = row(change.guid, change.label)
+      current.kind = change.kind
+      current.label = change.label
+    }
+  }
+
   const snapshots = snapshotFacts(changes.schemas, t)
 
   for (const [guid, after] of snapshots?.after ?? []) {
@@ -197,7 +212,7 @@ export function nodeRows(changes: PackageChanges, t: TranslateFacts) {
       facts.unshift({ label: t("facts.name"), before: beforeName, after: afterName, same: beforeName === afterName })
     }
 
-    return { label: row.label, kind: row.kind, reasons: row.reasons, facts }
+    return { guid, label: row.label, kind: row.kind, reasons: row.reasons, facts }
   })
 }
 

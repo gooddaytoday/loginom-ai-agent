@@ -57,6 +57,8 @@ const graph = Schema.Struct({
 
 export type Graph = typeof graph.Type
 
+export type Link = Graph["links"][number]
+
 export type Node = typeof node.Type
 
 export type Port = typeof port.Type
@@ -76,15 +78,21 @@ const saved: Schema.Codec<Workflow> = Schema.Struct({
   submodels: Schema.Array(Schema.suspend((): Schema.Codec<Workflow> => saved)),
 })
 
+const savedSnapshot = Schema.Struct({
+  source: Schema.Literal("saved"),
+  scope: Schema.Literal("package"),
+  complete: Schema.Literal(true),
+  observed_at: Schema.String,
+  package: Schema.Struct({ name: Schema.String, guid: Schema.NullOr(Schema.String) }),
+  workflows: Schema.Array(saved),
+})
+
+export const SchemaPair = Schema.Struct({ before: savedSnapshot, after: savedSnapshot })
+
+export type SchemaPair = typeof SchemaPair.Type
+
 const snapshot = Schema.Union([
-  Schema.Struct({
-    source: Schema.Literal("saved"),
-    scope: Schema.Literal("package"),
-    complete: Schema.Literal(true),
-    observed_at: Schema.String,
-    package: Schema.Struct({ name: Schema.String, guid: Schema.NullOr(Schema.String) }),
-    workflows: Schema.Array(saved),
-  }),
+  savedSnapshot,
   Schema.Struct({
     source: Schema.Literal("window"),
     scope: Schema.Literal("active_workflow"),

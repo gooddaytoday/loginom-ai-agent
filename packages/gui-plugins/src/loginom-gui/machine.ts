@@ -1,14 +1,31 @@
+import { findNodePath, overlayWorkflows, pathIn } from "./compare-schemas"
 import type { Finding, Snapshot, Workflow } from "./contract"
+import type { ChangesWithSchema } from "./package-changes-data"
 
 export type Request = { sessionID: string; serverID: string; directory: string; finding?: Finding }
+
+type Comparison = {
+  changes: ChangesWithSchema
+  overlay: ChangesWithSchema["schemaDiff"]["after"]
+  mode: "after" | "before"
+}
 
 export type State =
   | { status: "closed" }
   | { status: "loading" | "empty" | "failed"; request: Request }
-  | { status: "ready"; request: Request; snapshot: Snapshot; path: readonly Workflow[]; selected?: number }
+  | {
+      status: "ready"
+      request: Request
+      snapshot: Snapshot
+      path: readonly Workflow[]
+      selected?: number
+      comparison?: Comparison
+    }
 
 export type Event =
   | { type: "open"; request: Request }
+  | { type: "open-changes"; request: Request; changes: ChangesWithSchema }
+  | { type: "mode"; mode: Comparison["mode"] }
   | { type: "loaded"; request: Request; snapshot: Snapshot | null }
   | { type: "failed"; request: Request }
   | { type: "close" }
@@ -17,19 +34,39 @@ export type Event =
   | { type: "enter"; workflow: Workflow }
   | { type: "leave" }
 
-function findPath(workflows: readonly Workflow[], guid: string): readonly Workflow[] | undefined {
-  for (const workflow of workflows) {
-    if (workflow.nodes.some((node) => node.guid === guid)) return [workflow]
-    const nested = findPath(workflow.submodels, guid)
-
-    if (nested) return [workflow, ...nested]
-  }
-}
-
 export function transition(state: State, event: Event): State {
   switch (event.type) {
     case "open":
       return { status: "loading", request: event.request }
+    case "open-changes": {
+      const diff = event.changes.schemaDiff
+      const overlay = { ...diff.after, workflows: overlayWorkflows(diff.before.workflows, diff.after.workflows) }
+
+      return {
+        status: "ready",
+        request: event.request,
+        snapshot: overlay,
+        path: overlay.workflows.slice(0, 1),
+        comparison: { changes: event.changes, overlay, mode: "after" },
+      }
+    }
+
+    case "mode": {
+      if (state.status !== "ready" || !state.comparison || state.comparison.mode === event.mode) return state
+      const snapshot = event.mode === "before" ? state.comparison.changes.schemaDiff.before : state.comparison.overlay
+      const path = pathIn(snapshot.workflows, state.path)
+      const guid = state.path.at(-1)?.nodes[state.selected ?? -1]?.guid
+      const index = guid ? path.at(-1)?.nodes.findIndex((node) => node.guid === guid && !node.boundary_role) : undefined
+
+      return {
+        ...state,
+        snapshot,
+        path,
+        selected: index === -1 ? undefined : index,
+        comparison: { ...state.comparison, mode: event.mode },
+      }
+    }
+
     case "close":
       return { status: "closed" }
     case "failed":
@@ -45,7 +82,7 @@ export function transition(state: State, event: Event): State {
 
       if (snapshot.source === "saved" && finding) {
         for (const guid of finding.nodeGuids) {
-          const path = findPath(snapshot.workflows, guid)
+          const path = findNodePath(snapshot.workflows, guid)
 
           if (!path) continue
           const selected = path.at(-1)?.nodes.findIndex((node) => node.guid === guid)

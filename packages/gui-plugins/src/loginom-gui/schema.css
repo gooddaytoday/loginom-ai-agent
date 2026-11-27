@@ -180,3 +180,75 @@
 .loginom-schema-facts dt {
   font-weight: 600;
 }
+
+.loginom-schema-toggle,
+.loginom-schema-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.loginom-schema-toggle {
+  margin-inline-start: auto;
+}
+
+.loginom-schema-legend {
+  font-size: 12px;
+}
+
+.loginom-schema-legend .is-added,
+.loginom-schema-mark.is-added {
+  color: var(--text-diff-add-base);
+}
+
+.loginom-schema-legend .is-changed,
+.loginom-schema-mark.is-changed {
+  color: var(--v2-text-text-accent);
+}
+
+.loginom-schema-legend .is-removed,
+.loginom-schema-mark.is-removed {
+  color: var(--text-diff-delete-base);
+}
+
+.loginom-schema-link-key.is-added::before {
+  content: "━ ";
+}
+
+.loginom-schema-link-key.is-removed::before {
+  content: "┄ ";
+}
+
+.loginom-schema-card.is-added,
+.loginom-schema-mark.is-added {
+  border-color: var(--text-diff-add-base);
+}
+
+.loginom-schema-card.is-changed {
+  border-color: var(--v2-text-text-accent);
+}
+
+.loginom-schema-card.is-removed,
+.loginom-schema-mark.is-removed {
+  border: 1px dashed var(--text-diff-delete-base);
+}
+
+.loginom-schema-card.is-removed strong {
+  text-decoration: line-through;
+}
+
+.loginom-schema-canvas > svg path.is-added {
+  stroke: var(--text-diff-add-base);
+}
+
+.loginom-schema-canvas > svg path.is-removed {
+  stroke: var(--text-diff-delete-base);
+  stroke-dasharray: 5 4;
+}
+
+.loginom-schema-actions {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}

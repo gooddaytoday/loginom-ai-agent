@@ -1,12 +1,18 @@
+import { usePlugin } from "@opencode/plugin/gui"
 import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
 import { createMemo, createSignal, For, onCleanup, Show, type Accessor } from "solid-js"
+import { linkKey, workflowAt } from "./compare-schemas"
 import type { Node, Port } from "./contract"
 import { buildDiagram, cardHeight, cardWidth, componentKey, nativePortKey, type Diagram } from "./graph"
+import type definition from "./index"
+import { createPackageChangeActions, PackageChangeActions } from "./package-change-actions"
+import { nodeRows, type ChangesWithSchema } from "./package-changes-data"
+import { FactsTable } from "./facts-table"
 import type en from "./i18n/en"
-import type { Event, State } from "./machine"
+import type { Event, Request, State } from "./machine"
 
-type Translate = (key: keyof typeof en, args?: { number: number }) => string
+type Translate = (key: keyof typeof en, args?: Record<string, string | number>) => string
 
 type Ready = Extract<State, { status: "ready" }>
 
@@ -168,16 +174,17 @@ function WorkflowView(props: { state: Ready; dispatch: (event: Event) => void; t
   const path = () => props.state.path
   const workflow = () => path().at(-1)
 
-  const graph = () => {
+  const graph = createMemo(() => {
     const current = snapshot()
 
     return current.source === "window" ? current.workflow : workflow()
-  }
+  })
 
-  const parent = () =>
+  const parent = createMemo(() =>
     path()
       .at(-2)
-      ?.nodes.find((node) => node.guid === workflow()?.key.at(-1))
+      ?.nodes.find((node) => node.guid === workflow()?.key.at(-1)),
+  )
 
   const diagram = createMemo(() => {
     const current = graph()
@@ -218,7 +225,47 @@ function WorkflowView(props: { state: Ready; dispatch: (event: Event) => void; t
           .map((model) => model.label)
   }
 
+  const comparison = () => props.state.comparison
+  const diff = () => comparison()?.changes.schemaDiff
+  const showingChanges = () => comparison()?.mode === "after"
+  const changes = createMemo(() => comparison()?.changes)
+
+  const nodeChanges = createMemo(() => {
+    const current = changes()
+
+    return new Map(current ? nodeRows(current, props.t).map((row) => [row.guid, row]) : [])
+  })
+
+  const changeMark = (node: Node) => {
+    if (showingChanges() && node.guid && !node.boundary_role) return nodeChanges().get(node.guid)?.kind
+  }
+
+  const selectedChange = () => {
+    const guid = selection()?.guid
+
+    if (showingChanges() && guid) return nodeChanges().get(guid)
+  }
+
+  const description = (node: Node) => {
+    const mark = changeMark(node)
+
+    if (mark) return props.t(`schema.${mark}`)
+  }
+
+  const originalEdges = createMemo(
+    () => new Set(workflowAt(diff()?.before.workflows ?? [], path())?.links.map(linkKey)),
+  )
+
+  const currentEdges = createMemo(() => new Set(workflowAt(diff()?.after.workflows ?? [], path())?.links.map(linkKey)))
+
   const [overflow, setOverflow] = createSignal(false)
+  let details: HTMLDivElement | undefined
+
+  const select = (index: number) => {
+    props.dispatch({ type: "select", index })
+
+    if (comparison()) details?.scrollIntoView({ block: "nearest" })
+  }
 
   return (
     <>
@@ -226,7 +273,7 @@ function WorkflowView(props: { state: Ready; dispatch: (event: Event) => void; t
         <Icon name="branch" size="large" />
         <div>
           <h2>{packageName()}</h2>
-          <p class="loginom-schema-muted">{props.t(snapshot().source)}</p>
+          <p class="loginom-schema-muted">{comparison() ? props.t("changes.copy") : props.t(snapshot().source)}</p>
           <Show when={snapshot().source === "window"}>
             <p class="loginom-schema-muted">{props.t("windowScope")}</p>
           </Show>
@@ -252,7 +299,40 @@ function WorkflowView(props: { state: Ready; dispatch: (event: Event) => void; t
             </Show>
           )}
         </Show>
+        <Show when={comparison()}>
+          {(change) => (
+            <div class="loginom-schema-toggle" role="group" aria-label={props.t("schema.mode")}>
+              <Button
+                type="button"
+                size="small"
+                variant={change().mode === "after" ? "outline" : "ghost"}
+                aria-pressed={change().mode === "after"}
+                onClick={() => props.dispatch({ type: "mode", mode: "after" })}
+              >
+                {props.t("schema.withChanges")}
+              </Button>
+              <Button
+                type="button"
+                size="small"
+                variant={change().mode === "before" ? "outline" : "ghost"}
+                aria-pressed={change().mode === "before"}
+                onClick={() => props.dispatch({ type: "mode", mode: "before" })}
+              >
+                {props.t("schema.asBefore")}
+              </Button>
+            </div>
+          )}
+        </Show>
       </header>
+      <Show when={showingChanges()}>
+        <div class="loginom-schema-section loginom-schema-legend">
+          <span class="is-added">{props.t("schema.added")}</span>
+          <span class="is-changed">{props.t("schema.changed")}</span>
+          <span class="is-removed">{props.t("schema.removed")}</span>
+          <span class="loginom-schema-link-key is-added">{props.t("schema.linkAdded")}</span>
+          <span class="loginom-schema-link-key is-removed">{props.t("schema.linkRemoved")}</span>
+        </div>
+      </Show>
       <Show when={crumbs().length > 0}>
         <div class="loginom-schema-section loginom-schema-crumbs">
           <span>{[packageName(), ...crumbs()].join(" › ")}</span>
@@ -269,7 +349,9 @@ function WorkflowView(props: { state: Ready; dispatch: (event: Event) => void; t
             <div
               class="loginom-schema-viewport"
               role="region"
-              aria-label={props.t("schema")}
+              aria-label={props.t(
+                comparison() ? (showingChanges() ? "schema.graphAfter" : "schema.graphBefore") : "schema",
+              )}
               tabIndex={0}
               ref={(element) => {
                 const observer = new ResizeObserver(() => setOverflow(element.scrollWidth > element.clientWidth))
@@ -295,6 +377,10 @@ function WorkflowView(props: { state: Ready; dispatch: (event: Event) => void; t
 
                       return (
                         <path
+                          classList={{
+                            "is-added": showingChanges() && !originalEdges().has(linkKey(link.link)),
+                            "is-removed": showingChanges() && !currentEdges().has(linkKey(link.link)),
+                          }}
                           d={`M${from.x} ${from.y}C${from.x + bend} ${from.y} ${to.x - bend} ${to.y} ${to.x} ${to.y}`}
                         />
                       )
@@ -314,6 +400,11 @@ function WorkflowView(props: { state: Ready; dispatch: (event: Event) => void; t
                       <>
                         <Show when={marked(item.node)}>
                           <span class="loginom-schema-mark">{props.t("finding")}</span>
+                        </Show>
+                        <Show when={changeMark(item.node)}>
+                          {(mark) => (
+                            <span class={`loginom-schema-mark is-${mark()}`}>{props.t(`schema.${mark()}`)}</span>
+                          )}
                         </Show>
                         <Icon name="branch" />
                         <strong>{title}</strong>
@@ -365,11 +456,15 @@ function WorkflowView(props: { state: Ready; dispatch: (event: Event) => void; t
                         classList={{
                           "is-marked": marked(item.node),
                           "is-submodel": componentKey(item.node) === "submodel",
+                          "is-added": changeMark(item.node) === "added",
+                          "is-changed": changeMark(item.node) === "changed",
+                          "is-removed": changeMark(item.node) === "removed",
                         }}
                         aria-label={title}
+                        aria-description={description(item.node)}
                         aria-pressed={props.state.selected === index}
                         style={style}
-                        onClick={() => props.dispatch({ type: "select", index })}
+                        onClick={() => select(index)}
                       >
                         {content}
                       </button>
@@ -391,9 +486,22 @@ function WorkflowView(props: { state: Ready; dispatch: (event: Event) => void; t
           </p>
         )}
       </Show>
-      <div class="loginom-schema-section">
-        <Show when={selection() && diagram()} fallback={props.t("select")}>
-          {(current) => <NodeDetails diagram={current()} index={props.state.selected ?? -1} t={props.t} />}
+      <div class="loginom-schema-section" ref={details}>
+        <Show
+          when={selectedChange()}
+          fallback={
+            <Show when={selection() && diagram()} fallback={props.t("select")}>
+              {(current) => <NodeDetails diagram={current()} index={props.state.selected ?? -1} t={props.t} />}
+            </Show>
+          }
+        >
+          {(change) => (
+            <>
+              <h3>{selection()?.label}</h3>
+              <p class="loginom-schema-muted">{props.t("facts.title")}</p>
+              <FactsTable facts={change().facts} />
+            </>
+          )}
         </Show>
         <Show when={nested()}>
           {(model) => (
@@ -410,6 +518,31 @@ function WorkflowView(props: { state: Ready; dispatch: (event: Event) => void; t
           <p class="loginom-schema-muted">{props.t("submodelUnavailable")}</p>
         </Show>
       </div>
+    </>
+  )
+}
+
+function SchemaChangeActions(props: { changes: ChangesWithSchema; request: Request }) {
+  const ctx = usePlugin<typeof definition>()
+
+  const actions = createPackageChangeActions(props.changes, props.request, () =>
+    ctx.sessions
+      .list()
+      .find(
+        (session) =>
+          session.id === props.request.sessionID &&
+          session.server.id === props.request.serverID &&
+          !session.pending &&
+          session.location?.directory === props.request.directory,
+      ),
+  )
+
+  return (
+    <>
+      <p role="status" class="loginom-schema-muted">
+        {actions.status()}
+      </p>
+      <PackageChangeActions actions={actions} />
     </>
   )
 }
@@ -431,7 +564,11 @@ export default function SchemaPage(props: {
     <main class="loginom-schema-page">
       <div class="loginom-schema-content">
         <p class="loginom-schema-muted">{props.t("loginom")}</p>
-        <h1>{props.t("packages")}</h1>
+        <h1>
+          <Show when={ready()?.comparison} fallback={props.t("packages")}>
+            {(change) => props.t("schema.changesTitle", { name: change().changes.packageName })}
+          </Show>
+        </h1>
         <section class="loginom-schema-frame">
           <Show when={ready()}>
             {(current) => <WorkflowView state={current()} dispatch={props.dispatch} t={props.t} />}
@@ -451,7 +588,14 @@ export default function SchemaPage(props: {
             </div>
           </Show>
           <Show when={props.state().status !== "closed"}>
-            <footer class="loginom-schema-section">
+            <footer class="loginom-schema-section loginom-schema-actions">
+              <Show when={ready()?.comparison?.changes} keyed>
+                {(changes) => {
+                  const current = ready()
+
+                  if (current) return <SchemaChangeActions changes={changes} request={current.request} />
+                }}
+              </Show>
               <Button type="button" variant="neutral" onClick={props.back}>
                 {props.t("back")}
               </Button>

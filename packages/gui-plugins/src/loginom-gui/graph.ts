@@ -99,7 +99,7 @@ export function buildDiagram(graph: Graph, parent?: Node) {
     const source = edge(link.source, "output")
     const target = edge(link.target, "input")
 
-    return source && target ? [{ source, target }] : []
+    return source && target ? [{ source, target, link }] : []
   })
 
   return {

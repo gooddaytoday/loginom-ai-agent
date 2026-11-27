@@ -1,9 +1,9 @@
 import { CodeBlock, Slot, Style, type MountedSession, type Plugin } from "@opencode/plugin/gui"
 import { Page, ToolRenderer, builtinContext } from "@opencode/plugin/gui/builtin"
 import { Button } from "@opencode/ui/button"
-import { createMemo, createSignal, lazy, onCleanup, Show, Suspense, untrack } from "solid-js"
 import { Option } from "effect"
-import { decodePackageChanges, packageChangesTool } from "./package-changes-data"
+import { createMemo, createSignal, lazy, onCleanup, Show, Suspense, untrack } from "solid-js"
+import { decodePackageChanges, packageChangesTool, type ChangesWithSchema } from "./package-changes-data"
 import { PackageSchema, readFinding, type Finding } from "./contract"
 import { transition, type Event, type Request, type State } from "./machine"
 import type definition from "./index"
@@ -51,6 +51,16 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       ({ snapshot }) => dispatch({ type: "loaded", request, snapshot }),
       () => dispatch({ type: "failed", request }),
     )
+  }
+
+  const openChanges = (session: MountedSession, changes: ChangesWithSchema) => {
+    controller?.abort()
+    dispatch({
+      type: "open-changes",
+      request: { sessionID: session.id, serverID: session.server.id, directory: session.directory },
+      changes,
+    })
+    builtinContext(ctx).layout.openPage(pageID)
   }
 
   const open = (session: MountedSession, finding?: Finding) => {
@@ -157,12 +167,24 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
           : undefined,
       )
 
+      const target = createMemo(() => {
+        const session = ctx.sessions.current()
+
+        if (session && session.id === changes()?.sessionID && !session.pending) {
+          return { sessionID: session.id, serverID: session.server.id, directory: session.directory }
+        }
+      })
+
       return (
-        <Show when={changes()?.edits.length || changes()?.schemas ? changes() : undefined} keyed>
-          {(value) => (
-            <Suspense>
-              <Card changes={value} />
-            </Suspense>
+        <Show when={target()} keyed>
+          {(request) => (
+            <Show when={changes()?.edits.length || changes()?.schemas ? changes() : undefined} keyed>
+              {(value) => (
+                <Suspense>
+                  <Card changes={value} target={request} openSchema={openChanges} />
+                </Suspense>
+              )}
+            </Show>
           )}
         </Show>
       )

@@ -165,3 +165,67 @@ export function openLoginomSchemaConversation(page: Page, source: "saved" | "win
     },
   })
 }
+
+export function packageSchemaDiffFixture() {
+  const nodes = root.nodes
+    .map((node) => {
+      if (node.guid === id(5)) return { ...node, label: "Выручка по регионам", position: point(530, 45) }
+
+      if (node.guid === id(3)) return { ...node, position: point(70, 45) }
+
+      return { ...node, label: "Фильтр по дате", position: point(300, 225) }
+    })
+    .slice(0, 3)
+
+  const added = {
+    guid: id(14),
+    label: "Проверка пустых значений",
+    type: "TBGFilterDataEngine",
+    position: point(300, 45),
+    ports: [port(140, "input", 0, "Входной источник данных"), port(141, "output", 0, "Соответствуют условию")],
+    filter_conditions: [{ field: "Выручка", relation: "frtIsNotNull", value: null, join: null }],
+  }
+
+  const removed = {
+    guid: id(15),
+    label: "Промежуточная выгрузка",
+    type: "TBGExportExcel",
+    position: point(530, 225),
+    ports: [port(150, "input", 0, "Источник данных")],
+  }
+
+  return {
+    before: {
+      ...saved,
+      workflows: [
+        {
+          ...root,
+          nodes: [...nodes, removed],
+          links: [link(3, 30, 5, 50), link(3, 30, 4, 40), link(4, 41, 15, 150)],
+          submodels: [],
+        },
+      ],
+    },
+    after: {
+      ...saved,
+      workflows: [
+        {
+          ...root,
+          nodes: [
+            ...nodes.map((node) =>
+              node.guid === id(4)
+                ? {
+                    ...node,
+                    filter_conditions: [{ field: "Выручка", relation: "frtGreater", value: "100", join: "ctAnd" }],
+                  }
+                : node,
+            ),
+            added,
+          ],
+          links: [link(3, 30, 14, 140), link(14, 141, 5, 50), link(3, 30, 4, 40)],
+          submodels: [],
+        },
+      ],
+    },
+  }
+}
