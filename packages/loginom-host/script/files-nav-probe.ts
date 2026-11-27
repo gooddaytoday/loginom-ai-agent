@@ -12,7 +12,8 @@ import { join, resolve } from "node:path"
 // Differential: run it against another resources directory (for example the v0.4.2 CLI release) with the same account.
 // Prints one PROBE_STEP line per step and one PROBE_RESULT line. Environment:
 //   LOGINOM_AI_AGENT_TEST_CONFIG, LOGINOM_AI_AGENT_TEST_RESOURCES (as wizard-ready-probe.ts)
-//   PROBE_REPEATS (default 3), PROBE_VARIANTS (default "text,excel"), PROBE_HEADLESS=0 for a visible browser,
+//   PROBE_REPEATS (default 3), PROBE_VARIANTS (default "text,excel"; "acf" alone creates one research.auto_correlation node
+//   after importing the acf-update series: red when its target phase stays pending, see below), PROBE_HEADLESS=0 for a visible browser,
 //   PROBE_DRY=1 checks the configuration and prints the plan without touching the stand.
 if (process.argv.includes("--help")) {
   console.log(
@@ -22,7 +23,7 @@ if (process.argv.includes("--help")) {
 }
 const headless = process.env.PROBE_HEADLESS !== "0"
 const repeats = Number(process.env.PROBE_REPEATS ?? 3)
-const variants = (process.env.PROBE_VARIANTS ?? "text,excel").split(",").filter((item) => item === "text" || item === "excel")
+const variants = (process.env.PROBE_VARIANTS ?? "text,excel").split(",").filter((item) => item === "text" || item === "excel" || item === "acf")
 if (!Number.isInteger(repeats) || repeats < 1 || variants.length === 0) throw Error("PROBE_REPEATS_OR_VARIANTS_INVALID")
 const probeStart = performance.now()
 const steps: { step: string; ms: number; status: string; code: string | null }[] = []
@@ -37,6 +38,8 @@ const user = config.workflow_profile.loginom_user as string
 if (!user) throw Error("TEST_USER_REQUIRED")
 const resources = resolve(resourcePath)
 const label = randomUUID().slice(0, 8)
+const acf = variants.length === 1 && variants[0] === "acf"
+if (variants.includes("acf") && !acf) throw Error("PROBE_ACF_MUST_BE_ALONE")
 if (process.env.PROBE_DRY === "1") {
   console.log("PROBE_DRY " + JSON.stringify({ headless, repeats, variants, resources, folder: `/${user}`, label, plan: "prepare, deliver, import, then per repeat: export text/excel with file read, dock_storage_list" }))
   process.exit(0)
@@ -75,7 +78,7 @@ try {
   await host.runtime(1, chat)
   await run.scope("bind", { taskMessageID: SessionV1.MessageID.make("msg_original"), profile: "loginom-automation" })
   await run.tools()
-  await run.admit("original", [{ name: "probe.csv", data: Buffer.from("id,product,revenue\n1,A,80\n2,B,15\n3,C,5\n").toString("base64") }])
+  await run.admit("original", [{ name: "probe.csv", data: Buffer.from(acf ? "RowID,X\n1,1.0\n2,2.0\n3,4.0\n4,3.0\n5,6.0\n6,5.0\n7,8.0\n8,7.0\n" : "id,product,revenue\n1,A,80\n2,B,15\n3,C,5\n").toString("base64") }])
   const invoke = async (name: string, args: unknown) => {
     const result = (await run.call(name, args, "original")) as { content: { type: string; text?: string }[] }
     const text = result.content.find((block) => block.type === "text")?.text
@@ -91,9 +94,9 @@ try {
     console.log("PROBE_STEP " + JSON.stringify({ at: elapsed(), ...line, entries: result.output?.native_entry_count ?? null, message: failureText.test(JSON.stringify(result)) ? String(result.error?.message ?? "").slice(0, 160) : null }))
     return result
   }
-  const settle = async (operation_id: string, first: Record<string, any>) => {
+  const settle = async (operation_id: string, first: Record<string, any>, attempts = 6) => {
     let node = first
-    for (let attempt = 0; node.state !== "settled" && attempt < 6; attempt++)
+    for (let attempt = 0; node.state !== "settled" && attempt < attempts; attempt++)
       node = await invoke("dock_node_wait", { operation_id, timeout_ms: 60000 })
     return node
   }
@@ -123,7 +126,16 @@ try {
           source: { kind: "verified_delivery", artifact_id: artifact.artifact_id, upload_operation_id: delivered.output?.upload_operation_id, bytes: delivered.output?.bytes, sha256: delivered.output?.sha256 },
           settings: {
             source: { source_path: delivered.output?.destination, encoding: "UTF-8", rows_to_skip: 0, first_line_as_title: true },
-            format: { delimiter: ",", decimal_separator: ".", null_marker: "", text_qualifier: '"', auto_detect_columns: "new" },
+            format: { delimiter: ",", decimal_separator: ".", null_marker: "", text_qualifier: '"', auto_detect_columns: acf ? "none" : "new" },
+            // acf: the column set the model sent in b5-1/b5-2 (RowID integer, X real)
+            ...(acf
+              ? {
+                  columns: [
+                    { source_name: "RowID", name: "RowID", label: "RowID", type: "integer", data_kind: "Непрерывный", used: true },
+                    { source_name: "X", name: "X", label: "X", type: "real", data_kind: "Непрерывный", used: true },
+                  ],
+                }
+              : {}),
           },
         },
         finish: "execute",
@@ -134,9 +146,34 @@ try {
   assert.equal(imported.status, "SUCCEEDED", "IMPORT_FAILED")
   const inputs = [{ source: { document_id, workflow_id: workflow_ref.workflow_id, node_id: imported.node.node_id }, output: 0, input: 0 }]
 
-  for (let index = 1; index <= repeats && !blocked; index++)
+  if (acf) {
+    // Same call as b5-1 acf-series-1. Red = the target phase never settles (pending_phase "target", execution not_requested).
+    // Suspect: readAutoCorrelationRowCount in auto-correlation-preflight.mjs polls the upstream Preview row count until the operation deadline.
+    const stem = `fn-${label}-acf`
+    const applied = await timed("acf-node", async () => {
+      const first = await invoke("dock_node_apply", {
+        operation_id: stem,
+        contract_revision: "1.0.0",
+        document_id,
+        workflow_ref,
+        target: { kind: "new", type: "research.auto_correlation", label: "Autocorrelation X" },
+        inputs,
+        mode: "time_domain",
+        parameters: { autocorrelation: { field: "X", lag_count: 4 } },
+        finish: "execute",
+        read: { ports: [0], sample_rows: 20, require_exact_numbers: true },
+      })
+      const node = await settle(stem, first, 3)
+      if (node.state === "settled") return node
+      const cancelled = await invoke("dock_node_cancel", { operation_id: stem })
+      return { status: "ACF_TARGET_PENDING", error: { code: "ACF_TARGET_PENDING", message: `pending_phase=${JSON.stringify(node.pending_phase ?? node.phase ?? null)} cancel=${String(cancelled.status ?? cancelled.state ?? "")}` } }
+    })
+    if (applied.status !== "SUCCEEDED") blocked = true
+  }
+  for (let index = 1; index <= repeats && !blocked && !acf; index++)
     for (const variant of variants) {
       const stem = `fn-${label}-${variant}-${index}`
+      if (variant === "acf") continue
       const destination = `/${user}/${stem}.${variant === "text" ? "csv" : "xlsx"}`
       const applied = await timed(`export-${variant}-${index}`, async () =>
         settle(
