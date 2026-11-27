@@ -142,7 +142,7 @@
         "variables": [
           {
             "name": "LgdPath",
-            "label": "LgdPath",
+            "label": "Путь LGD",
             "type": "string",
             "value": "{{LGD_FINAL_DESTINATION}}"
           }

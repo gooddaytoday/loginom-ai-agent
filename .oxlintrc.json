@@ -25,6 +25,17 @@
   "overrides": [
     {
       "files": [
+        "packages/loginom-runtime/client/test/artifact-download.test.mjs",
+        "packages/loginom-runtime/tools/loginom-acceptance/javascript-calibration-wizard.mjs",
+        "packages/loginom-runtime/tools/loginom-acceptance/javascript-native-details-discovery.mjs",
+        "packages/loginom-runtime/tools/loginom-acceptance/javascript-native-input-binding.mjs",
+        "packages/loginom-runtime/tools/loginom-acceptance/javascript-native-roundtrip-binding.mjs",
+        "packages/loginom-runtime/tools/loginom-acceptance/javascript-native-zero.mjs"
+      ],
+      "rules": { "no-restricted-globals": "off" }
+    },
+    {
+      "files": [
         "packages/app/**",
         "packages/desktop/**",
         "packages/gui-plugins/**",

@@ -16,7 +16,7 @@ import { Schema } from "effect"
 import { SERVER, seed, sessionHref } from "./app"
 import { mockOpenCodeServer, type MockServerConfig } from "./mock-server"
 import { installSseTransport } from "./sse-transport"
-import { expectSessionReady } from "./waits"
+import { expectSessionReady, expectSessionTitle } from "./waits"
 
 export const directory = "C:/OpenCode/TimelineStability"
 
@@ -104,10 +104,11 @@ type ToolSeed = {
       }
 }
 
-// Mock server hooks a timeline scenario may add; the fixture owns directory, project, provider, and history.
+// Mock server hooks a timeline scenario may add; the fixture owns directory, project, and history defaults.
 type TimelineServerInput = Partial<
   Pick<
     MockServerConfig,
+    | "provider"
     | "inbox"
     | "configEntries"
     | "forms"
@@ -222,6 +223,7 @@ export async function setupTimeline(
     locale?: string
     deviceScaleFactor?: number
     seedHistory?: boolean
+    focusCard?: boolean
     // Session IDs to open as titlebar tabs.
     tabs?: string[]
   } & TimelineServerInput = {},
@@ -253,7 +255,7 @@ export async function setupTimeline(
     ...input,
     directory,
     project: project(),
-    provider: provider(),
+    provider: input.provider ?? provider(),
     sessions,
     sessionStatus: input.sessionStatus ?? { [sessionID]: initialStatus },
     pageMessages: input.pageMessages ?? (() => ({ items: messages })),
@@ -295,8 +297,18 @@ export async function setupTimeline(
     })
   }
 
-  await page.goto(sessionHref(sessionID))
-  await expectSessionReady(page, { server: SERVER, sessionID, title })
+  const route = sessionHref(sessionID)
+
+  if (input.focusCard) {
+    await page.goto(
+      `/e2e/utils/app-direction.html?${new URLSearchParams({ server: SERVER, route, direction: "ltr", "focus-card": "" })}`,
+    )
+    await expectSessionTitle(page, title)
+  } else {
+    await page.goto(route)
+    await expectSessionReady(page, { server: SERVER, sessionID, title })
+  }
+
   await transport.waitForConnection()
 
   if (input.cpuRate && input.cpuRate > 1) {

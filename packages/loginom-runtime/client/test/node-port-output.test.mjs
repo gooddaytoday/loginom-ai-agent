@@ -10,7 +10,7 @@ import {adaptCell} from '../lib/variant-native-values.mjs';
 
 const portGuid='11111111-1111-1111-1111-111111111111';
 const execution={verified:true,cleanup_complete:true,status:'completed',owner_verified:true,execution_id:'doc:root:1',group_id:'1',process_id:'1.1',process_record_id:'child'};
-function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '9007199254740993'},1.2345678901234567,'']],types=[4,3,5],clock,treeOutput=false,batch,getValueAsString}={}) {
+function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '9007199254740993'},1.2345678901234567,'']],types=[4,3,5],clock,treeOutput=false,treeRows=1,batch,getValueAsString}={}) {
  const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Scenario',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
  const rpcCalls=[],uiCalls=[],disposed=[],elements=new Map();
  const el=tid=>{const e={id:tid,getAttribute:k=>k==='data-tid'?tid:null,classList:{contains:k=>k==='x-tab-active'},getBoundingClientRect:()=>({width:100,height:100}),contains:x=>e===x||e.children?.includes(x)};elements.set(tid,e);return e;};
@@ -30,8 +30,8 @@ function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '900719925474
   dataSource.$.$I=83;
   const scalar=proxy('leaf',{get_Name:async()=> 'flag',get_DisplayName:async()=> 'Flag',get_IsContainer:async()=>false,get_IsArray:async()=>false,get_DataType:async()=>1});
   const children=proxy('treeChildren',{get_Count:async()=>1,getItem:async()=>scalar});
-  const treeRoot=proxy('treeRoot',{get_Name:async()=> 'Root',get_DisplayName:async()=> 'Root',get_IsContainer:async()=>true,get_IsArray:async()=>false,get_SubNodes:async()=>children});
-  const reader=proxy('treeReader',{GetRowCount:async()=>1,GetContainerExists:async()=>true,AsVariant:async()=>false});
+  const treeRoot=proxy('treeRoot',{get_Name:async()=> 'Root',get_DisplayName:async()=> 'Root',get_IsContainer:async()=>true,get_IsArray:async()=>treeRows>1,get_SubNodes:async()=>children});
+  const reader=proxy('treeReader',{GetRowCount:async()=>treeRows,GetContainerExists:async()=>true,AsVariant:async()=>false});
   dataSource.get_RootNodeDef=async()=>treeRoot;dataSource.GetReader=async()=>reader;
  }
  const output=proxy('output',{$S:session,$:{$OW:0,$O:9},QueryInterface:async()=>dataSource});
@@ -60,6 +60,41 @@ test('tree_io serialized reader retains completed-port ownership and disposes ev
  assert.deepEqual(f.disposed.sort(),['dataSource','leaf','output','treeChildren','treeReader','treeRoot']);
  assert.equal(Object.hasOwn(result.output,'row_count'),false);assert.deepEqual(f.rpcCalls,[]);
 });
+test('schema-only read returns an incomplete port and never acquires an instance reader',async()=>{
+ const f=fixture({treeOutput:true});
+ f.dataSource.GetReader=async()=>assert.fail('schema-only read must skip the instance reader');
+ const result=await f.run({port:0,execution,sampleRows:0,requireExactNumbers:true,treeSchemaOnly:true});
+ assert.equal(result.verified,true,JSON.stringify(result));
+ assert.equal(result.output.sample_complete,false);
+ assert.deepEqual(Object.keys(result.output.tree),['schema']);
+ assert.deepEqual(f.disposed.sort(),['dataSource','leaf','output','treeChildren','treeRoot']);
+});
+
+test('private schema-only requests require tree port 0, zero rows and no windows',()=>{
+ const f=fixture({treeOutput:true}),opts={origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000};
+ const request={port:0,execution,sampleRows:0,requireExactNumbers:true,treeSchemaOnly:true};
+ for(const extra of [{port:1},{sampleRows:1},{rowOffset:0},{treePreview:true},{treeSchemaOnly:false}]){
+  assert.throws(()=>makeNodePortOutputCode(f.binding,{...request,...extra},opts),/Exact bounded/);
+ }
+});
+
+test('completed native execution returns the ordered first 256 tree instances as a preview',async()=>{
+ for(const rows of [127,257]){
+  const f=fixture({treeOutput:true,treeRows:rows});
+  const result=await f.run({port:0,execution,sampleRows:100,requireExactNumbers:true,treePreview:true});
+  assert.equal(result.verified,true,JSON.stringify(result));
+  assert.equal(result.cleanup_complete,true);
+  assert.equal(result.output.sample_complete,rows===127);
+  const tree=result.output.tree;
+  assert.equal(tree.complete,rows===127);
+  assert.equal(tree.node_count,rows===127?255:256);
+  assert.equal(tree.node_count,tree.instances.length);
+  assert.equal(tree.instances[2].path,'/0/flag');
+  assert.equal(tree.instances.at(-1).path,rows===127?'/126/flag':'/127');
+  assert.ok(tree.instances.every(n=>n.children?.every(i=>tree.instances[i].parent===n.index)??true));
+ }
+});
+
 for(const interfaceId of [141,71,116,undefined])test('tree source rejects an interface other than the requested native tree '+interfaceId,async()=>{
  const f=fixture({treeOutput:true});f.dataSource.$.$I=interfaceId;
  const result=await f.run({port:0,execution,sampleRows:0,requireExactNumbers:true});
@@ -533,7 +568,7 @@ test('reader_applies_datetime_limitations_without_downgrading_numeric_precision'
 
 // Keep browser/UI boundaries inert while exercising the actual shared driver
 // lifecycle and the real schema/materialization contracts.
-async function sharedOutputFixture({cross=false,mapped=false,native=false,override=false}={}){
+async function sharedOutputFixture({cross=false,mapped=false,native=false,override=false,autosync}={}){
  const {createTabularTransformNodeSupport}=await import('../lib/calculator-node.mjs');
  const {alignReadSchema}=await import('../lib/node-read-contract.mjs');
  const {materializeCrossTableOutput}=await import('../lib/crosstable-output.mjs');
@@ -562,7 +597,7 @@ async function sharedOutputFixture({cross=false,mapped=false,native=false,overri
   selectPreparedGraphNode:async()=>{},openPreparedWizard:async()=>{},readOutputDefinitionPages:async()=>({fields:schema,total_columns:2}),
   openNewOutputTable:()=>assert.fail('Ordinary read must not open Table'),readCollapseNativeOutput:async()=>{calls.push('native');return {ports:[structuredClone(output)]};}};
  const implementation={type:cross?'transform.cross_table':'transform.group_data',revision:'test',configure:async()=>({configuration}),
-  configureOutput:async()=>({native_mapping:{target_fields:schema}}),...(cross?{materializedSchema:materializeCrossTableOutput}:{}),
+  configureOutput:async()=>({native_mapping:{target_fields:schema,autosync}}),...(cross?{materializedSchema:materializeCrossTableOutput}:{}),
   ...(native?{nativeFullOutput:true}:{}),...(override?{configureAllOutputs:async()=>({verified:true}),readOutputs:async()=>{calls.push('override');return {override:true};}}:{})};
  const support=vm.runInNewContext('('+createTabularTransformNodeSupport.toString()+')',context)({},implementation);
  const ctx={node,document_id:'doc',workflow_ref:{workflow_id:'wf'},deadline:10000,execution:{status:'completed',execution_id:'e'}};
@@ -582,6 +617,33 @@ test('shared ordinary output passes the full execution receipt, preserves exact 
  }
  f.output.schema[1].type='integer';
  await assert.rejects(f.drivers.readOutput({ports:[0],sample_rows:1,require_exact_numbers:true},f.ctx),{code:'NODE_READ_SCHEMA_CHANGED'});
+});
+
+test('shared tabular reads accept native order with autosync and require the complete field schema',async()=>{
+ const read={ports:[0],sample_rows:1,require_exact_numbers:true};
+ const autosynced=await sharedOutputFixture({autosync:true});
+ const ordered=await sharedOutputFixture({autosync:false});
+ const reverse=fields=>fields.toReversed().map((field,index)=>({...field,index}));
+ for(const f of [autosynced,ordered]){
+  f.output.schema=reverse(f.output.schema);
+  f.output.sample=f.output.sample.map(row=>row.toReversed());
+ }
+ const result=await autosynced.drivers.readOutput(read,autosynced.ctx);
+ assert.deepEqual(structuredClone(result.ports[0].schema),reverse(autosynced.schema));
+ assert.deepEqual(result.ports[0].sample,autosynced.output.sample);
+ await assert.rejects(ordered.drivers.readOutput(read,ordered.ctx),/output field order differs/i);
+
+ const [first,second]=autosynced.output.schema;
+ for(const schema of [
+  [first],
+  [first,{...first,index:1}],
+  [first,{...second,name:'Foreign'}],
+  [first,{...second,label:'Foreign'}],
+  [first,{...second,type:'integer'}],
+ ]){
+  autosynced.output.schema=schema;
+  await assert.rejects(autosynced.drivers.readOutput(read,autosynced.ctx),{code:'NODE_READ_SCHEMA_CHANGED'});
+ }
 });
 
 test('shared CrossTable ordinary read materializes its observed schema; native full and overrides retain dispatch',async()=>{

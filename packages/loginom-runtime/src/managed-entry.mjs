@@ -11,7 +11,7 @@ import { closeManagedResources } from "./managed-resources-close.mjs"
 import { dashboardStorage } from "./dashboard-storage.mjs"
 import { runtimeCallTimeout } from "./call-timeout.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
-import { loginBrowser, loginomAddress } from "./connection-check.mjs"
+import { loginBrowser, loginomAddress, reauthenticateReloadedPage } from "./connection-check.mjs"
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
@@ -247,6 +247,7 @@ async function handle(message) {
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+        reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
         startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {
           state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error,
             [input.connection.apiKey, input.connection.password, input.connection.username]) })
