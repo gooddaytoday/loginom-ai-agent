@@ -51,9 +51,20 @@ test("a prepared folder builds and serves its coherent sample using one shared s
   assert.deepEqual(data.parameters, [{ name: "Count", value: 2 }, { name: "Label", value: null }])
   const again = await draftDashboard({ work: prepared.directory, resources })
   assert.equal(again.match(/http:\/\/localhost:\d+\/[a-f0-9]{64}\//)?.[0], url)
+})
+
+test("the Desktop preview serves data only for the requested prepared snapshot", async t => {
+  const prepared = await fixture(t)
   const control = await readDashboardBinding(prepared.directory, dirname(dirname(prepared.directory)))
-  assert.equal(await previewDashboard({ work: prepared.directory, resources, snapshotId: control.snapshotId }), url)
   assert.equal(await previewDashboard({ work: prepared.directory, resources, snapshotId: crypto.randomUUID() }), undefined)
+  const url = await previewDashboard({ work: prepared.directory, resources, snapshotId: control.snapshotId })
+  assert.match(url, /^http:\/\/localhost:\d+\/[a-f0-9]{64}\/$/)
+  const page = await fetch(url)
+  assert.equal(page.status, 200)
+  assert.match(page.headers.get("content-security-policy"), /frame-ancestors 'none'/)
+  const sample = await (await fetch(url + "data")).json()
+  assert.equal(sample.nodeName, "Узел")
+  assert.deepEqual(sample.sample.rows, [[42], [43]])
 })
 
 test("a request admitted for an earlier draft cannot start a preview for its replacement", async t => {
