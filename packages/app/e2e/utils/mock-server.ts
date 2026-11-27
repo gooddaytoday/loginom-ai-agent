@@ -15,6 +15,7 @@ import {
   MockNotFound,
   MockPtyFeatureUnsupported,
   MockPtyNotFound,
+  MockRpcError,
   MockServiceUnavailable,
   MockShellNotFound,
   MockUnauthorized,
@@ -48,6 +49,7 @@ export type MockFileContent =
 
 export interface MockServerConfig {
   server?: string
+  rpc?: (call: { id: string; method: string; input: unknown }) => { output: unknown } | MockRpcError | undefined
   // The machine name `/api/info` reports; omitted like a server that predates it.
   hostname?: string
   provider: Resolvable<MockProviderCatalog>
@@ -70,7 +72,6 @@ export interface MockServerConfig {
   // Without it, writes answer 501 MockUnsupported.
   onFileWrite?: (input: { path: string; directory: string; body: string }) => void
   configEntries?: unknown[]
-  rpc?: (params: { rpcID: string; method: string }, payload: Schema.JsonValue) => Schema.JsonValue | undefined
   directory: string
   project: unknown
   // Replaces the `/api/project` inventory, which defaults to `[project]`. A location inside a listed project
@@ -1221,17 +1222,16 @@ function mockHandlers(
             cursor: { next: offset + limit < ordered.length ? String(offset + limit) : undefined },
           })
         },
-        // The goal plugin's pill reads each routed session's goal; no scenario sets one.
-        rpcCall: (ctx) => {
-          const response = config.rpc?.(ctx.params, ctx.payload)
-
-          if (response !== undefined) return Effect.succeed(response)
-
-          if (ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get") return Effect.succeed({ output: null })
-
-          return Effect.fail(new MockUnsupported({
-            message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC`,
-          }))
+        rpcCall: ({ params: { rpcID, method }, payload }) => {
+          const result = config.rpc?.({
+            id: rpcID,
+            method,
+            input: Predicate.hasProperty(payload, "input") ? payload.input : undefined,
+          })
+          if (result instanceof MockRpcError) return Effect.fail(result)
+          if (result) return Effect.succeed(result)
+          if (rpcID === "opencode.goal" && method === "get") return Effect.succeed({ output: null })
+          return Effect.fail(new MockUnsupported({ message: `The mock server has no ${rpcID}.${method} RPC` }))
         },
         sessionActive: () => {
           const status = resolve(config.sessionStatus ?? {})

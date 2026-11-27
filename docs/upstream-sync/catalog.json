@@ -86,6 +86,8 @@
         "packages/app/src/shell/routes/session-ui-provider.tsx",
         "packages/gui-plugins/AGENTS.md",
         "packages/gui-plugins/README.md",
+        "packages/gui-plugins/src/renderer.ts",
+        "packages/gui-plugins/src/main.ts",
         "packages/plugin/src/gui/builtin.ts",
         "packages/session-ui/src/context/data.tsx",
         "packages/session-ui/src/timeline-next/projection.ts",

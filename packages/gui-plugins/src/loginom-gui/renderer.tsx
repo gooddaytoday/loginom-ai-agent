@@ -1,7 +1,9 @@
 import { CodeBlock, Slot, Style, type MountedSession, type Plugin } from "@opencode/plugin/gui"
-import { Page, builtinContext } from "@opencode/plugin/gui/builtin"
+import { Page, ToolRenderer, builtinContext } from "@opencode/plugin/gui/builtin"
 import { Button } from "@opencode/ui/button"
-import { createSignal, lazy, onCleanup, Show, Suspense, untrack } from "solid-js"
+import { createMemo, createSignal, lazy, onCleanup, Show, Suspense, untrack } from "solid-js"
+import { Option } from "effect"
+import { decodePackageChanges, packageChangesTool } from "./package-changes-data"
 import { PackageSchema, readFinding, type Finding } from "./contract"
 import { transition, type Event, type Request, type State } from "./machine"
 import type definition from "./index"
@@ -10,6 +12,11 @@ import styles from "./schema.css?inline"
 const pageID = "package-schema"
 
 const SchemaPage = lazy(() => import("./page"))
+
+const Card = lazy(async () => {
+  const { PackageChangesCard } = await import("./package-changes")
+  return { default: PackageChangesCard }
+})
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   ctx.add(Style, styles)
@@ -132,6 +139,30 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
             {ctx.t("showOnSchema")}
           </Button>
         </div>
+      )
+    },
+  })
+
+  ctx.add(ToolRenderer, {
+    tool: packageChangesTool,
+    separate: true,
+    get title() {
+      return ctx.t("changes.title")
+    },
+    render(props) {
+      const changes = createMemo(() =>
+        props.status === "completed"
+          ? Option.getOrUndefined(decodePackageChanges(props.metadata))?.loginom.packageChanges
+          : undefined,
+      )
+      return (
+        <Show when={changes()?.edits.length ? changes() : undefined} keyed>
+          {(value) => (
+            <Suspense>
+              <Card changes={value} />
+            </Suspense>
+          )}
+        </Show>
       )
     },
   })

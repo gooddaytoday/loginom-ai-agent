@@ -151,14 +151,13 @@ export function openLoginomSchemaConversation(page: Page, source: "saved" | "win
     sessions: [{ id: sessionID, title: "Продажи" }],
     seed: { locale: "ru" },
     pageMessages: pageMessagesFrom({ [sessionID]: source === "saved" ? messages : messages.slice(0, 1) }),
-    rpc: (params, payload) => {
-      if (params.rpcID !== "loginom.package" || params.method !== "schema") return
-      const requested = JSON.stringify(payload)
+    rpc: ({ id, method, input }) => {
+      if (id !== "loginom.package" || method !== "schema") return
+      const requested = JSON.stringify(input)
 
-      if (requested === JSON.stringify({ input: { sessionID, source: "saved" } }))
-        return { output: { snapshot: saved } }
+      if (requested === JSON.stringify({ sessionID, source: "saved" })) return { output: { snapshot: saved } }
 
-      if (requested === JSON.stringify({ input: { sessionID } })) {
+      if (requested === JSON.stringify({ sessionID })) {
         return { output: { snapshot: source === "window" ? windowSnapshot : saved } }
       }
 
