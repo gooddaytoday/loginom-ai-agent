@@ -7,6 +7,7 @@
   "license": "MIT",
   "exports": {
     "./renderer": "./src/renderer.ts",
+    "./loginom/repeat-dock": "./src/loginom/repeat-dock.tsx",
     "./main": "./src/main.ts",
     "./terminal": "./src/terminal/index.ts",
     "./debug/options": "./src/debug/options.ts"

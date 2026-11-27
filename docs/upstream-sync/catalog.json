@@ -2,6 +2,26 @@
   "comment": "Source of truth for which fork changes inside upstream files are described in catalog.md. First matching entry wins. An entry with `pending` names the stage B task or stage that brings its 0.4 change to OpenCode 2; until then it has no divergent files. Checked by scripts/upstream-sync/catalog-check.py.",
   "against": "a6b15d33daf6ab7d35569f6d711fdb630b9f04e7",
   "entries": [
+    {
+      "id": "CAT-15",
+      "title": "Tool decision forms and timeline groups (C3 B6)",
+      "paths": [
+        "packages/core/src/plugin/host.ts",
+        "packages/plugin/src/effect/tool.ts",
+        "packages/plugin/src/promise/adapter.ts",
+        "packages/plugin/src/promise/tool.ts",
+        "packages/app/src/session/requests/question-controller.ts",
+        "packages/app/src/session/requests/session-question-dock.tsx",
+        "packages/app/e2e/regression/loginom-repeat-question.spec.ts",
+        "packages/gui-plugins/src/loginom/repeat-dock.tsx",
+        "packages/session-ui/src/components/tool-group-row.tsx",
+        "packages/session-ui/src/message/tool-group.ts",
+        "packages/session-ui/src/timeline/projection.ts",
+        "packages/session-ui/src/timeline-next/projection.ts",
+        "packages/session-ui/src/timeline-next/tools/tool-display.tsx",
+        "packages/session-ui/src/tools/tool-renderer.tsx"
+      ]
+    },
     { "id": "CAT-01", "title": "Manifests and lockfile", "paths": ["bun.lock", "**/package.json"] },
     {
       "id": "CAT-02",

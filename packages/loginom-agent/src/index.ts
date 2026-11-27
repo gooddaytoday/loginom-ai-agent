@@ -335,7 +335,10 @@ export default Plugin.define({
     // `package-docs` grant.
     const profiles = join(Global.Path.data, "file-profiles")
     const files = await localFiles(ctx, profiles)
-    const repeats = repeatGuard(async () => (await ctx.tool.list()).find((tool) => tool.id === "question"))
+    const repeats = repeatGuard({
+      ask: ctx.tool.ask,
+      interrupt: (sessionID) => ctx.session.interrupt({ sessionID }),
+    })
     await ctx.tool.transform((editor) => {
       editor.add(
         repeats.wrap(
@@ -420,7 +423,7 @@ export default Plugin.define({
       hide(event)
     })
     await ctx.tool.hook("execute.before", async (event) => {
-      if (!repeats.tracks(event.tool)) repeats.reset(event.sessionID)
+      repeats.before(event.sessionID, event.tool)
       await bound(event.sessionID)
       if (!permits(profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
