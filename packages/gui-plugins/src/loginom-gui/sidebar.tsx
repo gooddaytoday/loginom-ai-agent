@@ -142,7 +142,7 @@ export function ConversationSidebar(props: {
                     </Show>
                   </button>
                   <IconButton
-                    icon="plus"
+                    icon={<Icon name="plus" size="small" />}
                     size="small"
                     variant="ghost"
                     aria-label={props.text("newInProject")}
@@ -153,7 +153,7 @@ export function ConversationSidebar(props: {
                     }}
                   />
                   <IconButton
-                    icon="edit"
+                    icon={<Icon name="edit" size="small" />}
                     size="small"
                     variant="ghost"
                     aria-label={props.text("openProject")}
