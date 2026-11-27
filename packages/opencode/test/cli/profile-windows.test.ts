@@ -1,12 +1,13 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { protectWindowsProfile } from "../../src/cli/profile-windows"
+import { protectWindowsProfile, removeAbandonedBrowserDirectories } from "../../src/cli/profile-windows"
 import { acquireProfile } from "../../src/cli/profile"
 
 test.skipIf(process.platform === "win32")("Windows ACL protection fails closed on other platforms", async () => {
   await expect(protectWindowsProfile("C:\\profile")).rejects.toThrow("PROFILE_PERMISSIONS_INVALID")
+  await expect(removeAbandonedBrowserDirectories("C:\\profile")).rejects.toThrow("PROFILE_CLEANUP_FAILED")
 })
 
 test.skipIf(process.platform !== "win32")(
@@ -148,4 +149,64 @@ test.skipIf(process.platform !== "win32")(
     }
   },
   100000,
+)
+
+test.skipIf(process.platform !== "win32")(
+  "native cleanup removes only abandoned Chromium directories directly in the profile cache\\tmp",
+  async () => {
+    const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
+    if (!systemRoot) throw Error("SystemRoot required")
+    // Standard users may create junctions but not symlinks.
+    const junction = async (link: string, target: string) => {
+      const child = Bun.spawn([join(systemRoot, "System32/cmd.exe"), "/d", "/c", "mklink", "/J", link, target], {
+        stdout: "ignore",
+        stderr: "ignore",
+      })
+      expect(await child.exited).toBe(0)
+    }
+    const temporary = await mkdtemp(join(tmpdir(), "loginom-acl-cleanup-test-"))
+    try {
+      const outside = join(temporary, "outside")
+      await mkdir(join(outside, "lbC1wMfr"), { recursive: true })
+      await writeFile(join(outside, "keep.txt"), "keep")
+      const root = join(temporary, "profile")
+      await mkdir(root)
+      await protectWindowsProfile(root)
+      const abandoned = join(root, "cache", "tmp", "lbC1wMfr")
+      await mkdir(join(abandoned, "Default", "Network"), { recursive: true })
+      await writeFile(join(abandoned, "Default", "Network", "Cookies"), "test")
+      // A junction inside an abandoned directory is unlinked, never entered.
+      await junction(join(abandoned, "Default", "link"), outside)
+      const kept = [
+        join("cache", "tmp", "lbC1wMf"),
+        join("cache", "tmp", "lbC1wMfr0"),
+        join("cache", "tmp", "LBC1wMfr"),
+        join("cache", "tmp", "lb-1wMfr"),
+        join("cache", "tmp", "other", "lbC1wMfr"),
+        join("config", "cache", "tmp", "lbC1wMfr"),
+      ]
+      for (const directory of kept) await mkdir(join(root, directory, "Default"), { recursive: true })
+      await writeFile(join(root, "cache", "tmp", "lbAbCd12"), "not a directory")
+      await junction(join(root, "cache", "tmp", "lbJunct1"), outside)
+      await removeAbandonedBrowserDirectories(root)
+      await expect(lstat(abandoned)).rejects.toThrow()
+      for (const directory of kept) expect((await lstat(join(root, directory, "Default"))).isDirectory()).toBe(true)
+      expect(await readFile(join(root, "cache", "tmp", "lbAbCd12"), "utf8")).toBe("not a directory")
+      await lstat(join(root, "cache", "tmp", "lbJunct1"))
+      expect(await readFile(join(outside, "keep.txt"), "utf8")).toBe("keep")
+      expect((await lstat(join(outside, "lbC1wMfr"))).isDirectory()).toBe(true)
+      // Nothing left to remove: returns without starting PowerShell.
+      await removeAbandonedBrowserDirectories(root)
+
+      // The anchor is the profile root itself: a redirected cache\tmp is refused.
+      const redirected = join(temporary, "redirected")
+      await mkdir(join(redirected, "cache"), { recursive: true })
+      await junction(join(redirected, "cache", "tmp"), outside)
+      await expect(removeAbandonedBrowserDirectories(redirected)).rejects.toThrow("PROFILE_CLEANUP_FAILED")
+      expect((await lstat(join(outside, "lbC1wMfr"))).isDirectory()).toBe(true)
+    } finally {
+      await rm(temporary, { recursive: true, force: true })
+    }
+  },
+  60000,
 )
