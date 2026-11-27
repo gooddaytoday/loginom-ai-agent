@@ -48,12 +48,27 @@ test('regression reads predictions and only selected coefficients in observed sc
 
 test('filter refuses reordered fields and shared output identities',async()=>{
  const fields=[field,{name:'Other',label:'Other',type:'string',data_kind:'continuous'}];
- const mapped={ports:[0,1].map(port=>({port,native_mapping:{target_fields:fields}}))};
+ const mapped={ports:[0,1].map(port=>({port,native_mapping:{autosync:false,target_fields:fields}}))};
  const reordered=portChannel([fields.toReversed(),fields]);
  await assert.rejects(()=>readFilterOutputs(reordered.channel,{...read,ports:[0]},ctx,mapped),/field order/);
  const duplicate=portChannel([fields,fields]),original=duplicate.channel.readOutputPort;
  duplicate.channel.readOutputPort=async options=>{const result=await original(options);result.output.port_guid='same';return result;};
  await assert.rejects(()=>readFilterOutputs(duplicate.channel,{...read,ports:[0,1]},ctx,mapped),/unexpected identity/);
+});
+
+test('filter accepts native column order on each autosynced port and verifies field identities',async()=>{
+ const fields=[field,{name:'Other',label:'Другое',type:'string',data_kind:'continuous'}];
+ const observed=[fields.toReversed(),fields];
+ const mapped={ports:[0,1].map(port=>({port,native_mapping:{autosync:true,target_fields:fields}}))};
+ const {channel}=portChannel(observed);
+ const result=await readFilterOutputs(channel,{...read,ports:[0,1]},ctx,mapped);
+ assert.deepEqual(result.ports.map(p=>p.schema),observed.map(schema=>schema.map((f,index)=>({...f,index}))));
+ for(const changed of [
+  {...fields[1],label:'Foreign'}, {...fields[1],type:'integer'}, {...fields[1],name:'Foreign'},fields[0],
+ ]){
+  const {channel}=portChannel([[changed,fields[0]]]);
+  await assert.rejects(()=>readFilterOutputs(channel,{...read,ports:[0]},ctx,mapped),{code:'NODE_READ_SCHEMA_CHANGED'});
+ }
 });
 
 test('clustering reads Cluster Distance and permitted passthrough order on requested ports',async()=>{

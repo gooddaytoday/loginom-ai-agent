@@ -7,6 +7,7 @@ import { getFilename } from "@opencode/util/path"
 import { Option, Schema } from "effect"
 import { createMemo, For, Index, Match, Show, Switch } from "solid-js"
 import { BasicTool } from "../../components/basic-tool"
+import { useData, type ToolRenderers } from "../../context"
 import {
   currentToolError,
   currentToolGroupedRead,
@@ -54,7 +55,8 @@ export function ContextGroup(props: {
   const tools = createMemo(() => props.parts.filter((part) => part.type === "tool"))
   const reasoning = createMemo(() => props.parts.flatMap((part) => (part.type === "reasoning" ? [part] : [])))
   const thoughtsOnly = createMemo(() => reasoning().length > 0 && reasoning().length === props.parts.length)
-  const activity = createMemo(() => activityLabel(tools(), i18n))
+  const toolRenderers = useData().toolRenderers
+  const activity = createMemo(() => activityLabel(tools(), i18n, toolRenderers))
 
   const label = createMemo(() => {
     const value = activity()
@@ -467,7 +469,7 @@ const decodeChangedPath = Schema.decodeUnknownOption(Schema.Struct({ file: Schem
  * started 1 shell". Work that runs on is counted by what was started, not among the calls that started it; a stretch of
  * only that reads like an events row: "Started 2 subagents".
  */
-function activityLabel(group: SessionMessageAssistantTool[], i18n: UiI18n) {
+function activityLabel(group: SessionMessageAssistantTool[], i18n: UiI18n, renderers?: ToolRenderers) {
   const tools = group.filter((tool) => toolRule(tool).layout !== "event")
 
   const launches = summarizeEvents(
@@ -530,7 +532,7 @@ function activityLabel(group: SessionMessageAssistantTool[], i18n: UiI18n) {
   const runs = calls("run")
   // Commands are counted, never quoted: a command can be any length.
   const commands = runs.length ? [i18n.plural("ui.timeline.activity.commands", runs.length)] : []
-  const used = [...new Set(calls("tool").map((tool) => toolTitle(tool, i18n)))]
+  const used = [...new Set(calls("tool").map((tool) => renderers?.find(tool.name)?.title ?? toolTitle(tool, i18n)))]
 
   const others = {
     explore: explore(false),

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {runInNewContext} from 'node:vm';
 import { createSerialGate } from '../lib/clipboard.mjs';
-import { createBrowserRecovery, parseRecoveryPageProbe, recoveryBrowserTools } from '../lib/browser-recovery.mjs';
+import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe, recoveryBrowserTools } from '../lib/browser-recovery.mjs';
 
 const step = { key: 'doc|wf|node-1|mapping', document_id: 'doc', workflow_id: 'wf', node_id: 'node-1', phase: 'mapping' };
 const catalog = [...recoveryBrowserTools, 'browser_navigate', 'browser_run_code_unsafe', 'browser_evaluate', 'browser_tabs']
@@ -211,6 +212,28 @@ test('the page probe accepts only one page on the prepared origin and document',
   assert.equal(parseRecoveryPageProbe(reply({ kind: 'browser_recovery_page', pages: 1, origin: 'https://evil.test', document_id: 'doc' }), binding).ok, false);
   assert.equal(parseRecoveryPageProbe(reply({ kind: 'browser_recovery_page', pages: 1, origin: 'https://app.loginom.ai', document_id: null }), binding).ok, false);
   assert.equal(parseRecoveryPageProbe({ isError: true, content: [] }, binding).ok, false);
+});
+
+test('the real page probe reports a verified reload of the old document only on the bound origin',async()=>{
+  const binding={origin:'https://app.loginom.ai',documentId:'doc'};
+  const document={},browser={document,location:{origin:binding.origin},__loginomDockPreparationV1:{document,id:'doc'}};
+  let navigation='reload',pages=1;
+  browser.performance={getEntriesByType:()=>[{type:navigation}]};
+  const page={isClosed:()=>false,context:()=>({pages:()=>Array(pages).fill(page)}),
+    evaluate:(fn,arg)=>runInNewContext('('+fn.toString()+')(arg)',{...browser,arg})};
+  const probe=runInNewContext(makeRecoveryPageProbeCode());
+  const observe=async()=>parseRecoveryPageProbe({content:[{type:'text',text:await probe(page)}]},binding);
+  assert.deepEqual(await observe(),{ok:true});
+  browser.document={};
+  assert.deepEqual(await observe(),{ok:false,reason:'prepared document changed',reloaded:true});
+  navigation='navigate';
+  assert.deepEqual(await observe(),{ok:false,reason:'prepared document changed'});
+  navigation='reload';
+  pages=2;
+  assert.deepEqual(await observe(),{ok:false,reason:'expected one page, found 2'});
+  pages=1;
+  browser.location.origin='https://away.test';
+  assert.deepEqual(await observe(),{ok:false,reason:'origin changed'});
 });
 
 test('an action whose outcome is unknown keeps Dock blocked after the attempt stops', async () => {

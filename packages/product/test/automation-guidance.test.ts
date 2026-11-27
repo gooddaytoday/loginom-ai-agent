@@ -1,7 +1,74 @@
 import { expect, test } from "bun:test"
+import { fileURLToPath } from "node:url"
 
 const skill = await Bun.file(new URL("../skills/loginom-automation/SKILL.md", import.meta.url)).text()
 const chain = skill.split("## Один расчёт цепочки\n")[1].split("\n## Выбор узлов")[0]
+
+test("stepwise edits use the current graph and verify only the requested step", () => {
+  const step = skill.split("## Пошаговая сборка\n")[1]?.split("\n## ")[0] ?? ""
+  expect(step).toContain("Перед обработкой каждого сообщения пользователя наблюдай текущий граф")
+  expect(step).toContain("Ручные правки между сообщениями")
+  expect(step).toContain("Соседние узлы не меняй")
+  expect(step).toContain("Подпись узла меняй только по просьбе")
+  expect(step).toContain("Имя файла не задаёт подпись импорта")
+  expect(step).toContain("Неоднозначную ссылку уточни одной строкой")
+  expect(step).toContain('finish:"execute"')
+  expect(step).toContain("В пошаговом режиме (одно действие в просьбе)")
+  expect(step).toContain("сводки порта")
+  expect(step).toContain("числе строк")
+  expect(step).toContain("пропусти запуск")
+  expect(step).toContain("Если узел добавлен без подключения")
+  expect(step).toContain("что мешает запуску")
+})
+
+test("stepwise verification and data processing stay in Loginom", () => {
+  const step = skill.split("## Пошаговая сборка\n")[1]?.split("\n## ")[0] ?? ""
+  expect(step).toContain("Данные пользователя считай, проверяй и преобразуй только в Loginom")
+  expect(step).toContain("Без Read, bash, Python и awk")
+  expect(step).toContain("Если Loginom не открывает файл, сообщи причину и предложи пересохранить его")
+  expect(step).toContain("Сам файл не исправляй")
+})
+
+test("a step self-check uses a summary unless the card or request needs rows", async () => {
+  const step = skill.split("## Пошаговая сборка\n")[1]?.split("\n## ")[0] ?? ""
+  const workflow = await Bun.file(new URL("../skills/loginom-automation/references/workflow.md", import.meta.url)).text()
+  expect(step).toContain("Если просьба требует значений, прочитай и покажи их")
+  expect(step).toContain("`read.sample_rows:0`")
+  expect(step).toContain("Настройка чтения в карточке узла важнее значения по умолчанию")
+  expect(step).toContain("`row_count`")
+  expect(chain).not.toContain("sample_rows:100")
+  expect(workflow).toContain("Для самопроверки шага используй `read.sample_rows:0` по умолчанию")
+  expect(workflow).toContain("Настройка чтения в карточке узла важнее значения по умолчанию")
+})
+
+test("automation guidance scopes package saving to a request or the full-source checkpoint", async () => {
+  const finish = skill.split("## Завершение\n")[1]
+  expect(finish).toContain("Итоговый пакет сохраняй только по явной просьбе пользователя")
+  expect(finish).toContain("Для сохранения вызови `package.save_checkpoint` и дождись\nквитанции")
+  expect(finish).toContain("`package.save_as` с переоткрытием нужен при соответствующем запросе")
+  const root = new URL("../skills/loginom-automation/", import.meta.url)
+  for (const path of ["references/large-files.md", "references/workflow.md"]) {
+    const reference = await Bun.file(new URL(path, root)).text()
+    expect(reference, path).toContain("Если пользователь запросил результат по всему файлу")
+    expect(reference, path).toContain("промежуточный checkpoint")
+  }
+  const automaticSave = [
+    /сохрани (?:готовый |настроенный )?пакет (?:после|отдельно|в конце)|(?:и|затем) сохрани пакет/i,
+    /затем (?:штатный )?Save\b|Save (?:— )?после чтения|Save выполняй отдельно/i,
+    /в конце вызови `package.save_checkpoint`|(?:пакет сохраняй|сохраняй пакет) отдельно/i,
+    /after every values update, save|save again before finishing|save the (?:prepared )?package/i,
+  ]
+  const references = new Bun.Glob("references/**/*.md").scanSync(fileURLToPath(root))
+  for (const path of ["SKILL.md", ...references]) {
+    const reference = await Bun.file(new URL(path, root)).text()
+    for (const pattern of automaticSave) expect(reference, path).not.toMatch(pattern)
+  }
+})
+
+test("automation describes the selected node type and modes before apply and again after prepare", () => {
+  expect(skill).toContain("Перед `dock_node_apply` вызови `dock_action_describe` с типом узла и нужными `modes`")
+  expect(skill).toContain("После каждого `loginom_dock_prepare` (и `open_package`) карточки сброшены: снова `dock_action_describe` с типом и `modes` перед apply")
+})
 
 test("input replacement requires an explicit user request and preserves the downstream node", async () => {
   const canvas = await Bun.file(new URL("../skills/loginom-automation/references/canvas.md", import.meta.url)).text()
@@ -27,7 +94,8 @@ test("frequent recoverable mistakes have concrete preventive forms within the en
     "new upstream node AND a different destination",
   ]) expect(skill).toContain(hint)
   // 0.4.0 hint growth: REST replacement (#1235) and XLSX/REST type hints (#1239), each verified live.
-  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(36_298 + 2_000)
+  // The 39 000 B internal limit leaves headroom under the owner's 40 000 B budget.
+  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(39_000)
 })
 
 test("existing Import edits retain verified source and Close requires a complete first form", () => {
@@ -117,25 +185,30 @@ test("single chain calculation permits source activation only after a safe prefl
   expect(chain).toContain("Последний вычисляющий узел")
   expect(chain).toMatch(/`loginom_dock_node_read` читает выход последнего\s+завершённого выполнения и ждёт идущее/)
   expect(chain).toContain('Изменения внешнего файла/БД/REST не обнаруживает')
-  expect(chain).toContain('если пользователь сообщил об изменении источника, нужен `execution:"execute"`')
+  expect(chain).toContain('После правки источника пользователем или замены файла укажи `execution:"execute"`')
   expect(chain).toMatch(/Не повторяй\s+Execute вычисляющих узлов ради чтения, ответа или экспорта/)
 })
 
-test("REST JSON tables use the tabular path instead of the blanket tree instruction", async () => {
-  const settings = await Bun.file(new URL("../skills/loginom-automation/references/nodes/trees.from_json.md", import.meta.url)).text()
-  const trees = settings.split("## JSON в дерево и дерево в таблицу\n")[1]?.split("\n## ")[0] ?? ""
-  const details = settings
+test("tree guidance retains the native link and documents separate Dock read limits", async () => {
+  const references = new URL("../skills/loginom-automation/references/nodes/", import.meta.url)
+  const json = await Bun.file(new URL("trees.from_json.md", references)).text()
+  const table = await Bun.file(new URL("trees.to_table.md", references)).text()
 
-  expect(trees).toMatch(/REST[\s\S]*?Калькулятор[\s\S]*?Свёртка[\s\S]*?Кросс-таблица/)
-  expect(trees).toContain("по просьбе о дереве")
-  expect(trees).toContain("без вложенных контейнеров")
-  expect(trees).toContain("trees.from_json")
-  expect(trees).toContain("trees.to_table")
-  expect(details).toMatch(/Response[\s\S]*?RequestID[\s\S]*?HttpStatusCode/)
-  expect(details).toContain("Nested containers in repeated records")
-  expect(details).toContain("operation.recover")
-  expect(details).toContain("не останавливай")
-  expect(details).not.toContain("При отказе области поддержки\nсообщи ограничение")
+  expect(json).toMatch(/Response[\s\S]*?HttpStatusCode[\s\S]*?RequestID/)
+  expect(json).toContain('read:{ports:[],sample_rows:0,require_exact_numbers:false}')
+  expect(json).toContain("256 узлов **схемы**")
+  expect(json).toMatch(/Лимиты Dock на входе — 512 КиБ/)
+  expect(json).toMatch(/sample_complete:false[\s\S]*?tree.node_count[\s\S]*?256 экземпляров/)
+  expect(json).toContain("operation.recover")
+  expect(table).toContain("carts[].products[]")
+  expect(table).toContain("repeat_parents:true")
+  expect(table).toContain("composite_names:true")
+  expect(table).toContain("Root_carts_id")
+  expect(table).toContain("Root_carts_products_id")
+  expect(table).toMatch(/row_count[\s\S]*?sample_complete:false[\s\S]*?экспорт/)
+  for (const reference of [json, table]) {
+    expect(new TextEncoder().encode(reference).length).toBeLessThanOrEqual(6000)
+  }
 })
 
 test("relocated large-file and JavaScript rules stay reachable from the entry", async () => {
@@ -166,4 +239,37 @@ test("binning ties guidance keeps the rule without echoing the acceptance task",
   expect(settings).toContain("совпадения на границе остаются в текущем интервале")
   expect(settings).not.toContain('size:4,ties:"current"')
   expect(Buffer.byteLength(settings)).toBeLessThanOrEqual(6000)
+})
+
+test("REST record arrays route by document count and preserve an explicitly requested tree", async () => {
+  const nodes = new URL("../skills/loginom-automation/references/nodes/", import.meta.url)
+  const rest = await Bun.file(new URL("integration.rest_request.md", nodes)).text()
+  const table = await Bun.file(new URL("trees.to_table.md", nodes)).text()
+  const json = await Bun.file(new URL("trees.from_json.md", nodes)).text()
+  const get = rest.split("## GET и ответы\n")[1]?.split("\n## ")[0] ?? ""
+  expect(get).toMatch(/Один `Response` с массивами записей, включая вложенные.*trees\.from_json\.md.*trees\.to_table\.md/)
+  expect(get).toMatch(/Объект без массива: Калькулятор → Свёртка → Кросс-таблица/)
+  expect(get).toMatch(/нескольких документов в строках REST.*один `programming\.javascript`[\s\S]*?JSON\.parse\(Response\), Append per record with its RequestID\); no RequestID splits/)
+  expect(get).toContain("Не объединяй ответы")
+  // Live Loginom 7.4.2 JS node (l2046-bigint-1): JSON.parse and a context.source reviver both round >2^53.
+  const js = get.match(/^JS: JSON\.parse\/reviver round >2\^53; quote 16\+ digits first \(String\):\n`(text\.replace\(.+\))`$/m)
+  expect(js).not.toBeNull()
+  expect(get.indexOf("JS: ")).toBeGreaterThan(get.indexOf("один `programming.javascript`"))
+  const quote = new Function("text", "return " + js![1]) as (text: string) => string
+  const parsed = JSON.parse(quote(String.raw`{"items":[{"id":9007199254740993,"name":"a:12345678901234567"},{"id":-12345678901234567890,"w":12345678901234567.5},{"id":42}]}`))
+  expect(parsed.items.map((item: { id: unknown }) => item.id)).toEqual(["9007199254740993", "-12345678901234567890", 42])
+  expect(parsed.items[0].name).toBe("a:12345678901234567")
+  expect(typeof parsed.items[1].w).toBe("number")
+  // String values that contain long digits, including JSON nested in a string, stay untouched.
+  for (const text of [String.raw`{"a":"x:12345678901234567,y"}`, String.raw`{"note":"ids: 12345678901234567, 12345678901234568"}`,
+    String.raw`{"payload":"{\"id\":12345678901234567}"}`]) expect(JSON.parse(quote(text))).toEqual(JSON.parse(text))
+  expect(json).toMatch(/Response[\s\S]*?HttpStatusCode[\s\S]*?RequestID/)
+  for (const card of [rest, table, json]) {
+    expect(card).toContain("не подменяй дерево JavaScript")
+    expect(new TextEncoder().encode(card).length).toBeLessThanOrEqual(6000)
+  }
+  expect(json).toContain("operation.recover")
+  expect(table).toContain("operation.recover")
+  expect(json).toContain("(integration.rest_request.md)")
+  expect(table).toContain("(integration.rest_request.md)")
 })

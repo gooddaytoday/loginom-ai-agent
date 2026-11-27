@@ -1,5 +1,5 @@
 import {ensureGroupingOutputSources as ensureDerivedOutputSources} from './grouping-output-sources.mjs';
-import {resolveConfiguredOutputMapping,configureOutputFields,reorderOutputFields,configureOutputAutosync} from './port-mapping-procedure.mjs';
+import {resolveConfiguredOutputMapping,configureOutputFields,reorderOutputFields,configureRequestedOutputAutosync} from './port-mapping-procedure.mjs';
 import {verifyCalculatorInlineSync} from './calculator-inline-mapping.mjs';
 const need=(v,m)=>{if(!v)throw Error('Reform output: '+m);};
 // Sync propagates a changed source label only when the output label still
@@ -41,7 +41,7 @@ export async function configureReformOutput(channel,configuration,parameters,map
   const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
   changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));
  }
- if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
+ await configureRequestedOutputAutosync(channel,requested,changes);
  s=await channel.observe({condition:'reform complete output mapping readback',readMappings:true,ready});
  reformOutputSources(configuration,s.node_mapping);
  return {verified:true,cleanup_complete:true,effect_possible:changes.length>0,source_identity_verified:true,native_mapping:s.node_mapping,changes};

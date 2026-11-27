@@ -160,7 +160,7 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
     const result=await channel.readOutputPort({port,execution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
     const output=result.output;
     if(output.port_kind==='tree'){
-     need(request.target.type==='trees.from_json'&&output.tree?.complete===true
+     need(request.target.type==='trees.from_json'&&typeof output.tree?.complete==='boolean'&&output.sample_complete===output.tree.complete
       &&JSON.stringify(output.tree.schema)===JSON.stringify(schema),'Retained tree schema changed');
      ports.push(output);continue;
     }

@@ -11,7 +11,7 @@ function schemaRefusal(parameters,baseline,request) {
     return null;
   }
   if(parameters.schema_mode!==undefined&&parameters.schema_mode!==baseline.schema_mode
-    ||parameters.columns!==undefined||request.inputs.length!==0
+    ||parameters.columns!==undefined||request.inputs.length!==0&&parameters.source_text!==undefined
     ||parameters.input_state==='unconnected'&&request.variable_inputs?.length)return 'configured_schema_preserved';
   return null;
 }
