@@ -29,7 +29,7 @@ const productDescriptions = {
   shell: "permissionShell",
 } as const
 
-const coreActions = new Set(["read", "glob", "grep", "edit", "external_directory", "webfetch", "websearch"])
+const coreActions: readonly string[] = ["read", "glob", "grep", "edit", "external_directory", "webfetch", "websearch"]
 
 export function permissionDescription(request: Pick<PermissionRequest, "action" | "resources">) {
   if (Object.hasOwn(productDescriptions, request.action)) {
@@ -44,7 +44,7 @@ export function permissionDescription(request: Pick<PermissionRequest, "action" 
       return "permissionExport"
   }
 
-  if (coreActions.has(request.action)) return "permissionAction"
+  if (coreActions.includes(request.action)) return "permissionAction"
 }
 
 export function packageLocation(path: string | undefined) {
