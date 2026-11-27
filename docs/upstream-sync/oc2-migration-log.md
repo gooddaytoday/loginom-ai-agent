@@ -26806,6 +26806,15 @@ exports-excel, preprocessing-datapartition, preprocessing-sampling и разбо
 | `packages/opencode/test/product/tool-contributor.test.ts`, `test/product/turn-lifecycle.test.ts`, `test/session/prompt.test.ts`, `test/session/task-scope.test.ts` | проверки каталога, наследования, прав и восстановления | пути удалены; переносить проверки вместе с поведением |
 | `packages/app/src/components/package-docs-tool.tsx`, `packages/app/e2e/regression/generated-file-cards.spec.ts` | хотфикс удерживает чат смонтированным во время проверки файла при фокусе окна; e2e проверяет отсутствие перемонтирования | пути удалены в v2 и не восстановлены |
 
+Отдельно по пошаговой сборке:
+
+- В навыке вручную сохранена область активации v2: разрешение действует на текущий запрос, а не наследуется чатом.
+  Это единственное отличие `SKILL.md` от 0.4.3; раздел «Пошаговая сборка» и справочники совпадают с релизом.
+- В runtime конфликтов Git не было. Для побайтового совпадения с релизом поверх автослияния взяты релизные версии восьми
+  файлов: `AGENTS.md`, `package.json`, `client/test/artifact-download.test.mjs` и проб
+  `tools/loginom-acceptance/javascript-{calibration-wizard,native-details-discovery,native-input-binding,native-roundtrip-binding,native-zero}.mjs`.
+  Файлы реализации и тесты обновления исходной схемы между шагами не потребовали выбора.
+
 ### Не перенесено
 
 | Что | Где в 0.4.3 / hotfix-044 | Куда в v2 |
@@ -26825,8 +26834,11 @@ Bun 1.4.4, Node 24.19.0, зависимости клиента и шаблона
 |---|---:|---|
 | `git merge-base --is-ancestor 32c19008ff6502a13dfac1cb386c8631e13f9b7d HEAD` | 0 | релиз — второй родитель слияния |
 | `git merge-base --is-ancestor c91531e881cafb8ab4044bfcc3f31a739a86047e HEAD` | 0 | hotfix-044 — второй родитель дополнительного слияния |
+| `git merge-base --is-ancestor 56ba60c300 HEAD`; `git merge-base --is-ancestor c59849f1fe HEAD` | 0, 0 | оба коммита обновления исходной схемы входят через 0.4.3 |
 | `git diff --exit-code 32c19008ff6502a13dfac1cb386c8631e13f9b7d HEAD -- packages/loginom-runtime` | 0 | пустой вывод |
-| `packages/product`: `bun test --timeout 60000` | 0 | 125 pass, 0 fail; ни одного из трёх известных падений |
+| `packages/product`: `bun test --timeout 60000` | 0 | 125 pass, 0 fail |
+| `packages/product`: `bun test --timeout 60000 test/automation-guidance.test.ts` | 0 | 19 pass, 0 fail; навык требует наблюдать текущий граф с учётом ручных правок и сохранять итоговый пакет только по явной просьбе, без безусловного сохранения в конце хода |
+| `packages/loginom-runtime/client`: `node --test --test-concurrency=4 test/*baseline*.test.mjs test/{node-target-port-render,workspace-script-guard,workspace,workspace-ui}.test.mjs` | 0 | 893 pass, 0 fail, 0 skip; в том числе восемь случаев принятия ручной правки между шагами в `workspace.test.mjs` |
 | `packages/loginom-host`: `bun test --timeout 60000` | 1 | 548 pass, 14 skip, 2 timeout; `ci-inputs` и `file-reference-ipc` прошли отдельно, тест `managed-work-entry` также прошёл |
 | `packages/loginom-runtime`: `node --test --test-concurrency=3 test/*.test.mjs` | 0 | 148 pass, 0 fail |
 | `packages/loginom-runtime/client`: `node --test --test-concurrency=4 test/*.test.mjs` | 0 | 10 997 pass, 5 skip, 0 fail; закреплённый Chromium |
