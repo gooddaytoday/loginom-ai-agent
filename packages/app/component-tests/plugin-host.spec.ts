@@ -936,13 +936,13 @@ story(
 
 story("the new-session slot renders nothing without a plugin", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {
-    const { mountPlugins, Slot, until } = await import(fixture)
+    const { mountPlugins, BuiltinSlot, until } = await import(fixture)
     const host = mountPlugins({
       definitions: [
         {
           id: "fixture",
           windowEntry: async () => ({
-            default: (ctx: Context) => void ctx.add(Slot, { at: "session.new", render: () => "Draft heading" }),
+            default: (ctx: Context) => void ctx.add(BuiltinSlot, { at: "session.new.heading", render: () => "Draft heading" }),
           }),
         },
       ],

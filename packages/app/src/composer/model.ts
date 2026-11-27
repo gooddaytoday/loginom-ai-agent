@@ -112,7 +112,6 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
 
   const placeholder = () => {
     if (mode() === "shell") return language.t("prompt.placeholder.shell", { example: "git status" })
-    if (adapter.kind === "new-session") return language.t("prompt.placeholder.newSession")
 
     if (adapter.working() || (options?.queue?.count() ?? 0) > 0)
       return language.t("ui.promptInput.placeholder.followUp", { slash: "/", at: "@" })

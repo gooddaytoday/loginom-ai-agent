@@ -78,15 +78,15 @@
       "id": "CAT-14",
       "title": "New-session GUI slot (C1.3)",
       "paths": [
-        "packages/plugin/src/gui/registries.ts",
+        "packages/plugin/src/gui/builtin.ts",
         "packages/app/src/new-session/composer-adapter.ts", "packages/app/src/new-session/screen.tsx",
         "packages/app/src/new-session/view.tsx", "packages/app/src/composer/composer.tsx",
-        "packages/app/src/composer/model.ts", "packages/app/src/composer/editor/editor.tsx",
-        "packages/app/src/runtime/i18n/en.ts", "packages/app/src/runtime/i18n/ru.ts",
+        "packages/app/src/composer/editor/editor.tsx",
         "packages/app/src/shell/tabs/schema.ts", "packages/app/src/shell/tabs/tabs.test.ts",
         "packages/app/e2e/regression/new-session.spec.ts",
-        "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts",
-        "packages/gui-plugins/README.md"
+        "packages/app/e2e/utils/app-direction.html", "packages/app/e2e/utils/app-direction.fixture.tsx",
+        "packages/app/e2e/utils/direction.ts",
+        "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
       ]
     },
     {

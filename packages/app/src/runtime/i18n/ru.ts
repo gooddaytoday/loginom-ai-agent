@@ -220,7 +220,6 @@ export const dict = {
   "common.attachment": "вложение",
 
   "prompt.placeholder.shell": "Введите команду оболочки… {{example}}",
-  "prompt.placeholder.newSession": "Опишите задачу: собрать сценарий, разобрать пакет, проверить данные",
   "prompt.placeholder.normal": 'Спросите что угодно… "{{example}}"',
   "prompt.mode.shell": "Оболочка",
   "prompt.mode.normal": "Промпт",

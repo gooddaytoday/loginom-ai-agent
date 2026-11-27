@@ -1,4 +1,5 @@
-import { Slot, type Plugin } from "@opencode/plugin/gui"
+import type { Plugin } from "@opencode/plugin/gui"
+import { BuiltinSlot } from "@opencode/plugin/gui/builtin"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { For, Show, onCleanup } from "solid-js"
@@ -42,52 +43,54 @@ export const registerStartScreen: Plugin.Setup<typeof definition> = (ctx) => {
   const progress = ctx.stores.startExamples
   const visible = () => !progress.value.dismissed && progress.value.ownSessions < 3
 
-  ctx.add(Slot, {
-    at: "session.new",
+  ctx.add(BuiltinSlot, {
+    at: "session.new.heading",
+    render: () => (
+      <div
+        class="flex items-center justify-center gap-2.5 text-v2-text-text-base"
+        role="img"
+        aria-label="Loginom | AI Agent"
+      >
+        <LoginomWordmark />
+        <span class="border-s border-v2-border-border-base ps-2.5 text-lg font-semibold text-v2-text-text-muted">
+          AI Agent
+        </span>
+      </div>
+    ),
+  })
+
+  ctx.add(BuiltinSlot, {
+    at: "session.new.composer.placeholder",
+    render: () => <>{ctx.t("startPlaceholder")}</>,
+  })
+
+  ctx.add(BuiltinSlot, {
+    at: "session.new.composer.project",
+    render: (input) => (
+      <>
+        <span class="sr-only">{ctx.t("startProject", { name: input.project })}</span>
+        <Icon name="folder" size="small" class="shrink-0" />
+        <span class="truncate" aria-hidden="true">{input.project}</span>
+        <Icon name="chevron-down" size="small" class="shrink-0" />
+      </>
+    ),
+  })
+
+  ctx.add(BuiltinSlot, {
+    at: "session.new.composer.add.menu",
+    render: () => (
+      <Show when={!visible()}>
+        <ui.MenuItem
+          label={ctx.t("startExamples")}
+          onSelect={() => progress.set({ dismissed: false, ownSessions: 0 })}
+        />
+      </Show>
+    ),
+  })
+
+  ctx.add(BuiltinSlot, {
+    at: "session.new.below",
     render(input) {
-      if (input.placement === "heading") {
-        return (
-          <div
-            class="flex items-center justify-center gap-2.5 text-v2-text-text-base"
-            role="img"
-            aria-label="Loginom | AI Agent"
-          >
-            <LoginomWordmark />
-            <span class="border-s border-v2-border-border-base ps-2.5 text-lg font-semibold text-v2-text-text-muted">
-              AI Agent
-            </span>
-          </div>
-        )
-      }
-      if (input.placement === "toolbar") {
-        return (
-          <Show when={input.project}>
-            {(name) => (
-              <button
-                type="button"
-                class="flex max-w-40 items-center gap-1 rounded-md px-2 py-1 text-xs text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
-                title={ctx.t("startProject", { name: name() })}
-                aria-label={ctx.t("startProject", { name: name() })}
-                onClick={input.openProject}
-              >
-                <Icon name="folder" size="small" class="shrink-0" />
-                <span class="truncate">{name()}</span>
-                <Icon name="chevron-down" size="small" class="shrink-0" />
-              </button>
-            )}
-          </Show>
-        )
-      }
-      if (input.placement === "add-menu") {
-        return (
-          <Show when={!visible()}>
-            <ui.MenuItem
-              label={ctx.t("startExamples")}
-              onSelect={() => progress.set({ dismissed: false, ownSessions: 0 })}
-            />
-          </Show>
-        )
-      }
       onCleanup(
         input.onStarted((origin) => {
           if (origin === exampleOrigin) return

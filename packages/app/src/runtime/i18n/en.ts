@@ -351,7 +351,6 @@ export const dict = {
   "common.attachment": "attachment",
 
   "prompt.placeholder.shell": "Enter shell command… {{example}}",
-  "prompt.placeholder.newSession": "Describe the task: build a scenario, explore a package, or check data",
   "prompt.placeholder.normal": 'Ask anything… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",

@@ -27,7 +27,9 @@ export function Composer(props: {
   borderUnderlay?: boolean
   readOnly?: boolean
   suggestionBoundary?: () => HTMLElement | undefined
-  addMenu?: JSX.Element
+  suggestionViewport?: () => HTMLElement | undefined
+  addMenu?: { render: () => JSX.Element }
+  placeholder?: { render: () => JSX.Element }
   toolbar?: JSX.Element
 }) {
   const dialog = useDialog()
@@ -73,7 +75,9 @@ export function Composer(props: {
         queueFirstLabel={language.t("session.queue.first")}
         exitShellKeybind={[formatKeybind("esc", language.t)]}
         suggestionBoundary={props.suggestionBoundary}
+        suggestionViewport={props.suggestionViewport}
         addMenu={props.addMenu}
+        placeholder={props.placeholder}
         toolbar={props.toolbar}
         modelControl={
           <ComposerModelControl
