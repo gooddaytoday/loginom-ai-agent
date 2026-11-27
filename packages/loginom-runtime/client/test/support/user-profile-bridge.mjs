@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createArtifactStore } from '../../lib/artifacts.mjs';
+import { packageReadOnlyAdvice } from '../../lib/workspace.mjs';
 import { createBundledSkillFixture } from './bundled-skill-fixture.mjs';
 import { createActionCatalogFixture } from './action-catalog-fixture.mjs';
 import { Page } from './workspace-ui-fixture.mjs';
@@ -306,7 +307,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       package_ref:{...packageRef,read_only:true}};
     const readOnlyStep=JSON.parse((await apply('step-read-only')).content[0].text);
     assert.equal(readOnlyStep.status,'NOT_APPLIED');
-    assert.match(readOnlyStep.error.message,/только для чтения/i);
+    assert.equal(readOnlyStep.error.message,packageReadOnlyAdvice);
     assert.equal(stepFixture.admissions.length,1,'native read-only refresh must not start Apply');
     assert.equal(session.metadata.workspacePreparation.state.package_ref.read_only,true);
     session.metadata.workspacePreparation=beforeReadOnlyStep;
@@ -427,6 +428,8 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       const reply=JSON.parse((await client.callTool(request)).content[0].text);
       assert.equal(reply.error.code,'PACKAGE_READ_ONLY',JSON.stringify(reply));
       assert.equal(reply.effect_possible,false);
+      const advice=request.name==='dock_action_run'?reply.output.user_action:reply.next_step.instruction;
+      assert.equal(advice,packageReadOnlyAdvice);
     }
     assert.equal(browserCalls.length,beforeReadOnly);
     original.package_ref=originalPackage;
@@ -506,12 +509,9 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.equal(readOnlyOpen.prepared,true);
     assert.equal(readOnlyOpen.workspace.package_ref.read_only,true);
     const advice=readOnlyOpen.next_step.instruction;
-    assert.match(advice,/после разрыва.*блокировк.*прежней сессии.*около 30 минут/i);
-    assert.match(advice,/на языке пользователя/i);
-    assert.match(advice,/подождать и открыть пакет заново.*ReadOnly=false.*сверь граф/i);
-    assert.match(advice,/с согласия пользователя сохранить копию под новым именем/i);
-    assert.match(advice,/администратора закрыть прежнюю сессию в Диспетчере Loginom/i);
-    assert.ok(Buffer.byteLength(JSON.stringify(resumed),'utf8')<=46000);
+    assert.equal(advice,packageReadOnlyAdvice);
+    assert.ok(advice.includes('package.save_as'));
+    assert.ok(advice.includes('workspace.package_ref.read_only'));
     assert.equal(packageDeliveries.length,deliveriesBefore,'server-path continuation must not upload again');
     const opening=browserCalls.filter(call=>call.arguments.code.includes('async function prepareWorkspace(')).at(-1);
     assert.match(opening.arguments.code,/"recoverOnly":false/);
