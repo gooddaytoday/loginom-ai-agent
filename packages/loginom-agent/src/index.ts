@@ -10,6 +10,7 @@ import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
+import { windowHandlers, windowRpc } from "./browser-window"
 import { Dashboard } from "./dashboard"
 import { DashboardTarget } from "./dashboard-target"
 import { dashboardTools } from "./dashboard-tools"
@@ -509,6 +510,7 @@ export default Plugin.define({
         return code ? { code } : {}
       },
     })
+    await ctx.rpc.register(windowRpc, windowHandlers)
     // A dashboard's folder before its chat (B2.9h): Desktop and the CLI ask on the Location of their own working directory.
     await ctx.rpc.register(DashboardTarget.rpc, {
       prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),

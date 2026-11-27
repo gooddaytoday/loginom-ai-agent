@@ -28,6 +28,19 @@ test('browser launch normalizes headed DPI without incompatible viewport emulati
   assert.equal(browserLaunch(false, 'linux', {}).args.length,3);
 });
 
+test('positioned Desktop windows use DIP bounds; headless and Xvfb ignore them', () => {
+  const bounds = {x:1920, y:-240, width:816, height:1040};
+  assert.deepEqual(browserLaunch(false, 'win32', {}, bounds), {
+    args:['--window-position=1920,-240','--window-size=816,1040'], viewport:null, windowMode:'positioned',
+  });
+  const linux = {XDG_CURRENT_DESKTOP:'GNOME'};
+  assert.deepEqual(browserLaunch(false, 'linux', linux, bounds), {
+    args:['--window-position=1920,-240','--window-size=816,1040','--force-device-scale-factor=1'], viewport:null, windowMode:'positioned',
+  });
+  assert.deepEqual(browserLaunch(false, 'linux', {}, bounds), browserLaunch(false, 'linux', {}));
+  assert.deepEqual(browserLaunch(true, 'win32', {}, bounds), browserLaunch(true, 'win32', {}));
+});
+
 test('headed launch keeps the Files refresh control visible without a window manager', {
   skip: !process.env.LOGINOM_DOCK_TEST_BROWSER || process.env.LOGINOM_DOCK_TEST_HEADED !== '1',
   timeout: 30000,

@@ -2,7 +2,8 @@ import { inputStore, type InputFile } from "./inputs"
 import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { tmpdir } from "node:os"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
+import { setTimeout } from "node:timers/promises"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
@@ -17,6 +18,7 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
+import type { WindowBounds, WindowPlacement } from "./browser-window"
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
 export async function verifyInstallationResources(options: {
@@ -235,6 +237,7 @@ export async function createLoginomHost(options: {
   >()
   const restarts = new Map<string, number>()
   const lost = new Set<string>()
+  const placements = new Map<string, WindowBounds>()
   const stale = new Set<string>()
   const startupCleanup = { failed: false }
   const shutdown = { failed: false }
@@ -468,6 +471,7 @@ export async function createLoginomHost(options: {
         validationHttpCache: httpCache,
         // CLI supplies its explicit browser policy for background launches too.
         headless: purpose === "chat" ? options.headless === true : (options.preflightHeadless ?? true),
+        windowBounds: purpose === "chat" && !options.headless ? placements.get(chat) : undefined,
         closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
         browserRecovery: !validation && options.browserRecovery === true,
         environment,
@@ -807,6 +811,26 @@ export async function createLoginomHost(options: {
     },
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true
+    },
+    placeWindow({ sessionID, bounds }: WindowPlacement) {
+      if (options.headless) return false
+      const chat = createHash("sha256").update(sessionID).digest("hex")
+      placements.delete(chat)
+      placements.set(chat, bounds)
+      const oldest = placements.keys().next().value
+      if (placements.size > 128 && oldest !== undefined) placements.delete(oldest)
+      return true
+    },
+    async showWindow(sessionID: string) {
+      if (options.headless) return "no-window"
+      const { generation } = await service.api.status()
+      const current = generation === undefined ? undefined : generations.get(generation)
+      const chat = createHash("sha256").update(sessionID).digest("hex")
+      const child = current?.children.get(chat)
+      if (!child || stale.has(chat)) return "no-window"
+      const runtime = await Promise.race([child.catch(() => undefined), setTimeout(1000, undefined, { ref: false })])
+      if (!runtime || current?.children.get(chat) !== child) return "no-window"
+      return runtime.request("showWindow", undefined, 2000).catch(() => "no-window")
     },
     async workState(generation: number, chat: string) {
       // Inspect only the existing owner. Losing it is uncertainty, not evidence of idle work.

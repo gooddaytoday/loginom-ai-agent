@@ -7,6 +7,7 @@ import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
 import { DashboardRead } from "./dashboard"
+import { WindowChat, WindowPlacement } from "./browser-window"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
@@ -126,6 +127,14 @@ async function dispatch(message: unknown) {
       return
     }
     if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
+    if (message.method === "window.place") {
+      reply({ id: message.id, result: state.host.placeWindow(Schema.decodeUnknownSync(WindowPlacement)(input)) })
+      return
+    }
+    if (message.method === "window.show") {
+      reply({ id: message.id, result: await state.host.showWindow(Schema.decodeUnknownSync(WindowChat)(input).sessionID) })
+      return
+    }
     if (message.method === "dashboard.read") {
       const result = await state.host.readDashboard(Schema.decodeUnknownSync(DashboardRead)(input))
       reply({ id: message.id, result })

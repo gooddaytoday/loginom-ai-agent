@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { createHash } from "node:crypto"
 import { access, mkdir, mkdtemp, readFile, readdir, rm, symlink } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -47,12 +48,18 @@ async function fixture() {
     `
     import { appendFileSync } from 'node:fs';
     let work = { activeWork: false, unsettledWork: false, dispatching: false };
+    let chat;
     process.on('disconnect', () => process.exit(0));
     process.on('message', message => {
       const send = result => process.send({ id: message.id, result });
       if (message.operation === 'start') {
-        appendFileSync(${JSON.stringify(launches)}, JSON.stringify({ pid: process.pid }) + '\\n');
+        chat = message.input.chat;
+        appendFileSync(${JSON.stringify(launches)}, JSON.stringify({ chat, bounds: message.input.windowBounds }) + '\\n');
         send({ protocol: 1, generation: message.input.generation, chat: message.input.chat, ready: true });
+      }
+      if (message.operation === 'showWindow') {
+        appendFileSync(${JSON.stringify(launches)}, JSON.stringify({ shown: chat }) + '\\n');
+        send('focused');
       }
       if (message.operation === 'work') send(work);
       if (message.operation === 'fixture.state') { work = message.input; send(true); }
@@ -134,6 +141,31 @@ test("malformed work status is rejected instead of authorizing an idle transitio
       await expect(f.host.updateWorkState()).rejects.toThrow("LOGINOM_REPLY_INVALID")
     }
     expect(f.host.journal.pending()).toEqual([])
+  } finally {
+    await f.close()
+  }
+})
+
+test("window placement and show apply only to the named chat and show never starts Chromium", async () => {
+  const f = await fixture()
+  const sessionID = "ses_desktop"
+  const desktop = createHash("sha256").update(sessionID).digest("hex")
+  const cli = createHash("sha256").update("ses_cli").digest("hex")
+  const bounds = { x: 1000, y: -100, width: 620, height: 880 }
+  try {
+    expect(f.host.placeWindow({ sessionID, bounds })).toBe(true)
+    expect(await f.host.showWindow(sessionID)).toBe("no-window")
+    await expect(access(f.launches)).rejects.toMatchObject({ code: "ENOENT" })
+    await f.host.runtime(1, cli)
+    const runtime = await f.host.runtime(1, desktop)
+    expect(await f.host.showWindow(sessionID)).toBe("focused")
+    await runtime.request("fixture.exit")
+    await runtime.exited
+    expect(await f.host.showWindow(sessionID)).toBe("no-window")
+    const log = await readFile(f.launches, "utf8")
+    expect(log.trim().split("\n").map((line) => JSON.parse(line))).toEqual([
+      { chat: cli }, { chat: desktop, bounds }, { shown: desktop },
+    ])
   } finally {
     await f.close()
   }

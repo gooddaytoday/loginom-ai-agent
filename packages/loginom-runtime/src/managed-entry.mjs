@@ -15,6 +15,7 @@ import { loginBrowser, loginomAddress, reauthenticateReloadedPage } from "./conn
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
+import { showBrowserWindow } from "./browser-window.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -32,6 +33,7 @@ const state = {
   controller: undefined,
   session: undefined,
   browser: undefined,
+  windowPage: undefined,
   browserProfile: undefined,
   browserServer: undefined,
   inputs: new Map(),
@@ -145,7 +147,7 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
+      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache, windowBounds } = validateStartInput(input)
       state.owner = { chat: input.chat, generation: input.generation }
       state.startupStateDir = input.stateDir
       state.startupStarted = performance.now()
@@ -187,6 +189,7 @@ async function handle(message) {
         httpCachePath: validationHttpCache ? join(input.stateDir, "http-cache") : undefined,
         candidate: input.connection,
         headless: input.headless === true,
+        windowBounds,
         signal: state.startupController.signal,
         deadline,
         onPhase: startupPhase,
@@ -204,6 +207,7 @@ async function handle(message) {
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:browserDownloadsPath(directory),
         onContextCreated: context => { state.browser = context } })
       state.browser = authenticated.context
+      if (!login.headless) state.windowPage = authenticated.page
       state.owner.origin = new URL(input.connection.url).origin
       const config = {
         resources: input.resources,
@@ -234,6 +238,7 @@ async function handle(message) {
       }
       const session = await createSession(config, {
         headless: input.headless === true,
+        windowBounds,
         managed: { directory, browserPath: resources.browserPath, browserRoot: resources.browserRoot },
       })
       state.session = session
@@ -278,6 +283,10 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (message.operation === "showWindow") {
+      send({ id: message.id, result: await showBrowserWindow(state.windowPage) })
+      return
+    }
     if (["dashboardRead", "dashboardPublish", "dashboardVersions", "dashboardDelete"].includes(message.operation)) {
       if (message.operation === "dashboardVersions" || message.operation === "dashboardDelete") {
         if (message.input?.generation !== state.owner.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")

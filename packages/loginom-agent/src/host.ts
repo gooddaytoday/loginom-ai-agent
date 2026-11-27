@@ -139,6 +139,11 @@ async function request(method: string, input: unknown) {
   return connection.request(method, input)
 }
 
+export async function windowRequest(method: "window.place" | "window.show", input: unknown) {
+  if (!connected()) return
+  return request(method, input).catch(() => undefined)
+}
+
 /** Releases every lease still held, disconnects and closes the Host. Idempotent: soft stop (B2.3b) may call it first. */
 export function close() {
   const current = state.current

@@ -74,3 +74,11 @@ test("browser recovery never reaches validation or Help readiness", () => {
     assert.throws(() => validateStartInput({ ...base, ...patch, browserRecovery: true }), /^Error: LOGINOM_START_INVALID$/)
   assert.equal(validateStartInput({ ...base, validation: true, browserRecovery: false }).browserRecovery, false)
 })
+
+test("managed chat bounds accept negative monitor coordinates and reject invalid dimensions", () => {
+  const windowBounds = { x: -800, y: -120, width: 720, height: 800 }
+  assert.deepEqual(validateStartInput({ ...base, windowBounds }).windowBounds, windowBounds)
+  for (const value of [null, {}, { ...windowBounds, x: 10.25 }, { ...windowBounds, width: 0 }])
+    assert.throws(() => validateStartInput({ ...base, windowBounds: value }), /LOGINOM_START_INVALID/)
+  assert.throws(() => validateStartInput({ ...base, windowBounds, validation: true }), /LOGINOM_START_INVALID/)
+})

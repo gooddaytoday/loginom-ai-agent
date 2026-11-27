@@ -97,7 +97,12 @@
         "packages/ui/src/i18n/en.ts"
       ]
     },
-    { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
+    {
+      "id": "CAT-09",
+      "title": "Desktop main process, preload, renderer",
+      "paths": ["packages/desktop/**"],
+      "notes": "S10-2a: src/main/windows/security.ts attaches the Desktop window placement handoff to local chat prompts."
+    },
     {
       "id": "CAT-14",
       "title": "Built-in plugin top-level pages",

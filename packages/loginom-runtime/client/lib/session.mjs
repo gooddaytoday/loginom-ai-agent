@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 const packagePath = (name) => require.resolve(`${name}/package.json`);
 const json = async (path) => JSON.parse(await readFile(path, 'utf8'));
 
-export async function createSession(config, { headless = false, managed = null } = {}) {
+export async function createSession(config, { headless = false, managed = null, windowBounds } = {}) {
   const expectedNode = (await readFile(new URL('../.node-version', import.meta.url), 'utf8')).trim();
   if (process.versions.node !== expectedNode) throw new Error(`Dock requires Node.js ${expectedNode}`);
   if (!['darwin', 'linux', 'win32'].includes(process.platform)) throw new Error('Dock supports macOS, Linux and Windows');
@@ -63,7 +63,7 @@ export async function createSession(config, { headless = false, managed = null }
   // Let visible Loginom use the actual maximized window. A fixed emulated
   // viewport stays small even when the native window is enlarged. Headless
   // checks retain a deterministic size; live geometry guards still apply.
-  const launch = browserLaunch(headless);
+  const launch = browserLaunch(headless, process.platform, process.env, windowBounds);
   const browserViewport = launch.viewport;
   const browserWindowMode = launch.windowMode;
   // Executor actions own explicit readiness and pre-gesture guards. MCP's

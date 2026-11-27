@@ -40,6 +40,10 @@ test("actual managed entry reads live bridge work and dispatching over private I
       new URL("../../loginom-runtime/src/dashboard-storage.mjs", import.meta.url),
       "utf8",
     ),
+    "runtime/src/browser-window.mjs": await readFile(
+      new URL("../../loginom-runtime/src/browser-window.mjs", import.meta.url),
+      "utf8",
+    ),
     "runtime/src/resources.mjs": `export async function verifyResources() {
       return { manifestHash: 'fixture', manifest: { actionManifestSha256: 'fixture' } };
     }`,
@@ -126,6 +130,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
     environment: {},
   })
   try {
+    expect(await runtime.request("showWindow")).toBe("no-window")
     expect(await readFile(join(src, "managed-entry.mjs"), "utf8")).toBe(
       await readFile(new URL("../../loginom-runtime/src/managed-entry.mjs", import.meta.url), "utf8"),
     )
