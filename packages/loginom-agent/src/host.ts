@@ -18,7 +18,7 @@ export type Lease = NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>
 export type Connection = {
   port: Port
   close(): Promise<void>
-  request?: (method: string, input: unknown) => Promise<unknown>
+  request?: (method: string, input: unknown, timeout?: number) => Promise<unknown>
 }
 
 type Started = {
@@ -80,6 +80,13 @@ export async function start(input: { data: string; resources?: string; connect?:
   )
   state.current = current
   return { recovered, close }
+}
+
+/** Read the conversation's existing runtime without taking a run lease. */
+export async function packageSchema(sessionID: string) {
+  if (!connected()) return null
+  const connection = await state.current?.ready
+  return connection?.request?.("package.schema", { sessionID }, 14_000) ?? null
 }
 
 /** Whether the Host finished its handshake: before that, `acquire` waits for it (up to the handshake's 180 s). */

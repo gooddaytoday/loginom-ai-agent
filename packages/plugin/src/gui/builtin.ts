@@ -36,7 +36,7 @@ export function onIdle(fn: () => void) {
 
 /** The live state and display options of a tool call in the timeline. */
 export interface ToolRendererProps {
-  /** The tool's name in the transcript. */
+  /** The exact tool name in the transcript, even when the renderer registered a prefix. */
   readonly tool: string
   /** The registered display title, which can follow the window's locale. */
   readonly title: string
@@ -60,12 +60,17 @@ export interface ToolRendererProps {
 
 /** A built-in plugin's renderer for one tool it owns. */
 export interface ToolRenderer {
-  /** The exact tool name in the transcript. OpenCode's own names are reserved. */
+  /**
+   * The exact tool name, or a namespace prefix ending in `*`. Native names are reserved.
+   * The timeline picks an exact renderer first, then the longest matching prefix.
+   */
   readonly tool: string
   /** A display title. Use a getter for a localized title. */
   readonly title: string
   /** Keep visible calls on their own rows, even when tool activity is grouped. */
   readonly separate?: boolean
+  /** Draw failed calls as well. Defaults to the timeline's standard tool error card. */
+  readonly handlesFailure?: boolean
   /**
    * Draws a call under the plugin context. The host shows its tool error card if this throws.
    * @param props - Live call data and the timeline's display options.
@@ -171,6 +176,8 @@ export const Page = Registry.define<Page>("page")
 
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
+  /** Actions beside the session location on narrow screens, while the conversation is visible. */
+  readonly "session.header.mobile": Pick<SlotMap["session.header"], "session" | "screen">
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */
   readonly "session.location.branch.menu": SlotMap["session.location.menu"]
   /** Items after the host's copy and reveal actions in the session directory's path submenu. Requires an owning screen. */
@@ -344,6 +351,12 @@ export interface BuiltinDesktop extends Desktop {
 /** `Layout` with the abilities only built-ins use. */
 export interface BuiltinLayout extends Layout {
   /**
+   * Opens a top-level page registered by this plugin.
+   *
+   * @param id - The id of the page in the plugin's `Page` contribution.
+   */
+  openPage(id: string): void
+  /**
    * Runs an app command as the command palette does, e.g. `mcp.toggle` (the `/mcp` dialog). Does nothing when the
    * command is unavailable or disabled. App command ids are the app's own, not a plugin contract.
    *
@@ -362,6 +375,20 @@ export interface BuiltinLocale extends Locale {
   setDirection(direction: "ltr" | "rtl"): void
 }
 
+/** Shortcuts to the app's persisted timeline detail presets. */
+export interface BuiltinTimeline {
+  /**
+   * The effective two-mode display preference. Detailed and Everything expand details
+   * and other presets and custom settings use compact renderer details.
+   */
+  detail(): "compact" | "detailed"
+  /**
+   * Sets the app's shared timeline preset for all sessions, persisted by the app.
+   * @param mode - Compact or Detailed, as offered by the app's settings.
+   */
+  setDetail(mode: "compact" | "detailed"): void
+}
+
 /** The window context as the app's host builds it for every plugin, with the members only built-ins use. */
 export interface BuiltinContext extends Context {
   /** Desktop-only abilities, `forceFocus` included; undefined on the web. */
@@ -372,6 +399,15 @@ export interface BuiltinContext extends Context {
   readonly layout: BuiltinLayout
   /** Stores whose older homes may be parts of shared app keys. */
   readonly storage: BuiltinStorage
+  /**
+   * The current timeline detail preset. Use the app's saved setting for plugin tool details.
+   * @example
+   * ```ts
+   * const timeline = builtinContext(ctx).timeline
+   * timeline.setDetail(timeline.detail() === "compact" ? "detailed" : "compact")
+   * ```
+   */
+  readonly timeline: BuiltinTimeline
 }
 
 /**

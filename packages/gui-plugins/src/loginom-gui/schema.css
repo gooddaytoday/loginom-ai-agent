@@ -1,0 +1,182 @@
+.loginom-schema-page {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  color: var(--v2-text-text-base);
+  background: var(--v2-background-bg-layer-01);
+}
+
+.loginom-schema-content {
+  margin-inline: auto;
+  max-width: 1120px;
+  padding: clamp(16px, 4vw, 48px);
+}
+
+.loginom-schema-content h1 {
+  margin-block: 4px 20px;
+  font-size: 28px;
+  font-weight: 650;
+}
+
+.loginom-schema-frame {
+  overflow: hidden;
+  border: 1px solid var(--v2-border-border-muted);
+  border-radius: 12px;
+  background: var(--v2-background-bg-base);
+}
+
+.loginom-schema-section {
+  padding: 12px 16px;
+  overflow-wrap: anywhere;
+}
+
+.loginom-schema-section + .loginom-schema-section,
+.loginom-schema-section + .loginom-schema-viewport,
+.loginom-schema-viewport + .loginom-schema-section {
+  border-top: 1px solid var(--v2-border-border-muted);
+}
+
+.loginom-schema-frame h2,
+.loginom-schema-frame h3 {
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.loginom-schema-muted,
+.loginom-schema-card small {
+  font-size: 12px;
+  color: var(--v2-text-text-muted);
+}
+
+.loginom-schema-title,
+.loginom-schema-crumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.loginom-schema-title > [data-component="icon"] {
+  color: var(--v2-text-text-accent);
+}
+
+.loginom-schema-module {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+  max-width: 100%;
+}
+
+.loginom-schema-module select {
+  min-width: 0;
+  max-width: 18rem;
+  padding: 4px 6px;
+  border: 1px solid var(--v2-border-border-muted);
+  border-radius: 6px;
+}
+
+.loginom-schema-viewport {
+  direction: ltr;
+  max-height: min(480px, 65vh);
+  overflow: auto;
+  background:
+    radial-gradient(var(--v2-border-border-muted) 1px, transparent 1px) 0 0 / 15px 15px,
+    var(--v2-background-bg-layer-01);
+}
+
+.loginom-schema-canvas {
+  position: relative;
+  margin-inline: auto;
+}
+
+.loginom-schema-canvas > svg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.loginom-schema-canvas > svg path {
+  fill: none;
+  stroke: var(--v2-text-text-muted);
+  stroke-width: 2;
+}
+
+.loginom-schema-card {
+  position: absolute;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 3px;
+  padding: 8px 12px;
+  border: 1px solid var(--v2-border-border-muted);
+  border-radius: 9px;
+  background: var(--v2-background-bg-base);
+  text-align: center;
+}
+
+.loginom-schema-card :is(strong, small) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+
+.loginom-schema-card.is-submodel {
+  box-shadow:
+    3px 3px var(--v2-background-bg-base),
+    4px 4px var(--v2-border-border-muted),
+    7px 7px var(--v2-background-bg-base),
+    8px 8px var(--v2-border-border-muted);
+}
+
+.loginom-schema-card.is-marked,
+.loginom-schema-finding {
+  background: var(--v2-background-bg-layer-02);
+}
+
+.loginom-schema-card:is(:hover, [aria-pressed="true"], .is-marked) {
+  border-color: var(--v2-text-text-accent, currentColor);
+}
+
+.loginom-schema-card[aria-pressed="true"] {
+  outline: 2px solid var(--v2-text-text-accent, currentColor);
+}
+
+.loginom-schema-mark {
+  position: absolute;
+  inset-block-start: -10px;
+  padding: 0 5px;
+  border: 1px solid var(--v2-text-text-accent, currentColor);
+  border-radius: 8px;
+  background: var(--v2-background-bg-base);
+  font-size: 11px;
+}
+
+.loginom-schema-port {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--v2-text-text-muted);
+  border-radius: 50%;
+  background: var(--v2-background-bg-base);
+  transform: translate(-50%, -50%);
+}
+
+.loginom-schema-port.is-connected {
+  background: var(--v2-text-text-muted);
+}
+
+.loginom-schema-facts > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  margin-block: 5px;
+}
+
+.loginom-schema-facts dt {
+  font-weight: 600;
+}

@@ -18,12 +18,14 @@ import { Identifier } from "@opencode/schema/identifier"
 import type { Model } from "@opencode/schema/model"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 import { local, type Profile } from "./access"
 import { exactScanReceipt } from "./file-profile-core"
 import type { ServiceHost } from "./host"
 import { permissionFailure, type localFiles } from "./local-file"
 import { loginomResultState, loginomResultSummary } from "./loginom-result"
+import { rememberSavedPackage } from "./package-schema"
+import { manualEditNotice } from "./manual-edits"
 
 type Lease = ServiceHost.Lease
 type Files = Awaited<ReturnType<typeof localFiles>>
@@ -46,6 +48,10 @@ const Reply = Schema.Struct({
 })
 const decodeCatalog = Schema.decodeUnknownSync(Catalog)
 const decodeReply = Schema.decodeUnknownSync(Reply)
+const decodeLoginomMetadata = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Unknown))
+const decodeSchemaRef = Schema.decodeUnknownOption(
+  Schema.Struct({ document_id: Schema.NonEmptyString, workflow_id: Schema.NonEmptyString }),
+)
 
 // The product's own tools that 0.4 offered only beside a prepared Dock: the catalog then describes Dock actions.
 const prepared = ["loginom_file_admit", "loginom_file_profile", "loginom_file_scan", "loginom_file_sample"]
@@ -65,6 +71,7 @@ export async function dockTools(input: {
     location: Pick<Plugin.Context["location"], "directory">
     model: Pick<Plugin.Context["model"], "list">
     session: Pick<Plugin.Context["session"], "context">
+    storage: Pick<Plugin.Context["storage"], "set">
   }
   files: Pick<Files, "ask" | "snapshot">
   profiles: string
@@ -251,14 +258,14 @@ export async function dockTools(input: {
       throw packagePath ? permissionFailure(resolve(directory, packagePath), error) : error
     })
     const forwarded = { ...args }
-    const packageInput = packagePath
+    const packageSource = packagePath
       ? await (async () => {
           const source = await input.files.snapshot(packagePath, call)
           if (extname(source.file.name).toLowerCase() !== ".lgp")
             throw Error("local_package_path requires a .lgp file. Путь: " + source.sourcePath)
           delete forwarded.local_package_path
           if (forwarded.operation_id === undefined) forwarded.operation_id = randomUUID()
-          return { admissionID: JSON.stringify(["local-file", call.messageID, call.id]), file: source.file }
+          return source
         })()
       : undefined
     const parameters = args.parameters as { source_switch?: { profile_id?: unknown } } | undefined
@@ -279,7 +286,7 @@ export async function dockTools(input: {
         signal,
         // Help and connection diagnostics carry no attachments (0.4 `toolPolicy.isLocalLoginom`).
         local.has(key) ? undefined : await admissions(call.sessionID),
-        packageInput,
+        packageSource && { admissionID: JSON.stringify(["local-file", call.messageID, call.id]), file: packageSource.file },
         scanReceipt,
         (update) => {
           publishing = publishing
@@ -306,20 +313,49 @@ export async function dockTools(input: {
       summary && outputPath
         ? `${summary}\n\nTable data and verbose details were omitted by the backend response limit. The complete original result is retained at ${outputPath}. Do not infer unread data or repeat mutations solely to retrieve omitted text.`
         : text
+    const notice = manualEditNotice(
+      result._meta?.loginomManualEdits,
+      typeof forwarded.operation_id === "string" && forwarded.operation_id
+        ? forwarded.operation_id
+        : (call.id ?? randomUUID()),
+      state === "pending" ? "running" : "settled",
+    )
+    const output = notice ? `${notice.text}\n\n${content}` : content
+    const facts = Option.getOrUndefined(decodeLoginomMetadata(result._meta?.loginom))
+    const schemaRef =
+      state !== "failed" && name === "dock_prepare"
+        ? Option.getOrUndefined(decodeSchemaRef(result._meta?.packageSchema))
+        : undefined
+    const metadata = {
+      generation: lease.generation,
+      ...(notice || facts || schemaRef
+        ? {
+            loginom: {
+              ...facts,
+              ...notice?.loginom,
+              ...(schemaRef ? { package_schema: { source: "window", generation: lease.generation, ...schemaRef } } : {}),
+            },
+          }
+        : {}),
+    }
     if (state === "failed")
       throw new Tool.Error({
-        message: content || "LOGINOM_TOOL_FAILED",
-        metadata: { generation: lease.generation, isError: true },
+        message: output || "LOGINOM_TOOL_FAILED",
+        metadata: { ...metadata, isError: true },
       })
+    if (schemaRef && forwarded.intent !== "existing_workflow") {
+      // A new package supersedes the previous local file. Storage failure does not invalidate the prepared window.
+      await rememberSavedPackage(plugin.storage, call.sessionID, packageSource).catch(() => undefined)
+    }
     const images = result.content.flatMap((block) =>
       block.type === "image" && typeof block.data === "string" && typeof block.mimeType === "string"
         ? [{ type: "file" as const, uri: `data:${block.mimeType};base64,${block.data}`, mime: block.mimeType }]
         : [],
     )
     return {
-      content: images.length ? [{ type: "text", text: content }, ...images] : content,
+      content: images.length ? [{ type: "text", text: output }, ...images] : output,
       metadata: {
-        generation: lease.generation,
+        ...metadata,
         ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
         // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
         ...(outputPath ? { truncated: true, outputPath } : {}),

@@ -105,6 +105,7 @@ const layout: BuiltinLayout = {
   project() {},
   draft() {},
   command() {},
+  openPage() {},
 }
 
 const about: App = { name: "opencode", version: "", channel: "dev", platform: "desktop", packaged: false }
@@ -135,6 +136,7 @@ function fakeApis(storage: (plugin: string) => Storage): HostApiFactories {
     sessions: () => ({ list: () => [], current: () => undefined }),
     screen: () => ({ current: () => undefined }),
     layout: () => layout,
+    timeline: () => ({ detail: () => "compact", setDetail() {} }),
     storage,
     system: () => ({ copy: async () => {}, save: async () => false, openExternal() {} }),
     embeds: () => ({ View: () => null, capture: async () => undefined }),
@@ -431,9 +433,11 @@ function standIn(overrides: Partial<Interface>): Interface {
       scroll: { get: () => undefined, set() {} },
     },
     settings() {},
+    timeline: { detail: () => "compact", setDetail() {} },
     project() {},
     draft() {},
     command() {},
+    openPage() {},
     run: () => false,
     notify: async () => ({ notification: false, sound: false }),
     font: () => "fixture mono",
