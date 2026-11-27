@@ -5,7 +5,7 @@ export const jsonToTreeParametersSchema={type:'object',properties:{json_field:te
 export const treeToTableParametersSchema={type:'object',properties:{
  selected_paths:{type:'array',minItems:1,maxItems:256,items:text('JSON Pointer schema leaf path, without array indexes.',512),description:'Replace the complete leaf selection in native schema order.'},
  repeat_parents:{type:'boolean',description:'Repeat selected ancestors on every child row.'},
- composite_names:{type:'boolean',description:'true: native root+path names joined by _ (Root_items_code); false: leaf names.'},
+ composite_names:{type:'boolean',description:'Use native root+path names joined by _ (Root_items_code) to distinguish equal leaf names in different branches. False uses leaf names.'},
  composite_labels:{type:'boolean',description:'true: root+path tree labels joined by label_separator; false: leaf labels.'},
  label_separator:{type:'string',enum:treeLabelSeparators,description:'Composite label separator; names always use _.'},
  global_index_paths:{type:'array',maxItems:1,items:text('JSON Pointer of the repeated array schema node.',512),description:'Optional: arrays whose native global index integer column is added; [] removes it. Read the generated name.'}},required:[],additionalProperties:false};
@@ -36,7 +36,8 @@ export function validateTreeParameters(parameters,mode,request){
 // Inspect only the admitted JSON shape. Numeric lexemes are retained as text;
 // the native tree reader independently supplies every delivered scalar value.
 export function validateTreeJsonScope(text){
- if(typeof text!=='string'||Buffer.byteLength(text)>1024*1024)throw Error('Tree JSON input exceeds the bounded object scope');
+ if(typeof text!=='string'||Buffer.byteLength(JSON.stringify([[text]]))>512*1024)
+  throw Error('Tree JSON input exceeds the 512 KiB encoded source-row budget');
  const numbers=new WeakSet();
  const root=JSON.parse(text,(_key,value,context)=>{
   if(typeof value!=='number')return value;
@@ -52,9 +53,10 @@ export function validateTreeJsonScope(text){
   if(token===','){top.key=true;continue;}if(token===':'){top.key=false;continue;}
   if(top.key&&token.startsWith('"')){const key=JSON.parse(token);if(top.keys.has(key))throw Error('Duplicate JSON keys are outside tree stage 1');top.keys.add(key);top.key=false;}
  }
- let nodes=0;const arrays=new Map(),kinds=new Map(),leafNames=new Map();
+ let nodes=0;const arrays=new Map(),kinds=new Map(),schemaPaths=new Set();
  const walk=(value,depth,path='')=>{
-  if(++nodes>256||depth>16)throw Error('Tree JSON exceeds 256 nodes or depth 16');
+  nodes++;schemaPaths.add(path);
+  if(schemaPaths.size>256||depth>16)throw Error('Tree JSON exceeds 256 schema nodes or depth 16');
   if(value===null||numbers.has(value)||['string','boolean'].includes(typeof value)){
    return;
   }
@@ -68,10 +70,6 @@ export function validateTreeJsonScope(text){
     entry.kind=kind;
    }
    if(entry.kind==='object'&&entry.nulls)throw Error('NULL object-array records are outside tree scope');
-   if(entry.kind&&entry.kind!=='object'){
-    const name=path.split('/').at(-1).replaceAll('~1','/').replaceAll('~0','~');
-    if(leafNames.has(name)&&leafNames.get(name)!==path)throw Error('Colliding leaf names are outside tree stage 1');leafNames.set(name,path);
-   }
    for(const record of value)walk(record,depth+1,path);return;
   }
   if(!value||typeof value!=='object')throw Error('Tree stage 1 requires an object document');
@@ -82,8 +80,6 @@ export function validateTreeJsonScope(text){
    if(kind!=='null'&&kinds.has(child)&&kinds.get(child)!==kind
     &&([kind,kinds.get(child)].some(t=>['object','array'].includes(t))))throw Error('Mixed scalar/container fields are outside tree scope');
    if(kind!=='null')kinds.set(child,kind);
-   const scalar=cell===null||numbers.has(cell)||typeof cell!=='object';
-   if(scalar){if(leafNames.has(key)&&leafNames.get(key)!==child)throw Error('Colliding leaf names are outside tree stage 1');leafNames.set(key,child);}
    walk(cell,depth+1,child);
   }
  };
@@ -95,24 +91,41 @@ export function validateTreeJsonScope(text){
  return {verified:true,node_count:nodes};
 }
 
+const scalarTypes=['integer','real','string','boolean','datetime','variant'];
+
 export function validateJsonTreeSchema(schema){
  if(!Array.isArray(schema)||!schema.length||schema.length>256||!schema[0].is_container)
   throw Error('JSON tree requires one object root');
  if(!schema.some(n=>n.is_array&&n.is_container))throw Error('JSON tree requires a repeated object branch');
  const leaves=schema.filter(n=>!n.is_container);
- if(new Set(leaves.map(n=>n.name)).size!==leaves.length
-  ||leaves.some(n=>(!['integer','real','string','boolean','datetime','variant'].includes(n.type)||n.type==='variant'&&n.is_array)))throw Error('JSON tree requires distinct scalar leaf names and supported types');
+ if(leaves.some(n=>!scalarTypes.includes(n.type)||n.type==='variant'&&n.is_array))
+  throw Error('JSON tree requires supported types');
  return true;
 }
 
-export function validateSelectedTreePaths(schema,paths,indexPaths){
+// Loginom composes technical names from the root and every ancestor.
+export function treeColumnNames(schema,leaves,compositeNames){
+ const names=leaves.map(leaf=>compositeNames
+  ?schema.filter(n=>n.path===''||leaf.path===n.path||leaf.path.startsWith(n.path+'/')).map(n=>n.name).join('_')
+  :leaf.name);
+ if(new Set(names).size!==names.length)
+  throw Error('Colliding selected tree column names: enable composite_names or choose different paths');
+ return names;
+}
+
+export function validateSelectedTreePaths(schema,paths,indexPaths,compositeNames=false){
  if(!Array.isArray(schema)||!schema.length||schema.length>256||!schema[0].is_container
-  ||!schema.some(n=>n.is_array)||schema.some(n=>n.is_array&&(!n.is_container||schema.some(a=>a!==n&&a.is_array&&n.path.startsWith(a.path+'/')))))
-  throw Error('Tree stage 1 requires one object and one repeated branch per array; nested or scalar arrays are unsupported');
- const leaves=schema.filter(n=>!n.is_container);
- if(new Set(leaves.map(n=>n.name)).size!==leaves.length||leaves.some(n=>!['integer','real','string','boolean','datetime','variant'].includes(n.type)))throw Error('Tree stage 1 requires distinct scalar leaf names and supported types');
- if(paths){const selected=leaves.filter(n=>paths.includes(n.path)).map(n=>n.path);
-  if(JSON.stringify(selected)!==JSON.stringify(paths))throw Error('Invalid parameters.selected_paths: choose existing leaves in native schema order');}
- if(indexPaths?.some(p=>!schema.some(n=>n.path===p&&n.is_array)))throw Error('Invalid parameters.global_index_paths: choose the repeated array path');
+  ||!schema.some(n=>n.is_array&&n.is_container))
+  throw Error('Tree stage 1 requires one object and one repeated branch per array');
+ if(paths){
+  const selected=schema.filter(n=>!n.is_container&&paths.includes(n.path));
+  if(JSON.stringify(selected.map(n=>n.path))!==JSON.stringify(paths))
+   throw Error('Invalid parameters.selected_paths: choose existing leaves in native schema order');
+  if(selected.some(n=>n.is_array))throw Error('Selected scalar arrays are unsupported');
+  if(selected.some(n=>!scalarTypes.includes(n.type)))throw Error('Selected tree leaves require supported types');
+  if(compositeNames!==null)treeColumnNames(schema,selected,compositeNames);
+ }
+ if(indexPaths?.some(p=>!schema.some(n=>n.path===p&&n.is_array&&n.is_container)))
+  throw Error('Invalid parameters.global_index_paths: choose the repeated object-array path');
  return true;
 }

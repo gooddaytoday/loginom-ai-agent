@@ -213,3 +213,21 @@ test('compact large-file status preserves bytes, percent, elapsed time and ready
   upload_operation_id:'large:upload',bytes:progress.total_bytes,source_sha256:'a'.repeat(64),bytes_source:'native_file_store',cleanup_complete:true,upload_completion_verified:true}});
  assert.equal(ready.upload_status,'ready');assert.equal(ready.output.destination,'/user/file.csv');assert.equal(ready.output.bytes_source,'native_file_store');assert.equal(validate(ready).valid,true);
 });
+
+// LAB-2008: the import source needs the upload ID, not the delivery request ID
+// (bh-a10 lab2006-1 model.stdout:22,68; lab2006-2 model.stdout:39).
+test('a verified delivery receipt names the exact upload ID for the node source',()=>{
+ const settled={operation_id:'deliver-sales',state:'settled',phase:'completed',upload_operation_id:'deliver-sales:upload',error:null,
+  outcome:{status:'SUCCEEDED',upload_operation_id:'deliver-sales:upload',destination:'/user/sales.csv',bytes:761,sha256:'a'.repeat(64),
+   verification_id:'deliver-sales:verify',cleanup_complete:true,upload_completion_verified:true}};
+ const before=JSON.stringify(settled),receipt=compactNodeResult(settled);
+ assert.equal(receipt.output.upload_operation_id,'deliver-sales:upload');
+ assert.match(receipt.next_step.instruction,/use upload_operation_id "deliver-sales:upload"/);
+ assert.match(receipt.next_step.instruction,/not the delivery operation_id "deliver-sales"/);
+ assert.equal(receipt.next_step.tool,undefined);assert.equal(validate(receipt).valid,true);
+ assert.equal(JSON.stringify(settled),before);
+ for(const unverified of [{...settled,state:'running',outcome:null},
+  {...settled,outcome:{...settled.outcome,status:'FAILED',upload_completion_verified:false}},
+  {...settled,outcome:{...settled.outcome,upload_completion_verified:false}}])
+  assert.doesNotMatch(JSON.stringify(compactNodeResult(unverified).next_step??null),/deliver-sales:upload/);
+});

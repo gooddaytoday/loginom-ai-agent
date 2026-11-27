@@ -25,14 +25,15 @@ const proved = () => ({ verified: true, cleanup_complete: true, effect_possible:
 const blocked = () => { throw new NodeReleaseBlocked('A Loginom wizard of this node is open', 'Ask the user to close it with Cancel.'); };
 
 function fixture({ browserRecovery = true, release = blocked, releasePendingPhases, recoveryReleasePending,
-  nodeType = 'imports.text', stopPhase = 'finish' } = {}) {
+  nodeType = 'imports.text', stopPhase = 'finish', probePreparedPage, reopenNodePackage, now } = {}) {
   const calls = [], events = [];
   const graph = { complete: true, document_id: 'doc', workflow_ref: workflow, nodes: [], links: [], foreign_links: [] };
+  if(reopenNodePackage)graph.interaction_ready=true;
   const adapter = { observe: async () => { calls.push('graph'); return structuredClone(graph); }, preflight: async () => {},
     positionMatches: (n, p) => JSON.stringify(n.position) === JSON.stringify(p),
     reconcile: async () => ({ verified: true, cleanup_complete: true }),
     mutate: async e => { calls.push(e.kind); if (e.kind === 'create') graph.nodes.push({ ref: node, type: e.parameters.type, label: 'Source',
-      position: e.parameters.position, inputs: [], outputs: [0] }); return { status: 'SUCCEEDED', cleanup_complete: true }; } };
+      position: e.parameters.position, inputs: [], outputs: [0],...(reopenNodePackage?{locked:false}:{}) }); return { status: 'SUCCEEDED', cleanup_complete: true }; } };
   const ok = name => async () => { calls.push(name); return { verified: true, cleanup_complete: true, effect_possible: false }; };
   const state = { release, failFinish: stopPhase === 'finish' };
   const drivers = { verifySource: ok('source'), mapPorts: ok('mapping'), openWizard: ok('open'),
@@ -55,7 +56,7 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
     if (stopPhase === 'configure') throw Error('Managed source configuration stopped');
     return result;
   } };
-  const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery,
+  const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery, probePreparedPage, reopenNodePackage, now,
     // Only the page receipt ledger is read through this transport.
     execute: async code => {
       if (!state.receipt || !code.includes('receipt_read')) throw Error('Unexpected public transport');
@@ -158,6 +159,58 @@ test('Excel inherits the recovery-only release verifier without dispatching an u
  await assert.rejects(drivers.recoveryReleasePending(operation.nodeApply),/last browser call has not confirmed completion/);
 });
 
+test('a changed document during configure directs the user to the original scenario', async () => {
+  const f = fixture({ stopPhase: 'configure', nodeType: 'transform.filter_data', release: () => {
+    throw Object.assign(new Error('Pinned browser capability call failed [LOGINOM_IDENTITY_CHANGED]'),
+      { code: 'LOGINOM_IDENTITY_CHANGED' });
+  } });
+  f.runtime.startNodeApply(f.request('apply'));
+  const job = await f.runtime.waitNodeApply('apply', { timeoutMs: 1000 });
+  assert.equal(job.outcome.output.pending_phase, 'configure');
+
+  const outcome = await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+  assert.equal(outcome.error.code, 'NODE_RELEASE_REFUSED');
+  assert.equal(outcome.output.original_operation_pending, true);
+  assert.match(outcome.output.user_action, /original scenario/i);
+  assert.equal(outcome.output.next_step, undefined);
+  const inspected = await f.runtime.inspect({ operationId: 'apply' });
+  assert.deepEqual(inspected.output.next_steps, []);
+  assert.equal(inspected.output.user_action, outcome.output.user_action);
+  assert.throws(() => f.runtime.browserRecoveryBasis('apply'), /No browser recovery trigger/);
+  assert.equal(f.runtime.hasUnsettledWork(), true);
+  assert.equal(f.calls.filter(c => c === 'configure').length, 1);
+  assert.equal(f.calls.includes('finish'), false);
+});
+
+for (const probe of [{ ok: false, reason: 'prepared document changed' }, { ok: true }]) {
+  test('configure with an unconfirmed call retains its gate after a page probe ' + JSON.stringify(probe), async () => {
+    const observations = [];
+    const f = fixture({ stopPhase: 'configure', nodeType: 'transform.filter_data',
+      probePreparedPage: async binding => { observations.push(binding); return probe; } });
+    f.runtime.startNodeApply(f.request('apply'));
+    const job = await f.runtime.waitNodeApply('apply', { timeoutMs: 1000 });
+    assert.equal(job.outcome.output.pending_phase, 'configure');
+    f.state.operation.transportUncertain = true;
+
+    const inspected = await f.runtime.inspect({ operationId: 'apply' });
+    assert.deepEqual(observations.map(b => b.documentId), ['doc']);
+    assert.equal(inspected.output.effect_state, 'unknown');
+    const recover = () => f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+    if (probe.ok) {
+      assert.equal(inspected.output.user_action, undefined);
+      await assert.rejects(recover(), /Release proof unavailable/);
+    } else {
+      const refused = await recover();
+      assert.match(inspected.output.user_action, /original scenario/i);
+      assert.equal(refused.output.user_action, inspected.output.user_action);
+      assert.equal(refused.output.next_step, undefined);
+    }
+    assert.equal(f.state.operation.transportUncertain, true);
+    assert.equal(f.runtime.hasUnsettledWork(), true);
+    assert.equal(f.calls.includes('release:configure'), false);
+  });
+}
+
 test('T1: a refused release points to browser recovery instead of asking the user', async () => {
   const f = fixture();
   await stopAtFinish(f);
@@ -175,6 +228,163 @@ test('T1: a refused release points to browser recovery instead of asking the use
   assert.equal(basis.reason, 'NODE_RELEASE_REFUSED');
   assert.equal(basis.step.key, 'node|doc|wf|new|finish');
   assert.equal(basis.goal.ui_blocker, 'Ask the user to close it with Cancel.');
+});
+
+for(const failPublish of [false,true])test('verified reopened graph releases configure only after publishing references, fail='+failPublish,async()=>{
+  let published=0;
+  const newWorkflow={...workflow,workflow_id:'new-workflow'};
+  const ref={document_id:'new-doc',workflow_ref:newWorkflow};
+  const graph={complete:true,interaction_ready:true,...ref,nodes:[],links:[],foreign_links:[]};
+  const f=fixture({stopPhase:'configure',nodeType:'transform.filter_data',
+    probePreparedPage:async()=>({ok:false,reason:'prepared document changed'}),
+    reopenNodePackage:async()=>({first:graph,second:graph,ref,readOnly:false,reloaded:true,
+      publish:async recordRelease=>{
+        if(failPublish)throw Error('workspace save failed');
+        await recordRelease();published++;
+      }})});
+  f.runtime.startNodeApply(f.request('apply'));
+  await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+  f.state.operation.transportUncertain=true;
+  const inspected=await f.runtime.inspect({operationId:'apply'});
+  assert.equal(inspected.output.next_steps[0].tool,'dock_operation_recover');
+  assert.equal(published,0);
+  const options={strategy:'abandon_operation',recoveryOperationId:'reload-1'};
+  const outcome=await f.runtime.recover('apply',options);
+  if(failPublish){
+    assert.equal(outcome.status,'AMBIGUOUS');
+    assert.equal(outcome.output.original_operation_pending,true);
+    assert.match(outcome.output.user_action,/original scenario/i);
+    assert.equal(f.runtime.hasUnsettledWork(),true);
+    assert.equal(f.events.some(event=>event.phase==='operation_abandoned'),false);
+    assert.equal(published,0);
+    return;
+  }
+  assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+  assert.equal(outcome.output.goal_verified,false);
+  const original=outcome.output.original_outcome.output;
+  assert.equal(original.node,null);
+  assert.equal(original.configuration.status,'unknown');
+  assert.deepEqual(original.warnings,['Unsaved changes made before reloading were lost.']);
+  assert.equal(original.next_step.arguments.document_id,'new-doc');
+  assert.ok(f.events.some(event=>event.phase==='operation_abandoned'));
+  assert.equal(f.runtime.hasUnsettledWork(),false);
+  assert.deepEqual(await f.runtime.recover('apply',options),outcome);
+  assert.equal(published,1);
+  assert.equal(f.calls.includes('finish'),false);
+});
+
+const reloadProbe = { ok: false, reason: 'prepared document changed', reloaded: true };
+const loss = 'Unsaved changes made before reloading were lost.';
+const retryOptions = id => ({strategy:'abandon_operation',recoveryOperationId:id});
+
+function reopenedGraphReceipt(publish) {
+  const ref = {document_id:'reloaded-doc', workflow_ref:{...workflow,workflow_id:'reloaded-wf'}};
+  const graph = {complete:true,interaction_ready:true,...ref,nodes:[],links:[],foreign_links:[]};
+  return {first:graph,second:structuredClone(graph),ref,readOnly:false,reloaded:true,publish};
+}
+
+async function stopForReload(f) {
+  f.runtime.startNodeApply(f.request('apply'));
+  const job = await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+  assert.equal(job.outcome.status,'AMBIGUOUS');
+  f.state.operation.transportUncertain=true;
+}
+
+for(const stage of ['probe','login','open','manual login required'])test('reload keeps its warning and accepts a later verified login after '+stage,async()=>{
+  const controller=new AbortController();
+  let attempts=0,published=0,progress;
+  const f=fixture({stopPhase:'configure',nodeType:'transform.filter_data',
+    probePreparedPage:async()=>reloadProbe,
+    reopenNodePackage:async({signal,reload})=>{
+      attempts++;
+      if(attempts===1){
+        progress=reload;
+        if(stage!=='probe')reload.timeOrigin=42;
+        if(stage==='open'){
+          reload.openDispatched=true;
+          reload.openOperationId='first-native-open';
+        }
+        if(stage==='manual login required')return {reason:'RELOAD_LOGIN_UNVERIFIED'};
+        controller.abort();
+        signal.throwIfAborted();
+      }
+      assert.equal(reload,progress);
+      if(stage==='open')assert.equal(reload.openOperationId,'first-native-open');
+      return reopenedGraphReceipt(async record=>{await record();published++;});
+    },
+  });
+  await stopForReload(f);
+  const interrupted=await f.runtime.recover('apply',{...retryOptions('interrupted'),signal:controller.signal});
+  assert.equal(interrupted.output.original_operation_pending,true);
+  assert.equal(interrupted.output.next_step?.tool,'dock_operation_recover');
+  if(stage==='manual login required')assert.ok(interrupted.output.user_action.includes(loss));
+  else assert.deepEqual(interrupted.output.warnings,[loss]);
+  assert.equal(published,0);
+  const advice=(await f.runtime.inspect({operationId:'apply'})).output;
+  assert.equal(advice.next_steps[0].tool,'dock_operation_recover');
+  if(stage==='manual login required')assert.match(advice.user_action,/Sign in to the original Loginom account/);
+  else assert.deepEqual(advice.warnings,[loss]);
+  const outcome=await f.runtime.recover('apply',retryOptions('manual-login-verified'));
+  assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+  assert.deepEqual(outcome.output.original_outcome.output.warnings,[loss]);
+  assert.equal(published,1);
+  assert.equal(f.runtime.hasUnsettledWork(),false);
+  assert.equal(f.calls.filter(call=>call==='configure').length,1);
+});
+
+for(const [name,change] of [
+  ['wrong node type',{}],
+  ['wrong phase',{stopPhase:'finish',nodeType:'transform.filter_data'}],
+  ['target did not complete',{nodeType:'transform.filter_data',unverifiedTarget:true}],
+  ['probe saw the prepared document',{nodeType:'transform.filter_data',probe:{...reloadProbe,ok:true}}],
+  ['probe saw an unrelated change',{nodeType:'transform.filter_data',probe:{...reloadProbe,reason:'storage identity changed'}}],
+])test('reload recovery is unavailable for '+name,async()=>{
+  let attempted=0;
+  const f=fixture({stopPhase:'configure',...change,probePreparedPage:async()=>change.probe??reloadProbe,
+    reopenNodePackage:async()=>{attempted++;return reopenedGraphReceipt(async()=>{});}});
+  await stopForReload(f);
+  if(change.unverifiedTarget)f.state.operation.targetPhase.completed=false;
+  const inspection=await f.runtime.inspect({operationId:'apply'});
+  assert.equal(inspection.output.next_steps.some(step=>step.tool==='dock_operation_recover'),false);
+  if(change.probe||change.stopPhase)await assert.rejects(f.runtime.recover('apply',retryOptions('refused')),/Release proof unavailable/);
+  else {
+    const refusal=await f.runtime.recover('apply',retryOptions('refused'));
+    assert.equal(refusal.output.original_operation_pending,true);
+  }
+  assert.equal(attempted,0);
+});
+
+test('reopened graphs need a stable second read before any release is published',async()=>{
+  let published=0,attempts=0;
+  const f=fixture({stopPhase:'configure',nodeType:'transform.filter_data',probePreparedPage:async()=>reloadProbe,
+    reopenNodePackage:async()=>{
+      attempts++;
+      const opened=reopenedGraphReceipt(async()=>{published++;});
+      opened.second.interaction_ready=false;
+      return opened;
+    }});
+  await stopForReload(f);
+  const outcome=await f.runtime.recover('apply',retryOptions('inconsistent'));
+  assert.match(outcome.error.message,/REOPENED_GRAPH_UNVERIFIED/);
+  assert.equal(outcome.output.original_operation_pending,true);
+  assert.ok(outcome.output.user_action.includes(loss));
+  assert.equal(published,0);
+  assert.equal((await f.runtime.inspect({operationId:'apply'})).output.next_steps.length,0);
+  assert.equal(attempts,1);
+});
+
+test('reopened graph proof received after the original release deadline stays pending',async()=>{
+  let time=Date.now();
+  const f=fixture({stopPhase:'configure',nodeType:'transform.filter_data',probePreparedPage:async()=>reloadProbe,
+    now:()=>time,reopenNodePackage:async({deadline})=>{
+      time=deadline;
+      return reopenedGraphReceipt(async()=>assert.fail('late graph proof was published'));
+    }});
+  await stopForReload(f);
+  const outcome=await f.runtime.recover('apply',retryOptions('late'));
+  assert.match(outcome.error.message,/REOPENED_GRAPH_UNVERIFIED/);
+  assert.equal(outcome.output.original_operation_pending,true);
+  assert.equal(f.runtime.hasUnsettledWork(),true);
 });
 
 test('without the capability the existing user_action contract is unchanged', async () => {

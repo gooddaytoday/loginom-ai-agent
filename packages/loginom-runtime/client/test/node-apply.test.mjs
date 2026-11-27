@@ -175,6 +175,14 @@ for(const mode of ['done','execute'])test('Import reports its observed Finish ca
  assert.match(result.warnings.join(' '),/node1/);
  assert.deepEqual(await f.run(p),result);
 });
+test('a Text Import caption confirmed on the first apply does not suggest a second apply',async()=>{
+ const f=fixture(),p=request(),finish=f.drivers.finish;
+ f.drivers.finish=async mode=>({...await finish(mode),node_label:p.target.label});
+ const result=await f.run(p);
+ assert.equal(result.status,'SUCCEEDED');
+ assert.match(result.warnings.join(' '),/observed caption "Import"/);
+ assert.doesNotMatch(result.warnings.join(' '),/NEW dock_node_apply/);
+});
 test('full shell orders configuration before execution and binds empty fresh output',async()=>{
  const f=fixture(),r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.equal(r.execution.status,'completed');assert.equal(r.output.ports[0].row_count,0);
  assert.deepEqual(f.calls,['source','target','mapping','open','configure','mapping','finish','execute','read']);
@@ -639,6 +647,31 @@ test('invalid Duplicates input ends conclusively only with durable unchanged-dra
  }
 });
 
+test('new Join input 0 refusal settles only with owned and durably acknowledged Close',async()=>{
+ for(const fault of [null,'existing','owner','transport','cleanup','journal']){
+  const f=fixture({failJournal:fault==='journal'?'node_phase_refused':undefined}),p=request();
+  const node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
+  p.target=fault==='existing'?{kind:'existing',type:'transform.join_data',ref:node}:{...p.target,type:'transform.join_data'};
+  p.mode='inner';
+  p.inputs=['left','right'].map((node_id,input)=>({source:{...node,node_id},input,output:0}));
+  f.handlers.set(p.target.type,{...f.handlers.get('imports.text'),modes:['inner']});
+  f.operation.cleanupConfirmed=fault!=='cleanup';
+  f.operation.transportUncertain=fault==='transport';
+  const closed={verified:true,cleanup_complete:true,draft_discarded:true,settings_applied:false,mode:'close',execution_started:false,
+   node_context:{...node,node_id:fault==='owner'?'foreign':node.node_id,verified:true,surface:'graph',locked:false}};
+  f.drivers.mapPorts=async()=>{throw Object.assign(Error('Join input changed after validation'),{nodePhaseRefusal:{
+   phase:'input_mapping',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+   verification:'join_first_input_schema_refused',proof:{closed},
+  }});};
+  const r=await f.run(p);
+  assert.equal(r.status,fault?'AMBIGUOUS':'FAILED',fault);
+  assert.equal(r.effect_possible,true,fault);
+  assert.equal(r.cleanup_complete,!fault,fault);
+  assert.equal(r.pending_phase,fault?'input_mapping':null,fault);
+  assert.ok(!f.calls.includes('open')&&!f.calls.includes('configure')&&!f.calls.includes('execute'));
+ }
+});
+
 test('invalid Excel variable binding ends conclusively at input mapping only when the refusal reports the saved input',async()=>{
  for(const failure of ['none','cleanup_complete','input_saved','claims_unchanged','verification','phase','journal','foreign_type']){
   const f=fixture({failJournal:failure==='journal'?'node_phase_refused':undefined}),p=request();
@@ -991,4 +1024,31 @@ for(const fault of [null,'other-node','transport','receipt','effect','phase','jo
  f.drivers.releasePending=async()=>{f.calls.push('release-rest-variable-refusal');return {verified:true,cleanup_complete:true,node_context:{document_id:'doc',workflow_id:'workflow',node_id:'node1'},cleanup:{wizard_closed:false}};};
  const r=await f.run(p);assert.equal(r.status,fault?'AMBIGUOUS':'FAILED',JSON.stringify(r.error));assert.equal(r.cleanup_complete,!fault);assert.equal(r.pending_phase,fault?'input_mapping':null);assert.equal(r.error.code,'NODE_APPLY_STOPPED');
  assert.equal(f.calls.includes('release-rest-variable-refusal'),!fault||fault==='journal');assert.ok(!f.calls.includes('configure')&&!f.calls.includes('execute'));
+});
+for(const field of ['created','configured','executed','unconnected_verified'])test('add_only needs verified '+field+' in the target receipt',async()=>{
+ const f=fixture(),prepare=f.drivers.prepareTarget;
+ const args={...request(),mode:'add_only',finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false}};
+ const target={created:true,configured:false,executed:false,unconnected_verified:true};
+ delete target[field];
+ f.drivers.prepareTarget=async(...parameters)=>({...await prepare(...parameters),target,effect_possible:true});
+ const result=await f.run(args);
+ assert.equal(result.status,'AMBIGUOUS');
+ assert.match(result.error.message,/Creation without configuration was not verified/);
+ assert.ok(!f.records.some(e=>e.phase==='node_checkpoint'));
+ assert.ok(!f.calls.includes('open'));
+});
+
+// LAB-2024: a caption Done did not preserve keeps its own public code. Done has
+// already committed, so the node_finish effect is possible and unresolved.
+test('node_finish caption refusal is public NODE_LABEL_NOT_PRESERVED, never NODE_APPLY_STOPPED',async()=>{
+ const f=fixture();f.handlers.get('imports.text').output_wizard='separate';
+ const message='NODE_LABEL_NOT_PRESERVED: Done left caption "Revenue по Region" instead of target.label';
+ f.drivers.finish=async mode=>{f.calls.push('finish:'+mode);throw Error(message);};f.drivers.finishGraph=async()=>{throw Error('unexpected graph finish');};
+ const result=await f.run();
+ assert.equal(result.error.code,'NODE_LABEL_NOT_PRESERVED');assert.equal(result.error.message,message);
+ assert.equal(result.status,'AMBIGUOUS');assert.equal(result.effect_possible,true);assert.equal(result.pending_phase,'node_finish');
+ assert.deepEqual(f.calls.filter(c=>c.startsWith('finish')),['finish:done']);assert.ok(!f.calls.includes('execute')&&!f.calls.includes('read'));
+ const {nodeApplyResultSchema}=await import('../lib/node-result-schema.mjs');
+ const {AjvJsonSchemaValidator}=await import('@modelcontextprotocol/sdk/validation/ajv');
+ const validation=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(result);assert.equal(validation.valid,true,validation.errorMessage);
 });

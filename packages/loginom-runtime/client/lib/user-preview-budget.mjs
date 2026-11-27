@@ -5,10 +5,24 @@ export const USER_PREVIEW_WIRE_BUDGET=46000;
 export const previewWireSize=value=>Buffer.byteLength(JSON.stringify({result:JSON.stringify(value)}),'utf8');
 const pick=(value,keys)=>Object.fromEntries(keys.filter(k=>value?.[k]!==undefined).map(k=>[k,value[k]]));
 
-export function budgetUserPreview(reply,{wireSize=previewWireSize,preserveConfiguration=false}={}) {
+export function budgetUserPreview(reply,{wireSize=previewWireSize,preserveConfiguration=false,allowCompleteTreePreview=false}={}) {
  if(wireSize(reply)<=USER_PREVIEW_WIRE_BUDGET)return;
  const ports=reply.output?.ports??[];
- if(ports.some(p=>p.port_kind==='tree'||p.exact_table||p.read_coverage||p.cell_precision))return;
+ if(ports.some(p=>p.exact_table||p.read_coverage||p.cell_precision))return;
+ if(ports.some(p=>p.port_kind==='tree')){
+  const [port]=ports;
+  if(ports.length!==1||port.port_kind!=='tree'||port.tree.complete&&!allowCompleteTreePreview)return;
+  const tree=port.tree=structuredClone(port.tree);
+  while(tree.instances.length>1&&wireSize(reply)>USER_PREVIEW_WIRE_BUDGET){
+   const last=tree.instances.pop();
+   if(last.parent!==null)tree.instances[last.parent].children.pop();
+   tree.node_count=tree.instances.length;
+   tree.complete=port.sample_complete=false;
+   reply.output.status='partial';
+  }
+  if(!tree.complete)tree.max_depth=Math.max(...tree.instances.map(n=>n.path.split('/').length-1));
+  return;
+ }
  // Keep native summary ports intact without blocking ordinary sibling previews.
  const previews=ports.filter(p=>!p.sample?.some(r=>r.some(c=>c.precision==='exact_native')));
  for(const port of previews)for(const row of port.sample??[])for(const cell of row){
