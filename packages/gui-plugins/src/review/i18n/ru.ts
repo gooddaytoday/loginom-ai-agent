@@ -15,5 +15,5 @@ export default {
   loadingChanges: "Загрузка изменений…",
   noChanges: "Нет изменений",
   "settings.wrapLines.title": "Переносить строки",
-  "settings.wrapLines.description": "Перенос длинных строк в мобильных различиях вместо горизонтальной прокрутки",
+  "settings.wrapLines.description": "Переносить длинные строки при просмотре изменений на узком экране",
 }
