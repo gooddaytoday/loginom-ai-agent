@@ -336,8 +336,11 @@ export const dict = {
   "error.chain.configInvalidWithMessage": "Недопустимый конфигурационный файл по адресу {{path}}: {{message}}",
 
   "notification.permission.title": "Требуется разрешение",
+  "notification.permission.packageWrite.title": "Разрешить запись в пакет?",
+  "notification.question.title": "Нужен ответ на вопрос",
+  "notification.elicitation.title": "Нужно ввести данные",
 
-  "notification.session.responseReady.title": "Ответ готов",
+  "notification.session.responseReady.title": "Ход закончен",
   "notification.session.error.title": "Ошибка сессии",
   "notification.session.error.fallbackDescription": "Произошла ошибка",
 
@@ -495,6 +498,11 @@ export const dict = {
   "settings.general.notifications.permissions.title": "Разрешения",
   "settings.general.notifications.permissions.description":
     "Показывать системное уведомление, когда требуется разрешение",
+  "settings.general.notifications.turnFinished.title": "Ход закончен",
+  "settings.general.notifications.turnFinished.description": "Уведомлять об окончании хода, когда окно не в фокусе",
+  "settings.general.notifications.decision.title": "Нужно ваше решение",
+  "settings.general.notifications.decision.description":
+    "Уведомлять о вопросах и запросах разрешений, когда окно не в фокусе",
   "settings.general.notifications.errors.title": "Ошибки",
   "settings.general.notifications.errors.description": "Показывать системное уведомление, когда происходит ошибка",
 
@@ -620,7 +628,7 @@ export const dict = {
   "provider.disconnect.toast.failed.description": "Не удалось отключить {{provider}}.",
   "toast.migration.failed.title": "Не удалось перенести данные",
   "command.session.background": "Перейти на задний план",
-  "settings.tab.preferences": "Предпочтения",
+  "settings.tab.preferences": "Общие",
   "settings.tab.notifications": "Уведомления",
   "settings.tab.projects": "Проекты",
   "settings.tab.extensions": "Расширения",

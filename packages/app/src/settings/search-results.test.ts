@@ -69,11 +69,11 @@ describe("settings search index", () => {
     expect(index({ translate: (key) => `translated ${strings.get(key) ?? key}` }).map((item) => item.id)).toEqual(
       items.map((item) => item.id),
     )
-    expect(
-      rankSettings("agent", items)
-        .filter((item) => item.title === "Agent")
-        .map((item) => item.page),
-    ).toEqual(["Desktop notifications", "Sound effects"])
+    expect(rankSettings("agent", items).find((item) => item.title === "Agent")?.page).toBe("Sound effects")
+    expect(rankSettings("turn finished", items)[0]).toMatchObject({
+      page: "Preferences / Desktop notifications",
+      view: { tab: "general", target: "settings-notifications-turn-finished" },
+    })
     expect(rankSettings("follow-up behavior", items)[0].page).toBe("Preferences / General")
     expect(rankSettings("new question UI", items)[0].view).toMatchObject({
       tab: "experimental",

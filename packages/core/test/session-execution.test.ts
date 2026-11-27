@@ -60,6 +60,82 @@ describe("SessionExecution lifecycle", () => {
     expect(SessionExecution.terminal(interrupted, "user")).toEqual({ type: "interrupted", reason: "user" })
   })
 
+  for (const scenario of [
+    { name: "one queued correction", queued: 1 },
+    { name: "two queued corrections", queued: 2 },
+    { name: "a failed turn", queued: 0 },
+  ]) {
+    it.effect(`publishes only successful idle completion after ${scenario.name}`, () =>
+      Effect.gen(function* () {
+        const database = yield* Database.Service
+        const bus = yield* Bus.Service
+        const sessionID = Session.ID.make("ses_notify_idle")
+        yield* seedSessions(database, [sessionID])
+
+        const started = yield* Deferred.make<void>()
+        const release = yield* Deferred.make<void>()
+        const corrections = yield* Effect.forEach(Array.from({ length: scenario.queued }), () =>
+          Effect.gen(function* () {
+            return { started: yield* Deferred.make<void>(), release: yield* Deferred.make<void>() }
+          }),
+        )
+        const scope = yield* Scope.fork(yield* Effect.scope)
+        const context = yield* buildExecution(scope, ({ force }) =>
+          Effect.gen(function* () {
+            if (!force) return
+            yield* Deferred.succeed(started, undefined)
+            yield* Deferred.await(release)
+            if (scenario.queued === 0)
+              return yield* new AIError({
+                reason: new TransportError({ message: "Disconnected", transport: "http", operation: "request" }),
+              })
+            for (const correction of corrections) {
+              const promoted = yield* SessionInbox.promote(database.db, bus, sessionID, "input")
+              expect(promoted).toBeDefined()
+              yield* Deferred.succeed(correction.started, undefined)
+              yield* Deferred.await(correction.release)
+            }
+          }),
+        )
+        const execution = Context.get(context, SessionExecution.Service)
+        const observed: Array<{ type: string; active: boolean }> = []
+        yield* bus.listen((event) =>
+          event.type === SessionEvent.Execution.SucceededWhileIdle.type ||
+          event.type === SessionEvent.Execution.Failed.type
+            ? execution.isActive(sessionID).pipe(
+                Effect.map((active) => observed.push({ type: event.type, active })),
+                Effect.asVoid,
+              )
+            : Effect.void,
+        )
+        const run = yield* execution.resume(sessionID).pipe(Effect.forkChild)
+        yield* Deferred.await(started)
+        if (scenario.queued > 0) {
+          yield* seedInbox(
+            database,
+            sessionID,
+            corrections.map(() => "queue"),
+          )
+          yield* Effect.forEach(corrections, () => execution.wake(sessionID), { discard: true })
+        }
+        yield* Deferred.succeed(release, undefined)
+        for (const correction of corrections) {
+          yield* Deferred.await(correction.started)
+          expect(observed).toEqual([])
+          yield* Deferred.succeed(correction.release, undefined)
+        }
+
+        const exit = yield* Fiber.await(run)
+        expect(Exit.isSuccess(exit)).toBe(scenario.queued > 0)
+        expect(observed).toEqual(
+          scenario.queued > 0
+            ? [{ type: SessionEvent.Execution.SucceededWhileIdle.type, active: false }]
+            : [{ type: SessionEvent.Execution.Failed.type, active: true }],
+        )
+      }),
+    )
+  }
+
   it.effect("resumes a directly driven child after execution teardown", () =>
     Effect.gen(function* () {
       const database = yield* Database.Service

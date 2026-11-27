@@ -1,7 +1,13 @@
 import { readFile } from "node:fs/promises"
 import { expect, test, type Page } from "@playwright/test"
-import type { ConfigEntry, OpenCodeEvent, SessionMessageInfo, WorktreeDirectory } from "@opencode/client/promise"
-import { NO_PROVIDER, REMOTE_SERVER, SERVER, holdRoute, project, seed, session } from "../utils/app"
+import type {
+  ConfigEntry,
+  OpenCodeEvent,
+  PermissionRequest,
+  SessionMessageInfo,
+  WorktreeDirectory,
+} from "@opencode/client/promise"
+import { NO_PROVIDER, REMOTE_SERVER, SERVER, holdRoute, project, seed, session, sessionHref } from "../utils/app"
 import { mockMissingLocation, mockOpenCodeServer } from "../utils/mock-server"
 import { mockRemoteServer, mockWorkspace, openSession, openSettings, type WorkspaceInput } from "../utils/workspace"
 import { CONSOLE_URL, consoleGateway, consoleSignIn } from "../utils/console"
@@ -135,69 +141,67 @@ test("a language whose chunk fails to load keeps English and says so", async ({ 
   await expect(settings.locator('[data-action="settings-language"]')).toContainText("English")
 })
 
-test("Questions settings default independently of old Permissions settings and survive reload", async ({ page }) => {
+test("General notification settings migrate old preferences and survive reload", async ({ page }) => {
   const { settings } = await open(page, {
     seed: {
       settings: {
-        notifications: { agent: false, permissions: false, errors: true },
+        notifications: { agent: false, permissions: false, questions: true, errors: true },
         sounds: { permissionsEnabled: false, permissions: "alert-05" },
       },
     },
   })
 
+  const notifications = settings.getByRole("region", { name: "Desktop notifications" })
+  const finished = notifications.getByRole("switch", { name: "Turn finished" })
+  const decision = notifications.getByRole("switch", { name: "Your decision is needed" })
+  await expect(notifications.getByRole("switch")).toHaveCount(2)
+  await expect(finished).not.toBeChecked()
+  await expect(decision).not.toBeChecked()
+  await finished.press("Space")
+  await decision.press("Space")
+  await expect(finished).toBeChecked()
+  await expect(decision).toBeChecked()
+  await page.reload()
+  await expect(finished).toBeChecked()
+  await expect(decision).toBeChecked()
+  const search = settings.getByRole("combobox", { name: "Search", exact: true })
+  await search.fill("Your decision")
+  await expect(settings.locator('[data-setting-target="settings-notifications-decision"]')).toBeVisible()
+  await search.press("Escape")
   await settings.getByRole("tab", { name: "Notifications", exact: true }).click()
-  await expect(settings.locator('[data-slot="settings-row-title"]')).toHaveText([
-    "Agent",
-    "Permissions",
-    "Questions",
-    "Errors",
-    "Agent",
-    "Permissions",
-    "Questions",
-    "Errors",
-    "Interface",
-  ])
-  const questions = settings.getByRole("switch", { name: "Questions", exact: true })
-
-  const permissions = settings.locator('[data-action="settings-notifications-permissions"]').getByRole("switch")
-
+  await expect(settings.locator('[data-action="settings-notifications-errors"]').getByRole("switch")).toBeChecked()
   const questionSound = settings.locator('[data-action="settings-sounds-questions"]')
-
   const permissionSound = settings.locator('[data-action="settings-sounds-permissions"]')
-
-  await expect(questions).toBeChecked()
-  await expect(permissions).not.toBeChecked()
   await expect(questionSound).toHaveText("Staplebops 05")
   await expect(permissionSound).toHaveText("None")
-  await questions.locator("..").locator('[data-slot="switch-control"]').click()
-  await expect(questions).not.toBeChecked()
   await questionSound.click()
   await page.getByRole("option", { name: "Alert 02", exact: true }).click()
   await expect(questionSound).toHaveText("Alert 02")
 
   await page.reload()
-  await expect(questions).not.toBeChecked()
   await expect(questionSound).toHaveText("Alert 02")
-  await expect(permissions).not.toBeChecked()
   await expect(permissionSound).toHaveText("None")
-  await questions.locator("..").locator('[data-slot="switch-control"]').click()
   await questionSound.click()
   await page.getByRole("option", { name: "None", exact: true }).click()
-  await expect(questions).toBeChecked()
   await expect(questionSound).toHaveText("None")
-  await settings.getByRole("combobox", { name: "Search", exact: true }).fill("Questions")
-  await expect(settings.locator('[data-setting-target="settings-notifications-questions"]')).toBeVisible()
+  await search.fill("Questions")
   await expect(settings.locator('[data-setting-target="settings-sounds-questions"]')).toBeVisible()
 })
 
-test("request events use real Questions settings without disabling Permissions alerts", async ({ page }) => {
+test("decision notifications share a setting and open the conversation with the request", async ({ page }) => {
   const recorded = await recordNotifications(page)
-
   const transport = await installSseTransport(page, { server: SERVER })
+  const pending: PermissionRequest[] = []
 
   const workspace = await openSession(page, {
     name: "Request notifications",
-    seed: { settings: { sounds: { agentEnabled: false, permissions: "alert-01", questions: "alert-02" } } },
+    permissions: () => pending,
+    seed: {
+      settings: {
+        notifications: { turnFinished: true },
+        sounds: { agentEnabled: false, permissions: "alert-01", questions: "alert-02" },
+      },
+    },
   })
 
   await transport.waitForConnection()
@@ -205,10 +209,17 @@ test("request events use real Questions settings without disabling Permissions a
   await page.getByRole("button", { name: "Settings", exact: true }).click()
   const settings = page.getByTestId("settings-screen")
 
-  await settings.getByRole("tab", { name: "Notifications", exact: true }).click()
-  const questions = settings.getByRole("switch", { name: "Questions", exact: true })
-
-  await expect(questions).toBeChecked()
+  const decision = settings.getByRole("switch", { name: "Your decision is needed" })
+  await expect(decision).toBeChecked()
+  const privatePath = "/private/demo-package.lgp"
+  const permission = (index: number): PermissionRequest => ({
+    id: `per_request_${index}`,
+    sessionID: workspace.session.id,
+    action: "loginom_dock_action_run",
+    resources: [privatePath],
+    message: `Save ${privatePath}`,
+    metadata: { input: { package_path: privatePath, credential: "fixture-value" } },
+  })
 
   const event = (
     kind: "question" | "mcp-elicitation" | "websearch.provider" | "permission",
@@ -224,13 +235,7 @@ test("request events use real Questions settings without disabling Permissions a
       return {
         ...base,
         type: "permission.asked",
-        data: {
-          id: `per_request_${index}`,
-          sessionID: workspace.session.id,
-          action: "shell",
-          resources: ["echo hello"],
-          metadata: {},
-        },
+        data: permission(index),
       }
 
     return {
@@ -240,9 +245,9 @@ test("request events use real Questions settings without disabling Permissions a
         form: {
           id: `frm_request_${index}`,
           sessionID: workspace.session.id,
-          title: "Input",
+          title: `Continue using ${privatePath}?`,
           metadata: { kind },
-          fields: [{ key: "answer", type: "string", title: "Continue?" }],
+          fields: [{ key: "answer", type: "string", title: `Proceed with ${privatePath}?` }],
         },
       },
     }
@@ -254,25 +259,59 @@ test("request events use real Questions settings without disabling Permissions a
     .toEqual([{ title: "Question requires an answer", body: "Request notifications" }])
   await expect.poll(() => recorded.sounds).toEqual([expect.stringContaining("alert-02")])
 
-  await settings.locator('[data-action="settings-sounds-questions"]').click()
-  await page.getByRole("option", { name: "None", exact: true }).click()
-  await expect(settings.locator('[data-action="settings-sounds-questions"]')).toHaveText("None")
-  const previews = recorded.sounds.slice()
-
   await transport.send(event("mcp-elicitation", 2))
   await expect
     .poll(() => recorded.notifications.map((item) => item.title))
     .toEqual(["Question requires an answer", "Input requested"])
 
-  await questions.locator("..").locator('[data-slot="switch-control"]').click()
-  await expect(questions).not.toBeChecked()
-  await transport.burst([event("question", 3), event("permission", 4), event("websearch.provider", 5)])
+  pending.push(permission(3))
+  await transport.send(event("permission", 3))
   await expect
-    .poll(() => recorded.notifications.map((item) => item.title))
-    .toEqual(["Question requires an answer", "Input requested", "Permission required", "Permission required"])
+    .poll(() => recorded.notifications)
+    .toEqual([
+      { title: "Question requires an answer", body: "Request notifications" },
+      { title: "Input requested", body: "Request notifications" },
+      { title: "Allow writing to the package?", body: "Request notifications" },
+    ])
+  await recorded.clickLatest()
+  await expect(page).toHaveURL(sessionHref(workspace.session.id))
+  await expect(page.getByRole("button", { name: "Allow once", exact: true })).toBeVisible()
+
+  await page.getByRole("button", { name: "Home", exact: true }).click()
+  await page.getByRole("button", { name: "Settings", exact: true }).click()
+  await decision.press("Space")
+  await expect(decision).not.toBeChecked()
+  await transport.burst([
+    event("question", 4),
+    event("permission", 5),
+    event("websearch.provider", 6),
+    {
+      id: "evt_request_execution_succeeded",
+      created: 1700000001010,
+      type: "session.execution.succeeded",
+      durable: { aggregateID: workspace.session.id, seq: 1, version: 1 },
+      data: { sessionID: workspace.session.id },
+    },
+    {
+      id: "evt_request_execution_idle",
+      created: 1700000001011,
+      type: "session.execution.succeeded-while-idle",
+      data: { sessionID: workspace.session.id },
+    },
+  ])
   await expect
     .poll(() => recorded.sounds)
-    .toEqual([...previews, expect.stringContaining("alert-01"), expect.stringContaining("alert-01")])
+    .toEqual([
+      expect.stringContaining("alert-02"),
+      expect.stringContaining("alert-02"),
+      expect.stringContaining("alert-01"),
+      expect.stringContaining("alert-02"),
+      expect.stringContaining("alert-01"),
+      expect.stringContaining("alert-01"),
+    ])
+  await expect
+    .poll(() => recorded.notifications.map((item) => item.title))
+    .toEqual(["Question requires an answer", "Input requested", "Allow writing to the package?", "Turn finished"])
 })
 
 for (const locale of ["en", "ar"]) {

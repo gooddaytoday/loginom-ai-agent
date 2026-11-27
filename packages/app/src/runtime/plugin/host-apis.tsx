@@ -1103,13 +1103,12 @@ export function createPluginAttachment(apis: HostApis) {
     return true
   }
 
-  // Follows the user's settings for the app's own notifications: Agent, or Errors for `error`. The coordinator shows a
-  // keyed notification once across windows, and only while none of them has focus.
+  // The coordinator follows the completion or error preference and only notifies once across unfocused windows.
   const notify = async (plugin: string, options: NotifyOptions): Promise<NotifyResult> => {
     const error = options.variant === "error"
 
     const allowed = untrack(() => ({
-      notification: error ? settings.notifications.errors() : settings.notifications.agent(),
+      notification: error ? settings.notifications.errors() : settings.notifications.turnFinished(),
       sound: options.sound !== false && (error ? settings.sounds.errorsEnabled() : settings.sounds.agentEnabled()),
       id: error ? settings.sounds.errors() : settings.sounds.agent(),
     }))

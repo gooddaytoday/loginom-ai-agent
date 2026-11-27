@@ -107,6 +107,32 @@
         "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
       ]
     },
+    {
+      "id": "CAT-15",
+      "title": "Background conversation notifications (C3.10, A3)",
+      "paths": [
+        "packages/app/e2e/regression/settings.spec.ts",
+        "packages/app/e2e/utils/notifications.ts",
+        "packages/app/src/runtime/i18n/en.ts",
+        "packages/app/src/runtime/i18n/ru.ts",
+        "packages/app/src/runtime/plugin/host-apis.tsx",
+        "packages/app/src/settings/general/general.tsx",
+        "packages/app/src/settings/model.test.ts",
+        "packages/app/src/settings/model.tsx",
+        "packages/app/src/settings/notifications/notifications.tsx",
+        "packages/app/src/settings/search-catalog.ts",
+        "packages/app/src/settings/search-results.test.ts",
+        "packages/app/src/shell/notifications/notification.tsx",
+        "packages/app/test-browser/server-notification-state.test.ts",
+        "packages/client/src/effect/api/api.ts",
+        "packages/client/src/promise/generated/types.ts",
+        "packages/core/src/session/execution.ts",
+        "packages/core/src/session/run-coordinator.ts",
+        "packages/core/test/session-execution.test.ts",
+        "packages/core/test/session-run-coordinator.test.ts",
+        "packages/schema/src/session-event.ts"
+      ]
+    },
     { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
     { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }

@@ -19,6 +19,8 @@ export async function recordNotifications(page: Page) {
     } = window
 
     document.hasFocus = () => false
+    let clickLatest: (() => void) | undefined
+    window.addEventListener("test:notification-click", () => clickLatest?.())
     Object.defineProperty(window, "Notification", {
       value: class extends EventTarget {
         static permission = "granted"
@@ -26,6 +28,7 @@ export async function recordNotifications(page: Page) {
 
         constructor(title: string, options?: NotificationOptions) {
           super()
+          clickLatest = () => this.onclick?.()
           void host.recordNotification!({ title, body: options?.body })
         }
 
@@ -47,5 +50,9 @@ export async function recordNotifications(page: Page) {
     })
   })
 
-  return { notifications, sounds }
+  return {
+    notifications,
+    sounds,
+    clickLatest: () => page.evaluate(() => window.dispatchEvent(new Event("test:notification-click"))),
+  }
 }

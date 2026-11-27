@@ -2095,6 +2095,7 @@ export type EventSubscribeInput = {
         | "session.inbox.delivery.changed"
         | "session.execution.started"
         | "session.execution.succeeded"
+        | "session.execution.succeeded-while-idle"
         | "session.execution.failed"
         | "session.execution.interrupted"
         | "session.instructions.updated"

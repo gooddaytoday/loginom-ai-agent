@@ -248,6 +248,10 @@ export namespace Execution {
   export const Succeeded = Event.durable({ type: "session.execution.succeeded", ...options, schema: Base })
   export type Succeeded = typeof Succeeded.Type
 
+  /** Live successful completion with no successor execution waiting to run. */
+  export const SucceededWhileIdle = Event.ephemeral({ type: "session.execution.succeeded-while-idle", schema: Base })
+  export type SucceededWhileIdle = typeof SucceededWhileIdle.Type
+
   export const Failed = Event.durable({
     type: "session.execution.failed",
     ...options,
@@ -682,6 +686,7 @@ export const Definitions = Event.inventory(
   InboxDeliveryChanged,
   Execution.Started,
   Execution.Succeeded,
+  Execution.SucceededWhileIdle,
   Execution.Failed,
   Execution.Interrupted,
   InstructionsUpdated,

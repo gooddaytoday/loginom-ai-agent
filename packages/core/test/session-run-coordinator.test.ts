@@ -264,19 +264,24 @@ describe("SessionRunCoordinator", () => {
     Effect.gen(function* () {
       const settling = yield* Deferred.make<void>()
       const release = yield* Deferred.make<void>()
+      const notified = yield* Deferred.make<void>()
       const scopes: SessionInbox.Promotable[] = []
+      const completion: number[] = []
       const coordinator = yield* SessionRunCoordinator.make({
         drain: (_key, _force, scope) => Effect.sync(() => scopes.push(scope)),
         settled: () => Deferred.succeed(settling, undefined).pipe(Effect.andThen(Deferred.await(release))),
+        succeededWhileIdle: () =>
+          Effect.sync(() => completion.push(scopes.length)).pipe(Effect.andThen(Deferred.succeed(notified, undefined))),
       })
 
       yield* coordinator.wake("session", "steer")
       yield* Deferred.await(settling)
       yield* coordinator.wake("session", "input")
       yield* Deferred.succeed(release, undefined)
-      yield* coordinator.awaitIdle("session")
+      yield* Deferred.await(notified)
 
       expect(scopes).toEqual(["steer", "input"])
+      expect(completion).toEqual([2])
     }),
   )
 

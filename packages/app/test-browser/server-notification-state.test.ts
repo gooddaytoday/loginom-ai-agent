@@ -41,9 +41,8 @@ let createServerNotificationState: typeof import("@/shell/notifications/notifica
 
 const preferences = {
   autoApprove: false,
-  agent: true,
-  permissions: true,
-  questions: true,
+  turnFinished: true,
+  decision: true,
   permissionsSound: true,
   questionsSound: true,
 }
@@ -92,10 +91,9 @@ beforeAll(async () => {
         questions: () => "alert-02",
       },
       notifications: {
-        agent: () => preferences.agent,
+        turnFinished: () => preferences.turnFinished,
         errors: () => true,
-        permissions: () => preferences.permissions,
-        questions: () => preferences.questions,
+        decision: () => preferences.decision,
       },
       permissions: { autoApproves: () => preferences.autoApprove },
     }),
@@ -117,9 +115,8 @@ beforeEach(() => {
   desktopStorage.clear()
   Object.assign(preferences, {
     autoApprove: false,
-    agent: true,
-    permissions: true,
-    questions: true,
+    turnFinished: true,
+    decision: true,
     permissionsSound: true,
     questionsSound: true,
   })
@@ -136,7 +133,7 @@ test.each(
   requests.flatMap((request) =>
     [
       "enabled",
-      "other category disabled",
+      "other sound disabled",
       "notifications disabled",
       "sound disabled",
       "resolved",
@@ -148,14 +145,12 @@ test.each(
     ].map((scenario) => ({ ...request, scenario })),
   ),
 )("request alerts: $kind / $scenario", async (options) => {
-  preferences.agent = false
   preferences.autoApprove = options.scenario === "auto approve"
-  preferences[options.category] = options.scenario !== "notifications disabled"
+  preferences.decision = options.scenario !== "notifications disabled"
   preferences[options.category === "questions" ? "questionsSound" : "permissionsSound"] =
     options.scenario !== "sound disabled"
 
-  if (options.scenario === "other category disabled") {
-    preferences[options.category === "questions" ? "permissions" : "questions"] = false
+  if (options.scenario === "other sound disabled") {
     preferences[options.category === "questions" ? "permissionsSound" : "questionsSound"] = false
   }
 
@@ -256,7 +251,7 @@ test.each(
 })
 
 test.each([
-  ["session.execution.succeeded", "notification.session.responseReady.title"],
+  ["session.execution.succeeded-while-idle", "notification.session.responseReady.title"],
   ["session.execution.failed", "notification.session.error.title"],
 ] as const)("system alert for %s requires an open session tab", async (type, title) => {
   alerts.length = 0

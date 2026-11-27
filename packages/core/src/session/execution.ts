@@ -169,6 +169,8 @@ export const layer = Layer.effect(
             )
           }),
         ),
+      succeededWhileIdle: (sessionID) =>
+        reportLifecycle(sessionID, bus.publish(SessionEvent.Execution.SucceededWhileIdle, { sessionID })),
     })
     holder.coordinator = coordinator
 

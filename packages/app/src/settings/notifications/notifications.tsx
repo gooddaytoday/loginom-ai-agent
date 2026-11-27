@@ -82,45 +82,6 @@ export const SettingsNotifications: Component = () => {
           <h3 class="settings-section-title">{language.t("settings.general.section.notifications")}</h3>
           <SettingsList>
             <SettingsRow
-              title={language.t("settings.general.notifications.agent.title")}
-              description={language.t("settings.general.notifications.agent.description")}
-            >
-              <div data-action="settings-notifications-agent">
-                <Switch
-                  checked={settings.notifications.agent()}
-                  onChange={(checked) => settings.notifications.setAgent(checked)}
-                />
-              </div>
-            </SettingsRow>
-
-            <SettingsRow
-              title={language.t("settings.general.notifications.permissions.title")}
-              description={language.t("settings.general.notifications.permissions.description")}
-            >
-              <div data-action="settings-notifications-permissions">
-                <Switch
-                  checked={settings.notifications.permissions()}
-                  onChange={(checked) => settings.notifications.setPermissions(checked)}
-                />
-              </div>
-            </SettingsRow>
-
-            <SettingsRow
-              title={language.t("settings.general.notifications.questions.title")}
-              description={language.t("settings.general.notifications.questions.description")}
-            >
-              <div data-action="settings-notifications-questions">
-                <Switch
-                  hideLabel
-                  checked={settings.notifications.questions()}
-                  onChange={(checked) => settings.notifications.setQuestions(checked)}
-                >
-                  {language.t("settings.general.notifications.questions.title")}
-                </Switch>
-              </div>
-            </SettingsRow>
-
-            <SettingsRow
               title={language.t("settings.general.notifications.errors.title")}
               description={language.t("settings.general.notifications.errors.description")}
             >

@@ -65,6 +65,8 @@ export const make = <Key, E, Reason = never>(options: {
    * drain and before the execution settles (waiters resolve after it completes).
    */
   readonly settled?: (key: Key, exit: Exit.Exit<void, E>, reason?: Reason) => Effect.Effect<void>
+  /** Runs after a successful execution releases ownership without a successor. */
+  readonly succeededWhileIdle?: (key: Key) => Effect.Effect<void>
 }): Effect.Effect<Coordinator<Key, E, Reason>, never, Scope.Scope> =>
   Effect.gen(function* () {
     const executions = new Map<Key, Execution<E, Reason>>()
@@ -102,7 +104,7 @@ export const make = <Key, E, Reason = never>(options: {
               execution.owner = undefined
             }).pipe(Effect.andThen(options.settled?.(key, exit, execution.interruptionReason) ?? Effect.void)),
           ),
-          Effect.onExit((exit) => Effect.sync(() => settle(key, execution, exit))),
+          Effect.onExit((exit) => settle(key, execution, exit)),
           Effect.exit,
           Effect.asVoid,
         ),
@@ -112,11 +114,17 @@ export const make = <Key, E, Reason = never>(options: {
 
     // A doorbell that survives the execution loop (rung after the loop decided to end, or
     // during failure or interruption cleanup) starts a fresh execution for the remaining work.
-    const settle = (key: Key, execution: Execution<E, Reason>, exit: Exit.Exit<void, E>) => {
-      if (execution.pendingWake) start(key, false, execution.pendingWake)
-      else executions.delete(key)
-      Deferred.doneUnsafe(execution.done, exit)
-    }
+    const settle = (key: Key, execution: Execution<E, Reason>, exit: Exit.Exit<void, E>) =>
+      Effect.suspend(() => {
+        const next = execution.pendingWake
+        if (next) start(key, false, next)
+        else executions.delete(key)
+
+        const notify = next === undefined && Exit.isSuccess(exit) ? options.succeededWhileIdle?.(key) : undefined
+        return (notify ?? Effect.void).pipe(
+          Effect.ensuring(Effect.sync(() => Deferred.doneUnsafe(execution.done, exit))),
+        )
+      })
 
     const isActive = (key: Key) => Effect.sync(() => executions.has(key))
 

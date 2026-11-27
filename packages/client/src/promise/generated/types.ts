@@ -1758,6 +1758,15 @@ export type SessionUsageUpdated = {
   data: { sessionID: SessionID; cost: MoneyUSD; tokens: TokenUsageInfo }
 }
 
+export type SessionExecutionSucceededWhileIdle = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "session.execution.succeeded-while-idle"
+  location?: LocationRef
+  data: { sessionID: SessionID }
+}
+
 export type SessionTextDelta = {
   id: EventID
   created: number
@@ -2915,6 +2924,7 @@ export type V2Event =
   | SessionInboxDeliveryChanged
   | SessionExecutionStarted
   | SessionExecutionSucceeded
+  | SessionExecutionSucceededWhileIdle
   | SessionExecutionFailed
   | SessionExecutionInterrupted
   | SessionInstructionsUpdated
@@ -4414,6 +4424,7 @@ export type EventSubscribeInput = {
         | "session.inbox.delivery.changed"
         | "session.execution.started"
         | "session.execution.succeeded"
+        | "session.execution.succeeded-while-idle"
         | "session.execution.failed"
         | "session.execution.interrupted"
         | "session.instructions.updated"

@@ -308,9 +308,6 @@ export function createServerNotificationState(input: {
   }
 
   const handleSessionIdle = (sessionID: string, eventID: string) => {
-    // A running subagent's report wakes the session again, so it isn't done yet.
-    if (hasRunningChild(input.data, sessionID)) return
-
     void lookup(sessionID).then((session) => {
       if (disposed.value || input.muted(sessionID)) return
 
@@ -318,18 +315,24 @@ export function createServerNotificationState(input: {
 
       if (session.parentID) return
 
+      // A new turn may have started during lookup. A running subagent can also wake its parent with a report.
+      const busy = () => input.data.session.status(sessionID) === "running" || hasRunningChild(input.data, sessionID)
+      if (busy()) return
+
       const hasOpenTab = sessionIDHasOpenTab(tabs.store, input.key, sessionID)
 
       if (hasOpenTab && settings.sounds.agentEnabled()) {
         void input.coordinator.sound(`${input.key}\0${eventID}`, () => playSoundById(settings.sounds.agent()))
       }
 
-      if (hasOpenTab && settings.notifications.agent()) {
-        void input.coordinator.system(`${input.key}\0${eventID}`, () =>
-          platform.notify(language.t("notification.session.responseReady.title"), session.title ?? sessionID, () =>
+      if (hasOpenTab && settings.notifications.turnFinished()) {
+        void input.coordinator.system(`${input.key}\0${eventID}`, () => {
+          if (busy()) return
+
+          return platform.notify(language.t("notification.session.responseReady.title"), session.title, () =>
             openNotificationSession(tabs, input.key, sessionID),
-          ),
-        )
+          )
+        })
       }
     })
   }
@@ -372,13 +375,13 @@ export function createServerNotificationState(input: {
     const category = kind === "question" || kind === "mcp-elicitation" ? "questions" : "permissions"
 
     const pending = () => {
-      if (disposed.value || input.muted(sessionID) || input.muted(input.data.session.root(sessionID))) return false
+      if (disposed.value || input.muted(sessionID) || input.muted(input.data.session.root(sessionID))) return
 
-      if (kind !== "permission") return input.data.session.form.list(sessionID)?.some((form) => form.id === requestID)
+      if (kind !== "permission") return input.data.session.form.list(sessionID)?.find((form) => form.id === requestID)
 
-      if (settings.permissions.autoApproves(projectSettingsKey(input.sdk.scope, session.projectID))) return false
+      if (settings.permissions.autoApproves(projectSettingsKey(input.sdk.scope, session.projectID))) return
 
-      return input.data.session.permission.list(sessionID)?.some((request) => request.id === requestID)
+      return input.data.session.permission.list(sessionID)?.find((request) => request.id === requestID)
     }
 
     if (!pending()) return
@@ -391,14 +394,19 @@ export function createServerNotificationState(input: {
       })
     }
 
-    if (!settings.notifications[category]()) return
+    if (!settings.notifications.decision()) return
 
     void input.coordinator.system(key, () => {
-      if (!pending()) return
+      const request = pending()
+      if (!request || !settings.notifications.decision()) return
 
-      return platform.notify(language.t(requestTitles[kind]), session.title ?? sessionID, () =>
-        openNotificationSession(tabs, input.key, target),
-      )
+      // Request messages, form copy and tool arguments can contain paths or credentials.
+      const subject =
+        "action" in request && request.action === "loginom_dock_action_run"
+          ? "notification.permission.packageWrite.title"
+          : requestTitles[kind]
+
+      return platform.notify(language.t(subject), session.title, () => openNotificationSession(tabs, input.key, target))
     })
   }
 
@@ -431,7 +439,7 @@ export function createServerNotificationState(input: {
       return
     }
 
-    if (event.type === "session.execution.succeeded") handleSessionIdle(event.data.sessionID, event.id)
+    if (event.type === "session.execution.succeeded-while-idle") handleSessionIdle(event.data.sessionID, event.id)
   })
 
   onCleanup(() => {
