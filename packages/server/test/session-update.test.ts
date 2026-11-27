@@ -14,7 +14,7 @@ const makeRequest = Effect.fn(function* () {
     fs: { filewatcher: false },
     models: { fetch: false },
   })
-  return (path: string, method: string, body?: unknown) =>
+  return (path: string, method: string, body?: unknown, status = method === "PATCH" ? 204 : 200) =>
     Effect.promise(async () => {
       const response = await handler(
         new Request(`http://opencode.local${path}`, {
@@ -23,10 +23,47 @@ const makeRequest = Effect.fn(function* () {
           body: body === undefined ? undefined : JSON.stringify(body),
         }),
       )
-      expect(response.status).toBe(method === "PATCH" ? 204 : 200)
+      expect(response.status).toBe(status)
       return response.status === 204 ? undefined : response.json()
     })
 })
+
+it.live("edits and cancels queued input in place, reporting missing rows only for strict cancellation", () =>
+  Effect.gen(function* () {
+    const request = yield* makeRequest()
+    const created = Schema.decodeUnknownSync(SessionResponse)(yield* request("/api/session", "POST", {}))
+    const base = `/api/session/${created.data.id}`
+    for (const [id, text] of [
+      ["msg_first", "First"],
+      ["msg_second", "Second"],
+      ["msg_third", "Third"],
+    ]) {
+      yield* request(`${base}/prompt`, "POST", { id, text, delivery: "queue", resume: false })
+    }
+
+    yield* request(`${base}/inbox/msg_second`, "PUT", { text: "Edited" }, 204)
+    expect(yield* request(`${base}/inbox`, "GET")).toMatchObject({
+      data: [
+        { id: "msg_first", delivery: "queue", payload: { text: "First" } },
+        { id: "msg_second", delivery: "queue", payload: { text: "Edited" } },
+        { id: "msg_third", delivery: "queue", payload: { text: "Third" } },
+      ],
+    })
+    yield* request(`${base}/inbox/msg_second?strict=true`, "DELETE", undefined, 204)
+    yield* request(`${base}/inbox/msg_second`, "DELETE", undefined, 204)
+    expect(yield* request(`${base}/inbox/msg_second?strict=true`, "DELETE", undefined, 409)).toMatchObject({
+      _tag: "ConflictError",
+      resource: "msg_second",
+    })
+    expect(yield* request(`${base}/inbox/msg_second`, "PUT", { text: "Too late" }, 409)).toMatchObject({
+      _tag: "ConflictError",
+      resource: "msg_second",
+    })
+    expect(yield* request(`${base}/inbox`, "GET")).toMatchObject({
+      data: [{ id: "msg_first" }, { id: "msg_third" }],
+    })
+  }).pipe(Effect.scoped),
+)
 
 it.live("updates session metadata through PATCH", () =>
   Effect.gen(function* () {

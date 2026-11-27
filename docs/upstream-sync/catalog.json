@@ -55,7 +55,7 @@
     },
     {
       "id": "CAT-15",
-      "title": "Durable next-turn queue and atomic queued prompt edits (C3.15)",
+      "title": "Durable next-turn queue, atomic edits and composer controls (C3.15)",
       "paths": [
         "packages/core/src/session.ts", "packages/core/src/session/session.ts",
         "packages/core/src/session/execution.ts", "packages/core/src/session/run-coordinator.ts",
@@ -63,7 +63,14 @@
         "packages/core/src/session/inbox.ts", "packages/core/src/session/projector.ts", "packages/core/src/session/store.ts",
         "packages/core/src/session/message-updater.ts", "packages/core/test/session-runner.test.ts",
         "packages/schema/src/session-event.ts", "packages/protocol/openapi.json",
-        "packages/client/src/effect/api/api.ts"
+        "packages/client/src/effect/api/api.ts", "packages/client/src/effect/generated/client.ts",
+        "packages/client/src/solid/data.ts", "packages/server/test/session-update.test.ts",
+        "packages/app/src/composer/editor/editor.tsx", "packages/app/src/composer/model.ts",
+        "packages/app/src/session/composer/queue*.ts", "packages/app/src/session/composer/queue-panel.tsx",
+        "packages/app/src/runtime/i18n/en.ts", "packages/app/src/runtime/i18n/ru.ts",
+        "packages/ui/src/i18n/en.ts", "packages/ui/src/i18n/ru.ts",
+        "packages/app/e2e/regression/session-queue.spec.ts", "packages/app/e2e/utils/mock-api.ts",
+        "packages/app/e2e/utils/mock-server.ts"
       ]
     },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7" },

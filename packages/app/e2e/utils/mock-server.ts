@@ -12,6 +12,7 @@ import {
   MockApi,
   MockBadRequest,
   MockInternal,
+  MockInboxConflict,
   MockNotFound,
   MockPtyFeatureUnsupported,
   MockPtyNotFound,
@@ -166,7 +167,8 @@ export interface MockServerConfig {
   // answer to replace the response.
   onFork?: (input: { sessionID: string; body: Schema.JsonObject }) => void | MockAnswer | Promise<void | MockAnswer>
   generate?: (input: { sessionID: string; prompt: string }) => { text: string } | Promise<{ text: string }>
-  onInboxChange?: (input: { sessionID: string; inboxID: string; action: "cancel" | "steer" | "queue" }) => void
+  onInboxChange?: (input: { sessionID: string; inboxID: string; action: "cancel" | "steer" | "queue" }) => void | false
+  onInboxEdit?: (input: { sessionID: string; inboxID: string; body: unknown }) => void | false
   onBackground?: (input: { sessionID: string }) => void
   // Serves the session-scoped persistent PTY routes and their connect WebSockets (`e2e/utils/persistent-pty.ts`).
   // Without it, the server has a working daemon and no terminals; `capability: false` makes the routes answer 503.
@@ -1342,18 +1344,21 @@ function mockHandlers(
               text: "Side-question answer",
             },
           })),
-        sessionInboxCancel: (ctx) =>
-          Effect.sync(() =>
-            config.onInboxChange?.({ sessionID: ctx.params.sessionID, inboxID: ctx.params.inboxID, action: "cancel" }),
-          ).pipe(Effect.andThen(noContent)),
+        sessionInboxCancel: (ctx) => {
+          const cancelled = config.onInboxChange?.({ ...ctx.params, action: "cancel" })
+
+          return cancelled === false && ctx.query.strict === "true"
+            ? new MockInboxConflict({ resource: ctx.params.inboxID, message: "Inbox item is no longer pending" })
+            : noContent
+        },
+        sessionInboxEdit: (ctx) =>
+          config.onInboxEdit?.({ ...ctx.params, body: ctx.payload }) === false
+            ? new MockInboxConflict({ resource: ctx.params.inboxID, message: "Inbox item is no longer pending" })
+            : noContent,
         sessionInboxUpdate: (ctx) =>
-          Effect.sync(() =>
-            config.onInboxChange?.({
-              sessionID: ctx.params.sessionID,
-              inboxID: ctx.params.inboxID,
-              action: ctx.payload.delivery,
-            }),
-          ).pipe(Effect.andThen(noContent)),
+          config.onInboxChange?.({ ...ctx.params, action: ctx.payload.delivery }) === false
+            ? new MockInboxConflict({ resource: ctx.params.inboxID, message: "Inbox item is no longer pending" })
+            : noContent,
         sessionSwitchAgent: () => noContent,
         sessionSwitchModel: () => noContent,
         // Only the session's own list; location requests (`permissions`) come from `/api/permission/request`.

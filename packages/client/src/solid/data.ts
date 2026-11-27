@@ -935,6 +935,15 @@ export function createData(config: CreateDataInput) {
       case "session.inbox.delivery.changed":
         updatePending(event.data.sessionID, event.data.inboxID, event.data.delivery)
         return
+      case "session.inbox.edited": {
+        const { sessionID, inboxID, payload } = event.data
+        const item = store.session.pending[sessionID]?.find((entry) => entry.id === inboxID)
+        if (item?.type !== "user") return
+        const updated = { ...item, payload }
+        pendingUpdates.get(sessionID)?.set(inboxID, updated)
+        admitLocal(updated)
+        return
+      }
       case "session.inbox.cancelled": {
         retractLocal(event.data.sessionID, event.data.inboxID)
         compacting.get(event.data.sessionID)?.observed.add(event.data.inboxID)

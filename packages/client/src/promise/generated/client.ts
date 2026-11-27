@@ -61,6 +61,8 @@ import type {
   SessionInboxListOutput,
   SessionInboxCancelInput,
   SessionInboxCancelOutput,
+  SessionInboxEditInput,
+  SessionInboxEditOutput,
   SessionInboxUpdateInput,
   SessionInboxUpdateOutput,
   SessionGenerateInput,
@@ -900,8 +902,27 @@ export function make(options: ClientOptions) {
             {
               method: "DELETE",
               path: `/api/session/${encodeURIComponent(input.sessionID)}/inbox/${encodeURIComponent(input.inboxID)}`,
+              query: { strict: input["strict"] },
               successStatus: 204,
-              declaredStatuses: [400, 401, 404],
+              declaredStatuses: [400, 401, 404, 409],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        edit: (input: SessionInboxEditInput, requestOptions?: RequestOptions) =>
+          request<SessionInboxEditOutput>(
+            {
+              method: "PUT",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/inbox/${encodeURIComponent(input.inboxID)}`,
+              body: {
+                text: input["text"],
+                files: input["files"],
+                agents: input["agents"],
+                skills: input["skills"],
+                metadata: input["metadata"],
+              },
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404, 409],
               empty: true,
             },
             requestOptions,

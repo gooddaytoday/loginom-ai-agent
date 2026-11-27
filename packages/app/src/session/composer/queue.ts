@@ -224,9 +224,18 @@ export function createSessionQueue(input: {
     }
 
     if (operation.type === "remove")
-      return server.api.session.inbox.cancel({ sessionID: input.sessionID, inboxID: operation.id }).then(
+      return server.api.session.inbox.cancel({ sessionID: input.sessionID, inboxID: operation.id, strict: true }).then(
         () => dispatch({ type: "mutation.succeeded", attempt }),
-        () => dispatch({ type: "mutation.failed", attempt, hidden: [] }),
+        (error) => {
+          const conflict = error instanceof Error && error.name === "ConflictError"
+
+          dispatch({ type: "mutation.failed", attempt, hidden: conflict ? [operation.id] : [], conflict })
+
+          if (conflict) {
+            data.session.pending.invalidate(input.sessionID)
+            void data.session.pending.sync(input.sessionID).catch(() => undefined)
+          }
+        },
       )
 
     if (operation.type === "undo") {
@@ -255,76 +264,44 @@ export function createSessionQueue(input: {
       return
     }
 
-    const settled = await (
+    const result = await (
       operation.type === "reorder" ? rewrite(attempt, progress, [...operation.inboxIDs]) : sendEdit(operation, progress)
     ).then(
-      () => true,
-      () => false,
+      () => ({ type: "mutation.succeeded" as const, attempt }),
+      (error) => ({
+        type: "mutation.failed" as const,
+        attempt,
+        hidden: progress.hidden,
+        conflict: error instanceof Error && error.name === "ConflictError",
+      }),
     )
 
-    if (settled) progress.stage = "settled"
+    if (result.type === "mutation.succeeded") progress.stage = "settled"
 
-    if (operation.type === "reorder") data.session.pending.invalidate(input.sessionID)
+    data.session.pending.invalidate(input.sessionID)
     // The rows keep their optimistic state until the server's queue has caught up.
     await data.session.pending.sync(input.sessionID).catch(() => undefined)
-    dispatch(
-      settled ? { type: "mutation.succeeded", attempt } : { type: "mutation.failed", attempt, hidden: progress.hidden },
-    )
+    dispatch(result)
   }
 
   const sendEdit = async (operation: EditOperation & { attempt: number }, progress: MutationProgress) => {
     const signal = progress.controller.signal
 
-    const replacement = await editedPromptInput(
-      input.sessionID,
-      location().directory,
-      operation.item,
-      operation.prompt,
-      operation.raw,
-    )
-
-    // Admit before cancelling so a failed replacement never discards the original. A queued edit rebuilds its position
-    // in one rewrite, which leaves the queue unchanged if any admission fails.
-    const admission = { ...replacement, id: operation.moved[operation.original], delivery: operation.delivery }
-
-    if (operation.delivery === "queue")
-      return rewrite(operation.attempt, progress, undefined, {
-        original: operation.original,
-        admission: { ...admission, resume: false },
-        moved: operation.moved,
-      })
+    const replacement = await editedPromptInput(location().directory, operation.item, operation.prompt, operation.raw)
 
     signal.throwIfAborted()
-    // Like a queued edit, an original the server delivered meanwhile keeps the edit draft instead of sending twice.
-    const pending = await server.api.session.inbox.list({ sessionID: input.sessionID })
-
-    if (!pending.some((item) => item.id === operation.original && item.type === "user" && item.delivery === "queue"))
-      throw new Error("Queued prompt was delivered before the edit")
-    signal.throwIfAborted()
-    const background = input.background()
-    // A steered replacement can be delivered before a withdrawal reaches it, so the bound waits for the admission and
-    // the edit returns to the composer only if it really did not go out.
-    progress.stage = "committed"
-    await data.session.prompt(admission)
-    void background?.move()
+    const target = { sessionID: input.sessionID, inboxID: operation.original }
+    await server.api.session.inbox.edit({ ...replacement, ...target }, { signal })
     dispatch({ type: "mutation.admitted", attempt: operation.attempt })
-    // Cancelling is a no-op once the original is gone, so one retry is safe.
-    const cancel = () => server.api.session.inbox.cancel({ sessionID: input.sessionID, inboxID: operation.original })
-    await cancel().catch(cancel)
+
+    if (operation.delivery !== "steer") return
+
+    const background = input.background()
+    await server.api.session.inbox.update({ ...target, delivery: "steer" }, { signal })
+    void background?.move()
   }
 
-  // `replace` substitutes an edited prompt for the original at its position in the same rewrite.
-  // Without `inboxIDs` the server's current order is kept.
-  const rewrite = async (
-    attempt: number,
-    progress: MutationProgress,
-    inboxIDs: string[] | undefined,
-    replace?: {
-      original: string
-      admission: Parameters<typeof data.session.prompt>[0]
-      moved: Readonly<Record<string, string>>
-    },
-  ) => {
+  const rewrite = async (attempt: number, progress: MutationProgress, inboxIDs: string[]) => {
     const signal = progress.controller.signal
     signal.throwIfAborted()
     const pending = await server.api.session.inbox.list({ sessionID: input.sessionID })
@@ -333,12 +310,11 @@ export function createSessionQueue(input: {
     if (pending.some((item) => item.delivery === "queue" && item.type !== "user"))
       throw new Error("Queued control items block reordering")
     const current = pending.filter((item): item is QueuedPrompt => item.type === "user" && item.delivery === "queue")
-    const ordered = inboxIDs ? inboxIDs.flatMap((id) => current.filter((item) => item.id === id)) : current
+    const ordered = inboxIDs.flatMap((id) => current.filter((item) => item.id === id))
 
-    // An edited prompt delivered meanwhile is no longer queued; fail so the edit draft stays.
-    if (ordered.length !== current.length || (replace && !current.some((item) => item.id === replace.original)))
+    if (ordered.length !== current.length || ordered.length !== inboxIDs.length)
       throw new Error("Queued prompts changed before reordering")
-    const changed = ordered.findIndex((item, index) => item.id !== current[index]?.id || item.id === replace?.original)
+    const changed = ordered.findIndex((item, index) => item.id !== current[index]?.id)
 
     if (changed < 0) return
 
@@ -364,33 +340,27 @@ export function createSessionQueue(input: {
       signal.throwIfAborted()
     }
 
-    // An edit's pending rows follow the queue as the server has it now, keeping the IDs minted at confirm.
-    const moved = Object.fromEntries(
-      ordered.slice(changed).map((item) => [item.id, replace?.moved[item.id] ?? SessionMessage.ID.create()]),
-    )
+    const moved = Object.fromEntries(ordered.slice(changed).map((item) => [item.id, SessionMessage.ID.create()]))
 
     dispatch({ type: "mutation.moved", attempt, moved })
 
     for (const item of ordered.slice(changed)) {
-      const admission =
-        item.id === replace?.original
-          ? replace.admission
-          : {
-              id: moved[item.id],
-              sessionID: input.sessionID,
-              text: item.payload.text,
-              files: item.payload.files?.map((file) => ({
-                uri: storedFileUri(file),
-                name: file.name,
-                description: file.description,
-                mention: file.mention,
-              })),
-              agents: item.payload.agents,
-              skills: item.payload.skills,
-              metadata: item.payload.metadata,
-              delivery: "queue" as const,
-              resume: false,
-            }
+      const admission = {
+        id: moved[item.id],
+        sessionID: input.sessionID,
+        text: item.payload.text,
+        files: item.payload.files?.map((file) => ({
+          uri: storedFileUri(file),
+          name: file.name,
+          description: file.description,
+          mention: file.mention,
+        })),
+        agents: item.payload.agents,
+        skills: item.payload.skills,
+        metadata: item.payload.metadata,
+        delivery: "queue" as const,
+        resume: false,
+      }
 
       const id = admission.id ?? SessionMessage.ID.create()
 
@@ -406,13 +376,7 @@ export function createSessionQueue(input: {
     // Every copy is in, so the originals must go, however long that takes, or the queue holds both.
     progress.stage = "committed"
 
-    if (replace) dispatch({ type: "mutation.admitted", attempt })
-
-    // An edit cancels last first: the strip shows each original until it goes, so its copies never
-    // show out of order.
-    const replaced = current.slice(changed)
-
-    for (const item of replace ? replaced.reverse() : replaced) {
+    for (const item of current.slice(changed)) {
       await server.api.session.inbox.cancel({ sessionID: input.sessionID, inboxID: item.id })
       progress.hidden.push(item.id)
     }
@@ -456,7 +420,6 @@ export function createSessionQueue(input: {
         delivery,
         reverted: reverted(),
         prompt: clonePrompt(input.draft.current()),
-        ids: queued().map(() => SessionMessage.ID.create()),
       }),
     cancelEdit: () => dispatch({ type: "edit.cancel" }),
     editFirst: () => {
@@ -523,13 +486,7 @@ function storedFileUri(file: PromptAttachment) {
 // to the original's model-visible text survive. Ambient composer context (open
 // review comments) stays out: it belongs to the next fresh prompt, not to a
 // queued edit.
-async function editedPromptInput(
-  sessionID: string,
-  directory: string,
-  item: QueuedPrompt | undefined,
-  prompt: Prompt,
-  text: string,
-) {
+async function editedPromptInput(directory: string, item: QueuedPrompt | undefined, prompt: Prompt, text: string) {
   const images = await Promise.all(
     prompt
       .filter((part): part is ImageAttachmentPart => part.type === "image")
@@ -571,7 +528,6 @@ async function editedPromptInput(
   ]
 
   return {
-    sessionID,
     text: request.text + notes,
     files: [
       // A stored file whose mention the edit deleted is dropped; unmentioned context stays.

@@ -3567,9 +3567,43 @@ export type SessionInboxListInput = { readonly sessionID: string }
 
 export type SessionInboxListOutput = { data: Array<SessionInboxInfo> }["data"]
 
-export type SessionInboxCancelInput = { readonly sessionID: string; readonly inboxID: string }
+export type SessionInboxCancelInput = {
+  readonly sessionID: string
+  readonly inboxID: string
+  readonly strict?: boolean | undefined
+}
 
 export type SessionInboxCancelOutput = void
+
+export type SessionInboxEditInput = {
+  readonly sessionID: string
+  readonly inboxID: string
+  readonly text: string
+  readonly files?:
+    | ReadonlyArray<{
+        readonly uri: string
+        readonly source?: { readonly type: "inline" } | { readonly type: "uri"; readonly uri: string }
+        readonly name?: string
+        readonly description?: string
+        readonly mention?: { readonly start: number; readonly end: number; readonly text: string }
+      }>
+    | undefined
+  readonly agents?:
+    | ReadonlyArray<{
+        readonly name: string
+        readonly mention?: { readonly start: number; readonly end: number; readonly text: string }
+      }>
+    | undefined
+  readonly skills?:
+    | ReadonlyArray<{
+        readonly id: string
+        readonly mention?: { readonly start: number; readonly end: number; readonly text: string }
+      }>
+    | undefined
+  readonly metadata?: { readonly [x: string]: JsonValue } | undefined
+}
+
+export type SessionInboxEditOutput = void
 
 export type SessionInboxUpdateInput = {
   readonly sessionID: string

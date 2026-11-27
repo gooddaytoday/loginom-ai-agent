@@ -2347,6 +2347,16 @@
               }
             }
           },
+          "403": {
+            "description": "ForbiddenError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenErrorEncoded"
+                }
+              }
+            }
+          },
           "404": {
             "description": "SessionNotFoundError | SkillNotFoundError | LocationNotFoundError",
             "content": {
@@ -3370,6 +3380,15 @@
               "$ref": "#/components/schemas/Session.Message.ID"
             },
             "required": true
+          },
+          {
+            "name": "strict",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            },
+            "required": false
           }
         ],
         "security": [],
@@ -3406,10 +3425,135 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "ConflictError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictErrorEncoded"
+                }
+              }
+            }
           }
         },
-        "description": "Cancel an inbox item that has not yet been delivered. Unavailable items are a no-op.",
+        "description": "Cancel an inbox item. An unavailable item is a no-op unless strict is set.",
         "summary": "Cancel inbox input"
+      },
+      "put": {
+        "tags": ["session"],
+        "operationId": "session.inbox.edit",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Session.ID"
+            },
+            "required": true
+          },
+          {
+            "name": "inboxID",
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Session.Message.ID"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SessionNotFoundError | LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ConflictError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Edit a queued user prompt without changing its position or waking execution.",
+        "summary": "Edit queued prompt",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/PromptInput.FileAttachment"
+                    }
+                  },
+                  "agents": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Prompt.AgentAttachment"
+                    }
+                  },
+                  "skills": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/PromptInput.SkillAttachment"
+                    }
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
+                },
+                "required": ["text"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
       },
       "patch": {
         "tags": ["session"],

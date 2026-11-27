@@ -56,6 +56,12 @@ export class MockBadRequest extends Schema.TaggedError<MockBadRequest>()("MockBa
   message: Schema.String,
 }) {}
 
+export class MockInboxConflict extends Schema.TaggedError<MockInboxConflict>()(
+  "ConflictError",
+  { resource: Schema.String, message: Schema.String },
+  { httpApiStatus: 409 },
+) {}
+
 export class MockInternal extends Schema.TaggedError<MockInternal>()("MockInternal", {
   message: Schema.String,
 }) {}
@@ -482,7 +488,17 @@ const Group = HttpApiGroup.make("mock")
   .add(
     HttpApiEndpoint.delete("sessionInboxCancel", "/api/session/:sessionID/inbox/:inboxID", {
       params: { ...SessionParams, inboxID: Schema.String },
+      query: { strict: Schema.optional(Schema.String) },
       success: NoContent,
+      error: MockInboxConflict,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.put("sessionInboxEdit", "/api/session/:sessionID/inbox/:inboxID", {
+      params: { ...SessionParams, inboxID: Schema.String },
+      payload: JsonPayload,
+      success: NoContent,
+      error: MockInboxConflict,
     }),
   )
   .add(
@@ -490,6 +506,7 @@ const Group = HttpApiGroup.make("mock")
       params: { ...SessionParams, inboxID: Schema.String },
       payload: Schema.Struct({ delivery: Schema.Literals(["steer", "queue"]) }),
       success: NoContent,
+      error: MockInboxConflict,
     }),
   )
   .add(

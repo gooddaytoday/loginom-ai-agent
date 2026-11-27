@@ -559,15 +559,35 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
     .add(
       HttpApiEndpoint.delete("session.inbox.cancel", "/api/session/:sessionID/inbox/:inboxID", {
         params: { sessionID: Session.ID, inboxID: SessionMessage.ID },
+        query: { strict: BooleanFromString.pipe(Schema.optional) },
         success: HttpApiSchema.NoContent,
-        error: SessionNotFoundError,
+        error: [ConflictError, SessionNotFoundError],
       }).annotateMerge(
         OpenApi.annotations({
           identifier: "session.inbox.cancel",
           summary: "Cancel inbox input",
-          description: "Cancel an inbox item that has not yet been delivered. Unavailable items are a no-op.",
+          description: "Cancel an inbox item. An unavailable item is a no-op unless strict is set.",
         }),
       ),
+    )
+    .add(
+      HttpApiEndpoint.put("session.inbox.edit", "/api/session/:sessionID/inbox/:inboxID", {
+        params: { sessionID: Session.ID, inboxID: SessionMessage.ID },
+        payload: Schema.Struct({
+          ...PromptInput.Prompt.fields,
+          metadata: SessionInbox.UserPayload.fields.metadata,
+        }),
+        success: HttpApiSchema.NoContent,
+        error: [ConflictError, InvalidRequestError, SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.inbox.edit",
+            summary: "Edit queued prompt",
+            description: "Edit a queued user prompt without changing its position or waking execution.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.patch("session.inbox.update", "/api/session/:sessionID/inbox/:inboxID", {

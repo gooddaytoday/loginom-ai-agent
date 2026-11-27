@@ -543,7 +543,12 @@ export function ComposerEditor(props: ComposerEditorProps) {
                 stopping={view.submit.stopping()}
                 busy={view.submit.busy?.() ?? false}
                 disabled={!props.controller.canSubmit()}
-                sendLabel={i18n.t("ui.promptInput.send")}
+                sendLabel={composerSendLabel(view, mode(), i18n.t)}
+                labeled={
+                  mode() === "normal" &&
+                  !!(view.submit.queue?.editing() || view.submit.queue?.alternate()) &&
+                  props.controller.canSubmit()
+                }
                 stopLabel={i18n.t("ui.promptInput.stop")}
                 onSubmit={() => props.controller.submit()}
                 onStop={props.controller.stop}
@@ -1463,25 +1468,30 @@ function ComposerEditorAlternateDelivery(props: {
   const action = createMemo(() => {
     const queue = view.submit.queue
 
-    if (!queue || !props.controller.canSubmit()) return undefined
-
-    if (queue.editing()) return "steer" as const
+    if (!queue || queue.editing() || !props.controller.canSubmit()) return undefined
 
     return queue.alternate()
   })
 
   // Appears and leaves on the same frame as the placeholder, so typing never shows a fade.
   return (
-    <Show when={action()} keyed>
+    <Show
+      when={action()}
+      keyed
+      fallback={
+        <Show when={view.submit.queue?.editing()}>
+          <Button type="button" variant="ghost-faint" size="small" onClick={() => view.submit.queue?.cancelEdit()}>
+            {i18n.t("ui.common.cancel")}
+          </Button>
+        </Show>
+      }
+    >
       {(delivery) => (
         <Tooltip
           placement="top"
           inactive={delivery !== "steer" && !view.submit.queue?.count()}
           value={
-            <Show
-              when={view.submit.queue?.count() && !view.submit.queue?.editing() && props.firstLabel}
-              fallback={i18n.t("ui.promptInput.steerHint")}
-            >
+            <Show when={view.submit.queue?.count() && props.firstLabel} fallback={i18n.t("ui.promptInput.steerHint")}>
               <div class="flex flex-col gap-1">
                 <div class="flex items-center justify-between gap-4">
                   <span>{delivery === "steer" ? i18n.t("ui.promptInput.steer") : i18n.t("ui.promptInput.queue")}</span>
@@ -1504,7 +1514,7 @@ function ComposerEditorAlternateDelivery(props: {
             onClick={() => props.controller.submit({ alternate: true })}
           >
             {delivery === "steer" ? i18n.t("ui.promptInput.steer") : i18n.t("ui.promptInput.queue")}
-            <span class="hidden sm:block">
+            <span aria-hidden="true" class="hidden sm:block">
               <Keybind keys={props.keybind} variant="neutral" />
             </span>
           </Button>
@@ -1520,6 +1530,7 @@ function ComposerEditorSubmitButton(props: {
   busy?: boolean
   disabled: boolean
   sendLabel: string
+  labeled?: boolean
   stopLabel: string
   onSubmit: () => void
   onStop: () => void
@@ -1538,13 +1549,19 @@ function ComposerEditorSubmitButton(props: {
         icon={
           props.busy && !props.stopping ? (
             <Loader class="size-4" />
+          ) : props.labeled && !props.stopping ? (
+            props.sendLabel
           ) : (
             <Icon name={props.stopping ? "stop" : props.mode === "shell" ? "arrow-undo-down" : "arrow-up"} />
           )
         }
         aria-busy={props.busy && !props.stopping}
         variant="submit"
-        class="size-7 rounded-md p-[6px]"
+        class="h-7 rounded-md"
+        classList={{
+          "w-auto whitespace-nowrap px-2 text-[12px]": props.labeled && !props.stopping,
+          "w-7 p-[6px]": !props.labeled || props.stopping,
+        }}
         aria-label={props.stopping ? props.stopLabel : props.sendLabel}
         onClick={(event) => {
           event.preventDefault()
@@ -1561,6 +1578,20 @@ function ComposerEditorSubmitButton(props: {
       />
     </Tooltip>
   )
+}
+
+function composerSendLabel(
+  view: ComposerEditorModel["view"],
+  mode: ComposerMode,
+  translate: ReturnType<typeof useI18n>["t"],
+) {
+  const queue = view.submit.queue
+
+  if (mode !== "normal" || !queue || !queue.alternate()) return translate("ui.promptInput.send")
+
+  if (queue.editing()) return translate("ui.promptInput.saveQueued")
+
+  return translate(queue.delivery() === "queue" ? "ui.promptInput.queue" : "ui.promptInput.steer")
 }
 
 // The composer's actions on a touch device, where Return only adds a line: this bar is the one way to send, steer,
@@ -1585,25 +1616,11 @@ function ComposerEditorTouchBar(props: { controller: ComposerEditorModel; docked
   const alternate = createMemo(() => {
     const queue = view.submit.queue
 
-    if (props.controller.mode() !== "normal" || !queue || !props.controller.canSubmit()) return undefined
-
-    if (queue.editing()) return "steer" as const
+    if (props.controller.mode() !== "normal" || !queue || queue.editing() || !props.controller.canSubmit())
+      return undefined
 
     return queue.alternate()
   })
-
-  const label = () => {
-    const queue = view.submit.queue
-
-    if (props.controller.mode() !== "normal" || !queue) return i18n.t("ui.promptInput.send")
-
-    // A submit while editing puts the prompt back in the queue; the alternate steers it.
-    if (queue.editing()) return i18n.t("ui.promptInput.queue")
-
-    if (!queue.alternate()) return i18n.t("ui.promptInput.send")
-
-    return queue.delivery() === "queue" ? i18n.t("ui.promptInput.queue") : i18n.t("ui.promptInput.steer")
-  }
 
   const busy = () => (view.submit.busy?.() ?? false) && !view.submit.stopping()
 
@@ -1637,7 +1654,7 @@ function ComposerEditorTouchBar(props: { controller: ComposerEditorModel; docked
         <IconButton
           data-action="composer-attach-file"
           variant="ghost-muted"
-          class="size-11 rounded-lg"
+          class="size-11 shrink-0 rounded-lg"
           icon={<Icon name="plus" />}
           aria-label={i18n.t("ui.promptInput.add")}
           disabled={view.draftOnly}
@@ -1657,7 +1674,8 @@ function ComposerEditorTouchBar(props: { controller: ComposerEditorModel; docked
             <IconButton
               data-action={key.action}
               variant="ghost-muted"
-              class="size-11 rounded-lg"
+              class="size-11 shrink-0 rounded-lg"
+              classList={{ "max-[480px]:hidden": !!alternate() }}
               icon={<span class="font-mono text-[17px] leading-5">{key.glyph}</span>}
               aria-label={i18n.t(key.label)}
               disabled={view.draftOnly}
@@ -1683,12 +1701,17 @@ function ComposerEditorTouchBar(props: { controller: ComposerEditorModel; docked
           </Button>
         }
       >
+        <Show when={view.submit.queue?.editing()}>
+          <Button variant="neutral" class="h-11 rounded-xl px-2" onClick={() => view.submit.queue?.cancelEdit()}>
+            {i18n.t("ui.common.cancel")}
+          </Button>
+        </Show>
         <Show when={alternate()} keyed>
           {(delivery) => (
             <Button
               data-action="composer-alternate-delivery"
               variant="neutral"
-              class="h-11 rounded-xl px-4 text-[15px] leading-5"
+              class="h-11 rounded-xl px-2 text-[13px] leading-5 sm:px-4 sm:text-[15px]"
               onMouseDown={keep}
               onClick={() => props.controller.submit({ alternate: true })}
             >
@@ -1699,13 +1722,13 @@ function ComposerEditorTouchBar(props: { controller: ComposerEditorModel; docked
         <Button
           data-action="composer-submit"
           variant="submit"
-          class="h-11 gap-1.5 rounded-xl px-4 text-[15px] leading-5"
+          class="h-11 gap-1.5 rounded-xl px-2 text-[13px] leading-5 sm:px-4 sm:text-[15px]"
           disabled={!props.controller.canSubmit()}
           aria-busy={busy()}
           onMouseDown={keep}
           onClick={() => props.controller.submit()}
         >
-          {label()}
+          {composerSendLabel(view, props.controller.mode(), i18n.t)}
           <Show
             when={busy()}
             fallback={<Icon name={props.controller.mode() === "shell" ? "arrow-undo-down" : "arrow-up"} />}

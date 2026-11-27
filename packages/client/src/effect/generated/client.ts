@@ -67,6 +67,8 @@ import type {
   SessionInboxListOutput,
   SessionInboxCancelInput,
   SessionInboxCancelOutput,
+  SessionInboxEditInput,
+  SessionInboxEditOutput,
   SessionInboxUpdateInput,
   SessionInboxUpdateOutput,
   SessionGenerateInput,
@@ -649,9 +651,24 @@ const EndpointSessionInboxList = (raw: RawClient["server.session"]) => (input: S
 
 const EndpointSessionInboxCancel = (raw: RawClient["server.session"]) => (input: SessionInboxCancelInput) =>
   preserveEffect<SessionInboxCancelOutput>()(
-    raw["session.inbox.cancel"]({ params: { sessionID: input["sessionID"], inboxID: input["inboxID"] } }).pipe(
-      Effect.mapError(mapClientError),
-    ),
+    raw["session.inbox.cancel"]({
+      params: { sessionID: input["sessionID"], inboxID: input["inboxID"] },
+      query: { strict: input["strict"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSessionInboxEdit = (raw: RawClient["server.session"]) => (input: SessionInboxEditInput) =>
+  preserveEffect<SessionInboxEditOutput>()(
+    raw["session.inbox.edit"]({
+      params: { sessionID: input["sessionID"], inboxID: input["inboxID"] },
+      payload: {
+        text: input["text"],
+        files: input["files"],
+        agents: input["agents"],
+        skills: input["skills"],
+        metadata: input["metadata"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
   )
 
 const EndpointSessionInboxUpdate = (raw: RawClient["server.session"]) => (input: SessionInboxUpdateInput) =>
@@ -774,6 +791,7 @@ const adaptGroupSession = (raw: RawClient["server.session"]) => ({
   inbox: {
     list: EndpointSessionInboxList(raw),
     cancel: EndpointSessionInboxCancel(raw),
+    edit: EndpointSessionInboxEdit(raw),
     update: EndpointSessionInboxUpdate(raw),
   },
   generate: EndpointSessionGenerate(raw),

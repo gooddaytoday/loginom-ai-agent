@@ -65,6 +65,7 @@ function createQueueMock(seed: string[], messages: SessionMessageInfo[] = []) {
 
   const events: OpenCodeEvent[] = []
   const prompts: (typeof PromptBody.Type)[] = []
+  const edits: (typeof PromptBody.Type)[] = []
   const compactions: SessionInboxInfo[] = []
   const changes: { inboxID: string; action: "cancel" | "steer" | "queue" }[] = []
   const log: string[] = []
@@ -91,6 +92,7 @@ function createQueueMock(seed: string[], messages: SessionMessageInfo[] = []) {
     rows,
     compactions,
     prompts,
+    edits,
     changes,
     log,
     messages,
@@ -139,13 +141,27 @@ function createQueueMock(seed: string[], messages: SessionMessageInfo[] = []) {
     onBackground: () => {
       log.push("background")
     },
+    onInboxEdit: ({ sessionID, inboxID, body }: Parameters<NonNullable<MockServerConfig["onInboxEdit"]>>[0]) => {
+      const row = rows.find((entry) => entry.id === inboxID && entry.delivery === "queue")
+
+      if (!row) return false
+      const edit = decodePromptBody(body)
+      edits.push(edit)
+      row.payload = {
+        text: edit.text,
+        files: edit.files?.map(storedFile),
+        metadata: edit.metadata,
+        agents: edit.agents?.map((agent) => ({ name: agent.name, mention: agent.mention })),
+      }
+      emit("session.inbox.edited", { sessionID, inboxID, payload: row.payload })
+    },
     onInboxChange: (input: { sessionID: string; inboxID: string; action: "cancel" | "steer" | "queue" }) => {
       changes.push({ inboxID: input.inboxID, action: input.action })
       log.push(`${input.action}:${input.inboxID}`)
       const index = rows.findIndex((row) => row.id === input.inboxID)
       const row = rows[index]
 
-      if (!row) return
+      if (!row) return false
 
       if (input.action === "cancel") {
         rows.splice(index, 1)
@@ -171,7 +187,7 @@ async function openQueue(
   revert?: string,
   status: "idle" | "running" = "running",
   model = { id: "queue-model", name: "Queue Model" },
-  config: Pick<MockServerConfig, "beforeAgentsResponse"> = {},
+  config: Pick<MockServerConfig, "beforeAgentsResponse" | "sessionStatus"> & { seed?: Parameters<typeof seed>[1] } = {},
 ) {
   const options: Parameters<typeof openSession>[1] = {
     name: "SessionQueueRegression",
@@ -190,13 +206,14 @@ async function openQueue(
     onPrompt: mock.onPrompt,
     onCompact: mock.onCompact,
     onInboxChange: mock.onInboxChange,
+    onInboxEdit: mock.onInboxEdit,
     onBackground: mock.onBackground,
     shellCommands: () => mock.shells,
     events: mock.events,
     ...config,
   }
 
-  if (followUpBehavior) options.seed = { settings: { general: { followUpBehavior } } }
+  if (followUpBehavior) options.seed = { ...options.seed, settings: { general: { followUpBehavior } } }
   await openSession(page, options)
   const composer = page.locator('[data-component="composer"]')
 
@@ -220,6 +237,100 @@ function userRow(page: Page, messageID: string) {
     `[data-timeline-virtual-content] [data-timeline-row="UserMessage"][data-message-id="${messageID}"]`,
   )
 }
+
+for (const width of [1280, 390]) {
+  test(`after-turn queue shows FIFO history and parks on Stop at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 844 })
+    await page.emulateMedia({ reducedMotion: "reduce" })
+
+    const mock = createQueueMock(
+      [],
+      [{ id: "msg_start_queue", type: "user", text: "Проверь настройки проекта", time: { created: 1700000000000 } }],
+    )
+
+    let status = "running"
+
+    const view = await openQueue(page, mock, undefined, undefined, "running", undefined, {
+      seed: { locale: "ru" },
+      sessionStatus: () => ({ [sessionID]: { type: status } }),
+    })
+
+    const panel = page.getByRole("region", { name: "Очередь поправок" })
+    const rows = panel.locator('[data-action="session-queue-edit"]')
+    const queued = ["Первая поправка", "Вторая поправка", "Третья поправка"]
+    const steer = view.composer.getByRole("button", { name: "Поправка сейчас", exact: true })
+    const queue = view.composer.getByRole("button", { name: "В очередь: после хода", exact: true })
+
+    for (const [index, text] of queued.entries()) {
+      await view.input.fill(text)
+      await expect(steer).toBeVisible()
+      await queue.click()
+      await expect(rows).toHaveText(queued.slice(0, index + 1))
+      await expect(view.input).toHaveText("")
+    }
+
+    await expect
+      .poll(() => mock.prompts.map(({ text, delivery }) => [text, delivery]))
+      .toEqual(queued.map((text) => [text, "queue"]))
+
+    await view.input.fill("Черновик следующей поправки")
+    await page.mouse.move(0, 0)
+    await expect(steer).toBeInViewport()
+    await expect(queue).toBeInViewport()
+    await expect(panel).toBeInViewport()
+    await expect(rows.nth(2)).toBeInViewport({ ratio: 1 })
+    await page.screenshot({ path: testInfo.outputPath(`queue-${width}.png`), animations: "disabled" })
+    await view.input.press("ControlOrMeta+A")
+    await view.input.press("Backspace")
+
+    const interrupted = page.waitForResponse((response) =>
+      new URL(response.url()).pathname.endsWith(`/${sessionID}/interrupt`),
+    )
+
+    await view.composer.getByRole("button", { name: "Остановить", exact: true }).click()
+    await interrupted
+    status = "idle"
+    mock.emit("session.execution.interrupted", { sessionID, reason: "user" })
+    await expect(panel.getByRole("status")).toHaveText("Отправятся после следующего хода")
+    await expect(rows).toHaveText(queued)
+    await expect(rows.nth(2)).toBeInViewport({ ratio: 1 })
+    await page.screenshot({ path: testInfo.outputPath(`queue-stopped-${width}.png`), animations: "disabled" })
+
+    status = "running"
+    mock.emit("session.execution.started", { sessionID })
+    await expect(panel.getByRole("status")).toHaveCount(0)
+
+    for (const [index, text] of queued.entries()) {
+      const [delivered] = mock.rows.splice(0, 1)
+      mock.emit("session.execution.succeeded", { sessionID })
+      mock.emit("session.execution.started", { sessionID })
+      mock.emit("session.inbox.delivered", { sessionID, inboxID: delivered.id })
+      await expect(rows).toHaveText(queued.slice(index + 1))
+      await expect(userRow(page, delivered.id)).toContainText(text)
+    }
+
+    expect(mock.prompts).toHaveLength(3)
+  })
+}
+
+test("removing a row that crossed the turn boundary reports the conflict and keeps the next row", async ({ page }) => {
+  const mock = createQueueMock(["Already sent", "Still waiting"])
+  const view = await openQueue(page, mock)
+  const row = view.rows.filter({ hasText: "Already sent" })
+
+  const removal = await holdRoute(page, new RegExp(`/api/session/${sessionID}/inbox/[^/?]+(\\?|$)`), {
+    method: "DELETE",
+  })
+
+  await row.hover()
+  await row.getByRole("button", { name: "Remove", exact: true }).click()
+  await removal.arrived
+  mock.rows.shift()
+  removal.release()
+
+  await expect(page.getByText("This message has already been sent or removed from the queue")).toBeVisible()
+  await expect(view.rows.locator('[data-action="session-queue-edit"]')).toHaveText(["Still waiting"])
+})
 
 test("follow-up preference controls Enter while Mod+Enter uses the alternate delivery", async ({ page }) => {
   const mock = createQueueMock([])
@@ -377,11 +488,12 @@ test.describe("touch keyboard", () => {
       ])
     await expect(view.input).toBeEmpty()
 
-    // Editing a queued prompt: the primary action puts it back in the queue, the other steers it.
     await view.rows.filter({ hasText: "check the logs" }).locator('[data-action="session-queue-edit"]').tap()
     await expect(view.input).toHaveText(/check the logs/)
-    await expect(bar.locator('[data-action="composer-alternate-delivery"]')).toHaveText("Steer")
-    await expect(bar.locator('[data-action="composer-submit"]')).toHaveText("Queue")
+    await expect(bar.getByRole("button", { name: "Save", exact: true })).toBeVisible()
+    await bar.getByRole("button", { name: "Cancel", exact: true }).tap()
+    await expect(view.input).toBeEmpty()
+    await expect(view.rows).toHaveText(/check the logs/)
   })
 })
 
@@ -665,58 +777,59 @@ test("a partially cancelled reorder reconciles the server's queue instead of res
   await expect.poll(() => mock.changes.at(-1)).toEqual({ inboxID: mock.prompts[1].id, action: "cancel" })
 })
 
-for (const change of ["reorder", "edit"] as const) {
-  test(`a ${change} that cannot re-admit a prompt leaves the queue unchanged`, async ({ page }) => {
-    const order = ["first queued prompt", "second queued prompt", "third queued prompt"]
-    const mock = createQueueMock(order)
-    const admit = mock.onPrompt
-    // The last prompt's re-admission fails after the server admitted it, so its response is lost.
-    mock.onPrompt = (input) => {
-      admit(input)
+test("a reorder that cannot re-admit a prompt leaves the queue unchanged", async ({ page }) => {
+  const order = ["first queued prompt", "second queued prompt", "third queued prompt"]
+  const mock = createQueueMock(order)
+  const admit = mock.onPrompt
+  // The last prompt's re-admission fails after the server admitted it, so its response is lost.
+  mock.onPrompt = (input) => {
+    admit(input)
 
-      if (input.body.text === order[2]) throw new Error("Connection lost after admission")
-    }
+    if (input.body.text === order[2]) throw new Error("Connection lost after admission")
+  }
 
-    const view = await openQueue(page, mock)
-    await expect(view.rows).toHaveCount(3)
+  const view = await openQueue(page, mock)
+  await expect(view.rows).toHaveCount(3)
 
-    if (change === "reorder") {
-      const first = view.rows.filter({ hasText: order[0] })
-      const second = view.rows.filter({ hasText: order[1] })
-      await first.getByRole("button", { name: "Reorder queued prompt" }).hover()
-      await page.mouse.down()
-      const target = await second.boundingBox()
+  const first = view.rows.filter({ hasText: order[0] })
+  const second = view.rows.filter({ hasText: order[1] })
+  await first.getByRole("button", { name: "Reorder queued prompt" }).hover()
+  await page.mouse.down()
+  const target = await second.boundingBox()
 
-      if (!target) throw new Error("The target queue row is not visible")
-      await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 10 })
-      await page.mouse.up()
-    }
+  if (!target) throw new Error("The target queue row is not visible")
+  await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 10 })
+  await page.mouse.up()
 
-    if (change === "edit") {
-      await view.rows.getByText(order[1], { exact: true }).click()
-      await expect(view.input).toHaveText(order[1])
-      await expect(view.input).toBeFocused()
-      await view.input.press("End")
-      await view.input.pressSequentially(", edited")
-      await view.input.press("Enter")
-    }
+  // The replacements admitted before the failure are withdrawn; the originals stay in place.
+  await expect.poll(() => mock.log.includes(`cancel:${mock.prompts.at(-1)?.id}`)).toBe(true)
+  await expect.poll(() => mock.changes.length).toBe(mock.prompts.length)
+  expect(mock.changes.every((entry) => entry.action === "cancel" && !entry.inboxID.startsWith("inb_seed_"))).toBe(true)
+  await expect(view.rows.locator('[data-action="session-queue-edit"]')).toHaveText(order)
+  expect(mock.rows.map((row) => row.payload.text)).toEqual(order)
+  await expect(first.getByRole("button", { name: "Remove", exact: true })).toBeEnabled()
+})
 
-    // The replacements admitted before the failure are withdrawn; the originals stay in place.
-    await expect.poll(() => mock.log.includes(`cancel:${mock.prompts.at(-1)?.id}`)).toBe(true)
-    await expect.poll(() => mock.changes.length).toBe(mock.prompts.length)
-    expect(mock.changes.every((entry) => entry.action === "cancel" && !entry.inboxID.startsWith("inb_seed_"))).toBe(
-      true,
-    )
-    await expect(view.rows.locator('[data-action="session-queue-edit"]')).toHaveText(order)
-    expect(mock.rows.map((row) => row.payload.text)).toEqual(order)
-    await expect(
-      view.rows.filter({ hasText: order[0] }).getByRole("button", { name: "Remove", exact: true }),
-    ).toBeEnabled()
+test("a failed queue edit keeps the original row and returns the edit draft", async ({ page }) => {
+  const order = ["first queued prompt", "second queued prompt", "third queued prompt"]
+  const mock = createQueueMock(order)
+  mock.onInboxEdit = () => {
+    throw new Error("Failed before saving edit")
+  }
 
-    // A failed edit keeps its draft in the composer so nothing typed is lost.
-    if (change === "edit") await expect(view.input).toHaveText("second queued prompt, edited")
-  })
-}
+  const view = await openQueue(page, mock)
+  await view.rows.getByText(order[1], { exact: true }).click()
+  await expect(view.input).toBeFocused()
+  await view.input.press("End")
+  await view.input.pressSequentially(", edited")
+  await view.input.press("Enter")
+
+  await expect(page.getByText("Request failed")).toBeVisible()
+  await expect(view.rows.locator('[data-action="session-queue-edit"]')).toHaveText(order)
+  await expect(view.input).toHaveText("second queued prompt, edited")
+  expect(mock.prompts).toEqual([])
+  expect(mock.changes).toEqual([])
+})
 
 test("editing restores the existing draft and replaces only the original queue position", async ({ page }) => {
   const mock = createQueueMock(["first queued prompt", "tighten the error copy", "third queued prompt"])
@@ -746,19 +859,15 @@ test("editing restores the existing draft and replaces only the original queue p
     "third queued prompt",
   ])
   await expect(view.input).toHaveText("my in-progress draft")
-  // The strip shows the edit before the server confirms it; wait for the rewrite to finish.
-  await expect.poll(() => mock.changes.length).toBe(2)
-  // One rewrite from the edited position: the replacement, then the prompts after it.
-  expect(mock.prompts.map((prompt) => prompt.text)).toEqual([
-    "tighten the error copy and add a retry hint",
-    "third queued prompt",
-  ])
-  expect(mock.prompts.every((prompt) => prompt.delivery === "queue" && prompt.resume === false)).toBe(true)
-  expect(mock.changes).toEqual([
-    { inboxID: "inb_seed_3", action: "cancel" },
-    { inboxID: "inb_seed_2", action: "cancel" },
-  ])
-  expect(mock.log[0]).toBe("prompt:queue")
+  await expect
+    .poll(() => mock.rows.map((row) => [row.id, row.payload.text]))
+    .toEqual([
+      ["inb_seed_1", "first queued prompt"],
+      ["inb_seed_2", "tighten the error copy and add a retry hint"],
+      ["inb_seed_3", "third queued prompt"],
+    ])
+  expect(mock.prompts).toEqual([])
+  expect(mock.changes).toEqual([])
 })
 
 test("a queued prompt the server delivers mid-edit returns the draft typed before the edit", async ({ page }) => {
@@ -778,6 +887,7 @@ test("a queued prompt the server delivers mid-edit returns the draft typed befor
   await expect(view.rows.locator('[data-action="session-queue-edit"]')).toHaveText(["first queued prompt"])
   await expect(view.input).toHaveText("my in-progress draft")
   await expect(view.input).toBeFocused()
+  await expect(page.getByText("This message has already been sent or removed from the queue")).toBeVisible()
 })
 
 for (const delivery of ["queue", "steer"] as const) {
@@ -793,7 +903,7 @@ for (const delivery of ["queue", "steer"] as const) {
     mock.rows.splice(1, 1)
     await view.input.press(delivery === "queue" ? "Enter" : "ControlOrMeta+Enter")
 
-    await expect(page.getByText("Request failed")).toBeVisible()
+    await expect(page.getByText("This message has already been sent or removed from the queue")).toBeVisible()
     await expect(view.input).toHaveText("second queued prompt, edited")
     expect(mock.prompts).toEqual([])
     expect(mock.changes).toEqual([])
@@ -843,11 +953,9 @@ for (const delivery of ["steer", "queue"] as const) {
       },
     ]
     const view = await openQueue(page, mock)
-    // A loaded server answers admissions and cancellations late; hold both until the strip is checked.
-    const admission = await holdRoute(page, new RegExp(`/api/session/${sessionID}/prompt(\\?|$)`), { method: "POST" })
 
-    const cancellation = await holdRoute(page, new RegExp(`/api/session/${sessionID}/inbox/[^/?]+(\\?|$)`), {
-      method: "DELETE",
+    const save = await holdRoute(page, new RegExp(`/api/session/${sessionID}/inbox/[^/?]+(\\?|$)`), {
+      method: "PUT",
     })
 
     const texts = view.rows.locator('[data-action="session-queue-edit"]')
@@ -859,7 +967,7 @@ for (const delivery of ["steer", "queue"] as const) {
     await view.input.press("End")
     await view.input.pressSequentially(", edited")
     await view.input.press(delivery === "queue" ? "Enter" : "ControlOrMeta+Enter")
-    await admission.arrived
+    await save.arrived
 
     // The composer is free at once and the strip shows the edit, pending, in the original's place.
     const edited = view.rows.filter({ hasText: "second queued prompt, edited" })
@@ -885,15 +993,12 @@ for (const delivery of ["steer", "queue"] as const) {
         ? ["first queued prompt, edited too", "second queued prompt, edited"]
         : ["first queued prompt, edited too"]
 
-    admission.release()
-    await cancellation.arrived
-    cancellation.release()
+    save.release()
 
     await expect(texts).toHaveText(final)
     await expect(view.rows.and(page.locator('[aria-busy="true"]'))).toHaveCount(0)
-    // The steered or queued edit was admitted once, with its attachment, and no original is left.
-    expect(mock.prompts[0]).toMatchObject({ text: "second queued prompt, edited", delivery })
-    expect(mock.prompts[0].files?.map((file) => file.uri.startsWith("data:image/png;"))).toEqual([true])
+    expect(mock.edits[0].text).toBe("second queued prompt, edited")
+    expect(mock.edits[0].files?.map((file) => file.uri.startsWith("data:image/png;"))).toEqual([true])
     await expect
       .poll(() => mock.rows.filter((row) => row.delivery === "queue").map((row) => row.payload.text))
       .toEqual(final)
@@ -925,8 +1030,8 @@ test("editing drops a file whose mention was deleted and keeps unmentioned conte
   await view.input.pressSequentially("inspect here")
   await view.input.press("Enter")
 
-  await expect.poll(() => mock.prompts.length).toBe(1)
-  expect(mock.prompts[0].files?.map((file) => file.uri)).toEqual(["file:///repo/notes.md"])
+  await expect.poll(() => mock.edits.length).toBe(1)
+  expect(mock.edits[0].files?.map((file) => file.uri)).toEqual(["file:///repo/notes.md"])
 })
 
 test("editing a comment-only prompt keeps its notes once", async ({ page }) => {
@@ -960,9 +1065,9 @@ test("editing a comment-only prompt keeps its notes once", async ({ page }) => {
   await expect(view.input).toHaveText(`${note}, please`)
   await view.input.press("Enter")
 
-  await expect.poll(() => mock.prompts.length).toBe(1)
-  expect(mock.prompts[0].text).toBe(`${note}, please`)
-  expect(mock.prompts[0].metadata).toMatchObject({ displayText: `${note}, please`, comments: [] })
+  await expect.poll(() => mock.edits.length).toBe(1)
+  expect(mock.edits[0].text).toBe(`${note}, please`)
+  expect(mock.edits[0].metadata).toMatchObject({ displayText: `${note}, please`, comments: [] })
 })
 
 test("Undo cancels only the selected queued prompt and focuses the restored input", async ({ page }) => {
