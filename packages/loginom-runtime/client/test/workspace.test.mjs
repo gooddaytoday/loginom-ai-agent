@@ -684,10 +684,13 @@ test('package schema observes unsaved graph edits and keeps native node and port
   tab.graph.contains=element=>elements.includes(element);
   tab.graph.querySelectorAll=()=>elements;
   tab.model.FDiagram.FmxGraph.view={getState:cell=>shapes.get(cell)};
-  const read=runInNewContext(makeWorkspaceStepCode({loginomUrl:'http://loginom.example/app',build,
-    sessionId:'standalone',workflowRef:{...prepared.workflow_ref,document_id:prepared.document_id},readGraph,types:NODE_TYPES,snapshotOnly:true,snapshotDetails:true}));
   const events=[...fixture.events];
-  const snapshot=async()=>JSON.parse(JSON.stringify((await read(fixture.page)).output.snapshot??null));
+  const snapshot=async(details=true)=>{
+    const read=runInNewContext(makeWorkspaceStepCode({loginomUrl:'http://loginom.example/app',build,
+      sessionId:'standalone',workflowRef:{...prepared.workflow_ref,document_id:prepared.document_id},
+      readGraph,types:NODE_TYPES,snapshotOnly:true,snapshotDetails:details}));
+    return JSON.parse(JSON.stringify((await read(fixture.page)).output.snapshot??null));
+  };
   const before=await snapshot();
   source.FLabel.FRawValue='Renamed';
   source.FCell.geometry.x=120;
@@ -702,6 +705,9 @@ test('package schema observes unsaved graph edits and keeps native node and port
   });
   assert.deepEqual(after.links,before.links);
   assert.deepEqual(after.links,[{source:source.FGuid,output:'source-port',target:target.FGuid,input:'target-port'}]);
+  const step=await snapshot(false);
+  assert.deepEqual(step.links,after.links);
+  assert.deepEqual(step.nodes,after.nodes.map(({guid,type,label,position})=>({guid,type,label,position})));
   fixture.setBlocked(true);
   assert.equal(await snapshot(),null);
   fixture.setBlocked(false);

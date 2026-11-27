@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { normalizePackageGuid } from "../../loginom-runtime/client/lib/saved-package-reader.mjs"
 import type { PackageStructure } from "./package-docs/extract"
 
 const position = Schema.Struct({ x: Schema.Finite, y: Schema.Finite })
@@ -44,10 +45,7 @@ export const maxPackageBytes = 16 * 1024 * 1024
 const maxSchemaBytes = 512 * 1024
 
 function guid(value: string | null) {
-  if (!value) return null
-  const match = /^(?:\{([\da-f-]+)\}|([\da-f-]+))$/i.exec(value)
-  const candidate = match?.[1] ?? match?.[2]
-  return candidate && /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(candidate) ? candidate.toLowerCase() : value
+  return value ? normalizePackageGuid(value) : null
 }
 
 function normalizedLink(value: typeof link.Type) {

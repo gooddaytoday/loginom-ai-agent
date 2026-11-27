@@ -1,7 +1,9 @@
-import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from "@zip.js/zip.js"
-import { DOMParser } from "@xmldom/xmldom"
 import { readFile } from "node:fs/promises"
 import { basename, extname } from "node:path"
+import {
+  child, children, items, readSavedNode, readSavedWorkflow, withSavedPackage,
+  type SavedNode, type SavedWorkflow, type XmlElement,
+} from "../../../loginom-runtime/client/lib/saved-package-reader.mjs"
 
 const portNames: Record<string, string> = {
   "58f7e6c3-511e-39d7-8853-036e0a1a7612": "DataSet",
@@ -22,58 +24,22 @@ export async function extractPackage(path: string) {
 }
 
 export async function extractPackageBytes(fileName: string, bytes: Uint8Array, xmlBudget?: number) {
-  // zip.js slices must own their buffers; Buffer.slice retains the original byte offset.
-  const zip = new ZipReader(new Uint8ArrayReader(new Uint8Array(bytes)), { useWebWorkers: false })
-  try {
-    const entries = await zip.getEntries()
-    const members = new Map(entries.map((entry) => [normalized(entry.filename), entry]))
-    async function xml(name: string) {
-      const entry = members.get(normalized(name))
-      if (!entry?.getData || entry.directory) return undefined
-      let bytes: Uint8Array
-      if (xmlBudget === undefined) {
-        bytes = await entry.getData(new Uint8ArrayWriter())
-      } else {
-        xmlBudget -= entry.uncompressedSize
-        if (xmlBudget < 0) throw Error("PACKAGE_SCHEMA_TOO_LARGE")
-        const data = new Uint8Array(entry.uncompressedSize)
-        let offset = 0
-        await entry.getData(new WritableStream<Uint8Array>({
-          write(chunk) {
-            if (offset + chunk.byteLength > data.byteLength) throw Error("PACKAGE_SCHEMA_TOO_LARGE")
-            data.set(chunk, offset)
-            offset += chunk.byteLength
-          },
-        }), { checkSignature: true })
-        if (offset !== data.byteLength) throw Error("PACKAGE_DOCS_XML_INVALID")
-        bytes = data
-      }
-      const fail = () => { throw Error("PACKAGE_DOCS_XML_INVALID") }
-      return new DOMParser({ errorHandler: { warning: fail, error: fail, fatalError: fail } })
-        .parseFromString(new TextDecoder("utf-8", { fatal: true }).decode(bytes), "application/xml").documentElement
-    }
+  return withSavedPackage(bytes, xmlBudget, async ({ xml, units }) => {
     const info = await xml("PackageInfo.xml")
     if (!info) throw Error("PACKAGE_DOCS_PACKAGE_INFO_MISSING")
     const references = await xml("References.xml")
     const external = [references, ...Array.from(references?.getElementsByTagName("*") ?? [])]
-      .filter((element): element is Element => !!element && element.localName === "Item")
+      .filter((element): element is XmlElement => !!element && element.localName === "Item")
       .map((element) => element.getAttribute("Name") || element.getAttribute("DisplayName") || element.getAttribute("Path") || "")
       .filter(Boolean)
-    const index = await xml("PackageIndex.xml")
-    const indexed = items(child(index, "Units")).map((unit) => (unit.getAttribute("BasePath") ?? "").replaceAll("\\", "/").replace(/^\/+|\/+$/g, ""))
-      .filter(Boolean)
-    const units = indexed.length ? indexed : [...new Set(entries.flatMap((entry) => {
-      const match = /^(Unit_\d+)\/Unit\.xml$/i.exec(entry.filename.replaceAll("\\", "/"))
-      return match ? [match[1]] : []
-    }))].toSorted()
-    const modules = await Promise.all(units.map(async (base, number) => {
+    const modules = await Promise.all((await units()).map(async (base, number) => {
       const metadata = await xml(base + "/Info.xml")
       const unit = await xml(base + "/Unit.xml")
       if (!unit) throw Error("PACKAGE_DOCS_UNIT_MISSING")
-      const body = workflow(child(unit, "WorkFlow"), base)
+      const body = workflow(readSavedWorkflow(child(unit, "WorkFlow"), xmlBudget === undefined ? undefined : 32), base)
       const stats = statistics(body)
       const views = items(child(child(unit, "ModelViews"), "Nodes")).map((node) => {
-        const entry = nodeEntry(node, base, 0)
+        const entry = nodeEntry(readSavedNode(node), base, 0)
         return { guid: entry.guid, label: entry.label, engine_type: entry.engine_type, service_name: entry.service_name }
       })
       return { id: base.split("/").at(-1)!, index: number + 1,
@@ -90,25 +56,16 @@ export async function extractPackageBytes(fileName: string, bytes: Uint8Array, x
         programming_nodes: total("programming_nodes"), reference_nodes: total("reference_nodes"), derived_nodes: total("derived_nodes") },
       modules, unique_engine_types: [...new Set(modules.flatMap((module) => workflowBodies(module).flatMap((body) => body.workflow_nodes.map((node) => node.engine_type))).filter(Boolean))].toSorted(),
     }
-  } finally { await zip.close() }
+  })
 }
 
-function normalized(name: string) { return name.replaceAll("\\", "/").replace(/^\/+/, "").toLowerCase() }
-
-function children(parent?: Element) {
-  return Array.from(parent?.childNodes ?? []).filter((node): node is Element => node.nodeType === 1)
-}
-function child(parent: Element | undefined, name: string) { return children(parent).find((node) => node.localName === name) }
-function items(parent?: Element) { return children(parent).filter((node) => node.localName === "Item") }
-
-function nodeEntry(node: Element, path: string, depth: number) {
+function nodeEntry(identity: SavedNode, path: string, depth: number) {
+  const node = identity.element
   const component = child(node, "Component")
   const engine = child(component, "Engine") ?? component
   const engine_type = engine?.getAttributeNS("http://www.w3.org/2001/XMLSchema-instance", "type") || engine?.getAttribute("type") || ""
-  const guid = node.getAttribute("Guid") ?? ""
-  const name = node.getAttribute("Name") ?? ""
-  const display_name = node.getAttribute("DisplayName") ?? ""
-  const label = display_name || name || engine_type || guid.slice(0, 8)
+  const { guid, name, display_name } = identity
+  const label = identity.label || engine_type || guid.slice(0, 8)
   const service_name = engine_type === "TBGModelGenericComponentEngine" ? "Подмодель" : engine_type.replace(/^TBG/, "") || name || "Узел"
   const ports = (section: string) => items(child(node, section)).map((port) => {
     const guid = port.getAttribute("Guid") ?? ""
@@ -165,21 +122,16 @@ type Workflow = {
   submodels: (Workflow & { label: string; guid: string; depth: number; path: string })[]
 }
 
-function workflow(root: Element | undefined, path: string, depth = 0): Workflow {
-  const raw = items(child(root, "Nodes"))
-  const workflow_nodes = raw.map((node) => nodeEntry(node, path, depth))
+function workflow(graph: SavedWorkflow, path: string, depth = 0): Workflow {
+  const workflow_nodes = graph.nodes.map((node) => nodeEntry(node, path, depth))
   const nodes = new Map(workflow_nodes.map((node) => [node.guid, node]))
   const portName = (node: ReturnType<typeof nodeEntry> | undefined, guid: string) =>
     node && [...node.input_ports, ...node.output_ports, ...node.service_input_ports, ...node.service_output_ports].find((port) => port.guid.toLowerCase() === guid.toLowerCase())?.display_name || portNames[guid.toLowerCase()] || ""
-  const links = [...items(child(root, "Links")), ...items(child(root, "ServiceLinks"))].flatMap((item) => {
-    const source = child(item, "SourcePort"), target = child(item, "TargetPort")
-    if (!source && !target) return []
-    const source_node_guid = source?.getAttribute("NodeGuid") ?? "", target_node_guid = target?.getAttribute("NodeGuid") ?? ""
-    const source_port_guid = source?.getAttribute("PortGuid") ?? "", target_port_guid = target?.getAttribute("PortGuid") ?? ""
+  const links = graph.links.map(({ source_node_guid, source_port_guid, target_node_guid, target_port_guid }) => {
     const from = nodes.get(source_node_guid), to = nodes.get(target_node_guid)
     const source_port_name = portName(from, source_port_guid), target_port_name = portName(to, target_port_guid)
-    return [{ source_node_guid, source_port_guid, target_node_guid, target_port_guid, source_label: from?.label ?? "", target_label: to?.label ?? "",
-      source_port_name, target_port_name, readable: `${from?.label ?? source_node_guid}.${source_port_name || "?"} → ${to?.label ?? target_node_guid}.${target_port_name || "?"}` }]
+    return { source_node_guid, source_port_guid, target_node_guid, target_port_guid, source_label: from?.label ?? "", target_label: to?.label ?? "",
+      source_port_name, target_port_name, readable: `${from?.label ?? source_node_guid}.${source_port_name || "?"} → ${to?.label ?? target_node_guid}.${target_port_name || "?"}` }
   })
   const hierarchy = links.map((link) => ({ Source: nodes.get(link.source_node_guid)?.hierarchy_token ?? null, Target: nodes.get(link.target_node_guid)?.hierarchy_token ?? null }))
   const sources = new Set(hierarchy.map((link) => link.Source).filter(Boolean)), targets = new Set(hierarchy.map((link) => link.Target).filter(Boolean))
@@ -187,15 +139,14 @@ function workflow(root: Element | undefined, path: string, depth = 0): Workflow 
     if (!targets.has(node.hierarchy_token)) hierarchy.push({ Source: null, Target: node.hierarchy_token })
     if (!sources.has(node.hierarchy_token)) hierarchy.push({ Source: node.hierarchy_token, Target: null })
   }
-  const submodels = raw.flatMap((node, index) => {
+  const submodels = graph.nodes.flatMap((node, index) => {
     const entry = workflow_nodes[index]
     if (entry.engine_type !== "TBGModelGenericComponentEngine") return []
-    const inner = child(child(child(child(node, "Component"), "Engine"), "ModelUnit"), "WorkFlow")
     const nested = path + "/" + entry.label
-    return [{ label: entry.label, guid: entry.guid, depth: depth + 1, path: nested, ...workflow(inner, nested, depth + 1) }]
+    return [{ label: entry.label, guid: entry.guid, depth: depth + 1, path: nested, ...workflow(node.submodel ?? readSavedWorkflow(), nested, depth + 1) }]
   })
   const noteFields = ["Text", "Caption", "Comment", "Description"]
-  const notes = children(child(root, "Annotations")).flatMap((item) => {
+  const notes = children(child(graph.root, "Annotations")).flatMap((item) => {
     const texts = [item, ...Array.from(item.getElementsByTagName("*"))].flatMap((element) => [
       ...(noteFields.includes(element.localName) && leadingText(element) ? [leadingText(element)] : []),
       ...noteFields.map((name) => element.getAttribute(name)?.trim() ?? "").filter(Boolean),
@@ -207,7 +158,7 @@ function workflow(root: Element | undefined, path: string, depth = 0): Workflow 
   return { workflow_nodes, links, hierarchy, notes, submodels }
 }
 
-function leadingText(element: Element) {
+function leadingText(element: XmlElement) {
   // ElementTree .text excludes descendants and text following a child element.
   const nodes = Array.from(element.childNodes)
   const first = nodes.findIndex((node) => node.nodeType === 1)

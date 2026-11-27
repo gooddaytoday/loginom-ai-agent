@@ -330,6 +330,14 @@ export async function dockTools(input: {
       // A new package supersedes the previous local file. Storage failure does not invalidate the prepared window.
       await rememberSavedPackage(plugin.storage, call.sessionID, packageSource).catch(() => undefined)
     }
+    const savedGraph = result._meta?.loginom
+    const loginom = {
+      ...(savedGraph && typeof savedGraph === "object" ? savedGraph : {}),
+      ...notice?.loginom,
+      ...(schemaRef?._tag === "Some"
+        ? { package_schema: { source: "window", generation: lease.generation, ...schemaRef.value } }
+        : {}),
+    }
     const images = result.content.flatMap((block) =>
       block.type === "image" && typeof block.data === "string" && typeof block.mimeType === "string"
         ? [{ type: "file" as const, uri: `data:${block.mimeType};base64,${block.data}`, mime: block.mimeType }]
@@ -339,14 +347,7 @@ export async function dockTools(input: {
       content: images.length ? [{ type: "text", text: output }, ...images] : output,
       metadata: {
         generation: lease.generation,
-        ...(notice || schemaRef?._tag === "Some"
-          ? { loginom: {
-              ...notice?.loginom,
-              ...(schemaRef?._tag === "Some"
-                ? { package_schema: { source: "window", generation: lease.generation, ...schemaRef.value } }
-                : {}),
-            } }
-          : {}),
+        ...(Object.keys(loginom).length ? { loginom } : {}),
         ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
         // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
         ...(outputPath ? { truncated: true, outputPath } : {}),

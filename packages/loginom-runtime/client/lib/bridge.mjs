@@ -33,6 +33,7 @@ import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory, userActionKeys } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState,readSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
+import {compareSavedPackageGraph,makeSavedPackageGraphCode,parseSavedPackageBytes,savedGraphMessage} from './saved-package-graph.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
 import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
 import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
@@ -806,6 +807,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               savedPackages.set(admission.path,confirmedSave.operation_id);
               lastSavedPackage={path:admission.path,operation_id:confirmedSave.operation_id,
                 document_id:admission.document_id,sequence:admission.sequence};
+              admission.confirmed=true;
               if(confirmedSave.output?.reopened===true||confirmedSave.trace?.some(e=>e.event==='save_continuations_observed'
                 &&e.recovered_reopen===true&&e.native_identity_verified===true))
                 reopenedSave={path:admission.path,preparation:session.metadata.workspacePreparation};
@@ -861,6 +863,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               instruction:'Save rebound the saved package. Issued document/workflow/node identities remain valid; this is their current tab and navigation.'})});
             if(workspaceBindingAdvice)reply.content.push({type:'text',text:JSON.stringify(workspaceBindingAdvice)});
             if(savedOutcome.status==='SUCCEEDED'&&['package.save_as','package.save_checkpoint'].includes(savedOutcome.action_key)&&savedOutcome.output?.package_ref?.path){
+              let savedState;
               // Save As can reopen a package that Loginom immediately marks
               // modified. Report this while the model can still checkpoint it,
               // rather than discovering it only during isolated shutdown.
@@ -871,6 +874,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                   loginomUrl:config.loginomUrl,loginomBuild:session.metadata.targetIdentity.loginom_build};
                 const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code:makeSavedPackageStateCode(options)}},undefined,{timeout:15000});
                 const state=parseSavedPackageState(response,options),advice=savedPackageStateAdvice(state,savedOutcome);
+                savedState=state;
                 await recordExecution({phase:'saved_package_state_observed',operation_id:savedOutcome.operation_id,state,advice});
                 reply.content.push({type:'text',text:JSON.stringify(advice)});
               }catch{
@@ -883,6 +887,30 @@ export async function createBridge(config, session, { browserTransport: managedB
                   instruction:'The save receipt remains valid, but the current open package dirty state could not be verified. Do not claim that session cleanup is confirmed.',
                   ...(recovery.enabled?{next_step:{tool:'dock_browser_recovery',arguments:{action:'start',operation_id:savedOutcome.operation_id},
                     reason:'SAVE_STATE_UNCONFIRMED',instruction:'Start browser recovery for this save yourself; do not ask the user to act in the interface.'}}:{})})});
+              }
+              if(admission?.confirmed && savedOutcome.operation_id===lastSavedPackage?.operation_id) {
+                if(!admission.savedGraph) {
+                  const prepared=session.metadata.workspacePreparation?.state;
+                  const identity={save_operation_id:savedOutcome.operation_id,package_path:admission.path};
+                  try {
+                    const before=savedOutcome.trace?.findLast(entry=>entry.event==='save_graph_before_write')?.graph;
+                    if(!before||!savedState||workspaceBindingAdvice||prepared?.document_id!==admission.document_id
+                      ||savedOutcome.cleanup_complete!==true) throw Error('Saved graph binding unavailable');
+                    if(config.storageDirectories)requireStorageDestination(admission.path,config.storageDirectories,'packages');
+                    const workflow=normalizedWorkspace?.workflow_ref??prepared.workflow_ref;
+                    const intent=actionRuntime.saveNodeIntent(prepared.document_id,workflow.workflow_id);
+                    const code=makeSavedPackageGraphCode({origin:new URL(config.loginomUrl).origin,build:session.metadata.targetIdentity.loginom_build,
+                      path:admission.path,tabTid:workflow.tab_tid,documentId:prepared.document_id,sessionId:session.metadata.sessionId,account:savedState.account});
+                    const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,{timeout:15000});
+                    const graph=await compareSavedPackageGraph({bytes:parseSavedPackageBytes(response),before,...intent});
+                    admission.savedGraph={...identity,status:'compared',...graph,
+                      rename_attribution:savedState.modified?'unconfirmed':'observed_during_save'};
+                  } catch {
+                    admission.savedGraph={...identity,status:'unavailable'};
+                  }
+                }
+                reply._meta={...reply._meta,loginom:{saved_package_graph:admission.savedGraph}};
+                reply.content.push({type:'text',text:savedGraphMessage(admission.savedGraph)});
               }
             }
             try {

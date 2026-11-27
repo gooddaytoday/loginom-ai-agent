@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { normalizePackageGuid } from "../../loginom-runtime/client/lib/saved-package-reader.mjs"
 
 const Position = Schema.Struct({ x: Schema.Finite, y: Schema.Finite })
 const Node = Schema.Struct({
@@ -51,7 +52,16 @@ const linkKey = ({ source, output, target, input }: typeof Link.Type) => JSON.st
 function snapshot(value: unknown) {
   const result = decodeSnapshot(value)
   if (result._tag === "None") return
-  const graph = result.value
+  const graph = {
+    ...result.value,
+    nodes: result.value.nodes.map((node) => ({ ...node, guid: normalizePackageGuid(node.guid) })),
+    links: result.value.links.map((link) => ({
+      source: normalizePackageGuid(link.source),
+      output: normalizePackageGuid(link.output),
+      target: normalizePackageGuid(link.target),
+      input: normalizePackageGuid(link.input),
+    })),
+  }
   const nodes = new Set(graph.nodes.map((node) => node.guid))
   if (nodes.size !== graph.nodes.length || new Set(graph.links.map(linkKey)).size !== graph.links.length) return
   if (graph.links.some((link) => !nodes.has(link.source) || !nodes.has(link.target))) return
