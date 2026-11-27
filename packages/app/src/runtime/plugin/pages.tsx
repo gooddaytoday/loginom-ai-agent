@@ -49,7 +49,14 @@ function PagePending() {
   const loading = () => {
     const target = route()
 
-    return target.type === "page" && host.status(target.plugin) === "loading"
+    if (target.type !== "page") return false
+
+    const status = host.status(target.plugin)
+
+    return (
+      status === "loading" ||
+      (status === undefined && host.definitions().some((definition) => definition.id === target.plugin))
+    )
   }
 
   return (

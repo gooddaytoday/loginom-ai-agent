@@ -80,7 +80,7 @@ story("a plugin page that fails to render shows a way back to Home", async ({ pa
   await host.evaluate((host) => host.unmount())
 })
 
-story("a restored plugin page shows a loader until its plugin fails to load", async ({ page }) => {
+story("a restored plugin page shows a loader while waiting for settings and while loading", async ({ page }) => {
   const host = await page.evaluateHandle(async (fixture) => {
     const { mountLoadingPluginPage } = await import(fixture)
 
@@ -89,8 +89,14 @@ story("a restored plugin page shows a loader until its plugin fails to load", as
 
   const loader = page.getByRole("img", { name: "Loading", exact: true })
   const unavailable = page.getByRole("heading", { name: "Plugin page unavailable" })
+  expect(await host.evaluate((host) => host.status())).toBeUndefined()
+  expect(await loader.isVisible()).toBe(true)
+  await expect(unavailable).toHaveCount(0)
+
+  await host.evaluate((host) => host.releaseSettings())
   await expect(loader).toBeVisible()
   await expect(unavailable).toHaveCount(0)
+
   await host.evaluate((host) => host.fail(0, new Error("Fixture load failed")))
   await expect(unavailable).toBeVisible()
   await expect(loader).toHaveCount(0)

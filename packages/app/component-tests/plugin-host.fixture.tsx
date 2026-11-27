@@ -43,7 +43,7 @@ import { Persist, persisted } from "@/runtime/persistence/storage"
 import { ServerScope } from "@/runtime/server/scope"
 import { PluginHostProvider, usePluginHost, type HostApiFactories, type PluginInput } from "../src/runtime/plugin/host"
 import { createHostApis } from "../src/runtime/plugin/host-apis"
-import type { Bridge, Entry } from "@opencode/plugin/gui/host"
+import type { Bridge, Entry, Installed } from "@opencode/plugin/gui/host"
 import { createRegion, RegionContent } from "../src/runtime/plugin/panels"
 import { createSessionScreenLayout } from "../src/session/screen-layout"
 import type { SessionModel } from "../src/session/model"
@@ -170,7 +170,12 @@ export async function until(check: () => boolean) {
 }
 
 /** Mounts the real plugin host with one plugin whose every renderer load settles when the test says so. */
-export function mountPluginHost(input?: { builtins: ReadonlySet<string>; View: Component }) {
+export function mountPluginHost(input?: {
+  builtins: ReadonlySet<string>
+  View?: Component
+  extra?: readonly Entry[]
+  bridge?: Bridge
+}) {
   const loads: PromiseWithResolvers<{ default: Plugin.Setup<Entry> }>[] = []
   const [disabled, setDisabled] = createSignal<ReadonlySet<string>>(new Set())
   const hosts: PluginHost[] = []
@@ -180,7 +185,7 @@ export function mountPluginHost(input?: { builtins: ReadonlySet<string>; View: C
   function Capture() {
     hosts.push(usePluginHost())
 
-    return input && <input.View />
+    return input?.View && <input.View />
   }
 
   const dispose = render(
@@ -198,8 +203,10 @@ export function mountPluginHost(input?: { builtins: ReadonlySet<string>; View: C
                   return load.promise
                 },
               },
+              ...(input?.extra ?? []),
             ]}
-            disabled={disabled}
+            disabled={input?.bridge ? undefined : disabled}
+            bridge={input?.bridge}
             builtins={input?.builtins}
             apis={fakeApis(unused)}
             whenMounted={mounted}
@@ -226,7 +233,7 @@ export function mountPluginHost(input?: { builtins: ReadonlySet<string>; View: C
     reload: () => hosts[0]?.reload("fixture"),
     disable: () => setDisabled(new Set(["fixture"])),
     enable: () => setDisabled(new Set<string>()),
-    status: () => hosts[0]?.status("fixture"),
+    status: (id = "fixture") => hosts[0]?.status(id),
     /** Contributions the host holds for a registry; readable after the host unmounts. */
     entries: (registry: string) => hosts[0]?.state.entries[registry]?.length ?? 0,
   }
@@ -379,14 +386,42 @@ export function mountLoadingPluginPage() {
   const history = createMemoryHistory()
   history.set({ value: "/page/fixture/overview" })
 
-  return mountPluginHost({
+  const settings = Promise.withResolvers<readonly Installed[]>()
+  const bridge: Bridge = {
+    packaged: false,
+    call: async () => undefined,
+    subscribe: async () => ({ available: false }),
+    on: () => () => {},
+    embed() {},
+    capture: async () => undefined,
+    runMenubarItem() {},
+    configure() {},
+    pluginGuis: async () => ({ plugins: [], reserved: [] }),
+    manager: {
+      list: () => settings.promise,
+      enable: async () => {},
+      disable: async () => {},
+      reload: async () => {},
+    },
+  }
+
+  const host = mountPluginHost({
     builtins: new Set(["fixture"]),
+    bridge,
     View: () => (
       <MemoryRouter history={history}>
         <PluginPageRoute />
       </MemoryRouter>
     ),
   })
+
+  return {
+    ...host,
+    async releaseSettings() {
+      settings.resolve([])
+      await until(() => host.status() === "loading")
+    },
+  }
 }
 
 export function mountPluginPages(options?: Parameters<typeof pagePlugin>[0]) {
