@@ -65,7 +65,9 @@ function GeneratedFileCard(props: { path: string; name: string }) {
     window.addEventListener("focus", refresh)
     onCleanup(() => window.removeEventListener("focus", refresh))
   })
-  const title = () => (local() && available() ? props.path : language.t("session.file.unavailable"))
+  // Calling available() while a check is pending suspends the page <Suspense>; the chat leaves the DOM and loses its scroll.
+  const found = () => (available.state === "ready" || available.state === "refreshing" ? available.latest : false)
+  const title = () => (local() && found() ? props.path : language.t("session.file.unavailable"))
   return (
     <button
       type="button"
@@ -73,15 +75,15 @@ function GeneratedFileCard(props: { path: string; name: string }) {
       class="border-0 bg-transparent p-0 text-left disabled:opacity-50"
       title={title()}
       aria-label={language.t("session.header.reveal.containingFolder") + ": " + props.name}
-      disabled={!local() || !available()}
+      disabled={!local() || !found()}
       onClick={() =>
         void platform.revealPath?.(props.path).then(
-          (found) => mutate(found),
+          (exists) => mutate(exists),
           () => mutate(false),
         )
       }
     >
-      <AttachmentCardV2 title={props.name} hover={title()} clickable={available()}>
+      <AttachmentCardV2 title={props.name} hover={title()} clickable={found()}>
         {props.name.split(".").at(-1)?.toUpperCase()}
       </AttachmentCardV2>
     </button>
