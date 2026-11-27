@@ -28,7 +28,7 @@ import {javascriptContextReceiptSchema} from './javascript-context-read.mjs';
 import { createRecoveryContext } from './recovery-context.mjs';
 import { outcomeVerification } from './outcome-verification.mjs';
 import { createHostArtifactAdmission, codexInputIdentity } from './host-artifacts.mjs';
-import { compactActionResult, compactNodeRequestFailure, userResultSchema, compactKnowledgeBundle } from './user-results.mjs';
+import { compactActionResult, compactNodeRequestFailure, userResultSchema, compactKnowledgeBundle, loginomFeedMetadata, loginomSaveMetadata } from './user-results.mjs';
 import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory, userActionKeys } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
@@ -93,7 +93,7 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
   return inherited;
 }
 
-export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, reauthenticateReload } = {}) {
+export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, reauthenticateReload, presentNodeReply } = {}) {
   if (config.closeSavedPackageOnShutdown !== undefined && typeof config.closeSavedPackageOnShutdown !== 'boolean'
       || config.closeSavedPackageOnShutdown === true && config.acceptanceCleanupPackage)
     throw Error('Invalid private saved-package cleanup policy');
@@ -768,7 +768,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             const newSave=saveRequest&&!saveAdmissions.has(operationId);
             const saveAdmission=newSave?{
               sequence:saveSequence++,action_key:args.action_key,path:args.parameters?.path,
-              document_id:session.metadata.workspacePreparation?.state?.document_id}:null;
+              document_id:session.metadata.workspacePreparation?.state?.document_id,startedAt:Math.floor(performance.now())}:null;
             const outcome = request.params.name === 'dock_workspace_observe' ? await actionRuntime.observe({ signal: extra.signal, scope: args.scope, cursor: args.cursor, rootRef: args.root_ref, observationId: args.observation_id, storageName: args.storage_name })
               : request.params.name === 'dock_operation_inspect' ? await actionRuntime.inspect({ operationId: args.operation_id, signal: extra.signal })
                 : request.params.name === 'dock_operation_recover' ? await actionRuntime.recover(args.operation_id,
@@ -797,6 +797,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               &&outcome.output.cleanup_confirmed===true&&outcome.output.outcome?.operation_id===args.operation_id
                 ?outcome.output.outcome:null;
             const admission=confirmedSave&&saveAdmissions.get(confirmedSave.operation_id);
+            if(admission&&confirmedSave.status==='SUCCEEDED')admission.confirmedAt??=Math.floor(performance.now());
             // Reconciliation confirms the original admission, not a new Save.
             // An older receipt can never supersede a later confirmed mutation.
             if(admission&&confirmedSave.status==='SUCCEEDED'&&confirmedSave.action_key===admission.action_key
@@ -902,7 +903,9 @@ export async function createBridge(config, session, { browserTransport: managedB
               // Knowledge/journal failure cannot erase a completed browser receipt.
               reply.content.push({ type: 'text', text: 'Recovery context unavailable; keep the operation receipt and inspect the actual state.' });
             }
-            return reply;
+            return userProfile && presentNodeReply && confirmedSave
+              ? presentNodeReply(reply, options=>loginomSaveMetadata(confirmedSave,{...options,
+                receiptWindow:admission&&{documentId:admission.document_id,startedAt:admission.startedAt,confirmedAt:admission.confirmedAt}})) : reply;
           });
         }
         if (owner === 'remote') return await remote.callTool(request.params, undefined, {
@@ -960,14 +963,21 @@ export async function createBridge(config, session, { browserTransport: managedB
         return { isError: true, content: [{ type: 'text', text: message }] };
       }
     };
+    const presentDeliveredNode = (reply, tool) => {
+      if(!presentNodeReply||!userProfile||!isNodeApiTool(tool)||reply.structuredContent?.result_version!=='user-v1')return reply;
+      const facts=actionRuntime?.nodeFeedFacts(reply.structuredContent.operation_id);
+      return presentNodeReply(reply,options=>loginomFeedMetadata(reply,{...options,tool,facts}));
+    };
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       const reply=await callTool(request,extra);
-      return userProfile && ['local','action'].includes(catalog.routes.get(request.params.name))
+      const delivered=userProfile && ['local','action'].includes(catalog.routes.get(request.params.name))
         ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
+      return presentDeliveredNode(delivered,request.params.name);
     });
     return { server, catalog,
-      applyWithScanReceipt(args,receipt,extra) {
-        return callTool({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);
+      async applyWithScanReceipt(args,receipt,extra) {
+        const tool='dock_node_apply';
+        return presentDeliveredNode(await callTool({params:{name:tool,arguments:args}},extra,null,receipt),tool);
       },
       async prepareLocalPackage(args,pair,extra) {
         if(!userProfile||!actionRuntime||!config.storageDirectories||args?.intent!=='open_package'

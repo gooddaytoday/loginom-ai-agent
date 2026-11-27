@@ -112,6 +112,7 @@ export function createSessionTimelineRowRenderer(input: {
   anchor?: (messageID: string) => string | undefined
   /** Scrolls to and expands the tool call named by its ID or by the shell ID a backgrounded shell call reports. */
   revealPart?: (target: string) => boolean
+  renderTurnResult?: (row: Accessor<TimelineRow.AssistantPart>, settled: Accessor<boolean>) => JSX.Element
 }) {
   const i18n = useI18n()
   const data = useData()
@@ -1219,6 +1220,7 @@ export function createSessionTimelineRowRenderer(input: {
             <div data-slot="session-turn-assistant-content" aria-hidden={phase(current().userMessageID).live}>
               {content}
             </div>
+            {input.renderTurnResult?.(current, () => phase(current().userMessageID).settled)}
           </div>
         </Frame>
       )

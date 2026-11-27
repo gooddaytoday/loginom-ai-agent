@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import type { SessionMessageAssistant, SessionMessageInfo, ShellInfo } from "@opencode/client/promise"
+import type { Fact, Reason } from "@opencode/schema/loginom-app-verified"
 import { timelinePresets } from "@opencode/session-ui/timeline/detail"
 import { createTwoFilesPatch } from "diff"
 import { readSessionDraftText } from "../utils/drafts"
@@ -28,6 +29,7 @@ import {
   stepStarted,
   textPart,
   toolPart,
+  userID,
   userMessage,
   userText,
 } from "../utils/timeline"
@@ -44,6 +46,167 @@ const completed = {
   content: [{ type: "text", text: "Working" }],
   time: { created: 2, completed: 3 },
 } satisfies SessionMessageAssistant
+
+test.describe("application verification", () => {
+  type Step = { evidence: Fact["evidence"]; tool: string; phrase: string }
+
+  const read = {
+    evidence: { kind: "tableRead", port: 0, portGuid: "result-port", rowsRead: 12, rowCount: 80 },
+    tool: "loginom_dock_node_read",
+    phrase: "Прочитаны строки таблицы · 12 из 80",
+  } satisfies Step
+
+  const run = {
+    evidence: { kind: "executed", executionId: "execution-1", scope: "workspace" },
+    tool: "loginom_dock_node_apply",
+    phrase: "Запуск в рабочем пакете завершён",
+  } satisfies Step
+
+  const save = {
+    evidence: { kind: "saved", path: "/user/Продажи и прибыль.lgp" },
+    tool: "loginom_dock_save",
+    phrase: "Пакет сохранён по пути /user/Продажи и прибыль.lgp",
+  } satisfies Step
+
+  const reread = {
+    evidence: { kind: "savedGraphRead", nodeCount: 4, scope: "activeWorkflow" },
+    tool: "loginom_dock_save",
+    phrase: "Схема сохранённого пакета перечитана · узлов 4",
+  } satisfies Step
+
+  const completeRead = {
+    ...read,
+    evidence: { ...read.evidence, rowsRead: 80, executionId: "execution-1" },
+    phrase: "Прочитаны строки результата · 80 из 80",
+  }
+
+  const scenarios = [
+    {
+      name: "read without running",
+      verifyScroll: true,
+      steps: [read],
+      reasons: ["unreadTableRows", "noExecutionReceipt", "noSaveReceipt"],
+      unchecked: "Не проверено · строки за пределами выборки · запуск не подтверждён · сохранение не подтверждено",
+      width: 1280,
+    },
+    {
+      name: "run without reading",
+      steps: [run],
+      reasons: ["noTableReadReceipt", "noSaveReceipt"],
+      unchecked: "Не проверено · строки таблицы не прочитаны · сохранение не подтверждено",
+      width: 1280,
+    },
+    {
+      name: "save without running",
+      steps: [save],
+      reasons: ["noTableReadReceipt", "noExecutionReceipt", "noSavedGraphReadReceipt"],
+      unchecked: "Не проверено · строки таблицы не прочитаны · запуск не подтверждён · содержимое сохранённого пакета",
+      width: 390,
+      screenshot: true,
+    },
+    {
+      name: "all facts on desktop",
+      steps: [run, completeRead, save, reread],
+      reasons: [],
+      width: 1280,
+      screenshot: true,
+    },
+    {
+      name: "all facts on narrow screens",
+      steps: [run, completeRead, save, reread],
+      reasons: [],
+      width: 390,
+    },
+    {
+      name: "turn without Loginom",
+      steps: [],
+      reasons: ["noExecutionReceipt"],
+      width: 1280,
+    },
+  ] satisfies {
+    name: string
+    steps: Step[]
+    reasons: Reason[]
+    unchecked?: string
+    width: number
+    screenshot?: boolean
+    verifyScroll?: boolean
+  }[]
+
+  for (const scenario of scenarios) {
+    test(scenario.name, async ({ page }, testInfo) => {
+      const steps = scenario.steps.map((step, index) => ({ ...step, id: `prt_verification_${index}` }))
+
+      const facts: Fact[] = steps.map((step) => ({
+        evidence: step.evidence,
+        source: { messageID: assistantID, toolCallID: step.id, operationId: step.id },
+      }))
+
+      const requests: unknown[] = []
+      const answer = "Итог работы с таблицей готов."
+
+      const reply = scenario.verifyScroll
+        ? [...Array.from({ length: 38 }, (_, i) => `Пояснение ${i + 1} о ходе работы.`), answer].join("\n\n")
+        : answer
+
+      await setupTimeline(page, {
+        locale: "ru",
+        viewport: { width: scenario.width, height: 900 },
+        settings: {
+          newTimeline: scenario.width === 390,
+          timelineDetail: scenario.verifyScroll ? timelinePresets[0].value : timelinePresets[2].value,
+        },
+        messages: [
+          userMessage([userText("Проверь, что удалось сделать с таблицей.")]),
+          assistantMessage([
+            ...steps.map((step) => toolPart(step.id, step.tool, "completed", {})),
+            textPart("prt_verification_answer", reply),
+          ]),
+        ],
+        rpc: ({ rpcID, method, body }) => {
+          if (rpcID !== "loginom.appVerified" || method !== "summary") return
+          requests.push(body)
+
+          return { output: { facts, notVerified: scenario.reasons } }
+        },
+      })
+
+      await expect(page.getByText(answer, { exact: true })).toBeVisible()
+      const card = page.getByRole("region", { name: "Проверено приложением" })
+
+      if (!steps.length) {
+        await expect(card).toHaveCount(0)
+        expect(requests).toEqual([])
+
+        return
+      }
+
+      await expect(card.getByRole("button")).toHaveText(steps.map((step) => step.phrase))
+      expect(requests.length).toBeGreaterThan(0)
+
+      for (const request of requests) expect(request).toEqual({ input: { sessionID, promptID: userID } })
+
+      if (scenario.unchecked) await expect(card.getByText(scenario.unchecked, { exact: true })).toBeVisible()
+      else await expect(card.getByText("Не проверено", { exact: true })).toHaveCount(0)
+
+      if (scenario.screenshot && testInfo.repeatEachIndex === 0) {
+        await expect(card).toBeInViewport({ ratio: 1 })
+        const path = testInfo.outputPath(`loginom-app-verified-${scenario.width}.png`)
+        await page.screenshot({ path, animations: "disabled" })
+        await testInfo.attach(`Проверено приложением · ${scenario.width} px`, { path, contentType: "image/png" })
+      }
+
+      for (const step of steps) {
+        const tool = page.locator(`[data-timeline-part-id="${step.id}"]`)
+
+        if (scenario.verifyScroll) await expect(tool).not.toBeInViewport()
+
+        await card.getByRole("button", { name: step.phrase, exact: true }).click()
+        await expect(tool).toBeInViewport()
+      }
+    })
+  }
+})
 
 test.describe("static projection", () => {
   test("renders current protocol notices in CLI order", async ({ page }) => {
