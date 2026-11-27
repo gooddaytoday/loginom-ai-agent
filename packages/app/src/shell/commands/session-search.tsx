@@ -22,7 +22,9 @@ import {
 
 const RECENT_LIMIT = 10
 
-const SEARCH_FIELDS = ["title", "project", "prompt"] as const
+const SEARCH_FIELDS = ["title", "project"] as const
+
+const SEARCH_DEBOUNCE_MS = 300
 
 function rankConversationSearch(entries: CommandPaletteEntry[], query: string) {
   const value = query.toLowerCase()
@@ -69,9 +71,15 @@ export function DialogSessionSearch(props: { archived?: boolean }) {
 
         if (!search || props.archived) return ctx.sdk.api.session.list(filters, { signal })
 
-        const results = await Promise.all(
-          SEARCH_FIELDS.map((searchField) => ctx.sdk.api.session.list({ ...filters, searchField }, { signal })),
+        const requests = SEARCH_FIELDS.map((searchField) =>
+          ctx.sdk.api.session.list({ ...filters, searchField }, { signal }),
         )
+
+        if (Array.from(search).length >= 3) {
+          requests.push(ctx.sdk.api.session.list({ ...filters, searchField: "prompt" }, { signal }))
+        }
+
+        const results = await Promise.all(requests)
 
         return { data: results.flatMap((result) => result.data) }
       },
@@ -80,6 +88,7 @@ export function DialogSessionSearch(props: { archived?: boolean }) {
       category: () => language.t(props.archived ? "sidebar.inbox.archived.title" : "sidebar.search.conversations"),
       recentCategory: () => language.t(props.archived ? "sidebar.inbox.archived.title" : "sidebar.search.recent"),
       recentLimit: RECENT_LIMIT,
+      debounceMs: props.archived ? undefined : SEARCH_DEBOUNCE_MS,
     })
 
     const tag = registry.tag(conn)
@@ -219,7 +228,7 @@ export function DialogSessionSearch(props: { archived?: boolean }) {
       items={items}
       sources={loaders.map((loader) => loader.search)}
       rank={props.archived ? undefined : rankConversationSearch}
-      keepPrevious={!!props.archived}
+      keepPreviousWhileLoading={!props.archived}
       highlight={() => {}}
       select={select}
       close={() => dialog.close(layer?.id)}

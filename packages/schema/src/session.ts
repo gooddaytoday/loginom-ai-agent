@@ -77,7 +77,8 @@ const ListFilterFields = {
   }),
   search: Schema.String.pipe(Schema.optional),
   searchField: Schema.Literals(["title", "project", "prompt"]).pipe(Schema.optional).annotate({
-    description: "Field for literal session search. Prompt searches only stored user message text.",
+    description:
+      "Field for literal session search. Prompt searches stored user message text with at least three query characters.",
   }),
   parentID: Schema.Union([
     ID,

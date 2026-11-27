@@ -46,7 +46,7 @@ export function createCommandPaletteSearch(props: {
   /** Sessions open as tabs, which lead the matching sessions. */
   open?: (entry: CommandPaletteEntry) => boolean
   rank?: (entries: CommandPaletteEntry[], query: string) => CommandPaletteEntry[]
-  keepPrevious?: boolean
+  keepPreviousWhileLoading?: boolean
 }) {
   const query = createMemo(() => props.query().trim())
   const local = createMemo(() => props.items(query()))
@@ -103,17 +103,27 @@ export function createCommandPaletteSearch(props: {
 
   onCleanup(() => dispatch({ type: "disposed" }))
 
-  const items = createMemo<CommandPaletteEntry[]>(() => {
+  const items = createMemo<CommandPaletteEntry[]>((previous) => {
     const current = query()
+    const sources = selectPaletteSearchSources(searchState())
+
+    if (
+      current &&
+      props.keepPreviousWhileLoading &&
+      previous?.length &&
+      sources.length > 0 &&
+      sources.every((source) => source.settled.query !== current)
+    )
+      return previous
 
     const entries = uniqueCommandPaletteEntries([
       ...local(),
-      ...selectPaletteSearchSources(searchState()).flatMap((source) => {
+      ...sources.flatMap((source) => {
         const result = source.settled
 
         if (result.query === current) return result.items
 
-        if (!current || props.keepPrevious === false) return []
+        if (!current || props.keepPreviousWhileLoading) return []
 
         const matched = uniqueCommandPaletteEntries([...result.items, ...source.seen]).filter((item) =>
           matchesCommandPaletteEntry(item, current),

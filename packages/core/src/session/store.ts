@@ -163,6 +163,8 @@ const layer = Layer.effect(
         return row ? fromRow(row) : undefined
       }),
       list: Effect.fn("SessionStore.list")(function* (input = {}) {
+        if (input.searchField === "prompt" && Array.from(input.search?.trim() ?? "").length < 3) return []
+
         const direction = input.anchor?.direction ?? "next"
         const requestedOrder = input.order ?? "desc"
         const order = direction === "previous" ? (requestedOrder === "asc" ? "desc" : "asc") : requestedOrder
@@ -178,14 +180,16 @@ const layer = Layer.effect(
             case "title":
               conditions.push(sql`${SessionTable.title} glob ${pattern}`)
               break
-            case "project":
+            case "project": {
+              const worktree = sql`replace(${ProjectTable.worktree}, ${"\\"}, '/')`
               conditions.push(sql`exists (
                 select 1 from ${ProjectTable} where ${ProjectTable.id} = ${SessionTable.project_id}
                 and coalesce(nullif(${ProjectTable.name}, ''),
-                  json_extract('[' || replace(json_quote(rtrim(${ProjectTable.worktree}, '/')), '/', '\",\"') || ']', '$[#-1]')
+                  json_extract('[' || replace(json_quote(rtrim(${worktree}, '/')), '/', '\",\"') || ']', '$[#-1]')
                 ) glob ${pattern}
               )`)
               break
+            }
             case "prompt":
               conditions.push(sql`exists (
                 select 1 from ${SessionMessageTable} where ${SessionMessageTable.session_id} = ${SessionTable.id}

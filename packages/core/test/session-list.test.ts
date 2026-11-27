@@ -13,7 +13,7 @@ import { SessionProjector } from "@opencode/core/session/projector"
 import { SessionMessageTable, SessionPartTable } from "@opencode/core/session/sql"
 import { SessionStore } from "@opencode/core/session/store"
 import { LayerNode } from "@opencode/util/effect/layer-node"
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { Effect, Schema } from "effect"
 import { testEffect } from "./lib/effect"
 import { globalProjectNode } from "./lib/project"
@@ -110,12 +110,14 @@ describe("Session.list", () => {
       const next = yield* sessions.list({ cursor: first.cursor.next, limit: 1 })
       const end = yield* sessions.list({ cursor: next.cursor.next, limit: 1 })
       const titles = yield* sessions.list({ search: "выручка [2026]?", searchField: "title" })
+      const short = yield* sessions.list({ search: "вы", searchField: "prompt" })
 
       expect([...first.data, ...next.data].map((session) => session.id).toSorted()).toEqual(
         [userMatch.id, nextMatch.id].toSorted(),
       )
       expect(end.data).toEqual([])
       expect(titles.data.map((session) => session.id)).toEqual([titleOnly.id])
+      expect(short.data).toEqual([])
     }),
   )
 
@@ -138,6 +140,21 @@ describe("Session.list", () => {
       yield* setName(null)
       expect((yield* find('папка "отчётов"')).data.map((session) => session.id)).toEqual([item.id])
       expect((yield* find("parent")).data).toEqual([])
+    }),
+  )
+
+  it.effect("does not match parent folders of a persisted Windows project path", () =>
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      const item = yield* sessions.create({ location: project, title: "Untitled" })
+      const { db } = yield* Database.Service
+      const worktree = "C:\\Work\\Loginom\\Documents\\Витрина\\"
+      yield* db.run(sql`update ${ProjectTable} set worktree = ${worktree} where ${ProjectTable.id} = ${item.projectID}`)
+
+      const find = (search: string) => sessions.list({ search, searchField: "project" })
+      expect((yield* find("витрина")).data.map((session) => session.id)).toEqual([item.id])
+      expect((yield* find("documents")).data).toEqual([])
+      expect((yield* find("loginom")).data).toEqual([])
     }),
   )
 

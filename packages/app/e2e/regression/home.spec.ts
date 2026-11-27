@@ -96,6 +96,56 @@ for (const viewport of [
   })
 }
 
+test("conversation search keeps its results while waiting and searches prompts from three characters", async ({
+  page,
+}) => {
+  const title = "Quarterly analysis"
+  const sessionID = "ses_prompt_search"
+  await mockWorkspace(page, {
+    name: "Sales",
+    seed: { tabs: [] },
+    sessions: [{ id: sessionID, title }],
+    provider: NO_PROVIDER,
+    pageMessages: pageMessagesFrom({
+      [sessionID]: [{ id: "msg_search", type: "user", time: { created: T0 }, text: "Find revenue" }],
+    }),
+  })
+
+  const isSearch = (url: URL, field: string) =>
+    url.pathname === "/api/session" && url.searchParams.get("searchField") === field
+
+  const shortTitle = await holdRoute(page, (url) => isSearch(url, "title") && url.searchParams.get("search") === "fi")
+  const prompt = await holdRoute(page, (url) => isSearch(url, "prompt"))
+
+  await page.goto("/")
+  await expect(row(page, title)).toBeVisible({ timeout: APP_READY_TIMEOUT })
+  await page.getByRole("button", { name: "Search", exact: true }).click()
+  const dialog = page.getByRole("dialog")
+  const search = dialog.getByRole("combobox", { name: "Title, project, or words from your prompt" })
+  const results = dialog.getByRole("option")
+  await expect(search).toBeFocused()
+  await expect(results).toHaveText([new RegExp(title)])
+
+  await page.clock.install()
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+  await search.fill("fi")
+  await page.clock.runFor(300)
+  await shortTitle.arrived
+  await expect(results).toHaveText([new RegExp(title)])
+  shortTitle.release()
+  await expect(dialog.getByText("No results found")).toBeVisible()
+  expect(prompt.requests).toHaveLength(0)
+
+  await search.fill("fin")
+  await page.clock.runFor(299)
+  expect(prompt.requests).toHaveLength(0)
+  await page.clock.runFor(1)
+  const request = await prompt.arrived
+  expect(new URL(request.url()).searchParams.get("search")).toBe("fin")
+  prompt.release()
+  await expect(results).toHaveText([new RegExp(title)])
+})
+
 test("Home keeps the session list in every interface mode", async ({ page }) => {
   const earlier = { id: "ses_home_earlier", title: "Finished earlier" }
   await mockWorkspace(page, { name: "Home", sessions: [earlier] })

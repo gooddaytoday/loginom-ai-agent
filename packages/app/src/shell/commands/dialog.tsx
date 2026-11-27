@@ -67,7 +67,7 @@ export function CommandPaletteView(props: {
   items: (query: string) => CommandPaletteEntry[]
   sources: ((query: string, signal: AbortSignal) => Promise<CommandPaletteEntry[]>)[]
   rank?: Parameters<typeof createCommandPaletteSearch>[0]["rank"]
-  keepPrevious?: boolean
+  keepPreviousWhileLoading?: boolean
   highlight: (item: CommandPaletteEntry | undefined) => void
   select: (item: CommandPaletteEntry | undefined) => void
   close: () => void
@@ -92,7 +92,7 @@ export function CommandPaletteView(props: {
     sources: props.sources,
     open: sessionOpen,
     rank: props.rank,
-    keepPrevious: props.keepPrevious,
+    keepPreviousWhileLoading: props.keepPreviousWhileLoading,
   })
 
   return (
