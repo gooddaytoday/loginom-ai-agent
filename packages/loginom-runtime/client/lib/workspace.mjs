@@ -962,6 +962,40 @@ export function makeWorkspaceStepCode({loginomUrl,build,sessionId,workflowRef,re
   }`;
 }
 
+export function makeWorkspaceSchemaCode({loginomUrl,build,sessionId,workflowRef,readGraph,types}) {
+  const url=new URL(loginomUrl);
+  const options={origin:url.origin,pathname:url.pathname,expectedBuild:build,sessionId,workflowRef};
+  const icons=Object.values(types).map(({type,icon_class})=>({type,icon_class}));
+  return `async page=>{
+    const options=${JSON.stringify(options)};
+    const outcome=output=>({status:'SUCCEEDED',phase:'observed',action_key:'workspace.schema',action_revision:'1',
+      effect_possible:false,error:null,trace:[],output:{snapshot:output}});
+    const state=await (${captureWorkspaceStep.toString()})(page,options);
+    if(state.status!=='READY')return outcome(null);
+    const graph=await (${readGraph.toString()})(page,{request:{document_id:state.document_id,workflow_ref:state.workflow_ref},
+      types:${JSON.stringify(icons)},origin:options.origin,build:options.expectedBuild,
+      window_blocker_selector:'.x-window,.bg-dialog,.x-message-box,[data-tid$=";WizrdMCF;btnClose"]',
+      step_rebaseline:true,schema_snapshot:true});
+    if(!graph.interaction_ready)return outcome(null);
+    const portKey=(node,direction,kind,index)=>JSON.stringify([node,direction,kind,index]);
+    const ports=new Map(graph.nodes.flatMap(n=>n.snapshot_ports.map(p=>[portKey(n.ref.node_id,p.direction,p.kind,p.index),p.guid])));
+    const endpoint=(node_guid,direction,kind,index)=>({node_guid,kind,index,
+      port_guid:ports.get(portKey(node_guid,direction,kind,index))??null});
+    const links=[
+      ...graph.links.map(l=>{
+        const source=ports.has(portKey(l.source,'output','tree',l.output))?'tree':'data';
+        return {source:endpoint(l.source,'output',source,l.output),target:endpoint(l.target,'input',source,l.input)};
+      }),
+      ...(graph.variable_links??[]).map(l=>({source:endpoint(l.source,'output','variables',l.output),
+        target:endpoint(l.target,'input',l.kind,l.input)})),
+    ];
+    return outcome({name:state.package_ref.name,document_id:state.document_id,workflow_id:state.workflow_ref.workflow_id,
+      navigation_path:state.workflow_ref.navigation_path.map(crumb=>crumb.label),
+      nodes:graph.nodes.map(n=>({guid:n.ref.node_id,label:n.label,type:n.type,position:n.position,ports:n.snapshot_ports,
+        ...(n.boundary_role?{boundary_role:n.boundary_role}:{})})),links});
+  }`;
+}
+
 export function parseWorkspacePreparation(response, onNativeStepOwner) {
   if (response?.isError) throw new Error('Loginom workspace preparation failed');
   for (const block of response?.content ?? []) {

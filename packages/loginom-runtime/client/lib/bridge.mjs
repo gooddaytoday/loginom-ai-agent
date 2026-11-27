@@ -19,7 +19,7 @@ import {createCandidateNodeSupport} from './node-support.mjs';
 import {NODE_ADD_ONLY_MODE,NODE_TYPES} from './node-contracts.mjs';
 import {readGraph} from './node-target-browser.mjs';
 import {isNodeApiTool,dispatchNodeApi} from './node-api.mjs';
-import { makeWorkspacePrepareCode, makeWorkspaceStepCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace, workspaceObserveTool, packageReadOnlyAdvice } from './workspace.mjs';
+import { makeWorkspacePrepareCode, makeWorkspaceStepCode, makeWorkspaceSchemaCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace, workspaceObserveTool, packageReadOnlyAdvice } from './workspace.mjs';
 import { makeBrowserGeometryCode, parseBrowserGeometry } from './browser-geometry.mjs';
 import { createExecutionJournal } from './execution-journal.mjs';
 import {createRedactor} from './redact.mjs';
@@ -966,6 +966,20 @@ export async function createBridge(config, session, { browserTransport: managedB
         ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
     });
     return { server, catalog,
+      async packageSchema(signal) {
+        const prepared=session.metadata.workspacePreparation?.state, workflowRef=session.metadata.workflowRef;
+        if (!session.metadata.workspaceReady || prepared?.status!=='READY' || !workflowRef
+          || actionRuntime?.hasUnsettledWork() || actionRuntime?.hasActiveWork()
+          || recovery.unsettled() || clipboardUncertain || heldLeases.size>0) return null;
+        const code=makeWorkspaceSchemaCode({loginomUrl:config.loginomUrl,build:prepared.target.loginom_build,
+          sessionId:session.metadata.sessionId,workflowRef:{...workflowRef,document_id:prepared.document_id},
+          readGraph,types:NODE_TYPES});
+        const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{
+          code:config.storageDirectories?withStorageIdentity(code,session.metadata.storageBinding):code,
+        }},undefined,{timeout:10000,signal});
+        const result=parseCapabilityResult(response,{redactor});
+        return result.status==='SUCCEEDED' ? redactor.redact(result.output.snapshot) : null;
+      },
       applyWithScanReceipt(args,receipt,extra) {
         return callTool({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);
       },

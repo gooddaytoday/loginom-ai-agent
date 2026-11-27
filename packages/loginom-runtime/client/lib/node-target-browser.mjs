@@ -16,7 +16,7 @@ export async function readGraph(page, task) {
     .filter(r=>r.state==='completed'&&r.outcome?.status==='SUCCEEDED'&&r.outcome.action_key==='ui.act'&&r.outcome.cleanup_complete===true)
     .map(r=>({context:r.outcome.output?.prepared_node_context,trace:r.outcome.trace}));
   return page.evaluate(({ request, types, origin, build, read_bindings=false, window_blocker_selector,
-    track_link_guids=false, finishes, step_rebaseline=false, reopened }) => {
+    track_link_guids=false, finishes, step_rebaseline=false, schema_snapshot=false, reopened }) => {
     const fail = message => { throw new Error(message); };
     const preparation = globalThis.__loginomDockPreparationV1;
     if (location.origin !== origin || globalThis.bg?.app?.Version !== build || preparation?.document !== document
@@ -56,11 +56,13 @@ export async function readGraph(page, task) {
     // Older hosts without this native class still support the graph driver,
     // but cannot enter a bound composite node configuration.
     if (record.nodeTargetWorkflowNode && record.nodeTargetWorkflowNode !== workflowNode) fail('Prepared workflow object changed');
-    if (workflowNode) record.nodeTargetWorkflowNode=workflowNode;
-    const epochs=preparation.nodeTargetDomEpochs??={objects:new WeakMap(),next:0};
+    if (workflowNode && !schema_snapshot) record.nodeTargetWorkflowNode=workflowNode;
+    const epochs=schema_snapshot?{objects:new WeakMap(),next:0}
+      :preparation.nodeTargetDomEpochs??={objects:new WeakMap(),next:0};
     const epoch=e=>{if(!epochs.objects.has(e))epochs.objects.set(e,++epochs.next);return epochs.objects.get(e);};
     const domEpoch=epoch(containers[0]);
-    const portIdentities=record.nodeTargetPortIdentities??=new WeakMap();
+    const portIdentities=schema_snapshot?(record.nodeTargetPortIdentities??new WeakMap())
+      :record.nodeTargetPortIdentities??=new WeakMap();
     const stepPorts=[];
     const collection = diagram.FNodes?.FCollection;
     if (!Array.isArray(collection) || collection.length > 200) fail('Graph node bound exceeded');
@@ -83,7 +85,7 @@ export async function readGraph(page, task) {
       const type=boundaryRole==='output'?'control.supernode_output':nodeTypes.find(t=>t.type!=='control.supernode_output'&&t.icon_class===n.FIconCls)?.type??n.FIconCls;
       if(boundaryRole&&(n.FIconCls!=='bg-vendor-icon-nullvendor'||!n.data
         ||(n.FPorts??[]).flatMap(g=>g.FCollection??[]).some(p=>p.parent!==n||p.FCell?.parent!==n.FCell||p.FType!==(boundaryRole==='input'?1:0))))fail('Submodel boundary identity changed');
-      const inputs = [], outputs = [], allPorts=[],variableInputs=[],variableOutputs=[];
+      const inputs = [], outputs = [], allPorts=[],variableInputs=[],variableOutputs=[],snapshotPorts=[];
       for (const ports of n.FPorts ?? []) for (const p of ports.FCollection ?? []) {
         const element = graph.view.getState(p.FCell)?.shape?.node;
         let ptid = element?.getAttribute('data-tid');
@@ -164,13 +166,19 @@ export async function readGraph(page, task) {
           previous_tid:previous?.tid??null,type:p.FType,subtype:p.FSubType}));
         if (!ptid || !containers[0].contains(element)) continue; // Hidden service ports are outside tabular phase.
         if(!ptid.startsWith(tid+';'))fail('Port identity belongs to another node');
-        if(renderedPort.getAttribute('data-tid')===ptid && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
-          && (nativeRebound||[...exact(ptid)].filter(e=>containers[0].contains(e)).length===1)){
+        const nativePort=renderedPort.getAttribute('data-tid')===ptid && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
+          && (nativeRebound||[...exact(ptid)].filter(e=>containers[0].contains(e)).length===1);
+        if(nativePort&&!schema_snapshot){
           const identity={graph,node:n,cell:p.FCell,guid:p.FGuid,data:p.data,nodeTid:tid,type:p.FType,subtype:p.FSubType,tid:ptid};
           if(step_rebaseline)stepPorts.push([p,identity]);else portIdentities.set(p,identity);
         }
         const suffix = ptid.slice(tid.length + 1), m = /^(Input|Output)_Data(Tree)?-(\d+)$/.exec(suffix);
         const variable=/^(Input|Output)_Var-(\d+)$/.exec(suffix),control=suffix==='Input_ControlVar';
+        if(schema_snapshot&&m){
+          const direction=m[1]==='Input'?'input':'output';
+          snapshotPorts.push({direction,index:Number(m[3]),name:suffix,kind:m[2]?'tree':'data',
+            guid:nativePort&&p.FType===(direction==='input'?0:1)?p.FGuid:null});
+        }
         if([3,4].includes(p.FSubType)&&!variable&&!control)fail('Variable port native identity changed');
         if(variable||control){
           const direction=control?'Input':variable[1],kind=control?'control':'variables',nativeIndex=control?0:Number(variable[2]);
@@ -196,6 +204,12 @@ export async function readGraph(page, task) {
         if(new Set(selected.map(p=>p.native_index)).size!==selected.length||kind==='control'&&selected.length>1)fail('Ambiguous variable port indexes');
         selected.forEach((p,i)=>{p.port=i;});
       }
+      if(schema_snapshot){
+        for(const port of snapshotPorts)port.index=(port.direction==='input'?inputs:outputs).indexOf(port.index);
+        for(const [direction,ports] of [['input',variableInputs],['output',variableOutputs]])
+          for(const port of ports)snapshotPorts.push({direction,index:port.port,name:'',kind:port.kind,guid:port.port_guid});
+        if(snapshotPorts.length>100)fail('Graph port bound exceeded');
+      }
       const variablePorts=variableInputs.length||variableOutputs.length?{variable_inputs:variableInputs,variable_outputs:variableOutputs}:{};
       const kinds={};
       for(const [direction,indexes] of [['Input',inputs],['Output',outputs]]){
@@ -209,6 +223,7 @@ export async function readGraph(page, task) {
       for(const p of byTid.values())if(p.node===n.FGuid)p.index=(p.direction==='Input'?inputs:outputs).indexOf(p.index);
       return {ref:{document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,node_id:n.FGuid},type,label,...(boundaryRole?{boundary_role:boundaryRole}:{}),dom_epoch:epoch(dom),
         position:{x:n.FCell.geometry.x,y:n.FCell.geometry.y},inputs:inputs.map((_,i)=>i),outputs:outputs.map((_,i)=>i),...kinds,...variablePorts,
+        ...(schema_snapshot?{snapshot_ports:snapshotPorts}:{}),
         other_ports:allPorts.filter(p=>! /^(Input|Output)_Data(?:Tree)?-\d+$/.test(p)).sort(),locked:n.FLocked===true};
     }).sort((a,b)=>a.ref.node_id.localeCompare(b.ref.node_id));
     const links=[],variable_links=[],foreign_links=[],rest_connection_links=[];

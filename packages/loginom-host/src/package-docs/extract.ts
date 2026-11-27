@@ -18,15 +18,36 @@ const portNames: Record<string, string> = {
 export type PackageStructure = Awaited<ReturnType<typeof extractPackage>>
 
 export async function extractPackage(path: string) {
+  return extractPackageBytes(path, await readFile(path))
+}
+
+export async function extractPackageBytes(fileName: string, bytes: Uint8Array, xmlBudget?: number) {
   // zip.js slices must own their buffers; Buffer.slice retains the original byte offset.
-  const zip = new ZipReader(new Uint8ArrayReader(new Uint8Array(await readFile(path))), { useWebWorkers: false })
+  const zip = new ZipReader(new Uint8ArrayReader(new Uint8Array(bytes)), { useWebWorkers: false })
   try {
     const entries = await zip.getEntries()
     const members = new Map(entries.map((entry) => [normalized(entry.filename), entry]))
     async function xml(name: string) {
       const entry = members.get(normalized(name))
       if (!entry?.getData || entry.directory) return undefined
-      const bytes = await entry.getData(new Uint8ArrayWriter())
+      let bytes: Uint8Array
+      if (xmlBudget === undefined) {
+        bytes = await entry.getData(new Uint8ArrayWriter())
+      } else {
+        xmlBudget -= entry.uncompressedSize
+        if (xmlBudget < 0) throw Error("PACKAGE_SCHEMA_TOO_LARGE")
+        const data = new Uint8Array(entry.uncompressedSize)
+        let offset = 0
+        await entry.getData(new WritableStream<Uint8Array>({
+          write(chunk) {
+            if (offset + chunk.byteLength > data.byteLength) throw Error("PACKAGE_SCHEMA_TOO_LARGE")
+            data.set(chunk, offset)
+            offset += chunk.byteLength
+          },
+        }), { checkSignature: true })
+        if (offset !== data.byteLength) throw Error("PACKAGE_DOCS_XML_INVALID")
+        bytes = data
+      }
       const fail = () => { throw Error("PACKAGE_DOCS_XML_INVALID") }
       return new DOMParser({ errorHandler: { warning: fail, error: fail, fatalError: fail } })
         .parseFromString(new TextDecoder("utf-8", { fatal: true }).decode(bytes), "application/xml").documentElement
@@ -63,7 +84,7 @@ export async function extractPackage(path: string) {
     const total = (key: keyof ReturnType<typeof statistics>) => modules.reduce((sum, module) => sum + module.stats[key], 0)
     return {
       schema_version: "package_docs.structure.v1",
-      package: { file_name: basename(path), name: info.getAttribute("Name") ?? basename(path, extname(path)),
+      package: { file_name: basename(fileName), name: info.getAttribute("Name") ?? basename(fileName, extname(fileName)),
         application_version: info.getAttribute("ApplicationVersion") ?? "", guid: info.getAttribute("Guid") ?? "", external_references: external },
       stats: { modules: modules.length, notes: total("notes"), nodes: total("nodes"), submodels: total("submodels"),
         programming_nodes: total("programming_nodes"), reference_nodes: total("reference_nodes"), derived_nodes: total("derived_nodes") },
@@ -97,7 +118,34 @@ function nodeEntry(node: Element, path: string, depth: number) {
   const expressions = engine_type === "TBGCalcData" ? items(child(engine, "Expressions")).map((expression) => ({
     Name: expression.getAttribute("Name") ?? "", DataType: expression.getAttribute("DataType") ?? "", Expression: expression.getAttribute("Expression") ?? "",
   })) : []
-  return { guid, name, display_name, label, service_name, engine_type, vendor_guid: node.getAttribute("VendorGuid") ?? "",
+  const point = child(node, "Position")
+  const left = point?.getAttribute("Left"), top = point?.getAttribute("Top")
+  const position = left?.trim() && top?.trim() && Number.isFinite(Number(left)) && Number.isFinite(Number(top))
+    ? { x: Number(left), y: Number(top) }
+    : undefined
+  const filter = engine_type === "TBGFilterDataEngine" && child(engine, "Filter")
+  const filter_conditions = filter ? items(filter).map((item) => ({
+    field: item.getAttribute("Name") ?? "",
+    relation: item.getAttribute("RelationType") ?? "",
+    join: item.getAttribute("ConcatenationType") || null,
+    value: child(item, "CompareValue")?.textContent ?? (item.hasAttribute("CompareValue") ? item.getAttribute("CompareValue") : null),
+  })) : undefined
+  const grouping = engine_type === "TBGGroupDataEngine" ? items(child(component, "InputSockets")).flatMap((input) =>
+    items(child(child(child(input, "Socket"), "DataSource"), "ColumnDefs")).flatMap((column) => {
+      const usage = column.getAttribute("UsageType")
+      const field = column.getAttribute("InputColumnInfoName") || column.getAttribute("Name")
+      if (!field || (usage !== "utGroup" && usage !== "utValue")) return []
+      const extension = items(child(column, "Extensions")).map((item) => child(item, "Extension"))
+        .find((value) => value?.getAttributeNS("http://www.w3.org/2001/XMLSchema-instance", "type") === "TBGGroupDataColumnDefExtension")
+      return [{ field, role: usage === "utGroup" ? "group" as const : "measure" as const,
+        functions: extension?.getAttribute("GroupFunctions") || null }]
+    }),
+  ) : undefined
+  return { guid, name, display_name, label, service_name, engine_type,
+    ...(position ? { position } : {}),
+    ...(filter_conditions ? { filter_conditions } : {}),
+    ...(grouping ? { grouping_fields: grouping } : {}),
+    vendor_guid: node.getAttribute("VendorGuid") ?? "",
     input_ports: ports("InputPorts"), output_ports: ports("OutputPorts"), service_input_ports: ports("ServiceInputPorts"), service_output_ports: ports("ServiceOutputPorts"),
     settings_main: Object.fromEntries([
       ...Array.from(engine?.attributes ?? []).filter((attribute) =>
