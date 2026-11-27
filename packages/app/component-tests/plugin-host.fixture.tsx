@@ -1,3 +1,4 @@
+import { createMemoryHistory, MemoryRouter, useLocation } from "@solidjs/router"
 import type { PluginInfo, SessionMessageInfo } from "@opencode/client/promise"
 import { DialogProvider, useDialog } from "@opencode/ui/context/dialog"
 import { Menu } from "@opencode/ui/menu"
@@ -30,6 +31,7 @@ import {
   onCleanup,
   runWithOwner,
   Show,
+  type JSX,
   type Component,
   type ParentProps,
 } from "solid-js"
@@ -54,6 +56,8 @@ import { LanguageProvider } from "../src/runtime/i18n/language"
 import { ExtensionPlugins } from "../src/runtime/plugin/extension-plugins"
 import { SessionPluginPills } from "../src/session/composer/plugin-pills"
 import { ui } from "../src/runtime/plugin/ui"
+import { PluginPageNav, PluginPageRoute } from "../src/runtime/plugin/pages"
+import { pagePlugin } from "./page-plugin.fixture"
 
 export {
   bindPlugin,
@@ -234,6 +238,7 @@ export function mountPluginHost(input?: { builtins: ReadonlySet<string>; View: C
  */
 export function mountPlugins(input: {
   definitions: readonly Entry[]
+  surface?: () => JSX.Element
   disabled?: readonly string[]
   bridge?: Bridge
   stored?: Readonly<Record<string, Json>>
@@ -303,6 +308,7 @@ export function mountPlugins(input: {
           )}
         </Show>
         <PluginSlot at="window.bottom" input={{}} />
+        {input.surface?.()}
       </Show>
     )
   }
@@ -364,6 +370,35 @@ export function mountPlugins(input: {
     /** Errors that reached the error boundary above the host. */
     escaped: () => [...escaped],
   }
+}
+
+export function mountPluginPages(options?: Parameters<typeof pagePlugin>[0]) {
+  const plugin = pagePlugin(options)
+  const history = createMemoryHistory()
+
+  function Pages() {
+    const location = useLocation()
+
+    return (
+      <>
+        <PluginPageNav />
+        <Show when={location.pathname !== "/"} fallback={<h1>Fixture Home</h1>}>
+          <PluginPageRoute />
+        </Show>
+      </>
+    )
+  }
+
+  const host = mountPlugins({
+    definitions: [plugin],
+    surface: () => (
+      <MemoryRouter history={history}>
+        <Pages />
+      </MemoryRouter>
+    ),
+  })
+
+  return { disable: () => host.disable([plugin.id]), unmount: host.unmount }
 }
 
 const web: Platform = {
