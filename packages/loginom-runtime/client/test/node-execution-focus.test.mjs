@@ -37,17 +37,25 @@ for(const fault of [undefined,'root','record','node'])test('empty import waits f
  if(fault)assert.equal(actions.length,0);
 });
 
-test('already open console captures its toolbar before the next confirmed launch',async()=>{
+test('confirmed launch polls past baseline groups before identifying the new group',async()=>{
  // LAB-713 :354-370 scopes reads to ConsoleForm; the toolbar is only
  // observed after Close. The subsequent graph/output read omits it again.
- let opened=true,menu=false,launched=false,captured=false;
+ let opened=true,menu=false,launched=false,captured=false,identifySamples=0;
+ const baselineGroups=['7','8'].map(process_id=>({process_id,record_id:'old-'+process_id,parent_id:null,state:'completed',error:false}));
  const el=(tid,allowed_actions=['click'])=>({tid,ref:tid,signature:{tid},allowed_actions});
  const state=()=>({prepared_node_context:{...node,verified:true,surface:'graph'},
-  node_processes:{verified:true,inventory_complete:true,show_completed:true,root_id:'root',node_context:{...node,verified:true},processes:launched?[
-   {process_id:'1',record_id:'group',parent_id:null,state:'completed',error:false}]:[]},
+  node_processes:{verified:true,inventory_complete:true,show_completed:true,root_id:'root',node_context:{...node,verified:true},processes:[...baselineGroups,
+   ...(identifySamples>=3?[{process_id:'9',record_id:'group',parent_id:null,state:'completed',error:false}]:[])]},
   ui:{elements:opened?[el(grid,['right_click']),el('ConsoleForm;btnClose'),...(menu?[el('mnContextMenu;mniShowCompletedProcesses',['click','press'])]:[])]:[el(button)]}});
  const channel={get launchConfirmed(){return launched;},observe:async o=>{
   if(!opened&&!launched&&o.readProcessControls)captured=true;
+  if(o.pollExecution){
+   while(identifySamples<3){
+    identifySamples++;
+    const s=state();
+    if(o.ready(s))return s;
+   }
+  }
   const s=state();assert.ok(o.ready(s),o.condition);return s;
  },perform:async o=>{
   const s=state();assert.ok(o.ready(s));const a=o.resolve(s);
@@ -55,8 +63,12 @@ test('already open console captures its toolbar before the next confirmed launch
   if(a.verb==='right_click')menu=true;if(a.verb==='press')menu=false;if(a.ref==='ConsoleForm;btnClose')opened=false;
   return {status:'SUCCEEDED'};
  }};
- const driver=createNodeExecutionProcedure(channel,node);await driver.prepare();launched=true;
- assert.equal((await driver.identify()).group_id,'1');
+ const driver=createNodeExecutionProcedure(channel,node);
+ const baseline=await driver.prepare();
+ assert.deepEqual(baseline.roots.map(p=>p.process_id),['7','8']);
+ launched=true;
+ assert.equal((await driver.identify()).group_id,'9');
+ assert.equal(identifySamples,3);
 });
 async function fixture({hide=true,replace=false,lost=false,failure=false,closeFault=false,failedChild=false,
  training=false,trainUnknown=false,verifyFailedChild=false,ownerNode='node',childState='failed',showMismatch=false,changedError=false,replaceAtMenu=false,deadlineFault=false,cachedGroup=false,groupFault,repaintGroup=false,paintFault}={}){
@@ -101,6 +113,15 @@ for(const hide of [false,true])test('completion verifies the same process after 
  assert.equal(f.actions.filter(a=>a.ref===button).length,hide?1:0);
  assert.equal(f.actions.filter(a=>a.verb==='show_process_node').length,1);
  assert.equal(f.actions.some(a=>a.verb==='execute_graph_node'),false);
+});
+
+test('an expanded loaded group reuses the terminal observation before Show Node',async()=>{
+ const f=await fixture();
+ assert.equal((await f.driver.waitCompleted()).owner_verified,true);
+ assert.ok(f.observations.some(o=>o.condition==='one new node execution group'&&o.pollExecution===true));
+ assert.ok(f.observations.some(o=>o.condition==='new node execution completed'&&o.pollExecution===true));
+ assert.ok(!f.observations.some(o=>o.condition==='execution child processes loaded'));
+ assert.equal(f.actions.filter(a=>a.verb==='show_process_node').length,1);
 });
 test('reopening cannot accept a replaced execution child',async()=>{
  const f=await fixture({replace:true});await assert.rejects(f.driver.waitCompleted(),/selected requested node process/);

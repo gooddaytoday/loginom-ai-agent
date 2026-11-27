@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {configureOutputAutosync} from '../lib/port-mapping-procedure.mjs';
+import {configureOutputAutosync,configureRequestedOutputAutosync} from '../lib/port-mapping-procedure.mjs';
+import {validateNodeUiAction} from '../lib/workspace-ui.mjs';
 
 function fixture(initial=true) {
  let value=initial,mutations=0,changed=false,foreign=false;
@@ -27,6 +28,22 @@ test('autosync refuses changed fields and foreign wizard after an effect without
 });
 test('autosync requires an explicit boolean before observation',async()=>{
  await assert.rejects(configureOutputAutosync({},'false'),/boolean/);
+});
+test('output rename freezes native layout unless the request explicitly keeps autosync',async()=>{
+ const rename={direction:'output',port:0,changes:[{source:{kind:'configured_field',name:'Id'},name:'Renamed'}]};
+ for(const [mapping,expected,gestures] of [[rename,false,1],[{...rename,autosync:true},true,0]]){
+  const f=fixture(),changes=[];
+  await configureRequestedOutputAutosync(f.channel,mapping,changes);
+  assert.equal(changes[0].autosync.value,expected);
+  assert.equal(f.mutations(),gestures);
+ }
+});
+test('a fields-only output order freezes the layout',async()=>{
+ const f=fixture(),changes=[];
+ const fields=['Amount','Id'].map(name=>({source:{kind:'configured_field',name}}));
+ await configureRequestedOutputAutosync(f.channel,{direction:'output',port:0,fields},changes);
+ assert.equal(f.mutations(),1);
+ assert.deepEqual(changes.map(change=>change.autosync),[{before:true,value:false}]);
 });
 
 test('configured mapping resolves duplicate labels by source name with explicit order and exclusion',async()=>{
@@ -55,38 +72,71 @@ test('second output mapping requires the verified exact native port owner',async
  assert.throws(()=>resolve({direction:'input',port:1},configured,native),/direction/);
 });
 
-function fieldFixture({links=false}={}) {
+function fieldFixture({links=false,prepared=false,ineligible=false,batchFailure,secondField=false}={}) {
  const original={record_id:'t',field_id:'0',index:0,name:'Amount',label:'Amount',type:'real',data_kind:'Непрерывный',
   source:{record_id:'s',field_id:'0',index:0,name:'Amount',label:'Amount',type:'real'}};
- let current=structuredClone(original),editor=false,draft={},mutations=0,table=!links;
- const field={current:structuredClone(original),source:original.source,name:'Mapped',label:'Сумма'};
+ const targets=[structuredClone(original)];
+ if(secondField)targets.push({...structuredClone(original),record_id:'t2',field_id:'1',index:1,name:'Other',label:'Other',
+  source:{record_id:'s2',field_id:'1',index:1,name:'Other',label:'Other',type:'real'}});
+ const sources=structuredClone(targets.map(target=>target.source));
+ let editor=null,draft={},mutations=0,table=!links;
+ const field={current:structuredClone(original),source:original.source,name:'Mapped',label:'Сумма'},observations=[],actions=[];
+ const property=name=>({status:'observed',value:draft[name],input_ref:'ui-'+name,owner_ref:'owner-'+name});
  const state=()=>{
-  const row={...current,status:'observed',name_ref:'name',selected:editor};
-  const params=editor?{status:'observed',root_ref:'editor',selected_column:{...original,status:'observed'},fields:{name:{value:draft.name,input_ref:'name'},label:{value:draft.label,input_ref:'label'}}}:undefined;
-  const fields=[row];
-  return {wizard:{status:'observed',stage:'output_mapping',root_ref:'wizard',root_tid:'W',column_parameters:params,
-   output_columns:{fields,page:{status:'complete_definition_page',offset:0,limit:8,returned:1,total_columns:1,next_offset:null,schema_id:'schema'}}},
-   node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,autosync:false,source_fields:[original.source],target_fields:[current],rendered_indices:[0],
+  const fields=targets.map(target=>({...target,status:'observed',name_ref:'name-'+target.record_id,selected:editor===target}));
+  const params=editor?{status:'observed',root_ref:'editor',selected_column:{...editor,status:'observed'},fields:{name:property('name'),label:property('label')}}:undefined;
+  return {...(prepared?{prepared_node_context:{verified:true,surface:'wizard'}}:{}),wizard:{status:'observed',stage:'output_mapping',root_ref:'wizard',root_tid:'W',column_parameters:params,
+   output_columns:{fields,page:{status:'complete_definition_page',offset:0,limit:8,returned:fields.length,total_columns:fields.length,next_offset:null,schema_id:'schema'}}},
+   node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,autosync:false,source_fields:sources,target_fields:targets,rendered_indices:fields.map(f=>f.index),
     ...(links?{mapping_wizard:'DerivedDataSourceOutputSocketWizard',node_context:{verified:true,node_id:'own'}}:{}),
     ...(links&&!table?{source_selection:{verified:true,record_ids:[]}}:{})},
    ui:{elements:[...(links?['Table','Links'].map(view=>({ref:view,tid:'W;DerivedDataSourceOutputSocketWizard;rb'+view+';DisplayEl',
       signature:{check_state:{kind:'radio',source:'loginom_ext',checked:view==='Table'?table:!table}},allowed_actions:['click']})):[]),
-    ...(editor?[...['name','label'].map(k=>({ref:k,wizard_field:{scope:'output_column',name:k},allowed_actions:['set_wizard_field']})),
-      {ref:'apply',column_close:{scope:'output'},allowed_actions:['apply_output_column']}]:[{ref:'name',allowed_actions:['double_click']}])]}};
+    ...(editor?[...['name','label'].map(k=>({ref:'ui-'+k,wizard_field:{scope:'output_column',name:k,root_ref:'editor',
+       wizard_root_ref:'wizard',owner_ref:ineligible&&k==='label'?'foreign':'owner-'+k},allowed_actions:['set_wizard_field']})),
+      {ref:'apply',column_close:{scope:'output'},allowed_actions:['apply_output_column']}]:fields.map(f=>({ref:f.name_ref,allowed_actions:['double_click']})))]}};
  };
- const channel={async observe(o){const s=structuredClone(state());if(!o.ready(s))throw Error('Not ready');return s;},
-  async perform(o){const s=structuredClone(state());assert.ok(o.ready(s));const a=o.resolve(s);mutations++;
-   if(a.verb==='click'&&a.ref==='Table'){table=true;channel.afterTable?.(current);}
-   else if(a.verb==='double_click'){editor=true;draft={name:current.name,label:current.label};}
-   else if(a.verb==='set_wizard_field')draft[a.ref]=a.text;
-   else if(a.verb==='apply_output_column'){current={...current,...draft};editor=false;channel.afterApply?.(current);}
+ const channel={async observe(o){observations.push(o.condition);const s=structuredClone(state());channel.onObserve?.(o,s);if(!o.ready(s))throw Error('Not ready');return s;},
+  async perform(o){const s=structuredClone(state());assert.ok(o.ready(s));const a=o.resolve(s);actions.push(a.verb);mutations++;
+   if(a.verb==='click'&&a.ref==='Table'){table=true;channel.afterTable?.(targets[0]);}
+   else if(a.verb==='double_click'){editor=targets.find(f=>'name-'+f.record_id===a.ref);draft={name:editor.name,label:editor.label};}
+   else if(a.verb==='set_wizard_field')draft[a.ref.slice(3)]=a.text;
+   else if(a.verb==='set_wizard_fields'){
+    validateNodeUiAction(a,s,s.prepared_node_context);
+    if(batchFailure)throw batchFailure;
+    for(const {ref,text} of a.fields)draft[ref.slice(3)]=text;
+    return {output:structuredClone(state())};
+   }
+   else if(a.verb==='apply_output_column'){Object.assign(editor,draft);channel.afterApply?.(editor);editor=null;}
    else throw Error('Unexpected action');
   }};
- return {channel,field,mutations:()=>mutations};
+ return {channel,field,mutations:()=>mutations,observations,actions};
 }
 test('output field driver edits name and label once and proves native source preservation',async()=>{
  const {configureOutputField}=await import('../lib/port-mapping-procedure.mjs');
  const f=fieldFixture(),r=await configureOutputField(f.channel,f.field);assert.equal(r.verified,true);assert.equal(r.field.name,'Mapped');assert.equal(r.field.source.record_id,'s');assert.equal(f.mutations(),4);
+});
+test('prepared output editor uses the batch readback for Apply and verifies the native mapping',async()=>{
+ const {configureOutputField}=await import('../lib/port-mapping-procedure.mjs');
+ const f=fieldFixture({prepared:true}),result=await configureOutputField(f.channel,f.field);
+ assert.equal(result.field.name,'Mapped');assert.equal(result.field.label,'Сумма');
+ assert.equal(f.mutations(),3);
+ assert.ok(!f.observations.includes('output field Apply ready'));
+ assert.ok(f.observations.includes('native output field after Apply'));
+});
+test('prepared output editor falls back before dispatch if the batch validator rejects a field binding',async()=>{
+ const {configureOutputField}=await import('../lib/port-mapping-procedure.mjs');
+ const f=fieldFixture({prepared:true,ineligible:true}),result=await configureOutputField(f.channel,f.field);
+ assert.equal(result.field.name,'Mapped');assert.equal(result.field.label,'Сумма');
+ assert.deepEqual(f.actions,['double_click','set_wizard_field','set_wizard_field','apply_output_column']);
+ assert.ok(f.observations.includes('output field Apply ready'));
+ assert.ok(f.observations.includes('native output field after Apply'));
+});
+test('prepared output editor refuses further writes after an uncertain batch',async()=>{
+ const {configureOutputField}=await import('../lib/port-mapping-procedure.mjs');
+ const failure=new Error('Batch receipt uncertain'),f=fieldFixture({prepared:true,batchFailure:failure});
+ await assert.rejects(configureOutputField(f.channel,f.field),error=>error===failure);
+ assert.deepEqual(f.actions,['double_click','set_wizard_fields']);
 });
 test('output field driver rejects changed identity and unexpected post-Apply state',async()=>{
  const {configureOutputField}=await import('../lib/port-mapping-procedure.mjs');
@@ -100,11 +150,17 @@ test('output field driver preserves a matching field without opening its editor'
 test('planned output edits bind their baseline after the owned Links to Table switch (D69 p18)',async()=>{
  const {configureOutputFields}=await import('../lib/port-mapping-procedure.mjs');
  const f=fieldFixture({links:true});
+ const observations=[],observe=f.channel.observe;
+ f.channel.observe=o=>{observations.push(o);return observe(o);};
  const result=await configureOutputFields(f.channel,{direction:'output',port:0,fields:[{source:{kind:'configured_field',name:'Amount'},name:'Mapped',label:'Сумма'}]},
   [{name:'Amount',label:'Amount',type:'real',used:true}]);
  assert.equal(result.verified,true);assert.equal(result.definition.source_selection,undefined);
  assert.equal(result.definition.target_fields[0].name,'Mapped');assert.equal(result.definition.target_fields[0].source.record_id,'s');
  assert.equal(f.mutations(),5);
+ assert.equal(observations.filter(o=>o.readMappings&&o.outputColumnPage).length,1,
+  'Bind the addressed row and the complete native mapping in one observation');
+ assert.equal(observations.filter(o=>o.readMappings&&!o.outputColumnPage).length,3,
+  'Reuse the Table view receipt and check the complete mapping after Apply');
 });
 test('D69 output edits still reject unrelated native changes at the view switch or field Apply',async()=>{
  const {configureOutputFields}=await import('../lib/port-mapping-procedure.mjs');
@@ -116,6 +172,24 @@ test('D69 output edits still reject unrelated native changes at the view switch 
  }
 });
 
+test('planned output edits refuse a changed native mapping on the second addressed read',async()=>{
+ const {configureOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const f=fieldFixture({secondField:true});
+ const configured=['Amount','Other'].map(name=>({name,label:name,type:'real',used:true}));
+ const mapping={direction:'output',port:0,fields:configured.map(({name})=>({source:{kind:'configured_field',name},name:name+'Mapped'}))};
+ const normal=fieldFixture({secondField:true});
+ const result=await configureOutputFields(normal.channel,mapping,configured);
+ assert.deepEqual(result.definition.target_fields.map(field=>field.name),['AmountMapped','OtherMapped']);
+ f.channel.onObserve=(options,state)=>{
+  if(options.readMappings&&options.outputColumnPage&&f.actions.includes('apply_output_column')){
+   assert.equal(state.node_mapping.target_fields[0].name,'AmountMapped');
+   state.node_mapping.target_fields[0].label='Changed after Apply';
+  }
+ };
+ await assert.rejects(configureOutputFields(f.channel,mapping,configured),/Not ready/);
+ assert.deepEqual(f.actions,['double_click','set_wizard_field','apply_output_column']);
+});
+
 function reorderFixture(grouped=false,sourceSelection) {
  const sources=(grouped?['A','B','C','D']:['A','B','C']).map((name,i)=>({name,label:name,record_id:'s'+i,field_id:String(i),index:i,type:'string'}));
  let fields=sources.map((source,index)=>({name:source.name,label:source.label,type:'string',data_kind:'Дискретный',record_id:'t'+index,field_id:String(index),index,source})),selected=null,actions=0;
@@ -123,14 +197,39 @@ function reorderFixture(grouped=false,sourceSelection) {
  const state=()=>({wizard:{root_ref:'wizard',root_tid:'W',stage:'output_mapping',output_columns:{page:{status:'complete_definition_page',schema_id:'schema',offset:0,limit:8,total_columns:fields.length,returned:fields.length,next_offset:null},fields:fields.map(f=>({...f,status:'observed',name_ref:f.record_id,selected:f.record_id===selected}))}},
   node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,autosync:false,...(grouped?{mapping_wizard:'DerivedDataSourceOutputSocketWizard'}:{}),...(sourceSelection===undefined?{}:{source_selection:sourceSelection}),source_fields:sources,target_fields:fields,rendered_indices:fields.map(f=>f.index)},
   ui:{elements:[...fields.map(f=>({ref:f.record_id,allowed_actions:['click']})),{ref:'up',tid:'W;'+(grouped?'DerivedDataSourceOutputSocketWizard':'ColumnsMappingEngineOutputPortWizard')+';btnMoveMappingColumnUp',allowed_actions:['click']}]}});
- const channel={async observe(o){const s=structuredClone(state());if(!o.ready(s))throw Error('Not ready');return s;},async perform(o){const s=structuredClone(state());assert.ok(o.ready(s));const a=o.resolve(s);actions++;
+ const channel={async observe(o){const s=structuredClone(state());channel.onObserve?.(o,s);if(!o.ready(s))throw Error('Not ready');return s;},async perform(o){const s=structuredClone(state());assert.ok(o.ready(s));const a=o.resolve(s);actions++;
   if(a.ref!=='up')selected=a.ref;else{const index=fields.findIndex(f=>f.record_id===selected);assert.ok(index>0);if(grouped)assert.equal(fields[index-1].excluded,fields[index].excluded);[fields[index-1],fields[index]]=[fields[index],fields[index-1]];fields=fields.map((f,index)=>({...f,index,...(grouped?{group_index:index%2}:{})}));if(channel.sourceSelectionAfterMove)sourceSelection=channel.sourceSelectionAfterMove(sourceSelection);channel.afterMove?.(fields);}}};
  return {channel,actions:()=>actions};
 }
 test('output reorder moves only requested records and retains native source identities',async()=>{
  const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');const f=reorderFixture(),r=await reorderOutputFields(f.channel,['t2','t1','t0']);
- assert.equal(r.moves,3);assert.equal(f.actions(),6);assert.deepEqual(r.definition.target_fields.map(f=>f.source.name),['C','B','A']);
- const noop=await reorderOutputFields(f.channel,['t2','t1','t0']);assert.equal(noop.effect_possible,false);assert.equal(f.actions(),6);
+ assert.equal(r.moves,3);assert.equal(f.actions(),5);assert.deepEqual(r.definition.target_fields.map(f=>f.source.name),['C','B','A']);
+ const noop=await reorderOutputFields(f.channel,['t2','t1','t0']);assert.equal(noop.effect_possible,false);assert.equal(f.actions(),5);
+});
+test('output reorder selects again when the reconciled selection has the wrong page offset',async()=>{
+ const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const f=reorderFixture();
+ f.channel.onObserve=(options,state)=>{
+  if(options.readMappings&&options.outputColumnPage&&f.actions()===2){
+   assert.equal(state.wizard.output_columns.fields[1].selected,true);
+   state.wizard.output_columns.page.offset=8;
+  }
+ };
+ const result=await reorderOutputFields(f.channel,['t2','t0','t1']);
+ assert.equal(result.moves,2);
+ assert.equal(f.actions(),4,'select both times before moving');
+ assert.deepEqual(result.definition.target_fields.map(field=>field.record_id),['t2','t0','t1']);
+});
+test('output reorder stops when post-move readback has a different wizard root or stage',async()=>{
+ const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ for(const [key,value] of [['root_ref','foreign-wizard'],['stage','input_mapping']]){
+  const f=reorderFixture();
+  f.channel.onObserve=(options,state)=>{
+   if(options.readMappings&&options.outputColumnPage&&f.actions()===2)state.wizard[key]=value;
+  };
+  await assert.rejects(reorderOutputFields(f.channel,['t2','t0','t1']),/Not ready/);
+  assert.equal(f.actions(),2,key);
+ }
 });
 test('output reorder refuses incomplete goals and stops after an unexpected native change',async()=>{
  const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');

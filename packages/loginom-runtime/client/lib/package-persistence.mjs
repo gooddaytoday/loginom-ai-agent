@@ -19,7 +19,16 @@ export function readSavedPackageState(o) {
    need(m?.FServerConnection?.Connected===true&&m.FServerConnection.UserName===o.account,'Saved package account changed');
    const card=f.Items.Workspace.getActiveTab();let n=card?.Controller?.Node?.data?.node,pack;const seen=new Set();
    for(let i=0;n&&i<32&&!seen.has(n);i++,n=n.ParentNode){seen.add(n);if(n instanceof app.PackageTreeNode){pack=n;break;}}
-   need(pack&&normalize(pack.PackageFileName)===o.packagePath&&pack.ReadOnly===false,'Active saved package changed');
+   const reload=o.reloadOperationId!==undefined;
+   need(pack&&normalize(pack.PackageFileName)===o.packagePath
+     &&pack.ReadOnly===(reload?o.expectedReadOnly:false),'Active saved package changed');
+   if(reload){
+    const receipt=prep.receipts.get(o.reloadOperationId), connection=m.FServerConnection;
+    need(typeof o.expectedReadOnly==='boolean'&&f.FReconnecting!==true&&m.PackageNodes.Count===1
+      &&receipt?.phase==='verified'&&JSON.parse(receipt.request).session===o.sessionId
+      &&receipt.packageNode===pack&&pack.Package&&receipt.openConnection===connection
+      &&receipt.openServerSession===connection.Session,'Reopened saved package identity changed');
+   }
    const matches=Array.from({length:m.PackageNodes.Count},(_,i)=>m.PackageNodes.Items(i)).filter(p=>p===pack);
    need(matches.length===1&&pack.HasRunningNodes()===false,'Saved package inventory or execution changed');
    return {prep,card,pack,proxy:pack.Package,connection:m.FServerConnection,session:m.FServerConnection.Session,count:m.PackageNodes.Count};

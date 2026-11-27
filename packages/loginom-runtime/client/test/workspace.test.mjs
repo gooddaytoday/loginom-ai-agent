@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runInNewContext, createContext, runInContext } from 'node:vm';
-import { makeWorkspacePrepareCode, makeWorkspaceBootstrapCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace } from '../lib/workspace.mjs';
+import { makeWorkspacePrepareCode, makeWorkspaceBootstrapCode, makeWorkspaceStepCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace } from '../lib/workspace.mjs';
 import {prepareTool} from '../lib/skill.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
 import { createSerialGate } from '../lib/clipboard.mjs';
@@ -51,9 +51,9 @@ test('bootstrap stops the DOM walk at its budget and cannot claim readiness',asy
   assert.equal(scanned,4000);assert.equal(result.output.scan.complete,false);
   assert.equal(result.output.target_state,'indeterminate');
 });
-function pageFixture({ authenticated = false, workflow = false, actualBuild = build, loseReply = false, refuseMenuOnce = false, blocked = false, entryDelay = 0, busyTicks = 0, fileExists = true, fileRead = null, fileDialog = {} } = {}) {
+function pageFixture({ authenticated = false, workflow = false, nativeWorkflow = false, actualBuild = build, loseReply = false, refuseMenuOnce = false, blocked = false, entryDelay = 0, busyTicks = 0, fileExists = true, fileRead = null, fileDialog = {} } = {}) {
   const events = [], tabs = [], packages = new Map();
-  let url = 'about:blank', active = null, openedPath = null, pickerOpen = fileDialog.foreign === true;
+  let url = 'about:blank', active = null, openedPath = null, pickerOpen = fileDialog.foreign === true, hasBlocker=blocked;
   const element = (tid, text = '') => ({tid,textContent:text,innerHTML:'',isConnected:true,
     getAttribute: () => tid,getBoundingClientRect:()=>({width:100,height:100}),
     classList:{contains:()=>false},matches:()=>false});
@@ -68,32 +68,48 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
     tab.graph=element(prefix+';ModelForm;cmpDiagram');tab.area=element(prefix+';ModelForm;pnlWorkarea');
     tab.crumbs=['Server','Packages','Package'+n,'Module','Workflow'].map((text,i)=>element(prefix+';cnrNaviMode;b.s_'+i,text));
     tabs.push(tab);active=tab;packages.set(tab,new PackageNode(path));
+    tab.workflowNode=Object.assign(new WorkFlowTreeNode(),{ParentNode:packages.get(tab)});
+    tab.model=Object.assign(new ModelForm(),{FDiagram:{FmxGraph:{container:tab.graph}}});
+    tab.crumbs.at(-1).id=prefix+'-workflow-crumb';
   };
   class PackageNode { constructor(path) {this.PackageFileName=path;this.PackageName='Draft';} }
+  class WorkFlowTreeNode {}
+  class ModelForm {}
   class FileSenderManager{constructor(){this.CurrentDirectory='/user/';this.FActiveLoadersCount=0;this.FCurrentUploadFilePaths={};}}
   class FileStorageForm{constructor(root){this.FView={el:{dom:root}};this.FFileInput={isConnected:true,files:[]};this.FFileSenderManager=new FileSenderManager();}}
   if (workflow) add(null);
   else {add(null);tabs[0].home=element('MF;TF-2;HomePage;btnCreateUnsavedPackage');tabs[0].graph=null;tabs[0].area=null;packages.delete(tabs[0]);}
   const context=createContext({Date,Math,Map,Set,JSON,screen:{availWidth:1000,availHeight:900},
     innerWidth:1000,innerHeight:800,outerWidth:1000,outerHeight:900,getComputedStyle:e=>({visibility:e===picker&&nativePicker.hidden&&!fileDialog.cssVisible?'hidden':'visible'}),
-    Ext:{getCmp:id=>id===picker.id&&!fileDialog.unknownOwner?nativePicker:null},
+    Ext:{getCmp:id=>{
+      if(id===picker.id&&!fileDialog.unknownOwner)return nativePicker;
+      const crumb=active?.crumbs.at(-1);
+      return nativeWorkflow&&id&&id===crumb?.id?{el:{dom:crumb},_node:{data:{node:active.workflowNode}}}:null;
+    }},
     location:{origin:'http://loginom.example',pathname:'/app'},
     document:{querySelectorAll(selector) {
       if(selector.startsWith('[data-tid^="MF;cntMain;cntWorkspace'))return tabs;
       if(pickerOpen&&selector.includes('.x-window'))return fileDialog.nested?[picker,pickerChild]:[picker];
       if(pickerOpen&&selector==='[data-tid="OpenDialogForm"]')return [picker];
-      if(selector.startsWith('[role=')) {if(blocked)return [element('blocker')];if(busyTicks>0)return [{...element('busy'),matches:()=>true}];return [];}
+      if(selector.startsWith('[role=')) {
+        assert.ok(!selector.endsWith(']')||selector==='[role="dialog"]','Invalid blocker selector');
+        if(hasBlocker)return [element('blocker')];
+        if(busyTicks>0)return [{...element('busy'),matches:()=>true}];
+        return [];
+      }
       const prefix=selector.match(/^\[data-tid\^=(".*")\]$/);
       if(prefix)return tabs.flatMap(t=>t.crumbs).filter(e=>e.tid.startsWith(JSON.parse(prefix[1])));
       const exact=selector.match(/^\[data-tid=(".*")\]$/);
       if(exact && JSON.parse(exact[1]).endsWith(';HomePage;btnCreateUnsavedPackage') && entryDelay>0)return [];
-      return exact?tabs.flatMap(t=>[t.graph,t.area,t.home,t.files]).filter(e=>e && e.tid===JSON.parse(exact[1])):[];
-    }},bg:{app:{Version:actualBuild,PackageTreeNode:PackageNode,Application:{FInstance:{FMainForm:{Items:{Workspace:{
-      getActiveTab:()=>({Controller:{Node:{data:{node:packages.get(active)}},FController:active?.filesForm}}),
+      return exact?tabs.flatMap(t=>[t,t.graph,t.area,t.home,t.files,...t.crumbs]).filter(e=>e && e.tid===JSON.parse(exact[1])):[];
+    }},bg:{app:{Version:actualBuild,PackageTreeNode:PackageNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{
+      getActiveTab:()=>({Controller:{Node:{data:{node:nativeWorkflow&&packages.has(active)?active.workflowNode:packages.get(active)}},
+        FController:active?.filesForm??(nativeWorkflow?active?.model:undefined)}}),
     }},FMapTree:{FServerConnection:{UserName:'test-account'}}}}}}}});
   const map=context.bg.app.Application.FInstance.FMainForm.FMapTree;
   map.PackageNodes={get Count(){return packages.size;}};
   map.FServerConnection.Connected=true;
+  if(nativeWorkflow) Object.assign(map.FServerConnection,{FRemoteSession:{},FSession:{}});
   map.FServerConnection.Session={async get_FileStorage(){return {async FileExists(path){events.push({file_exists:path});await fileRead?.(context);return fileExists;}};}};
   const locator = selector => ({
     or() { return this; }, first() { return this; }, async waitFor() {}, async inputValue() { return ''; },
@@ -111,14 +127,16 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
         if(loseReply){loseReply=false;throw new Error('lost response');}
       } else if(selector.includes('btnOpen"')){events.push('open_package');add(openedPath);nativePicker.hidden=fileDialog.hidden!==false;
         if(loseReply){loseReply=false;throw new Error('lost response');}}
-      else if(selector.includes('t.br;tb'))active=tabs.find(t=>selector.includes(t.tid));
+      else if(selector.includes('t.br;tb')){
+        active=tabs.find(t=>selector.includes(t.tid));
+      }
       else {assert.equal(entryDelay,0,'menu must wait for homepage readiness');events.push('menu');if(selector.includes('btnOpenPackage'))pickerOpen=true;}
     },
     async fill(value) { events.push({ fill: value });if(selector.includes('edtFileName'))openedPath=value; },
     async press(key) { assert.equal(key,'Tab');assert.ok(selector.includes('edtUsername'));events.push('username_lookup'); },
     locator(child) { return locator(selector + ' ' + child); },
   });
-  return { events, tabs, context, openFiles() {add(null);const tab=tabs.at(-1);tab.graph=null;tab.area=null;packages.delete(tab);tab.files=element('MF;TF-'+(tabs.length+1)+';FileStorageForm');tab.filesForm=new FileStorageForm(tab.files);}, page: {
+  return { events, tabs, context, setBlocked(value){hasBlocker=value;}, activate(tab){active=tab;}, openFiles() {add(null);const tab=tabs.at(-1);tab.graph=null;tab.area=null;packages.delete(tab);tab.files=element('MF;TF-'+(tabs.length+1)+';FileStorageForm');tab.filesForm=new FileStorageForm(tab.files);}, page: {
     url: () => url,
     async goto(value) { url = value;context.location={origin:new URL(value).origin,pathname:new URL(value).pathname};events.push('navigate'); },
     async waitForFunction() {
@@ -250,6 +268,65 @@ test('bindOpenOnly binds the active saved package without any package gesture',a
   const replay=await execute(fixture,{intent:'open_package',operationId:'cleanup-rebind-1',packagePath:'/user/B.lgp',timeoutMs:500,bindOpenOnly:true});
   assert.equal(replay.status,'NOT_READY');assert.equal(replay.reason,'OPERATION_CONFLICT');assert.equal(replay.effect_possible,false);
   assert.deepEqual(fixture.events,['navigate']);
+});
+
+test('reload opens the exact saved path with its native read-only state in the authenticated account',async()=>{
+  const fixture=pageFixture({authenticated:true});
+  const locate=fixture.page.locator;
+  fixture.page.locator=selector=>{
+    const locator=locate(selector), click=locator.click;
+    if(selector.includes('OpenDialogForm;btnOpen'))locator.click=async()=>{
+      await click();
+      fixture.context.bg.app.Application.FInstance.FMainForm.Items.Workspace
+        .getActiveTab().Controller.Node.data.node.ReadOnly=true;
+    };
+    return locator;
+  };
+  const request={intent:'open_package',packagePath:'/user/B.lgp',timeoutMs:500,recoveryAccount:'test-account'};
+  const state=await execute(fixture,request);
+  assert.equal(state.status,'READY',JSON.stringify(state));
+  assert.equal(state.package_ref.read_only,true);
+  assert.equal(state.package_ref.path,request.packagePath);
+  assert.equal(fixture.events.filter(event=>event==='open_package').length,1);
+
+  for(const changed of [pageFixture({authenticated:true,workflow:true}),pageFixture({authenticated:true})]){
+    if(!changed.tabs[0].graph)changed.context.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.UserName='other-account';
+    const refused=await execute(changed,request);
+    assert.equal(refused.reason,'RELOAD_IDENTITY_UNVERIFIED');
+    assert.equal(changed.events.includes('open_package'),false);
+  }
+});
+
+test('reload binds the exact package already opened by the user without opening it again',async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true});
+  await fixture.page.goto('http://loginom.example/app?testable=true');
+  const active=fixture.context.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
+  Object.assign(active.Controller.Node.data.node,{PackageFileName:'/user/B.lgp',ReadOnly:true});
+  const request={intent:'open_package',operationId:'manual-package',packagePath:'/user/B.lgp',
+    timeoutMs:500,recoveryAccount:'test-account'};
+  const state=await execute(fixture,request);
+  assert.equal(state.status,'READY',JSON.stringify(state));
+  assert.equal(state.package_ref.path,request.packagePath);
+  assert.equal(state.package_ref.read_only,true);
+  assert.equal(state.effect_possible,false);
+  assert.deepEqual(fixture.events,['navigate']);
+});
+
+test('interrupted reload Open uses the exact receipt with no second gesture',async()=>{
+  const fixture=pageFixture({authenticated:true,loseReply:true});
+  const request={intent:'open_package',operationId:'lost-open',packagePath:'/user/B.lgp',
+    timeoutMs:500,recoveryAccount:'test-account'};
+  const interrupted=await execute(fixture,request);
+  assert.equal(interrupted.reason,'PREPARATION_INTERRUPTED');
+  assert.equal(interrupted.effect_possible,true);
+  const before=structuredClone(fixture.events);
+  const lost=await execute(fixture,{...request,operationId:'foreign',recoverOnly:true});
+  assert.equal(lost.reason,'RECEIPT_LOST');
+  const recovered=await execute(fixture,{...request,recoverOnly:true});
+  assert.equal(recovered.status,'READY',JSON.stringify(recovered));
+  assert.equal(recovered.package_ref.path,request.packagePath);
+  assert.equal(recovered.replayed,true);
+  assert.deepEqual(fixture.events,before);
 });
 
 test('bindOpenOnly retains an already rebound logical workflow identity',async()=>{
@@ -522,11 +599,385 @@ test('lost browser receipt cannot recreate a nonpersistent draft', async () => {
   assert.equal(state.reason,'RECEIPT_LOST');assert.equal(fixture.tabs.length,1);
 });
 
-test('foreign graph changes and closed draft invalidate readiness', async () => {
-  const fixture=pageFixture({authenticated:true,workflow:true});await execute(fixture);
-  fixture.tabs[0].graph.innerHTML='changed';
-  assert.equal((await execute(fixture)).reason,'FOREIGN_WORKFLOW_CHANGED');
-  fixture.tabs.pop();assert.equal((await execute(fixture)).reason,'WORKFLOW_LOST');
+test('strict preparation rejects a retained foreign graph change and then a closed draft', async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true});
+  await execute(fixture);
+  fixture.tabs[0].graph.innerHTML='foreign change';
+  assert.equal((await execute(fixture,{recoverOnly:true})).reason,'FOREIGN_WORKFLOW_CHANGED');
+  fixture.tabs.pop();
+  assert.equal((await execute(fixture,{recoverOnly:true})).reason,'WORKFLOW_LOST');
+});
+
+for(const [edit, apply] of [
+  ['add a node',t=>{t.graph.innerHTML+=' <node id="manual"/>'; }],
+  ['move a node',t=>{t.graph.innerHTML=t.graph.innerHTML.replace('x="1"','x="4"');}],
+  ['rename a node',t=>{t.graph.innerHTML=t.graph.innerHTML.replace('Source','Renamed');}],
+  ['remove a link',t=>{t.graph.innerHTML=t.graph.innerHTML.replace('<link from="source" to="target"/>','');}],
+  ['reconnect a link',t=>{t.graph.innerHTML=t.graph.innerHTML.replace('to="target"','to="agent"');}],
+  ['delete an agent node',t=>{t.graph.innerHTML=t.graph.innerHTML.replace('<node id="agent"/>','');}],
+  ['change a parameter visible on the canvas',t=>{
+    t.model.FDiagram.settings={threshold:10};
+    t.graph.innerHTML=t.graph.innerHTML.replace('param="old"','param="new"');
+  }],
+  ['save the package',t=>{
+    t.workflowNode.ParentNode.PackageFileName='user/manual.lgp';
+    t.workflowNode.ParentNode.PackageName='Manual';
+    t.crumbs[2].textContent='Manual';
+  }],
+])test('verified dock_prepare observes a manual edit between steps: '+edit, async()=>{
+  const fixture=pageFixture({authenticated:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  const tab=fixture.tabs[0];
+  tab.model.FDiagram.settings={threshold:5};
+  tab.graph.innerHTML='<node id="source" x="1">Source</node><node id="target" param="old"/><node id="agent"/><link from="source" to="target"/>';
+  const request={intent:'existing_workflow',operationId:'step',workflowRef:{...first.workflow_ref,document_id:first.document_id}};
+  const step=await execute(fixture,request);
+  assert.equal(step.status,'READY');
+  apply(tab);
+  const remainingGraph=tab.graph.innerHTML;
+  const later=await execute(fixture,{...request,refreshVerified:true,recoverOnly:true});
+  assert.equal(later.status,'READY',later.reason);
+  assert.equal(later.workflow_ref.workflow_id,first.workflow_ref.workflow_id);
+  assert.equal(tab.graph.innerHTML,remainingGraph);
+  assert.equal(later.package_ref.path,edit==='save the package'?'/user/manual.lgp':null);
+  if(edit==='save the package')assert.equal(later.workflow_ref.navigation_path[2].label,'Manual');
+  assert.equal(fixture.events.filter(e=>e==='create_draft').length,1);
+});
+
+test('repeat dock_prepare accepts a manually saved draft with the same native owner', async()=>{
+  const fixture=pageFixture({authenticated:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  fixture.tabs[0].workflowNode.ParentNode.PackageFileName='user/manual.lgp';
+  const second=await execute(fixture,{refreshVerified:true,recoverOnly:true});
+  assert.equal(second.status,'READY',second.reason);
+  assert.equal(second.workflow_ref.workflow_id,first.workflow_ref.workflow_id);
+  assert.equal(second.package_ref.path,'/user/manual.lgp');
+  assert.equal(fixture.events.filter(e=>e==='create_draft').length,1);
+});
+
+test('new Apply preflight reads manual Save navigation without replacing the issued preparation', async()=>{
+  const fixture=pageFixture({authenticated:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  const tab=fixture.tabs[0],workflowRef={...first.workflow_ref,document_id:first.document_id};
+  const readStep=runInNewContext(makeWorkspaceStepCode({loginomUrl:'http://loginom.example/app',build,sessionId:'standalone',
+    workflowRef,types:{},readGraph:async()=>{throw Error('No retained ports to refresh');}}));
+  tab.workflowNode.ParentNode.PackageFileName='user/manual.lgp';
+  tab.crumbs[2].textContent='Manual Save';
+  for(let index=0;index<2;index++){
+    const outcome=await readStep(fixture.page);
+    assert.equal(outcome.status,'SUCCEEDED');
+    assert.equal(outcome.effect_possible,false);
+    assert.equal(outcome.output.workflow_ref.navigation_path[2].label,'Manual Save');
+    assert.equal(outcome.output.package_ref.path,'/user/manual.lgp');
+  }
+  const prepared=await execute(fixture,{intent:'existing_workflow',operationId:'publish-current',workflowRef});
+  assert.equal(prepared.status,'READY',prepared.reason);
+  assert.equal(prepared.workflow_ref.navigation_path[2].label,'Manual Save');
+  const recovered=await execute(fixture,{intent:'existing_workflow',operationId:'publish-current',workflowRef,recoverOnly:true});
+  assert.equal(recovered.status,'READY',recovered.reason);
+  assert.equal(recovered.replayed,true);
+  assert.equal(fixture.events.filter(e=>e==='create_draft').length,1);
+});
+
+for(const [fault,reason,change] of [
+  ['native workflow','WORKFLOW_CHANGED',({fixture,tab})=>{tab.workflowNode=Object.assign(
+    new fixture.context.bg.app.WorkFlowTreeNode(),{ParentNode:tab.workflowNode.ParentNode});}],
+  ['native package','WORKFLOW_CHANGED',({fixture,tab})=>{tab.workflowNode.ParentNode=new fixture.context.bg.app.PackageTreeNode('/user/other.lgp');}],
+  ['unbound breadcrumb','WORKFLOW_CHANGED',({fixture})=>{fixture.context.Ext.getCmp=()=>null;}],
+  ['breadcrumb native owner','WORKFLOW_CHANGED',({fixture,tab})=>{
+    fixture.context.Ext.getCmp=()=>({el:{dom:tab.crumbs.at(-1)},_node:{data:{node:{}}}});
+  }],
+  ['server session','WORKFLOW_CHANGED',({connection})=>{connection.Session={};}],
+  ['remote session','WORKFLOW_CHANGED',({connection})=>{connection.FRemoteSession={};}],
+  ['local session','WORKFLOW_CHANGED',({connection})=>{connection.FSession={};}],
+  ['account','WORKFLOW_CHANGED',({connection})=>{connection.UserName='other';}],
+  ['disconnect','WORKFLOW_CHANGED',({connection})=>{connection.Connected=false;}],
+  ['reconnect','WORKFLOW_CHANGED',({main})=>{main.FReconnecting=true;}],
+  ['connection object','WORKFLOW_CHANGED',({main,connection})=>{main.FMapTree.FServerConnection={...connection};}],
+  ['connection absent','WORKFLOW_CHANGED',({main})=>{delete main.FMapTree.FServerConnection;}],
+  ['origin','WORKFLOW_LOST',({fixture})=>{fixture.context.location.origin='https://other.test';}],
+  ['path','WORKFLOW_LOST',({fixture})=>{fixture.context.location.pathname='/other';}],
+  ['build','WORKFLOW_LOST',({fixture})=>{fixture.context.bg.app.Version='different';}],
+  ['document object','WORKFLOW_LOST',({state})=>{state.document={};}],
+  ['document id','WORKFLOW_LOST',({state})=>{state.id='other';}],
+  ['tab element with same tid','WORKFLOW_LOST',({fixture,tab})=>{
+    const query=fixture.context.document.querySelectorAll;
+    fixture.context.document.querySelectorAll=q=>q==='[data-tid='+JSON.stringify(tab.tid)+']'?[{...tab}]:query(q);
+  }],
+  ['duplicate tab tid','WORKFLOW_LOST',({fixture,tab})=>{fixture.tabs.push({...tab});}],
+  ['different receipt tab','WORKFLOW_CHANGED',({state,tab})=>{state.receipts.set('other',{...state.receipts.get('prepare'),tab:{...tab}});}],
+  ['different receipt package','WORKFLOW_CHANGED',({state})=>{state.receipts.set('other',{...state.receipts.get('prepare'),packageNode:{}});}],
+  ['different receipt owner','WORKFLOW_CHANGED',({state})=>{state.receipts.set('other',{...state.receipts.get('prepare'),stepWorkflowNode:{}});}],
+  ['different receipt session','WORKFLOW_CHANGED',({state})=>{
+    const receipt=state.receipts.get('prepare');
+    state.receipts.set('other',{...receipt,request:JSON.stringify({...JSON.parse(receipt.request),session:'other'})});
+  }],
+  ['active blocker','UNAVAILABLE',({fixture})=>fixture.setBlocked(true)],
+  ['inactive tab','INACTIVE',({fixture})=>fixture.activate(fixture.tabs[0])],
+])test('new Apply preflight refuses or defers '+fault,async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  const tab=fixture.tabs.at(-1),workflowRef={...first.workflow_ref,document_id:first.document_id};
+  const readStep=runInNewContext(makeWorkspaceStepCode({loginomUrl:'http://loginom.example/app',build,sessionId:'standalone',
+    workflowRef,types:{},readGraph:async()=>{throw Error('Foreign owner must be refused before the graph read');}}));
+  tab.crumbs[2].textContent='Manual Save';
+  assert.equal((await readStep(fixture.page)).output.status,'READY');
+  const main=fixture.context.bg.app.Application.FInstance.FMainForm;
+  const state=fixture.context.__loginomDockPreparationV1;
+  change({fixture,tab,main,state,connection:main.FMapTree.FServerConnection});
+  const outcome=await readStep(fixture.page);
+  assert.equal(outcome.effect_possible,false);
+  assert.equal(outcome.output.reason??outcome.output.status,reason);
+  if(outcome.output.reason)assert.equal(outcome.output.status,'NOT_READY');
+});
+
+for(const useNewId of [false,true])test('Prepare returns to a manually saved inactive scenario '+(useNewId?'with a new id':'with the original id'),async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true,nativeWorkflow:true});
+  const metadata={skillRevision:'skill'};
+  const run=request=>prepareWorkspaceSession({metadata,request,assertAllowed(){},assertTarget(){},record:async()=>{},save:async()=>{},
+    prepare:options=>execute(fixture,{...options,intent:request.intent,workflowRef:request.workflow_ref,operationId:request.operation_id})});
+  const request={operation_id:'prepare',intent:'new_draft',workflow_ref:null};
+  const first=await run(request);
+  const tab=fixture.tabs.at(-1);
+  tab.workflowNode.ParentNode.PackageFileName='/user/manual.lgp';
+  tab.crumbs[2].textContent='Manual Save';
+  fixture.tabs[0].graph.innerHTML='manual change before the step';
+  fixture.activate(fixture.tabs[0]);
+  const result=await run(useNewId?{operation_id:'return',intent:'existing_workflow',
+    workflow_ref:{...first.workflow_ref,document_id:first.document_id}}:request);
+  assert.equal(result.status,'READY',result.reason);
+  assert.equal(result.package_ref.path,'/user/manual.lgp');
+  assert.equal(result.workflow_ref.workflow_id,first.workflow_ref.workflow_id);
+  assert.equal(result.workflow_ref.navigation_path[2].label,'Manual Save');
+  assert.equal(fixture.events.filter(e=>e==='create_draft').length,1);
+});
+
+for(const useNewId of [false,true])test('Prepare refresh refuses a foreign package before any tab click '+(useNewId?'with a new id':'with the original id'),async()=>{
+  const fixture=pageFixture({authenticated:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  const tab=fixture.tabs[0];
+  tab.workflowNode.ParentNode=new fixture.context.bg.app.PackageTreeNode('/user/other.lgp');
+  const locator=fixture.page.locator;
+  let clicks=0;
+  fixture.page.locator=selector=>{
+    const control=locator(selector);
+    return {...control,click:async(...args)=>{if(selector.includes(tab.tid))clicks++;await control.click(...args);}};
+  };
+  const result=await execute(fixture,useNewId?{operationId:'other',intent:'existing_workflow',
+    workflowRef:{...first.workflow_ref,document_id:first.document_id}}:{refreshVerified:true,recoverOnly:true});
+  assert.equal(result.reason,'WORKFLOW_CHANGED');
+  assert.equal(clicks,0);
+});
+
+test('foreign edit while an existing workflow is being activated still refuses', async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  const second=await execute(fixture,{operationId:'another-draft'});
+  fixture.tabs[1].crumbs[2].textContent='Manual Save before activation';
+  const locator=fixture.page.locator;
+  fixture.page.locator=selector=>{
+    const control=locator(selector), click=control.click;
+    control.click=async(...args)=>{
+      await click(...args);
+      if(selector.includes(first.workflow_ref.tab_tid))fixture.tabs.at(-1).graph.innerHTML='<node id="foreign"/>';
+    };
+    return control;
+  };
+  const state=await execute(fixture,{intent:'existing_workflow',operationId:'return',workflowRef:{...first.workflow_ref,document_id:first.document_id}});
+  assert.notEqual(second.workflow_ref.workflow_id,first.workflow_ref.workflow_id);
+  assert.equal(state.reason,'FOREIGN_WORKFLOW_CHANGED');
+});
+
+test('a lost inactive Prepare activation reply reconciles the original click once',async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  const target=fixture.tabs[1];
+  target.crumbs[2].textContent='Manual Save';
+  fixture.activate(fixture.tabs[0]);
+  const locator=fixture.page.locator;
+  let clicks=0;
+  fixture.page.locator=selector=>{
+    const control=locator(selector);
+    return {...control,click:async(...args)=>{
+      if(selector.includes(first.workflow_ref.tab_tid)&&++clicks===1)throw Error('lost activation reply');
+      await control.click(...args);
+    }};
+  };
+  const request={intent:'existing_workflow',operationId:'return',workflowRef:{...first.workflow_ref,document_id:first.document_id},timeoutMs:500};
+  const interrupted=await execute(fixture,request);
+  assert.equal(interrupted.reason,'PREPARATION_INTERRUPTED');
+  assert.equal(interrupted.effect_possible,true);
+  assert.equal(target.classList.contains('x-tab-active'),false);
+  assert.equal((await execute(fixture,{...request,operationId:'foreign'})).reason,'OPERATION_CONFLICT');
+  // The original click settles after the retry has already observed the inactive tab.
+  fixture.page.waitForTimeout=async()=>fixture.activate(target);
+  const recovered=await execute(fixture,{...request,recoverOnly:true});
+  assert.equal(recovered.status,'READY',recovered.reason);
+  assert.equal(recovered.workflow_ref.navigation_path[2].label,'Manual Save');
+  assert.equal(clicks,1);
+});
+
+for(const change of ['owner','package'])for(const rebindReceipt of [false,true])test(
+  'Prepare rechecks the reserved '+change+' after the activation click'+(rebindReceipt?' even when the receipt also changes':''),async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  const target=fixture.tabs[1];
+  if(rebindReceipt)target.crumbs[2].textContent='Manual Save';
+  fixture.activate(fixture.tabs[0]);
+  const locator=fixture.page.locator;
+  fixture.page.locator=selector=>{
+    const control=locator(selector);
+    return {...control,click:async(...args)=>{
+      await control.click(...args);
+      if(!selector.includes(target.tid))return;
+      // Even a receipt that agrees with the live state cannot replace the
+      // owner captured by the original reservation.
+      const {bg:{app},__loginomDockPreparationV1:state}=fixture.context;
+      const receipt=state.receipts.get('prepare');
+      if(change==='owner'){
+        target.workflowNode=Object.assign(new app.WorkFlowTreeNode(),{ParentNode:receipt.packageNode});
+        if(rebindReceipt)receipt.stepWorkflowNode=target.workflowNode;
+      }else{
+        target.workflowNode.ParentNode=new app.PackageTreeNode('/user/other.lgp');
+        if(rebindReceipt)receipt.packageNode=target.workflowNode.ParentNode;
+      }
+    }};
+  };
+  const result=await execute(fixture,{intent:'existing_workflow',operationId:'return',
+    workflowRef:{...first.workflow_ref,document_id:first.document_id},timeoutMs:500});
+  assert.equal(result.status,'NOT_READY');
+  assert.equal(result.reason,rebindReceipt?'FOREIGN_WORKFLOW_CHANGED':'WORKFLOW_CHANGED');
+  assert.equal(result.effect_possible,true);
+});
+
+test('a READY Prepare releases the reservation for the next inactive activation',async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  const target=fixture.tabs[1];
+  target.crumbs[2].textContent='Manual Save';
+  const activate=async (operationId,prepared)=>{
+    fixture.activate(fixture.tabs[0]);
+    const result=await execute(fixture,{intent:'existing_workflow',operationId,
+      workflowRef:{...prepared.workflow_ref,document_id:prepared.document_id}});
+    assert.equal(result.status,'READY',result.reason);
+    assert.equal(result.workflow_ref.workflow_id,first.workflow_ref.workflow_id);
+    assert.equal(target.classList.contains('x-tab-active'),true);
+    return result;
+  };
+  const returned=await activate('return',first);
+  await activate('return-again',returned);
+  assert.equal(fixture.events.filter(event=>event==='create_draft').length,1);
+});
+
+test('Prepare activation preserves a conflicting receipt that appears after lookup',async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  fixture.tabs[1].crumbs[2].textContent='Manual Save';
+  fixture.activate(fixture.tabs[0]);
+  const locator=fixture.page.locator,foreign={phase:'reserved',request:'foreign'};
+  fixture.page.locator=selector=>{
+    const control=locator(selector);
+    return {...control,click:async(...args)=>{
+      await control.click(...args);
+      if(selector.includes(first.workflow_ref.tab_tid))
+        fixture.context.__loginomDockPreparationV1.receipts.set('return',foreign);
+    }};
+  };
+  const result=await execute(fixture,{intent:'existing_workflow',operationId:'return',
+    workflowRef:{...first.workflow_ref,document_id:first.document_id}});
+  assert.equal(result.reason,'OPERATION_CONFLICT');
+  assert.equal(fixture.context.__loginomDockPreparationV1.receipts.get('return'),foreign);
+});
+
+test('a hard blocker during the inactive Prepare activation keeps the click unresolved',async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  fixture.tabs[1].crumbs[2].textContent='Manual Save';
+  fixture.activate(fixture.tabs[0]);
+  const locator=fixture.page.locator;
+  fixture.page.locator=selector=>{
+    const control=locator(selector);
+    return {...control,click:async(...args)=>{
+      await control.click(...args);
+      if(selector.includes(first.workflow_ref.tab_tid))fixture.setBlocked(true);
+    }};
+  };
+  const result=await execute(fixture,{intent:'existing_workflow',operationId:'return',
+    workflowRef:{...first.workflow_ref,document_id:first.document_id}});
+  assert.equal(result.reason,'NATIVE_MESSAGE_BOX_BLOCKED');
+  assert.equal(result.effect_possible,true);
+});
+
+test('an active blocker cannot click or retire a verified Prepare refresh anchor',async()=>{
+  const fixture=pageFixture({authenticated:true,nativeWorkflow:true});
+  const request={operation_id:'prepare',intent:'new_draft',workflow_ref:null};
+  const metadata={skillRevision:'skill'};
+  const run=()=>prepareWorkspaceSession({metadata,request,assertAllowed(){},assertTarget(){},record:async()=>{},save:async()=>{},
+    prepare:options=>execute(fixture,{...options,timeoutMs:250})});
+  const first=await run();
+  fixture.tabs[0].crumbs[2].textContent='Manual Save';
+  fixture.setBlocked(true);
+  const locator=fixture.page.locator;
+  let clicks=0;
+  fixture.page.locator=selector=>{
+    const control=locator(selector);
+    return {...control,click:async(...args)=>{if(selector.includes(first.workflow_ref.tab_tid))clicks++;await control.click(...args);}};
+  };
+  const blocked=await run();
+  assert.equal(blocked.reason,'UI_BLOCKED');
+  assert.equal(blocked.effect_possible,true);
+  fixture.setBlocked(false);
+  const recovered=await run();
+  assert.equal(recovered.status,'READY',recovered.reason);
+  assert.equal(recovered.workflow_ref.navigation_path[2].label,'Manual Save');
+  assert.equal(clicks,0);
+});
+
+for(const restart of ['receipt lost','about:blank'])test('blocked Prepare replay refuses '+restart+' without recreating a draft',async()=>{
+  const firstPage=pageFixture({authenticated:true,nativeWorkflow:true});
+  let fixture=firstPage;
+  const request={operation_id:'prepare',intent:'new_draft',workflow_ref:null};
+  const metadata={skillRevision:'skill'};
+  const run=()=>prepareWorkspaceSession({metadata,request,assertAllowed(){},assertTarget(){},record:async()=>{},save:async()=>{},
+    prepare:options=>execute(fixture,{...options,timeoutMs:500})});
+  assert.equal((await run()).status,'READY');
+  firstPage.setBlocked(true);
+  assert.equal((await run()).reason,'UI_BLOCKED');
+  firstPage.setBlocked(false);
+  if(restart==='about:blank')fixture=pageFixture({authenticated:true,nativeWorkflow:true});
+  else runInContext('globalThis.__loginomDockPreparationV1 = undefined',firstPage.context);
+  const result=await run();
+  const events=fixture===firstPage?firstPage.events:[...firstPage.events,...fixture.events];
+  assert.equal(result.reason,restart==='about:blank'?'DOCUMENT_LOST':'RECEIPT_LOST',
+    JSON.stringify({status:result.status,events}));
+  assert.equal(result.status,'NOT_READY');
+  assert.equal(result.created_draft,false);
+  assert.equal(events.filter(event=>event==='create_draft').length,1);
+  if(restart==='about:blank')assert.deepEqual(fixture.events,[]);
+});
+
+test('blocking a new Prepare ID before activation reports no possible effect',async()=>{
+  const fixture=pageFixture({authenticated:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  fixture.setBlocked(true);
+  const result=await execute(fixture,{intent:'existing_workflow',operationId:'blocked',
+    workflowRef:{...first.workflow_ref,document_id:first.document_id}});
+  assert.equal(result.reason,'UI_BLOCKED');
+  assert.equal(result.effect_possible,false);
+  assert.equal(fixture.events.filter(event=>event==='create_draft').length,1);
+});
+
+test('a host receipt that never published readiness does not authorize a fresh Prepare snapshot',async()=>{
+  const request={operation_id:'original',intent:'new_draft'};
+  const metadata={workspaceReady:false,workspacePreparation:{identity:JSON.stringify(request),
+    operation_id:'original',effect_possible:true,state:{status:'READY'}}};
+  const result=await prepareWorkspaceSession({metadata,request,assertAllowed(){},assertTarget(){},record:async()=>{},save:async()=>{},
+    prepare:options=>{
+      assert.equal(options.recoverOnly,true);
+      assert.equal(options.refreshVerified,false);
+      return {status:'NOT_READY',reason:'WORKFLOW_CHANGED',effect_possible:true};
+    }});
+  assert.equal(result.status,'NOT_READY');
 });
 
 test('blockers refuse preparation before any package creation', async () => {
@@ -733,6 +1184,35 @@ for(const variant of ['lost','effect','created','unauthenticated','cancelled','s
   }
  });
 
+
+// LAB-2054 (bh-i103): a Submodel entry refused before any gesture left only
+// dock_prepare, and every new ID hit the conflict until the run ended.
+for(const variant of ['refused','other-intent','other-document','effect','gesture','verification','same-id','phase','status','created','held-plain','restore'])
+ test('new existing_workflow preparation after a no-effect navigation refusal: '+variant,async()=>{
+  const ref={document_id:'doc',workflow_id:'doc-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'MF;TF-1;crumb',label:'Сценарий'}]};
+  const metadata={skillRevision:'skill'};
+  const request={operation_id:'enter',intent:'existing_workflow',package_path:null,workflow_ref:ref,
+   ...(variant==='held-plain'?{}:{graph_navigation:{direction:'enter',node_ref:{document_id:'doc',workflow_id:'doc-1',node_id:'node'}}})};
+  const state={status:variant==='status'?'LOGIN_REQUIRED':'NOT_READY',reason:'page.evaluate: Error: Submodel selection control unavailable',
+   phase:variant==='phase'?'login_or_workspace':'graph_navigation',
+   authenticated:true,created_draft:variant==='created',effect_possible:variant==='effect',operation_id:'enter',trace:variant==='gesture'?[{event:'graph_navigation_owner_selected'}]:[],
+   verification_required:variant==='verification',...(variant==='restore'?{connection_restore:'attempted'}:{})};
+  let calls=0;
+  const args={metadata,request,assertAllowed(){},assertTarget(){},record:async()=>{},save:async()=>{},prepare:async()=>{calls++;return structuredClone(state);}};
+  await prepareWorkspaceSession(args);assert.equal(metadata.workspaceReady,false);
+  const next={...args,request:{operation_id:variant==='same-id'?'enter':'parent',intent:variant==='other-intent'?'new_draft':'existing_workflow',package_path:null,
+   workflow_ref:variant==='other-intent'?null:variant==='other-document'?{...ref,document_id:'foreign'}:ref},
+   prepare:async({recoverOnly})=>{calls++;assert.equal(recoverOnly,false);return {status:'READY',effect_possible:false,created_draft:false,target:{},workflow_ref:ref};}};
+  if(variant==='refused'){
+   assert.equal((await prepareWorkspaceSession(next)).status,'READY');assert.equal(calls,2);assert.equal(metadata.workspaceReady,true);
+   assert.equal(metadata.workspacePreparation.after_refused_navigation,true);
+   // A later ordinary preparation does not inherit the refused navigation's binding.
+   await prepareWorkspaceSession({...next,request:{...next.request,operation_id:'again'}});
+   assert.equal(metadata.workspacePreparation.after_refused_navigation,undefined);
+  }else{
+   await assert.rejects(prepareWorkspaceSession(next),/Preparation operation conflict: .*operation_id enter/);assert.equal(calls,1);
+  }
+ });
 
 test('D70 readiness refuses an unknown offscreen file window before any package gesture',async()=>{
  const fixture=pageFixture({authenticated:true,workflow:true,fileDialog:{foreign:true,unknownOwner:true,cssVisible:true}});
