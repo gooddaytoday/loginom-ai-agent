@@ -1,12 +1,8 @@
 ; electron-builder names a one-click per-user install directory after the package name, which every
 ; channel shares, so OpenCode, OpenCode Beta and OpenCode Dev all installed into one "@opencodedesktop"
 ; directory and each channel's installer and uninstaller replaced or deleted the others' files.
-; Each channel now installs into a directory named after its app ID, like its data directory.
-; Only the installer moves, and NSIS rejects a variable that the uninstaller build never sets.
-; Loginom AI Agent 0.4 channels shared "@loginom-ai-agentdesktop" the same way, so the package name stays.
-!ifndef BUILD_UNINSTALLER
-  Var /GLOBAL sharedInstallDir
-!endif
+; A new install uses the app ID, like its data directory.
+; Loginom AI Agent keeps an existing 0.4 install in "@loginom-ai-agentdesktop" for that channel.
 
 LangString VerifyResourcesStatus 1033 "Verifying application resources. This may take a few minutes..."
 LangString VerifyResourcesError 1033 "Application resources could not be verified or the verification cache could not be saved. Installation did not complete. Please run the installer again."
@@ -44,19 +40,9 @@ LangString VerifyResourcesError 1049 "Не удалось проверить р�
 !insertmacro VerifyResourcesEnglish 1066
 
 !macro customInit
-  StrCpy $sharedInstallDir ""
   ${StdUtils.GetParentPath} $R0 $INSTDIR
   ${If} $INSTDIR == "$R0\${APP_FILENAME}"
-    ${If} ${FileExists} "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
-      StrCpy $sharedInstallDir $INSTDIR
-      ; The old uninstaller would delete every channel's files from the shared directory, so the
-      ; install skips it and removes only this channel's files afterwards. The install writes the
-      ; uninstall entry again for the new directory.
-      DeleteRegValue SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" UninstallString
-      !ifdef UNINSTALL_REGISTRY_KEY_2
-        DeleteRegValue SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY_2}" UninstallString
-      !endif
-    ${EndIf}
+  ${AndIfNot} ${FileExists} "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
     StrCpy $INSTDIR "$R0\${APP_ID}"
   ${EndIf}
 !macroend
@@ -66,7 +52,6 @@ LangString VerifyResourcesError 1049 "Не удалось проверить р�
   ; https://github.com/electron/electron/issues/49143#issuecomment-3618354787
   nsExec::ExecToLog '"$SYSDIR\icacls.exe" "$INSTDIR" /grant "*S-1-15-2-2:(OI)(CI)(RX)"'
   Pop $0
-  !insertmacro leaveSharedInstall
   ; Never skip updates: the final installed bytes and current user's profile
   ; must be checked before NSIS can mark the installation successful or launch.
   SetDetailsPrint textonly
@@ -86,26 +71,6 @@ LangString VerifyResourcesError 1049 "Не удалось проверить р�
     ${EndIf}
     SetErrorLevel 1
     Abort
-  ${EndIf}
-!macroend
-
-; Removes this channel's files from the shared directory, and the directory with the files every
-; channel shared once no other channel's uninstaller is left in it. A taskbar pin still starts the
-; old executable, so it is pointed at the new one.
-!macro leaveSharedInstall
-  ${If} $sharedInstallDir != ""
-    Delete "$sharedInstallDir\${APP_EXECUTABLE_FILENAME}"
-    Delete "$sharedInstallDir\${UNINSTALL_FILENAME}"
-    !insertmacro removeStagedUpdates $sharedInstallDir
-    FindFirst $R0 $R1 "$sharedInstallDir\Uninstall *.exe"
-    FindClose $R0
-    ${If} $R1 == ""
-      RMDir /r $sharedInstallDir
-    ${EndIf}
-    ${If} ${FileExists} "$QUICKLAUNCH\User Pinned\TaskBar\${SHORTCUT_NAME}.lnk"
-      CreateShortCut "$QUICKLAUNCH\User Pinned\TaskBar\${SHORTCUT_NAME}.lnk" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0
-      WinShell::SetLnkAUMI "$QUICKLAUNCH\User Pinned\TaskBar\${SHORTCUT_NAME}.lnk" "${APP_ID}"
-    ${EndIf}
   ${EndIf}
 !macroend
 
@@ -193,20 +158,9 @@ LangString VerifyResourcesError 1049 "Не удалось проверить р�
             System::Call "kernel32::QueryFullProcessImageNameW(p R4, i 0, w .R5, *i ${NSIS_MAX_STRLEN}) i .R6"
             System::Call "kernel32::CloseHandle(p R4)"
             ${If} $R6 != 0
-              ; A channel leaving the shared directory stops its own app there, but not the others'.
-              StrCpy $2 0
-              !ifndef BUILD_UNINSTALLER
-                ${If} $sharedInstallDir != ""
-                ${AndIf} $R5 == "$sharedInstallDir\${APP_EXECUTABLE_FILENAME}"
-                  StrCpy $2 1
-                ${EndIf}
-              !endif
               StrLen $R6 "$INSTDIR\"
               StrCpy $R5 $R5 $R6
               ${If} $R5 == "$INSTDIR\"
-                StrCpy $2 1
-              ${EndIf}
-              ${If} $2 == 1
                 IntOp $R7 $R7 + 1
                 ${If} $1 >= 0
                   System::Call "kernel32::OpenProcess(i 1, i 0, i R3) p .R4"
@@ -292,12 +246,6 @@ LangString VerifyResourcesError 1049 "Не удалось проверить р�
       ${AndIf} ${FileExists} "$R1\${APP_EXECUTABLE_FILENAME}"
       ${AndIf} $R2 > $R3
         !insertmacro removeStagedUpdates $R1
-        ; Stage beside the directory the install will use, which customInit moves out of the shared one.
-        ${StdUtils.GetParentPath} $R5 $R1
-        ${If} $R1 == "$R5\${APP_FILENAME}"
-          StrCpy $R1 "$R5\${APP_ID}"
-          !insertmacro removeStagedUpdates $R1
-        ${EndIf}
         InitPluginsDir
         ; Stored like the template's copy, so the installer keeps one copy of the payload.
         !ifdef COMPRESS

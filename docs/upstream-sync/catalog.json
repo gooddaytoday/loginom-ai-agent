@@ -25,6 +25,7 @@
       "title": "Upstream endpoints: updates, installer, sharing",
       "paths": [
         "packages/gui-plugins/src/updater/main.ts", "packages/gui-plugins/src/updater/platform.ts",
+        "packages/gui-plugins/src/updater/signed-feed*.ts", "packages/desktop/src/main/plugin/storage.test.ts",
         "packages/gui-plugins/src/updater/whats-new.tsx", "packages/desktop/src/renderer/platform/notifications.ts",
         "packages/desktop/src/renderer/platform/notifications.test.ts", "packages/cli/src/services/updater.ts",
         "packages/cli/test/updater-install.test.ts"
