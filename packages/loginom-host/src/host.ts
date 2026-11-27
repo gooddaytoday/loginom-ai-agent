@@ -811,7 +811,7 @@ export async function createLoginomHost(options: {
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true
     },
-    async packageAccess(input: typeof PackageRecheck.Type, expectedGeneration?: number): Promise<PackageAccess> {
+    async packageAccess(input: typeof PackageRecheck.Type, expectedGeneration?: number, observedBusy = false): Promise<PackageAccess> {
       const { sessionID, packagePath } = input
       const unavailable = { packagePath, kind: "unavailable" } as const
       const { generation } = await service.api.status()
@@ -833,11 +833,11 @@ export async function createLoginomHost(options: {
           return null
         }
       }
-      const observed = await observe(current, packagePath)
+      const observed = observedBusy ? null : await observe(current, packagePath)
       if ((await service.api.status()).generation !== generation || !live(chat, current)) return unavailable
       const target = observed?.packages.find((pkg) => pkg.path === packagePath)
-      if (!target) return unavailable
-      if (!target.readOnly) return { packagePath, kind: "writable" }
+      if (!target && !observedBusy) return unavailable
+      if (target?.readOnly === false) return { packagePath, kind: "writable" }
       const peers = [...children.entries()].flatMap(([key, child]) => {
         const id = conversations.get(child)
         return key !== chat && id && live(key, child) ? [{ key, child, id }] : []
@@ -853,7 +853,7 @@ export async function createLoginomHost(options: {
       const holder = holders.length === 1 ? holders[0] : undefined
       if (holder) return { packagePath, kind: "other_conversation", sessionID: holder.id }
       const lockMarker = observed?.lockMarker ?? "unknown"
-      if (lockMarker === "present") return { packagePath, kind: "other_loginom_session" }
+      if (observedBusy || lockMarker === "present") return { packagePath, kind: "other_loginom_session" }
       return { packagePath, kind: "read_only", lockMarker }
     },
     async workState(generation: number, chat: string) {

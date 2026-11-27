@@ -1,3 +1,5 @@
+import { packageCopyStorage } from './package-copy-storage.mjs'
+import { PackageCopyError } from '../client/lib/package-copy.mjs'
 import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
@@ -258,6 +260,11 @@ async function handle(message) {
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+        packageCopy: {
+          file: join(directory, '..', '..', 'package-copy.json'),
+          root: state.uploadDirectory,
+          storage: packageCopyStorage(authenticated.context, {url:config.loginomUrl, account:input.connection.username}),
+        },
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
         startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {
           state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error,
@@ -289,6 +296,24 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (message.operation === "packageCopy") {
+      const { action, ...input } = message.input ?? {}
+      if (!["save-version", "undo-save", "replace-original", "restore-previous", "discard"].includes(action))
+        throw Error("LOGINOM_REQUEST_INVALID")
+      if (state.controller) throw Error("LOGINOM_CALL_BUSY")
+      const controller = new AbortController()
+      state.controller = controller
+      try {
+        const output = await state.bridge.packageCopy(action, input, controller.signal)
+        send({ id:message.id, result:{ output } })
+      } catch (error) {
+        send({ id:message.id, result:{ failure:error instanceof PackageCopyError
+          ? {code:error.code, data:error.data} : {code:"state_check_required", data:{}} } })
+      } finally {
+        state.controller = undefined
+      }
+      return
+    }
     if (message.operation === "packageAccess") {
       const { observePackages } = await import("./package-access.mjs")
       const page = state.browser.pages()[0]

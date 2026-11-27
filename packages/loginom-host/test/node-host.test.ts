@@ -175,6 +175,11 @@ test("package recheck distinguishes a live app conversation, an external marker 
         case 'call':
           return send({result:{content:[],_meta:{existing:true}}, recoveryPending:false,
             ...(!writer && {packagePath})});
+        case 'packageCopy': {
+          if (m.input.action !== 'replace-original' || m.input.confirmed !== true)
+            return send({ failure: { code:'copy_missing', data:{} } });
+          return send({ failure: { code:'package_busy', data:{packagePath,kind:'other_loginom_session'} } });
+        }
         case 'packageAccess': {
           const state = JSON.parse(readFileSync(${JSON.stringify(stateFile)}, 'utf8'));
           return send(writer
@@ -214,6 +219,13 @@ test("package recheck distinguishes a live app conversation, an external marker 
     await setPackages(packagePath, "present")
     await prepare(writer)
     const owned = { packagePath, kind: "other_conversation", sessionID: writer }
+    await host.request("acquire", { run: reader, session: reader })
+    try {
+      expect(await host.request("packageCopy", {run:reader, action:"replace-original", confirmed:true}))
+        .toEqual({failure:{code:"package_busy", data:owned}})
+    } finally {
+      await host.request("release", { run: reader })
+    }
     expect(await prepare(reader)).toEqual({ content: [], _meta: { existing: true, packageAccess: owned } })
     const pending = prepare(starting)
     try {

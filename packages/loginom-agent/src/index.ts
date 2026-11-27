@@ -19,6 +19,7 @@ import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
 import { packageDocs } from "./package-docs"
 import { packageAccessRpc, visiblePackageAccess } from "./package-access"
+import { registerPackageCopy } from "./package-copy"
 import {
   classify,
   declinedText,
@@ -510,6 +511,9 @@ export default Plugin.define({
         return code ? { code } : {}
       },
     })
+    await registerPackageCopy(ctx, async (sessionID) =>
+      !dashboard() && !await rules({ sessionID }, "loginom_package_copy"),
+    )
     await ctx.rpc.register(packageAccessRpc, {
       recheck: async (input) => {
         await ctx.session.get({ sessionID: input.sessionID })

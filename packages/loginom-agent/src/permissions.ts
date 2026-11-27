@@ -66,6 +66,7 @@ export const table: readonly Entry[] = [
   { action: "loginom_dock_action_run", resource: "*", kind: "save", effect: "ask" },
   // A local package opened through `local_package_path` is uploaded into Loginom as a copy (В-75).
   { action: "loginom_dock_prepare", resource: "local_package", kind: "save", effect: "ask" },
+  { action: "loginom_dock_prepare", resource: "agent_copy", kind: "save", effect: "ask" },
   // Dashboards (B2.9): publishing sends sources to Loginom, deleting removes the published versions there.
   { action: "dashboard_publish", resource: "*", kind: "save", effect: "ask" },
   { action: "dashboard_delete", resource: "*", kind: "save", effect: "ask" },

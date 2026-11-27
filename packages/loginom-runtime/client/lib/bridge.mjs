@@ -35,6 +35,7 @@ import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBindi
 import {makeSavedPackageStateCode,parseSavedPackageState,readSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
 import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
+import {createPackageCopy, PackageCopyError} from './package-copy.mjs';
 import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
 
 // Keep the runtime receipt byte-for-byte meaningful to reconciliation/journal
@@ -93,7 +94,7 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
   return inherited;
 }
 
-export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, reauthenticateReload } = {}) {
+export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, reauthenticateReload, packageCopy } = {}) {
   if (config.closeSavedPackageOnShutdown !== undefined && typeof config.closeSavedPackageOnShutdown !== 'boolean'
       || config.closeSavedPackageOnShutdown === true && config.acceptanceCleanupPackage)
     throw Error('Invalid private saved-package cleanup policy');
@@ -394,7 +395,53 @@ export async function createBridge(config, session, { browserTransport: managedB
         : 'Call dock_prepare for scenario work after skill activation. It returns dynamic readiness, input artifacts and local skill pins. Dock provides shared knowledge and a local browser. Source files and live DOM take precedence over recalled context. All clipboard copy/paste must use dock_clipboard_transfer so other Dock sessions cannot overwrite it during the operation. The installed native adapter activates shared session archiving after successful preparation. Check dock_diagnostics for actual archive activation and delivery state.'),
     });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [...structuredClone(catalog.tools), ...recovery.listTools(browserTools)] }));
-    const callTool = async (request, extra, privatePackage=null, scanReceipt=undefined) => {
+    const stateCheck = () => new PackageCopyError('state_check_required');
+    const invokeCopyTool = (name, args, signal) =>
+      callTool({params:{name,arguments:args}}, {signal}, null, undefined, true);
+    const saveCopy = async (kind, path, operationId, signal) => {
+      const response = await invokeCopyTool('dock_action_run', {
+        operation_id:operationId, action_key:kind, parameters:{path, conflict_policy:'replace'},
+      }, signal);
+      const outcome = JSON.parse(response.content[0].text);
+      if (outcome.operation_id !== operationId || outcome.output?.package_ref?.path !== path
+          || outcomeVerification(outcome, pinnedActions.actions.get(kind)).domain_effect.state !== 'verified')
+        throw stateCheck();
+    };
+    const copies = packageCopy && createPackageCopy({
+      ...packageCopy,
+      record: recordExecution,
+      async flush(path, id, signal) {
+        const state = await packageCopy.storage.workspace(path);
+        if (!state?.modified) return;
+        if (state.running || state.readOnly || session.metadata.workspaceReady !== true
+            || session.metadata.workspacePreparation?.state?.package_ref?.path !== path) throw stateCheck();
+        await saveCopy('package.save_checkpoint', path, id + '-checkpoint', signal);
+        if ((await packageCopy.storage.workspace(path))?.modified !== false) throw stateCheck();
+      },
+      async saveFrom(source, sourceHash, path, previous, id, signal) {
+        if (await packageCopy.storage.digest(source) !== sourceHash) throw stateCheck();
+        const prepared = session.metadata.workspacePreparation?.state;
+        if (session.metadata.workspaceReady !== true || prepared?.package_ref?.path !== source) {
+          const response = await invokeCopyTool('dock_prepare', {
+            operation_id:id + '-open', intent:'open_package', package_path:source,
+          }, signal);
+          const result = JSON.parse(response.content[0].text);
+          if (result.prepared !== true || result.workspace?.package_ref?.path !== source) throw stateCheck();
+        }
+        if ((await packageCopy.storage.workspace(source))?.modified !== false
+            || await packageCopy.storage.digest(source) !== sourceHash
+            || await packageCopy.storage.busy(path) || await packageCopy.storage.digest(path) !== previous) throw stateCheck();
+        await saveCopy('package.save_as', path, id + '-save', signal);
+        session.metadata.workspaceReady = false;
+        // Native Save keeps its own previous revision. Compare it independently
+        // so a racing Save in a different Loginom window cannot certify our backup.
+        if (await packageCopy.storage.digest(path.slice(0,-4) + '.~lgp') !== previous) throw stateCheck();
+        const hash = await packageCopy.storage.digest(path);
+        if (!hash) throw stateCheck();
+        return hash;
+      },
+    });
+    const callTool = async (request, extra, privatePackage=null, scanReceipt=undefined, copyAction=false) => {
       if (shutdownStarted) throw new McpError(ErrorCode.InvalidRequest, 'Dock shutdown has started');
       if (recovery.owns(request.params.name)) {
         requirePreparedWorkspace(session.metadata);
@@ -429,6 +476,8 @@ export async function createBridge(config, session, { browserTransport: managedB
         if (request.params.name === 'dock_prepare') {
           let args = request.params.arguments ?? {};
           validateActionParameters(prepareTool.inputSchema, args);
+          if (args.copy_for_edit === true && (!copies || privatePackage || args.intent !== 'open_package' || !args.package_path))
+            throw Error('copy_for_edit requires a managed existing server package');
           const packageDeadline=privatePackage?Date.now()+Math.min(args.timeout_ms??120000,runtimeCallTimeout('dock_prepare',args)-5000):null;
           const remaining=()=>{
             const ms=packageDeadline-Date.now();
@@ -471,6 +520,18 @@ export async function createBridge(config, session, { browserTransport: managedB
           let workspace = null;
           if (actionRuntime) {
             workspace = await dockGate(request.params.name, async () => {
+              if (copies && !copyAction) {
+                if (args.copy_for_edit === true) {
+                  actionRuntime.assertPreparationAllowed();
+                  const edit = await copies.execute('begin', {originalPath:preparationRequest.package_path}, extra.signal);
+                  preparationRequest = {...preparationRequest, package_path:edit.path};
+                } else {
+                  const path = preparationRequest.package_path ?? session.metadata.workspacePreparation?.state?.package_ref?.path;
+                  const draft = await copies.guard(path);
+                  if (draft && (preparationRequest.intent === 'new_draft' || path !== draft))
+                    throw Error('Prepare the existing agent copy for this conversation');
+                }
+              }
               const state = await prepareWorkspaceSession({ metadata: session.metadata,
               request: preparationRequest, signal: extra.signal,
               assertAllowed() {
@@ -539,6 +600,14 @@ export async function createBridge(config, session, { browserTransport: managedB
                 &&ownedUnsavedDraft.tab_tid===state.workflow_ref?.tab_tid&&ownedUnsavedDraft.account===state.loginom_account
                 &&state.package_ref?.persisted===false&&state.package_ref.path===null)
                 ownedUnsavedDraft.state=structuredClone(state);
+              if (copies && !copyAction && state.status === 'READY') {
+                const path = state.package_ref?.path;
+                const draft = await copies.guard(path);
+                if (draft && path !== draft) {
+                  session.metadata.workspaceReady = false;
+                  throw Error('Prepared workflow is outside the owned agent copy');
+                }
+              }
               if (userProfile && session.metadata.workspaceReady === true) userWorkflows.remember(state);
               return state;
             });
@@ -546,18 +615,20 @@ export async function createBridge(config, session, { browserTransport: managedB
           }
           if (!actionRuntime) await session.save(catalog);
           if (userProfile && actionRuntime) {
-            const first = !userBundleDelivered;
+            const first = !userBundleDelivered && !copyAction;
             const ready = session.metadata.workspaceReady === true;
             const types = first ? actionRuntime.describe().available_node_types : [];
             const described = first ? actionRuntime.describe({action_keys:['package.save_checkpoint'],node_types:types.slice(0,32)}) : null;
             if(first&&types.length>32)for(let offset=32;offset<types.length;offset+=32)
               described.node_types.push(...actionRuntime.describe({node_types:types.slice(offset,offset+32)}).node_types);
             const bundle = first ? compactKnowledgeBundle(described) : null;
+            const originalPath = ready && await copies?.originalFor(workspace.package_ref?.path);
             const result = { prepared: ready, sessionId: session.metadata.sessionId, skillRevision: prepared.detail.revision,
               source: prepared.detail.source,
               loginomUrl: config.loginomUrl, workspace, result_version: 'user-v1', input_artifacts: session.artifactStore.list(),
               ...(workspace?.package_ref?.read_only===true?{next_step:{instruction:packageReadOnlyAdvice}}:{}),
               ...(localPackageUpload?{local_package_upload:localPackageUpload}:{}),
+              ...(originalPath ? {agent_copy:{originalPath, path:workspace.package_ref.path}} : {}),
               ...(config.storageDirectories ? { storage_directories: config.storageDirectories } : {}),
               knowledge: bundle ?? { reused: true, skillRevision: prepared.detail.revision } };
             await logResult('dock_prepare', result);
@@ -583,9 +654,10 @@ export async function createBridge(config, session, { browserTransport: managedB
               delivered.next_step={tool:'dock_action_describe',instruction:'The preparation catalog lists types and modes only. Request selected node_types and modes for complete semantics, rules and parameter schemas before applying nodes.'};
               reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},budget);
             }
-            if (ready && reply.isError !== true) userBundleDelivered = true;
+            if (ready && reply.isError !== true && !copyAction) userBundleDelivered = true;
             undeliveredDraft = ready && reply.isError === true && workspace?.created_draft === true
               && preparationRequest.intent === 'new_draft' ? session.metadata.workspacePreparation.identity : null;
+            if (originalPath && reply.isError !== true) reply._meta = {agentCopy:{originalPath, path:workspace.package_ref.path}};
             return reply;
           }
           return { content: [{ type: 'text', text: JSON.stringify({
@@ -614,6 +686,11 @@ export async function createBridge(config, session, { browserTransport: managedB
             const invoke=async()=>{
               requirePreparedWorkspace(session.metadata);
               let args=request.params.arguments??{};
+              if (copies && ['dock_node_apply','dock_node_resume','dock_node_delete'].includes(request.params.name)) {
+                const active = session.metadata.workspacePreparation?.state?.package_ref?.path;
+                const draft = await copies.guard(active);
+                if (draft && active !== draft) throw Error('Open the owned agent copy before editing');
+              }
               if(userProfile && ['dock_node_apply','dock_node_resume','dock_node_read','dock_node_delete'].includes(request.params.name)) {
                 validateActionParameters(userNodeTool(actionRuntime.tools.find(tool=>tool.name===request.params.name)).inputSchema,args);
                 if(request.params.name==='dock_node_apply')args=userWorkflows.expandNode(args);
@@ -756,6 +833,12 @@ export async function createBridge(config, session, { browserTransport: managedB
               validateActionParameters(definition.inputSchema,args);
             }
             if (!(request.params.name === 'dock_workspace_observe' && args.scope === 'bootstrap')) requirePreparedWorkspace(session.metadata);
+            if (copies && !copyAction && request.params.name === 'dock_action_run') {
+              const active = session.metadata.workspacePreparation?.state?.package_ref?.path;
+              const draft = await copies.guard(active);
+              if (draft && (active !== draft || args.parameters?.path !== draft))
+                throw Error('Save is restricted to the owned agent copy. Use the package card for other destinations.');
+            }
             const saveRequest=request.params.name==='dock_action_run'
               &&['package.save_as','package.save_checkpoint'].includes(args.action_key);
             if(userProfile&&saveRequest&&args.action_key==='package.save_checkpoint'
@@ -853,7 +936,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             }
             if (userProfile && savedOutcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(savedOutcome.action_key))
               for (const continuation of saveContinuations) userWorkflows.remember(continuation);
-            const reply = actionReply(userProfile?compactActionResult(outcome,{
+            const reply = actionReply(userProfile&&!copyAction?compactActionResult(outcome,{
               wireSize:value=>Buffer.byteLength(JSON.stringify(actionReply(value,{userProfile})),'utf8'),
             }):outcome, { observe: request.params.name === 'dock_workspace_observe', userProfile });
             if(normalizedWorkspace)reply.content.push({type:'text',text:JSON.stringify({kind:'dock_saved_package_workspace',
@@ -966,6 +1049,15 @@ export async function createBridge(config, session, { browserTransport: managedB
         ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
     });
     return { server, catalog,
+      async packageCopy(action, input, signal) {
+        if (!copies || !actionRuntime || shutdownStarted || recovery.unsettled() || actionRuntime.hasUnsettledWork())
+          throw stateCheck();
+        const active = session.metadata.workspacePreparation?.state?.package_ref?.path;
+        const discarding = action === 'discard' && await copies.originalFor(active);
+        const result = await copies.execute(action, input, signal);
+        if (discarding) session.metadata.workspaceReady = false;
+        return result;
+      },
       applyWithScanReceipt(args,receipt,extra) {
         return callTool({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);
       },

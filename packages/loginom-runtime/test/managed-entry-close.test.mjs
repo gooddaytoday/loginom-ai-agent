@@ -11,12 +11,12 @@ for (const heldSocket of [true, false]) test(`checked managed close ${heldSocket
   const directory = await mkdtemp(join(tmpdir(), "managed-exit-fallback-"))
   // Entry, input validation and resource closure remain byte-identical. Only
   // external browser/MCP boundaries are fixtures, as in managed-work-entry.
-  for (const name of ["managed-entry", "managed-resources-close", "start-input", "call-timeout", "dashboard-storage"]) {
+  for (const name of ["managed-entry", "managed-resources-close", "start-input", "call-timeout", "dashboard-storage", "package-copy-storage"]) {
     await mkdir(join(directory, "src"), { recursive: true })
     await copyFile(new URL(`../src/${name}.mjs`, import.meta.url), join(directory, "src", `${name}.mjs`))
   }
   await mkdir(join(directory, "client/lib"), { recursive: true })
-  for (const name of ["browser-downloads", "step-progress"])
+  for (const name of ["browser-downloads", "step-progress", "package-copy"])
     await copyFile(new URL(`../client/lib/${name}.mjs`, import.meta.url), join(directory, "client/lib", `${name}.mjs`))
   const files = {
     "src/resources.mjs": "export async function verifyResources() { return {manifestHash:'fixture',manifest:{}} }",

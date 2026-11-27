@@ -7,6 +7,7 @@ import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 import { HostTaskScope } from "./task-scope"
 import { DashboardDelete, DashboardRead, DashboardPublish } from "./dashboard"
 import { PackageRecheck } from "./package-access"
+import { CopyReply, CopyRequest } from "./package-copy"
 import { Schema } from "effect"
 import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
 import { browserRecoveryToolName, isBrowserRecoveryTool } from "../../loginom-runtime/client/lib/browser-recovery.mjs"
@@ -359,6 +360,48 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         } finally {
           run.dashboardController = undefined
           run.dispatching = false
+          run.calls--
+          if (run.released && !run.calls) await release(input.run, run)
+        }
+        return
+      }
+      if (data.method === "packageCopy") {
+        const request = Schema.decodeUnknownSync(CopyRequest)(input)
+        if (run.scope?.profile === "loginom-dashboard" || run.applyingScope) throw Error("LOGINOM_SCOPE_DENIED")
+        if (run.browserDispatching) throw Error("LOGINOM_CALL_BUSY")
+        if (service.journal.pending().length) throw Error("LOGINOM_RECOVERY_REQUIRED")
+        run.browserDispatching = true
+        run.calls++
+        try {
+          const lease = await connectionLease(input.run, run)
+          const runtime = await service.runtime(lease.generation, run.chat, undefined, run.sessionID)
+          if (state.closed || run.released) throw Error("LOGINOM_RUN_ABORTED")
+          const id = await service.journal.begin(run.chat, lease.generation)
+          run.active.add(id)
+          const result = await runtime.request("packageCopy", request, 360_000)
+            .then(Schema.decodeUnknownSync(CopyReply))
+            .catch(() => ({ failure: { code: "state_check_required", data: {} } }) as const)
+          const certain = !("failure" in result && result.failure.code === "state_check_required")
+          if (certain) {
+            await service.journal.settle(id, true)
+            run.active.delete(id)
+          } else {
+            await abandon(run)
+            service.markRuntimeStale(run.chat)
+          }
+          if ("failure" in result && result.failure.code === "package_busy") {
+            const candidate = { sessionID: run.sessionID, packagePath: result.failure.data.packagePath }
+            const access = Schema.is(PackageRecheck)(candidate)
+              ? await service.packageAccess(candidate, lease.generation, true).catch(() => undefined)
+              : undefined
+            if (access?.kind === "other_conversation") {
+              reply({ id: data.id, result: { failure: { code: "package_busy", data: access } } }, lease.generation)
+              return
+            }
+          }
+          reply({ id: data.id, result }, lease.generation)
+        } finally {
+          run.browserDispatching = false
           run.calls--
           if (run.released && !run.calls) await release(input.run, run)
         }

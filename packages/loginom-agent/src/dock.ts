@@ -1,3 +1,4 @@
+import { AgentCopy } from "@loginom-ai-agent/loginom-host/package-copy"
 // The Dock catalog of the Loginom Host (B2.5d). Ported from 0.4 `packages/opencode/src/product/tool-contributor.ts`
 // (`contribute`), the task binding of 0.4 `session/tools.ts` and the model hints of 0.4 `turnLifecycle.system`.
 //
@@ -243,11 +244,14 @@ export async function dockTools(input: {
             resolve(directory, args.local_package_path),
         )
     }
+    const editCopy = name === "dock_prepare" && args.copy_for_edit === true
+    if (editCopy && (localPackage || args.intent !== "open_package" || typeof args.package_path !== "string"))
+      throw Error("copy_for_edit requires open_package with a server package_path")
     const packagePath = localPackage ? (args.local_package_path as string) : undefined
     // The resource tells the product's permission kinds apart (B2.6a): an uploaded local package is a save, an export
     // node writes outside the package.
     const target = name === "dock_node_apply" ? (args.target as { type?: unknown } | undefined)?.type : undefined
-    const resource = localPackage ? "local_package" : typeof target === "string" ? target : "*"
+    const resource = localPackage ? "local_package" : editCopy ? "agent_copy" : typeof target === "string" ? target : "*"
     await input.files.ask(call, { action: key, resources: [resource], save: ["*"] }).catch((error) => {
       throw packagePath ? permissionFailure(resolve(directory, packagePath), error) : error
     })
@@ -320,12 +324,15 @@ export async function dockTools(input: {
     const metadata = name === "dock_prepare"
       ? await packageAccessMetadata(result._meta?.packageAccess, (sessionID) => plugin.session.get({ sessionID }))
       : {}
+    const agentCopy = name === "dock_prepare" && Schema.is(AgentCopy)(result._meta?.agentCopy)
+      ? result._meta.agentCopy : undefined
     return {
       content: images.length ? [{ type: "text", text: content }, ...images] : content,
       metadata: {
         generation: lease.generation,
         ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
         ...metadata,
+        ...(agentCopy ? { loginom: { ...("loginom" in metadata ? metadata.loginom : {}), agentCopy } } : {}),
         // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
         ...(outputPath ? { truncated: true, outputPath } : {}),
         ...(state === "pending" ? { loginomPending: true } : {}),
