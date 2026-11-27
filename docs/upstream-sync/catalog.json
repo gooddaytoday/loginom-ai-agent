@@ -74,6 +74,29 @@
       ]
     },
     {
+      "id": "CAT-16",
+      "title": "Turn footer and Desktop file availability (LAB-2233)",
+      "paths": [
+        "packages/app/e2e/regression/loginom-export-cards.spec.ts",
+        "packages/app/e2e/utils/app-direction.fixture.tsx",
+        "packages/app/e2e/utils/app-direction.html",
+        "packages/app/e2e/utils/timeline.ts",
+        "packages/app/src/runtime/platform/platform.tsx",
+        "packages/app/src/runtime/plugin/host-apis.tsx",
+        "packages/app/src/session/timeline/turn-presentation.tsx",
+        "packages/desktop/src/main/files/index.ts",
+        "packages/desktop/src/main/ipc-handlers/files.ts",
+        "packages/desktop/src/renderer/api-types.ts",
+        "packages/desktop/src/renderer/api.ts",
+        "packages/desktop/src/renderer/platform/files.ts",
+        "packages/desktop/src/shared/ipc-rpc/files.ts",
+        "packages/plugin/src/gui/builtin.ts",
+        "packages/plugin/src/gui/host-apis.ts",
+        "packages/session-ui/src/timeline/timeline-row.ts",
+        "packages/session-ui/src/timeline/turn-presentation.ts"
+      ]
+    },
+    {
       "id": "CAT-14",
       "title": "Built-in GUI tool renderers (C3.0, C3.18)",
       "paths": [

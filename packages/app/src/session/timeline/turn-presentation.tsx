@@ -67,7 +67,16 @@ export function createTurnPresentation(base: ReturnType<typeof createTimelinePro
     description: (id: string) => descriptions().get(id),
     projection: createTurnPresentationProjection({
       base,
-      presentation: (id) => descriptions().get(id)?.kind,
+      presentation: (id) => {
+        const value = descriptions().get(id)
+
+        return value?.label ? value.kind : undefined
+      },
+      footer: (id) => {
+        const value = descriptions().get(id)
+
+        return value?.kind === "summary" && !!value.footer
+      },
       ...disclosure,
     }),
   }
@@ -93,6 +102,9 @@ export function TurnPresentationRow(props: {
     >
       {(() => {
         const value = props.value
+
+        if (props.row.placement === "footer")
+          return value.kind === "summary" && <p class="wrap-break-word">{value.footer}</p>
 
         if (value.kind === "plan")
           return (

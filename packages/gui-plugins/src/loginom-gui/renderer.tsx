@@ -5,6 +5,8 @@ import { Option } from "effect"
 import { createMemo, createSignal, createUniqueId, For, onCleanup, Show } from "solid-js"
 import { createKeyed, Slot, usePlugin, type Plugin } from "@opencode/plugin/gui"
 import { builtinContext, BuiltinSlot, ToolRenderer, type ToolRendererProps } from "@opencode/plugin/gui/builtin"
+import { ExportCard } from "./export-card"
+import { confirmedExport, localExportPath } from "./export-receipt"
 import type definition from "./index"
 import { decodeFacts, decodeProgress, failureTitle, loginomStepPhrase, stepDetails } from "./step-phrase"
 import setupTurnPresentation from "./turn-presentation"
@@ -64,6 +66,10 @@ function Step(props: ToolRendererProps) {
 
   const running = () => !failed() && (props.status === "streaming" || props.status === "running")
 
+  const receipt = createMemo(() =>
+    failed() ? undefined : confirmedExport(props.tool, props.status, props.metadata),
+  )
+
   const progress = createMemo(() =>
     running() ? Option.getOrUndefined(decodeProgress(props.metadata.loginomStep)) : undefined,
   )
@@ -92,6 +98,8 @@ function Step(props: ToolRendererProps) {
 
   const title = () => {
     if (failed()) return failureTitle(ctx, facts())
+
+    if (receipt()) return ctx.t("export.step")
 
     if (!running()) return loginomStepPhrase(ctx, outcome(), { pending: props.metadata.loginomPending === true })
     const step = progress()
@@ -156,6 +164,15 @@ function Step(props: ToolRendererProps) {
       <ul id={id} hidden={!open() || details().length === 0} class="min-w-0 break-words ps-7 text-v2-text-text-faint">
         <For each={details()}>{(detail) => <li>{detail}</li>}</For>
       </ul>
+      <Show when={receipt()}>
+        {(file) => (
+          <ExportCard
+            receipt={file()}
+            nodeLabel={facts()?.node?.label}
+            path={localExportPath(file(), props.metadata)}
+          />
+        )}
+      </Show>
     </div>
   )
 }

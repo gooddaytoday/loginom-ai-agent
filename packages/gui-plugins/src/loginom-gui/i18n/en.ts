@@ -42,4 +42,11 @@ export const dict = {
   "failure.withReason": "{{action}} · {{reason}}",
   "failure.withAttempt": "{{action}} · {{attempt}}",
   "failure.withReasonAndAttempt": "{{action}} · {{reason}} · {{attempt}}",
+  "export.step": "Ran the export",
+  "export.node": "Node “{{name}}”",
+  "export.path": "Loginom path: {{path}}",
+  "export.reveal": "Open folder",
+  "export.unavailable": "The local copy is unavailable",
+  "export.turnFiles": "Files from this turn: {{names}}",
+  "export.noFiles": "No files were created",
 }

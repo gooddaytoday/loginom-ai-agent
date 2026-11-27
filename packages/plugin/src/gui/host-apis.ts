@@ -1123,9 +1123,16 @@ export interface Desktop {
    * Shows a path in the system file manager.
    *
    * @param path - An absolute path.
-   * @returns False when it could not.
+   * @param options - With `checkOnly`, checks whether the path exists without opening it.
+   * @returns False when the path is unavailable.
    */
-  reveal(path: string): Promise<boolean>
+  reveal(
+    path: string,
+    options?: {
+      /** Checks for the path without opening the system file manager. */
+      checkOnly?: boolean
+    },
+  ): Promise<boolean>
   /**
    * Whether an app is installed.
    *

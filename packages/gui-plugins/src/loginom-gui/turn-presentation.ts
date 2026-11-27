@@ -2,6 +2,7 @@ import type { SessionMessageAssistantTool } from "@opencode/client/promise"
 import { Option } from "effect"
 import type { Plugin } from "@opencode/plugin/gui"
 import { TurnPresentation } from "@opencode/plugin/gui/builtin"
+import { turnExportNames } from "./export-receipt"
 import type definition from "./index"
 import { decodeFacts, loginomStepPhrase } from "./step-phrase"
 
@@ -55,7 +56,13 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
         ),
       ]
 
-      if (!actions.length) return
+      const files = turnExportNames(calls)
+
+      const footer = files?.length
+        ? ctx.t("export.turnFiles", { names: new Intl.ListFormat(locale).format(files) })
+        : files && ctx.t("export.noFiles")
+
+      if (!actions.length) return footer ? { kind: "summary", footer } : undefined
 
       const seconds = Math.round(input.durationMs / 1000)
       const number = new Intl.NumberFormat(locale)
@@ -75,6 +82,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       return {
         kind: "summary",
         label: ctx.t("turn.worked", { duration, actions: displayed.join(", ") }),
+        footer,
       }
     },
   })

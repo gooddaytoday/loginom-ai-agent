@@ -8,6 +8,7 @@ type Projection = ReturnType<typeof createReactiveTimelineProjection>
 export function createTurnPresentationProjection(input: {
   base: Projection
   presentation: (id: string) => "plan" | "summary" | undefined
+  footer: (id: string) => boolean
   open: (id: string) => boolean
   setOpen: (id: string, open: boolean) => void
 }) {
@@ -42,11 +43,17 @@ export function createTurnPresentationProjection(input: {
   const rows = createMemo(() => {
     const native = base.rows()
 
-    const displayed = native.flatMap((row) => {
-      if (Predicate.isTagged(row, "UserMessage") && input.presentation(row.userMessageID))
-        return [row, new TimelineRow.TurnPresentation({ userMessageID: row.userMessageID })]
+    const displayed = native.flatMap((row, index) => {
+      const { userMessageID } = row
+      const visible = hiddenRefs(row) ? [] : [row]
 
-      return hiddenRefs(row) ? [] : [row]
+      if (Predicate.isTagged(row, "UserMessage") && input.presentation(userMessageID))
+        visible.push(new TimelineRow.TurnPresentation({ userMessageID, placement: "header" }))
+
+      if (native[index + 1]?.userMessageID !== userMessageID && input.footer(userMessageID))
+        visible.push(new TimelineRow.TurnPresentation({ userMessageID, placement: "footer" }))
+
+      return visible
     })
 
     return displayed.length === native.length && displayed.every((row, index) => row === native[index])

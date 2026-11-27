@@ -115,7 +115,7 @@ export type TurnPresentationInput = {
     }
 )
 
-/** A localized row to show before the turn's activity. */
+/** Localized content before the turn's activity or after its answer. */
 export type TurnPresentationValue =
   | {
       /** Display an ordered plan without changing the live activity rows. */
@@ -135,8 +135,10 @@ export type TurnPresentationValue =
   | {
       /** A disclosure button for the completed turn's activity rows. */
       readonly kind: "summary"
-      /** The localized summary shown on the button. */
-      readonly label: string
+      /** The localized summary shown on the disclosure button, when there is activity to disclose. */
+      readonly label?: string
+      /** Optional localized text after the answer. */
+      readonly footer?: string
     }
 
 /** Supplies optional plan and summary rows for a built-in plugin's turns. */

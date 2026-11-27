@@ -162,11 +162,12 @@ function make(
         }),
       )
     }),
-    revealPath: Effect.fn("DesktopFiles.revealPath")(function* (target: string) {
+    revealPath: Effect.fn("DesktopFiles.revealPath")(function* (target: string, checkOnly = false) {
       const exists = yield* fs.exists(target).pipe(Effect.orElseSucceed(() => false))
 
       if (!exists) return false
-      shell.showItemInFolder(target)
+
+      if (!checkOnly) shell.showItemInFolder(target)
 
       return true
     }),

@@ -50,6 +50,7 @@ export function createDesktopFiles(api: DesktopFileAPI, os: DesktopOS) {
         const selected = options?.reference?.(file.name)
           ? new File([], file.name, { type: binaryReferenceMime(file.name) })
           : new File([await api.readPickedFile(result.token, file.path)], file.name)
+
         attachmentPaths.set(selected, file.path)
         await onFile(selected)
       }
@@ -92,8 +93,8 @@ export function createDesktopFiles(api: DesktopFileAPI, os: DesktopOS) {
       const resolvedApp = app ? await api.resolveAppPath(app).catch(() => null) : null
       await api.openPath(path, resolvedApp ?? undefined)
     },
-    async revealPath(path: string) {
-      return api.revealPath(path)
+    async revealPath(path: string, options?: Parameters<typeof api.revealPath>[1]) {
+      return api.revealPath(path, options)
     },
     async readClipboardImage() {
       const image = await api.readClipboardImage().catch(() => null)

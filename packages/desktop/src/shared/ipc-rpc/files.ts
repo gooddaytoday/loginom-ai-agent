@@ -69,7 +69,7 @@ export const FilesOpenPath = Rpc.make("FilesOpenPath", {
 })
 
 export const FilesRevealPath = Rpc.make("FilesRevealPath", {
-  payload: { path: Schema.String },
+  payload: { path: Schema.String, checkOnly: Schema.optional(Schema.Boolean) },
   success: Schema.Boolean,
 })
 

@@ -330,7 +330,7 @@ export function createHostApis() {
             os: platform.os ?? "linux",
             zoom: () => platform.webviewZoom?.() ?? 1,
             launch: (path, app) => platform.openPath?.(path, app) ?? Promise.resolve(),
-            reveal: (path) => platform.revealPath?.(path) ?? Promise.resolve(false),
+            reveal: (path, options) => platform.revealPath?.(path, options) ?? Promise.resolve(false),
             installed: (app) => platform.checkAppExists?.(app) ?? Promise.resolve(false),
             forceFocus: (enabled) => platform.setForceFocus?.(enabled) ?? Promise.resolve(),
             async pick(options) {

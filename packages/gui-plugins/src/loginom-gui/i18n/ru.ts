@@ -46,4 +46,11 @@ export const dict = {
   "failure.withReason": "{{action}} · {{reason}}",
   "failure.withAttempt": "{{action}} · {{attempt}}",
   "failure.withReasonAndAttempt": "{{action}} · {{reason}} · {{attempt}}",
+  "export.step": "Выполнил экспорт",
+  "export.node": "Узел «{{name}}»",
+  "export.path": "Путь в Loginom: {{path}}",
+  "export.reveal": "Открыть папку",
+  "export.unavailable": "Локальная копия недоступна",
+  "export.turnFiles": "Файлы этого хода: {{names}}",
+  "export.noFiles": "Файлы не создавались",
 } satisfies Record<keyof typeof en | "step.build.few" | "step.build.many", string>
