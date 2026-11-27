@@ -606,12 +606,12 @@ function chatsMark(list) {
 }
 function waitingFor(item) {
   if (item.phase === 'permission') {
+    if (filesForLoginom(item).length) return 'ждёт разрешения на загрузку'
     if (item.kind === 'abc') return 'ждёт разрешения на сохранение'
     if (item.kind === 'node-export') return 'ждёт разрешения на запись CSV'
     return 'ждёт разрешения на создание копии'
   }
   if (item.phase === 'question') return 'ждёт ответа: какие строки считать дубликатами'
-  if (item.phase === 'upload') return 'ждёт подтверждения загрузки'
   if (item.phase === 'repeated') return 'ждёт решения о повторе шага'
   if (item.phase === 'busy') return 'ждёт решения по занятому пакету'
   return {plan:'ждёт запуска плана', connect:'ждёт подключения к Loginom', proposed:'ждёт подтверждения изменений'}[item.phase] || ''
@@ -1276,7 +1276,7 @@ scripts.keepFrom = {...scripts.keep, permission:{...scripts.improve.permission, 
   {plan:0, icon:'flow', ask:'permission', live:'Делаю копию «{from}»', done:'Сделал копию «{copy}» из новой версии «{from}»', short:'сделал копию новой версии', detail:'Новая версия и исходный не меняются', time:3},
   ...scripts.keep.steps.slice(1)]}
 // A package from the computer: the first step uploads the agent's own copy, the rest is the same edit.
-scripts.improveLocal = {...scripts.improve, permission:{...scripts.improve.permission, title:'Разрешить правку копии «{pkg}»?', text:'Чтобы править пакет, агент загрузит его копию с компьютера в вашу папку Loginom. Файл на компьютере не изменится.', trace:'загрузить копию «{pkg}» с компьютера в {home}/Копии агента'}, steps:[
+scripts.improveLocal = {...scripts.improve, permission:{...scripts.improve.permission, title:'Разрешить правку копии «{pkg}»?', text:'Чтобы править пакет, агент загрузит его копию с компьютера в вашу папку Loginom. Файл на компьютере не изменится.', args:[['Файл','{pkg}'],['Папка','{home}/Копии агента'],['Изменится','появится копия «{copy}»']], trace:'загрузить копию «{pkg}» с компьютера в {home}/Копии агента'}, steps:[
   {plan:0, icon:'upload', ask:'permission', live:'Загружаю копию «{pkg}» с компьютера в Loginom', done:'Загрузил «{pkg}» в {home}/Копии агента', short:'загрузил копию пакета', detail:'Файл на компьютере не меняется — вы решите, куда сохранить изменённый пакет', time:4},
   ...scripts.improve.steps.slice(1)]}
 // Kinds the agent answers in words, without steps in Loginom.
@@ -1313,18 +1313,34 @@ function completeTurn(turn) {
   turn.steer = turn.steer || []
   return turn
 }
-// A step that needs the user stops the run until they answer.
-function filesForLoginom(item) {
-  if (item.kind === 'improve' && item.local && item.step === 0 && !item.resumeCopy) return item.files.slice(0, 1)
-  if (item.kind === 'abc' && item.step === 1) return item.localFiles?.length ? item.localFiles : item.local ? item.files.slice(0, 1) : []
+function filesForLoginom(item, at = item.step) {
+  if (item.kind === 'improve' && item.local && at === 0 && !item.resumeCopy) return item.files.slice(0, 1)
+  if (item.kind === 'abc' && at === 1) return item.localFiles?.length ? item.localFiles : item.local ? item.files.slice(0, 1) : []
   return []
 }
+function permissionFor(item, at = item.step) {
+  if (item.kind === 'abc') {
+    const files = filesForLoginom(item, at)
+    if (files.length) {
+      const names = files.map(name => `«${name}»`).join(', ')
+      const folder = packageFolder('personal')
+      return {title:'Разрешить загрузку в Loginom?', text:'Агент загрузит данные в вашу папку Loginom для сборки сценария.',
+        args:[[files.length === 1 ? 'Файл' : 'Файлы', files.join(', ')], ['Папка', folder]], noInstead:true,
+        trace:`загрузить ${names} в ${folder}`, scope:`загружать ${names} в ${folder} на ${hostOf(state.settings.connection.url)}`,
+        denied:'Загрузку отменили. Агент не собрал сценарий.'}
+    }
+  }
+  return scriptOf(item).permission
+}
+// A step that needs the user stops the run until they answer.
 function runSteps(item) {
   clearTimeout(item.timer)
   const script = scriptOf(item)
   if (item.step >= script.steps.length) return writeAnswer(item, 'done')
   const step = script.steps[item.step]
   const asked = (item.cleared || []).includes(item.step)
+  const files = filesForLoginom(item)
+  const ask = step.ask === 'permission' || (item.kind === 'abc' && files.length) ? permissionFor(item) : null
   // Run 3 of the review: «Разрешения» → «Сохранять пакеты в Loginom» decides first — «Разрешено» saves without asking,
   // «Запрещено» does not save and the agent says so; «Спрашивать» asks here.
   // An edit of a copy that exists (follow-up, finishing a stopped edit) does not ask again, but «Запрещено» stops it.
@@ -1340,26 +1356,17 @@ function runSteps(item) {
     item.phase = 'denied'
     return render()
   }
-  if (step.ask === 'permission' && !(item.cleared || []).includes(item.step) && (item.allowed || []).includes(script.permission.scope)) {
+  if (ask && !(item.cleared || []).includes(item.step) && (item.allowed || []).includes(ask.scope)) {
     item.decisions.push({at:item.step, choice:'auto'})
     item.cleared.push(item.step)
   }
-  if (step.ask === 'permission' && !(item.cleared || []).includes(item.step)) {
+  if (ask && !(item.cleared || []).includes(item.step)) {
     item.phase = 'permission'
     turnNotice(item, 'notifyDecision', waitingFor(item), 'alert')
     return render()
   }
   if (step.ask === 'question' && !asked) {
     item.phase = 'question'
-    turnNotice(item, 'notifyDecision', waitingFor(item), 'alert')
-    return render()
-  }
-  const files = filesForLoginom(item)
-  const connection = state.settings.connection
-  const onStand = files.length && hostOf(connection.url) === 'app.loginom.ai'
-  const uploadAccount = onStand && state.packageAccount
-  if (onStand && item.uploadConsent !== uploadAccount) {
-    item.phase = 'upload'
     turnNotice(item, 'notifyDecision', waitingFor(item), 'alert')
     return render()
   }
@@ -1373,6 +1380,7 @@ function runSteps(item) {
     item.waitedAt = null
   }
   item.phase = 'running'
+  const folder = files.length ? packageFolder('personal') + (item.kind === 'improve' ? '/Копии агента' : '') : null
   const loginom = files.length > 0 || (['abc','improve','keep','refactor','clean','document','skilltrial','node-data','node-error','node-export'].includes(item.kind) && !item.local && !(item.kind === 'abc' && item.step === 0) && !['book','file'].includes(step.icon))
   const long = longChatStep(item)
   item.stepKind = loginom ? (step.write ? 'write' : 'read') : 'model'
@@ -1390,8 +1398,7 @@ function runSteps(item) {
     }
     if (item.failAt === item.step) return stepFailed(item)
     if (item.modelFailAt === item.step) return modelFailed(item)
-    if (files.length) {
-      const folder = '/' + connection.username + (item.kind === 'improve' ? '/Копии агента' : '')
+    if (folder) {
       item.uploads = [...(item.uploads || []), ...files.map(name => ({at:item.step, text:`Загрузил «${name}» в ${folder}` }))]
     }
     if (loginom) item.lastReply = Date.now()
@@ -1560,7 +1567,7 @@ function permit(choice, text = '') {
     render()
     return $('#prompt')?.focus()
   }
-  if (choice === 'session') item.allowed = [...(item.allowed || []), scriptOf(item).permission.scope]
+  if (choice === 'session') item.allowed = [...(item.allowed || []), permissionFor(item).scope]
   item.cleared.push(item.step)
   runSteps(item)
   $('#prompt')?.focus()
@@ -1584,9 +1591,9 @@ function answerText(turn) {
 }
 function turnAnswer(turn, live = false) {
   if (turn.phase === 'denied') {
-    if (turn.uploadDenied) return '<div class="answer-block"><p>Файл не загружен на учебный сервер.</p></div>'
-    if (turn.decisions?.some(entry => entry.choice === 'forbidden')) return `<div class="answer-block"><p>${esc(stepText(scriptOf(turn).permission.forbidden || '', turn) || 'Сохранять пакеты в Loginom мне запрещено: так стоит в «Настройки» → «Разрешения». Сценарий собран и проверен — он остался в этом разговоре.')}</p>${live ? `<button class="btn" data-settings="permissions">${icon('shield',15)} Открыть «Разрешения»</button>` : ''}</div>`
-    return `<div class="answer-block"><p>${esc(scriptOf(turn).permission.denied)}</p></div>`
+    const permission = permissionFor(turn)
+    if (turn.decisions?.some(entry => entry.choice === 'forbidden')) return `<div class="answer-block"><p>${esc(stepText(permission.forbidden || '', turn) || 'Сохранять пакеты в Loginom мне запрещено: так стоит в «Настройки» → «Разрешения». Сценарий собран и проверен — он остался в этом разговоре.')}</p>${live ? `<button class="btn" data-settings="permissions">${icon('shield',15)} Открыть «Разрешения»</button>` : ''}</div>`
+    return `<div class="answer-block"><p>${esc(permission.denied)}</p></div>`
   }
   if (turn.phase === 'failed' && turn.modelError && !turn.modelError.resolved) {
     const [title, reason] = modelErrorText(turn.modelError)
@@ -1707,9 +1714,13 @@ function turnSteps(turn, live, turnIndex) {
     for (const decision of (turn.decisions || []).filter(entry => entry.at === index && entry.choice === 'retry')) rows.push(`<li class="step-trace">${icon('refresh',14)}<span>Вы повторили шаг</span></li>`)
     if (turn.modelError?.at === index) rows.push(modelErrorRow(turn))
     for (const decision of (turn.decisions || []).filter(entry => entry.at === index && entry.choice === 'continue')) rows.push(`<li class="step-trace">${icon('play',14)}<span>Вы продолжили с моделью «${esc(decision.model)}»</span></li>`)
-    for (const decision of (turn.decisions || []).filter(entry => entry.at === index && !['retry','continue','forbidden'].includes(entry.choice))) rows.push(decision.choice === 'instead'
-      ? `<li class="step-trace steer">${icon('message',14)}<span>Вы попросили иначе: «${esc(decision.text)}»</span></li>`
-      : `<li class="step-trace">${icon('check',14)}<span>${{session:'Вы разрешили в этом разговоре', auto:'Разрешено ранее в этом разговоре', once:'Вы разрешили один раз', setting:'Разрешено в «Разрешениях»'}[decision.choice]}: ${esc(followed(script.permission.trace, turn))}</span></li>`)
+    for (const decision of (turn.decisions || []).filter(entry => entry.at === index && !['retry','continue','forbidden'].includes(entry.choice))) {
+      const permission = permissionFor(turn, index)
+      const trace = permission.noInstead ? stepText(permission.trace, turn) : followed(permission.trace, turn)
+      rows.push(decision.choice === 'instead'
+        ? `<li class="step-trace steer">${icon('message',14)}<span>Вы попросили иначе: «${esc(decision.text)}»</span></li>`
+        : `<li class="step-trace">${icon('check',14)}<span>${{session:'Вы разрешили в этом разговоре', auto:'Разрешено ранее в этом разговоре', once:'Вы разрешили один раз', setting:'Разрешено в «Разрешениях»'}[decision.choice]}: ${esc(trace)}</span></li>`)
+    }
     if (step.ask === 'question') rows.push(`<li class="step-trace">${icon('help',14)}<span>${esc(script.question.text)} — <strong>${esc(turn.answer || '')}</strong></span></li>`)
     if (detailed && step.think) rows.push(`<li class="step think">${icon('spark',14)}<span>Думал ${step.think[0]} с<small>${esc(step.think[1])}</small></span></li>`)
     const uploads = turn.uploads?.filter(entry => entry.at === index) || []
@@ -1722,8 +1733,8 @@ function turnSteps(turn, live, turnIndex) {
     ;(turn.steer || []).filter(entry => entry.at === index + 1).forEach(entry => rows.push(`<li class="step-trace steer">${icon('message',14)}<span>Ваша поправка: «${esc(entry.text)}»</span></li>`))
   })
   const denied = turn.decisions?.find(entry => entry.choice === 'deny')
-  if (denied) rows.push(`<li class="step-trace denied">${icon('close',14)}<span>Вы отклонили: ${esc(stepText(script.permission.trace, turn))}</span></li>`)
-  if (turn.decisions?.some(entry => entry.choice === 'forbidden')) rows.push(`<li class="step-trace denied">${icon('lock',14)}<span>Не сделал: ${esc(stepText(script.permission.trace, turn))} — в «Разрешениях» это запрещено</span></li>`)
+  if (denied) rows.push(`<li class="step-trace denied">${icon('close',14)}<span>Вы отклонили: ${esc(stepText(permissionFor(turn, denied.at).trace, turn))}</span></li>`)
+  if (turn.decisions?.some(entry => entry.choice === 'forbidden')) rows.push(`<li class="step-trace denied">${icon('lock',14)}<span>Не сделал: ${esc(stepText(permissionFor(turn).trace, turn))} — в «Разрешениях» это запрещено</span></li>`)
   errorRows(turn.step)
   recoveryRows(turn.step)
   if (turn.modelError?.at === turn.step && turn.step < script.steps.length) rows.push(modelErrorRow(turn))
@@ -1760,7 +1771,7 @@ function turnPlan(turn) {
 function turnView(item, turn, index, live) {
   const script = scriptOf(turn)
   const finished = ['done','answer','denied','stopped','interrupted','failed','busy'].includes(turn.phase)
-  const hasSteps = script.steps.length && turn.step > 0 || (live && ['running','retrying','permission','upload','question','failed','repeated','busy'].includes(turn.phase)) || (turn.decisions || []).some(entry => ['deny','forbidden'].includes(entry.choice))
+  const hasSteps = script.steps.length && turn.step > 0 || (live && ['running','retrying','permission','question','failed','repeated','busy'].includes(turn.phase)) || (turn.decisions || []).some(entry => ['deny','forbidden'].includes(entry.choice))
   const brief = state.detail !== 'full'
   const objects = [...(turn.rules ? [turn.rules.short] : []), ...script.steps.slice(0, turn.step).map(step => stepText(step.short, turn)), ...((turn.errors || []).some(entry => entry.at < turn.step) ? ['повторил шаг после сбоя Loginom'] : []), ...(turn.modelError?.resolved ? [(turn.decisions || []).some(entry => entry.choice === 'continue' && entry.model !== turn.modelError.model) ? 'продолжил с другой моделью после остановки' : 'продолжил после остановки модели'] : [])]
   const unresolved = (turn.errors || []).some(entry => entry.at >= turn.step) || Boolean(turn.modelError && !turn.modelError.resolved)
@@ -1775,7 +1786,7 @@ function turnView(item, turn, index, live) {
     <div class="agent-message"><span class="agent-avatar"><img src="assets/loginom.png" alt="" width="31" height="31"></span><div class="agent-body"><strong class="agent-caption">Loginom AI Agent</strong>
       ${turn.phase === 'connect' ? `<div class="answer-block"><h2>Для этой задачи нужен Loginom</h2><p>Я буду строить и проверять сценарий в Loginom. Подключитесь — и я продолжу.</p>${connectCard()}</div>` : ''}
       ${turn.phase === 'plan' ? `<div class="answer-block"><h2>План работы</h2><p>Проверьте шаги — и я начну.</p>${turnPlan(turn)}<button class="btn primary" data-action="run-plan">Выполнить ${icon('arrow',16)}</button></div>` : ''}
-      ${live && ['running','retrying','permission','upload','question'].includes(turn.phase) && script.plan ? turnPlan(turn) : ''}
+      ${live && ['running','retrying','permission','question'].includes(turn.phase) && script.plan ? turnPlan(turn) : ''}
       ${summary ? `<button class="turn-summary" data-expand-turn="${index}" aria-expanded="false">${icon('chevron',14)}<span>Работал ${turnTime(turn)} · ${esc(objects.join(', '))}</span></button>` : ''}
       ${hasSteps && !summary ? `${finished && brief && !unresolved && turn.step > 0 ? `<button class="turn-summary open" data-expand-turn="${index}" aria-expanded="true">${icon('chevron',14)}<span>Работал ${turnTime(turn)}</span></button>` : finished && turn.step ? `<p class="turn-time">Работал ${turnTime(turn)}</p>` : ''}${turnSteps(turn, live, index)}` : ''}
       ${finished || turn.phase === 'writing' ? turnAnswer({...turn, id:item.id + '-' + index, index}, live) : ''}
@@ -1787,14 +1798,6 @@ function turnView(item, turn, index, live) {
 // The input area of a chat: the agent's question or permission takes the input's place until answered.
 function chatDock(item) {
   const script = scriptOf(item)
-  if (item.phase === 'upload') {
-    const files = filesForLoginom(item)
-    const names = files.map(name => `«${name}»`).join(', ')
-    return `<section class="dock" aria-labelledby="dock-title">
-      <div class="dock-head">${icon('upload',20)}<h2 id="dock-title" tabindex="-1">Загрузить ${esc(names)} на учебный сервер в интернете?</h2></div>
-      <div class="dock-actions"><button class="btn" data-upload="deny">Не загружать</button><button class="btn primary" data-upload="allow">Загрузить</button></div>
-    </section>`
-  }
   if (item.phase === 'repeated') {
     return `<section class="dock" aria-labelledby="dock-title">
       <div class="dock-head">${icon('help',20)}<h2 id="dock-title" tabindex="-1">Агент третий раз делает одно и то же: ${esc(item.repeated.operation)}</h2></div>
@@ -1803,7 +1806,7 @@ function chatDock(item) {
     </section>`
   }
   if (item.phase === 'permission') {
-    const ask = script.permission
+    const ask = permissionFor(item)
     return `<section class="dock" aria-labelledby="dock-title">
       <div class="dock-head">${icon('shield',20)}<h2 id="dock-title" tabindex="-1">${esc(stepText(ask.title, item))}</h2></div>
       <p>${esc(ask.text)}</p>
@@ -2314,7 +2317,7 @@ function review() {
     ['Проверить и улучшить «Продажи»','Запрос «Проверь сценарий продаж» уже в поле ввода — отправьте: агент перечислит замечания, у каждого — «Показать на схеме». «Внести улучшения» — агент спросит, можно ли сделать копию в «Копии агента», и поправит её. В карточке правки — что изменено по узлам, «Настройки и связи» до и после, «Посмотреть в Loginom» — копия такой, какая она в самом Loginom. «Сохранить новой версией» — исходный останется как был.',[['try-check','Начать']]],
     ['Правила отдела','Откроются «Настройки» → «Инструкции». Впишите, например: «Узлы называй по смыслу, по-русски. Перед расчётом выручки — проверка пустых значений. В каждом модуле — заметка: что делает и кто отвечает» (прототип узнаёт только этот пример). Сохраните и в новом разговоре попросите «Проверь сценарий продаж»: в ответе — «учёл ваши инструкции» и замечание «по вашим инструкциям».',[['try-instructions','Начать']]],
     ['Заменить исходный, не сломав другие пакеты','Запрос уже в поле ввода — отправьте. В карточке правки — «Заменить исходный…»: окно покажет, какие пакеты ссылаются на «Продажи» и что сломается, и предложит «Попросить агента оставить узел». В новом разговоре агент снова спросит про копию. Когда обе ссылки рабочие — замените. Потом — «Вернуть прежнюю версию», чтобы «Продажи» снова был исходным.',[['try-improve','Начать']]],
-    ['Файл коллеги с компьютера','Разговор с учебным файлом «Продажи.lgp» с компьютера — отправьте запрос. Разрешите правку копии; на учебном сервере агент отдельно спросит перед загрузкой. «Скачать на компьютер…» сохраняет исправленный файл у вас, после этого «Удалить копию из Loginom» убирает копию с сервера.',[['try-local-improve','Начать']]],
+    ['Файл коллеги с компьютера','Разговор с учебным файлом «Продажи.lgp» с компьютера — отправьте запрос. В разрешении на правку копии указаны файл и папка. «Скачать на компьютер…» сохраняет исправленный файл у вас, после этого «Удалить копию из Loginom» убирает копию с сервера.',[['try-local-improve','Начать']]],
     ['Каталог и своё','Каталог: кто подготовил — Loginom, «Проверено Loginom» или «Сообщество» — и что будет разрешено; навык «Сообщество» ставится только после вашего согласия. «Создать своё» — навык из разговора, с нуля или из файла; «Попробовать», а после «Включить» — «Отправить на проверку».',[['plus-catalog','Начать'],['own-chat','Создать своё']]],
     ['Сбои','Проверьте ожидание и очередь поправок, возврат Loginom, обрыв при записи, перезапуск приложения, занятый пакет и одинаковые вызовы. При сбое чтения агент сначала повторит запрос сам. Если и повтор не удался, дождитесь восстановления связи и нажмите «Повторить шаг». При сбое записи сначала проверьте состояние пакета.',[
       ['try-long-step','Долгий шаг'],['try-failure','Сбой при чтении'],['try-write-failure','Сбой при записи'],['try-crash','Закрытие приложения'],
@@ -2406,7 +2409,7 @@ function review() {
     '<strong>Р1. Шлюз C</strong> — пошаговая сборка как в 0.4.3; на шлюзе C сценарии 1, 2, 4, 7, 8, 9 и новый 10 «Собрать вместе с Loginom»; сценарии 3, 5, 6 — на шлюзе D вместе с копией агента.',
     '<strong>Р2. Окно Loginom агента</strong> — справа от приложения; «Показать окно Loginom» в дополнение к «Посмотреть в Loginom»; «не меняйте схему, пока агент работает»; список окон приложения с «Закрыть»; вопрос перед закрытием с несохранённым.',
     '<strong>Р3. Итерация 10 макета</strong> — до ленты разговора (C3); C1, C2, C5 идут сразу.',
-    '<strong>Р4. Учебный стенд</strong> — «учебный сервер Loginom в интернете»; вопрос перед первой загрузкой файла на него.',
+    '<strong>Р4. Учебный стенд</strong> — «учебный сервер Loginom в интернете». Для загрузки действует обычное разрешение с файлом и папкой (В-128).',
     '<strong>Р5. Глубина Loginom в этапе C</strong> — данные на выходе узла, узлы и ошибки со схемой, переменные пакета (просмотр); остальное — позже.',
     '<strong>Р6. Тексты</strong> — «Контекст» → «Файлы и шаги»; «Ответвить» с подсказкой.',
     '<strong>Р7. План перед выполнением</strong> — новый механизм не добавляем: есть режим «Планирование».',
@@ -2901,7 +2904,7 @@ function send(queued = null) {
   const next = {
     id: old?.id ?? 'session-' + Date.now(), date:'Сейчас', title:old?.title || baseTitle + ' · ' + titleSuffix,
     kind, phase, nodeContext, saveRequested:kind === 'abc' && /сохрани|сохранение/i.test(prompt), packageId:draftPackage?.id || nodeContext?.packageId,
-    uploadConsent:old?.uploadConsent, localFiles:[...draftFiles],
+    localFiles:[...draftFiles],
     files:[...(draftPackage ? [draftPackage.name] : []), ...draftFiles], prompt,
     project:old ? old.project : state.page === 'project' ? state.projectView : projectById(state.project) ? state.project : null,
     demo:queued ? undefined : state.demoTurn, busy:queued ? undefined : state.demoBusy, holderId:state.demoHolder, queue:queued ? old.queue.slice(1) : old?.queue,
@@ -3177,7 +3180,7 @@ function feedAction(d) {
   const base = turns[index]
   // Iteration 8: a copy the agent made stays with this conversation; the fork shows its cards with a link here.
   const owned = turn => turn.copy && !turn.forkOf ? {...turn, forkOf:{session:item.id, title:item.title}} : turn
-  const fork = {...owned(turnSnapshot(base)), id:'session-' + Date.now(), date:'Сейчас', title:'Ветка: ' + item.title + ' · ' + new Date().toLocaleTimeString('ru-RU'), project:item.project, model:item.model, uploadConsent:null,
+  const fork = {...owned(turnSnapshot(base)), id:'session-' + Date.now(), date:'Сейчас', title:'Ветка: ' + item.title + ' · ' + new Date().toLocaleTimeString('ru-RU'), project:item.project, model:item.model,
     history:turns.slice(0, index).map(turn => owned(turn === item ? turnSnapshot(item) : structuredClone(turn))), allowed:[]}
   state.sessions = [fork, ...state.sessions]
   openSession(fork.id)
@@ -3185,8 +3188,8 @@ function feedAction(d) {
 }
 function turnSnapshot(item) {
   // A copy, not shared references: a fork's decisions must not show up in the original.
-  return structuredClone({nodeContext:item.nodeContext, saveRequested:item.saveRequested, packageId:item.packageId, savedPath:item.savedPath, exportTo:item.exportTo, instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:item.phase === 'writing' ? item.writeFinal : ['running','retrying','permission','upload','question','repeated','busy','plan','connect','starting'].includes(item.phase) ? 'interrupted' : item.phase,
-    step:item.step, uploads:item.uploads, uploadDenied:item.uploadDenied, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, copy:item.copy, rules:item.rules, web:item.web, nosend:item.nosend, local:item.local, from:item.from, resumeCopy:item.resumeCopy, about:item.about, aboutKeep:item.aboutKeep, nocopy:item.nocopy, modelNote:item.modelNote, forkOf:item.forkOf, model:item.model, modelName:item.modelName, modelError:item.modelError, recovery:item.recovery, repeated:item.repeated, saveName:item.saveName, loginomFailure:item.loginomFailure, savedStep:item.savedStep, elapsedByStep:item.elapsedByStep, interruptedAt:item.interruptedAt})
+  return structuredClone({nodeContext:item.nodeContext, saveRequested:item.saveRequested, packageId:item.packageId, savedPath:item.savedPath, exportTo:item.exportTo, instruction:item.instruction, prompt:item.prompt, files:item.files, localFiles:item.localFiles, kind:item.kind, phase:item.phase === 'writing' ? item.writeFinal : ['running','retrying','permission','question','repeated','busy','plan','connect','starting'].includes(item.phase) ? 'interrupted' : item.phase,
+    step:item.step, uploads:item.uploads, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, copy:item.copy, rules:item.rules, web:item.web, nosend:item.nosend, local:item.local, from:item.from, resumeCopy:item.resumeCopy, about:item.about, aboutKeep:item.aboutKeep, nocopy:item.nocopy, modelNote:item.modelNote, forkOf:item.forkOf, model:item.model, modelName:item.modelName, modelError:item.modelError, recovery:item.recovery, repeated:item.repeated, saveName:item.saveName, loginomFailure:item.loginomFailure, savedStep:item.savedStep, elapsedByStep:item.elapsedByStep, interruptedAt:item.interruptedAt})
 }
 function connectLoginom() {
   if (state.connecting) return
@@ -3784,17 +3787,6 @@ app.addEventListener('click', event => {
   }
   if (d.openProject) return openProject(d.openProject)
   if (d.queue) return editQueue(d.queue)
-  if (d.upload) {
-    const item = currentItem()
-    if (item?.phase !== 'upload') return
-    if (d.upload === 'allow') {
-      item.uploadConsent = state.packageAccount
-      return runSteps(item)
-    }
-    item.phase = 'denied'
-    item.uploadDenied = true
-    return render()
-  }
   if (d.permit) return permit(d.permit)
   if (d.answer) return answerQuestion(d.answer)
   if (d.detail) {
