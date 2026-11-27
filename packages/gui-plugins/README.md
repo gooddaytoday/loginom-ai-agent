@@ -202,6 +202,12 @@ It then falls back to the quote's composer tile without closing the editor or di
 | `bindPlugin(component)`                          | One contract component under its provider's context; data methods stay plain   |
 | `onIdle(fn)` (built-ins only)                    | Preloading a lazy chunk while the app is idle                                  |
 
+Built-in window plugins can import `ToolRenderer` from `@opencode/plugin/gui/builtin` and call
+`ctx.add(ToolRenderer, { tool, title, separate, render })` in setup for a tool they own. The host rejects native or
+already registered tool names and withdraws the renderer when the plugin unloads. `separate: true` gives visible calls
+their own row in grouped timelines. The renderer receives live data, including partial input. The timeline shows a tool
+error card if rendering throws and retries rendering at the next call status.
+
 [Lifetimes](#lifetimes) shows `createKeyed` in files.
 
 ```ts

@@ -165,7 +165,7 @@ export async function until(check: () => boolean) {
 }
 
 /** Mounts the real plugin host with one plugin whose every renderer load settles when the test says so. */
-export function mountPluginHost(input?: { builtins: ReadonlySet<string>; View: Component }) {
+export function mountPluginHost(input?: { builtins: ReadonlySet<string>; View?: Component; extra?: readonly Entry[] }) {
   const loads: PromiseWithResolvers<{ default: Plugin.Setup<Entry> }>[] = []
   const [disabled, setDisabled] = createSignal<ReadonlySet<string>>(new Set())
   const hosts: PluginHost[] = []
@@ -175,7 +175,7 @@ export function mountPluginHost(input?: { builtins: ReadonlySet<string>; View: C
   function Capture() {
     hosts.push(usePluginHost())
 
-    return input && <input.View />
+    return input?.View && <input.View />
   }
 
   const dispose = render(
@@ -193,6 +193,7 @@ export function mountPluginHost(input?: { builtins: ReadonlySet<string>; View: C
                   return load.promise
                 },
               },
+              ...(input?.extra ?? []),
             ]}
             disabled={disabled}
             builtins={input?.builtins}
@@ -221,7 +222,7 @@ export function mountPluginHost(input?: { builtins: ReadonlySet<string>; View: C
     reload: () => hosts[0]?.reload("fixture"),
     disable: () => setDisabled(new Set(["fixture"])),
     enable: () => setDisabled(new Set<string>()),
-    status: () => hosts[0]?.status("fixture"),
+    status: (id = "fixture") => hosts[0]?.status(id),
     /** Contributions the host holds for a registry; readable after the host unmounts. */
     entries: (registry: string) => hosts[0]?.state.entries[registry]?.length ?? 0,
   }

@@ -1,6 +1,6 @@
 import { ToolRenderer } from "@opencode/plugin/gui/builtin"
 import type { ToolRenderContribution } from "@opencode/session-ui/context"
-import { createMemo, mergeProps } from "solid-js"
+import { createMemo, For, mergeProps } from "solid-js"
 import { usePluginHost, type Item } from "@/runtime/plugin/host"
 import { Contribution } from "@/runtime/plugin/render"
 
@@ -15,26 +15,29 @@ export function createToolRenderers() {
     for (const item of host.items(ToolRenderer)) {
       const name = item.value.tool
 
-      if (byTool.has(name)) continue
-
       const renderer =
         wrapped.get(item) ??
         ({
           get title() {
             return item.value.title
           },
+          // A new status gives a failed renderer a fresh error boundary.
           render: (props, fallback) => (
-            <Contribution plugin={item.plugin} fallback={fallback}>
-              {() =>
-                item.value.render(
-                  mergeProps(props, {
-                    get title() {
-                      return item.value.title
-                    },
-                  }),
-                )
-              }
-            </Contribution>
+            <For each={[props.status]}>
+              {() => (
+                <Contribution plugin={item.plugin} fallback={fallback}>
+                  {() =>
+                    item.value.render(
+                      mergeProps(props, {
+                        get title() {
+                          return item.value.title
+                        },
+                      }),
+                    )
+                  }
+                </Contribution>
+              )}
+            </For>
           ),
         } satisfies ToolRenderContribution)
 
