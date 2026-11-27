@@ -161,7 +161,7 @@ test("window focus keeps the chat scroll position with a file card", async ({ pa
   await expect(page.getByText("Last answer after export", { exact: true })).toBeVisible()
 })
 
-test("the last message stays reachable when scrolling back down to a file card", async ({ page }) => {
+test("scrolling back down to a file card keeps the chat in the DOM", async ({ page }) => {
   await setupTimeline(page, {
     seedHistory: true,
     viewport: { width: 1400, height: 700 },
