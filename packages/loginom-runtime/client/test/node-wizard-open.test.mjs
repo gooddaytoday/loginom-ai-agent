@@ -7,6 +7,11 @@ import vm from 'node:vm';
 import {runInContext} from 'node:vm';
 import {createNodeProcedure} from '../lib/node-procedure.mjs';
 import {readPreparedNodeContext} from '../lib/node-context.mjs';
+import {applyNode} from '../lib/node-apply.mjs';
+import {createTabularTransformNodeSupport} from '../lib/calculator-node.mjs';
+import {createTreeNodeSupport,treeConfigurationReadback} from '../lib/tree-node.mjs';
+import {closePreparedWizard} from '../lib/node-wizard-close.mjs';
+import {TREE_LABEL_SEPARATOR_REQUIRES_COMPOSITE,validateTreeParameters} from '../lib/tree-parameters.mjs';
 import {scriptGraphFixture,clone,build,origin} from './support/workspace-ui-fixture.mjs';
 
 // A long source caption overflows into a hidden native pending breadcrumb.
@@ -94,6 +99,97 @@ test('question discovery cannot replace button verification',()=>{
 });
 test('settings opening requires one control of the prepared graph node',()=>{
  const {state}=fixture();assert.throws(()=>wizardOpenBinding(state));
+});
+
+test('tree separator refusal proves inactivity only from the native Run button for the sole selected node',async t=>{
+ const cases=[
+  {name:'prepared node alone',select:own=>[own],mode:'execute'},
+  {name:'prepared node and another cell',select:(own,other)=>[own,other]},
+  {name:'foreign cell alone',select:(own,other)=>[other]},
+  {name:'nothing selected',select:()=>[]},
+  {name:'prepared node with no recognized toggle mode',select:own=>[own],unknown:true},
+  {name:'prepared node with Deactivate button',select:own=>[own],mode:'deactivate'},
+  {name:'active node with owner-bound deactivation prompt',select:own=>[own],mode:'deactivate',deactivation:true},
+ ];
+ for(const {name,select,mode,unknown,deactivation=false} of cases)await t.test(name,async()=>{
+  const {state}=fixture(),f=scriptGraphFixture('Import','bg-vendor-icon-treetotable'),{page}=f;
+  const context=state.prepared_node_context;
+  context.locked=false;
+  f.node.FGuid=context.node_id;
+  const otherTid='MF;TF-1;Graph;Other';
+  page.add('g',otherTid);
+  f.model.FDiagram.FmxGraph.getSelectionCells=()=>select(f.node.FCell,f.byTid.get(otherTid).FCell);
+  const runTid='MF;TF-1;ModelForm;btnToggleActivateCurrent';
+  const button=page.add('button',runTid,'',{x:400,y:50,width:30,height:25});
+  button.id='run-button';
+  button.attrs['data-qtip']=unknown?'Unknown':mode==='deactivate'?'Деактивировать узел':'Выполнить узел (F9)';
+  page.add('span',null,'',{x:405,y:55,width:10,height:10},button).attrs.class=mode==='deactivate'?'bg-icon-stop':'bg-icon-run_current';
+  page.context.Ext={getCmp:id=>id===button.id?{el:{dom:button},disabled:false,tooltip:'Выполнить узел'}:null};
+  const observe=runInContext('('+workspaceUiCapability.toString()+')',page.context);
+  const observation=await observe(page,{expected_build:build,expected_origin:origin,mode:'observe',
+   prepared_node_context:{node:{node_id:context.node_id},workflow_ref:{navigation_path:[],prefix:'MF;TF-1'}}},async()=>context);
+  assert.equal(observation.status,'SUCCEEDED');
+  const run=clone(observation.output.ui.elements.find(e=>e.tid===runTid));
+  assert.equal(run.graph_execution?.mode,mode);
+
+  // Keep the wizard transition in the host fixture and carry over the browser's actual toolbar observation.
+  const path=state.navigation_context.path;
+  const question=structuredClone(state);
+  question.ui.elements[0].ref='yes';
+  state.ui={masks:[],dialogs:[],elements:[run,
+   {ref:'settings',tid:context.tid+';Setting',allowed_actions:['begin_wizard'],wizard_open:{node:{node_label:'Import'},workflow_path:path}}]};
+  delete state.wizard_pending_owner;
+  const owner={tid:'flow>Import',label:'Import'},root='MF;TF-1;WizrdMCF';
+  const wizard={...state,prepared_node_context:{...context,tid:root,surface:'wizard'},
+   wizard:{status:'observed',root_ref:'wizard',root_tid:root,stage:'tree_table',owner_context:{status:'observed',node:owner,
+    path:[...path,owner,{tid:owner.tid+'>Settings',label:'Settings'}]}},
+   node_tree:{verified:true,composite_labels:false,label_separator:'.'},
+   ui:{masks:[],dialogs:[],elements:[{ref:'close',tid:root+';btnClose',allowed_actions:['click']}]}};
+  const gestures=[];
+  let current=state;
+  const channel={
+   async observe({ready,condition}){assert.ok(ready(current),condition);return current;},
+   async perform({resolve,ready,condition}){
+    assert.ok(ready(current),condition);
+    const action=resolve(current);
+    gestures.push([action.verb,action.ref]);
+    if(action.verb==='begin_wizard')current=deactivation?question:wizard;
+    else if(action.verb==='confirm_wizard_deactivation')current=wizard;
+    else current=state;
+   },
+  };
+  const verified={verified:true,cleanup_complete:true,effect_possible:false};
+  const createTransform=vm.runInNewContext('('+createTabularTransformNodeSupport.toString()+')',{
+   calculatorConfigurationReadback:()=>{},calculatorParametersSchema:{},verified:value=>({...verified,...value}),
+   createNodeProcedure:()=>channel,createNodeExecutionProcedure:()=>({prepare:async()=>{}}),openPreparedWizard,
+  });
+  const owned=s=>s.prepared_node_context?.verified&&s.prepared_node_context.surface==='wizard';
+  const createTree=vm.runInNewContext('('+createTreeNodeSupport.toString()+')',{
+   createTabularTransformNodeSupport:createTransform,treeToTableParametersSchema:{},validateTreeParameters,treeConfigurationReadback,
+   owned,ready:s=>owned(s)&&s.node_tree?.verified,closePreparedWizard,TREE_LABEL_SEPARATOR_REQUIRES_COMPOSITE,
+  });
+  const support=createTree({}, {json:false}),operation={id:'tree-separator-open'};
+  const node={document_id:context.document_id,workflow_id:context.workflow_id,node_id:context.node_id};
+  const request={operation_id:operation.id,contract_revision:'1.0.0',document_id:node.document_id,
+   workflow_ref:{workflow_id:node.workflow_id,tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:path},
+   target:{kind:'existing',type:'trees.to_table',ref:node},mode:'selected_nodes',parameters:{label_separator:'_'},
+   inputs:[],mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false},
+   budgets:{configure_ms:1000,execute_ms:1000,total_ms:1000}};
+  const {openWizard,configureCalculator}=support.nodeApplyDriverFactory({operation});
+  const result=await applyNode({request,operation,handlers:support.nodeApplyHandlers,record:async event=>event,now:()=>1,drivers:{
+   verifySource:async()=>verified,prepareTarget:async()=>({...verified,node}),mapPorts:async()=>verified,
+   openWizard,configureCalculator,
+   finish:async()=>assert.fail('Done must not run'),finishGraph:async()=>assert.fail('Graph finish must not run'),
+  }});
+  const inactive=mode==='execute';
+  const opened=operation.nodeApply.phases.find(p=>p.phase==='open')?.value;
+  assert.equal(opened?.node_was_inactive,inactive);
+  assert.equal(opened?.deactivation_required,deactivation);
+  assert.deepEqual([result.status,result.effect_possible,result.cleanup_complete,result.pending_phase],
+   [inactive?'NOT_APPLIED':'FAILED',!inactive,true,null]);
+  assert.deepEqual(result.error,{code:'REQUEST_REJECTED',message:TREE_LABEL_SEPARATOR_REQUIRES_COMPOSITE});
+  assert.deepEqual(gestures,[['begin_wizard','settings'],...(deactivation?[['confirm_wizard_deactivation','yes']]:[]),['click','close']]);
+ });
 });
 
 for(const fault of [null,'node','component','path','owner TID','caption']){
