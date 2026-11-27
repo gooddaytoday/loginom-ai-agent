@@ -12,9 +12,9 @@ test('model schema inventory pins W1 variable inputs and excludes private cold w
  // #1310 lists control input support (+272 full, +136 compact).
  // LAB-2021 adds the graph-only mode and its empty request constraints.
  // #1383 expands composite_names guidance (+112 full, 0 compact).
- // LAB-2108 adds the JavaScript Calculator this.Expr read-once hint (+148 full, 0 compact).
+ // LAB-2108 adds the JavaScript Calculator this.Expr read-twice NULL hint (+306 full, 0 compact).
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,205327,'1cd7802d68d199c59c73dc561dc62545d232c41cf6d7adb21b294f8bcd3d63b7'],
+  [nodeApiTools,205485,'d202e2eb06ad9ce1145d2bb4056ff1b682065a690bb0886794d9d135b905ad12'],
   [nodeApiTools.map(userNodeTool),14839,'6d59bccb09e8d3fd7d56aa2711c7ccfc2bef03461ab1fd6273177cb3f75763a0'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
