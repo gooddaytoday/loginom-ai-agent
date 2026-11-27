@@ -541,7 +541,6 @@ export const dict = {
   "workspace.status.dirty": "এই ওয়ার্কস্পেসে একত্রিত না হওয়া পরিবর্তন শনাক্ত করা হয়েছে।",
   "workspace.delete.confirm": 'ওয়ার্কস্পেস "{{name}}" মুছবেন?',
   "workspace.delete.button": "ওয়ার্কস্পেস মুছুন",
-  "dialog.usageExceeded.dontShowAgain": "আবার দেখাবেন না",
   "toast.migration.failed.title": "ডেটা মাইগ্রেশন ব্যর্থ হয়েছে",
   "command.session.background": "ব্যাকগ্রাউন্ডে সরান",
   "settings.tab.preferences": "পছন্দসমূহ",

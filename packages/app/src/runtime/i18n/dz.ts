@@ -628,7 +628,6 @@ export const dict = {
   "session.summary.basedOn": "{{branch}} གུ་གཞི་བཞག་ཡོདཔ།",
   "provider.disconnect.toast.noCredentials.description": "{{provider}} གི་བཏོན་གཏང་བཏུབ་པའི་ངོ་རྟགས་འཚོལ་མ་ཐོབ།",
   "provider.disconnect.toast.failed.description": "{{provider}} མཐུད་ལམ་བཏོག་མ་ཚུགས།",
-  "dialog.usageExceeded.dontShowAgain": "ལོག་སྟེ་མ་སྟོན།",
   "dialog.server.menu.hide": "ལས་འགུལ་ཐོ་ཡིག་ནང་ལས་སྦ་བཞག།",
   "dialog.server.menu.show": "ལས་འགུལ་ཐོ་ཡིག་ནང་སྟོན།",
   "session.queue.count.one": "{{count}} བསྒུག་ཐོ་ནང་།",

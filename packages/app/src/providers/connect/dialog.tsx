@@ -168,7 +168,7 @@ export const DialogConnectProvider: Component<{
                   class="shrink-0 rounded-sm text-[13px] font-[440] leading-5 tracking-[-0.04px] text-v2-text-text-faint hover:text-v2-text-text-base focus-visible:text-v2-text-text-base focus-visible:outline-none"
                   onClick={controller.back}
                 >
-                  {language.t("command.provider.connect")}
+                  {language.t("dialog.provider.title")}
                 </button>
                 <Icon name="chevron-right" size="small" class="shrink-0 text-v2-icon-icon-muted" />
               </Show>
@@ -198,8 +198,8 @@ export const DialogConnectProvider: Component<{
           </Match>
           <Match when={true}>
             <DialogTitleGroup
-              title={language.t("command.provider.connect")}
-              description={language.t("dialog.provider.connect.description")}
+              title={language.t("dialog.provider.title")}
+              description={language.t("dialog.provider.description")}
             />
           </Match>
         </Switch>

@@ -106,7 +106,7 @@ export const DialogManageModels: Component = () => {
           description={language.t("dialog.model.manage.description")}
         />
         <Button variant="neutral" size="small" icon="plus" onClick={handleConnectProvider}>
-          {language.t("dialog.model.connect.open")}
+          {language.t("command.provider.connect")}
         </Button>
       </DialogHeader>
       <DialogBody class="flex min-h-0 flex-1 flex-col">

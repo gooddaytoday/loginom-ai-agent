@@ -539,7 +539,6 @@ export const dict = {
   "workspace.status.dirty": "මෙම වැඩබිමේ ඒකාබද්ධ නොකළ වෙනස්කම් හමු විය.",
   "workspace.delete.confirm": '"{{name}}" වැඩබිම මකන්නද?',
   "workspace.delete.button": "වැඩබිම මකන්න",
-  "dialog.usageExceeded.dontShowAgain": "නැවත නොපෙන්වන්න",
   "provider.disconnect.toast.noCredentials.description": "{{provider}} සඳහා ඉවත් කළ හැකි අක්තපත්‍ර හමු නොවීය.",
   "provider.disconnect.toast.failed.description": "{{provider}} විසන්ධි කිරීමට අසමත් විය.",
   "toast.migration.failed.title": "දත්ත සංක්‍රමණය අසමත් විය",

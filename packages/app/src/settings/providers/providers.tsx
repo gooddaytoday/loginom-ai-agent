@@ -6,7 +6,7 @@ import { IconButton } from "@opencode/ui/icon-button"
 import { Menu } from "@opencode/ui/menu"
 import { OpenCodeLogo } from "@/providers/opencode-logo"
 import { showToast } from "@/shell/notifications/toast"
-import { popularProviders, useProviders } from "@/providers/catalog/providers"
+import { useProviders } from "@/providers/catalog/providers"
 import { consoleProviderGroup } from "@/providers/catalog/console"
 import { useIntegrations } from "@/providers/catalog/integrations"
 import { createEffect, createMemo, createSignal, on, untrack, type Component, For, type JSX, Show } from "solid-js"
@@ -34,6 +34,17 @@ import "@/settings/settings.css"
 type ProviderSource = "env" | "api" | "account" | "config" | "custom"
 
 type ProviderItem = ReturnType<ReturnType<typeof useProviders>["connected"]>[number]
+
+const POPULAR_SETTINGS_ORDER = [
+  "opencode",
+  "opencode-go",
+  "openai",
+  "github-copilot",
+  "anthropic",
+  "google",
+  "openrouter",
+  "vercel",
+]
 
 const PROVIDER_NOTES = [
   { match: (id: string) => id === "opencode", key: "dialog.provider.opencode.note" },
@@ -241,7 +252,7 @@ export const SettingsProviders: Component<{
       })
       .slice()
 
-    items.sort((a, b) => popularProviders.indexOf(a.id) - popularProviders.indexOf(b.id))
+    items.sort((a, b) => POPULAR_SETTINGS_ORDER.indexOf(a.id) - POPULAR_SETTINGS_ORDER.indexOf(b.id))
 
     return items
   })

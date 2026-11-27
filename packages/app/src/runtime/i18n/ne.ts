@@ -543,7 +543,6 @@ export const dict = {
   "workspace.status.dirty": "यस कार्यस्थानमा अनमर्ज गरिएका परिवर्तनहरू पत्ता लगाइयो।",
   "workspace.delete.confirm": 'कार्यस्थान "{{name}}" मेट्ने हो?',
   "workspace.delete.button": "कार्यस्थान मेटाउनुहोस्",
-  "dialog.usageExceeded.dontShowAgain": "फेरि नदेखाउनुहोस्",
   "toast.migration.failed.title": "डेटा माइग्रेसन असफल भयो",
   "command.session.background": "पृष्ठभूमिमा सार्नुहोस्",
   "settings.tab.preferences": "प्राथमिकताहरू",

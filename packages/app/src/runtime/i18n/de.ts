@@ -389,7 +389,6 @@ export const dict = {
   "dialog.project.edit.color.select": "{{color}}-Farbe auswählen",
   "dialog.project.edit.worktree.startup": "Startup-Skript für Arbeitsbereich",
   "dialog.project.edit.worktree.startup.placeholder": "z. B. bun install",
-  "dialog.usageExceeded.dontShowAgain": "Nicht mehr anzeigen",
 
   "toast.permissions.autoaccept.on.title": "Berechtigungen werden automatisch akzeptiert",
   "toast.permissions.autoaccept.on.description": "Berechtigungsanfragen werden automatisch genehmigt",

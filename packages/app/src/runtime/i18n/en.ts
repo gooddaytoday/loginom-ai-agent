@@ -54,8 +54,9 @@ export const dict = {
 
   "command.project.open": "Open project",
   "command.project.copyID": "Copy Project ID",
+  "command.provider.connect": "Connect model…",
+  "command.provider.connect.description": "Connect a model with a subscription, an API key, or your own server.",
   "command.settings.open": "Open settings",
-  "command.provider.connect": "Connect provider",
   "command.config.reload": "Reload configuration",
   "command.config.reload.description": "Reload agents, commands, skills, MCP servers and plugins from your config",
   "command.config.reload.pending": "Reloading configuration…",
@@ -131,7 +132,8 @@ export const dict = {
   "palette.group.settings": "Settings",
   "palette.session.location": "{{project}} · {{server}}",
 
-  "dialog.provider.connect.description": "Connect a provider to use its models in Loginom AI Agent.",
+  "dialog.provider.title": "Connect provider",
+  "dialog.provider.description": "Connect a provider to use its models in Loginom AI Agent.",
   "dialog.provider.search.placeholder": "Search providers",
   "dialog.provider.empty": "No providers found",
   "dialog.provider.group.popular": "Popular",
@@ -155,8 +157,6 @@ export const dict = {
 
   "dialog.model.select.title": "Select model",
   "dialog.model.connect": "Connect model",
-  "dialog.model.connect.open": "Connect model…",
-  "dialog.model.connect.description": "Connect a model with a subscription, an API key, or your own server.",
   "dialog.model.search.placeholder": "Search models",
   "dialog.model.empty": "No model results",
   "dialog.model.unavailable": "{{model}} (unavailable)",
@@ -173,6 +173,7 @@ export const dict = {
 
   "dialog.model.unpaid.freeModels.title": "Free models provided by OpenCode",
   "dialog.model.unpaid.connect.title": "Add more models",
+  "dialog.model.unpaid.moreProviders": "More providers",
 
   "dialog.provider.viewAll": "Show more providers",
   "dialog.provider.accounts.add": "Add account",
@@ -489,8 +490,6 @@ export const dict = {
   "dialog.project.edit.color.select": "Select {{color}} color",
   "dialog.project.edit.worktree.startup": "Worktree startup script",
   "dialog.project.edit.worktree.startup.placeholder": "e.g. bun install",
-
-  "dialog.usageExceeded.dontShowAgain": "Don't show again",
 
   "toast.permissions.autoaccept.on.title": "Auto-accepting permissions",
   "toast.permissions.autoaccept.on.description": "Permission requests will be automatically approved",

@@ -84,7 +84,7 @@ export function SessionFreeLimitPanel(props: { resetAt: number | null; selection
           {language.t("session.freeLimit.stopped")}
         </div>
         <div class="text-[13px] font-[440] leading-[var(--line-height-base)] text-v2-text-text-muted [font-variant-numeric:tabular-nums]">
-          {language.t("dialog.model.connect.description")}
+          {language.t("command.provider.connect.description")}
           <Show when={reset()}>
             {(time) => <> {language.t("session.freeLimit.resetTime", { time: time() })}</>}
           </Show>

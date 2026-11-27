@@ -1913,10 +1913,35 @@ test("providers: the free model picker lists Go without a subscription offer", a
   const models = page.getByRole("dialog", { name: "Select model", exact: true })
   await expect(models.getByText("Free models provided by OpenCode", { exact: true })).toBeVisible()
   await expect(models.getByRole("button", { name: "OpenCode Go", exact: true })).toBeVisible()
-  await models.getByRole("button", { name: "Connect model…", exact: true }).click()
+  await models.getByRole("button", { name: "More providers", exact: true }).click()
   const providers = page.getByRole("dialog", { name: "Connect provider", exact: true })
   await expect(providers).toContainText("Connect a provider to use its models in Loginom AI Agent.")
   await expect(providers.getByText("OpenCode Go", { exact: true })).toBeVisible()
+})
+
+test("providers: settings and the connect dialog list popular providers in the same order", async ({ page }) => {
+  const popular = [
+    { id: "opencode", name: "OpenCode Console" },
+    { id: "opencode-go", name: "OpenCode Go" },
+    { id: "openai", name: "OpenAI" },
+    { id: "github-copilot", name: "GitHub Copilot" },
+    { id: "anthropic", name: "Anthropic" },
+    { id: "google", name: "Google" },
+  ]
+  const { settings } = await open(page, {
+    integrations: popular.toReversed().map((item) => ({ ...item, methods: [{ type: "key" }], connections: [] })),
+  })
+  const names = popular.map((item) => item.name)
+
+  await settings.getByRole("tab", { name: "Providers", exact: true }).click()
+  const section = settings.locator(".settings-section").filter({
+    has: page.getByRole("heading", { name: "Popular providers", exact: true }),
+  })
+  await expect(section.locator(".settings-provider-name")).toHaveText(names)
+
+  await settings.getByRole("button", { name: "Show more providers", exact: true }).click()
+  const dialog = page.getByRole("dialog", { name: "Connect provider", exact: true })
+  await expect(dialog.locator("[data-provider-id]")).toHaveText(names)
 })
 
 test("providers: the connect dialog lists connected providers and manages their accounts", async ({ page }) => {

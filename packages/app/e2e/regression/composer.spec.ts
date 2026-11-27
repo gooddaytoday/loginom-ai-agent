@@ -196,7 +196,7 @@ test("the free usage limit offers model connection without an upsell and restore
           : []),
       ],
       connected: state.authorized ? ["opencode", "opencode-go"] : ["opencode"],
-      default: { providerID: "opencode", modelID: "big-pickle" },
+      default: { build: "opencode/big-pickle" },
     }),
     integrations: () => [
       {

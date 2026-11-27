@@ -277,7 +277,6 @@ export const dict = {
 
   "dialog.project.edit.worktree.startup": "工作區啟動腳本",
   "dialog.project.edit.worktree.startup.placeholder": "例如 bun install",
-  "dialog.usageExceeded.dontShowAgain": "不再顯示",
 
   "toast.permissions.autoaccept.on.title": "正在自動接受權限",
   "toast.permissions.autoaccept.on.description": "權限要求將自動獲准",

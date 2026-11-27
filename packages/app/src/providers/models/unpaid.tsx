@@ -16,7 +16,7 @@ import { ModelTooltip } from "./tooltip"
 
 type ModelState = ModelSelection
 
-const featuredProviders = ["opencode", "opencode-go", "openai", "github-copilot", "anthropic", "google"]
+const featuredProviders = ["opencode-go", "opencode", "openai", "anthropic", "google", "github-copilot"]
 
 const displayModelName = (name: string) => name.replace(/\s+(?:\(free\)|free)$/i, "")
 
@@ -180,7 +180,7 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
                     class="col-span-full flex h-8 w-full scroll-my-3.5 items-center justify-start rounded-md px-3 text-left text-[13px] font-[440] leading-5 tracking-[-0.04px] text-v2-text-text-muted [font-family:var(--v2-font-family-sans)] [font-variation-settings:'slnt'_0] hover:bg-v2-overlay-simple-overlay-hover focus:bg-v2-overlay-simple-overlay-hover focus:outline-none"
                     onClick={() => openProviders()}
                   >
-                    {language.t("dialog.model.connect.open")}
+                    {language.t("dialog.model.unpaid.moreProviders")}
                   </button>
                 </div>
               </div>

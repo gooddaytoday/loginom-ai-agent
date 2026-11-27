@@ -8,7 +8,7 @@ import { useDialog } from "@opencode/ui/context"
 
 const MAX_RETRY_AFTER_MS = 45 * 86_400_000
 
-const ONE_DAY_MS = 86_400_000
+const CHATGPT_USAGE_LIMIT_WINDOW = 86_400_000 // 24 hrs
 
 // When a usage limit resets, or undefined when the refusal's delay is missing or out of range.
 export function limitResetAt(created: number, retryAfterMs: number | undefined) {
@@ -34,7 +34,7 @@ export function formatLimitReset(locale: string, created: number, retryAfterMs: 
   if (at === undefined) return undefined
 
   const now = Date.now()
-  const sameDay = new Date(at).toDateString() === new Date(now).toDateString() && at - now < ONE_DAY_MS
+  const sameDay = new Date(at).toDateString() === new Date(now).toDateString() && at - now < 86_400_000
 
   return new Intl.DateTimeFormat(
     locale,
@@ -58,7 +58,7 @@ export function useUsageExceededDialogs() {
       if (evt.data.sessionID !== params.id || dialog.active) return
       if (evt.data.error.type !== "provider.chatgpt-limit") return
 
-      if (chatgptUsageLimit.lastSeenAt && Date.now() - chatgptUsageLimit.lastSeenAt < ONE_DAY_MS) return
+      if (chatgptUsageLimit.lastSeenAt && Date.now() - chatgptUsageLimit.lastSeenAt < CHATGPT_USAGE_LIMIT_WINDOW) return
 
       void import("@/providers/connect/chatgpt-usage-limit").then((usage) => {
         if (dialog.active) return

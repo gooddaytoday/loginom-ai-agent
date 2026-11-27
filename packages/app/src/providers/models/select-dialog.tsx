@@ -445,7 +445,7 @@ function ModelDrawer(props: {
                     icon="plus"
                     onClick={() => dispatch({ type: "action.selected", action: "connect" })}
                   >
-                    {language.t("dialog.model.connect.open")}
+                    {language.t("command.provider.connect")}
                   </Button>
                 </Show>
                 <Show when={props.chatgptPlan}>
@@ -1012,13 +1012,13 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
                 <Tooltip
                   placement="top"
                   gutter={4}
-                  value={language.t("dialog.model.connect.open")}
+                  value={language.t("command.provider.connect")}
                   ignoreSafeArea={false}
                 >
                   <IconButton
                     variant="ghost-muted"
                     icon={<Icon name="plus" size="small" />}
-                    aria-label={language.t("dialog.model.connect.open")}
+                    aria-label={language.t("command.provider.connect")}
                     onClick={connect}
                   />
                 </Tooltip>
