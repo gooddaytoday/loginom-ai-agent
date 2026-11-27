@@ -29,6 +29,151 @@ const c = { id: "ses_tab_c", title: "Tab C session" }
 
 test.use({ serviceWorkers: "block" })
 
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  test(`Loginom package picker and page at ${viewport.width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport)
+    const sales = {
+      name: "Продажи.lgp",
+      folder: "/user",
+      path: "/user/Продажи.lgp",
+      size: 24576,
+      modified: "2026-11-25T12:00:00Z",
+    }
+    const archive = {
+      name: "Архив.lgp",
+      folder: "/user/Архив",
+      path: "/user/Архив/Архив.lgp",
+      size: 4096,
+      modified: "2026-11-24T12:00:00Z",
+    }
+    const first = { ...sales, name: "Баланс.lgp", path: "/user/Баланс.lgp", modified: "2026-11-21T12:00:00Z" }
+    const copy = { ...first, name: "Копия.lgp", path: "/user/Копия.lgp", size: 4 }
+    const entry = (item: typeof sales) => ({
+      kind: "package",
+      name: item.name,
+      path: item.path,
+      modifiedAt: item.modified,
+      sizeBytes: item.size,
+    })
+    const calls: unknown[] = []
+    let connected = true
+    const workspace = await openSession(page, {
+      name: "Packages",
+      seed: { locale: "ru" },
+      provider: {
+        all: [
+          {
+            id: "test",
+            name: "Test",
+            models: { "test-model": { id: "test-model", name: "Test model", limit: { context: 200000 } } },
+          },
+        ],
+        connected: ["test"],
+        default: { providerID: "test", modelID: "test-model" },
+      },
+      rpc(request) {
+        if (request.id === "loginom.connection" && request.method === "status")
+          return {
+            ok: true,
+            value: {
+              revision: 1,
+              generation: 1,
+              url: "https://loginom.test/",
+              username: "analyst",
+              folder: "/user",
+              hasPassword: false,
+              state: connected ? "ready" : "unconfigured",
+              failed: false,
+              deviceOnly: false,
+            },
+          }
+        if (request.id === "loginom.package-upload" && request.method === "upload") {
+          calls.push(request.payload)
+          return entry(copy)
+        }
+        if (request.id !== "loginom.packages") return
+        calls.push(request.payload)
+        const input = request.payload
+        if (!input || typeof input !== "object" || !("folder" in input) || typeof input.folder !== "string") return
+        if (request.method === "search")
+          return "cursor" in input && input.cursor
+            ? { folder: "/user/Архив", entries: [entry(archive)], slow: false }
+            : { folder: "/user", entries: [], slow: false, cursor: "380e21c6-581f-48d7-8dbd-978650e8c285" }
+        if (request.method !== "list") return
+        if (input.folder === "/common") return { folder: "/common", entries: [], slow: false }
+        return {
+          folder: "/user",
+          entries: [{ kind: "folder", name: "Архив", path: "/user/Архив" }, entry(first), entry(sales)],
+          slow: false,
+        }
+      },
+    })
+    await expect(workspace.editor).toBeEditable()
+    await page
+      .locator('[data-action="composer-attach"], [data-action="composer-attach-file"]')
+      .filter({ visible: true })
+      .click()
+    await page.getByRole("menuitem", { name: "Пакет из Loginom…" }).click()
+    const picker = page.getByRole("dialog", { name: "Из Loginom" })
+    const rows = picker.getByRole("group", { name: "Содержимое папки" }).getByRole("button")
+    await expect(rows).toHaveText(["Архив", /Продажи\.lgp/, /Баланс\.lgp/])
+    await page.screenshot({ path: testInfo.outputPath("picker.png") })
+    await picker.getByRole("button", { name: "Сначала новые" }).click()
+    await expect(rows).toHaveText(["Архив", /Баланс\.lgp/, /Продажи\.lgp/])
+
+    await picker.getByRole("button", { name: "Общие папки" }).click()
+    await expect(picker.getByText("В этой папке ничего нет.")).toBeVisible()
+    await picker.getByRole("button", { name: "Моя папка" }).click()
+    const search = picker.getByRole("textbox", { name: "Найти пакет по имени" })
+    await search.fill("Архив")
+    await expect(picker.getByRole("button", { name: "Архив", exact: true })).toBeVisible()
+    expect(JSON.stringify(calls)).not.toContain("/user/Архив")
+    await picker.getByRole("button", { name: "Искать и во вложенных папках" }).click()
+    const result = picker.getByRole("button", { name: /Архив\.lgp/ })
+    await expect(result).toContainText("/user/Архив")
+    expect(calls).toContainEqual({
+      folder: "/user",
+      text: "Архив",
+      recursive: true,
+      cursor: "380e21c6-581f-48d7-8dbd-978650e8c285",
+    })
+    await result.click()
+    await expect(page).toHaveURL(/\/page\/loginom-gui\/packages$/)
+    await expect(page.getByRole("heading", { name: "Архив.lgp" })).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath("packages.png") })
+
+    await page.getByRole("button", { name: "Из Loginom" }).click()
+    await expect(
+      picker.getByRole("region", { name: "Недавние" }).getByRole("button", { name: /Архив\.lgp/ }),
+    ).toBeVisible()
+    await picker.getByRole("button", { name: /Архив\.lgp/ }).click()
+    await page.getByRole("button", { name: "С компьютера" }).click()
+    const upload = page.getByRole("dialog", { name: "С компьютера" })
+    await upload
+      .locator('input[type="file"]')
+      .setInputFiles({ name: "Копия.lgp", mimeType: "application/octet-stream", buffer: Buffer.from("demo") })
+    await upload.getByRole("button", { name: "Загрузить копию и открыть" }).click()
+    await expect(page.getByRole("heading", { name: "Копия.lgp" })).toBeVisible()
+    expect(calls).toContainEqual({ content: "ZGVtbw==", name: "Копия.lgp", generation: 1 })
+    await page.reload()
+    await page.getByRole("button", { name: "Из Loginom" }).click()
+    const recents = picker.getByRole("region", { name: "Недавние" })
+    await expect(recents.getByRole("button")).toHaveText([/Копия\.lgp/, /Архив\.lgp/])
+    await page.keyboard.press("Escape")
+    await expect(picker).toBeHidden()
+
+    connected = false
+    await page.getByRole("button", { name: "Из Loginom" }).click()
+    await expect(picker.getByRole("button", { name: "Подключить Loginom" })).toBeVisible()
+    await expect(picker.getByRole("button", { name: "Файл .lgp с компьютера" })).toBeVisible()
+    await expect(picker.getByRole("textbox")).toHaveCount(0)
+    await expect(picker.getByRole("region", { name: "Недавние" })).toHaveCount(0)
+  })
+}
+
 for (const layout of ["horizontal", "vertical", "narrow"] as const) {
   test(`a plugin page can open a new session in the ${layout} tab layout`, async ({ page }) => {
     const narrow = layout === "narrow"

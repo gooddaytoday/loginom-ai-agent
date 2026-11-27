@@ -169,6 +169,23 @@ export interface Page {
  */
 export const Page = Registry.define<Page>("page")
 
+/** An entry supplied by a built-in plugin to the composer attachment menu. */
+export interface ComposerAddItem {
+  /** Label shown in the menu. */
+  readonly title: string
+  /** Optional icon shown beside the label. */
+  readonly icon?: IconName
+  /**
+   * Runs when the user picks the entry.
+   *
+   * @param openPage - Opens a registered plugin page by ID in the current session.
+   */
+  run(openPage: (id: string) => void): void
+}
+
+/** The registry of additional composer attachment menu entries for built-in plugins. */
+export const ComposerAddItem = Registry.define<ComposerAddItem>("composer-add-item")
+
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */

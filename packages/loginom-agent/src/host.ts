@@ -10,6 +10,8 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
+import { decodeFolderListing, type ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
+import type { UploadInput } from "@loginom-ai-agent/loginom-host/package-upload"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { Option, Schema } from "effect"
@@ -18,11 +20,12 @@ export type Lease = NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>
 export type Connection = {
   port: Port
   close(): Promise<void>
-  request?: (method: string, input: unknown) => Promise<unknown>
+  request?: (method: string, input: unknown, timeout?: number) => Promise<unknown>
 }
 
 type Started = {
   readonly directory: string
+  readonly deviceOnly: boolean
   ready: Promise<Connection | undefined>
   connected?: boolean
   held: Map<Lease, string>
@@ -47,7 +50,12 @@ const decodePublication = Schema.decodeUnknownOption(Schema.NullOr(PublicationSo
  * The Node host comes from `resources` and starts in the background, so the server does not wait for its handshake.
  * `connect` replaces it in tests. A file system failure here only leaves the server without leases, never stops it.
  */
-export async function start(input: { data: string; resources?: string; connect?: () => Promise<Connection> }) {
+export async function start(input: {
+  data: string
+  resources?: string
+  deviceOnly?: boolean
+  connect?: () => Promise<Connection>
+}) {
   if (state.current && !state.current.closing) throw Error("LOGINOM_HOST_ALREADY_STARTED")
   await state.current?.closing
   const root = join(input.data, "loginom")
@@ -68,7 +76,12 @@ export async function start(input: { data: string; resources?: string; connect?:
       }),
   ).then((sessions) => sessions.flat())
   const connect = input.connect ?? (input.resources ? nodeHost(root, input.resources) : undefined)
-  const current: Started = { directory, ready: Promise.resolve(undefined), held: new Map() }
+  const current: Started = {
+    directory,
+    deviceOnly: input.deviceOnly ?? false,
+    ready: Promise.resolve(undefined),
+    held: new Map(),
+  }
   current.ready = (connect?.() ?? Promise.resolve(undefined)).then(
     (connection) => {
       if (connection && current.closing) return connection.close().then(() => undefined)
@@ -116,11 +129,7 @@ export async function preflight(automation: boolean) {
  * rejects with `LOGINOM_HOST_NOT_READY`.
  */
 export const dashboard = {
-  status: async () => {
-    const view = Option.getOrUndefined(decodeView(await request("connection.status", {})))
-    if (!view) throw new Error("LOGINOM_REPLY_INVALID")
-    return view
-  },
+  status: connectionView,
   settled: async () => {
     await state.current?.ready
   },
@@ -132,11 +141,70 @@ export const dashboard = {
   },
 }
 
-async function request(method: string, input: unknown) {
+export const connectionSettings = {
+  request,
+  deviceOnly: () => state.current?.deviceOnly ?? false,
+  holdTurn() {
+    const id = randomUUID()
+    const held = request("connection.settings.turn", { id, active: true }).catch(() => undefined)
+    return async () => {
+      await held
+      await request("connection.settings.turn", { id, active: false }).catch(() => undefined)
+    }
+  },
+}
+
+async function connectionView() {
+  const view = Option.getOrUndefined(decodeView(await request("connection.status", {})))
+  if (!view) throw new Error("LOGINOM_REPLY_INVALID")
+  return view
+}
+
+export const packageFolders = {
+  async generation() {
+    const { generation } = await connectionView()
+    return generation
+  },
+  async read(input: ReadFolder, signal: AbortSignal) {
+    return decodeFolderListing(await packageRequest("packages.list", input, signal), input.folder)
+  },
+}
+
+export async function uploadPackage(input: UploadInput, signal: AbortSignal) {
+  const view = await connectionView()
+  if (view.generation !== input.generation) throw Error("LOGINOM_CONNECTION_NOT_READY")
+  if (connectionSettings.deviceOnly()) {
+    const hostname = new URL(view.url).hostname
+    if (hostname !== "localhost" && hostname !== "[::1]" && !/^127(?:\.\d{1,3}){3}$/.test(hostname))
+      throw Error("LOGINOM_CONNECTION_NOT_READY")
+  }
+  return packageRequest("packages.upload", input, signal)
+}
+
+async function packageRequest(method: "packages.list" | "packages.upload", input: ReadFolder | UploadInput, signal: AbortSignal) {
+    signal.throwIfAborted()
+    const current = state.current
+    const connection = await current?.ready
+    signal.throwIfAborted()
+    if (!connection?.request || current?.closing) throw Error("LOGINOM_HOST_NOT_READY")
+    const { request } = connection
+    const requestId = randomUUID()
+    const cancel = () => { void request("packages.cancel", { requestId }).catch(() => undefined) }
+    signal.addEventListener("abort", cancel, { once: true })
+    try {
+      const result = await request(method, { ...input, requestId }, 145_000)
+      signal.throwIfAborted()
+      return result
+    } finally {
+      signal.removeEventListener("abort", cancel)
+    }
+}
+
+async function request(method: string, input: unknown, timeout?: number) {
   const current = state.current
   const connection = await current?.ready
   if (!connection?.request || current?.closing) throw new Error("LOGINOM_HOST_NOT_READY")
-  return connection.request(method, input)
+  return connection.request(method, input, timeout)
 }
 
 /** Releases every lease still held, disconnects and closes the Host. Idempotent: soft stop (B2.3b) may call it first. */

@@ -69,10 +69,6 @@ export const dict = {
   "ui.sessionTurn.retry.geminiHot": "मिथुन अहिले धेरै तातो छ",
   "ui.sessionTurn.error.freeUsageExceeded": "नि:शुल्क प्रयोग नाघ्यो",
   "ui.sessionTurn.error.addCredits": "क्रेडिटहरू थप्नुहोस्",
-  "dialog.usageExceeded.freeTier.title": "नि: शुल्क सीमा पुग्यो",
-  "dialog.usageExceeded.freeTier.description":
-    "उत्कृष्ट खुला स्रोत मोडेलहरूमा भरपर्दो पहुँचका लागि $10/महिनामा OpenCode Go को सदस्यता लिनुहोस्।",
-  "dialog.usageExceeded.freeTier.actionLabel": "सदस्यता लिनुहोस्",
   "ui.sessionTurn.status.delegating": "काम प्रत्यायोजन गर्ने",
   "ui.sessionTurn.status.planning": "अर्को चरणहरू योजना",
   "ui.sessionTurn.status.gatheringContext": "अन्वेषण गर्दै",

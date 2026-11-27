@@ -67,10 +67,6 @@ export const dict = {
   "ui.sessionTurn.retry.geminiHot": "Gemini яг одоо хэтэрхий халуун байна",
   "ui.sessionTurn.error.freeUsageExceeded": "Үнэгүй хэрэглээ хэтэрсэн",
   "ui.sessionTurn.error.addCredits": "Кредит нэмэх",
-  "dialog.usageExceeded.freeTier.title": "Үнэгүй хязгаарт хүрсэн",
-  "dialog.usageExceeded.freeTier.description":
-    "OpenCode Go-д сард 10 доллараар бүртгүүлж, нээлттэй эхийн шилдэг загваруудад найдвартай хандаарай.",
-  "dialog.usageExceeded.freeTier.actionLabel": "Бүртгүүлэх",
   "ui.sessionTurn.status.delegating": "Ажлыг шилжүүлэх",
   "ui.sessionTurn.status.planning": "Дараагийн алхамуудыг төлөвлөх",
   "ui.sessionTurn.status.gatheringContext": "Судалж байна",

@@ -130,8 +130,8 @@ type HostState = {
   contracts: Record<string, number | undefined>
 }
 
-// How long a plugin may load its window entry and global stores before it fails.
-const activationTimeout = 30_000
+// Give Desktop's 30 s port handshake time to finish, with 15 s of headroom for store reads.
+const activationTimeout = 45_000
 
 type Stores = Record<string, Persisted<object> | ((session: SessionRef) => Persisted<object>)>
 
@@ -144,8 +144,12 @@ const inactive = {
 
 const HostContext = createContext<ReturnType<typeof createHost>>()
 
+export function useOptionalPluginHost() {
+  return useContext(HostContext)
+}
+
 export function usePluginHost() {
-  const host = useContext(HostContext)
+  const host = useOptionalPluginHost()
 
   if (!host) throw new Error("Plugin host is unavailable")
 
