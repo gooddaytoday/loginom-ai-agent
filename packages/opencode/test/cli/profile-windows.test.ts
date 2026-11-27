@@ -99,6 +99,23 @@ test.skipIf(process.platform !== "win32")(
       })
       expect(await child.exited).toBe(0)
     }
+    // Raw rights and propagation of each ACE, as the profile check reads them.
+    const aces = async (target: string) => {
+      const child = Bun.spawn(
+        [
+          join(systemRoot, "System32/WindowsPowerShell/v1.0/powershell.exe"),
+          "-NoLogo",
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          "(Get-Acl -LiteralPath $env:ACL_TARGET).Access | ForEach-Object { '' + [int]$_.FileSystemRights + ' ' + $_.PropagationFlags }",
+        ],
+        { env: { ...process.env, ACL_TARGET: target }, stdout: "pipe", stderr: "ignore" },
+      )
+      const text = await new Response(child.stdout).text()
+      expect(await child.exited).toBe(0)
+      return text.split(/\r?\n/)
+    }
     const capability =
       "*S-1-15-3-1024-1528657515-1944437972-2795272136-1227674495-293963776-353393192-4060142787-1908764039:"
     const temporary = await mkdtemp(join(tmpdir(), "loginom-acl-cache-test-"))
@@ -120,6 +137,10 @@ test.skipIf(process.platform !== "win32")(
       // Chromium's own grant (LAB-2078 readback): Modify, Synchronize on the
       // directory plus an inherit-only entry with these generic rights.
       await icacls(join(root, httpCache), capability + "(OI)(CI)(GR,GW,GE,D)")
+      // The generic-bit mapping must be exercised: same raw entries as on Windows.
+      const chromium = await aces(join(root, httpCache))
+      expect(chromium).toContain("-536805376 InheritOnly")
+      expect(chromium).toContain("1245631 None")
       await writeFile(join(root, network, "Cookies"), "test")
       await writeFile(join(root, httpCache, "index"), "test")
       await protectWindowsProfile(root)
@@ -149,6 +170,7 @@ test.skipIf(process.platform !== "win32")(
       ]) {
         const rejected = await profile(directory)
         await icacls(join(rejected, directory), grant)
+        if (grant.endsWith("(IO)(GA)")) expect(await aces(join(rejected, directory))).toContain("268435456 InheritOnly")
         await expect(protectWindowsProfile(rejected)).rejects.toThrow("PROFILE_PERMISSIONS_INVALID")
       }
     } finally {
