@@ -10,6 +10,7 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
+import { decodeFolderListing, type ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { Option, Schema } from "effect"
@@ -116,11 +117,7 @@ export async function preflight(automation: boolean) {
  * rejects with `LOGINOM_HOST_NOT_READY`.
  */
 export const dashboard = {
-  status: async () => {
-    const view = Option.getOrUndefined(decodeView(await request("connection.status", {})))
-    if (!view) throw new Error("LOGINOM_REPLY_INVALID")
-    return view
-  },
+  status: connectionView,
   settled: async () => {
     await state.current?.ready
   },
@@ -129,6 +126,37 @@ export const dashboard = {
     const source = decodePublication(await request("dashboard.read", input))
     if (Option.isNone(source)) throw new Error("LOGINOM_REPLY_INVALID")
     return source.value
+  },
+}
+
+async function connectionView() {
+  const view = Option.getOrUndefined(decodeView(await request("connection.status", {})))
+  if (!view) throw new Error("LOGINOM_REPLY_INVALID")
+  return view
+}
+
+export const packageFolders = {
+  async generation() {
+    const { generation } = await connectionView()
+    return generation
+  },
+  async read(input: ReadFolder, signal: AbortSignal) {
+    signal.throwIfAborted()
+    const current = state.current
+    const connection = await current?.ready
+    signal.throwIfAborted()
+    if (!connection?.request || current?.closing) throw Error("LOGINOM_HOST_NOT_READY")
+    const { request } = connection
+    const requestId = randomUUID()
+    const cancel = () => { void request("packages.cancel", { requestId }).catch(() => undefined) }
+    signal.addEventListener("abort", cancel, { once: true })
+    try {
+      const result = await request("packages.list", { ...input, requestId })
+      signal.throwIfAborted()
+      return decodeFolderListing(result, input.folder)
+    } finally {
+      signal.removeEventListener("abort", cancel)
+    }
   },
 }
 
