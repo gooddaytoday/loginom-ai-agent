@@ -1,4 +1,4 @@
-import {NODE_ADD_ONLY_MODE} from './node-contracts.mjs';
+import {NODE_ADD_ONLY_MODE,NODE_POSITION_MIN,nodeFieldNamePattern} from './node-contracts.mjs';
 import {loopParametersSchema} from './loop-parameters.mjs';
 import {supernodeParametersSchema} from './supernode-parameters.mjs';
 import {variableBindingsSchema} from './variable-binding-parameters.mjs';
@@ -18,7 +18,6 @@ import {importSourceSchema} from './storage-policy.mjs';
 import {restRequestParametersSchema} from './rest-request-parameters.mjs';
 import {DATE_TIME_OPERATIONS} from './date-time-parameters.mjs';
 import {JAVASCRIPT_DECLARED_TYPES,JAVASCRIPT_DECLARED_COLUMN_LIMIT} from './javascript-column-types.mjs';
-import {NODE_POSITION_MIN} from './node-contracts.mjs';
 import {validateActionParameters} from './action-catalog.mjs';
 import {nodeJobResultSchema,deliveryJobResultSchema} from './node-result-schema.mjs';
 import {validateJavascriptSourceReadRequest} from './javascript-source-read-session.mjs';
@@ -27,7 +26,6 @@ import {javascriptContextInitialSchema,javascriptContextReceiptSchema,validateJa
 
 const object=(properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 const text=(maxLength=128)=>({type:'string',minLength:1,maxLength});
-export const nodeFieldNamePattern=/^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 const fieldName={...text(128),pattern:nodeFieldNamePattern.source,description:'ASCII name; title=label.'};
 const id={...text(),pattern:'^[A-Za-z0-9_.:-]+$'};
 const integer=(minimum,maximum)=>({type:'integer',minimum,maximum});

@@ -24,7 +24,7 @@ import { makeWorkspaceUiCode, validateUiAction, uiActionSchema } from './workspa
 import { createObservationPages } from './observation-pages.mjs';
 import { makeWorkspaceBootstrapCode, packageReadOnlyAdvice } from './workspace.mjs';
 import { createNodeProcedure } from './node-procedure.mjs';
-import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow, releaseNodeApply, NodeMappingNameError, NodeVariableInputError } from './node-apply.mjs';
+import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow, releaseNodeApply, NodeVariableInputError } from './node-apply.mjs';
 import {reconcileOutputMappingPhase} from './node-output-mapping-recovery.mjs';
 import {reconcileInputMappingPhase} from './node-input-mapping-recovery.mjs';
 import { createNodeOperationRunner } from './node-operation-runner.mjs';
@@ -3805,10 +3805,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return { action: structuredClone(action), session_manifest: structuredClone(pinned.pins) };
     },
     requestFailure(error) {
-      const rejection=error?.cause??error;
-      const variableInputRefusal=!pending&&!nodeJobs.active&&rejection instanceof NodeVariableInputError;
-      const noEffectRefusal=variableInputRefusal||!pending&&!nodeJobs.active&&rejection instanceof NodeMappingNameError;
-      return { status: pending ? 'AMBIGUOUS' : noEffectRefusal ? 'NOT_APPLIED' : 'FAILED', action_key: pending?.action.action_key ?? 'request.validate',
+      const variableError=error?.cause instanceof NodeVariableInputError?error.cause:error;
+      const variableInputRefusal=!pending&&!nodeJobs.active&&variableError instanceof NodeVariableInputError;
+      return { status: pending ? 'AMBIGUOUS' : variableInputRefusal ? 'NOT_APPLIED' : 'FAILED', action_key: pending?.action.action_key ?? 'request.validate',
         action_revision: pending?.action.revision ?? '1', operation_id: pending?.id ?? null,
         phase: 'request_rejected', effect_possible: !!pending, request_rejected: true,
         output: { available_actions: pending ? [] : [...pinned.actions.keys()], ui_action_tool: 'dock_ui_action', operation: view(pending).output,
@@ -3816,8 +3815,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           ...(error?.code==='ARTIFACT_GRANT_NOT_FOUND' && allowCandidate && artifactStore ? {input_artifacts:artifactStore.list()} : {}) },
         ...(!pending&&!nodeJobs.active&&error?.message==='Choose a single action or a batch description'
           ?{next_step:{tool:'dock_action_describe',instruction:'Use action_key alone for one action, OR action_keys:[...] with optional node_types:[...] for a batch. For example: {"action_keys":["package.save_checkpoint"],"node_types":["imports.text","transform.join_data","exports.text"]}. Remove action_key from the batch request; do not combine it with action_keys or node_types. This is a description request; no browser mutation or recovery is needed.'}}:{}),
-        ...(noEffectRefusal?{cleanup_complete:true}:{}),
-        ...(variableInputRefusal?{next_step:rejection.nextStep}:{}),
+        ...(variableInputRefusal?{cleanup_complete:true,next_step:variableError.nextStep}:{}),
         error: { code: 'REQUEST_REJECTED', message: String(error?.message ?? error).slice(0, 1000) }, trace: [] };
     },
     inspect,

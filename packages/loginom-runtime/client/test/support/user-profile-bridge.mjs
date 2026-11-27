@@ -248,9 +248,10 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.notEqual(crossTableReply.isError,true,JSON.stringify(crossTableReply));
     const [crossTableCard]=JSON.parse(crossTableReply.content[0].text).node_types;
     assert.equal(crossTableCard.type,'transform.cross_table');
+    const crossTableCardBudget=12000-64;
     const crossTableCardBytes=Buffer.byteLength(JSON.stringify(crossTableCard));
-    assert.ok(crossTableCardBytes<=12000,`CrossTable card is ${crossTableCardBytes} bytes`);
-    assert.match(crossTableCard.semantics,/Loginom rejects YYYY-MM as an output column name\. Use name: M_2026_01, label: 2026-01\./);
+    assert.ok(crossTableCardBytes<=crossTableCardBudget,`CrossTable card is ${crossTableCardBytes} bytes, budget ${crossTableCardBudget}`);
+    assert.match(crossTableCard.semantics,/Loginom rejects YYYY-MM names\. Use name: M_2026_01, label: 2026-01\./);
 
     for(const [layout,name] of [['changes','2026-01'],['fields','Revenue-total'],['changes','Сумма']]){
       const operation_id='invalid-mapping-'+layout+'-'+name.length;
@@ -265,9 +266,21 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       assert.equal(failure.effect_possible,false);
       assert.equal(failure.cleanup_complete,true);
       assert.equal(failure.error.parameter_path,`mappings[0].${layout}[0].name`);
-      assert.match(failure.error.message,/идентификатор.*2026-01.*подписью/);
+      assert.match(failure.error.message,/identifier.*2026-01.*label.*Omit name to keep the current name/);
       assert.equal(browserCalls.length,beforeDescription,'invalid output names cannot start browser work');
     }
+
+    await client.callTool({name:'dock_action_describe',arguments:{node_types:['exports.text'],modes:['delimited']}});
+    const rejectedExport=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,operation_id:'invalid-export-mapping',
+      target:{kind:'existing',type:'exports.text',ref:{document_id:undescribed.document_id,
+        workflow_id:undescribed.workflow_ref.workflow_id,node_id:'existing-export'}},
+      mode:'delimited',finish:'execute',mappings:[{direction:'input',port:0,fields:[
+        {source:{kind:'configured_field',name:'C_1'},name:'2026-01'}]}]}});
+    const exportFailure=JSON.parse(rejectedExport.content[0].text);
+    assert.equal(exportFailure.status,'NOT_APPLIED');
+    assert.equal(exportFailure.error.parameter_path,'mappings');
+    assert.match(exportFailure.next_step.instruction,/mappings:\[\].*transform\.reform_columns/);
+    assert.equal(browserCalls.length,beforeDescription,'unsupported export mappings cannot start browser work');
 
     const invalidMode=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,mode:'invented'}});
     assert.equal(JSON.parse(invalidMode.content[0].text).error.code,'REQUEST_REJECTED');

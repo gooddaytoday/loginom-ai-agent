@@ -8,9 +8,8 @@ import {verifiedNativeReadRefusal,verifiedExportReadRefusal,verifiedJavascriptUi
 import {verifiedJavascriptExistingSchemaRefusal} from './javascript-existing-schema-refusal.mjs';
 import {verifiedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs';
 import {verifiedJavascriptSourcePolicyRefusal,verifiedJavascriptEffectsSourceRefusal,JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT} from './javascript-source-policy-refusal.mjs';
-import {NODE_ADD_ONLY_MODE, NODE_CONTRACT_REVISION, validateNodeTargetRequest} from './node-contracts.mjs';
+import {NODE_ADD_ONLY_MODE, NODE_CONTRACT_REVISION, nodeFieldNamePattern, validateNodeTargetRequest} from './node-contracts.mjs';
 import {NODE_READ_MODE,nodeReadHandler,isUnchangedTextImportExecution,isUnchangedTransformExecution} from './node-read-contract.mjs';
-import {nodeFieldNamePattern} from './node-api.mjs';
 
 const stable = v => Array.isArray(v) ? v.map(stable) : v && typeof v === 'object'
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, stable(v[k])])) : v;
@@ -20,8 +19,6 @@ const object = (v, keys) => requireValue(v && typeof v === 'object' && !Array.is
   && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v,k)), 'Invalid node.apply contract');
 const addOnlyHandler=Object.freeze({revision:'add-only-v1'});
 const id = v => typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);
-
-export class NodeMappingNameError extends Error {}
 
 export class NodeVariableInputError extends Error {
   constructor(request, capabilities, path, message, correction) {
@@ -97,7 +94,7 @@ export function validateNodeApplyRequest(request, handlers, {fresh=false}={}) {
   const hasVariableMappings=request.mappings.some(m=>m?.kind!==undefined);
   if(request.target.type==='variables.column_union'&&(!fresh||!hasVariableMappings))requireValue(request.mappings.length===0,'Variables column union supports automatic mapping only; custom variable/control/table mappings are unsupported');
   const mapped = new Set();
-  for (const [mappingIndex,mapping] of request.mappings.entries()) {
+  for (const mapping of request.mappings) {
     requireValue(mapping && typeof mapping === 'object' && !Array.isArray(mapping)
       && Object.keys(mapping).every(k=>['direction','port','kind','autosync','fields','changes'].includes(k))
       && ['input','output'].includes(mapping.direction) && Number.isInteger(mapping.port) && mapping.port >= 0 && mapping.port < 100,
@@ -111,7 +108,7 @@ export function validateNodeApplyRequest(request, handlers, {fresh=false}={}) {
     if (entries !== undefined) {
       requireValue(Array.isArray(entries) && entries.length <= 1000, 'Bounded mapping fields required');
       const changed=new Set();
-      for (const [fieldIndex,field] of entries.entries()) {
+      for (const field of entries) {
         requireValue(field && typeof field === 'object' && !Array.isArray(field)
           && Object.keys(field).every(k=>['source','name','label','excluded'].includes(k)), 'Invalid mapping field');
         if(field.source?.kind==='configured_field') {
@@ -124,11 +121,6 @@ export function validateNodeApplyRequest(request, handlers, {fresh=false}={}) {
         }
         for(const key of ['name','label'])requireValue(field[key]===undefined || typeof field[key]==='string'
           && field[key].length>0 && field[key].length<=200 && !/[\x00-\x1f]/.test(field[key]), 'Invalid mapping '+key);
-        if(fresh&&mapping.kind===undefined&&field.name!==undefined&&!nodeFieldNamePattern.test(field.name)){
-          const layout=mapping.fields===undefined?'changes':'fields';
-          throw new NodeMappingNameError(`Invalid parameters.mappings[${mappingIndex}].${layout}[${fieldIndex}].name: `
-            +'Имя столбца — идентификатор до 128 символов. Первый символ — латинская буква или _. Далее допустимы латиница, цифры и _. Текст вида 2026-01 задавай подписью (label).');
-        }
         requireValue(field.excluded===undefined || typeof field.excluded==='boolean', 'Invalid exclusion flag');
         if(mapping.changes!==undefined){
           requireValue(field.source?.kind==='configured_field'&&!changed.has(field.source.name),'Unique configured output changes required');changed.add(field.source.name);
@@ -171,6 +163,15 @@ export function validateNodeApplyRequest(request, handlers, {fresh=false}={}) {
     handler.validate(request.parameters,request.mode,legacyRequest);
     throw new NodeVariableInputError(request,capabilities,'mappings',error.message,
       'Remove or correct the variable mapping according to the handler error.');
+  }
+  if(fresh)for(const [mappingIndex,mapping] of request.mappings.entries()){
+    if(mapping.kind!==undefined)continue;
+    const layout=mapping.fields===undefined?'changes':'fields';
+    const fields=mapping[layout]??[];
+    const fieldIndex=fields.findIndex(field=>field.name!==undefined&&!nodeFieldNamePattern.test(field.name));
+    if(fieldIndex>=0)throw Error(`Invalid parameters.mappings[${mappingIndex}].${layout}[${fieldIndex}].name: `
+      +'Column name must be a 1 to 128 character identifier starting with an ASCII letter or _. '
+      +'Use ASCII letters, digits and _ only. Put text such as 2026-01 in label. Omit name to keep the current name.');
   }
   return {graph,handler};
 }

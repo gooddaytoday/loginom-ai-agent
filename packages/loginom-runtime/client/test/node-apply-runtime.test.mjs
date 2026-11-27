@@ -316,6 +316,27 @@ async function assertAdmissionRefusal(r,error){
  assert.deepEqual(f.graph.nodes,[]);
 }
 
+test('fresh CrossTable mapping accepts a valid name or a label-only edit and retained requests can replay',()=>{
+ const type='transform.cross_table';
+ const r={...admissionRequest(type,'pivot',{}),target:{kind:'existing',type,ref:targetRef},inputs:[],finish:'execute'};
+ const field={source:{kind:'configured_field',name:'C_1'},label:'2026-01'};
+ for(const layout of ['fields','changes']){
+  const mapped=edit=>({...r,mappings:[{direction:'output',port:0,[layout]:[edit]}]});
+  assert.doesNotThrow(()=>validateNodeApplyRequest(mapped({...field,name:'M_2026_01'}),admissionHandlers,{fresh:true}));
+  assert.doesNotThrow(()=>validateNodeApplyRequest(mapped(field),admissionHandlers,{fresh:true}));
+  const retained=mapped({...field,name:'2026-01'});
+  assert.throws(()=>validateNodeApplyRequest(retained,admissionHandlers,{fresh:true}),/Invalid parameters\.mappings/);
+  assert.doesNotThrow(()=>validateNodeApplyRequest(retained,admissionHandlers,{fresh:false}));
+ }
+});
+
+test('tabular name rules do not apply to mappings with kind',()=>{
+ const type='transform.sorting';
+ const r={...admissionRequest(type,'keys',{}),target:{kind:'existing',type,ref:targetRef},inputs:[],
+  mappings:[{kind:'control',direction:'input',port:0,fields:[{source:{kind:'configured_field',name:'Limit'},name:'User-limit'}]}]};
+ assert.doesNotThrow(()=>validateNodeApplyRequest(r,admissionHandlers,{fresh:true}));
+});
+
 test('LGD export requires the matching variables link for a new destination binding before target',async()=>{
  const settings={compression:'lz4',checksum:'none',overwrite:'reject'};
  const r=admissionRequest('exports.lgd','native',{lgd_export:{...settings,bindings:{destination:{variable:'Path'}}}});
