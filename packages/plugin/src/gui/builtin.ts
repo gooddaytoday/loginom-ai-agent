@@ -171,6 +171,18 @@ export const Page = Registry.define<Page>("page")
 
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
+  /** An extension below the last timeline row, tied to its owning session and route visibility. */
+  readonly "session.timeline.end": {
+    readonly session: SlotMap["session.header"]["session"]
+    readonly active: boolean
+    readonly busy: boolean
+  }
+  /** A passive status mark for the conversation in the sidebar or tab strip. */
+  readonly "session.sidebar.status": {
+    readonly server: string
+    readonly sessionID: string | undefined
+    readonly busy: boolean
+  }
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */
   readonly "session.location.branch.menu": SlotMap["session.location.menu"]
   /** Items after the host's copy and reveal actions in the session directory's path submenu. Requires an owning screen. */

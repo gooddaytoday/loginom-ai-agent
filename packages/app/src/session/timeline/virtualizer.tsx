@@ -26,6 +26,7 @@ import {
 } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
+import { createResizeObserver } from "@solid-primitives/resize-observer"
 import type { createTimelineProjection } from "./projection"
 import { observeElementOffsetReconnectAware } from "./observe-element-offset"
 import { filterVirtualIndexes } from "./virtual-items"
@@ -137,6 +138,7 @@ export type TimelineRouteReveal = {
 type ViewProps = {
   header: JSX.Element
   bottomSpacer?: JSX.Element
+  bottomContent?: JSX.Element
   deferred: (row: TimelineRow.TimelineRow) => boolean
   renderRow: (row: Accessor<TimelineRow.TimelineRow>, onSizeChange?: () => void) => JSX.Element
 }
@@ -150,7 +152,15 @@ export function createTimelineVirtualizer(input: Input) {
   // activity pill and its 10px composer gap. Without hover the pill grows from 32px to its 44px touch size
   // (composer-lane.css), and the tail grows with it. Both come and go inside it, so neither moves the rows above.
   const touch = createMediaQuery("(hover: none)")
-  const tailSize = () => (touch() ? 104 : 92)
+  const [tailContent, setTailContent] = createSignal<HTMLDivElement>()
+  const [tailContentSize, setTailContentSize] = createSignal(0)
+  createResizeObserver(tailContent, (_size, element) => {
+    if (active()) setTailContentSize(element.offsetHeight)
+  })
+  createEffect(() => {
+    if (active()) setTailContentSize(tailContent()?.offsetHeight ?? 0)
+  })
+  const tailSize = () => (touch() ? 104 : 92) + tailContentSize()
   const ownerSessionKey = input.sessionKey()
   const entry = cache.get(ownerSessionKey)
   const cached = entry?.presentationKey === input.presentationKey?.() ? entry : undefined
@@ -1210,6 +1220,9 @@ export function createTimelineVirtualizer(input: Input) {
                 transform: `translateY(${virtualizer.getTotalSize() - tailSize() - rendering.scrollAdjustment}px)`,
               }}
             >
+              <div ref={setTailContent} class="flow-root">
+                {props.bottomContent}
+              </div>
               {props.bottomSpacer}
             </div>
           </div>

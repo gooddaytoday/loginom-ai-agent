@@ -9,6 +9,7 @@ import { Icon } from "@opencode/ui/icon"
 import { Menu } from "@opencode/ui/menu"
 import { useServerCtx } from "@/runtime/server/runtime"
 import { useLanguage } from "@/runtime/i18n/language"
+import { PluginSlot } from "@/runtime/plugin/render"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { displayName, ProjectAvatar } from "@opencode/ui/project-avatar"
 import { SessionTabAvatarView } from "@/shell/layout/session-tab-avatar"
@@ -514,6 +515,22 @@ export function TabNavItem(
           <Show when={dotted()}>
             <span data-slot="tab-avatar-unread-dot" aria-hidden="true" />
           </Show>
+          <span class="pointer-events-none absolute -end-[3px] -top-[3px] flex">
+            <PluginSlot
+              at="session.sidebar.status"
+              input={{
+                get server() {
+                  return props.server
+                },
+                get sessionID() {
+                  return props.session?.id
+                },
+                get busy() {
+                  return props.loading || props.preparing
+                },
+              }}
+            />
+          </span>
         </span>
         <span
           ref={(el) => {

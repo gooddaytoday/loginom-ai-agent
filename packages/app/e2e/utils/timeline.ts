@@ -115,6 +115,7 @@ type TimelineServerInput = Partial<
     | "permissions"
     | "sessionPermissions"
     | "onPrompt"
+    | "pluginRpc"
     | "onInboxChange"
     | "beforeMessagesResponse"
     | "onMessages"

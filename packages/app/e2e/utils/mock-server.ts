@@ -161,6 +161,7 @@ export interface MockServerConfig {
   sessionStatus?: Resolvable<Record<string, { type: string }>>
   inbox?: unknown[] | (() => unknown[])
   onPrompt?: (input: { sessionID: string; body: Schema.JsonObject }) => void
+  pluginRpc?: (rpcID: string, method: string, input: Schema.Json | undefined) => Schema.Json | undefined
   onCompact?: (input: { sessionID: string; body: Schema.JsonObject }) => void
   // POST /api/session/:id/fork creates `<id>_fork` in the same directory. The hook may hold the request, or return an
   // answer to replace the response.
@@ -1221,14 +1222,21 @@ function mockHandlers(
           })
         },
         // The goal plugin's pill reads each routed session's goal; no scenario sets one.
-        rpcCall: (ctx) =>
-          ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get"
-            ? Effect.succeed({ output: null })
-            : Effect.fail(
-                new MockUnsupported({
-                  message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC`,
-                }),
-              ),
+        rpcCall: (ctx) => {
+          const body = Option.getOrElse(decodeJsonObject(ctx.payload), () => ({}))
+          const output = config.pluginRpc?.(ctx.params.rpcID, ctx.params.method, body.input)
+
+          if (output !== undefined) return Effect.succeed({ output })
+
+          if (ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get")
+            return Effect.succeed({ output: null })
+
+          return Effect.fail(
+            new MockUnsupported({
+              message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC`,
+            }),
+          )
+        },
         sessionActive: () => {
           const status = resolve(config.sessionStatus ?? {})
 
