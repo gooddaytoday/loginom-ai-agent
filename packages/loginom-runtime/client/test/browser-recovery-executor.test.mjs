@@ -584,12 +584,15 @@ test('T4: an unconfirmed export download is recovered by a verified re-read with
   assert.equal(verified.status, 'completed');
   assert.deepEqual(verified.facts, ['export_file_storage_row_observed', 'export_file_bytes_verified']);
   assert.equal(verified.file_artifacts[0].sha256, 'a'.repeat(64));
+  assert.match(verified.next_step.instruction, /`file_artifacts\[\]\.destination` in backticks/);
+  assert.match(verified.next_step.instruction, /file card at the export step if shown in Desktop/);
+  assert.match(verified.next_step.instruction, /without claiming you attached the file or looking for or guessing its private local path/);
   assert.deepEqual(reads, ['new']);
   assert.throws(() => runtime.browserRecoveryBasis('export'), /No browser recovery trigger/);
   const settled = runtime.nodeApplyStatus('export').outcome;
   assert.equal(settled.status, 'FAILED');
   assert.equal(settled.output.browser_recovery.file_artifacts[0].sha256, 'a'.repeat(64));
-  assert.equal(settled.output.next_step.tool, 'dock_action_run');
+  assert.deepEqual(settled.output.next_step, verified.next_step);
 });
 
 test('handoff proves callback completion independently from UI cleanup', async () => {

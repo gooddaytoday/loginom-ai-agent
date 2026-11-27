@@ -17,7 +17,7 @@ import {createBundledSkillFixture} from './support/bundled-skill-fixture.mjs';
 const reply=value=>({content:[{type:'text',text:JSON.stringify(value)}]});
 const bytes=value=>Buffer.byteLength(JSON.stringify(value),'utf8');
 
-test('public export receipts tell the model where the file is and that chat cannot attach it',()=>{
+test('public export receipts tell the model where to direct the user after a successful export',()=>{
  const artifact={artifact_id:'report',destination:'/exports/report.csv',bytes:176,sha256:'a'.repeat(64),
   execution_id:'execution',verification_id:'download',freshness_basis:'native_absence_check_and_completed_execution'};
  const result={operation_id:'export',state:'settled',outcome:{status:'SUCCEEDED',action_key:'node.apply',
@@ -27,10 +27,19 @@ test('public export receipts tell the model where the file is and that chat cann
   const value=JSON.parse(delivered.content[0].text);
   assert.equal(value.status,'SUCCEEDED');
   assert.deepEqual(value.output.file_artifacts,[artifact]);
-  assert.match(value.limitations.join('\n'),/Приложить файл к ответу пока нельзя\./);
-  assert.match(value.limitations.join('\n'),/путь в хранилище Loginom из file_artifacts\[\]\.destination/);
-  assert.match(value.limitations.join('\n'),/локальную копию в каталоге артефактов/);
-  assert.ok(bytes(delivered)<=20000);
+  const guidance=value.limitations.join('\n');
+  assert.match(guidance,/Не утверждай, что приложил файл/);
+  assert.match(guidance,/путь в хранилище Loginom из `file_artifacts\[\]\.destination` в обратных кавычках/);
+  assert.match(guidance,/В Desktop файл доступен через карточку у шага экспорта/);
+  assert.match(guidance,/Локальный путь модели не передаётся/);
+  assert.match(guidance,/Не ищи и не придумывай локальный путь/);
+  for(const status of ['FAILED','AMBIGUOUS']){
+   const failed=nodeResultReply({...result,outcome:{...result.outcome,status}},{userProfile:true,tool});
+   const failure=JSON.parse(failed.content[0].text);
+   assert.equal(failure.status,status);
+   assert.deepEqual(failure.output.file_artifacts,[artifact]);
+   assert.deepEqual(failure.limitations,[]);
+  }
  }
  result.outcome.output.output.file_artifacts=[];
  const withoutFile=nodeResultReply(result,{userProfile:true,tool:'dock_node_wait'});
