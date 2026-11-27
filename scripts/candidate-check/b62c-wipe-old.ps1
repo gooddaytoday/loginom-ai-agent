@@ -10,3 +10,7 @@ Remove-Item C:\lab\b62c\u\apps -Recurse -Force -ErrorAction SilentlyContinue
 & C:\lab\b62c\tools\wipe.ps1
 'HKCU uninstall entries left: ' + @(Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'Loginom*' }).Count
 'HKCU URI scheme left: ' + (Test-Path 'HKCU:\Software\Classes\loginom-ai-agent')
+# B6.2-W: the smoke does not clean the `dev` channel profile of its own earlier run (B6.2-F finding 2); every run must start clean
+foreach ($dir in @((Join-Path $env:APPDATA 'com.loginom.aiagent.dev'), (Join-Path $env:USERPROFILE '.local\share\loginom-ai-agent-dev'))) {
+  if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue; "removed $dir" }
+}
