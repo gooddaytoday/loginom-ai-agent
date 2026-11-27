@@ -109,7 +109,7 @@ test("bundled Node host handshakes without Electron, manages its profile and clo
     expect(host.alive).toBe(true)
     expect(await host.request("connection.status", {})).toMatchObject({ state: "unconfigured", generation: 0 })
     expect(await host.request("window.show", { sessionID: "ses_missing" })).toBe("no-window")
-    expect(await host.request("window.place", { sessionID: "ses_missing", bounds: { x: 10, y: -20, width: 800, height: 600 } })).toBe(false)
+    expect(await host.request("window.place", { sessionID: "ses_missing", bounds: { x: 10, y: -20, width: 800, height: 600 } })).toBe("no-window")
     // Await IPC directly: the Bun rejection matcher can stall the Windows message loop.
     const dashboardError = await host
       .request("dashboard.read", {

@@ -2,6 +2,7 @@ import { app, BrowserWindow, systemPreferences } from "electron"
 import { Effect } from "effect"
 import { WindowRpcs } from "../../shared/ipc-rpc"
 import { IpcPortHandoff } from "../ipc-transport"
+import { showLoginomWindow } from "../loginom/browser-window"
 import {
   getPinchZoomEnabled,
   setPinchZoomEnabled,
@@ -43,6 +44,11 @@ export const windowHandlers = WindowRpcs.toLayer(
         Effect.sync(() => focusWindow(BrowserWindow.fromWebContents(sender(handoff, context)), app)),
       WindowShow: (_args, context) =>
         Effect.sync(() => showWindow(BrowserWindow.fromWebContents(sender(handoff, context)))),
+      WindowShowLoginom: ({ sessionID }, context) =>
+        Effect.promise(async () => {
+          const window = BrowserWindow.fromWebContents(sender(handoff, context))
+          return window ? showLoginomWindow(window, sessionID) : "no-window"
+        }),
       WindowGetZoomFactor: (_args, context) => Effect.sync(() => sender(handoff, context).getZoomFactor()),
       WindowSetZoomFactor: ({ factor }, context) =>
         Effect.sync(() => {

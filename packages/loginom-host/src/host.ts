@@ -237,7 +237,6 @@ export async function createLoginomHost(options: {
   >()
   const restarts = new Map<string, number>()
   const lost = new Set<string>()
-  const placements = new Map<string, WindowBounds>()
   const stale = new Set<string>()
   const startupCleanup = { failed: false }
   const shutdown = { failed: false }
@@ -471,7 +470,7 @@ export async function createLoginomHost(options: {
         validationHttpCache: httpCache,
         // CLI supplies its explicit browser policy for background launches too.
         headless: purpose === "chat" ? options.headless === true : (options.preflightHeadless ?? true),
-        windowBounds: purpose === "chat" && !options.headless ? placements.get(chat) : undefined,
+        desktopWindow: purpose === "chat" && environment.LOGINOM_AI_AGENT_SERVICE_IDENTITY === "desktop",
         closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
         browserRecovery: !validation && options.browserRecovery === true,
         environment,
@@ -644,6 +643,17 @@ export async function createLoginomHost(options: {
     resourceController.abort()
     for (const controller of dashboardOperations.keys()) controller.abort(new Error("DASHBOARD_CANCELLED"))
   }
+  async function windowRequest(sessionID: string, operation: "placeWindow" | "showWindow", bounds?: WindowBounds) {
+    if (options.headless) return "no-window"
+    const { generation } = await service.api.status()
+    const current = generations.get(generation)
+    const chat = createHash("sha256").update(sessionID).digest("hex")
+    const child = current?.children.get(chat)
+    if (!child || stale.has(chat)) return "no-window"
+    const runtime = await Promise.race([child.catch(() => undefined), setTimeout(1000, undefined, { ref: false })])
+    if (!runtime || current?.children.get(chat) !== child || stale.has(chat)) return "no-window"
+    return runtime.request(operation, bounds, 2000).catch(() => "no-window")
+  }
   return {
     ...service,
     beginClose,
@@ -813,24 +823,10 @@ export async function createLoginomHost(options: {
       return generations.get(generation)?.children.has(chat) === true
     },
     placeWindow({ sessionID, bounds }: WindowPlacement) {
-      if (options.headless) return false
-      const chat = createHash("sha256").update(sessionID).digest("hex")
-      placements.delete(chat)
-      placements.set(chat, bounds)
-      const oldest = placements.keys().next().value
-      if (placements.size > 128 && oldest !== undefined) placements.delete(oldest)
-      return true
+      return windowRequest(sessionID, "placeWindow", bounds)
     },
-    async showWindow(sessionID: string) {
-      if (options.headless) return "no-window"
-      const { generation } = await service.api.status()
-      const current = generation === undefined ? undefined : generations.get(generation)
-      const chat = createHash("sha256").update(sessionID).digest("hex")
-      const child = current?.children.get(chat)
-      if (!child || stale.has(chat)) return "no-window"
-      const runtime = await Promise.race([child.catch(() => undefined), setTimeout(1000, undefined, { ref: false })])
-      if (!runtime || current?.children.get(chat) !== child) return "no-window"
-      return runtime.request("showWindow", undefined, 2000).catch(() => "no-window")
+    showWindow(sessionID: string) {
+      return windowRequest(sessionID, "showWindow")
     },
     async workState(generation: number, chat: string) {
       // Inspect only the existing owner. Losing it is uncertainty, not evidence of idle work.

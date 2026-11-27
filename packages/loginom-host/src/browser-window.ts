@@ -13,3 +13,5 @@ export const WindowChat = Schema.Struct({ sessionID: Session })
 export const WindowPlacement = Schema.Struct({ ...WindowChat.fields, bounds: WindowBounds })
 export type WindowPlacement = typeof WindowPlacement.Type
 export const WindowStatus = Schema.Literals(["focused", "focus-unconfirmed", "no-window"])
+export const PlacementStatus = Schema.Literals(["placed", "layout-unavailable", "no-window"])
+export const DesktopWindowStatus = Schema.Literals([...WindowStatus.literals, "layout-unavailable"])

@@ -128,7 +128,7 @@ async function dispatch(message: unknown) {
     }
     if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
     if (message.method === "window.place") {
-      reply({ id: message.id, result: state.host.placeWindow(Schema.decodeUnknownSync(WindowPlacement)(input)) })
+      reply({ id: message.id, result: await state.host.placeWindow(Schema.decodeUnknownSync(WindowPlacement)(input)) })
       return
     }
     if (message.method === "window.show") {

@@ -414,7 +414,7 @@ function loginFailure(error, candidate, phase, duration, elapsed) {
   }
 }
 
-export async function loginBrowser({ browserPath, profile, candidate, httpCachePath, headless = false, keepOpen = false, signal, onContextCreated, downloadsPath, windowBounds,
+export async function loginBrowser({ browserPath, profile, candidate, httpCachePath, headless = false, keepOpen = false, signal, onContextCreated, downloadsPath, desktopWindow,
   deadline = Date.now() + 150_000, onRetry, onPhase }) {
   signal?.throwIfAborted()
   const phase = onPhase ?? (async () => {})
@@ -422,7 +422,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
   await phase({ phase: "browser.dependencies", status: "starting" })
   const { chromium } = require("playwright-core")
   await phase({ phase: "browser.dependencies", status: "ready", duration_ms: Math.round(performance.now() - dependenciesStarted) })
-  const launch = browserLaunch(headless, process.platform, process.env, windowBounds)
+  const launch = browserLaunch(headless, process.platform, process.env, desktopWindow)
   const profileStarted = performance.now()
   await phase({ phase: "browser.profile", status: "starting" })
   await mkdir(profile, { recursive: true, mode: 0o700 })

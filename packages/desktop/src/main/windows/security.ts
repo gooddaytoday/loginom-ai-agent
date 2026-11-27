@@ -1,5 +1,4 @@
 import type { BrowserWindow, Session } from "electron"
-import { placeForPrompt } from "../loginom/browser-window"
 import { SidecarCredentials } from "../service/sidecar-credentials"
 import { addRendererHeaders, hasHeader, upsertHeader } from "./headers"
 import { isRendererUrl } from "./scheme"
@@ -103,17 +102,13 @@ export function wireRendererHeaders(win: BrowserWindow) {
     (details, callback) => {
       const frame = details.frame
       const renderer = !!frame && frame.parent === null && isRendererUrl(frame.url)
-      const sidecar = SidecarCredentials.get()
-      const authorization = renderer && SidecarCredentials.authorization(sidecar, details.url)
+      const authorization = renderer && SidecarCredentials.authorization(SidecarCredentials.get(), details.url)
 
       if (authorization && !hasHeader(details.requestHeaders, "Authorization")) {
         upsertHeader(details.requestHeaders, "Authorization", authorization)
       }
 
-      const next = () => callback({ requestHeaders: details.requestHeaders })
-      const placement = renderer ? placeForPrompt(sidecar, details) : undefined
-      if (placement) void placement.then(next, next)
-      else next()
+      callback({ requestHeaders: details.requestHeaders })
     },
   )
   session.webRequest.onHeadersReceived((details, callback) => {

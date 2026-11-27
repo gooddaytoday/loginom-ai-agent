@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { showBrowserWindow } from "../src/browser-window.mjs"
+import { placeBrowserWindow, showBrowserWindow } from "../src/browser-window.mjs"
 
 test("show restores and raises the owning target and reports only confirmed focus", async () => {
   for (const outcome of ["focused", "focus-unconfirmed", "no-window"]) {
@@ -9,7 +9,7 @@ test("show restores and raises the owning target and reports only confirmed focu
     const cdp = {
       async send(method, params) {
         calls.push([method, params])
-        if (method === "Browser.getWindowForTarget") return { windowId: 25 }
+        if (method === "Browser.getWindowForTarget") return { windowId: 25, bounds: { windowState: "minimized" } }
         if (method === "Page.bringToFront" && outcome === "no-window") {
           closed = true
           throw Error("target closed")
@@ -35,4 +35,31 @@ test("show restores and raises the owning target and reports only confirmed focu
   }
   assert.equal(await showBrowserWindow(undefined), "no-window")
   assert.equal(await showBrowserWindow({ isClosed: () => true }), "no-window")
+})
+
+test("explicit placement checks real CDP readback and Show does not reset a maximized window", async () => {
+  const original = { windowState: "maximized", left: 0, top: 0, width: 1600, height: 900 }
+  let bounds = original
+  let allowPlacement = true
+  const cdp = {
+    async send(method, payload) {
+      if (method === "Browser.getWindowForTarget") return { windowId: 25, bounds }
+      if (method === "Browser.getWindowBounds") return { bounds }
+      if (method === "Browser.setWindowBounds" && allowPlacement) bounds = { ...bounds, ...payload.bounds }
+    },
+    async detach() {},
+  }
+  const page = {
+    isClosed: () => false,
+    context: () => ({ async newCDPSession() { return cdp } }),
+    async waitForFunction() { return { async dispose() {} } },
+  }
+  const requested = { x: 800, y: -40, width: 800, height: 860 }
+  assert.equal(await showBrowserWindow(page), "focused")
+  assert.deepEqual(bounds, original)
+  assert.equal(await placeBrowserWindow(page, requested), "placed")
+  assert.deepEqual(bounds, { windowState: "normal", left: 800, top: -40, width: 800, height: 860 })
+  allowPlacement = false
+  assert.equal(await placeBrowserWindow(page, { ...requested, x: -500 }), "layout-unavailable")
+  assert.equal(bounds.left, 800)
 })

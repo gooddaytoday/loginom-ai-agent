@@ -61,6 +61,10 @@ async function fixture() {
         appendFileSync(${JSON.stringify(launches)}, JSON.stringify({ shown: chat }) + '\\n');
         send('focused');
       }
+      if (message.operation === 'placeWindow') {
+        appendFileSync(${JSON.stringify(launches)}, JSON.stringify({ placed: chat, bounds: message.input }) + '\\n');
+        send('placed');
+      }
       if (message.operation === 'work') send(work);
       if (message.operation === 'fixture.state') { work = message.input; send(true); }
       if (message.operation === 'fixture.exit') {
@@ -153,18 +157,19 @@ test("window placement and show apply only to the named chat and show never star
   const cli = createHash("sha256").update("ses_cli").digest("hex")
   const bounds = { x: 1000, y: -100, width: 620, height: 880 }
   try {
-    expect(f.host.placeWindow({ sessionID, bounds })).toBe(true)
+    expect(await f.host.placeWindow({ sessionID, bounds })).toBe("no-window")
     expect(await f.host.showWindow(sessionID)).toBe("no-window")
     await expect(access(f.launches)).rejects.toMatchObject({ code: "ENOENT" })
     await f.host.runtime(1, cli)
     const runtime = await f.host.runtime(1, desktop)
+    expect(await f.host.placeWindow({ sessionID, bounds })).toBe("placed")
     expect(await f.host.showWindow(sessionID)).toBe("focused")
     await runtime.request("fixture.exit")
     await runtime.exited
     expect(await f.host.showWindow(sessionID)).toBe("no-window")
     const log = await readFile(f.launches, "utf8")
     expect(log.trim().split("\n").map((line) => JSON.parse(line))).toEqual([
-      { chat: cli }, { chat: desktop, bounds }, { shown: desktop },
+      { chat: cli }, { chat: desktop }, { placed: desktop, bounds }, { shown: desktop },
     ])
   } finally {
     await f.close()

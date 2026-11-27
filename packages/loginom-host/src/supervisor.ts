@@ -6,8 +6,6 @@ import { hostError, hostException } from "./errors"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { recordLocalDiagnostics } from "../../loginom-runtime/client/lib/local-diagnostics.mjs"
 
-import type { WindowBounds } from "./browser-window"
-
 export type Launch = {
   node: string
   entry: string
@@ -22,7 +20,7 @@ export type Launch = {
   // Host-owned HTTP cache only; browser profiles and authentication remain fresh.
   validationHttpCache?: boolean
   headless?: boolean
-  windowBounds?: WindowBounds
+  desktopWindow?: boolean
   environment?: NodeJS.ProcessEnv
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
   // its own shutdown (bridge acceptanceCleanupPackage). Product code never sets it.
@@ -80,6 +78,7 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
     "no_proxy",
     "NODE_USE_ENV_PROXY",
     "LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT",
+    "LOGINOM_AI_AGENT_SERVICE_IDENTITY",
   ]
   if (platform === "linux")
     keys.push(

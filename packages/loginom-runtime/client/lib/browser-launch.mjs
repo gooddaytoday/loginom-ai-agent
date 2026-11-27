@@ -9,7 +9,7 @@ const acceptanceViewports = new Map([
   ['1920x945', {width:1920, height:945}],
 ]);
 
-export function browserLaunch(headless, platform = process.platform, env = process.env, bounds) {
+export function browserLaunch(headless, platform = process.platform, env = process.env, desktopWindow = false) {
   const acceptance=headless?env.LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:undefined;
   const viewport=acceptanceViewports.get(acceptance??'1280x800');
   if(!viewport)throw Error('Invalid acceptance viewport');
@@ -19,11 +19,10 @@ export function browserLaunch(headless, platform = process.platform, env = proce
   // stands), where nothing maximizes it and the native Files toolbar would
   // otherwise fall off the edge.
   const fixedSize = platform === 'linux' && !env.XDG_CURRENT_DESKTOP && !env.DESKTOP_SESSION && !env.WAYLAND_DISPLAY;
-  if (!headless && !fixedSize && bounds) return {
-    args: [`--window-position=${bounds.x},${bounds.y}`, `--window-size=${bounds.width},${bounds.height}`,
-      ...(platform === 'win32' ? [] : ['--force-device-scale-factor=1'])],
+  if (!headless && !fixedSize && desktopWindow) return {
+    args: platform === 'win32' ? [] : ['--force-device-scale-factor=1'],
     viewport: null,
-    windowMode: 'positioned',
+    windowMode: 'normal',
   };
   return {
     args: headless ? [] : ['--start-maximized', ...(fixedSize ? ['--window-size=1280,800'] : []), '--force-device-scale-factor=1'],

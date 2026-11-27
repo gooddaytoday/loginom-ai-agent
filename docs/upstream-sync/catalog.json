@@ -101,7 +101,7 @@
       "id": "CAT-09",
       "title": "Desktop main process, preload, renderer",
       "paths": ["packages/desktop/**"],
-      "notes": "S10-2a: src/main/windows/security.ts attaches the Desktop window placement handoff to local chat prompts."
+      "notes": "S10-2a: WindowShowLoginom in src/shared/ipc-rpc/window.ts, src/main/ipc-handlers/window.ts and src/renderer/{api.ts,api-types.ts,platform/index.ts} bridges explicit chat commands to Electron window placement."
     },
     {
       "id": "CAT-14",
@@ -112,7 +112,12 @@
         "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
       ]
     },
-    { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
+    {
+      "id": "CAT-10",
+      "title": "Web app, UI kit, session UI",
+      "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"],
+      "notes": "S10-2a: src/session/commands/use-session-commands.tsx adds the local Desktop action via src/runtime/platform/platform.tsx and src/runtime/i18n/{en,ru}.ts; e2e/regression/command-palette.spec.ts covers it with the windows-menu fixture."
+    },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
     { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }
   ]

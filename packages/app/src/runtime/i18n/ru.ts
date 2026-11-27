@@ -681,6 +681,10 @@ export const dict = {
   "desktop.cli.failed.message": "Не удалось установить CLI: {{error}}",
   "command.project.copyID": "Копировать идентификатор проекта",
   "command.session.copyID": "Копировать идентификатор сеанса",
+  "command.session.showLoginomWindow": "Показать окно Loginom",
+  "command.session.showLoginomWindow.missing": "Окно Loginom появится после первого обращения к Loginom.",
+  "command.session.showLoginomWindow.focusUnconfirmed": "Выберите окно Loginom в системном переключателе окон.",
+  "command.session.showLoginomWindow.layoutUnavailable": "Не удалось расположить окна автоматически. Разместите окно Loginom вручную.",
   "server.row.incompatible":
     "На этом сервере работает OpenCode {{version}}, несовместимый с приложением. Чтобы продолжить, обновите его до OpenCode V2.",
   "toast.session.copyID.failed.title": "Не удалось скопировать идентификатор сеанса",

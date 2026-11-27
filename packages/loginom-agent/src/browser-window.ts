@@ -1,4 +1,4 @@
-import { WindowChat, WindowPlacement, WindowStatus } from "@loginom-ai-agent/loginom-host/browser-window"
+import { PlacementStatus, WindowChat, WindowPlacement, WindowStatus } from "@loginom-ai-agent/loginom-host/browser-window"
 import { Schema } from "effect"
 import { ServiceHost } from "./host"
 
@@ -27,11 +27,11 @@ export const windowRpc = {
         required: ["sessionID", "bounds"],
         additionalProperties: false,
       },
-      output: { type: "boolean" },
+      output: { type: "string", enum: PlacementStatus.literals },
     },
     show: {
       input: { type: "object", properties: { sessionID }, required: ["sessionID"], additionalProperties: false },
-      output: { type: "string", enum: ["focused", "focus-unconfirmed", "no-window"] },
+      output: { type: "string", enum: WindowStatus.literals },
     },
   },
   events: {},
@@ -40,7 +40,8 @@ export const windowRpc = {
 export const windowHandlers = {
   async place(value: unknown) {
     const input = Schema.decodeUnknownSync(WindowPlacement)(value)
-    return (await ServiceHost.windowRequest("window.place", input)) === true
+    const result = await ServiceHost.windowRequest("window.place", input)
+    return Schema.is(PlacementStatus)(result) ? result : "no-window"
   },
   async show(value: unknown) {
     const input = Schema.decodeUnknownSync(WindowChat)(value)

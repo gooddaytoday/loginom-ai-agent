@@ -15,7 +15,7 @@ import { loginBrowser, loginomAddress, reauthenticateReloadedPage } from "./conn
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
-import { showBrowserWindow } from "./browser-window.mjs"
+import { placeBrowserWindow, showBrowserWindow } from "./browser-window.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -147,7 +147,7 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache, windowBounds } = validateStartInput(input)
+      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
       state.owner = { chat: input.chat, generation: input.generation }
       state.startupStateDir = input.stateDir
       state.startupStarted = performance.now()
@@ -189,7 +189,7 @@ async function handle(message) {
         httpCachePath: validationHttpCache ? join(input.stateDir, "http-cache") : undefined,
         candidate: input.connection,
         headless: input.headless === true,
-        windowBounds,
+        desktopWindow: input.desktopWindow,
         signal: state.startupController.signal,
         deadline,
         onPhase: startupPhase,
@@ -238,7 +238,7 @@ async function handle(message) {
       }
       const session = await createSession(config, {
         headless: input.headless === true,
-        windowBounds,
+        desktopWindow: input.desktopWindow,
         managed: { directory, browserPath: resources.browserPath, browserRoot: resources.browserRoot },
       })
       state.session = session
@@ -285,6 +285,10 @@ async function handle(message) {
     if (!state.client) throw Error("LOGINOM_NOT_READY")
     if (message.operation === "showWindow") {
       send({ id: message.id, result: await showBrowserWindow(state.windowPage) })
+      return
+    }
+    if (message.operation === "placeWindow") {
+      send({ id: message.id, result: await placeBrowserWindow(state.windowPage, message.input) })
       return
     }
     if (["dashboardRead", "dashboardPublish", "dashboardVersions", "dashboardDelete"].includes(message.operation)) {
