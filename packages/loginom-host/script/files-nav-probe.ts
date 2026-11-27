@@ -91,7 +91,7 @@ try {
     const code = result.error?.code ?? result.output?.error?.code ?? null
     const line = { step, ms: Math.round(performance.now() - started), status: String(result.status ?? result.state ?? ""), code: code && String(code).slice(0, 120) }
     steps.push(line)
-    console.log("PROBE_STEP " + JSON.stringify({ at: elapsed(), ...line, entries: result.output?.native_entry_count ?? null, message: failureText.test(JSON.stringify(result)) ? String(result.error?.message ?? "").slice(0, 160) : null }))
+    console.log("PROBE_STEP " + JSON.stringify({ at: elapsed(), ...line, entries: result.output?.native_entry_count ?? null, message: code || failureText.test(JSON.stringify(result)) ? String(result.error?.message ?? result.output?.error?.message ?? "").slice(0, 200) : null }))
     return result
   }
   const settle = async (operation_id: string, first: Record<string, any>, attempts = 6) => {
@@ -108,7 +108,8 @@ try {
   const delivered = await timed("deliver", () =>
     invoke("dock_artifact_deliver", { operation_id: `fn-${label}-deliver`, artifact_id: artifact.artifact_id, upload_grant_id: artifact.upload.grant_id, budget_ms: 120000 }),
   )
-  await invoke("dock_action_describe", { node_types: ["imports.text", "exports.text", "exports.excel"], modes: ["delimited", "xlsx"] })
+  // The node must be described before dock_node_apply admits it (the model described research.auto_correlation first in b5-1).
+  await invoke("dock_action_describe", acf ? { node_types: ["imports.text", "research.auto_correlation"], modes: ["delimited", "time_domain"] } : { node_types: ["imports.text", "exports.text", "exports.excel"], modes: ["delimited", "xlsx"] })
   const document_id = prepared.workspace.document_id
   const workflow_ref = { workflow_id: prepared.workspace.workflow_ref.workflow_id }
   const imported = await timed("import", async () =>
