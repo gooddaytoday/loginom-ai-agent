@@ -32,6 +32,9 @@ for (const next of [false, true]) {
       await expect(failure).toContainText("Проверка данных")
       await failure.locator('[data-slot="collapsible-trigger"]').click()
       await expect(failure).toContainText("Could not display this tool call")
+      await host.evaluate((value) => value.complete())
+      await expect(timeline.locator('[data-timeline-part-id="crash"] article')).toContainText("Recovered")
+      await expect(failure).toHaveCount(0)
       await expect(toolError).toContainText("Проверка данных")
       await expect(timeline.getByText("Проверка завершена.")).toBeVisible()
       await expect(group).toHaveAttribute("data-timeline-part-ids", "read")
@@ -52,3 +55,20 @@ for (const next of [false, true]) {
     },
   )
 }
+
+story("Only one built-in plugin can register a renderer for a tool", async ({ mount, page }) => {
+  await mount("ui-line-comment--editor")
+
+  const result = await page.evaluate(async (fixture) => {
+    const { checkToolRendererRegistration } = await import(fixture)
+
+    return checkToolRendererRegistration()
+  }, fixture)
+
+  expect(result).toEqual({
+    duplicate: 'Error: A renderer is already registered for tool "loginom_demo"',
+    external: "Error: Only built-in plugins can add tool renderers",
+    active: true,
+    entries: 1,
+  })
+})

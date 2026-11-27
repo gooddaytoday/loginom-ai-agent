@@ -71,11 +71,6 @@ export const dict = {
   "ui.sessionTurn.error.freeUsageExceeded": "เกินขีดจำกัดการใช้งานฟรี",
   "ui.sessionTurn.error.addCredits": "เพิ่มเครดิต",
 
-  "dialog.usageExceeded.freeTier.title": "ถึงขีดจำกัดฟรีแล้ว",
-  "dialog.usageExceeded.freeTier.description":
-    "สมัครสมาชิก OpenCode Go ในราคา $10/เดือน เพื่อการเข้าถึงโมเดลโอเพนซอร์สที่ดีที่สุดอย่างเชื่อถือได้",
-  "dialog.usageExceeded.freeTier.actionLabel": "สมัครสมาชิก",
-
   "ui.sessionTurn.status.delegating": "กำลังมอบหมายงาน",
   "ui.sessionTurn.status.planning": "กำลังวางแผนขั้นตอนถัดไป",
   "ui.sessionTurn.status.gatheringContext": "กำลังสำรวจ",

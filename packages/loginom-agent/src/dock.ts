@@ -62,8 +62,13 @@ const unavailable = (failure: string) =>
   "). No new Loginom action was dispatched by this failed preparation. Report this concrete failure and preserve the existing scenario. Attachment admission is not confirmed by the presence of a chat attachment; do not claim input_artifacts were admitted or uploaded. After connection/recovery is resolved, continue in the same chat. Never ask for credentials in chat or substitute fabricated results."
 
 export async function dockTools(input: {
-  plugin: Pick<Plugin.Context, "tool" | "location" | "model" | "session">
-  files: Files
+  plugin: {
+    tool: Pick<Plugin.Context["tool"], "transform" | "reload">
+    location: Pick<Plugin.Context["location"], "directory">
+    model: Pick<Plugin.Context["model"], "list">
+    session: Pick<Plugin.Context["session"], "context">
+  }
+  files: Pick<Files, "ask" | "snapshot">
   profiles: string
   /** The execution's Host lease (B2.3) and why it is missing, if acquiring it failed. */
   lease: (sessionID: string) => Promise<Lease | undefined>
@@ -266,17 +271,27 @@ export async function dockTools(input: {
         : undefined
     // The task the run is bound to, as 0.4 dispatched with the turn's task.
     const task = bound.get(lease)?.task ?? (await input.task(call.sessionID))
+    const signal = call.signal
+    let publishing = Promise.resolve()
     const result = await lease
       .call(
         name,
         forwarded,
         task,
-        call.signal,
+        signal,
         // Help and connection diagnostics carry no attachments (0.4 `toolPolicy.isLocalLoginom`).
         local.has(key) ? undefined : await admissions(call.sessionID),
         packageInput,
         scanReceipt,
+        (update) => {
+          publishing = publishing
+            .then(async () => {
+              if (!signal.aborted) await call.progress({ loginomStep: update })
+            })
+            .catch(() => undefined)
+        },
       )
+      .finally(() => publishing)
       .then(decodeReply)
       .catch((error) => {
         throw Error(hostErrorText(error))
