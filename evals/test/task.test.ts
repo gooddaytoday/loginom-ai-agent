@@ -13,7 +13,7 @@ test("loadTasks: встроенный аналитический корпус с
   const tasks = await loadTasks(dir)
   expect(tasks).toHaveLength(65)
   expect(await agentInputsHash(tasks)).toBe("dd1a21c6be4e0482ea3d1fd700ec1f5e4140abb037502d0310f16fda8e9773cc")
-  expect(await rubricHash(tasks)).toBe("a39049e6d2660ce57f9ae23dd3e1ddbc99ea4d1adb8cfa8c953c2c7582579377")
+  expect(await rubricHash(tasks)).toBe("06d756a78dc89ecb6046355a34aaa5953c8e623e3f679cbafda466715a07fbdb")
   expect((await loadTasks(dir, ["sales-by-category"])).map((task) => task.id)).toEqual(["sales-by-category"])
   expect((await loadTasks(dir, ["monthly-retention-curve"])).map((task) => task.id)).toEqual(["monthly-retention-curve"])
 })
