@@ -4,7 +4,6 @@ import { isIPv6 } from "node:net"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { Product } from "@loginom-ai-agent/product"
-import { BlobReader, BlobWriter, ZipWriter } from "@zip.js/zip.js"
 import { createRedactor } from "../../loginom-runtime/client/lib/redact.mjs"
 import { connectionStore } from "./connection/connection-store"
 import type { CredentialCodec } from "./connection/credentials"
@@ -401,7 +400,9 @@ export async function buildDiagnosticsArchive(input: DiagnosticsInput) {
     ...startup.map((entry) => ({ name: entry.name, priority: 5, entry })),
   ].sort((a, b) => a.priority - b.priority)
 
-  const writer = new ZipWriter(new BlobWriter("application/zip"))
+  const { BlobReader, BlobWriter, ZipWriter } = await import("@zip.js/zip.js")
+  // macOS Archive Utility requires the signature on ZIP data descriptors.
+  const writer = new ZipWriter(new BlobWriter("application/zip"), { dataDescriptorSignature: true })
   const files: Array<Record<string, unknown>> = []
   const prepared: Array<{
     source: Source
@@ -641,24 +642,43 @@ function collectStrings(value: unknown, out: string[], depth = 0) {
 
 // The credential values (`credential`) and account tokens of an OpenCode 2 database (core/src/{credential,account}/sql.ts),
 // through a query-only connection: the running CLI keeps writing. Not `readonly`, as `openSessions` in diagnostics-cli.ts:
-// the macOS system SQLite fails a read-only connection on a WAL database without -wal and -shm. Bun only: under Node
-// (Desktop) the import fails and the secrets are reported unavailable.
+// the macOS system SQLite fails a read-only connection on a WAL database without -wal and -shm.
 async function databaseSecrets(file: string) {
-  const { Database } = await import("bun:sqlite")
-  const db = new Database(file, { readwrite: true, create: false })
+  const db = await openCredentialDatabase(file)
   try {
-    db.run("PRAGMA query_only = ON")
-    db.run("PRAGMA busy_timeout = 5000")
+    db.exec("PRAGMA query_only = ON")
+    db.exec("PRAGMA busy_timeout = 5000")
     const secrets: string[] = []
-    for (const row of db.query("SELECT value FROM credential").all() as { value: string }[])
-      collectStrings(JSON.parse(row.value), secrets)
+    for (const row of db.rows("SELECT value FROM credential"))
+      if (row && typeof row.value === "string") collectStrings(JSON.parse(row.value), secrets)
     for (const table of ["account", "control_account"])
-      for (const row of db.query(`SELECT access_token, refresh_token FROM ${table}`).all() as Record<string, string>[])
-        secrets.push(row.access_token, row.refresh_token)
+      for (const row of db.rows(`SELECT access_token, refresh_token FROM ${table}`)) {
+        if (row && typeof row.access_token === "string") secrets.push(row.access_token)
+        if (row && typeof row.refresh_token === "string") secrets.push(row.refresh_token)
+      }
     return secrets
   } finally {
     db.close()
   }
+}
+
+async function openCredentialDatabase(file: string) {
+  if (!process.versions.bun) {
+    const { DatabaseSync } = await import("node:sqlite")
+    const db = new DatabaseSync(file, { readOnly: true })
+    return { exec: (sql: string) => db.exec(sql), rows: (sql: string) => db.prepare(sql).all(), close: () => db.close() }
+  }
+  // A dynamic specifier keeps the Bun-only module out of Electron's bundle.
+  const sqlite = "bun:sqlite"
+  const { Database }: {
+    Database: new (file: string, options: { readwrite: true; create: false }) => {
+      exec(sql: string): unknown
+      query(sql: string): { all(): Record<string, unknown>[] }
+      close(): void
+    }
+  } = await import(sqlite)
+  const db = new Database(file, { readwrite: true, create: false })
+  return { exec: (sql: string) => db.exec(sql), rows: (sql: string) => db.query(sql).all(), close: () => db.close() }
 }
 
 // Credential stores are read only to learn values for masking and are never

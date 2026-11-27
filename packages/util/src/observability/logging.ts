@@ -173,8 +173,8 @@ export function minimumLogLevel() {
   return value && value in levels ? levels[value as keyof typeof levels] : levels.INFO
 }
 
-export function loggers(local = true, channel = "local") {
-  return [fileLogger(file(local, channel)), stderrLogger]
+export function loggers(local = true, channel = "local", logger?: Logger.Logger<unknown, void>) {
+  return [logger ?? fileLogger(file(local, channel)), stderrLogger]
 }
 
 export * as Logging from "./logging.js"

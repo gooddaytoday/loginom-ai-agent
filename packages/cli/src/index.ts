@@ -17,6 +17,7 @@ import { Npm } from "@opencode/util/npm"
 import { EffectFlock } from "@opencode/util/effect-flock"
 import { Heap } from "./heap"
 import { CpuProfile } from "./cpu-profile"
+import { desktopServiceLogger } from "./desktop-service-logging"
 import { ShutdownDeadline } from "./shutdown-deadline"
 
 // Keep requests to the local service off any proxy. Bun reads lowercase `no_proxy` alone whenever it is set, so both
@@ -146,13 +147,16 @@ Effect.gen(function* () {
     }),
   ),
   Effect.provide(
-    Observability.layer({
-      endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
-      headers: process.env.OTEL_EXPORTER_OTLP_HEADERS,
-      client: process.env.LOGINOM_AI_AGENT_CLIENT ?? LOGINOM_AI_AGENT_ARTIFACT,
-      version: LOGINOM_AI_AGENT_VERSION,
-      channel: LOGINOM_AI_AGENT_CHANNEL,
-    }),
+    Observability.layer(
+      {
+        endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+        headers: process.env.OTEL_EXPORTER_OTLP_HEADERS,
+        client: process.env.LOGINOM_AI_AGENT_CLIENT ?? LOGINOM_AI_AGENT_ARTIFACT,
+        version: LOGINOM_AI_AGENT_VERSION,
+        channel: LOGINOM_AI_AGENT_CHANNEL,
+      },
+      desktopServiceLogger(),
+    ),
   ),
   Effect.provide(NodeServices.layer),
   Effect.scoped,

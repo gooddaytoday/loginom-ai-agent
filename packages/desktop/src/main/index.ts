@@ -3,6 +3,8 @@ import { marks } from "./lifecycle/marks"
 import { app } from "electron"
 import { acquireApplicationLock, configureApplication } from "./lifecycle/configure"
 import { LoginomResources } from "./loginom/resources"
+import { monitorMainCrashes } from "./native/crash-logging"
+import { writeCrash } from "./native/log-files"
 import { startSidecarProbe } from "./service/sidecar-probe"
 import { registerStorageSnapshotHandler } from "./storage/snapshot"
 import { createEarlyWindow, earlyWindowClosed } from "./windows/early"
@@ -26,6 +28,7 @@ if (process.argv.includes("--verify-resources"))
     },
   )
 else if (acquireApplicationLock()) {
+  app.once("quit", monitorMainCrashes(writeCrash))
   registerRendererScheme()
   // Window first, then the bundle: starting the import before ready delays ready itself, because the
   // module graph evaluates on the same thread Chromium needs to finish initialising.

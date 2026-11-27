@@ -1,10 +1,12 @@
 import { app } from "electron"
 import type { Endpoint } from "@opencode/client/service"
-import { Context, Effect, FileSystem, Layer, Option, Path, Schema } from "effect"
+import { Cause, Context, Effect, FileSystem, Layer, Option, Path, Schema } from "effect"
 import { SidecarChanged } from "../../shared/ipc-rpc/events"
 import { CHANNEL } from "../constants"
 import { emitIpcEvent } from "../ipc-events"
 import { LoginomResources } from "../loginom/resources"
+import { monitorServiceCrashes } from "../native/crash-logging"
+import { serviceLogDirectory, writeCrash } from "../native/log-files"
 import { getMainWindows } from "../windows"
 import { BackgroundServiceMachine } from "./background-service-machine"
 import { cleanStages } from "./cli-stages"
@@ -23,7 +25,13 @@ import { takeSidecarProbe } from "./sidecar-probe"
 
 export * as BackgroundService from "./background-service"
 
-const RegisteredService = Schema.Struct({ version: Schema.optional(Schema.String) })
+const RegisteredService = Schema.Struct({
+  version: Schema.optional(Schema.String),
+  pid: Schema.optional(Schema.Int),
+  url: Schema.optional(Schema.String),
+})
+
+type ServiceMonitor = ReturnType<typeof monitorServiceCrashes>
 
 export interface Interface {
   readonly connection: Effect.Effect<SidecarCredentials.Data>
@@ -36,11 +44,22 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const context = yield* Effect.context<FileSystem.FileSystem | Path.Path | DesktopCli.Service>()
+    const monitor = monitorServiceCrashes(writeCrash)
+    yield* Effect.addFinalizer(() => Effect.sync(monitor.stop))
 
     return Service.of(
       yield* BackgroundServiceMachine.make({
-        probe: probe().pipe(Effect.provide(context)),
-        ensure: (mode) => ensure(mode).pipe(Effect.provide(context)),
+        probe: probe(monitor).pipe(Effect.provide(context)),
+        ensure: (mode) =>
+          ensure(mode, monitor).pipe(
+            Effect.tapCause((cause) =>
+              Effect.sync(() => {
+                if (!Cause.hasInterruptsOnly(cause))
+                  writeCrash("background service connection failed", { mode, error: Cause.squash(cause) })
+              }),
+            ),
+            Effect.provide(context),
+          ),
         publish: (data) => {
           SidecarCredentials.set(data)
           // Every window moves its requests and event stream to the new origin, not only the one that reconnected.
@@ -49,6 +68,7 @@ export const layer = Layer.effect(
         },
         // Loginom AI Agent (B4.10): the app's quit waits for this stop (`lifecycle/index.ts`).
         stop: Effect.logInfo("stopping v2 CLI background service").pipe(
+          Effect.andThen(Effect.sync(monitor.stop)),
           Effect.andThen(Effect.tryPromise(stopService)),
           Effect.andThen(Effect.logInfo("v2 CLI background service stopped")),
           Effect.catch((error) => Effect.logError("failed to stop v2 CLI background service", { error })),
@@ -60,16 +80,19 @@ export const layer = Layer.effect(
 
 // A compatible service the entry module already found is adopted at once; the machine still verifies it with
 // `ensure("initial")` (which also completes a terminal handoff), off the renderer's path.
-const probe = Effect.fn("BackgroundService.probe")(function* () {
+const probe = Effect.fn("BackgroundService.probe")(function* (monitor: ServiceMonitor) {
   const service = yield* Effect.promise(takeSidecarProbe)
 
   if (!service) return undefined
   const setup = yield* prepare("initial")
 
-  return (yield* adopt(setup, service, true)).credentials
+  return (yield* adopt(setup, service, true, monitor)).credentials
 })
 
-const ensure = Effect.fn("BackgroundService.ensure")(function* (mode: BackgroundServiceMachine.ConnectMode) {
+const ensure = Effect.fn("BackgroundService.ensure")(function* (
+  mode: BackgroundServiceMachine.ConnectMode,
+  monitor: ServiceMonitor,
+) {
   const runFork = Effect.runForkWith(yield* Effect.context<FileSystem.FileSystem | Path.Path>())
   const setup = yield* prepare(mode)
 
@@ -86,8 +109,10 @@ const ensure = Effect.fn("BackgroundService.ensure")(function* (mode: Background
         "--service",
         ...(setup.isolated ? ["--hostname", "0.0.0.0", "--port", String(0x0c0c)] : []),
       ]),
-      onStart: (reason, previousVersion) =>
-        runFork(Effect.logInfo("v2 CLI background service starting", { reason, previousVersion })),
+      onStart: (reason, previousVersion) => {
+        if (reason === "version-mismatch") monitor.stop()
+        runFork(Effect.logInfo("v2 CLI background service starting", { reason, previousVersion }))
+      },
     })
 
   const service = yield* Effect.tryPromise(() =>
@@ -98,7 +123,7 @@ const ensure = Effect.fn("BackgroundService.ensure")(function* (mode: Background
     }),
   )
 
-  const ready = yield* adopt(setup, service, false)
+  const ready = yield* adopt(setup, service, false, monitor)
 
   // Only packaged and isolated builds run a staged copy; any other binary sits in the source tree.
   // Keep both the bundled stage and the running server's stage so its executable stays on disk. This runs only
@@ -127,8 +152,16 @@ const prepare = Effect.fn("BackgroundService.prepare")(function* (mode: Backgrou
   const installation = LoginomResources.installation(app)
   // Loginom AI Agent (B4.8a): a packaged app's service takes its Loginom resources, or the app does not start it.
   const resources = yield* Effect.promise(() => LoginomResources.serviceEnvironment(installation))
+
   // Loginom AI Agent (B4.9): its own identity and port, and the version the installer verified the resources with.
-  const env = { ...serviceEnvironment(installation.version), ...resources, ...ownerEnvironment() }
+  const env = {
+    ...serviceEnvironment(installation.version),
+    ...resources,
+    ...ownerEnvironment(),
+    LOGINOM_AI_AGENT_SERVICE_LOG_DIR: serviceLogDirectory(),
+    LOGINOM_AI_AGENT_PRINT_LOGS: "0",
+  }
+
   // Loginom AI Agent (B4.16): this window owns the service it starts or adopts; its predecessor's claim ends here.
   yield* Effect.promise(claimService)
 
@@ -139,6 +172,7 @@ const adopt = Effect.fn("BackgroundService.adopt")(function* (
   setup: Effect.Success<ReturnType<typeof prepare>>,
   service: Endpoint,
   probed: boolean,
+  monitor: ServiceMonitor,
 ) {
   const fs = yield* FileSystem.FileSystem
 
@@ -147,13 +181,16 @@ const adopt = Effect.fn("BackgroundService.adopt")(function* (
 
   if (url.hostname === "0.0.0.0") url.hostname = "127.0.0.1"
 
-  const runningVersion = yield* fs.readFileString(setup.file ?? setup.client.fallback()).pipe(
-    Effect.map(
-      (text) =>
-        Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(RegisteredService))(text))?.version,
+  const registration = yield* fs.readFileString(setup.file ?? setup.client.fallback()).pipe(
+    Effect.map((text) =>
+      Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(RegisteredService))(text)),
     ),
     Effect.orElseSucceed(() => undefined),
   )
+
+  if (registration?.url === service.url && registration.pid !== undefined && registration.pid > 0)
+    monitor.watch(registration.pid)
+  const runningVersion = registration?.version
 
   yield* Effect.logInfo("v2 CLI background service ready", {
     version: setup.version,
