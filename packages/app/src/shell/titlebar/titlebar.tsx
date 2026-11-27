@@ -537,8 +537,9 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
             return (
               <div
                 ref={titlebarRow}
-                class="h-full flex-1 overflow-hidden flex flex-row items-center gap-1.5 px-2 md:pe-3"
+                class="h-full flex-1 flex flex-row items-center gap-1.5 px-2 md:pe-3"
                 classList={{
+                  "overflow-hidden": !windows() || !props.verticalTabs,
                   "pt-[max(0px,calc(8px-env(safe-area-inset-top,0px)))]": !bottom() && !windows() && !mobileTop(),
                   "pb-[max(0px,calc(8px-var(--shell-safe-area-bottom,var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))))]":
                     bottom(),
@@ -552,8 +553,12 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
                   <WindowsAppMenu command={command} platform={platform} />
                 </Show>
                 <Show when={windows() && props.verticalTabs}>
-                  <SidebarSearchButton />
-                  <SidebarToggle />
+                  <div class="relative flex shrink-0 items-center">
+                    <div classList={{ "absolute z-40 start-0 top-full mt-1": !settings.appearance.sidebarOpen() }}>
+                      <SidebarSearchButton />
+                    </div>
+                    <SidebarToggle />
+                  </div>
                 </Show>
                 <Show when={!mobile() && !props.verticalTabs}>
                   {/* Pulls the first tab's avatar 10px from Search, past the row gap plus the tab's own inset. */}
