@@ -96,6 +96,8 @@ export function createNextTimelineRowRenderer(input: {
     set: (key: string, open: boolean) => void
     patchGroupKeys?: Map<string, string>
   }
+  /** Whether the host disclosed the turn's activity groups together. */
+  activityOpen?: (userMessageID: string) => true | undefined
   centered?: Accessor<boolean>
   padding?: Accessor<string>
   anchor?: (messageID: string) => string | undefined
@@ -399,7 +401,7 @@ export function createNextTimelineRowRenderer(input: {
             onToolOpenChange={(id, open) => input.disclosure.set(`${row().group.key}:tool:${id}`, open)}
             fileOpen={(path) => input.disclosure.value(`patch:${path}`) ?? diffOpens(input.timelineDetail())}
             onFileOpenChange={(path, open) => input.disclosure.set(`patch:${path}`, open)}
-            open={input.disclosure.value(key()) === true}
+            open={(input.disclosure.value(key()) ?? input.activityOpen?.(row().userMessageID)) === true}
             onOpenChange={(open) => input.disclosure.set(key(), open)}
             onSizeChange={onSizeChange}
           />
@@ -433,7 +435,9 @@ export function createNextTimelineRowRenderer(input: {
       return (
         <TimelineEventRow
           events={events()}
-          open={input.disclosure.value(`events:${row().group.key}`) === true}
+          open={
+            (input.disclosure.value(`events:${row().group.key}`) ?? input.activityOpen?.(row().userMessageID)) === true
+          }
           onOpenChange={(open) => {
             input.disclosure.set(`events:${row().group.key}`, open)
             onSizeChange?.()
@@ -460,7 +464,7 @@ export function createNextTimelineRowRenderer(input: {
       return (
         <SessionReadToolGroup
           tools={tools()}
-          open={input.disclosure.value(row().group.key)}
+          open={input.disclosure.value(row().group.key) ?? input.activityOpen?.(row().userMessageID)}
           onOpenChange={(open) => input.disclosure.set(row().group.key, open)}
           onSizeChange={onSizeChange}
         />

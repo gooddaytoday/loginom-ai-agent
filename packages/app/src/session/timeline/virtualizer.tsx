@@ -8,7 +8,7 @@ import {
 } from "@tanstack/solid-virtual"
 import { isScrollKeyTarget, scrollKey, scrollKeyOwner, ScrollView } from "@opencode/ui/scroll-view"
 import { Predicate } from "effect"
-import { Timeline, TimelineRow } from "@opencode/session-ui/timeline/projection"
+import { Timeline, TimelineRow, type PartRef } from "@opencode/session-ui/timeline/projection"
 import { useLanguage } from "@/runtime/i18n/language"
 import {
   batch,
@@ -103,6 +103,7 @@ type Input = {
   /** Whether what the user opened or closed survives a change of detail setting, as in the New timeline. */
   keepsDisclosure?: boolean
   projection: Projection
+  revealActivity?: (matches: (ref: PartRef) => boolean) => void
   showHeader: Accessor<boolean>
   /** Whether the timeline follows the newest content. Drives every anchoring decision. */
   follow: TimelineFollow
@@ -511,6 +512,8 @@ export function createTimelineVirtualizer(input: Input) {
       )
     }
 
+    input.revealActivity?.(matches)
+
     const found = rows()
       .flatMap((row, index) =>
         Predicate.isTagged(row, "AssistantPart")
@@ -645,6 +648,8 @@ export function createTimelineVirtualizer(input: Input) {
     })
     input.setRevealMessage?.((id, partID) => {
       if (!active()) return
+
+      if (partID) input.revealActivity?.((ref) => ref.partID === partID)
 
       const partIndex = partID
         ? rows().findIndex(

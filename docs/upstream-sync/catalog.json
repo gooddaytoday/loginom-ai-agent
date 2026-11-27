@@ -105,6 +105,23 @@
         "packages/gui-plugins/src/renderer.ts"
       ]
     },
+    {
+      "id": "CAT-15",
+      "title": "Built-in GUI turn presentation (C3.19)",
+      "paths": [
+        "packages/app/e2e/regression/session-timeline-tool-projection.spec.ts",
+        "packages/app/src/session/timeline/message-timeline.tsx",
+        "packages/app/src/session/timeline/turn-presentation.tsx",
+        "packages/app/src/session/timeline/virtualizer.tsx",
+        "packages/app/test-browser/builtin-plugins.test.ts",
+        "packages/gui-plugins/src/main.ts",
+        "packages/gui-plugins/src/renderer.ts",
+        "packages/session-ui/src/timeline-next/row.tsx",
+        "packages/session-ui/src/timeline/session-timeline-row.tsx",
+        "packages/session-ui/src/timeline/timeline-row.ts",
+        "packages/session-ui/src/timeline/turn-presentation.ts"
+      ]
+    },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
     {
       "id": "CAT-14",

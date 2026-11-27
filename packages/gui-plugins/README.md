@@ -213,6 +213,11 @@ and retries rendering at the next call status.
 `builtinContext(ctx).timeline` reads and sets the app's saved Compact and Detailed presets. A built-in can use
 `session.header.mobile` to put a control beside the session location on narrow screens.
 
+Built-ins can also register a `TurnPresentation` with `ctx.add(TurnPresentation, { describe })`. The callback
+receives the turn's assistant messages, plus its todos while working or its duration once completed. Returning
+`undefined` leaves the turn's presentation in place. A completed summary lets the reader disclose the activity;
+the answer and rows that carry results stay in view.
+
 [Lifetimes](#lifetimes) shows `createKeyed` in files.
 
 ```ts

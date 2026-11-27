@@ -7,10 +7,12 @@ import { createKeyed, Slot, usePlugin, type Plugin } from "@opencode/plugin/gui"
 import { builtinContext, BuiltinSlot, ToolRenderer, type ToolRendererProps } from "@opencode/plugin/gui/builtin"
 import type definition from "./index"
 import { decodeFacts, decodeProgress, failureTitle, loginomStepPhrase, stepDetails } from "./step-phrase"
+import setupTurnPresentation from "./turn-presentation"
 
 const modes = ["compact", "detailed"] as const
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
+  setupTurnPresentation(ctx)
   const timeline = builtinContext(ctx).timeline
 
   const renderDetail = () => (
