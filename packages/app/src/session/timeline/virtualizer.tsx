@@ -26,6 +26,7 @@ import {
 } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
+import { createResizeObserver } from "@solid-primitives/resize-observer"
 import type { createTimelineProjection } from "./projection"
 import { observeElementOffsetReconnectAware } from "./observe-element-offset"
 import { filterVirtualIndexes } from "./virtual-items"
@@ -136,6 +137,7 @@ export type TimelineRouteReveal = {
 
 type ViewProps = {
   header: JSX.Element
+  toolbar?: JSX.Element
   bottomSpacer?: JSX.Element
   deferred: (row: TimelineRow.TimelineRow) => boolean
   renderRow: (row: Accessor<TimelineRow.TimelineRow>, onSizeChange?: () => void) => JSX.Element
@@ -145,7 +147,8 @@ export function createTimelineVirtualizer(input: Input) {
   const language = useLanguage()
   const active = () => input.active?.() !== false
   const isDesktop = createMediaQuery("(min-width: 768px)")
-  const topOffset = () => (input.showHeader() ? 64 : isDesktop() ? 0 : 16)
+  const [toolbarHeight, setToolbarHeight] = createSignal(0)
+  const topOffset = () => (input.showHeader() ? 64 : isDesktop() ? 0 : 16) + toolbarHeight()
   // Reserved below the last row: a 36px lane for the live status row and its background hint, a 14px gap, then the
   // activity pill and its 10px composer gap. Without hover the pill grows from 32px to its 44px touch size
   // (composer-lane.css), and the tail grows with it. Both come and go inside it, so neither moves the rows above.
@@ -1056,6 +1059,11 @@ export function createTimelineVirtualizer(input: Input) {
   }
 
   function View(props: ViewProps) {
+    const [toolbar, setToolbar] = createSignal<HTMLDivElement>()
+    createResizeObserver(toolbar, ({ height }) => {
+      if (active()) setToolbarHeight(height)
+    })
+
     function VirtualRow(rowProps: { rowKey: string }) {
       let element: HTMLDivElement
       const initialItem = virtualItemByKey().get(rowProps.rowKey)!
@@ -1180,6 +1188,7 @@ export function createTimelineVirtualizer(input: Input) {
           <Show when={input.showHeader()} fallback={<div aria-hidden="true" class="h-4 md:hidden" />}>
             {props.header}
           </Show>
+          <div ref={setToolbar}>{props.toolbar}</div>
           <div
             data-timeline-virtual-content
             ref={virtualContent}

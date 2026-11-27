@@ -2,7 +2,7 @@ import { inputStore, type InputFile } from "./inputs"
 import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { tmpdir } from "node:os"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
@@ -17,6 +17,7 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
+import { desktopWindowBounds, WindowReply } from "./window"
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
 export async function verifyInstallationResources(options: {
@@ -214,6 +215,7 @@ export async function createLoginomHost(options: {
   closeSavedPackageOnShutdown?: boolean
   // Private launcher capability baked into packaged release builds; never from env or the model.
   browserRecovery?: boolean
+  desktopOwnerFile?: string
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
@@ -455,6 +457,10 @@ export async function createLoginomHost(options: {
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
     // Mutate cache state only after the existing resource-verification admission.
     const httpCache = validationHttpCache && await prepareValidationCache(connection)
+    const windowBounds =
+      purpose === "chat" && !options.headless && options.desktopOwnerFile
+        ? await desktopWindowBounds(options.desktopOwnerFile, chat, AbortSignal.any([waiting, resourceController.signal]))
+        : undefined
     return supervise(
       {
         node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
@@ -470,6 +476,7 @@ export async function createLoginomHost(options: {
         headless: purpose === "chat" ? options.headless === true : (options.preflightHeadless ?? true),
         closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
         browserRecovery: !validation && options.browserRecovery === true,
+        windowBounds,
         environment,
         actionManifestUri: manifest.actionManifestUri,
         actionManifestSha256: manifest.actionManifestSha256,
@@ -804,6 +811,21 @@ export async function createLoginomHost(options: {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
       return inputs.admit(`${generation}:${chat}`, userMessage, files, `/${current.connection.username}`)
+    },
+    async showWindow(sessionID: string) {
+      const unavailable = { kind: "unavailable" } as const
+      if (resourceController.signal.aborted || options.headless || !options.desktopOwnerFile) return unavailable
+      const chat = createHash("sha256").update(sessionID).digest("hex")
+      const owner = [...generations.values()].reverse().find((generation) => generation.children.has(chat))
+      const child = owner?.children.get(chat)
+      if (!child) return unavailable
+      // A click does not wait for a starting runtime or start one itself.
+      const runtime = await Promise.race([child, Promise.resolve(undefined)]).catch(() => undefined)
+      if (!runtime || owner?.children.get(chat) !== child) return unavailable
+      return runtime
+        .request("window.show", undefined, 10_000)
+        .then(Schema.decodeUnknownSync(WindowReply))
+        .catch(() => unavailable)
     },
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true

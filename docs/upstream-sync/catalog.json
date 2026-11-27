@@ -97,6 +97,19 @@
         "packages/ui/src/i18n/en.ts"
       ]
     },
+    {
+      "id": "CAT-15",
+      "title": "Loginom conversation toolbar and Desktop window placement (C5.8)",
+      "paths": [
+        "packages/app/src/session/timeline/message-timeline.tsx",
+        "packages/app/src/session/timeline/virtualizer.tsx",
+        "packages/desktop/src/main/plugin/host.ts",
+        "packages/gui-plugins/src/main.ts",
+        "packages/gui-plugins/src/renderer.ts",
+        "packages/gui-plugins/src/loginom-window/**",
+        "packages/plugin/src/gui/builtin.ts"
+      ]
+    },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
     {
       "id": "CAT-14",

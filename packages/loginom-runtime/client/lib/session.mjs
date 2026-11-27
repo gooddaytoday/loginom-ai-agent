@@ -60,10 +60,10 @@ export async function createSession(config, { headless = false, managed = null }
   const browserConfig = join(directory, 'playwright.json');
   const downloadScript = join(directory, 'browser-downloads.js');
   await writeFile(downloadScript, browserDownloadScript(config.loginomUrl), { mode: 0o600 });
-  // Let visible Loginom use the actual maximized window. A fixed emulated
+  // Let visible Loginom use the actual native window. A fixed emulated
   // viewport stays small even when the native window is enlarged. Headless
   // checks retain a deterministic size; live geometry guards still apply.
-  const launch = browserLaunch(headless);
+  const launch = browserLaunch(headless, process.platform, process.env, managed?.windowBounds);
   const browserViewport = launch.viewport;
   const browserWindowMode = launch.windowMode;
   // Executor actions own explicit readiness and pre-gesture guards. MCP's

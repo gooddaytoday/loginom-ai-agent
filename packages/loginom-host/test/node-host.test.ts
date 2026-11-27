@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from "bun:test"
 import { access, copyFile, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
-import { createHash } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { buildKeychain } from "../script/build-keychain"
@@ -8,8 +8,10 @@ import { launchNodeHost, NodeHostStartupError } from "../src/node-client"
 import { verifyInstallationResources } from "../src/host"
 import { connectionStore } from "../src/connection/connection-store"
 import { cliCredentials } from "../src/connection/cli-credentials"
-import { stageHeldKnowledge } from "./fixtures/knowledge"
+import { stageHeldKnowledge, stageKnowledgeFixture } from "./fixtures/knowledge"
 import { constants } from "node:fs"
+import { createServer } from "node:http"
+import { once } from "node:events"
 
 const fixture = { directory: "", entry: "", node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? "" }
 beforeAll(async () => {
@@ -438,6 +440,75 @@ test.each(["ready", "close"])(
   },
   45_000,
 )
+
+test.skipIf(process.platform !== "linux")("the Desktop window RPC addresses an existing runtime of the exact conversation", async () => {
+  const resources = join(fixture.directory, "window-resources")
+  const root = join(fixture.directory, "window-profile")
+  const desktopOwnerFile = join(fixture.directory, "desktop.owner")
+  const bounds = { x: 801, y: -20, width: 799, height: 850 }
+  const token = randomUUID()
+  const launches: string[] = []
+  const endpoint = createServer((request, response) => {
+    if (request.method !== "POST" || request.headers.authorization !== "Bearer " + token) {
+      response.writeHead(404).end()
+      return
+    }
+    launches.push(request.url ?? "")
+    response.writeHead(200).end(JSON.stringify({ kind: "placed", bounds }))
+  })
+  await mkdir(join(resources, "bin"), { recursive: true })
+  await stageKnowledgeFixture(resources)
+  await symlink(fixture.node, join(resources, "bin/node"))
+  await writeFile(join(resources, "resource-manifest.json"), "{}")
+  await writeFile(join(resources, "runtime/src/managed-entry.mjs"), `
+    let input;
+    process.on("message", m => {
+      const respond = result => process.send({ id: m.id, result });
+      if (m.operation === "start") {
+        input = m.input;
+        respond({ protocol: 1, ready: true, chat: input.chat, generation: input.generation });
+      }
+      if (m.operation === "call") respond({ result: input.windowBounds, recoveryPending: false, activeWork: false });
+      if (m.operation === "window.show") respond({ kind: "taskbar" });
+      if (m.operation === "interrupt") respond(true);
+      if (m.operation === "close") process.send({ id: m.id, result: { closed: true } }, () => process.disconnect());
+    });
+  `)
+  const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
+  await store.stage({
+    generation: 1, revision: 1, url: "http://127.0.0.1:1/app/", username: "fixture", apiKey: "", password: "",
+  })
+  await store.activate(1)
+  endpoint.listen(0, "127.0.0.1")
+  try {
+    await once(endpoint, "listening")
+    const address = endpoint.address()
+    if (!address || typeof address === "string") throw Error("Expected test TCP endpoint")
+    await writeFile(desktopOwnerFile + ".window", JSON.stringify({ port: address.port, token }))
+    const host = await launchNodeHost({
+      node: fixture.node, entry: fixture.entry, root, resources, headless: false, desktopOwnerFile,
+    })
+    try {
+      const show = (sessionID: string) => host.request("window.show", { sessionID })
+      await host.request("connection.ready", {})
+      expect(await show("ses_window")).toEqual({ kind: "unavailable" })
+      expect(launches).toEqual([])
+      await host.request("acquire", { run: "window", session: "ses_window" })
+      await host.request("scope", {
+        run: "window", mode: "bind", scope: { taskMessageID: "msg_original", profile: "loginom-automation" },
+      })
+      expect(await host.request("call", { run: "window", name: "dock_prepare", args: {}, userMessage: "original" })).toEqual(bounds)
+      await host.request("release", { run: "window" })
+      expect(await show("ses_other")).toEqual({ kind: "unavailable" })
+      expect(await show("ses_window")).toEqual({ kind: "taskbar" })
+      expect(launches).toEqual(["/" + createHash("sha256").update("ses_window").digest("hex")])
+    } finally {
+      await host.close()
+    }
+  } finally {
+    endpoint.close()
+  }
+}, 20_000)
 
 test("private host handshake retains its upper budget beyond the former 30s deadline", async () => {
   const entry = join(fixture.directory, "slow-readiness.mjs")

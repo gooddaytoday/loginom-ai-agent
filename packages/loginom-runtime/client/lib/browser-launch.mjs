@@ -9,10 +9,18 @@ const acceptanceViewports = new Map([
   ['1920x945', {width:1920, height:945}],
 ]);
 
-export function browserLaunch(headless, platform = process.platform, env = process.env) {
+export function browserLaunch(headless, platform = process.platform, env = process.env, bounds) {
   const acceptance=headless?env.LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:undefined;
   const viewport=acceptanceViewports.get(acceptance??'1280x800');
   if(!viewport)throw Error('Invalid acceptance viewport');
+  if (!headless && bounds) {
+    // Keep the OS device scale for DIP coordinates from Electron, including mixed-DPI displays.
+    return {
+      args: [`--window-position=${bounds.x},${bounds.y}`, `--window-size=${bounds.width},${bounds.height}`],
+      viewport: null,
+      windowMode: 'positioned',
+    };
+  }
   // An explicit --window-size puts Chromium in the normal window state and
   // overrides --start-maximized on every OS (0.3.8–0.3.9 opened 1280×800 on
   // desktops). Size the window only on Linux without a desktop session (Xvfb

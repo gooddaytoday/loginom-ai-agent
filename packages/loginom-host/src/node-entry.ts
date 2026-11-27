@@ -13,6 +13,8 @@ if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 const events = new EventEmitter()
 const operations = new Set<Promise<void>>()
 const stopped = Promise.withResolvers<void>()
+const WindowSession = Schema.Struct({ sessionID: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(160)) })
+
 const state: {
   starting?: Promise<void>
   host?: Awaited<ReturnType<typeof createLoginomHost>>
@@ -112,6 +114,10 @@ async function dispatch(message: unknown) {
         closeSavedPackageOnShutdown:
           "closeSavedPackageOnShutdown" in input && input.closeSavedPackageOnShutdown === true,
         browserRecovery: "browserRecovery" in input && input.browserRecovery === true,
+        desktopOwnerFile:
+          "desktopOwnerFile" in input && typeof input.desktopOwnerFile === "string" && isAbsolute(input.desktopOwnerFile)
+            ? input.desktopOwnerFile
+            : undefined,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
       }
@@ -126,6 +132,11 @@ async function dispatch(message: unknown) {
       return
     }
     if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
+    if (message.method === "window.show") {
+      const { sessionID } = Schema.decodeUnknownSync(WindowSession)(input)
+      reply({ id: message.id, result: await state.host.showWindow(sessionID) })
+      return
+    }
     if (message.method === "dashboard.read") {
       const result = await state.host.readDashboard(Schema.decodeUnknownSync(DashboardRead)(input))
       reply({ id: message.id, result })

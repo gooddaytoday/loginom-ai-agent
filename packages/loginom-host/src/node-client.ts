@@ -34,6 +34,7 @@ export async function launchNodeHost(
     strictRecovery?: boolean
     closeSavedPackageOnShutdown?: boolean
     browserRecovery?: boolean
+    desktopOwnerFile?: string
   },
   timing: { start?: number; close?: number; terminate?: number; teardown?: number } = {},
 ) {
@@ -171,6 +172,7 @@ export async function launchNodeHost(
         ...(input.closeSavedPackageOnShutdown !== undefined
           ? { closeSavedPackageOnShutdown: input.closeSavedPackageOnShutdown }
           : {}),
+        desktopOwnerFile: input.desktopOwnerFile,
         ...(input.browserRecovery !== undefined ? { browserRecovery: input.browserRecovery } : {}),
       },
       // Restored startup acknowledges local activation independently of the Help catalog.

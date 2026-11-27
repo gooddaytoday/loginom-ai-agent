@@ -74,3 +74,14 @@ test("browser recovery never reaches validation or Help readiness", () => {
     assert.throws(() => validateStartInput({ ...base, ...patch, browserRecovery: true }), /^Error: LOGINOM_START_INVALID$/)
   assert.equal(validateStartInput({ ...base, validation: true, browserRecovery: false }).browserRecovery, false)
 })
+
+test("only a headful conversation accepts a positive rectangle in DIP", () => {
+  const windowBounds = { x: -1280, y: -120, width: 1280, height: 720 }
+  assert.deepEqual(validateStartInput({ ...base, windowBounds }).windowBounds, windowBounds)
+  for (const input of [
+    { ...base, windowBounds: { ...windowBounds, width: 0 } },
+    { ...base, windowBounds: { ...windowBounds, y: 0.5 } },
+    { ...base, windowBounds, headless: true },
+    { ...base, windowBounds, validation: true },
+  ]) assert.throws(() => validateStartInput(input), /LOGINOM_START_INVALID/)
+})

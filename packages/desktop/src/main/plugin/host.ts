@@ -56,6 +56,7 @@ import {
   nativePluralCategory,
   onNativeTranslations,
 } from "../native/translations"
+import { ownerFile } from "../service/service-identity"
 import { SidecarCredentials } from "../service/sidecar-credentials"
 import type { Database } from "../storage/database"
 import type { StateStore } from "../storage/state"
@@ -203,7 +204,17 @@ export function createHost(input: {
     data: Data,
   ) => void
 }) {
-  const definitions: readonly Entry[] = builtins
+  const definitions: readonly Entry[] = builtins.map((entry) =>
+    entry.id === "loginom-window"
+      ? {
+          ...entry,
+          mainEntry: async () => {
+            const { loginomWindowMain } = await import("@opencode/gui-plugins/loginom-window/main")
+            return { default: loginomWindowMain(ownerFile) }
+          },
+        }
+      : entry,
+  )
   const local = definitions.filter((definition) => runsOn(definition, os))
 
   const manager = createManager(

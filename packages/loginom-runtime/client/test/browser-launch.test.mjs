@@ -53,3 +53,9 @@ test('headed launch keeps the Files refresh control visible without a window man
     await browser.close();
   }
 });
+
+test('positioned Windows Chromium uses the target DIP rectangle at the OS scale', () => {
+  assert.deepEqual(browserLaunch(false, 'win32', {}, {x:1601,y:-170,width:1280,height:690}), {
+    args:['--window-position=1601,-170','--window-size=1280,690'], viewport:null, windowMode:'positioned',
+  });
+});

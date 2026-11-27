@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import { appendFile, mkdir, writeFile } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
 import { hostError, hostException } from "./errors"
+import type { WindowBounds } from "./window"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { recordLocalDiagnostics } from "../../loginom-runtime/client/lib/local-diagnostics.mjs"
 
@@ -20,6 +21,7 @@ export type Launch = {
   // Host-owned HTTP cache only; browser profiles and authentication remain fresh.
   validationHttpCache?: boolean
   headless?: boolean
+  windowBounds?: WindowBounds
   environment?: NodeJS.ProcessEnv
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
   // its own shutdown (bridge acceptanceCleanupPackage). Product code never sets it.

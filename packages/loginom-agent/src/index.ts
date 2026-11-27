@@ -7,6 +7,7 @@ import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
 import { Tool } from "@opencode/schema/tool"
+import { Schema } from "effect"
 import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
@@ -510,6 +511,31 @@ export default Plugin.define({
       },
     })
     // A dashboard's folder before its chat (B2.9h): Desktop and the CLI ask on the Location of their own working directory.
+    await ctx.rpc.register(
+      {
+        id: "loginom.window",
+        methods: {
+          show: {
+            input: Schema.toStandardSchemaV1(
+              Schema.Struct({ sessionID: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(160)) }),
+            ),
+            output: {
+              type: "object",
+              properties: { kind: { type: "string", enum: ["focused", "taskbar", "manual", "unavailable"] } },
+              required: ["kind"],
+            },
+          },
+        },
+        events: {},
+      } as const,
+      {
+        show: async ({ sessionID }) => {
+          // The browser belongs to the exact conversation, including for subagent sessions.
+          await ctx.session.get({ sessionID })
+          return ServiceHost.showWindow(sessionID)
+        },
+      },
+    )
     await ctx.rpc.register(DashboardTarget.rpc, {
       prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),
       find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),

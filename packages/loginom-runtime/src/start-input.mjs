@@ -41,5 +41,11 @@ export function validateStartInput(input) {
       cleanup.split("/").some((segment) => segment === "." || segment === ".."))
   )
     throw Error("LOGINOM_START_INVALID")
-  return { acceptanceCleanupPackage: cleanup, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache }
+  const windowBounds = input.windowBounds
+  if (windowBounds !== undefined && (
+    input.validation === true || input.headless === true || !windowBounds ||
+    ![windowBounds.x, windowBounds.y, windowBounds.width, windowBounds.height].every(Number.isSafeInteger) ||
+    windowBounds.width <= 0 || windowBounds.height <= 0
+  )) throw Error("LOGINOM_START_INVALID")
+  return { ...(windowBounds ? { windowBounds } : {}), acceptanceCleanupPackage: cleanup, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache }
 }

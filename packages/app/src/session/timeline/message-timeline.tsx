@@ -740,6 +740,19 @@ function MessageTimelineView(
           </SessionTitleHeader>
         </Show>
       }
+      toolbar={
+        <PluginSlot
+          at="session.toolbar"
+          input={{
+            get session() {
+              return props.view
+            },
+            get active() {
+              return props.active !== false
+            },
+          }}
+        />
+      }
     />
   )
 }

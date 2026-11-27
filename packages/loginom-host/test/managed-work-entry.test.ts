@@ -30,6 +30,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       new URL("../../loginom-runtime/src/managed-entry.mjs", import.meta.url),
       "utf8",
     ),
+    "runtime/src/browser-window.mjs": await readFile(
+      new URL("../../loginom-runtime/src/browser-window.mjs", import.meta.url),
+      "utf8",
+    ),
     "runtime/src/start-input.mjs": await readFile(
       new URL("../../loginom-runtime/src/start-input.mjs", import.meta.url),
       "utf8",

@@ -7,6 +7,7 @@ import { appendFileSync } from "node:fs"
 import { createHook } from "node:async_hooks"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
+import { showBrowserWindow } from "./browser-window.mjs"
 import { closeManagedResources } from "./managed-resources-close.mjs"
 import { dashboardStorage } from "./dashboard-storage.mjs"
 import { runtimeCallTimeout } from "./call-timeout.mjs"
@@ -33,6 +34,7 @@ const state = {
   controller: undefined,
   session: undefined,
   browser: undefined,
+  visibleWindow: undefined,
   browserProfile: undefined,
   browserServer: undefined,
   lastLoginomReplyAt: null,
@@ -147,7 +149,7 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
+      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache, windowBounds } = validateStartInput(input)
       state.owner = { chat: input.chat, generation: input.generation }
       state.startupStateDir = input.stateDir
       state.startupStarted = performance.now()
@@ -189,6 +191,7 @@ async function handle(message) {
         httpCachePath: validationHttpCache ? join(input.stateDir, "http-cache") : undefined,
         candidate: input.connection,
         headless: input.headless === true,
+        windowBounds,
         signal: state.startupController.signal,
         deadline,
         onPhase: startupPhase,
@@ -211,6 +214,8 @@ async function handle(message) {
           })
         } })
       state.browser = authenticated.context
+      if (input.headless !== true)
+        state.visibleWindow = { page: authenticated.page, browserPath: resources.browserPath }
       state.owner.origin = new URL(input.connection.url).origin
       const config = {
         resources: input.resources,
@@ -241,7 +246,7 @@ async function handle(message) {
       }
       const session = await createSession(config, {
         headless: input.headless === true,
-        managed: { directory, browserPath: resources.browserPath, browserRoot: resources.browserRoot },
+        managed: { directory, browserPath: resources.browserPath, browserRoot: resources.browserRoot, windowBounds },
       })
       state.session = session
       const { Client } = require("@modelcontextprotocol/sdk/client/index.js")
@@ -310,6 +315,10 @@ async function handle(message) {
         await cancellation.close
         state.controller = undefined
       }
+      return
+    }
+    if (message.operation === "window.show") {
+      send({ id: message.id, result: await showBrowserWindow(state.visibleWindow?.page, state.visibleWindow?.browserPath) })
       return
     }
     if (message.operation === "work") {

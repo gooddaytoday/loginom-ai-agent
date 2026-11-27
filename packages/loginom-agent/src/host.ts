@@ -37,6 +37,9 @@ const decodeStatus = Schema.decodeUnknownOption(
   Schema.Struct({ generation: Schema.Number, recoveries: Schema.optional(Schema.Array(Schema.String)) }),
 )
 const decodeView = Schema.decodeUnknownOption(Schema.Struct({ url: Schema.String, generation: Schema.Number }))
+const decodeWindow = Schema.decodeUnknownSync(
+  Schema.Struct({ kind: Schema.Literals(["focused", "taskbar", "manual", "unavailable"]) }),
+)
 const decodePublication = Schema.decodeUnknownOption(Schema.NullOr(PublicationSource), { onExcessProperty: "error" })
 
 /**
@@ -132,6 +135,11 @@ export const dashboard = {
   },
 }
 
+export async function showWindow(sessionID: string) {
+  if (!connected()) return { kind: "unavailable" as const }
+  return request("window.show", { sessionID }).then(decodeWindow).catch(() => ({ kind: "unavailable" as const }))
+}
+
 async function request(method: string, input: unknown) {
   const current = state.current
   const connection = await current?.ready
@@ -219,6 +227,8 @@ function nodeHost(root: string, resources: string) {
       // service, Desktop's server and `serve` never close a package. The runtime then writes `saved-package-cleanup.json`.
       closeSavedPackageOnShutdown:
         process.env.LOGINOM_AI_AGENT_CLI_ROOT !== undefined && process.env.LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE === "1",
+      desktopOwnerFile:
+        process.env.LOGINOM_AI_AGENT_CLI_ROOT === undefined ? process.env.LOGINOM_AI_AGENT_SERVICE_OWNER : undefined,
       environment: process.env,
     })
 }
