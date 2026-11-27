@@ -1333,7 +1333,7 @@ test('saved continuation returns current navigation with the same native workflo
  assert.equal(continuation.workflow_ref.tab_tid,continuation.previous_workflow_ref.tab_tid);
 });
 
-test('checkpoint publishes the saved breadcrumb to the next native Apply preflight',async()=>{
+async function checkpointApplyFixture(){
  const page=await restSavePage([false],false);
  const prep=page.context.__loginomDockPreparationV1;
  const receipt=prep.receipts.get('prepared');
@@ -1344,20 +1344,52 @@ test('checkpoint publishes the saved breadcrumb to the next native Apply preflig
  receipt.crumbs=page.context.document.querySelectorAll('[data-tid^="MF;TF-1;cnrNaviMode;b.s_"]')
   .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
  const path='/user/data/packages/continued.lgp';
- const saved=await run(page,'package.save_checkpoint',{path,conflict_policy:'fail'});
+ const save=()=>run(page,'package.save_checkpoint',{path,conflict_policy:'fail'});
+ const step=async workflow_ref=>{
+  page.model.FDiagram.FmxGraph.container.getBoundingClientRect=()=>({width:100,height:100});
+  return (await page.execute(makeWorkspaceStepCode({
+   loginomUrl:url.href,build,sessionId:'save-session',workflowRef:{...workflow_ref,document_id:prep.id},readGraph,types:{},
+  }))).output;
+ };
+ return {page,receipt,connection,path,save,step};
+}
+
+test('checkpoint publishes the saved breadcrumb to the next native Apply preflight',async()=>{
+ const {connection,path,save,step}=await checkpointApplyFixture();
+ const saved=await save();
  assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));
  const [continuation]=saved.output.workflow_continuations;
- const diagram=page.model.FDiagram.FmxGraph.container;
- diagram.getBoundingClientRect=()=>({width:100,height:100});
- const step=async workflow_ref=>(await page.execute(makeWorkspaceStepCode({
-  loginomUrl:url.href,build,sessionId:'save-session',workflowRef:{...workflow_ref,document_id:prep.id},readGraph,types:{},
- }))).output;
  const ready=await step(continuation.workflow_ref);
  assert.equal(ready.status,'READY',JSON.stringify(ready));
  assert.equal(ready.package_ref.path,path);
  assert.equal((await step(continuation.previous_workflow_ref)).reason,'WORKFLOW_CHANGED');
  connection.Session={};
  assert.equal((await step(continuation.workflow_ref)).reason,'WORKFLOW_CHANGED');
+});
+
+for(const fault of ['package path','document'])test('checkpoint refuses a foreign '+fault+' during navigation refresh',async()=>{
+ const reference=await checkpointApplyFixture();
+ const [continuation]=(await reference.save()).output.workflow_continuations;
+ const {page,receipt,save,step}=await checkpointApplyFixture();
+ const crumbs=structuredClone(receipt.crumbs);
+ const afterDoubleClick=page.afterDoubleClick;
+ let refreshed=false;
+ page.afterDoubleClick=async()=>{
+  await afterDoubleClick();
+  refreshed=true;
+  if(fault==='package path')page.packagePath='/user/data/packages/foreign.lgp';
+  else page.context.document={...page.context.document};
+ };
+ const refused=await save();
+ assert.equal(refreshed,true);
+ assert.equal(refused.status,'AMBIGUOUS',JSON.stringify(refused));
+ assert.equal(refused.effect_possible,true);
+ assert.match(refused.error.message,fault==='package path'?/Saved continuation identities changed/:/Saved continuation document changed/);
+ assert.equal(refused.output?.workflow_continuations,undefined);
+ assert.deepEqual(receipt.crumbs,crumbs);
+ const rejected=await step(continuation.workflow_ref);
+ assert.equal(rejected.status,'NOT_READY',JSON.stringify(rejected));
+ assert.equal(rejected.reason,fault==='package path'?'WORKFLOW_CHANGED':'WORKFLOW_LOST');
 });
 
 test('saved continuation ends at its native workflow after a visible ExportCSV breadcrumb',async()=>{
