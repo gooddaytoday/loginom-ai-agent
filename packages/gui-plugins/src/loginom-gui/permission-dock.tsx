@@ -14,7 +14,9 @@ const decodeDetails = Schema.decodeUnknownOption(
 )
 
 const decodeInput = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Unknown))
+
 const isString = Schema.is(Schema.String)
+
 const traces = { once: "traceOnce", reject: "traceDeny", conversation: "traceConversation" } as const
 
 export default function PermissionPrompt(props: PermissionDockInput) {
