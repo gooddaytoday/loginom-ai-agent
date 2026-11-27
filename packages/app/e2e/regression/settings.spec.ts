@@ -1906,33 +1906,17 @@ test("providers: Back during a pending API key request does not report the provi
   await expect(dialog.getByPlaceholder("API key")).toHaveValue("")
 })
 
-test("providers: the free tier upsell opens Go on its own, sized to its content", async ({ page }) => {
+test("providers: the free model picker lists Go without a subscription offer", async ({ page }) => {
   const view = await openSession(page, { name: "FreeTier", integrations: consoleIntegrations })
-  await view.push([
-    {
-      id: "evt_free_tier_limit",
-      created: 1700000000000,
-      type: "session.step.failed",
-      location: { directory: view.directory },
-      durable: { aggregateID: view.session.id, seq: 1, version: 1 },
-      data: {
-        sessionID: view.session.id,
-        assistantMessageID: "msg_free_tier_assistant",
-        error: { type: "provider.free-limit", message: "Free usage limit reached.", status: 429 },
-      },
-    },
-  ])
-  await page
-    .getByRole("dialog", { name: "Free limit reached" })
-    .getByRole("button", { name: "Subscribe", exact: true })
-    .click()
-
-  const dialog = page.getByRole("dialog", { name: "Connect OpenCode Go", exact: true })
-  const container = page.locator('[data-slot="dialog-container"]')
-  await expect(dialog.getByPlaceholder("API key")).toBeVisible()
-  // Nothing to go back to: the upsell opened the dialog straight on Go.
-  await expect(dialog.getByRole("button", { name: "Navigate back", exact: true })).toHaveCount(0)
-  await expect.poll(async () => (await container.boundingBox())?.height).toBeLessThan(512)
+  await expect(view.editor).toBeVisible()
+  await page.locator('[data-action="composer-model"]').click()
+  const models = page.getByRole("dialog", { name: "Select model", exact: true })
+  await expect(models.getByText("Free models provided by OpenCode", { exact: true })).toBeVisible()
+  await expect(models.getByRole("button", { name: "OpenCode Go", exact: true })).toBeVisible()
+  await models.getByRole("button", { name: "Connect model…", exact: true }).click()
+  const providers = page.getByRole("dialog", { name: "Connect provider", exact: true })
+  await expect(providers).toContainText("Connect a provider to use its models in Loginom AI Agent.")
+  await expect(providers.getByText("OpenCode Go", { exact: true })).toBeVisible()
 })
 
 test("providers: the connect dialog lists connected providers and manages their accounts", async ({ page }) => {
@@ -2072,7 +2056,7 @@ test("providers: adding an account starts a lone method once", async ({ page, co
 
   await dialog.getByRole("button", { name: "Navigate back", exact: true }).click()
   await expect(dialog.getByRole("radio", { name: "Go key", exact: true })).toBeVisible()
-  await dialog.getByRole("button", { name: "Integrations", exact: true }).click()
+  await dialog.getByRole("button", { name: "Connect provider", exact: true }).click()
   await dialog.locator('[data-provider-id="github-copilot"]').click()
   const popup = page.waitForEvent("popup")
   await dialog.getByRole("button", { name: "Add account", exact: true }).click()

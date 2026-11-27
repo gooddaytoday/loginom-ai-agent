@@ -84,7 +84,7 @@ function CommandPaletteStory(props: { query?: string }) {
       {
         id: "command:provider.connect",
         type: "command",
-        title: language.t("command.provider.connect"),
+        title: language.t("dialog.model.connect.open"),
         description: language.t("dialog.provider.description"),
         keywords: "model provider integration",
         category,

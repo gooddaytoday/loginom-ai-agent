@@ -130,8 +130,8 @@ export const useComposerCommands = (input: { model?: ModelSelection } = {}) => {
     }),
     providerCommand({
       id: "provider.connect",
-      title: language.t("command.provider.connect"),
-      description: language.t("command.provider.connect.description"),
+      title: language.t("dialog.model.connect.open"),
+      description: language.t("dialog.model.connect.description"),
       slash: "connect",
       onSelect: connectProvider,
     }),
