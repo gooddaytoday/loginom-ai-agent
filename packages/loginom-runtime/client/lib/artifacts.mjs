@@ -234,7 +234,7 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
       for(const file of receipt.output.file_artifacts) {
         const item=outputs.get(file?.artifact_id);
         if(!item||!['destination','execution_id','sha256','bytes'].every(key=>file[key]===item.descriptor[key]))continue;
-        await item.check();
+        try { await item.check(); } catch { continue; }
         files.push({artifact_id:file.artifact_id,path:item.path,name:item.descriptor.name});
       }
       return files;

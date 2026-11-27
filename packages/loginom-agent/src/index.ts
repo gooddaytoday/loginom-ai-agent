@@ -14,6 +14,7 @@ import { Dashboard } from "./dashboard"
 import { DashboardTarget } from "./dashboard-target"
 import { dashboardTools } from "./dashboard-tools"
 import { dockTools } from "./dock"
+import { exportReceiptsRpc, turnExports } from "./export-receipts"
 import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
@@ -491,6 +492,10 @@ export default Plugin.define({
       await binding.fork(event.sessionID)
     })
 
+    await ctx.rpc.register(exportReceiptsRpc, {
+      turn: async (input, call) =>
+        (await turnExports(ctx.session.history, input, call.signal)) ?? call.error("not_found", "Turn not found"),
+    })
     await ctx.rpc.register(runner, {
       start: async (value) => {
         // The RPC host validates the call against the JSON Schema above before the handler runs.

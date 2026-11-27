@@ -1103,6 +1103,7 @@ describe("loginom file profile tools (B2.5b1)", () => {
         const result = yield* Effect.promise(() =>
           tool.loginom_file_sample.execute({ profile_id: profiled.profile_id, max_records: 1 }, ctx),
         )
+        expect(result.metadata?.loginom).toBeUndefined()
         const sample = content(result)
         expect(path.dirname(sample.path)).toBe(path.join(test.profiles, ctx.sessionID))
         expect(sample).toMatchObject({ manifest_path: sample.path + ".manifest.json", offset_count: 2 })

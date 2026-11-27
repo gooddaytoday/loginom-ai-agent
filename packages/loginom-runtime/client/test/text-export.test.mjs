@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,writeFile,symlink,rm} from 'node:fs/promises';
+import {mkdtemp,writeFile,symlink,rm,rename} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {dirname,join} from 'node:path';
 import {createArtifactStore} from '../lib/artifacts.mjs';
 import {validateTextExportParameters,validateExportDestination,validateNativeExportFormat} from '../lib/text-export-parameters.mjs';
 import {compactNodeRequestFailure} from '../lib/user-results.mjs';
@@ -58,6 +58,11 @@ test('native output lease never becomes an input/upload grant and verifies real 
   assert.deepEqual(await store.outputFiles({...receipt,output:{file_artifacts:[{...descriptor,artifact_id:'foreign'}]}}),[]);
   assert.deepEqual(await store.outputFiles({...receipt,output:{file_artifacts:[{...descriptor,sha256:'wrong'}]}}),[]);
   assert.equal((await store.resolveOutput(descriptor.artifact_id)).buffer.toString(),'id;text\n1;Привет\n');
+  const directory=dirname(lease.path),moved=join(dir,'moved-output');
+  await rename(directory,moved);
+  assert.deepEqual(await store.outputFiles(receipt),[]);
+  assert.equal(JSON.stringify(receipt),original);
+  await rename(moved,directory);
   await writeFile(lease.path,'changed');await assert.rejects(store.resolveOutput(descriptor.artifact_id));
   await lease.release();await assert.rejects(store.resolveOutput(descriptor.artifact_id));
  }finally{await rm(dir,{recursive:true,force:true});}

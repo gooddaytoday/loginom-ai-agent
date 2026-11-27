@@ -20,6 +20,7 @@ import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
 import { Schema } from "effect"
 import { local, type Profile } from "./access"
+import { exportMetadata } from "./export-receipts"
 import { exactScanReceipt } from "./file-profile-core"
 import type { ServiceHost } from "./host"
 import { permissionFailure, type localFiles } from "./local-file"
@@ -316,11 +317,13 @@ export async function dockTools(input: {
         ? [{ type: "file" as const, uri: `data:${block.mimeType};base64,${block.data}`, mime: block.mimeType }]
         : [],
     )
+    const loginom = exportMetadata(name, result.structuredContent)
     return {
       content: images.length ? [{ type: "text", text: content }, ...images] : content,
       metadata: {
         generation: lease.generation,
         ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
+        ...(loginom ? { loginom } : {}),
         // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
         ...(outputPath ? { truncated: true, outputPath } : {}),
         ...(state === "pending" ? { loginomPending: true } : {}),

@@ -6,7 +6,7 @@ import { EventManifest } from "@opencode/schema/event-manifest"
 import type { Event } from "@opencode/schema/event"
 import { ServerConfig } from "@opencode/schema/mcp"
 import { App } from "../app.js"
-import { Effect, Schema, Stream } from "effect"
+import { Effect, Option, Schema, Stream } from "effect"
 import { Agent } from "../agent.js"
 import { Artifact } from "../artifact.js"
 import { AISDK } from "../aisdk.js"
@@ -607,6 +607,12 @@ export const make = Effect.fn("PluginHost.make")(function* (plugin: Pick<Interfa
           .pipe(Effect.map((interrupted) => ({ interrupted }))),
       wait: (input) => sessions.wait(input.sessionID),
       context: (input) => sessions.context(input.sessionID),
+      history: Effect.fn(function* (input) {
+        const session = yield* sessions.get(input.sessionID).pipe(Effect.option)
+        if (Option.isNone(session) || !isCurrentLocation(session.value.location)) return []
+        const limit = Math.max(1, Math.min(input.limit ?? 50, 50))
+        return yield* sessions.messages({ ...input, order: "asc", limit })
+      }),
       instructions: {
         entry: {
           list: Effect.fn(function* (input) {

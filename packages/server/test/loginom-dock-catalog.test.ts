@@ -22,6 +22,7 @@ import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { ServiceHost } from "../../loginom-agent/src/host"
 import { declinedText, deniedKindsText, deniedText, policyDeniedText, table } from "../../loginom-agent/src/permissions"
+import { nodeResultReply } from "../../loginom-runtime/client/lib/node-result-reply.mjs"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { createEmbeddedRoutes } from "../src/routes"
 import { dockTool, scriptedHost } from "./fixture/loginom-dock-host"
@@ -562,6 +563,88 @@ describe("loginom.product Dock catalog (B2.5d, 0.4 toolContributor)", () => {
 
 describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () => {
   it.live(
+    "projects verified exports into tool metadata and returns distinct receipts for each turn",
+    () =>
+      Effect.gen(function* () {
+        const destination = "/server/exports/отчёт.csv"
+        const expected = (id: string) => ({
+          artifact_id: `artifact-${id}`,
+          verification_id: `${id}:export-download`,
+          node: { document_id: "doc", workflow_id: "flow", node_id: `node-${id}` },
+          destination,
+          name: "отчёт.csv",
+          bytes: 24,
+          sha256: "a".repeat(64),
+        })
+        const host = scriptedHost({
+          catalog: () => ["apply", "wait", "status", "read"].map((action) => dockTool(`dock_node_${action}`)),
+          call: (input) => {
+            const { path: id } = Schema.decodeUnknownSync(Schema.Struct({ path: Schema.String }))(input.args)
+            const tool = String(input.name)
+            if (tool === "dock_node_apply" && id === "first")
+              return nodeResultReply({ operation_id: id, state: "running" }, { userProfile: true })
+            const { node, name, ...file } = expected(id)
+            const execution_id = `execution-${id}`
+            const output =
+              tool === "dock_node_read"
+                ? { status: "complete", ports: [{ port: 0, row_count: 2, sample: [[]], schema: [] }] }
+                : {
+                    status: "complete",
+                    file_artifacts: [
+                      { ...file, execution_id, freshness_basis: "native_absence_check_and_completed_execution" },
+                    ],
+                  }
+            const reply = nodeResultReply(
+              {
+                operation_id: id,
+                state: "settled",
+                outcome: {
+                  status: "SUCCEEDED",
+                  action_key: "node.apply",
+                  cleanup_complete: true,
+                  output: { node, execution: { status: "completed", execution_id }, output },
+                },
+              },
+              { userProfile: true },
+            )
+            return tool === "dock_node_read"
+              ? reply
+              : {
+                  ...reply,
+                  _meta: { outputFiles: [{ artifact_id: file.artifact_id, path: "/runtime/private.csv", name }] },
+                }
+          },
+        })
+        const test = yield* boot(host)
+        const id = yield* test.create("exports")
+        const call = (action: string, id: string) => ({ tool: `loginom_dock_node_${action}`, input: { path: id } })
+        yield* test.wizard(id, script(call("apply", "first"), call("wait", "first"), call("status", "first")))
+        yield* test.wizard(id, script(call("apply", "second"), call("wait", "third"), call("status", "third")))
+        yield* test.wizard(id, script(call("read", "sample")))
+
+        const calls = yield* test.calls(id)
+        expect(calls.map((part) => part.state.status)).toEqual(Array(7).fill("completed"))
+        expect(calls.map((part) => part.state.status === "completed" && part.state.metadata?.loginom)).toEqual([
+          undefined,
+          ...["first", "first", "second", "third", "third"].map((key) => ({ export: expected(key) })),
+          undefined,
+        ])
+        const messages = yield* test.sessions.messages({ sessionID: id, order: "asc", type: "user" })
+        yield* test.sessions.compact({ sessionID: id })
+        yield* test.sessions.wait(id)
+        expect((yield* test.sessions.context(id)).some((message) => message.id === messages[0].id)).toBe(false)
+        const turn = (messageID: string, sessionID = id) =>
+          test.call("/api/rpc/loginom.exports/turn", { input: { sessionID, messageID } })
+        for (const [index, files] of [[expected("first")], [expected("second"), expected("third")], []].entries()) {
+          expect(yield* turn(messages[index].id)).toEqual({ status: 200, body: { output: { files } } })
+        }
+        const other = yield* test.create("another conversation")
+        expect((yield* turn(messages[0].id, other)).body).toMatchObject({ type: "not_found" })
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
     "host outputFiles are private metadata while model-facing output stays byte-identical",
     () =>
       Effect.gen(function* () {
@@ -1092,6 +1175,8 @@ describe("OpenCode hooks the Dock catalog relies on (contract)", () => {
 })
 
 function respond(request: LLMRequest) {
+  if (request.messages.some((message) => text(message).includes("Do not continue the task or call tools.")))
+    return TestLLM.text("## Objective\n- Check confirmed file exports.", "text_summary")
   // Titles and other tool-less requests get plain text.
   const user = request.messages.findLastIndex((message) => message.role === "user" && text(message).includes("SCRIPT<"))
   if (user < 0 || request.tools.length === 0) return TestLLM.text("ok", "text_ok")
