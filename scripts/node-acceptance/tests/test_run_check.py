@@ -3230,6 +3230,22 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                             sha256=hashlib.sha256(data).hexdigest())
             reply = dict(status='SUCCEEDED', cleanup_complete=True, output={'file_artifacts': [artifact]})
             self.assertEqual(runner.downloaded_csv(profile, destination, [(1, reply), (2, reply)]), original)
+
+            missing_cleanup = dict(reply)
+            del missing_cleanup['cleanup_complete']
+            for receipt in [dict(reply, status='NOT_APPLIED'), missing_cleanup, dict(reply, cleanup_complete=False)]:
+                with self.subTest(status=receipt['status'], cleanup_complete=receipt.get('cleanup_complete')):
+                    with self.assertRaisesRegex(AssertionError, 'DOWNLOAD_MISSING_OR_AMBIGUOUS'):
+                        runner.downloaded_csv(profile, destination, [(1, receipt)])
+
+            with self.subTest('two output slots for the same receipt'):
+                duplicate = profile / 'another-attempt' / original.relative_to(profile / 'attempt')
+                duplicate.parent.mkdir(parents=True)
+                duplicate.write_bytes(data)
+                with self.assertRaisesRegex(AssertionError, 'DOWNLOAD_MISSING_OR_AMBIGUOUS'):
+                    runner.downloaded_csv(profile, destination, [(1, reply)])
+                duplicate.unlink()
+
             with self.assertRaisesRegex(AssertionError, 'DOWNLOAD_MISSING_OR_AMBIGUOUS'):
                 runner.downloaded_csv(profile, '/another/run-joined_orders.csv', [(1, reply)])
 
