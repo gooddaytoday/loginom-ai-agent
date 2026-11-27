@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto"
 import { mkdir, writeFile } from "node:fs/promises"
 import { extname, join, resolve } from "node:path"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
+import { StepMetadata } from "@loginom-ai-agent/loginom-host/step-state"
 import { SessionV1 } from "@loginom-ai-agent/loginom-host/session-v1"
 import type { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
@@ -18,7 +19,7 @@ import { Identifier } from "@opencode/schema/identifier"
 import type { Model } from "@opencode/schema/model"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 import { local, type Profile } from "./access"
 import { exactScanReceipt } from "./file-profile-core"
 import type { ServiceHost } from "./host"
@@ -46,6 +47,7 @@ const Reply = Schema.Struct({
 })
 const decodeCatalog = Schema.decodeUnknownSync(Catalog)
 const decodeReply = Schema.decodeUnknownSync(Reply)
+const decodeStep = Schema.decodeUnknownOption(StepMetadata)
 
 // The product's own tools that 0.4 offered only beside a prepared Dock: the catalog then describes Dock actions.
 const prepared = ["loginom_file_admit", "loginom_file_profile", "loginom_file_scan", "loginom_file_sample"]
@@ -307,10 +309,12 @@ export async function dockTools(input: {
       summary && outputPath
         ? `${summary}\n\nTable data and verbose details were omitted by the backend response limit. The complete original result is retained at ${outputPath}. Do not infer unread data or repeat mutations solely to retrieve omitted text.`
         : text
+    const loginom = Option.getOrUndefined(decodeStep(result._meta?.loginomStep))
+    const metadata = { generation: lease.generation, ...(loginom ? { loginom } : {}) }
     if (state === "failed")
       throw new Tool.Error({
         message: content || "LOGINOM_TOOL_FAILED",
-        metadata: { generation: lease.generation, isError: true },
+        metadata: { ...metadata, isError: true },
       })
     const images = result.content.flatMap((block) =>
       block.type === "image" && typeof block.data === "string" && typeof block.mimeType === "string"
@@ -320,7 +324,7 @@ export async function dockTools(input: {
     return {
       content: images.length ? [{ type: "text", text: content }, ...images] : content,
       metadata: {
-        generation: lease.generation,
+        ...metadata,
         ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
         // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
         ...(outputPath ? { truncated: true, outputPath } : {}),

@@ -301,13 +301,6 @@ async function handle(message) {
       send({ id: message.id, result: intent })
       return
     }
-    if (message.operation === "write-outcome.check") {
-      const entry = message.input
-      const result = entry.receipt.owner !== state.owner.attempt || entry.chat !== state.owner.chat || entry.generation !== state.owner.generation
-        ? "owner_lost" : state.controller ? "unknown" : await state.bridge.checkWriteOutcome(entry)
-      send({ id: message.id, result })
-      return
-    }
     if (message.operation === "write-outcome.readback") {
       const { savedCopyDigest } = await import("./saved-copy-readback.mjs")
       const { packagePath, savedDigest } = message.input
@@ -391,6 +384,25 @@ async function handle(message) {
       send({ id: message.id, result: { interrupted: true } })
       return
     }
+    if (message.operation === "checkStepState") {
+      if (message.input.owner !== undefined && message.input.owner !== state.owner.attempt) {
+        send({ id: message.id, result: "owner_lost" })
+        return
+      }
+      if (state.controller) {
+        send({ id: message.id, result: { state: "busy", retryAvailable: false } })
+        return
+      }
+      const controller = new AbortController()
+      state.controller = controller
+      try {
+        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)])
+        send({ id: message.id, result: await state.bridge.checkStepState(message.input.operationId, signal) })
+      } finally {
+        state.controller = undefined
+      }
+      return
+    }
     if (message.operation !== "call" || state.controller) throw Error("LOGINOM_REQUEST_INVALID")
     if (message.input.packageArtifact !== undefined && message.input.name !== "dock_prepare")
       throw Error("LOGINOM_REQUEST_INVALID")
@@ -403,32 +415,31 @@ async function handle(message) {
         signal: controller.signal,
         timeout: runtimeCallTimeout(message.input.name, message.input.arguments),
       }
-      const receipt = message.input.writeReceipt
-      const args = message.input.name === "dock_action_run" && receipt?.operationID && message.input.arguments?.operation_id === undefined
-        ? { ...message.input.arguments, operation_id: receipt.operationID } : message.input.arguments
+      const { name, arguments: args, packageArtifact, scanReceipt, writeReceipt, observeOnly } = message.input
       const result = await withStepProgress({
-        name: message.input.name,
+        name,
         signal: controller.signal,
         lastReply: () => state.lastLoginomReplyAt,
         send: message.input.stepProgress === true ? progress => send({ id: message.id, progress }) : undefined,
-      }, async () => message.input.packageArtifact !== undefined
-        ? await state.bridge.prepareLocalPackage(message.input.arguments, message.input.packageArtifact, {
+      }, () => state.bridge.trackedStep(name, args, () => {
+        if (packageArtifact !== undefined)
+          return state.bridge.prepareLocalPackage(args, packageArtifact, {
             signal: AbortSignal.any([controller.signal, AbortSignal.timeout(options.timeout)]),
           })
-        : message.input.scanReceipt !== undefined
-          ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
-          : message.input.observeOnly === true && message.input.name === "dock_operation_inspect"
-            ? await state.bridge.inspectWithoutRecovery(args, options)
-            : await state.client.callTool({name:message.input.name,arguments:args}, undefined, options))
+        if (scanReceipt !== undefined) return state.bridge.applyWithScanReceipt(args, scanReceipt, options)
+        if (observeOnly === true && name === "dock_operation_inspect") return state.bridge.inspectWithoutRecovery(args, options)
+        return state.client.callTool({ name, arguments: args }, undefined, options)
+      }, controller.signal))
       const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
-      const writeSettled = receipt ? (await import("../client/lib/write-outcome.mjs")).writeReplySettled(result, message.input.name) : undefined
+      const writeSettled = writeReceipt ? (await import("../client/lib/write-outcome.mjs")).writeReplySettled(result, name, args) : undefined
       send({
         id: message.id,
         result: {
           result: outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result,
           recoveryPending: state.bridge.hasUnsettledWork(),
           activeWork: state.bridge.hasActiveWork(),
-          ...(receipt ? { writeSettled } : {}),
+          ...(writeReceipt ? { writeSettled } : {}),
+          ...(observeOnly ? { writeOwner: state.owner.attempt } : {}),
         },
       })
     } finally {

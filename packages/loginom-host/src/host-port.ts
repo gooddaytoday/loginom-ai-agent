@@ -4,6 +4,8 @@ import type { InputFile } from "./inputs"
 import type { FileReference } from "./file-reference"
 import { hostException, hostFailure } from "./errors"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
+import { StepCheckRequest, StepMetadata, StepOperationId, uncertainStep } from "./step-state"
+import { stepWriteTool } from "../../loginom-runtime/client/lib/step-retry.mjs"
 import { HostTaskScope } from "./task-scope"
 import { DashboardDelete, DashboardRead, DashboardPublish } from "./dashboard"
 import { Schema } from "effect"
@@ -12,6 +14,7 @@ import { browserRecoveryToolName, isBrowserRecoveryTool } from "../../loginom-ru
 import { WriteIntent, type WriteRecord } from "./connection/write-outcomes"
 
 const knowledgeTools = new Set(["find", "search", "read", "grep", "glob", "list", "tree"])
+const StepReply = Schema.Struct({ _meta: Schema.Struct({ loginomStep: StepMetadata }) })
 const Admissions = Schema.Array(
   Schema.Struct({
     userMessage: HostTaskScope.Info.fields.taskMessageID,
@@ -92,6 +95,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
   const acquiring = new Map<string, string>()
   const state = { closed: false, stopping: undefined as Promise<void> | undefined }
   const pending = new Set<Promise<void>>()
+  const lostStepReplies = new Map<string, { operationId: string; generation: number; journalIds: string[] }>()
   async function abandon(run: NonNullable<ReturnType<typeof runs.get>>) {
     for (const id of run.active) await service.journal.settle(id, false)
     const retained = [...run.active].filter((id) => service.journal.pending().includes(id))
@@ -191,6 +195,42 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     )
       return
     const input = "input" in data ? data.input : undefined
+    if (data.method === "checkStepState") {
+      try {
+        const check = Schema.decodeUnknownSync(StepCheckRequest)(input)
+        const chat = createHash("sha256").update(check.sessionID).digest("hex")
+        if ([...runs.values()].some((run) => run.chat === chat && run.dispatching)) {
+          reply({ id: data.id, result: { state: "busy", retryAvailable: false } })
+          return
+        }
+        const durable = service.writes?.find(chat, undefined, check.operationId)
+        if (durable && (durable.status === "unknown" || service.writes?.active(durable))) {
+          const result = await service.checkRecordedStep(durable)
+          reply({ id: data.id, result: result.observation })
+          return
+        }
+        const lost = lostStepReplies.get(chat)
+        if (lost && lost.operationId !== check.operationId) {
+          reply({ id: data.id, result: { state: "unavailable", retryAvailable: false } })
+          return
+        }
+        const result = await service.checkStepState(chat, check.operationId, lost?.generation)
+        if (result === "owner_lost") throw Error("LOGINOM_REPLY_INVALID")
+        if (lost && result.state === "observed" && (result.retryAvailable || result.step.outcome === "completed")) {
+          for (const id of lost.journalIds) await service.journal.settle(id, true)
+          lostStepReplies.delete(chat)
+          if (!service.journal.pending().length) {
+            service.recoveries.get(chat)?.reconciled()
+            service.recoveries.delete(chat)
+          }
+        }
+        reply({ id: data.id, result: result.state === "observed" && service.writes?.pending(chat).length
+          ? { ...result, retryAvailable: false, step: { ...result.step, retryAvailable: false } } : result })
+      } catch (error) {
+        reply({ id: data.id, ...hostFailure(error) })
+      }
+      return
+    }
     if (!input || typeof input !== "object" || !("run" in input) || typeof input.run !== "string") {
       reply({ id: data.id, error: "LOGINOM_HOST_REQUEST_FAILED" })
       return
@@ -590,6 +630,19 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         const lease = await connectionLease(input.run, run, preparation)
         if (input.name !== prepareTool.name && !service.hasRuntime(lease.generation, run.chat))
           throw new Error("LOGINOM_SCOPE_DENIED")
+        const stepWrite = stepWriteTool(input.name, args)
+        const lost = lostStepReplies.get(run.chat)
+        if (stepWrite && lost) {
+          reply({ id: data.id, result: uncertainStep(lost.operationId) }, lease.generation)
+          return
+        }
+        const callArgs = stepWrite && input.name === "dock_action_run" && args && typeof args === "object"
+          && (!("operation_id" in args) || args.operation_id === undefined)
+          ? { ...args, operation_id: randomUUID() }
+          : args
+        const stepId = stepWrite && callArgs && typeof callArgs === "object" && "operation_id" in callArgs
+          && Schema.is(StepOperationId)(callArgs.operation_id)
+          ? callArgs.operation_id : undefined
         const recovery = { id: undefined as string | undefined }
         const writes = service.writes
         let write: WriteRecord | undefined
@@ -632,7 +685,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           const server = writes ? service.writeServer(lease.generation) : undefined
           if (writes && server) {
             const intent = Schema.decodeUnknownSync(WriteIntent)(await runtime.request("write-outcome.prepare", {
-              name: input.name, arguments: args, ...(packageArtifact ? { packageArtifact } : {}),
+              name: input.name, arguments: callArgs, ...(packageArtifact ? { packageArtifact } : {}),
             }, 8_000))
             if (intent.effect !== "read") {
               const invocation = "invocation" in input ? Schema.decodeUnknownSync(Invocation)(input.invocation)
@@ -672,13 +725,13 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
               await writes.finish(write, "not_applied")
               throw Error("LOGINOM_WRITE_NOT_DISPATCHED")
             }
-            dispatched = true
           }
+          dispatched = true
           const result = await runtime.request(
             "call",
             {
               name: input.name,
-              arguments: remaining === undefined ? args : { ...(args as object), timeout_ms: remaining },
+              arguments: remaining === undefined ? callArgs : { ...(callArgs as object), timeout_ms: remaining },
               ...(packageArtifact ? { packageArtifact } : {}),
               ...(input.name === "dock_node_apply" && "scanReceipt" in input ? { scanReceipt: input.scanReceipt } : {}),
               ...(stepProgress ? { stepProgress: true } : {}),
@@ -697,19 +750,14 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           )
             throw new Error("LOGINOM_REPLY_INVALID")
           if (writes) {
-            if (write && "writeSettled" in result && result.writeSettled === true)
-              await writes.finish(write, "complete")
-            if (!write && result.recoveryPending === false && input.name === "dock_node_wait" &&
-              args && typeof args === "object" && "operation_id" in args) {
-              for (const entry of writes.pending(run.chat)) {
-                if (!writes.active(entry) && entry.receipt.operationID === args.operation_id && writes.reserveCheck(entry)) {
-                  try {
-                    const verdict = await service.liveWriteVerdict(entry)
-                    if (verdict === "applied" || verdict === "not_applied") await writes.finish(entry, "complete")
-                  } finally {
-                    writes.release(entry)
-                  }
-                }
+            const step = Schema.is(StepReply)(result.result) ? result.result._meta.loginomStep : undefined
+            if (write && (stepWrite ? step && step.operationId === stepId && step.step.outcome !== "check_required" && !result.recoveryPending
+              : "writeSettled" in result && result.writeSettled === true)) await writes.finish(write, "complete")
+            if (!write && input.name === "dock_node_wait" && step?.step.outcome === "completed" && !result.recoveryPending) {
+              const entry = writes.find(run.chat, undefined, step.operationId)
+              if (entry?.status === "unknown" && entry.receipt.fresh && entry.generation === lease.generation &&
+                "writeOwner" in result && result.writeOwner === entry.receipt.owner && writes.reserveCheck(entry)) {
+                try { await writes.finish(entry, "applied", step.step) } finally { writes.release(entry) }
               }
             }
           } else if (result.recoveryPending && !("activeWork" in result && result.activeWork === true)) {
@@ -729,11 +777,23 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           if (isBrowserRecoveryTool(input.name)) run.recovery = recoveryPhase(result.result, run.recovery)
           reply({ id: data.id, result: result.result }, lease.generation)
         } catch (error) {
-          if (dispatched) throw Error("LOGINOM_CALL_UNCERTAIN")
+          if (writes && dispatched && write) {
+            if (!stepId) throw Error("LOGINOM_CALL_UNCERTAIN")
+            reply({ id: data.id, result: uncertainStep(stepId) }, lease.generation)
+            return
+          }
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE") throw error
           // A journal write failure precedes runtime dispatch and cannot establish
           // an uncertain external operation without an admitted journal identity.
           if (!recovery.id) throw hostException(error)
+          if (stepId && dispatched) {
+            lostStepReplies.set(run.chat, {
+              operationId: stepId, generation: lease.generation, journalIds: [...run.active],
+            })
+            await abandon(run)
+            reply({ id: data.id, result: uncertainStep(stepId) }, lease.generation)
+            return
+          }
           await abandon(run)
           service.markRuntimeStale(run.chat)
           throw new Error("LOGINOM_CALL_UNCERTAIN")

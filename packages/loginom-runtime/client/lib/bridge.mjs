@@ -35,6 +35,7 @@ import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBindi
 import {makeSavedPackageStateCode,parseSavedPackageState,readSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
 import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
+import {createStepRetry} from './step-retry.mjs';
 import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
 
 // Keep the runtime receipt byte-for-byte meaningful to reconciliation/journal
@@ -381,6 +382,23 @@ export async function createBridge(config, session, { browserTransport: managedB
           documentId: session.metadata.workspacePreparation?.state?.document_id,
           tabTid: session.metadata.workspacePreparation?.state?.workflow_ref?.tab_tid ?? null });
       } });
+    const stepRetry=userProfile&&managedBrowserTransport&&actionRuntime?createStepRetry({
+      workspace:()=>session.metadata.workspaceReady===true?session.metadata.workspacePreparation?.state:null,
+      async observe(scope,signal){
+        const code=makeWorkspaceStepCode({loginomUrl:config.loginomUrl,build:session.metadata.targetIdentity.loginom_build,
+          sessionId:session.metadata.sessionId,workflowRef:{...scope.workflow_ref,document_id:scope.document_id},
+          readGraph,types:NODE_TYPES,inspectState:true});
+        return parseCapabilityResult(await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},
+          undefined,{timeout:6000,signal}),{redactor}).output;
+      },
+      busy:()=>recovery.unsettled()||clipboardUncertain||heldLeases.size>0||actionRuntime.stepCheckBusy(),
+      unsettled:()=>actionRuntime.hasUnsettledWork(),
+      receipt:id=>actionRuntime.stepReceipt(id),
+      settleUnapplied:(id,graph,signal)=>actionRuntime.settleUnappliedStep(id,graph,{signal,deadline:Date.now()+6000}),
+      confirmedSave:id=>lastSavedPackage?.operation_id===id?lastSavedPackage:null,
+      label:(name,args)=>redactor.text((typeof args?.target?.label==='string'&&args.target.label?args.target.label:undefined)??NODE_TYPES[args?.target?.type]?.title
+        ??(name==='dock_action_run'?'Сохранение пакета':name==='dock_node_delete'?'Удаление узла':'Шаг Loginom')).slice(0,240),
+    }):null;
     // A Dock request may wait in the gate while a recovery action settles: recheck the lease inside it.
     const dockGate = (name, operation) => browserGate(async () => {
       if (recovery.refusesDock(name))
@@ -966,12 +984,26 @@ export async function createBridge(config, session, { browserTransport: managedB
         ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
     });
     return { server, catalog,
-      knowsWriteOperation: id => actionRuntime?.knowsWriteOperation(id) === true,
-      checkWriteOutcome: entry => actionRuntime?.checkWriteOutcome(entry) ?? 'unknown',
+      knowsWriteOperation: id => stepRetry?.has(id) === true || actionRuntime?.knowsWriteOperation(id) === true,
       async inspectWithoutRecovery(args, options) {
         requirePreparedWorkspace(session.metadata);
         return actionReply(await actionRuntime.inspect({ operationId: args?.operation_id, signal: options.signal, observeOnly: true }), { userProfile });
       },
+      async trackedStep(name,args,dispatch,signal){
+        if(!stepRetry)return dispatch();
+        const admitted=stepRetry.admit(name,args);
+        if(admitted?.blocked)return {isError:true,content:[{type:'text',text:
+          'Check the state of the original Loginom operation before another mutation: '+admitted.blocked.operationId}],
+          _meta:{loginomStep:admitted.blocked}};
+        let reply;
+        try{reply=await dispatch();}
+        catch(error){
+          await stepRetry.finish(name,args,null,admitted?.step,signal);
+          throw error;
+        }
+        return stepRetry.finish(name,args,reply,admitted?.step,signal);
+      },
+      checkStepState:(id,signal)=>browserGate(()=>stepRetry?.check(id,signal)??{state:'unavailable',retryAvailable:false}),
       applyWithScanReceipt(args,receipt,extra) {
         return callTool({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);
       },

@@ -8,7 +8,8 @@ import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
 import { DashboardRead } from "./dashboard"
-import { WriteOutcomeInput } from "./connection/write-outcomes"
+import { WriteOutcomeInput, WriteOutcomeResult, writeStep } from "./connection/write-outcomes"
+import { StepOperationId } from "./step-state"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
@@ -136,8 +137,7 @@ async function dispatch(message: unknown) {
       return
     }
     if (message.method === "loginom.write-outcome.check") {
-      const { sessionID, writeID } = Schema.decodeUnknownSync(WriteOutcomeInput)(input)
-      reply({ id: message.id, result: await checkWriteOutcome(state.host, sessionID, writeID) })
+      reply({ id: message.id, result: await checkWriteOutcome(state.host, Schema.decodeUnknownSync(WriteOutcomeInput)(input)) })
       return
     }
     if (!message.method.startsWith("connection.")) {
@@ -151,23 +151,20 @@ async function dispatch(message: unknown) {
   }
 }
 
-async function checkWriteOutcome(host: Awaited<ReturnType<typeof createLoginomHost>>, sessionID: string, writeID?: string) {
+async function checkWriteOutcome(host: Awaited<ReturnType<typeof createLoginomHost>>, input: typeof WriteOutcomeInput.Type): Promise<typeof WriteOutcomeResult.Type> {
   const journal = host.writes
-  const entry = journal?.find(createHash("sha256").update(sessionID).digest("hex"), writeID)
+  const entry = journal?.find(createHash("sha256").update(input.sessionID).digest("hex"), input.writeID, input.operationId)
   if (!journal || !entry) return { status: "unknown" }
-  if (journal.active(entry)) return { status: "unknown", writeID: entry.id }
-  if (entry.status !== "unknown") return { status: entry.status, writeID: entry.id }
-  if (!journal.reserveCheck(entry)) return { status: "unknown", writeID: entry.id }
-  try {
-    const verdict = await host.liveWriteVerdict(entry)
-    if (verdict === "applied" || verdict === "not_applied") {
-      await journal.finish(entry, verdict)
-      return { status: verdict, writeID: entry.id }
-    }
-    if (verdict === "owner_lost") return { status: "unknown", writeID: entry.id, readback: await host.readSavedWriteTarget(entry) }
-    return { status: "unknown", writeID: entry.id }
-  } finally {
-    journal.release(entry)
+  const operationId = entry.receipt.operationID
+  const ref = { writeID: entry.id, ...(Schema.is(StepOperationId)(operationId) ? { operationId } : {}) }
+  if (journal.active(entry)) return { ...ref, status: "unknown", step: writeStep("unknown") }
+  if (entry.status !== "unknown") return { ...ref, status: entry.status, step: entry.step ?? writeStep(entry.status) }
+  const result = await host.checkRecordedStep(entry)
+  const status = result.status ?? "unknown"
+  const observed = result.observation.state === "observed" ? result.observation.step : undefined
+  const step = observed && (status !== "unknown" || observed.outcome === "check_required") ? observed : writeStep(status)
+  return { ...ref, status, step,
+    ...(result.ownerLost ? { readback: await host.readSavedWriteTarget(entry) } : {}),
   }
 }
 

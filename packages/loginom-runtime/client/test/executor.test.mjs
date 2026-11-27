@@ -14,7 +14,6 @@ import {withStorageIdentity} from '../lib/storage-policy.mjs';
 import {readPreparedNodeContext} from '../lib/node-context.mjs';
 import {readUserVariablesSnapshot} from '../lib/crosstable-variables.mjs';
 import {makePackageCleanupCode} from '../lib/package-cleanup.mjs';
-import {writeIntent,writeReplySettled} from '../lib/write-outcome.mjs';
 import {savedCopyDigest} from '../../src/saved-copy-readback.mjs';
 
 test('an independent readback opens only the exact saved package, in read mode',async()=>{
@@ -34,24 +33,6 @@ test('an independent readback opens only the exact saved package, in read mode',
  assert.equal(await savedCopyDigest(browser,target),createHash('sha256').update(saved).digest('hex'));
  assert.equal(await savedCopyDigest(browser,'/fixture/packages/other.lgp'),null);
  assert.deepEqual(opened,[[target,'read']]);
-});
-
-test('the write check reads a completed browser receipt without submitting a second node mutation',async()=>{
- const page=new Page();
- let responses=0;
- const engine=runtime(page,{execute:async code=>{
-  const response=await page.execute(code);
-  if(++responses===2)throw Error('Loginom reply lost');
-  return response;
- }});
- const entry=writeIntent({name:'dock_action_run',arguments:{action_key:'node.add',operation_id:'lost-node'}},
-  {package_ref:{path:'/user/package.lgp'}},{owner:'original-runtime',knownOperation:engine.knowsWriteOperation});
- const original=await engine.run('node.add',nodeParameters,{operationId:'lost-node'});
- assert.equal(original.status,'AMBIGUOUS');
- assert.equal(page.nodes.length,1);
- assert.equal(await engine.checkWriteOutcome(entry),'applied');
- assert.equal(page.nodes.length,1);
- assert.equal(await engine.checkWriteOutcome({...entry,receipt:{...entry.receipt,fresh:false}}),'unknown');
 });
 
 test('a retained preparation cannot mask a settled node worker using the same ID',async()=>{
@@ -161,9 +142,6 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
   if(mismatch)assert.equal(inspected.output.outcome.error.code,'SAVE_RESULT_MISMATCH');
   assert.equal(original.packageNode,oldPackage);assert.equal(page.saveWrites,1);
   if(mismatch){
-   const entry={operation:action,receipt:{operationID:'lost-save',fresh:true},baseline:{packagePath:path}};
-   assert.equal(await engine.checkWriteOutcome(entry),'unknown');
-   assert.equal(writeReplySettled({content:[{type:'text',text:JSON.stringify(inspected.output.outcome)}]}),false);
    assert.equal(page.saveWrites,1);
    const repeated=await engine.run(action,{path,conflict_policy:'fail'},{operationId:'lost-save'});
    assert.equal(repeated.status,'NOT_APPLIED');assert.equal(repeated.effect_possible,true);assert.equal(page.saveWrites,1);

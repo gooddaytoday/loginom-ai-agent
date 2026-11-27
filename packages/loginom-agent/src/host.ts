@@ -10,6 +10,7 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
+import { StepCheckRequest, StepCheckResult } from "@loginom-ai-agent/loginom-host/step-state"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { WriteOutcomeInput, WriteOutcomeResult } from "@loginom-ai-agent/loginom-host/write-outcomes"
@@ -133,6 +134,12 @@ export const dashboard = {
   },
 }
 
+export async function checkStepState(input: typeof StepCheckRequest.Type): Promise<typeof StepCheckResult.Type> {
+  return request("checkStepState", input)
+    .then(Schema.decodeUnknownSync(StepCheckResult))
+    .catch(() => ({ state: "unavailable", retryAvailable: false }))
+}
+
 async function request(method: string, input: unknown) {
   const current = state.current
   const connection = await current?.ready
@@ -140,8 +147,8 @@ async function request(method: string, input: unknown) {
   return connection.request(method, input)
 }
 
-export async function checkWriteOutcome(input: unknown) {
-  const reply = await request("loginom.write-outcome.check", Schema.decodeUnknownSync(WriteOutcomeInput)(input))
+export async function checkWriteOutcome(input: typeof WriteOutcomeInput.Type): Promise<typeof WriteOutcomeResult.Type> {
+  const reply = await request("loginom.write-outcome.check", input)
   return Schema.decodeUnknownSync(WriteOutcomeResult)(reply)
 }
 

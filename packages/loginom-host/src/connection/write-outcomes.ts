@@ -3,13 +3,20 @@ import { constants, type Stats } from "node:fs"
 import { lstat, mkdir, open, readdir, rename, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { Schema } from "effect"
+import { Step, StepOperationId, unknownWriteStep } from "../step-state"
 
-export const WriteOutcomeInput = Schema.Struct({ sessionID: Schema.NonEmptyString, writeID: Schema.optional(Schema.String) })
+export const WriteOutcomeInput = Schema.Struct({
+  sessionID: Schema.NonEmptyString,
+  writeID: Schema.optional(Schema.String),
+  operationId: Schema.optional(StepOperationId),
+})
 export const WriteVerdict = Schema.Literals(["applied", "not_applied", "unknown"])
 export const SavedCopyReadback = Schema.Literals(["unchanged", "changed", "observed", "unavailable"])
 export const WriteOutcomeResult = Schema.Struct({
   status: WriteVerdict,
   writeID: Schema.optional(Schema.String),
+  operationId: Schema.optional(StepOperationId),
+  step: Schema.optional(Step),
   readback: Schema.optional(SavedCopyReadback),
 })
 const identity = Schema.NonEmptyString
@@ -35,9 +42,16 @@ const Record = Schema.Struct({
   generation: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
   server: digest,
   status: WriteVerdict,
+  step: Schema.optional(Step),
   createdAt: Schema.Number,
 })
 export type WriteRecord = typeof Record.Type
+
+export function writeStep(status: typeof WriteVerdict.Type): typeof Step.Type {
+  if (status === "unknown") return unknownWriteStep
+  if (status === "not_applied") return { outcome: "not_applied", retryAvailable: true, persistence: "step_unsaved", save: null }
+  return { outcome: "completed", retryAvailable: false, persistence: "unknown", save: null }
+}
 
 export async function writeOutcomes(directory: string) {
   await mkdir(directory, { recursive: true, mode: 0o700 })
@@ -77,7 +91,7 @@ export async function writeOutcomes(directory: string) {
     entries.set(entry.id, entry)
   }
   return {
-    async begin(input: Omit<WriteRecord, "id" | "status" | "createdAt">) {
+    async begin(input: Omit<WriteRecord, "id" | "status" | "step" | "createdAt">) {
       const paths = input.paths.map((value) => value.normalize("NFC").toLowerCase())
       if ([...entries.values()].some((entry) => entry.server === input.server &&
         (active.has(entry.id) || entry.status === "unknown") &&
@@ -93,12 +107,14 @@ export async function writeOutcomes(directory: string) {
     },
     pending: (chat: string) => [...entries.values()].filter((entry) => entry.chat === chat && entry.status === "unknown"),
     hasPending: (server: string) => [...entries.values()].some((entry) => entry.server === server && (active.has(entry.id) || entry.status === "unknown")),
-    find(chat: string, writeID?: string) {
+    find(chat: string, writeID?: string, operationId?: string) {
       if (writeID !== undefined) {
         const entry = entries.get(writeID)
-        return entry?.chat === chat ? entry : undefined
+        return entry?.chat === chat && (operationId === undefined || entry.receipt.operationID === operationId) ? entry : undefined
       }
-      const recent = [...entries.values()].filter((entry) => entry.chat === chat).sort((left, right) => right.createdAt - left.createdAt)
+      const recent = [...entries.values()]
+        .filter((entry) => entry.chat === chat && (operationId === undefined || entry.receipt.operationID === operationId))
+        .sort((left, right) => right.createdAt - left.createdAt)
       return recent.find((entry) => entry.status === "unknown" || active.has(entry.id)) ?? recent[0]
     },
     active: (entry: WriteRecord) => active.has(entry.id),
@@ -109,8 +125,8 @@ export async function writeOutcomes(directory: string) {
     },
     dispatch: (entry: WriteRecord) => put({ ...entry, status: "unknown" }),
     release: (entry: WriteRecord) => { active.delete(entry.id) },
-    async finish(entry: WriteRecord, verdict: "applied" | "not_applied" | "complete") {
-      if (verdict !== "complete") return put({ ...entry, status: verdict })
+    async finish(entry: WriteRecord, verdict: "applied" | "not_applied" | "complete", step?: typeof Step.Type) {
+      if (verdict !== "complete") return put({ ...entry, status: verdict, ...(step ? { step } : {}) })
       await rm(join(directory, `${entry.id}.json`), { force: true })
       await sync()
       entries.delete(entry.id)

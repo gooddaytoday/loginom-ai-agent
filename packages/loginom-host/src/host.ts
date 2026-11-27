@@ -10,7 +10,8 @@ import { connectionService } from "./connection/connection-service"
 import { connectionStore, type ActiveConnection } from "./connection/connection-store"
 import type { CredentialCodec } from "./connection/credentials"
 import { recoveryStore } from "./connection/recovery-store"
-import { SavedCopyReadback, WriteVerdict, writeOutcomes, type WriteRecord } from "./connection/write-outcomes"
+import { SavedCopyReadback, type WriteVerdict, writeOutcomes, type WriteRecord } from "./connection/write-outcomes"
+import { StepCheckResult, StepOperationId } from "./step-state"
 import { fileReferences } from "./file-reference"
 import { dashboardRequest, type DashboardStorageOperation } from "../../loginom-runtime/src/dashboard-storage.mjs"
 import { DashboardRead, DashboardDelete, DashboardDeleteResult, DashboardPublish, PublicationRef, PublicationSet, PublicationSource, PublicationWrite, decodeDashboardDeleteResult } from "./dashboard"
@@ -644,6 +645,21 @@ export async function createLoginomHost(options: {
     resourceController.abort()
     for (const controller of dashboardOperations.keys()) controller.abort(new Error("DASHBOARD_CANCELLED"))
   }
+  async function checkStepState(chat: string, operationId: string, originalGeneration?: number, owner?: string): Promise<typeof StepCheckResult.Type | "owner_lost"> {
+    const unavailable = { state: "unavailable", retryAvailable: false } as const
+    const unavailableOwner = owner === undefined ? unavailable : "owner_lost"
+    const status = await service.api.status()
+    if (originalGeneration !== undefined && status.generation !== originalGeneration) return unavailableOwner
+    const children = generations.get(status.generation)?.children
+    const child = children?.get(chat)
+    if (!child || lost.has(chat) || stale.has(chat)) return unavailableOwner
+    const result = await child.then((runtime) => runtime.request("checkStepState", { operationId, owner }, 25000)).catch(() => unavailable)
+    const after = await service.api.status()
+    if (children?.get(chat) !== child || status.generation !== after.generation) return unavailableOwner
+    if (owner !== undefined && result === "owner_lost") return result
+    return Schema.is(StepCheckResult)(result) ? result : unavailable
+  }
+
   return {
     ...service,
     beginClose,
@@ -761,12 +777,24 @@ export async function createLoginomHost(options: {
       if (!current) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
       return writeServer(current.connection.url)
     },
-    async liveWriteVerdict(entry: WriteRecord): Promise<typeof WriteVerdict.Type | "owner_lost"> {
-      const child = generations.get(entry.generation)?.children.get(entry.chat)
-      if (!child) return "owner_lost"
-      const result = await child.then((runtime) => runtime.request("write-outcome.check", entry, 24_000)).catch(() => undefined)
-      if (result === "owner_lost" || !generations.get(entry.generation)?.children.has(entry.chat)) return "owner_lost"
-      return Schema.is(WriteVerdict)(result) ? result : "unknown"
+    async checkRecordedStep(entry: WriteRecord) {
+      const unavailable = { state: "unavailable", retryAvailable: false } as const
+      const operationId = entry.receipt.operationID
+      if (!writes || !writes.reserveCheck(entry)) return { observation: unavailable }
+      try {
+        if (!generations.get(entry.generation)?.children.has(entry.chat)) return { observation: unavailable, ownerLost: true }
+        if (!entry.receipt.fresh || !Schema.is(StepOperationId)(operationId)) return { observation: unavailable }
+        const result = await checkStepState(entry.chat, operationId, entry.generation, entry.receipt.owner)
+        if (result === "owner_lost") return { observation: unavailable, ownerLost: true }
+        if (result.state !== "observed") return { observation: result }
+        const step = result.step
+        const status: typeof WriteVerdict.Type = step.outcome === "completed" ? "applied"
+          : step.outcome === "not_applied" && result.retryAvailable ? "not_applied" : "unknown"
+        if (status !== "unknown") await writes.finish(entry, status, step)
+        return { observation: result, status }
+      } finally {
+        writes.release(entry)
+      }
     },
     async readSavedWriteTarget(entry: WriteRecord): Promise<typeof SavedCopyReadback.Type> {
       const path = entry.baseline.packagePath
@@ -850,6 +878,7 @@ export async function createLoginomHost(options: {
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true
     },
+    checkStepState,
     async workState(generation: number, chat: string) {
       // Inspect only the existing owner. Losing it is uncertainty, not evidence of idle work.
       if (lost.has(chat) || stale.has(chat)) throw new Error("LOGINOM_RUNTIME_UNAVAILABLE")

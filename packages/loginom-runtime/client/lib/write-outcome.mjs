@@ -1,11 +1,9 @@
-import { randomUUID } from 'node:crypto';
-import { outcomeVerification } from './outcome-verification.mjs';
+import { stepWriteTool } from './step-retry.mjs';
 
 const reads = new Set(['dock_workspace_observe', 'dock_action_describe', 'dock_operation_inspect',
   'dock_node_status', 'dock_node_wait', 'dock_node_source', 'dock_node_context', 'dock_artifact_delivery_status',
   'dock_storage_source', 'dock_storage_list', 'dock_storage_download_status', 'dock_storage_download_wait',
   'browser_snapshot', 'browser_find', 'browser_take_screenshot', 'browser_wait_for']);
-const saves = new Set(['package.save_as', 'package.save_checkpoint']);
 
 export function savedPackagePath(value) {
   return typeof value === 'string' && /^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+\.lgp$/i.test(value)
@@ -20,9 +18,8 @@ export function writeIntent(input, workspace, { owner, uploadPath, knownOperatio
     || prepare && !input.packageArtifact && ['open_package', 'existing_workflow'].includes(args?.intent))
     return { effect: 'read' };
   const action = name === 'dock_action_run' && typeof args?.action_key === 'string' ? args.action_key : name;
-  const save = saves.has(action);
-  const operationID = typeof args?.operation_id === 'string' && args.operation_id.length ? args.operation_id
-    : save && args?.operation_id === undefined ? randomUUID() : null;
+  const save = name === 'dock_action_run' && stepWriteTool(name, args);
+  const operationID = typeof args?.operation_id === 'string' && args.operation_id.length ? args.operation_id : null;
   const current = savedPackagePath(workspace?.package_ref?.path);
   const destination = savedPackagePath(save ? args?.parameters?.path : uploadPath);
   return {
@@ -40,28 +37,14 @@ export function writeIntent(input, workspace, { owner, uploadPath, knownOperatio
   };
 }
 
-export function writeVerdict(outcome, action, entry) {
-  const node = entry.operation === 'dock_node_apply' && outcome?.action_key === 'node.apply';
-  if (!outcome || outcome.operation_id !== entry.receipt.operationID || outcome.cleanup_complete !== true
-    || !node && (action?.action_key !== entry.operation || outcome.action_key !== entry.operation)
-    || outcome.error?.code === 'SAVE_RESULT_MISMATCH') return 'unknown';
-  if (outcome.status === 'NOT_APPLIED' && outcome.effect_possible === false) return 'not_applied';
-  if (outcome.status !== 'SUCCEEDED' || outcome.error !== null) return 'unknown';
-  if (node) {
-    return outcome.output?.pending_phase === null && outcome.phase === 'node_ready' ? 'applied' : 'unknown';
-  }
-  if (saves.has(entry.operation) && (!entry.baseline.packagePath || outcome.output?.package_ref?.path !== entry.baseline.packagePath))
-    return 'unknown';
-  return outcomeVerification(outcome, action).domain_effect.state === 'verified' ? 'applied' : 'unknown';
-}
-
-export function writeReplySettled(reply, name) {
+export function writeReplySettled(reply, name, args) {
+  if (stepWriteTool(name, args)) return false;
   let result = reply.structuredContent;
   if (!result && reply.content?.[0]?.type === 'text') {
     try { result = JSON.parse(reply.content[0].text); } catch { return name?.startsWith('browser_') && !reply.isError; }
   }
   const outcome = result?.outcome ?? result?.output?.outcome ?? result;
-  if (['AMBIGUOUS', 'unresolved', 'pending'].includes(outcome?.status) || outcome?.error?.code === 'SAVE_RESULT_MISMATCH') return false;
+  if (['AMBIGUOUS', 'unresolved', 'pending'].includes(outcome?.status)) return false;
   if (outcome?.status === 'FAILED' || outcome?.status === 'NOT_APPLIED')
     return outcome.effect_possible === false && outcome.cleanup_complete === true;
   if (result?.state && result.state !== 'settled') return false;

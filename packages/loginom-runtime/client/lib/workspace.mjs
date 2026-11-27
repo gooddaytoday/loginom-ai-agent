@@ -4,8 +4,8 @@ export const packageReadOnlyAdvice = 'The saved package is read-only and the loc
 // A settled preparation can attest the current contents of the same native
 // scenario in one read. Historical snapshots remain with their operations.
 async function captureWorkspaceStep(page, options) {
-  return page.evaluate(({origin, pathname, expectedBuild, sessionId, workflowRef, replayId, prepareId,
-    operationId, intent, packagePath, reserveActivation})=>{
+  return page.evaluate(async ({origin, pathname, expectedBuild, sessionId, workflowRef, replayId, prepareId,
+    inspectState, operationId, intent, packagePath, reserveActivation})=>{
     const state=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
     const refused=reason=>({status:'NOT_READY',reason});
     if(location.origin!==origin||location.pathname!==pathname||app?.Version!==expectedBuild
@@ -111,9 +111,25 @@ async function captureWorkspaceStep(page, options) {
     }
     if(prepareId||replayId)for(const record of records)record.crumbs=crumbs;
     if(activation)delete state.stepActivation;
+    let modified=null;
     const file=packageNode.PackageFileName;
+    if(inspectState){
+      const proxy=packageNode.Package;
+      if(!proxy||packageNode.HasRunningNodes?.()!==false)return {status:'UNAVAILABLE'};
+      if(typeof connection.Session?.IsPackageModified==='function'){
+        try {
+          const value=await connection.Session.IsPackageModified(proxy);
+          if(typeof value==='boolean')modified=value;
+        } catch { /* Dirty state is unavailable even if the live graph can be read. */ }
+      }
+      if(state.document!==document||state!==globalThis.__loginomDockPreparationV1||main.FReconnecting===true
+        ||main.FMapTree?.FServerConnection!==connection||connection.Connected!==true
+        ||connection.Session!==session.nativeSession||main.Items.Workspace.getActiveTab()!==card
+        ||packageNode.Package!==proxy||packageNode.PackageFileName!==file||packageNode.HasRunningNodes?.()!==false)
+        return refused('WORKFLOW_CHANGED');
+    }
     const path=typeof file==='string'&&file?'/'+file.replaceAll('\\','/').replace(/^\/+/, ''):null;
-    return {status:'READY',document_id:state.id,loginom_account:connection.UserName,refresh_ports:!!source.nodeTargetPortIdentities,
+    return {status:'READY',document_id:state.id,loginom_account:connection.UserName,...(inspectState?{modified}:{}),refresh_ports:!!source.nodeTargetPortIdentities,
       workflow_ref:{tab_tid:tabTid,prefix,navigation_path:crumbs,workflow_id:workflowId},
       package_ref:{path,name:packageNode.PackageName??null,persisted:path!==null,
         ...(typeof packageNode.ReadOnly==='boolean'?{read_only:packageNode.ReadOnly}:{})}};
@@ -946,16 +962,18 @@ export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestL
   return `async (page) => ${implementation}(page, ${JSON.stringify(options)})`;
 }
 
-export function makeWorkspaceStepCode({loginomUrl,build,sessionId,workflowRef,readGraph,types}) {
+export function makeWorkspaceStepCode({loginomUrl,build,sessionId,workflowRef,readGraph,types,inspectState=false}) {
   const url=new URL(loginomUrl);
-  const options={origin:url.origin,pathname:url.pathname,expectedBuild:build,sessionId,workflowRef};
+  const options={origin:url.origin,pathname:url.pathname,expectedBuild:build,sessionId,workflowRef,inspectState};
   const icons=Object.values(types).map(({type,icon_class})=>({type,icon_class}));
   return `async page=>{
     const options=${JSON.stringify(options)};
-    const state=await (${captureWorkspaceStep.toString()})(page,options);
-    if(state.status==='READY'&&state.refresh_ports){
-      await (${readGraph.toString()})(page,{request:{document_id:state.document_id,workflow_ref:state.workflow_ref},
-        types:${JSON.stringify(icons)},origin:options.origin,build:options.expectedBuild,step_rebaseline:true});
+    const capture=${captureWorkspaceStep.toString()},read=${readGraph.toString()};
+    const state=await capture(page,options);
+    if(state.status==='READY'&&(state.refresh_ports||options.inspectState)){
+      const graph=await read(page,{request:{document_id:state.document_id,workflow_ref:state.workflow_ref},
+        types:${JSON.stringify(icons)},origin:options.origin,build:options.expectedBuild,step_rebaseline:true,read_only:options.inspectState});
+      if(options.inspectState)state.graph=graph;
     }
     return {status:'SUCCEEDED',phase:'observed',action_key:'workspace.step',action_revision:'1',
       effect_possible:false,error:null,trace:[],output:state};
