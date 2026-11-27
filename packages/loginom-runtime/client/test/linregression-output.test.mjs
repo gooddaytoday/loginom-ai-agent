@@ -164,7 +164,7 @@ test('the installed catalog and request validator admit Enter with both tabular 
  assert.equal(validateNodeApplyRequest({...request,mode:'elastic',parameters:{...request.parameters,linear_regression:{lambda_l1:1,lambda_l2:3}}},support.nodeApplyHandlers).handler,support.nodeApplyHandlers.get('datamining.lin_regression'));
 });
 
-for(const mode of ['lasso','elastic','partition','categorical'])for(const mixed of [false,true])test(mode+' freezes prediction field order, mixed='+mixed,async()=>{
+for(const mode of ['lasso','elastic','partition','categorical'])for(const mixed of [false,true])test(mode+' keeps native prediction order and autosync, mixed='+mixed,async()=>{
  const c={...configuration,...(mode==='categorical'?{statistics:'full',indicators:[{field:'Factor',method:'indicator',reference:'first',reference_value:'A'}]}:mode==='partition'?{partition:{method:'sequential',train_count:16,test_count:2}}:{mode})},predicted=linRegressionOutputColumns(c,0);
  const prediction={verified:true,inventory_complete:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',autosync:true,
   target_fields:predicted.map((f,index)=>({...f,index,record_id:'p'+index,required:false,inherited:false,excluded:false})),source_fields:[]};
@@ -175,6 +175,7 @@ for(const mode of ['lasso','elastic','partition','categorical'])for(const mixed 
    .map((f,index)=>({...f,index,group_index:index}));
  }
  const originalSources=structuredClone(prediction.source_fields);
+ const originalOrder=prediction.target_fields.map(f=>f.name);
  const coefficient=configuredCoefficients(),finished=[],actions=[];let port,selected;
  const channel={async openOutputPort(value){port=value;},async observe(options){
   const mapping=port===0?prediction:coefficient,offset=options.outputColumnPage?.offset??0;
@@ -194,9 +195,9 @@ for(const mode of ['lasso','elastic','partition','categorical'])for(const mixed 
   prediction.target_fields=prediction.target_fields.map((f,index)=>({...f,index,group_index:index}));
  }};
  await configureLinRegressionOutputs(channel,c,{},[],async()=>{finished.push(port);});
- assert.deepEqual(finished,mode==='categorical'?[0]:[0,1]);assert.equal(prediction.autosync,false);assert.equal(actions.filter(a=>a.ref==='auto').length,1);
- assert.equal(actions.some(a=>a.ref==='move'),mixed);assert.deepEqual(prediction.source_fields,originalSources);
- assert.deepEqual(prediction.target_fields.map(f=>f.name),predicted.map(f=>f.name));
+ assert.deepEqual(finished,mode==='categorical'?[0]:[0,1]);assert.equal(prediction.autosync,true);assert.deepEqual(actions,[]);
+ assert.deepEqual(prediction.source_fields,originalSources);
+ assert.deepEqual(prediction.target_fields.map(f=>f.name),originalOrder);
 });
 
 const fullNames=['Name','DisplayName','UniqueValues',...['coefficients','stdError','TStat','PValue','lowerBound','upperBound'].map(s=>'Response_'+s)];

@@ -140,14 +140,16 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
    assert.equal(parse(await apply('transform.sorting')).status,'SUCCEEDED');
    assert.equal(applied.length,2,'earlier descriptions survive a later delivery refusal');
    const next=parse(refused).next_step;
-   assert.deepEqual([next.arguments,...next.remaining_requests],args.node_types.map((type,index)=>({node_types:[type],modes:[args.modes[index]]})));
-   for(const request of [next.arguments,...next.remaining_requests]){
+   const requests=[next.arguments,...next.remaining_requests];
+   assert.ok(requests.length<args.node_types.length,JSON.stringify(requests));
+   assert.deepEqual(requests.flatMap(request=>request.node_types).sort(),[...args.node_types].sort());
+   for(const request of requests){
+    assert.deepEqual(request.modes,args.modes.filter((mode,index)=>request.node_types.includes(args.node_types[index])));
     const delivered=await call(next.tool,request);
     assert.notEqual(delivered.isError,true,JSON.stringify(delivered));
     assert.ok(size(delivered)<=46000);
-    assert.equal(parse(delivered).node_types[0].type,request.node_types[0]);
-    assert.ok(parse(delivered).node_types[0].parameter_schema);
-    assert.ok(parse(delivered).node_types[0].guidance);
+    assert.deepEqual(parse(delivered).node_types.map(card=>card.type).sort(),[...request.node_types].sort());
+    for(const card of parse(delivered).node_types){assert.ok(card.parameter_schema);assert.ok(card.guidance);}
    }
    assert.equal(parse(await apply('transform.calculator')).status,'SUCCEEDED');
    assert.equal(applied.length,3);
@@ -209,10 +211,12 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
    const retained=JSON.parse((await readFile(diagnosticPath,'utf8')).trim().split('\n')[0]).result;
    assert.deepEqual(delivered.knowledge,retained.knowledge);
    assert.ok(delivered.knowledge.session_manifest.actionManifestDigest);
+   let importCard;
    for(const node of delivered.knowledge.node_types){
     assert.equal(node.cache_key,undefined);
     const described=parse(await call('dock_action_describe',{node_types:[node.type]})).node_types[0];
     assert.match(described.cache_key,/^[a-f0-9]{64}$/);
+    if(node.type==='imports.text')importCard=described;
     for(const key of Object.keys(node)){
      // Prepare retains its compact limitations; describe routes details to the
      // verified reference without duplicating the diagnostic knowledge asset.
@@ -221,8 +225,10 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
      assert.deepEqual(node[key],expected,node.type+': '+key);
     }
    }
-   const imported=parse(await call('dock_action_describe',{node_types:['imports.text']})).node_types[0];
-   assert.ok(imported.parameter_schema);
+   assert.ok(importCard?.parameter_schema);
+   const repeated=parse(await call('dock_action_describe',{node_types:['imports.text']}));
+   assert.deepEqual(repeated.node_types,[]);
+   assert.deepEqual(repeated.reused_node_types,[{type:'imports.text',cache_key:importCard.cache_key}]);
    return;
   }
 
@@ -360,8 +366,12 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   const all=await call('dock_action_describe',{node_types:[...parse(inventory).available_node_types.filter(t=>t!=='programming.javascript').slice(0,31),'programming.javascript']});
   assert.equal(all.isError,true);assert.equal(parse(all).error.scope,'whole_response');assert.ok(size(all)<2000);
   const pair=await call('dock_action_describe',{node_types:['imports.text','programming.javascript']});
-  assert.notEqual(pair.isError,true);assert.equal(parse(pair).node_types.length,2);assert.ok(size(pair)<=46000);
-  assert.deepEqual(parse(pair).node_types[1].parameter_schema,js.parameter_schema);assert.equal(browserCalls,before);
+  assert.notEqual(pair.isError,true);assert.ok(size(pair)<=46000);
+  const mixed=parse(pair);
+  assert.deepEqual(mixed.node_types.map(node=>node.type),['imports.text']);
+  assert.ok(mixed.node_types[0].parameter_schema);
+  assert.deepEqual(mixed.reused_node_types,[{type:'programming.javascript',cache_key:js.cache_key}]);
+  assert.equal(browserCalls,before);
 
   session.metadata.stress='"'.repeat(24000);
   const diagnostic=await call('dock_diagnostics',{checkConnections:false});
