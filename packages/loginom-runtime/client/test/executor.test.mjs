@@ -12,6 +12,7 @@ import {withStorageIdentity} from '../lib/storage-policy.mjs';
 import {readPreparedNodeContext} from '../lib/node-context.mjs';
 import {readUserVariablesSnapshot} from '../lib/crosstable-variables.mjs';
 import {makePackageCleanupCode} from '../lib/package-cleanup.mjs';
+import {makeWorkspacePrepareCode} from '../lib/workspace.mjs';
 
 test('a retained preparation cannot mask a settled node worker using the same ID',async()=>{
  const page=new Page(),receipt={status:'READY',operation_id:'shared'};
@@ -938,6 +939,35 @@ test('ordinary Save As rebinds preparation before the next workflow activation',
  assert.match((await activate()).error,/Prepared workflow receipt changed/);
  assert.equal(page.modifiedReads,0);assert.equal(page.saveWrites,1);
  assert.equal(saved.trace.some(e=>e.event==='rest_package_normalization'),false);
+});
+
+test('checkpoint Save provides the binding used by bind-only preparation on the same page',async()=>{
+ const page=await restSavePage([false]);
+ const preparation=page.context.__loginomDockPreparationV1;
+ const earlier=preparation.receipts.get('prepared');
+ preparation.receipts.set('current',{...earlier,workflowId:'current-workflow'});
+ const path='/user/data/packages/rebind.lgp',saveOperationId='save-for-bind';
+ const saved=await run(page,'package.save_checkpoint',{path,conflict_policy:'fail'},{operation_id:saveOperationId});
+ assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved.error));
+ assert.equal(saved.output.reopened,true);
+ const [other,current]=saved.output.workflow_continuations;
+ assert.equal(other.workflow_ref.workflow_id,'workflow');
+ assert.equal(current.workflow_ref.workflow_id,'current-workflow');
+ assert.equal(current.workflow_ref.tab_tid,other.workflow_ref.tab_tid);
+ assert.notEqual(current.workflow_ref.tab_tid,current.previous_workflow_ref.tab_tid);
+
+ const gestures=page.events.slice();
+ const rebound=await page.execute(makeWorkspacePrepareCode({loginomUrl:page.url(),platform:'linux',
+  compatibility:{profile_id:'test',loginom_build:build,platform:'linux',browser:'chromium'},
+  sessionId:page.storageBinding.session_id,operationId:'bind-after-save',intent:'open_package',
+  packagePath:saved.output.package_ref.path,bindOpenOnly:true,saveOperationId:saved.operation_id,
+  workflowRef:{...current.workflow_ref,document_id:current.document_id},timeoutMs:500}));
+ assert.equal(rebound.status,'READY',JSON.stringify(rebound));
+ assert.equal(rebound.effect_possible,false);
+ assert.equal(rebound.document_id,current.document_id);
+ assert.equal(rebound.package_ref.path,path);
+ assert.deepEqual(rebound.workflow_ref,current.workflow_ref);
+ assert.deepEqual(page.events,gestures);
 });
 
 for(const fault of ['native-node','package-path'])test('ordinary Save As refuses a foreign reopened identity: '+fault,async()=>{

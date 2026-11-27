@@ -347,7 +347,9 @@ for(const fault of ['none','GUID','account','session','owner','tab','path','oper
  const old=await execute(f,{intent:'open_package',operationId:'earlier',packagePath:path,bindOpenOnly:true});
  assert.equal(old.status,'READY');
  const prep=f.context.__loginomDockPreparationV1,connection=f.context.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection;
- prep.receipts.set('current',{...prep.receipts.get('earlier'),workflowId:'current-workflow',nodeTargetWorkflowNode:workflowNode});
+ const earlier=prep.receipts.get('earlier');
+ earlier.nodeTargetWorkflowNode=workflowNode;
+ prep.receipts.set('current',{...earlier,workflowId:'current-workflow'});
  const nativeNode={FGuid:'node-guid',FIconCls:'grouping'};
  tab.model.FDiagram.FNodes={FCollection:[nativeNode]};
  prep.savedWorkspaceBinding={operationId:'save',path,packageNode,workflowNode,tab,nativeNodes:[['node-guid','grouping']],

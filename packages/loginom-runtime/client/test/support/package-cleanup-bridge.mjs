@@ -192,7 +192,7 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
 
-for(const [upstream,expectedReopen] of [['importtextfile',false],['calcdata',true]])
+for(const [upstream,expectedReopen] of [['importtextfile',false],['calcdata',true],['filterdata',true],['joindata',true],['foreign',true]])
 test('public checkpoint Save follows the input of Grouping: '+upstream,async t=>{
  const directory=await mkdtemp(join(tmpdir(),'grouping-save-'));
  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
@@ -200,8 +200,9 @@ test('public checkpoint Save follows the input of Grouping: '+upstream,async t=>
  const diagram=page.model.FDiagram;
  const [group,,source]=diagram.FNodes.FCollection;
  group.FIconCls='bg-vendor-icon-groupdata';
- source.FIconCls='bg-vendor-icon-'+upstream;
- diagram.FLinks={FCollection:[{FSourcePort:{parent:source},FTargetPort:{parent:group}}]};
+ source.FIconCls='bg-vendor-icon-'+(upstream==='foreign'?'importtextfile':upstream);
+ const parent=upstream==='foreign'?{...source}:source;
+ diagram.FLinks={FCollection:[{FSourcePort:{parent},FTargetPort:{parent:group}}]};
  page.edges=['Источник|Output_Data-0|Приёмник|Input_Data-0'];
  const path='/user/data/packages/grouping.lgp';
  current={scenario:'grouping-save',events:[],catalog,path,realPackageSave:page};

@@ -136,7 +136,7 @@ class Page extends EventEmitter {
   contains(box, point) { return box && point && point.x >= box.x && point.x <= box.x + box.width && point.y >= box.y && point.y <= box.y + box.height; }
   ref(label) { return { kind: 'node', node_label: label, workflow_ref: { tab_tid: this.tabTid, prefix: this.prefix } }; }
   addNode(label, x, y, ports = []) { this.nodes.push({ label, x, y, ports: [...ports] }); }
-  element(tid, props = {}) { const page=this;return { tid,ownerDocument:page.dom, visible: true, box: { x: 10, y: 10, width: 20, height: 20 }, ...props,
+  element(tid, props = {}) { const page=this;return { tid,ownerDocument:page.dom, isConnected: true, visible: true, box: { x: 10, y: 10, width: 20, height: 20 }, ...props,
     querySelectorAll(selector) {const descendants=item=>(item.children??[]).flatMap(child=>[child,...descendants(child)]);return page.match(selector,descendants(this));},
     getBoundingClientRect() { return { ...this.box, left: this.box.x, top: this.box.y, right: this.box.x + this.box.width, bottom: this.box.y + this.box.height }; },
     getAttribute(name) { return name === 'data-tid' ? this.tid : this.attributes?.[name] ?? null; } }; }
@@ -304,9 +304,13 @@ function runtime(page, options = {}) { return createActionRuntime({ pinned: { ac
 
 async function continuationPage() {
  const page=linkPage();await page.execute('async page=>true');
+ page.url=()=> 'https://loginom.invalid/app';
+ Object.assign(page.context,{location:{origin:'https://loginom.invalid',pathname:'/app'},
+  innerWidth:1600,innerHeight:1000,outerWidth:1600,outerHeight:1000,screen:{availWidth:1600,availHeight:1000}});
  class WorkFlowTreeNode{};page.app.WorkFlowTreeNode=WorkFlowTreeNode;
  let pkg=new page.app.PackageTreeNode(),flow=new WorkFlowTreeNode();flow.ParentNode=pkg;
- let tab={tid:page.tabTid,getAttribute(){return this.tid;},classList:{contains:name=>name==='x-tab-active'}};
+ const activeTab=()=>page.element(page.tabTid,{classList:{contains:name=>name==='x-tab-active'}});
+ let tab=activeTab();
  const card={Controller:{FController:page.model,Node:{data:{node:flow}}}};
  page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>card;
  let parentLength=0;const components=new Map();
@@ -328,8 +332,12 @@ async function continuationPage() {
  page.afterDoubleClick=async()=>{parentLength=0;page.editor=null;};
  const document={querySelectorAll:selector=>{
    if(selector.includes('cnrNaviMode'))return crumbs().filter(e=>selector.includes('^=')||selector==='[data-tid='+JSON.stringify(e.tid)+']');
-   if(selector.includes('cmpDiagram'))return [page.model.FDiagram.FmxGraph.container];
-   if(selector==='[data-tid='+JSON.stringify(page.tabTid)+']'&&page.active)return [tab];return [];
+   if(selector==='[data-tid='+JSON.stringify(page.prefix+';ModelForm;cmpDiagram')+']'){
+    const graph=page.model.FDiagram.FmxGraph.container;
+    return page.active&&graph?[graph]:[];
+   }
+   if(selector.includes('Workspace;t.br;tb'))return page.active?page.match(selector,[tab]):[];
+   return selector.startsWith('[data-tid')?page.match(selector):[];
  }};
  page.context.Ext={getCmp:id=>components.get(id)};
  page.context.document=document;
@@ -337,7 +345,7 @@ async function continuationPage() {
  return {page,flow,card,reopenNative(){
   pkg=new page.app.PackageTreeNode();flow=new WorkFlowTreeNode();flow.ParentNode=pkg;
   card.Controller.Node.data.node=flow;
-  tab={tid:page.tabTid,getAttribute(){return this.tid;},classList:{contains:name=>name==='x-tab-active'}};
+  tab=activeTab();
   return pkg;
  }};
 }
@@ -353,7 +361,6 @@ async function restSavePage(modified, restReference = true) {
   FServerConnection:{Connected:true,UserName:'save-user',Session:{IsPackageModified:async()=>{
    page.modifiedReads++;return modified[Math.min(page.modifiedReads-1,modified.length-1)];
   }}}};
- page.context.location={origin:'https://loginom.invalid'};
  page.context.__loginomDockPreparationV1.receipts.get('prepared').request=JSON.stringify({session:'save-session'});
  await page.execute('async page=>{const p=globalThis.__loginomDockPreparationV1;p.receipts=new Map(p.receipts);return true;}');
  page.context.setTimeout=(callback,ms)=>page.waitForTimeout(ms).then(callback);
