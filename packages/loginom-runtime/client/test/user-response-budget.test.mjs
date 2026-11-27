@@ -17,6 +17,26 @@ import {createBundledSkillFixture} from './support/bundled-skill-fixture.mjs';
 const reply=value=>({content:[{type:'text',text:JSON.stringify(value)}]});
 const bytes=value=>Buffer.byteLength(JSON.stringify(value),'utf8');
 
+test('public export receipts tell the model where the file is and that chat cannot attach it',()=>{
+ const artifact={artifact_id:'report',destination:'/exports/report.csv',bytes:176,sha256:'a'.repeat(64),
+  execution_id:'execution',verification_id:'download',freshness_basis:'native_absence_check_and_completed_execution'};
+ const result={operation_id:'export',state:'settled',outcome:{status:'SUCCEEDED',action_key:'node.apply',
+  output:{output:{status:'complete',ports:[],file_artifacts:[artifact]}}}};
+ for(const tool of ['dock_node_apply','dock_node_wait']){
+  const delivered=nodeResultReply(result,{userProfile:true,tool});
+  const value=JSON.parse(delivered.content[0].text);
+  assert.equal(value.status,'SUCCEEDED');
+  assert.deepEqual(value.output.file_artifacts,[artifact]);
+  assert.match(value.limitations.join('\n'),/Приложить файл к ответу пока нельзя\./);
+  assert.match(value.limitations.join('\n'),/путь в хранилище Loginom из file_artifacts\[\]\.destination/);
+  assert.match(value.limitations.join('\n'),/локальную копию в каталоге артефактов/);
+  assert.ok(bytes(delivered)<=20000);
+ }
+ result.outcome.output.output.file_artifacts=[];
+ const withoutFile=nodeResultReply(result,{userProfile:true,tool:'dock_node_wait'});
+ assert.deepEqual(JSON.parse(withoutFile.content[0].text).limitations,[]);
+});
+
 test('compact JS delivery bounds only analytical rows and inspection preserves the original effects',()=>{
  const configuration={status:'applied',readback:{kind:'javascript',source:{sha256:'a'.repeat(64),utf8_bytes:771,lf_lines:18},
   receipt_ids:['compact:configure','compact:finish','compact:execute','compact:read'],
