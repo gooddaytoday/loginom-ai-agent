@@ -3,6 +3,7 @@ import {createRedactor} from './redact.mjs';
 import {browserDownloadsPath} from './browser-downloads.mjs';
 import {journalCopy} from './execution-journal.mjs';
 import {readSavedPackageState} from './package-persistence.mjs';
+import {readSaveGraph} from './saved-package-graph.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,requireServerDownloadFormat,serverDownloadTools,storageListPattern,listStorageDirectory,readStorageDestination} from './storage-policy.mjs';
 import {preflightExcelExportDestination} from './exports-excel-procedure.mjs';
 import {buildNodeReadRequest,NODE_READ_MODE} from './node-read-contract.mjs';
@@ -857,7 +858,7 @@ export async function readNodeTargetLinkValidation(page, context, parameters) {
   },{context,parameters});
 }
 
-function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, readLinkValidation, normalizeVariablesToTableLinkGraph, readSavedState) {
+function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, readLinkValidation, normalizeVariablesToTableLinkGraph, readSavedState, readSaveGraph) {
   const started = Date.now();
   const deadline = task.deadline_at ?? started + task.action.timeout_ms;
   const trace = [];
@@ -1770,6 +1771,11 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if (staged.package_identity.running)
       throw new Error('Cannot save the package while a process is running or its nodes are locked. No save request was sent.');
     if (!same(staged, before)) throw Error('Package changed after save preflight');
+    const recordSaveGraph = async () => {
+      try { record('save_graph_before_write', {graph:await page.evaluate(readSaveGraph)}); }
+      catch { record('save_graph_before_write', {graph:null}); }
+    };
+    await recordSaveGraph();
     await click('file_dialog.confirm', true);
     record('save_requested', { path: before.path });
     const expectedConflict = '"' + before.path + '" уже существует. Вы хотите заменить его?';
@@ -1795,6 +1801,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       if ((await yes.innerText()).trim() !== 'Да' || (await noButton.innerText()).trim() !== 'Нет')
         throw new Error('Save confirmation answer labels differ');
       if (task.parameters.conflict_policy === 'replace') {
+        await recordSaveGraph();
         await click('message.yes', true);
         record('overwrite_confirmed');
       } else {
@@ -1999,6 +2006,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       continuations = await bindSavedContinuations(before, before.continuations, 'reconcile');
     }
     record('save_continuations_observed', { continuations, reopened, native_identity_verified: true });
+    const savedGraph = receipt.trace.findLast(entry => entry.event === 'save_graph_before_write');
+    if (savedGraph) record('save_graph_before_write', {graph:savedGraph.graph});
     phase = 'verified'; effectPossible = true;
     record('postcondition_verified', { proof: 'save_receipt_and_unmodified_native_package', package_path: before.path, reopened });
     const output = { package_ref: { kind: 'package', path: before.path, active_identity: before.path }, reopened };
@@ -2113,7 +2122,7 @@ export function makeCapabilityCode(action, selectors, parameters, options = {}) 
   const task = { action: structuredClone(action), selectors: structuredClone(allowedSelectors), parameters: structuredClone(parameters), ...structuredClone(serializableOptions), handler,
     ...(['packageSaveAs','packageSaveCheckpoint'].includes(handler) ? { arrangement_selector: structuredClone(arrangementSelector),
       normalization_selector: structuredClone(selectorCatalog.native_rest_save) } : {}) };
-  const body = `(${browserCapability.toString()})(page, ${JSON.stringify(task)}, ${readNodeTargetGraph?readNodeTargetGraph.toString():'undefined'}, ${rebindNodeTargetLinkEpochs.toString()}, ${readNodeTargetLinkValidation.toString()}, ${normalizeVariablesToTableLinkGraph.toString()}, ${readSavedPackageState.toString()})`;
+  const body = `(${browserCapability.toString()})(page, ${JSON.stringify(task)}, ${readNodeTargetGraph?readNodeTargetGraph.toString():'undefined'}, ${rebindNodeTargetLinkEpochs.toString()}, ${readNodeTargetLinkValidation.toString()}, ${normalizeVariablesToTableLinkGraph.toString()}, ${readSavedPackageState.toString()}, ${readSaveGraph.toString()})`;
   return ['apply', 'recover_link'].includes(task.mode) && task.receipt_namespace
     ? withBrowserReceipt(body, task) : `async (page) => ${body}`;
 }
@@ -3773,6 +3782,22 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     },
     nodeApplyStatus:id=>sourceReads.has(id)?sourceReads.status(id):nodeJobs.status(id),
     nodeApplyWorkflow:id=>nodeJobs.workflow(id),
+    saveNodeIntent(documentId, workflowId) {
+      const sorting=new Map(), intendedLabels=new Map();
+      for(const operation of operations.values()) {
+        const {result,request}=operation.nodeApply??{};
+        const node=result?.node;
+        if(result?.status!=='SUCCEEDED'||result.cleanup_complete!==true||request?.finish==='close'
+          ||node?.document_id!==documentId||node.workflow_id!==workflowId)continue;
+        const id=node.node_id.toLowerCase();
+        if(typeof request?.target?.label==='string')intendedLabels.set(id,request.target.label);
+        const readback=result.configuration?.readback;
+        if(readback?.kind==='sorting')sorting.set(id,{
+          keys:readback.keys.map(field=>field.name),fields:readback.output_mapping.fields.filter(field=>!field.excluded).map(field=>field.name),
+        });
+      }
+      return {sorting,intendedLabels};
+    },
     waitNodeApply:(id,options)=>sourceReads.has(id)?sourceReads.wait(id,options):nodeJobs.wait(id,options),
     cancelNodeApply:id=>sourceReads.has(id)?sourceReads.cancel(id):nodeJobs.cancel(id),
     stopNodeApply:id=>nodeJobs.stop(id),
@@ -4842,7 +4867,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }});
   // Internal delivery calls retain the original runtime methods. The returned
   // facade prevents a second caller from changing UI between transfer stages.
-  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','nodeApplyWorkflow','waitNodeApply']);
+  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','nodeApplyWorkflow','saveNodeIntent','waitNodeApply']);
   const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply','deleteNode']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{

@@ -306,6 +306,7 @@ export async function dockTools(input: {
       metadata: {
         generation: lease.generation,
         ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
+        ...(result._meta?.loginom ? { loginom: result._meta.loginom } : {}),
         // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
         ...(outputPath ? { truncated: true, outputPath } : {}),
         ...(state === "pending" ? { loginomPending: true } : {}),
