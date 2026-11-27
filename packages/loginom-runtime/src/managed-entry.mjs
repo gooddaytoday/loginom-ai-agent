@@ -15,7 +15,6 @@ import { loginBrowser, loginomAddress } from "./connection-check.mjs"
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
-import { loginomFeedMetadata } from "../client/lib/user-results.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -249,10 +248,10 @@ async function handle(message) {
       await state.browserServer.connect(browserServerTransport)
       const knownSecrets = [input.connection.apiKey, input.connection.password, input.connection.username]
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
-        presentNodeReply: async (reply, tool, facts) => {
+        presentNodeReply: async (reply, project) => {
           const outputFiles = await session.artifactStore.outputFiles(reply.structuredContent)
           let loginom
-          try { loginom = loginomFeedMetadata(reply, { tool, outputFiles, knownSecrets, facts }) } catch {}
+          try { loginom = project({ outputFiles, knownSecrets }) } catch {}
           return outputFiles.length || loginom ? { ...reply, _meta: { ...reply._meta,
             ...(loginom ? { loginom } : {}), ...(outputFiles.length ? { outputFiles } : {}) } } : reply
         },

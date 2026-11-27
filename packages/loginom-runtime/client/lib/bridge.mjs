@@ -27,7 +27,7 @@ import {javascriptContextReceiptSchema} from './javascript-context-read.mjs';
 import { createRecoveryContext } from './recovery-context.mjs';
 import { outcomeVerification } from './outcome-verification.mjs';
 import { createHostArtifactAdmission, codexInputIdentity } from './host-artifacts.mjs';
-import { compactActionResult, compactNodeRequestFailure, userResultSchema, compactKnowledgeBundle } from './user-results.mjs';
+import { compactActionResult, compactNodeRequestFailure, userResultSchema, compactKnowledgeBundle, loginomFeedMetadata } from './user-results.mjs';
 import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory, userActionKeys } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
@@ -779,10 +779,11 @@ export async function createBridge(config, session, { browserTransport: managedB
         return { isError: true, content: [{ type: 'text', text: message }] };
       }
     };
-    const presentDeliveredNode = (reply, tool) => presentNodeReply && userProfile && isNodeApiTool(tool)
-      && reply.structuredContent?.result_version === 'user-v1'
-      ? presentNodeReply(reply,tool,actionRuntime?.nodeFeedFacts(reply.structuredContent.operation_id))
-      : reply;
+    const presentDeliveredNode = (reply, tool) => {
+      if(!presentNodeReply||!userProfile||!isNodeApiTool(tool)||reply.structuredContent?.result_version!=='user-v1')return reply;
+      const facts=actionRuntime?.nodeFeedFacts(reply.structuredContent.operation_id);
+      return presentNodeReply(reply,options=>loginomFeedMetadata(reply,{...options,tool,facts}));
+    };
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       const reply=await callTool(request,extra);
       const delivered=userProfile && ['local','action'].includes(catalog.routes.get(request.params.name))
