@@ -1214,6 +1214,35 @@ test('REST normalization keeps continuations when the last allowed clean read co
  assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
 });
 
+for(const cleanAfter of [4900,5200,Infinity])
+test('REST normalization confirms the same Save at '+cleanAfter+' ms',async()=>{
+ const page=await restSavePage([true]);
+ const session=page.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.Session;
+ const reads=[];
+ let savedAt;
+ const click=page.click.bind(page);
+ page.click=async item=>{
+  await click(item);
+  if(item.symbol==='native-save')savedAt=page.clock;
+ };
+ session.IsPackageModified=async()=>{
+  if(savedAt===undefined)return true;
+  const elapsed=page.clock-savedAt;
+  reads.push(elapsed);
+  // The control RPC starts at the cutoff and receives its reply 200 ms later.
+  if(elapsed>=5000)await page.waitForTimeout(200);
+  return page.clock-savedAt<cleanAfter;
+ };
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ const clean=cleanAfter!==Infinity;
+ assert.equal(outcome.status,clean?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(outcome));
+ if(clean)assert.equal(outcome.output.workflow_continuations.length,1);
+ else assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
+ assert.deepEqual(reads.filter(ms=>ms>=5000),cleanAfter<5000?[]:[5000]);
+ assert.equal(outcome.trace.find(e=>e.event==='rest_package_normalization').modified_after,!clean);
+ assert.equal(page.saveWrites,2);
+});
+
 test('REST normalization stops if the native session changes between modified-state reads',async()=>{
  const page=await restSavePage([true,true,false]);
  const connection=page.app.Application.FInstance.FMainForm.FMapTree.FServerConnection;

@@ -1911,7 +1911,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       if (!binding) throw Error('REST package normalization requires its prepared session storage identity');
       const read = async cleanDeadline => (await page.evaluate(readSavedState, {
         sessionId: binding.session_id, documentId: binding.document_id, account: binding.loginom_account,
-        packagePath: before.path, origin: binding.origin, loginomBuild, cleanDeadline,
+        packagePath: before.path, origin: binding.origin, loginomBuild, cleanDeadline, confirmationDeadline: deadline,
       })).modified;
       modifiedBefore = await read();
       modifiedAfter = modifiedBefore;

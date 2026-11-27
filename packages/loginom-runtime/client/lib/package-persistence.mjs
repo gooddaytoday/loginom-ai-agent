@@ -52,6 +52,11 @@ export function readSavedPackageState(o) {
    checkOwner();
    modified=await read();
   }
+  // Confirm once after polling, while the original native owner can still be checked.
+  if(modified&&o.cleanDeadline!==undefined&&Date.now()<o.confirmationDeadline){
+   checkOwner();
+   modified=await read();
+  }
   return {version:1,session_id:o.sessionId,document_id:o.documentId,account:o.account,package_path:o.packagePath,
    modified,observation:'after_confirmed_save',read_only:true,persisted_content_verified:false};
  })();
