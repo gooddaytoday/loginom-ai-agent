@@ -129,7 +129,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     if(implementation?.afterOpen)await implementation.afterOpen(channel,operation.nodeApply.request);
     const opened=await channel.observe(implementation?.configurationObservation??{condition:'calculator expression page',readCalculator:true,ready:s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true});
     return verified({effect_possible:true,node_context:opened.prepared_node_context,...(preconfiguration?{preconfiguration}: {}),
-     ...(implementation?.type==='trees.to_table'?{deactivation_required:opening.deactivation_required}:{})});
+     ...(implementation?.type==='trees.to_table'?{deactivation_required:opening.deactivation_required,node_was_inactive:opening.node_was_inactive}:{})});
    },
    async configureCalculator(ctx,p) {
     enter(ctx);

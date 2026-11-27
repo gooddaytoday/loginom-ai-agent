@@ -469,7 +469,7 @@ for(const labelMode of ['composite','plain','existing composite'])test('tree-to-
  assert.deepEqual([configuration.composite_labels,configuration.label_separator],[composite_labels,composite_labels?'_':'.']);
  assert.deepEqual(performed,existing?['picker','option:_']:composite_labels?['btnSelectAll','pedCompositeColumnDisplayNames','picker','option:_']:['btnSelectAll']);
 });
-for(const deactivated of [false,true])test('tree separator refusal closes the owned draft and preserves prior effect facts (deactivation '+deactivated+')',async()=>{
+for(const [inactive,deactivated] of [[true,false],[false,true],[false,false]])test('tree separator refusal closes the owned draft (initially inactive '+inactive+', deactivation prompt '+deactivated+')',async()=>{
  const state=compositeState(),performed=[],implementation=tableImplementation();
  const node={document_id:'doc',workflow_id:'wf',node_id:'tree'};
  Object.assign(state.prepared_node_context,node,{locked:false});
@@ -488,14 +488,15 @@ for(const deactivated of [false,true])test('tree separator refusal closes the ow
  const verified={verified:true,cleanup_complete:true,effect_possible:false};
  const runtime={tools:nodeApiTools,startNodeApply:request=>applyNode({request,operation,handlers,record:async event=>event,now:()=>1,drivers:{
   verifySource:async()=>verified,prepareTarget:async()=>({...verified,node}),mapPorts:async()=>verified,
-  openWizard:async()=>({...verified,effect_possible:true,deactivation_required:deactivated}),
+  openWizard:async()=>({...verified,effect_possible:true,deactivation_required:deactivated,node_was_inactive:inactive}),
   configureCalculator:(_ctx,parameters)=>implementation.configure(channel,parameters,{request}),
   finish:async()=>assert.fail('Done must not run'),
   finishGraph:async()=>assert.fail('Graph finish must not run'),
  }})};
  const result=await dispatchNodeApi(runtime,'dock_node_apply',request);
+ const effectPossible=!inactive||deactivated;
  assert.deepEqual([result.status,result.effect_possible,result.cleanup_complete,result.pending_phase],
-  [deactivated?'FAILED':'NOT_APPLIED',deactivated,true,null]);
+  [effectPossible?'FAILED':'NOT_APPLIED',effectPossible,true,null]);
  assert.deepEqual(result.error,{code:'REQUEST_REJECTED',message:TREE_LABEL_SEPARATOR_REQUIRES_COMPOSITE});
  assert.deepEqual(performed,['close']);
  assert.equal(state.node_tree.label_separator,'.');

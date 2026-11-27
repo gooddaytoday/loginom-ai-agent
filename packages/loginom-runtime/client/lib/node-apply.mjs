@@ -307,8 +307,9 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&closed.settings_applied===false&&closed.execution_started===false&&closed.package_saved===false
         &&closed.node_context?.verified===true&&closed.node_context.surface==='graph'&&closed.node_context.locked===false
         &&['document_id','workflow_id','node_id'].every(k=>closed.node_context[k]===state.node?.[k])){
-        // Close proves the draft had no effect. Preserve earlier graph edits or native deactivation.
-        const effectPossible=state.phases.some(p=>p.phase==='open'?p.value.deactivation_required!==false:p.effect_possible);
+        // Close proves the draft had no effect. An active node can be deactivated without a confirmation.
+        const effectPossible=state.phases.some(p=>p.phase==='open'
+          ?p.value.node_was_inactive!==true||p.value.deactivation_required!==false:p.effect_possible);
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=effectPossible;state.pending=null;state.cleanup_complete=true;treeSeparatorRefused=true;
       }
