@@ -267,11 +267,13 @@ function SessionScreenContent(props: {
 
   const platform = usePlatform()
   const pluginHost = usePluginHost()
+
   const permissionWaiting = createMemo(() => {
     const request = composer.requests.permissionRequest()
 
     return request && pluginHost.items(PermissionDock).find((item) => item.value.matches(request))?.value.waiting
   })
+
   const [permissionTraces, setPermissionTraces] = createStore<Record<string, readonly string[]>>({})
   const [headerGap, setHeaderGap] = createSignal<HTMLElement>()
 

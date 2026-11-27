@@ -662,6 +662,7 @@ for (const decision of ["once", "conversation", "reject", "feedback"] as const) 
     await expect(page.getByText("Жду вашего разрешения — внизу")).toBeVisible()
     await expect(dock.getByText("В этом разговоре: сохранять пакеты в Loginom")).toBeVisible()
     await expect(page.locator('[data-component="composer"]')).toHaveCount(0)
+
     if (decision === "once") {
       for (const [width, height] of [
         [1440, 900],
@@ -676,6 +677,7 @@ for (const decision of ["once", "conversation", "reject", "feedback"] as const) 
 
         await page.screenshot({ path: info.outputPath(`permission-${width}x${height}.png`), animations: "disabled" })
       }
+
       await dock.getByRole("button", { name: "Разрешить один раз" }).click()
       await expect(page.getByText(/^Вы разрешили один раз:/)).toBeVisible()
       expect(replies).toEqual([{ decision: "once" }])
@@ -694,6 +696,7 @@ for (const decision of ["once", "conversation", "reject", "feedback"] as const) 
       await expect(page.getByText(/^Вы отклонили:/)).toBeVisible()
       expect(replies).toEqual([{ decision: "reject" }])
     }
+
     await expect(dock).toHaveCount(0)
   })
 }
