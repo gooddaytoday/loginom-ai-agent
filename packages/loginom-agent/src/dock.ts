@@ -24,6 +24,7 @@ import { exactScanReceipt } from "./file-profile-core"
 import type { ServiceHost } from "./host"
 import { permissionFailure, type localFiles } from "./local-file"
 import { loginomResultState, loginomResultSummary } from "./loginom-result"
+import { packageVariablesMetadata } from "./package-variables"
 
 type Lease = ServiceHost.Lease
 type Files = Awaited<ReturnType<typeof localFiles>>
@@ -301,10 +302,14 @@ export async function dockTools(input: {
         ? [{ type: "file" as const, uri: `data:${block.mimeType};base64,${block.data}`, mime: block.mimeType }]
         : [],
     )
+    const loginom = packageInput && result._meta?.confirmedLocalPackage === true
+      ? await packageVariablesMetadata(Buffer.from(packageInput.file.data, "base64"))
+      : undefined
     return {
       content: images.length ? [{ type: "text", text: content }, ...images] : content,
       metadata: {
         generation: lease.generation,
+        ...(loginom ? { loginom } : {}),
         ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
         // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
         ...(outputPath ? { truncated: true, outputPath } : {}),
