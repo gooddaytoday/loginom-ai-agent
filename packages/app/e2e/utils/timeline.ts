@@ -109,6 +109,7 @@ type TimelineServerInput = Partial<
   Pick<
     MockServerConfig,
     | "provider"
+    | "rpc"
     | "inbox"
     | "configEntries"
     | "forms"

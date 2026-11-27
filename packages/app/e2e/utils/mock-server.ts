@@ -138,6 +138,7 @@ export interface MockServerConfig {
   // Runs on DELETE .../connect/oauth/:attemptID, which closes an OAuth attempt the dialog left.
   onIntegrationOAuthCancel?: (attemptID: string) => void
   plugins?: Resolvable<unknown[]>
+  rpc?: (call: { rpcID: string; method: string; body: unknown }) => { output: unknown } | undefined
   skills?: Resolvable<unknown[]>
   // Replaces the `/api/worktree` inventory, which defaults to the directory plus project sandboxes.
   worktrees?: Resolvable<unknown[]>
@@ -1220,15 +1221,17 @@ function mockHandlers(
             cursor: { next: offset + limit < ordered.length ? String(offset + limit) : undefined },
           })
         },
-        // The goal plugin's pill reads each routed session's goal; no scenario sets one.
-        rpcCall: (ctx) =>
-          ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get"
-            ? Effect.succeed({ output: null })
-            : Effect.fail(
-                new MockUnsupported({
-                  message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC`,
-                }),
-              ),
+        rpcCall: ({ params, payload }) => {
+          const response = config.rpc?.({ ...params, body: payload })
+
+          if (response) return Effect.succeed(response)
+
+          if (params.rpcID === "opencode.goal" && params.method === "get") return Effect.succeed({ output: null })
+
+          return Effect.fail(
+            new MockUnsupported({ message: `The mock server has no ${params.rpcID}.${params.method} RPC` }),
+          )
+        },
         sessionActive: () => {
           const status = resolve(config.sessionStatus ?? {})
 

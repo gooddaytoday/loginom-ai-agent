@@ -1,44 +1,17 @@
 import { Option, Schema } from "effect"
-import { LoginomEvidence, LoginomMetadata } from "./loginom-metadata"
+import { Definition, type Fact, type Reason, Report, Request } from "@opencode/schema/loginom-app-verified"
+import { LoginomMetadata } from "./loginom-metadata"
 
-const request = Schema.Struct({ sessionID: Schema.NonEmptyString, promptID: Schema.NonEmptyString })
-const source = Schema.Struct({
-  operationId: Schema.NonEmptyString,
-  attempt: Schema.optional(Schema.Int),
-  messageID: Schema.String,
-  toolCallID: Schema.String,
-  nodeGuid: Schema.optional(Schema.String),
-})
-const summaryFact = Schema.Struct({
-  evidence: LoginomEvidence,
-  source,
-  relativeToSave: Schema.optional(
-    Schema.Struct({
-      timing: Schema.Literals(["before", "after"]),
-      source,
-    }),
-  ),
-})
-const reason = Schema.Literals([
-  "promptUnavailable",
-  "noTableReadReceipt",
-  "unreadTableRows",
-  "noExecutionReceipt",
-  "noSaveReceipt",
-  "noSavedGraphReadReceipt",
-  "noSavedVersionExecutionReceipt",
-])
-const report = Schema.Struct({ facts: Schema.Array(summaryFact), notVerified: Schema.Array(reason) })
-const schema = (value: typeof request | typeof report) =>
+const schema = (value: typeof Request | typeof Report) =>
   Schema.toJsonSchemaDocument(value, { referencePolicy: () => undefined }).schema
 
 export const appVerifiedRpc = {
-  id: "loginom.appVerified",
-  methods: { summary: { input: schema(request), output: schema(report) } },
+  id: Definition.id,
+  methods: { summary: { input: schema(Request), output: schema(Report) } },
   events: {},
 } as const
 
-export const decodeAppVerifiedRequest = Schema.decodeUnknownSync(request)
+export const decodeAppVerifiedRequest = Schema.decodeUnknownSync(Request)
 const decodeReceipt = Schema.decodeUnknownOption(Schema.Struct({ generation: Schema.Int, loginom: LoginomMetadata }))
 
 type Message = {
@@ -50,14 +23,14 @@ type Message = {
   )[]
 }
 
-export function appVerifiedSummary(messages: readonly Message[], promptID: string): typeof report.Type {
+export function appVerifiedSummary(messages: readonly Message[], promptID: string): typeof Report.Type {
   const start = messages.findIndex((message) => message.type === "user" && message.id === promptID)
   if (start === -1) return { facts: [], notVerified: ["promptUnavailable"] }
 
   const facts = new Map<
     string,
     {
-      fact: typeof summaryFact.Type
+      fact: Fact
       generation: number
       window?: LoginomMetadata["receiptWindow"]
     }
@@ -101,7 +74,7 @@ export function appVerifiedSummary(messages: readonly Message[], promptID: strin
   const saves = entries
     .filter(({ fact, window }) => fact.evidence.kind === "saved" && window !== undefined)
     .sort((left, right) => (right.window?.confirmedAt ?? 0) - (left.window?.confirmedAt ?? 0))
-  const linked = entries.map((entry): typeof summaryFact.Type => {
+  const linked = entries.map((entry): Fact => {
     const { fact, generation, window } = entry
     if (fact.evidence.kind !== "executed" || !window) return fact
     for (const save of saves) {
@@ -117,7 +90,7 @@ export function appVerifiedSummary(messages: readonly Message[], promptID: strin
     return fact
   })
   const observed = new Set(linked.map(({ evidence }) => evidence.kind))
-  const notVerified: (typeof reason.Type)[] = []
+  const notVerified: Reason[] = []
   if (!observed.has("tableRead")) notVerified.push("noTableReadReceipt")
   if (linked.some(({ evidence }) => evidence.kind === "tableRead" && evidence.rowsRead < evidence.rowCount))
     notVerified.push("unreadTableRows")

@@ -17,7 +17,7 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { useSettings } from "@/settings/model"
 import { useServer } from "@/runtime/server/current"
 import { useWorkspaceLocation } from "@/workspaces/location"
-import { Timeline } from "@opencode/session-ui/timeline/projection"
+import { Timeline, type TimelineRow } from "@opencode/session-ui/timeline/projection"
 import { createSessionTimelineRowRenderer } from "@opencode/session-ui/timeline/row"
 import { createNextTimelineRowRenderer, laneGap, StatusLane, timelineStatus } from "@opencode/session-ui/timeline-next"
 import { getReadyMarkdown, preloadMarkdown } from "@opencode/session-ui/markdown-cache"
@@ -325,6 +325,32 @@ function MessageTimelineView(
     padding: turnPadding,
     anchor: props.anchor,
     revealPart: virtualized.revealPart,
+    renderTurnResult: (row: Accessor<TimelineRow.AssistantPart>, settled: Accessor<boolean>) => (
+      <Show
+        when={
+          settled() &&
+          projection.lastAssistantGroupKey().get(row().userMessageID) === row().group.key &&
+          row().userMessageID
+        }
+        keyed
+      >
+        {(promptID) => (
+          <PluginSlot
+            at="session.turn.result"
+            input={{
+              get session() {
+                return props.view
+              },
+              promptID,
+              get messages() {
+                return projection.assistantMessagesByParent().get(promptID) ?? []
+              },
+              revealTool: virtualized.revealPart,
+            }}
+          />
+        )}
+      </Show>
+    ),
   }
 
   const rowRenderer = props.next

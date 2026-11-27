@@ -1,4 +1,7 @@
 import { Schema } from "effect"
+import { LoginomEvidence } from "@opencode/schema/loginom-app-verified"
+
+export { LoginomEvidence }
 
 const count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 const maxBytes = 16 * 1024
@@ -15,28 +18,6 @@ const cell = Schema.Struct({
   cell_type: Schema.optional(Schema.Union([Schema.String, Schema.Number])),
   non_finite: Schema.optional(Schema.String),
 })
-
-export const LoginomEvidence = Schema.Union([
-  Schema.Struct({
-    kind: Schema.Literal("tableRead"),
-    port: count,
-    portGuid: Schema.NonEmptyString,
-    rowsRead: count,
-    rowCount: count,
-    executionId: Schema.optional(Schema.NonEmptyString),
-  }).check(Schema.makeFilter((read) => read.rowsRead <= read.rowCount)),
-  Schema.Struct({
-    kind: Schema.Literal("executed"),
-    executionId: Schema.NonEmptyString,
-    scope: Schema.Literal("workspace"),
-  }),
-  Schema.Struct({ kind: Schema.Literal("saved"), path: Schema.NonEmptyString }),
-  Schema.Struct({
-    kind: Schema.Literal("savedGraphRead"),
-    nodeCount: count,
-    scope: Schema.Literal("activeWorkflow"),
-  }),
-])
 
 export const LoginomMetadata = Schema.Struct({
   v: Schema.Literal(1),

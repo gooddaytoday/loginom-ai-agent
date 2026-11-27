@@ -1,5 +1,6 @@
 import { Option, Schema } from "effect"
 import type { Plugin } from "@opencode/plugin/gui"
+import type { LoginomEvidence } from "@opencode/schema/loginom-app-verified"
 import type definition from "./index"
 
 type Copy = Pick<Parameters<Plugin.Setup<typeof definition>>[0], "t" | "plural">
@@ -46,24 +47,38 @@ export const decodeProgress = Schema.decodeUnknownOption(Progress)
 
 type Facts = Option.Option.Value<ReturnType<typeof decodeFacts>>
 
+type PhraseFact = ReturnType<typeof decodeFacts> | typeof LoginomEvidence.Type
+
 function operation(facts?: Facts) {
   if (facts?.kind !== "read" && facts?.node?.type.startsWith("imports.") && facts.ports?.length) return "import"
 
   return facts?.kind
 }
 
-/** Formats the outcome of a completed call, for either a step row or a turn summary. */
-export function loginomStepPhrase(
-  copy: Copy,
-  input: ReturnType<typeof decodeFacts>,
-  options?: { pending?: boolean; lowercase?: boolean },
-) {
+/** Formats Loginom facts for a step row, turn summary, or the application verification card. */
+export function loginomStepPhrase(copy: Copy, input: PhraseFact, options?: { pending?: boolean; lowercase?: boolean }) {
   const phrase = completedTitle(copy, input, options?.pending)
 
   return options?.lowercase ? phrase.replace(/^\p{Lu}/u, (first) => first.toLowerCase()) : phrase
 }
 
-function completedTitle(copy: Copy, input: ReturnType<typeof decodeFacts>, pending = false) {
+function completedTitle(copy: Copy, input: PhraseFact, pending = false) {
+  if ("kind" in input) {
+    switch (input.kind) {
+      case "tableRead":
+        return copy.t(input.executionId ? "verified.resultRead" : "verified.tableRead", {
+          rowsRead: input.rowsRead,
+          rowCount: input.rowCount,
+        })
+      case "executed":
+        return copy.t("verified.executed")
+      case "saved":
+        return copy.t("verified.saved", { path: input.path })
+      case "savedGraphRead":
+        return copy.t("verified.savedGraphRead", { nodeCount: input.nodeCount })
+    }
+  }
+
   const facts = Option.getOrUndefined(input)
 
   if (pending || facts?.state === "running") return copy.t("step.pending")

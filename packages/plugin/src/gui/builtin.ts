@@ -1,10 +1,11 @@
 // The parts of the SDK only the app's built-in plugins use, for workspace imports only: `tsconfig.build.json` leaves it
 // out of `dist`, and `script/pack.ts` exports it as `null`. Public SDK modules never import it.
 
+import type { SessionMessageAssistant } from "@opencode/client/promise"
 import type { Schema } from "effect"
 import type { Context } from "./context.js"
 import { Registry, type Catalog, type Messages, type Persisted, type StoreDeclaration, type StoreFrom } from "./core.js"
-import type { Desktop, Layout, Locale, StorageScope, StoreOptions } from "./host-apis.js"
+import type { Desktop, Layout, Locale, MountedSession, StorageScope, StoreOptions } from "./host-apis.js"
 import type { MainContext } from "./main.js"
 import type { Command, IconName, Panel, PanelTab, SlotMap } from "./registries.js"
 import { type JSX } from "solid-js"
@@ -171,6 +172,20 @@ export const Page = Registry.define<Page>("page")
 
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
+  /** Content under the final answer of a completed turn. */
+  readonly "session.turn.result": {
+    /** The session that owns the turn. */
+    readonly session: MountedSession
+    /** The user message that started the turn. */
+    readonly promptID: string
+    /** Assistant messages associated with the prompt, in transcript order. */
+    readonly messages: readonly SessionMessageAssistant[]
+    /**
+     * Reveals a tool call in the same timeline. Returns whether the call is in the timeline.
+     * @param id - The tool call's transcript ID.
+     */
+    revealTool(id: string): boolean
+  }
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */
   readonly "session.location.branch.menu": SlotMap["session.location.menu"]
   /** Items after the host's copy and reveal actions in the session directory's path submenu. Requires an owning screen. */
