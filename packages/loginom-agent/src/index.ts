@@ -14,6 +14,8 @@ import { BrowserRecovery } from "./browser-recovery"
 import { connectionSettings } from "./connection-settings"
 import { Dashboard } from "./dashboard"
 import { DashboardTarget } from "./dashboard-target"
+import { Definition as Packages } from "./package-list-contract"
+import { packageListHandlers } from "./package-list"
 import { dashboardTools } from "./dashboard-tools"
 import { dockTools } from "./dock"
 import { fileTools } from "./file-profile"
@@ -520,6 +522,7 @@ export default Plugin.define({
       prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),
       find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),
     })
+    await ctx.rpc.register(Packages, packageListHandlers())
     await ctx.rpc.register(permission, {
       conversation: async (value, call) => {
         const input = value as { sessionID: string; requestID: string }
