@@ -202,7 +202,8 @@ export function createTreeNodeSupport(config,{json}){
     await setBool('pedRepeatParentNodeValues',p.repeat_parents);await setBool('pedCompositeColumnNames',p.composite_names);
     const compositeLabels=p.composite_labels??s.node_tree.composite_labels;
     if(p.label_separator!==undefined&&s.node_tree.label_separator!==p.label_separator){
-     // Loginom retains the separator after composite labels are turned off.
+     // Loginom 7.4.2 enables the list only with composite labels and retains the draft choice when they are off (LAB-2105).
+     // Loginom replaces spaces in option tids with underscores (LAB-1815).
      await setBool('pedCompositeColumnDisplayNames',true);
      const names={'.':'Точка (.)','|':'Вертикальная черта (|)',' ':'Пробел ( )','-':'Дефис (-)','_':'Подчёркивание (_)'};
      const control=s.node_tree.base+'pedCompositeDisplayNameSeparator;ValueControl',option=control+';boundlist;'+names[p.label_separator].replaceAll(' ','_');
