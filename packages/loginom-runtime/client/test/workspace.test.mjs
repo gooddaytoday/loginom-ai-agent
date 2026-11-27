@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runInNewContext, createContext, runInContext } from 'node:vm';
-import { makeWorkspacePrepareCode, makeWorkspaceBootstrapCode, makeWorkspaceStepCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace } from '../lib/workspace.mjs';
+import { makeBuildGraphCode, makeWorkspacePrepareCode, makeWorkspaceBootstrapCode, makeWorkspaceStepCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace } from '../lib/workspace.mjs';
 import {prepareTool} from '../lib/skill.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
 import { createSerialGate } from '../lib/clipboard.mjs';
@@ -653,6 +653,27 @@ test('repeat dock_prepare accepts a manually saved draft with the same native ow
   assert.equal(second.workflow_ref.workflow_id,first.workflow_ref.workflow_id);
   assert.equal(second.package_ref.path,'/user/manual.lgp');
   assert.equal(fixture.events.filter(e=>e==='create_draft').length,1);
+});
+
+test('counts the named active workflow of an unsaved draft without changing Loginom', async()=>{
+  const fixture=pageFixture({authenticated:true,nativeWorkflow:true});
+  const prepared=await execute(fixture), tab=fixture.tabs[0];
+  assert.equal(prepared.package_ref.path,null);
+  const workflowRef={...prepared.workflow_ref,document_id:prepared.document_id};
+  const count=runInNewContext(makeBuildGraphCode({loginomUrl:'http://loginom.example/app',build,sessionId:'standalone',workflowRef}));
+  tab.model.FDiagram.FNodes={FCollection:[]};
+  const read=async()=>JSON.parse(JSON.stringify((await count(fixture.page)).output));
+  const events=[...fixture.events];
+  const navigation=tab.crumbs.map(part=>part.textContent);
+  assert.deepEqual(await read(),{status:'READY',node_count:0,navigation});
+  tab.model.FDiagram.FNodes.FCollection.push({FGuid:'source'},{FGuid:'result'});
+  assert.deepEqual(await read(),{status:'READY',node_count:2,navigation});
+  tab.model.FDiagram.FNodes.FCollection.push({FGuid:'result'});
+  assert.equal((await read()).node_count,undefined);
+  tab.model.FDiagram.FNodes.FCollection.pop();
+  fixture.setBlocked(true);
+  assert.equal((await read()).node_count,undefined);
+  assert.deepEqual(fixture.events,events);
 });
 
 test('new Apply preflight reads manual Save navigation without replacing the issued preparation', async()=>{

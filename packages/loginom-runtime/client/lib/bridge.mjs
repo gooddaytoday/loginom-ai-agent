@@ -15,11 +15,12 @@ import { openArchive } from './archive.mjs';
 import { diagnoseConnection } from './diagnostics.mjs';
 import { actionDescribeTool, pinActionCatalog, assertCatalogTarget, validateActionParameters, BUNDLED_CATALOG_RELEASES } from './action-catalog.mjs';
 import { createActionRuntime, parseCapabilityResult } from './executor.mjs';
+import { nodeBuildFacts, saveBuildFacts } from './build-facts.mjs';
 import {createCandidateNodeSupport} from './node-support.mjs';
 import {NODE_ADD_ONLY_MODE,NODE_TYPES} from './node-contracts.mjs';
 import {readGraph} from './node-target-browser.mjs';
 import {isNodeApiTool,dispatchNodeApi} from './node-api.mjs';
-import { makeWorkspacePrepareCode, makeWorkspaceStepCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace, workspaceObserveTool, packageReadOnlyAdvice } from './workspace.mjs';
+import { makeBuildGraphCode, makeWorkspacePrepareCode, makeWorkspaceStepCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace, workspaceObserveTool, packageReadOnlyAdvice } from './workspace.mjs';
 import { makeBrowserGeometryCode, parseBrowserGeometry } from './browser-geometry.mjs';
 import { createExecutionJournal } from './execution-journal.mjs';
 import {createRedactor} from './redact.mjs';
@@ -93,7 +94,7 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
   return inherited;
 }
 
-export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, reauthenticateReload } = {}) {
+export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, reauthenticateReload, buildFacts = false } = {}) {
   if (config.closeSavedPackageOnShutdown !== undefined && typeof config.closeSavedPackageOnShutdown !== 'boolean'
       || config.closeSavedPackageOnShutdown === true && config.acceptanceCleanupPackage)
     throw Error('Invalid private saved-package cleanup policy');
@@ -394,7 +395,21 @@ export async function createBridge(config, session, { browserTransport: managedB
         : 'Call dock_prepare for scenario work after skill activation. It returns dynamic readiness, input artifacts and local skill pins. Dock provides shared knowledge and a local browser. Source files and live DOM take precedence over recalled context. All clipboard copy/paste must use dock_clipboard_transfer so other Dock sessions cannot overwrite it during the operation. The installed native adapter activates shared session archiving after successful preparation. Check dock_diagnostics for actual archive activation and delivery state.'),
     });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [...structuredClone(catalog.tools), ...recovery.listTools(browserTools)] }));
-    const callTool = async (request, extra, privatePackage=null, scanReceipt=undefined) => {
+    const observeBuildGraph = async (facts, signal) => {
+      const prepared=session.metadata.workspacePreparation?.state;
+      if(signal.aborted||!prepared||prepared.document_id!==facts.document_id
+        ||prepared.workflow_ref.workflow_id!==facts.workflow_id||actionRuntime.hasUnsettledWork())return;
+      try {
+        const code=makeBuildGraphCode({loginomUrl:config.loginomUrl,build:session.metadata.targetIdentity.loginom_build,
+          sessionId:session.metadata.sessionId,workflowRef:{...prepared.workflow_ref,document_id:facts.document_id}});
+        const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,{timeout:2000,signal});
+        const graph=parseCapabilityResult(response,{redactor}).output;
+        if(graph.status==='READY')facts.node_count={source:'workspace.graph',count:graph.node_count,navigation:graph.navigation};
+      } catch {
+        // A blocked or unavailable diagram leaves the count unverified.
+      }
+    };
+    const callTool = async (request, extra, privatePackage=null, scanReceipt=undefined, reportBuildFacts) => {
       if (shutdownStarted) throw new McpError(ErrorCode.InvalidRequest, 'Dock shutdown has started');
       if (recovery.owns(request.params.name)) {
         requirePreparedWorkspace(session.metadata);
@@ -540,6 +555,12 @@ export async function createBridge(config, session, { browserTransport: managedB
                 &&state.package_ref?.persisted===false&&state.package_ref.path===null)
                 ownedUnsavedDraft.state=structuredClone(state);
               if (userProfile && session.metadata.workspaceReady === true) userWorkflows.remember(state);
+              if(reportBuildFacts&&state.status==='READY'){
+                const facts={kind:'workspace',document_id:state.document_id,workflow_id:state.workflow_ref.workflow_id,
+                  operation_id:state.operation_id??preparationRequest.operation_id};
+                await observeBuildGraph(facts,extra.signal);
+                reportBuildFacts(facts);
+              }
               return state;
             });
             if(localPackageUpload&&workspace.status!=='READY')throw Error('Local package opening was not verified: '+workspace.reason);
@@ -679,6 +700,14 @@ export async function createBridge(config, session, { browserTransport: managedB
               if(userProfile)userWorkflows.rememberDelivery(result,args);
               await logResult(request.params.name,result);
               const reply=nodeResultReply(result,{userProfile,tool:request.params.name});
+              if(reportBuildFacts&&!reply.isError){
+                const facts=nodeBuildFacts(result);
+                const prepared=session.metadata.workspacePreparation?.state;
+                if(facts&&prepared?.document_id===facts.document_id&&prepared.workflow_ref?.workflow_id===facts.workflow_id){
+                  await observeBuildGraph(facts,extra.signal);
+                  reportBuildFacts(facts);
+                }
+              }
               if(observedPackage&&!reply.isError){
                 reply.content.push({type:'text',text:JSON.stringify({kind:'dock_package_observation',package_ref:observedPackage})});
                 return boundedUserToolReply(reply,{tool:request.params.name,operationId:args.operation_id});
@@ -766,9 +795,11 @@ export async function createBridge(config, session, { browserTransport: managedB
             }
             const operationId=saveRequest&&args.operation_id===undefined?randomUUID():args.operation_id;
             const newSave=saveRequest&&!saveAdmissions.has(operationId);
+            const preparedForSave=session.metadata.workspacePreparation?.state;
             const saveAdmission=newSave?{
               sequence:saveSequence++,action_key:args.action_key,path:args.parameters?.path,
-              document_id:session.metadata.workspacePreparation?.state?.document_id}:null;
+              document_id:preparedForSave?.document_id,workflow_id:preparedForSave?.workflow_ref?.workflow_id,
+              navigation:preparedForSave?.workflow_ref?.navigation_path?.map(part=>part.label)}:null;
             const outcome = request.params.name === 'dock_workspace_observe' ? await actionRuntime.observe({ signal: extra.signal, scope: args.scope, cursor: args.cursor, rootRef: args.root_ref, observationId: args.observation_id, storageName: args.storage_name })
               : request.params.name === 'dock_operation_inspect' ? await actionRuntime.inspect({ operationId: args.operation_id, signal: extra.signal })
                 : request.params.name === 'dock_operation_recover' ? await actionRuntime.recover(args.operation_id,
@@ -797,6 +828,9 @@ export async function createBridge(config, session, { browserTransport: managedB
               &&outcome.output.cleanup_confirmed===true&&outcome.output.outcome?.operation_id===args.operation_id
                 ?outcome.output.outcome:null;
             const admission=confirmedSave&&saveAdmissions.get(confirmedSave.operation_id);
+            const buildSave=reportBuildFacts&&admission?.document_id===preparedForSave?.document_id
+              &&admission?.workflow_id===preparedForSave?.workflow_ref?.workflow_id
+              ?saveBuildFacts(confirmedSave,admission):undefined;
             // Reconciliation confirms the original admission, not a new Save.
             // An older receipt can never supersede a later confirmed mutation.
             if(admission&&confirmedSave.status==='SUCCEEDED'&&confirmedSave.action_key===admission.action_key
@@ -868,9 +902,12 @@ export async function createBridge(config, session, { browserTransport: managedB
                 const prepared=session.metadata.workspacePreparation?.state;
                 const options={sessionId:session.metadata.sessionId,documentId:prepared?.document_id,
                   account:prepared?.loginom_account??config.replayLoginUser,packagePath:savedOutcome.output.package_ref.path,
-                  loginomUrl:config.loginomUrl,loginomBuild:session.metadata.targetIdentity.loginom_build};
+                  loginomUrl:config.loginomUrl,loginomBuild:session.metadata.targetIdentity.loginom_build,
+                  ...(buildSave?{checkExistence:true}:{})};
                 const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code:makeSavedPackageStateCode(options)}},undefined,{timeout:15000});
                 const state=parseSavedPackageState(response,options),advice=savedPackageStateAdvice(state,savedOutcome);
+                if(buildSave&&state.exists===true)buildSave.package_path={source:'storage.FileExists',path:state.package_path};
+                if(buildSave&&state.exists===false)delete buildSave.package_path;
                 await recordExecution({phase:'saved_package_state_observed',operation_id:savedOutcome.operation_id,state,advice});
                 reply.content.push({type:'text',text:JSON.stringify(advice)});
               }catch{
@@ -885,6 +922,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                     reason:'SAVE_STATE_UNCONFIRMED',instruction:'Start browser recovery for this save yourself; do not ask the user to act in the interface.'}}:{})})});
               }
             }
+            if(buildSave)reportBuildFacts(buildSave);
             try {
               const verification = outcomeVerification(outcome, pinnedActions.actions.get(outcome.action_key));
               await recordExecution({ phase: 'verification_delivered', operation_id: outcome.operation_id, verification });
@@ -960,14 +998,19 @@ export async function createBridge(config, session, { browserTransport: managedB
         return { isError: true, content: [{ type: 'text', text: message }] };
       }
     };
-    server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-      const reply=await callTool(request,extra);
-      return userProfile && ['local','action'].includes(catalog.routes.get(request.params.name))
+    const callWithBuildFacts = async (request, extra, privatePackage, scanReceipt, checkBudget=false) => {
+      let facts;
+      const reply=await callTool(request,extra,privatePackage,scanReceipt,buildFacts ? value => { facts=value; } : undefined);
+      const delivered=checkBudget && userProfile && ['local','action'].includes(catalog.routes.get(request.params.name))
         ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
-    });
+      return facts && !delivered.isError
+        ? {...delivered,_meta:{...delivered._meta,loginomBuild:redactor.redact(facts)}}
+        : delivered;
+    };
+    server.setRequestHandler(CallToolRequestSchema, (request, extra) => callWithBuildFacts(request,extra,null,undefined,true));
     return { server, catalog,
       applyWithScanReceipt(args,receipt,extra) {
-        return callTool({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);
+        return callWithBuildFacts({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);
       },
       async prepareLocalPackage(args,pair,extra) {
         if(!userProfile||!actionRuntime||!config.storageDirectories||args?.intent!=='open_package'
@@ -977,7 +1020,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         if(!/\.lgp$/i.test(artifact.name)||artifact.upload.overwrite!=='reject')
           throw Error('Private package preparation requires an admitted .lgp with reject upload policy');
         requireStorageDestination(artifact.upload.destination,config.storageDirectories,'packages');
-        return callTool({params:{name:'dock_prepare',arguments:args}},extra,artifact);
+        return callWithBuildFacts({params:{name:'dock_prepare',arguments:args}},extra,artifact);
       },
       hasActiveWork: () => !clipboardUncertain && (!!actionRuntime?.hasActiveWork() || recovery.unsettled()),
       cancelArtifactDeliveries: () => actionRuntime?.cancelArtifactDeliveries(),

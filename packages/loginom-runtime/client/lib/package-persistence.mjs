@@ -1,12 +1,12 @@
 // Read-only follow-up to a confirmed save. Never alters the save receipt or
 // discards changes; a reopened package can already be dirty in Loginom.
 export function makeSavedPackageStateCode(options) {
- const {sessionId,documentId,account,packagePath,loginomUrl,loginomBuild}=options;
+ const {sessionId,documentId,account,packagePath,loginomUrl,loginomBuild,checkExistence}=options;
  if(![sessionId,documentId,account].every(v=>typeof v==='string'&&v.length>0&&v.length<=200)
   ||loginomBuild!=='7.4.2'||typeof packagePath!=='string'||!/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+\.lgp$/.test(packagePath)
   ||packagePath.split('/').some(p=>p==='.'||p==='..'))throw Error('Exact saved package identity required');
  const url=new URL(loginomUrl);if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw Error('Invalid saved package origin');
- return `async page=>page.evaluate(${readSavedPackageState.toString()},${JSON.stringify({sessionId,documentId,account,packagePath,origin:url.origin,loginomBuild})})`;
+ return `async page=>page.evaluate(${readSavedPackageState.toString()},${JSON.stringify({sessionId,documentId,account,packagePath,origin:url.origin,loginomBuild,checkExistence})})`;
 }
 export function readSavedPackageState(o) {
  return (async()=>{
@@ -52,8 +52,24 @@ export function readSavedPackageState(o) {
    checkOwner();
    modified=await read();
   }
+  let exists;
+  if(o.checkExistence===true){
+   let timer, expired=false;
+   try{
+    const check=async()=>{
+     const storage=await before.session.get_FileStorage();
+     if(expired)return;
+     checkOwner();
+     const value=await storage.FileExists(o.packagePath);
+     checkOwner();
+     return typeof value==='boolean'?value:undefined;
+    };
+    exists=await Promise.race([check(),new Promise(resolve=>{timer=setTimeout(()=>{expired=true;resolve();},1200);})]);
+   }catch{}finally{clearTimeout(timer);}
+  }
   return {version:1,session_id:o.sessionId,document_id:o.documentId,account:o.account,package_path:o.packagePath,
-   modified,observation:'after_confirmed_save',read_only:true,persisted_content_verified:false};
+   modified,observation:'after_confirmed_save',read_only:true,persisted_content_verified:false,
+   ...(typeof exists==='boolean'?{exists}:{})};
  })();
 }
 export function parseSavedPackageState(response,expected) {

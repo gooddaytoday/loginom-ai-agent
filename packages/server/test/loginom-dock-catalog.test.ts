@@ -562,6 +562,76 @@ describe("loginom.product Dock catalog (B2.5d, 0.4 toolContributor)", () => {
 
 describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () => {
   it.live(
+    "turn facts RPC reads only this turn's trusted Dock metadata",
+    () =>
+      Effect.gen(function* () {
+        const text = '{"operation_id":"abc","status":"SUCCEEDED","output":{"save_completed":true}}'
+        const scope = { document_id: "abc-document", workflow_id: "abc-workflow" }
+        const evidence = {
+          kind: "node",
+          ...scope,
+          operation_id: "abc",
+          node_count: { source: "workspace.graph", count: 4, navigation: ["ABC", "Scenario"] },
+          execution: { source: "node.execution", execution_id: "exec", node_id: "final" },
+          final_port_rows: { source: "node.output.port", execution_id: "exec", port: 0, port_guid: "out", count: 25 },
+        }
+        const host = scriptedHost({
+          catalog: () => [dockTool("dock_node_wait")],
+          call: (input) => ({
+            content: [{ type: "text", text }],
+            ...((input.args as { path: string }).path === "with-proof" ? { _meta: { loginomBuild: evidence } } : {}),
+          }),
+        })
+        const test = yield* boot(host, undefined, { compaction: { keep: { tokens: 0 } } })
+        const sessionID = yield* test.create("ABC facts")
+        for (const path of ["with-proof", "without-proof"]) {
+          yield* test.wizard(sessionID, script({ tool: "loginom_dock_node_wait", input: { path } }, { text }))
+        }
+        const turns = (yield* test.sessions.context(sessionID)).filter((message) => message.type === "user")
+        const [run, unsupported] = turns
+        const input = (turnID: string) => ({ input: { sessionID, turnID } })
+        const route = "/api/rpc/loginom.build-facts/get"
+        const result = yield* test.call(route, input(run.id))
+        expect(result).toEqual({
+          status: 200,
+          body: {
+            output: {
+              metadata: {
+                loginom: {
+                  version: 1,
+                  scope: { ...scope, generation: 1 },
+                  facts: {
+                    node_count: { ...evidence.node_count, status: "verified", operation_id: "abc" },
+                    execution: { ...evidence.execution, status: "verified", operation_id: "abc" },
+                    final_port_rows: { ...evidence.final_port_rows, status: "verified", operation_id: "abc" },
+                    save_completed: { status: "unverified" },
+                    package_path: { status: "unverified" },
+                    reopened: { status: "unverified" },
+                    persisted_content: { status: "unverified" },
+                  },
+                },
+              },
+            },
+          },
+        })
+        const other = yield* test.call(route, input(unsupported.id))
+        expect(other.status).toBe(200)
+        const { facts } = other.body.output.metadata.loginom
+        expect(Object.values(facts)).toEqual(Array.from({ length: 7 }, () => ({ status: "unverified" })))
+        const [first] = yield* test.calls(sessionID)
+        if (first.state.status !== "completed") throw Error("Dock call failed")
+        expect(first.state.content).toEqual([{ type: "text", text }])
+        expect(first.state.metadata?.loginom).toEqual({ session_id: sessionID, turn_id: run.id, generation: 1, evidence })
+        yield* test.sessions.compact({ sessionID })
+        yield* test.sessions.wait(sessionID)
+        const compacted = yield* test.sessions.context(sessionID)
+        expect(compacted.some((message) => message.id === run.id)).toBe(false)
+        expect(yield* test.call(route, input(run.id))).toEqual(result)
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
     "host outputFiles are private metadata while model-facing output stays byte-identical",
     () =>
       Effect.gen(function* () {
@@ -1092,6 +1162,9 @@ describe("OpenCode hooks the Dock catalog relies on (contract)", () => {
 })
 
 function respond(request: LLMRequest) {
+  const last = request.messages.at(-1)
+  if (last && text(last).includes("<template>\n## Objective"))
+    return TestLLM.text("## Objective\n- Build the ABC scenario.", "test_summary")
   // Titles and other tool-less requests get plain text.
   const user = request.messages.findLastIndex((message) => message.role === "user" && text(message).includes("SCRIPT<"))
   if (user < 0 || request.tools.length === 0) return TestLLM.text("ok", "text_ok")

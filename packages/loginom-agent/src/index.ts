@@ -10,6 +10,7 @@ import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
+import { buildFactsRPC, turnBuildFacts } from "./build-facts"
 import { Dashboard } from "./dashboard"
 import { DashboardTarget } from "./dashboard-target"
 import { dashboardTools } from "./dashboard-tools"
@@ -491,6 +492,10 @@ export default Plugin.define({
       await binding.fork(event.sessionID)
     })
 
+    await ctx.rpc.register(buildFactsRPC, {
+      get: async ({ sessionID, turnID }) =>
+        turnBuildFacts(await ctx.session.history({ sessionID, afterMessageID: turnID, type: "assistant" }), sessionID, turnID),
+    })
     await ctx.rpc.register(runner, {
       start: async (value) => {
         // The RPC host validates the call against the JSON Schema above before the handler runs.
