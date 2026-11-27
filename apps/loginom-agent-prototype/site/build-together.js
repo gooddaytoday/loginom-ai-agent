@@ -5,7 +5,21 @@ const savePrompt = 'Сохрани как «Продажи — сборка» в
 const fixPrompt = 'Исправь имя узла «Левое» на «Слияние»'
 const workWarning = 'Агент работает в окне Loginom — не меняйте схему до конца шага'
 const interruptWarning = 'Вы изменили схему во время шага: шаг остановлен, ваши правки остались в окне'
-const csv = 'assets/sales-demo.csv'
+const csv = `date,product,region,quantity,amount
+2025-10-08,Кружка,Север,2,760
+2025-12-17,Термос,Центр,1,1490
+2026-01-09,Кружка,Север,3,1140
+2026-02-12,Блокнот,Юг,6,1740
+2026-02-24,Термос,Центр,2,2980
+2026-03-04,Блокнот,Север,4,1160
+2026-04-18,Кружка,Центр,5,1900
+2026-05-03,Термос,Юг,2,2980
+2026-07-21,Кружка,Север,1,380
+2026-10-30,Блокнот,Центр,3,870
+2027-01-05,Термос,Север,1,1490
+2027-01-12,Блокнот,Юг,2,580
+`
+const csvDownload = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
 const seconds = {import:90, filter:270, fix:120}
 const now = () => new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})
 const last = item => item.build.turns.at(-1)
@@ -73,21 +87,12 @@ export function createBuildTogether({state, esc, icon, render, composer, openSes
     turn.timer = setTimeout(() => finish(item, turn), seconds[step] * 1000 / 20)
   }
 
-  async function finish(item, turn) {
+  function finish(item, turn) {
     const build = item.build
     const pkg = build.pkg
     if (turn.step === 'import') {
-      try {
-        const response = await fetch(csv)
-        if (!response.ok) throw new Error('Учебный файл недоступен')
-        const [, ...rows] = (await response.text()).trim().split(/\r?\n/)
-        if (turn.status !== 'working') return
-        pkg.rows = rows
-      } catch {
-        if (turn.status !== 'working') return
-        stop(item, 'Не удалось прочитать sales-demo.csv. Можно повторить шаг.')
-        return
-      }
+      const [, ...rows] = csv.trim().split(/\r?\n/)
+      pkg.rows = rows
       pkg.nodes.import = 'Импорт'
       pkg.links.push(['import', 'result'])
       turn.answer = `Добавил узел «Импорт» для sales-demo.csv. Связал с узлом «${pkg.nodes.result}». Запустил импорт без ошибок · ${pkg.rows.length} строк.`
@@ -278,7 +283,7 @@ export function createBuildTogether({state, esc, icon, render, composer, openSes
   function turnView(item, turn) {
     const verification = turn.verification
     return `<div class="turn build-turn">
-      ${turn.prompt && !turn.retry ? `<div class="user-turn"><div class="user-message">${esc(turn.prompt)}${turn.step === 'import' ? `<div class="message-files"><a href="${csv}" download>${icon('file',14)} sales-demo.csv</a></div>` : ''}</div></div>` : ''}
+      ${turn.prompt && !turn.retry ? `<div class="user-turn"><div class="user-message">${esc(turn.prompt)}${turn.step === 'import' ? `<div class="message-files"><a href="${csvDownload}" download="sales-demo.csv">${icon('file',14)} sales-demo.csv</a></div>` : ''}</div></div>` : ''}
       <div class="agent-message"><span class="agent-avatar"><img src="assets/loginom.png" alt="" width="31" height="31"></span><div class="agent-body"><strong class="agent-caption">Loginom AI Agent</strong>
         <div class="answer-block build-answer">
           ${turn.retry ? '<p class="muted">Повтор шага</p>' : ''}
@@ -316,7 +321,7 @@ export function createBuildTogether({state, esc, icon, render, composer, openSes
         <div class="build-chat-title"><div><p class="eyebrow">Разговор</p><h1>${esc(item.title)}</h1></div>${moreButton('chat',item.id,`Действия с разговором «${item.title}»`).replace('row-more','row-more page-more')}</div>
         ${pkg ? packageLine(build) : ''}
         <div class="build-toolbar"><button class="btn" data-build="show" aria-expanded="${build.visible}">${icon('panel',17)} ${build.visible ? 'Скрыть окно Loginom' : 'Показать окно Loginom'}</button></div>
-        <div class="chat-timeline">${build.turns.length ? build.turns.map(turn => turnView(item, turn)).join('') : `<div class="answer-block build-intro"><p>Начните с импорта учебной таблицы. После шага можно изменить схему в окне Loginom и попросить агента продолжить.</p><a href="${csv}" download>${icon('file',16)} sales-demo.csv</a></div>`}</div>
+        <div class="chat-timeline">${build.turns.length ? build.turns.map(turn => turnView(item, turn)).join('') : `<div class="answer-block build-intro"><p>Начните с импорта учебной таблицы. После шага можно изменить схему в окне Loginom и попросить агента продолжить.</p><a href="${csvDownload}" download="sales-demo.csv">${icon('file',16)} sales-demo.csv</a></div>`}</div>
         <div class="chat-bottom">${suggestion ? `<button class="link-btn build-suggestion" data-build="${suggestion[0]}">${esc(suggestion[1])}</button>` : ''}${composer(item)}</div>
       </div>
       ${build.visible ? panel(item) : ''}

@@ -4,7 +4,8 @@ import { editedPackageBase64 } from './edited-package.js'
 import { icon } from './icons.js'
 import { renderHub, bindHub, hubHasInstalled, openHubSolution, showHubType, showHubTab, showHubDetail, installForDemo } from './hub.js'
 import { renderSettings, bindSettings, ensureSettings, beforeSettingsLeave, availableModels, usableModels, startConnect } from './settings.js'
-import { renderSolutions, bindSolutions, initSolutionDrafts } from './solutions.js'
+import { renderSolutions, bindSolutions, initSolutionDrafts, updateRunnerProgress } from './solutions.js'
+import { duration, refreshStepProgress, stepProgress } from './step-progress.js'
 import { renderCreate, renderModeration, bindOwn, trialBanner, trialResult, startFromSession, ownActionsGroup, demoOwn } from './create.js'
 import { actions as packageActions, byId, tierBadge } from './catalog.js'
 
@@ -206,6 +207,7 @@ const serverPackages = [
 ]
 let peek = false, peekWanted = false, peekHeld = false, peekTimer = 0, pointerInPanel = false
 const state = {
+  notificationPrefs:read('notification-prefs', {}),
   page:'home', policy:read('policy',''), contour:read('policy','') ? 'closed' : read('contour','online'), theme:read('theme','light'),
   project:null, projects:stage === 'used' ? seedProjects.map(item => ({...item, sources:[...item.sources]})) : [], session:null,
   projectView:null, projectTab:'chats', menu:null, renameId:null, deleteId:null,
@@ -273,12 +275,21 @@ initSolutionDrafts(state)
 // A fresh profile has the public Loginom stand filled in but not connected (as in 0.4).
 // Under the demo policy the user still has to sign in to the administrator's Loginom; a mode that does not allow
 // the public stand parks the connection (the second ensureSettings).
-if (stage === 'used' && state.policy !== 'set') {
+const interruptedDemo = read('interrupted-demo', null)
+if (interruptedDemo && location.hash === '#chat') {
+  interruptedDemo.queue = interruptedDemo.queue?.map(entry => typeof entry === 'string' ? {text:entry} : entry)
+  state.sessions.unshift(interruptedDemo)
+  state.session = interruptedDemo.id
+  state.page = 'chat'
+  state.scrollToEnd = true
+}
+if ((stage === 'used' || interruptedDemo && state.session === interruptedDemo.id) && state.policy !== 'set') {
   ensureSettings(state).connection.connected = true
   ensureSettings(state)
 }
 
 const api = {
+  saveNotificationPrefs:({notifyFinished, notifyDecision}) => write('notification-prefs', {notifyFinished, notifyDecision}),
   icon, render, toast, navigate, setContour, setTheme, useTemplate, runSolution, discuss, pinSolution, openMine, startTrial, runOwnAction,
 }
 // Iteration 6: own skills and actions (create.js).
@@ -435,6 +446,7 @@ function keepChatDraft() {
     draftNode:state.draftNode, editTurn:state.editTurn})
 }
 function newSession() {
+  Object.assign(state, {demoTurn:null, demoBusy:null, demoHolder:null})
   if (!canNavigate('home')) return
   // Coming back from Схема, Каталог or Настройки keeps what the user typed and chose.
   keepChatDraft()
@@ -577,17 +589,46 @@ function projectTree(project) {
 function chatRow(item, nested = false) {
   const project = nested ? null : projectById(item.project)
   const current = state.page === 'chat' && state.session === item.id
-  return `<div class="side-row chat-row${nested ? ' nested' : ''}"><button class="session-link${current ? ' current' : ''}" data-session="${item.id}">${nested ? '' : icon('message',15)}<span class="row-text"><span>${esc(item.title)}</span>${project ? `<small><i class="pc-dot pc-${project.color}"></i>${esc(project.name)}</small>` : ''}</span>${sessionMark(item)}</button>${moreButton('chat',item.id,`Действия с разговором «${item.title}»`)}</div>`
+  const decision = waitingFor(item)
+  return `<div class="side-row chat-row${nested ? ' nested' : ''}"><button class="session-link${current ? ' current' : ''}" data-session="${item.id}">${nested ? '' : icon('message',15)}<span class="row-text"><span>${esc(item.title)}</span>${project ? `<small><i class="pc-dot pc-${project.color}"></i>${esc(project.name)}</small>` : ''}${decision ? `<small class="session-decision">${esc(decision)}</small>` : ''}</span>${sessionMark(item, Boolean(decision))}</button>${moreButton('chat',item.id,`Действия с разговором «${item.title}»`)}</div>`
 }
 // One mark for a whole list: what the collapsed panel shows on the section's icon.
 function chatsMark(list) {
   return sessionMark(list.find(item => item.phase === 'running') || list.find(item => sessionMark(item)) || {})
 }
+function waitingFor(item) {
+  const script = scriptOf(item)
+  if (item.phase === 'permission') {
+    const permission = script.permission
+    if (permission.external) return 'ждёт разрешения на отправку данных'
+    if (item.kind === 'abc') return 'ждёт разрешения на сохранение'
+    return 'ждёт разрешения на создание копии'
+  }
+  if (item.phase === 'question') return 'ждёт ответа: какие строки считать дубликатами'
+  if (item.phase === 'repeated') return 'ждёт решения о повторе шага'
+  if (item.phase === 'busy') return 'ждёт решения по занятому пакету'
+  return {plan:'ждёт запуска плана', connect:'ждёт подключения к Loginom', proposed:'ждёт подтверждения изменений'}[item.phase] || ''
+}
+function turnNotice(item, preference, message, kind) {
+  if (state.settings.preferences[preference] && (state.session !== item.id || state.page !== 'chat' || document.hidden))
+    toast(`«${item.title}»: ${message}`, kind, item.id)
+}
+function canQueue(item) { return !item?.build && ['running','retrying','writing'].includes(item?.phase) }
+function correctionQueue(item) {
+  if (!item?.queue?.length) return ''
+  return `<section class="correction-queue" aria-label="Очередь поправок">${item.queue.map(({text, node}, index) =>
+    `<div class="correction-row">${item.queueEdit === index
+      ? `<label class="sr-only" for="correction-text">Изменить поправку</label><input id="correction-text" value="${esc(item.queueDraft)}"><button class="btn" type="button" data-queue="save:${index}">Сохранить</button><button class="link-btn" type="button" data-queue="cancel:${index}">Отмена</button>`
+      : `<span>${esc(nodeContextText(node, text))}</span><button class="link-btn" type="button" data-queue="edit:${index}">Изменить</button><button class="link-btn" type="button" data-queue="remove:${index}">Удалить</button>`
+    }</div>`).join('')}</section>`
+}
 // Status next to a conversation: the agent is working or waits for the user.
-function sessionMark(item) {
+function sessionMark(item, visibleDecision = false) {
   if (['running','retrying','writing'].includes(item.phase)) return '<i class="conn-dot busy" title="Агент работает"></i><span class="sr-only">— агент работает</span>'
   if (item.phase === 'failed') return item.modelError && !item.modelError.resolved ? '<i class="conn-dot warn" title="Модель не ответила — нужна ваша помощь"></i><span class="sr-only">— модель не ответила</span>' : '<i class="conn-dot warn" title="Шаг не выполнен — нужна ваша помощь"></i><span class="sr-only">— шаг не выполнен</span>'
-  if (['permission','question','plan','connect'].includes(item.phase) || item.phase === 'proposed') return '<i class="conn-dot warn" title="Ждёт вашего ответа"></i><span class="sr-only">— ждёт вашего ответа</span>'
+  const decision = waitingFor(item)
+  if (decision && visibleDecision) return '<i class="conn-dot warn" aria-hidden="true"></i>'
+  if (decision) return `<i class="conn-dot warn" title="${esc(decision)}"></i><span class="sr-only">— ${esc(decision)}</span>`
   return ''
 }
 function runNotice() {
@@ -642,6 +683,8 @@ function composer(buildItem) {
     </form>`
   }
   const modelName = currentModel()
+  const item = state.page === 'chat' ? currentItem() : null
+  const queueing = canQueue(item)
   const pkg = state.draftPackage
   const node = state.page === 'chat' && state.draftNode
   const model = chatModel()
@@ -655,7 +698,9 @@ function composer(buildItem) {
     ${node ? `<div class="attachment-list"><span class="node-chip">${icon('flow',14)} ${esc(node.name)} <button type="button" class="small-icon" aria-label="Убрать узел" data-action="remove-draft-node">${icon('close',13)}</button></span></div>` : ''}
     ${state.draftFiles.length ? `<div class="attachment-list">${state.draftFiles.map((file,i) => `<span>${icon('file',14)} ${esc(file)} <button type="button" class="small-icon" aria-label="Убрать ${esc(file)}" data-remove-file="${i}">${icon('close',13)}</button></span>`).join('')}</div>` : ''}
     ${note ? `<div class="composer-note">${note}</div>` : ''}
-    <textarea id="prompt" aria-label="Сообщение агенту" placeholder="${state.page === 'chat' && state.editTurn?.session === state.session ? 'Изменённое сообщение' : state.page === 'chat' && ['running','retrying'].includes(currentItem()?.phase) ? 'Поправка агенту — учтёт после текущего шага' : state.page === 'chat' ? 'Уточните задачу или задайте вопрос' : state.page === 'project' || projectById(state.project) ? esc(`Новый разговор в проекте «${projectById(state.page === 'project' ? state.projectView : state.project)?.name}»`) : esc(placeholder)}" rows="2">${esc(state.draft)}</textarea>
+    ${correctionQueue(item)}
+    ${queueing ? '<label class="queue-label" for="prompt">В очередь: после хода</label>' : ''}
+    <textarea id="prompt" aria-label="Сообщение агенту" placeholder="${state.page === 'chat' && state.editTurn?.session === state.session ? 'Изменённое сообщение' : queueing ? 'Поправка агенту' : state.page === 'chat' ? 'Уточните задачу или задайте вопрос' : state.page === 'project' || projectById(state.project) ? esc(`Новый разговор в проекте «${projectById(state.page === 'project' ? state.projectView : state.project)?.name}»`) : esc(placeholder)}" rows="2">${esc(state.draft)}</textarea>
     <div class="composer-toolbar">
       <div class="composer-options">
         <button class="icon-btn neutral plus-btn" type="button" aria-label="Добавить: пакет, файл, каталог" title="Пакет из Loginom, файл с компьютера, каталог" data-overlay="plus">${icon('plus',18)}</button>
@@ -667,7 +712,7 @@ function composer(buildItem) {
         ${modelName ? `<button class="filter-btn composer-model" type="button" data-menu="model:" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && !state.menu.id}" aria-label="Модель${state.page === 'chat' ? ' этого разговора' : ''}: ${esc(modelName)}${model.kind === 'cloud' ? `, облако — данные уходят в «${esc(model.where)}»` : ''}" title="Модель${state.page === 'chat' ? ' этого разговора' : ''}: ${esc(modelName)}${model.kind === 'cloud' ? ` · облако: данные уходят в «${esc(model.where)}»` : ''}">${icon(model.kind === 'cloud' ? 'globe' : 'cpu',15)} <span class="filter-label">${esc(modelName)}</span> ${icon('down',12)}</button>`
           : `<button class="filter-btn composer-model lgm-chip off" type="button" data-action="provider-connect" title="Модель">${icon('cpu',15)} <span class="filter-label">Выберите модель</span> ${icon('down',12)}</button>`}
         ${state.page === 'chat' && ['running','retrying','writing'].includes(currentItem()?.phase) ? `<button class="stop-btn" type="button" data-action="stop" title="Остановить агента (Esc)">${icon('stop',14)}<span>Остановить</span></button>` : ''}
-        <button class="send-btn" type="submit" ${state.draft.trim() ? '' : 'disabled'} aria-label="Отправить сообщение" title="Отправить сообщение">${icon('up',20)}</button>
+        <button class="send-btn" type="submit" ${state.draft.trim() ? '' : 'disabled'} aria-label="${queueing ? 'Поставить поправку в очередь' : 'Отправить сообщение'}" title="${queueing ? 'Поставить поправку в очередь' : 'Отправить сообщение'}">${icon('up',20)}</button>
       </div>
     </div>
   </form>`
@@ -754,7 +799,7 @@ function createdFiles(item) {
 function turnFiles(item) {
   if (item.phase !== 'done') return []
   if (item.kind === 'document') return [stepText('{doc}', item)]
-  if (item.kind === 'abc' && abcSaved(item)) return ['ABC-анализ.lgp']
+  if (item.kind === 'abc' && abcSaved(item)) return [abcPackageName(item)]
   if (item.kind === 'node-export') return filesFromReceipts(item).map(file => file.name)
   if (item.kind === 'quality') return ['Качество выгрузки.html']
   if (item.kind === 'enrich') return ['sales-demo — с данными Example Data.csv']
@@ -772,6 +817,7 @@ function followedNow(item) {
   ].filter(Boolean)
   return rows.length ? `<p class="review-label">Агент учитывает</p><div class="review-stack">${rows.map(text => `<div class="review-entry">${icon('book',16)} ${esc(text)}</div>`).join('')}</div>` : ''
 }
+function abcPackageName(turn) { return turn.saveName || 'ABC-анализ.lgp' }
 function abcSaved(turn) {
   return scriptOf(turn).steps.slice(0, turn.step).some(step => step.saved)
 }
@@ -783,8 +829,8 @@ function filesFromReceipts(turn) {
     file?.verification_id && turn.exportTo ? [{...file, destination:turn.exportTo}] : [])
 }
 function outputPackage(turn, session, at) {
-  if (turn.kind === 'abc') return {id:`result-${session}-${at}`, name:'ABC-анализ.lgp', scope:'personal', view:'abc',
-    isResult:true, isDraft:!abcSaved(turn), fullPath:turn.savedPath, project:state.project}
+  if (turn.kind === 'abc') return {id:`result-${session}-${at}`, name:abcPackageName(turn), scope:'personal', view:'abc',
+    isResult:true, isDraft:!abcSaved(turn), fullPath:turn.savedPath, project:state.sessions.find(item => item.id === session)?.project}
   if (['node-data','node-error','node-export'].includes(turn.kind)) return {id:`receipt-${turn.kind}`,
     name:turn.kind === 'node-export' ? 'Продажи · экспорт.lgp' : 'Продажи · проверка.lgp',
     scope:'personal', folder:'Продажи', view:turn.kind === 'node-export' ? 'receipt-export' : 'receipt-sales'}
@@ -1143,9 +1189,9 @@ const scripts = {
     {plan:3, icon:'file', ask:'permission', live:'Выгружаю CSV в Loginom', done:'Выполнил узел', short:'выгрузил CSV', file:exportReceipt, time:6}]},
   abc:{plan:['Проверить данные','Собрать сценарий','Проверить и сохранить'], steps:[
     {plan:0, icon:'database', live:'Читаю таблицу «sales-demo.csv»', done:'Прочитал таблицу «sales-demo.csv»', short:'прочитал таблицу', detail:'2 400 строк, 6 столбцов: дата, товар, регион, количество, цена, выручка', time:4, think:[3,'Для ABC-анализа нужна выручка по товарам. Сначала посмотрю, какие столбцы есть в таблице.']},
-    {plan:1, think:[5,'Выручка есть по строкам продаж. Сгруппирую по товару, отсортирую по убыванию и поделю по накопленной доле: обычные пороги 80 / 15 / 5 %.'], icon:'flow', live:'Собираю сценарий в Loginom', fail:'собрать сценарий в Loginom', done:'Собрал сценарий из 4 узлов', short:'собрал сценарий из 4 узлов', detail:'Импорт CSV → Группировка по товару → Сортировка по выручке → ABC-классификация (80 / 15 / 5 %)', time:21},
+    {plan:1, think:[5,'Выручка есть по строкам продаж. Сгруппирую по товару, отсортирую по убыванию и поделю по накопленной доле: обычные пороги 80 / 15 / 5 %.'], icon:'flow', write:'edit', live:'Собираю сценарий в Loginom', fail:'собрать сценарий в Loginom', done:'Собрал сценарий из 4 узлов', short:'собрал сценарий из 4 узлов', detail:'Импорт CSV → Группировка по товару → Сортировка по выручке → ABC-классификация (80 / 15 / 5 %)', time:21},
     {plan:2, icon:'play', live:'Запускаю сценарий', done:'Запустил сценарий на демонстрационных данных', short:'проверил на данных', output:abcOutput, time:9},
-    {plan:2, icon:'download', ask:'permission', live:'Сохраняю пакет в Loginom', done:'Сохранил «ABC-анализ.lgp» в {home}', short:'сохранил «ABC-анализ.lgp»', saved:true, detail:'Пакет открыт и прочитан после сохранения', time:3},
+    {plan:2, icon:'download', write:'save', ask:'permission', live:'Сохраняю пакет в Loginom', fail:'сохранить пакет в Loginom', done:'Сохранил «ABC-анализ.lgp» в {home}', short:'сохранил «ABC-анализ.lgp»', saved:true, detail:'Пакет открыт и прочитан после сохранения', time:3},
   ], permission:{title:'Сохранить новый пакет в Loginom?', text:'Агент создаст пакет «ABC-анализ.lgp» в вашей папке Loginom. Другие пакеты не изменятся.', args:[['Пакет','ABC-анализ.lgp'],['Папка','{home}'],['Изменится','появится новый пакет']], trace:'сохранить «ABC-анализ.lgp» в {home}', scope:'сохранять новые пакеты в {home}', denied:'Хорошо, сохранять не стал. Сценарий собран и проверен — он остался в этом разговоре. Скажите, если сохранить в другую папку.'}},
   quality:{plan:['Прочитать данные','Найти пропуски и дубликаты','Составить отчёт'], steps:[
     {plan:0, icon:'database', live:'Читаю таблицу «sales-demo.csv»', done:'Прочитал таблицу «sales-demo.csv»', short:'прочитал таблицу', detail:'2 400 строк, 6 столбцов', time:3},
@@ -1159,7 +1205,7 @@ const scripts = {
   ]},
   refactor:{plan:['Открыть пакет','Проверить узлы','Собрать замечания'], steps:[
     {plan:0, icon:'flow', live:'Открываю «Продажи.lgp»', done:'Открыл «Продажи.lgp» только для чтения', short:'открыл пакет', time:2},
-    {plan:1, think:[6,'«Фильтр по дате» стоит отдельно в двух ветках — его можно поставить один раз до разветвления. «Узел14» по имени не понять. Перед расчётом нет проверки пустых значений.'], icon:'layers', live:'Проверяю узлы', done:'Проверил 6 узлов', short:'проверил 6 узлов', detail:'Повтор «Фильтра по дате», непонятное имя «Узел14», нет проверки пустых значений', time:14},
+    {plan:1, think:[6,'«Фильтр по дате» стоит отдельно в двух ветках — его можно поставить один раз до разветвления. «Узел14» по имени не понять. Перед расчётом нет проверки пустых значений.'], icon:'layers', live:'Проверяю узлы', fail:'проверить узлы', done:'Проверил 6 узлов', short:'проверил 6 узлов', detail:'Повтор «Фильтра по дате», непонятное имя «Узел14», нет проверки пустых значений', time:14},
     {plan:2, icon:'file', live:'Собираю замечания', done:'Собрал {count} замечания', short:'собрал {count} замечания', time:3},
   ]},
   // Changes go to a working copy; the package in Loginom changes only when the user saves (iteration 4).
@@ -1243,11 +1289,12 @@ function atHome(text) {
 }
 function stepText(text, turn) {
   const pkg = (turn.files?.[0] || 'Продажи.lgp')
+  if (turn.saveName) text = text.replaceAll('ABC-анализ.lgp', turn.saveName)
   return text.replaceAll('{folder}', chatFolder(state.sessions.find(item => item.id === state.session) || turn).label.replace(/^в/,'В')).replaceAll('{skill}', turn.trial?.name || '').replaceAll('{pkg}', pkg).replace('{doc}', pkg.replace(/\.lgp$/i,'') + ' — описание.md').replace('{answer}', turn.answer || '').replaceAll('{home}', packageFolder('personal')).replace('{count}', turn.rules ? 4 : 3).replaceAll('{copy}', turn.copy?.name || '').replaceAll('{from}', turn.from || '').replace('{nodes}', pkg === 'Продажи.lgp' ? '6 узлов' : '14 узлов, 3 подмодели')
 }
 function turnTime(turn) {
-  const seconds = scriptOf(turn).steps.slice(0, turn.step).reduce((sum, step) => sum + step.time + (step.think?.[0] || 0), 0) + (turn.errors?.length || 0) * 33
-  return seconds >= 60 ? `${Math.floor(seconds / 60)} мин ${seconds % 60} с` : `${seconds} с`
+  const seconds = scriptOf(turn).steps.slice(0, turn.step).reduce((sum, step, index) => sum + (turn.elapsedByStep?.[index] ?? (step.time + (step.think?.[0] || 0))), 0) + (turn.errors?.length || 0) * 33
+  return duration(seconds)
 }
 // A finished seed or history turn: every step done, the user's answers filled in as they would have been.
 function completeTurn(turn) {
@@ -1258,7 +1305,7 @@ function completeTurn(turn) {
   turn.steer = turn.steer || []
   return turn
 }
-// The engine: one step every ~0.7 s; a step that needs the user stops the run until they answer.
+// A step that needs the user stops the run until they answer.
 function runSteps(item) {
   clearTimeout(item.timer)
   const script = scriptOf(item)
@@ -1286,36 +1333,103 @@ function runSteps(item) {
   }
   if (step.ask === 'permission' && !(item.cleared || []).includes(item.step)) {
     item.phase = 'permission'
-    if (state.session !== item.id || state.page !== 'chat') toast(`«${item.title}» ждёт вашего разрешения`, 'alert', item.id)
+    turnNotice(item, 'notifyDecision', waitingFor(item), 'alert')
     return render()
   }
   if (step.ask === 'question' && !asked) {
     item.phase = 'question'
-    if (state.session !== item.id || state.page !== 'chat') toast(`«${item.title}» ждёт вашего ответа`, 'alert', item.id)
+    turnNotice(item, 'notifyDecision', waitingFor(item), 'alert')
     return render()
   }
+  if (item.busy && step.write === 'save') {
+    item.phase = 'busy'
+    turnNotice(item, 'notifyDecision', waitingFor(item), 'alert')
+    return render()
+  }
+  if (item.phase !== 'retrying') {
+    item.stepStarted = Date.now()
+    item.waitedAt = null
+  }
   item.phase = 'running'
+  const loginom = (['abc','improve','keep','refactor','clean','document','skilltrial','node-data','node-error','node-export'].includes(item.kind) && !item.local && !(item.kind === 'abc' && item.step === 0) && !['book','file'].includes(step.icon))
+  const long = longChatStep(item)
+  item.stepKind = loginom ? (step.write ? 'write' : 'read') : 'model'
+  item.signal = loginom && !step.think ? 'working' : 'thinking'
+  if (loginom && !item.lastReply && !state.loginomDown) item.lastReply = Date.now()
   render()
-  item.timer = setTimeout(() => {
+
+  const finish = () => {
     if (item.phase !== 'running') return
     if (item.kind === 'node-error' && item.step === 1) {
+      item.lastReply = Date.now()
       item.phase = 'failed'
       render()
       return
     }
     if (item.failAt === item.step) return stepFailed(item)
     if (item.modelFailAt === item.step) return modelFailed(item)
-    if (step.saved) item.savedPath = atHome('{home}/ABC-анализ.lgp')
+    if (loginom) item.lastReply = Date.now()
+    if (long) (item.elapsedByStep ??= {})[item.step] = stepProgress(item, long).seconds
+    item.calls = null
+    if (item.demo === 'read' && item.step === 1 && item.errors.length)
+      item.recovery.push({at:item.step, text:'Loginom показал окно «Восстановление сеанса» — закрыл'})
+    if (step.saved) {
+      item.savedStep = item.step
+      item.savedPath = atHome('{home}/' + abcPackageName(item))
+    }
     if (step.file) item.exportTo = atHome('{home}/Продажи/' + step.file.name)
     item.step++
     runSteps(item)
-  }, 750)
+  }
+  const call = () => {
+    if (item.phase !== 'running') return
+    item.signal = 'waiting'
+    if (long) item.lastReply = Date.now()
+    if (item.demo === 'repeat' && item.step === 1) {
+      const operation = 'прочитать настройки узлов «Продажи.lgp»'
+      const count = item.calls?.operation === operation ? item.calls.count + 1 : 1
+      item.calls = {operation, count}
+      item.lastReply = Date.now()
+      if (count === 3) {
+        item.repeated = {at:item.step, count, operation}
+        item.phase = 'repeated'
+        turnNotice(item, 'notifyDecision', waitingFor(item), 'alert')
+        return render()
+      }
+      item.timer = setTimeout(call, 700)
+      return
+    }
+    item.timer = setTimeout(finish, long ? 16000 : 350)
+  }
+  const work = () => {
+    if (item.phase !== 'running') return
+    item.signal = 'working'
+    item.timer = setTimeout(call, long ? 2800 : 250)
+  }
+  item.timer = setTimeout(loginom ? work : finish, long ? 1500 : 150)
 }
-// The demo «Сбой Loginom» makes the step that works in Loginom fail twice; «Повторить шаг» then succeeds.
+function longChatStep(item) {
+  return ['long','crash'].includes(item.demo) && item.step === 1
+}
+function outageRestored() {
+  clearTimeout(state.outageTimer)
+  state.loginomDown = false
+  for (const item of state.sessions) {
+    const failure = item.loginomFailure
+    if (!failure || failure.ready) continue
+    failure.ready = true
+    item.lastReply = Date.now()
+    item.recovery.push({at:item.step, text:'переподключился'})
+  }
+  render()
+}
+// Retry reading once. An interrupted write first requires a fresh read of the package.
 function stepFailed(item) {
   state.loginomDown = true
-  item.errors = [...(item.errors || []), {at:item.step, attempt:(item.errors || []).filter(entry => entry.at === item.step).length + 1}]
-  if (item.errors.filter(entry => entry.at === item.step).length < 2) {
+  const attempts = (item.errors || []).filter(entry => entry.at === item.step).length + 1
+  const needsCheck = scriptOf(item).steps[item.step].write != null
+  item.errors.push({at:item.step, attempt:attempts, needsCheck})
+  if (!needsCheck && attempts === 1) {
     item.phase = 'retrying'
     item.retryIn = 3
     const tick = () => {
@@ -1331,9 +1445,12 @@ function stepFailed(item) {
     item.timer = setTimeout(tick, 1000)
     return
   }
+  item.loginomFailure = {needsCheck, ready:false}
   item.phase = 'failed'
+  clearTimeout(state.outageTimer)
+  state.outageTimer = setTimeout(outageRestored, 11000)
   render()
-  if (state.session !== item.id || state.page !== 'chat') toast(`«${item.title}»: шаг не выполнен`, 'alert', item.id)
+  turnNotice(item, 'notifyDecision', needsCheck ? 'нужно проверить состояние' : 'шаг не выполнен', 'alert')
 }
 // Iteration 8: the model stops the turn. OpenCode 2 retries a busy model by itself (429, overload, 5xx: up to 10 tries,
 // about 1,5 min; no network: up to an hour) — the feed shows «повторю через N с». A spent limit, a wrong key or an
@@ -1346,7 +1463,7 @@ function modelFailed(item) {
   item.modelFailAt = null
   item.phase = 'failed'
   render()
-  if (state.session !== item.id || state.page !== 'chat') toast(`«${item.title}»: модель не ответила`, 'alert', item.id)
+  turnNotice(item, 'notifyDecision', 'модель не ответила', 'alert')
 }
 function modelErrorText(error) {
   return {
@@ -1379,13 +1496,14 @@ function writeAnswer(item, finalPhase) {
     clearInterval(item.writer)
     item.phase = finalPhase
     render()
-    if (state.session !== item.id && finalPhase === 'done') toast(`Готово: «${item.title}»`, 'check', item.id)
+    turnNotice(item, 'notifyFinished', 'ход закончен', 'check')
+    sendQueued(item)
   }, 35)
 }
 function startRun(item) {
-  Object.assign(item, {step:0, decisions:[], cleared:[], steer:[], answer:null, expanded:false, instruction:'', errors:[], failAt:state.failNext && !answerOnly.includes(item.kind) ? 1 : null,
+  Object.assign(item, {step:0, decisions:[], cleared:[], steer:[], answer:null, expanded:false, instruction:'', errors:[], recovery:[],
+    failAt:{read:1, write:3}[item.demo] ?? null,
     modelFailAt:state.failModel && !answerOnly.includes(item.kind) ? 1 : null, modelError:null})
-  state.failNext = false
   if (!answerOnly.includes(item.kind)) state.failModel = false
   // The free model whose daily limit the demo spent stops any turn at once until the page is reloaded («обновится в 03:00»).
   if (state.freeLimited && chatModel(item)?.source === 'free') return modelFailed(item)
@@ -1451,7 +1569,26 @@ function turnAnswer(turn, live = false) {
       ${live && copySettled(currentItem()) ? `<p class="muted">${esc(settledNote(copySettled(currentItem())))}</p>` : live ? `<div class="button-row">${others.length ? `<button class="btn primary" type="button" data-menu="model:continue" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && state.menu.id === 'continue'}">${icon('play',15)} Продолжить с другой моделью ${icon('down',12)}</button>` : state.policy === 'set' ? '' : `<button class="btn primary" data-action="provider-connect">${icon('cpu',15)} Подключить модель</button>`}${turn.modelError.blocked ? '' : `<button class="btn" data-action="continue-turn">${icon('refresh',15)} Продолжить с этой же</button>`}<button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
   }
   if (turn.phase === 'failed' && turn.kind === 'node-error') return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} ${esc(missingDate)}</h2><p>В источнике поле называется «Дата продажи». Проверьте поле в условии фильтра.</p><button class="btn" data-run-node="${turn.index}:1">${icon('flow',15)} Показать на схеме</button></div>`
-  if (turn.phase === 'failed') return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Не удалось ${esc(scriptOf(turn).steps[turn.step].fail || 'выполнить шаг')}</h2><p>Loginom (${esc(hostOf(state.settings.connection.url))}) дважды не ответил за 30 секунд. Сделанные шаги выше сохранены.</p><p>Что сделать: проверьте, открывается ли Loginom в браузере. Если нет — он выключен или недоступна сеть, обратитесь к администратору. Когда Loginom заработает, нажмите «Повторить шаг».</p>${live ? `<div class="button-row"><button class="btn primary" data-action="retry-step">${icon('refresh',15)} Повторить шаг</button><button class="btn" data-overlay="loginom-status">Проверить подключение</button><button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
+  if (turn.phase === 'failed') {
+    const failure = turn.loginomFailure || {}
+    const needsCheck = failure.needsCheck && !failure.checked
+    const saved = turn.savedStep == null ? '' : scriptOf(turn).steps[turn.savedStep].done
+    const packageState = saved ? `Сохранено до шага «${stepText(saved, turn)}».`
+      : needsCheck ? 'Сохранение этого шага не подтверждено.' : 'Изменения шага не сохранены.'
+    return `<div class="answer-block failed" role="status"><h2>${icon('alert',18)} ${needsCheck ? 'Нужно проверить состояние' : 'Шаг не выполнен'}</h2>
+      <p>Не удалось ${esc(scriptOf(turn).steps[turn.step].fail || scriptOf(turn).steps[turn.step].live.toLowerCase())}. ${failure.ready ? 'Loginom снова отвечает.' : 'Loginom не ответил.'}</p>
+      <p>${esc(packageState)}${needsCheck ? ' Проверьте пакет в Loginom перед повтором.' : ''}</p>
+      ${live ? `<div class="button-row">${needsCheck ? `<button class="btn primary" data-action="check-write" ${failure.ready ? '' : 'disabled'}>Проверить состояние</button>` : ''}
+        <button class="btn${failure.ready && !needsCheck ? ' primary' : ''}" data-action="retry-step" ${failure.ready && !needsCheck ? '' : 'disabled'}>${icon('refresh',15)} Повторить шаг</button>
+        <button class="btn" data-overlay="loginom-status">Проверить Loginom</button><button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
+  }
+  if (turn.phase === 'busy') return `<div class="answer-block failed" role="status"><h2>${icon('alert',18)} Пакет занят</h2>
+    <p>${{chat:'«ABC-анализ.lgp» открыт в другом разговоре этого приложения.', studio:'«ABC-анализ.lgp» открыт у вас в Loginom Studio или у коллеги.', crash:'После аварии осталась сессия, в которой открыт «ABC-анализ.lgp».'}[turn.busy]}</p>
+    ${live ? `<div class="button-row">${turn.busy === 'chat' ? `<button class="btn" data-session="${esc(turn.holderId)}">Открыть разговор</button>` : ''}
+      <button class="btn primary" data-action="check-lock">Я закрыл — проверить снова</button><button class="btn" data-action="save-unlocked-version">Сохранить новой версией</button></div>` : ''}</div>`
+  if (turn.phase === 'interrupted' && turn.interruptedAt) return `<div class="answer-block failed" role="status"><h2>Ход прерван в ${esc(turn.interruptedAt)}</h2>
+    <p>${esc(scriptOf(turn).steps.slice(0, turn.step).map(step => stepText(step.done, turn)).join('. '))}. Окно Loginom закрылось — несохранённые изменения пропали.</p>
+    ${live ? '<button class="btn primary" data-action="resume-crash">Продолжить</button>' : ''}</div>`
   if (turn.phase === 'writing') {
     const text = turn.writeText || '', title = turn.writeTitle || 0
     return `<div class="answer-block answer-stream">${title ? `<h2>${esc(text.slice(0, Math.min(turn.written, title)))}</h2>` : ''}<p>${esc(text.slice(title, Math.max(title, turn.written)))}<span class="stream-caret" aria-hidden="true"></span></p></div>`
@@ -1530,9 +1667,16 @@ function turnSteps(turn, live, turnIndex) {
   const detailed = state.detail === 'full'
   const rows = []
   if (turn.rules && turn.step > 0) rows.push(`<li class="step done">${icon('book',15)}<span>${esc(turn.rules.step)}<small>${esc(turn.rules.detail)}</small></span></li>`)
-  const errorRows = at => (turn.errors || []).filter(entry => entry.at === at).forEach(entry => rows.push(`<li class="step error">${icon('alert',15)}<span>Не удалось ${esc(script.steps[at].fail || 'выполнить шаг')}<small>Loginom не ответил за 30 с · попытка ${entry.attempt} из 2</small></span></li>`))
+  const recoveryRows = at => {
+    for (const entry of (turn.recovery || []).filter(entry => entry.at === at)) {
+      rows.push(`<li class="step-trace">${icon('refresh',14)}<span>${esc(entry.text)}</span></li>`)
+    }
+    if (turn.repeated?.at === at) rows.push(`<li class="step-trace">${icon('refresh',14)}<span>${esc(turn.repeated.operation)} · повторил ${turn.repeated.count} раза</span></li>`)
+  }
+  const errorRows = at => (turn.errors || []).filter(entry => entry.at === at).forEach(entry => rows.push(`<li class="step error">${icon('alert',15)}<span>Не удалось ${esc(script.steps[at].fail || 'выполнить шаг')}<small>Loginom не ответил${entry.needsCheck ? ' во время записи' : ` · попытка ${entry.attempt} из 2`}</small></span></li>`))
   script.steps.slice(0, turn.step).forEach((step, index) => {
     errorRows(index)
+    recoveryRows(index)
     for (const decision of (turn.decisions || []).filter(entry => entry.at === index && entry.choice === 'retry')) rows.push(`<li class="step-trace">${icon('refresh',14)}<span>Вы повторили шаг</span></li>`)
     if (turn.modelError?.at === index) rows.push(modelErrorRow(turn))
     for (const decision of (turn.decisions || []).filter(entry => entry.at === index && entry.choice === 'continue')) rows.push(`<li class="step-trace">${icon('play',14)}<span>Вы продолжили с моделью «${esc(decision.model)}»</span></li>`)
@@ -1552,11 +1696,18 @@ function turnSteps(turn, live, turnIndex) {
   if (denied) rows.push(`<li class="step-trace denied">${icon('close',14)}<span>Вы отклонили: ${esc(stepText(script.permission.trace, turn))}</span></li>`)
   if (turn.decisions?.some(entry => entry.choice === 'forbidden')) rows.push(`<li class="step-trace denied">${icon('lock',14)}<span>Не сделал: ${esc(stepText(script.permission.trace, turn))} — в «Разрешениях» это запрещено</span></li>`)
   errorRows(turn.step)
+  recoveryRows(turn.step)
   if (turn.modelError?.at === turn.step && turn.step < script.steps.length) rows.push(modelErrorRow(turn))
   for (const decision of (turn.decisions || []).filter(entry => entry.at === turn.step && entry.choice === 'continue' && turn.step < script.steps.length)) rows.push(`<li class="step-trace">${icon('play',14)}<span>Вы продолжили с моделью «${esc(decision.model)}»</span></li>`)
   ;(turn.steer || []).filter(entry => entry.at > turn.step).forEach(entry => rows.push(`<li class="step-trace steer">${icon('message',14)}<span>Ваша поправка: «${esc(entry.text)}» — ${turn.phase === 'running' ? 'учту после текущего шага' : turn.phase === 'retrying' ? 'учту после повтора шага' : 'учту, когда продолжите'}</span></li>`))
-  if (live && turn.phase === 'retrying') rows.push(`<li class="step live" role="status"><span class="spinner"></span><span>Повторю через ${turn.retryIn} с…</span></li>`)
-  if (live && turn.phase === 'running') rows.push(`<li class="step live" role="status"><span class="spinner"></span><span>${esc(stepText(script.steps[turn.step].live, turn))}…</span></li>`)
+  if (live && turn.phase === 'retrying') rows.push(`<li class="step live" role="status"><span class="spinner"></span><span>Повторю через ${turn.retryIn} с…<small data-step-clock>${stepProgress(turn).text}</small></span></li>`)
+  if (live && turn.phase === 'running') {
+    const progress = stepProgress(turn, longChatStep(turn))
+    rows.push(`<li class="step live"><span class="spinner" aria-hidden="true"></span><span>${esc(stepText(script.steps[turn.step].live, turn))}…<small data-step-clock>${progress.text}</small></span></li>
+      <li class="step-stalled" data-step-stalled ${progress.stalled ? '' : 'hidden'}><strong>Похоже, шаг завис</strong><div class="button-row">
+        <button class="btn" data-action="wait-step">Подождать</button><button class="btn" data-action="stop">Остановить</button><button class="btn" data-overlay="loginom-status">Проверить Loginom</button></div></li>`)
+    if (turn.demo === 'crash' && turn.step === 1) rows.push('<li class="step-trace"><button class="link-btn" data-action="demo-close">Закрыть приложение посреди хода</button></li>')
+  }
   if (live && ['permission','question'].includes(turn.phase)) rows.push(`<li class="step waiting">${icon('alert',15)}<span>${turn.phase === 'permission' ? 'Жду вашего разрешения — внизу' : 'Жду вашего ответа — внизу'}</span></li>`)
   return `<ol class="turn-steps">${rows.join('')}</ol>`
 }
@@ -1579,8 +1730,8 @@ function turnPlan(turn) {
 }
 function turnView(item, turn, index, live) {
   const script = scriptOf(turn)
-  const finished = ['done','answer','denied','stopped','interrupted','failed'].includes(turn.phase)
-  const hasSteps = script.steps.length && turn.step > 0 || (live && ['running','retrying','permission','question','failed'].includes(turn.phase)) || (turn.decisions || []).some(entry => ['deny','forbidden'].includes(entry.choice))
+  const finished = ['done','answer','denied','stopped','interrupted','failed','busy'].includes(turn.phase)
+  const hasSteps = script.steps.length && turn.step > 0 || (live && ['running','retrying','permission','question','failed','repeated','busy'].includes(turn.phase)) || (turn.decisions || []).some(entry => ['deny','forbidden'].includes(entry.choice))
   const brief = state.detail !== 'full'
   const objects = [...(turn.rules ? [turn.rules.short] : []), ...script.steps.slice(0, turn.step).map(step => stepText(step.short, turn)), ...((turn.errors || []).some(entry => entry.at < turn.step) ? ['повторил шаг после сбоя Loginom'] : []), ...(turn.modelError?.resolved ? [(turn.decisions || []).some(entry => entry.choice === 'continue' && entry.model !== turn.modelError.model) ? 'продолжил с другой моделью после остановки' : 'продолжил после остановки модели'] : [])]
   const unresolved = (turn.errors || []).some(entry => entry.at >= turn.step) || Boolean(turn.modelError && !turn.modelError.resolved)
@@ -1607,6 +1758,13 @@ function turnView(item, turn, index, live) {
 // The input area of a chat: the agent's question or permission takes the input's place until answered.
 function chatDock(item) {
   const script = scriptOf(item)
+  if (item.phase === 'repeated') {
+    return `<section class="dock" aria-labelledby="dock-title">
+      <div class="dock-head">${icon('help',20)}<h2 id="dock-title" tabindex="-1">Агент третий раз делает одно и то же: ${esc(item.repeated.operation)}</h2></div>
+      <div class="dock-actions"><button class="btn primary" data-action="continue-repeat">Продолжить</button><button class="btn" data-action="stop">Остановить</button></div>
+      <form class="dock-instead" id="repeat-form"><label for="repeat-text">Подсказать агенту</label><div><input id="repeat-text" name="text" value="${esc(item.dockDraft?.['repeat-text'] || '')}" required><button class="btn">Отправить</button></div></form>
+    </section>`
+  }
   if (item.phase === 'permission') {
     const ask = script.permission
     return `<section class="dock" aria-labelledby="dock-title">
@@ -1641,12 +1799,13 @@ function chat() {
   return `<div class="chat-layout${state.review ? ' with-review':''}">
     <div class="chat-main">
       <div class="chat-title"><div><p class="eyebrow">Разговор</p><h1>${esc(item.title)}</h1></div><div class="button-row">${isEdit ? '' : `<div class="detail-toggle" role="group" aria-label="Подробность ленты"><button data-detail="brief" aria-pressed="${state.detail !== 'full'}">Кратко</button><button data-detail="full" aria-pressed="${state.detail === 'full'}">Подробно</button></div>`}<button class="btn" data-action="review" aria-pressed="${state.review}">${icon('panel',17)} <span>Контекст</span></button>${moreButton('chat',item.id,`Действия с разговором «${item.title}»`).replace('row-more','row-more page-more')}</div></div>
+      ${item.holdsBusyPackage ? '<div class="chat-package-context"><strong>В этом разговоре открыт «ABC-анализ.lgp»</strong><button class="btn" data-action="close-busy-package">Закрыть пакет</button></div>' : ''}
       ${isEdit && canUsePackageEdit(item) ? `<div class="chat-package-context"><span class="glyph red">${icon('flow',18)}</span><span><strong>${esc(item.source.name)}</strong><small>${esc(item.sourcePath)}</small></span><span class="badge">Пакет в разговоре</span></div>` : ''}
       <div class="chat-timeline">
         ${isEdit ? `${item.prompt ? `<div class="user-message">${esc(item.prompt)}</div>` : ''}<div class="agent-message"><span class="agent-avatar"><img src="assets/loginom.png" alt="" width="31" height="31"></span><div><strong class="agent-caption">Loginom AI Agent</strong>${packageEditBody(item)}</div></div>`
           : turns.map((turn, index) => turnView(item, turn, index, index === turns.length - 1)).join('')}
       </div>
-      <div class="chat-bottom">${dock || (!isEdit || (canUsePackageEdit(item) && !item.workingPackage && item.phase !== 'proposed') ? composer() : '')}<p class="muted">${isEdit ? 'Учебная формула и файл .lgp для демонстрации.' : 'Демонстрационный разговор. Реальные пакеты и данные не изменяются.'}</p></div>
+      <div class="chat-bottom">${dock ? correctionQueue(item) + dock : (!isEdit || (canUsePackageEdit(item) && !item.workingPackage && item.phase !== 'proposed') ? composer() : '')}<p class="muted">${isEdit ? 'Учебная формула и файл .lgp для демонстрации.' : 'Демонстрационный разговор. Реальные пакеты и данные не изменяются.'}</p></div>
     </div>
     ${state.review ? rightPanel(item):''}
   </div>`
@@ -2118,7 +2277,10 @@ function review() {
     ['Заменить исходный, не сломав другие пакеты','Запрос уже в поле ввода — отправьте. В карточке правки — «Заменить исходный…»: окно покажет, какие пакеты ссылаются на «Продажи» и что сломается, и предложит «Попросить агента оставить узел». В новом разговоре агент снова спросит про копию. Когда обе ссылки рабочие — замените. Потом — «Вернуть прежнюю версию», чтобы «Продажи» снова был исходным.',[['try-improve','Начать']]],
     ['Файл коллеги с компьютера','Разговор с учебным файлом «Продажи.lgp» с компьютера — отправьте запрос. Агент спросит, можно ли загрузить копию в Loginom, и поправит её; «Скачать на компьютер…» сохраняет исправленный файл у вас, после этого «Удалить копию из Loginom» убирает копию с сервера.',[['try-local-improve','Начать']]],
     ['Каталог и своё','Каталог: кто подготовил — Loginom, «Проверено Loginom» или «Сообщество» — и что будет разрешено; навык «Сообщество» ставится только после вашего согласия. «Создать своё» — навык из разговора, с нуля или из файла; «Попробовать», а после «Включить» — «Опубликовать для всех…».',[['plus-catalog','Начать'],['own-chat','Создать своё']]],
-    ['Сбои','Отправьте запрос: шаг в Loginom не удастся — блок скажет, что случилось, с «Повторить шаг» и «Проверить подключение»; «Проверить снова» вернёт Loginom. «Лимит модели» — на втором шаге у бесплатной модели кончится дневной лимит: что случилось, что уже сделано, другая модель или «Подключить модель». После лимита бесплатная модель в прототипе молчит до перезагрузки страницы; в карточке 9 работает модель администратора.',[['try-failure','Начать'],['try-model-failure','Лимит модели']]],
+    ['Сбои','Проверьте ожидание и очередь поправок, возврат Loginom, обрыв при записи, перезапуск приложения, занятый пакет и одинаковые вызовы. При сбое чтения Loginom ответит сам. При сбое записи проверьте состояние пакета перед повтором.',[
+      ['try-long-step','Долгий шаг'],['try-failure','Сбой при чтении'],['try-write-failure','Сбой при записи'],['try-crash','Закрытие приложения'],
+      ['try-busy-chat','Пакет в другом разговоре'],['try-busy-studio','Пакет в Studio'],['try-busy-crash','Сессия после аварии'],
+      ['try-repeat','Одинаковые вызовы'],['try-model-failure','Лимит модели'],['try-notifications','Уведомления']]],
     ['Закрытый контур','Включится политика администратора: только сеть организации, в настройках — «Задано администратором», модель — от администратора. Дополнение «Контроль полноты загрузок» администратор скачивает на сайте каталога и передаёт файлом: в приложении — «Каталог» → «Импорт из файла». Сайт откроется вместо приложения; после возврата разговоры, подключение Loginom и инструкции прототипа сбросятся, политика останется. Убрать политику — «убрать» внизу этой страницы.',[['policy-set','Начать'],['open-hub-site','Сайт каталога']]],
     ['Собрать вместе с Loginom','Импортируйте учебную таблицу, поправьте схему в окне Loginom и попросите агента добавить фильтр. Сохраните пакет, когда он готов.',[['try-build-together','Начать']]],
   ]
@@ -2354,7 +2516,7 @@ function overlay() {
       : state.settings.connection.connected
       ? `<div class="connect-card"><span class="glyph green">${icon('check',19)}</span><div><strong>Подключено</strong>
           <dl><div><dt>Адрес</dt><dd>${esc(hostOf(state.settings.connection.url))}</dd></div><div><dt>Пользователь</dt><dd>${esc(state.settings.connection.username)}</dd></div><div><dt>Папка</dt><dd>${esc(packageFolder('personal'))}</dd></div></dl>
-          <div class="button-row"><button class="btn quiet" data-settings="loginom">${icon('settings',15)} Настройки подключения</button></div></div></div>`
+          <div class="button-row"><button class="btn" data-action="recheck-loginom">${icon('refresh',15)} Проверить снова</button><button class="btn quiet" data-settings="loginom">${icon('settings',15)} Настройки подключения</button></div></div></div>`
       : `<p class="dialog-desc">Без Loginom агент отвечает на вопросы, но не открывает и не меняет пакеты.</p>${connectCard()}`) + (buildTogether.hasWindows() ? buildTogether.windowsList() : '')) : ''],
     'agent-mode':['Режим агента',`<div class="dialog-options">${[['Выполнение','Предлагает план и запрашивает разрешения на действия'],['Планирование','Готовит план до начала выполнения']].map(([mode,detail]) => `<button data-agent-mode="${mode}"><span class="glyph red">${icon(mode === 'Планирование' ? 'layers':'spark',19)}</span><span><strong>${mode}</strong><small>${detail}</small></span>${state.mode === mode ? icon('check',18):''}</button>`).join('')}</div>`],
     rename:['Переименовать разговор',`<form class="inline-form" id="rename-form"><label class="sr-only" for="session-name">Имя разговора</label><input id="session-name" name="name" maxlength="70" value="${esc(state.sessions.find(x => x.id === state.renameId)?.title)}" required><button class="btn primary">Сохранить</button></form>`],
@@ -2377,7 +2539,7 @@ function pageContents() {
   }
 }
 function render(resetScroll = false) {
-  state.activeRun = state.sessions.some(item => item.phase === 'running') || Object.values(state.solutions.runs).some(run => run.status === 'running')
+  state.activeRun = state.sessions.some(item => item.phase === 'running' || canQueue(item)) || Object.values(state.solutions.runs).some(run => run.step === 'running')
   const settings = ensureSettings(state)
   const packageAccount = JSON.stringify([settings.connection.url,settings.connection.username])
   if (state.packageAccount && state.packageAccount !== packageAccount) {
@@ -2389,7 +2551,7 @@ function render(resetScroll = false) {
     state.node = null
     for (const [id,run] of Object.entries(state.solutions.runs)) {
       if (!run.boundPackage) continue
-      clearInterval(run.timer)
+      clearTimeout(run.timer)
       delete state.solutions.runs[id]
     }
   }
@@ -2531,15 +2693,30 @@ function continueTurn(index) {
 function nodeContextText(node, text) {
   return node ? `«${node.name}»: ${text}` : text
 }
-function send() {
-  const prompt = state.draft.trim()
+function sendQueued(item) {
+  if (state.sessions.includes(item) && ['done','answer'].includes(item.phase) && item.queueEdit == null && item.queue?.length)
+    send({item, correction:item.queue[0]})
+}
+function send(queued = null) {
+  const prompt = queued?.correction.text ?? state.draft.trim()
+  const old = queued?.item ?? (state.page === 'chat' ? currentItem() : null)
+  const draftPackage = queued ? null : state.draftPackage
+  const draftFiles = queued ? [] : state.draftFiles
   if (!prompt) {
     $('#prompt')?.focus()
     return
   }
-  const old = state.page === 'chat' ? currentItem() : null
   if (old?.build) return buildTogether.request(old, prompt)
-  if (!currentModel()) {
+  if (!queued && canQueue(old) && state.editTurn?.session !== old.id) {
+    (old.queue ??= []).push({text:prompt, node:state.draftNode})
+    state.draftNode = null
+    state.draft = ''
+    render()
+    $('#prompt')?.focus()
+    return
+  }
+  if (!currentModel(old)) {
+    if (queued) return
     toast('Сначала выберите модель — без неё агент не ответит', 'alert')
     return openConnect()
   }
@@ -2554,16 +2731,7 @@ function send() {
     $('.chat-main .answer-block h2')?.scrollIntoView({block:'nearest'})
     return
   }
-  // While the agent works, a message is a correction: it reaches the agent after the current step.
-  if (old && ['running','retrying'].includes(old.phase) && state.editTurn?.session !== old.id) {
-    old.steer.push({text:nodeContextText(state.draftNode, prompt), at:old.step + 1})
-    state.draftNode = null
-    state.draft = ''
-    render()
-    $('#prompt')?.focus()
-    return
-  }
-  const withPackage = Boolean(state.draftPackage)
+  const withPackage = Boolean(draftPackage)
   // The reason is fixed when asked: a later change of the network or permissions does not rewrite old answers.
   const web = !withPackage && /(?:открой|открыть|зайди|прочитай|найди|поищи)[^.?!]{0,40}(?:сайт|интернет|https?:\/\/)/i.test(prompt)
     && (state.contour === 'closed' || state.settings.permissions.web === 'deny')
@@ -2583,38 +2751,38 @@ function send() {
   const enrich = aboutEnrich && (state.contour === 'closed' ? 'closed' : !hubHasInstalled(state,'cloud') ? (sendAsked ? 'missing' : 'info-missing') : sendAsked ? 'ok' : 'info')
   let kind = web ? 'chat' : enrich ? (enrich === 'ok' ? 'enrich' : 'noenrich') : discussing ? 'discuss' : named ? 'document' : /документ|описан|опиши/i.test(prompt) && (withPackage || (inChat && !/замечани|шаг|подробн/i.test(prompt))) ? 'document'
     // Run 3: the mock cannot find a package by its name in the text — it asks to pick one instead of building ABC.
-    : /документ|описан|опиши/i.test(prompt) && !state.draftFiles.length ? 'pick'
+    : /документ|описан|опиши/i.test(prompt) && !draftFiles.length ? 'pick'
     : /дубликат|пропуск|выгрузк/i.test(prompt) ? 'quality' : /провер|оптимиз|(?<![а-яё])лучше/i.test(prompt) ? 'refactor'
     : /внеси|улучш|объедин|исправ|переимен|измени|доработ|поправ/i.test(prompt) ? 'improve'
     : /abc|сценари|loginom|пакет|узл|данн|таблиц|lgp/i.test(prompt) || withPackage ? 'abc'
     // A follow-up without a task word continues the previous task («Собери такой же для регионов»); a question is answered.
     // An edit or an answer about the copy is not repeated by «Спасибо».
     : old && !['chat','improve','keep','more','nocopy','pick','discuss','enrich','noenrich'].includes(old.kind) && !/\?\s*$/.test(prompt) ? old.kind : 'chat'
-  const nodeContext = old ? state.draftNode : null
+  const nodeContext = queued ? queued.correction.node : old ? state.draftNode : null
   if (nodeContext) kind = 'node-context'
   if (/проверь выходы фильтров учебных продаж/i.test(prompt)) kind = 'node-data'
   if (/проверь фильтр без поля «дата»/i.test(prompt)) kind = 'node-error'
   if (/выгрузи учебные продажи в csv/i.test(prompt)) kind = 'node-export'
   // A package from the computer: the agent uploads its own copy to Loginom; the file itself never changes.
-  const local = state.draftPackage ? state.draftPackage.source === 'local' : Boolean(old?.local)
-  if (['refactor','improve'].includes(kind) && !improvable(state.draftPackage?.name || (old ? old.files?.[0] : ''), local)) kind = 'clean'
+  const local = draftPackage ? draftPackage.source === 'local' : Boolean(old?.local)
+  if (['refactor','improve'].includes(kind) && !improvable(draftPackage?.name || (old ? old.files?.[0] : ''), local)) kind = 'clean'
   // Iteration 8: while the last copy is a draft, a follow-up edit goes on in it (mock: keeping the city filter);
   // another «improve» has nothing left from the check.
-  const editAt = old && state.editTurn?.session === old.id ? state.editTurn.index : null
+  const editAt = !queued && old && state.editTurn?.session === old.id ? state.editTurn.index : null
   const earlier = old ? [...(old.history || []), turnSnapshot(old)] : []
   const kept = editAt === null ? earlier : earlier.slice(0, editAt)
   if (editAt !== null) carryCopyState(earlier, editAt)
-  const draft = !nodeContext && !web && !state.draftPackage ? draftCopy(kept) : null
+  const draft = !nodeContext && !web && !draftPackage ? draftCopy(kept) : null
   // A request, not a question that names the node.
   const keepAsk = !nodeContext && /не удаля|оставь|оставить|верни|вернуть/i.test(prompt) && /фильтр|узел|узл/i.test(prompt) && !/\?\s*$/.test(prompt)
   // From a saved version (В-73: a new copy after «Сохранить»): the agent copies the saved version and keeps the node.
-  const fromSaved = !draft && keepAsk && !state.draftPackage ? savedCopy(kept) : null
+  const fromSaved = !draft && keepAsk && !draftPackage ? savedCopy(kept) : null
   if (draft && keepAsk && !draft.partial) kind = 'keep'
   else if (fromSaved) kind = 'keep'
   else if (draft && kind === 'improve' && !draft.partial) kind = 'more'
   // Asked to keep the node with no copy to change: the copy was saved, replaced, discarded, belongs to another chat or
   // was left half-done by a stopped edit.
-  else if (keepAsk && !state.draftPackage && (!draft || draft.partial)) kind = 'nocopy'
+  else if (keepAsk && !draftPackage && (!draft || draft.partial)) kind = 'nocopy'
   // The trial applies to the trial task; another request is answered as usual.
   const trialTurn = state.trialSkill && !old && prompt === state.trialSkill.prompt
   if (trialTurn) kind = state.trialSkill.kind
@@ -2629,9 +2797,10 @@ function send() {
   // «Изменить» on a message: the turns from it on are replaced by the new request.
   const next = {
     id: old?.id ?? 'session-' + Date.now(), date:'Сейчас', title:old?.title || state.templateTitle || (prompt.length > 56 ? prompt.slice(0,57).replace(/\s+\S*$/,'') + '…' : prompt),
-    kind, phase, nodeContext, saveRequested:kind === 'abc' && /сохрани|сохранение/i.test(prompt), packageId:state.draftPackage?.id || nodeContext?.packageId,
-    files:[...(state.draftPackage ? [state.draftPackage.name] : []), ...state.draftFiles], prompt,
+    kind, phase, nodeContext, saveRequested:kind === 'abc' && /сохрани|сохранение/i.test(prompt), packageId:draftPackage?.id || nodeContext?.packageId,
+    files:[...(draftPackage ? [draftPackage.name] : []), ...draftFiles], prompt,
     project:old ? old.project : state.page === 'project' ? state.projectView : projectById(state.project) ? state.project : null,
+    demo:queued ? undefined : state.demoTurn, busy:queued ? undefined : state.demoBusy, holderId:state.demoHolder, queue:queued ? old.queue.slice(1) : old?.queue,
     history:kept, allowed:[...(old?.allowed || [])],
     step:0, decisions:[], cleared:[], steer:[], web, local, nosend:kind === 'noenrich' ? enrich : undefined,
     // The conversation keeps the model it started with (OpenCode 2: the session's model), not the current default.
@@ -2642,7 +2811,7 @@ function send() {
   // mode (the default answers), or allowed again.
   next.modelNote = old?.modelSwitched ? 'switched' : next.modelName === next.model ? 'back' : 'fallback'
   if (!old) state.nextModel = null
-  state.editTurn = null
+  if (!queued) state.editTurn = null
   if (trialTurn) next.trial = state.trialSkill
   // Run 3: the rules apply to the edit as well as to the check — the edit adds the module note they ask for.
   if (!trialTurn && ['refactor','improve'].includes(kind)) next.rules = appliedRules(next.project)
@@ -2656,15 +2825,18 @@ function send() {
   if (!old) state.trialSkill = null
   // Examples stop showing once the user has started three conversations of their own.
   if (!old && !state.templateTitle) state.progress.ownChats++
-  if (state.draftPackage && !trialTurn) state.progress.packages = true
+  if (draftPackage && !trialTurn) state.progress.packages = true
   state.sessions = [next, ...state.sessions.filter(x => x.id !== next.id)]
-  state.templateTitle = ''
-  Object.assign(state, {draft:'', draftFiles:[], draftPackage:null, draftNode:null})
-  openSession(next.id)
+  if (!queued) {
+    Object.assign(state, {templateTitle:'', draft:'', draftFiles:[], draftPackage:null, draftNode:null, scrollToEnd:true, demoTurn:null, demoBusy:null, demoHolder:null})
+    openSession(next.id)
+  }
   if (phase === 'starting') startRun(next)
+  else if (queued) render()
 }
-function tryPrompt(text) {
+function tryPrompt(text, demo = null, busy = null, holder = null) {
   newSession()
+  Object.assign(state, {demoTurn:demo, demoBusy:busy, demoHolder:holder})
   // A starter left unsent on another card must not attach its package or files to this one.
   Object.assign(state, {draftPackage:null, draftFiles:[], templateTitle:''})
   state.draft = text
@@ -2907,8 +3079,8 @@ function feedAction(d) {
 }
 function turnSnapshot(item) {
   // A copy, not shared references: a fork's decisions must not show up in the original.
-  return structuredClone({nodeContext:item.nodeContext, saveRequested:item.saveRequested, packageId:item.packageId, savedPath:item.savedPath, exportTo:item.exportTo, instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:item.phase === 'writing' ? item.writeFinal : ['running','retrying','permission','question','plan','connect','starting'].includes(item.phase) ? 'interrupted' : item.phase,
-    step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, copy:item.copy, rules:item.rules, web:item.web, nosend:item.nosend, local:item.local, from:item.from, resumeCopy:item.resumeCopy, about:item.about, aboutKeep:item.aboutKeep, nocopy:item.nocopy, modelNote:item.modelNote, forkOf:item.forkOf, model:item.model, modelName:item.modelName, modelError:item.modelError})
+  return structuredClone({nodeContext:item.nodeContext, saveRequested:item.saveRequested, packageId:item.packageId, savedPath:item.savedPath, exportTo:item.exportTo, instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:item.phase === 'writing' ? item.writeFinal : ['running','retrying','permission','question','repeated','busy','plan','connect','starting'].includes(item.phase) ? 'interrupted' : item.phase,
+    step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, copy:item.copy, rules:item.rules, web:item.web, nosend:item.nosend, local:item.local, from:item.from, resumeCopy:item.resumeCopy, about:item.about, aboutKeep:item.aboutKeep, nocopy:item.nocopy, modelNote:item.modelNote, forkOf:item.forkOf, model:item.model, modelName:item.modelName, modelError:item.modelError, recovery:item.recovery, repeated:item.repeated, saveName:item.saveName, loginomFailure:item.loginomFailure, savedStep:item.savedStep, elapsedByStep:item.elapsedByStep, interruptedAt:item.interruptedAt})
 }
 function connectLoginom() {
   if (state.connecting) return
@@ -2941,6 +3113,37 @@ function downloadTable(at) {
   a.download = name
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+function editQueue(value) {
+  const [action, at] = value.split(':')
+  const index = Number(at)
+  const item = currentItem()
+  if (action === 'edit') {
+    item.queueEdit = index
+    item.queueDraft = item.queue[index].text
+    render()
+    return $('#correction-text').focus()
+  }
+  if (action === 'save') {
+    const text = item.queueDraft?.trim()
+    if (!text) return $('#correction-text')?.focus()
+    item.queue[index].text = text
+  }
+  if (action === 'remove') {
+    item.queue.splice(index, 1)
+    if (item.queueEdit === index) item.queueEdit = null
+    else if (item.queueEdit > index) item.queueEdit--
+  } else item.queueEdit = null
+  render()
+  sendQueued(item)
+  $('#prompt')?.focus()
+}
+function continueRepeat(text = '') {
+  const item = currentItem()
+  if (item.phase !== 'repeated') return
+  if (text.trim()) item.steer.push({text:text.trim(), at:item.step + 1})
+  item.demo = null
+  runSteps(item)
 }
 const actions = {
   new:newSession,
@@ -3083,6 +3286,7 @@ const actions = {
   'run-plan':() => runSteps(currentItem()),
   stop:() => {
     const item = currentItem()
+    if (item.phase === 'repeated') item.demo = null
     clearTimeout(item.timer)
     clearInterval(item.writer)
     // The work is done while the answer is being written: stopping just shows it whole.
@@ -3091,31 +3295,90 @@ const actions = {
     $('#prompt')?.focus()
   },
   resume:() => copySettled(currentItem()) ? toast(settledNote(copySettled(currentItem())), 'alert') : runSteps(currentItem()),
-  // The demo's Loginom «comes back» on the next check.
+  'wait-step':() => {
+    currentItem().waitedAt = Date.now()
+    refreshStepProgress(app, currentItem(), longChatStep(currentItem()))
+  },
   'recheck-loginom':() => {
-    state.loginomDown = false
     state.overlay = null
+    outageRestored()
     toast('Loginom отвечает')
+  },
+  'check-write':() => {
+    const item = currentItem()
+    if (!item.loginomFailure?.ready) return
+    item.loginomFailure.checked = true
+    item.recovery.push({at:item.step, text:'Проверил пакет в Loginom: изменения шага не сохранены'})
     render()
   },
   'retry-step':() => {
     const item = currentItem()
-    state.loginomDown = false
+    const failure = item.loginomFailure
+    if (!failure?.ready || (failure.needsCheck && !failure.checked)) return
+    item.loginomFailure = null
     item.failAt = null
     item.decisions.push({at:item.step, choice:'retry'})
     runSteps(item)
     $('#prompt')?.focus()
   },
-  'copy-error':() => currentItem()?.modelError && !currentItem().modelError.resolved ? copyText(`Loginom AI Agent: модель «${currentItem().modelError.model}» не ответила — ${modelErrorText(currentItem().modelError).join('. ')}`) : copyText(`Loginom AI Agent: не удалось ${scriptOf(currentItem()).steps[currentItem().step].fail || 'выполнить шаг'}. Loginom не ответил за 30 с (${hostOf(state.settings.connection.url)}), 2 попытки.`),
+  'copy-error':() => currentItem()?.modelError && !currentItem().modelError.resolved ? copyText(`Loginom AI Agent: модель «${currentItem().modelError.model}» не ответила — ${modelErrorText(currentItem().modelError).join('. ')}`) : copyText(`Loginom AI Agent: Loginom не ответил (${hostOf(state.settings.connection.url)}), шаг «${stepText(scriptOf(currentItem()).steps[currentItem().step].live, currentItem())}».`),
   'continue-turn':() => continueTurn(null),
+  'continue-repeat':() => continueRepeat(),
+  'demo-close':() => {
+    const item = currentItem()
+    const interruptedAt = new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})
+    write('interrupted-demo', {...item, phase:'interrupted', interruptedAt})
+    location.reload()
+  },
+  'resume-crash':() => {
+    const item = currentItem()
+    Object.assign(item, {interruptedAt:null, demo:null, lastReply:null})
+    write('interrupted-demo', null)
+    runSteps(item)
+  },
+  'check-lock':() => {
+    const item = currentItem()
+    if (state.sessions.some(entry => entry.id === item.holderId && entry.holdsBusyPackage))
+      return toast('Пакет всё ещё открыт в другом разговоре', 'alert', item.holderId)
+    item.busy = null
+    runSteps(item)
+  },
+  'close-busy-package':() => {
+    const holder = currentItem()
+    holder.holdsBusyPackage = false
+    const blocked = state.sessions.find(entry => entry.holderId === holder.id && entry.phase === 'busy')
+    if (blocked) return openSession(blocked.id)
+    render()
+  },
+  'save-unlocked-version':() => {
+    const item = currentItem()
+    item.busy = null
+    item.saveName = 'ABC-анализ — новая версия.lgp'
+    runSteps(item)
+  },
   'try-model-failure':() => {
     state.failModel = true
     tryPrompt('Построй ABC-анализ товаров по выручке')
   },
-  'try-failure':() => {
-    state.failNext = true
-    tryPrompt('Построй ABC-анализ товаров по выручке')
+  'try-long-step':() => tryPrompt('Построй ABC-анализ товаров по выручке и сохрани пакет', 'long'),
+  'try-failure':() => tryPrompt('Проверь сценарий продаж', 'read'),
+  'try-write-failure':() => tryPrompt('Построй ABC-анализ товаров по выручке и сохрани пакет', 'write'),
+  'try-crash':() => tryPrompt('Построй ABC-анализ товаров по выручке и сохрани пакет', 'crash'),
+  'try-repeat':() => tryPrompt('Проверь сценарий продаж', 'repeat'),
+  'try-busy-chat':() => {
+    const holderId = 'demo-busy-holder'
+    let holder = state.sessions.find(entry => entry.id === holderId)
+    if (!holder) {
+      holder = completeTurn({id:holderId, title:'ABC-анализ · открытый пакет', date:'Сейчас', phase:'done', kind:'abc',
+        prompt:'Построй ABC-анализ товаров по выручке'})
+      state.sessions.push(holder)
+    }
+    holder.holdsBusyPackage = true
+    tryPrompt('Построй ABC-анализ товаров по выручке и сохрани пакет', null, 'chat', holderId)
   },
+  'try-busy-studio':() => tryPrompt('Построй ABC-анализ товаров по выручке и сохрани пакет', null, 'studio'),
+  'try-busy-crash':() => tryPrompt('Построй ABC-анализ товаров по выручке и сохрани пакет', null, 'crash'),
+  'try-notifications':() => settingsTab('general'),
   'open-instead':() => {
     currentItem().insteadOpen = true
     render()
@@ -3409,6 +3672,7 @@ app.addEventListener('click', event => {
     return
   }
   if (d.openProject) return openProject(d.openProject)
+  if (d.queue) return editQueue(d.queue)
   if (d.permit) return permit(d.permit)
   if (d.answer) return answerQuestion(d.answer)
   if (d.detail) {
@@ -3543,7 +3807,11 @@ app.addEventListener('input', event => {
     $('#search-results').innerHTML = searchResults(event.target.value)
     return
   }
-  if (['instead-text','answer-text'].includes(event.target.id)) {
+  if (event.target.id === 'correction-text') {
+    currentItem().queueDraft = event.target.value
+    return
+  }
+  if (['instead-text','answer-text','repeat-text'].includes(event.target.id)) {
     const item = currentItem()
     if (item) item.dockDraft = {...item.dockDraft, [event.target.id]:event.target.value}
     return
@@ -3583,7 +3851,7 @@ app.addEventListener('change', event => {
 })
 app.addEventListener('submit', event => {
   const id = event.target.id
-  if (!['composer','project-form','rename-form','package-version-form','instead-form','answer-form'].includes(id)) return
+  if (!['composer','project-form','rename-form','package-version-form','instead-form','answer-form','repeat-form'].includes(id)) return
   event.preventDefault()
   if (id === 'composer') return send()
   if (id === 'instead-form') {
@@ -3591,6 +3859,7 @@ app.addEventListener('submit', event => {
     return text ? permit('instead', text) : $('#instead-text')?.focus()
   }
   if (id === 'answer-form') return answerQuestion(new FormData(event.target).get('text'))
+  if (id === 'repeat-form') return continueRepeat(new FormData(event.target).get('text'))
   if (id === 'package-version-form') return savePackageVersion(new FormData(event.target).get('version').trim())
   const name = new FormData(event.target).get('name').trim()
   if (!name) return
@@ -3669,7 +3938,7 @@ document.addEventListener('keydown', event => {
     menuOpener(menu)?.focus()
     return
   }
-  if (event.key === 'Escape' && !peek && !document.querySelector('dialog[open]') && state.page === 'chat' && ['running','retrying','writing'].includes(currentItem()?.phase)) {
+  if (event.key === 'Escape' && event.target.id !== 'correction-text' && !peek && !document.querySelector('dialog[open]') && state.page === 'chat' && ['running','retrying','writing'].includes(currentItem()?.phase)) {
     if (!currentItem()?.build) actions.stop()
     return
   }
@@ -3679,6 +3948,10 @@ document.addEventListener('keydown', event => {
       peekHeld = pointerInPanel
       setPeek(false)
     }
+  }
+  if (['Enter','Escape'].includes(event.key) && event.target.id === 'correction-text' && !event.isComposing) {
+    event.preventDefault()
+    return editQueue(`${event.key === 'Enter' ? 'save' : 'cancel'}:${currentItem().queueEdit}`)
   }
   if (event.key === 'Enter' && event.target.id === 'prompt' && !event.shiftKey && !event.isComposing) {
     event.preventDefault()
@@ -3758,5 +4031,11 @@ addEventListener('popstate',() => {
 })
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',() => { if (state.theme === 'system') render() })
 // Seeds are finished conversations: every step done (the scripts are declared above this line).
-for (const item of state.sessions) completeTurn(item)
+for (const item of state.sessions) if (!item.interruptedAt) completeTurn(item)
+setInterval(() => {
+  if (state.page === 'runner') updateRunnerProgress(state, app)
+  if (state.page !== 'chat' || !currentItem() || !canQueue(currentItem()) || currentItem().phase === 'writing') return
+  const item = currentItem()
+  refreshStepProgress(app, item, longChatStep(item))
+}, 250)
 render()
