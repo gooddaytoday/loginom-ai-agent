@@ -97,7 +97,7 @@ export async function configureGroupingOutput(channel,configuration,parameters,m
  const final=await channel.observe({condition:'grouping output names and order applied',readMappings:true,ready:planned.fields?bound:ready});
  if(planned.fields){const order=[...planned.fields.filter(f=>!f.excluded),...planned.fields.filter(f=>f.excluded)];
   const actual=final.node_mapping;
-  need(actual.inventory_complete===true&&actual.source_identity_verified===true&&actual.mapping_wizard===expected.mapping_wizard
+  need(actual.inventory_complete===true&&actual.source_identity_verified===true&&actual.mapping_wizard===expected.mapping_wizard&&actual.autosync===expected.autosync
    &&same(actual.node_context,expected.node_context)&&same(actual.source_fields,expected.source_fields)
    &&same(actual.target_fields,expected.target_fields),'Grouping output binding changed before final readback');
   need(same(final.node_mapping.target_fields.map(f=>({source:(f.source??f.exclusion_source)?.name,name:f.name,label:f.label,type:f.type,excluded:f.excluded})),

@@ -277,6 +277,16 @@ export function reorderBoundOutputFields(channel,recordIds,edited) {
   return reorderFields(channel,recordIds,edited,true);
 }
 
+function sameReorderMapping(observed,expected) {
+  const actual=mappingSemantics(observed),wanted=mappingSemantics(expected),selection=wanted.source_selection;
+  // Table view and moving a row can remove the confirmed empty Links selection.
+  if(!Object.hasOwn(actual,'source_selection')&&selection?.verified===true
+    &&Object.keys(selection).sort().join(',')==='record_ids,verified'
+    &&Array.isArray(selection.record_ids)&&selection.record_ids.length===0)
+    delete wanted.source_selection;
+  return same(actual,wanted);
+}
+
 async function reorderFields(channel,recordIds,initialObservation,bindRows) {
   const ready=s=>['output_mapping','input_mapping'].includes(s.wizard?.stage)&&s.node_mapping?.verified===true
     &&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true;
@@ -297,7 +307,6 @@ async function reorderFields(channel,recordIds,initialObservation,bindRows) {
     // relative order inside each group; never move a row across that boundary.
     recordIds=[...recordIds.filter(id=>!excluded.has(id)),...recordIds.filter(id=>excluded.has(id))];
   }
-  const semantic=({rendered_indices,...rest})=>rest;
   let expected=structuredClone(baseline),moves=0;
   for(let destination=0;destination<recordIds.length;destination++) {
     while(expected.target_fields.findIndex(f=>f.record_id===recordIds[destination])>destination) {
@@ -330,7 +339,7 @@ async function reorderFields(channel,recordIds,initialObservation,bindRows) {
             ...(bindRows?{readMappings:true}:{}),
             ready:s=>{
               if(!bindRows)return s.wizard?.root_ref===root;
-              if(!bound(s)||!sameWizard(s)||!same(mappingSemantics(s.node_mapping),mappingSemantics(before)))
+              if(!bound(s)||!sameWizard(s)||!sameReorderMapping(s.node_mapping,before))
                 throw Error('Output reorder binding changed');
               return true;
             }});
@@ -352,14 +361,7 @@ async function reorderFields(channel,recordIds,initialObservation,bindRows) {
       });moves++;
       state=await channel.observe({condition:'native output order and selection after one move',readMappings:true,
         outputColumnPage:{offset:Math.floor((index-1)/8)*8,limit:8},ready:s=>bound(s)&&(!bindRows||sameWizard(s))});
-      const observed=semantic(state.node_mapping),wanted=semantic(expected),selection=wanted.source_selection;
-      // Moving an output row can remove the confirmed empty source selection.
-      // No selected source or other mapping property may change with the move.
-      if(!Object.hasOwn(observed,'source_selection')&&selection?.verified===true
-        &&Object.keys(selection).sort().join(',')==='record_ids,verified'
-        &&Array.isArray(selection.record_ids)&&selection.record_ids.length===0)
-        delete wanted.source_selection;
-      if(!same(observed,wanted))throw Error('Output reorder changed unrelated native mapping state');
+      if(!sameReorderMapping(state.node_mapping,expected))throw Error('Output reorder changed unrelated native mapping state');
     }
   }
   return {verified:true,cleanup_complete:true,effect_possible:moves>0,moves,definition:state.node_mapping??expected,
