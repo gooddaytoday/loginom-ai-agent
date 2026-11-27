@@ -2,8 +2,121 @@ import { expect, test, type Locator, type Page } from "@playwright/test"
 import { NO_PROVIDER, SERVER, T0, expectPath, holdRoute, pageMessagesFrom, provider, sessionHref } from "../utils/app"
 import { mockWorkspace, openDraft, openSession } from "../utils/workspace"
 import { mockPluginsActivating, type MockServerConfig } from "../utils/mock-server"
+import { nodeFixture } from "../utils/loginom-node-fixture"
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] })
+
+for (const width of [1280, 390]) {
+  test(`references a Loginom node in its originating conversation at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 860 })
+    const source = nodeFixture.source
+    const other = { id: "ses_node_other", title: "Другой разговор" }
+    const prompts: Parameters<NonNullable<MockServerConfig["onPrompt"]>>[0][] = []
+    const bindings: { sessionID: string; directory: string | undefined }[] = []
+    let creates = 0
+    let currentPath = nodeFixture.node.path
+
+    const view = await openSession(page, {
+      name: "LoginomNodeDraft",
+      sessions: [{ id: source.sessionID, title: "Продажи" }, other],
+      pageMessages: pageMessagesFrom({
+        [source.sessionID]: [
+          { id: source.messageID, type: "user", text: "Подготовь отчёт", time: { created: T0 } },
+          ...Array.from({ length: 26 }, (_, index) => ({
+            id: `msg_node_${String(index + 1).padStart(2, "0")}`,
+            type: "user" as const,
+            text: `Уточнение ${index + 1}`,
+            time: { created: T0 + index + 1 },
+          })),
+        ],
+      }),
+      seed: { locale: "ru", storage: { "opencode.e2e.loginom-node": "1" } },
+      loginomPackagePath(sessionID, directory) {
+        bindings.push({ sessionID, directory })
+
+        return currentPath
+      },
+      onPrompt: (input) => void prompts.push(input),
+      onSessionCreate: () => {
+        creates++
+      },
+    })
+
+    const titlebar = page.locator('[data-slot="titlebar-v2"]')
+    const tabs = width === 390 ? page.locator('[data-slot="mobile-tabs-drawer"]') : titlebar
+
+    const showTabs = async () => {
+      if (width === 390) await titlebar.getByRole("button", { name: "Вкладки", exact: true }).click()
+    }
+
+    const openPackage = async () => {
+      await showTabs()
+      await tabs.getByRole("button", { name: "Тестовый пакет", exact: true }).click()
+    }
+
+    const origin = page.getByText("Подготовь отчёт", { exact: true })
+    await expect(page.getByText("Уточнение 26", { exact: true })).toBeInViewport()
+
+    const text = "Проверь расчёт."
+    await view.editor.fill(text)
+    await expect(view.editor).toHaveText(text)
+    await openPackage()
+    await page.getByRole("button", { name: "Спросить агента", exact: true }).click()
+    await expect(page).toHaveURL((url) => url.pathname === sessionHref(source.sessionID))
+    await expect(origin).toBeInViewport()
+    const chip = page.getByRole("group", { name: "Расчёт выручки · Продажи.lgp", exact: true })
+    await expect(chip).toBeVisible()
+    await expect(view.editor).toHaveText(text)
+    expect(prompts).toEqual([])
+    expect(creates).toBe(0)
+    await page.screenshot({ path: testInfo.outputPath(`loginom-node-${width}.png`) })
+
+    await showTabs()
+    const otherTab = tabs.locator(`[data-titlebar-tab-link][href="${sessionHref(other.id)}"]`)
+    await expect(otherTab).toBeVisible()
+    await otherTab.click()
+    await expectPath(page, sessionHref(other.id))
+    await expect(view.editor).toBeEditable()
+    await expect(chip).toHaveCount(0)
+    await showTabs()
+    const sourceTab = tabs.locator(`[data-titlebar-tab-link][href="${sessionHref(source.sessionID)}"]`)
+    await expect(sourceTab).toBeVisible()
+    await sourceTab.click()
+    await expectPath(page, sessionHref(source.sessionID))
+    await expect(chip).toBeVisible()
+    await chip.getByRole("button", { name: "Убрать узел", exact: true }).click()
+    await expect(chip).toHaveCount(0)
+    await expect(view.editor).toHaveText(text)
+
+    await openPackage()
+    await page.getByRole("button", { name: "Изменить узел с агентом", exact: true }).click()
+    await expect(chip).toBeVisible()
+    currentPath = "/Команда/Другой.lgp"
+    await view.editor.press("Enter")
+    await expect(
+      page.getByText("К этому разговору привязан другой пакет Loginom. Уберите узел, чтобы отправить сообщение."),
+    ).toBeVisible()
+    await expect(chip).toBeVisible()
+    await expect(view.editor).toHaveText(text)
+    expect(prompts).toEqual([])
+    expect(creates).toBe(0)
+
+    currentPath = nodeFixture.node.path
+    await view.editor.press("Enter")
+    await expect.poll(() => prompts.length).toBe(1)
+    expect(prompts[0]?.sessionID).toBe(source.sessionID)
+    expect(prompts[0]?.body.text).toBe(
+      text +
+        '\nThe user referenced Loginom node {"package":"Продажи.lgp","path":"/Команда/Продажи.lgp","guid":"{e9bd5bda-1245-43b0-acbe-d81c405077b1}","name":"Расчёт выручки","intent":"edit"}.',
+    )
+    expect(bindings).toEqual([
+      { sessionID: source.sessionID, directory: view.directory },
+      { sessionID: source.sessionID, directory: view.directory },
+    ])
+    expect(creates).toBe(0)
+    await expect(chip).toHaveCount(0)
+  })
+}
 
 test("mention a session by title, send its stable token, and open its own tab", async ({ page }) => {
   const target = "ses_0123456789abcdefghijklmnop"

@@ -113,6 +113,8 @@ export function createTimelineCursor(input: {
   ): TimelineCursorEvent {
     const mounted = glide ? document.getElementById(input.anchor(effect.messageID)) : null
 
+    input.detach()
+
     if (!mounted) input.revealMessage(effect.messageID)
     const element = mounted ?? document.getElementById(input.anchor(effect.messageID))
 
@@ -178,10 +180,14 @@ export function createTimelineCursor(input: {
       },
     ),
   )
-  // A new session starts out following; only the reader's own return to the end clears the route's hash.
+  // The first scroll to the end can arrive while a route's message seek is still waiting for its frame.
   createEffect(
     on([input.sessionKey, input.following], ([key, following], previous) => {
-      if (following && previous?.[0] === key) clear()
+      if (!following || previous?.[0] !== key) return
+      const cursor = cursorState()
+
+      if (cursor.status === "selected" && cursor.seek) return
+      clear()
     }),
   )
 

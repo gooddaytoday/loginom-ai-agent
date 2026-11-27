@@ -104,6 +104,8 @@ export function noteComment(item: NoteContextItem, comment: string) {
 
   if (item.subtitle !== undefined) note.subtitle = item.subtitle
 
+  if (item.data !== undefined) note.data = item.data
+
   if (item.href) note.href = item.href
 
   if (item.live) note.live = { ...item.live }

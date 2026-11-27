@@ -1061,13 +1061,13 @@ export function createPluginAttachment(apis: HostApis) {
 
     // A tab that already routes the session, e.g. a subagent opened from its parent's tab, keeps its route.
     if (shown?.type === "session" && shown.routeSessionId === session.id) {
-      if (options?.focus) tabs.select(shown)
+      if (options?.focus) tabs.select(shown, options)
 
       return
     }
 
     if (!options?.focus) return void tabs.addSessionTab({ server: key, sessionId: session.id })
-    openNotificationSession(tabs, key, session.id)
+    openNotificationSession(tabs, key, session.id, options)
   }
 
   const shell: Tabs = {

@@ -36,12 +36,17 @@ const requestTitles = {
   "websearch.provider": "notification.permission.title",
 } as const
 
-export function openNotificationSession(tabs: NotificationTabs, server: ServerConnection.Key, sessionID: string) {
+export function openNotificationSession(
+  tabs: NotificationTabs,
+  server: ServerConnection.Key,
+  sessionID: string,
+  options?: { messageID?: string },
+) {
   const tab = tabs.addSessionTab({ server, sessionId: sessionID })
 
   if (tab.type !== "session") return
   tabs.rememberSessionRoute(tab, sessionID)
-  tabs.select(tab)
+  tabs.select(tab, options)
 }
 
 // Only direct children: a grandchild reports to its own parent, so waiting on it could mean no sound at all. Running

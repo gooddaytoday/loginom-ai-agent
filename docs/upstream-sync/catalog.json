@@ -74,6 +74,22 @@
       ]
     },
     {
+      "id": "CAT-15",
+      "title": "Structured composer notes and return to the originating message (C3 Г4)",
+      "paths": [
+        "packages/plugin/src/gui/builtin.ts", "packages/plugin/src/gui/host-apis.ts",
+        "packages/app/src/runtime/plugin/host.tsx", "packages/app/src/runtime/plugin/host-apis.tsx",
+        "packages/app/src/composer/editor/editor.tsx", "packages/app/src/composer/machine.ts",
+        "packages/app/src/composer/model.ts", "packages/app/src/composer/request.ts",
+        "packages/app/src/composer/schema.ts", "packages/app/src/composer/submit.ts",
+        "packages/app/src/shell/notifications/notification.tsx", "packages/app/src/shell/tabs/tabs.tsx",
+        "packages/app/src/session/timeline/cursor.ts", "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts",
+        "packages/gui-plugins/README.md",
+        "packages/app/e2e/regression/composer.spec.ts",
+        "packages/app/e2e/utils/mock-api.ts", "packages/app/e2e/utils/mock-server.ts"
+      ]
+    },
+    {
       "id": "CAT-14",
       "title": "Built-in GUI tool renderers (C3.0, accepted timeline row exception)",
       "paths": [

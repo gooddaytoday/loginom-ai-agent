@@ -4,7 +4,7 @@
 import type { Schema } from "effect"
 import type { Context } from "./context.js"
 import { Registry, type Catalog, type Messages, type Persisted, type StoreDeclaration, type StoreFrom } from "./core.js"
-import type { Desktop, Layout, Locale, StorageScope, StoreOptions } from "./host-apis.js"
+import type { Desktop, Layout, Locale, MountedSession, StorageScope, StoreOptions } from "./host-apis.js"
 import type { MainContext } from "./main.js"
 import type { Command, IconName, Panel, PanelTab, SlotMap } from "./registries.js"
 import { type JSX } from "solid-js"
@@ -81,6 +81,27 @@ export interface ToolRenderer {
  * ```
  */
 export const ToolRenderer = Registry.define<ToolRenderer>("tool.renderer")
+
+/** Presentation and send check for a built-in plugin's structured composer notes, matched by the note's origin. */
+export const ComposerNoteHandler = Registry.define<{
+  /**
+   * Renders the draft chip. The fallback is the standard note card.
+   * @param input - The note data and its removal action.
+   */
+  render(input: {
+    /** The data stored with the note. */
+    readonly data: string
+    /** Removes the note from its draft. */
+    readonly remove: () => void
+  }): JSX.Element
+  /**
+   * Returns a message to block sending, or undefined to accept the note.
+   * @param data - The data stored with the note.
+   * @param session - The receiving conversation, if it already exists and is mounted.
+   * @param signal - Aborts the check when its composer closes.
+   */
+  check(data: string, session: MountedSession | undefined, signal: AbortSignal): Promise<string | undefined>
+}>("composer.note")
 
 /** A `Command` with the fields only built-ins set. */
 export interface BuiltinCommand extends Command {

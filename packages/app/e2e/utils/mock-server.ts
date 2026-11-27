@@ -25,6 +25,8 @@ import { installSseTransport } from "./sse-transport"
 
 type Resolvable<T> = T | (() => T)
 
+const decodePackageSnapshot = Schema.decodeUnknownOption(Schema.Struct({ sessionID: Schema.String }))
+
 // A hook's replacement response.
 export type MockAnswer = { status: number; body: unknown }
 
@@ -138,6 +140,7 @@ export interface MockServerConfig {
   // Runs on DELETE .../connect/oauth/:attemptID, which closes an OAuth attempt the dialog left.
   onIntegrationOAuthCancel?: (attemptID: string) => void
   plugins?: Resolvable<unknown[]>
+  loginomPackagePath?: (sessionID: string, directory: string | undefined) => string | null
   skills?: Resolvable<unknown[]>
   // Replaces the `/api/worktree` inventory, which defaults to the directory plus project sandboxes.
   worktrees?: Resolvable<unknown[]>
@@ -1221,14 +1224,25 @@ function mockHandlers(
           })
         },
         // The goal plugin's pill reads each routed session's goal; no scenario sets one.
-        rpcCall: (ctx) =>
-          ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get"
-            ? Effect.succeed({ output: null })
-            : Effect.fail(
-                new MockUnsupported({
-                  message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC`,
-                }),
-              ),
+        rpcCall: (ctx) => {
+          if (ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get")
+            return Effect.succeed({ output: null })
+          const snapshot = Option.getOrUndefined(decodePackageSnapshot(ctx.payload.input))
+
+          if (
+            ctx.params.rpcID === "loginom.package-state" &&
+            ctx.params.method === "snapshot" &&
+            config.loginomPackagePath &&
+            snapshot
+          )
+            return Effect.succeed({
+              output: { path: config.loginomPackagePath(snapshot.sessionID, ctx.query["location[directory]"]) },
+            })
+
+          return Effect.fail(
+            new MockUnsupported({ message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC` }),
+          )
+        },
         sessionActive: () => {
           const status = resolve(config.sessionStatus ?? {})
 

@@ -347,18 +347,19 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
       if (next.length !== closed.length) setClosed(() => next)
     })
 
-    const navigateTab = (tab: Tab) => {
+    const navigateTab = (tab: Tab, options?: { messageID?: string }) => {
+      const href = options?.messageID ? `${tabHref(tab)}#message-${options.messageID}` : tabHref(tab)
+
       if (preview.current()) {
         void startTransition(() => {
           preview.clear()
           setRecentKey(tabKey(tab))
-          navigate(tabHref(tab))
+          navigate(href)
         })
 
         return
       }
 
-      const href = tabHref(tab)
       setRecentKey(tabKey(tab))
       navigate(href)
     }
