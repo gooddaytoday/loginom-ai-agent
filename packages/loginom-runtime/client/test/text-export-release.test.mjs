@@ -155,6 +155,7 @@ async function stoppedRuntime(phase,{browserRecovery=false,blocked=false,record=
        ]:[]}}};
    }
    const result=value=>({status:'SUCCEEDED',output:{value}});
+   if(state.autoRebindBlocked&&code.includes('"reconcile_only":true'))throw Error('Port wizard owner observation timed out');
    if(code.includes('"reconcile_only":true')||code.includes('"release_opening":{')){
     const surface=state.open?'wizard':'graph';
     return result({...port,verified:true,cleanup_complete:true,status:'SUCCEEDED',surface,phase:state.open?'verified':'released'});
@@ -215,6 +216,25 @@ for(const lostOpening of ['completed','wizard','running','foreign'])test('public
  }
  assert.deepEqual(f.calls,lostOpening==='wizard'?['open_input_port','click']:['open_input_port']);
 });
+
+test('public export browser recovery releases a completed opening after the wizard was closed',async()=>{
+ const f=await stoppedRuntime('input_mapping',{lostOpening:'wizard',browserRecovery:true});
+ f.state.autoRebindBlocked=true;
+ const refused=await f.runtime.recover('apply-export',{strategy:'abandon_operation',recoveryOperationId:'release-export'});
+ assert.equal(refused.error.code,'NODE_RELEASE_REFUSED');
+ const basis=f.runtime.browserRecoveryBasis('apply-export');
+ assert.equal((await f.runtime.browserRecoveryHandoff('apply-export')).stopped,true);
+
+ f.state.open=false;
+ const recovered=await f.runtime.verifyBrowserRecovery({operationId:'apply-export',step:basis.step,attested:{actions_performed:['closed the input wizard']}});
+ assert.equal(recovered.status,'continuable',JSON.stringify(recovered));
+ assert.equal(recovered.original_operation.phase,'node_released');
+ assert.deepEqual(recovered.original_operation.configuration,{status:'unknown'});
+ assert.equal(f.runtime.hasUnsettledWork(),false);
+ f.runtime.assertPreparationAllowed();
+ assert.deepEqual(f.calls,['open_input_port']);
+});
+
 for(const phase of ['configure','execute'])test('public export '+phase+' refusal offers abandon and settles without repeating the phase',async()=>{
  const f=await stoppedRuntime(phase),advice=(await f.runtime.inspect({operationId:'apply-export'})).output;
  assert.deepEqual(advice.recovery_options,['abandon_operation']);
