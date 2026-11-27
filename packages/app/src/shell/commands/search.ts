@@ -23,7 +23,7 @@ export function matchesCommandPaletteEntry(entry: CommandPaletteEntry, query: st
   )
 }
 
-const typeOrder = { command: 0, session: 1, setting: 2, file: 3 }
+const typeOrder = { command: 0, project: 1, session: 2, setting: 3, file: 4 }
 
 /** Search results: commands lead, then sessions (those open as tabs first, then the newest), settings and files. */
 export function rankCommandPaletteEntries(
@@ -45,6 +45,8 @@ export function createCommandPaletteSearch(props: {
   sources: ((query: string, signal: AbortSignal) => Promise<CommandPaletteEntry[]>)[]
   /** Sessions open as tabs, which lead the matching sessions. */
   open?: (entry: CommandPaletteEntry) => boolean
+  rank?: (entries: CommandPaletteEntry[], query: string) => CommandPaletteEntry[]
+  keepPrevious?: boolean
 }) {
   const query = createMemo(() => props.query().trim())
   const local = createMemo(() => props.items(query()))
@@ -111,7 +113,7 @@ export function createCommandPaletteSearch(props: {
 
         if (result.query === current) return result.items
 
-        if (!current) return []
+        if (!current || props.keepPrevious === false) return []
 
         const matched = uniqueCommandPaletteEntries([...result.items, ...source.seen]).filter((item) =>
           matchesCommandPaletteEntry(item, current),
@@ -125,7 +127,7 @@ export function createCommandPaletteSearch(props: {
 
     if (!current) return entries
 
-    return rankCommandPaletteEntries(entries, props.open ?? (() => false))
+    return props.rank?.(entries, current) ?? rankCommandPaletteEntries(entries, props.open ?? (() => false))
   })
 
   return {

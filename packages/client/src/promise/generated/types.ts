@@ -3361,6 +3361,7 @@ export type SessionListInput = {
   readonly limit?: number | undefined
   readonly order?: "asc" | "desc" | undefined
   readonly search?: string | undefined
+  readonly searchField?: "title" | "project" | "prompt" | undefined
   readonly parentID?: string | null | undefined
   readonly archived?: boolean | undefined
   readonly directory?: string | undefined

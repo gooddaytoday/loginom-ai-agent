@@ -76,6 +76,9 @@ const ListFilterFields = {
     description: "Session order for the first page. Use desc for newest first or asc for oldest first.",
   }),
   search: Schema.String.pipe(Schema.optional),
+  searchField: Schema.Literals(["title", "project", "prompt"]).pipe(Schema.optional).annotate({
+    description: "Field for literal session search. Prompt searches only stored user message text.",
+  }),
   parentID: Schema.Union([
     ID,
     Schema.Null.pipe(

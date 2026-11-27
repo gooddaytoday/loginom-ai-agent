@@ -4,6 +4,7 @@ import {
   expectPath,
   holdRoute,
   NO_PROVIDER,
+  pageMessagesFrom,
   project,
   REMOTE_SERVER,
   seed,
@@ -26,6 +27,73 @@ async function openHome(page: Page, input: Parameters<typeof mockStressTimeline>
   await mockStressTimeline(page, input)
   await seed(page, { usedProjects: { local: [fixture.project.id] } })
   await page.goto("/")
+}
+
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  test(`conversation search at ${viewport.width}×${viewport.height}`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport)
+    const model = { id: "demo", providerID: "test" }
+    await mockWorkspace(page, {
+      name: "Sales",
+      seed: { tabs: [], settings: { appearance: { tabLayout: "vertical" } } },
+      sessions: [
+        { id: "ses_match_title", title: "Revenue report", created: T0 },
+        { id: "ses_match_prompt", title: "Quarterly analysis", created: T0 + 1 },
+        { id: "ses_assistant_only", title: "Agent notes", created: T0 + 2 },
+      ],
+      provider: {
+        all: [{ id: "test", name: "Test", models: { demo: { id: "demo", name: "Demo" } } }],
+        connected: ["test"],
+        default: { providerID: "test", modelID: "demo" },
+      },
+      pageMessages: pageMessagesFrom({
+        ses_match_prompt: [{ id: "msg_prompt", type: "user", time: { created: T0 }, text: "Find revenue" }],
+        ses_assistant_only: [
+          {
+            id: "msg_reply",
+            type: "assistant",
+            agent: "build",
+            model,
+            time: { created: T0 },
+            content: [{ type: "text", text: "Revenue is in the ledger" }],
+          },
+        ],
+      }),
+    })
+    await page.goto("/")
+    const trigger = page.getByRole("button", { name: "Search", exact: true })
+    await expect(row(page, "Revenue report")).toBeVisible({ timeout: APP_READY_TIMEOUT })
+    await trigger.click()
+    const dialog = page.getByRole("dialog")
+    const search = dialog.getByRole("combobox", { name: "Title, project, or words from your prompt" })
+    const results = dialog.getByRole("option")
+    await expect(search).toBeFocused()
+    await expect(results).toHaveText([/Agent notes/, /Quarterly analysis/, /Revenue report/])
+    await search.fill("Sales")
+    await expect(results).toHaveText(["Sales", /Agent notes/, /Quarterly analysis/, /Revenue report/])
+    await search.fill("revenue")
+    await expect(results).toHaveText([/Revenue report/, /Quarterly analysis/])
+    await testInfo.attach(`search-${viewport.width}x${viewport.height}`, {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    })
+    await search.press("ArrowDown")
+    await expect(dialog.getByRole("option", { selected: true })).toHaveText(/Quarterly analysis/)
+    await search.press("ArrowUp")
+    await expect(dialog.getByRole("option", { selected: true })).toHaveText(/Revenue report/)
+    await search.press("Escape")
+    await expect(dialog).toBeHidden()
+    await expect(trigger).toBeFocused()
+
+    await trigger.press("ControlOrMeta+k")
+    await search.fill("revenue")
+    await expect(results).toHaveText([/Revenue report/, /Quarterly analysis/])
+    await search.press("Enter")
+    await expectPath(page, sessionHref("ses_match_title"))
+  })
 }
 
 test("Home keeps the session list in every interface mode", async ({ page }) => {

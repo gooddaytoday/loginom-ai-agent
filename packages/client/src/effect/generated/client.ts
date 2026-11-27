@@ -434,6 +434,7 @@ const EndpointSessionList = (raw: RawClient["server.session"]) => (input?: Sessi
         limit: input?.["limit"],
         order: input?.["order"],
         search: input?.["search"],
+        searchField: input?.["searchField"],
         parentID: input?.["parentID"],
         archived: input?.["archived"],
         directory: input?.["directory"],

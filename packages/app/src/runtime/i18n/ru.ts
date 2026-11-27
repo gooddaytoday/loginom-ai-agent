@@ -89,6 +89,10 @@ export const dict = {
   "command.settings.open": "Открыть настройки",
 
   "command.palette": "Палитра команд",
+  "sidebar.search": "Поиск",
+  "sidebar.search.placeholder": "Название, проект или слова из запроса",
+  "sidebar.search.conversations": "Разговоры",
+  "sidebar.search.recent": "Недавние разговоры",
 
   "command.session.new": "Новая сессия",
   "command.session.import": "Импортировать сессию",
