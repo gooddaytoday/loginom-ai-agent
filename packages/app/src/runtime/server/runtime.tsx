@@ -1,5 +1,4 @@
 import { createSimpleContext } from "@opencode/ui/context"
-import { isConversationDraft, isConversationFolder } from "@opencode/gui-plugins/managed-folders"
 import {
   Accessor,
   batch,
@@ -300,14 +299,11 @@ function createServerController(
   })
 
   // The projects this client has used, in server order. Using any ID of a path shows that path's current project.
-  const visibleProject = (project: Project) =>
-    conn.type !== "sidecar" || !(isConversationDraft(project.worktree) || isConversationFolder(project.worktree))
-
   const used = createMemo(() => {
     const ids = new Set(projects.used())
     const paths = new Set(list().flatMap((project) => (ids.has(project.id) ? [pathKey(project.worktree)] : [])))
 
-    return unique().filter((project) => paths.has(pathKey(project.worktree)) && visibleProject(project))
+    return unique().filter((project) => paths.has(pathKey(project.worktree)))
   })
 
   const forDirectory = (directory: string): Project | undefined => {
@@ -362,12 +358,12 @@ function createServerController(
     },
     projects: {
       list,
-      unique: () => unique().filter(visibleProject),
+      unique,
       used,
       add,
       forDirectory,
       forSession: (session: SessionInfo): Project | undefined => projectForSession(session, list()),
-      last: () => list().find((project) => project.id === projects.last() && visibleProject(project)),
+      last: () => list().find((project) => project.id === projects.last()),
       // Marks the project of a directory as used from this client, and as the last one.
       touch(directory: string) {
         const id = forDirectory(directory)?.id

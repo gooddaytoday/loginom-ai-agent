@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp } from "node:fs/promises"
+import { mkdir, rmdir } from "node:fs/promises"
 import path from "node:path"
 import { conversationsFolder, workspaceFolder } from "./folders"
 
@@ -13,34 +13,56 @@ function folderName(title: string) {
 
 async function createFolder(parent: string, name: string) {
   await mkdir(parent, { recursive: true })
-  const directory = path.join(parent, name)
-  try {
-    await mkdir(directory)
-    return directory
-  } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error
-    return mkdtemp(`${directory} — `)
+  for (let index = 1; ; index++) {
+    const directory = path.join(parent, index === 1 ? name : `${name} (${index})`)
+    try {
+      await mkdir(directory)
+      return directory
+    } catch (error) {
+      if (!hasCode(error, ["EEXIST"])) throw error
+    }
   }
 }
 
-export function managedFolders(documents: string, today = () => new Date()) {
-  const root = path.join(documents, workspaceFolder)
-  const loose = path.join(root, conversationsFolder)
+function hasCode(error: unknown, codes: readonly string[]) {
+  if (!(error instanceof Error) || !("code" in error)) return false
+  return codes.some((code) => code === error.code)
+}
+
+export function managedFolders(documents: string, profile: string, today = () => new Date()) {
+  const allocations = new Set<string>()
+  const allocate = async (folder: string, name: string) => {
+    const directory = await createFolder(path.join(documents, workspaceFolder, folder), name).catch((error) => {
+      if (!hasCode(error, ["EACCES", "EPERM", "EROFS", "ENOENT", "ENOTDIR", "ENOSPC"])) throw error
+      return createFolder(path.join(profile, workspaceFolder, folder), name)
+    })
+    allocations.add(directory)
+    return directory
+  }
+
   return {
-    async draftDirectory() {
-      await mkdir(loose, { recursive: true })
-      return loose
+    async draftDirectory(draftID: string) {
+      if (!/^[a-z0-9-]{1,80}$/i.test(draftID)) throw new Error("Invalid draft ID")
+      const directory = await createFolder(path.join(profile, "drafts"), draftID)
+      allocations.add(directory)
+      return directory
     },
     project(title: string) {
       if (!title.trim()) throw new Error("Missing project name")
-      return createFolder(path.join(root, "Проекты"), folderName(title))
+      return allocate("Проекты", folderName(title))
     },
     conversation(title: string) {
       const date = today()
       const day = [date.getFullYear(), date.getMonth() + 1, date.getDate()]
         .map((part) => String(part).padStart(2, "0"))
         .join("-")
-      return createFolder(loose, `${day} ${folderName(title)}`)
+      return allocate(conversationsFolder, `${day} ${folderName(title)}`)
+    },
+    async finish({ directory, keep }: { directory: string; keep: boolean }) {
+      if (!allocations.delete(directory) || keep) return
+      await rmdir(directory).catch((error) => {
+        if (!hasCode(error, ["ENOENT", "ENOTEMPTY", "EEXIST"])) throw error
+      })
     },
   }
 }

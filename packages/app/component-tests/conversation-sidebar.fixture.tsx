@@ -11,6 +11,7 @@ export function mountSidebar() {
     (_, index): SidebarConversation => ({
       id: `report-${index}`,
       title: `Отчёт ${index + 1}`,
+      created: index,
       active: false,
       activity: index === 7 ? "input" : index === 0 ? "running" : "idle",
     }),
@@ -24,8 +25,14 @@ export function mountSidebar() {
           { directory: "/reports", title: "Отчёты", conversations: items },
           { directory: "/other", title: "Другой проект", conversations: [] },
         ]}
-        conversations={[{ id: "loose", title: "Разговор без проекта", active: false, activity: "running" }]}
-        onCreate={async () => false}
+        conversations={[{ id: "loose", title: "Разговор без проекта", created: 0, active: false, activity: "running" }]}
+        onCreate={async (name) => {
+          if (!host.dataset.attempted) {
+            host.dataset.attempted = "true"
+            throw new Error("Couldn't create project")
+          }
+          host.dataset.created = name
+        }}
         onOpenProject={() => {}}
         onNewInProject={() => {}}
         onOpenConversation={(id) => {

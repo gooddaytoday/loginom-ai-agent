@@ -746,7 +746,7 @@ test("updates authoritative cached project metadata from live events", async () 
     baseUrl: "http://opencode.local",
     fetch: async (input, init) => {
       const request = input instanceof Request ? input : new Request(input, init)
-      if (!request.url.endsWith("/api/project")) throw new Error(`Unexpected request: ${request.url}`)
+      if (!request.url.endsWith("/api/project?includeHidden=true")) throw new Error(`Unexpected request: ${request.url}`)
       requests++
       return Response.json([original, unrelated])
     },
@@ -775,6 +775,7 @@ test("updates authoritative cached project metadata from live events", async () 
         ...original,
         canonical: "/projects/renamed",
         name: "Updated custom name",
+        hidden: true,
         time: { ...original.time, updated: 2 },
       },
     }
@@ -782,6 +783,10 @@ test("updates authoritative cached project metadata from live events", async () 
 
     expect(setup.data.project.get(original.id)?.canonical).toBe("/projects/renamed")
     expect(setup.data.project.get(original.id)?.name).toBe("Updated custom name")
+    expect(setup.data.project.list().map((project) => project.id)).toEqual([unrelated.id])
+    expect(setup.data.project.list({ includeHidden: true })).toContainEqual(
+      expect.objectContaining({ id: original.id, hidden: true }),
+    )
     expect(setup.data.project.get(unrelated.id)).toEqual(unrelated)
     expect(requests).toBe(1)
 

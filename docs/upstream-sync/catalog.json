@@ -78,14 +78,24 @@
       "id": "CAT-10",
       "title": "Web app, UI kit, session UI",
       "paths": [
-        "packages/app/src/new-session/composer-adapter.ts", "packages/app/src/runtime/server/runtime.tsx",
+        "packages/app/src/new-session/composer-adapter.ts", "packages/app/src/runtime/server/sync.tsx",
+        "packages/app/src/runtime/plugin/navigation.tsx",
         "packages/app/src/shell/shell.tsx", "packages/app/src/shell/titlebar/titlebar.tsx",
         "packages/app/src/shell/sidebar-peek.ts", "packages/app/src/shell/sidebar-toggle.tsx",
         "packages/app/**", "packages/ui/**", "packages/session-ui/**",
-        "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**"
+        "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**",
+        "packages/plugin/src/gui/builtin.ts"
       ]
     },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
-    { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }
+    {
+      "id": "CAT-12",
+      "title": "Core identity and shared packages",
+      "paths": [
+        "packages/core/src/project.ts", "packages/core/src/project/sql.ts", "packages/core/src/database/migration/*_project-visibility.ts",
+        "packages/schema/src/project.ts", "packages/protocol/src/groups/project.ts", "packages/server/src/handlers/project.ts",
+        "packages/client/src/solid/data.ts", "packages/**"
+      ]
+    }
   ]
 }

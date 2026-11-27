@@ -2071,17 +2071,20 @@ export function createData(config: CreateDataInput) {
       },
     },
     project: {
-      list() {
+      list(options?: { includeHidden?: boolean }) {
         return Object.values(store.project.info)
-          .filter((project) => project.time.archived === undefined)
+          .filter((project) => project.time.archived === undefined && (!project.hidden || options?.includeHidden))
           .toSorted((a, b) => b.time.active - a.time.active)
       },
       get(projectID: string) {
         return store.project.info[projectID]
       },
+      remember(project: Project) {
+        setStore("project", "info", project.id, project)
+      },
       sync() {
         return sync.run("project", async () => {
-          const projects = await api().project.list()
+          const projects = await api().project.list({ includeHidden: true })
           setStore("project", "info", reconcile(Object.fromEntries(projects.map((project) => [project.id, project]))))
         })
       },

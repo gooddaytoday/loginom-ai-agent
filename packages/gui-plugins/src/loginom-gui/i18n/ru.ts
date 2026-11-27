@@ -5,6 +5,7 @@ export default {
   newProject: "Новый проект",
   projectName: "Название проекта",
   createProject: "Создать",
+  projectCreateFailed: "Не удалось создать проект. Попробуйте ещё раз.",
   cancelProject: "Отмена",
   openProject: "Открыть страницу проекта",
   newInProject: "Новый разговор в проекте",

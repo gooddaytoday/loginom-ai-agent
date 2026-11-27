@@ -1881,9 +1881,19 @@ export interface CredentialApi<E = never> {
   readonly remove: CredentialRemoveOperation<E>
 }
 
-export type ProjectListInput = { readonly archived?: boolean | undefined }
+export type ProjectListInput = { readonly archived?: boolean | undefined; readonly includeHidden?: boolean | undefined }
 export type ProjectListOutput = ReadonlyArray<Project.Info>
 export type ProjectListOperation<E = never> = (input?: ProjectListInput) => Effect.Effect<ProjectListOutput, E>
+
+export type ProjectRegisterInput = {
+  readonly directory: AbsolutePath
+  readonly name?: string | undefined
+  readonly hidden?: boolean | undefined
+}
+export type ProjectRegisterOutput = Project.Info
+export type ProjectRegisterOperation<E = never> = (
+  input: ProjectRegisterInput,
+) => Effect.Effect<ProjectRegisterOutput, E>
 
 export type ProjectUpdateInput = {
   readonly projectID: Project.ID
@@ -1897,6 +1907,7 @@ export type ProjectUpdateOperation<E = never> = (input: ProjectUpdateInput) => E
 
 export interface ProjectApi<E = never> {
   readonly list: ProjectListOperation<E>
+  readonly register: ProjectRegisterOperation<E>
   readonly update: ProjectUpdateOperation<E>
 }
 

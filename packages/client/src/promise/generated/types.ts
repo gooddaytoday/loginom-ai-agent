@@ -799,6 +799,7 @@ export type Project = {
   canonical: AbsolutePath
   vcs?: ProjectVcs
   name?: string
+  hidden?: boolean
   icon?: ProjectIcon
   commands?: ProjectCommands
   time: ProjectTime
@@ -1868,6 +1869,7 @@ export type ProjectUpdated = {
     canonical: AbsolutePath
     vcs?: ProjectVcs
     name?: string
+    hidden?: boolean
     icon?: ProjectIcon
     commands?: ProjectCommands
     time: ProjectTime
@@ -4254,9 +4256,17 @@ export type CredentialRemoveInput = { readonly credentialID: string }
 
 export type CredentialRemoveOutput = void
 
-export type ProjectListInput = { readonly archived?: boolean | undefined }
+export type ProjectListInput = { readonly archived?: boolean | undefined; readonly includeHidden?: boolean | undefined }
 
 export type ProjectListOutput = Array<Project>
+
+export type ProjectRegisterInput = {
+  readonly directory: string
+  readonly name?: string | undefined
+  readonly hidden?: boolean | undefined
+}
+
+export type ProjectRegisterOutput = Project
 
 export type ProjectUpdateInput = {
   readonly projectID: string

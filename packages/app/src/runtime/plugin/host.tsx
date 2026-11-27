@@ -23,7 +23,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import { LifetimeContext, liveAccessor, PluginContext, type Bridge, type Entry } from "@opencode/plugin/gui/host"
-import type { BuiltinCatalog, BuiltinContext } from "@opencode/plugin/gui/builtin"
+import { ShellNavigation, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
 import { Predicate } from "effect"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { pluralCategory, resolveTemplate } from "@opencode/ui/context/i18n"
@@ -812,7 +812,7 @@ function createHost(input: HostInput) {
       },
       signal: controller.signal,
       add<T>(registry: Registry<T>, item: T | (() => T | undefined)) {
-        if (late()) return () => {}
+        if (late() || (registry.id === ShellNavigation.id && !input.builtins?.has(plugin))) return () => {}
 
         // Promise callbacks may have no owner; fall back to the plugin root.
         const read =

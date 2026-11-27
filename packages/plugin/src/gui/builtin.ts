@@ -96,6 +96,137 @@ export interface BuiltinPanel extends Panel {
  */
 export const BuiltinPanel = Registry.define<BuiltinPanel>("panel")
 
+/** Whether a conversation is idle, running, or waiting for input. */
+export type NavigationActivity = "idle" | "running" | "input"
+/** A visible project in the navigation. */
+export type NavigationProject = {
+  /** Canonical path on the server. */
+  directory: string
+  /** The project's display name. */
+  title: string
+}
+/** A conversation in the navigation, including those whose projects are hidden. */
+export type NavigationSession = {
+  /** Session ID on this server. */
+  id: string
+  /** The displayed session title. */
+  title: string
+  /** Canonical project path, or its own location when the project is not listed. */
+  directory: string
+  /** Whether the owning project is hidden from project lists. */
+  hiddenProject: boolean
+  /** Creation time in epoch milliseconds. */
+  created: number
+  /** Whether this session is active in the shell. */
+  active: boolean
+  /** The current progress or input state. */
+  activity: NavigationActivity
+}
+
+type RegisterWorkspace = (input: { directory: string; hidden: boolean }) => Promise<void>
+
+/** Live inventory and actions offered to the active navigation contribution. */
+export interface ShellNavigationInput {
+  /** Visible projects used in this window's profile. */
+  readonly projects: readonly NavigationProject[]
+  /** Top-level conversations on this server. */
+  readonly sessions: readonly NavigationSession[]
+  /** Display names of all visible projects on the server, even if not used on this client. */
+  projectNames(): Promise<readonly string[]>
+  /**
+   * Register a named project and open its page.
+   *
+   * @param input - The directory and its display name.
+   */
+  createProject(input: {
+    /** An existing directory the server can resolve. */
+    directory: string
+    /** The name to display, independently of the path. */
+    name: string
+  }): Promise<void>
+  /**
+   * Open an existing project's page.
+   *
+   * @param directory - The project's canonical directory.
+   */
+  openProject(directory: string): void
+  /**
+   * Open a draft in an explicit project.
+   *
+   * @param directory - The project's canonical directory.
+   */
+  openNewSession(directory: string): void
+  /**
+   * Open a session tab.
+   *
+   * @param id - Session ID from the inventory.
+   */
+  openSession(id: string): void
+  /**
+   * Set the status shown when the sidebar is closed.
+   *
+   * @param status - The aggregate activity.
+   * @param label - Its accessible description.
+   */
+  announce(status: NavigationActivity, label: string): void
+}
+
+/** A built-in replacement for the local server's navigation and new-session workspace policy. */
+export interface ShellNavigation {
+  /** Label for the shell's new-session action. */
+  readonly newSessionTitle: string
+  /** The default shortcut for toggling the sidebar, if overridden. */
+  readonly sidebarShortcut?: string
+  /**
+   * Render the navigation inside this contribution's boundary.
+   *
+   * @param input - Reactive inventory and shell actions.
+   */
+  render(input: ShellNavigationInput): JSX.Element
+  /**
+   * Choose the directory the new draft opens in.
+   *
+   * @param input - Destination context and the ability to register a workspace.
+   */
+  draft(input: {
+    /** The draft's stable identifier. */
+    draftID: string
+    /** The selected directory, if the current route has one. */
+    directory?: string
+    /** Whether the selected project is hidden from inventories. */
+    hidden: boolean
+    /** Registers a workspace before the window opens it. */
+    register: RegisterWorkspace
+  }): Promise<string>
+  /**
+   * Provide optional workspace preparation instead of the normal worktree creation flow.
+   *
+   * @param input - The draft context and first prompt.
+   */
+  prepare(input: {
+    /** Whether the draft project is hidden from inventories. */
+    hidden: boolean
+    /** The first prompt's plain text. */
+    prompt: string
+    /** Registers a workspace before a session starts there. */
+    register: RegisterWorkspace
+  }):
+    | (() => Promise<{
+        /** The actual workspace for the new session. */
+        directory: string
+        /**
+         * Release the prepared workspace when the attempt settles.
+         *
+         * @param keep - Whether a session was created and promoted there.
+         */
+        finish(keep: boolean): Promise<void>
+      }>)
+    | undefined
+}
+
+/** The built-in registry for replacing the shell's local navigation. */
+export const ShellNavigation = Registry.define<ShellNavigation>("shell-navigation")
+
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */

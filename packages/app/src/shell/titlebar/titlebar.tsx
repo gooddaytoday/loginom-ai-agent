@@ -2,7 +2,6 @@ import { createEffect, createMemo, createSignal, Match, on, onCleanup, Show, Swi
 import { Portal } from "solid-js/web"
 import { useLocation } from "@solidjs/router"
 import { Product } from "@loginom-ai-agent/product"
-import { isConversationDraft, isConversationFolder } from "@opencode/gui-plugins/managed-folders"
 import { uuid } from "@opencode/util/uuid"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { IconButton } from "@opencode/ui/icon-button"
@@ -14,8 +13,12 @@ import { useLayout } from "@/shell/state/layout"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
-import { usePluginHost } from "@/runtime/plugin/host"
-import { useManagedFolders } from "@/runtime/plugin/managed-folders"
+import {
+  hiddenWorkspace,
+  PluginNavigation,
+  registerNavigationWorkspace,
+  useShellNavigation,
+} from "@/runtime/plugin/navigation"
 import { showToast } from "@/shell/notifications/toast"
 import { useSettings } from "@/settings/model"
 import { WindowsAppMenu } from "./windows-menu"
@@ -25,7 +28,6 @@ import { macVerticalTrafficLights, SidebarToggle } from "@/shell/sidebar-toggle"
 import { SidebarInbox } from "@/shell/titlebar/inbox"
 import { SidebarCustomized, type SidebarStripGrouping } from "@/shell/titlebar/sidebar-customized"
 import { SidebarOrganized } from "@/shell/titlebar/sidebar-organized"
-import { ManagedSidebar } from "@/shell/titlebar/managed-sidebar"
 import { RecentSessions } from "@/shell/titlebar/recent-sessions"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createMediaQuery } from "@solid-primitives/media"
@@ -81,10 +83,8 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
   const command = useCommand()
   const language = useLanguage()
   const settings = useSettings()
-  const pluginHost = usePluginHost()
-  const folders = useManagedFolders()
-  const newConversation = () =>
-    pluginHost.context("loginom-gui")?.t("newConversation") ?? language.t("command.session.new")
+  const navigation = useShellNavigation()
+  const newConversation = () => navigation()?.value.newSessionTitle ?? language.t("command.session.new")
 
   const openSettings = useSettingsDialog()
   const dialog = useDialog()
@@ -236,22 +236,26 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
               const server = currentTab()?.server ?? layout.home.selection().server
               const connections = global.servers.list()
               const conn = server ? connections.find((item) => ServerConnection.key(item) === server) : connections[0]
-              return conn?.type === "sidecar" && folders() ? conn : undefined
+              return conn?.type === "sidecar" && navigation() ? conn : undefined
             })
 
-            const openManagedDraft = (
+            const openNavigationDraft = (
               server: ServerConnection.Key,
               draftID: string,
               directory?: string,
               model?: ReturnType<ComposerState["model"]["current"]>,
+              projectID?: string,
             ) => {
-              const api = folders()
-              if (server !== ServerConnection.Key.make("sidecar") || !api) return false
-              const target =
-                !directory || isConversationFolder(directory) || isConversationDraft(directory)
-                  ? api.draftDirectory()
-                  : Promise.resolve(directory)
-              void target
+              const policy = navigation()?.value
+              const ctx = global.serverCtx(server)
+              if (!policy || !ctx || server !== ServerConnection.Key.make("sidecar")) return false
+              void policy
+                .draft({
+                  directory,
+                  draftID,
+                  hidden: hiddenWorkspace(ctx, directory, projectID),
+                  register: (input) => registerNavigationWorkspace(ctx, input),
+                })
                 .then((directory) => tabs.newDraft({ server, directory, draftID }, "", model))
                 .catch(() => showToast({ variant: "error", title: language.t("common.requestFailed") }))
               return true
@@ -274,7 +278,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
 
                   if (pending) {
                     const model = tabs.stateValue<ComposerState>(pending.draft, "prompt")?.model.current()
-                    if (openManagedDraft(route.server, draftID, pending.draft.directory, model)) return true
+                    if (openNavigationDraft(route.server, draftID, pending.draft.directory, model)) return true
                     void tabs.newDraft({ server: route.server, directory: pending.draft.directory, draftID }, "", model)
 
                     return true
@@ -291,7 +295,16 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                   }
 
                   const model = tabs.stateValue<ComposerState>(sessionTab, "prompt")?.model.current()
-                  if (openManagedDraft(route.server, draftID, activeSession.location.directory, model)) return true
+                  if (
+                    openNavigationDraft(
+                      route.server,
+                      draftID,
+                      activeSession.location.directory,
+                      model,
+                      activeSession.projectID,
+                    )
+                  )
+                    return true
                   void tabs.newDraft(
                     { server: sessionTab.server, directory: activeSession.location.directory, draftID },
                     "",
@@ -307,7 +320,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                   if (activeTab?.type !== "draft") return false
 
                   const model = tabs.stateValue<ComposerState>(activeTab, "prompt")?.model.current()
-                  if (openManagedDraft(activeTab.server, draftID, activeTab.directory, model)) return true
+                  if (openNavigationDraft(activeTab.server, draftID, activeTab.directory, model)) return true
                   void tabs.newDraft({ server: activeTab.server, directory: activeTab.directory, draftID }, "", model)
 
                   return true
@@ -324,7 +337,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                     global.servers.list()[0]
 
                   const projects = conn ? global.serverCtx(ServerConnection.key(conn))?.projects : undefined
-                  if (conn && openManagedDraft(ServerConnection.key(conn), draftID, selection.directory)) return true
+                  if (conn && openNavigationDraft(ServerConnection.key(conn), draftID, selection.directory)) return true
 
                   const project =
                     projects?.list().find((item) => item.worktree === selection.directory) ??
@@ -468,7 +481,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                 id: "home.toggle",
                 title: language.t("home.title"),
                 category: language.t("command.category.view"),
-                keybind: windows() || folders() ? "alt+home" : "mod+b",
+                keybind: windows() || navigation()?.value.sidebarShortcut === "mod+b" ? "alt+home" : "mod+b",
                 hidden: true,
                 onSelect: () => {
                   if (layout.route().type !== "home") layout.home.searchFocus.request()
@@ -713,7 +726,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                               }
                             >
                               {(conn) => (
-                                <ManagedSidebar connection={conn()} tab={currentTab()} onNavigate={closeMobileTabs} />
+                                <PluginNavigation connection={conn()} tab={currentTab()} onNavigate={closeMobileTabs} />
                               )}
                             </Show>
                           </div>
@@ -872,7 +885,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                             <div class="flex min-h-0 flex-1 flex-col gap-1">
                               <Switch fallback={verticalTabStrip()}>
                                 <Match when={managedConnection()}>
-                                  {(conn) => <ManagedSidebar connection={conn()} tab={currentTab()} />}
+                                  {(conn) => <PluginNavigation connection={conn()} tab={currentTab()} />}
                                 </Match>
                                 <Match when={settings.appearance.tabLayout() === "inbox"}>
                                   <SidebarInbox />

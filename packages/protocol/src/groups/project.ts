@@ -1,7 +1,7 @@
 import { Project } from "@opencode/schema/project"
 import { Schema, SchemaGetter, Struct } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/http-api"
-import { ProjectNotFoundError } from "../errors.js"
+import { InvalidRequestError, ProjectNotFoundError } from "../errors.js"
 
 const root = "/api/project"
 const UpdatePayload = Schema.Struct(Struct.omit(Project.UpdateInput.fields, ["projectID"]))
@@ -15,13 +15,29 @@ const BooleanFromString = Schema.Literals(["true", "false"]).pipe(
 export const ProjectGroup = HttpApiGroup.make("server.project")
   .add(
     HttpApiEndpoint.get("project.list", root, {
-      query: Schema.Struct({ archived: BooleanFromString.pipe(Schema.optional) }),
+      query: Schema.Struct({
+        archived: BooleanFromString.pipe(Schema.optional),
+        includeHidden: BooleanFromString.pipe(Schema.optional),
+      }),
       success: Schema.Array(Project.Info),
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "project.list",
         summary: "List projects",
-        description: "List known projects. Archived projects are excluded unless archived=true.",
+        description: "List known projects. Include archived or hidden projects with archived=true or includeHidden=true.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("project.register", root, {
+      payload: Project.RegisterInput,
+      success: Project.Info,
+      error: InvalidRequestError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "project.register",
+        summary: "Register project",
+        description: "Resolve a project directory and register it with optional display metadata and visibility.",
       }),
     ),
   )

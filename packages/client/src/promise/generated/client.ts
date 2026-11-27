@@ -171,6 +171,8 @@ import type {
   CredentialRemoveOutput,
   ProjectListInput,
   ProjectListOutput,
+  ProjectRegisterInput,
+  ProjectRegisterOutput,
   ProjectUpdateInput,
   ProjectUpdateOutput,
   FormListInput,
@@ -2050,7 +2052,19 @@ export function make(options: ClientOptions) {
           {
             method: "GET",
             path: `/api/project`,
-            query: { archived: input?.["archived"] },
+            query: { archived: input?.["archived"], includeHidden: input?.["includeHidden"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      register: (input: ProjectRegisterInput, requestOptions?: RequestOptions) =>
+        request<ProjectRegisterOutput>(
+          {
+            method: "POST",
+            path: `/api/project`,
+            body: { directory: input["directory"], name: input["name"], hidden: input["hidden"] },
             successStatus: 200,
             declaredStatuses: [400, 401],
             empty: false,

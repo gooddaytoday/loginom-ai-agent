@@ -1,8 +1,8 @@
 import { afterEach, expect, test } from "bun:test"
-import { mkdtemp, readdir, rm, stat } from "node:fs/promises"
+import { mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { conversationTitle, isConversationDraft, isConversationFolder } from "./folders"
+import { availableProjectName, conversationTitle } from "./folders"
 import { managedFolders } from "./folders-main"
 
 const roots: string[] = []
@@ -10,12 +10,15 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
-test("conversations have separate dated folders and projects are not hidden", async () => {
+test("each draft is private and conversations have separate dated folders", async () => {
   const documents = await mkdtemp(path.join(tmpdir(), "loginom-folders-"))
   roots.push(documents)
-  const api = managedFolders(documents, () => new Date(2026, 10, 27))
-  const draft = await api.draftDirectory()
-  expect(isConversationDraft(draft)).toBe(true)
+  const profile = path.join(documents, "profile")
+  const api = managedFolders(documents, profile, () => new Date(2026, 10, 27))
+  const draft = await api.draftDirectory("first-draft")
+  const other = await api.draftDirectory("second-draft")
+  expect(draft).not.toBe(other)
+  expect(path.dirname(draft)).toBe(path.join(profile, "drafts"))
   expect(await readdir(draft)).toEqual([])
 
   const title = conversationTitle("  Анализ продаж  \nИз файла", "Новый разговор")
@@ -23,24 +26,46 @@ test("conversations have separate dated folders and projects are not hidden", as
   expect(first).not.toBe(second)
   expect([first, second]).toContain(path.join(documents, "Loginom AI Agent", "Без проекта", "2026-11-27 Анализ продаж"))
   for (const directory of [first, second]) {
-    expect(path.dirname(directory)).toBe(draft)
-    expect(isConversationFolder(directory)).toBe(true)
+    expect(path.dirname(directory)).toBe(path.join(documents, "Loginom AI Agent", "Без проекта"))
     expect((await stat(directory)).isDirectory()).toBe(true)
   }
 
   const project = await api.project("Отчёты")
   expect(project).toBe(path.join(documents, "Loginom AI Agent", "Проекты", "Отчёты"))
-  expect(isConversationFolder(project)).toBe(false)
   expect((await stat(project)).isDirectory()).toBe(true)
 })
 
 test("path characters in titles cannot escape the managed directories", async () => {
   const documents = await mkdtemp(path.join(tmpdir(), "loginom-folders-"))
   roots.push(documents)
-  const api = managedFolders(documents, () => new Date(2026, 10, 27))
+  const api = managedFolders(documents, path.join(documents, "profile"))
   const parent = path.join(documents, "Loginom AI Agent", "Проекты")
   expect(path.dirname(await api.project("../..\\elsewhere"))).toBe(parent)
   expect(path.basename(await api.project("CON.txt"))).toBe("_CON.txt")
-  expect(isConversationFolder("C:\\Documents\\Loginom AI Agent\\Без проекта\\2026-11-27 Анализ")).toBe(true)
-  expect(isConversationFolder("C:\\Documents\\Loginom AI Agent\\Без проекта\\other")).toBe(false)
+  await expect(api.draftDirectory("../outside")).rejects.toThrow()
+})
+
+test("an unavailable Documents directory falls back to the profile and failed starts remove only empty folders", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "loginom-folders-"))
+  roots.push(root)
+  const documents = path.join(root, "Documents")
+  await writeFile(documents, "")
+  const profile = path.join(root, "profile")
+  const api = managedFolders(documents, profile, () => new Date(2026, 10, 27))
+  const failed = await api.conversation("Не запущен")
+  const retained = await api.conversation("С файлом")
+  const parent = path.join(profile, "Loginom AI Agent", "Без проекта")
+  expect(path.dirname(failed)).toBe(parent)
+  await writeFile(path.join(retained, "input.csv"), "total\n12\n")
+  await api.finish({ directory: failed, keep: false })
+  await api.finish({ directory: retained, keep: false })
+  expect(await readdir(parent)).toEqual(["2026-11-27 С файлом"])
+  expect(await readdir(retained)).toEqual(["input.csv"])
+})
+
+test("project display names preserve punctuation and distinguish duplicates", () => {
+  const requested = "Отчёт: Q1/Q2"
+  expect(availableProjectName(requested, ["Отчёт- Q1-Q2"])).toBe(requested)
+  expect(availableProjectName(requested, [requested])).toBe("Отчёт: Q1/Q2 (2)")
+  expect(availableProjectName(requested, [requested, "ОТЧЁТ: Q1/Q2 (2)"])).toBe("Отчёт: Q1/Q2 (3)")
 })

@@ -1,14 +1,13 @@
 import { Predicate } from "effect"
 import { base64Encode } from "@opencode/util/encode"
 import { Session } from "@opencode/schema/session"
-import { conversationTitle, isConversationDraft } from "@opencode/gui-plugins/managed-folders"
 import { createMemo, createSignal, onCleanup, startTransition, untrack } from "solid-js"
 import type { ComposerSession, NewSessionComposerAdapter } from "@/composer/adapter"
 import { useComposerState } from "@/composer/persistence"
 import { createComposerControls, createComposerModelSelection } from "@/composer/selection"
 import { createComposerProjectControls } from "./project/controller"
 import { useLanguage } from "@/runtime/i18n/language"
-import { useManagedFolders } from "@/runtime/plugin/managed-folders"
+import { hiddenWorkspace, registerNavigationWorkspace, useShellNavigation } from "@/runtime/plugin/navigation"
 import { useLocal } from "@/providers/models/selection"
 import { useData, useServer } from "@/runtime/server/current"
 import { useServerSDK } from "@/runtime/server/client"
@@ -94,7 +93,7 @@ export function createNewSessionComposerAdapter(props: {
   const serverSDK = useServerSDK()
   const tabs = useTabs()
   const language = useLanguage()
-  const folders = useManagedFolders()
+  const navigation = useShellNavigation()
   const model = createComposerModelSelection({ agent: () => local.agent.current() })
   const controls = createComposerControls({ model })
 
@@ -109,8 +108,14 @@ export function createNewSessionComposerAdapter(props: {
       const projectDirectory = props.root()
       const worktree = props.worktree()
       const directory = worktree === "main" ? projectDirectory : worktree
-      const managed = server.conn.type === "sidecar" && isConversationDraft(projectDirectory) ? folders() : undefined
-      const title = managed ? conversationTitle(message.text, language.t("command.session.new")) : undefined
+      const prepare =
+        server.conn.type === "sidecar"
+          ? navigation()?.value.prepare({
+              hidden: hiddenWorkspace(server.ctx, projectDirectory),
+              prompt: message.text,
+              register: (input) => registerNavigationWorkspace(server.ctx, input),
+            })
+          : undefined
       const sessionID = Session.ID.create()
       const settled = Promise.withResolvers<Started>()
 
@@ -119,11 +124,11 @@ export function createNewSessionComposerAdapter(props: {
           type: "start",
           sessionID,
           workspace:
-            worktree === "create" || managed
+            worktree === "create" || prepare
               ? { type: "new", projectDirectory, branch: props.branch() }
               : { type: "existing", directory },
           mcp: props.mcp.capture(),
-          toggling: !managed && worktree !== "create" && props.mcp.toggling(directory),
+          toggling: !prepare && worktree !== "create" && props.mcp.toggling(directory),
         },
         (attempt) => {
           const pending = tabs.prepareSession(
@@ -135,6 +140,12 @@ export function createNewSessionComposerAdapter(props: {
           // Aborted when the attempt ends: MCP preparation stops between steps and a late Session create is undone.
           const ended = new AbortController()
           let timer: ReturnType<typeof setTimeout> | undefined
+          let prepared: Awaited<ReturnType<NonNullable<typeof prepare>>> | undefined
+          const finish = async (keep: boolean) => {
+            const workspace = prepared
+            prepared = undefined
+            await workspace?.finish(keep).catch(() => undefined)
+          }
 
           const end = () => {
             clearTimeout(timer)
@@ -145,6 +156,7 @@ export function createNewSessionComposerAdapter(props: {
             // Settles before awaiting the tab, so a disposed attempt starts no request.
             if (effect.type === "attempt.abort") {
               end()
+              void finish(false)
               settled.resolve(undefined)
 
               return
@@ -171,8 +183,12 @@ export function createNewSessionComposerAdapter(props: {
               if (ended.signal.aborted) return
               props.start.dispatch(
                 await (
-                  managed && title
-                    ? managed.conversation(title)
+                  prepare
+                    ? prepare().then(async (workspace) => {
+                        prepared = workspace
+                        if (ended.signal.aborted) await finish(false)
+                        return workspace.directory
+                      })
                     : createWorktree({
                         api: serverSDK.api,
                         data,
@@ -207,7 +223,6 @@ export function createNewSessionComposerAdapter(props: {
                 await data.session
                   .create({
                     id: effect.sessionID,
-                    ...(title ? { title } : {}),
                     agent: selection.agent,
                     model: {
                       id: selection.model.modelID,
@@ -231,6 +246,7 @@ export function createNewSessionComposerAdapter(props: {
             }
 
             if (effect.type === "session.promote") {
+              void finish(true)
               const cleanupReady = startTransition(() => {
                 local.session.promote(effect.directory, effect.sessionID, {
                   agent: selection.agent,
@@ -271,9 +287,10 @@ export function createNewSessionComposerAdapter(props: {
               await data.project.sync().catch(() => undefined)
             }
 
-            await pending.rollback(managed ? undefined : effect.worktree?.directory)
+            await finish(false)
+            await pending.rollback(prepare ? undefined : effect.worktree?.directory)
 
-            if (effect.worktree) props.mcp.remember(effect.worktree.directory, effect.worktree.mcp)
+            if (!prepare && effect.worktree) props.mcp.remember(effect.worktree.directory, effect.worktree.mcp)
             settled.resolve(undefined)
           }
         },

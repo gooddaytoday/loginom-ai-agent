@@ -4,5 +4,5 @@ import { ManagedFolders } from "./folders"
 import { managedFolders } from "./folders-main"
 
 export default function setup(ctx: MainContext) {
-  ctx.provide(ManagedFolders, managedFolders(app.getPath("documents")))
+  ctx.provide(ManagedFolders, managedFolders(app.getPath("documents"), app.getPath("userData")))
 }

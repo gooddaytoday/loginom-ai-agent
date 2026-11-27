@@ -42,12 +42,20 @@ export const Info = Schema.Struct({
   canonical: AbsolutePath,
   vcs: optional(Vcs),
   name: optional(Schema.String),
+  hidden: optional(Schema.Boolean),
   icon: optional(Icon),
   commands: optional(Commands),
   time: Time,
   sandboxes: Schema.Array(Schema.String),
 }).annotate({ identifier: "Project" })
 export interface Info extends Schema.Schema.Type<typeof Info> {}
+
+export const RegisterInput = Schema.Struct({
+  directory: AbsolutePath,
+  name: optional(Schema.String),
+  hidden: optional(Schema.Boolean),
+}).annotate({ identifier: "Project.RegisterInput" })
+export interface RegisterInput extends Schema.Schema.Type<typeof RegisterInput> {}
 
 export const UpdateInput = Schema.Struct({
   projectID: ID,

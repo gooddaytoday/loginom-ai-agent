@@ -9,6 +9,30 @@ import {
 } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Schema } from "effect"
 
+export type ProjectForm =
+  | { type: "closed" }
+  | { type: "editing"; failed?: boolean }
+  | { type: "saving"; name: string }
+
+type ProjectFormEvent =
+  | { type: "open" | "close" | "created" | "failed" }
+  | { type: "submit"; name: string }
+
+export function transitionProjectForm(state: ProjectForm, event: ProjectFormEvent): ProjectForm {
+  switch (state.type) {
+    case "closed":
+      return event.type === "open" ? { type: "editing" } : state
+    case "editing":
+      if (event.type === "close") return { type: "closed" }
+      if (event.type === "submit" && event.name.trim()) return { type: "saving", name: event.name.trim() }
+      return state
+    case "saving":
+      if (event.type === "created") return { type: "closed" }
+      if (event.type === "failed") return { type: "editing", failed: true }
+      return state
+  }
+}
+
 type Draft = { url: string; username: string; password: string; noPassword: boolean }
 type Form = { status: Status; draft: Draft }
 type State = { attempt: number } & (
