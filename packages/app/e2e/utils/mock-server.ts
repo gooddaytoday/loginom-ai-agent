@@ -1223,8 +1223,8 @@ function mockHandlers(
         },
         // The goal plugin's pill reads each routed session's goal; no scenario sets one.
         rpcCall: (ctx) => {
-          const body = Option.getOrElse(decodeJsonObject(ctx.payload), () => ({}))
-          const output = config.pluginRpc?.(ctx.params.rpcID, ctx.params.method, body.input)
+          const body = Option.getOrUndefined(decodeJsonObject(ctx.payload))
+          const output = config.pluginRpc?.(ctx.params.rpcID, ctx.params.method, body?.input)
 
           if (output !== undefined) return Effect.succeed({ output })
 
