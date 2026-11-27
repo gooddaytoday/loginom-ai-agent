@@ -44,6 +44,8 @@ export function scriptedHost(
     const run = runs.get(input.run)
     if (!run) return fail("LOGINOM_RUN_INVALID")
     if (request.method === "release" || request.method === "interrupt") return reply(true)
+    if (request.method === "packageUploadTarget")
+      return reply({ generation: state.generation, destination: `/user/${"a".repeat(64)}-0-${input.name}` })
     if (request.method === "scope") {
       const mode = input.mode
       const scope = input.scope as Scope

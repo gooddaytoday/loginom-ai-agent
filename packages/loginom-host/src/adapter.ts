@@ -11,6 +11,8 @@ import { Option, Schema } from "effect"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 import { decodeStepProgress, type StepProgress } from "./step-progress"
 
+const PackageUploadTarget = Schema.Struct({ generation: Schema.Int, destination: Schema.NonEmptyString })
+
 const state: { connection?: ReturnType<typeof transport> } = {}
 export function connect(port: Port) {
   state.connection?.close()
@@ -124,13 +126,20 @@ export async function acquire(session: string) {
     async tools() {
       return connection.request("tools", { run }, undefined, observe)
     },
+    async packageUploadTarget(admissionID: string, name: string) {
+      return queued(async () =>
+        Schema.decodeUnknownSync(PackageUploadTarget)(
+          await connection.request("packageUploadTarget", { run, admissionID, name }, undefined, observe),
+        ),
+      )
+    },
     async call(
       name: string,
       args: unknown,
       userMessage: string,
       signal?: AbortSignal,
       admissions?: { userMessage: string; files: InputFile[] }[],
-      packageInput?: { admissionID: string; file: InputFile },
+      packageInput?: { admissionID: string; file: InputFile; target: typeof PackageUploadTarget.Type },
       scanReceipt?: { profile_id: string; records: number; sha256: string; bytes: number; identity: unknown; basis: "backend_exact_scan" },
       progress?: (value: StepProgress) => void,
     ) {

@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto"
 import type { createLoginomHost } from "./host"
-import type { InputFile } from "./inputs"
+import { packageUploadDestination, type InputFile } from "./inputs"
 import type { FileReference } from "./file-reference"
 import { hostException, hostFailure } from "./errors"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
@@ -20,7 +20,9 @@ const Admissions = Schema.Array(
 const PackageInput = Schema.Struct({
   admissionID: Schema.NonEmptyString,
   file: Schema.Struct({ name: Schema.String, data: Schema.String }),
+  target: Schema.optional(Schema.Struct({ generation: Schema.Int, destination: Schema.NonEmptyString })),
 })
+const PackagePreview = Schema.Struct({ admissionID: Schema.NonEmptyString, name: Schema.NonEmptyString })
 const PackageAdmission = Schema.Tuple([
   Schema.Struct({ artifact_id: Schema.NonEmptyString, upload: Schema.Struct({ grant_id: Schema.NonEmptyString }) }),
 ])
@@ -253,6 +255,22 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       }
       const run = runs.get(input.run)
       if (!run || run.released) throw new Error("LOGINOM_RUN_INVALID")
+      if (data.method === "packageUploadTarget") {
+        if (run.scope?.profile !== "loginom-automation" || run.applyingScope) throw Error("LOGINOM_SCOPE_DENIED")
+        const preview = Schema.decodeUnknownSync(PackagePreview)(input)
+        const connection = await service.api.status()
+        if (!connection.generation) throw Error("LOGINOM_CONFIG_REQUIRED")
+        if (state.closed || run.released) throw Error("LOGINOM_RUN_ABORTED")
+        if (run.lease && run.lease.generation !== connection.generation) throw Error("LOGINOM_CONNECTION_NOT_READY")
+        const destination = packageUploadDestination({
+          ...preview,
+          generation: connection.generation,
+          chat: run.chat,
+          folder: connection.folder,
+        })
+        reply({ id: data.id, result: { generation: connection.generation, destination } }, connection.generation)
+        return
+      }
       if (data.method === "release") {
         run.released = true
         run.packagePreparation?.abort()
@@ -586,6 +604,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         if (admissions.some((admission) => admission.files.some((file) => file.name.toLowerCase().endsWith(".lgp"))))
           throw new Error("LOGINOM_SCOPE_DENIED")
         const lease = await connectionLease(input.run, run, preparation)
+        if (packageInput?.target && packageInput.target.generation !== lease.generation)
+          throw Error("LOGINOM_CONNECTION_NOT_READY")
         if (input.name !== prepareTool.name && !service.hasRuntime(lease.generation, run.chat))
           throw new Error("LOGINOM_SCOPE_DENIED")
         const recovery = { id: undefined as string | undefined }
@@ -596,6 +616,12 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
                 files: await service.inputs(lease.generation, run.chat, packageInput.admissionID, [packageInput.file]),
               }
             : undefined
+          const stagedPackage = packageAdmission?.files[0]
+          if (
+            packageInput?.target &&
+            (!stagedPackage || packageInput.target.destination !== `${stagedPackage.upload.directory}/${stagedPackage.name}`)
+          )
+            throw Error("LOGINOM_INPUT_INVALID")
           if (packageAborted()) throw new Error("LOGINOM_RUN_ABORTED")
           // A dead runtime is replaced before admission. Past the relaunch limit this
           // is a known refusal, not an uncertain dispatch.
