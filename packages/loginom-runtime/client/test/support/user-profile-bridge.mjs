@@ -314,6 +314,17 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const nextRef={...refreshedRef,navigation_path:[{tid:'crumb',label:'Current browser navigation'}]};
     const packageRef={path:'/user/manual-save.lgp',name:'manual-save',persisted:true};
     stepFixture.output={status:'READY',document_id:'fixture-document',workflow_ref:nextRef,package_ref:packageRef};
+    await describe({node_types:['trees.to_table'],modes:['selected_nodes']});
+    const treeRef={document_id:undescribed.document_id,workflow_id:undescribed.workflow_ref.workflow_id,node_id:'tree'};
+    const beforeTree=browserCalls.length;
+    for(const target of [{kind:'new',type:'trees.to_table'},{kind:'existing',type:'trees.to_table',ref:treeRef}]){
+      const rejected=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,operation_id:'tree-separator-'+target.kind,
+        target,mode:'selected_nodes',parameters:{composite_labels:false,label_separator:'_'}}});
+      const decoded=JSON.parse(rejected.content[0].text);
+      assert.deepEqual([decoded.status,decoded.effect_possible,decoded.cleanup_complete],['NOT_APPLIED',false,true]);
+      assert.match(decoded.error.message,/label_separator applies only with composite_labels:true/);
+    }
+    assert.equal(browserCalls.length,beforeTree,'the explicit refusal must precede browser preflight');
     const apply=(id,args={})=>client.callTool({name:'dock_node_apply',arguments:{...undescribed,operation_id:id,...args}});
     const accepted=await apply('step-apply');
     assert.equal(accepted.isError,undefined,JSON.stringify(accepted));

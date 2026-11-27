@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {nodeApiTools,deliveryApiTools,dispatchNodeApi,clusteringParametersSchema} from '../lib/node-api.mjs';
+import {nodeApiTools,deliveryApiTools,dispatchNodeApi,clusteringParametersSchema,validateNodeApplyEnvelope} from '../lib/node-api.mjs';
 import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
 import {createUserWorkflowBindings,userNodeTool} from '../lib/user-workflow.mjs';
 import {createHash} from 'node:crypto';
+import {createActionRuntime} from '../lib/executor.mjs';
+import {compactNodeRequestFailure} from '../lib/user-results.mjs';
 
 test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
  // #1281: optional inputs[].replace_existing adds 222 bytes to apply and resume
@@ -12,8 +14,9 @@ test('model schema inventory pins W1 variable inputs and excludes private cold w
  // #1310 lists control input support (+272 full, +136 compact).
  // LAB-2021 adds the graph-only mode and its empty request constraints.
  // #1383 expands composite_names guidance (+112 full, 0 compact).
+ // LAB-2105 clarifies when the separator is available (+204 full, 0 compact).
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,205179,'c15fc9697afa16e671be18c17f916dc220fb8b3491992ea37766958632f41105'],
+  [nodeApiTools,205383,'cae679108703317d9be8566e8bcd8da18fff562c4a2e0faf7a5c211cf43634c3'],
   [nodeApiTools.map(userNodeTool),14839,'6d59bccb09e8d3fd7d56aa2711c7ccfc2bef03461ab1fd6273177cb3f75763a0'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
@@ -37,6 +40,35 @@ const fixture=()=>{
   runtime[name]=(...args)=>{calls.push({name,args});return {operation_id:'op',state:'running'};};
  return {runtime,calls};
 };
+test('tree separator admission refuses before the public path can start browser work',async()=>{
+ const {runtime,calls}=fixture();
+ const executor=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}}});
+ const node={document_id:'doc',workflow_id:'wf',node_id:'tree'};
+ const request={operation_id:'tree-separator',contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'tab',prefix:'prefix',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'new',type:'trees.to_table',position:{x:320,y:280}},inputs:[{source:{...node,node_id:'source'},input:0,output:0}],
+  mode:'selected_nodes',parameters:{selected_paths:['/items/id'],repeat_parents:true,composite_names:false,
+   composite_labels:false,label_separator:'_'},mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false},
+  budgets:{configure_ms:1000,execute_ms:1000,total_ms:1000}};
+ const existing={...request,target:{kind:'existing',type:'trees.to_table',ref:node},inputs:[]};
+ for(const rejected of [request,{...existing,parameters:{composite_labels:false,label_separator:'.'}},
+  {...request,parameters:{label_separator:'_'}}]){
+  const result=await dispatchNodeApi(runtime,'dock_node_apply',rejected)
+   .catch(error=>compactNodeRequestFailure(executor.requestFailure(error),rejected));
+  assert.equal(result.status,'NOT_APPLIED');
+  assert.equal(result.effect_possible,false);
+  assert.equal(result.cleanup_complete,true);
+  assert.equal(result.error.message,'label_separator applies only with composite_labels:true; drop label_separator or enable composite labels');
+ }
+ assert.deepEqual(calls,[]);
+ const parameters={label_separator:'_'};
+ await dispatchNodeApi(runtime,'dock_node_apply',{...existing,parameters});
+ assert.deepEqual(calls[0].args[0].parameters,parameters);
+ assert.doesNotThrow(()=>validateNodeApplyEnvelope({...existing,parameters:undefined}));
+ const resume={operation_id:existing.operation_id};
+ await dispatchNodeApi(runtime,'dock_node_resume',resume);
+ assert.deepEqual(calls[1].args,[resume,{resume:true}]);
+});
 test('W1 variable_inputs is optional and dispatched independently from table inputs',async()=>{
  const f=fixture(),request={operation_id:'w1',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'tab',prefix:'wf',navigation_path:[{tid:'crumb',label:'Scenario'}]},
   target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'wf',node_id:'target'}},inputs:[],mode:'request',parameters:{},mappings:[],finish:'execute',

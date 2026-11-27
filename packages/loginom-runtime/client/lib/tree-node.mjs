@@ -3,7 +3,8 @@ import {makeNodeOutputContextCode} from './node-output-context.mjs';
 import {existingOutputExecution} from './node-execution-evidence.mjs';
 import {makeNodeProcessContextCode} from './node-process-context.mjs';
 import {makeNodePortOutputCode} from './node-port-output.mjs';
-import {jsonToTreeParametersSchema,treeToTableParametersSchema,treeLabelSeparators,validateTreeParameters,validateTreeJsonScope,validateJsonTreeSchema,validateSelectedTreePaths,treeColumnNames} from './tree-parameters.mjs';
+import {closePreparedWizard} from './node-wizard-close.mjs';
+import {jsonToTreeParametersSchema,treeToTableParametersSchema,treeLabelSeparators,TREE_LABEL_SEPARATOR_REQUIRES_COMPOSITE,validateTreeParameters,validateTreeJsonScope,validateJsonTreeSchema,validateSelectedTreePaths,treeColumnNames} from './tree-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'
  ?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
@@ -130,6 +131,12 @@ export function createTreeNodeSupport(config,{json}){
     s=await observe('tree checkbox readback');need(s.node_tree[fields[key]]===value,'Tree checkbox did not settle');
    };
    if(request.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:false,configuration:s.node_tree};
+   if(!json&&request.target.kind==='existing'&&p.label_separator!==undefined&&p.composite_labels===undefined&&s.node_tree.composite_labels===false){
+    const closed=await closePreparedWizard(channel,{initialObservation:s});
+    throw Object.assign(Error(TREE_LABEL_SEPARATOR_REQUIRES_COMPOSITE),{
+     nodePhaseRefusal:{phase:'configure',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,
+      verification:'tree_label_separator_disabled',proof:{closed}}});
+   }
    let jsonField;
    if(json){
     // The picker displays native input labels (REST: Response → Ответ сервера),
@@ -202,7 +209,8 @@ export function createTreeNodeSupport(config,{json}){
     await setBool('pedRepeatParentNodeValues',p.repeat_parents);await setBool('pedCompositeColumnNames',p.composite_names);
     await setBool('pedCompositeColumnDisplayNames',p.composite_labels);
     if(p.label_separator!==undefined&&s.node_tree.label_separator!==p.label_separator){
-     // The native separator combo is enabled only with composite labels; option tids replace spaces with _ (LAB-1815 probe).
+     // Loginom 7.4.2 enables the list only with composite labels (LAB-2105).
+     // Loginom replaces spaces in option tids with underscores (LAB-1815).
      const names={'.':'Точка (.)','|':'Вертикальная черта (|)',' ':'Пробел ( )','-':'Дефис (-)','_':'Подчёркивание (_)'};
      const control=s.node_tree.base+'pedCompositeDisplayNameSeparator;ValueControl',option=control+';boundlist;'+names[p.label_separator].replaceAll(' ','_');
      await click(control+';trg_picker','open tree label separator');

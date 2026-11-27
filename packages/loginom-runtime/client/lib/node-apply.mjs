@@ -278,6 +278,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
   const context=()=>({operation_id:operation.id,document_id:request.document_id,workflow_ref:request.workflow_ref,
     node:state.node,execution:state.execution,deadline:state.deadline,signal,stopSignal});
   const check=()=>{signal?.throwIfAborted();requireValue(now()<state.deadline,'node.apply total deadline elapsed');};
+  let treeSeparatorRefused=false;
   const phase=async(name,call,{budget=request.budgets.configure_ms,mutation=true,verify=()=>{}}={})=>{
     const prior=state.phases.find(p=>p.phase===name);
     if(prior)return structuredClone(prior.value);
@@ -306,6 +307,21 @@ export async function applyNode({request, operation, handlers, drivers, record,
       // Explicit trusted-driver proof is required: a transport exception alone
       // never clears uncertainty, even in a nominally non-mutating phase.
       const refusal=error.nodePhaseRefusal;
+      const closed=refusal?.proof?.closed;
+      if(name==='configure'&&request.target.type==='trees.to_table'&&request.target.kind==='existing'
+        &&request.parameters.label_separator!==undefined&&request.parameters.composite_labels===undefined
+        &&refusal?.verification==='tree_label_separator_disabled'&&refusal.phase===name
+        &&refusal.status==='NOT_APPLIED'&&refusal.effect_possible===false&&refusal.cleanup_complete===true&&!operation.transportUncertain
+        &&closed?.verified===true&&closed.cleanup_complete===true&&closed.draft_discarded===true
+        &&closed.settings_applied===false&&closed.execution_started===false&&closed.package_saved===false
+        &&closed.node_context?.verified===true&&closed.node_context.surface==='graph'&&closed.node_context.locked===false
+        &&['document_id','workflow_id','node_id'].every(k=>closed.node_context[k]===state.node?.[k])){
+        // Close proves the draft had no effect. An active node can be deactivated without a confirmation.
+        const effectPossible=state.phases.some(p=>p.phase==='open'
+          ?p.value.node_was_inactive!==true||p.value.deactivation_required!==false:p.effect_possible);
+        await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
+        state.effect_possible=effectPossible;state.pending=null;state.cleanup_complete=true;treeSeparatorRefused=true;
+      }
       if(['source','target','read'].includes(name)&&request.mode===NODE_READ_MODE&&request.parameters.execution_policy==='existing'
         &&refusal?.verification==='existing_output_read_only'&&refusal.phase===name
         &&refusal.effect_possible===false&&refusal.cleanup_complete===true
@@ -734,7 +750,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // No automatic rollback and no repetition of an unknown upload/run/save.
     // status/wait/inspect remain the responsibility of the owning runtime.
     if(readingOnly&&state.pending?.phase==='read'&&error.code==='NODE_READ_SCHEMA_CHANGED')state.read_schema_changed=true;
-    return {operation_id:operation.id,status:state.verified_refusal?'FAILED':state.effect_possible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:state.effect_possible,
+    return {operation_id:operation.id,status:state.verified_refusal||treeSeparatorRefused&&state.effect_possible?'FAILED':state.effect_possible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:state.effect_possible,
       phases:state.phases.map(({value,...p})=>p),node:state.node,execution:state.execution,output:state.output,
       package_saved:false,cleanup_complete:state.cleanup_complete,warnings:[],
       ...(state.existing_read_refusal?{next_step:{tool:'dock_node_read',original_operation_id:operation.id,
@@ -766,7 +782,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         instruction:'FS/Fetch scripts need declared output columns before execution. Submit a NEW operation_id: configure a NEW JavaScript node with parameters.schema_mode:"declared" and complete columns, retaining the intended source and inputs, then finish:"execute". Existing-node requests cannot change schema mode. Alternatively configure the SAME target with finish:"done", read:{ports:[],sample_rows:0,require_exact_numbers:false} and no coverage. Other import admission rules still apply.'}}:{}),
       pending_phase:state.pending?.phase??null,error:state.javascript_wizard_refusal&&state.verified_refusal
         ?{code:'JAVASCRIPT_WIZARD_SOURCE_REJECTED',message:String(error.message).slice(0,1000),native:state.javascript_wizard_refusal.native}
-        :{code:state.existing_read_refusal?error.code:state.javascript_declared_output_required?JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT:error.nodeExecutionFailure?.code??/^(BINDING_PARAMETER_UNSUPPORTED|BINDING_CONFLICT|BINDING_VARIABLE_MISSING|BINDING_TYPE_MISMATCH|BINDING_NULL_UNSUPPORTED|BINDING_VALUE_INVALID|BINDING_PORT_MISMATCH|BINDING_SOURCE_UNVERIFIED|UNION_AUTO_MATCH_AMBIGUOUS|LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED|NODE_LABEL_NOT_PRESERVED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
+        :{code:treeSeparatorRefused?'REQUEST_REJECTED':state.existing_read_refusal?error.code:state.javascript_declared_output_required?JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT:error.nodeExecutionFailure?.code??/^(BINDING_PARAMETER_UNSUPPORTED|BINDING_CONFLICT|BINDING_VARIABLE_MISSING|BINDING_TYPE_MISMATCH|BINDING_NULL_UNSUPPORTED|BINDING_VALUE_INVALID|BINDING_PORT_MISMATCH|BINDING_SOURCE_UNVERIFIED|UNION_AUTO_MATCH_AMBIGUOUS|LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED|NODE_LABEL_NOT_PRESERVED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
         ...(typeof error.receipt?.error?.code==='string'&&typeof error.receipt.error.message==='string'?{cause:{code:error.receipt.error.code.slice(0,120),
           message:String(error.receipt.error.message??'').slice(0,240)}}:{})}};
   }

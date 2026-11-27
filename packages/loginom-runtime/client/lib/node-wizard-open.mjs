@@ -122,6 +122,8 @@ export async function openPreparedWizard(channel) {
   }
  }
  const binding=wizardOpenBinding(s);
+ const executionControls=s.ui.elements.filter(e=>e.graph_execution?.node_id===binding.node.node_id);
+ const nodeWasInactive=executionControls.length===1&&executionControls[0].graph_execution.mode==='execute';
  const openingReceipt=await channel.perform({condition:'open settings of the prepared node',initialObservation:s,
   ready:s=>same(wizardOpenBinding(s),binding),identity:()=>binding,
   resolve:s=>({verb:'begin_wizard',ref:s.ui.elements.find(e=>e.tid===binding.graph_tid+';Setting').ref})});
@@ -160,6 +162,6 @@ export async function openPreparedWizard(channel) {
  requireValue(bound&&ownerMatches
   &&same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path),
   'Opened wizard owner differs from the prepared node');
- return {verified:true,deactivation_required:deactivationRequired,node_context:after.prepared_node_context,
+ return {verified:true,deactivation_required:deactivationRequired,node_was_inactive:nodeWasInactive,node_context:after.prepared_node_context,
   owner,settings_applied:false,execution_started:false};
 }

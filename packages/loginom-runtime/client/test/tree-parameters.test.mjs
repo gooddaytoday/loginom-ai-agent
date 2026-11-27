@@ -2,8 +2,11 @@ import test from 'node:test';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {treeLabelSeparators,treeToTableParametersSchema,validateTreeJsonScope,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths,treeColumnNames} from '../lib/tree-parameters.mjs';
+import {treeLabelSeparators,treeToTableParametersSchema,TREE_LABEL_SEPARATOR_REQUIRES_COMPOSITE,validateTreeJsonScope,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths,treeColumnNames} from '../lib/tree-parameters.mjs';
 import {createTreeNodeSupport,treeConfigurationReadback} from '../lib/tree-node.mjs';
+import {dispatchNodeApi,nodeApiTools} from '../lib/node-api.mjs';
+import {applyNode,validateNodeApplyRequest} from '../lib/node-apply.mjs';
+import {closePreparedWizard} from '../lib/node-wizard-close.mjs';
 import {NODE_TYPES,validateNodeTargetRequest} from '../lib/node-contracts.mjs';
 test('tree stage 1 admits the independent acceptance JSON with exact original integer lexemes',async()=>{
  const text=await readFile(new URL('../../../../docs/node-development/nodes/trees-jsontotree/fixtures/response.json',import.meta.url),'utf8');
@@ -99,7 +102,7 @@ for(const saved of [false,true])test('JSON tree configure confirms '+(saved?'sav
 
 test('tree-to-table global index is optional on new nodes, bounded and bound to the repeated array',()=>{
  const request={target:{kind:'new',type:'trees.to_table'},inputs:[{input:0}],mappings:[]};
- const base={selected_paths:['/items/sku'],repeat_parents:true,composite_names:false,composite_labels:false,label_separator:'.'};
+ const base={selected_paths:['/items/sku'],repeat_parents:true,composite_names:false,composite_labels:false};
  validateTreeParameters(base,'selected_nodes',request);
  validateTreeParameters({...base,global_index_paths:['/items']},'selected_nodes',request);
  validateTreeParameters({...base,global_index_paths:[]},'selected_nodes',request);
@@ -140,6 +143,7 @@ function tableImplementation(json=false){
  const factory=vm.runInNewContext('('+createTreeNodeSupport.toString()+')',{
   createTabularTransformNodeSupport:(_config,implementation)=>implementation,
   jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},treeLabelSeparators,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths,treeColumnNames,treeConfigurationReadback,
+  TREE_LABEL_SEPARATOR_REQUIRES_COMPOSITE,closePreparedWizard,
   need,owned,ready:s=>owned(s)&&s.node_tree?.verified,same:(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b)),
   one:(s,p,m)=>{const found=s.ui.elements.filter(p);need(found.length===1,m);return found[0];},structuredClone,JSON,
  });
@@ -400,10 +404,10 @@ test('JSON tree Variant preflight admits scalar subtype changes and retains cont
 
 test('tree-to-table admits native composite names, labels and the five separators; other values refuse before UI',()=>{
  const request={target:{kind:'new',type:'trees.to_table'},inputs:[{input:0}],mappings:[]};
- const base={selected_paths:['/items/code'],repeat_parents:true,composite_names:false,composite_labels:false,label_separator:'.'};
+ const base={selected_paths:['/items/code'],repeat_parents:true,composite_names:false,composite_labels:false};
  validateTreeParameters(base,'selected_nodes',request);
  for(const label_separator of ['.','|',' ','-','_'])validateTreeParameters({...base,composite_names:true,composite_labels:true,label_separator},'selected_nodes',request);
- for(const label_separator of [';','','..','/',1])assert.throws(()=>validateTreeParameters({...base,label_separator},'selected_nodes',request),/label_separator/);
+ for(const label_separator of [';','','..','/',1])assert.throws(()=>validateTreeParameters({...base,composite_labels:true,label_separator},'selected_nodes',request),/Invalid parameters.label_separator/);
  for(const k of ['composite_names','composite_labels'])assert.throws(()=>validateTreeParameters({...base,[k]:'true'},'selected_nodes',request),new RegExp(k));
 });
 function compositeState(){
@@ -419,7 +423,10 @@ function compositeChannel(state,performed){
  return {observe:async o=>{assert.ok(o.ready(state));return structuredClone(state);},perform:async o=>{
   const action=o.resolve(state);if(action.verb!=='click'){state.wizard.stage='done';return;}
   performed.push(action.ref);const t=state.node_tree;
-  if(action.ref==='pedCompositeColumnNames')t.composite_names=!t.composite_names;
+  if(action.ref==='close'){
+   state.wizard={status:'absent'};state.prepared_node_context.surface='graph';
+  }
+  else if(action.ref==='pedCompositeColumnNames')t.composite_names=!t.composite_names;
   else if(action.ref==='pedCompositeColumnDisplayNames')t.composite_labels=!t.composite_labels;
   else if(action.ref==='picker')for(const [name,value] of Object.entries(options))
    state.ui.elements.push({tid:W+'pedCompositeDisplayNameSeparator;ValueControl;boundlist;'+name,ref:'option:'+value,label:name,role:'option',allowed_actions:['click']});
@@ -434,10 +441,70 @@ for(const [label_separator,clicks] of [['|',['picker','option:|']],[' ',['picker
   assert.deepEqual(performed,['pedCompositeColumnNames','pedCompositeColumnDisplayNames',...clicks]);
   assert.deepEqual([result.configuration.composite_names,result.configuration.composite_labels,result.configuration.label_separator],[true,true,label_separator]);
  });
+for(const labelMode of ['composite','plain','existing composite'])test('tree-to-table request admission and configure accept '+labelMode+' labels',async()=>{
+ const state=compositeState(),performed=[],implementation=tableImplementation();
+ const existing=labelMode==='existing composite',composite_labels=labelMode!=='plain';
+ state.node_tree.composite_labels=existing;
+ state.ui.elements.push({tid:'W;btnSelectAll',ref:'btnSelectAll',allowed_actions:['click']});
+ const channel=compositeChannel(state,performed);
+ const {nodeApplyHandlers}=createTreeNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'},{json:false});
+ const runtime={tools:nodeApiTools,startNodeApply:request=>{
+  const {handler}=validateNodeApplyRequest(request,nodeApplyHandlers,{fresh:true});
+  return handler.configure({},request.parameters,{
+   configureCalculator:(_ctx,parameters)=>implementation.configure(channel,parameters,{request}),
+  });
+ }};
+ const node={document_id:'doc',workflow_id:'wf',node_id:'source'};
+ const request={operation_id:'tree-labels',contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',
+   navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:existing?{kind:'existing',type:'trees.to_table',ref:{...node,node_id:'tree'}}:{kind:'new',type:'trees.to_table',position:{x:320,y:280}},
+  inputs:existing?[]:[{source:node,input:0,output:0}],mode:'selected_nodes',
+  parameters:existing?{label_separator:'_'}:{selected_paths:['/batch','/items/code','/items/qty'],repeat_parents:true,composite_names:false,composite_labels,
+   ...(composite_labels?{label_separator:'_'}:{})},
+  mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false},
+  budgets:{configure_ms:1000,execute_ms:1000,total_ms:1000}};
+ const {verified,configuration}=await dispatchNodeApi(runtime,'dock_node_apply',request);
+ assert.equal(verified,true);
+ assert.deepEqual([configuration.composite_labels,configuration.label_separator],[composite_labels,composite_labels?'_':'.']);
+ assert.deepEqual(performed,existing?['picker','option:_']:composite_labels?['btnSelectAll','pedCompositeColumnDisplayNames','picker','option:_']:['btnSelectAll']);
+});
+for(const [inactive,deactivated] of [[true,false],[false,true],[false,false]])test('tree separator refusal closes the owned draft (initially inactive '+inactive+', deactivation prompt '+deactivated+')',async()=>{
+ const state=compositeState(),performed=[],implementation=tableImplementation();
+ const node={document_id:'doc',workflow_id:'wf',node_id:'tree'};
+ Object.assign(state.prepared_node_context,node,{locked:false});
+ Object.assign(state.wizard,{status:'observed',root_ref:'wizard',owner_context:{status:'observed'}});
+ Object.assign(state.ui,{dialogs:[],masks:[]});
+ state.ui.elements.push({tid:'W;btnClose',ref:'close',allowed_actions:['click']});
+ const channel=compositeChannel(state,performed);
+ const {nodeApplyHandlers:handlers}=createTreeNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'},{json:false});
+ const operation={id:'tree-separator-draft'};
+ const request={operation_id:operation.id,contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',
+   navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'existing',type:'trees.to_table',ref:node},inputs:[],mode:'selected_nodes',parameters:{label_separator:'_'},
+  mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false},
+  budgets:{configure_ms:1000,execute_ms:1000,total_ms:1000}};
+ const verified={verified:true,cleanup_complete:true,effect_possible:false};
+ const runtime={tools:nodeApiTools,startNodeApply:request=>applyNode({request,operation,handlers,record:async event=>event,now:()=>1,drivers:{
+  verifySource:async()=>verified,prepareTarget:async()=>({...verified,node}),mapPorts:async()=>verified,
+  openWizard:async()=>({...verified,effect_possible:true,deactivation_required:deactivated,node_was_inactive:inactive}),
+  configureCalculator:(_ctx,parameters)=>implementation.configure(channel,parameters,{request}),
+  finish:async()=>assert.fail('Done must not run'),
+  finishGraph:async()=>assert.fail('Graph finish must not run'),
+ }})};
+ const result=await dispatchNodeApi(runtime,'dock_node_apply',request);
+ const effectPossible=!inactive||deactivated;
+ assert.deepEqual([result.status,result.effect_possible,result.cleanup_complete,result.pending_phase],
+  [effectPossible?'FAILED':'NOT_APPLIED',effectPossible,true,null]);
+ assert.deepEqual(result.error,{code:'REQUEST_REJECTED',message:TREE_LABEL_SEPARATOR_REQUIRES_COMPOSITE});
+ assert.deepEqual(performed,['close']);
+ assert.equal(state.node_tree.label_separator,'.');
+});
 test('tree-to-table keeps the plain dot settings without clicks and refuses a separator that does not settle',async()=>{
  let state=compositeState(),performed=[];
  const plain=await tableImplementation().configure(compositeChannel(state,performed),
-  {repeat_parents:true,composite_names:false,composite_labels:false,label_separator:'.'},{request:{finish:'execute',target:{kind:'new'}}});
+  {repeat_parents:true,composite_names:false,composite_labels:false},{request:{finish:'execute',target:{kind:'new'}}});
  assert.deepEqual(performed,[]);assert.equal(plain.configuration.label_separator,'.');
  state=compositeState();performed=[];const channel=compositeChannel(state,performed),perform=channel.perform;
  channel.perform=async o=>{const a=o.resolve(state);if(a.ref?.startsWith?.('option:')){performed.push(a.ref);return;}return perform(o);};

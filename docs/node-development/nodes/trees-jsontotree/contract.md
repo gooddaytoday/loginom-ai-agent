@@ -91,11 +91,15 @@ Strict остаётся native true, формат дат — исходный, �
 {"kind":"json_to_tree","mode":"auto_structure","json_field":"Document","root_mode":"auto","auto_structure":true,"strict":true,"exclude_root":false}
 ```
 
-Второго:
+Второго с включёнными составными метками:
 
 ```json
-{"kind":"tree_to_table","mode":"selected_nodes","selected_paths":["/id","/active","/items/sku","/items/qty","/items/price","/items/note"],"repeat_parents":true,"composite_names":false,"composite_labels":false,"label_separator":"."}
+{"kind":"tree_to_table","mode":"selected_nodes","selected_paths":["/id","/active","/items/sku","/items/qty","/items/price","/items/note"],"repeat_parents":true,"composite_names":false,"composite_labels":true,"label_separator":"."}
 ```
+
+В запросе с `composite_labels:false` поле `label_separator` опускается.
+Readback передаёт фактически наблюдённое значение поля мастера и при
+выключенных составных метках.
 
 Общая оболочка дополнительно сохраняет реальные document/workflow/node/port
 identities, тип каждого порта, фактические связи и наблюдённую схему.

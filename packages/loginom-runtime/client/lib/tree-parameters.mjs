@@ -7,16 +7,23 @@ export const treeToTableParametersSchema={type:'object',properties:{
  repeat_parents:{type:'boolean',description:'Repeat selected ancestors on every child row.'},
  composite_names:{type:'boolean',description:'Use native root+path names joined by _ (Root_items_code) to distinguish equal leaf names in different branches. False uses leaf names.'},
  composite_labels:{type:'boolean',description:'true: root+path tree labels joined by label_separator; false: leaf labels.'},
- label_separator:{type:'string',enum:treeLabelSeparators,description:'Composite label separator; names always use _.'},
+ label_separator:{type:'string',enum:treeLabelSeparators,description:'Requires composite_labels:true on new nodes. On existing nodes, the flag may be omitted if composite labels are already enabled. Names always use _.'},
  global_index_paths:{type:'array',maxItems:1,items:text('JSON Pointer of the repeated array schema node.',512),description:'Optional: arrays whose native global index integer column is added; [] removes it. Read the generated name.'}},required:[],additionalProperties:false};
 const optionalOnNew=new Set(['global_index_paths']);
+export const TREE_LABEL_SEPARATOR_REQUIRES_COMPOSITE='label_separator applies only with composite_labels:true; drop label_separator or enable composite labels';
+export function validateTreeLabelSeparator(parameters,{kind}){
+ if(parameters?.label_separator!==undefined&&(parameters.composite_labels===false||kind==='new'&&parameters.composite_labels!==true))
+  throw Error(TREE_LABEL_SEPARATOR_REQUIRES_COMPOSITE);
+}
 export function validateTreeParameters(parameters,mode,request){
  const json=request.target.type==='trees.from_json',schema=json?jsonToTreeParametersSchema:treeToTableParametersSchema;
  if(mode!==(json?'auto_structure':'selected_nodes')||!parameters||typeof parameters!=='object'||Array.isArray(parameters)
   ||Object.keys(parameters).some(k=>!Object.hasOwn(schema.properties,k))||request.mappings.length)
   throw Error('Tree stage 1 requires its documented mode, parameters and mappings:[]');
  if(request.inputs.length>1||request.inputs.some(i=>i.input!==0)||request.target.kind==='new'&&request.inputs.length!==1)throw Error('Tree stage 1 requires one input 0');
- if(request.target.kind==='new'&&Object.keys(schema.properties).some(k=>!optionalOnNew.has(k)&&!Object.hasOwn(parameters,k)))throw Error('New tree node requires every documented parameter');
+ if(!json)validateTreeLabelSeparator(parameters,request.target);
+ if(request.target.kind==='new'&&Object.keys(schema.properties).some(k=>!optionalOnNew.has(k)
+  &&(k!=='label_separator'||parameters.composite_labels===true)&&!Object.hasOwn(parameters,k)))throw Error('New tree node requires every documented parameter');
  if(json){
   if(parameters.json_field!==undefined&&(typeof parameters.json_field!=='string'||!parameters.json_field||parameters.json_field.length>128))throw Error('Invalid parameters.json_field');
   if(parameters.root_mode!==undefined&&parameters.root_mode!=='auto')throw Error('Invalid parameters.root_mode: only auto is supported');

@@ -13,7 +13,10 @@ Dock проверяет схему того же завершённого вып
 Если пользователь просил дерево, не подменяй дерево JavaScript.
 
 На новом узле укажи `mode:"selected_nodes"` и параметры `selected_paths`,
-`repeat_parents`, `composite_names`, `composite_labels`, `label_separator`.
+`repeat_parents`, `composite_names`, `composite_labels`. На новом узле
+передавай `label_separator` вместе с `composite_labels:true`. На существующем
+узле можно указать только разделитель, если составные метки уже включены.
+Для коротких меток укажи `composite_labels:false` и опусти разделитель.
 Указывай пути листьев в порядке нативной схемы и без индексов массива. Например,
 для `carts[].products[]` выбери `["/carts/id","/carts/products/id","/carts/products/quantity"]`,
 `repeat_parents:true`, `composite_names:true`, `composite_labels:true` и
