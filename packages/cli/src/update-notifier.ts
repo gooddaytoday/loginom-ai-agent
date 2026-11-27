@@ -2,6 +2,7 @@ export * as UpdateNotifier from "./update-notifier"
 
 import fs from "node:fs/promises"
 import path from "node:path"
+import { policyPath } from "@loginom-ai-agent/loginom-host/admin-policy"
 import { Product } from "@loginom-ai-agent/product"
 import { verifyUpdateSignature } from "@loginom-ai-agent/product/update-signature"
 import { LOGINOM_AI_AGENT_VERSION } from "./version"
@@ -123,12 +124,7 @@ export async function notify(input: {
   }
 }
 
-export function policyPath(platform: NodeJS.Platform, env: NodeJS.ProcessEnv) {
-  if (platform === "win32")
-    return path.win32.join(env.ProgramData ?? "C:\\ProgramData", "Loginom AI Agent", "policy.json")
-  if (platform === "darwin") return "/Library/Application Support/Loginom AI Agent/policy.json"
-  return "/etc/loginom-ai-agent/policy.json"
-}
+export { policyPath }
 
 async function readSettings(file: string, signal: AbortSignal) {
   const text = await fs.readFile(file, { encoding: "utf8", signal }).catch((error: NodeJS.ErrnoException) => {

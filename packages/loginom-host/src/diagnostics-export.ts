@@ -88,6 +88,36 @@ export type DiagnosticsInput = {
 type Source = { name: string; priority: number; entry?: DiagnosticsEntry; chat?: unknown }
 const MAX_DUMP_BYTES = 8 * 1024 * 1024
 
+export function administratorReport(input: {
+  network: "online" | "device" | null
+  policy: "absent" | "present" | "invalid"
+  address: string
+  model: string | null
+  knownSecrets: readonly string[]
+}) {
+  const secrets = input.knownSecrets.filter(Boolean)
+  const clean = (value: string) => {
+    if (secrets.some((secret) => value.includes(secret)) || hasExportSecret(value)) return "[redacted]"
+    return value
+  }
+  const url = URL.canParse(input.address) ? new URL(input.address) : undefined
+  const address = url && (url.protocol === "http:" || url.protocol === "https:") ? url.origin + url.pathname : null
+  const cleanAddress = (value: string) => {
+    try {
+      if (clean(decodeURIComponent(value)) === "[redacted]") return "[redacted]"
+      return clean(value)
+    } catch {
+      return "[redacted]"
+    }
+  }
+  return JSON.stringify({
+    network: input.network,
+    policy: input.policy,
+    loginom: address && cleanAddress(address),
+    model: input.model && clean(input.model),
+  }, null, 2) + "\n"
+}
+
 function readWhole(path: string, limit: number) {
   const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
   try {
@@ -565,13 +595,18 @@ export async function profileSecrets(input: {
     }
     // Never create profile directories: read only an existing store. Any entry
     // counts: the store refuses a linked record, which is then reported unavailable.
-    if (lstatSync(join(directory, "connection.json"), { throwIfNoEntry: false }) || history.length) {
+    if (
+      lstatSync(join(directory, "connection.json"), { throwIfNoEntry: false }) ||
+      lstatSync(join(directory, "pending.json"), { throwIfNoEntry: false }) ||
+      history.length
+    ) {
       const store = input.codec && connectionStore(directory, input.codec)
       // Every generation, not only the active one: an older chat may echo the
       // login and password of an account the profile used before.
       const reads = store
         ? [
             () => store.read(),
+            () => store.pending(),
             ...history
               .filter((name) => /^\d+\.json$/.test(name))
               .map((name) => () => store.staged(Number(name.slice(0, -5)))),

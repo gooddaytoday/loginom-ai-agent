@@ -5,6 +5,7 @@ import { TextField } from "@opencode/ui/text-field"
 import { createMemo, createSignal, onCleanup, Show, untrack } from "solid-js"
 import type definition from "./index"
 import { initial, transition, view } from "./machine"
+import { loginomClient } from "./target"
 
 export default function Page() {
   const ctx = usePlugin<typeof definition>()
@@ -14,18 +15,11 @@ export default function Page() {
 
   const errorText = (issue: Issue | undefined) => (issue ? ctx.t(issue) : undefined)
 
-  const client = createMemo(() => {
-    const servers = ctx.servers.list().flatMap((id) => ctx.servers.get(id) ?? [])
-    // Desktop owns the sidecar. Web uses the serving origin, or the single local service in development.
-    if (ctx.desktop) return servers.find((server) => server.builtin)?.client
-    const serving = ctx.servers.get(location.origin)
-    if (serving) return serving.client
-    const local = servers.filter((server) => server.local)
-    if (local.length === 1) return local.at(0)?.client
-  })
+  const client = createMemo(() => loginomClient(ctx))
 
   let controller: AbortController | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
+
   const dispatch = (event: Parameters<typeof transition>[1]) => {
     const next = transition(untrack(state), event)
     setState(next.state)
@@ -36,26 +30,33 @@ export default function Page() {
     if (effect.type === "cancel") {
       clearTimeout(timer)
       controller?.abort()
+
       return
     }
+
     const request = async () => {
       controller = new AbortController()
+
       const signal = AbortSignal.any([
         controller.signal,
         AbortSignal.timeout(effect.type === "check" ? 245_000 : 12_000),
       ])
+
       const rpc = untrack(client)?.rpc(Definition)
+
       switch (effect.type) {
         case "status": {
           const result = await rpc?.status({}, { signal }).catch(() => undefined)
           dispatch({ type: "status", attempt: effect.attempt, result: result ?? { ok: false, issue: "unavailable" } })
           break
         }
+
         case "check": {
           const result = await rpc?.check(effect.input, { signal }).catch(() => undefined)
           dispatch({ type: "checked", attempt: effect.attempt, result: result ?? { ok: false, issue: "unavailable" } })
           break
         }
+
         case "save": {
           const result = await rpc?.save(effect.input, { signal }).catch(() => undefined)
           dispatch({ type: "saved", attempt: effect.attempt, result: result ?? { ok: false, issue: "saveFailed" } })
@@ -63,10 +64,13 @@ export default function Page() {
         }
       }
     }
+
     if (effect.type === "status" && effect.delay) {
       timer = setTimeout(() => void request(), effect.delay)
+
       return
     }
+
     void request()
   }
 

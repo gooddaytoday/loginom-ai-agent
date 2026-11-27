@@ -24,6 +24,7 @@ export type Connection = {
 type Started = {
   readonly directory: string
   readonly deviceOnly: boolean
+  readonly diagnostics: { root: string; data: string; resources?: string }
   ready: Promise<Connection | undefined>
   connected?: boolean
   held: Map<Lease, string>
@@ -77,6 +78,7 @@ export async function start(input: {
   const current: Started = {
     directory,
     deviceOnly: input.deviceOnly ?? false,
+    diagnostics: { root, data: input.data, resources: input.resources },
     ready: Promise.resolve(undefined),
     held: new Map(),
   }
@@ -96,6 +98,12 @@ export async function start(input: {
 /** Whether the Host finished its handshake: before that, `acquire` waits for it (up to the handshake's 180 s). */
 export function connected() {
   return !!state.current?.connected && !state.current.closing
+}
+
+export function diagnosticsProfile() {
+  const current = state.current
+  if (!current || current.closing) return undefined
+  return { ...current.diagnostics, network: current.deviceOnly ? "device" : "online" } as const
 }
 
 /**

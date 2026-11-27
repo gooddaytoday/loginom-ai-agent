@@ -4,6 +4,7 @@
 import { join } from "node:path"
 import { Definition as ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
+import { DiagnosticsRpc } from "@loginom-ai-agent/loginom-host/diagnostics-rpc"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
@@ -15,6 +16,7 @@ import { connectionSettings } from "./connection-settings"
 import { Dashboard } from "./dashboard"
 import { DashboardTarget } from "./dashboard-target"
 import { dashboardTools } from "./dashboard-tools"
+import { diagnostics } from "./diagnostics"
 import { dockTools } from "./dock"
 import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
@@ -508,7 +510,9 @@ export default Plugin.define({
         return { granted: true }
       },
     })
-    await ctx.rpc.register(ConnectionSettingsRpc, connectionSettings())
+    const connection = connectionSettings()
+    await ctx.rpc.register(ConnectionSettingsRpc, connection)
+    await ctx.rpc.register(DiagnosticsRpc, diagnostics(ctx, catalog.length > 0, connection))
     await ctx.rpc.register(preflight, {
       check: async (value) => {
         const code = await ServiceHost.preflight((value as { automation: boolean }).automation)
