@@ -12,6 +12,7 @@ import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
+import { WindowList } from "@loginom-ai-agent/loginom-host/windows"
 import { Option, Schema } from "effect"
 
 export type Lease = NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>
@@ -30,6 +31,8 @@ type Started = {
 }
 
 const state: { current?: Started } = {}
+const windowsChanged = new Set<() => void>()
+const decodeWindows = Schema.decodeUnknownOption(WindowList)
 const decodeRecord = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ session: Schema.String, pid: Schema.Number })),
 )
@@ -72,8 +75,22 @@ export async function start(input: { data: string; resources?: string; connect?:
   current.ready = (connect?.() ?? Promise.resolve(undefined)).then(
     (connection) => {
       if (connection && current.closing) return connection.close().then(() => undefined)
-      if (connection) LoginomHost.connect(connection.port)
       current.connected = !!connection
+      if (connection) {
+        LoginomHost.connect(connection.port)
+        connection.port.on("message", ({ data }) => {
+          if (
+            state.current === current && !current.closing && data && typeof data === "object" &&
+            "event" in data && data.event === "windows.changed"
+          )
+            for (const listener of windowsChanged) listener()
+        })
+        connection.port.onClose?.(() => {
+          if (state.current !== current) return
+          current.connected = false
+          for (const listener of windowsChanged) listener()
+        })
+      }
       return connection
     },
     () => undefined,
@@ -182,6 +199,20 @@ export async function release(lease: Lease) {
   current?.held.delete(lease)
   await lease.release()
   if (file) await rm(file, { force: true })
+}
+
+export const windows = {
+  async list() {
+    if (!connected()) return []
+    const value = await request("windows.list", {}).catch(() => undefined)
+    return Option.getOrElse(decodeWindows(value), () => [])
+  },
+  onChanged(listener: () => void) {
+    windowsChanged.add(listener)
+    return () => {
+      windowsChanged.delete(listener)
+    }
+  },
 }
 
 function alive(pid: number) {

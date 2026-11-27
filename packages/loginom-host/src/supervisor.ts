@@ -109,17 +109,18 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
 
 // One browser child per generation/chat; knowledge has one child per generation.
 // Both use the same private transport and acknowledged cleanup contract.
-export async function supervise(input: Launch, signal?: AbortSignal) {
+export async function supervise(input: Launch, signal?: AbortSignal, onWindow?: (value: unknown) => void) {
   if (!isAbsolute(input.resources)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   // Browser validation follows the separate local Help check in Host.
   const runtime = await superviseProcess(
     { ...input, diagnosticSecrets: [input.connection.apiKey, input.connection.password, input.connection.username] },
-    { ...input, environment: undefined, protocol: 1 },
+    { ...input, environment: undefined, protocol: 1, ...(onWindow ? { observeWindow: true } : {}) },
     Math.max(1, Math.min(input.validation ? 210_000 : 120_000, (input.startupDeadline ?? Infinity) - Date.now())),
     signal,
     // Windows browser/resource teardown can outlast 5s even after native Close/logout.
     // Leave headroom for the exit grace inside the outer Host's 30s close budget.
     input.closeSavedPackageOnShutdown === true || input.acceptanceCleanupPackage ? 45_000 : 15_000,
+    onWindow,
   )
   const ready = runtime.ready
   if (
@@ -165,6 +166,7 @@ async function superviseProcess(
   timeout = 120_000,
   signal?: AbortSignal,
   closeTimeout = 5000,
+  onWindow?: (value: unknown) => void,
 ) {
   signal?.throwIfAborted()
   if (![input.node, input.entry, input.stateDir].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
@@ -197,7 +199,12 @@ async function superviseProcess(
   child.on("exit", fail)
   child.on("error", fail)
   child.on("message", async (message) => {
-    if (!message || typeof message !== "object" || !("id" in message) || typeof message.id !== "string") return
+    if (!message || typeof message !== "object") return
+    if ("windowSnapshot" in message) {
+      onWindow?.(message.windowSnapshot)
+      return
+    }
+    if (!("id" in message) || typeof message.id !== "string") return
     const request = pending.get(message.id)
     if (!request) return
     if ("progress" in message) {

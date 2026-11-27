@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
+import { WindowSnapshot } from "./windows"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
 import { connectionService } from "./connection/connection-service"
 import { connectionStore, type ActiveConnection } from "./connection/connection-store"
@@ -230,12 +231,17 @@ export async function createLoginomHost(options: {
       knowledge: Awaited<ReturnType<typeof superviseKnowledge>>
       catalog: Promise<unknown>
       ready: Promise<void>
-      children: Map<string, Promise<Awaited<ReturnType<typeof supervise>>>>
+      children: Map<string, RuntimeChild>
     }
   >()
   const restarts = new Map<string, number>()
   const lost = new Set<string>()
   const stale = new Set<string>()
+  const windowListeners = new Set<() => void>()
+  const windows = { closing: false }
+  function windowsChanged() {
+    for (const listener of windowListeners) listener()
+  }
   const startupCleanup = { failed: false }
   const shutdown = { failed: false }
   const validationCache = {
@@ -319,14 +325,27 @@ export async function createLoginomHost(options: {
       },
     )
   type Runtime = Awaited<ReturnType<typeof supervise>>
-  function retain(generation: { children: Map<string, Promise<Runtime>> }, chat: string, child: Promise<Runtime>) {
-    const tracked = child.then((runtime) => {
+  type WindowOwner = { sessionID: string; ready: boolean; snapshot?: WindowSnapshot | null }
+  type RuntimeChild = Promise<Runtime> & { window?: WindowOwner }
+  const decodeWindow = Schema.decodeUnknownOption(Schema.NullOr(WindowSnapshot))
+  function retain(
+    generation: { connection: ActiveConnection; children: Map<string, RuntimeChild> },
+    chat: string,
+    child: Promise<Runtime>,
+    window?: WindowOwner,
+  ) {
+    const tracked: RuntimeChild = child.then((runtime) => {
       const closing: { requested: boolean; promise?: Promise<void> } = { requested: false }
+      if (window) {
+        window.ready = true
+        if (window.snapshot) void activeWindowsChanged(generation.connection.generation)
+      }
       void runtime.exited.then(() => {
         if (options.closeSavedPackageOnShutdown === true && !closing.requested) shutdown.failed = true
         if (generation.children.get(chat) !== tracked) return
         lost.add(chat)
         generation.children.delete(chat)
+        if (window?.snapshot && !stale.has(chat)) void activeWindowsChanged(generation.connection.generation)
       })
       return {
         ...runtime,
@@ -340,11 +359,15 @@ export async function createLoginomHost(options: {
         },
       }
     })
+    tracked.window = window
     generation.children.set(chat, tracked)
     tracked.catch(() => {
       if (generation.children.get(chat) === tracked) generation.children.delete(chat)
     })
     return tracked
+  }
+  async function activeWindowsChanged(generation: number) {
+    if (!windows.closing && (await service.api.status()).generation === generation) windowsChanged()
   }
   async function prepareValidationCache(connection: ActiveConnection) {
     try {
@@ -369,6 +392,7 @@ export async function createLoginomHost(options: {
     signal?: AbortSignal,
     deadline?: number,
     validationHttpCache = false,
+    onWindow?: (value: unknown) => void,
   ) {
     const validation = purpose === "validation"
     const startupDeadline = deadline ?? Date.now() + (validation ? 210_000 : 120_000)
@@ -479,6 +503,7 @@ export async function createLoginomHost(options: {
         resourceCacheVersion: resourceVersion,
       },
       signal,
+      onWindow,
     ).catch(startupFailure)
   }
   function startupFailure(error: unknown): never {
@@ -557,7 +582,7 @@ export async function createLoginomHost(options: {
         }).catch(startupFailure)
         const catalog = knowledge.request("list")
         const ready = catalog.then(() => undefined)
-        const generation = { connection, knowledge, catalog, ready, children: new Map<string, Promise<Runtime>>() }
+        const generation = { connection, knowledge, catalog, ready, children: new Map<string, RuntimeChild>() }
         generations.set(connection.generation, generation)
         void ready.catch(() => undefined)
         return {
@@ -574,6 +599,7 @@ export async function createLoginomHost(options: {
           },
           async close() {
             generations.delete(connection.generation)
+            if ([...generation.children.values()].some((child) => child.window?.snapshot)) windowsChanged()
             const results = await Promise.allSettled([
               knowledge.close(),
               ...[...generation.children.values()].map(async (child) => (await child).close()),
@@ -636,6 +662,7 @@ export async function createLoginomHost(options: {
   }
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
   function beginClose() {
+    windows.closing = true
     service.beginClose()
     resourceController.abort()
     for (const controller of dashboardOperations.keys()) controller.abort(new Error("DASHBOARD_CANCELLED"))
@@ -719,6 +746,22 @@ export async function createLoginomHost(options: {
         return view
       },
     },
+    onWindowsChanged(listener: () => void) {
+      windowListeners.add(listener)
+      return () => {
+        windowListeners.delete(listener)
+      }
+    },
+    async listWindows() {
+      const { generation } = await service.api.status()
+      const current = generations.get(generation)
+      if (!current || windows.closing) return []
+      return [...current.children.entries()].flatMap(([chat, child]) => {
+        const window = child.window
+        if (!window?.ready || !window.snapshot || stale.has(chat)) return []
+        return [{ sessionID: window.sessionID, generation, ...window.snapshot }]
+      })
+    },
     async verifyInstallationResources(settings: { reusePrewarm?: boolean } = {}) {
       // Drain prewarming before replacing its cache; setup must finish the full
       // pass even if an unconfigured profile's Host is closed immediately after.
@@ -767,7 +810,11 @@ export async function createLoginomHost(options: {
       lost.delete(chat)
     },
     markRuntimeStale(chat: string) {
+      if (stale.has(chat)) return
       stale.add(chat)
+      for (const [generation, current] of generations) {
+        if (current.children.get(chat)?.window?.snapshot) void activeWindowsChanged(generation)
+      }
     },
     async retireRuntime(chat: string) {
       if (!stale.delete(chat)) return
@@ -827,7 +874,7 @@ export async function createLoginomHost(options: {
         throw new Error("LOGINOM_REPLY_INVALID")
       return { activeWork: result.activeWork, unsettledWork: result.unsettledWork, dispatching: result.dispatching }
     },
-    async runtime(generation: number, chat: string, startup?: { deadline: number; signal: AbortSignal }) {
+    async runtime(generation: number, chat: string, startup?: { deadline: number; signal: AbortSignal }, sessionID?: string) {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
       const previous = current.children.get(chat)
@@ -838,10 +885,18 @@ export async function createLoginomHost(options: {
         restarts.set(chat, count + 1)
         lost.delete(chat)
       }
+      const window: WindowOwner | undefined = sessionID && !options.headless ? { sessionID, ready: false } : undefined
+      const onWindow = window && ((value: unknown) => {
+        if (current.children.get(chat)?.window !== window || stale.has(chat)) return
+        const next = decodeWindow(value)
+        if (Option.isNone(next) || (!next.value && !window.snapshot)) return
+        window.snapshot = next.value
+        if (window.ready) void activeWindowsChanged(generation)
+      })
       return retain(
         current,
         chat,
-        launch(current.connection, chat, "chat", startup?.signal, startup?.deadline).then(
+        launch(current.connection, chat, "chat", startup?.signal, startup?.deadline, false, onWindow).then(
           (child) => {
             service.browserStatus(generation, { state: "verified" })
             return child
@@ -852,6 +907,7 @@ export async function createLoginomHost(options: {
             throw error
           },
         ),
+        window,
       )
     },
   }

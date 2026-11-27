@@ -128,6 +128,7 @@ test("bundled Node host handshakes without Electron, manages its profile and clo
     expect(error).toBe("LOGINOM_CANDIDATE_INVALID")
     expect(await host.request("acquire", { run: "test", session: "chat" })).toEqual({ generation: 0 })
     expect(await host.request("release", { run: "test" })).toBe(true)
+    expect(await host.request("windows.list", {})).toEqual([])
   } finally {
     await host.close()
   }

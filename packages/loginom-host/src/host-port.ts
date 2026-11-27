@@ -69,6 +69,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     string,
     {
       chat: string
+      sessionID: string
       lease?: NonNullable<ReturnType<typeof service.acquire>>
       calls: number
       dispatching: boolean
@@ -235,6 +236,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
           runs.set(input.run, {
             chat,
+            sessionID: input.session,
             calls: 0,
             dispatching: false,
             released: false,
@@ -603,7 +605,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             run.admitted.clear()
             run.catalog = new Set([prepareTool.name])
           }
-          const runtime = await service.runtime(lease.generation, run.chat, preparation)
+          const runtime = await service.runtime(lease.generation, run.chat, preparation, run.sessionID)
           if (packageAborted()) throw new Error("LOGINOM_RUN_ABORTED")
           const packageArtifact = packageAdmission
             ? await runtime.request("admit", packageAdmission).then((value) => {

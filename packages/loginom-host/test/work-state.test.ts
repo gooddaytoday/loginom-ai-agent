@@ -1,10 +1,13 @@
 import { expect, test } from "bun:test"
+import { createHash } from "node:crypto"
 import { access, mkdir, mkdtemp, readFile, readdir, rm, symlink } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { EventEmitter, once } from "node:events"
 import { createLoginomHost } from "../src/host"
 import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
+import type { WindowList } from "../src/windows"
 import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
 
 test("work state of an unconfigured chat is local and never creates a runtime", async () => {
@@ -50,6 +53,8 @@ async function fixture() {
     process.on('disconnect', () => process.exit(0));
     process.on('message', message => {
       const send = result => process.send({ id: message.id, result });
+      if (message.operation === 'start' && message.input.validation)
+        return send({ protocol: 1, generation: message.input.generation, checked: true });
       if (message.operation === 'start') {
         appendFileSync(${JSON.stringify(launches)}, JSON.stringify({ pid: process.pid }) + '\\n');
         send({ protocol: 1, generation: message.input.generation, chat: message.input.chat, ready: true });
@@ -61,6 +66,13 @@ async function fixture() {
       }
       if (message.operation === 'close') {
         process.send({ id: message.id, result: { closed: true } }, () => process.disconnect());
+      }
+      if (message.operation === 'start' && message.input.observeWindow)
+        process.send({ windowSnapshot: { openedAt: 123, state: 'open',
+          package: { name: 'Sales', path: '/user/Sales.lgp' } } });
+      if (message.operation === 'fixture.window') {
+        process.send({ windowSnapshot: message.input });
+        send(true);
       }
     });
   `,
@@ -88,6 +100,52 @@ async function fixture() {
     },
   }
 }
+
+test("headed conversation windows are listed and invalidated when the window closes or its generation retires", async () => {
+  const f = await fixture()
+  const changes = new EventEmitter()
+  const unsubscribe = f.host.onWindowsChanged(() => changes.emit("changed"))
+  const nextChange = () => once(changes, "changed", { signal: AbortSignal.timeout(5000) })
+  const chat = (sessionID: string) => createHash("sha256").update(sessionID).digest("hex")
+  try {
+    expect(await f.host.listWindows()).toEqual([])
+    const firstOpened = nextChange()
+    const first = await f.host.runtime(1, chat("ses_one"), undefined, "ses_one")
+    await firstOpened
+    const firstRow = {
+      sessionID: "ses_one", generation: 1, openedAt: 123, state: "open",
+      package: { name: "Sales", path: "/user/Sales.lgp" },
+    } satisfies typeof WindowList.Type[number]
+    expect(await f.host.listWindows()).toEqual([firstRow])
+
+    const secondOpened = nextChange()
+    await f.host.runtime(1, chat("ses_two"), undefined, "ses_two")
+    await secondOpened
+    const secondRow = { ...firstRow, sessionID: "ses_two" }
+    expect(await f.host.listWindows()).toEqual([firstRow, secondRow])
+
+    const closed = nextChange()
+    await first.request("fixture.window", null)
+    await closed
+    expect(await f.host.listWindows()).toEqual([secondRow])
+
+    const checked = await f.host.api.check({
+      revision: 1,
+      url: "http://127.0.0.1:1/app/",
+      username: "user",
+      password: { operation: "empty" },
+    })
+    const retired = nextChange()
+    await f.host.api.save({ revision: 1, validationId: checked.validationId })
+    await retired
+    expect(await f.host.api.status()).toMatchObject({ generation: 2 })
+    expect(await f.host.listWindows()).toEqual([])
+    await f.host.settled()
+  } finally {
+    unsubscribe()
+    await f.close()
+  }
+}, 15_000)
 
 test("work state rereads the existing child after asynchronous changes and never creates another chat", async () => {
   const f = await fixture()
