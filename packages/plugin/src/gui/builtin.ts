@@ -173,14 +173,20 @@ export const Page = Registry.define<Page>("page")
 export interface BuiltinSlotMap extends SlotMap {
   /** An extension below the last timeline row, tied to its owning session and route visibility. */
   readonly "session.timeline.end": {
+    /** The timeline's owning session. */
     readonly session: SlotMap["session.header"]["session"]
+    /** Whether the timeline's route is visible. */
     readonly active: boolean
+    /** Whether the session currently has work in progress. */
     readonly busy: boolean
   }
   /** A passive status mark for the conversation in the sidebar or tab strip. */
   readonly "session.sidebar.status": {
+    /** The connection key for the server that owns this row. */
     readonly server: string
+    /** The conversation id, if the row represents an existing session. */
     readonly sessionID: string | undefined
+    /** Whether the conversation currently has work in progress. */
     readonly busy: boolean
   }
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */
