@@ -790,6 +790,9 @@ OAuth link. `RUN_CHECK_MODEL`, `RUN_CHECK_VARIANT` (empty: no `--variant`) and
 select another provider, e.g. `opencode-go/deepseek-v4.1-flash` with
 `RUN_CHECK_AUTH=~/.config/loginom-run-check/auth-opencode-go.json`. Two-turn
 scenarios keep the default model. `results.json` records the model per run.
+`request.json` and `results.json` record `model_catalog_source` as `fresh`,
+`stale cache` after a failed refresh, or `snapshot` when the product snapshot
+supplies the catalog or the selected model. `start` prints this source to stderr.
 
 Each output may declare `header: false` in private `expected.json` for a CSV
 without a header (including a single JSON cell). Columns then declare CSV

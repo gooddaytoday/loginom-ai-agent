@@ -1,8 +1,9 @@
 import copy
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 import csv
 import hashlib
+from http.client import IncompleteRead
 import importlib.util
 import io
 import json
@@ -2295,17 +2296,19 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
         with tempfile.TemporaryDirectory() as directory, patch.object(runner.Path, 'home', return_value=Path(directory)), \
              patch.object(runner, 'urlopen', side_effect=[response(live), response(updated), response({})]) as download:
             with ThreadPoolExecutor(max_workers=2) as executor:
-                first, second = [executor.submit(runner.fresh_model_catalog) for _ in range(2)]
-                self.assertEqual((first.result(), second.result()), (live, live))
+                first, second = [executor.submit(runner.host_model_catalog) for _ in range(2)]
+                self.assertEqual(first.result(), (live, 'fresh', None))
+                self.assertEqual(second.result(), (live, 'fresh', None))
             download.assert_called_once()
             path = next(Path(directory).rglob('models.json'))
             stale = time.time() - runner.MODELS_TTL - 1
             os.utime(path, (stale, stale))
-            self.assertEqual(runner.fresh_model_catalog(), updated)
+            self.assertEqual(runner.host_model_catalog(), (updated, 'fresh', None))
             self.assertEqual(download.call_count, 2)
             os.utime(path, (stale, stale))
-            with self.assertRaisesRegex(ValueError, 'Invalid model catalog'):
-                runner.fresh_model_catalog()
+            catalog, origin, error = runner.host_model_catalog()
+            self.assertEqual((catalog, origin), (updated, 'stale cache'))
+            self.assertIsInstance(error, ValueError)
             self.assertEqual(runner.read(path), updated)
             self.assertEqual(list(path.parent.glob('*.tmp')), [])
 
@@ -2314,16 +2317,62 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
         snapshot = {'example': {'models': {'fallback': {'id': 'fallback'}}}}
         source = subprocess.CompletedProcess([], 0, stdout=json.dumps(snapshot))
         with patch.object(runner, 'MODEL', 'example/fallback'), \
-             patch.object(runner, 'fresh_model_catalog', return_value=live), \
+             patch.object(runner, 'host_model_catalog', return_value=(live, 'fresh', None)), \
              patch.object(runner.subprocess, 'run', return_value=source) as git_show:
             head = 'a' * 40
-            self.assertEqual(runner.model_catalog(head), {'example': {'models': {
+            self.assertEqual(runner.model_catalog(head), ({'example': {'models': {
                 **live['example']['models'], **snapshot['example']['models'],
-            }}})
+            }}}, 'snapshot'))
             self.assertEqual(git_show.call_args.args[0], ['git', 'show', f'{head}:packages/product/models.json'])
             with patch.object(runner, 'MODEL', 'example/unknown'):
                 with self.assertRaisesRegex(ValueError, 'RUN_CHECK_MODEL_NOT_FOUND:.*example/unknown'):
                     runner.model_catalog(head)
+
+    def test_incomplete_catalog_response_uses_snapshot_for_default_sol(self):
+        snapshot = {'openai': {'models': {'gpt-5': {}}}}
+        source = subprocess.CompletedProcess([], 0, stdout=json.dumps(snapshot))
+        response = io.BytesIO()
+        with tempfile.TemporaryDirectory() as directory, patch.object(runner.Path, 'home', return_value=Path(directory)), \
+             patch.object(runner, 'MODEL', 'openai/gpt-6.1-sol'), patch.dict(os.environ, {'RUN_CHECK_MODEL': ''}), \
+             patch.object(runner, 'urlopen', return_value=response), \
+             patch.object(response, 'read', side_effect=IncompleteRead(b'{"openai":', 100)), \
+             patch.object(runner.subprocess, 'run', return_value=source):
+            self.assertEqual(runner.model_catalog('a' * 40), (snapshot, 'snapshot'))
+            self.assertEqual(list(Path(directory).rglob('models.json')), [])
+
+    def test_model_catalog_timeout_skips_corrupt_cache_and_checks_snapshot(self):
+        snapshot = {'example': {'models': {'fallback': {}}}}
+        source = subprocess.CompletedProcess([], 0, stdout=json.dumps(snapshot))
+        with tempfile.TemporaryDirectory() as directory, patch.object(runner.Path, 'home', return_value=Path(directory)), \
+             patch.object(runner, 'urlopen', side_effect=TimeoutError('read timed out')), \
+             patch.object(runner.subprocess, 'run', return_value=source):
+            path = Path(directory) / '.cache/loginom-run-check' / runner.socket.gethostname() / 'models.json'
+            path.parent.mkdir(parents=True)
+            path.write_text('{"example":')
+            with patch.object(runner, 'MODEL', 'example/fallback'):
+                self.assertEqual(runner.model_catalog('a' * 40), (snapshot, 'snapshot'))
+            with patch.object(runner, 'MODEL', 'example/unknown'):
+                with self.assertRaisesRegex(ValueError, 'MODEL_CATALOG_UNAVAILABLE:.*read timed out.*example/unknown'):
+                    runner.model_catalog('a' * 40)
+            self.assertEqual(path.read_text(), '{"example":')
+
+    def test_model_catalog_timeout_reuses_stale_cache_without_extending_ttl(self):
+        cached = {'openai': {'models': {'gpt-6.1-terra': {}}}}
+        with tempfile.TemporaryDirectory() as directory, patch.object(runner.Path, 'home', return_value=Path(directory)), \
+             patch.object(runner, 'MODEL', 'openai/gpt-6.1-terra'), \
+             patch.object(runner, 'urlopen', side_effect=TimeoutError('read timed out')) as download, \
+             patch.object(runner.subprocess, 'run') as git_show:
+            path = Path(directory) / '.cache/loginom-run-check' / runner.socket.gethostname() / 'models.json'
+            path.parent.mkdir(parents=True)
+            runner.write(path, cached)
+            stale = time.time() - runner.MODELS_TTL - 1
+            os.utime(path, (stale, stale))
+            mtime_ns = path.stat().st_mtime_ns
+            self.assertEqual(runner.model_catalog('a' * 40), (cached, 'stale cache'))
+            download.assert_called_once()
+            git_show.assert_not_called()
+            self.assertEqual(path.stat().st_mtime_ns, mtime_ns)
+            self.assertEqual(runner.read(path), cached)
 
     def test_flat_pair_preserves_the_assigned_account(self):
         config = {'username': 'test', 'url': 'https://app.loginom.ai', 'api_key': 'private', 'password': 'private', 'package_directory': '/test'}
@@ -3608,13 +3657,18 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                 def detach(command, **kwargs):
                     return spawn.return_value if '_worker' in command else popen(command, **kwargs)
                 mask = os.umask(0o077)
+                stdout, stderr = io.StringIO(), io.StringIO()
+                catalog_source = 'stale cache' if exists else 'snapshot'
                 try:
-                    with patch.dict(os.environ, inherited), patch.object(sys, 'argv', argv), redirect_stdout(io.StringIO()), patch.object(runner.subprocess, 'Popen', side_effect=detach) as spawn:
+                    with patch.dict(os.environ, inherited), patch.object(sys, 'argv', argv), redirect_stdout(stdout), \
+                         redirect_stderr(stderr), patch.object(runner.subprocess, 'Popen', side_effect=detach) as spawn:
                         spawn.return_value.pid = 123
                         with patch.object(runner.Path, 'home', return_value=path), patch.object(runner.time, 'time_ns', return_value=123), \
-                             patch.object(runner, 'model_catalog', return_value={'openai': {'models': {'gpt-6.1-sol': {}}}}):
+                             patch.object(runner, 'model_catalog', return_value=({'openai': {'models': {'gpt-6.1-sol': {}}}}, catalog_source)):
                             self.assertEqual(runner.main(), 0)
                         environment = spawn.call_args.kwargs.get('env', dict(os.environ))
+                    self.assertEqual(stdout.getvalue().splitlines(), [str(out)])
+                    self.assertEqual(stderr.getvalue().splitlines(), [f'Model catalog: {catalog_source}'])
                     for key in ['TMPDIR', 'TMP', 'TEMP']:
                         self.assertEqual(environment[key], str(out / 'tmp'))
                     self.assertTrue((out / 'tmp').is_dir())
@@ -3622,6 +3676,8 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                     self.assertEqual(environment['MULTICA_DAEMON_PORT'], '12345')
                     self.assertEqual(environment.get('HOME'), os.environ.get('HOME'))
                     self.assertEqual(runner.read(out / 'request.json')['pair'], str(pair))
+                    self.assertEqual(runner.read(out / 'request.json')['model_catalog_source'], catalog_source)
+                    self.assertEqual(runner.read(out / 'results.json')['model_catalog_source'], catalog_source)
                     if exists: shutil.rmtree(launcher)
                     with patch.dict(os.environ, environment, clear=True):
                         instance = runner.Runner(out)

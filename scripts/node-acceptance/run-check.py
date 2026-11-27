@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 import fcntl
 import hashlib
+from http.client import HTTPException
 import io
 import json
 import math
@@ -96,35 +97,40 @@ def checked_model_catalog(catalog):
     return catalog
 
 
-def fresh_model_catalog():
+def host_model_catalog():
     host_cache = Path.home() / '.cache/loginom-run-check' / socket.gethostname()
     host_cache.mkdir(parents=True, exist_ok=True)
     path = host_cache / 'models.json'
     with (host_cache / 'models.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
+        cached = None
         try:
-            if time.time() - path.stat().st_mtime < MODELS_TTL:
-                return checked_model_catalog(read(path))
+            mtime = path.stat().st_mtime
+            cached = checked_model_catalog(read(path))
+            if time.time() - mtime < MODELS_TTL:
+                return cached, 'fresh', None
         except (OSError, ValueError):
             pass
         request = Request(MODELS_URL, headers={'User-Agent': 'loginom-run-check/1.0'})
-        with urlopen(request, timeout=15) as response:
-            catalog = checked_model_catalog(json.load(response))
-        write(path, catalog)
-        return catalog
+        try:
+            with urlopen(request, timeout=15) as response:
+                catalog = checked_model_catalog(json.load(response))
+            write(path, catalog)
+        except (HTTPException, OSError, ValueError) as error:
+            return cached or {}, 'stale cache' if cached else None, error
+        return catalog, 'fresh', None
 
 
 def model_catalog(head):
     provider, separator, model_id = MODEL.partition('/')
     if not (provider and separator and model_id):
         raise ValueError(f'RUN_CHECK_MODEL_INVALID: {MODEL!r}; expected provider/model')
-    refresh_error = None
     try:
-        catalog = fresh_model_catalog()
-    except (OSError, ValueError) as error:
-        catalog, refresh_error = {}, error
+        catalog, catalog_source, refresh_error = host_model_catalog()
+    except OSError as error:
+        catalog, catalog_source, refresh_error = {}, None, error
     if model_id in catalog.get(provider, {}).get('models', {}):
-        return catalog
+        return catalog, catalog_source
     snapshot_file = 'packages/product/models.json'
     source = subprocess.run(['git', 'show', f'{head}:{snapshot_file}'], cwd=REPO,
                             capture_output=True, text=True, check=False)
@@ -132,19 +138,23 @@ def model_catalog(head):
     fallback = snapshot.get(provider, {})
     if model_id in fallback.get('models', {}):
         if not catalog:
-            return snapshot
+            return snapshot, 'snapshot'
         # ModelsDev uses the profile catalog as a whole. Include the requested
         # snapshot entry there when it has disappeared from the live catalog.
         current = catalog.get(provider, fallback)
         return {**catalog, provider: {**current, 'models': {
             **current['models'], model_id: fallback['models'][model_id],
-        }}}
+        }}}, 'snapshot'
     if refresh_error is not None:
         # The default Sol is already configured in each profile for older SHAs.
-        if not os.environ.get('RUN_CHECK_MODEL') and MODEL == 'openai/gpt-6.1-sol' and snapshot:
-            return snapshot
+        if not os.environ.get('RUN_CHECK_MODEL') and MODEL == 'openai/gpt-6.1-sol':
+            if catalog:
+                return catalog, catalog_source
+            if snapshot:
+                return snapshot, 'snapshot'
+        checked_stale = 'a valid stale cache and ' if catalog else ''
         raise ValueError(f'MODEL_CATALOG_UNAVAILABLE: could not refresh {MODELS_URL} ({refresh_error}); '
-                         f'{MODEL!r} not found in {snapshot_file} at {head}') from refresh_error
+                         f'{MODEL!r} not found in {checked_stale}{snapshot_file} at {head}') from refresh_error
     raise ValueError(f'RUN_CHECK_MODEL_NOT_FOUND: {MODEL!r} is absent from {MODELS_URL} '
                      f'and {snapshot_file} at {head}')
 
@@ -4482,7 +4492,7 @@ def main():
     if not args.case_root and any(name in D87 for name in names) and (out == REPO or REPO in out.parents):
         raise ValueError('D87 result directory and generated data must be outside Git checkout')
     try:
-        catalog = None if args.prepare_only else model_catalog(head)
+        catalog, catalog_source = (None, None) if args.prepare_only else model_catalog(head)
     except ValueError as error:
         sys.exit(str(error))
     out.mkdir(parents=True)
@@ -4495,12 +4505,16 @@ def main():
     request = vars(args) | {'pair': str(pair), 'build': str(build) if build else None, 'out': str(out),
                             'cases': str(args.cases.expanduser().resolve()) if args.cases else None,
                             'case_root': str(args.case_root.expanduser().resolve()) if args.case_root else None}
+    report = {'head': head, 'tree': git('rev-parse', head + '^{tree}'), 'started': time.time(),
+              'phase': 'build', 'runs': [{'scenario': n, 'status': 'PENDING'} for n in names]}
     if catalog is not None:
         path = out / 'models.json'
         write(path, catalog)
-        request['model_catalog'] = str(path)
+        request.update(model_catalog=str(path), model_catalog_source=catalog_source)
+        report['model_catalog_source'] = catalog_source
+        print(f'Model catalog: {catalog_source}', file=sys.stderr)
     write(out / 'request.json', request)
-    write(out / 'results.json', {'head': head, 'tree': git('rev-parse', head + '^{tree}'), 'started': time.time(), 'phase': 'build', 'runs': [{'scenario': n, 'status': 'PENDING'} for n in names]})
+    write(out / 'results.json', report)
     with (out / 'worker.log').open('wb') as log:
         child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '_worker', str(out)], env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
     write(out / 'worker.json', {'pid': child.pid})
