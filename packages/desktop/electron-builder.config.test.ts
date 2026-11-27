@@ -116,7 +116,8 @@ test.each(channels)("the $channel packaging names nothing of OpenCode", ({ chann
 })
 
 // The per-user install directory and the updater cache come from the package name, not from the config's
-// own fields. They must stay those of the published 0.4 installers for in-place updates and cache cleanup.
+// own fields. They must stay those of the published 0.4 installers: the install moves out of the shared
+// directory, and the uninstaller finds the cache.
 test.each(channels)("the $channel installer keeps the 0.4 directory and updater cache names", async ({ channel }) => {
   const packager = new Packager({ projectDir: import.meta.dirname, config: load(channel) })
 
@@ -140,6 +141,7 @@ test("the installer verifies the installed app, and the uninstaller removes the 
   // The app checks its resources last, and a refusal stops the install before NSIS reports success.
   const install = macro("customInstall")
   const verify = install.indexOf(`ExecWait '"$INSTDIR\\\${APP_EXECUTABLE_FILENAME}" --verify-resources' $0`)
+  expect(verify).toBeGreaterThan(install.indexOf("!insertmacro leaveSharedInstall"))
   expect(install.slice(verify)).toEqual(
     expect.arrayContaining(["${If} ${Errors}", "${If} $0 != 0", "SetErrorLevel 1", "Abort"]),
   )

@@ -8,6 +8,9 @@ const windows = test.skipIf(process.platform !== "win32")
 // Matches the 16 hex characters the staged directory name takes from APP_64_HASH.
 const payloadHash = "0123456789ABCDEF0123456789ABCDEF"
 
+// The installer clears the uninstall entry of an install it moves; the tests point it at their own key.
+const uninstallKey = "Software\\OpenCodeInstallerTest"
+
 async function harness() {
   const { getMakeNsisPath, getNsisPluginsPath } = await import("app-builder-lib/out/toolsets/windows")
   const { nsisTemplatesDir } = await import("app-builder-lib/out/targets/nsis/nsisUtil")
@@ -55,6 +58,7 @@ LangString appCannotBeClosed \${LANG_ENGLISH} "cannot close"
 !define APP_ID "com.loginom.aiagent"
 !define APP_FILENAME "@loginom-ai-agentdesktop"
 !define UNINSTALL_FILENAME "Uninstall OpenCode.exe"
+!define UNINSTALL_REGISTRY_KEY "${uninstallKey}"
 !define SHORTCUT_NAME "OpenCode Installer Test"
 !define APP_64 "${path.join(dir, "app.7z")}"
 !define APP_64_HASH "${payloadHash}"
@@ -207,37 +211,62 @@ windows(
   120_000,
 )
 
+// Every channel used to install into one directory named after the package. Each channel now installs into
+// a directory named after its app ID and leaves the shared one without touching the other channels' files.
 const directoryCases = [
   {
     name: "a first install uses the app ID",
     from: "@loginom-ai-agentdesktop",
     shared: [],
     expected: "com.loginom.aiagent",
+    left: undefined,
+    uninstallKept: true,
   },
   {
-    name: "another channel in the 0.4 directory does not redirect a new install",
+    name: "a first install leaves a different channel in the 0.4 directory alone",
     from: "@loginom-ai-agentdesktop",
     shared: ["OpenCode Beta.exe", "Uninstall OpenCode Beta.exe", "resources/app.asar"],
     expected: "com.loginom.aiagent",
+    left: ["OpenCode Beta.exe", "Uninstall OpenCode Beta.exe", "resources/app.asar"],
+    uninstallKept: true,
   },
   {
-    name: "an existing 0.4 install stays in place",
+    name: "leaving the shared directory keeps the other channels",
+    from: "@loginom-ai-agentdesktop",
+    shared: [
+      "OpenCode.exe",
+      "Uninstall OpenCode.exe",
+      "OpenCode Beta.exe",
+      "Uninstall OpenCode Beta.exe",
+      "resources/app.asar",
+    ],
+    expected: "com.loginom.aiagent",
+    left: ["OpenCode Beta.exe", "Uninstall OpenCode Beta.exe", "resources/app.asar"],
+    uninstallKept: false,
+  },
+  {
+    name: "the last channel removes the shared directory",
     from: "@loginom-ai-agentdesktop",
     shared: ["OpenCode.exe", "Uninstall OpenCode.exe", "resources/app.asar"],
-    expected: "@loginom-ai-agentdesktop",
+    expected: "com.loginom.aiagent",
+    left: undefined,
+    uninstallKept: false,
   },
   {
     name: "an install elsewhere stays where it is",
     from: "custom",
     shared: ["OpenCode.exe", "Uninstall OpenCode.exe"],
     expected: "custom",
+    left: ["OpenCode.exe", "Uninstall OpenCode.exe"],
+    uninstallKept: true,
   },
 ]
 
 windows(
-  "keeps existing 0.4 install locations and uses the app ID for new installs",
+  "installs each channel into a directory named after its app ID",
   async () => {
     const installer = await harness()
+    const registry = (args: string[]) => installer.run(["reg.exe", ...args, "/f"])
 
     try {
       const exe = await installer.compile(
@@ -245,7 +274,8 @@ windows(
         `  !insertmacro customInit
   FileOpen $0 "$EXEDIR\\instdir.txt" w
   FileWrite $0 $INSTDIR
-  FileClose $0`,
+  FileClose $0
+  !insertmacro leaveSharedInstall`,
       )
 
       for (const item of directoryCases) {
@@ -253,6 +283,7 @@ windows(
         const from = path.join(root, item.from)
         await mkdir(root, { recursive: true })
         await Promise.all(item.shared.map((file) => Bun.write(path.join(from, file), "old")))
+        await registry(["add", `HKCU\\${uninstallKey}`, "/v", "UninstallString", "/d", "uninstall"])
 
         expect((await installer.run([exe, `/D=${from}`])).code, item.name).toBe(0)
         expect(await Bun.file(path.join(installer.dir, "instdir.txt")).text(), item.name).toBe(
@@ -262,9 +293,12 @@ windows(
           ?.filter((entry) => entry.isFile())
           .map((entry) => path.relative(from, path.join(entry.parentPath, entry.name)).replaceAll("\\", "/"))
           .toSorted()
-        expect(left, item.name).toEqual(item.shared.length ? item.shared.toSorted() : undefined)
+        expect(left, item.name).toEqual(item.left)
+        const query = await installer.run(["reg.exe", "query", `HKCU\\${uninstallKey}`, "/v", "UninstallString"])
+        expect(query.code === 0, item.name).toBe(item.uninstallKept)
       }
     } finally {
+      await installer.run(["reg.exe", "delete", `HKCU\\${uninstallKey}`, "/f"])
       await installer.cleanup()
     }
   },
