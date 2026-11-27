@@ -27,7 +27,7 @@ import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
-import {readColdNativeOutput,coldNativeEligible,performColdNodeAction,runColdExecution as runOwnedColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation,readColdPortWindows} from './cold-reader-policy.mjs'
+import {readColdNativeOutput,coldNativeEligible,performColdNodeAction,runColdExecution as runOwnedColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation,readColdPortWindows,MAX_COLD_WINDOW_ROWS} from './cold-reader-policy.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -48,6 +48,7 @@ const args = parseArgs({
     'csv-encoding': { type: "string", default: 'UTF-8' },
     'text-export-case': { type: 'string' },
     'exact-port-windows': { type: 'boolean', default: false },
+    'case-port-read-only': { type: 'boolean', default: false },
     'sampling-baseline': { type: 'string' },
   },
   strict: true,
@@ -104,7 +105,12 @@ const sampling=expected.sampling_modes===undefined?null:parseSamplingExpected(ex
 if(sampling&&!args['sampling-baseline'])throw Error('SAMPLING_BASELINE_REQUIRED')
 if(!sampling&&args['sampling-baseline'])throw Error('SAMPLING_BASELINE_UNEXPECTED')
 const samplingBaseline=sampling?JSON.parse(await readFile(args['sampling-baseline'],'utf8')):null
-const {multiple,outputs:expectedOutputs}=sampling??parseExpectedOutputs(expected)
+const {multiple,outputs:expectedOutputs}=sampling??parseExpectedOutputs(expected,{
+ ...(args['exact-port-windows']?{maxRows:MAX_COLD_WINDOW_ROWS}:{}),
+})
+const nodeIds=expected.case_port_node_ids;
+if(nodeIds!==undefined&&(!Array.isArray(nodeIds)||nodeIds.length!==expectedOutputs.length
+ ||!nodeIds.every(id=>typeof id==='string'&&id.length>0)))throw Error('CASE_PORT_NODE_IDS_INVALID');
 if(!['names','labels'].includes(args['csv-header']))throw Error('COLD_EXPORT_CSV_HEADER_MODE_INVALID')
 // --csv is the actual runtime-downloaded export, already checked in full by
 // the scenario's file oracle. It supplies order only, never cold cell values.
@@ -192,7 +198,8 @@ page = context.pages()[0]
     state.openFailure={status:prepared.status,reason:'PACKAGE_PATH_MISMATCH'}
     throw Error("COLD_PACKAGE_PATH_MISMATCH")
   }
-  if(prepared.workflow_ref.navigation_path.some(item=>item.label.endsWith("(только чтение)"))) {
+  const readOnly=prepared.workflow_ref.navigation_path.some(item=>item.label.endsWith("(только чтение)"));
+  if(readOnly&&!args['case-port-read-only']) {
     state.openFailure={status:prepared.status,reason:'PACKAGE_READ_ONLY'}
     throw Error("COLD_PACKAGE_NOT_WRITABLE")
   }
@@ -330,7 +337,7 @@ page = context.pages()[0]
 
   const reads=expectedOutputs.length===0&&(Array.isArray(expected.tree_outputs)&&expected.tree_outputs.length>0
    ||state.variableInventory?.outputs.length===variableInventory?.outputs.length&&state.variableInventory.outputs.length>0)
-   ?[]:selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node});
+   ?[]:selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node,nodeIds:expected.case_port_node_ids});
   if(expected.tree_outputs){
    for(const contract of expected.tree_outputs){
     const matches=graph.nodes.filter(n=>n.type===contract.output_node_type&&(contract.output_node_label===undefined||n.label===contract.output_node_label));
@@ -524,7 +531,7 @@ page = context.pages()[0]
   }
   // Variant cells have no exact table-visualizer proof; read them through the completed port.
   const variantPortRead=['transform.replace_columns','transform.group_data','transform.sorting'].includes(target.type)&&expectedOutputs.some(o=>o.columns?.some(c=>c.type==='variant'));
-  if(variantPortRead||['trees.to_table','trees.to_json','research.quality','variables.to_table','transform.collapse_columns','imports.lgd'].includes(target.type)){
+  if(!args['exact-port-windows']&&(variantPortRead||['trees.to_table','trees.to_json','research.quality','variables.to_table','transform.collapse_columns','imports.lgd'].includes(target.type))){
    // The approved tree cold path executes the saved conversion and reads every
    // resulting table cell through the existing completed-port reader.
    const read=await channel.readOutputPort({port:outputPort,execution,sampleRows:100,requireExactNumbers:true,
@@ -533,7 +540,12 @@ page = context.pages()[0]
    data=read.output;
   }
   if(args['exact-port-windows']){
-   data=await readColdPortWindows(channel,{node,execution,port:outputPort,rowCount:Math.max(...expectedOutputs.map(o=>o.rows.length))});
+   const matching=expectedOutputs.filter(o=>o.output_node_type===target.type
+    &&(o.output_node_label===undefined||o.output_node_label===target.label)&&(o.output_port??0)===outputPort
+    ||o.output_node_type==='export_input'&&exportInput?.node.ref.node_id===node.node_id&&exportInput.output_port===outputPort);
+   const rowCounts=new Set((matching.length?matching:expectedOutputs).map(o=>o.rows.length));
+   if(rowCounts.size!==1)throw Error('COLD_PORT_WINDOW_ROW_COUNT_AMBIGUOUS');
+   data=await readColdPortWindows(channel,{node,execution,port:outputPort,rowCount:[...rowCounts][0]});
   }else if(useNative){
    // Preview enforces the actual 50x8 bound; wide baseline reports retain their
    // existing formatted scalar reader. No native fallback after a failed read.
@@ -623,7 +635,7 @@ page = context.pages()[0]
    checkGmeansRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
   }
   if(expected.clustering_normalized)checkClusteringRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
-  const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv,factorSigns:expected.factor_signs});
+  const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv,factorSigns:expected.factor_signs,nodeIds:expected.case_port_node_ids});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
 
   if(variableInventory?.outputs.length===0){
@@ -648,8 +660,9 @@ page = context.pages()[0]
       loginomUrl: config.loginom_url,
       loginomBuild: "7.4.2",
       tabTid: prepared.workflow_ref.tab_tid,
-      diagnosticDiscard: true,
-      diagnosticWaitForIdle: true,
+      diagnosticReadOnly: readOnly,
+      diagnosticDiscard: !readOnly,
+      diagnosticWaitForIdle: !readOnly,
     }),
   )
   await writeFile(join(args.output, "cleanup.json"), JSON.stringify(cleanup, null, 2) + "\n")
@@ -668,6 +681,7 @@ page = context.pages()[0]
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
+    ...(rawExpected.graph?.exact ? {case_graph:graph} : {}),
     ...(graph.loop_for?{loop_for:graph.loop_for}:{}),
     ...(graph.supernode_variable_boundary?{supernode_variable_boundary:graph.supernode_variable_boundary}:{}),
     ...(state.assnrulesExclusion?{assnrules_exclusion:state.assnrulesExclusion}:{}),

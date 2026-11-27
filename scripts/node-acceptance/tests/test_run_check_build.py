@@ -72,6 +72,7 @@ class BuildPreparationTests(unittest.TestCase):
         (self.repo / 'packages/loginom-host').mkdir()
         (self.repo / 'packages/cli/bin/lildax.cjs').write_text('original\n')
         (self.repo / 'other.txt').write_text('other\n')
+        runner.write(self.repo / 'package.json', {'packageManager': 'bun@1.4.4'})
         runner.git('add', '.', cwd=self.repo)
         runner.git('commit', '-qm', 'fixture', cwd=self.repo)
         self.head = runner.git('rev-parse', 'HEAD', cwd=self.repo)

@@ -497,8 +497,9 @@ intermediate cached Helper, reorder); only the task and `fixtures/modes.csv` rea
 keep the machine available and collect it with `wait` before handing off the
 task. `wait` returns 0 for all PASS, 1 for a finished failed/unknown/incomplete batch, or 2
 for its own timeout. A timeout does not cancel the worker; repeat `wait`.
-The result directory is private (0700); `summary.md` and atomic `results.json`
-contain the report. Configs, profiles and raw logs stay private there.
+The result directory is private (0700) and must be outside any Git checkout.
+`summary.md` and atomic `results.json` contain the report. Configs, retained
+profiles and raw logs stay private there.
 Results default to `~/.cache/loginom-runs/<timestamp>/`. The worker and its
 children use the result directory's `tmp/` for `TMPDIR`, `TMP` and `TEMP`;
 task-owned `CODEX_*` settings are not inherited. On Linux, keep an explicit
@@ -508,13 +509,45 @@ The pair must contain `worker.json` and `reviewer.json` with the established
 `loginom` and either `package_directory` or `personal_folder` fields (when both
 exist, `package_directory` wins). Unknown formats fail before detach and name
 the file, required fields and supplied keys; credential values are never printed.
-Runs use the worker account. The model is `deepseek/deepseek-flash` (constant
-`MODEL` in `run-check.py`, no variant); the key is read from `DEEPSEEK_API_KEY`
-in the environment, shared OAuth is not used. `make-pair.py` builds the pair in a
+Runs use the worker account. The default is `deepseek/deepseek-flash` without a
+variant, using `DEEPSEEK_API_KEY`. Set `RUN_CHECK_MODEL` to select another model
+and `RUN_CHECK_VARIANT` for the model variant in `run` or `--live-chain`. A variant on a two-turn TUI case or an unreadable `RUN_CHECK_AUTH` file
+is rejected before detach. `RUN_CHECK_AUTH` points to a legacy `auth.json`.
+The path is private to the runner and is not passed in the phase environment.
+The runner copies the file with mode `0600` into the fresh CLI profile for
+import. For an ordinary case the runner unlinks it after the final model phase;
+a live chain keeps its profile until the CLI shuts down. On success,
+failure, or worker SIGTERM, cleanup removes any remaining copy and the entire
+OAuth profile, including its database, sidecars, and `execution-events.jsonl`.
+If the worker is forcibly killed before cleanup (for example with SIGKILL),
+remove that run's OAuth profile manually before sharing any evidence.
+Without `RUN_CHECK_AUTH`, no copy is made and the profile is retained.
+
+The source file is never updated. If the provider rotates the refresh token,
+the next copy (even in a sequential batch) can be stale, and reusing it can
+revoke the OAuth session. The runner warns on OAuth starts: do not run scenarios
+in parallel with the same file. If a run rotates the token, obtain fresh OAuth
+credentials before reusing the account for another scenario.
+`make-pair.py` builds the pair in a
 0700 temporary directory from `LOGINOM_{WORKER,REVIEWER}_{USER,PASS}` (see its
 docstring); remove it with `make-pair.py --remove DIR` after `wait`. Requires git, Python 3.9+, the pinned Bun/Node/browser bootstrap cache,
 and network access for the locked dependencies. Build inputs can be overridden
 with `LOGINOM_AI_AGENT_NODE_SOURCE` / `LOGINOM_AI_AGENT_BROWSER_SOURCE`.
+
+Use the repository's pinned Bun on `PATH`. On Linux x64 the runner builds a
+baseline CLI. It reuses the executable
+`bun-linux-x64-baseline-v<version>` in `BUN_INSTALL_CACHE_DIR` (default
+`~/.bun/install/cache`), when present. For a manual build with an isolated home,
+put the cached executable in the new Bun cache, then use that executable to
+invoke the baseline build. `build-cli.ts` checks its version and revision.
+
+```sh
+export BUN_INSTALL_CACHE_DIR="$BUILD_TMP/bun-cache"
+mkdir -p "$BUN_INSTALL_CACHE_DIR"
+baseline="$BUN_INSTALL_CACHE_DIR/bun-linux-x64-baseline-v1.4.4"
+cp "$HOST_BUN_CACHE/bun-linux-x64-baseline-v1.4.4" "$baseline"
+LOGINOM_CLI_BASELINE_CHILD=1 "$baseline" packages/loginom-host/script/build-cli.ts "$ARTIFACT" --baseline --no-archive
+```
 
 Defaults: 1800 seconds per model phase, load1 and load5 ≤ 8, ≥60 seconds
 between phase starts, 85 minutes total per batch including builds. `--spacing`,
@@ -651,13 +684,27 @@ export replacement list. Only `task.md` and files in `data/` reach the model;
 oracles remain private. All existing CSV, Save, cold and cleanup checks apply.
 
 A private case may add `case.json` with `base` (another case in the same
-`--cases` directory, run first in the same chat, then this case continues it),
-`input_files` (attachments of this turn) and `budget` (read only by
-`bughunt-audit.py`). The first turn of a private case attaches every file in
-`data/`, any format; a continuation attaches only its `input_files`.
+`--cases` directory), `input_files` (attachments of this turn) and `budget`
+(read by `bughunt-audit.py`). Pass the last case to `--scenarios`. The runner
+follows `base` to the root, then runs up to eight turns using the same chat,
+profile, workspace and package. The root attaches files in `data/` by default.
+A continuation attaches its listed `input_files`. Results include each turn.
 
-The model under test is the constant `MODEL` of `run-check.py` (`deepseek/deepseek-flash`, no variant); it is
-recorded per run in `results.json`.
+On Linux, add `--live-chain` to drive the built CLI TUI through a private
+terminal. Ordinary turns share the CLI process and its private server. The
+profile config selects the model and variant. The runner reads the v2 session
+database for the submitted prompt, attachments, selected model and terminal
+turn state, and verifies Save and the case's graph and outputs per turn.
+
+A case with a following turn may specify a `manual_edit` such as
+`{"kind":"rename","node":{"type":"imports.text","label":"Заказы"},"label":"Заказы (проверено)"}`.
+At that boundary, the runner verifies package close, logout and runtime ACK,
+applies the edit in a separate browser, reopens the package to confirm it, and
+resumes the same chat in a new CLI process. For `"output_mode":"ports"`, the
+runner checks native port receipts against the expected graph and values.
+A partial receipt requires a full verified read from the same saved node.
+
+The model and any explicit variant are recorded per run in `results.json`.
 
 Each output may declare `header: false` in private `expected.json` for a CSV
 without a header (including a single JSON cell). Columns then declare CSV
@@ -841,8 +888,8 @@ names `Root_items_code`, `Root_items_qty` and labels `Root.Позиции.Код
    contract registration set `NODE_SCENARIOS=<name>` when executing its rows.
    `required-checks.py verify` results: `exit 0`, `FAIL`, `NOT_RUN`, `CI`, `COVERED`, `APPROVED` (formats and summary in `required-checks.md`).
 
-Offline tests: from `scripts/node-acceptance/tests`, run
-`python3 -m unittest test_run_check test_run_check_build test_catalog_delta -v`.
+Run the offline Python tests with `python3 -m unittest discover` from
+`scripts/node-acceptance`.
 
 CSV specification audit (the original 87 fixture names, including variants; D87 uses its generated manifest):
 

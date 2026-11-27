@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Quiet, detached live acceptance runner. Python 3 standard library only."""
 import argparse
+from contextlib import contextmanager
 import csv
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 import fcntl
 import hashlib
@@ -28,13 +29,13 @@ SCENARIOS = {
     '5-REST': dict(model_timeout=2700),
 }
 D76_STATUS = 'PASS с ограничением платформы D76'
+MAX_CASE_TURNS = 8
 # Owner decisions 16.11 logreg-{partition,kfold}-csv-by-name: native warm/reopen order differs.
 CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential', 'logreg-partition-column', 'logreg-validation-kfold')
 # LAB-1869: native Enrich autosync reorders RowID/Key on cold Execute.
 COLD_COLUMNS_BY_NAME_SCENARIOS = ('enrich-data-left',)
 D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week', 'tree-to-table-typed')
-# Acceptance model (B-106). No variant: models.json gives deepseek-flash none. Key comes from DEEPSEEK_API_KEY in the environment.
-MODEL = 'deepseek/deepseek-flash'  # the only place that names the model; `--variant` is never passed
+MODEL = 'deepseek/deepseek-flash'
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
@@ -73,7 +74,19 @@ def write(path, value):
 
 
 def daemon_pid():
-    return json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))['pid']
+    return json.loads(subprocess.check_output([os.environ.get('MULTICA_CLI_PATH', 'multica'), 'daemon', 'status', '--output', 'json']))['pid']
+
+
+def stop_phase(child):
+    assert child.pid != daemon_pid(), 'Cannot terminate daemon'
+    child.send_signal(signal.SIGINT)
+    try: child.wait(timeout=100)
+    except subprocess.TimeoutExpired:
+        os.killpg(child.pid, signal.SIGINT)
+        try: child.wait(timeout=40)
+        except subprocess.TimeoutExpired:
+            os.killpg(child.pid, signal.SIGKILL)
+            child.wait()
 
 
 def git(*args, cwd=REPO):
@@ -307,20 +320,36 @@ def scenario(name, case_root=None, *, cases=None):
     if cases and (name in SCENARIOS or re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', name)):
         src = Path(cases).resolve() / name
         if (src / 'task.md').is_file():
-            assert src.resolve().parent == Path(cases).resolve(), 'Case must stay in its assigned directory'
+            if src.resolve().parent != Path(cases).resolve():
+                raise ValueError('Case must stay in its assigned directory')
+            declaration = src / 'intervention.json'
+            if declaration.is_file():
+                raise ValueError(f'{declaration}: case requires an external intervention')
+
             # Optional case.json: `base` continues a sibling case in the same chat;
             # `input_files` limits attachments; `budget` is read only by bughunt-audit.py.
             extra = read(src / 'case.json') if (src / 'case.json').is_file() else {}
-            if set(extra) - {'base', 'input_files', 'budget', 'notes'}:
-                raise ValueError(f'{name}/case.json: allowed keys are base, input_files, budget, notes')
+            if not isinstance(extra, dict) or set(extra) - {'base', 'input_files', 'budget', 'notes', 'manual_edit', 'output_mode', 'cold_port_windows'}:
+                raise ValueError(f'{name}/case.json: allowed keys are base, input_files, budget, notes, cold_port_windows, manual_edit, output_mode')
+            if 'manual_edit' in extra:
+                validate_manual_edit(extra['manual_edit'], name)
+            if 'output_mode' in extra and extra['output_mode'] != 'ports':
+                raise ValueError(f'{name}/case.json: output_mode must be ports')
+            cold_port_windows = extra.get('cold_port_windows', False)
+            if type(cold_port_windows) is not bool:
+                raise ValueError(f'{name}/case.json: cold_port_windows must be a boolean')
             base = extra.get('base')
-            if base is not None and (base == name or not re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', base) or not (Path(cases).resolve() / base / 'task.md').is_file()):
+            if base == name:
+                raise ValueError(f'Case base cycle: {name} → {name}')
+            if base is not None and (not isinstance(base, str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', base) or not (Path(cases).resolve() / base / 'task.md').is_file()):
                 raise ValueError(f'{name}/case.json: base must name another case in the same directory')
             files = extra.get('input_files')
             if files is not None and not (isinstance(files, list) and all(isinstance(f, str) and '/' not in f and (src / 'data' / f).is_file() for f in files)):
                 raise ValueError(f'{name}/case.json: input_files must list files in data/')
             return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=base, external=True,
-                        attach_all=True, **({'input_files': files} if files is not None else {}))
+                        attach_all=True, manual_edit=extra.get('manual_edit'), output_mode=extra.get('output_mode'),
+                        cold_port_windows=cold_port_windows,
+                        **({'input_files': files} if files is not None else {}))
     if case_root is not None:
         if name not in SCENARIOS and not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,31}', name):
             raise ValueError('Invalid external case name')
@@ -1456,6 +1485,26 @@ def rest_query_expected(case, package, initial=False):
     return expected
 
 
+def scenario_steps(name, case_root=None, *, cases=None):
+    """Resolve private cases root-first, retaining the built-in Path-based pairs."""
+    def resolve(step, spec, trail):
+        if step in trail:
+            raise ValueError('Case base cycle: ' + ' → '.join((*trail, step)))
+        if len(trail) >= MAX_CASE_TURNS:
+            raise ValueError(f'Case chain exceeds {MAX_CASE_TURNS} turns: {name}')
+        base = spec.get('base')
+        if base is None:
+            return [(step, spec)]
+        if isinstance(base, Path):
+            return [(base, dict(source=base, prompt=base / 'task.md', data=base / 'data')), (step, spec)]
+        return [*resolve(base, scenario(base, case_root, cases=cases), (*trail, step)), (step, spec)]
+
+    steps = resolve(name, scenario(name, case_root, cases=cases), ())
+    if steps[-1][1].get('manual_edit'):
+        raise ValueError(f'{name}/case.json: manual_edit requires a following turn')
+    return steps
+
+
 def expected_for(case, package, cold=False):
     src = case['source']
     if case.get('rest_query_initial'):
@@ -1545,9 +1594,17 @@ def expected_for(case, package, cold=False):
         expected = read(src / ('expected-demo.json' if (src / 'expected-demo.json').exists() else 'expected.json'))
     else:
         expected = json.loads(subprocess.check_output([sys.executable, '-B', str(src / 'oracle.py'), package]))
+    if case.get('attach_all') and 'graph' in expected:
+        validate_graph_contract(expected['graph'])
+        expected.setdefault('nodes', [])
+        if 'columns' not in expected:
+            expected.setdefault('outputs', [])
+    if case.get('output_mode') == 'ports' and 'graph' not in expected:
+        raise ValueError('CASE_PORT_GRAPH_REQUIRED')
     if 'outputs' not in expected:
         expected = dict(package_path=expected['package_path'], nodes=expected['nodes'],
-                        outputs=[{k: v for k, v in expected.items() if k not in ['package_path', 'nodes']}])
+                        outputs=[{k: v for k, v in expected.items() if k not in ['package_path', 'nodes', 'graph']}],
+                        **({'graph': expected['graph']} if 'graph' in expected else {}))
     if case.get('colunion_output_indices') is not None:
         expected['outputs'] = [expected['outputs'][i] for i in case['colunion_output_indices']]
     if case.get('logreg_kfold'):
@@ -1626,6 +1683,7 @@ def arguments(argv=None):
     start.add_argument('--prepare-only', action='store_true', help='Prepare/verify the build without starting Loginom or the model')
     start.add_argument('--cases', type=Path, help='Private external task/expected/oracle/data case directory')
     start.add_argument('--cold', action='store_true')
+    start.add_argument('--live-chain', action='store_true', help='Keep a CLI and browser open across --cases turns')
     start.add_argument('--viewport', choices=['1024x633', '1366x633', '1280x665', '1280x800', '1920x945'], default='1280x800')
     start.add_argument('--case-root', type=Path, help='Private external task.md/expected.json/case.json fixtures; oracle is never sent')
     start.add_argument('--host-load-max', type=float, default=8)
@@ -1656,6 +1714,8 @@ def summary(report):
         load = r.get('start_load', [])
         outcome = ('подготовка' if r.get('status') == 'NOT_RUN' and r.get('reason') == 'PREPARE_ONLY' else
                    'не запущен (бюджет пакета)' if r.get('status') == 'NOT_RUN' else r.get('status', 'RUNNING'))
+        if r.get('failure_category'):
+            outcome += f" ({r['failure_category']})"
         rows.append('| ' + ' | '.join([r['scenario'], outcome,
                     *[r.get(k, '—') for k in ['csv', 'save', 'cold', 'cleanup', 'port-read', 'read-path']],
                     '/'.join(f'{v:.2f}' for v in load[:2]) or '—']) + ' |')
@@ -1669,6 +1729,16 @@ def summary(report):
             rows.append(f"\nFAIL {r['scenario']}: {r.get('failure_class')}; {r.get('detail')}; "
                         f"журнал: {r.get('location')}; load при отказе: {r.get('failure_load')}; "
                         f"профиль: {r.get('profile')}")
+    failed_edits = [(r['scenario'], turn['case'], edit)
+                    for r in report['runs'] for turn in r.get('turns', [])
+                    if (edit := turn.get('manual_edit')) and edit.get('failure_category')]
+    if failed_edits:
+        rows += ['\n### Сбои ручных правок', '', '| Сценарий | После хода | Правка | Итог | Класс | Код | Журнал |',
+                 '|---|---|---|---|---|---|---|']
+        for scenario, case, edit in failed_edits:
+            values = [scenario, case, *[edit[key] for key in ('kind', 'status', 'failure_category', 'failure_class')],
+                      edit.get('journal', edit['location'])]
+            rows.append('| ' + ' | '.join(values) + ' |')
     timings = report.get('phase_timings', [])
     if timings:
         rows += ['\n| сценарий | фаза | queue, с | выполнение, с |', '|---|---|---|---|']
@@ -1966,6 +2036,193 @@ def records(path):
         except ValueError: continue
 
 
+def validate_manual_edit(edit, case):
+    fields = {
+        'create': {'type'}, 'rename': {'node', 'label'}, 'move': {'node', 'position'},
+        'remove_link': {'source', 'target', 'output', 'input'},
+        'connect': {'source', 'target', 'output', 'input'},
+        'filter_threshold': {'node', 'field', 'value'}, 'delete_node': {'node'},
+    }
+
+    def need(condition, message):
+        if not condition:
+            raise ValueError(f'{case}/case.json: manual_edit {message}')
+
+    def text(value):
+        return isinstance(value, str) and 0 < len(value) <= 200 and value == value.strip() and value.isprintable()
+
+    def selector(value):
+        return (isinstance(value, dict) and bool(value) and not set(value) - {'label', 'type'}
+                and all(text(item) for item in value.values()))
+
+    need(isinstance(edit, dict) and isinstance(edit.get('kind'), str) and edit['kind'] in fields, 'has an invalid kind')
+    kind = edit['kind']
+    required = fields[kind] | {'kind'}
+    optional = {'position'} if kind == 'create' else set()
+    need(required <= edit.keys() <= required | optional, f'has invalid fields for {kind}')
+    for key in edit.keys() & {'type', 'label', 'field'}:
+        need(text(edit[key]), f'{key} must be nonempty printable text')
+    for key in edit.keys() & {'node', 'source', 'target'}:
+        need(selector(edit[key]), f'{key} must have an exact label, a type, or both')
+    for key in edit.keys() & {'input', 'output'}:
+        need(type(edit[key]) is int and 0 <= edit[key] <= 99, f'{key} must be a zero-based port')
+    if 'position' in edit:
+        position = edit['position']
+        need(isinstance(position, dict) and position.keys() == {'x', 'y'}
+             and all(type(a) is int and 64 <= a <= 10000 for a in position.values()),
+             'position must have integer x and y between 64 and 10000')
+    if 'value' in edit:
+        value = edit['value']
+        need(type(value) in (int, float) and abs(value) <= (2**53 - 1) and math.isfinite(value),
+             'value must be a finite numeric threshold')
+
+
+def validate_graph_contract(graph):
+    def nonempty(value):
+        return isinstance(value, str) and bool(value.strip())
+
+    if (not isinstance(graph, dict) or set(graph) - {'nodes', 'links', 'exact', 'retain'}
+            or not isinstance(graph.get('nodes'), list) or not graph['nodes']
+            or not isinstance(graph.get('links', []), list)
+            or type(graph.get('exact', False)) is not bool):
+        raise ValueError('CASE_GRAPH_INVALID: expected nodes and optional links')
+    ids = set()
+    for node in graph['nodes']:
+        if (not isinstance(node, dict) or set(node) - {'id', 'type', 'label', 'label_contains'}
+                or not all(nonempty(node.get(k)) for k in ('id', 'type')) or node['id'] in ids
+                or ('label' in node and 'label_contains' in node)
+                or any(not nonempty(node[k]) for k in ('label', 'label_contains') if k in node)):
+            raise ValueError(f'CASE_GRAPH_INVALID_NODE: {node!r}')
+        ids.add(node['id'])
+    retain = graph.get('retain', [])
+    if not isinstance(retain, list) or any(not nonempty(item) or item not in ids for item in retain) or len(set(retain)) != len(retain):
+        raise ValueError('CASE_GRAPH_INVALID_RETAIN')
+    links_seen = set()
+    for link in graph.get('links', []):
+        if (not isinstance(link, dict) or set(link) - {'source', 'target', 'output', 'input'}
+                or not all(nonempty(link.get(k)) and link[k] in ids for k in ('source', 'target'))
+                or any(type(link[k]) is not int or link[k] < 0 for k in ('output', 'input') if k in link)
+                or graph.get('exact') and not {'output', 'input'} <= link.keys()):
+            raise ValueError(f'CASE_GRAPH_INVALID_LINK: {link!r}')
+        key = (link['source'], link.get('output'), link['target'], link.get('input'))
+        if graph.get('exact') and key in links_seen:
+            raise ValueError(f'CASE_GRAPH_INVALID_LINK: duplicate {link!r}')
+        links_seen.add(key)
+
+
+def native_case_graph(graph, location):
+    return dict(location=location,
+                nodes={n['ref']['node_id']: dict(type=n['type'], label=n.get('label') or '', **({'position': n['position']} if 'position' in n else {}))
+                       for n in graph['nodes']},
+                links=[*graph['links'], *graph.get('variable_links', []), *graph.get('foreign_links', [])])
+
+
+def observed_case_graph(profile, since):
+    """Read the latest complete graph already observed during this turn."""
+    observations = []
+    for path in sorted(profile.rglob('execution-events.jsonl')):
+        for line, event in records(path):
+            observed_at = event.get('recorded_at', '')
+            if event.get('phase') == 'node_target_checkpoint':
+                state = event['target_state']
+                graph = state.get('final_graph') or state.get('last_graph') or {}
+                if graph.get('complete') is True:
+                    observations.append((observed_at, path, line, True, graph))
+            elif observed_at >= since and event.get('phase') in {'observation_completed', 'node_observation_completed'}:
+                outcome = event.get('outcome', {})
+                graph = outcome.get('output', {})
+                if (outcome.get('status') == 'SUCCEEDED' and graph.get('scan', {}).get('complete') is True
+                        and graph.get('graph_identity', {}).get('status') == 'observed'
+                        and not graph.get('observation_filter') and isinstance(graph.get('nodes'), list)
+                        and len(graph['nodes']) < 200 and isinstance(graph.get('links'), list)):
+                    observations.append((observed_at, path, line, False, graph))
+    known_nodes = {}
+    evidence = None
+    for observed_at, path, line, native, graph in sorted(observations):
+        if native:
+            projected = native_case_graph(graph, f'{path.relative_to(profile)}:{line}')
+            nodes, links = projected['nodes'], projected['links']
+            known_nodes.update(nodes)
+        else:
+            captions = {n['node_label']: n['label_text'] for element in graph.get('ui', {}).get('elements', [])
+                        if (n := element.get('graph_node') or {}).get('part') == 'label' and n.get('label_text')}
+            labels = {}
+            nodes = {}
+            variable_ports = {}
+            for node in graph['nodes']:
+                if node_id := node.get('node_id'):
+                    key = node['node_ref']['node_label']
+                    labels[key] = node_id
+                    known = known_nodes.get(node_id, {})
+                    native_label = known.get('label', '')
+                    caption = captions.get(key)
+                    # SVG text can omit a space at a line break. Preserve the
+                    # native caption when the control key and visible text agree.
+                    if (native_label and re.sub(r'\s', '_', native_label) == key
+                            and (not caption or re.sub(r'\s', '', caption) == re.sub(r'\s', '', native_label))):
+                        caption = native_label
+                    nodes[node_id] = dict(type=node.get('type') or known.get('type'), label=caption or key)
+                    for direction in ('input', 'output'):
+                        for port in node.get('variable_' + direction + 's', []):
+                            variable_ports[node_id, direction, port['native_index']] = port['port']
+            links = []
+            prefix = graph['graph_identity']['native_prefix']
+            for raw in graph['links']:
+                match = re.fullmatch(r'([^|]+)\|Output_([^|]+?)-(\d+)\|([^|]+)\|Input_([^|]+?)-(\d+)',
+                                     raw.removeprefix(prefix))
+                if match and (source := labels.get(match[1])) and (target := labels.get(match[4])):
+                    output, input_port = int(match[3]), int(match[6])
+                    if match[2] == 'Var':
+                        output = variable_ports.get((source, 'output', output))
+                    if match[5] == 'Var':
+                        input_port = variable_ports.get((target, 'input', input_port))
+                    links.append(dict(source=source, output=output, target=target, input=input_port))
+                else:
+                    links.append(raw)
+        if observed_at >= since:
+            evidence = dict(location=f'{path.relative_to(profile)}:{line}', nodes=nodes, links=links)
+    if evidence is None:
+        raise AssertionError('CASE_GRAPH_EVIDENCE_MISSING: no complete graph observation during this turn')
+    return evidence
+
+
+def check_case_graph(expected, observed, baseline=None, *, defer_position=False):
+    def match(want, have):
+        return (have['type'] == want['type']
+                and ('label' not in want or want['label'] == have['label'])
+                and ('label_contains' not in want or want['label_contains'] in have['label']))
+
+    bindings = {}
+    location = observed['location']
+    for want in expected['nodes']:
+        candidates = [node_id for node_id, node in observed['nodes'].items() if match(want, node)]
+        assert candidates, f'CASE_GRAPH_NODE_MISSING: {want!r} at {location}'
+        assert len(candidates) == 1 and candidates[0] not in bindings.values(), f'CASE_GRAPH_NODE_AMBIGUOUS: {want!r} at {location}'
+        node_id = candidates[0]
+        bindings[want['id']] = node_id
+        if want['id'] in expected.get('retain', []):
+            assert baseline is not None, 'CASE_GRAPH_BASELINE_MISSING'
+            prior = [key for key, node in baseline['nodes'].items() if match(want, node)]
+            assert prior == [node_id], f'CASE_GRAPH_NODE_REPLACED: {want!r} at {location}'
+            old, new = baseline['nodes'][node_id], observed['nodes'][node_id]
+            moved = baseline.get('moved_node_id') == node_id
+            if 'position' in new and 'position' in old or moved and not defer_position:
+                assert old.get('position') == new.get('position'), f'CASE_GRAPH_POSITION_CHANGED: {want!r} at {location}'
+    for link in expected.get('links', []):
+        want = dict(link, source=bindings[link['source']], target=bindings[link['target']])
+        assert any(isinstance(have, dict) and all(have.get(k) == value for k, value in want.items())
+                   for have in observed['links']), f'CASE_GRAPH_LINK_MISSING: {link!r} at {location}'
+    if expected.get('exact'):
+        assert len(bindings) == len(observed['nodes']), f'CASE_GRAPH_UNEXPECTED_NODE: at {location}'
+        assert len(expected.get('links', [])) == len(observed['links']), f'CASE_GRAPH_UNEXPECTED_LINK: at {location}'
+    return bindings
+
+
+def graph_only(spec, expected):
+    return (spec.get('attach_all') and 'graph' in expected and not expected.get('outputs')
+            and not any(expected.get(key) is not None for key in ('refusal', 'execution_error', 'rejection')))
+
+
 def fs_effect_execution_evidence(journals):
     """Count native completed JS processes, including downstream activation.
 
@@ -2196,21 +2453,74 @@ def check_tree(port, expected):
             assert actual.get('is_null') is (kind == 'null') and (kind != 'null' or actual.get('precision') == 'exact_null'), 'TREE_NULL'
 
 
-def downloaded_csv(profile, destination):
-    files = [p for p in profile.rglob(Path(destination).name) if 'artifacts/input/' not in str(p)]
-    assert len(files) == 1, 'DOWNLOAD_MISSING_OR_AMBIGUOUS'
+def cli_cleanup_paths(profile):
+    return (set(profile.rglob('saved-package-cleanup.json')),
+            set((profile / 'loginom/runtime').glob('runtime-close-*.json')))
+
+
+class PackageCloseUnconfirmed(AssertionError):
+    pass
+
+
+def check_fresh_cli_close(profile, package, before):
+    cleanup_paths, ack_paths = cli_cleanup_paths(profile)
+    receipts = [read(path) for path in cleanup_paths - before[0]]
+    acks = [read(path) for path in ack_paths - before[1]]
+    if not receipts or not all(r.get('package_closed') is True and r.get('logged_out') is True and r.get('package_path') == package
+                               and not r.get('unsaved_changes_discarded') for r in receipts):
+        raise PackageCloseUnconfirmed('MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED')
+    if not acks or not all(a.get('closed_ack') is True for a in acks):
+        raise PackageCloseUnconfirmed('MANUAL_EDIT_CLI_CLOSE_ACK_MISSING')
+
+
+def check_case_excel_artifact(replies, profile, folder, artifact, output):
+    destination = artifact['destination']
+    assert any(reply.get('status') == 'SUCCEEDED'
+               and any(file.get('destination') == destination and file.get('bytes', 0) > 0
+                       for file in reply.get('output', {}).get('file_artifacts', []))
+               for _, reply in replies), 'CASE_EXCEL_ARTIFACT_MISSING'
+    actual = folder / Path(destination).name
+    shutil.copyfile(downloaded_csv(profile, destination), actual)
+    oracle = runpy.run_path(str(REPO / 'docs/node-development/nodes/exports-excel/acceptance/oracle.py'))
+    columns = output['columns']
+    default_order = 'exact' if artifact['header'] == 'none' else output.get('column_order', 'any')
+    oracle['verify'](actual, dict(artifact, filename=actual.name, output_port=None, ordered=output['ordered'],
+        column_order=artifact.get('column_order', default_order),
+        columns=columns, rows=[[row[col['name']] for col in columns] for row in output['rows']], row_count=len(output['rows'])))
+
+
+def downloaded_csv(profile, destination, replies=()):
+    name = Path(destination).name
+    files = [p for p in profile.rglob(name) if p.is_file() and 'artifacts/input/' not in p.relative_to(profile).as_posix()]
+    if files or not replies:
+        assert len(files) == 1, 'DOWNLOAD_MISSING_OR_AMBIGUOUS'
+        return files[0]
+
+    # A native export can keep its original name in the retained output slot
+    # even when the separately delivered copy has a different name.
+    receipts = {(f.get('artifact_id'), f.get('bytes'), f.get('sha256'))
+                for _, reply in replies if reply.get('status') == 'SUCCEEDED' and reply.get('cleanup_complete') is True
+                for f in reply.get('output', {}).get('file_artifacts', []) if f.get('destination') == destination}
+    assert len(receipts) == 1, 'DOWNLOAD_MISSING_OR_AMBIGUOUS'
+    artifact_id, size, digest = receipts.pop()
+    assert isinstance(artifact_id, str) and re.fullmatch(r'[\w-]+', artifact_id), 'DOWNLOAD_MISSING_OR_AMBIGUOUS'
+    files = [p / name for p in profile.glob(f'**/artifacts/input/output-{artifact_id}') if (p / name).is_file()]
+    assert len(files) == 1 and files[0].resolve().is_relative_to(profile.resolve()), 'DOWNLOAD_MISSING_OR_AMBIGUOUS'
+    assert files[0].stat().st_size == size and hashlib.sha256(files[0].read_bytes()).hexdigest() == digest, 'DOWNLOAD_RECEIPT_MISMATCH'
     return files[0]
 
 
 class Runner:
-    def __init__(self, directory):
+    def __init__(self, directory, *, auth_source=None):
         self.out = directory
         self.report = read(directory / 'results.json')
         self.options = read(directory / 'request.json')
         self.deadline = self.report['started'] + 85 * 60
         self.last_start = 0
         self.current = None
-        self.env = {k: v for k, v in os.environ.items() if not k.startswith(('MULTICA_', 'CODEX_'))}
+        self.closing_live = self.cancel_requested = False
+        self.auth_source = auth_source
+        self.env = {k: v for k, v in os.environ.items() if k != 'RUN_CHECK_AUTH' and not k.startswith(('MULTICA_', 'CODEX_'))}
         self.env['LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT'] = self.options.get('viewport', '1280x800')
         self.env.update(LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS='false', HTTP_PROXY='http://127.0.0.1:2080', HTTPS_PROXY='http://127.0.0.1:2080', NO_PROXY='localhost,127.0.0.1,::1,app.loginom.ai,mcp.loginom.ai,mas.kartamyshev.dev')
 
@@ -2239,15 +2549,28 @@ class Runner:
         write(self.out / 'results.json', self.report)
         (self.out / 'summary.md').write_text(summary(self.report))
 
-    def failure(self, result, error, folder):
-        result.update(status='UNKNOWN' if isinstance(error, TimeoutError) else 'FAIL', failure_class=str(error).split(':')[0] or type(error).__name__, detail=str(error), failure_load=list(os.getloadavg()), failed_phase=self.report['phase'], failed_at=time.time())
+    def failure(self, result, error, folder, *, manual_edit=None):
+        detail = str(error)
+        phase = 'manual-edit' if manual_edit is not None else self.report['phase']
+        result.update(status='UNKNOWN' if isinstance(error, TimeoutError) else 'FAIL',
+                      failure_class=detail.split(':')[0] or type(error).__name__, detail=detail,
+                      failure_load=list(os.getloadavg()), failed_phase=phase, failed_at=time.time())
+        if isinstance(error, PackageCloseUnconfirmed):
+            result['failure_category'] = 'product'
+        elif manual_edit is not None:
+            result['failure_category'] = 'runner/setup'
         journal = folder / (result['scenario'] + '-checks.jsonl')
         result['location'] = str(journal) + ':1'
+        if manual_edit is not None:
+            manual_edit.update({key: result[key] for key in ('status', 'failure_category', 'failure_class', 'detail', 'location')})
+            if not Path(manual_edit['journal']).is_file():
+                manual_edit.pop('journal')
         journal.write_text(json.dumps(result, ensure_ascii=False) + '\n')
 
-    def phase(self, name, command, folder, timeout=1800, stdin=None, env=None, cwd=None):
+    @contextmanager
+    def timed_phase(self, name, folder, spacing=True):
         timing = dict(name=name, scenario=self.current['scenario'] if self.current else None,
-                      queued=time.time(), started=None)
+                      case_folder=str(folder), queued=time.time(), started=None)
         self.report.setdefault('phase_timings', []).append(timing)
         self.report['phase'] = 'gate:' + name
         self.report['phase_folder'] = str(folder)
@@ -2255,48 +2578,54 @@ class Runner:
         try:
             while True:
                 if time.time() >= self.deadline: raise TimeoutError('load/spacing budget')
-                if load_ready(os.getloadavg(), self.options['host_load_max']) and time.time() - self.last_start >= self.options['spacing']: break
+                if load_ready(os.getloadavg(), self.options['host_load_max']) and (not spacing or time.time() - self.last_start >= self.options['spacing']): break
                 time.sleep(1)
             self.last_start = timing['started'] = time.time()
+            timing['load1'] = os.getloadavg()[0]
             self.report['phase'] = name
             if self.current is not None:
                 self.current.setdefault('started', timing['started'])
                 self.current.setdefault('start_load', list(os.getloadavg()))
             self.save()
-            with (folder / (name + '.stdout')).open('wb') as stdout, (folder / (name + '.stderr')).open('wb') as stderr, (folder / 'loads.jsonl').open('a') as loads:
-                child = subprocess.Popen(list(map(str, command)), cwd=cwd or folder, env=env or self.env, stdin=subprocess.PIPE if stdin else subprocess.DEVNULL, stdout=stdout, stderr=stderr, start_new_session=True)
-                self.report['child_pid'] = child.pid
-                self.save()
-                if stdin:
-                    child.stdin.write(stdin.encode())
-                    child.stdin.close()
-                end = min(self.deadline, time.time() + timeout)
-                while child.poll() is None:
-                    loads.write(json.dumps({'at': time.time(), 'phase': name, 'load': os.getloadavg(), 'rss_bytes': self.memory(child.pid)}) + '\n')
-                    loads.flush()
-                    if time.time() >= end:
-                        daemon = json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))
-                        assert child.pid != daemon['pid'], 'Cannot terminate daemon'
-                        # The CLI owns runtime close/ACK. Let it close children
-                        # before interrupting the whole process group.
-                        child.send_signal(signal.SIGINT)
-                        # Host teardown already allows up to 90 seconds.
-                        try: child.wait(timeout=100)
-                        except subprocess.TimeoutExpired:
-                            os.killpg(child.pid, signal.SIGINT)
-                            try: child.wait(timeout=40)
-                            except subprocess.TimeoutExpired:
-                                os.killpg(child.pid, signal.SIGKILL)
-                                child.wait()
-                        raise TimeoutError(name + ' deadline')
-                    try: child.wait(timeout=1)
-                    except subprocess.TimeoutExpired: pass
-                assert child.returncode == 0, f'{name} exit={child.returncode}: {folder / (name + ".stderr")}:1'
+            yield
         finally:
             timing['finished'] = time.time()
             timing['queue_seconds'] = (timing['started'] if timing['started'] is not None else timing['finished']) - timing['queued']
             timing['duration_seconds'] = timing['finished'] - timing['started'] if timing['started'] is not None else 0
             self.save()
+
+    def phase(self, name, command, folder, timeout=1800, stdin=None, env=None, cwd=None, check_exit=True):
+        child = None
+        try:
+            with self.timed_phase(name, folder), (folder / (name + '.stdout')).open('wb') as stdout, \
+                    (folder / (name + '.stderr')).open('wb') as stderr, (folder / 'loads.jsonl').open('a') as loads:
+                child = subprocess.Popen(list(map(str, command)), cwd=cwd or folder, env=env or self.env, stdin=subprocess.PIPE if stdin else subprocess.DEVNULL, stdout=stdout, stderr=stderr, start_new_session=True)
+                self.report['child_pid'] = child.pid
+                self.save()
+                if stdin:
+                    try:
+                        with child.stdin:
+                            child.stdin.write(stdin.encode())
+                    except BrokenPipeError:
+                        pass  # Read the command exit status and masked stderr below.
+                end = min(self.deadline, time.time() + timeout)
+                while child.poll() is None:
+                    loads.write(json.dumps({'at': time.time(), 'phase': name, 'load': os.getloadavg(), 'rss_bytes': self.memory(child.pid)}) + '\n')
+                    loads.flush()
+                    if time.time() >= end:
+                        # The CLI owns runtime close/ACK. Let it close children
+                        # before interrupting the whole process group.
+                        stop_phase(child)
+                        raise TimeoutError(name + ' deadline')
+                    try: child.wait(timeout=1)
+                    except subprocess.TimeoutExpired: pass
+                if check_exit:
+                    assert child.returncode == 0, f'{name} exit={child.returncode}: {folder / (name + ".stderr")}:1'
+                return child.returncode
+        except (InterruptedError, SystemExit):
+            if child is not None and child.poll() is None:
+                stop_phase(child)
+            raise
 
     def build(self):
         cache = Path.home() / '.cache/loginom-run-check' / socket.gethostname() / self.report['head']
@@ -2318,7 +2647,8 @@ class Runner:
                 if not source.exists(): git('worktree', 'add', '--detach', str(source), self.report['head'])
                 restore_source_modes(source)
                 assert git('rev-parse', 'HEAD', cwd=source) == self.report['head'] and not git('status', '--porcelain', cwd=source), 'Dirty build source'
-                bun = Path.home() / '.cache/loginom-bootstrap/bun-linux-x64/bun'
+                bun = shutil.which('bun')
+                assert bun, 'Bun is required on PATH'
                 env = dict(self.env, LOGINOM_AI_AGENT_NODE_SOURCE=os.environ.get('LOGINOM_AI_AGENT_NODE_SOURCE') or str(next((Path.home() / '.cache/loginom-bootstrap/node').glob('*/bin/node'))), LOGINOM_AI_AGENT_BROWSER_SOURCE=os.environ.get('LOGINOM_AI_AGENT_BROWSER_SOURCE', str(Path.home() / '.cache/loginom-wave2-browsers')), LOGINOM_AI_AGENT_BROWSER_RECOVERY='1')
                 # Keep Bun's shared warm cache; serialize installations across
                 # SHAs on this host, releasing the lock before compilation.
@@ -2333,7 +2663,17 @@ class Runner:
                     self.phase('dependencies', ['nice', '-n', '19', bun, 'install', '--frozen-lockfile', '--ignore-scripts', '--linker', 'hoisted'], cache, env=env, cwd=source)
                 restore_source_modes(source)
                 assert not git('status', '--porcelain', cwd=source), 'Dependencies modified tracked source'
-                self.phase('build', ['nice', '-n', '19', bun, '--no-install', 'run', 'script/build-cli.ts', build, '--no-archive', *(['--baseline'] if socket.gethostname().split('.')[0] == 'mas2' else [])], cache, env=env, cwd=source / 'packages/loginom-host')
+                build_args = []
+                if sys.platform == 'linux' and os.uname().machine == 'x86_64':
+                    build_args.append('--baseline')
+                    version = read(source / 'package.json')['packageManager'].removeprefix('bun@')
+                    bun_cache = Path(env.get('BUN_INSTALL_CACHE_DIR') or Path.home() / '.bun/install/cache')
+                    baseline = bun_cache / f'bun-linux-x64-baseline-v{version}'
+                    if baseline.is_file() and os.access(baseline, os.X_OK):
+                        bun = baseline
+                        env['LOGINOM_CLI_BASELINE_CHILD'] = '1'
+                self.phase('build', ['nice', '-n', '19', bun, '--no-install', 'run', 'script/build-cli.ts',
+                                     build, '--no-archive', *build_args], cache, env=env, cwd=source / 'packages/loginom-host')
             meta = read(build / 'cli-manifest.json')['metadata']
         assert meta['sourceCommit'] == self.report['head'] and meta['sourceDirty'] is False, 'Build SHA/cleanliness mismatch'
         assert (build / 'resources/loginom/help/help-manifest.json').is_file(), 'Build has no shipped Loginom Help'
@@ -2499,7 +2839,7 @@ class Runner:
         assert all(delivered['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'TEXT_MASK_INPUT_CLEANUP_MISSING'
         return books
 
-    def model(self, case, folder, profile, workspace, package, login, build, session=None):
+    def model(self, case, folder, profile, workspace, package, login, build, session=None, baseline=None, live=None):
         spec = (self.prepared_case if isinstance(case, str) and case in D87 and not getattr(self, 'options', {}).get('case_root') else
                 dict(source=case, prompt=case / 'task.md', data=case / 'data')
                 if isinstance(case, Path) else scenario(case, getattr(self, 'options', {}).get('case_root'),
@@ -2553,6 +2893,8 @@ class Runner:
         rejection = expected.get('rejection')
         refusal = expected.get('refusal')
         execution_error = expected.get('execution_error')
+        only_graph = graph_only(spec, expected)
+        port_output = spec.get('output_mode') == 'ports' and bool(expected['outputs'])
         lgd_corrupt = spec.get('lgd') == 'corrupt'
         if refusal is not None:
             assert (isinstance(refusal, dict) and set(refusal) == {'text'}
@@ -2569,7 +2911,7 @@ class Runner:
         if rejection is not None:
             assert rejection == dict(code='LOGINOM_FILE_CHANGED', node_type='transform.group_data') and expected['outputs'] == [], 'INVALID_REJECTION_ORACLE'
         filenames = re.findall(r'[\w-]+\.(?:csv|xlsx|txt)', prompt)
-        exports = ([Path(output['export_destination']).name for output in expected['outputs']]
+        exports = [] if port_output else ([Path(output['export_destination']).name for output in expected['outputs']]
                    if spec.get('external') else
                    list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
                                         and name != (spec.get('local_file').name if spec.get('local_file') else None))))
@@ -2577,12 +2919,19 @@ class Runner:
         if spec.get('text_mask'): exports = ['text-mask-initial.csv', 'text-mask-final.csv']
         if spec.get('excel_mode'): exports = [b['filename'] for b in expected['excel_books']]
         if spec.get('text_file_variable'): exports = [Path(o['export_destination']).name for o in expected['outputs']]
+        if (artifact := expected.get('excel_artifact')):
+            assert port_output, 'CASE_EXCEL_PORT_OUTPUT_REQUIRED'
+            filename = artifact['filename']
+            assert re.fullmatch(r'[\w-]+\.xlsx', filename) and filename in prompt, 'CASE_EXCEL_FILENAME_INVALID'
+            destination = package.removesuffix('.lgp') + '-' + filename
+            prompt = prompt.replace(filename, destination)
+            artifact['destination'] = destination
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
             if exports and not any(name in prompt for name in exports):
                 prompt += '\nВыгрузи и скачай итоговые таблицы в файлы ' + ', '.join(exports) + '.'
-        if spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') or spec.get('upload_only') or rejection or refusal or execution_error or lgd_corrupt: exports = []
-        if not exports and not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('upload_only') and not rejection and not refusal and not execution_error and not lgd_corrupt:
+        if only_graph or spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') or spec.get('upload_only') or rejection or refusal or execution_error or lgd_corrupt: exports = []
+        if not exports and not port_output and not only_graph and not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('upload_only') and not rejection and not refusal and not execution_error and not lgd_corrupt:
             count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
@@ -2593,7 +2942,10 @@ class Runner:
             if spec.get('sampling_uniform'):
                 prompt += (' Порядок файлов: общее, обучающее, тестовое множество для начала набора, затем те же три выхода для конца набора.' if spec.get('sampling_priority') else ' Порядок файлов: общее, обучающее, тестовое множество.' if len(exports) == 3 else ' Порядок файлов: первый расчёт, затем повторный расчёт того же узла.')
             if spec.get('export_count') == 3 and not spec.get('sampling_uniform') and not spec.get('import_initial') and not spec.get('binding_initial') and spec.get('grouping_mode') != 'concat': prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
-        destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
+        export_prefix = self.out.name + '-' + folder.parent.name + '-'
+        if spec.get('attach_all') and folder.name != folder.parent.name:
+            export_prefix += folder.name + '-'
+        destinations = [login['package_directory'].rstrip('/') + '/' + export_prefix + name for name in exports]
         if exports:
             routes = dict(zip(exports, destinations))
             names = '|'.join(map(re.escape, sorted(exports, key=len, reverse=True)))
@@ -2617,9 +2969,8 @@ class Runner:
             if spec.get('logreg_normalization'):
                 prompt += '\n' + logreg_normalization_exports(destinations)
             prompt += f'\nСохрани пакет как {package}.'
-            if not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('text_export_cases') and not spec.get('text_file_variable') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Доставь все итоговые книги Excel.' if spec.get('excel_mode') else ' Выгрузи и скачай полный итоговый CSV.'
-        (folder / 'task.md').write_text(prompt)
-        for index, output in enumerate(expected['outputs']):
+            if not only_graph and not port_output and not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('text_export_cases') and not spec.get('text_file_variable') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Доставь все итоговые книги Excel.' if spec.get('excel_mode') else ' Выгрузи и скачай полный итоговый CSV.'
+        for index, output in enumerate(expected['outputs'] if not port_output else []):
             if spec.get('excel_mode') or spec.get('fs_case') == 'paths' or spec.get('text_file_variable'): output['export_destination'] = destinations[index]
             elif output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
             elif spec.get('external') or output['output_node_type'] == 'integration.rest_request':
@@ -2667,7 +3018,10 @@ class Runner:
                 parameter='/sort_result' if grouping else '/compare_with_locale', mode='variable',
                 variable=dict(kind='control', input=0, name='Flag', type='boolean', is_null=False), source=dict(type='variables.user', output=4))]
         write(folder / 'expected.json', expected)
-        command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', MODEL, '--dangerously-skip-permissions']
+        model_id = self.env.get('RUN_CHECK_MODEL') or MODEL
+        variant = self.env.get('RUN_CHECK_VARIANT')
+        command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', model_id, '--dangerously-skip-permissions']
+        if variant: command += ['--variant', variant]
         if session: command += ['--session', session]
         # Initial requests need their inputs even when the prose omits names.
         # Continuations only admit new, explicitly requested files (r3/r4).
@@ -2729,19 +3083,35 @@ class Runner:
             delivered = read(folder / 'text-folder-inputs' / 'result.json')
             assert [d['destination'] for d in delivered['delivered']] == [b['destination'] for b in books], 'TEXT_FOLDER_INPUT_DELIVERY_MISSING'
             files = []
+        attachments = []
         for file in files:
             if not file.is_file(): continue
             target = workspace / file.name
-            if target.exists(): continue
+            if target.exists():
+                if not spec.get('attach_all'):
+                    continue
+                # Preserve paths admitted by earlier turns when filenames recur.
+                target = workspace / '.turn-inputs' / folder.name / file.name
+                target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(file, target)
             if spec.get('lgd') and target.suffix.lower() == '.lgd':
                 # Native binary input uses the existing local-path admission flow.
                 prompt += f'\nИсходный файл LGD: {target}.'
             else:
                 command += ['--file', target]
+                attachments.append(target)
         (folder / 'task.md').write_text(prompt)
         env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile), LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG='1', LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE='1', LOGINOM_AI_AGENT_PURE='1')
-        if spec.get('two_turn'):
+        graph_start = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+        cli_before = cli_cleanup_paths(profile) if port_output else None
+        exit_status = 0
+        if live:
+            timeout = spec.get('model_timeout', 1800)
+            with self.timed_phase('model', folder, spacing=live.child is None):
+                deadline = time.monotonic() + max(0, min(timeout, self.deadline - time.time()))
+                session = live.turn(folder, command[0], env, session, prompt, attachments, deadline)
+        elif spec.get('two_turn'):
+            assert not variant, 'TWO_TURN_VARIANT_UNSUPPORTED'
             assert session is None, 'TWO_TURN_REQUIRES_FRESH_CHAT'
             # Unique physical name prevents collisions with prior attempts (#1157).
             source = workspace / 'rows.csv'
@@ -2753,19 +3123,56 @@ class Runner:
             second += '\n' + prompt[prompt.rfind('\nСохрани пакет как '):]
             config_path = profile / 'config/loginom-ai-agent.json'
             config = read(config_path)
-            config['model'] = MODEL
+            config['model'] = model_id
             write(config_path, config)
             (profile / 'state').mkdir(exist_ok=True)
             write(profile / 'state/model.json', dict(recent=[], favorite=[], variant={}))
             write(folder / 'two-turn.json', dict(executable=str(command[0]), workspace=str(workspace),
-                  profile=str(profile), folder=str(folder), kind=spec['two_turn'], prompts=[first, second], model=MODEL, daemon_pid=daemon_pid()))
+                  profile=str(profile), folder=str(folder), kind=spec['two_turn'], prompts=[first, second], model=model_id, daemon_pid=daemon_pid()))
             self.phase('model', [sys.executable, '-B', REPO / 'scripts/node-acceptance/run-check-two-turn.py',
                        folder / 'two-turn.json'], folder, timeout=1800, env=env, cwd=workspace)
         else:
-            self.phase('model', command + ['--', prompt], folder, timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace)
+            exit_status = self.phase('model', command + ['--', prompt], folder,
+                                     timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace,
+                                     **({'check_exit': False} if port_output else {}))
+        if not live and getattr(self, 'auth_source', None) and case == self.current['scenario']:
+            try:
+                (profile / 'data/auth.json').unlink(missing_ok=True)
+            except OSError as error:
+                self.current['oauth_cleanup_error'] = str(error)
+                raise
         events = list(records(folder / 'model.stdout'))
-        session = next(e['sessionID'] for _, e in events if e.get('sessionID'))
+        if live:
+            terminal = next(((line, event['error']['name']) for line, event in reversed(events)
+                             if event.get('source') == 'standalone_tool_outcome'), None)
+            if terminal:
+                line, code = terminal
+                location = f'{folder / "model.stdout"}:{line}'
+                if not (port_output and code == 'CLI_TOOL_FAILED' and live.turn_saved):
+                    raise RuntimeError(f'{code}: {location}')
+                self.current['cli_exit'] = dict(code=code, location=location)
+                self.close_live(live)
+        if exit_status:
+            cli_error = next((line for line, event in reversed(events)
+                              if event.get('type') == 'error' and (event.get('error') or {}).get('name') == 'CLI_TOOL_FAILED'), None)
+            assert cli_before and exit_status == 1 and cli_error is not None, f'model exit={exit_status}: {folder / "model.stderr"}:1'
+            self.current['cli_exit'] = dict(code='CLI_TOOL_FAILED', location=f'{folder / "model.stdout"}:{cli_error}')
+            # A nonzero CLI exit remains a failed turn. Later checks may prove
+            # the requested work and its saved, closed package are usable.
+            check_fresh_cli_close(profile, package, cli_before)
+        observed_session = next((e['sessionID'] for _, e in events if e.get('sessionID')), None)
+        assert observed_session, 'MODEL_SESSION_MISSING'
+        assert not (spec.get('attach_all') and session and observed_session != session), 'CASE_SESSION_CHANGED'
+        session = observed_session
         replies = model_replies(events)
+        if spec.get('attach_all') and 'graph' in expected:
+            self.current['graph'] = 'FAIL'
+            observed = observed_case_graph(profile, graph_start)
+            write(folder / 'graph-observed.json', observed)
+            browser_followup = spec.get('manual_edit') or (
+                port_output and self.options.get('cold') and case == self.current['scenario'])
+            check_case_graph(expected['graph'], observed, baseline, defer_position=bool(browser_followup))
+            self.current['graph'] = 'PASS'
         if spec.get('two_turn'):
             self.current['execution_id'] = check_read_turns(profile, folder, spec['two_turn'])
             self.current['two-turn'] = 'PASS'
@@ -3094,12 +3501,18 @@ class Runner:
         self.current['read-path'] = '/'.join(sorted((set(self.current.get('read-path', '').split('/')) | paths) - {''}))
         delivered = any(ports([o for _, o in replies]))
         assert not (lgd_corrupt and delivered), 'LGD_CORRUPT_PORTS_FORBIDDEN'
+        # Some graph turns assert native tables without exporting them as CSV.
+        graph_without_tables = only_graph and not expected.get('tables')
+        port_optional = graph_without_tables or rejection or refusal or execution_error or lgd_corrupt
         invalid = (port_failure(replies, folder / 'model.stdout')
-                   if not spec.get('variable_only') and (not (rejection or refusal or execution_error or lgd_corrupt) or delivered) else None)
+                   if not spec.get('variable_only') and (delivered or not port_optional) else None)
         if invalid:
             self.current.update(failure_class='PORT_READ_INVALID', detail='Port source or native binding/exactness/Preview cleanup absent or invalid', location=invalid, failure_load=list(os.getloadavg()))
             self.current['port-read'] = 'FAIL'
-        self.current.setdefault('port-read', '— (expected execution error)' if execution_error and not delivered else 'PASS')
+        elif graph_without_tables and not delivered:
+            self.current.setdefault('port-read', '— (graph only)')
+        elif self.current.get('port-read') in (None, '— (graph only)'):
+            self.current['port-read'] = '— (expected execution error)' if execution_error and not delivered else 'PASS'
         if expected.get('proposed_tree_output'):
             trees = [(owner, port) for _, reply in replies for owner, port in ports(reply) if port.get('port_kind') == 'tree']
             assert trees, 'TREE_READ_MISSING'
@@ -3117,13 +3530,17 @@ class Runner:
                 matched_trees += 1
             assert matched_trees, 'TREE_SELECTED_READ_MISSING'
             self.current['tree-read'] = 'PASS'
-        cleanups = [read(p) for p in profile.rglob('package-cleanup.json' if spec.get('two_turn') else 'saved-package-cleanup.json')]
-        acks = [read(p) for p in profile.rglob('runtime-close-*.json')]
-        assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
-        known_ack = spec.get('two_turn') and (folder / 'shutdown-signature.json').exists() and read(folder / 'shutdown-signature.json').get('kind') == 'known_two_turn_shutdown_ack_timeout'
-        assert acks and all(a.get('closed_ack') is True or known_ack and a.get('closed_ack') is False and a.get('request_error') == 'LOGINOM_RUNTIME_TIMEOUT' and a.get('exit_code') == 0 and a.get('exit_signal') is None for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
-        if known_ack: self.current['shutdown-signature'] = 'known_two_turn_shutdown_ack_timeout; cleanup confirmed'
-        self.current['cleanup'] = 'main PASS'
+        if live:
+            if live.child is not None:
+                self.current['cleanup'] = 'pending live shutdown'
+        else:
+            cleanups = [read(p) for p in profile.rglob('package-cleanup.json' if spec.get('two_turn') else 'saved-package-cleanup.json')]
+            acks = [read(p) for p in profile.rglob('runtime-close-*.json')]
+            assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
+            known_ack = spec.get('two_turn') and (folder / 'shutdown-signature.json').exists() and read(folder / 'shutdown-signature.json').get('kind') == 'known_two_turn_shutdown_ack_timeout'
+            assert acks and all(a.get('closed_ack') is True or known_ack and a.get('closed_ack') is False and a.get('request_error') == 'LOGINOM_RUNTIME_TIMEOUT' and a.get('exit_code') == 0 and a.get('exit_signal') is None for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
+            if known_ack: self.current['shutdown-signature'] = 'known_two_turn_shutdown_ack_timeout; cleanup confirmed'
+            self.current['cleanup'] = 'main PASS'
         if spec.get('reopened_cleanup'):
             # #986: the final cleanup must bind the package reopened by Save As.
             assert any(save_confirmed(spec, o, package) and o.get('action_key') == 'package.save_as'
@@ -3178,6 +3595,46 @@ class Runner:
             return session, expected, None, None
         if rejection:
             self.current.update(csv='— (expected rejection)', cold='— (expected rejection)')
+            return session, expected, None, None
+        if artifact:
+            check_case_excel_artifact(replies, profile, folder, artifact, expected['outputs'][0])
+        if port_output:
+            candidates = []
+            for _, reply in replies:
+                for owner, port in ports(reply):
+                    node_id = owner.get('node', {}).get('node_id')
+                    node = observed['nodes'].get(node_id)
+                    if node and port_path(owner, port) and owner.get('status') == 'SUCCEEDED':
+                        candidates.append(dict(node_id=node_id, type=node['type'], label=node['label'], port=port.get('port'), data=port))
+            write(folder / 'case-port-evidence.json', candidates)
+            oracle = [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/case-ports.mjs',
+                      folder / 'expected.json', folder / 'case-port-evidence.json']
+            self.phase('case-port-oracle', oracle, folder, timeout=60)
+            readback = read(folder / 'case-port-oracle.stdout')
+            if readback:
+                if live and (spec.get('manual_edit') or case == self.current['scenario']):
+                    self.close_live(live)
+                write(folder / 'case-port-expected.json', dict(package_path=package,
+                    outputs=[target['output'] for target in readback],
+                    case_port_node_ids=[target['node_id'] for target in readback],
+                    **{key: expected[key] for key in ('nodes', 'n18_javascript_step') if key in expected}))
+                write(folder / 'case-port-config.json', dict(loginom_url=login['url'], workflow_profile=dict(
+                    loginom_user=login['username'], password=login['password'], passwordless_login=login.get('passwordless_login', False))))
+                self.phase('case-port-readback', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs',
+                    '--config', folder / 'case-port-config.json', '--resources', build / 'resources/loginom',
+                    '--saved', package, '--expected', folder / 'case-port-expected.json', '--output', folder / 'case-port-readback',
+                    *(['--case-port-read-only'] if live and live.child is not None else [])], folder)
+                result = folder / 'case-port-readback/result.json'
+                verified = read(result)
+                assert verified['status'] == 'PASS' and all(verified['cleanup'].get(key) is True
+                    for key in ['package_closed', 'logged_out']), 'CASE_PORT_READBACK_UNCONFIRMED'
+                assert [match['node']['node_id'] for match in verified['correspondence']] == [
+                    target['node_id'] for target in readback], 'CASE_PORT_READBACK_NODE_CHANGED'
+                self.phase('case-port-sample-oracle', [*oracle, result], folder, timeout=60)
+            self.current['csv'] = '— (native outputs PASS)'
+            return session, expected, None, None
+        if only_graph:
+            self.current.update(csv='— (graph only)', cold='— (graph only)')
             return session, expected, None, None
         if spec.get('lgd') == 'roundtrip':
             if spec.get('lgd_case'): check_lgd_export_case(replies, spec['lgd_case'], lgd_destination, lgd_initial_destination)
@@ -3430,7 +3887,7 @@ class Runner:
         sampling_csvs = []
         for index, destination in enumerate(destinations):
             actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
-            shutil.copyfile(downloaded_csv(profile, destination), actual)
+            shutil.copyfile(downloaded_csv(profile, destination, replies), actual)
             if spec.get('text_export_encodings'):
                 self.phase('oracle-' + str(index + 1), [sys.executable, '-B', src / 'oracle.py',
                     '--csv', actual, '--encoding', spec['text_export_encodings'][index]], folder, timeout=60)
@@ -3507,6 +3964,107 @@ class Runner:
         self.current['csv'] = D76_STATUS if any(self.current.get('d76', {}).values()) else 'PASS'
         return session, expected, actual, delimiter
 
+    def manual_edit(self, edit, stage, profile, package, login, build, before, *, prior=None, expected_graph=None, live=None):
+        if live:
+            self.close_live(live)
+        else:
+            check_fresh_cli_close(profile, package, before)
+        output = stage / 'manual'
+        output.mkdir()
+        config = dict(login=login, packagePath=package, edit=edit)
+        if prior and prior.get('moved_node_id') and expected_graph and expected_graph.get('retain'):
+            bindings = check_case_graph(expected_graph, read(stage / 'graph-observed.json'), prior, defer_position=True)
+            moved = prior['moved_node_id']
+            if moved in (bindings[local_id] for local_id in expected_graph['retain']):
+                config['positionProof'] = dict(node_id=moved, position=prior['nodes'][moved]['position'])
+        self.phase('manual-edit', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/manual-edit.mjs',
+                   build / 'resources/loginom', output], stage, timeout=300, stdin=json.dumps(config))
+        result = read(output / 'result.json')
+        assert result['status'] == 'PASS' and all(
+            proof.get('package_closed') is True and proof.get('logged_out') is True and not proof.get('unsaved_changes_discarded')
+            for proof in (result['cleanup'], result['reopen_cleanup'])), 'MANUAL_EDIT_PERSISTENCE_UNCONFIRMED'
+        baseline = native_case_graph(result['persisted'], str(output / 'result.json'))
+        if edit['kind'] == 'move':
+            baseline['moved_node_id'] = result['delta']['changed_nodes'][0]['node_id']
+        return baseline
+
+    def close_live(self, live):
+        if live.child is None:
+            return
+        cancellation_pending = getattr(self, 'cancel_requested', False)
+        self.closing_live = True
+        cleanup = 'FAIL'
+        try:
+            close_error = None
+            try:
+                live.close()
+            except InterruptedError:
+                raise
+            except (AssertionError, OSError) as error:
+                if live.child is not None:
+                    raise PackageCloseUnconfirmed(str(error)) from error
+                close_error = 'LIVE_CHAIN_CLI_CLOSE_UNCONFIRMED'
+
+            def close_evidence(path):
+                try:
+                    value = read(path)
+                except (OSError, ValueError):
+                    return {}
+                return value if isinstance(value, dict) else {}
+
+            attempts = live.segment_attempts()
+            acks = [close_evidence(path) for path in (live.profile / 'loginom/runtime').glob('runtime-close-*.json')
+                    if path not in live.previous_acks]
+            ack = len(acks) >= len(attempts) and all(
+                item.get('closed_ack') is True and item.get('exit_code') == 0 and item.get('exit_signal') is None
+                for item in acks)
+            try:
+                end = time.monotonic() + 5
+                remaining = live.remaining_browsers()
+                while remaining and time.monotonic() < end:
+                    time.sleep(0.1)
+                    remaining = live.remaining_browsers()
+                chromium_exited = not remaining and (not attempts or bool(live.browsers_seen) or ack)
+            except OSError:
+                chromium_exited = False
+
+            package_closed = logged_out = None
+            if attempts:
+                package_closed = logged_out = True
+                for attempt in attempts:
+                    path = attempt / 'saved-package-cleanup.json'
+                    receipt = close_evidence(path)
+                    owned = (receipt.get('account') == live.account and receipt.get('package_path') == live.package
+                             and bool(receipt.get('document_id')))
+                    if live.saved and live.browser and attempt == live.browser[2]:
+                        owned = owned and receipt.get('document_id') == live.saved.get('document_id')
+                    package_closed &= (owned and receipt.get('package_closed') is True
+                                       and receipt.get('unsaved_changes_discarded') is False)
+                    logged_out &= owned and receipt.get('logged_out') is True and receipt.get('status') == 'SUCCEEDED'
+
+            proof = dict(cli_exited=True, cli_shutdown_confirmed=close_error is None, chromium_exited=chromium_exited,
+                         package_closed=package_closed, logged_out=logged_out,
+                         runtime_ack=ack if acks or attempts else None, attempts=len(attempts))
+            with live.turn_log.open('a') as log:
+                print(json.dumps(dict(event='cleanup_verified', at=time.time(), **proof)), file=log)
+            if not chromium_exited:
+                raise PackageCloseUnconfirmed('LIVE_CHAIN_CHROMIUM_EXIT_UNCONFIRMED')
+            if package_closed is False or logged_out is False:
+                raise PackageCloseUnconfirmed('LIVE_CHAIN_PACKAGE_CLEANUP_UNCONFIRMED')
+            if not ack:
+                raise PackageCloseUnconfirmed('LIVE_CHAIN_RUNTIME_ACK_MISSING')
+            if close_error:
+                raise PackageCloseUnconfirmed(close_error)
+            cleanup = 'main PASS' if attempts else 'no workspace started'
+        finally:
+            self.current['cleanup'] = cleanup
+            for turn in self.current['turns']:
+                if turn.get('cleanup') == 'pending live shutdown':
+                    turn['cleanup'] = cleanup
+            self.closing_live = False
+            if not cancellation_pending and getattr(self, 'cancel_requested', False):
+                raise InterruptedError('LIVE_CHAIN_CANCELLED')
+
     def run(self):
         try:
             build = self.build()
@@ -3516,6 +4074,10 @@ class Runner:
                 return
             account = read(Path(self.options['pair']) / 'worker.json')
             login = pair_login(account, 'worker.json')
+            model_id = self.env.get('RUN_CHECK_MODEL') or MODEL
+            variant = self.env.get('RUN_CHECK_VARIANT')
+            auth = self.auth_source
+            live_chain = self.options.get('live_chain')
             for r in self.report['runs']:
                 self.current = r
                 if time.time() >= self.deadline:
@@ -3525,33 +4087,96 @@ class Runner:
                 folder = self.out / r['scenario']
                 folder.mkdir()
                 profile, workspace = folder / 'profile', folder / 'workspace'
+                auth_path = profile / 'data/auth.json'
                 workspace.mkdir()
-                r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp', model=MODEL)
+                r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp', model=model_id)
+                if variant: r['variant'] = variant
                 env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile))
+                active_turn = live = None
                 try:
+                    case = r['scenario']
+                    steps = scenario_steps(case, self.options.get('case_root'), cases=self.options.get('cases'))
+                    spec = steps[-1][1]
+                    r['turns'] = [dict(turn=number, case=step.parent.name if isinstance(step, Path) else step, status='NOT_RUN')
+                                  for number, (step, _) in enumerate(steps, 1)]
                     if r['scenario'] in D87 and not self.options.get('case_root'):
                         self.prepared_case = self.prepare_d87(r['scenario'], folder)
                     self.phase('setup', [build / 'bin/loginom-ai-agent-cli', 'loginom', 'setup', '--headless', '--stdin-json', '--format', 'json'], folder, timeout=180, env=env, stdin=json.dumps(dict(url=login['url'], username=login['username'], password=login['password'])))
                     assert read(folder / 'setup.stdout').get('browser', {}).get('state') == 'verified', 'SETUP_NOT_VERIFIED'
-                    write(profile / 'config/loginom-ai-agent.json', dict(model=MODEL))
-                    case = r['scenario']
-                    spec = scenario(case, self.options.get('case_root'), cases=self.options.get('cases'))
+                    if auth:
+                        with auth.open('rb') as source, os.fdopen(
+                            os.open(auth_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600), 'wb'
+                        ) as target:
+                            shutil.copyfileobj(source, target)
+                    selected = f'{model_id}#{variant}' if live_chain and variant else model_id
+                    config = dict(model=selected)
+                    if live_chain:
+                        config['agents'] = {'title': {'model': selected}}
+                    write(profile / 'config/loginom-ai-agent.json', config)
                     if spec.get('fs_case') == 'paths':
                         r['package'] = self.fs_directory('paths', login) + '/original/paths.lgp'
                     if spec.get('source_package'):
                         write(folder / 'source-config.json', dict(login=login, package=r['package']))
                         self.phase('source-package', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/variables-column-union.mjs', 'prepare', build / 'resources/loginom', folder / 'source-config.json', spec['source_package'], folder / 'source'], folder, timeout=300)
-                    base = spec['base']
                     session = None
-                    for step in ([base, case] if base else [case]):
+                    if live_chain:
+                        from run_check_live import LiveChain
+                        resources = build / 'resources/loginom'
+                        browser_executable = (resources / read(resources / 'resource-manifest.json')['browser']).resolve(strict=True)
+                        live = LiveChain(profile, workspace, folder, login['username'], r['package'],
+                                         model_id, variant or '', daemon_pid, browser_executable)
+                    baseline = None
+                    for (step, step_spec), turn in zip(steps, r['turns']):
+                        active_turn = turn
+                        turn['status'] = 'PENDING'
                         r.update(csv='—', save='—', cleanup='—')
-                        stage = folder / (step.parent.name if isinstance(step, Path) else step)
+                        r.pop('graph', None)
+                        r.pop('cli_exit', None)
+                        stage = folder / turn['case']
                         stage.mkdir()
-                        session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
+                        prior = baseline
+                        manual = step_spec.get('manual_edit')
+                        cli_before = cli_cleanup_paths(profile) if manual and not live else None
+                        model_options = {}
+                        if baseline is not None:
+                            model_options['baseline'] = baseline
+                        if live:
+                            model_options['live'] = live
+                        session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'],
+                            login, build, session, **model_options)
+                        observed_graph = stage / 'graph-observed.json'
+                        if observed_graph.is_file():
+                            baseline = read(observed_graph)
+                        turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class', 'failure_category', 'cli_exit') if k in r},
+                                    status='FAIL' if r.get('failure_class') or r.get('cli_exit') else 'PASS')
+                        if 'cli_exit' in turn:
+                            turn.setdefault('failure_class', turn['cli_exit']['code'])
+                        active_turn = None
+                        if manual and not r.get('failure_class'):
+                            edit_result = turn['manual_edit'] = dict(kind=manual['kind'], status='PENDING',
+                                journal=str(stage / 'manual/execution-events.jsonl'))
+                            try:
+                                baseline = self.manual_edit(manual, stage, profile, r['package'], login, build, cli_before,
+                                    prior=prior, expected_graph=expected.get('graph'), live=live)
+                            except InterruptedError:
+                                raise
+                            except Exception as error:
+                                self.failure(r, error, folder, manual_edit=edit_result)
+                                break
+                            edit_result['status'] = 'PASS'
+                        if spec.get('attach_all') and r.get('failure_class'):
+                            break
+                    if live:
+                        self.close_live(live)
+                    if spec.get('attach_all') and r.get('failure_class'):
+                        if r['status'] == 'PENDING':
+                            r['status'] = 'FAIL'
+                        self.save()
+                        continue
                     if spec.get('fs_case'):
                         self.fs_files(spec, folder, login, build, 'fs-warm')
                     assert case != 'types300' or (self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection')), 'TYPES300_COLD_REQUIRED'
-                    if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
+                    if self.options['cold'] and not graph_only(spec, expected) and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
                         cold_expected = stage / 'expected.json'
                         if spec.get('fs_case') == 'paths' or spec.get('text_file_variable'):
@@ -3568,10 +4193,13 @@ class Runner:
                             cold_expected = stage / 'expected-cold.json'
                             write(cold_expected, cold_columns_by_name(expected, case))
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
+                        read_windows = spec.get('cold_port_windows') or case == 'types300'
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') or spec.get('output_mode') == 'ports' else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if read_windows else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
+                        if spec.get('output_mode') == 'ports' and expected.get('graph', {}).get('exact'):
+                            check_case_graph(expected['graph'], native_case_graph(cold['case_graph'], 'cold/result.json'), prior)
                         if spec.get('variable_audit') == 'variables-union-inputs':
                             self.phase('cold-inputs-audit', [build / 'resources/loginom/bin/node', spec['oracle'], 'cold', stage / 'variable-oracle.stdout', folder / 'cold/result.json'], folder, timeout=60)
                         if spec.get('loop_for'):
@@ -3585,13 +4213,46 @@ class Runner:
                         r.update(cold='PASS', cleanup='both PASS')
                         if spec.get('fs_case'):
                             self.fs_files(spec, folder, login, build, 'fs-cold')
+                    cli_failures = [turn['cli_exit'] for turn in r['turns'] if 'cli_exit' in turn]
+                    if cli_failures and not r.get('failure_class'):
+                        r.update(failure_class=cli_failures[0]['code'], location=cli_failures[0]['location'],
+                                 detail='CLI returned a nonzero exit after the validated turn')
                     r['status'] = 'FAIL' if r.get('failure_class') else (D76_STATUS if r.get('csv') == D76_STATUS else 'PASS')
                 except Exception as error:
                     if isinstance(error, TimeoutError) and not r.get('started') and self.report['phase'].startswith('gate:'):
                         r.update(status='NOT_RUN', reason='BATCH_BUDGET_EXHAUSTED')
                     else:
                         self.failure(r, error, folder)
+                    if active_turn is not None:
+                        active_turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class', 'failure_category', 'cli_exit') if k in r},
+                                           status=r['status'])
+                    if isinstance(error, InterruptedError):
+                        raise
                 finally:
+                    try:
+                        if live and live.child is not None:
+                            try:
+                                self.close_live(live)
+                            except InterruptedError as error:
+                                self.failure(r, error, folder)
+                                raise
+                            except Exception as error:
+                                r['live_cleanup_error'] = str(error)
+                                if r['status'] not in ('FAIL', 'UNKNOWN'):
+                                    self.failure(r, error, folder)
+                                if live.child is not None:
+                                    raise  # Do not start another scenario with a live CLI.
+                    finally:
+                        if auth:
+                            try:
+                                if profile.exists():
+                                    try: auth_path.unlink(missing_ok=True)
+                                    finally: shutil.rmtree(profile)
+                            except OSError as error:
+                                r['oauth_cleanup_error'] = str(error)
+                                if r['status'] != 'FAIL': self.failure(r, error, folder)
+                            else:
+                                r.pop('profile', None)
                     if r.get('dataset'):
                         try: self.cleanup_d87(folder, login, build)
                         except Exception as error:
@@ -3610,7 +4271,20 @@ class Runner:
 def main():
     os.umask(0o077)
     args = arguments()
-    if args.command == '_worker': return Runner(args.directory.resolve()).run()
+    if args.command == '_worker':
+        signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+        source = sys.stdin.buffer.read()
+        runner = Runner(args.directory.resolve(), auth_source=Path(os.fsdecode(source)) if source else None)
+        if runner.options.get('live_chain'):
+            def interrupted(signum, frame):
+                if not runner.cancel_requested:
+                    runner.cancel_requested = True
+                    if not runner.closing_live:
+                        raise InterruptedError('LIVE_CHAIN_CANCELLED')
+
+            signal.signal(signal.SIGINT, interrupted)
+            signal.signal(signal.SIGTERM, interrupted)
+        return runner.run()
     if args.command == 'wait':
         end = time.monotonic() + args.timeout
         while True:
@@ -3624,15 +4298,29 @@ def main():
                 print(f"{ready}/{len(report['runs'])} готово, идёт {current}")
                 return 2
             time.sleep(min(1, max(0, end - time.monotonic())))
+    # Chromium also puts its Unix singleton socket under TMPDIR. Keep the
+    # default short enough even when the checkout is in a deep task directory.
+    out = (args.out or Path.home() / '.cache/loginom-runs' / str(time.time_ns())).expanduser().resolve()
+    if any((parent / '.git').exists() for parent in (out, *out.parents)):
+        raise ValueError('Result directory must be outside Git checkout')
+    auth = os.environ.pop('RUN_CHECK_AUTH', None)
+    if auth:
+        auth_path = Path(auth).expanduser().resolve()
+        if not auth_path.is_file() or not os.access(auth_path, os.R_OK):
+            raise ValueError('RUN_CHECK_AUTH must point to a readable file')
+    variant = os.environ.get('RUN_CHECK_VARIANT')
     head = git('rev-parse', '--verify', args.head + '^{commit}')
     names = scenario_names(args.scenarios, args.case_root)
+    assert not args.live_chain or args.cases and not args.case_root, 'LIVE_CHAIN_REQUIRES_CASES'
     assert 'types300' not in names or args.cold, 'TYPES300_COLD_REQUIRED'
     for name in names:
-        spec = scenario(name, args.case_root, cases=args.cases)
-        if spec.get('generated'): continue
-        assert spec['prompt'].is_file(), 'Scenario prompt missing'
-        assert args.case_root or spec.get('oracle', spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
-        expected_for(spec, '/preflight/package.lgp')
+        for step, spec in scenario_steps(name, args.case_root, cases=args.cases):
+            if variant and spec.get('two_turn'):
+                raise ValueError('TWO_TURN_VARIANT_UNSUPPORTED')
+            if spec.get('generated') or isinstance(step, Path): continue
+            assert spec['prompt'].is_file(), 'Scenario prompt missing'
+            assert args.case_root or spec.get('oracle', spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
+            expected_for(spec, '/preflight/package.lgp')
     pair = args.pair.expanduser().resolve()
     for role in ['worker', 'reviewer']:
         pair_login(read(pair / (role + '.json')), role + '.json')
@@ -3640,11 +4328,6 @@ def main():
     if build:
         meta = read(build / 'cli-manifest.json')['metadata']
         assert meta['sourceCommit'] == head and meta['sourceDirty'] is False, 'Build SHA/cleanliness mismatch'
-    # Chromium also puts its Unix singleton socket under TMPDIR. Keep the
-    # default short enough even when the checkout is in a deep task directory.
-    out = (args.out or Path.home() / '.cache/loginom-runs' / str(time.time_ns())).expanduser().resolve()
-    if not args.case_root and any(name in D87 for name in names) and (out == REPO or REPO in out.parents):
-        raise ValueError('D87 result directory and generated data must be outside Git checkout')
     out.mkdir(parents=True)
     temporary = out / 'tmp'
     temporary.mkdir()
@@ -3652,13 +4335,18 @@ def main():
     # Set this before spawning so direct children (including oracles) inherit it.
     env = {k: v for k, v in os.environ.items() if not k.startswith('CODEX_')}
     env.update(TMPDIR=str(temporary), TMP=str(temporary), TEMP=str(temporary))
+    if auth:
+        print('Warning: do not run scenarios in parallel with the same OAuth file. '
+              'Refresh-token rotation can invalidate copies; the source is not updated.', file=sys.stderr)
     request = vars(args) | {'pair': str(pair), 'build': str(build) if build else None, 'out': str(out),
                             'cases': str(args.cases.expanduser().resolve()) if args.cases else None,
                             'case_root': str(args.case_root.expanduser().resolve()) if args.case_root else None}
     write(out / 'request.json', request)
     write(out / 'results.json', {'head': head, 'tree': git('rev-parse', head + '^{tree}'), 'started': time.time(), 'phase': 'build', 'runs': [{'scenario': n, 'status': 'PENDING'} for n in names]})
     with (out / 'worker.log').open('wb') as log:
-        child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '_worker', str(out)], env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
+        child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '_worker', str(out)], env=env, stdin=subprocess.PIPE if auth else subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
+        if auth:
+            with child.stdin as channel: channel.write(os.fsencode(auth_path))
     write(out / 'worker.json', {'pid': child.pid})
     print(out)
     return 0

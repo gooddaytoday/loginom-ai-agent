@@ -95,14 +95,20 @@ for(const scenario of ['clean','dirty','foreign','expired','already dispatched']
 
 const refusalStart=source.indexOf('  if (\n    prepared.status !== "READY"');
 const refusalEnd=source.indexOf('\n\n  const origin',refusalStart);
-const classify=new Function('prepared','saved','state',source.slice(refusalStart,refusalEnd));
+const classify=new Function('prepared','saved','state','args',source.slice(refusalStart,refusalEnd));
 for(const kind of ['rejected','foreign','readonly'])test('D56c cold Open keeps the exact refusal class: '+kind,()=>{
  const p=kind==='rejected'?{status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED',effect_possible:true}:structuredClone(prepared);
  if(kind==='foreign')p.package_ref.path='/foreign/other.lgp';
  const state={};let error;
- try{classify(p,{path},state);}catch(e){error=e;}
+ try{classify(p,{path},state,{});}catch(e){error=e;}
  assert.equal(error?.message,{rejected:'COLD_PACKAGE_OPEN_NOT_READY',foreign:'COLD_PACKAGE_PATH_MISMATCH',readonly:'COLD_PACKAGE_NOT_WRITABLE'}[kind]);
  assert.equal(state.openFailure?.reason,kind==='rejected'?'PACKAGE_OPEN_REJECTED':kind==='foreign'?'PACKAGE_PATH_MISMATCH':'PACKAGE_READ_ONLY');
+});
+
+test('cold case-port read accepts an owned read-only package',()=>{
+ const args={'case-port-read-only':true};
+ assert.doesNotThrow(()=>classify(prepared,{path},{},args));
+ assert.throws(()=>classify(prepared,{path:'/foreign/other.lgp'},{},args),/COLD_PACKAGE_PATH_MISMATCH/);
 });
 
 for(const scenario of ['clean writer','dirty writer','no effect','transport lost','journal failure'])test('D56c saved rejected Open runs guarded cleanup before browser: '+scenario,async()=>{
