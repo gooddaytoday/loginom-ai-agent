@@ -12,9 +12,10 @@ test('model schema inventory pins W1 variable inputs and excludes private cold w
  // #1310 lists control input support (+272 full, +136 compact).
  // LAB-2021 adds the graph-only mode and its empty request constraints.
  // #1383 expands composite_names guidance (+112 full, 0 compact).
+ // LAB-2098 describes the inline node card in compact parameters (+15 bytes).
  for(const [tools,bytes,hash] of [
   [nodeApiTools,205179,'c15fc9697afa16e671be18c17f916dc220fb8b3491992ea37766958632f41105'],
-  [nodeApiTools.map(userNodeTool),14839,'6d59bccb09e8d3fd7d56aa2711c7ccfc2bef03461ab1fd6273177cb3f75763a0'],
+  [nodeApiTools.map(userNodeTool),14854,'3071a7539b43f7d1ac7f5dcfdb140a0eb3bea2c9c02cd440160cc9ed1797ab31'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
   assert.equal(Buffer.byteLength(json),bytes);
