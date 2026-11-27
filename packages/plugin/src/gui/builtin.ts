@@ -370,7 +370,15 @@ export interface BuiltinContext extends Context {
   readonly locale: BuiltinLocale
   /** The session layout, with `command`. */
   readonly layout: BuiltinLayout
-  readonly router: Context["router"] & { openPage(id: string): void }
+  /** The app's route, with navigation to a built-in plugin's pages. */
+  readonly router: Context["router"] & {
+    /**
+     * Opens a top-level page contributed by the calling plugin. Waits for the app interface to mount.
+     *
+     * @param id - The page's id within the plugin, as registered with `Page`.
+     */
+    openPage(id: string): void
+  }
   /** Stores whose older homes may be parts of shared app keys. */
   readonly storage: BuiltinStorage
 }

@@ -774,7 +774,7 @@ export const builtins = compose({
   "microsoft-office": microsoftOffice,
   sources,
   goal,
-  "loginom-gui": loginom,
+  "loginom-gui": { ...loginom, mainEntry: () => import("./loginom-gui/main") },
 })
 ```
 
