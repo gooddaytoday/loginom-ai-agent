@@ -2598,9 +2598,24 @@ def check_case_excel_artifact(replies, profile, folder, artifact, output):
         columns=columns, rows=[[row[col['name']] for col in columns] for row in output['rows']], row_count=len(output['rows'])))
 
 
-def downloaded_csv(profile, destination):
-    files = [p for p in profile.rglob(Path(destination).name) if 'artifacts/input/' not in str(p)]
-    assert len(files) == 1, 'DOWNLOAD_MISSING_OR_AMBIGUOUS'
+def downloaded_csv(profile, destination, replies=()):
+    name = Path(destination).name
+    files = [p for p in profile.rglob(name) if p.is_file() and 'artifacts/input/' not in p.relative_to(profile).as_posix()]
+    if files or not replies:
+        assert len(files) == 1, 'DOWNLOAD_MISSING_OR_AMBIGUOUS'
+        return files[0]
+
+    # A native export can keep its original name in the retained output slot
+    # even when the separately delivered copy has a different name.
+    receipts = {(f.get('artifact_id'), f.get('bytes'), f.get('sha256'))
+                for _, reply in replies if reply.get('status') == 'SUCCEEDED' and reply.get('cleanup_complete') is True
+                for f in reply.get('output', {}).get('file_artifacts', []) if f.get('destination') == destination}
+    assert len(receipts) == 1, 'DOWNLOAD_MISSING_OR_AMBIGUOUS'
+    artifact_id, size, digest = receipts.pop()
+    assert isinstance(artifact_id, str) and re.fullmatch(r'[\w-]+', artifact_id), 'DOWNLOAD_MISSING_OR_AMBIGUOUS'
+    files = [p / name for p in profile.glob(f'**/artifacts/input/output-{artifact_id}') if (p / name).is_file()]
+    assert len(files) == 1 and files[0].resolve().is_relative_to(profile.resolve()), 'DOWNLOAD_MISSING_OR_AMBIGUOUS'
+    assert files[0].stat().st_size == size and hashlib.sha256(files[0].read_bytes()).hexdigest() == digest, 'DOWNLOAD_RECEIPT_MISMATCH'
     return files[0]
 
 
@@ -3976,7 +3991,7 @@ class Runner:
         sampling_csvs = []
         for index, destination in enumerate(destinations):
             actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
-            shutil.copyfile(downloaded_csv(profile, destination), actual)
+            shutil.copyfile(downloaded_csv(profile, destination, replies), actual)
             if spec.get('text_export_encodings'):
                 self.phase('oracle-' + str(index + 1), [sys.executable, '-B', src / 'oracle.py',
                     '--csv', actual, '--encoding', spec['text_export_encodings'][index]], folder, timeout=60)

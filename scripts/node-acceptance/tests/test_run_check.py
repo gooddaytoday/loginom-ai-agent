@@ -1,6 +1,7 @@
 import copy
 from contextlib import redirect_stdout
 import csv
+import hashlib
 import importlib.util
 import io
 import json
@@ -3207,6 +3208,42 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                 path.write_text('SKU,Requested\nA,1\n')
             self.assertEqual(runner.downloaded_csv(profile, '/user/smoke-4-n1-shortages.csv'), profile / 'artifacts/smoke-4-n1-shortages.csv')
             with self.assertRaises(AssertionError): runner.downloaded_csv(profile, '/user/shortages.csv')
+            duplicate = profile / 'another-attempt/artifacts/smoke-4-n1-shortages.csv'
+            duplicate.parent.mkdir(parents=True)
+            duplicate.write_bytes(path.read_bytes())
+            with self.assertRaisesRegex(AssertionError, 'DOWNLOAD_MISSING_OR_AMBIGUOUS'):
+                runner.downloaded_csv(profile, '/user/smoke-4-n1-shortages.csv')
+
+    def test_download_uses_verified_export_when_delivered_copy_is_renamed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            profile = Path(folder)
+            artifacts = profile / 'attempt/artifacts'
+            original = artifacts / 'input/output-export-id/run-joined_orders.csv'
+            original.parent.mkdir(parents=True)
+            data = b'OrderID,Revenue\n10,42\n'
+            original.write_bytes(data)
+            for prefix in ['', 'a' * 64 + '-0-']:
+                (artifacts / (prefix + 'run-joined-orders.csv')).write_bytes(data)
+
+            destination = '/user/run-joined_orders.csv'
+            artifact = dict(artifact_id='export-id', destination=destination, bytes=len(data),
+                            sha256=hashlib.sha256(data).hexdigest())
+            reply = dict(status='SUCCEEDED', cleanup_complete=True, output={'file_artifacts': [artifact]})
+            self.assertEqual(runner.downloaded_csv(profile, destination, [(1, reply), (2, reply)]), original)
+            with self.assertRaisesRegex(AssertionError, 'DOWNLOAD_MISSING_OR_AMBIGUOUS'):
+                runner.downloaded_csv(profile, '/another/run-joined_orders.csv', [(1, reply)])
+
+            other_artifact = dict(artifact, artifact_id='another-export-id')
+            conflicting_reply = dict(reply, output={'file_artifacts': [other_artifact]})
+            with self.assertRaisesRegex(AssertionError, 'DOWNLOAD_MISSING_OR_AMBIGUOUS'):
+                runner.downloaded_csv(profile, destination, [(1, reply), (2, conflicting_reply)])
+
+            original.write_bytes(data.replace(b'42', b'43'))
+            with self.assertRaisesRegex(AssertionError, 'DOWNLOAD_RECEIPT_MISMATCH'):
+                runner.downloaded_csv(profile, destination, [(1, reply)])
+            original.unlink()
+            with self.assertRaisesRegex(AssertionError, 'DOWNLOAD_MISSING_OR_AMBIGUOUS'):
+                runner.downloaded_csv(profile, destination, [(1, reply)])
 
     def test_port_path_requires_freshness_and_cleanup(self):
         port = {'port': 0, 'schema': [], 'sample': [], 'freshness_basis': 'completed_execution_port_source'}
