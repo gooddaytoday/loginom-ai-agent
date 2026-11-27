@@ -234,7 +234,9 @@ async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,exte
  const toolbar='MF;cntMain;tlbMainToolbar',button=toolbar+';btnFilestorage';
  const strip='MF;cntMain;cntWorkspace;Workspace;t.br';
  const temporary={tab_tid:strip+';tb-3',prefix:'MF;TF-3'};
- const restored=fault==='native restore'||fault==='foreign restore';
+ const nextFiles={tab_tid:strip+';tb-4',prefix:'MF;TF-4'};
+ const chain=['restored twice','foreign second restore'].includes(fault);
+ const restored=chain||['native restore','foreign restore','stale restored strip'].includes(fault);
  let files={tab_tid:strip+';tb-2',prefix:'MF;TF-2'};
  const originalFiles=files;
  let nav,table,row,folder,anchor,file;
@@ -250,14 +252,20 @@ async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,exte
  Object.assign(base,{active_tab_ref:page.uiReference(base.workflow_ref.tab_tid),
   navigation_context:{status:'observed',kind:'workflow',path:[{tid:base.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Сценарий',label:'Сценарий'}]}});
  let directory=startInFiles?'/worker':null,top=0,revision=0,attempts=0,scrolls=0,rowRef='ui-parent-row';
+ let staleStripReads=0;
  let retrySamples=0,folderClicks=0,downloadStarts=0,mtime='native-time',returnDeadline,returnReceiptReadable=false,returnClicked=false;
  const filesTab=page.app.Application.FInstance.FMainForm.Items.Workspace;
  const getActiveTab=filesTab.getActiveTab;
  filesTab.getActiveTab=()=>directory===null?getActiveTab():{};
  const evaluate=page.evaluate.bind(page),elements=page.elements.bind(page),click=page.click.bind(page);
- page.elements=()=>[...elements(),page.element(button),page.element(folder)];
+ const filesRoot=()=>files.prefix+';cnrNaviMode;b.s_Сервер>Файлы';
+ page.elements=()=>[...elements(),page.element(button),page.element(folder),...(chain?[page.element(filesRoot())]:[])];
  page.click=async item=>{
   if(item.tid===button){if(restored)setFiles(temporary);directory='/';top=0;revision++;return;}
+  if(chain&&item.tid===filesRoot()){
+   if(fault==='foreign second restore')page.uiRefs.set(nextFiles.tab_tid,'ui-foreign-second-tab');
+   setFiles(nextFiles);directory='/worker';revision++;return;
+  }
   if(item.tid===base.workflow_ref.tab_tid){
    returnClicked=true;
    if(fault==='return uncertain'||returnFault==='unknown click')throw Error('Return click outcome was lost');
@@ -271,6 +279,7 @@ async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,exte
   if(restored&&files===temporary){
    if(fault==='foreign restore')page.uiRefs.set(originalFiles.tab_tid,'ui-foreign-tab');
    setFiles(originalFiles);
+   if(chain)directory='/previous';
   }
   if(fault==='files replaced')page.uiRefs.set(files.tab_tid,'ui-replacement-files');
  };
@@ -298,13 +307,15 @@ async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,exte
    directory_entries:2,row_ref:'ui-file-row'}};
   const scenario=element(base.workflow_ref.tab_tid,'Сценарий',['click']);
   if(returnFault==='clipped')scenario.interaction={state:'point_not_observed',point:null};
-  state.ui.elements=!inFiles?(rootRef===page.uiReference(strip)?[scenario,...(restored?[element(originalFiles.tab_tid,'worker')]:[])]:[element(button,'',['click'])])
+  state.ui.elements=!inFiles?(rootRef===page.uiReference(strip)?[scenario,...(restored?[element(originalFiles.tab_tid,'worker')]:[]),
+    ...(chain?[element(nextFiles.tab_tid,'next')]:[])]:[element(button,'',['click'])])
    :rootRef===scenario.ref?[scenario]
    :rootRef===page.uiReference(strip)?[scenario,element(files.tab_tid,'Файлы'),...(restored&&files===originalFiles?[element(temporary.tab_tid,'Файлы')]:[])]
+   :chain&&directory==='/previous'?[element(filesRoot(),'Файлы',['click'])]
    :directory==='/'?[{...element(folder,'worker',['double_click']),storage_entry:{kind:'folder'}}]
    :rootRef===page.uiReference(table)?[up,...(top&&fault!=='missing'?[csv]:[])]:rootRef===page.uiReference(file)?[csv]:[];
   if(rootRef)state.observation_root={ref:rootRef,identity:element(rootRef===page.uiReference(strip)?strip:inFiles
-   ?[nav,table,folder,file,base.workflow_ref.tab_tid].find(tid=>page.uiReference(tid)===rootRef):toolbar).identity};
+   ?[nav,table,folder,file,filesRoot(),base.workflow_ref.tab_tid].find(tid=>page.uiReference(tid)===rootRef):toolbar).identity};
   return state;
  };
  page.evaluate=async(fn,arg)=>{
@@ -313,6 +324,8 @@ async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,exte
    if(returnClicked&&['unknown verification','lost return verification'].includes(returnFault)&&arg.discoverRoots)
     throw Error('Return observation was lost');
    if(directory!==null&&arg.rootRef===page.uiReference(strip))abortReturn?.();
+   if(fault==='stale restored strip'&&files===originalFiles&&directory!==null&&arg.rootRef===page.uiReference(strip)&&staleStripReads++===0)
+    throw Object.assign(Error('Observed root is detached'),{code:'UI_ROOT_STALE'});
    if(fault==='repaint'&&attempts===1&&arg.rootRef===page.uiReference(table)&&++retrySamples===2)revision++;
    return stateFor(arg);
   }
@@ -421,6 +434,21 @@ test('Files list refuses a replacement tab with the same native tab ID',async t=
  const f=await storageScrollAfterFolder(t,{listing:true,fault:'foreign restore'});
  assert.equal(f.result.status,'FAILED');assert.deepEqual(f.notices,[]);
  assert.equal(f.page.events.filter(event=>event==='mouse_click').length,2);
+});
+
+for(const fault of ['stale restored strip','restored twice'])test('Files list returns after '+fault,async t=>{
+ const f=await storageScrollAfterFolder(t,{listing:true,fault});
+ assert.equal(f.result.status,'SUCCEEDED',JSON.stringify(f.records.filter(record=>record.phase.endsWith('_failed'))));
+ assert.equal(f.result.output.directory,'/worker');
+ assert.deepEqual(f.notices,['restored']);
+ assert.equal(f.page.events.filter(event=>event==='mouse_click').length,fault==='restored twice'?4:3);
+});
+
+test('Files list refuses a replacement on the second tab restoration',async t=>{
+ const f=await storageScrollAfterFolder(t,{listing:true,fault:'foreign second restore'});
+ assert.equal(f.result.status,'FAILED');
+ assert.deepEqual(f.notices,[]);
+ assert.equal(f.page.events.filter(event=>event==='mouse_click').length,3);
 });
 
 test('Files scroll waits for two stable observations before reissuing',async t=>{

@@ -3562,13 +3562,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             &&fresh.dom_epoch.document===previous.dom_epoch.document
             &&!same(fresh.workflow_ref,previous.workflow_ref)){
             if(workflowBeforeFiles){
-              const tabs=await tabStrip(s);
+              let tabs;
+              try{tabs=await tabStrip(s);}catch(error){if(error.code==='UI_ROOT_STALE')return null;throw error;}
               if(!quiet(tabs)||!same(binding(tabs),binding(fresh))||!previous.active_tab_ref
                 ||!same(owner(previous),owner(filesEntered))||previous.active_tab_ref!==filesEntered.active_tab_ref
                 ||!same(owner(fresh).slice(0,3),owner(workflowBeforeFiles).slice(0,3))
                 ||!tabsBeforeFiles.some(tab=>tabMatches(tab,fresh))
                 ||tabs.ui.elements.filter(tab=>tabMatches(tab,fresh)).length!==1
-                ||tabsBeforeFiles.some(tab=>tab.tid===previous.workflow_ref.tab_tid||tab.ref===previous.active_tab_ref))
+                ||tabsBeforeFiles.some(tab=>(tab.tid===previous.workflow_ref.tab_tid||tab.ref===previous.active_tab_ref)
+                  &&!tabMatches(tab,previous)))
                 throw Error('Original Files owner could not be verified');
               filesEntered=fresh;
             }
