@@ -461,7 +461,7 @@ export function builtinCatalog(catalog: BuiltinCatalog): Catalog {
   return catalog as Catalog
 }
 
-/** The pending request and its owning server, with a callback to append a line to the conversation. */
+/** The pending request and its owning server, with a callback to close the prompt. */
 export interface PermissionDockInput {
   /** The pending permission request, including the session that owns it. */
   readonly request: PermissionRequest
@@ -469,8 +469,10 @@ export interface PermissionDockInput {
   readonly client: OpenCodeClient
   /** The workspace directory to use for location-scoped RPCs. */
   readonly directory: string
-  /** Append localized feedback after the server accepts the response and close the prompt. */
-  readonly record: (text: string) => void
+  /** Localized description, when the application recognizes the tool. */
+  readonly description?: string
+  /** Close the prompt after the server accepts the response. */
+  readonly confirm: () => void
 }
 
 /** Replaces the pending permission prompt in the composer. The first matching contribution is used. */

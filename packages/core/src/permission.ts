@@ -3,6 +3,7 @@ export * as Permission from "./permission.js"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Context, Deferred, Effect, Layer, Schema } from "effect"
 import { Permission } from "@opencode/schema/permission"
+import { SessionEvent } from "@opencode/schema/session-event"
 import type { Tool } from "@opencode/schema/tool"
 import { Bus } from "./bus.js"
 import { Location } from "./location.js"
@@ -47,6 +48,7 @@ export interface ReplyInput {
   readonly requestID: ID
   readonly reply: Reply
   readonly message?: string
+  readonly notice?: string
 }
 
 export interface AskResult {
@@ -308,6 +310,21 @@ const layer = Layer.effect(
         Effect.gen(function* () {
           const existing = pending.get(input.requestID)
           if (!existing) return yield* new NotFoundError({ requestID: input.requestID })
+          pending.delete(input.requestID)
+          if (input.notice) {
+            const description = input.notice
+            let sessionID: SessionSchema.ID | undefined = existing.request.sessionID
+            while (sessionID) {
+              const session: SessionSchema.Info | undefined = yield* sessions.get(sessionID)
+              if (!session) break
+              yield* bus.publish(SessionEvent.PermissionReplied, {
+                sessionID,
+                requestID: existing.request.id,
+                description,
+              })
+              sessionID = session.parentID
+            }
+          }
           yield* bus.publish(Permission.Event.Replied, {
             sessionID: existing.request.sessionID,
             requestID: existing.request.id,
@@ -319,7 +336,6 @@ const layer = Layer.effect(
               existing.deferred,
               input.message ? new CorrectedError({ feedback: input.message }) : new DeclinedError(),
             )
-            pending.delete(input.requestID)
             for (const [id, item] of pending) {
               if (item.request.sessionID !== existing.request.sessionID) continue
               yield* bus.publish(Permission.Event.Replied, {
@@ -345,7 +361,6 @@ const layer = Layer.effect(
             })
           }
           yield* Deferred.succeed(existing.deferred, undefined)
-          pending.delete(input.requestID)
           if (input.reply !== "always" || !existing.request.save?.length) return
 
           for (const [id, item] of pending) {

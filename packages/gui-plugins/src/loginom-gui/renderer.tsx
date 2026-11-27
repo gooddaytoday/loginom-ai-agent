@@ -1,5 +1,6 @@
 import { PermissionDock } from "@opencode/plugin/gui/builtin"
 import PermissionPrompt from "./permission-dock"
+import { permissionDescription } from "./permission-model"
 import { SettingsPage, type Plugin } from "@opencode/plugin/gui"
 import { lazy, Suspense } from "solid-js"
 import type definition from "./index"
@@ -7,7 +8,7 @@ import type definition from "./index"
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   ctx.add(PermissionDock, {
     id: "loginom",
-    matches: () => true,
+    matches: (request) => permissionDescription(request) !== undefined,
     get waiting() {
       return ctx.t("permissionWaiting")
     },

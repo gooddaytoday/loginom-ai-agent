@@ -274,7 +274,6 @@ function SessionScreenContent(props: {
     return request && pluginHost.items(PermissionDock).find((item) => item.value.matches(request))?.value.waiting
   })
 
-  const [permissionTraces, setPermissionTraces] = createStore<Record<string, readonly string[]>>({})
   const [headerGap, setHeaderGap] = createSignal<HTMLElement>()
 
   const registerHeaderGap = (gap: HTMLElement) => {
@@ -323,9 +322,6 @@ function SessionScreenContent(props: {
             bottomInset={timeline.inset()}
             footer={
               <div classList={{ "md:max-w-session md:mx-auto": screen.centered() }}>
-                <For each={permissionTraces[source.identity.sessionID() ?? ""]}>
-                  {(text) => <div class="px-4 py-1 text-sm text-text-weak break-words">{text}</div>}
-                </For>
                 <Show when={active() && permissionWaiting()}>
                   {(text) => (
                     <div role="status" class="px-4 py-1 text-sm text-text-weak">
@@ -463,9 +459,6 @@ function SessionScreenContent(props: {
               screen={props.screen}
               model={model}
               suggestionBoundary={timeline.visible}
-              recordPermission={(text, sessionID) =>
-                setPermissionTraces(sessionID, (previous) => [...(previous ?? []), text])
-              }
             />
           )}
         </Show>

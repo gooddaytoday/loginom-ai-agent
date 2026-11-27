@@ -68,9 +68,10 @@ const boot = (
   config: Record<string, unknown> = {},
   extra: (ctx: PluginContext) => Effect.Effect<void, never, Scope.Scope> = () => Effect.void,
   policies?: readonly Record<string, unknown>[],
+  persisted?: string,
 ) =>
   Effect.gen(function* () {
-    const dir = (yield* tmpdirScoped("loginom-permissions-")).path
+    const dir = persisted ?? (yield* tmpdirScoped("loginom-permissions-")).path
     const global = path.join(dir, "global")
     const system = path.join(global, "system")
     const location = Location.Ref.make({ directory: AbsolutePath.make(dir) })
@@ -95,7 +96,7 @@ const boot = (
         {
           // Schedules are on by default in the dev channel; the project's own config file is read.
           app: { channel: "dev", version: "test" },
-          database: { path: ":memory:" },
+          database: { path: persisted ? path.join(dir, "service.sqlite") : ":memory:" },
           config: { claude: false },
           models: { fetch: false, snapshot: false },
           fs: { filewatcher: false, fff: false },
@@ -165,12 +166,18 @@ const boot = (
       call(`/api/session/${sessionID}/permission?${at}`).pipe(
         Effect.map((response) => response.body.data as { id: string; action: string; resources: string[] }[]),
       )
-    const reply = (sessionID: string, requestID: string, decision: "once" | "always" | "reject", message?: string) =>
-      call(`/api/session/${sessionID}/permission/${requestID}/reply?${at}`, { decision, message }).pipe(
+    const reply = (
+      sessionID: string,
+      requestID: string,
+      decision: "once" | "always" | "reject",
+      message?: string,
+      notice?: string,
+    ) =>
+      call(`/api/session/${sessionID}/permission/${requestID}/reply?${at}`, { decision, message, notice }).pipe(
         Effect.map((response) => response.status),
       )
-    const conversation = (sessionID: string, requestID: string) =>
-      call(`/api/rpc/loginom.permission/conversation?${at}`, { input: { sessionID, requestID } })
+    const conversation = (sessionID: string, requestID: string, notice?: string) =>
+      call(`/api/rpc/loginom.permission/conversation?${at}`, { input: { sessionID, requestID, notice } })
     const saved = call(`/api/permission/saved?${at}`).pipe(Effect.map((response) => response.body.data as unknown[]))
     const prompt = (sessionID: Session.ID, text: string) =>
       sessions.prompt({ sessionID, text }).pipe(Effect.andThen(sessions.wait(sessionID)))
@@ -333,6 +340,56 @@ describe("loginom.product permissions (B2.6a)", () => {
         expect((yield* test.conversation(id, first.id)).status).toBe(200)
         expect((yield* test.open(id)).map((item) => item.id)).toEqual([web.id])
         expect(second.effect).toBe("ask")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "retains a grant and chronological receipts across service restart, with no grant in children or forks",
+    () =>
+      Effect.gen(function* () {
+        const dir = (yield* tmpdirScoped("loginom-permissions-restart-")).path
+        const edit = { action: "edit", resources: ["file.md"] }
+        const receipt = "You allowed editing in this conversation"
+        const childReceipt = "You declined the child's edit"
+        const parentID = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const test = yield* boot({}, undefined, undefined, dir)
+            const id = yield* test.create("original conversation")
+            yield* test.prompt(id, script({ text: "before the permission" }))
+            const first = yield* test.ask(id, edit)
+            expect(first.effect).toBe("ask")
+            expect((yield* test.conversation(id, first.id, receipt)).status).toBe(200)
+            const child = yield* test.sessions.create({ parentID: id })
+            const question = yield* test.ask(child.id, edit)
+            expect(question.effect).toBe("ask")
+            expect(yield* test.reply(child.id, question.id, "reject", undefined, childReceipt)).toBe(204)
+            const messages = yield* test.sessions.messages({ sessionID: child.id })
+            expect(messages).toContainEqual(expect.objectContaining({ description: childReceipt }))
+            yield* test.prompt(id, script({ text: "after the permission" }))
+            const context = JSON.stringify((yield* test.requests(id)).at(-1)?.messages)
+            expect(context).not.toContain(receipt)
+            expect(context).not.toContain(childReceipt)
+            return id
+          }),
+        )
+        const restarted = yield* boot({}, undefined, undefined, dir)
+        expect((yield* restarted.ask(parentID, edit)).effect).toBe("allow")
+        const fork = yield* restarted.sessions.fork({ sessionID: parentID })
+        expect((yield* restarted.ask(fork.id, edit)).effect).toBe("ask")
+        expect(yield* restarted.saved).toEqual([])
+        const messages = yield* restarted.sessions.messages({ sessionID: parentID })
+        const history = messages.map((message) => {
+          if (message.type === "user") return message.text
+          if (message.type === "system") return message.description
+          return undefined
+        })
+        expect(history.filter(Boolean).toReversed()).toEqual([
+          script({ text: "before the permission" }),
+          receipt,
+          childReceipt,
+          script({ text: "after the permission" }),
+        ])
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )

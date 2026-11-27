@@ -162,6 +162,8 @@ export type EventSeq = number
 
 export type WorkspaceID = string
 
+export type PermissionID = string
+
 export type InstructionKey = string
 
 export type InstructionHash = string
@@ -287,8 +289,6 @@ export type ProjectIcon = { url?: string; override?: string; color?: string }
 export type ProjectCommands = { start?: string }
 
 export type ProjectTime = { created: number; updated: number; active: number; archived?: number }
-
-export type PermissionID = string
 
 export type PermissionSource = { type: "tool"; messageID: string; id: string }
 
@@ -1225,6 +1225,16 @@ export type SessionMetadataUpdated = {
   durable: { aggregateID: string; seq: EventSeq; version: 1 }
   location?: LocationRef
   data: { sessionID: SessionID; metadata: SessionMetadata }
+}
+
+export type SessionPermissionReplied = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "session.permission.replied"
+  durable: { aggregateID: string; seq: EventSeq; version: 1 }
+  location?: LocationRef
+  data: { sessionID: SessionID; requestID: PermissionID; description: string }
 }
 
 export type SessionViewed = {
@@ -2845,6 +2855,7 @@ export type SessionEventDurable =
   | SessionRenamed
   | SessionMetadataUpdated
   | SessionPermissions
+  | SessionPermissionReplied
   | SessionViewed
   | SessionArchived
   | SessionUnarchived
@@ -2903,6 +2914,7 @@ export type V2Event =
   | SessionRenamed
   | SessionMetadataUpdated
   | SessionPermissions
+  | SessionPermissionReplied
   | SessionViewed
   | SessionArchived
   | SessionUnarchived
@@ -4318,6 +4330,7 @@ export type PermissionReplyInput = {
   readonly requestID: string
   readonly decision: "once" | "always" | "reject"
   readonly message?: string | undefined
+  readonly notice?: string | undefined
 }
 
 export type PermissionReplyOutput = void
@@ -4402,6 +4415,7 @@ export type EventSubscribeInput = {
         | "session.renamed"
         | "session.metadata.updated"
         | "session.permissions"
+        | "session.permission.replied"
         | "session.viewed"
         | "session.archived"
         | "session.unarchived"

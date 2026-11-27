@@ -6,7 +6,11 @@ export const PermissionConversation = {
     conversation: {
       input: {
         type: "object",
-        properties: { sessionID: { type: "string" }, requestID: { type: "string" } },
+        properties: {
+          sessionID: { type: "string" },
+          requestID: { type: "string" },
+          notice: { type: "string" },
+        },
         required: ["sessionID", "requestID"],
         additionalProperties: false,
       },

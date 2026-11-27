@@ -499,6 +499,7 @@ export namespace Timeline {
                 message.type === "compaction" ||
                 message.type === "model-switched" ||
                 message.type === "location-switched" ||
+                (message.type === "system" && message.metadata?.notice === "permission-replied") ||
                 (message.type === "synthetic" && timelineNoticePlacement(message, detail) === "separate")
                   ? [message.id]
                   : [],

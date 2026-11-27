@@ -142,9 +142,9 @@ export function TabNavItem(
 
     if (!props.session) return
 
-    if (props.attention) return "attention"
-
     if (props.active && !serverCtx()?.notification.session.manuallyUnread(props.session.id)) return
+
+    if (props.attention) return "attention"
 
     if (!props.unread) return
 

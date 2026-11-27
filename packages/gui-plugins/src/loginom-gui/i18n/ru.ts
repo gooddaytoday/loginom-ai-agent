@@ -38,6 +38,13 @@ export default {
   permissionInstead: "Или скажите, что сделать иначе",
   permissionSend: "Отправить",
   permissionFailed: "Не удалось отправить ответ. Попробуйте ещё раз.",
+  permissionNotGrantable:
+    "Политика администратора не разрешает одобрить это действие на весь разговор. Вы можете ответить на этот запрос отдельно.",
+  permissionAction: "Разрешить действие",
+  permissionRead: "Получить доступ к локальному файлу",
+  permissionExport: "Запустить сценарий с выгрузкой",
+  permissionPublish: "Опубликовать дашборд в Loginom",
+  permissionDelete: "Удалить дашборд в Loginom",
   permissionScope: "В этом разговоре: {{scope}}",
   permissionSave: "Сохранить пакет в Loginom",
   permissionSaveAs: "По этому пути будет сохранён пакет",

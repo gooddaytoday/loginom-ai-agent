@@ -2347,6 +2347,16 @@
               }
             }
           },
+          "403": {
+            "description": "ForbiddenError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenErrorEncoded"
+                }
+              }
+            }
+          },
           "404": {
             "description": "SessionNotFoundError | SkillNotFoundError | LocationNotFoundError",
             "content": {
@@ -9161,6 +9171,16 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "notice": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": ["decision"],
@@ -10099,6 +10119,7 @@
                     "session.renamed",
                     "session.metadata.updated",
                     "session.permissions",
+                    "session.permission.replied",
                     "session.viewed",
                     "session.archived",
                     "session.unarchived",
@@ -10210,6 +10231,7 @@
                           "session.renamed",
                           "session.metadata.updated",
                           "session.permissions",
+                          "session.permission.replied",
                           "session.viewed",
                           "session.archived",
                           "session.unarchived",
@@ -22899,6 +22921,9 @@
             "$ref": "#/components/schemas/session.permissions"
           },
           {
+            "$ref": "#/components/schemas/session.permission.replied"
+          },
+          {
             "$ref": "#/components/schemas/session.viewed"
           },
           {
@@ -25410,6 +25435,9 @@
           },
           {
             "$ref": "#/components/schemas/session.permissions"
+          },
+          {
+            "$ref": "#/components/schemas/session.permission.replied"
           },
           {
             "$ref": "#/components/schemas/session.viewed"
@@ -28572,6 +28600,61 @@
               }
             },
             "required": ["sessionID", "location", "projectID"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "created", "type", "durable", "data"],
+        "additionalProperties": false
+      },
+      "session.permission.replied": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Event.ID"
+          },
+          "created": {
+            "type": "number"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["session.permission.replied"]
+          },
+          "durable": {
+            "type": "object",
+            "properties": {
+              "aggregateID": {
+                "type": "string"
+              },
+              "seq": {
+                "$ref": "#/components/schemas/Event.Seq"
+              },
+              "version": {
+                "$ref": "#/components/schemas/Event.VersionEncoded_c77c5abcb68d"
+              }
+            },
+            "required": ["aggregateID", "seq", "version"],
+            "additionalProperties": false
+          },
+          "location": {
+            "$ref": "#/components/schemas/Location.Ref"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "sessionID": {
+                "$ref": "#/components/schemas/Session.ID"
+              },
+              "requestID": {
+                "$ref": "#/components/schemas/Permission.ID"
+              },
+              "description": {
+                "type": "string"
+              }
+            },
+            "required": ["sessionID", "requestID", "description"],
             "additionalProperties": false
           }
         },

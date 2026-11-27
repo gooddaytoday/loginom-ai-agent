@@ -225,10 +225,10 @@ export default Plugin.define({
 
     // Product permissions (B2.6a, `./permissions`): the defaults go into every agent's rules, the hook settles what rules
     // cannot express. It is registered before `localFiles`, whose rules-only check then still turns a remaining `ask`
-    // into `allow`. Conversation grants are memory only, keyed by the exact session ID, like access grants: a restart
-    // asks again, and a subagent's or a fork's session holds none.
+    // into `allow`. Core copies session.permissions into forks and children. The plugin store keeps each grant
+    // bound to the session that received it, even after a restart.
     const subagents = new Set<string>()
-    const conversation = new Map<string, Set<Kind>>()
+    const conversationKey = (sessionID: string, kind: Kind) => `permission/conversation/${sessionID}/${kind}`
     // The product's own directories outside the project, which the agent reads without the «outside the project»
     // question (B2.6a2): the full text of a large tool result (`<data>/tool-output`, where OpenCode and `dock.ts` keep
     // it), the bundled skills' files and the `plan` agent's plans (the directory of `core/src/plugin/plan.ts`).
@@ -302,10 +302,16 @@ export default Plugin.define({
         return
       }
       const tool = event.source ? calls.get(`${event.source.messageID} ${event.source.id}`) : undefined
+      const entry = classify(event.action, event.resources)
+      const granted =
+        event.effect !== "deny" &&
+        entry &&
+        grantable(entry) &&
+        (await ctx.storage.get(conversationKey(event.sessionID, entry.kind))) === true
       const settled = settle(
         event,
         event.agent !== undefined && subagents.has(event.agent),
-        conversation.get(event.sessionID) ?? new Set(),
+        granted && entry ? new Set([entry.kind]) : new Set(),
         ownRead(tool, event, own),
       )
       event.effect = settled.effect
@@ -501,7 +507,11 @@ export default Plugin.define({
     })
     await ctx.rpc.register(PermissionConversation, {
       conversation: async (value, call) => {
-        const input = value as { sessionID: string; requestID: string }
+        const input = value as {
+          sessionID: string
+          requestID: string
+          notice?: string
+        }
         const request = await ctx.permission.get(input)
         const entry = classify(request.action, request.resources)
         if (!entry || !grantable(entry))
@@ -520,15 +530,15 @@ export default Plugin.define({
           return call.error("not_grantable", `the administrator's policy sets «${kinds[entry.kind]}»`, {
             action: request.action,
           })
-        conversation.set(input.sessionID, new Set([...(conversation.get(input.sessionID) ?? []), entry.kind]))
-        // The request itself and the session's other open requests the grant now covers are answered once; nothing is
-        // saved for the project, unlike OpenCode's `always`.
+        await ctx.storage.set(conversationKey(input.sessionID, entry.kind), true)
+        // The request itself and the session's other open requests the grant now covers are answered once.
+        await ctx.permission.reply({ ...input, decision: "once" })
         const open = await ctx.permission.list({ sessionID: input.sessionID })
         await Promise.all(
           open
             .filter((item) => {
               const other = classify(item.action, item.resources)
-              return item.id === request.id || (grantable(other) && other?.kind === entry.kind)
+              return grantable(other) && other?.kind === entry.kind
             })
             .map((item) => ctx.permission.reply({ sessionID: input.sessionID, requestID: item.id, decision: "once" })),
         )

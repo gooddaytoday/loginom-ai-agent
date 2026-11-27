@@ -244,9 +244,10 @@ export async function dockTools(input: {
     const resource = localPackage ? "local_package" : typeof target === "string" ? target : "*"
     const actionInput = args.parameters
     const path = actionInput && typeof actionInput === "object" && "path" in actionInput ? actionInput.path : undefined
+    const targetPath = packagePath ?? (typeof path === "string" ? path : args.package_path)
     const details = {
-      operation: args.action_key,
-      path: packagePath ?? (typeof path === "string" ? path : args.package_path),
+      ...(typeof args.action_key === "string" ? { operation: args.action_key } : {}),
+      ...(typeof targetPath === "string" ? { path: targetPath } : {}),
     }
     await input.files
       .ask(call, { action: key, resources: [resource], save: ["*"], metadata: { loginom: details } })

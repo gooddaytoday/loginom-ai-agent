@@ -139,6 +139,17 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
       "session.renamed": () => Effect.void,
       "session.metadata.updated": () => Effect.void,
       "session.permissions": () => Effect.void,
+      "session.permission.replied": (event) =>
+        adapter.appendMessage(
+          SessionMessage.System.make({
+            id: SessionMessage.ID.fromEvent(event.id),
+            type: "system",
+            text: "",
+            description: event.data.description,
+            metadata: { notice: "permission-replied" },
+            time: { created },
+          }),
+        ),
       "session.deleted": () => Effect.void,
       "session.forked": () => Effect.void,
       "session.inbox.delivered": () => Effect.void,

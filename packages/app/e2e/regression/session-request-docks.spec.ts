@@ -1,5 +1,6 @@
-import type { OpenCodeEvent } from "@opencode/client/promise"
+import type { OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
 import { expect, test, type Page } from "@playwright/test"
+import { Option, Schema } from "effect"
 import { SERVER, sessionHref } from "../utils/app"
 import { installSseTransport } from "../utils/sse-transport"
 import { expectSessionTitle } from "../utils/waits"
@@ -270,16 +271,20 @@ test("offers only one-time consent for a terminal permission", async ({ page }) 
   await expect(permission).toBeVisible()
   await expect(permission.getByText("git status")).toBeVisible()
   await expect(permission.getByText("git diff")).toBeVisible()
-  await expect(permission.getByRole("button")).toHaveCount(1)
+  await expect(permission.getByRole("button", { name: "Allow once" })).toBeVisible()
+  await expect(permission.getByRole("button", { name: "Decline" })).toBeVisible()
+  await expect(permission.getByRole("textbox", { name: "Or say what to do instead" })).toBeVisible()
+  await expect(permission.getByRole("button", { name: /Allow in this conversation/ })).toHaveCount(0)
   await expect(page.locator('[data-component="composer"]')).toHaveCount(0)
 
   const reply = page.waitForResponse((response) => response.request().method() === "POST")
   await permission.getByRole("button", { name: "Allow once" }).click()
   const response = await reply
   expect(new URL(response.url()).pathname).toBe(`/api/session/${sessionID}/permission/permission-request/reply`)
-  expect(response.request().postDataJSON()).toEqual({ decision: "once" })
+  const body = { decision: "once", notice: "You allowed once: Run shell commands" }
+  expect(response.request().postDataJSON()).toEqual(body)
   expect(response.status()).toBe(204)
-  expect(replies).toEqual([{ sessionID, permissionID: "permission-request", body: { decision: "once" } }])
+  expect(replies).toEqual([{ sessionID, permissionID: "permission-request", body }])
   await expect(permission).toHaveCount(0)
   await expect(page.locator('[data-component="composer"]')).toBeVisible()
 })
@@ -323,7 +328,7 @@ test("sends one permission reply and closes the dock when it lands, before permi
   await expect(permission).toHaveCount(0)
   await expect(page.locator('[data-component="composer"]')).toBeVisible()
   await expect(page.getByText("Request failed", { exact: true })).toHaveCount(0)
-  expect(replies).toEqual([{ decision: "once" }])
+  expect(replies).toEqual([{ decision: "once", notice: "You allowed once: Run shell commands" }])
 })
 
 test("shows an auto-accepted permission in the dock once its replies stop answering", async ({ page }) => {
@@ -625,16 +630,29 @@ function mockServer(page: Page, requests: Pick<WorkspaceInput, "sessionPermissio
   return mockWorkspace(page, { name: "RequestDocks", directory, sessions: [{ id: sessionID, title }], ...requests })
 }
 
+const decodeNotice = Schema.decodeUnknownOption(Schema.Struct({ notice: Schema.String }))
+
 for (const decision of ["once", "conversation", "reject", "feedback"] as const) {
   test(`answers package permission with ${decision} and records it in the conversation`, async ({ page }, info) => {
     const id = "per_save_package"
     const replies: unknown[] = []
-    await mockWorkspace(page, {
+
+    const history: SessionMessageInfo[] = [
+      { id: "msg_before", type: "user", text: "Before permission", time: { created: 1700000000000 } },
+    ]
+
+    const { push } = await mockWorkspace(page, {
       name: "RequestDocks",
       directory,
       sessions: [{ id: sessionID, title }],
       seed: { locale: "ru" },
-      onPermissionReply: (reply) => replies.push(reply.body),
+      pageMessages: () => ({ items: history }),
+      onPermissionReply: (reply) => {
+        replies.push(reply.body)
+
+        const answer = Option.getOrThrow(decodeNotice(reply.body))
+        record(answer.notice)
+      },
       sessionPermissions: {
         [sessionID]: [
           {
@@ -643,14 +661,40 @@ for (const decision of ["once", "conversation", "reject", "feedback"] as const) 
             action: "loginom_dock_action_run",
             resources: ["*"],
             save: ["*"],
-            metadata: { loginom: { path: "/user/ABC-анализ.lgp", operation: "package.save_as" } },
+            metadata: { loginom: { path: "C:\\Проекты\\ABC-анализ.lgp", operation: "package.save_as" } },
           },
         ],
       },
     })
+
+    const created = 1700000001000
+
+    function record(description: string) {
+      history.push({
+        id: "msg_permission_receipt",
+        type: "system",
+        time: { created },
+        description,
+        text: "",
+        metadata: { notice: "permission-replied" },
+      })
+      void push([
+        {
+          id: "evt_permission_receipt",
+          created,
+          type: "session.permission.replied",
+          location: { directory },
+          durable: { aggregateID: sessionID, seq: 0, version: 1 },
+          data: { sessionID, requestID: id, description },
+        },
+      ])
+    }
+
     const grants: unknown[] = []
     await page.route("**/api/rpc/loginom.permission/conversation**", async (route) => {
-      grants.push(route.request().postDataJSON())
+      const body = route.request().postDataJSON()
+      grants.push(body)
+      record(body.input.notice)
       await route.fulfill({ json: { output: { kind: "save" } } })
     })
     await page.goto(sessionHref(sessionID))
@@ -658,10 +702,12 @@ for (const decision of ["once", "conversation", "reject", "feedback"] as const) 
     const dock = page.locator('[data-component="dock-prompt"][data-kind="permission"]')
     await expect(dock.getByRole("table")).toBeVisible()
     await expect(dock.getByRole("table")).toContainText("ABC-анализ.lgp")
-    await expect(dock.getByRole("table")).toContainText("/user")
+    await expect(dock.getByRole("table")).toContainText("C:\\Проекты")
     await expect(page.getByText("Жду вашего разрешения — внизу")).toBeVisible()
     await expect(dock.getByText("В этом разговоре: сохранять пакеты в Loginom")).toBeVisible()
     await expect(page.locator('[data-component="composer"]')).toHaveCount(0)
+
+    const action = "Сохранить пакет в Loginom «ABC-анализ.lgp»"
 
     if (decision === "once") {
       for (const [width, height] of [
@@ -671,32 +717,65 @@ for (const decision of ["once", "conversation", "reject", "feedback"] as const) 
         await page.setViewportSize({ width, height })
         await expect(dock.getByRole("button", { name: "Разрешить один раз" })).toBeVisible()
 
-        if (width === 1440) {
-          await expect(page.locator('[data-titlebar-tab][data-status="attention"]')).toBeVisible()
-        }
-
         await page.screenshot({ path: info.outputPath(`permission-${width}x${height}.png`), animations: "disabled" })
       }
 
       await dock.getByRole("button", { name: "Разрешить один раз" }).click()
       await expect(page.getByText(/^Вы разрешили один раз:/)).toBeVisible()
-      expect(replies).toEqual([{ decision: "once" }])
+      expect(replies).toEqual([{ decision: "once", notice: `Вы разрешили один раз: ${action}` }])
     } else if (decision === "conversation") {
       await dock.getByRole("button", { name: /^Разрешать в этом разговоре/ }).click()
       await expect(page.getByText(/^Вы разрешили в этом разговоре:/)).toBeVisible()
-      expect(grants).toEqual([{ input: { sessionID, requestID: id } }])
+      expect(grants).toEqual([{ input: { sessionID, requestID: id, notice: `Вы разрешили в этом разговоре: ${action}` } }])
       expect(replies).toEqual([])
     } else if (decision === "feedback") {
       await dock.getByRole("textbox", { name: "Или скажите, что сделать иначе" }).fill("Сохрани в другую папку")
       await dock.getByRole("button", { name: "Отправить", exact: true }).click()
       await expect(page.getByText("Вы попросили иначе: «Сохрани в другую папку»")).toBeVisible()
-      expect(replies).toEqual([{ decision: "reject", message: "Сохрани в другую папку" }])
+      expect(replies).toEqual([
+        { decision: "reject", message: "Сохрани в другую папку", notice: "Вы попросили иначе: «Сохрани в другую папку»" },
+      ])
     } else {
       await dock.getByRole("button", { name: "Отклонить" }).click()
       await expect(page.getByText(/^Вы отклонили:/)).toBeVisible()
-      expect(replies).toEqual([{ decision: "reject" }])
+      expect(replies).toEqual([{ decision: "reject", notice: `Вы отклонили: ${action}` }])
     }
 
     await expect(dock).toHaveCount(0)
+
+    if (decision === "once") {
+      history.push({ id: "msg_later", type: "user", text: "After permission", time: { created: created + 1 } })
+      await page.reload()
+      const earlier = page.getByText("Before permission", { exact: true })
+      const receipt = page.getByText(/^Вы разрешили один раз:/)
+      const later = page.getByText("After permission", { exact: true })
+      await expect(earlier).toBeVisible()
+      await expect(receipt).toBeVisible()
+      await expect(later).toBeVisible()
+      expect((await earlier.boundingBox())!.y).toBeLessThan((await receipt.boundingBox())!.y)
+      expect((await receipt.boundingBox())!.y).toBeLessThan((await later.boundingBox())!.y)
+    }
   })
 }
+
+
+test("explains a policy lock and leaves a one-time answer available", async ({ page }) => {
+  await mockServer(page, {
+    sessionPermissions: {
+      [sessionID]: [{ id: "per_locked", sessionID, action: "webfetch", resources: ["https://example.test"] }],
+    },
+  })
+  await page.route("**/api/rpc/loginom.permission/conversation**", (route) =>
+    route.fulfill({ status: 400, json: { type: "not_grantable", message: "locked", data: { action: "webfetch" } } }),
+  )
+  await page.goto(sessionHref(sessionID))
+  await expectSessionTitle(page, title)
+  const dock = page.locator('[data-component="dock-prompt"][data-kind="permission"]')
+  await expect(dock.getByText("Fetch content from a URL?")).toBeVisible()
+  const grant = dock.getByRole("button", { name: /Allow in this conversation/ })
+  await grant.click()
+  await expect(dock.getByRole("alert")).toContainText("Administrator policy")
+  await expect(grant).toHaveCount(0)
+  await expect(dock.getByRole("button", { name: "Allow once" })).toBeEnabled()
+  await expect(dock.getByRole("button", { name: "Decline" })).toBeEnabled()
+})

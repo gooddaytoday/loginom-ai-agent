@@ -422,7 +422,6 @@ export function ActiveSessionComposerRegion(props: {
   screen: SessionScreen
   model: SessionComposerController
   suggestionBoundary: () => HTMLElement | undefined
-  recordPermission: (text: string, sessionID: string) => void
 }) {
   const location = useWorkspaceLocation()
   const data = useData()
@@ -565,10 +564,7 @@ export function ActiveSessionComposerRegion(props: {
       permission={{
         client: server.api,
         directory: location().directory,
-        record: (text, sessionID, requestID) => {
-          props.model.region.state.confirmPermission(requestID)
-          props.recordPermission(text, sessionID)
-        },
+        confirm: props.model.region.state.confirmPermission,
       }}
       subagent={
         <Show when={props.session.data.info()}>

@@ -30,6 +30,7 @@ import {
   onCleanup,
   runWithOwner,
   Show,
+  type Component,
   type ParentProps,
 } from "solid-js"
 import { createStore, produce } from "solid-js/store"
@@ -39,6 +40,10 @@ import { PlatformProvider, type Platform } from "@/runtime/platform/platform"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { ServerScope } from "@/runtime/server/scope"
 import { PluginHostProvider, usePluginHost, type HostApiFactories, type PluginInput } from "../src/runtime/plugin/host"
+import { OpenCode } from "@opencode/client/promise"
+import { builtins } from "../src/runtime/plugin/builtins"
+import { SettingsProvider } from "../src/settings/model"
+import { SessionComposerRegion } from "../src/session/composer/session-composer-region"
 import { createHostApis } from "../src/runtime/plugin/host-apis"
 import type { Bridge, Entry } from "@opencode/plugin/gui/host"
 import { createRegion, RegionContent } from "../src/runtime/plugin/panels"
@@ -233,6 +238,7 @@ export function mountPluginHost() {
 export function mountPlugins(input: {
   definitions: readonly Entry[]
   disabled?: readonly string[]
+  children?: Component
   bridge?: Bridge
   stored?: Readonly<Record<string, Json>>
   /** Shows the production Extensions › Plugins rows of the desktop app's own server, which lists these plugins. */
@@ -301,6 +307,7 @@ export function mountPlugins(input: {
           )}
         </Show>
         <PluginSlot at="window.bottom" input={{}} />
+        <Show when={input.children} keyed>{(Children) => <Children />}</Show>
       </Show>
     )
   }
@@ -965,4 +972,55 @@ export function mountHostApis(input: { definitions: readonly Entry[] }) {
       container.remove()
     },
   }
+}
+
+
+export function mountPermissionComposer() {
+  const loginom = builtins.find((plugin) => plugin.id === "loginom-gui")
+
+  if (!loginom) throw new Error("Loginom GUI plugin is unavailable")
+  const client = OpenCode.make({ baseUrl: location.origin })
+
+  return mountPlugins({
+    definitions: [loginom],
+    children: () => (
+      <SettingsProvider>
+        <SessionComposerRegion
+          composer={null}
+          subagent={null}
+          permission={{ client, directory: "/fixture", confirm: () => undefined }}
+          controller={{
+            centered: () => false,
+            child: () => false,
+            showComposer: () => false,
+            onResponseSubmit: () => undefined,
+            setDockRef: () => undefined,
+            state: {
+              blocked: () => true,
+              websearch: {
+                request: () => undefined,
+                options: () => [],
+                selected: () => undefined,
+                specific: () => false,
+                loading: () => false,
+                loadFailed: () => false,
+                failed: () => false,
+                optionUnavailable: () => false,
+                sending: () => false,
+                connected: () => false,
+                select: () => undefined,
+                retry: () => undefined,
+                submit: async () => undefined,
+              },
+              questionRequest: () => undefined,
+              elicitationRequest: () => undefined,
+              permissionRequest: () => ({ id: "per_fixture", sessionID: "ses_fixture", action: "edit", resources: ["test.md"] }),
+              permissionResponding: () => false,
+              decide: () => undefined,
+            },
+          }}
+        />
+      </SettingsProvider>
+    ),
+  })
 }

@@ -10,6 +10,14 @@ const decodeToolInput = Schema.decodeUnknownOption(Schema.Record(Schema.String, 
 
 const isString = Schema.is(Schema.String)
 
+export function permissionToolDescription(action: string, t: ReturnType<typeof useLanguage>["t"]) {
+  const key = `settings.permissions.tool.${action === "shell" ? "bash" : action}.description`
+  // SAFETY: an action without a curated description returns the key itself.
+  const value = t(key as Parameters<typeof t>[0])
+
+  return value === key ? undefined : value
+}
+
 export function SessionPermissionDock(props: {
   request: PermissionRequest
   responding: boolean
@@ -17,15 +25,7 @@ export function SessionPermissionDock(props: {
 }) {
   const language = useLanguage()
 
-  const toolDescription = () => {
-    const key = `settings.permissions.tool.${props.request.action}.description`
-    // SAFETY: an action without a curated description returns the key itself, which the check below detects.
-    const value = language.t(key as Parameters<typeof language.t>[0])
-
-    if (value === key) return ""
-
-    return value
-  }
+  const toolDescription = () => permissionToolDescription(props.request.action, language.t)
 
   const input = () =>
     Option.match(decodeToolInput(props.request.metadata?.input), {

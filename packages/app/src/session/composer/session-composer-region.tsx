@@ -1,10 +1,11 @@
 import type { OpenCodeClient } from "@opencode/client/promise"
 import { PermissionDock } from "@opencode/plugin/gui/builtin"
+import { useLanguage } from "@/runtime/i18n/language"
 import { usePluginHost } from "@/runtime/plugin/host"
 import { Contribution } from "@/runtime/plugin/render"
 import { createMemo, Show, type JSX } from "solid-js"
 import { SessionElicitationDock } from "@/session/requests/session-elicitation-dock"
-import { SessionPermissionDock } from "@/session/requests/session-permission-dock"
+import { permissionToolDescription, SessionPermissionDock } from "@/session/requests/session-permission-dock"
 import { SessionQuestionDock } from "@/session/requests/session-question-dock"
 import { questionMotion } from "@/session/requests/question-motion"
 import { useSettings } from "@/settings/model"
@@ -36,12 +37,13 @@ export function SessionComposerRegion(props: {
   permission?: {
     client: OpenCodeClient
     directory: string
-    record: (text: string, sessionID: string, requestID: string) => void
+    confirm: (requestID: string) => void
   }
 }) {
   const controller = props.controller
   const settings = useSettings()
   const host = props.permission && usePluginHost()
+  const language = useLanguage()
 
   const face = createMemo(() => {
     const websearch = controller.state.websearch.request()
@@ -93,9 +95,12 @@ export function SessionComposerRegion(props: {
 
                 <Grow when={current().permission} fade card class={controller.child() ? "mb-2" : undefined}>
                   {(request) => {
-                    const item = createMemo(() =>
-                      host?.items(PermissionDock).find((entry) => entry.value.matches(request)),
-                    )
+                    const item = createMemo(() => {
+                      const permission = props.permission
+                      const entry = host?.items(PermissionDock).find((entry) => entry.value.matches(request))
+
+                      return permission && entry && { permission, entry }
+                    })
 
                     return (
                       <Show
@@ -112,23 +117,20 @@ export function SessionComposerRegion(props: {
                           />
                         }
                       >
-                        {(entry) => (
+                        {({ entry, permission }) => (
                           <Contribution plugin={entry.plugin}>
-                            {() => {
-                              const permission = props.permission
-
-                              if (!permission) return
-
-                              return entry.value.render({
+                            {() =>
+                              entry.value.render({
                                 request,
                                 client: permission.client,
                                 directory: permission.directory,
-                                record: (text) => {
-                                  permission.record(text, request.sessionID, request.id)
+                                description: permissionToolDescription(request.action, language.t),
+                                confirm: () => {
+                                  permission.confirm(request.id)
                                   controller.onResponseSubmit()
                                 },
                               })
-                            }}
+                            }
                           </Contribution>
                         )}
                       </Show>

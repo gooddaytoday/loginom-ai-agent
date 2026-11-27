@@ -38,6 +38,13 @@ export default {
   permissionInstead: "Or say what to do instead",
   permissionSend: "Send",
   permissionFailed: "Could not submit the response. Try again.",
+  permissionNotGrantable:
+    "Administrator policy prevents allowing this action for the whole conversation. You can still answer this request.",
+  permissionAction: "Allow an action",
+  permissionRead: "Access a local file",
+  permissionExport: "Run a workflow that exports data",
+  permissionPublish: "Publish a dashboard in Loginom",
+  permissionDelete: "Delete a dashboard in Loginom",
   permissionScope: "In this conversation: {{scope}}",
   permissionSave: "Save a package in Loginom",
   permissionSaveAs: "A package will be saved at this location",

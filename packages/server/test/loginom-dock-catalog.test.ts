@@ -248,7 +248,7 @@ const boot = (
     const question = (sessionID: Session.ID) =>
       until(() =>
         call(`/api/session/${sessionID}/permission`).pipe(
-          Effect.map((response) => (response.body.data as { id: string; action: string }[])[0]),
+          Effect.map((response) => (response.body.data as { id: string; action: string; metadata?: unknown }[])[0]),
         ),
       )
     const told = (sessionID: Session.ID) =>
@@ -825,7 +825,7 @@ describe("loginom.product refusals that do not end the turn (B2.6b, В-75)", () 
   const saving = () =>
     scriptedHost({
       catalog: () => [
-        tool("dock_action_run", { action_key: { type: "string" } }),
+        tool("dock_action_run", { action_key: { type: "string" }, parameters: { type: "object" } }),
         tool("dock_prepare", { intent: { type: "string" } }),
       ],
     })
@@ -891,9 +891,13 @@ describe("loginom.product refusals that do not end the turn (B2.6b, В-75)", () 
           permissions: [{ action: "*", resource: "*", effect: "ask" }],
         })
         yield* test.wizard(id, script(save, upload, { text: "end" }), false)
-        for (const action of ["loginom_dock_action_run", "loginom_dock_prepare"]) {
+        for (const [action, details] of [
+          ["loginom_dock_action_run", { operation: "package.save_as" }],
+          ["loginom_dock_prepare", { path: "Демо.lgp" }],
+        ] as const) {
           const pending = yield* test.question(id)
           expect(pending.action).toBe(action)
+          expect(pending.metadata).toMatchObject({ loginom: details })
           expect(
             (yield* test.call(`/api/session/${id}/permission/${pending.id}/reply`, { decision: "reject" })).status,
           ).toBe(204)
@@ -928,8 +932,14 @@ describe("loginom.product refusals that do not end the turn (B2.6b, В-75)", () 
         const host = saving()
         const test = yield* boot(host)
         const id = yield* test.create("save corrected", true)
-        yield* test.wizard(id, script(save, { text: "end" }), false)
+        const path = "C:\\Работа\\Демо.lgp"
+        yield* test.wizard(
+          id,
+          script({ ...save, input: { ...save.input, parameters: { path } } }, { text: "end" }),
+          false,
+        )
         const pending = yield* test.question(id)
+        expect(pending.metadata).toMatchObject({ loginom: { operation: "package.save_as", path } })
         const words = "Не сохраняй, сначала покажи итог"
         expect(
           (yield* test.call(`/api/session/${id}/permission/${pending.id}/reply`, {

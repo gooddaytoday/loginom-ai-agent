@@ -6,7 +6,7 @@ import { DockPrompt } from "@opencode/session-ui/dock-prompt"
 import { Option, Schema } from "effect"
 import { createSignal, For, Show } from "solid-js"
 import type definition from "./index"
-import { conversationScope } from "./permission-model"
+import { conversationScope, packageLocation, permissionDescription } from "./permission-model"
 
 const decodeDetails = Schema.decodeUnknownOption(
   Schema.Struct({ path: Schema.optional(Schema.String), operation: Schema.optional(Schema.String) }),
@@ -22,28 +22,34 @@ const traces = { once: "traceOnce", reject: "traceDeny", conversation: "traceCon
 export default function PermissionPrompt(props: PermissionDockInput) {
   const ctx = usePlugin<typeof definition>()
   const request = props.request
-  const terminal = request.action === "shell"
   const scope = conversationScope(request)
   const [feedback, setFeedback] = createSignal("")
   const [pending, setPending] = createSignal(false)
   const [failed, setFailed] = createSignal(false)
+  const [locked, setLocked] = createSignal(false)
 
   const details = Option.getOrUndefined(decodeDetails(request.metadata?.loginom))
   const path = details?.path
-  const slash = path?.lastIndexOf("/") ?? -1
-  const name = path?.slice(slash + 1)
-  const folder = slash < 0 ? undefined : path?.slice(0, slash) || "/"
+  const { name, folder } = packageLocation(path)
   const save = scope === "scopeSave" && request.action !== "dashboard_publish"
-  const operation = save ? ctx.t("permissionSave") : terminal ? ctx.t("permissionShell") : request.action
+  const operation = props.description ?? ctx.t(permissionDescription(request) ?? "permissionAction")
   const description = name ? `${operation} «${name}»` : operation
   const input = Option.getOrElse(Option.map(decodeInput(request.metadata?.input), Object.entries), () => [])
   const resources = request.resources.filter((resource) => !save || resource !== "*")
+  const decodeFailure = Schema.is(Schema.Struct({ type: Schema.Literal("not_grantable") }))
 
   async function answer(decision: "once" | "conversation" | "reject", message?: string) {
     if (pending()) return
     setPending(true)
     setFailed(false)
-    const target = { sessionID: request.sessionID, requestID: request.id }
+    const notice = message ? ctx.t("traceInstead", { message }) : ctx.t(traces[decision], { action: description })
+
+    const target = {
+      sessionID: request.sessionID,
+      requestID: request.id,
+      notice,
+    }
+
     const options = { signal: ctx.signal }
 
     try {
@@ -52,9 +58,10 @@ export default function PermissionPrompt(props: PermissionDockInput) {
           .rpc(PermissionConversation)
           .conversation(target, { ...options, location: { directory: props.directory } })
       else await props.client.permission.reply({ ...target, decision, message }, options)
-    } catch {
+    } catch (error) {
       if (!ctx.signal.aborted) {
-        setFailed(true)
+        if (decodeFailure(error)) setLocked(true)
+        else setFailed(true)
         setPending(false)
       }
 
@@ -63,7 +70,7 @@ export default function PermissionPrompt(props: PermissionDockInput) {
 
     if (ctx.signal.aborted) return
 
-    props.record(message ? ctx.t("traceInstead", { message }) : ctx.t(traces[decision], { action: description }))
+    props.confirm()
   }
 
   return (
@@ -75,7 +82,7 @@ export default function PermissionPrompt(props: PermissionDockInput) {
           <Button variant="submit" size="normal" disabled={pending()} onClick={() => void answer("once")}>
             {ctx.t("permissionOnce")}
           </Button>
-          <Show when={scope}>
+          <Show when={!locked() && scope}>
             {(key) => (
               <Button variant="neutral" size="normal" disabled={pending()} onClick={() => void answer("conversation")}>
                 {ctx.t("permissionConversation")}
@@ -83,11 +90,9 @@ export default function PermissionPrompt(props: PermissionDockInput) {
               </Button>
             )}
           </Show>
-          <Show when={!terminal}>
-            <Button variant="ghost" size="normal" disabled={pending()} onClick={() => void answer("reject")}>
-              {ctx.t("permissionDeny")}
-            </Button>
-          </Show>
+          <Button variant="ghost" size="normal" disabled={pending()} onClick={() => void answer("reject")}>
+            {ctx.t("permissionDeny")}
+          </Button>
         </div>
       }
     >
@@ -147,38 +152,39 @@ export default function PermissionPrompt(props: PermissionDockInput) {
             </For>
           </ul>
         </Show>
-        <Show when={scope}>
+        <Show when={!locked() && scope}>
           {(key) => <p class="m-0 py-2 text-text-weak">{ctx.t("permissionScope", { scope: ctx.t(key()) })}</p>}
         </Show>
-        <Show when={!terminal}>
-          <form
-            class="flex flex-wrap gap-2 py-2"
-            onSubmit={(event) => {
-              event.preventDefault()
-              const text = feedback().trim()
+        <form
+          class="flex flex-wrap gap-2 py-2"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const text = feedback().trim()
 
-              if (text) void answer("reject", text)
-            }}
+            if (text) void answer("reject", text)
+          }}
+        >
+          <label class="flex min-w-0 flex-1 flex-col gap-1">
+            <span>{ctx.t("permissionInstead")}</span>
+            <input
+              class="min-w-0 rounded-md border border-border-base bg-background-base px-2 py-1"
+              value={feedback()}
+              onInput={(event) => setFeedback(event.currentTarget.value)}
+              disabled={pending()}
+            />
+          </label>
+          <Button
+            class="self-end"
+            type="submit"
+            variant="neutral"
+            size="normal"
+            disabled={pending() || !feedback().trim()}
           >
-            <label class="flex min-w-0 flex-1 flex-col gap-1">
-              <span>{ctx.t("permissionInstead")}</span>
-              <input
-                class="min-w-0 rounded-md border border-border-base bg-background-base px-2 py-1"
-                value={feedback()}
-                onInput={(event) => setFeedback(event.currentTarget.value)}
-                disabled={pending()}
-              />
-            </label>
-            <Button
-              class="self-end"
-              type="submit"
-              variant="neutral"
-              size="normal"
-              disabled={pending() || !feedback().trim()}
-            >
-              {ctx.t("permissionSend")}
-            </Button>
-          </form>
+            {ctx.t("permissionSend")}
+          </Button>
+        </form>
+        <Show when={locked()}>
+          <p role="alert">{ctx.t("permissionNotGrantable")}</p>
         </Show>
         <Show when={failed()}>
           <p role="alert">{ctx.t("permissionFailed")}</p>

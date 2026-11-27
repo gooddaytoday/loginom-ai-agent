@@ -2231,3 +2231,21 @@ story("code block content follows plugins that join and leave after the message 
   await expect(root.getByTestId("chart")).toHaveCount(0)
   await expect(root.locator("pre code")).toHaveText("A,B")
 })
+
+
+story("falls back to the native permission dock when the Loginom plugin is disabled", async ({ page }) => {
+  const host = await page.evaluateHandle(async (fixture) => {
+    const { mountPermissionComposer } = await import(fixture)
+    const host = mountPermissionComposer()
+    host.release()
+
+    return host
+  }, fixture)
+
+  const dock = page.locator('[data-component="dock-prompt"][data-kind="permission"]')
+  await expect(dock.getByRole("button", { name: /Allow in this conversation/ })).toBeVisible()
+  await host.evaluate((fixture) => fixture.disable(["loginom-gui"]))
+  await expect(dock.getByText("Permission required")).toBeVisible()
+  await expect(dock.getByRole("button", { name: "Allow always" })).toBeVisible()
+  await expect(dock.getByRole("button", { name: /Allow in this conversation/ })).toHaveCount(0)
+})
