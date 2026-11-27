@@ -31,7 +31,7 @@ function fixture(file,reply){
  const readReceipt=async()=>{calls.push('old-gesture');return {state:'completed',receipt:{cleanup_complete:true}};};
  const driver=vm.runInNewContext('({'+source.slice(readStart,readEnd)+source.slice(start,end)+'})',{
   enter:()=>{},now:()=>1,NODE_RELEASE_BUDGET_MS,requireValue:(ok,message)=>{if(!ok)throw Error(message);},
-  verified:value=>({verified:true,cleanup_complete:true,...value}),executionReceipt:execution,columns:[field],outputColumns:[field],implementation:null,
+  verified:value=>({verified:true,cleanup_complete:true,...value}),executionReceipt:execution,mapping:{autosync:true},columns:[field],outputColumns:[field],implementation:null,
   alignReadSchema,releasePendingNode,operation,channel,options:{readReceipt},readReceipt});
  return {operation,calls,channel,driver,read:port=>channel.readOutputPort({port,sampleRows:1,requireExactNumbers:true,execution}),
   release:()=>driver.releasePending(operation.nodeApply)};

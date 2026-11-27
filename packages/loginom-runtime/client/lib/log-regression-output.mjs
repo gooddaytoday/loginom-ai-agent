@@ -1,5 +1,4 @@
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
-import {configureOutputAutosync,reorderOutputFields} from './port-mapping-procedure.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
 import {ensureGroupingOutputSources} from './grouping-output-sources.mjs';
 const need=(v,m)=>{if(!v)throw Error('Logistic regression output: '+m);};
@@ -18,9 +17,6 @@ export function logRegressionOutputColumns(configuration,port=0){
 }
 export async function configureLogRegressionOutputs(channel,configuration,p,mappings,finishWizard){
  need(mappings.length===0,'mapping overrides are outside stage 1');
- // LAB-1796 c2 cold actual-readback retained Split before informational fields.
- // Pin the approved order with the same native mapping
- // controls already used for weighted predictions; never relax cold matching.
  const weighted=configuration.mode!=='apply'&&configuration.fields.some(f=>f.usage_type===7);
  const column=configuration.mode!=='apply'&&configuration.partition?.sampling===2;
  if(weighted||column){
@@ -28,17 +24,11 @@ export async function configureLogRegressionOutputs(channel,configuration,p,mapp
   const observe=condition=>channel.observe({condition,readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true});
   let state=await observe('complete weighted prediction mapping');const expected=logRegressionOutputColumns(configuration);
   need(state.node_mapping.target_fields.length===expected.length&&expected.every(e=>state.node_mapping.target_fields.filter(f=>!f.excluded&&['name','label','type'].every(k=>f[k]===e[k])).length===1),'weighted prediction fields differ');
-  await configureOutputAutosync(channel,false);
-  state=await observe('weighted prediction mapping before ordering');
   // A fresh weighted node can retain targets while its source cache is empty.
-  // Fetch once through the native UI, preserving the pinned output definition.
+  // Fetch once through the native UI, preserving the native output definition.
   state=await ensureGroupingOutputSources(channel,state);
-  if(state.node_mapping.target_fields.some((f,i)=>f.name!==expected[i].name))
-   await reorderOutputFields(channel,expected.map(e=>state.node_mapping.target_fields.find(f=>f.name===e.name).record_id));
-  state=await observe('stable weighted prediction layout');
-  need(state.node_mapping.autosync===false&&state.node_mapping.target_fields.every((f,i)=>['name','label','type'].every(k=>f[k]===expected[i][k])),'weighted prediction order was not retained');
   const definition=await readOutputDefinitionPages(channel,{expectedCount:expected.length});
-  need(definition.fields.every((f,i)=>['name','label','type'].every(k=>f[k]===expected[i][k])),'rendered weighted prediction order differs');
+  need(definition.fields.every((f,i)=>['name','label','type'].every(k=>f[k]===state.node_mapping.target_fields[i][k])),'rendered weighted prediction definition differs');
   await finishWizard('done',true,definition);
  }
  // Preserve both intrinsic tables; verify their materialized schemas after

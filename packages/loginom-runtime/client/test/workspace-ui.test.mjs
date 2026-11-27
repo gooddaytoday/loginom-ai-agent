@@ -2,10 +2,33 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { createObservationPages } from '../lib/observation-pages.mjs';
-import { makeWorkspaceUiCode, validateUiAction, workspaceUiCapability, makeBlockingWindowDiagnosticCode } from '../lib/workspace-ui.mjs';
+import { makeWorkspaceUiCode, validateUiAction, validateNodeUiAction, workspaceUiCapability, makeBlockingWindowDiagnosticCode } from '../lib/workspace-ui.mjs';
 import { assertActionOutcome } from '../lib/action-catalog.mjs';
+import { NODE_TYPES } from '../lib/node-contracts.mjs';
 
 import {Page,Element,Document,build,origin,clone,fixtureClock,scriptGraphFixture} from './support/workspace-ui-fixture.mjs';
+
+test('private quiet graph observation refuses only visible port menus even outside the scanned root',async()=>{
+ const page=new Page(),menu=page.add('div','mn');
+ const tid='MF;TF-1;ModelForm;cmpDiagram';
+ page.add('button',tid,'Graph');
+ const observed=await page.observe();
+ const ref=observed.ui.elements.find(element=>element.tid===tid).ref;
+ const node={verified:true,surface:'graph',locked:false,document_id:'doc',workflow_id:'wf',node_id:'node'};
+ const primitive=vm.runInContext('('+workspaceUiCapability.toString()+')',page.context);
+ const read=options=>primitive(page,{mode:'observe',expected_build:build,expected_origin:origin,kind:'workspace-ui',
+  prepared_node_context:{node,workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},root_ref:ref,...options},async()=>node);
+ assert.equal((await read({})).status,'SUCCEEDED');
+ assert.equal((await read({quiet_graph_observation:true})).error?.code,'UI_PORT_MENU_VISIBLE');
+ menu.attrs.hidden='';
+ assert.equal((await read({quiet_graph_observation:true})).status,'SUCCEEDED');
+ delete menu.attrs.hidden;menu.attrs['data-tid']='different-menu';
+ assert.equal((await read({quiet_graph_observation:true})).status,'SUCCEEDED');
+ menu.attrs.class='x-menu';
+ assert.equal((await read({quiet_graph_observation:true})).error?.code,'UI_PORT_MENU_VISIBLE');
+ menu.attrs.hidden='';
+ assert.equal((await read({quiet_graph_observation:true})).status,'SUCCEEDED');
+});
 
 test('error toast template is private and requires the native error class, component and message structure',async()=>{
  for(const fault of [null,'info','native','messages']) {
@@ -679,6 +702,54 @@ test('failure output observes the graph after finally mouse-up, including effect
   assert.equal(outcome.status, 'AMBIGUOUS'); assert.equal(outcome.cleanup_complete, true);
   assert.deepEqual(outcome.output.nodes.map(node => node.node_ref.node_label), ['Последствие']);
   assert.equal(outcome.output.verification_required, true);
+});
+
+for(const renderLabel of [true,false])test('graph observation lists a manually added native node with '+(renderLabel?'a visible':'a hidden')+' caption',async()=>{
+ const {page,tid:source,node:sourceNode,port:sourcePort,model}=scriptGraphFixture('First','bg-vendor-icon-calcdata');
+ sourceNode.FGuid='42e7502e-9fbb-4bff-8188-2e907fed167c';
+ const before=await page.observe();
+ assert.deepEqual(before.nodes.map(n=>n.node_ref.node_label),['First']);
+ const tid='MF;TF-1;Graph;Manual_Node',link=source+'|Output_Data-0|Manual_Node|Input_Data-0';
+ const box={x:620,y:300,width:90,height:55},body=page.add('g',tid,'',box);
+ const label=page.add('g',tid+';Label;Label','Manual Node');
+ if(!renderLabel)label.attrs.hidden='';
+ const {byTid}=page.graphModels.get(body.parentElement),node=byTid.get(tid);
+ node.FGuid='f4e7502e-9fbb-4bff-8188-2e907fed167c';
+ node.FIconCls='bg-vendor-icon-calcdata';
+ node.FLabel.FRawValue='Manual Node';
+ node.FCell.geometry={x:box.x,y:box.y};
+ const linkShape=page.add('g',link);
+ model.FDiagram.FLinks.FCollection.at(-1).FSourcePort=sourcePort;
+ if(!renderLabel)linkShape.attrs.hidden='';
+ const snapshot=await page.observe();
+ const observed=snapshot.nodes.find(n=>n.node_id===node.FGuid);
+ assert.ok(observed,'native node missing from the model-facing inventory');
+ assert.equal(observed.node_ref.node_label,'Manual_Node');
+ assert.equal(observed.label_text,'Manual Node');
+ assert.equal(observed.type,'transform.calculator');
+ assert.deepEqual(observed.bounding_box,box);
+ assert.ok(snapshot.links.includes(link));
+});
+
+test('model graph inventory reports a native node without a renderer or action refs',async()=>{
+ const {page,body,model,node:rendered}=scriptGraphFixture('Calc_1','bg-vendor-icon-calcdata');
+ rendered.FGuid='f4e7502e-9fbb-4bff-8188-2e907fed167c';
+ rendered.FLabel.FRawValue='Calc_1';
+ const diagram=model.FDiagram;
+ Object.assign(diagram.FmxGraph.view,{scale:2,translate:{x:5,y:10}});
+ const node={FGuid:'42e7502e-9fbb-4bff-8188-2e907fed167c',FIconCls:'bg-vendor-icon-calcdata',
+  FCell:{geometry:{x:500,y:60,width:50,height:30}},FPorts:[]};
+ node.FLabel={parent:node,FCell:{parent:node.FCell},FRawValue:'Calc 1'};
+ diagram.FNodes.FCollection.push(node);
+ const snapshot=await page.observe(),observed=snapshot.nodes.find(n=>n.node_id===node.FGuid);
+ assert.equal(snapshot.nodes.find(n=>n.node_id===rendered.FGuid).node_ref.node_label,'Calc_1');
+ assert.equal(observed.node_ref.node_label,undefined);
+ assert.equal(observed.label_text,'Calc 1');
+ assert.equal(observed.type,'transform.calculator');
+ assert.deepEqual(observed.bounding_box,{x:1010,y:190,width:100,height:60});
+ assert.deepEqual(observed.ports,[]);
+ assert.ok(!snapshot.ui.elements.some(e=>e.signature?.native_graph?.node_id===node.FGuid));
+ assert.equal(body.parentElement,diagram.FmxGraph.container);
 });
 
 test('native Calculator graph captions containing code names remain clickable', async () => {
@@ -1772,6 +1843,165 @@ function importFormatField(page) {
   const input=page.add('input',null,'',undefined,owner);input.value='old';
   return {form,owner,input};
 }
+
+async function importFormatBatchFixture() {
+  const page=new Page(), {form,input}=importFormatField(page);
+  const box={x:250,y:100,width:100,height:25};
+  const owner=page.add('div',form.getAttribute('data-tid')+';ImportTextFileParamsWizard;edtDelimiterChar;ValueControl','',box,form);
+  const delimiter=page.add('input',null,'',box,owner);
+  delimiter.value=',';
+  const node={verified:true,surface:'wizard',document_id:'doc',workflow_id:'wf',node_id:'node',tid:form.getAttribute('data-tid')};
+  const primitive=vm.runInContext('('+workspaceUiCapability.toString()+')',page.context);
+  const run=options=>primitive(page,{expected_build:build,expected_origin:origin,kind:'workspace-ui',
+    prepared_node_context:{node,workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},async()=>structuredClone(node));
+  const snapshot=(await run({mode:'observe'})).output;
+  const field=(name,text)=>({ref:snapshot.wizard.settings.fields[name].input_ref,text});
+  const action={verb:'set_wizard_fields',fields:[field('delimiter',';'),field('null_marker','\\N')]};
+  const act=()=>run({mode:'act',snapshot,action});
+  return {page,input,delimiter,act,node,snapshot,action,run};
+}
+
+test('the private validator binds batch fields, order and values to the observed page',async()=>{
+  const {snapshot,action,node}=await importFormatBatchFixture();
+  snapshot.wizard.owner_context={status:'observed'};
+  assert.doesNotThrow(()=>validateNodeUiAction(action,snapshot,node));
+  assert.throws(()=>validateUiAction(action,snapshot),/Unsupported/);
+  assert.throws(()=>validateNodeUiAction(action,snapshot),/prepared owner/);
+  for(const change of [
+    a=>a.fields.reverse(),
+    a=>a.fields[1]=a.fields[0],
+    a=>a.fields[1].text='NULL',
+    a=>a.fields[1].text='x'.repeat(257),
+    a=>a.fields[1].ref='ui-foreign',
+    (_,s)=>s.wizard.settings.fields.null_marker.owner_ref='ui-foreign',
+    (_,s)=>s.wizard.settings.fields.null_marker.truncated=true,
+    (_,s)=>s.wizard.owner_context.status='unknown',
+    (_,s)=>s.prepared_node_context.surface='graph'
+  ]){
+    const changedAction=clone(action),changedSnapshot=clone(snapshot);
+    change(changedAction,changedSnapshot);
+    assert.throws(()=>validateNodeUiAction(changedAction,changedSnapshot,node));
+  }
+});
+
+test('an owned import page verifies each individual format edit',async()=>{
+  const {page,delimiter,input,run,snapshot}=await importFormatBatchFixture();
+  const writes=[];
+  page.onPress=(key,element)=>{if(key==='Tab')writes.push(element);};
+  const setField=(snapshot,name,text)=>run({mode:'act',snapshot,
+    action:{verb:'set_wizard_field',ref:snapshot.wizard.settings.fields[name].input_ref,text}});
+  const first=await setField(snapshot,'delimiter',';');
+  assert.equal(first.status,'SUCCEEDED',JSON.stringify(first.error));
+  assert.equal(first.output.wizard.settings.fields.delimiter.value,';');
+  assert.equal(first.output.wizard.settings.fields.null_marker.value,'old');
+  assert.deepEqual(writes,[delimiter]);
+  const result=await setField(first.output,'null_marker','\\N');
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.deepEqual(writes,[delimiter,input]);
+  assert.equal(result.output.wizard.settings.fields.delimiter.value,';');
+  assert.equal(result.output.wizard.settings.fields.null_marker.value,'\\N');
+  for(const receipt of [first,result])
+    assert.ok(receipt.trace.some(e=>e.event==='wizard_draft_value_verified'&&e.settings_applied===false));
+});
+
+for(const name of ['delimiter','null_marker'])test('an owned import page refuses final readback mismatch for '+name,async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===input)(name==='delimiter'?delimiter:input).value='wrong';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_FIELD_NOT_CONFIRMED');
+  assert.match(result.error.message,new RegExp(name));
+  assert.equal(page.events.filter(e=>e==='click').length,2);
+  assert.ok(!result.trace.some(e=>e.event==='wizard_fields_verified'));
+});
+
+test('an owned import page confirms the delimiter before touching the next field',async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===delimiter)delimiter.value='wrong';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_FIELD_NOT_CONFIRMED');
+  assert.match(result.error.message,/delimiter/);
+  assert.equal(input.value,'old');
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+});
+
+test('an owned import page preserves a pending field changed by the application',async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===delimiter)input.value='app choice';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  assert.equal(input.value,'app choice');
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+});
+
+test('an owned import page refuses a different signature for the next input',async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===delimiter)input.attrs.name='foreign-input-signature';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'UI_REFERENCE_STALE');
+  assert.equal(input.value,'old');
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+});
+
+test('an owned import page rechecks native ownership after select all on the second field',async()=>{
+  const {page,input,act,node}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='ControlOrMeta+A'&&element===input)node.node_id='foreign';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_FIELD_CHANGED');
+  assert.equal(input.value,'old');
+  assert.equal(page.events.filter(e=>e==='keyboard_type').length,1);
+});
+
+for(const field of ['delimiter','null_marker'])test('an owned import page waits for consecutive quiet epochs after '+field,async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  const target=field==='delimiter'?delimiter:input;
+  let waits=0,settling=false,waitsBeforeNext;
+  page.onPress=(key,element)=>{
+    if(key==='Tab'&&element===target){settling=true;target.value='transient';}
+    if(key==='ControlOrMeta+A'&&element===input)waitsBeforeNext=waits;
+  };
+  page.waitForTimeout=async ms=>{
+    page.clock.advance(ms);
+    if(settling&&++waits===2){
+      target.value=field==='delimiter'?';':'\\N';
+      page.mutationObserver.pending.push({type:'attributes',attributeName:'class',target});
+    }
+  };
+  const result=await act();
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  if(field==='delimiter')assert.equal(waitsBeforeNext,4);
+  else assert.equal(waits,4);
+  assert.equal(result.trace.filter(e=>e.event==='wizard_fields_verified').length,1);
+});
+
+test('an owned import page stops before the next write when its native owner changes',async()=>{
+  const {page,input,delimiter,act,node}=await importFormatBatchFixture();
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===delimiter)node.node_id='foreign';};
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  assert.equal(input.value,'old');
+  assert.equal(page.events.filter(e=>e==='keyboard_type').length,1);
+});
+
+test('an owned import page rechecks a repainted next field without replaying a completed write',async()=>{
+  const {page,input,delimiter,act}=await importFormatBatchFixture();
+  let checks=0;
+  page.beforeHandleGeometry=element=>{
+    if(element===input&&++checks===2)
+      page.mutationObserver.pending.push({type:'attributes',attributeName:'class',target:element});
+  };
+  const writes=[];
+  page.onPress=(key,element)=>{if(key==='Tab')writes.push(element);};
+  const result=await act();
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.deepEqual(writes,[delimiter,input]);
+  assert.equal(result.trace.filter(e=>e.event==='wizard_field_preflight_refreshed').length,1);
+});
 
 test('typed wizard field replacement confirms exact draft values without claiming apply',async()=>{
   for(const text of ['\\N','', '\t ']) {
@@ -3367,19 +3597,86 @@ test('output columns bind names labels and types to real rows, excluding summary
   }
 });
 
+function outputColumnEditorFixture(){
+  const page=new Page(),base='MF;TF-1;WizrdMCF;',form=page.add('div',base.slice(0,-1));
+  page.add('button',base+'DerivedDataSourceOutputSocketWizard;btnAddMappingColumn','',undefined,form);
+  const table=page.add('table',null,'',undefined,form);table.attrs.class='x-grid-item-selected';
+  page.add('td',base+'DerivedDataSourceOutputSocketWizard;colName_Quantity','Quantity',undefined,table);
+  const label=page.add('td',base+'DerivedDataSourceOutputSocketWizard;colDisplayName_Quantity','Quantity|Сумма',undefined,table);
+  page.add('span',null,'',undefined,label).attrs.class='bg-TBGDataType-dtInteger';
+  const dialog=page.add('div',base+'EditColumnDefForm');dialog.attrs.class='x-window';const inputs={};
+  for(const [key,value] of [['edtName','Quantity'],['edtDisplayName','Quantity|Сумма'],['cbxDataType','Целый'],['cbxDataKind','Непрерывный'],['cbxUsageType','Не задано']]) {
+    const owner=page.add('div',base+'EditColumnDefForm;'+key,'',undefined,dialog),input=page.add('input',null,'',undefined,owner);
+    input.value=value;input.box={x:300,y:200+Object.keys(inputs).length*40,width:120,height:25};inputs[key]=input;
+  }
+  return {page,base,form,table,dialog,inputs};
+}
+
+async function observeOutputColumnBatch({page,base},label='Sum'){
+  const full=await page.observe(),root_ref=full.wizard.column_parameters.root_ref;
+  const node={verified:true,surface:'wizard',document_id:'doc',workflow_id:'wf',node_id:'node',tid:base.slice(0,-1)};
+  const binding={node:structuredClone(node),workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+  const primitive=vm.runInContext('('+workspaceUiCapability.toString()+')',page.context);
+  const run=options=>primitive(page,{expected_build:build,expected_origin:origin,prepared_node_context:binding,...options},
+    async()=>structuredClone(node));
+  const snapshot=(await run({mode:'observe',root_ref})).output;
+  const action={verb:'set_wizard_fields',fields:Object.entries({name:'QuantitySum',label}).map(([name,text])=>({
+    ref:snapshot.wizard.column_parameters.fields[name].input_ref,text}))};
+  validateNodeUiAction(action,snapshot,binding);
+  return {node,snapshot,act:()=>run({mode:'act',snapshot,action})};
+}
+
+test('W1 rejects an output batch when the native owner changes on Tab after the name',async()=>{
+  const editor=outputColumnEditorFixture(),{page,inputs}=editor;
+  const {node,act}=await observeOutputColumnBatch(editor);
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===inputs.edtName)node.node_id='foreign';};
+
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  assert.equal(result.effect_possible,true);
+  assert.equal(inputs.edtName.value,'QuantitySum');
+  assert.equal(inputs.edtDisplayName.value,'Quantity|Сумма');
+  assert.equal(page.events.filter(event=>event==='click').length,1);
+  assert.equal(page.events.filter(event=>event==='keyboard_type').length,1);
+});
+
+test('W13 refuses a different output batch owner between observation and action in the same DOM epoch',async()=>{
+  const editor=outputColumnEditorFixture(),{page,inputs}=editor;
+  const {node,snapshot,act}=await observeOutputColumnBatch(editor);
+  node.node_id='foreign';
+
+  const result=await act();
+  assert.equal(result.status,'NOT_APPLIED');
+  assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  assert.equal(result.effect_possible,false);
+  assert.deepEqual(clone(result.output.dom_epoch),clone(snapshot.dom_epoch));
+  assert.equal(result.output.prepared_node_context.node_id,'foreign');
+  assert.deepEqual(page.events,[]);
+  assert.equal(inputs.edtName.value,'Quantity');
+  assert.equal(inputs.edtDisplayName.value,'Quantity|Сумма');
+});
+
+test('R5 preserves an unlinked output label the application changed to the new name',async()=>{
+  const editor=outputColumnEditorFixture(),{page,inputs}=editor;
+  const {act}=await observeOutputColumnBatch(editor);
+  page.onPress=(key,element)=>{
+    if(key==='Tab'&&element===inputs.edtName)inputs.edtDisplayName.value=inputs.edtName.value;
+  };
+
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  assert.equal(inputs.edtName.value,'QuantitySum');
+  assert.equal(inputs.edtDisplayName.value,'QuantitySum');
+  assert.equal(page.events.filter(event=>event==='click').length,1);
+  assert.equal(page.events.filter(event=>event==='keyboard_type').length,1);
+});
+
 test('output column typed editing preserves the selected row and all other parameters',async()=>{
-  for(const mode of ['name','label','linked_name','linked_wrong','unlinked_changed','type_changed','selection_changed','missing_type','combo','combo_kind_changed','combo_busy']) {
-    const page=new Page(),base='MF;TF-1;WizrdMCF;',form=page.add('div',base.slice(0,-1));
-    page.add('button',base+'DerivedDataSourceOutputSocketWizard;btnAddMappingColumn','',undefined,form);
-    const table=page.add('table',null,'',undefined,form);table.attrs.class='x-grid-item-selected';
-    page.add('td',base+'DerivedDataSourceOutputSocketWizard;colName_Quantity','Quantity',undefined,table);
-    const label=page.add('td',base+'DerivedDataSourceOutputSocketWizard;colDisplayName_Quantity','Quantity|Сумма',undefined,table);
-    page.add('span',null,'',undefined,label).attrs.class='bg-TBGDataType-dtInteger';
-    const dialog=page.add('div',base+'EditColumnDefForm');dialog.attrs.class='x-window';const inputs={};
-    for(const [key,value] of [['edtName','Quantity'],['edtDisplayName','Quantity|Сумма'],['cbxDataType','Целый'],['cbxDataKind','Непрерывный'],['cbxUsageType','Не задано']]) {
-      const owner=page.add('div',base+'EditColumnDefForm;'+key,'',undefined,dialog),input=page.add('input',null,'',undefined,owner);
-      input.value=value;input.box={x:300,y:200+Object.keys(inputs).length*40,width:120,height:25};inputs[key]=input;
-    }
+  for(const mode of ['name','label','linked_name','linked_wrong','unlinked_changed','type_changed','selection_changed','missing_type',
+    'combo','combo_kind_changed','combo_busy','batch_linked','batch_linked_satisfied','batch_unlinked_changed','batch_linked_signature_changed']) {
+    const editor=outputColumnEditorFixture(),{page,base,form,table,dialog,inputs}=editor;
     if(mode.startsWith('combo')) {
       const stem=base+'EditColumnDefForm;cbxDataType;';
       const list=page.add('div',stem+'boundlist','',{x:600,y:300,width:140,height:40});
@@ -3397,9 +3694,24 @@ test('output column typed editing preserves the selected row and all other param
       assert.equal(page.events.filter(e=>e==='click').length,mode==='combo_busy'?0:1);
       continue;
     }
-    if(mode.startsWith('linked_'))inputs.edtDisplayName.value='Quantity';
+    if(mode.startsWith('linked_')||mode.startsWith('batch_linked'))inputs.edtDisplayName.value='Quantity';
     if(mode==='missing_type')inputs.cbxDataType.remove();
-    const full=await page.observe(),read=await page.execute({mode:'observe',root_ref:full.wizard.column_parameters.root_ref});
+    if(mode.startsWith('batch_')){
+      const {act}=await observeOutputColumnBatch(editor,mode==='batch_linked_satisfied'?'QuantitySum':'Sum');
+      page.onPress=(key,element)=>{
+        if(key!=='Tab'||element!==inputs.edtName)return;
+        inputs.edtDisplayName.value=mode==='batch_unlinked_changed'?'App choice':'QuantitySum';
+        if(mode==='batch_linked_signature_changed')inputs.edtDisplayName.attrs.name='foreign-signature';
+      };
+      const result=await act();
+      const verified=['batch_linked','batch_linked_satisfied'].includes(mode);
+      assert.equal(result.status,verified?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+      assert.equal(page.events.filter(e=>e==='keyboard_type').length,mode==='batch_linked'?2:1);
+      assert.equal(inputs.edtDisplayName.value,mode==='batch_linked'?'Sum':mode==='batch_unlinked_changed'?'App choice':'QuantitySum');
+      continue;
+    }
+    const full=await page.observe(),root_ref=full.wizard.column_parameters.root_ref;
+    const read=await page.execute({mode:'observe',root_ref});
     const target=read.output.ui.elements.find(e=>e.wizard_field?.scope==='output_column' && e.wizard_field.name===(mode==='label'?'label':'name'));
     if(mode==='missing_type'){assert.equal(target,undefined);continue;}
     assert.ok(target);
@@ -6346,10 +6658,15 @@ test('union continues the observed unmapped-variable warning with one fresh Next
 });
 async function inputPortFinishFixture(mode='valid') {
   const clock=fixtureClock(),f=await inputMappingLiveFixture(false,clock.Date),{page,owner,base,nodes}=f;
+  const joinCaption=mode.startsWith('join_caption');
+  const joinIcon=mode==='join_caption_other_component'?'bg-vendor-icon-calcdata':'bg-vendor-icon-joindata';
   const {inputPortBreadcrumbs}=await import('./input-port-breadcrumbs.fixture.mjs');
   const panel=page.add('div','MF;TF-5;NavigationBar;NavigationPanel','',{x:48,y:35,width:1392,height:36});
   const crumbs=inputPortBreadcrumbs.map((n,i)=>{
-    const multiline=mode==='multiline'; const crumb=page.add('a',multiline?n.tid.replace('Revenue','Duplicates:__in:_Key_Sub'):n.tid,multiline&&i===5?'Duplicates: in: Key, Sub':n.label,n.rect,panel),icon={4:'maptree-icon-workflow',5:'bg-vendor-icon-calcdata',8:'maptree-icon-wizard'}[i];
+    const multiline=mode==='multiline';
+    const tid=joinCaption?n.tid.replace('Revenue','Слияние'):multiline?n.tid.replace('Revenue','Duplicates:__in:_Key_Sub'):n.tid;
+    const caption=joinCaption?n.label.replace('Revenue','Слияние'):multiline&&i===5?'Duplicates: in: Key, Sub':n.label;
+    const crumb=page.add('a',tid,caption,n.rect,panel),icon={4:'maptree-icon-workflow',5:joinCaption?joinIcon:'bg-vendor-icon-calcdata',8:'maptree-icon-wizard'}[i];
     if(icon)page.add('span',null,'',{x:n.rect.x+1,y:n.rect.y+1,width:16,height:16},crumb).attrs.class=icon;return crumb;
   });
   const done=page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:1300,y:950,width:100,height:25},owner);
@@ -6371,10 +6688,11 @@ async function inputPortFinishFixture(mode='valid') {
       prompt.remove();
     }
     owner.remove();for(const c of crumbs.slice(5))c.remove();
-    if(mode==='wrong_workflow')crumbs[4].ownText='Другой сценарий';
+    if(mode==='wrong_workflow'||mode==='join_caption_foreign_workflow')crumbs[4].ownText='Другой сценарий';
     graph=page.add('div','MF;TF-5;ModelForm;cmpDiagram','',{x:48,y:71,width:1392,height:929});
-    const key=mode==='wrong_node'?'Other':mode==='multiline'?'Duplicates:__in:_Key_Sub':mode.startsWith('suffix')?'Revenue@1':'Revenue';node=page.add('g','MF;TF-5;Graph;'+key,'',{x:100,y:200,width:150,height:80},graph);
+    const key=joinCaption?'Левое':mode==='wrong_node'?'Other':mode==='multiline'?'Duplicates:__in:_Key_Sub':mode.startsWith('suffix')?'Revenue@1':'Revenue';node=page.add('g','MF;TF-5;Graph;'+key,'',{x:100,y:200,width:150,height:80},graph);
     label=page.add('span','MF;TF-5;Graph;'+key+';Label;Label',mode==='multiline'?'Duplicates:in: Key, Sub':key,{x:110,y:220,width:120,height:30},node);
+    if(mode==='join_caption_other_text')label.ownText='Правое';
     if(mode.startsWith('suffix')){label.ownText='Revenue';const other=page.add('g','MF;TF-5;Graph;Revenue','',{x:300,y:200,width:150,height:80},graph);page.add('span','MF;TF-5;Graph;Revenue;Label;Label','Revenue',{x:310,y:220,width:120,height:30},other);}
     if(mode.startsWith('ellipsis'))label.ownText=mode==='ellipsis_wrong_text'?'Other…':'Reve…';
     if(mode==='duplicate_node')page.add('g','MF;TF-5;Graph;'+key,'',node.box,graph);
@@ -6392,6 +6710,13 @@ async function inputPortFinishFixture(mode='valid') {
   if((mode.startsWith('ellipsis')&&mode!=='ellipsis_unbound')||mode.startsWith('suffix')||mode.startsWith('late_loading')||mode.startsWith('lost_links_native'))page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
     {expected_build:build,expected_origin:origin,...(mode==='late_loading_long'?{settlement_timeout_ms:120000}:{}),prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},
     async()=>({verified:true,node_id:mode==='suffix_wrong_id'||mode==='late_loading_foreign_node'&&waits>=3||mode==='lost_links_native_foreign'&&prompt?'other':'node',surface:graph?'graph':'wizard',tid:graph?(mode==='ellipsis_wrong_body'?'foreign':node.attrs['data-tid']):'MF;TF-5;WizrdMCF',...(!graph?{input_port:{direction:'input',port:0}}:{})})));
+  if(joinCaption)page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {expected_build:build,expected_origin:origin,join_design_title:NODE_TYPES['transform.join_data'].title,
+      prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},
+    async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:graph&&mode==='join_caption_foreign_node'?'foreign':'node',
+      surface:graph?'graph':'wizard',tid:graph?node.attrs['data-tid']:'MF;TF-5;WizrdMCF',
+      ...(graph?{}:{input_port:{direction:'input',port:0,native_index:0,port_guid:'input-0',opening_operation_id:'open-input',node_icon_class:joinIcon},
+        navigation_node:{tid:crumbs[5].attrs['data-tid'],label:'Слияние'}})})));
   return {...f,done,crumbs,waits:()=>waits};
 }
 
@@ -6493,6 +6818,60 @@ test('typed input-port finish uses one gesture and quiet exact graph return with
     if(mode==='late_body')assert.equal(waits(),5);if(mode==='churn')assert.equal(waits(),12);
   }
 });
+
+for(const fault of ['none','foreign node','foreign workflow','other component','other title']){
+  test('LAB-2082 opens the bound Join wizard from its automatic graph caption: '+fault,async()=>{
+    const icon=fault==='other component'?'bg-vendor-icon-calcdata':'bg-vendor-icon-joindata';
+    const {page,tid,body,node}=scriptGraphFixture('Левое',icon),prefix='MF;TF-1';
+    node.FGuid='node';
+    const panel=page.add('div',prefix+';NavigationBar;NavigationPanel');
+    const crumbs=['Сервер','Пакеты','Package1','Модуль1','Сценарий'];
+    const breadcrumb=prefix+';cnrNaviMode;b.s_';
+    crumbs.forEach((label,i)=>{
+      const element=page.add('a',breadcrumb+crumbs.slice(0,i+1).join('>'),label,undefined,panel);
+      if(i===4)page.add('span',null,'',undefined,element).attrs.class='maptree-icon-workflow';
+    });
+    let opened=false;
+    const binding=async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:opened&&fault==='foreign node'?'foreign':'node',
+      surface:opened?'wizard':'graph',tid:opened?prefix+';WizrdMCF':tid,...(opened?{}:{locked:false})});
+    page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+      {expected_build:build,expected_origin:origin,join_design_title:NODE_TYPES['transform.join_data'].title,
+        prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix,navigation_path:[]}},...options},binding));
+    const snapshot=await page.observe();
+    const settings=snapshot.ui.elements.find(element=>element.wizard_open);
+    assert.ok(settings);
+    const click=page.mouse.click;
+    page.mouse.click=async(...args)=>{
+      await click(...args);
+      opened=true;
+      body.parentElement.remove();
+      const wizard=page.add('div',prefix+';WizrdMCF');
+      page.add('table',prefix+';WizrdMCF;JoinDataWizard;grdSourceColumns;tbl','',undefined,wizard);
+      const name=fault==='other title'?'Другой':'Слияние';
+      const path=crumbs.join('>').replace('Модуль1',fault==='foreign workflow'?'Модуль2':'Модуль1');
+      const owner=page.add('a',breadcrumb+path+'>'+name,name,undefined,panel);
+      page.add('span',null,'',undefined,owner).attrs.class='bg-vendor-icon-joindata';
+      const last=page.add('a',breadcrumb+path+'>'+name+'>Настройка','Настройка',undefined,panel);
+      page.add('span',null,'',undefined,last).attrs.class='maptree-icon-wizard';
+    };
+    const result=await page.act({verb:'begin_wizard',ref:settings.ref},snapshot);
+    assert.equal(page.events.filter(event=>event==='click').length,1);
+    assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result.error));
+    assert.equal(result.trace.some(event=>event.event==='wizard_open_verified'),fault==='none');
+  });
+}
+
+for(const mode of ['join_caption','join_caption_foreign_node','join_caption_foreign_workflow','join_caption_other_component','join_caption_other_text']){
+  test('LAB-2082 input Done uses the bound Join graph caption: '+mode,async()=>{
+    const {page}=await inputPortFinishFixture(mode),snapshot=await page.observe();
+    const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port');
+    assert.ok(done,mode);
+    const result=await page.act({verb:'finish_wizard',ref:done.ref},snapshot);
+    assert.equal(page.events.filter(event=>event==='click').length,1);
+    assert.equal(result.status,mode==='join_caption'?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result.error));
+    assert.equal(result.trace.some(event=>event.event==='input_port_finish_verified'),mode==='join_caption');
+  });
+}
 
 test('input-port Done confirms the exact lost-links question once and retains all refusal cases',async()=>{
   for(const mode of ['lost_links','lost_links_native','lost_links_text','lost_links_title','lost_links_button','lost_links_disabled','lost_links_duplicate','lost_links_workflow','lost_links_mask','lost_links_native_foreign','lost_links_repeat','lost_links_lost_reply']){

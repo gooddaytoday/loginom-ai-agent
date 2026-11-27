@@ -1,18 +1,52 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createUserWorkflowBindings, userNodeTool, userActionInventory } from '../lib/user-workflow.mjs';
+import { createUserWorkflowBindings, userActionTool, userNodeTool, userActionInventory } from '../lib/user-workflow.mjs';
 import { nodeApiTools, dispatchNodeApi } from '../lib/node-api.mjs';
-import { validateActionParameters } from '../lib/action-catalog.mjs';
+import { actionDescribeTool, validateActionParameters } from '../lib/action-catalog.mjs';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 import {compactNodeRequestFailure,userResultSchema} from '../lib/user-results.mjs';
 import {groupingParametersSchema,filterParametersSchema} from '../lib/node-api.mjs';
 import {validateFilterConditions} from '../lib/filter-parameters.mjs';
 import {validateTextExportParameters} from '../lib/text-export-parameters.mjs';
+import {describeNodeTypes} from '../lib/node-contracts.mjs';
+import {createSkillLoader} from '../lib/skill.mjs';
+import {createBundledSkillFixture} from './support/bundled-skill-fixture.mjs';
 
 const workspace=()=>({document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'tab',prefix:'prefix',navigation_path:[{tid:'module',label:'Module'},{tid:'scenario',label:'Scenario'}]}});
 const request=()=>({operation_id:'op',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf'},
   target:{kind:'existing',type:'transform.sorting',ref:{document_id:'doc',workflow_id:'wf',node_id:'sort'}},inputs:[],mappings:[],mode:'keys',parameters:{},finish:'execute',
   read:{ports:[0],sample_rows:3,require_exact_numbers:false}});
+
+test('user describe schema accepts boolean refresh only with node_types',()=>{
+ const schema=new AjvJsonSchemaValidator();
+ const validate=schema.getValidator(userActionTool(actionDescribeTool).inputSchema);
+ const args={node_types:['imports.text'],modes:['delimited'],refresh:true};
+ assert.equal(validate(args).valid,true);
+ assert.equal(validate({}).valid,true);
+ assert.equal(validate({...args,refresh:'true'}).valid,false);
+ assert.equal(validate({refresh:true}).valid,false);
+ assert.equal(validate({action_key:'package.save_checkpoint',refresh:true}).valid,false);
+ assert.equal(schema.getValidator(actionDescribeTool.inputSchema)(args).valid,false);
+});
+
+test('equal regression cards are cached by requested modes and admit apply after it is described',async t=>{
+ const {resources}=await createBundledSkillFixture(t),skill=createSkillLoader({resources});
+ for(const type of ['datamining.lin_regression','datamining.log_regression']){
+  const bindings=createUserWorkflowBindings();bindings.remember(workspace());
+  const cards=describeNodeTypes([type]);
+  const [enter]=await skill.describeNodes(cards,['enter']);
+  const [apply]=await skill.describeNodes(cards,['apply']);
+  assert.deepEqual(apply,enter,type);
+  const applyRequest={...request(),target:{type},mode:'apply'};
+  bindings.rememberDescriptions({node_types:[enter]},['enter']);
+  assert.equal(bindings.hasDescription(enter,['enter']),true,type);
+  assert.equal(bindings.checkNodeDescription(applyRequest).error.code,'NODE_TYPE_NOT_DESCRIBED',type);
+  assert.equal(bindings.hasDescription(apply,['apply']),false,type);
+  bindings.rememberDescriptions({node_types:[apply]},['apply']);
+  assert.equal(bindings.hasDescription(apply,['apply']),true,type);
+  assert.equal(bindings.checkNodeDescription(applyRequest),null,type);
+ }
+});
 
 test('an unrelated workflow replacement retires its previous identity before another node request',()=>{
  const b=createUserWorkflowBindings(),previous=workspace();b.remember(previous);

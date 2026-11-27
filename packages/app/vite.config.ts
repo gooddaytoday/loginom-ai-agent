@@ -22,7 +22,18 @@ const sentry =
       })
     : false
 
+const testFixtures = process.env.VITE_OPENCODE_TEST_FIXTURES === "1"
+
 export default defineConfig({
+  resolve: {
+    alias: testFixtures
+      ? {
+          "@opencode/gui-plugins/renderer": fileURLToPath(
+            new URL("./e2e/utils/page-plugin-builtins.ts", import.meta.url),
+          ),
+        }
+      : undefined,
+  },
   plugins: [
     desktopPlugin,
     icons(channel),
@@ -35,7 +46,7 @@ export default defineConfig({
     port: 3000,
   },
   build: {
-    ...(process.env.VITE_OPENCODE_TEST_FIXTURES === "1"
+    ...(testFixtures
       ? {
           rolldownOptions: {
             input: [
