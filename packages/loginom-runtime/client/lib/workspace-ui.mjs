@@ -5936,7 +5936,7 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false, downloa
       || !Number.isInteger(p.limit) || p.limit<1 || p.limit>8)throw new Error('Import definition page requires a bounded offset and limit');
   }
   if (options.mode === 'act') validateNodeUiAction(options.action,options.snapshot,options.prepared_node_context);
-  const task = { ...structuredClone(options), kind: 'workspace-ui', join_design_title:NODE_TYPES['transform.join_data'].title,
+  const task = { ...structuredClone(options), join_design_title:NODE_TYPES['transform.join_data'].title, kind: 'workspace-ui',
     ...(!options.prepared_node_context?{node_types_by_icon:nodeTypesByIcon}:{}),
     ...(downloadToastObservation?{download_toast_observation:true}:{}) };
   // Trusted composite operations may supply their own fresh native read after
