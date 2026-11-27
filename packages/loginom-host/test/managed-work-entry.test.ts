@@ -188,6 +188,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
           loginom: {
             operationId: "test-operation",
             node: { label: "test node" },
+            evidence: [{ kind: "tableRead", port: 0, portGuid: "port-guid", rowsRead: 3, rowCount: 3 }],
             ports: [
               {
                 preview: {

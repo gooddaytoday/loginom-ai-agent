@@ -16,11 +16,33 @@ const cell = Schema.Struct({
   non_finite: Schema.optional(Schema.String),
 })
 
+export const LoginomEvidence = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("tableRead"),
+    port: count,
+    portGuid: Schema.NonEmptyString,
+    rowsRead: count,
+    rowCount: count,
+    executionId: Schema.optional(Schema.NonEmptyString),
+  }).check(Schema.makeFilter((read) => read.rowsRead <= read.rowCount)),
+  Schema.Struct({
+    kind: Schema.Literal("executed"),
+    executionId: Schema.NonEmptyString,
+    scope: Schema.Literal("workspace"),
+  }),
+  Schema.Struct({ kind: Schema.Literal("saved"), path: Schema.NonEmptyString }),
+  Schema.Struct({
+    kind: Schema.Literal("savedGraphRead"),
+    nodeCount: count,
+    scope: Schema.Literal("activeWorkflow"),
+  }),
+])
+
 export const LoginomMetadata = Schema.Struct({
   v: Schema.Literal(1),
   operationId: Schema.NonEmptyString,
   attempt: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
-  kind: Schema.optional(Schema.Literals(["add", "configure", "execute", "export", "read"])),
+  kind: Schema.optional(Schema.Literals(["add", "configure", "execute", "export", "read", "save"])),
   state: Schema.Literals(["running", "settled"]),
   status: Schema.optional(Schema.Literals(["SUCCEEDED", "FAILED", "NOT_APPLIED", "AMBIGUOUS"])),
   phase: Schema.optional(Schema.String),
@@ -34,6 +56,14 @@ export const LoginomMetadata = Schema.Struct({
   effectPossible: Schema.optional(Schema.Boolean),
   cleanupComplete: Schema.optional(Schema.Boolean),
   limitations: Schema.optional(Schema.Array(Schema.String)),
+  evidence: Schema.optional(Schema.Array(LoginomEvidence)),
+  receiptWindow: Schema.optional(
+    Schema.Struct({
+      documentId: Schema.NonEmptyString,
+      startedAt: count,
+      confirmedAt: count,
+    }).check(Schema.makeFilter((window) => window.startedAt <= window.confirmedAt)),
+  ),
   nextStep: Schema.optional(Schema.Struct({ tool: Schema.optional(Schema.String), instruction: Schema.String })),
   ports: Schema.optional(
     Schema.Array(

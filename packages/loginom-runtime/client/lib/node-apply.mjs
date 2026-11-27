@@ -291,6 +291,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // Preserve uncertainty until the driver and journal both confirm completion.
     const previousEffect=state.effect_possible;
     state.effect_possible ||= mutation;
+    if(name==='finish'&&request.finish==='execute')state.execution_started_at=Math.floor(performance.now());
     let value;
     try{value=await call({...context(),receipt_id:pending.receipt_id,deadline:pending.deadline});}
     catch(error){
@@ -517,6 +518,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         return result;
       }
       state.execution={status:'completed',execution_id:execution.execution_id};
+      if(name==='execute')state.execution_completed_at=Math.floor(performance.now());
       return null;
   };
   try {

@@ -4867,12 +4867,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const state=operations.get(id)?.nodeApply;
       const observed=state?.phases.find(phase=>phase.phase==='target')?.value?.target?.node;
       if(!observed||observed.ref?.node_id!==state.node?.node_id)return;
-      const label=state.phases.find(phase=>phase.phase==='finish')?.value?.node_label??observed.label;
+      const finish=state.phases.find(phase=>phase.phase==='finish')?.value;
+      const label=finish?.node_label??observed.label;
       const request=state.request;
       const kind=request.mode===NODE_READ_MODE?'read':request.mode==='add_only'?'add':request.finish==='execute'
         ?observed.type?.startsWith('exports.')?'export':'execute'
         :request.finish==='done'?'configure':undefined;
-      return {node:{ref:observed.ref,label,type:observed.type},kind};
+      return {node:{ref:observed.ref,label,type:observed.type},kind,
+        launchedExecutionId:finish?.mode==='execute'?finish.execution_id:undefined,readPorts:state.output?.ports,
+        executionWindow:{documentId:observed.ref.document_id, startedAt:state.execution_started_at, confirmedAt:state.execution_completed_at}};
     },
     // Host lifecycle cleanup must bypass the user mutation facade. A retained
     // node/recovery gate still blocks package cleanup; it cannot block draining

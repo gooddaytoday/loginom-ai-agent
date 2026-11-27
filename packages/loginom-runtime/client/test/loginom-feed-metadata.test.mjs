@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {nodeResultReply} from '../lib/node-result-reply.mjs';
-import {loginomFeedMetadata} from '../lib/user-results.mjs';
+import {loginomFeedMetadata, loginomSaveMetadata} from '../lib/user-results.mjs';
 
 const node = {document_id:'document', workflow_id:'workflow', node_id:'node-guid'};
 const facts = {kind:'execute', node:{ref:node, label:'Фильтр', type:'transform.filter_data'}};
@@ -13,6 +13,35 @@ const receipt = ({ports, artifacts, failure, warnings=['Read limitation'], statu
   operation_id:'operation', attempt:1, state:'settled', outcome:{status, action_key:'node.apply', phase:'node_ready',
     effect_possible:true, cleanup_complete:true, error:failure, output:{node, execution, configuration:{status:'applied'},
       output:{...(ports && {ports}), ...(artifacts && {file_artifacts:artifacts})}, warnings}},
+});
+
+test('reading existing output proves sample coverage, not a new execution', () => {
+  const tool = 'dock_node_read';
+  const sample = {...port([[cell('first')], [cell('second')]]), row_count:12, sample_complete:false};
+  const reply = nodeResultReply(receipt({ports:[sample]}), {userProfile:true, tool});
+  assert.deepEqual(loginomFeedMetadata(reply, {tool, facts:{...facts, kind:'read'}}).evidence, [
+    {kind:'tableRead', port:0, portGuid:'port-0', rowsRead:2, rowCount:12, executionId:'exec'},
+  ]);
+});
+
+test('completed launch proves execution even when no output was requested', () => {
+  const tool = 'dock_node_wait';
+  const reply = nodeResultReply(receipt(), {userProfile:true, tool});
+  assert.deepEqual(loginomFeedMetadata(reply, {tool, facts:{...facts, launchedExecutionId:'exec'}}).evidence, [
+    {kind:'executed', executionId:'exec', scope:'workspace'},
+  ]);
+  assert.equal(loginomFeedMetadata(reply, {tool, facts:{...facts, launchedExecutionId:'another-exec'}}).evidence, undefined);
+});
+
+test('save proves only the path unless the reopened workflow graph was checked', () => {
+  const path = '/analyst/result.lgp';
+  const save = {operation_id:'save', status:'SUCCEEDED', action_key:'package.save_checkpoint',
+    output:{package_ref:{path, active_identity:path}, reopened:false}};
+  assert.deepEqual(loginomSaveMetadata(save).evidence, [{kind:'saved', path}]);
+  assert.deepEqual(loginomSaveMetadata({...save, output:{...save.output, reopened:true}, trace:[
+    {event:'reopened_package_observed', actual_path:path, path_matches:true, graph_matches:true, graph:{nodes:['first','second']}},
+  ]}).evidence, [{kind:'saved', path}, {kind:'savedGraphRead', nodeCount:2, scope:'activeWorkflow'}]);
+  assert.equal(loginomSaveMetadata({...save, status:'AMBIGUOUS'}), undefined);
 });
 
 test('configuration keeps the model text and exposes only the observed node and signals', () => {
