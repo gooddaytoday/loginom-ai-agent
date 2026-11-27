@@ -505,7 +505,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       let result;
       // The browser still uses the original deadline. Leave time for its
       // cleanup and receipt to reach MCP after a native opening times out.
-      try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:Math.max(1,operation.deadline-now())+5000});}
+      try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:Math.max(1,operation.deadline-now())+(direction==='input'?5000:0)});}
       catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
       if(result.operation_id!==id||result.action_key!==actionKey){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw Error('Port opening receipt identity differs');}
       operation.cleanupConfirmed=result.cleanup_complete===true;operation.nodeEffectPossible ||= result.effect_possible===true;
