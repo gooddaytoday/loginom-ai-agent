@@ -16,6 +16,7 @@ import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
 import { observeLoginomReplies, withStepProgress } from "../client/lib/step-progress.mjs"
+import { createProtectedOperation } from "./protected-operation.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -36,6 +37,7 @@ const state = {
   browserProfile: undefined,
   browserServer: undefined,
   lastLoginomReplyAt: null,
+  protectedOperation: undefined,
   inputs: new Map(),
   owner: undefined,
   uploadDirectory: undefined,
@@ -254,7 +256,9 @@ async function handle(message) {
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
       const knownSecrets = [input.connection.apiKey, input.connection.password]
+      state.protectedOperation = createProtectedOperation(authenticated.context, new URL(input.connection.url).origin)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+        protectOperation: state.protectedOperation.begin,
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
         presentNodeReply: async (reply, project) => {
           const outputFiles = await session.artifactStore.outputFiles(reply.structuredContent)
@@ -327,6 +331,7 @@ async function handle(message) {
           activeWork: state.bridge.hasActiveWork(),
           unsettledWork: state.bridge.hasUnsettledWork(),
           dispatching: state.controller !== undefined,
+          busy: state.protectedOperation.snapshot() ?? null,
         },
       })
       return
@@ -364,6 +369,7 @@ async function handle(message) {
     }
     if (message.operation === "interrupt") {
       state.bridge?.cancelArtifactDeliveries?.()
+      state.bridge?.cancelNodeOperations?.()
       state.controller?.abort()
       send({ id: message.id, result: { interrupted: true } })
       return
@@ -373,6 +379,9 @@ async function handle(message) {
       throw Error("LOGINOM_REQUEST_INVALID")
     const controller = new AbortController()
     state.controller = controller
+    const unsubscribeBusy = message.input.stepProgress === true
+      ? state.protectedOperation.subscribe(busy => send({ id: message.id, progress: { busy } }))
+      : undefined
     try {
       // Allow the bounded owned read and cleanup to return before the outer IPC
       // deadlines. Other tools retain room for a 60-second dock_node_wait.
@@ -394,15 +403,21 @@ async function handle(message) {
           : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options))
       const outputFiles = result._meta?.loginom && Array.isArray(result._meta.outputFiles)
         ? result._meta.outputFiles : await state.session.artifactStore.outputFiles(result.structuredContent)
+      const busy = state.protectedOperation.snapshot()
+      const metadata = { ...result._meta,
+        ...(outputFiles.length ? { outputFiles } : {}),
+        ...(busy && result._meta?.loginom?.operationId === busy.operationId
+          ? { loginom: { ...result._meta.loginom, busy } } : {}) }
       send({
         id: message.id,
         result: {
-          result: outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result,
+          result: Object.keys(metadata).length ? { ...result, _meta: metadata } : result,
           recoveryPending: state.bridge.hasUnsettledWork(),
           activeWork: state.bridge.hasActiveWork(),
         },
       })
     } finally {
+      unsubscribeBusy?.()
       state.controller = undefined
     }
   } catch (error) {

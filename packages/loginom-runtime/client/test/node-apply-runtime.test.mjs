@@ -15,13 +15,14 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createExecutionJournal} from '../lib/execution-journal.mjs';
+import {createProtectedOperation} from '../../src/protected-operation.mjs';
 const validateJob=new AjvJsonSchemaValidator().getValidator(nodeJobResultSchema);
 const assertJob=job=>{const result=validateJob(job);assert.equal(result.valid,true,result.errorMessage);};
 const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]};
 const request=()=>({operation_id:'apply',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
  target:{kind:'new',type:'imports.text',label:'Source',position:{x:320,y:280}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'done',
  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
-function fixture({execute=async()=>{throw Error('Unexpected public transport')},wrapDrivers,wrapAdapter,now=Date.now,pinnedActions=new Map(),browserRecovery=false,record=async e=>e}={}){
+function fixture({execute=async()=>{throw Error('Unexpected public transport')},wrapDrivers,wrapAdapter,now=Date.now,pinnedActions=new Map(),browserRecovery=false,record=async e=>e,protectOperation}={}){
  const calls=[],events=[];const graph={complete:true,interaction_ready:true,document_id:'doc',workflow_ref:workflow,nodes:[],links:[],foreign_links:[]};
  const adapter={observe:async()=>structuredClone(graph),preflight:async()=>{},positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),reconcile:async()=>({verified:true,cleanup_complete:true}),mutate:async e=>{calls.push(e.kind);if(e.kind==='create')graph.nodes.push({ref:{document_id:'doc',workflow_id:'wf',node_id:'new'},type:e.parameters.type,label:'Source',position:e.parameters.position,inputs:[],outputs:[0]});return {status:'SUCCEEDED',cleanup_complete:true};}};
  const ok=(name,extra={})=>async()=>{calls.push(name);return {verified:true,cleanup_complete:true,effect_possible:false,...extra}};
@@ -31,10 +32,46 @@ function fixture({execute=async()=>{throw Error('Unexpected public transport')},
  let failRecord;
  const handlers=new Map([['imports.text',handler]]);
  const runtime=createActionRuntime({pinned:{actions:pinnedActions,selectors:new Map(),pins:{}},allowCandidate:pinnedActions.size>0,execute,now,
-  browserRecovery,nodeTargetAdapterFactory:options=>wrapAdapter?wrapAdapter(adapter,options):adapter,nodeApplyHandlers:handlers,nodeApplyDriverFactory:context=>wrapDrivers?wrapDrivers(context,drivers):drivers,
+  browserRecovery,protectOperation,nodeTargetAdapterFactory:options=>wrapAdapter?wrapAdapter(adapter,options):adapter,nodeApplyHandlers:handlers,nodeApplyDriverFactory:context=>wrapDrivers?wrapDrivers(context,drivers):drivers,
   onRecord:async e=>{events.push(e);if(e.phase===failRecord)throw Error('disk unavailable');return record(e);}});
  return {runtime,adapter,calls,events,graph,drivers,handler,handlers,failRecord:p=>{failRecord=p}};
 }
+
+test('pending Apply stays protected across calls until the interrupted worker settles',async()=>{
+ const tracker=createProtectedOperation({pages:()=>[]},'http://loginom.test');
+ const entered=Promise.withResolvers(),release=Promise.withResolvers();
+ const f=fixture({protectOperation:tracker.begin,wrapDrivers:(_context,drivers)=>({...drivers,mapPorts:async(_mappings,ctx)=>{
+  entered.resolve();await release.promise;ctx.signal.throwIfAborted();
+ }})});
+ assert.equal(f.runtime.startNodeApply(request()).state,'running');
+ await entered.promise;
+ assert.equal(tracker.snapshot().active,true);
+ assert.equal((await f.runtime.waitNodeApply('apply',{timeoutMs:0})).state,'running');
+ const updates=[];const unsubscribe=tracker.subscribe(update=>updates.push(update.active));
+ f.runtime.cancelNodeOperations();
+ assert.equal(tracker.snapshot().active,true);
+ release.resolve();
+ const settled=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+ assert.equal(settled.state,'settled');assert.equal(settled.cancel_requested,true);
+ assert.deepEqual(updates,[true,false]);unsubscribe();
+});
+
+test('a verified foreign graph change reaches the Apply reply and cannot resume',async()=>{
+ const f=fixture({wrapAdapter:adapter=>({...adapter,mutate:async effect=>{
+  const result=await adapter.mutate(effect);
+  f.graph.nodes[0].label='Исправлено вручную';
+  return result;
+ }})});
+ f.graph.nodes.push({ref:{document_id:'doc',workflow_id:'wf',node_id:'manual'},type:'imports.text',
+  label:'До шага',position:{x:20,y:40},inputs:[],outputs:[0]});
+ f.runtime.startNodeApply(request());
+ const result=compactNodeResult(await f.runtime.waitNodeApply('apply',{timeoutMs:1000}));
+ assert.equal(result.error.code,'LOGINOM_FOREIGN_GRAPH_EDIT');
+ assert.equal(result.error.message,'Вы изменили схему во время шага: шаг остановлен, ваши правки остались в окне');
+ assert.equal(f.graph.nodes[0].label,'Исправлено вручную');
+ assert.throws(()=>f.runtime.startNodeApply({operation_id:'apply'},{resume:true}),/manual graph edit/);
+ assert.deepEqual(f.calls,['source','create']);
+});
 
 for(const variant of ['absent','opened','missing-node','unknown-receipt','changed-graph','expired','journal'])test('open UI_EPOCH_CHANGED recovery: '+variant,async()=>{
  let context,checkpoint,opens=0,time=1000;

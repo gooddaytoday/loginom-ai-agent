@@ -12,6 +12,20 @@ const digest = value => createHash('sha256').update(JSON.stringify(canonical(val
 // Its horizontal layout is not a graph edit; GUID, role, ports and y remain bound.
 const domainNode=({dom_epoch,...value})=>value.type==='control.supernode_output'&&value.boundary_role==='output'&&Number.isFinite(value.position?.x)?{...value,position:{...value.position,x:0}}:value;
 const sameDomainGraph=(a,b)=>same({...a,nodes:a.nodes.map(domainNode)},{...b,nodes:b.nodes.map(domainNode)});
+export const FOREIGN_GRAPH_EDIT='LOGINOM_FOREIGN_GRAPH_EDIT';
+const foreignGraphEdit=()=>Object.assign(Error('Вы изменили схему во время шага: шаг остановлен, ваши правки остались в окне'),{code:FOREIGN_GRAPH_EDIT});
+
+function unrelatedGraphEdit(before,after,{kind,parameters}={}) {
+  if(!after.complete||before.document_id!==after.document_id||!same(before.workflow_ref,after.workflow_ref))return false;
+  const owned=new Set([parameters?.ref?.node_id,parameters?.edge?.source,parameters?.edge?.target].filter(Boolean));
+  if(kind==='create')for(const item of after.nodes)if(!before.nodes.some(node=>node.ref.node_id===item.ref.node_id))owned.add(item.ref.node_id);
+  const content=graph=>({
+    nodes:graph.nodes.filter(node=>!owned.has(node.ref.node_id)).map(({locked,...node})=>domainNode(node)),
+    links:graph.links.filter(edge=>!owned.has(edge.source)&&!owned.has(edge.target)),
+    variable_links:(graph.variable_links??[]).filter(edge=>!owned.has(edge.source)&&!owned.has(edge.target)),
+  });
+  return !same(content(before),content(after));
+}
 
 export function proveReloadedNode(operation, first, second, {readOnly=false}={}) {
   const state=operation.nodeApply, target=operation.targetPhase;
@@ -294,6 +308,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
     for(let refresh=0;refresh<3;refresh++){
       budget();
       const before=refresh===0?original:await observe();
+      if(unrelatedGraphEdit(original,before))throw foreignGraphEdit();
       if(!same(before,original))throw new Error('Graph target changed before local refresh');
       if(addOnly&&kind==='remove_link'&&![...before.links,...before.variable_links??[],...before.rest_connection_links??[]]
         .some(edge=>same(edge,parameters.edge)))throw Error('Owned add-only link identity changed before deletion');
@@ -321,6 +336,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         // Confirm the same live graph before accepting a pre-dispatch refusal.
         // An unrelated change or lost observation keeps this effect pending.
         const after=await observe();
+        if(unrelatedGraphEdit(before,after))throw foreignGraphEdit();
         if(!sameDomainGraph(before,after))throw new Error('Graph changed after refused gesture');
         await save('node_target_refusal_observed',{refusal:{effect,receipt:structuredClone(receipt),after_graph:after}});
         (state.refusals??=[]).push({id:effect.id,kind,receipt:structuredClone(receipt)});
@@ -338,6 +354,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       if(await settleMoveMismatch({operation,state,effect,receipt,graph:after,adapter,record}))throw Error(state.result.error);
       const proof=verifyPreparedTargetEffect({...effect,receipt},after,adapter.positionMatches,request,state);
       if (receipt?.cleanup_complete !== true || !proof || !verify(before, after, effect,proof)) {
+        if(unrelatedGraphEdit(before,after,effect))throw foreignGraphEdit();
         if(kind==='connect'&&receipt?.error?.message==='Validated link target is no longer ready'){
           // Omit user captions and foreign tids; hashes still expose changes.
           const snapshot=g=>({complete:g.complete,document_id:g.document_id,workflow_id:g.workflow_ref.workflow_id,dom_epoch:g.dom_epoch,
@@ -619,8 +636,10 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
     await commit(); return structuredClone(state.result);
   } catch (error) {
     if(state.move_mismatch)return structuredClone(state.result);
+    if(error?.code===FOREIGN_GRAPH_EDIT)operation.foreignGraphEdit=true;
     return { status: state.effect_possible ? 'AMBIGUOUS' : 'NOT_APPLIED', phase: 'target_incomplete',
       error: String(error?.message ?? error), node_id: state.targetId, partial_effect: state.effect_possible,
+      ...(operation.foreignGraphEdit?{error_code:FOREIGN_GRAPH_EDIT}:{}),
       cleanup_complete: !state.pending,
       pending: state.pending?.id ?? null, effects: state.receipts.map(({ id, kind, verified }) => ({ id, kind, verified })),
       configured: false, executed: false, package_saved: false };

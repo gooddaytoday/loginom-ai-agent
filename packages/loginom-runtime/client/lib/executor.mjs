@@ -2183,7 +2183,7 @@ export function parseCapabilityResult(response,{redactor}={}) {
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
   nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, getPreparationReceipt = () => null,
-  browserRecovery = false, probePreparedPage, reopenNodePackage, cacheDirectory, serverSourceCache = true }) {
+  browserRecovery = false, probePreparedPage, reopenNodePackage, cacheDirectory, serverSourceCache = true, protectOperation }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   const executeBrowser=execute;
   execute=async(...args)=>{
@@ -2541,7 +2541,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   };
   const nodeTargetOutcome=(operation,result)=>({status:result.status,action_key:operation.action.action_key,action_revision:'1',operation_id:operation.id,
     phase:result.phase,effect_possible:operation.targetPhase?.effect_possible===true,cleanup_complete:result.cleanup_complete===true,
-    output:result,error:result.error?{code:'NODE_TARGET_INCOMPLETE',message:result.error}:null,trace:[]});
+    output:result,error:result.error?{code:result.error_code??'NODE_TARGET_INCOMPLETE',message:result.error}:null,trace:[]});
   const nodeTargetRecord=event=>onRecord({...event,action_key:'node.target.internal',action_revision:'1'});
   const targetAdapter=operation=>nodeTargetAdapterFactory({execute:async(code,options)=>{
     const wrapped='async page => {const base={action_key:"node.target.transport",action_revision:"1",operation_id:'+JSON.stringify(operation.id)+',phase:"observed",effect_possible:false,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('+code+')(page)}};}catch(error){return {...base,status:"FAILED",output:{},error:{code:"NODE_TARGET_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
@@ -2979,9 +2979,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if(operation.action.capability==='node.apply'){
       const release=nodeReleaseStep(operation);
       return {recovery_options:release?['abandon_operation']:[],next_steps:release?[release,...base]:base,
-        internal_resume_available:operation.cleanupConfirmed===true&&!operation.nodeApply?.pending};
+        internal_resume_available:!operation.foreignGraphEdit&&operation.cleanupConfirmed===true&&!operation.nodeApply?.pending};
     }
-    if(operation.action.capability==='node.target.internal')return {recovery_options:[],next_steps:base,internal_resume_available:operation.cleanupConfirmed===true&&!operation.targetPhase?.pending};
+    if(operation.action.capability==='node.target.internal')return {recovery_options:[],next_steps:base,internal_resume_available:!operation.foreignGraphEdit&&operation.cleanupConfirmed===true&&!operation.targetPhase?.pending};
     if(operation.action.capability==='artifact.upload') {
       if(operation.deliveryOperationId){
         if(operation.cleanupConfirmed && !operation.verification)base.push({tool:'dock_artifact_delivery_resume',
@@ -3303,6 +3303,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const nodeJobs=createNodeOperationRunner({run:(request,options)=>runtime.runNodeApply(request,options),
     admitResume:id=>{
       const operation=operations.get(id),phase=operation?.nodeApply?.pending?.phase,drivers=operation?.nodeApplyDrivers;
+      if(operation?.foreignGraphEdit)throw Error('A step stopped by a manual graph edit cannot be resumed');
       if(operation?.nodeApply?.result?.checkpoint_kind==='local_node_released')
         throw new Error('The original node operation was released; follow its next_step with a NEW operation_id');
       // Эти фазы сначала сверяют собственные квитанции; итоговую проверку делает runNodeApply.
@@ -4361,6 +4362,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(pending&&pending!==operation)throw new Error('Another Dock operation remains pending');
       if(operation&&!resume){await inspectTarget(operation);return {...structuredClone(operation.outcome),output:{...structuredClone(operation.outcome.output),replayed:operation.outcome.status==='SUCCEEDED'}};}
       if(resume){
+        if(operation?.foreignGraphEdit)throw Error('A step stopped by a manual graph edit cannot be resumed');
         if(!operation||pending!==operation)throw new Error('Resume requires the original pending node target');
         await inspectTarget(operation);
         if(!pending)return structuredClone(operation.outcome);
@@ -4369,6 +4371,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         operation.resumeAttempts=(operation.resumeAttempts??0)+1;
       }
       running=true;
+      let endProtection;
       try{
         if(!operation){operation={id:operationId,signature,parameters:structuredClone(request),action:{action_key:actionKey,capability:'node.target.internal',revision:'1'}};
           operation.nodeTargetAdapter=targetAdapter(operation);
@@ -4377,6 +4380,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         operation.deadline=now()+60000;
         await remember(operation,resume?'node_target_resume_prepared':'prepared');signal?.throwIfAborted();
         operations.set(operation.id,operation);pending=operation;observations.clear();
+        if(protectOperation)endProtection=await protectOperation(operationId);
         const result=await prepareNodeTarget({request:operation.parameters,operation,adapter:operation.nodeTargetAdapter,record:nodeTargetRecord,signal,now});
         // A settled child receipt is needed even after cancellation. Never infer
         // cleanup from a model summary or release the gate on transport timeout.
@@ -4385,7 +4389,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         try{await remember(operation,'completed',outcome);}catch(error){operation.outcome=failed(operation,'EVIDENCE_WRITE_FAILED',String(error.message));return operation.outcome;}
         if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)pending=null;
         return structuredClone(outcome);
-      }finally{running=false;}
+      }finally{try{if(endProtection)await endProtection();}finally{running=false;}}
     },
     // Public deletion of one node of the prepared workflow. It reuses the
     // journaled node target phase; a busy session refuses before any gesture.
@@ -4408,7 +4412,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             instruction:'Do not retry deletion while the operation runs. Report the refusal; delete later only if the user still asks after it settles, with a NEW operation_id.'});
       let outcome=await runtime.runNodeTarget(request,{operationId:id,signal,actionKey:'node.delete'});
       const operation=operations.get(id);
-      if(known&&outcome.status==='AMBIGUOUS'&&operation&&pending===operation&&!operation.targetPhase?.pending&&operation.cleanupConfirmed)
+      if(known&&outcome.status==='AMBIGUOUS'&&operation&&!operation.foreignGraphEdit&&pending===operation&&!operation.targetPhase?.pending&&operation.cleanupConfirmed)
         outcome=await runtime.runNodeTarget(request,{operationId:id,signal,resume:true,actionKey:'node.delete'});
       const result=outcome.output??{};
       const deleted=result.deleted_node;
@@ -4527,7 +4531,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         admissionSources=proofs;
       }
       running=true;
+      let endProtection;
       try {
+        if(protectOperation)endProtection=await protectOperation(operationId);
         if(!operation){
           operation={id:operationId,signature,parameters:request,scanReceipt:structuredClone(scanReceipt),
             action:{action_key:'node.apply',capability:'node.apply',revision:request.contract_revision},
@@ -4684,6 +4690,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             }finally{operation.deadline=overallDeadline;}
             if(result.status!=='SUCCEEDED'){
               const error=new Error(result.error??'Node target is not verified');
+              if(result.error_code)error.code=result.error_code;
               if(result.status==='FAILED'&&result.cleanup_complete===true&&operation.targetPhase?.move_mismatch&&!operation.targetPhase.pending)
                 error.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:true,cleanup_complete:true,
                   settings_unchanged:true,verification:'node_move_position_mismatch'};
@@ -4745,7 +4752,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if(exported&&operation.outcome.output)operation.outcome.output.next_step={...browserRecoveryNext(operation,exported),
           alternative_next_step:operation.outcome.output.next_step??null};
         return structuredClone(operation.outcome);
-      }finally{running=false;}
+      }finally{try{if(endProtection)await endProtection();}finally{running=false;}}
     },
     async run(actionKey, parameters, { signal, operationId, deadlineAt } = {}) {
       signal?.throwIfAborted();
@@ -4878,6 +4885,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // node/recovery gate still blocks package cleanup; it cannot block draining
     // the owned worker or removing its private local download cache.
     closeNodeOperations:()=>nodeJobs.close(),
+    cancelNodeOperations:()=>nodeJobs.interrupt(),
     cleanupServerCache:runtime.cleanupServerCache,
     // Retained ambiguous jobs are active recovery work even while no worker is
     // running. Keep the same host lease so the next model turn can use the

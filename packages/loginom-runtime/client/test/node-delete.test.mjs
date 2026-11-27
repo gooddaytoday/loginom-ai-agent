@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {runInNewContext} from 'node:vm';
+import {createProtectedOperation} from '../../src/protected-operation.mjs';
 import {prepareNodeTarget,verifyNodeTargetEffect} from '../lib/node-target.mjs';
 import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
 import {mutateGraph} from '../lib/node-target-browser.mjs';
@@ -140,7 +142,7 @@ test('deletion contract rejects foreign workflow, inputs and unknown fields befo
 
 test('an unverified deletion stays ambiguous and is never repeated',async()=>{
  const f=fixture();f.adapter.mutate=async effect=>{f.calls.push(effect.kind);f.graph=remove(remove(f.graph,'b'),'d');return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true};};
- const result=await f.run();assert.equal(result.status,'AMBIGUOUS');assert.match(result.error,/reconciliation/);
+ const result=await f.run();assert.equal(result.status,'AMBIGUOUS');assert.equal(result.error_code,'LOGINOM_FOREIGN_GRAPH_EDIT');
  assert.equal(result.pending,'delete:graph:0');assert.deepEqual(f.calls,['delete_node']);
 });
 
@@ -246,17 +248,57 @@ test('a locked node is refused before the selection click',async()=>{
 });
 
 // Public tool: running node operations refuse without touching the graph.
-function runtime(initial=chain()){
+function runtime(initial=chain(),protectOperation){
  let graph=initial;const calls=[];
  const adapter={observe:async()=>structuredClone(graph),preflight:async()=>{},positionMatches:()=>false,reconcile:async()=>({verified:false}),
   mutate:async effect=>{calls.push(effect.kind);graph=remove(graph,effect.parameters.ref.node_id);return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true};}};
  const value=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},allowCandidate:true,execute:async()=>{throw Error('Unexpected public transport');},
-  onRecord:async e=>e,nodeTargetAdapterFactory:()=>adapter,
+  onRecord:async e=>e,nodeTargetAdapterFactory:()=>adapter,protectOperation,
   nodeApplyHandlers:new Map([['imports.text',{revision:'1',modes:['delimited'],validate:()=>{},configure:async()=>{}}]]),
   nodeApplyDriverFactory:()=>({})});
  return {runtime:value,calls,adapter,set:v=>{graph=v;},get graph(){return graph;}};
 }
 const args={operation_id:'del-1',document_id:'doc',workflow_ref:workflow,node:ref('b'),label:'Фильтр'};
+for(const outcome of ['success','failure','interrupt'])test('protected delete shows and removes the warning after '+outcome,async()=>{
+ let layer;
+ const origin='http://loginom.test';
+ const document={createElement(){return {style:{},setAttribute(){},remove(){layer=undefined;},
+  attachShadow(){return {append:label=>{this.label=label;}};}};},
+  getElementById:id=>layer?.id===id?layer:undefined,documentElement:{append:node=>{layer=node;}}};
+ const page={isClosed:()=>false,url:()=>origin};
+ const context={pages:()=>[page],newCDPSession:async target=>{
+  assert.equal(target,page);
+  return {send:async (method,{expression})=>{
+   assert.equal(method,'Runtime.evaluate');runInNewContext(expression,{document,location:{origin}});return {};
+  },detach:async()=>{}};
+ }};
+ const protectedOperation=createProtectedOperation(context,origin);
+ const f=runtime(chain(),protectedOperation.begin);
+ const controller=new AbortController();
+ const updates=[];
+ const entered=Promise.withResolvers(),release=Promise.withResolvers(),mutate=f.adapter.mutate;
+ f.adapter.mutate=async effect=>{
+  entered.resolve();await release.promise;
+  controller.signal.throwIfAborted();
+  if(outcome==='failure')throw Error('fixture failure');
+  return mutate(effect);
+ };
+ const pending=dispatchNodeApi(f.runtime,'dock_node_delete',args,{signal:controller.signal});
+ await entered.promise;
+ const unsubscribe=protectedOperation.subscribe(update=>updates.push(update));
+ const active=protectedOperation.snapshot();
+ assert.equal(active.active,true);assert.equal(active.operationId,args.operation_id);
+ assert.equal(layer.label.textContent,'Агент работает в окне Loginom — не меняйте схему до конца шага');
+ assert.equal(layer.inert,true);assert.match(layer.style.cssText,/pointer-events:none/);
+ if(outcome==='interrupt')controller.abort();
+ assert.equal(protectedOperation.snapshot().active,true);
+ release.resolve();
+ const result=await pending;
+ assert.equal(result.outcome.status,outcome==='success'?'SUCCEEDED':'AMBIGUOUS');
+ assert.deepEqual(updates,[active,{...active,active:false}]);
+ assert.equal(layer,undefined);
+ unsubscribe();
+});
 test('dock_node_delete deletes through the public tool and reports a user-v1 receipt',async()=>{
  const f=runtime();assert.ok(f.runtime.tools.some(t=>t.name==='dock_node_delete'));
  const result=await dispatchNodeApi(f.runtime,'dock_node_delete',args);
