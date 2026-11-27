@@ -1,0 +1,16 @@
+export default {
+  "close.title": "Закрыть разговор?",
+  "close.message": "Пакет «{{package}}» в разговоре «{{conversation}}» не сохранён.",
+  "close.untitledPackage": "Новый пакет",
+  "close.untitledConversation": "Новый разговор",
+  "close.save": "Сохранить в Loginom",
+  "close.discard": "Закрыть без сохранения",
+  "close.cancel": "Отмена",
+  "close.pending": "Завершаем работу в Loginom…",
+  "close.stateFailed": "Не удалось проверить состояние пакета в Loginom.",
+  "close.failed": "Не удалось закрыть пакет в Loginom.",
+  "close.saveFailed": "Не удалось подтвердить сохранение и закрытие пакета в Loginom.",
+  "close.keptOpen": "Разговор остался открыт.",
+  "close.savedNote": "Вы сохранили «{{package}}» перед закрытием",
+  "close.discardedNote": "Закрыто без сохранения",
+} as const

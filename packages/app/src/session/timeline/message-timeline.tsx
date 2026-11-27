@@ -549,7 +549,20 @@ function MessageTimelineView(
 
   return (
     <VirtualizedTimeline
-      bottomSpacer={activity(() => !activityRow())}
+      bottomSpacer={
+        <>
+          {activity(() => !activityRow())}
+          <PluginSlot
+            at="session.timeline.end"
+            input={{
+              get session() {
+                return props.view
+              },
+              screen: props.screen,
+            }}
+          />
+        </>
+      }
       deferred={(row) => {
         if (!Predicate.isTagged(row, "AssistantPart") || row.group.type !== "part") return false
         const content = Timeline.resolveContent(messageByID().get(row.group.ref.messageID), row.group.ref.partID)

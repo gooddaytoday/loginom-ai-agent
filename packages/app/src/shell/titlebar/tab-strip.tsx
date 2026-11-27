@@ -201,7 +201,7 @@ function SessionTabEntry(
 
       dialog.close()
 
-      if (!value || !ctx) return
+      if (!value || !ctx || !(await ctx.beforeSessionRemove(value.id))) return
       const ids = sessionTreeIDs(ctx.data.session.list(), value.id)
 
       try {

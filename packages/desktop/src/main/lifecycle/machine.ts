@@ -14,6 +14,7 @@ export type Reply = { readonly resolve: () => void; readonly reject: (cause: unk
  */
 export type State =
   | { readonly status: "running"; readonly attempt: number }
+  | { readonly status: "confirming"; readonly attempt: number; readonly exit: ExitMode }
   /** Every plugin but `keep` is stopping for a restart handoff; without `handoff` the app relaunches next. */
   | {
       readonly status: "suspending"
@@ -38,6 +39,8 @@ export type Event =
   | { readonly type: "plugins.resumed"; readonly attempt: number }
   /** A relaunch from the app, or a quit signal from the OS. */
   | { readonly type: "exit.requested"; readonly mode: ExitMode }
+  | { readonly type: "exit.confirmation.requested"; readonly mode: ExitMode }
+  | { readonly type: "exit.confirmation.completed"; readonly attempt: number; readonly approved: boolean }
   /** Windows logoff or shutdown (`session-end` on each window); Electron emits no `before-quit` for it. */
   | { readonly type: "session.ending" }
   | { readonly type: "before.quit" }
@@ -50,6 +53,7 @@ export type RejectReason =
 
 export type Command =
   | { readonly type: "stop-plugins"; readonly attempt: number }
+  | { readonly type: "confirm-exit"; readonly attempt: number }
   | { readonly type: "run-handoff"; readonly attempt: number; readonly handoff: Handoff }
   | { readonly type: "resume-plugins"; readonly attempt: number }
   | { readonly type: "resolve"; readonly reply: Reply }
@@ -66,6 +70,14 @@ export function transition(state: State, event: Event): Transition {
   if (event.type === "restart.requested") return restartRequested(state, event)
 
   if (event.type === "exit.requested") return exitRequested(state, event.mode)
+
+  if (event.type === "exit.confirmation.requested") {
+    if (state.status !== "running") return unchanged(state)
+
+    const attempt = state.attempt + 1
+
+    return { state: { status: "confirming", attempt, exit: event.mode }, commands: [{ type: "confirm-exit", attempt }] }
+  }
 
   // The OS ends the session whatever the app asked for, so a pending relaunch becomes a quit.
   if (event.type === "session.ending")
@@ -84,7 +96,7 @@ export function transition(state: State, event: Event): Transition {
 }
 
 /** The app starts no plugin, and the windows that close are restored on the next launch. */
-export const isQuitting = (state: State) => state.status !== "running" && state.status !== "resuming"
+export const isQuitting = (state: State) => state.status !== "running" && state.status !== "resuming" && state.status !== "confirming"
 
 /** The scope a stop leaves running: the restart caller's, until the handoff settled. */
 export const keptScope = (state: State) =>
@@ -95,6 +107,8 @@ export const restoresWindows = (state: State) => state.status !== "stopping" && 
 
 /** Electron's `before-quit` waits for the plugins to stop first. */
 export const preventsQuit = (state: State) => state.status !== "handing-off" && state.status !== "quitting"
+
+export const needsQuitConfirmation = (state: State) => state.status === "running" || state.status === "confirming"
 
 /**
  * On macOS the app outlives its windows, except during a quit: Electron emits `window-all-closed` instead of `will-quit`
@@ -151,6 +165,9 @@ function willQuit(state: State): Transition {
 
 function stepSettled(state: State, event: Extract<Event, { readonly attempt: number }>): Transition {
   if (state.status === "quitting" || state.attempt !== event.attempt) return unchanged(state)
+
+  if (event.type === "exit.confirmation.completed" && state.status === "confirming")
+    return event.approved ? exitRequested(state, state.exit) : unchanged({ status: "running", attempt: state.attempt })
 
   if (event.type === "plugins.stopped" && state.status === "suspending") {
     if (state.handoff)
@@ -209,6 +226,7 @@ function unchanged(state: State, commands: Command[] = []): Transition {
  * event. It holds no other state.
  */
 export function createDriver(input: {
+  readonly confirmExit: () => Promise<boolean>
   /** Stops every plugin but `keptScope`; never rejects. */
   readonly stop: () => Promise<void>
   /** Starts the plugins a handoff stopped again; never rejects. */
@@ -224,6 +242,13 @@ export function createDriver(input: {
   }
 
   const perform = (command: Command) => {
+    if (command.type === "confirm-exit") {
+      const complete = (approved: boolean) =>
+        dispatch({ type: "exit.confirmation.completed", attempt: command.attempt, approved })
+
+      return void input.confirmExit().then(complete, () => complete(false))
+    }
+
     if (command.type === "stop-plugins") {
       const done = () => dispatch({ type: "plugins.stopped", attempt: command.attempt })
 

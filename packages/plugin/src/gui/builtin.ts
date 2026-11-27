@@ -169,8 +169,36 @@ export interface Page {
  */
 export const Page = Registry.define<Page>("page")
 
+/** A conversation a user is about to close or delete. */
+export interface SessionCloseTarget {
+  /** The server that owns the conversation. */
+  readonly server: string
+  /** The id of the conversation on that server. */
+  readonly sessionID: string
+}
+
+/** Lets a built-in plugin ask for a decision before the shell closes or deletes a conversation. */
+export interface BeforeSessionClose {
+  /**
+   * Allows the action with true. False or rejection leaves the conversation open.
+   * @param target - The conversation the user is acting on, which may be outside the current route.
+   */
+  check(target: SessionCloseTarget): boolean | Promise<boolean>
+}
+
+/**
+ * Registers a guard for user-initiated conversation closes and deletes.
+ * @example
+ * ```ts
+ * ctx.add(BeforeSessionClose, { check: (target) => canClose(target) })
+ * ```
+ */
+export const BeforeSessionClose = Registry.define<BeforeSessionClose>("session.beforeClose")
+
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
+  /** Content at the end of the conversation timeline, below its messages. */
+  readonly "session.timeline.end": Pick<SlotMap["session.header"], "session" | "screen">
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */
   readonly "session.location.branch.menu": SlotMap["session.location.menu"]
   /** Items after the host's copy and reveal actions in the session directory's path submenu. Requires an owning screen. */

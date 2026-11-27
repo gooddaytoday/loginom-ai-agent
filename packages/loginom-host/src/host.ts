@@ -2,7 +2,7 @@ import { inputStore, type InputFile } from "./inputs"
 import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { tmpdir } from "node:os"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
@@ -635,6 +635,22 @@ export async function createLoginomHost(options: {
     }
   }
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
+  const packageChild = (chat: string) => {
+    const owners = [...generations.values()].filter((entry) => entry.children.has(chat))
+    const owner = owners.length === 1 ? owners[0] : undefined
+    const child = owner?.children.get(chat)
+    return owner && child ? { owner, child } : undefined
+  }
+  const chatKey = (sessionID: string) => createHash("sha256").update(sessionID).digest("hex")
+  const emptyPackageState = { open: false, path: null, modified: null, modifiedDetectedAt: null, lastSave: null }
+  async function packageState(sessionID: string) {
+    const chat = chatKey(sessionID)
+    if (lost.has(chat) || stale.has(chat)) return null
+    const target = packageChild(chat)
+    if (!target) return [...generations.values()].some((entry) => entry.children.has(chat)) ? null : emptyPackageState
+    const result = await (await target.child).request("packageState", undefined, 5000)
+    return target.owner.children.get(chat) === target.child && !stale.has(chat) ? result : null
+  }
   function beginClose() {
     service.beginClose()
     resourceController.abort()
@@ -804,6 +820,29 @@ export async function createLoginomHost(options: {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
       return inputs.admit(`${generation}:${chat}`, userMessage, files, `/${current.connection.username}`)
+    },
+    packageState,
+    async packageInventory(sessionIDs: readonly string[]) {
+      const chats = new Set([...generations.values()].flatMap((entry) => [...entry.children.keys()]))
+      return Promise.all(sessionIDs.filter((sessionID) => chats.has(chatKey(sessionID))).map(async (sessionID) => ({
+        sessionID,
+        state: await packageState(sessionID).catch(() => null),
+      })))
+    },
+    async packageAction(input: { sessionID: string; path: string | null; decision: "save" | "discard" | "clean"; close: boolean }) {
+      const chat = chatKey(input.sessionID)
+      const target = packageChild(chat)
+      if (!target) return input.close && (await packageState(input.sessionID)) === emptyPackageState
+        ? { status: "closed" } : { status: "blocked" }
+      if (lost.has(chat) || stale.has(chat)) return { status: "blocked" }
+      const child = await target.child
+      if (target.owner.children.get(chat) !== target.child || stale.has(chat)) return { status: "blocked" }
+      const result = await child.request("packageAction", { path: input.path, decision: input.decision, close: input.close }, input.close ? 85000 : 55000)
+      if (input.close && result && typeof result === "object" && "status" in result && result.status === "closed") {
+        await child.close()
+        if (target.owner.children.get(chat) === target.child) target.owner.children.delete(chat)
+      }
+      return result
     },
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true

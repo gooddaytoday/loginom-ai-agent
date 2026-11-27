@@ -1,5 +1,5 @@
 import type { SessionInfo } from "@opencode/client/promise"
-import { useDialog } from "@opencode/ui/context/dialog"
+import { useDialog, useDialogLayer } from "@opencode/ui/context/dialog"
 import { Button } from "@opencode/ui/button"
 import { DialogFooter, DialogHeader, DialogTitleGroup, Dialog } from "@opencode/ui/dialog"
 import { prefersReducedMotion } from "@opencode/ui/motion"
@@ -494,7 +494,26 @@ export function createHomeSessionsController(home: HomeController) {
     }
 
     onCleanup(() => dispatch({ type: "disposed" }))
-    const busy = () => selectSessionDeleteView(deleteState()).busy
+    const layer = useDialogLayer()
+    const [checking, setChecking] = createSignal(false)
+    const busy = () => checking() || selectSessionDeleteView(deleteState()).busy
+    let disposed = false
+    onCleanup(() => (disposed = true))
+
+    const confirm = async () => {
+      if (busy()) return
+      const ctx = serverContext(props.server)?.ctx
+
+      if (!ctx) return
+      setChecking(true)
+
+      try {
+        if ((await ctx.beforeSessionRemove(props.session.id)) && !disposed && !layer?.closing())
+          dispatch({ type: "confirm.requested", target: deleteTarget() })
+      } finally {
+        if (!disposed) setChecking(false)
+      }
+    }
 
     return (
       <Dialog fit>
@@ -508,11 +527,7 @@ export function createHomeSessionsController(home: HomeController) {
           <Button variant="ghost" autofocus disabled={busy()} onClick={() => dispatch({ type: "cancel.requested" })}>
             {language.t("common.cancel")}
           </Button>
-          <Button
-            variant="danger"
-            disabled={busy()}
-            onClick={() => dispatch({ type: "confirm.requested", target: deleteTarget() })}
-          >
+          <Button variant="danger" disabled={busy()} onClick={confirm}>
             {language.t("session.delete.button")}
           </Button>
         </DialogFooter>

@@ -312,6 +312,13 @@ export const DESKTOP_NATIVE_ENGLISH = {
   "desktop.dialog.saveFile": "Save file",
   "desktop.dialog.files": "Files",
   "desktop.onboarding.defaultProject": "Default Project",
+  "desktop.loginom.quit.unsaved": "Save changes to open Loginom packages before quitting? For a new package, choose a path in Loginom.",
+  "desktop.loginom.quit.unknown": "Loginom could not check all open packages for unsaved changes.",
+  "desktop.loginom.quit.save": "Save in Loginom",
+  "desktop.loginom.quit.discard": "Close Without Saving",
+  "desktop.loginom.quit.cancel": "Cancel",
+  "desktop.loginom.quit.saveFailed":
+    "Quit cancelled: Loginom did not confirm all saves. Save the packages in Loginom first. For a new package, use Save As and choose a path.",
 
   "desktop.picker.error.notSelected": "File was not selected by the picker",
   "desktop.picker.error.sizeLimit": "Selected attachments exceed the {{limit}} MB limit",

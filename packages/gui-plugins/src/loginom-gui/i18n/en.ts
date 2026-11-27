@@ -1,0 +1,16 @@
+export default {
+  "close.title": "Close conversation?",
+  "close.message": "Package “{{package}}” in “{{conversation}}” has unsaved changes.",
+  "close.untitledPackage": "Untitled package",
+  "close.untitledConversation": "New conversation",
+  "close.save": "Save in Loginom",
+  "close.discard": "Close without saving",
+  "close.cancel": "Cancel",
+  "close.pending": "Finishing in Loginom…",
+  "close.stateFailed": "Could not check the package in Loginom.",
+  "close.failed": "Could not close the package in Loginom.",
+  "close.saveFailed": "Could not confirm that the package was saved and closed in Loginom.",
+  "close.keptOpen": "The conversation is still open.",
+  "close.savedNote": "You saved “{{package}}” before closing",
+  "close.discardedNote": "Closed without saving",
+} as const

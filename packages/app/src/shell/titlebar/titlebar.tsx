@@ -457,7 +457,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
 
               const closeCurrent = () => {
                 if (current === tabs.preview()) {
-                  tabs.closePreview()
+                  void tabs.requestClosePreview()
 
                   return
                 }

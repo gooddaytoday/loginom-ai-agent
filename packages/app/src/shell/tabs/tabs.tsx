@@ -5,6 +5,7 @@ import { produce } from "solid-js/store"
 import { Persist, persisted, removePersisted, draftPersistedKeys } from "@/runtime/persistence/storage"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { usePluginServers } from "@/runtime/plugin/servers"
+import { useBeforeSessionClose } from "@/runtime/plugin/session-close"
 import { createEffect, createSignal, getOwner, onCleanup, startTransition, untrack, type Accessor } from "solid-js"
 import type { NewSessionStartView } from "@/new-session/machine"
 import { useLocation, useNavigate } from "@solidjs/router"
@@ -107,6 +108,7 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
   init: () => {
     const servers = useServers()
     const pluginServers = usePluginServers()
+    const beforeSessionClose = useBeforeSessionClose()
     const platform = usePlatform()
     const [store, setStore, _, ready] = persisted(Persist.window("tabs"), TabStorage.Tabs, [])
 
@@ -430,6 +432,14 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
       disposeTab(tab)
     }
 
+    const closeTargets = (tab: Tab) => {
+      if (tab.type === "draft" || pendingPromotion(promotion(), tabKey(tab))) return []
+
+      return [tab.sessionId, tab.routeSessionId].flatMap((sessionID) =>
+        sessionID ? [{ server: tab.server, sessionID }] : [],
+      )
+    }
+
     const actions = {
       preview: preview.current,
       previewSession(tab: Omit<SessionTab, "type">) {
@@ -452,6 +462,12 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
 
           navigate("/")
         })
+      },
+      async requestClosePreview() {
+        const current = preview.current()
+
+        if (current && (await beforeSessionClose(closeTargets(current))) && current === preview.current())
+          actions.closePreview()
       },
       sessionTab(server: ServerConnection.Key, sessionID: string) {
         const current = preview.current()
@@ -608,16 +624,27 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
       // User-initiated close: records the tab so it can be reopened.
       // Cleanup paths (missing sessions, archive, server removal) go through
       // removeTab and friends directly and are not recorded.
-      closeTab(index: number) {
+      async closeTab(index: number) {
         const tab = store[index]
 
         if (!tab) return
+        const targets = closeTargets(tab)
 
-        if (tab.type === "session") updateClosed((stack) => pushClosedTab(stack, tab, index, info[tabKey(tab)]))
-        removeTab(index)
+        if (targets.length && !(await beforeSessionClose(targets))) return
+        const currentIndex = store.indexOf(tab)
+
+        if (currentIndex === -1) return
+
+        if (tab.type === "session") updateClosed((stack) => pushClosedTab(stack, tab, currentIndex, info[tabKey(tab)]))
+        removeTab(currentIndex)
       },
-      closeTabs(keys: string[], keep: Tab) {
+      async closeTabs(keys: string[], keep: Tab) {
         const removed = new Set(keys)
+        const targets = store.filter((tab) => removed.has(tabKey(tab))).flatMap(closeTargets)
+
+        if (targets.length && !(await beforeSessionClose(targets))) return
+
+        if (!store.includes(keep)) return
 
         const entries = store.flatMap((tab, index) => (removed.has(tabKey(tab)) ? [{ tab, index }] : []))
 
