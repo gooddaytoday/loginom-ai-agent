@@ -335,12 +335,15 @@ export default Plugin.define({
     // `package-docs` grant.
     const profiles = join(Global.Path.data, "file-profiles")
     const files = await localFiles(ctx, profiles)
+    const repeats = repeatGuard(async () => (await ctx.tool.list()).find((tool) => tool.id === "question"))
     await ctx.tool.transform((editor) => {
       editor.add(
-        files.admitTool(async (sessionID) => {
-          const host = await hold(sessionID)
-          return host && { host, userMessage: await task(sessionID) }
-        }),
+        repeats.wrap(
+          files.admitTool(async (sessionID) => {
+            const host = await hold(sessionID)
+            return host && { host, userMessage: await task(sessionID) }
+          }),
+        ),
       )
       fileTools(files, profiles).forEach((tool) => editor.add(tool))
       editor.add(packageDocs(files, ctx.location.directory, resources))
@@ -358,9 +361,8 @@ export default Plugin.define({
       ready: () => ServiceHost.connected(),
       failure: (sessionID) => refused.get(sessionID),
       task,
+      wrap: repeats.wrap,
     })
-    const repeats = repeatGuard()
-    await ctx.tool.transform(repeats.wrap)
 
     // The lease events start once the catalog that `drop` clears exists.
     const stop = new AbortController()
@@ -418,7 +420,7 @@ export default Plugin.define({
       hide(event)
     })
     await ctx.tool.hook("execute.before", async (event) => {
-      if (!event.tool.startsWith("loginom_")) repeats.reset(event.sessionID)
+      if (!repeats.tracks(event.tool)) repeats.reset(event.sessionID)
       await bound(event.sessionID)
       if (!permits(profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
