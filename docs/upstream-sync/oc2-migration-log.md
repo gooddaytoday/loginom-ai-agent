@@ -26564,3 +26564,81 @@ A — Host v2 + ресурсы `cli5`, B — Host v2 + ресурсы релиз
 2. Узлы, не принятые из-за модели (sampling, smoothing, части exports-excel и partition) и стенда (acf, части exports-excel и partition): повторные серии или зачесть как есть.
    Повтор узлов «стенда» на сегодняшнем стенде не поможет — их падает и `v0.4.2`.
 3. Класс «встроенный инструмент на нелокальном пути» — главный источник провалов DeepSeek flash; контракт 0.4.2 не менялся (общий критерий приёмки).
+
+## B6.2-F Итоговый прогон проверок шлюза B на кандидате
+
+26.11.2026. Ветка `b62f-final` от `oc2-migration` (`70f2e3b07d`), дерево `.claude/worktrees/b62f`. Кандидат — `70f2e3b07dd9218491d9084ea771e7b0fad4d867`, выпуск `loginom-release.yml`
+run `45884410046` (зелёный на трёх ОС, `SHA256SUMS` есть). Код продукта не менялся; правка одна — `scripts/candidate-check/b62c-windows.sh` (ниже). Настоящая модель не вызывалась:
+профили писала подставная модель обвязки на `127.0.0.1`; счётчик подставных запросов — Linux: `old` 10 на релиз (20), `serve`/`migrate` по 2 на прогон (8); Windows: `old` 8+8, `serve`/`migrate`
+по 2 на прогон (8), задача CLI 2; `no-model-calls` в smoke — 0 во всех запусках; матрица Docker шла с `--network none`. Эталон 0.4 — `v0.4.2` (В-110). Протоколы без секретов —
+`~/.local/share/loginom-evidence/b62f/` (`g/`, `b33-linux.log`, `b33-state/`, `sec01-linux.log`, `matrix*/`, `win/`, `artifact-sha256.txt`).
+
+### Артефакты (сверены с `SHA256SUMS` и `ci-summary.json`)
+
+| Файл | SHA-256 |
+|---|---|
+| `loginom-ai-agent-cli-0.0.0-dev-9-linux-x64.tar.gz` (`cli-manifest.json`: `sourceCommit` `70f2e3b0…`, `sourceDirty: false`) | `7df20c9b89cd99017aaac71ed31b5a2109bab9ae470c3d7d5bb4a1fea4357086` |
+| `loginom-ai-agent-linux-amd64.deb` | `b206b9e372e145a16c46d9e9e270d2f41feb37e271b912c58bc33fb0d1c0253d` |
+| `loginom-ai-agent-linux-x86_64.AppImage` | `f758dc33b7f6e3aab6404e13634164aa007c72ad2031f3800757280ce99e7572` |
+| `loginom-ai-agent-win-x64.exe` (NSIS, не подписан) | `aa3641eafdc26c08bb1c12da13b8b7232cd8725b0a4ca32409d7c7218165c2f5` |
+| `loginom-ai-agent-cli-0.0.0-dev-9-win32-x64.zip` | `bbb3dd695dc7eee27dabb6543b8765a4b4a3ecea10ac2eaba7c45ff30c126eb3` |
+
+Релизные Desktop для профилей: Linux `v0.3.9` (`d7e64fa0…`) и `v0.4.2` (`53372997…d107`) — как в B6.2b; Windows `0.3.9` и `0.4.0` из `C:\lab` (как в B6.2c; `0.4.2` на Windows по-прежнему не проверялась).
+
+### Итог по строкам плана B6.2-S
+
+| Строка | Итог | Длительность | Что получено; отличие от репетиции |
+|---|---|---|---|
+| B3.3 Linux (0.3.9 и 0.4.2 × `serve`, `migrate`) | PASS | 115 с (`b62b-linux.sh`) | 4 / 11 / 26, 38 миграций, 13 сообщений v2, 10 вызовов подставной модели на профиль, `v1-backup.db` равна исходной, повторы без второй копии, `migrate` после `serve` — «Already migrated». Числа те же. Состояний `old`/`pristine` репетиции в каталоге доказательств **нет** (рабочий каталог репетиции удалён), `old` записан заново AppImage — хеши баз другие, числа те же |
+| B3.3 Windows (0.4.0 и 0.3.9 × `serve`, `migrate`) | PASS | `profiles` 1369 с (0.4.0: установка 477, `old` 31, `serve` 241, `migrate` 51; 0.3.9: 210, 165, 133, 41) | 3 / 9 / 22, 38, 11 сообщений v2, 8 вызовов на профиль, 4 прогона зелёные. Числа те же; `serve` 133–241 с вместо 63–131 (холодный первый запуск, стенд) |
+| SEC-01 Linux | PASS | 1 с | `write`/`read`/`unavailable` Electron 44.9.1, обычный пользователь `lrun`; равно `safe-storage-*.json` артефакта, кроме `pid`; `must-not-exist.json` нет. Как в репетиции |
+| SEC-01 Windows (DPAPI) | PASS | 51 с стадии (скрипт 22 с) | `write`, `read`, `unavailable` равны CI кроме `pid`; повреждённый шифротекст: `read` код 1, «Error while decrypting the ciphertext…», доказательство не записано; хеш Electron сверен с `checksums.json`. Как в репетиции |
+| Чек-лист Windows 4/5/8/10 | PASS (с оговоркой) | smoke 319 с (успешный прогон), CLI 504 с | Успешный прогон (`smoke-192651`): 42 проверки PASS, `NotSigned`, 3 запуска (окно 0,5–0,6 с, закрытие `WM_CLOSE` 0,35–0,52 с), `manifestHash` `060bbe04…af69` как в CI, служба `0.0.0-dev-9`. CLI из ZIP: `install.cmd` 402 с, `--version` `0.0.0-dev-9`, `setup` отказ `LOGINOM_LOGIN_UNAVAILABLE`, задача на подставной модели код 0 `B62C-STUB-ANSWER` (2 запроса), `uninstall.cmd` 15 с. Первый прогон smoke — FAIL, см. находку 1 |
+| Установленный Linux (Docker, DEB + AppImage) | PASS | 10 целей: основной прогон около 29 мин (8 целей) + `debian13` 293 с и `debian13-appimage` 85 с повторно | PKG-02 (хеши, `--verify-resources` 0, песочница Chromium), PKG-01 (окно 537–589 мс, служба `0.0.0-dev-9`), LIFE-01 на пяти DEB (`--shutdown 3`) и перенос профиля 0.4.2 — PASS на всех. Как в репетиции (там 10 целей, 45 мин) |
+| G1–G6 | PASS | 4191 с (1 ч 10 мин) | см. ниже |
+
+### G1–G6, сравнение с репетицией (`abb6374106`)
+
+Дерево `70f2e3b07d`, Bun 1.4.4, Node 24.19.0, `guarantees.ts all`. Таблица: `g/table.md`, `g/results.json`.
+
+| Набор | Репетиция | Кандидат |
+|---|---|---|
+| `product` | 95/0 | **118/0** (три известных падения B5.1 нет) |
+| `cli` identity / profile / host / resources | 8/0, 11/0, 1/0, 13/0 | 8/0, 11/0, 1/0, 13/0 |
+| `loginom-agent` | 125/0 | **131/0** (слияние 0.4.2) |
+| `server`: access / dashboard-files / local-file / package-docs / dock-catalog / host-lease | 12 / 13 / 42 / 42 / 19 / 8, 0 падений | 12 / 13 / **44** / 42 / 19 / 8, 0 падений |
+| `loginom-host` | 548/2 | **549/2**: те же два под root (`archive verification preserves manifest modes under a private umask`, `actual managed entry reads live bridge work and dispatching over private IPC`) |
+| `dashboard` | падение `log.test.mjs` | то же (`assert.ok(process.stdout.writableNeedDrain)`), `test:coverage:web` 49/1 |
+| `selftest.sh` | код 0 | код 0 |
+
+Мутации: 15 из 15 красные и после отката равны базе. Изменение против репетиции: `G2-flag-identity` теперь **красная** (7/1; в репетиции — NOT RED, там выбор мутации был исправлен уже после прогона).
+Базы выросли (131 и 549), число падений в мутациях то же, что в репетиции.
+
+### Правка скрипта проверки
+
+`scripts/candidate-check/b62c-windows.sh`: переменная `zip` вычислялась до стадии `fetch`, при `fetch prepare send` в одном вызове `split` получал пустое имя («cannot open '' for reading»). Теперь имя
+считается в начале стадии `send` (+2 строки). Остальные стадии (`fetch`, `prepare`, `send`, `profiles`) в этом прогоне впервые прошли скриптом, `send` — за 372 с (в репетиции 65 мин). Проверки: `bash -n` чисто.
+
+### Находки, продукт не правился
+
+1. **Intermittent: `Plugin activation timed out` в `renderer.log` при первом холодном запуске установленного Desktop на Windows.** Файл: `packages/app/src/runtime/plugin/instance-machine.ts:243`.
+   Шаг: чистая установка NSIS, первый запуск (`smoke-191453`, run 1: `main` 10 с, окно 4,4 с). Вывод: `[plugin] debug|file|review|browser|updater Error: Plugin activation timed out` в 06:20:12, через 31 с после
+   старта `main` (06:19:41); проверка `no-error-lines` — FAIL, остальные 41 — PASS. Повтор на том же профиле дал FAIL от старых журналов (мой повтор без чистки — ошибка прогона), повтор на чистом профиле
+   (`smoke-192651`) — 42/42 PASS, три запуска без ошибок. Не воспроизведено; в репетиции (B6.2c) этого не было. Стенд в это время принимал `serve` и пробный CLI, возможна нагрузка. Решение — владельцу: считать флейком
+   стенда или записать как дефект.
+2. **`b62c-windows.sh smoke` не чистит профиль `com.loginom.aiagent.dev` и `.local\share\loginom-ai-agent-dev`** предыдущего прогона (`b62c-wipe-old.ps1` убирает только прежние каналы): повторный `smoke` без ручной чистки падает на `clean-profile`.
+3. **Блок `#< CLIXML` в stderr CLI остаётся** (`cli-step8.log`: 2 вхождения, фильтр скрипта их убирает); причина — как в B6.2c.
+4. **Права на каталоги `test/loginom`**: дерево создаётся с umask 077, контейнер Docker (UID 1200) не видит `/test`, и все цели падают с `Cannot find module '/test/docker/installed-smoke.mjs'`. Нужен `chmod -R a+rX packages/desktop/test/loginom` (в инструкции «Как перезапустить» B6.2b этого нет).
+5. В инструкции `fetch-linux.sh` ищет прогоны `Loginom Linux`/`Loginom macOS candidate`/`Loginom Windows candidate`; для выпуска `loginom-release.yml` run есть один с другими именами — артефакты `loginom-linux-x64-cli` и `-desktop` скачаны `gh run download` напрямую. Скрипт не менял.
+6. Остальное из B6.2c (холодный запуск, `uninstall.cmd` оставляет пустой `bin`, 0.3.9 оставляет ключ схемы — после первой `wipe` `URI scheme left: True`) без изменений.
+
+### Уборка
+
+Windows: `clean` — учётная запись и профиль удалены, `C:\lab\b62c` удалён, снимок «после» равен «до» (`snapshot after == before`); независимо: `Test-Path C:\lab\b62c` — False, процессов из каталога 0,
+пользователи `DefaultAccount, user, WDAGUtilityAccount, Администратор, Гость`, группа «Администраторы» — `user`, `Администратор`. Файл пароля удалён. Linux: каталоги `b62f` под пользователем `lrun` и рабочий каталог загрузок — копии прогона (удаляются
+после отчёта); процессы и каталоги линии `b61a` не затрагивались. Крупные артефакты Windows (`exe`, ZIP) из каталога доказательств удалены, остались хеши и `ci-summary.json`.
+
+### Не проверено
+
+Видимое окно (сеанс 0, `visible: false`); подпись (`NotSigned`, как в 0.4); вход в настоящий Loginom; Windows 0.4.2 (взят 0.4.0); перенос ключа Electron 42 → 44; SEC-01 в установленном Desktop, журналы и экспорт
+диагностики — шлюз C (В-86); пункты 6, 7, 9 чек-листа Windows; macOS (run зелёный, живой проверки не было).
