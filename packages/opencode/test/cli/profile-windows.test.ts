@@ -117,7 +117,9 @@ test.skipIf(process.platform !== "win32")(
       const httpCache = join("loginom", "validation", "http-cache", "Default", "Cache")
       const root = await profile(network, httpCache)
       await icacls(join(root, network), capability + "(OI)(CI)M")
-      await icacls(join(root, httpCache), capability + "(OI)(CI)M")
+      // Chromium's own grant (LAB-2078 readback): Modify, Synchronize on the
+      // directory plus an inherit-only entry with these generic rights.
+      await icacls(join(root, httpCache), capability + "(OI)(CI)(GR,GW,GE,D)")
       await writeFile(join(root, network, "Cookies"), "test")
       await writeFile(join(root, httpCache, "index"), "test")
       await protectWindowsProfile(root)
@@ -129,6 +131,11 @@ test.skipIf(process.platform !== "win32")(
         [join("loginom", "validation", "other", "Default"), capability + "(OI)(CI)M"],
         [join("config", "Default"), capability + "(OI)(CI)M"],
         [network, capability + "(OI)(CI)F"],
+        // Only Modify + Synchronize: 0.4.3 accepted these because they are not FullControl.
+        [network, capability + "(OI)(CI)(M,WDAC)"],
+        [network, capability + "(OI)(CI)(M,WO)"],
+        [network, capability + "(OI)(CI)(M,DC)"],
+        [network, capability + "(OI)(CI)(IO)(GA)"],
         [network, "*S-1-15-2-1:(OI)(CI)M"],
         // Another principal inside an anchor is what the check exists for.
         [network, "*S-1-1-0:(OI)(CI)R"],

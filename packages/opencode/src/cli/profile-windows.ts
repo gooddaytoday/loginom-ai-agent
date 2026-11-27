@@ -61,10 +61,20 @@ try {
       if ($access.IdentityReference.Value -ne $sid.Value -and $access.IdentityReference.Value -ne 'S-1-5-18') {
         # Chromium grants its restricted AppContainer capability modify access
         # to cache/network directories. Accept that narrow SID class only
-        # inside browser-profile or the Chromium caches above, never with FullControl.
+        # inside browser-profile or the Chromium caches above. Chromium asks for
+        # GENERIC_READ|WRITE|EXECUTE|DELETE: Windows stores Modify, Synchronize
+        # plus an inherit-only entry with the generic bits. Map generic bits
+        # through the file mapping and allow nothing beyond Modify, Synchronize:
+        # no ChangePermissions, TakeOwnership, DeleteSubdirectoriesAndFiles.
+        $rights = [int]$access.FileSystemRights
+        $mapped = $rights -band 0x0FFFFFFF
+        if ($rights -band [int]::MinValue) { $mapped = $mapped -bor 0x120089 }
+        if ($rights -band 0x40000000) { $mapped = $mapped -bor 0x120116 }
+        if ($rights -band 0x20000000) { $mapped = $mapped -bor 0x1200A0 }
+        if ($rights -band 0x10000000) { $mapped = $mapped -bor 0x1F01FF }
         $browserCapability = ($chromiumCache -or (@($entry.FullName.Split([IO.Path]::DirectorySeparatorChar)) -contains 'browser-profile')) -and
           $access.IdentityReference.Value -match '^S-1-15-3-1024-(?:[0-9]+-){7}[0-9]+$' -and
-          ($access.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne [Security.AccessControl.FileSystemRights]::FullControl
+          ($mapped -band -bnot 0x1301BF) -eq 0
         if (!$browserCapability) { exit 1 }
       }
       if ($access.IdentityReference.Value -eq $sid.Value -and ($access.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -eq [Security.AccessControl.FileSystemRights]::FullControl) { $userFull = $true }
