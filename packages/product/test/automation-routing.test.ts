@@ -67,7 +67,8 @@ test("final message reports the saved path and requires confirmation of cleanup"
   const finish = skill.slice(skill.indexOf("## Завершение"))
   expect(finish).toContain("После подтверждённого Save сообщи")
   expect(finish).toContain("Пакет сохранён в `<полный серверный путь .lgp>`")
-  expect(finish).toContain("Сообщай о закрытии или выходе только после подтверждения")
+  expect(finish).toContain("В Desktop пакет не закрывается и выход из Loginom не выполняется")
+  expect(finish).toContain("Инструментов закрытия и выхода нет")
   expect(finish).not.toContain("закрытие и выход выполнит приложение")
   // Export results carry artifact_id/destination, not a download URL.
   expect(finish).toContain("серверный путь пиши в `коде`, не ссылкой")
