@@ -5,7 +5,7 @@ export const packageReadOnlyAdvice = 'The saved package is read-only and the loc
 // scenario in one read. Historical snapshots remain with their operations.
 async function captureWorkspaceStep(page, options) {
   return page.evaluate(({origin, pathname, expectedBuild, sessionId, workflowRef, replayId, prepareId,
-    operationId, intent, packagePath, reserveActivation})=>{
+    operationId, intent, packagePath, reserveActivation, countGraph})=>{
     const state=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
     const refused=reason=>({status:'NOT_READY',reason});
     if(location.origin!==origin||location.pathname!==pathname||app?.Version!==expectedBuild
@@ -99,6 +99,12 @@ async function captureWorkspaceStep(page, options) {
       // A new explicit preparation with the existing path still uses the
       // ordinary reservation and verification path.
       return {status:'UNAVAILABLE'};
+    }
+    if(countGraph){
+      const nodes=model.FDiagram.FNodes?.FCollection;
+      if(!crumbs.at(-1).label||!Array.isArray(nodes)||nodes.length>200||nodes.some(node=>typeof node?.FGuid!=='string'||!node.FGuid)
+        ||new Set(nodes.map(node=>node.FGuid)).size!==nodes.length)return {status:'UNAVAILABLE'};
+      return {status:'READY',node_count:nodes.length,navigation:crumbs.map(part=>part.label).filter(Boolean)};
     }
     if(prepareId){
       // The operation ID was free at lookup, before the asynchronous tab
@@ -959,6 +965,16 @@ export function makeWorkspaceStepCode({loginomUrl,build,sessionId,workflowRef,re
     }
     return {status:'SUCCEEDED',phase:'observed',action_key:'workspace.step',action_revision:'1',
       effect_possible:false,error:null,trace:[],output:state};
+  }`;
+}
+
+export function makeBuildGraphCode({loginomUrl,build,sessionId,workflowRef}) {
+  const url=new URL(loginomUrl);
+  const options={origin:url.origin,pathname:url.pathname,expectedBuild:build,sessionId,workflowRef,countGraph:true};
+  return `async page=>{
+    const output=await (${captureWorkspaceStep.toString()})(page,${JSON.stringify(options)});
+    return {status:'SUCCEEDED',phase:'observed',action_key:'workspace.build_graph',action_revision:'1',
+      effect_possible:false,error:null,trace:[],output};
   }`;
 }
 

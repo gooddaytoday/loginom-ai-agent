@@ -20,6 +20,7 @@ import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
 import { Schema } from "effect"
 import { local, type Profile } from "./access"
+import { buildFactsMetadata } from "./build-facts"
 import { exactScanReceipt } from "./file-profile-core"
 import type { ServiceHost } from "./host"
 import { permissionFailure, type localFiles } from "./local-file"
@@ -46,6 +47,10 @@ const Reply = Schema.Struct({
 })
 const decodeCatalog = Schema.decodeUnknownSync(Catalog)
 const decodeReply = Schema.decodeUnknownSync(Reply)
+const buildFactTools = new Set([
+  "dock_prepare", "dock_node_apply", "dock_node_resume", "dock_node_read", "dock_node_wait", "dock_node_status", "dock_node_delete",
+  "dock_action_run", "dock_operation_inspect",
+])
 
 // The product's own tools that 0.4 offered only beside a prepared Dock: the catalog then describes Dock actions.
 const prepared = ["loginom_file_admit", "loginom_file_profile", "loginom_file_scan", "loginom_file_sample"]
@@ -298,6 +303,9 @@ export async function dockTools(input: {
       .flatMap((block) => (block.type === "text" && typeof block.text === "string" ? [block.text] : []))
       .join("\n\n")
     const state = loginomResultState(result as Parameters<typeof loginomResultState>[0])
+    const loginom = state === "completed" && buildFactTools.has(name)
+      ? buildFactsMetadata(result._meta?.loginomBuild, { session_id: call.sessionID, turn_id: task, generation: lease.generation })
+      : undefined
     const summary = oversized(text)
       ? loginomResultSummary(result as Parameters<typeof loginomResultSummary>[0])
       : undefined
@@ -320,6 +328,7 @@ export async function dockTools(input: {
       content: images.length ? [{ type: "text", text: content }, ...images] : content,
       metadata: {
         generation: lease.generation,
+        ...(loginom ? { loginom } : {}),
         ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
         // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
         ...(outputPath ? { truncated: true, outputPath } : {}),

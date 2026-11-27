@@ -236,4 +236,10 @@ export type SessionDomain = Pick<
 > &
   Pick<ExperimentalSessionApi, "wait" | "instructions"> & {
     readonly hook: ModelHooks<SessionHooks>
+    /** Stored messages after an exact message, including messages retained across compaction. */
+    readonly history: (input: {
+      readonly sessionID: Session.ID
+      readonly afterMessageID: SessionMessage.ID
+      readonly type?: SessionMessage.Type
+    }) => Promise<SessionMessage.Info[]>
   }

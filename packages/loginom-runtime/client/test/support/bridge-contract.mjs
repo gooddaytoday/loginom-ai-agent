@@ -73,6 +73,9 @@ test('MCP application refusals remain typed normal content and the same connecti
         ? { status: 'READY', target: compatibility, authenticated: true, created_draft: true, effect_possible: true, document_id: 'fixture-document', target_verified: true, package_ref: {path:null,persisted:false}, workflow_ref: { tab_tid: page.tabTid, prefix: page.prefix, workflow_id: 'fixture-workflow', navigation_path: preparationPath } }
         : code.includes('async function observeGeometry(')
         ? { version:1, source:'prepare_same_browser_page', observed:{document_id:'fixture-document'}, fixture:true }
+        : code.includes("action_key:'workspace.build_graph'")
+        ? {status:'SUCCEEDED',phase:'observed',action_key:'workspace.build_graph',action_revision:'1',effect_possible:false,
+          trace:[],error:null,output:{status:'READY',node_count:page.nodes.length,navigation:preparationPath.map(part=>part.label)}}
         : await page.execute(code);
       return { content: [{ type: 'text', text: JSON.stringify(output) }] };
     }
@@ -315,7 +318,7 @@ test('MCP application refusals remain typed normal content and the same connecti
     const compactSession={directory:compactDirectory,browserCli:session.browserCli,browserConfig:session.browserConfig,
       browserRoot:session.browserRoot,metadata:{...session.metadata,sessionId:'unit-bridge-compact'},async save(){},
       artifactStore:await createArtifactStore({directory:join(compactDirectory,'input')})};
-    bridge=await createBridge({...config,resultProfile:'user-v1',stateDir:compactDirectory},compactSession);
+    bridge=await createBridge({...config,resultProfile:'user-v1',stateDir:compactDirectory},compactSession,{buildFacts:true});
     client=new ProtocolClient({name:'test-compact-agent',version:'1.0.0'},{jsonSchemaValidator:new SchemaCachingValidator()});
     const [compactAgentTransport,compactBridgeTransport]=InMemoryTransport.createLinkedPair();
     await Promise.all([bridge.server.connect(compactBridgeTransport),client.connect(compactAgentTransport)]);
@@ -344,6 +347,9 @@ test('MCP application refusals remain typed normal content and the same connecti
     assert.deepEqual(compactPreparation,prepareSchema);
     const compactPrepare=await client.callTool({name:'dock_prepare',arguments:{}});
     assert.equal(JSON.parse(compactPrepare.content[0].text).prepared,true);
+    assert.deepEqual(JSON.parse(JSON.stringify(compactPrepare._meta.loginomBuild)),{kind:'workspace',document_id:'fixture-document',
+      workflow_id:'fixture-workflow',operation_id:'prepare',node_count:{source:'workspace.graph',count:1,navigation:['Scenario']}});
+    assert.ok(!JSON.stringify(compactPrepare.content).includes('loginomBuild'));
     const compactRequest={...sourceRequest,operation_id:'bridge-compact-source',
       workflow_ref:{workflow_id:'fixture-workflow'}};
     const beforeCompact=browserCalls;
@@ -381,6 +387,7 @@ test('MCP application refusals remain typed normal content and the same connecti
       assert.equal(browserCalls,beforeRefusal,'the competing read must not reach the browser');
       const waiting=await client.callTool({name:'dock_node_wait',arguments:{operation_id:'bridge-background',timeout_ms:1}});
       assert.equal(waiting.structuredContent.state,'running');
+      assert.equal(waiting._meta?.loginomBuild,undefined);
       assert.equal(bridge.hasActiveWork(),true);
     } finally {
       actionRuntime.cancelNodeApply('bridge-background');

@@ -607,6 +607,8 @@ export const make = Effect.fn("PluginHost.make")(function* (plugin: Pick<Interfa
           .pipe(Effect.map((interrupted) => ({ interrupted }))),
       wait: (input) => sessions.wait(input.sessionID),
       context: (input) => sessions.context(input.sessionID),
+      history: ({ sessionID, afterMessageID, type }) =>
+        sessions.messages({ sessionID, type, order: "asc", cursor: { id: afterMessageID, direction: "next" } }),
       instructions: {
         entry: {
           list: Effect.fn(function* (input) {
