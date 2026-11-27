@@ -1,3 +1,4 @@
+import { abcDownload, abcOutput, emptyOutput, exportReceipt, filteredOutput, filterSettings, missingDate, salesVariables, sourceOutput } from './node-receipts.js'
 import { editedPackageBase64 } from './edited-package.js'
 import { icon } from './icons.js'
 import { renderHub, bindHub, hubHasInstalled, openHubSolution, showHubType, showHubTab, showHubDetail, installForDemo } from './hub.js'
@@ -60,9 +61,9 @@ const packageViews = {
   // Iteration 9: the 3rd field of a node without facts is its Loginom component — the schema writes it under the name.
   abc:[
     ['database','CSV продаж','Импорт из текстового файла','Демонстрационный CSV · 2 400 строк'],
-    ['layers','Подготовка','Заполнение пропусков','Проверка пропусков и нормализация форматов'],
-    ['chart','ABC-анализ','Группировка','Группировка по накопленной доле выручки'],
-    ['file','Результат','Экспорт в Excel-файл','120 товаров · 3 группы'],
+    ['chart','Выручка по товарам','Группировка','Сумма выручки по каждому товару'],
+    ['layers','Сортировка по выручке','Сортировка','Первыми идут товары с наибольшей выручкой'],
+    ['chart','ABC-классификация','Калькулятор','120 товаров · 3 группы'],
   ],
   // Iteration 9: «14 узлов, 3 подмодели», as the document and the action say — 5 here and 9 inside (packageSubmodels).
   // Field checks and duplicates are parallel branches; both feed «Сводка ошибок» (packageLinks).
@@ -129,7 +130,16 @@ const packageViews = {
   ],
 }
 // Links of a view without facts, [from, output, to, input]; a view not listed here is a chain.
+const receiptNodes = [
+  packageViews.abc[0],
+  ['layers','Фильтр по дате (ветка «Регионы»)','Фильтр строк',filterSettings],
+  ['shield','Проверка будущих дат','Фильтр строк',emptyOutput.settings],
+]
+packageViews['receipt-sales'] = receiptNodes
+packageViews['receipt-export'] = [...receiptNodes, ['file','Экспорт в CSV','Экспорт в текстовый файл','Продажи за период.csv']]
 const packageLinks = {
+  'receipt-sales':[[0,0,1,0],[1,0,2,0]],
+  'receipt-export':[[0,0,1,0],[1,0,2,0],[1,0,3,0]],
   quality:[[0,0,1,0],[0,0,2,0],[1,0,3,0],[2,0,3,1],[3,0,4,0]],
 }
 // The nodes inside each submodel of a view. In Loginom a submodel is a node that holds other nodes; «Войти» opens them,
@@ -235,6 +245,7 @@ const route = () => {
 }
 route()
 // «Проекты» on the review page reloads as a returning user and opens a project.
+const chatDrafts = new Map()
 const pendingChat = read('openChat', null)
 if (pendingChat) {
   write('openChat', null)
@@ -310,6 +321,7 @@ function canNavigate(page, tab) {
 function navigate(page, keepReturn = false) {
   if (!Object.hasOwn(pages, page) || !canNavigate(page)) return
   if (page === 'settings' && !keepReturn) state.returnTo = null
+  if (state.page === 'chat' && page !== 'chat') keepChatDraft()
   state.page = page
   state.overlay = null
   state.mobile = false
@@ -415,9 +427,15 @@ function discuss(title, prompt, files, pkg = null) {
   render()
   $('#prompt')?.focus()
 }
+function keepChatDraft() {
+  if (state.page !== 'chat' || !state.session) return
+  chatDrafts.set(state.session, {draft:state.draft, draftFiles:state.draftFiles, draftPackage:state.draftPackage,
+    draftNode:state.draftNode, editTurn:state.editTurn})
+}
 function newSession() {
   if (!canNavigate('home')) return
   // Coming back from Схема, Каталог or Настройки keeps what the user typed and chose.
+  keepChatDraft()
   const keepDraft = state.session === null && !['home','project'].includes(state.page)
   state.editTurn = null
   // As in Codex, a new chat goes to the project you are in; the start screen shows it and lets you change it.
@@ -427,6 +445,7 @@ function newSession() {
   if (!keepDraft) {
     state.draft = ''
     state.templateTitle = ''
+    state.draftNode = null
     state.draftFiles = []
     state.draftPackage = null
   }
@@ -439,6 +458,10 @@ function projectById(id) {
 }
 function openProject(id) {
   if (!projectById(id) || !canNavigate('project')) return
+  keepChatDraft()
+  if (state.page === 'chat' || state.session) {
+    Object.assign(state, {draft:'', draftFiles:[], draftPackage:null, draftNode:null, editTurn:null})
+  }
   if (state.projectView !== id) {
     state.draftFiles = []
     state.draftPackage = null
@@ -454,19 +477,22 @@ function openProject(id) {
 function expandProject(id) {
   if (id && !state.expanded.includes(id)) state.expanded.push(id)
 }
-function openSession(id) {
-  if (state.editTurn?.session !== id) state.editTurn = null
+function openSession(id, at) {
   const item = state.sessions.find(entry => entry.id === id)
   if (!item || !canNavigate('chat')) return
+  keepChatDraft()
   expandProject(item.project)
   state.project = item.project
   state.session = id
   state.review = false
-  state.draft = ''
-  state.draftFiles = []
-  // A conversation opens at its latest turn, as in ChatGPT.
-  state.scrollToEnd = true
+  Object.assign(state, {draft:'', draftFiles:[], draftPackage:null, draftNode:null, editTurn:null}, chatDrafts.get(id))
+  state.scrollToEnd = at == null
   navigate('chat')
+  if (at != null) {
+    const turn = $(`#turn-${at}`)
+    turn?.scrollIntoView({block:'start'})
+    turn?.focus({preventScroll:true})
+  }
 }
 // В-82: the OpenCode 2 connect window opens over «Провайдеры»; after «Продолжить» the app returns to the task.
 function openConnect(id = '') {
@@ -605,14 +631,16 @@ function header() {
 function composer() {
   const modelName = currentModel()
   const pkg = state.draftPackage
+  const node = state.page === 'chat' && state.draftNode
   const model = chatModel()
   // Where the data goes is said where the user decides to send it, not only in «Модели».
   const note = state.policy === 'broken' && !modelName ? `${icon('alert',14)}<span>Файл политики администратора с ошибкой: модели — только на этом компьютере.</span><button type="button" class="link-btn" data-settings="models">Что делать</button>`
-    : modelName && model.kind === 'cloud' && (pkg || state.draftFiles.length) ? `${icon('globe',14)}<span>Модель в облаке: сообщение и то, что агент прочитает в приложенном, уйдут в «${esc(model.where)}».</span><button type="button" class="link-btn" data-settings="models">Модели</button>` : ''
+    : modelName && model.kind === 'cloud' && (pkg || node || state.draftFiles.length) ? `${icon('globe',14)}<span>Модель в облаке: сообщение и то, что агент прочитает в приложенном, уйдут в «${esc(model.where)}».</span><button type="button" class="link-btn" data-settings="models">Модели</button>` : ''
   return `<form class="composer" id="composer">
     ${['home','chat','project'].includes(state.page) ? trialBanner(state) : ''}
     ${state.editTurn && state.editTurn.session === state.session && state.page === 'chat' ? `<div class="edit-banner">${icon('compose',15)}<span>Изменяете сообщение — ответы после него заменятся новыми${editCopyNote()}${state.importedPackages.some(entry => entry.savedVersion) || salesState().replaced ? '. Пакеты, уже сохранённые в Loginom, останутся как есть' : ''}</span><button type="button" class="link-btn" data-action="cancel-edit">Отмена</button></div>` : ''}
     ${pkg ? packageContext(pkg) : ''}
+    ${node ? `<div class="attachment-list"><span class="node-chip">${icon('flow',14)} ${esc(node.name)} <button type="button" class="small-icon" aria-label="Убрать узел" data-action="remove-draft-node">${icon('close',13)}</button></span></div>` : ''}
     ${state.draftFiles.length ? `<div class="attachment-list">${state.draftFiles.map((file,i) => `<span>${icon('file',14)} ${esc(file)} <button type="button" class="small-icon" aria-label="Убрать ${esc(file)}" data-remove-file="${i}">${icon('close',13)}</button></span>`).join('')}</div>` : ''}
     ${note ? `<div class="composer-note">${note}</div>` : ''}
     <textarea id="prompt" aria-label="Сообщение агенту" placeholder="${state.page === 'chat' && state.editTurn?.session === state.session ? 'Изменённое сообщение' : state.page === 'chat' && ['running','retrying'].includes(currentItem()?.phase) ? 'Поправка агенту — учтёт после текущего шага' : state.page === 'chat' ? 'Уточните задачу или задайте вопрос' : state.page === 'project' || projectById(state.project) ? esc(`Новый разговор в проекте «${projectById(state.page === 'project' ? state.projectView : state.project)?.name}»`) : esc(placeholder)}" rows="2">${esc(state.draft)}</textarea>
@@ -714,7 +742,8 @@ function createdFiles(item) {
 function turnFiles(item) {
   if (item.phase !== 'done') return []
   if (item.kind === 'document') return [stepText('{doc}', item)]
-  if (item.kind === 'abc') return ['ABC-анализ.lgp']
+  if (item.kind === 'abc' && abcSaved(item)) return ['ABC-анализ.lgp']
+  if (item.kind === 'node-export') return filesFromReceipts(item).map(file => file.name)
   if (item.kind === 'quality') return ['Качество выгрузки.html']
   if (item.kind === 'enrich') return ['sales-demo — с данными Example Data.csv']
   if (['improve','keep'].includes(item.kind)) return savedVersion(item) ? [savedVersion(item).name] : []
@@ -731,11 +760,22 @@ function followedNow(item) {
   ].filter(Boolean)
   return rows.length ? `<p class="review-label">Агент учитывает</p><div class="review-stack">${rows.map(text => `<div class="review-entry">${icon('book',16)} ${esc(text)}</div>`).join('')}</div>` : ''
 }
-function resultPackage(item) {
-  return {
-    id:'result-' + item.id, name:item.kind === 'abc' ? 'ABC-анализ.lgp' : item.kind === 'refactor' ? 'Продажи — улучшено.lgp' : 'Результат.lgp',
-    scope:'personal', view:item.kind === 'quality' ? 'quality' : item.kind === 'abc' ? 'abc' : 'sales', isResult:true,
-  }
+function abcSaved(turn) {
+  return scriptOf(turn).steps.slice(0, turn.step).some(step => step.saved)
+}
+function runOutputs(turn) {
+  return scriptOf(turn).steps.slice(0, turn.step).flatMap(step => step.output ? [step.output] : [])
+}
+function filesFromReceipts(turn) {
+  return scriptOf(turn).steps.slice(0, turn.step).flatMap(({file}) =>
+    file?.verification_id && turn.exportTo ? [{...file, destination:turn.exportTo}] : [])
+}
+function outputPackage(turn, session, at) {
+  if (turn.kind === 'abc') return {id:`result-${session}-${at}`, name:'ABC-анализ.lgp', scope:'personal', view:'abc',
+    isResult:true, isDraft:!abcSaved(turn), fullPath:turn.savedPath, project:state.project}
+  if (['node-data','node-error','node-export'].includes(turn.kind)) return {id:`receipt-${turn.kind}`,
+    name:turn.kind === 'node-export' ? 'Продажи · экспорт.lgp' : 'Продажи · проверка.lgp',
+    scope:'personal', folder:'Продажи', view:turn.kind === 'node-export' ? 'receipt-export' : 'receipt-sales'}
 }
 // В-55…В-57: a chat without a project has its own visible folder; files follow the chat into a project.
 function chatFiles(item) {
@@ -760,13 +800,13 @@ const salesFindings = [
   ['«Узел14»',' — по имени не понять, что он считает; это выручка по городам.',[4]],
   ['Нет проверки пустых значений',' перед расчётом — строки без цены или региона искажают итог.',[2,4]],
 ]
-function showFinding(index, local = false) {
+function showFinding(index, local = false, at) {
   const [title,text,nodes] = salesFindings[index]
   // Iteration 8: a file from the computer is read where it is (the parser works on a local .lgp), without Loginom.
   const target = local ? {id:'local-sales', name:'Продажи.lgp', scope:'personal', folder:'', view:'sales', localFile:true}
     : packageEntries().find(entry => entry.id === (salesState().replaced ? 'sales-backup' : 'sales'))
   if (!target) return toast('Замечания относятся к прежней версии «Продажи.lgp», а её в этом подключении Loginom нет', 'alert')
-  openPackage(target, {pkg:target.id, view:target.view, nodes, text:title + text, session:state.session})
+  openPackage(target, {pkg:target.id, view:target.view, nodes, text:title + text, session:state.session, at})
 }
 function result(item) {
   if (item.kind === 'skilltrial') return trialResult(item)
@@ -784,11 +824,11 @@ function result(item) {
   }
   if (item.kind === 'clean') return `<div class="answer-block"><h2>Замечаний нет</h2><p>Проверил «${esc(item.files?.[0] || 'Продажи.lgp')}»: повторов, непонятных имён и пропущенных проверок не нашёл. Пакет не менял.</p>${(item.files?.[0] || 'Продажи.lgp') === 'Продажи.lgp' && salesState().replaced ? `<p class="muted">«Продажи.lgp» уже заменён улучшенной версией. Прежняя версия сохранена как «Продажи — до правки.lgp».</p><button class="btn" data-action="restore-sales">${icon('refresh',15)} Вернуть прежнюю версию</button>` : ''}</div>`
   if (item.kind === 'refactor') return `<div class="answer-block"><h2>Нашёл ${item.rules ? 4 : 3} улучшения</h2><p>${item.local ? 'Файл «Продажи.lgp» с компьютера не менял' : 'Пакет «Продажи.lgp» не менял'}. Что можно сделать лучше:</p>
-    <ol class="findings">${salesFindings.map(([title,text],i) => `<li><strong>${esc(title)}</strong>${esc(text)} <button class="link-btn finding-link" data-finding="${i}${item.local ? ':local' : ''}">${icon('flow',14)} Показать на схеме</button></li>`).join('')}${item.rules ? `<li><strong>В модуле нет заметки</strong> о том, что он делает и кто за него отвечает, — ${esc(item.rules.by)}.</li>` : ''}</ol>
+    <ol class="findings">${salesFindings.map(([title,text],i) => `<li><strong>${esc(title)}</strong>${esc(text)} <button class="link-btn finding-link" data-finding="${i}${item.local ? ':local' : ''}" data-at="${item.index ?? ''}">${icon('flow',14)} Показать на схеме</button></li>`).join('')}${item.rules ? `<li><strong>В модуле нет заметки</strong> о том, что он делает и кто за него отвечает, — ${esc(item.rules.by)}.</li>` : ''}</ol>
     <div class="button-row"><button class="btn primary" data-action="improve-from-check">${icon('wand',15)} Внести улучшения</button><span class="muted">${item.local ? 'Агент загрузит копию в Loginom и изменит её; файл на компьютере не изменится.' : 'Агент изменит копию; исходный пакет изменится, только если вы решите его заменить.'}</span></div></div>`
   if (item.kind === 'enrich') return `<div class="answer-block"><h2>Таблица дополнена</h2><p>Example Data вернул население региона и часовой пояс для 2 391 строки из 2 400; у 9 строк регион пустой — для них сервис ничего не нашёл. Исходная таблица не менялась, дополненная — отдельным файлом.</p>
     <dl class="result-metrics"><div><dt>Отправлено</dt><dd>1 столбец</dd></div><div><dt>Дополнено</dt><dd>2 391 строка</dd></div><div><dt>Куда</dt><dd>Example Data</dd></div></dl>
-    <div class="artifact-card"><span class="glyph green">${icon('file',19)}</span><span><strong>sales-demo — с данными Example Data.csv</strong><small>${chatFolder(item).label.replace(/^в/,'В')}</small></span><button class="btn quiet" data-action="open-chat-folder">Открыть папку</button></div></div>`
+    <button class="btn quiet" data-action="open-chat-folder">Открыть папку</button></div>`
   // A question about the service, or a request it cannot serve: what the catalog card says, in words.
   if (item.kind === 'noenrich') return `<div class="answer-block"><p>Подключение «Внешнее обогащение данных» отправляет выбранные столбцы таблицы в Example Data (api.example-data.example) — это сторонний сервис, не Loginom; что он делает с данными, решают его условия. Перед первой отправкой в разговоре я спрошу вас и покажу, какие столбцы и сколько строк уйдут.</p>
     <p>${{closed:'Сейчас закрытый контур, а подключению нужен интернет — в Example Data ничего не отправлено.', missing:'Оно не установлено, поэтому я ничего не отправил. Посмотреть и установить — в каталоге.', 'info-missing':'Сейчас оно не установлено — посмотреть и установить можно в каталоге.', info:'Оно установлено: попросите, например, «Дополни таблицу «sales-demo.csv» данными о регионах из Example Data».'}[item.nosend] || ''}</p>
@@ -797,18 +837,20 @@ function result(item) {
   if (item.kind === 'chat') return `<div class="answer-block"><p>Я помогаю работать в Loginom: собираю сценарии, разбираю и документирую пакеты, проверяю данные. Опишите задачу своими словами или выберите пакет через «+» — над полем появятся действия с ним.</p>${state.settings.connection.connected ? '' : '<p class="muted">Для работы с пакетами нужен Loginom — я предложу подключиться, когда он понадобится.</p>'}</div>`
   if (item.kind === 'document') return `<div class="answer-block"><h2>Пакет задокументирован</h2><p>Описаны назначение пакета, входные данные и каждый узел. Пакет не изменялся.</p>
     <dl class="result-metrics"><div><dt>Узлов описано</dt><dd>${(item.files?.[0] || '') === 'Продажи.lgp' ? 6 : 14}</dd></div><div><dt>Входные данные</dt><dd>2 таблицы</dd></div><div><dt>Изменено</dt><dd>ничего</dd></div></dl>
-    <div class="artifact-card"><span class="glyph green">${icon('file',19)}</span><span><strong>${esc((item.files[0] || 'Пакет.lgp').replace(/\.lgp$/i,''))} — описание.md</strong><small>${chatFolder(item).label.replace(/^в/,'В')}</small></span><button class="btn quiet" data-action="open-chat-folder">Открыть папку</button><button class="btn" data-action="download-result">Скачать ${icon('download',14)}</button></div></div>`
-  const info = item.kind === 'quality'
-    ? ['Проверка данных завершена','Обнаружены 12 пропусков и 3 дубликата. В отчёте отмечены столбцы, которые нужно проверить перед загрузкой.',[['Строки','2 400'],['Пропуски','12'],['Дубликаты','3']]]
-    : item.kind === 'refactor'
-    ? ['Нашёл 3 улучшения','Пакет не менял. Что можно сделать лучше:',[['Проверено узлов','6'],['Замечаний','3'],['Пакет','не изменён']]]
-    : ['Сценарий ABC-анализа собран','Товары распределены по трём группам по накопленной доле выручки. Итоговая таблица и шаги сценария доступны в результатах.',[['Группа A','15 товаров'],['Группа B','28 товаров'],['Группа C','77 товаров']]]
-  return `<div class="answer-block"><h2>${info[0]}</h2><p>${info[1]}</p>
-    <dl class="result-metrics">${info[2].map(([key,value]) => `<div><dt>${key}</dt><dd>${value}</dd></div>`).join('')}</dl>
-    ${item.kind === 'quality' ? `<div class="artifact-card"><span class="glyph green">${icon('file',19)}</span><span><strong>Качество выгрузки.html</strong><small>Отчёт ${chatFolder(item).label}</small></span><button class="btn quiet" data-action="open-chat-folder">Открыть папку</button><button class="btn" data-action="download-result">Скачать CSV ${icon('download',14)}</button></div>`
-      : `<div class="artifact-card"><span class="glyph red">${icon('flow',19)}</span><span><strong>${resultPackage(item).name}</strong><small>Пакет в ${esc(packageFolder('personal'))}</small></span><button class="btn" data-action="open-result-package">Открыть ${icon('external',14)}</button></div>`}
-    <div class="answer-actions"><button class="link-btn" data-action="download-result">${icon('download',15)} Скачать отчёт CSV</button><button class="link-btn" data-action="author-from-chat">${icon('box',15)} Сохранить как навык</button></div>
-  </div>`
+    <button class="btn quiet" data-action="open-chat-folder">Открыть папку</button></div>`
+  if (item.kind === 'node-context') return `<div class="answer-block"><p>${esc(item.nodeContext.mode === 'edit'
+    ? 'Узел «' + item.nodeContext.name + '» выбран для правки. В этом примере показан выбор узла.'
+    : item.nodeContext.description)}</p></div>`
+  if (item.kind === 'node-data') return `<div class="answer-block"><h2>Проверил выходы фильтров</h2><p>После отбора в заданном периоде в таблице остались продажи за октябрь. В прочитанных агентом строках цена не указана.</p></div>`
+  if (item.kind === 'node-export') return `<div class="answer-block"><h2>Продажи за период выгружены</h2><p>Loginom записал CSV после отбора строк.</p></div>`
+  if (item.kind === 'quality') return `<div class="answer-block"><h2>Проверка данных завершена</h2><p>Обнаружены 12 пропусков и 3 дубликата. В отчёте отмечены столбцы, которые нужно проверить перед загрузкой.</p>
+    <dl class="result-metrics"><div><dt>Строки</dt><dd>2 400</dd></div><div><dt>Пропуски</dt><dd>12</dd></div><div><dt>Дубликаты</dt><dd>3</dd></div></dl>
+    <button class="btn quiet" data-action="open-chat-folder">Открыть папку</button>
+    <div class="answer-actions"><button class="link-btn" data-action="author-from-chat">${icon('box',15)} Сохранить как навык</button></div></div>`
+  if (item.kind === 'abc') return `<div class="answer-block"><h2>Сценарий ABC-анализа собран</h2><p>Товары распределены по трём группам по накопленной доле выручки.</p>
+    <dl class="result-metrics"><div><dt>Группа A</dt><dd>15 товаров</dd></div><div><dt>Группа B</dt><dd>28 товаров</dd></div><div><dt>Группа C</dt><dd>77 товаров</dd></div></dl>
+    <div class="answer-actions"><button class="link-btn" data-action="author-from-chat">${icon('box',15)} Сохранить как навык</button></div></div>`
+  return ''
 }
 // What is really in Loginom: the package is one, so cards and the schema read this instead of keeping their own copy.
 function salesState() {
@@ -1072,12 +1114,26 @@ function projectPage() {
 // Iteration 3 — the conversation feed. A turn is one request and the agent's work on it: steps named in plain
 // words, a permission or a question where the agent needs the user, then the answer. The prototype has no
 // model, so the steps of each kind of task are scripted; a real run gets them from OpenCode tool calls.
+const readSalesStep = {plan:0, icon:'database', live:'Читаю CSV продаж', done:'Прочитал', short:'прочитал CSV продаж', output:sourceOutput, time:4}
+const filterSalesStep = {plan:1, icon:'layers', live:'Отбираю продажи за период', done:'Выполнил узел', short:'отобрал продажи за период', output:filteredOutput, time:8}
+const checkSalesStep = {plan:2, icon:'shield', live:'Проверяю будущие даты', done:'Выполнил узел', short:'проверил будущие даты', output:emptyOutput, time:5}
+const salesPlan = ['Прочитать данные','Отобрать продажи за период','Проверить будущие даты']
 const scripts = {
+  'node-data':{plan:salesPlan, steps:[readSalesStep, filterSalesStep, checkSalesStep]},
+  'node-error':{plan:salesPlan, steps:[{...readSalesStep, output:null, detail:'В таблице есть столбец «Дата продажи»'}, filterSalesStep, checkSalesStep]},
+  'node-export':{plan:[...salesPlan,'Выгрузить CSV'], permission:{
+    title:'Записать CSV в Loginom?', text:'Узел экспорта запишет таблицу в папку «Продажи».',
+    args:[['Файл','Продажи за период.csv'],['Папка','{home}/Продажи']], noInstead:true,
+    trace:'записать «Продажи за период.csv» в {home}/Продажи', scope:'выгружать продажи CSV в {home}/Продажи',
+    denied:'Выгрузку отменили. Выходы фильтров уже прочитаны.',
+    forbidden:'Выгрузка запрещена в настройках. Выходы фильтров уже прочитаны.',
+  }, steps:[readSalesStep, filterSalesStep, checkSalesStep,
+    {plan:3, icon:'file', ask:'permission', live:'Выгружаю CSV в Loginom', done:'Выполнил узел', short:'выгрузил CSV', file:exportReceipt, time:6}]},
   abc:{plan:['Проверить данные','Собрать сценарий','Проверить и сохранить'], steps:[
     {plan:0, icon:'database', live:'Читаю таблицу «sales-demo.csv»', done:'Прочитал таблицу «sales-demo.csv»', short:'прочитал таблицу', detail:'2 400 строк, 6 столбцов: дата, товар, регион, количество, цена, выручка', time:4, think:[3,'Для ABC-анализа нужна выручка по товарам. Сначала посмотрю, какие столбцы есть в таблице.']},
     {plan:1, think:[5,'Выручка есть по строкам продаж. Сгруппирую по товару, отсортирую по убыванию и поделю по накопленной доле: обычные пороги 80 / 15 / 5 %.'], icon:'flow', live:'Собираю сценарий в Loginom', fail:'собрать сценарий в Loginom', done:'Собрал сценарий из 4 узлов', short:'собрал сценарий из 4 узлов', detail:'Импорт CSV → Группировка по товару → Сортировка по выручке → ABC-классификация (80 / 15 / 5 %)', time:21},
-    {plan:2, icon:'play', live:'Запускаю сценарий', done:'Запустил сценарий на демонстрационных данных', short:'проверил на данных', detail:'120 товаров: A — 15, B — 28, C — 77 · выполнено за 1,2 с', time:9},
-    {plan:2, icon:'download', ask:'permission', live:'Сохраняю пакет в Loginom', done:'Сохранил «ABC-анализ.lgp» в {home}', short:'сохранил «ABC-анализ.lgp»', detail:'Новый пакет; другие пакеты не изменены', time:3},
+    {plan:2, icon:'play', live:'Запускаю сценарий', done:'Запустил сценарий на демонстрационных данных', short:'проверил на данных', output:abcOutput, time:9},
+    {plan:2, icon:'download', ask:'permission', live:'Сохраняю пакет в Loginom', done:'Сохранил «ABC-анализ.lgp» в {home}', short:'сохранил «ABC-анализ.lgp»', saved:true, detail:'Пакет открыт и прочитан после сохранения', time:3},
   ], permission:{title:'Сохранить новый пакет в Loginom?', text:'Агент создаст пакет «ABC-анализ.lgp» в вашей папке Loginom. Другие пакеты не изменятся.', args:[['Пакет','ABC-анализ.lgp'],['Папка','{home}'],['Изменится','появится новый пакет']], trace:'сохранить «ABC-анализ.lgp» в {home}', scope:'сохранять новые пакеты в {home}', denied:'Хорошо, сохранять не стал. Сценарий собран и проверен — он остался в этом разговоре. Скажите, если сохранить в другую папку.'}},
   quality:{plan:['Прочитать данные','Найти пропуски и дубликаты','Составить отчёт'], steps:[
     {plan:0, icon:'database', live:'Читаю таблицу «sales-demo.csv»', done:'Прочитал таблицу «sales-demo.csv»', short:'прочитал таблицу', detail:'2 400 строк, 6 столбцов', time:3},
@@ -1135,6 +1191,7 @@ const scripts = {
     {plan:2, icon:'check', live:'Сверяю узлы с правилами навыка', done:'Сверил узлы с правилами навыка: 3 расхождения', short:'сверил с навыком', time:5},
   ]},
   chat:{steps:[]},
+  'node-context':{steps:[]},
 }
 // Rules the agent follows show in the check itself: instructions (the project's, then the general ones, В-65) are read in every chat,
 // an enabled skill applies itself when the task fits «Когда агент его применяет». The prototype knows one set of rules.
@@ -1157,8 +1214,10 @@ scripts.improveLocal = {...scripts.improve, permission:{...scripts.improve.permi
   {plan:0, icon:'upload', ask:'permission', live:'Загружаю копию «{pkg}» с компьютера в Loginom', done:'Загрузил копию «{pkg}» с компьютера в «Копии агента»', short:'загрузил копию пакета', detail:'Файл на компьютере не меняется — вы решите, куда сохранить изменённый пакет', time:4},
   ...scripts.improve.steps.slice(1)]}
 // Kinds the agent answers in words, without steps in Loginom.
-const answerOnly = ['chat','more','nocopy','pick','discuss','noenrich']
+const abcDraftScript = {...scripts.abc, plan:['Проверить данные','Собрать сценарий','Запустить и проверить'], steps:scripts.abc.steps.slice(0, -1)}
+const answerOnly = ['chat','node-context','more','nocopy','pick','discuss','noenrich']
 function scriptOf(turn) {
+  if (turn.kind === 'abc' && turn.saveRequested === false) return abcDraftScript
   return turn.kind === 'improve' && turn.local ? scripts.improveLocal : turn.kind === 'keep' && turn.from ? scripts.keepFrom : scripts[turn.kind] || scripts.chat
 }
 function followed(text, turn) {
@@ -1227,8 +1286,15 @@ function runSteps(item) {
   render()
   item.timer = setTimeout(() => {
     if (item.phase !== 'running') return
+    if (item.kind === 'node-error' && item.step === 1) {
+      item.phase = 'failed'
+      render()
+      return
+    }
     if (item.failAt === item.step) return stepFailed(item)
     if (item.modelFailAt === item.step) return modelFailed(item)
+    if (step.saved) item.savedPath = atHome('{home}/ABC-анализ.lgp')
+    if (step.file) item.exportTo = atHome('{home}/Продажи/' + step.file.name)
     item.step++
     runSteps(item)
   }, 750)
@@ -1372,6 +1438,7 @@ function turnAnswer(turn, live = false) {
       <p>${others.length ? 'Продолжить можно с другой моделью — она увидит весь разговор.' : state.policy === 'set' ? 'Другой модели нет: модели задаёт администратор вашей организации — обратитесь к нему.' : 'Другой модели в этом режиме сети нет — подключите модель: по подписке, по ключу API или свой сервер.'}${turn.modelError.kind === 'free-limit' ? ' Или дождитесь обновления лимита.' : turn.modelError.blocked ? '' : ' Или продолжите с этой же, когда она заработает.'}</p>
       ${live && copySettled(currentItem()) ? `<p class="muted">${esc(settledNote(copySettled(currentItem())))}</p>` : live ? `<div class="button-row">${others.length ? `<button class="btn primary" type="button" data-menu="model:continue" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && state.menu.id === 'continue'}">${icon('play',15)} Продолжить с другой моделью ${icon('down',12)}</button>` : state.policy === 'set' ? '' : `<button class="btn primary" data-action="provider-connect">${icon('cpu',15)} Подключить модель</button>`}${turn.modelError.blocked ? '' : `<button class="btn" data-action="continue-turn">${icon('refresh',15)} Продолжить с этой же</button>`}<button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
   }
+  if (turn.phase === 'failed' && turn.kind === 'node-error') return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} ${esc(missingDate)}</h2><p>В источнике поле называется «Дата продажи». Проверьте поле в условии фильтра.</p><button class="btn" data-run-node="${turn.index}:1">${icon('flow',15)} Показать на схеме</button></div>`
   if (turn.phase === 'failed') return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Не удалось ${esc(scriptOf(turn).steps[turn.step].fail || 'выполнить шаг')}</h2><p>Loginom (${esc(hostOf(state.settings.connection.url))}) дважды не ответил за 30 секунд. Сделанные шаги выше сохранены.</p><p>Что сделать: проверьте, открывается ли Loginom в браузере. Если нет — он выключен или недоступна сеть, обратитесь к администратору. Когда Loginom заработает, нажмите «Повторить шаг».</p>${live ? `<div class="button-row"><button class="btn primary" data-action="retry-step">${icon('refresh',15)} Повторить шаг</button><button class="btn" data-overlay="loginom-status">Проверить подключение</button><button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
   if (turn.phase === 'writing') {
     const text = turn.writeText || '', title = turn.writeTitle || 0
@@ -1381,6 +1448,70 @@ function turnAnswer(turn, live = false) {
   if (turn.phase === 'interrupted') return `<div class="answer-block"><p class="muted">${turn.step ? 'Не закончено — вы отправили новое сообщение. Сделанные шаги выше.' : 'Не начато — вы отправили новое сообщение.'}</p></div>`
   const steer = turn.steer?.length ? `<p class="steer-note">Учёл вашу поправку: «${esc(turn.steer.at(-1).text)}». <span class="muted">В прототипе цифры не меняются.</span></p>` : ''
   return steer + result(turn)
+}
+const numberFormat = new Intl.NumberFormat('ru')
+const numberPlural = new Intl.PluralRules('ru')
+const number = value => numberFormat.format(value)
+function outputCount(output) {
+  const columns = output.schema.length
+  return `${number(output.row_count)} ${rowWord(output.row_count)} · ${number(columns)} ${{one:'столбец',few:'столбца'}[numberPlural.select(columns)] || 'столбцов'}`
+}
+function rowWord(count) {
+  return {one:'строка',few:'строки'}[numberPlural.select(count)] || 'строк'
+}
+function dataTable(output, rows, label) {
+  return rows.length ? `<div class="receipt-table" tabindex="0" role="region" aria-label="${esc(label)}"><table aria-label="${esc(label)}">
+    <thead><tr>${output.schema.map(([name]) => `<th scope="col">${esc(name)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${esc(cell ?? '—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`
+    : '<p class="muted">Нет строк для показа.</p>'
+}
+function nodeOutputRow(turn, output, at, step) {
+  const selected = turn.openOutput === step
+  const key = `${at}:${step}`
+  const empty = output.schema.filter((_, i) => output.sample.length && output.sample.every(row => row[i] === null))
+  const signals = [
+    output.row_count === 0 ? '0 строк' : !output.sample_complete ? `агент видел ${number(output.sample.length)} из ${number(output.row_count)}` : '',
+    ...empty.map(([name]) => `столбец «${name}» пуст в прочитанных строках`),
+    output.before != null ? `было ${number(output.before)} → стало ${number(output.row_count)}` : '',
+  ].filter(Boolean)
+  return `<li class="step receipt-step"><div class="receipt-output">
+    <button class="link-btn output-count" data-sample="${key}" aria-expanded="${selected}" aria-controls="sample-${at}-${step}">→ ${outputCount(output)}</button>
+    <p class="receipt-source"><strong>По квитанции запуска</strong>${signals.length ? ' · ' + esc(signals.join(' · ')) : ''}</p>
+    <div class="receipt-inline" id="sample-${at}-${step}"${selected ? '' : ' hidden'}>
+      ${selected ? dataTable(output, output.sample, 'Строки, которые видел агент') + `<button class="btn quiet" data-expand-output="${key}">Развернуть</button>` : ''}
+    </div></div></li>`
+}
+function outputDialog() {
+  const {at, step, tab} = state.outputDialog
+  const turn = turnAt(state.session,at)
+  const output = turn && scriptOf(turn).steps[step].output
+  if (!output) return ['', '']
+  const node = viewNodes(outputPackage(turn, state.session, at).view)[output.node][1]
+  const tabs = [['sample','Образец'], ['columns','Столбцы'], ['source','Как получено']]
+  const content = {
+    sample:() => `<p class="dialog-desc">Показано ${number(output.preview.length)} из ${number(output.row_count)} строк${!output.sample_complete && output.sample.length ? ` · агент видел ${number(output.sample.length)}` : ''}.</p>${dataTable(output, output.preview, 'Образец выходных данных')}`,
+    columns:() => dataTable({schema:[['Столбец'],['Тип']]}, output.schema, 'Столбцы выходных данных'),
+    source:() => `<dl class="node-facts"><div><dt>Узел</dt><dd>${esc(node)}</dd></div><div><dt>Настройки</dt><dd>${esc(output.settings)}</dd></div><div><dt>Порт</dt><dd>${esc(output.port)}</dd></div></dl>`,
+  }
+  return [esc(node), `<div class="detail-toggle receipt-tabs" role="group" aria-label="Выход узла">${tabs.map(([id,label]) =>
+    `<button data-output-tab="${id}" aria-pressed="${tab === id}">${label}</button>`).join('')}</div>${content[tab]()}`]
+}
+function receiptSummary(turn, at) {
+  const outputs = runOutputs(turn)
+  const files = filesFromReceipts(turn)
+  const pkg = outputPackage(turn, state.session, at)
+  const saved = turn.kind === 'abc' && abcSaved(turn)
+  const counter = turn.kind === 'abc' ? outputs.at(-1) : outputs.find(output => output === filteredOutput)
+  return `<div class="receipt-summary">
+    ${turn.kind === 'abc' && counter ? `<section class="run-verification">
+      <h3>${icon('check',16)} Проверено приложением</h3>
+      <ul>${saved ? `<li>Пакет есть по пути <code>${esc(pkg.fullPath || packagePath(pkg) + '/' + pkg.name)}</code>.</li><li>Открыт и прочитан после сохранения.</li>` : ''}<li>${viewNodes(pkg.view).length} узла · запуск без ошибок · ${number(counter.row_count)} строк.</li></ul>
+      <p class="muted">Не проверено: ${saved ? '' : 'сохранение пакета, '}правильность исходных данных и соответствие групп вашим правилам.</p>
+      <div class="button-row"><button class="btn" data-open-run-package="${at}">${icon('flow',15)} Открыть пакет</button><button class="btn" data-download-table="${at}">${icon('download',15)} Скачать таблицу</button></div>
+    </section>` : counter && state.detail !== 'full' ? `<p class="output-tally">→ ${outputCount(counter)} · по квитанции запуска</p>` : ''}
+    ${files.map(file => `<div class="artifact-card export-card"><span class="glyph green">${icon('file',19)}</span><span><strong>${esc(file.name)}</strong><small>Из узла «${esc(viewNodes(pkg.view)[file.node][1])}»</small><small>Путь в Loginom: <code>${esc(file.destination)}</code></small></span></div>`).join('')}
+    <p class="answer-files"><strong>Файлы этого ответа:</strong> ${files.length ? esc(files.map(file => file.name).join(', ')) : 'нет'}</p>
+  </div>`
 }
 function turnSteps(turn, live, turnIndex) {
   const script = scriptOf(turn)
@@ -1398,7 +1529,11 @@ function turnSteps(turn, live, turnIndex) {
       : `<li class="step-trace">${icon('check',14)}<span>${{session:'Вы разрешили в этом разговоре', auto:'Разрешено ранее в этом разговоре', once:'Вы разрешили один раз', setting:'Разрешено в «Разрешениях»'}[decision.choice]}: ${esc(followed(script.permission.trace, turn))}</span></li>`)
     if (step.ask === 'question') rows.push(`<li class="step-trace">${icon('help',14)}<span>${esc(script.question.text)} — <strong>${esc(turn.answer || '')}</strong></span></li>`)
     if (detailed && step.think) rows.push(`<li class="step think">${icon('spark',14)}<span>Думал ${step.think[0]} с<small>${esc(step.think[1])}</small></span></li>`)
-    rows.push(`<li class="step done">${icon(step.icon,15)}<span>${esc(step.ask === 'permission' ? followed(stepText(step.done, turn), turn) : stepText(step.done, turn))}${step.detail && (detailed || turn.open?.includes(index)) ? `<small>${esc(stepText(step.detail, turn))}</small>` : ''}</span>${step.detail && !detailed ? `<button class="small-icon step-more" data-step-detail="${turnIndex}:${index}" aria-label="${turn.open?.includes(index) ? 'Скрыть' : 'Показать'} подробности шага" aria-expanded="${Boolean(turn.open?.includes(index))}">${icon('more',14)}</button>` : ''}</li>`)
+    const receipt = step.output || step.file
+    const node = receipt && viewNodes(outputPackage(turn, state.session, turnIndex).view)[receipt.node][1]
+    const label = esc(step.ask === 'permission' ? followed(stepText(step.done, turn), turn) : stepText(step.done, turn))
+    rows.push(`<li class="step done">${icon(step.icon,15)}<span><span>${label}${node ? ` · <button class="link-btn run-node" data-run-node="${turnIndex}:${index}">${esc(node)}</button>` : ''}</span>${step.detail && (detailed || turn.open?.includes(index)) ? `<small>${esc(stepText(step.detail, turn))}</small>` : ''}</span>${step.detail && !detailed ? `<button class="small-icon step-more" data-step-detail="${turnIndex}:${index}" aria-label="${turn.open?.includes(index) ? 'Скрыть' : 'Показать'} подробности шага" aria-expanded="${Boolean(turn.open?.includes(index))}">${icon('more',14)}</button>` : ''}</li>`)
+    if (detailed && step.output) rows.push(nodeOutputRow(turn, step.output, turnIndex, index))
     ;(turn.steer || []).filter(entry => entry.at === index + 1).forEach(entry => rows.push(`<li class="step-trace steer">${icon('message',14)}<span>Ваша поправка: «${esc(entry.text)}»</span></li>`))
   })
   const denied = turn.decisions?.find(entry => entry.choice === 'deny')
@@ -1441,9 +1576,9 @@ function turnView(item, turn, index, live) {
   const switched = before && turn.modelName && before !== turn.modelName
   // Nothing done (a declined or forbidden first step): no «Работал 0 с» — the trace row shows why.
   const summary = (finished || turn.phase === 'writing') && hasSteps && brief && !turn.expanded && !unresolved && turn.step > 0
-  return `<div class="turn">
+  return `<div class="turn" id="turn-${index}" tabindex="-1">
     ${switched ? `<p class="feed-notice">${icon('cpu',14)} Дальше отвечает «${esc(turn.modelName)}»${cloudNote(turn.modelName)} — ${{switched:'модель сменили в поле ввода', back:'модель разговора снова доступна в этом режиме сети'}[turn.modelNote] || `«${esc(turn.model)}» недоступна в этом режиме сети, отвечает модель по умолчанию`}</p>` : ''}
-    <div class="user-turn"><div class="user-message">${esc(turn.prompt)}${turn.files?.length ? `<div class="message-files">${turn.files.map(file => `<span>${icon('file',14)}${esc(file)}</span>`).join('')}</div>` : ''}</div>
+    <div class="user-turn"><div class="user-message">${esc(turn.prompt)}${turn.nodeContext ? `<div class="message-files"><span>${icon('flow',14)} ${esc(turn.nodeContext.name)}</span></div>` : ''}${turn.files?.length ? `<div class="message-files">${turn.files.map(file => `<span>${icon('file',14)}${esc(file)}</span>`).join('')}</div>` : ''}</div>
       <div class="msg-actions"><button class="msg-act" data-copy-prompt="${index}">${icon('copy',14)}<span>Копировать</span></button><button class="msg-act" data-edit-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','failed','connect'].includes(turn.phase) ? 'disabled' : ''}>${icon('compose',14)}<span>Изменить</span></button><button class="msg-act" data-fork-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','failed'].includes(turn.phase) ? 'disabled' : ''}>${icon('branch',14)}<span>Ответвить</span></button></div></div>
     <div class="agent-message"><span class="agent-avatar"><img src="assets/loginom.png" alt="" width="31" height="31"></span><div class="agent-body"><strong class="agent-caption">Loginom AI Agent</strong>
       ${turn.phase === 'connect' ? `<div class="answer-block"><h2>Для этой задачи нужен Loginom</h2><p>Я буду строить и проверять сценарий в Loginom. Подключитесь — и я продолжу.</p>${connectCard()}</div>` : ''}
@@ -1452,6 +1587,7 @@ function turnView(item, turn, index, live) {
       ${summary ? `<button class="turn-summary" data-expand-turn="${index}" aria-expanded="false">${icon('chevron',14)}<span>Работал ${turnTime(turn)} · ${esc(objects.join(', '))}</span></button>` : ''}
       ${hasSteps && !summary ? `${finished && brief && !unresolved && turn.step > 0 ? `<button class="turn-summary open" data-expand-turn="${index}" aria-expanded="true">${icon('chevron',14)}<span>Работал ${turnTime(turn)}</span></button>` : finished && turn.step ? `<p class="turn-time">Работал ${turnTime(turn)}</p>` : ''}${turnSteps(turn, live, index)}` : ''}
       ${finished || turn.phase === 'writing' ? turnAnswer({...turn, id:item.id + '-' + index, index}, live) : ''}
+      ${finished ? receiptSummary(turn, index) : ''}
       ${finished ? `<div class="msg-actions agent-actions"><button class="msg-act" data-copy-answer="${index}">${icon('copy',14)}<span>Копировать</span></button><span class="turn-meta">${esc([hasSteps && turn.step ? turnTime(turn) : '', turnModels(turn).join(' → ')].filter(Boolean).join(' · '))}</span></div>` : ''}
     </div></div>
   </div>`
@@ -1542,11 +1678,15 @@ function openPackage(item, focus = null) {
   state.activePackage = item
   state.focus = focus
   rememberPackage(item.id, 'просмотр')
-  state.node = item.view === 'calculation' ? 1 : null
+  state.node = (focus?.step ? focus.nodes[0] : null) ?? (item.view === 'calculation' ? 1 : null)
   state.sub = null
   if (state.page === 'loginom') dismiss()
   else navigate('loginom')
-  $('.package-top strong')?.focus()
+  const selected = focus?.step && $(`[data-node="${state.node}"]`)
+  if (selected) {
+    selected.scrollIntoView({block:'nearest', inline:'nearest'})
+    selected.focus({preventScroll:true})
+  } else $('.package-top strong')?.focus()
 }
 function localDestination(name) {
   const baseName = name.slice(0,-4).replace(/[\\/:<>"|?*%#]/g,'_').trim() || 'Пакет'
@@ -1730,14 +1870,16 @@ function schemaGraph(cards, links, canvas) {
   const used = (i, side, k) => links.some(link => side === 'in' ? link.to === i && link.in === k : link.from === i && link.out === k)
   const port = (i, side, k) => [graphStep.left + depth[i] * graphStep.col + (side === 'in' ? 0 : graphStep.width),
     graphStep.top + half[i] * graphStep.half + graphStep.height * (k + 1) / (cards[i][side].length + 1)]
+  const labels = []
   const paths = links.map(link => {
     const [x1, y1] = port(link.from, 'out', link.out)
     const [x2, y2] = port(link.to, 'in', link.in)
     const bend = Math.min(60, (x2 - x1) / 2)
+    if (link.rows != null) labels.push(`<text class="graph-row-count" x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - 7}" text-anchor="middle"><title>${esc(cards[link.from].title)} → ${esc(cards[link.to].title)} · ${number(link.rows)} ${rowWord(link.rows)}</title>${number(link.rows)}</text>`)
     return `<path class="graph-link${link.status ? ' is-' + link.status : ''}" d="M${x1} ${y1}C${x1 + bend} ${y1} ${x2 - bend} ${y2} ${x2} ${y2}"/>`
   })
   const ports = (i, side) => cards[i][side].map((name, k, all) => `<span class="graph-port ${side} p${k + 1}of${all.length}${used(i, side, k) ? '' : ' is-free'}" title="${esc(name + (used(i, side, k) ? '' : ' — не подключён'))}"></span>`).join('')
-  return `<div class="package-canvas graph-canvas${canvas.cls || ''}" aria-label="${canvas.label}"><div class="graph"><svg class="graph-links" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true">${paths.join('')}</svg>${cards.map((card, i) => {
+  return `<div class="package-canvas graph-canvas${canvas.cls || ''}" aria-label="${canvas.label}"><div class="graph"><svg class="graph-links" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" ${labels.length ? 'role="img" aria-label="Число строк на связях: ' + esc(links.filter(link => link.rows != null).map(link => `${cards[link.from].title} → ${cards[link.to].title}, ${number(link.rows)} ${rowWord(link.rows)}`).join('; ')) + '"' : 'aria-hidden="true"'}>${paths.join('')}${labels.join('')}</svg>${cards.map((card, i) => {
     const tag = card.index == null ? 'div' : 'button'
     return `<${tag} class="canvas-node gx-${depth[i]} gy-${half[i]}${card.index != null && state.node === card.index ? ' active' : ''}${card.cls || ''}"${card.index == null ? '' : ` data-node="${card.index}" aria-pressed="${state.node === card.index}"`}>${card.mark ? `<span class="node-mark">${card.mark}</span>` : ''}<span class="glyph ${{database:'blue',chart:'red',file:'green',shield:'green',flow:'red'}[card.glyph] || 'violet'}">${icon(card.glyph,19)}</span><strong>${esc(card.title)}</strong><small>${esc(card.small)}</small>${ports(i,'in')}${ports(i,'out')}</${tag}>`
   }).join('')}</div></div>
@@ -1825,10 +1967,11 @@ function changedPackage(item) {
       {cls:' diff-canvas', label:`Схема пакета ${showBefore ? 'до изменений' : 'с изменениями'}`})}
     <div class="package-foot" role="status">${node ? (node[4] && !showBefore ? `<strong>${mark[node[4]]}: ${esc(node[1])}.</strong> ${esc(node[3])}${nodeFactsHtml(node[6],'diff')}`
       : `<strong>${esc(showBefore ? node[5] || node[1] : node[1])}.</strong>${showBefore && node[4] === 'mod' ? ' До изменений.' : ''}` + nodeFactsHtml(node[6], showBefore ? 'before' : 'after')) : 'Выберите узел, чтобы увидеть, что в нём изменилось.'}</div>
+    ${node ? graphNodeActions(item, node) : ''}
     <div class="package-save-bar">
       ${current === 'draft' ? (local ? `<button class="btn primary" data-change="download:${at}">${icon('download',15)} Скачать на компьютер…</button><button class="btn" data-change="save:${at}">${icon('plus',15)} Сохранить в Loginom</button>${inLoginom}<button class="link-btn discard-link" data-change="discard:${at}">${turn?.change?.downloaded ? 'Удалить копию из Loginom' : 'Отменить изменения'}</button>`
         : `<button class="btn primary" data-change="save:${at}">${icon('plus',15)} Сохранить новой версией</button>${inLoginom}${elsewhere ? '' : `<button class="btn quiet" data-change="replace:${at}">Заменить исходный…</button>`}<button class="link-btn discard-link" data-change="discard:${at}">Отменить изменения</button>`) : inLoginom}
-      ${chat ? `<button class="link-btn" data-session="${chat.id}">${icon('message',16)} Вернуться к разговору</button>` : ''}
+      ${chat ? returnToTurn({session:chat.id, at:item.changeOf.at}) : ''}
     </div></section>
   </div>`
 }
@@ -1839,6 +1982,55 @@ function calculationInspector(changed,canEditManually) {
     <div class="formula-preview"><span>Результат на трёх строках</span><strong>${changed ? '30, 60, 75' : '20, 40, 50'}</strong></div>
     ${canEditManually ? `<button class="btn" data-action="change-calculation" aria-pressed="${changed}">${icon(changed ? 'refresh' : 'wand',16)} ${changed ? 'Отменить правку' : 'Применить формулу ×3'}</button>` : ''}
   </div>`
+}
+function nodeNameWithBranch(name, type, sub) {
+  const branch = name.match(/ \(ветка «(.+)»\)$/)?.[1]
+  if (branch) return `ветка «${branch}» · ${type}`
+  return sub ? `подмодель «${sub}» · ${name}` : name
+}
+function graphConversation(item) {
+  const focus = state.focus?.pkg === item.id ? state.focus : null
+  if (focus) return focus
+  const session = item.changeOf?.session || item.editSessionId || state.session
+  const chat = state.sessions.find(entry => entry.id === session)
+  if (!chat) return null
+  const at = [...(chat.history || []), chat].findLastIndex((turn, index) =>
+    outputPackage(turn, session, index)?.id === item.id || turn.packageId === item.id ||
+    turn.source?.id === item.id || turn.files?.includes(item.name))
+  return at < 0 ? null : {session, at}
+}
+function returnToTurn({session, at}) {
+  return `<button class="link-btn" data-chat="${esc(session)}" data-back-to-turn="${at ?? ''}">${icon('message',15)} Вернуться к разговору</button>`
+}
+function graphNodeActions(item, node) {
+  return `<div class="button-row graph-node-actions">
+    <button class="link-btn" data-action="copy-node-name">${icon('copy',15)} Скопировать имя</button>
+    ${graphConversation(item) && node[4] !== 'del' ? `<button class="btn" data-node-chat="ask">${icon('message',15)} Спросить агента</button>
+      <button class="btn" data-node-chat="edit">${icon('compose',15)} Изменить узел с агентом</button>` : ''}
+  </div>`
+}
+function selectedGraphNode() {
+  const item = state.activePackage
+  const sub = state.sub?.pkg === item.id && state.sub.title
+  const nodes = sub ? packageSubmodels[item.view][sub].nodes : viewNodes(item.view, item.keep)
+  const before = item.view === 'sales-improve' && state.showBefore
+  const node = (before ? nodes.filter(entry => entry[4] !== 'add') : nodes)[state.node]
+  if (!node) return null
+  const name = before ? node[5] || node[1] : node[1]
+  const type = nodeFacts(item.view, node[1], item.keep)?.[0] || node[2]
+  return {name, copyName:nodeNameWithBranch(name, type, sub), description:node[3], packageId:item.id, sub, index:state.node}
+}
+function attachGraphNode(mode) {
+  const context = graphConversation(state.activePackage)
+  const node = selectedGraphNode()
+  if (!context || !node) return
+  openSession(context.session, context.at)
+  state.draftNode = {...node, mode}
+  render()
+  $('#prompt')?.focus()
+}
+function fullPackagePath(item) {
+  return item.fullPath || packagePath(item) + '/' + item.name
 }
 function packages() {
   if (state.activePackage.view === 'sales-improve') return changedPackage(state.activePackage)
@@ -1851,23 +2043,33 @@ function packages() {
   const facts = nodes.map(node => nodeFacts(item.view, node[1], item.keep))
   const links = facts.some(Boolean) ? factLinks(nodes.map(node => node[1]), facts.map(entry => entry?.[1]), item.view === 'sales' ? 'before' : 'after')
     : packageLinks[item.view] ? viewLinks(packageLinks[item.view]) : chainLinks(nodes.length)
+  for (const link of links) {
+    link.rows = focus?.outputs?.find(output => output.node === link.from && output.portIndex === link.out)?.row_count
+  }
+  const conversation = graphConversation(item)
   const inner = packageSubmodels[item.view] || {}
   const sub = state.sub?.pkg === item.id && inner[state.sub.title] ? state.sub.title : null
   const node = Number.isInteger(state.node) ? (sub ? inner[sub].nodes : nodes)[state.node] : null
   return `<div class="native-page packages-page">
     <div class="native-heading"><div><p class="eyebrow">Loginom</p><h1>Пакеты</h1><p>Откройте пакет, чтобы посмотреть схему, задокументировать, проверить или улучшить его.</p></div><div class="button-row"><button class="btn primary" data-action="package-server">${icon('folder',17)} Из Loginom</button><button class="btn" data-action="package-computer">${icon('upload',17)} С компьютера</button></div></div>
     <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">${esc(item.name)}</strong><small>${item.localFile ? 'Файл на компьютере · схема прочитана из файла, Loginom не нужен' : item.isDraft ? 'Рабочий черновик в разговоре' : `${esc(packagePath(item))} · ${item.id === 'sales' && salesState().replaced ? 'заменён в разговоре; прежняя версия — «Продажи — до правки.lgp»' : item.savedVersion ? 'новая версия' : item.isResult ? 'результат разговора' : item.agentCopy ? `копия агента из разговора «${esc(item.agentCopy)}»` : item.localCopy ? 'копия с компьютера' : 'хранилище Loginom'}`}</small></div><span class="badge">Учебная схема</span>${item.isDraft || item.localFile ? '' : loginomButton(item.id)}</div>
+    ${!item.isDraft && !item.localFile ? `<div class="graph-details"><code>${esc(fullPackagePath(item))}</code><button class="link-btn" data-action="copy-package-path">${icon('copy',15)} Скопировать путь</button></div>` : ''}
     ${sub ? `<div class="graph-path">${icon('layers',16)}<span>${esc(item.name)} › подмодель «${esc(sub)}»</span><button class="btn quiet" data-action="leave-sub">Выйти из подмодели</button></div>` : ''}
     ${sub ? submodelGraph(nodes, links, sub, inner[sub]) : schemaGraph(nodes.map(([glyph,title,kind],i) => ({glyph, title, small:inner[title] ? `Подмодель · ${inner[title].nodes.length} узла` : facts[i]?.[0] || kind, index:i,
-      cls:(focus?.nodes.includes(i) ? ' is-focus' : '') + (inner[title] ? ' is-sub' : ''), mark:focus?.nodes.includes(i) ? 'Замечание' : '', ...(inner[title] ? submodelPorts(inner[title]) : portsOf(facts[i], kind))})), links,
+      cls:(focus?.nodes.includes(i) ? ' is-focus' : '') + (inner[title] ? ' is-sub' : ''), mark:focus?.nodes.includes(i) && focus.text ? (focus.error ? 'Ошибка' : 'Замечание') : '', ...(inner[title] ? submodelPorts(inner[title]) : portsOf(facts[i], kind))})), links,
       {cls:focus ? ' focus-canvas' : '', label:'Схема пакета'})}
-    ${isCalculation && state.node === 1 ? calculationInspector(canDownload,item.id === editablePackage.id) : `<div class="package-foot">${focus ? `<p class="focus-note"><strong>Замечание агента:</strong> ${esc(focus.text)} <button class="link-btn" data-session="${focus.session}">${icon('message',15)} Вернуться к разговору</button></p>` : ''}${node ? `<strong>${esc(node[1])}.</strong> ${sub ? esc(node[2]) + ' · ' : ''}${esc(node[3])}` + (inner[node[1]] && !sub ? `<p class="graph-sub-note">Подмодель: внутри ${inner[node[1]].nodes.length} узла. <button class="btn" data-action="enter-sub">${icon('layers',15)} Войти в подмодель</button></p>` : '') + nodeFactsHtml(nodeFacts(item.view, node[1], item.keep), item.view === 'sales' ? 'before' : 'after') : focus ? '' : 'Выберите узел, чтобы увидеть сведения.'}</div>`}
+    ${focus?.text ? `<div class="package-foot"><p class="focus-note">${focus.error ? '' : '<strong>Замечание агента:</strong> '}${esc(focus.text)}</p></div>` : ''}
+    ${isCalculation && state.node === 1 ? calculationInspector(canDownload,item.id === editablePackage.id) : `<div class="package-foot">${node ? `<strong>${esc(node[1])}.</strong> ${sub ? esc(node[2]) + ' · ' : ''}${esc(node[3])}` + (inner[node[1]] && !sub ? `<p class="graph-sub-note">Подмодель: внутри ${inner[node[1]].nodes.length} узла. <button class="btn" data-action="enter-sub">${icon('layers',15)} Войти в подмодель</button></p>` : '') + nodeFactsHtml(nodeFacts(item.view, node[1], item.keep), item.view === 'sales' ? 'before' : 'after') : 'Выберите узел, чтобы увидеть сведения.'}</div>`}
+    ${node ? graphNodeActions(item, node) : ''}
+    ${item.view.startsWith('receipt-') ? `<details class="package-variables"><summary>Переменные</summary>
+      ${dataTable({schema:[['Имя'],['Тип'],['Значение'],['Где подставлена']]}, salesVariables, 'Переменные пакета')}
+    </details>` : ''}
     <div class="package-save-bar">
       ${isCalculation ? `<span class="package-save-status${dirty ? ' dirty' : ''}" role="status">${icon(dirty ? 'circle' : 'check',15)} ${dirty ? 'Есть несохранённые изменения' : item.savedVersion ? 'Сохранено в Loginom · демо' : 'Исходная версия'}</span>`
         : ''}
       ${isCalculation ? packageOutputButtons(dirty,canDownload) : ''}
       ${item.id === 'sales' && salesState().replaced ? `<button class="btn" data-action="restore-sales">${icon('refresh',15)} Вернуть прежнюю версию</button>` : ''}
-      ${item.editSessionId ? `<button class="link-btn" data-session="${item.editSessionId}">${icon('message',16)} Вернуться к разговору</button>`
+      ${conversation ? returnToTurn(conversation)
         : !item.savedVersion && !dirty && !item.localFile ? `<button class="btn package-chat-cta" data-action="ask-package-edit">${icon('message',16)} Изменить с агентом</button>` : ''}
     </div></section>
     ${item.isDraft || item.localFile ? '' : `<div class="section-bar package-section"><h2>Что сделать с пакетом</h2><button class="link-btn" data-action="catalog-actions">Ещё действия в каталоге ${icon('arrow',16)}</button></div>
@@ -1878,6 +2080,7 @@ function packages() {
 // Owner review page: iteration 4 (a package in the conversation) — what to try, questions with a recommendation.
 function review() {
   const look = [
+    ['Данные и узлы в разговоре','Отправьте запрос и включите «Подробно». Счётчик у шага раскрывает строки, которые видел агент. Имя узла открывает схему. Для проверки файлов запустите экспорт и разрешите запись CSV.',[['try-node-data','Выходы узлов'],['try-node-error','Ошибка узла'],['try-node-export','Файл экспорта']]],
     // Iteration 9 (В-77): findings 10, 22, 23 of the third review run.
     ['Схема пакета — ветви и связи','Откроется «Продажи.lgp»: узлы стоят по ходу данных, связь идёт от выхода узла (справа) ко входу следующего (слева). У «Фильтр строк» два выхода, неподключённый — пустой кружок; ветки «Регионы» и «Города» сходятся в «Результат». «Подмодели» — «Качество данных.lgp»: «Войти в подмодель», назад — «Выйти из подмодели». «Схема правки» — отправьте запрос, в карточке правки — «Посмотреть на схеме»: новые связи зелёные, связи удалённого узла — пунктиром. Если включена демо-политика (карточка 9), агент сначала попросит войти в Loginom организации — уберите её ссылкой «убрать» внизу страницы.',[['try-graph','Начать'],['try-submodel','Подмодели'],['try-improve','Схема правки']]],
     ['«По умолчанию» в «Разрешениях»','Включится демо-политика администратора и откроются «Разрешения»: строки с замком задал администратор, у остальных — «По умолчанию» или «Вы изменили · по умолчанию «Спрашивать»». Поменяйте строку — пометка сменится; «Всё по умолчанию» вернёт всё. Убрать политику — «убрать» внизу этой страницы.',[['try-policy-permissions','Начать']]],
@@ -2080,7 +2283,7 @@ function rowMenu() {
     ? [item('back','chevron','Назад','class="menu-back"'), ...state.projects.filter(entry => entry.id !== chat.project).map(entry => `<button role="menuitem" data-menu-act="move:${entry.id}"><span class="pc-${entry.color}">${icon('folder',16)}</span><span>${esc(entry.name)}</span></button>`),
        item('new-project-move','folder-plus','Новый проект…')]
     : chat ? [item('rename','file','Переименовать'), item('pin','pin',chat.pinned ? 'Открепить' : 'Закрепить'), item('move','folder','Перенести в проект'),
-       chat.project ? item('unmove','close','Убрать из проекта') : '', menu.where === 'page' && !currentPackageEdit() ? item('download','download','Скачать демонстрационный отчёт CSV') : '', item('delete','alert','Удалить','class="danger"')]
+       chat.project ? item('unmove','close','Убрать из проекта') : '', item('delete','alert','Удалить','class="danger"')]
     : project ? [item('pin','pin',project.pinned ? 'Открепить' : 'Закрепить'), item('settings','settings','Настройки проекта'), item('delete','alert','Удалить проект','class="danger"')]
     : menu.kind === 'model' ? modelMenu(menu)
     : [item('dest:', projectById(state.project) ? 'circle' : 'check', 'Без проекта'), ...state.projects.map(entry => `<button role="menuitem" data-menu-act="dest:${entry.id}"><span class="pc-${entry.color}">${icon(entry.id === state.project ? 'check' : 'folder',16)}</span><span>${esc(entry.name)}</span></button>`)]
@@ -2117,6 +2320,7 @@ function overlay() {
     'loginom-window': ['Окно Loginom', kind === 'loginom-window' ? loginomWindow() : ''],
     'download-copy': ['Скачать на компьютер', kind === 'download-copy' ? downloadCopyDialog() : ''],
     'remove-copy': [state.removeTurn?.act === 'unsave' ? 'Удалить новую версию из Loginom?' : 'Удалить копию из Loginom?', kind === 'remove-copy' ? removeCopyDialog() : ''],
+    'node-output': kind === 'node-output' ? outputDialog() : [],
     'delete-chat': ['Удалить разговор?', kind === 'delete-chat' ? `<p class="dialog-desc">«${esc(state.sessions.find(item => item.id === state.deleteId)?.title)}» удалится насовсем. Журнал действий агента остаётся: что агент делал и что отправлял в модель, видит администратор.</p>${deleteChatFiles()}<div class="button-row"><button class="btn danger" data-action="confirm-delete-chat">Удалить</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     'delete-project': ['Удалить проект?', kind === 'delete-project' ? `<p class="dialog-desc">Проект «${esc(projectById(state.deleteId)?.name)}» удалится насовсем вместе с разговорами (${state.sessions.filter(item => item.project === state.deleteId).length}) и папкой проекта: инструкциями, источниками и файлами, которые сделал агент.</p>${copiesBox(state.sessions.filter(item => item.project === state.deleteId).flatMap(liveCopies), 'delete-project-copies')}<div class="button-row"><button class="btn danger" data-action="confirm-delete-project">Удалить проект</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     // «+» is the one always-visible door to everything that is not on screen yet.
@@ -2141,7 +2345,7 @@ function overlay() {
     rename:['Переименовать разговор',`<form class="inline-form" id="rename-form"><label class="sr-only" for="session-name">Имя разговора</label><input id="session-name" name="name" maxlength="70" value="${esc(state.sessions.find(x => x.id === state.renameId)?.title)}" required><button class="btn primary">Сохранить</button></form>`],
   }[kind]
   if (!content) return ''
-  return `<dialog class="app-dialog" id="app-dialog" aria-labelledby="app-dialog-title"><div class="app-dialog-heading"><h2 id="app-dialog-title">${content[0]}</h2><button class="icon-btn" data-action="dismiss" aria-label="Закрыть">${icon('close',20)}</button></div><div class="app-dialog-body">${content[1]}</div></dialog>`
+  return `<dialog class="app-dialog${kind === 'node-output' ? ' output-dialog' : ''}" id="app-dialog" aria-labelledby="app-dialog-title"><div class="app-dialog-heading"><h2 id="app-dialog-title">${content[0]}</h2><button class="icon-btn" data-action="dismiss" aria-label="Закрыть">${icon('close',20)}</button></div><div class="app-dialog-body">${content[1]}</div></dialog>`
 }
 function pageContents() {
   switch (state.page) {
@@ -2237,6 +2441,13 @@ function render(resetScroll = false) {
   bindOwn(app,state,api)
 }
 function dismiss() {
+  if (state.overlay === 'node-output') {
+    const {at,step} = state.outputDialog
+    state.overlay = null
+    state.outputDialog = null
+    render()
+    return $(`[data-expand-output="${at}:${step}"]`)?.focus({preventScroll:true})
+  }
   if (state.overlay === 'loginom-window') {
     const opened = state.loginomView
     state.overlay = opened?.back || null
@@ -2301,6 +2512,9 @@ function continueTurn(index) {
   runSteps(item)
   $('#prompt')?.focus()
 }
+function nodeContextText(node, text) {
+  return node ? `«${node.name}»: ${text}` : text
+}
 function send() {
   const prompt = state.draft.trim()
   if (!prompt) {
@@ -2317,6 +2531,7 @@ function send() {
     old.prompt = prompt
     const supported = /утро[ий]|(?:[*×хx]\s*3\b)|(?:умно[жз]|множител|формул).{0,45}\b3\b/i.test(prompt)
     old.phase = supported ? 'proposed' : 'unsupported'
+    state.draftNode = null
     state.draft = ''
     render()
     $('.chat-main .answer-block h2')?.scrollIntoView({block:'nearest'})
@@ -2324,7 +2539,8 @@ function send() {
   }
   // While the agent works, a message is a correction: it reaches the agent after the current step.
   if (old && ['running','retrying'].includes(old.phase) && state.editTurn?.session !== old.id) {
-    old.steer.push({text:prompt, at:old.step + 1})
+    old.steer.push({text:nodeContextText(state.draftNode, prompt), at:old.step + 1})
+    state.draftNode = null
     state.draft = ''
     render()
     $('#prompt')?.focus()
@@ -2357,6 +2573,11 @@ function send() {
     // A follow-up without a task word continues the previous task («Собери такой же для регионов»); a question is answered.
     // An edit or an answer about the copy is not repeated by «Спасибо».
     : old && !['chat','improve','keep','more','nocopy','pick','discuss','enrich','noenrich'].includes(old.kind) && !/\?\s*$/.test(prompt) ? old.kind : 'chat'
+  const nodeContext = old ? state.draftNode : null
+  if (nodeContext) kind = 'node-context'
+  if (/проверь выходы фильтров учебных продаж/i.test(prompt)) kind = 'node-data'
+  if (/проверь фильтр без поля «дата»/i.test(prompt)) kind = 'node-error'
+  if (/выгрузи учебные продажи в csv/i.test(prompt)) kind = 'node-export'
   // A package from the computer: the agent uploads its own copy to Loginom; the file itself never changes.
   const local = state.draftPackage ? state.draftPackage.source === 'local' : Boolean(old?.local)
   if (['refactor','improve'].includes(kind) && !improvable(state.draftPackage?.name || (old ? old.files?.[0] : ''), local)) kind = 'clean'
@@ -2366,9 +2587,9 @@ function send() {
   const earlier = old ? [...(old.history || []), turnSnapshot(old)] : []
   const kept = editAt === null ? earlier : earlier.slice(0, editAt)
   if (editAt !== null) carryCopyState(earlier, editAt)
-  const draft = !web && !state.draftPackage ? draftCopy(kept) : null
+  const draft = !nodeContext && !web && !state.draftPackage ? draftCopy(kept) : null
   // A request, not a question that names the node.
-  const keepAsk = /не удаля|оставь|оставить|верни|вернуть/i.test(prompt) && /фильтр|узел|узл/i.test(prompt) && !/\?\s*$/.test(prompt)
+  const keepAsk = !nodeContext && /не удаля|оставь|оставить|верни|вернуть/i.test(prompt) && /фильтр|узел|узл/i.test(prompt) && !/\?\s*$/.test(prompt)
   // From a saved version (В-73: a new copy after «Сохранить»): the agent copies the saved version and keeps the node.
   const fromSaved = !draft && keepAsk && !state.draftPackage ? savedCopy(kept) : null
   if (draft && keepAsk && !draft.partial) kind = 'keep'
@@ -2391,7 +2612,7 @@ function send() {
   // «Изменить» on a message: the turns from it on are replaced by the new request.
   const next = {
     id: old?.id ?? 'session-' + Date.now(), date:'Сейчас', title:old?.title || state.templateTitle || (prompt.length > 56 ? prompt.slice(0,57).replace(/\s+\S*$/,'') + '…' : prompt),
-    kind, phase,
+    kind, phase, nodeContext, saveRequested:kind === 'abc' && /сохрани|сохранение/i.test(prompt), packageId:state.draftPackage?.id || nodeContext?.packageId,
     files:[...(state.draftPackage ? [state.draftPackage.name] : []), ...state.draftFiles], prompt,
     project:old ? old.project : state.page === 'project' ? state.projectView : projectById(state.project) ? state.project : null,
     history:kept, allowed:[...(old?.allowed || [])],
@@ -2421,8 +2642,7 @@ function send() {
   if (state.draftPackage && !trialTurn) state.progress.packages = true
   state.sessions = [next, ...state.sessions.filter(x => x.id !== next.id)]
   state.templateTitle = ''
-  state.draftPackage = null
-  state.scrollToEnd = true
+  Object.assign(state, {draft:'', draftFiles:[], draftPackage:null, draftNode:null})
   openSession(next.id)
   if (phase === 'starting') startRun(next)
 }
@@ -2548,7 +2768,7 @@ function viewInLoginom(target) {
   const chat = state.sessions.find(item => item.id === session)
   const entry = kind === 'copy' ? chat && agentCopy(turnAt(session, Number(at)), chainKeep(chat, Number(at))) : packageEntries().find(item => item.id === target) || (state.activePackage?.isResult && state.activePackage.id === target ? state.activePackage : null)
   if (!entry) return toast('Этого пакета в Loginom уже нет', 'alert')
-  state.loginomView = {target, name:entry.name, path:entry.copy ? entry.folder : packagePath(entry), view:entry.view, keep:Boolean(entry.keep), copy:Boolean(entry.copy), back:state.overlay === 'replace-package' ? 'replace-package' : null}
+  state.loginomView = {target, name:entry.name, path:entry.copy ? entry.folder : entry.fullPath?.slice(0, -(entry.name.length + 1)) || packagePath(entry), view:entry.view, keep:Boolean(entry.keep), copy:Boolean(entry.copy), back:state.overlay === 'replace-package' ? 'replace-package' : null}
   state.overlay = 'loginom-window'
   render()
 }
@@ -2602,6 +2822,36 @@ function replacePackage() {
   toast('«Продажи.lgp» заменён, прежняя версия — «Продажи — до правки.lgp»')
   render()
 }
+function outputAction(d) {
+  if (d.outputTab) {
+    state.outputDialog.tab = d.outputTab
+    render()
+    $(`[data-output-tab="${d.outputTab}"]`)?.focus()
+    return
+  }
+  const [at,step] = (d.sample || d.expandOutput).split(':').map(Number)
+  const turn = turnAt(state.session, at)
+  if (!turn || state.detail !== 'full') return
+  if (d.sample) {
+    turn.openOutput = turn.openOutput === step ? null : step
+    render()
+    return $(`[data-sample="${d.sample}"]`)?.focus({preventScroll:true})
+  }
+  state.outputDialog = {at, step, tab:'sample'}
+  state.overlay = 'node-output'
+  render()
+}
+function openTurnPackage(key) {
+  const [at,step] = key.split(':').map(Number)
+  const turn = turnAt(state.session, at)
+  const item = turn && outputPackage(turn, state.session, at)
+  if (!item) return
+  const receipt = scriptOf(turn).steps[step]?.output || scriptOf(turn).steps[step]?.file
+  const error = turn.kind === 'node-error' && turn.phase === 'failed'
+  const nodes = error ? [1] : receipt ? [receipt.node] : []
+  openPackage(item, {pkg:item.id, view:item.view, session:state.session, at, nodes, step:step != null,
+    text:error ? missingDate : '', error, outputs:runOutputs(turn)})
+}
 function feedAction(d) {
   const item = currentItem()
   const turns = [...(item.history || []), item]
@@ -2640,7 +2890,7 @@ function feedAction(d) {
 }
 function turnSnapshot(item) {
   // A copy, not shared references: a fork's decisions must not show up in the original.
-  return structuredClone({instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:item.phase === 'writing' ? item.writeFinal : ['running','retrying','permission','question','plan','connect','starting'].includes(item.phase) ? 'interrupted' : item.phase,
+  return structuredClone({nodeContext:item.nodeContext, saveRequested:item.saveRequested, packageId:item.packageId, savedPath:item.savedPath, exportTo:item.exportTo, instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:item.phase === 'writing' ? item.writeFinal : ['running','retrying','permission','question','plan','connect','starting'].includes(item.phase) ? 'interrupted' : item.phase,
     step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, copy:item.copy, rules:item.rules, web:item.web, nosend:item.nosend, local:item.local, from:item.from, resumeCopy:item.resumeCopy, about:item.about, aboutKeep:item.aboutKeep, nocopy:item.nocopy, modelNote:item.modelNote, forkOf:item.forkOf, model:item.model, modelName:item.modelName, modelError:item.modelError})
 }
 function connectLoginom() {
@@ -2662,24 +2912,18 @@ function chooseDraftPackage(ref) {
   else render()
   $('#prompt')?.focus()
 }
-function downloadResult() {
-  const item = state.sessions.find(x => x.id === state.session)
-  if (!item) return
-  const csv = {
-    quality:'Показатель,Количество\nПроверено строк,2400\nПропуски,12\nДубликаты,3\n',
-    refactor:'Показатель,Количество\nПроверено узлов,6\nРекомендации,3\nИзменено узлов,0\n',
-    abc:'Группа,Количество товаров\nA,15\nB,28\nC,77\n',
-    document:'Узел,Что делает\nCSV продаж,Загружает продажи\nФильтр по дате (ветка «Регионы»),Оставляет продажи за период\nВыручка по регионам,Считает выручку по регионам\nФильтр по дате (ветка «Города»),Оставляет продажи за период\nУзел14,Считает выручку по городам\nРезультат,Выгружает таблицу\n',
-    chat:'Ответ\nДемонстрационный разговор\n',
-  }
-  if (!csv[item.kind]) return toast('В этом разговоре нет отчёта для скачивания')
-  const url = URL.createObjectURL(new Blob(['\uFEFF',csv[item.kind]],{type:'text/csv;charset=utf-8'}))
+function downloadTable(at) {
+  const turn = turnAt(state.session, at)
+  if (!turn || !runOutputs(turn).includes(abcOutput)) return
+  const {name,schema,rows} = abcDownload
+  const csv = [schema.map(([label]) => label), ...rows].map(row =>
+    row.map(cell => '"' + String(cell ?? '').replaceAll('"','""') + '"').join(',')).join('\r\n')
+  const url = URL.createObjectURL(new Blob(['\uFEFF',csv],{type:'text/csv;charset=utf-8'}))
   const a = document.createElement('a')
   a.href = url
-  a.download = item.kind + '-demo.csv'
+  a.download = name
   a.click()
-  setTimeout(() => URL.revokeObjectURL(url),1000)
-  if (state.overlay) dismiss()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 const actions = {
   new:newSession,
@@ -2748,6 +2992,9 @@ const actions = {
     tryPrompt('Дополни таблицу «sales-demo.csv» данными о регионах из Example Data')
   },
   'try-diagnostics':() => applyDemoPolicy('', 'diagnostics'),
+  'try-node-data':() => tryPrompt('Проверь выходы фильтров учебных продаж'),
+  'try-node-error':() => tryPrompt('Проверь фильтр без поля «Дата»'),
+  'try-node-export':() => tryPrompt('Выгрузи учебные продажи в CSV'),
   'try-run':() => tryPrompt('Построй ABC-анализ товаров по выручке'),
   'try-check':() => tryPrompt('Проверь сценарий продаж'),
   'try-improve':() => tryPrompt('Внеси улучшения в сценарий продаж'),
@@ -2804,8 +3051,14 @@ const actions = {
     render()
   },
   'plus-catalog':() => navigate('hub'),
+  'remove-draft-node':() => { state.draftNode = null; render(); $('#prompt')?.focus() },
   'remove-package':() => { state.draftPackage = null; render(); $('#prompt')?.focus() },
-  'open-draft-package':() => { if (state.draftPackage?.item) openPackage(state.draftPackage.item) },
+  'open-draft-package':() => {
+    const item = state.draftPackage?.item
+    if (!item) return
+    const chat = state.page === 'chat' && currentItem()
+    openPackage(item, chat ? {pkg:item.id, view:item.view, nodes:[], session:chat.id, at:chat.history?.length || 0} : null)
+  },
   theme:() => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light':'dark'),
   dismiss,
   review:() => { state.review = !state.review; render() },
@@ -2855,7 +3108,6 @@ const actions = {
     state.draft = ''
     render()
   },
-  'download-result':downloadResult,
   'open-chat-folder':() => {
     const item = state.sessions.find(entry => entry.id === state.session)
     if (item) toast('Откроется папка: ' + chatFolder(item).path)
@@ -2889,13 +3141,17 @@ const actions = {
     render()
     $('.calculation-inspector button')?.focus()
   },
+  'copy-package-path':() => copyText(fullPackagePath(state.activePackage)),
+  'copy-node-name':() => {
+    const node = selectedGraphNode()
+    if (node) copyText(node.copyName)
+  },
   'ask-package-edit':() => {
     const source = state.activePackage
     if (source.view === 'calculation') return startPackageEdit()
     newSession()
-    const node = Number.isInteger(state.node) ? (state.sub?.pkg === source.id && packageSubmodels[source.view]?.[state.sub.title]?.nodes || viewNodes(source.view, source.keep))[state.node]?.[1] : null
-    chooseDraftPackage({name:source.name, where:packagePath(source), source:'loginom', item:source})
-    state.draft = node ? `Проверь узел «${node}» и покажи, что можно улучшить` : 'Проверь сценарий и покажи, что можно улучшить'
+    chooseDraftPackage({...packageRef(source), item:source})
+    state.draft = 'Проверь сценарий и покажи, что можно улучшить'
     render()
     $('#prompt')?.focus()
   },
@@ -2921,10 +3177,6 @@ const actions = {
     render()
   },
   'download-edited-package':downloadEditedPackage,
-  'open-result-package':() => {
-    const session = state.sessions.find(item => item.id === state.session)
-    if (session?.phase === 'done') openPackage(resultPackage(session))
-  },
   'package-server':() => { resetPackageBrowse(); state.pendingAction = null; state.overlay = 'package-server'; render() },
   'catalog-actions':() => { showHubType(state, 'Действие'); navigate('hub') },
   'review-actions':() => { navigate('home'); state.overlay = 'all-actions'; render() },
@@ -3045,7 +3297,6 @@ function menuAction(act) {
     return render()
   }
   state.menu = null
-  if (act === 'download') return downloadResult()
   if (act.startsWith('model:')) return menu.id === 'continue' ? continueTurn(Number(act.slice(6))) : chooseModel(Number(act.slice(6)))
   if (act === 'models-settings') return settingsTab('models')
   if (act === 'provider-connect') return openConnect()
@@ -3131,6 +3382,7 @@ app.addEventListener('click', event => {
   if (d.permit) return permit(d.permit)
   if (d.answer) return answerQuestion(d.answer)
   if (d.detail) {
+    if (d.detail === 'brief') for (const turn of [...(currentItem()?.history || []), currentItem()].filter(Boolean)) turn.openOutput = null
     state.detail = d.detail
     write('detail', d.detail)
     return render()
@@ -3186,7 +3438,12 @@ app.addEventListener('click', event => {
   }
   if (d.agentMode) { state.mode = d.agentMode; return dismiss() }
   if (d.review) { state.reviewTab = d.review; return render() }
-  if (d.finding != null) return showFinding(Number(d.finding.split(':')[0]), d.finding.endsWith(':local'))
+  if (d.finding != null) return showFinding(Number(d.finding.split(':')[0]), d.finding.endsWith(':local'), d.at === '' ? undefined : Number(d.at))
+  if (d.sample || d.expandOutput || d.outputTab) return outputAction(d)
+  if (d.runNode || d.openRunPackage != null) return openTurnPackage(d.runNode || d.openRunPackage)
+  if (d.downloadTable != null) return downloadTable(Number(d.downloadTable))
+  if (d.backToTurn != null) return openSession(d.chat, d.backToTurn === '' ? undefined : Number(d.backToTurn))
+  if (d.nodeChat) return attachGraphNode(d.nodeChat)
   if (d.node != null) {
     state.node = Number(d.node)
     render()
@@ -3462,7 +3719,12 @@ $('#announcements').addEventListener('click', event => {
   $('#announcements').innerHTML = ''
   openSession(id)
 })
-addEventListener('popstate',() => { route(); state.overlay = null; render(true) })
+addEventListener('popstate',() => {
+  keepChatDraft()
+  route()
+  state.overlay = null
+  render(true)
+})
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',() => { if (state.theme === 'system') render() })
 // Seeds are finished conversations: every step done (the scripts are declared above this line).
 for (const item of state.sessions) completeTurn(item)
