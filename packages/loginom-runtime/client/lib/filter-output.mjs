@@ -21,7 +21,8 @@ export async function readFilterOutputs(channel,read,ctx,mapped){
   const mapping=mapped.ports.find(p=>p.port===port);need(mapping,'Missing filter output schema');
   const {output}=await channel.readOutputPort({port,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
   const expected=mapping.native_mapping.target_fields.filter(f=>!f.excluded);
-  need(output.schema.every((field,index)=>field.name===expected[index]?.name),'Filter output field order differs from the configured output');
+  if(mapping.native_mapping.autosync!==true)
+   need(output.schema.every((field,index)=>field.name===expected[index]?.name),'Filter output field order differs from the configured output');
   const aligned=alignReadSchema(output.schema,expected);
   output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
   ports.push(output);

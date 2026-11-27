@@ -2,14 +2,14 @@
 UTF-8, маркер пропуска \N; различай NULL и пустую строку. Метаданные и порядок
 полей/строк — строго по schema.json.
 
-1. Создай и выполни штатный Калькулятор переменных с LgdPath типа string, значение
-   {{LGD_INITIAL_DESTINATION}}. Подключи выполненный выход переменных 0
+1. Создай и выполни штатный Калькулятор переменных с переменной LgdPath типа string,
+   меткой «Путь LGD» и значением {{LGD_INITIAL_DESTINATION}}. Подключи выполненный выход переменных 0
    к входу variables 0 нового exports.lgd (variable_inputs, kind=variables).
    Встроенный узел переменных сценария не используй: его выход не активирован.
 2. Нативно экспортируй таблицу через lgd_export.bindings.destination.variable=LgdPath,
    compression=lz4, checksum=compressed, overwrite=reject. Литеральный destination
    не задавай. Скачай полученный LGD.
-3. Измени формулу того же LgdPath на {{EXPORT_DIRECTORY}}/roundtrip.lgd.
+3. Измени формулу того же LgdPath на {{EXPORT_DIRECTORY}}/roundtrip.lgd, сохранив метку «Путь LGD».
    Повторно выполни Калькулятор переменных. На том же узле экспорта
    выполни parameters:{}: привязка должна сохраниться,
    а файл должен появиться по НОВОМУ значению переменной. Скачай LGD.

@@ -397,6 +397,7 @@ export function makeRecoveryPageProbeCode({ tabTid = null } = {}) {
     const pages = page.context().pages().filter(item => !item.isClosed()).length;
     const observed = await page.evaluate(tab => ({ origin: location.origin,
       document_id: globalThis.__loginomDockPreparationV1?.document === document ? globalThis.__loginomDockPreparationV1.id : null,
+      reloaded: globalThis.performance?.getEntriesByType?.('navigation')[0]?.type === 'reload',
       tab_present: tab ? !!document.querySelector('[data-tid="' + CSS.escape(tab) + '"]') : null }), ${JSON.stringify(tabTid)});
     return JSON.stringify({ kind: 'browser_recovery_page', pages, ...observed });
   }`;
@@ -413,7 +414,8 @@ export function parseRecoveryPageProbe(response, { origin, documentId, tabTid = 
       if (value?.kind !== 'browser_recovery_page') continue;
       if (value.pages !== 1) return { ok: false, reason: `expected one page, found ${value.pages}` };
       if (value.origin !== origin) return { ok: false, reason: 'origin changed' };
-      if (value.document_id !== documentId) return { ok: false, reason: 'prepared document changed' };
+      if (value.document_id !== documentId) return { ok: false, reason: 'prepared document changed',
+        ...(value.reloaded===true?{reloaded:true}:{}) };
       // Closing the prepared scenario tab changes the workflow context Dock is bound to.
       if (tabTid && value.tab_present !== true) return { ok: false, reason: 'prepared scenario tab closed' };
       return { ok: true };
