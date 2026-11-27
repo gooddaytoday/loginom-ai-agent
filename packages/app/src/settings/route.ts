@@ -1,6 +1,18 @@
 import { canHoldProjectRoute, type SettingsServerAvailability } from "./servers/machine"
 
-export type SettingsRootTab = keyof typeof rootTabs
+export type SettingsRootTab =
+  | "general"
+  | "appearance"
+  | "notifications"
+  | "shortcuts"
+  | "projects"
+  | "workspaces"
+  | "providers"
+  | "models"
+  | "extensions"
+  | "servers"
+  | "experimental"
+  | "about"
 
 declare const pluginTab: unique symbol
 
@@ -8,12 +20,13 @@ declare const pluginTab: unique symbol
 export type SettingsPluginTab = string & { readonly [pluginTab]: true }
 
 /** Root pages that show one server's settings: the selected server, or the default one. */
-export type SettingsServerTab = "providers" | "models"
+export type SettingsServerTab = "projects" | "workspaces" | "providers" | "models" | "extensions"
 
-export type SettingsProjectTab = "general"
+export type SettingsProjectTab = "general" | "workspaces" | "extensions"
 
 type SettingsViewState = {
   target?: string
+  subtab?: "mcps" | "plugins" | "skills" | "lsps"
   searchActivation?: number
 }
 
@@ -32,18 +45,39 @@ export type SettingsHostView = ({ type: "root"; tab: SettingsRootTab; server?: s
 
 export type SettingsTransientView = Pick<SettingsView, "target" | "searchActivation">
 
-const rootTabs = {
+const rootTabs: Record<SettingsRootTab, true> = {
   general: true,
   appearance: true,
   notifications: true,
   shortcuts: true,
+  projects: true,
+  workspaces: true,
   providers: true,
   models: true,
+  extensions: true,
   servers: true,
+  experimental: true,
   about: true,
 }
 
-const hiddenTabs = new Set(["projects", "workspaces", "extensions", "experimental", "plugins"])
+const projectTabs: Record<SettingsProjectTab, true> = {
+  general: true,
+  workspaces: true,
+  extensions: true,
+}
+
+const subtabs: Record<NonNullable<SettingsView["subtab"]>, true> = {
+  mcps: true,
+  plugins: true,
+  skills: true,
+  lsps: true,
+}
+
+const hiddenTabs = new Set<string>(["projects", "workspaces", "extensions", "experimental"])
+
+export function isVisibleSettingsTab(tab: string) {
+  return !hiddenTabs.has(tab === "plugins" ? "extensions" : tab)
+}
 
 export function parseSettingsView(
   search: string,
@@ -52,16 +86,28 @@ export function parseSettingsView(
 ): SettingsView {
   const params = new URLSearchParams(search)
   const tab = params.get("tab") ?? "general"
+  if (!isVisibleSettingsTab(tab)) return { type: "root", tab: "general", ...transient }
+
   const server = params.get("server") ?? undefined
   const project = params.get("project")
-  if (project && server && tab === "general") return { type: "project", server, project, tab, ...transient }
+  const subtab = params.get("subtab")
+  const nested = subtab && isSubtab(subtab) && tab === "extensions" ? subtab : undefined
+
+  if (project && server && isProjectTab(tab))
+    return { type: "project", server, project, tab, subtab: nested, ...transient }
 
   // Links to a server's own page, which the Servers page replaced, name a server without a tab.
   if (!project && server && !params.has("tab")) return { type: "root", tab: "servers", server, ...transient }
 
-  if (!project && isRootTab(tab)) return { type: "root", tab, server, ...transient }
+  // The desktop's Plugins page is now the Plugins tab of Extensions, so links to it and `layout.settings("plugins")`
+  // land there.
+  if (!project && tab === "plugins") return { type: "root", tab: "extensions", server, subtab: "plugins", ...transient }
 
-  if (!project && pluginTabs && isPluginTab(tab, pluginTabs)) return { type: "root", tab, server, ...transient }
+  if (!project && isRootTab(tab))
+    return { type: "root", tab, server, subtab: nested === "lsps" ? undefined : nested, ...transient }
+
+  if (!project && pluginTabs && isPluginTab(tab, pluginTabs))
+    return { type: "root", tab, server, subtab: undefined, ...transient }
 
   return { type: "root", tab: "general", ...transient }
 }
@@ -76,6 +122,7 @@ export function settingsViewUrl(view: SettingsView) {
   // A server without a tab names the Servers page, so a root view with a server always names its tab.
   if (view.tab !== "general" || (view.type === "root" && view.server)) params.set("tab", view.tab)
 
+  if (view.tab === "extensions" && view.subtab) params.set("subtab", view.subtab)
   const search = params.toString()
 
   return search ? `/settings?${search}` : "/settings"
@@ -99,7 +146,7 @@ export function settingsViewRedirect(input: {
 
   if (!server) return { type: "root", tab: "general" }
 
-  // The Servers page offers a retry for an unreachable project's server.
+  // A signed-out or unreachable server has no project to show; the Servers page shows why and offers a retry.
   if (!canHoldProjectRoute(server.availability)) return { type: "root", tab: "servers", server: server.key }
 }
 
@@ -107,11 +154,19 @@ export function isRootTab(value: string): value is SettingsRootTab {
   return Object.hasOwn(rootTabs, value)
 }
 
-/** Host tab ids stay reserved even when the host hides the page. */
+/** Host tabs and the legacy Plugins route win over a plugin page with the same id. */
 export function isReservedSettingsTab(value: string) {
-  return isRootTab(value) || hiddenTabs.has(value)
+  return isRootTab(value) || value === "plugins"
 }
 
 export function isPluginTab(value: string, tabs: ReadonlySet<string>): value is SettingsPluginTab {
   return !isReservedSettingsTab(value) && tabs.has(value)
+}
+
+export function isProjectTab(value: string): value is SettingsProjectTab {
+  return Object.hasOwn(projectTabs, value)
+}
+
+function isSubtab(value: string): value is NonNullable<SettingsView["subtab"]> {
+  return Object.hasOwn(subtabs, value)
 }

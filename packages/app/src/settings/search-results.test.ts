@@ -29,11 +29,11 @@ describe("settings search index", () => {
   test("indexes the selected server's pages and names it only when there are several servers", () => {
     const multi = rankSettings("models", index({ selected: "remote" })).filter((item) => item.topLevel)
     expect(multi.map((item) => item.view)).toEqual([
-      { type: "root", server: "remote", tab: "models", target: undefined },
+      { type: "root", server: "remote", tab: "models", target: undefined, subtab: undefined },
     ])
     const single = rankSettings("models", index({ servers: [servers[0]] })).find((item) => item.topLevel)!
     expect(single.server).toBe("local")
-    expect(single.view).toEqual({ type: "root", tab: "models", target: undefined })
+    expect(single.view).toEqual({ type: "root", tab: "models", target: undefined, subtab: undefined })
   })
 
   test("keeps unavailable servers discoverable without advertising unloaded settings", () => {
@@ -43,6 +43,7 @@ describe("settings search index", () => {
       type: "root",
       tab: "servers",
       target: undefined,
+      subtab: undefined,
     })
     expect(rankSettings("font", items)).toHaveLength(3)
   })

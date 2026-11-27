@@ -11,6 +11,7 @@ type Entry<Tab> = {
   keywords?: string
   description?: Label
   section?: Label
+  subtab?: "mcps" | "plugins" | "skills" | "lsps"
   available?: "desktop" | "browser" | "mobile"
 }
 
@@ -20,6 +21,7 @@ export const clientSettings: Entry<SettingsRootTab>[] = [
   { tab: "notifications", label: "settings.tab.notifications" },
   { tab: "shortcuts", label: "settings.shortcuts.title", keywords: "keybind keyboard hotkey" },
   { tab: "about", label: "settings.tab.about", keywords: "version license credits" },
+  { tab: "experimental", label: "settings.tab.experimental", keywords: "experiments preview beta" },
   { tab: "general", label: "settings.general.row.language.title", target: "settings-language" },
   {
     tab: "general",
@@ -33,6 +35,13 @@ export const clientSettings: Entry<SettingsRootTab>[] = [
     target: "settings-workspace-destination",
     description: "settings.workspaces.default.description",
     keywords: "worktree workspace default destination",
+  },
+  {
+    tab: "general",
+    label: "command.permissions.autoaccept.enable",
+    target: "settings-auto-accept-permissions",
+    description: "settings.permissions.autoAccept.default.description",
+    keywords: "permissions approve allow auto accept default",
   },
   {
     tab: "general",
@@ -94,6 +103,41 @@ export const clientSettings: Entry<SettingsRootTab>[] = [
     label: "settings.general.row.showCustomAgents.title",
     target: "settings-show-custom-agents",
     section: "settings.general.section.general",
+  },
+  {
+    tab: "experimental",
+    label: "settings.experimental.row.newIcons.title",
+    target: "settings-new-icons",
+    description: "settings.experimental.row.newIcons.description",
+    keywords: "icons iconography glyphs redesign",
+  },
+  {
+    tab: "experimental",
+    label: "settings.experimental.row.foldUserMessages.title",
+    target: "settings-fold-user-messages",
+    description: "settings.experimental.row.foldUserMessages.description",
+    keywords: "fold collapse long messages prompts read more",
+  },
+  {
+    tab: "experimental",
+    label: "settings.experimental.row.newTimeline.title",
+    target: "settings-new-timeline",
+    description: "settings.experimental.row.newTimeline.description",
+    keywords: "new timeline redesign activity explored edited ran grouping status",
+  },
+  {
+    tab: "experimental",
+    label: "settings.experimental.row.newQuestionUI.title",
+    target: "settings-new-question-ui",
+    description: "settings.experimental.row.newQuestionUI.description",
+    keywords: "question answers keyboard dock redesign",
+  },
+  {
+    tab: "experimental",
+    label: "settings.experimental.row.sidebarOrganize.title",
+    target: "settings-sidebar-organize",
+    description: "settings.experimental.row.sidebarOrganize.description",
+    keywords: "vertical side tabs projects recents organize sidebar",
   },
   {
     tab: "appearance",
@@ -209,8 +253,24 @@ export const clientSettings: Entry<SettingsRootTab>[] = [
 
 // Pages showing the selected server, and rows of its card on the Servers page.
 export const serverSettings: Entry<SettingsServerTab | "servers">[] = [
+  { tab: "projects", label: "settings.tab.projects" },
+  { tab: "workspaces", label: "settings.tab.workspaces", keywords: "workspaces disk usage cleanup delete" },
   { tab: "providers", label: "settings.providers.title", keywords: "connect api key credentials" },
   { tab: "models", label: "settings.models.title", keywords: "model picker visibility" },
+  { tab: "extensions", label: "settings.tab.extensions" },
+  {
+    tab: "extensions",
+    subtab: "mcps",
+    label: "settings.extensions.tab.mcps",
+    keywords: "model context protocol tools",
+  },
+  {
+    tab: "extensions",
+    subtab: "plugins",
+    label: "settings.extensions.tab.plugins",
+    keywords: "extension gui built-in",
+  },
+  { tab: "extensions", subtab: "skills", label: "settings.extensions.tab.skills" },
   {
     tab: "servers",
     label: "settings.general.row.shell.title",
@@ -230,4 +290,15 @@ export const projectSettings: Entry<SettingsProjectTab>[] = [
     target: "settings-project-auto-accept-permissions",
     keywords: "permissions approve allow auto accept",
   },
+  { tab: "workspaces", label: "settings.tab.workspaces", keywords: "workspaces disk usage cleanup delete" },
+  { tab: "extensions", label: "settings.tab.extensions" },
+  {
+    tab: "extensions",
+    subtab: "mcps",
+    label: "settings.extensions.tab.mcps",
+    keywords: "model context protocol tools",
+  },
+  { tab: "extensions", subtab: "plugins", label: "settings.extensions.tab.plugins" },
+  { tab: "extensions", subtab: "skills", label: "settings.extensions.tab.skills" },
+  { tab: "extensions", subtab: "lsps", label: "project.settings.extensions.tab.lsps", keywords: "language servers" },
 ]

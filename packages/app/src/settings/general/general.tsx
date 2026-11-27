@@ -16,10 +16,30 @@ import {
 import { formatKeybind } from "@/shell/commands/command"
 import { SettingsList } from "@/settings/list"
 import { SettingsRow } from "@/settings/row"
+import { showDefaultPermissionSetting } from "../pages"
 import { createShellOptions } from "./behavior"
 import { createOptimisticSetting, type ShellSettingsController } from "./controllers"
 import { InterfaceModeSetting } from "./interface-mode"
 import "@/settings/settings.css"
+
+const AutoApprovePermissionsSetting: Component = () => {
+  const language = useLanguage()
+  const settings = useSettings()
+
+  return (
+    <SettingsRow
+      title={language.t("command.permissions.autoaccept.enable")}
+      description={language.t("settings.permissions.autoAccept.default.description")}
+    >
+      <div data-action="settings-auto-accept-permissions">
+        <Switch
+          checked={settings.permissions.autoApproveDefault()}
+          onChange={(checked) => settings.permissions.setAutoApproveDefault(checked)}
+        />
+      </div>
+    </SettingsRow>
+  )
+}
 
 const WorkspaceDestinationSetting: Component = () => {
   const language = useLanguage()
@@ -236,6 +256,9 @@ export const SettingsGeneral: Component = () => {
         <LanguageSetting />
 
         <WorkspaceDestinationSetting />
+        <Show when={showDefaultPermissionSetting}>
+          <AutoApprovePermissionsSetting />
+        </Show>
 
         <SettingsRow
           title={language.t("settings.general.row.showCustomAgents.title")}

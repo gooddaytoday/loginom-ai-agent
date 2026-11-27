@@ -12,28 +12,38 @@ export const pageIcons = {
   notifications: "notifications",
   shortcuts: "keyboard",
   projects: "folder",
+  workspaces: "outline-worktree",
   providers: "providers",
   models: "models",
   extensions: "extensions",
   servers: "server",
+  experimental: "flask",
   about: "info",
-} as const satisfies Record<SettingsRootTab | "projects" | "extensions", IconProps["name"]>
+} as const satisfies Record<SettingsRootTab, IconProps["name"]>
 
 export const pageLabels = {
   general: "settings.tab.preferences",
   appearance: "settings.general.section.appearance",
   notifications: "settings.tab.notifications",
   shortcuts: "settings.shortcuts.title",
+  projects: "settings.tab.projects",
+  workspaces: "settings.tab.workspaces",
   providers: "settings.providers.title",
   models: "settings.models.title",
+  extensions: "settings.tab.extensions",
   servers: "settings.section.server",
+  experimental: "settings.tab.experimental",
   about: "settings.tab.about",
 } as const satisfies Record<SettingsRootTab, Label>
+
+export const showDefaultPermissionSetting = false
 
 export function settingsPageGroups(input: {
   translate: ReturnType<typeof useLanguage>["t"]
   multipleServers: boolean
   pages: readonly SettingsPage[]
+  experimentalAvailable: boolean
+  prefetchWorkspaces: () => void
 }): SettingsNavGroup[] {
   const host = (value: SettingsRootTab, order: number, label: Label = pageLabels[value]) => ({
     value,
@@ -53,9 +63,14 @@ export function settingsPageGroups(input: {
   return [
     {
       label: input.translate("settings.group.work"),
-      items: [host("providers", 20), host("models", 30), ...plugins.filter((page) => page.group === "work")].sort(
-        byOrder,
-      ),
+      items: [
+        host("providers", 20),
+        host("models", 30),
+        host("extensions", 100),
+        host("projects", 110),
+        { ...host("workspaces", 120), onPrefetch: input.prefetchWorkspaces },
+        ...plugins.filter((page) => page.group === "work"),
+      ].sort(byOrder),
     },
     {
       label: input.translate("settings.group.application"),
@@ -66,6 +81,7 @@ export function settingsPageGroups(input: {
         host("appearance", 100),
         host("notifications", 110),
         host("servers", 120, input.multipleServers ? "settings.tab.servers" : pageLabels.servers),
+        ...(input.experimentalAvailable ? [host("experimental", 130)] : []),
         ...plugins.filter((page) => page.group === "application"),
       ].sort(byOrder),
     },

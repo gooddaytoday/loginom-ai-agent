@@ -6,7 +6,7 @@ const parse = (view: SettingsView) => parseSettingsView(new URL(settingsViewUrl(
 describe("settings route", () => {
   test("keeps root preferences at the canonical route", () => {
     expect(settingsViewUrl({ type: "root", tab: "general" })).toBe("/settings")
-    expect(parseSettingsView("")).toEqual({ type: "root", tab: "general", server: undefined })
+    expect(parseSettingsView("")).toEqual({ type: "root", tab: "general", server: undefined, subtab: undefined })
   })
 
   test("round trips root pages, the selected server, and project pages", () => {
@@ -22,11 +22,11 @@ describe("settings route", () => {
       tab: "general",
     }
 
-    expect(parse(root)).toEqual({ ...root, server: undefined })
-    expect(parse(models)).toEqual(models)
+    expect(parse(root)).toEqual({ ...root, server: undefined, subtab: undefined })
+    expect(parse(models)).toEqual({ ...models, subtab: undefined })
     expect(settingsViewUrl(preferences)).toBe("/settings?server=wsl%3ADebian&tab=general")
-    expect(parse(preferences)).toEqual(preferences)
-    expect(parse(project)).toEqual(project)
+    expect(parse(preferences)).toEqual({ ...preferences, subtab: undefined })
+    expect(parse(project)).toEqual({ ...project, subtab: undefined })
   })
 
   test("opens links to a server's old settings page on the flat pages with that server selected", () => {
@@ -35,6 +35,7 @@ describe("settings route", () => {
       type: "root",
       tab: "providers",
       server: "wsl:Debian",
+      subtab: undefined,
     })
   })
 
@@ -67,6 +68,7 @@ describe("settings route", () => {
       tab: "general",
       target: "settings-project-name",
       searchActivation: 2,
+      subtab: undefined,
     })
   })
 

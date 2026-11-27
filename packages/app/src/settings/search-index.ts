@@ -3,8 +3,8 @@ import type { useLanguage } from "@/runtime/i18n/language"
 import type { LocalProject } from "@/shell/state/layout"
 import { displayName } from "@opencode/ui/project-avatar"
 import { clientSettings, projectSettings, serverSettings } from "./search-catalog"
-import { pageIcons, pageLabels } from "./pages"
-import { isReservedSettingsTab } from "./route"
+import { pageIcons, pageLabels, showDefaultPermissionSetting } from "./pages"
+import { isReservedSettingsTab, isVisibleSettingsTab } from "./route"
 import type { SettingsSearchResult } from "./search-results"
 import type { SettingsPluginTab, SettingsHostView, SettingsServerTab, SettingsView } from "./surface"
 
@@ -39,6 +39,9 @@ export function settingsSearchIndex(input: {
     project?: string,
     projectName?: string,
   ) => {
+    if (!isVisibleSettingsTab(view.tab)) return
+    if (!showDefaultPermissionSetting && view.target === "settings-auto-accept-permissions") return
+
     const page =
       !server && view.tab === "general" && view.target
         ? `${input.translate(pageLabels.general)} / ${input.translate(entry.section ?? "settings.general.section.general")}`
@@ -52,7 +55,7 @@ export function settingsSearchIndex(input: {
           )
 
     items.push({
-      id: JSON.stringify([server, project, view.tab, view.target, entry.label]),
+      id: JSON.stringify([server, project, view.tab, view.target, view.subtab, entry.label]),
       title: input.translate(entry.label),
       description: entry.description ? input.translate(entry.description) : "",
       keywords: entry.keywords ?? "",
@@ -61,7 +64,7 @@ export function settingsSearchIndex(input: {
       server,
       project,
       projectName,
-      topLevel: !view.target && !project,
+      topLevel: !view.target && !view.subtab && !project,
       icon: pageIcons[view.tab],
       view,
     })
@@ -79,7 +82,7 @@ export function settingsSearchIndex(input: {
     server?: string,
   ) =>
     items.push({
-      id: JSON.stringify([server, undefined, view.tab, view.target, `${item.plugin}:${entry.id}`]),
+      id: JSON.stringify([server, undefined, view.tab, view.target, undefined, `${item.plugin}:${entry.id}`]),
       title: entry.title,
       description: entry.description ?? "",
       keywords: entry.keywords ?? "",
@@ -121,7 +124,7 @@ export function settingsSearchIndex(input: {
 
     if (isReservedSettingsTab(setting.id)) return
 
-    // SAFETY: a SettingsPage without a host page or a reserved id is a plugin tab under its id.
+    // SAFETY: a SettingsPage without a host page is a plugin tab under its id, as `createSettingsPages().tabs` lists.
     const tab = setting.id as SettingsPluginTab
     const page = setting.entries?.find((entry) => entry.id === setting.id)
     addPlugin(item, { ...page, id: setting.id, title: setting.title }, { type: "root", tab }, setting.title, "")
@@ -132,8 +135,8 @@ export function settingsSearchIndex(input: {
   })
   input.servers.forEach((server) => {
     // With several servers, a result names the server its page shows.
-    const view = (tab: SettingsServerTab | "servers", target?: string) =>
-      ({ type: "root", tab, server: multiple ? server.key : undefined, target }) satisfies SettingsHostView
+    const view = (tab: SettingsServerTab | "servers", target?: string, subtab?: SettingsView["subtab"]) =>
+      ({ type: "root", tab, server: multiple ? server.key : undefined, target, subtab }) satisfies SettingsHostView
 
     items.push({
       id: `server:${server.key}`,
@@ -148,7 +151,7 @@ export function settingsSearchIndex(input: {
     })
 
     if (!server.connected || server.key !== input.selected) return
-    serverSettings.forEach((entry) => add(entry, view(entry.tab, entry.target), server.name, server.key))
+    serverSettings.forEach((entry) => add(entry, view(entry.tab, entry.target, entry.subtab), server.name, server.key))
     // Sections on the servers page render with each server's connection.
     plugins.forEach((item) => {
       if (item.value.page !== "servers") return
@@ -182,7 +185,7 @@ export function settingsSearchIndex(input: {
         if (entry.target === "settings-project-color" && project.icon?.override) return
         add(
           entry,
-          { ...destination, target: entry.target },
+          { ...destination, tab: entry.tab, target: entry.target, subtab: entry.subtab },
           `${server.name} · ${name}`,
           server.key,
           project.worktree,

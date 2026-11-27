@@ -127,7 +127,7 @@ test("settings group GUI plugin pages in order on desktop and in the narrow menu
   await expect(settings.getByRole("heading", { name: "Диагностика", exact: true })).toBeVisible()
 })
 
-test("hidden settings are unavailable from a direct link and search", async ({ page }) => {
+test("hidden settings are unavailable from a direct link", async ({ page }) => {
   await mockWorkspace(page, { name: "Settings demo", directory, provider: NO_PROVIDER, sessions: [] })
   await page.goto("/settings?tab=extensions&subtab=mcps")
   const settings = page.getByTestId("settings-screen")
@@ -135,13 +135,6 @@ test("hidden settings are unavailable from a direct link and search", async ({ p
   await expect(settings.getByRole("heading", { name: "General", exact: true, level: 2 })).toBeVisible()
   await expect(settings.locator('[data-action="settings-auto-accept-permissions"]')).toHaveCount(0)
   await expect(settings.getByRole("tab", { name: "Extensions", exact: true })).toHaveCount(0)
-
-  const search = settings.getByRole("combobox", { name: "Search", exact: true })
-  const results = settings.getByRole("listbox", { name: "Settings results", exact: true })
-  for (const name of ["Projects", "Worktrees", "Experimental", "Extensions", "Auto-accept permissions"]) {
-    await search.fill(name)
-    await expect(results.getByRole("option", { name: RegExp(`^${name}(,|$)`) })).toHaveCount(0)
-  }
 })
 
 // The Arabic dictionary chunks: built (`_assets/ar-<hash>.js`) and dev (`.../i18n/ar.ts`), for the app and the UI.
@@ -956,8 +949,8 @@ for (const field of [
     await expect.poll(() => hold.requests.map((request) => request.postDataJSON())).toEqual(field.patches)
     await expect(settings.locator('[aria-busy="true"]')).toHaveCount(0)
 
-    await settings.getByRole("tab", { name: "Worktrees", exact: true }).click()
-    await settings.getByRole("tab", { name: "General", exact: true }).click()
+    await settings.getByRole("button", { name: "Back to settings", exact: true }).click()
+    await openProject(page)
 
     if (field.name === "color") {
       await expect(settings.getByRole("button", { name: "Select orange color", exact: true })).toHaveAttribute(

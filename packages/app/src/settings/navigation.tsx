@@ -2,10 +2,11 @@ import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
 import { Menu } from "@opencode/ui/menu"
 import { Tabs } from "@opencode/ui/tabs"
-import { createEffect, ErrorBoundary, For, on, Show, type ComponentProps, type JSX } from "solid-js"
+import { createEffect, createMemo, ErrorBoundary, For, on, Show, type ComponentProps, type JSX } from "solid-js"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ErrorPage } from "@/shell/errors/error"
 import { CollapsedSidebarToggleSpace } from "@/shell/sidebar-toggle"
+import { isVisibleSettingsTab } from "./route"
 import { useSettingsSurface } from "./surface"
 import { SettingsSearch } from "./search"
 import "./search.css"
@@ -44,7 +45,13 @@ export function SettingsNavigation(props: {
 
   const backLabel = () => (surface.search.canReturn() ? language.t("settings.backToSettings") : props.backLabel)
 
-  const current = () => props.groups.flatMap((group) => group.items).find((item) => item.value === props.value)
+  const groups = createMemo(() =>
+    props.groups.map((group) => ({ ...group, items: group.items.filter((item) => isVisibleSettingsTab(item.value)) })),
+  )
+  const current = () =>
+    groups()
+      .flatMap((group) => group.items)
+      .find((item) => item.value === props.value)
 
   const change = (value: string) => {
     surface.search.clear()
@@ -86,7 +93,7 @@ export function SettingsNavigation(props: {
             <Menu.Portal>
               <Menu.Content class="settings-mobile-menu" onEscapeKeyDown={(event) => event.stopPropagation()}>
                 <Menu.RadioGroup value={props.value} onChange={change}>
-                  <For each={props.groups}>
+                  <For each={groups()}>
                     {(group, index) => (
                       <>
                         <Show when={index() > 0}>
@@ -134,7 +141,7 @@ export function SettingsNavigation(props: {
           </Show>
           <Show when={!searchable() || !surface.search.active()}>
             <Tabs.List class="settings-nav-groups" data-scrollable>
-              <For each={props.groups}>
+              <For each={groups()}>
                 {(group) => (
                   <div class="settings-nav-group">
                     <Show when={group.label || group.action}>
