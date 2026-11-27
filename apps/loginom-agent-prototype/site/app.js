@@ -605,10 +605,7 @@ function chatsMark(list) {
   return sessionMark(list.find(item => item.phase === 'running') || list.find(item => sessionMark(item)) || {})
 }
 function waitingFor(item) {
-  const script = scriptOf(item)
   if (item.phase === 'permission') {
-    const permission = script.permission
-    if (permission.external) return 'ждёт разрешения на отправку данных'
     if (item.kind === 'abc') return 'ждёт разрешения на сохранение'
     if (item.kind === 'node-export') return 'ждёт разрешения на запись CSV'
     return 'ждёт разрешения на создание копии'
@@ -899,10 +896,9 @@ function result(item) {
     <ol class="findings">${salesFindings.map(([title,text],i) => `<li><strong>${esc(title)}</strong>${esc(text)} <button class="link-btn finding-link" data-finding="${i}${item.local ? ':local' : ''}" data-at="${item.index ?? ''}">${icon('flow',14)} Показать на схеме</button></li>`).join('')}${item.rules ? `<li><strong>В модуле нет заметки</strong> о том, что он делает и кто за него отвечает, — ${esc(item.rules.by)}.</li>` : ''}</ol>
     <div class="button-row"><button class="btn primary" data-action="improve-from-check">${icon('wand',15)} Внести улучшения</button><span class="muted">${item.local ? 'Агент загрузит копию в Loginom и изменит её; файл на компьютере не изменится.' : 'Агент изменит копию; исходный пакет изменится, только если вы решите его заменить.'}</span></div></div>`
   if (item.kind === 'enrich') return `<div class="answer-block"><h2>Таблица дополнена</h2><p>Example Data вернул население региона и часовой пояс для 2 391 строки из 2 400; у 9 строк регион пустой — для них сервис ничего не нашёл. Исходная таблица не менялась, дополненная — отдельным файлом.</p>
-    <dl class="result-metrics"><div><dt>Отправлено</dt><dd>1 столбец</dd></div><div><dt>Дополнено</dt><dd>2 391 строка</dd></div><div><dt>Куда</dt><dd>Example Data</dd></div></dl>
+    <dl class="result-metrics"><div><dt>Дополнено</dt><dd>2 391 строка</dd></div></dl>
     <button class="btn quiet" data-action="open-chat-folder">Открыть папку</button></div>`
-  // A question about the service, or a request it cannot serve: what the catalog card says, in words.
-  if (item.kind === 'noenrich') return `<div class="answer-block"><p>Подключение «Внешнее обогащение данных» отправляет выбранные столбцы таблицы в Example Data (api.example-data.example) — это сторонний сервис, не Loginom; что он делает с данными, решают его условия. Перед первой отправкой в разговоре я спрошу вас и покажу, какие столбцы и сколько строк уйдут.</p>
+  if (item.kind === 'noenrich') return `<div class="answer-block"><p>Example Data (api.example-data.example) — сервис данных о регионах. Подключение «Внешнее обогащение данных» дополняет таблицу сведениями из этого сервиса, например населением региона и его часовым поясом.</p>
     <p>${{closed:'Сейчас закрытый контур, а подключению нужен интернет — в Example Data ничего не отправлено.', missing:'Оно не установлено, поэтому я ничего не отправил. Посмотреть и установить — в каталоге.', 'info-missing':'Сейчас оно не установлено — посмотреть и установить можно в каталоге.', info:'Оно установлено: попросите, например, «Дополни таблицу «sales-demo.csv» данными о регионах из Example Data».'}[item.nosend] || ''}</p>
     <button class="btn" data-action="open-enrich">${icon('grid',15)} Открыть в каталоге</button></div>`
   if (item.kind === 'chat' && item.web) return `<div class="answer-block"><p>Открывать сайты мне запрещено: ${item.web}. В разговоре это не разрешить.</p><p>По Loginom могу ответить по справке, которая встроена в приложение.</p></div>`
@@ -1239,12 +1235,9 @@ const scripts = {
     {plan:1, icon:'layers', live:'Возвращаю «Фильтр по дате (ветка «Города»)»', done:'Вернул «Фильтр по дате (ветка «Города»)» как в исходном', short:'вернул узел', detail:'На узел ссылается «Города — неделя.lgp». «Выручка по городам» по-прежнему получает данные от «Проверка пустых значений»', time:5, think:[3,'Узел нужен только для ссылки из «Города — неделя.lgp»: верну его с тем же условием и входом, а «Выручка по городам» пусть берёт данные после проверки.']},
     {plan:2, icon:'check', live:'Сверяю результат с исходным пакетом', done:'Сверил результат с исходным пакетом', short:'сверил результат', detail:'В результате 120 строк, как в исходном; выход «Фильтр по дате (ветка «Города»)» — те же строки, что раньше', time:8},
   ]},
-  // Iteration 9 (run 3, finding 23): data goes to a third-party service only after the user says so — before the first
-  // send in a conversation. «Разрешения» do not rule it: the connection's tool asks (in OpenCode 2 — rule `ask` for the
-  // connection's MCP tools); «Разрешать в этом разговоре» covers the next sends. The question shows the call's arguments.
-  enrich:{plan:['Прочитать таблицу','Отправить в Example Data','Дополнить таблицу'], permission:{external:true, title:'Отправить данные в Example Data?', text:'Example Data — сторонний сервис, не Loginom. Подключение «Внешнее обогащение данных» отправит ему только этот столбец; что сервис делает с данными, решают его условия.', args:[['Сервис','Example Data · api.example-data.example'],['Уйдёт','столбец «Регион», 2 400 строк из «sales-demo.csv»'],['Не уйдёт','дата, товар, количество, цена, выручка']], noInstead:true, trace:'отправить столбец «Регион» (2 400 строк) в Example Data', scope:'отправлять данные в Example Data (api.example-data.example)', denied:'Хорошо, в Example Data ничего не отправил. Без этого сервиса дополнить таблицу не могу.'}, steps:[
-    {plan:0, icon:'database', live:'Читаю таблицу «sales-demo.csv»', done:'Прочитал таблицу «sales-demo.csv»', short:'прочитал таблицу', detail:'2 400 строк, 6 столбцов: дата, товар, регион, количество, цена, выручка; сервису нужен только «Регион»', time:3},
-    {plan:1, icon:'upload', ask:'permission', live:'Отправляю «Регион» в Example Data', done:'Отправил «Регион» в Example Data', short:'отправил столбец «Регион» в Example Data', detail:'api.example-data.example · 2 400 строк; другие столбцы не отправлялись', time:6},
+  enrich:{plan:['Прочитать таблицу','Получить данные о регионах','Дополнить таблицу'], steps:[
+    {plan:0, icon:'database', live:'Читаю таблицу «sales-demo.csv»', done:'Прочитал таблицу «sales-demo.csv»', short:'прочитал таблицу', detail:'2 400 строк, 6 столбцов: дата, товар, регион, количество, цена, выручка', time:3},
+    {plan:1, icon:'database', live:'Получаю данные о регионах из Example Data', done:'Получил данные о регионах из Example Data', short:'получил данные о регионах', time:6},
     {plan:2, icon:'file', live:'Дополняю таблицу', done:'Дополнил таблицу столбцами «Население региона» и «Часовой пояс»', short:'дополнил таблицу', detail:'{folder}', time:4},
   ]},
   noenrich:{steps:[]},
@@ -1337,7 +1330,7 @@ function runSteps(item) {
   // An edit of a copy that exists (follow-up, finishing a stopped edit) does not ask again, but «Запрещено» stops it.
   const editsCopy = item.step === 0 && item.copy && (item.kind === 'keep' && !item.from || item.resumeCopy)
   if (editsCopy && step.ask === 'permission' && !asked) item.cleared.push(item.step)
-  const rule = step.ask === 'permission' && !asked && !editsCopy && !script.permission.external ? state.settings.permissions?.[step.write ?? 'save'] : editsCopy && !asked && state.settings.permissions?.save === 'deny' ? 'deny' : null
+  const rule = step.ask === 'permission' && !asked && !editsCopy ? state.settings.permissions?.[step.write ?? 'save'] : editsCopy && !asked && state.settings.permissions?.save === 'deny' ? 'deny' : null
   if (rule === 'allow') {
     item.decisions.push({at:item.step, choice:'setting'})
     item.cleared.push(item.step)
@@ -2302,7 +2295,7 @@ function review() {
     // Iteration 9 (В-77): findings 10, 22, 23 of the third review run.
     ['Схема пакета — ветви и связи','Откроется «Продажи.lgp»: узлы стоят по ходу данных, связь идёт от выхода узла (справа) ко входу следующего (слева). У «Фильтр строк» два выхода, неподключённый — пустой кружок; ветки «Регионы» и «Города» сходятся в «Результат». «Подмодели» — «Качество данных.lgp»: «Войти в подмодель», назад — «Выйти из подмодели». «Схема правки» — отправьте запрос, в карточке правки — «Посмотреть на схеме»: новые связи зелёные, связи удалённого узла — пунктиром. Если включена демо-политика (карточка 9), агент сначала попросит войти в Loginom организации — уберите её ссылкой «убрать» внизу страницы.',[['try-graph','Начать'],['try-submodel','Подмодели'],['try-improve','Схема правки']]],
     ['«По умолчанию» в «Разрешениях»','Включится демо-политика администратора и откроются «Разрешения»: строки с замком задал администратор, у остальных — «По умолчанию» или «Вы изменили · по умолчанию «Спрашивать»». Поменяйте строку — пометка сменится; «Всё по умолчанию» вернёт всё. Убрать политику — «убрать» внизу этой страницы.',[['try-policy-permissions','Начать']]],
-    ['Данные — стороннему сервису','Откроется «Внешнее обогащение данных» в каталоге: подключение подготовил Loginom, а сервис — Example Data, сторонняя компания; «Куда уходят данные». «Перед отправкой» — разговор: перед первой отправкой агент спросит «Отправить данные в Example Data?» и покажет, что уйдёт и что нет; «Разрешать в этом разговоре» снимает вопрос до конца разговора. Подключение в прототипе поставится само, демо-политика уберётся, лимит бесплатной модели сбросится. Спросите и словами: «Что за сервис Example Data?» — агент ответит, чей он, ничего не отправляя. «В закрытом контуре» включит демо-политику: агент ответит, что подключению нужен интернет.',[['try-enrich','Начать'],['try-enrich-send','Перед отправкой'],['try-enrich-closed','В закрытом контуре']]],
+    ['Внешнее обогащение данных','Откройте подключение в каталоге или отправьте в разговоре готовую просьбу дополнить таблицу данными о регионах из Example Data. Для этого прогона макет сам установит подключение, уберёт демо-политику и сбросит лимит бесплатной модели. На вопрос «Что за сервис Example Data?» агент ответит текстом. «В закрытом контуре» включит демо-политику: агент ответит, что подключению нужен интернет.',[['try-enrich','Открыть в каталоге'],['try-enrich-send','Обогатить таблицу'],['try-enrich-closed','В закрытом контуре']]],
     ['Модели — как в OpenCode 2','Откроется окно «Подключить провайдера», как в OpenCode 2 (В-82): популярные провайдеры и поиск, вход через ChatGPT, GitHub Copilot кодом, ключ API, свой сервер. Вход по подписке в прототипе подтверждаете сами. После «Подключено: … — выберите модель» приложение возвращается в новый разговор с этой моделью. Под демо-политикой администратора окно недоступно — модели задаёт он. В настройках — «Провайдеры» и «Модели», как в OpenCode 2; «Подключить модель» — в меню модели в поле ввода и в блоке «Модель остановила ход».',[['try-connect','Начать'],['try-model-failure','После лимита модели']]],
     ['Копия агента — с вопросом','Агент правит «Продажи». Перед первой копией в разговоре он спросит «Сделать копию «Продажи.lgp» в «Копии агента»?»; «Разрешать в этом разговоре» снимает вопрос и для следующих копий. Копии видны в «+» → «Пакет из Loginom…» → папка «Копии агента» и в «Файлы и шаги» → «Файлы». «С «Запрещено»» — то же, когда в «Разрешениях» сохранение в Loginom запрещено: агент пакет не правит (В-75).',[['try-improve','Начать'],['try-forbid-save','С «Запрещено»']]],
     ['Замена из сохранённой версии','В карточке правки нажмите «Сохранить новой версией», затем «Заменить исходный…». Окно покажет, что «Города — неделя.lgp» сломается, и предложит «Попросить агента оставить узел»: агент сделает копию новой версии и вернёт узел — после этого обе ссылки рабочие.',[['try-improve','Начать']]],
@@ -2346,8 +2339,6 @@ function review() {
   ]
   // Open owner questions, each with a recommendation; empty when everything is decided.
   const questions = [
-    '<strong>Когда спрашивать перед отправкой стороннему сервису.</strong> OpenCode 2 сам предлагает «Разрешить один раз» и «Разрешить всегда» — второе запоминается для проекта навсегда: после одного «да» данные уходят в Example Data из всех разговоров проекта без вопроса. «Разрешать в этом разговоре» в OpenCode 2 нет — делаем сами: правило на один разговор (событие <code>session.permissions</code>) и свой ответ на вопрос; та же доработка нужна остальным строкам «Спрашивать». Рекомендую «один раз» и «в этом разговоре», без «навсегда»: видно, что уходит, и согласие не переходит в другие разговоры.',
-    '<strong>Отметка у подключения к стороннему сервису.</strong> Подключения публикует только Loginom (В-59), так что отметка «Loginom» у них ничего не различает — различает отметка «Сервис: Example Data — сторонняя компания». Варианты: оставить обе, как сейчас; у подключений показывать только отметку сервиса; завести уровень «Сторонний сервис» — но уровни отвечают на вопрос «кто подготовил», и к ним добавится «Организация» (В-61). Рекомендую оставить обе: уровень — общий язык каталога и различит подключения, если они появятся в каталоге организации, а отметка сервиса говорит, куда уходят данные.',
   ]
   const changed = [
     'Итерация 9 (В-77), находки 10, 22, 23 третьего прогона оценки. Схема пакета — как сценарий Loginom: узлы по ходу данных, связи от выхода ко входу, порты (пустой кружок — не подключён), ветви и подмодели с «Войти в подмодель» и «Выйти из подмодели»; на схеме правки новые связи зелёные, связи удалённого узла — пунктиром. В «Разрешениях» под политикой у незапертых строк — «По умолчанию» или «Вы изменили». У «Внешнего обогащения данных» видно, чей сервис и куда уходят данные; перед первой отправкой в разговоре агент спрашивает, а на вопрос о сервисе отвечает словами и ничего не отправляет.',
@@ -2376,6 +2367,8 @@ function review() {
     'Свои навыки и действия живут до перезагрузки страницы.',
   ]
   const chosen = [
+    '<strong>Сторонние сервисы (В-128).</strong> Обогащение выполняется по просьбе пользователя без вопроса перед отправкой данных.',
+    '<strong>Отметка у подключения к стороннему сервису (В-128).</strong> «Loginom» показывает, кто подготовил подключение (В-59). Пометки о передаче данных убраны.',
     'План этапа B и окно моделей (В-83…В-91): <strong>переезд переносом</strong> с коммитом слияния; <strong>Bun 1.4.4</strong>; <strong>дашборды узлов — в паритете</strong>; шлюз B — 25 узлов по 2 из 3 прогонов и перенос данных, проверки через форму Desktop — в шлюзе C; <strong>служба останавливается вместе с приложением</strong>; оценка 45–75 агенто-дней; SDK провайдеров из npm — только в режиме «Интернет»; <strong>«Свой сервер» остаётся</strong> в окне провайдеров; <strong>без рекламы OpenCode Go</strong>.',
     'Шлюз этапа A (В-78…В-81): <strong>ключевые сценарии приняты</strong>; агент — <strong>фоновая служба OpenCode 2 с правкой U5</strong>, своя на продукт и профиль; <strong>сторонние серверные плагины не загружаются</strong> — агента расширяют навыки, действия и подключения из каталога; <strong>итоги spike приняты</strong>: история 0.4 переносится своей командой, оценка этапа B по таблице отчёта — 30–49 агенто-дней.',
     'По третьему прогону оценки: <strong>копия агента — под правилом «Сохранять пакеты в Loginom»</strong>: при «Спрашивать» — вопрос перед первой копией в разговоре, «Копии агента» — папка в окне выбора, копии разговора — в «Файлы и шаги» → «Файлы» (В-75). <strong>Политика может выключить свои навыки</strong>; по умолчанию они работают, «Инструкции» не выключаются (В-76).',
@@ -2855,7 +2848,7 @@ function send(queued = null) {
   // Iteration 9: only a request sends data to the third-party service, with the connection installed and online;
   // a question about the service gets its catalog card in words.
   const aboutEnrich = /обогащ|обогат|example data|внешн\S* сервис/i.test(prompt)
-  const sendAsked = /(?:^|[\s«"])(?:дополни|обогати|сделай обогащение)/i.test(prompt) && !/\?\s*$/.test(prompt)
+  const sendAsked = /(?:^|[\s«"])(?:дополни|обогати|сделай обогащение)(?![а-яё])/i.test(prompt) && !/\?\s*$/.test(prompt)
   const enrich = aboutEnrich && (state.contour === 'closed' ? 'closed' : !hubHasInstalled(state,'cloud') ? (sendAsked ? 'missing' : 'info-missing') : sendAsked ? 'ok' : 'info')
   let kind = web ? 'chat' : enrich ? (enrich === 'ok' ? 'enrich' : 'noenrich') : discussing ? 'discuss' : named ? 'document' : /документ|описан|опиши/i.test(prompt) && (withPackage || (inChat && !/замечани|шаг|подробн/i.test(prompt))) ? 'document'
     // Run 3: the mock cannot find a package by its name in the text — it asks to pick one instead of building ABC.
@@ -3301,7 +3294,7 @@ const actions = {
     state.node = 1
     render()
   },
-  // Iteration 9: the card of the connection to a third-party service, and the question before the first send.
+  // The catalog entry for data enrichment.
   'open-enrich':() => {
     showHubDetail(state, 'cloud')
     navigate('hub')
@@ -3312,8 +3305,7 @@ const actions = {
   },
   'try-enrich-send':() => {
     applyDemoPolicy('')
-    // Only for the prototype: the card is about the question before sending, so a free-model limit spent by card 8
-    // («Лимит модели») is reset, and the connection is installed without the catalog.
+    // The demo installs the connection and resets any limit spent in «Лимит модели».
     const reset = state.limitedModels?.size || state.failModel
     state.limitedModels?.clear()
     state.failModel = false

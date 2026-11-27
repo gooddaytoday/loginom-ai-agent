@@ -145,30 +145,20 @@ export const catalog = [
     description: 'Агент знает руководство по узлам, функциям и работе со сценариями и опирается на него в ответах.',
     evidence: null, prompt: 'Помоги разобраться с узлами Loginom.', can: ['Давать агенту сведения об узлах Loginom'], cannot: [],
   },
-  // Iteration 9 (run 3, finding 23): Loginom made the connection, the service is a third party's — both are shown.
   {
     id: 'cloud', title: 'Внешнее обогащение данных', kind: 'Подключение', icon: 'link', color: 'blue',
     version: '1.0.0', tier: 'official', offline: false, size: '64 КБ',
     keywords: 'обогащение внешний сервис api example data',
-    service: { name: 'Example Data', host: 'api.example-data.example' },
-    description: 'Дополняет записи данными стороннего сервиса Example Data по API.',
-    trust: 'Подключение подготовил Loginom. Сам сервис — Example Data, сторонняя компания: то, что агент ему отправит, она обрабатывает по своим условиям, а не Loginom.',
-    evidence: null, can: ['Отправлять выбранные поля таблицы в сторонний сервис Example Data (api.example-data.example)'],
-    cannot: ['Отправлять данные, пока вы не подтвердили отправку в разговоре'],
+    description: 'Дополняет таблицу сведениями о регионах из Example Data.',
+    trust: 'Подключение подготовил Loginom.',
+    evidence: null, can: ['Дополнять таблицу населением региона и его часовым поясом'], cannot: [],
   },
 ]
 
 export const byId = (id) => catalog.find((item) => item.id === id)
 
-// Who stands behind an item; a connection to a third-party service says whose service gets the data.
 export function trustText(item) {
   return item.trust || tiers[item.tier].explain
-}
-export function serviceBadge(item) {
-  return item.service ? `<span class="hub-service">Сервис: ${item.service.name} — сторонняя компания</span>` : ''
-}
-export function serviceText(item) {
-  return item.service ? `Выбранные поля таблицы уходят в ${item.service.name} (${item.service.host}), не в Loginom. Перед первой отправкой в каждом разговоре агент спросит вас и покажет, какие поля и сколько строк уйдут; «Разрешать в этом разговоре» снимает вопрос до конца разговора.` : ''
 }
 
 export function tierBadge(item, size = '') {

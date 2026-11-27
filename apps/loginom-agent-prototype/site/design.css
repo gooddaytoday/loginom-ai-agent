@@ -612,7 +612,6 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 @container (max-width:351.98px){.graph-scroll-hint.wide-2{display:inline}}
 .graph .canvas-node.is-sub{box-shadow:4px 4px 0 -1px var(--paper),4px 4px 0 0 var(--line),var(--shadow)}
 /* Iteration 9: a connection names the third-party service its data goes to */
-.hub-service{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;line-height:1.2;padding:2px 7px;border-radius:5px;border:1px solid var(--amber);color:var(--amber);background:var(--amber-soft)}
 .change-legend{flex-wrap:wrap;gap:4px 14px}.change-legend span{white-space:nowrap}
 .model-menu .badge{margin-left:6px;padding:1px 6px;font-size:11px;vertical-align:1px}
 
@@ -641,7 +640,7 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .st-menu .st-nav{position:static;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:12px}
 .st-menu-open{justify-self:start}
 .st-instructions-dirty:not([hidden]){color:var(--amber);font-weight:650}
-:is(.st-status,.st-locked small,.st-list-row .st-perm small,.sl-stages small,.sl-tag,.tier,.node-mark,.badge.latest,.model-menu .badge,.package-top>.badge,.hub-type,.hub-installed,.hub-version,.hub-offline-tag,.hub-online-tag,.hub-change,.hub-service){font-size:12px}
+:is(.st-status,.st-locked small,.st-list-row .st-perm small,.sl-stages small,.sl-tag,.tier,.node-mark,.badge.latest,.model-menu .badge,.package-top>.badge,.hub-type,.hub-installed,.hub-version,.hub-offline-tag,.hub-online-tag,.hub-change){font-size:12px}
 :is(button,input,select,textarea,summary,a[href]):focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 @media(max-width:1000px){
   .st-layout{grid-template-columns:minmax(0,1fr);gap:14px}
