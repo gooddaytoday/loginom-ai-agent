@@ -242,6 +242,15 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.notEqual(cardReply.isError,true,JSON.stringify(cardReply));
     const card=JSON.parse(cardReply.content[0].text).node_types[0];
     assert.match(card.guidance,/Сортировка/);assert.deepEqual(card.guidance_modes,['keys']);
+
+    const crossTableReply=await client.callTool({name:'dock_action_describe',arguments:{node_types:['transform.cross_table'],modes:['pivot']}});
+    assert.notEqual(crossTableReply.isError,true,JSON.stringify(crossTableReply));
+    const [crossTableCard]=JSON.parse(crossTableReply.content[0].text).node_types;
+    assert.equal(crossTableCard.type,'transform.cross_table');
+    const crossTableCardBytes=Buffer.byteLength(JSON.stringify(crossTableCard));
+    assert.ok(crossTableCardBytes<=12000,`CrossTable card is ${crossTableCardBytes} bytes`);
+    assert.match(crossTableCard.semantics,/name: M_2026_01, label: 2026-01/);
+
     const invalidMode=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,mode:'invented'}});
     assert.equal(JSON.parse(invalidMode.content[0].text).error.code,'REQUEST_REJECTED');
     assert.equal(browserCalls.length,beforeDescription,'mode validation remains before mutation');
