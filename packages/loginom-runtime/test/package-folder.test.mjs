@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { runInNewContext } from "node:vm"
-import { withPackageFolderSession, withPackageUploadSession } from "../src/package-folder.mjs"
+import { withPackageDownloadSession, withPackageFolderSession, withPackageUploadSession } from "../src/package-folder.mjs"
 
 const origin = "https://stand.example.test"
 const folder = "/user"
@@ -67,10 +67,11 @@ function fixture() {
     },
   }
   const evaluate = (fn, input) => runInNewContext(`(${fn})(input)`, {
-    Date, atob, input, location: new URL(origin),
+    Date, atob, btoa, input, location: new URL(origin),
     ReleaseObject: (value, awaited) => { assert.equal(awaited, true); released.push(value) },
     bg: {
       app: { Application: { FInstance: app } },
+      TBGFileOpenMode: { fomRead: 0 },
       selectAllAsync: async (items, project) => {
         if (!Array.isArray(items)) throw Error("unknown collection")
         if (items.length) project(items[0])
@@ -179,4 +180,28 @@ test("uploads exact bytes as a copy and never overwrites an existing package", a
     assert.deepEqual(Buffer.concat(files.get(path)), bytes)
     assert.deepEqual(f.events, [["logout"], ["close browser"]])
   }
+})
+
+test("reads the exact stored package without writing, and releases it before logout", async () => {
+  const browser = fixture()
+  const path = "/common/Продажи.lgp"
+  const expected = Buffer.concat([Buffer.alloc(512 * 1024, 47), Buffer.from("saved package")])
+  const info = { Size: expected.length }
+  let offset = 0
+  const stream = {
+    ReadBuffer(chunk) {
+      chunk.set(expected.subarray(offset, offset + chunk.length))
+      offset += chunk.length
+    },
+  }
+  browser.storage.OpenFile = (name, mode) => {
+    assert.equal(name, path)
+    assert.equal(mode, 0)
+    return stream
+  }
+  browser.storage.GetFileInfo = (name) => (name === path ? info : null)
+  const downloaded = await withPackageDownloadSession({ login: browser.login, origin, username, path, maxBytes: expected.length })
+  assert.deepEqual(Buffer.from(downloaded, "base64"), expected)
+  assert.deepEqual(browser.released, [info, stream])
+  assert.deepEqual(browser.events, [["logout"], ["close browser"]])
 })

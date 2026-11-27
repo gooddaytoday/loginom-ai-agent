@@ -7,7 +7,7 @@ import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
 import { DashboardRead } from "./dashboard"
-import { ReadFolder } from "./package-folder"
+import { ReadFolder, ReadStoredPackage } from "./package-folder"
 import { UploadInput } from "./package-upload"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
@@ -135,7 +135,7 @@ async function dispatch(message: unknown) {
       reply({ id: message.id, result })
       return
     }
-    if (message.method === "packages.list" || message.method === "packages.upload" || message.method === "packages.cancel") {
+    if (message.method === "packages.list" || message.method === "packages.upload" || message.method === "packages.variables" || message.method === "packages.cancel") {
       if (!input || typeof input !== "object" || !("requestId" in input) || typeof input.requestId !== "string")
         throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
       if (message.method === "packages.cancel") {
@@ -149,7 +149,9 @@ async function dispatch(message: unknown) {
       try {
         const result = message.method === "packages.upload"
           ? await state.host.uploadPackage(Schema.decodeUnknownSync(UploadInput)(input), controller.signal)
-          : await state.host.readPackageFolder(Schema.decodeUnknownSync(ReadFolder)(input), controller.signal)
+          : message.method === "packages.variables"
+            ? await state.host.readPackageVariables(Schema.decodeUnknownSync(ReadStoredPackage)(input), controller.signal)
+            : await state.host.readPackageFolder(Schema.decodeUnknownSync(ReadFolder)(input), controller.signal)
         reply({ id: message.id, result })
       } finally {
         folderReads.delete(input.requestId)

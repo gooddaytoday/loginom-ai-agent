@@ -26,6 +26,12 @@ export const ReadFolder = Schema.Struct({
 })
 export type ReadFolder = typeof ReadFolder.Type
 
+export const ReadStoredPackage = Schema.Struct({
+  path: Package.fields.path,
+  generation: ReadFolder.fields.generation,
+})
+export type ReadStoredPackage = typeof ReadStoredPackage.Type
+
 const decodeListing = Schema.decodeUnknownOption(FolderListing, { onExcessProperty: "error" })
 export function decodeFolderListing(value: unknown, folder: string): FolderListing {
   const result = decodeListing(value)

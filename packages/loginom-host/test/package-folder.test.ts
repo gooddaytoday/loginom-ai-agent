@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, rm, symlink } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createLoginomHost } from "../src/host"
@@ -7,7 +7,7 @@ import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
 import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
 
-test("reading a package folder disposes its temporary runtime while the conversation keeps running", async () => {
+test("reading packages disposes temporary runtimes while the conversation keeps running", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "package-folder-"))
@@ -18,21 +18,27 @@ test("reading a package folder disposes its temporary runtime while the conversa
     await mkdir(join(resources, "bin"))
     await symlink(node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
     await Bun.write(join(resources, "resource-manifest.json"), "{}")
+    const fixture = new URL("../../../evals/tasks/node-evals/crosstable-local-variable-bindings/reference.lgp", import.meta.url)
+    const bytes = await readFile(fixture)
     await Bun.write(
       join(resources, "runtime/src/managed-entry.mjs"),
       `
-      import { mkdirSync, writeFileSync } from "node:fs";
+      import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
       import { join } from "node:path";
       let started;
       process.on("message", message => {
         const reply = result => process.send({ id: message.id, result });
         if (message.operation === "start") {
-          const { stateDir, generation, chat, packageFolder, headless } = message.input;
+          const { stateDir, generation, chat, packageFolder, packageDownload, headless } = message.input;
           const profile = join(stateDir, "generations", String(generation), "chats", chat);
           mkdirSync(profile, { recursive: true });
           writeFileSync(join(profile, "browser-profile"), "fixture");
           started = { protocol: 1, generation };
           if (packageFolder && headless !== true) throw Error("picker opened a browser window");
+          if (packageDownload) {
+            if (packageDownload.path !== "/common/Продажи.lgp") throw Error("unexpected package");
+            return reply({ ...started, downloaded: readFileSync(new URL("./fixture.lgp", import.meta.url)).toString("base64") });
+          }
           return reply(packageFolder
             ? { ...started, listing: { folder: packageFolder, entries: [], slow: false } }
             : { ...started, ready: true, chat });
@@ -43,6 +49,7 @@ test("reading a package folder disposes its temporary runtime while the conversa
       });
     `,
     )
+    await Bun.write(join(resources, "runtime/src/fixture.lgp"), bytes)
     const codec = credentials("linux")
     const store = connectionStore(join(root, "connection"), codec)
     await store.stage({
@@ -62,6 +69,11 @@ test("reading a package folder disposes its temporary runtime while the conversa
         folder: "/common",
         entries: [],
         slow: false,
+      })
+      await expect(host.readPackageVariables({ path: "/common/Продажи.lgp", generation: 2 })).rejects.toThrow("LOGINOM_GENERATION_UNAVAILABLE")
+      expect(await host.readPackageVariables({ path: "/common/Продажи.lgp", generation: 1 })).toMatchObject({
+        source: "saved",
+        usages: expect.arrayContaining([expect.objectContaining({ name: "GroupLimit" })]),
       })
       expect(await readdir(join(root, "package-list", "generations", "1", "chats"))).toEqual([])
       expect(await readdir(join(root, "runtime", "generations", "1", "chats"))).toEqual(["conversation"])

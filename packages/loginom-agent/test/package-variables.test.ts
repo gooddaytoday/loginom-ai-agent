@@ -3,7 +3,8 @@ import { copyFile, mkdtemp, readFile, realpath, rm, symlink } from "node:fs/prom
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { packageVariablesHandler, packageVariablesMetadata, packageVariablesRpc } from "../src/package-variables"
+import { packageVariablesHandler, packageVariablesMetadata } from "../src/package-variables"
+import { packageVariablesRpc } from "../src/package-variables-contract"
 
 const fixture = new URL("../../../evals/tasks/node-evals/crosstable-local-variable-bindings/reference.lgp", import.meta.url)
 
@@ -17,6 +18,7 @@ test("variables RPC reads a saved file only in the conversation's location and h
       directory,
       sessionDirectory: async (sessionID) => sessionID === "local" ? directory : "/another/location",
       canRead: async (_sessionID, resources) => !resources.includes("denied.lgp"),
+      readStored: async () => { throw Error("Not a Loginom storage request") },
     })
     const call: Parameters<typeof variables>[1] = {
       signal: new AbortController().signal,

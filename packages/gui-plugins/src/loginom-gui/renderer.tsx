@@ -4,13 +4,14 @@ import { createSignal, lazy, Suspense } from "solid-js"
 import { PackagePicker, type PackageAction, type PackageInput } from "./contract"
 import type definition from "./index"
 import { History, remember, type Package } from "./package-model"
+import type { Connection } from "./package-rpc"
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   const Settings = lazy(() => import("./page"))
   const Picker = lazy(() => import("./package-picker"))
   const Packages = lazy(() => import("./packages-page"))
   const history = ctx.storage.store("packages-recent", { schema: History, initial: { connection: "", items: [] } })
-  const [selected, setSelected] = createSignal<Package>()
+  const [selected, setSelected] = createSignal<{ entry: Package; connection: Connection }>()
   const [prefill, setPrefill] = createSignal<File>()
   const [actions, setActions] = createSignal<readonly PackageAction[]>([])
 
@@ -19,7 +20,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     showPage?: () => void
     upload?: true
     file?: File
-    select?: (input: PackageInput) => void
+    select?: (input: PackageInput, connection?: Connection) => void
   }) {
     ctx.dialogs.open((dialog) => (
       <Suspense>
@@ -38,27 +39,27 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
           select={(input, connection) => {
             if (input.kind === "loginom" && connection) {
               history.update((draft) => {
-                draft.items = remember(draft.connection === connection ? draft.items : [], {
+                draft.items = remember(draft.connection === connection.key ? draft.items : [], {
                   package: input.package,
                   usedAt: Date.now(),
                   ...(options.action ? { action: options.action.title } : {}),
                 })
-                draft.connection = connection
+                draft.connection = connection.key
               })
             }
             dialog.close()
             options.action?.run(input)
-            options.select?.(input)
+            options.select?.(input, connection)
           }}
         />
       </Suspense>
     ))
   }
 
-  const openPackage = (input: PackageInput) => {
-    if (input.kind === "loginom") {
+  const openPackage = (input: PackageInput, connection?: Connection) => {
+    if (input.kind === "loginom" && connection) {
       setPrefill(undefined)
-      setSelected(input.package)
+      setSelected({ entry: input.package, connection })
     }
     if (input.kind === "file") setPrefill(input.file)
   }
@@ -81,8 +82,8 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       const showPage = () => openPage("packages")
       open({
         showPage,
-        select: (input) => {
-          openPackage(input)
+        select: (input, connection) => {
+          openPackage(input, connection)
           showPage()
         },
       })

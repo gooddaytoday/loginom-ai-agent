@@ -3,9 +3,11 @@ import { For, Show } from "solid-js"
 import type { PackageAction } from "./contract"
 import type definition from "./index"
 import type { Package } from "./package-model"
+import { PackageVariables } from "./package-variables"
+import type { Connection } from "./package-rpc"
 
 export default function Packages(props: {
-  selected?: Package
+  selected?: { entry: Package; connection: Connection }
   file?: File
   actions: readonly PackageAction[]
   choose: () => void
@@ -35,25 +37,26 @@ export default function Packages(props: {
             </div>
           )}
         </Show>
-        <Show when={props.selected} fallback={<p class="text-text-weak">{ctx.t("packages.noSelection")}</p>}>
-          {(entry) => (
+        <Show when={props.selected} keyed fallback={<p class="text-text-weak">{ctx.t("packages.noSelection")}</p>}>
+          {({ entry, connection }) => (
             <section class="rounded-xl border border-border-weak-base p-4">
               <div class="flex items-start gap-3">
                 <ui.Icon name="file-document" />
                 <div class="min-w-0 break-all">
-                  <h2 class="text-16-medium">{entry().name}</h2>
-                  <p class="text-12-regular text-text-weak">{entry().path}</p>
+                  <h2 class="text-16-medium">{entry.name}</h2>
+                  <p class="text-12-regular text-text-weak">{entry.path}</p>
                 </div>
               </div>
               <div class="mt-4 grid min-h-40 place-items-center rounded-lg border border-dashed border-border-weak-base p-3 text-text-weak">
                 {ctx.t("packages.diagram")}
               </div>
+              <PackageVariables load={(signal) => connection.variables(entry.path, signal)} />
             </section>
           )}
         </Show>
         <section class="flex flex-col gap-2">
           <h2 class="text-16-medium">{ctx.t("packages.actions")}</h2>
-          <Show when={props.selected}>
+          <Show when={props.selected?.entry}>
             {(entry) => (
               <div class="grid gap-2 sm:grid-cols-2">
                 <For each={props.actions} fallback={<p class="text-text-weak">{ctx.t("packages.noActions")}</p>}>

@@ -1,4 +1,5 @@
 import { Definition as ListRpc } from "@loginom-ai-agent/loginom-agent/package-list"
+import { packageVariablesRpc } from "@loginom-ai-agent/loginom-agent/package-variables"
 import type { Package as ServerPackage } from "@loginom-ai-agent/loginom-host/package-folder"
 import { Definition } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { UploadRpc } from "@loginom-ai-agent/loginom-host/package-upload"
@@ -24,6 +25,10 @@ export async function packageConnection(client: NonNullable<ReturnType<typeof lo
   const rpc = client.rpc(ListRpc)
   return {
     key: JSON.stringify([result.value.url, result.value.username]),
+    variables: (path: string, signal: AbortSignal) =>
+      client.rpc(packageVariablesRpc)
+        .variables({ path, generation: result.value.generation }, { signal })
+        .then((reply) => reply.snapshot),
     list: async (folder: string, signal: AbortSignal): Promise<Listing> => {
       const result = await rpc.list({ folder }, { signal })
       return {

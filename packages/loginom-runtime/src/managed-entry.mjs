@@ -210,6 +210,11 @@ async function handle(message) {
           username: input.connection.username,
           signal: state.startupController.signal,
         }
+        if (input.packageDownload) {
+          const downloaded = await packageReader.withPackageDownloadSession({ ...storage, ...input.packageDownload })
+          send({ id: message.id, result: { downloaded, protocol: 1, generation: input.generation } })
+          return
+        }
         if (input.packageUpload) {
           const uploaded = await packageReader.withPackageUploadSession({ ...storage, upload: input.packageUpload, temporary: input.chat })
           send({ id: message.id, result: { uploaded, protocol: 1, generation: input.generation } })

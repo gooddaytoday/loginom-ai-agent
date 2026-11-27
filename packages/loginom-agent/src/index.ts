@@ -25,7 +25,8 @@ import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
 import { packageDocs } from "./package-docs"
-import { packageVariablesHandler, packageVariablesRpc } from "./package-variables"
+import { packageVariablesHandler } from "./package-variables"
+import { packageVariablesRpc } from "./package-variables-contract"
 import {
   classify,
   declinedText,
@@ -534,6 +535,7 @@ export default Plugin.define({
           () => undefined,
         ),
         canRead: async (sessionID, resources) => (await rules({ sessionID }, "read", resources)) === undefined,
+        readStored: ServiceHost.readPackageVariables,
       }),
     })
     await ctx.rpc.register(Packages, packageListHandlers())

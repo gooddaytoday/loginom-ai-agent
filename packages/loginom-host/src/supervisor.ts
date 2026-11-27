@@ -20,6 +20,7 @@ export type Launch = {
   validation?: boolean
   packageFolder?: string
   packageUpload?: UploadInput
+  packageDownload?: { path: string; maxBytes: number }
   // Host-owned HTTP cache only; browser profiles and authentication remain fresh.
   validationHttpCache?: boolean
   validationLogout?: boolean
@@ -128,7 +129,7 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
   const ready = runtime.ready
   if (
     input.packageFolder !== undefined
-      ? !((input.packageUpload ? "uploaded" : "listing") in ready)
+      ? !((input.packageDownload ? "downloaded" : input.packageUpload ? "uploaded" : "listing") in ready)
       : input.validation
         ? !("checked" in ready) || ready.checked !== true
         : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat

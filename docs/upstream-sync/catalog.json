@@ -107,6 +107,7 @@
         "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts",
         "packages/app/src/composer/composer.tsx", "packages/app/src/composer/editor/editor.tsx",
         "packages/app/src/runtime/plugin/host.tsx", "packages/app/e2e/utils/mock-server.ts",
+        "packages/app/e2e/regression/tabs.spec.ts",
         "packages/plugin/src/gui/builtin.ts"
       ]
     },

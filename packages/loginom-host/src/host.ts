@@ -17,8 +17,8 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
-import { decodeFolderListing, Package, ReadFolder } from "./package-folder"
-import { UploadInput, validUpload } from "./package-upload"
+import { decodeFolderListing, Package, ReadFolder, ReadStoredPackage } from "./package-folder"
+import { MAX_PACKAGE_BYTES, UploadInput, validUpload } from "./package-upload"
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
 export async function verifyInstallationResources(options: {
@@ -367,7 +367,7 @@ export async function createLoginomHost(options: {
   async function launch(
     connection: ActiveConnection,
     chat: string,
-    purpose: "validation" | "dashboard" | "chat" | { packageFolder: string; upload?: UploadInput },
+    purpose: "validation" | "dashboard" | "chat" | { packageFolder: string; upload?: UploadInput; download?: string },
     signal?: AbortSignal,
     deadline?: number,
     validationHttpCache = false,
@@ -471,6 +471,9 @@ export async function createLoginomHost(options: {
         validation,
         packageFolder,
         packageUpload: typeof purpose === "object" ? purpose.upload : undefined,
+        packageDownload: typeof purpose === "object" && purpose.download
+          ? { path: purpose.download, maxBytes: MAX_PACKAGE_BYTES }
+          : undefined,
         validationHttpCache: httpCache,
         validationLogout,
         // CLI supplies its explicit browser policy for background launches too.
@@ -642,16 +645,20 @@ export async function createLoginomHost(options: {
     }
   }
   const packageReads = new Map<AbortController, Promise<unknown>>()
-  function packageStorage(input: ReadFolder | UploadInput, signal?: AbortSignal) {
+  function packageStorage(input: ReadFolder | UploadInput | ReadStoredPackage, signal?: AbortSignal) {
     const controller = new AbortController()
     const pending = performPackageStorage(input, signal ? AbortSignal.any([signal, controller.signal]) : controller.signal)
     packageReads.set(controller, pending)
     void pending.finally(() => packageReads.delete(controller)).catch(() => undefined)
     return pending
   }
-  async function performPackageStorage(input: ReadFolder | UploadInput, signal: AbortSignal) {
+  async function performPackageStorage(input: ReadFolder | UploadInput | ReadStoredPackage, signal: AbortSignal) {
     signal.throwIfAborted()
-    const purpose = "folder" in input ? { packageFolder: input.folder } : { packageFolder: "/user", upload: input }
+    const purpose = "folder" in input
+      ? { packageFolder: input.folder }
+      : "path" in input
+        ? { packageFolder: input.path.slice(0, input.path.lastIndexOf("/")), download: input.path }
+        : { packageFolder: "/user", upload: input }
     const chat = randomUUID()
     const lease = service.acquire(chat)
     if (!lease) throw Error("LOGINOM_CONNECTION_NOT_READY")
@@ -664,7 +671,9 @@ export async function createLoginomHost(options: {
       await runtime.close()
       cleanupConfirmed = true
       signal.throwIfAborted()
-      return "listing" in runtime.ready ? runtime.ready.listing : "uploaded" in runtime.ready ? runtime.ready.uploaded : undefined
+      if ("listing" in runtime.ready) return runtime.ready.listing
+      if ("uploaded" in runtime.ready) return runtime.ready.uploaded
+      if ("downloaded" in runtime.ready) return runtime.ready.downloaded
     } catch (error) {
       if (error instanceof Error && error.message === "LOGINOM_RUNTIME_CLEANUP_FAILED") cleanupConfirmed = false
       if (!cleanupConfirmed) shutdown.failed = true
@@ -725,6 +734,18 @@ export async function createLoginomHost(options: {
     async readPackageFolder(input: ReadFolder, signal?: AbortSignal) {
       if (!Schema.is(ReadFolder)(input)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
       return decodeFolderListing(await packageStorage(input, signal), input.folder)
+    },
+    async readPackageVariables(input: ReadStoredPackage, signal?: AbortSignal) {
+      if (!Schema.is(ReadStoredPackage)(input)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      const content = await packageStorage(input, signal)
+      if (typeof content !== "string" || content.length > 4 * Math.ceil(MAX_PACKAGE_BYTES / 3))
+        throw Error("LOGINOM_REPLY_INVALID")
+      const bytes = Buffer.from(content, "base64")
+      if (bytes.length > MAX_PACKAGE_BYTES || bytes.toString("base64") !== content) throw Error("LOGINOM_REPLY_INVALID")
+      const { extractPackageVariables } = await import("./package-docs/extract")
+      const snapshot = await extractPackageVariables(bytes)
+      signal?.throwIfAborted()
+      return snapshot
     },
     async uploadPackage(input: UploadInput, signal?: AbortSignal) {
       if (!Schema.is(UploadInput)(input) || !validUpload(input)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")

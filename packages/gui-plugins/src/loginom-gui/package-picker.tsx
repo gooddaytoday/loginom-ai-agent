@@ -6,7 +6,7 @@ import { createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "s
 import type { PackageInput } from "./contract"
 import type definition from "./index"
 import { matches, visible, type Folder, type Package, type Recent } from "./package-model"
-import { loginomClient, packageConnection } from "./package-rpc"
+import { loginomClient, packageConnection, type Connection } from "./package-rpc"
 
 const PERSONAL = "/user"
 const SHARED = "/common"
@@ -19,7 +19,7 @@ export default function Picker(props: {
   initialFile?: File
   acceptsFile: boolean
   recent: (key: string) => readonly Recent[]
-  select: (selection: PackageInput, key?: string) => void
+  select: (selection: PackageInput, connection?: Connection) => void
   showPage?: () => void
   close: () => void
 }) {
@@ -85,7 +85,7 @@ export default function Picker(props: {
     props.close()
     ctx.layout.settings("loginom")
   }
-  const choose = (entry: Package) => props.select({ kind: "loginom", package: entry }, connected()?.key)
+  const choose = (entry: Package) => props.select({ kind: "loginom", package: entry }, connected())
 
   function changeFile(input: HTMLInputElement) {
     const candidate = input.files?.item(0)
@@ -107,7 +107,7 @@ export default function Picker(props: {
     setFileError(undefined)
     try {
       const entry = await current.upload(candidate, AbortSignal.any([upload.signal, AbortSignal.timeout(150_000)]))
-      if (!upload.signal.aborted) props.select({ kind: "loginom", package: entry }, current.key)
+      if (!upload.signal.aborted) props.select({ kind: "loginom", package: entry }, current)
     } catch {
       if (!upload.signal.aborted) setFileError("packages.uploadFailed")
     } finally {

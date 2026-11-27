@@ -154,6 +154,44 @@ export async function withPackageFolderSession({ login, folder, origin, username
   })
 }
 
+export async function withPackageDownloadSession({ login, origin, username, signal, path, maxBytes }) {
+  if (!isPackageFolder(path) || !/\.lgp$/i.test(path)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+  return withPackageStorage({ login, origin, username }, async page => {
+    const content = await bounded(() => page.evaluate(async ({ origin, username, path, maxBytes }) => {
+      const mapTree = () => globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree
+      const connection = mapTree()?.FServerConnection
+      const session = connection?.Session
+      const ownsSession = () => location.origin === origin && connection?.Connected === true
+        && connection.UserName === username && mapTree()?.FServerConnection === connection && connection.Session === session
+      if (!session || !ownsSession()) return null
+      const storage = await session.get_FileStorage()
+      if (!ownsSession()) return null
+      const stream = await storage.OpenFile(path, bg.TBGFileOpenMode.fomRead)
+      try {
+        const info = await storage.GetFileInfo(path)
+        if (!info) return null
+        let size
+        try { size = await info.Size } finally { await ReleaseObject(info, true) }
+        if (!Number.isSafeInteger(size) || size <= 0 || size > maxBytes) return null
+        const bytes = new Uint8Array(size)
+        for (let offset = 0; offset < size; offset += 512 * 1024) {
+          if (!ownsSession()) return null
+          await stream.ReadBuffer(bytes.subarray(offset, offset + 512 * 1024))
+        }
+        if (!ownsSession()) return null
+        let encoded = ""
+        for (let offset = 0; offset < size; offset += 48 * 1024)
+          encoded += btoa(String.fromCharCode(...bytes.subarray(offset, offset + 48 * 1024)))
+        return encoded
+      } finally {
+        await ReleaseObject(stream, true)
+      }
+    }, { origin, username, path, maxBytes }), 60_000, signal)
+    if (content === null) throw Error("LOGINOM_PACKAGE_DOWNLOAD_UNCONFIRMED")
+    return content
+  })
+}
+
 export async function withPackageUploadSession({ login, origin, username, signal, upload, temporary }) {
   return withPackageStorage({ login, origin, username }, async page => {
     const saved = await bounded(() => page.evaluate(async ({ origin, username, name, content, temporary }) => {

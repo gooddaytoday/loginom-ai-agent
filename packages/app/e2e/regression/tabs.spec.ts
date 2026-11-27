@@ -51,6 +51,33 @@ for (const viewport of [
     }
     const first = { ...sales, name: "Баланс.lgp", path: "/user/Баланс.lgp", modified: "2026-11-21T12:00:00Z" }
     const copy = { ...first, name: "Копия.lgp", path: "/user/Копия.lgp", size: 4 }
+    const variables = {
+      source: "saved",
+      definitionsCoverage: "complete",
+      usagesCoverage: "partial",
+      definitions: [{ name: "Дата отчёта", type: "Дата" }, { name: "Режим", type: "Строка" }],
+      defaults: [{ name: "Дата отчёта", value: "2026-11-27" }, { name: "Режим", value: "Сводка" }],
+      usages: [
+        {
+          name: "Дата отчёта",
+          kind: "binding",
+          scope: "control",
+          module: "sales",
+          branch: [],
+          nodeID: "node-filter",
+          nodeLabel: "Фильтр продаж",
+          parameter: "Условие",
+        },
+      ],
+    }
+    const emptyVariables = {
+      source: "window",
+      definitionsCoverage: "complete",
+      usagesCoverage: "complete",
+      definitions: [],
+      defaults: [],
+      usages: [],
+    }
     const entry = (item: typeof sales) => ({
       kind: "package",
       name: item.name,
@@ -93,6 +120,12 @@ for (const viewport of [
         if (request.id === "loginom.package-upload" && request.method === "upload") {
           calls.push(request.payload)
           return entry(copy)
+        }
+        if (request.id === "loginom.package" && request.method === "variables") {
+          calls.push(request.payload)
+          const selection = request.payload
+          if (!selection || typeof selection !== "object" || !("path" in selection)) return
+          return { snapshot: selection.path === archive.path ? variables : selection.path === copy.path ? emptyVariables : null }
         }
         if (request.id !== "loginom.packages") return
         calls.push(request.payload)
@@ -145,6 +178,35 @@ for (const viewport of [
     await expect(page.getByRole("heading", { name: "Архив.lgp" })).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath("packages.png") })
 
+    const variableWidth = viewport.width === 390 ? 390 : 1280
+    await page.setViewportSize({ width: variableWidth, height: viewport.height })
+    const variablesToggle = page.getByText("Переменные", { exact: true })
+    const table = page.getByRole("table", { name: "Переменные" })
+    const savedSelection = { path: archive.path, generation: 1 }
+    expect(calls).not.toContainEqual(savedSelection)
+    await variablesToggle.click()
+    await expect(page.getByText("Из сохранённого файла · список может быть неполным")).toBeVisible()
+    await expect(table.getByRole("columnheader")).toHaveText(["Имя", "Тип", "Значение", "Где используется"])
+    const reportDate = table.getByRole("row", { name: /Дата отчёта/ })
+    await expect(reportDate.getByText("Дата", { exact: true })).toBeVisible()
+    await expect(reportDate.getByText("2026-11-27", { exact: true })).toBeVisible()
+    await expect(reportDate.getByText("Фильтр продаж · Условие", { exact: true })).toBeVisible()
+    await expect(reportDate.getByRole("link")).toHaveCount(0)
+    const mode = table.getByRole("row", { name: /Режим/ })
+    await expect(mode.getByText("Сводка", { exact: true })).toBeVisible()
+    await expect(mode.getByRole("cell", { name: "—", exact: true })).toBeVisible()
+    const name = await reportDate.getByText("Дата отчёта", { exact: true }).boundingBox()
+    const value = await reportDate.getByText("2026-11-27", { exact: true }).boundingBox()
+    if (!name || !value) throw Error("Visible variable cells are missing")
+    if (variableWidth === 390) expect(value.y).toBeGreaterThan(name.y + name.height)
+    if (variableWidth === 1280) {
+      expect(value.y).toBeLessThan(name.y + name.height)
+      const header = await table.getByRole("columnheader", { name: "Имя", exact: true }).boundingBox()
+      expect(header?.width).toBeGreaterThan(1)
+    }
+    expect(calls).toContainEqual(savedSelection)
+    await page.screenshot({ path: testInfo.outputPath(`package-variables-${variableWidth}.png`) })
+
     await page.getByRole("button", { name: "Из Loginom" }).click()
     await expect(
       picker.getByRole("region", { name: "Недавние" }).getByRole("button", { name: /Архив\.lgp/ }),
@@ -158,6 +220,12 @@ for (const viewport of [
     await upload.getByRole("button", { name: "Загрузить копию и открыть" }).click()
     await expect(page.getByRole("heading", { name: "Копия.lgp" })).toBeVisible()
     expect(calls).toContainEqual({ content: "ZGVtbw==", name: "Копия.lgp", generation: 1 })
+    await expect(table).toHaveCount(0)
+    await variablesToggle.click()
+    await expect(page.getByText("Из окна", { exact: true })).toBeVisible()
+    await expect(page.getByText("В пакете нет переменных", { exact: true })).toBeVisible()
+    await expect(page.getByText("список может быть неполным", { exact: false })).toHaveCount(0)
+    await expect(table).toHaveCount(0)
     await page.reload()
     await page.getByRole("button", { name: "Из Loginom" }).click()
     const recents = picker.getByRole("region", { name: "Недавние" })
