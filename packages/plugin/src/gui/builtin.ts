@@ -35,6 +35,54 @@ export function onIdle(fn: () => void) {
   return () => clearTimeout(id)
 }
 
+/** The live state and display options of a tool call in the timeline. */
+export interface ToolRendererProps {
+  /** The tool's name in the transcript. */
+  readonly tool: string
+  /** The registered display title, which can follow the window's locale. */
+  readonly title: string
+  /** The tool's input fields, including partial input while streaming. */
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- A renderer decodes the input for its own tool.
+  readonly input: Readonly<Record<string, unknown>>
+  /** Tool-specific data attached to this call. */
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- A renderer decodes the metadata for its own tool.
+  readonly metadata: Readonly<Record<string, unknown>>
+  /** The call's current status. */
+  readonly status?: string
+  /** The output text, once available. */
+  readonly output?: string
+  /** Whether disclosure starts open. */
+  readonly defaultOpen?: boolean
+  /** The current disclosure state, if controlled by the timeline. */
+  readonly open?: boolean
+  /** Saves the user's disclosure choice in the timeline. */
+  readonly onOpenChange?: (open: boolean) => void
+}
+
+/** A built-in plugin's renderer for one tool it owns. */
+export interface ToolRenderer {
+  /** The exact tool name in the transcript. OpenCode's own names are reserved. */
+  readonly tool: string
+  /** A display title. Use a getter for a localized title. */
+  readonly title: string
+  /** Keep visible calls on their own rows, even when tool activity is grouped. */
+  readonly separate?: boolean
+  /**
+   * Draws a call under the plugin context. The host shows its tool error card if this throws.
+   * @param props - Live call data and the timeline's display options.
+   */
+  render(props: ToolRendererProps): JSX.Element
+}
+
+/**
+ * The tool renderer registry for built-in plugins. Register once in setup; unloading the plugin withdraws the item.
+ * @example
+ * ```ts
+ * ctx.add(ToolRenderer, { tool: "example_action", title: ctx.t("action"), separate: true, render })
+ * ```
+ */
+export const ToolRenderer = Registry.define<ToolRenderer>("tool.renderer")
+
 /** A `Command` with the fields only built-ins set. */
 export interface BuiltinCommand extends Command {
   /**
@@ -96,6 +144,31 @@ export interface BuiltinPanel extends Panel {
  * ```
  */
 export const BuiltinPanel = Registry.define<BuiltinPanel>("panel")
+
+/** A top-level page at `/page/<plugin>/<id>`. */
+export interface Page {
+  /** Nonempty page id within this plugin, used as a route segment. */
+  readonly id: string
+  /** Label shown in app navigation. */
+  readonly title: string
+  /** Lists the page in app navigation, lowest `order` first. */
+  readonly nav?: {
+    /** Sort position in app navigation; defaults to zero. */
+    readonly order?: number
+  }
+  /** Renders the page inside the plugin's contribution boundary. */
+  render(): JSX.Element
+}
+
+/**
+ * The registry of top-level pages contributed by built-in plugins.
+ *
+ * @example
+ * ```ts
+ * ctx.add(Page, { id: "overview", title: ctx.t("overview"), nav: {}, render: () => <Overview /> })
+ * ```
+ */
+export const Page = Registry.define<Page>("page")
 
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {

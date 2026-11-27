@@ -75,11 +75,6 @@ export const dict = {
   "ui.sessionTurn.error.freeUsageExceeded": "تم تجاوز حد الاستخدام المجاني",
   "ui.sessionTurn.error.addCredits": "إضافة رصيد",
 
-  "dialog.usageExceeded.freeTier.title": "تم الوصول إلى الحد المجاني",
-  "dialog.usageExceeded.freeTier.description":
-    "اشترك في OpenCode Go مقابل $10/شهر للحصول على وصول موثوق إلى أفضل النماذج مفتوحة المصدر.",
-  "dialog.usageExceeded.freeTier.actionLabel": "اشترك",
-
   "ui.sessionTurn.status.delegating": "جارٍ تفويض العمل",
   "ui.sessionTurn.status.planning": "تخطيط الخطوات التالية",
   "ui.sessionTurn.status.gatheringContext": "استكشاف",

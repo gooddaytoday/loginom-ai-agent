@@ -67,10 +67,6 @@ export const dict = {
   "ui.sessionTurn.retry.geminiHot": "Gemini on praegu ülekoormatud",
   "ui.sessionTurn.error.freeUsageExceeded": "Tasuta kasutus on ületatud",
   "ui.sessionTurn.error.addCredits": "Lisa krediite",
-  "dialog.usageExceeded.freeTier.title": "Tasuta limiit on täis",
-  "dialog.usageExceeded.freeTier.description":
-    "Tellige OpenCode Go 10 dollari eest kuus, et saada usaldusväärne juurdepääs parimatele avatud lähtekoodiga mudelitele.",
-  "dialog.usageExceeded.freeTier.actionLabel": "Telli",
   "ui.sessionTurn.status.delegating": "Tööde delegeerimine",
   "ui.sessionTurn.status.planning": "Järgmiste sammude planeerimine",
   "ui.sessionTurn.status.gatheringContext": "Uurides",

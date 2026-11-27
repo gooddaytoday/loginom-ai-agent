@@ -55,6 +55,7 @@ test('every registered user-v1 node card fits its type budget',async t=>{
    assert.equal(boundedUserToolReply(reply,{tool:'dock_action_describe'}),reply,type+': '+modes);
    const card=description.node_types[0];
    if(type==='imports.text')assert.ok(bytes(card)<=12000,`Text Import card: ${bytes(card)} > 12000`);
+   assert.equal(typeof card.catalog_add_available,'boolean');
    assert.equal(typeof card.guidance,'string');
    assert.deepEqual(card.guidance_modes,original.modes);
    const budget=NODE_CARD_BUDGET_EXCEPTIONS[type]??12000;

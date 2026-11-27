@@ -41,6 +41,45 @@ story.beforeEach(async ({ mount }) => {
   await mount("ui-line-comment--editor")
 })
 
+story(
+  "a plugin page uses its contribution context and becomes unavailable when its plugin is disabled",
+  async ({ page }) => {
+    const host = await page.evaluateHandle(async (fixture) => {
+      const { mountPluginPages } = await import(fixture)
+
+      return mountPluginPages()
+    }, fixture)
+    const nav = page.getByRole("navigation", { name: "Plugin pages" })
+    const entry = nav.getByRole("button", { name: "Example plugin page", exact: true })
+
+    await entry.click()
+    await expect(page.getByRole("heading", { name: "Example plugin page" })).toBeVisible()
+    await expect(page.getByText("@acme/opencode-gui", { exact: true })).toBeVisible()
+    await expect(entry).toHaveAttribute("aria-current", "page")
+
+    await host.evaluate((host) => host.disable())
+    await expect(nav).toHaveCount(0)
+    await expect(page.getByRole("heading", { name: "Plugin page unavailable" })).toBeVisible()
+    await page.getByRole("button", { name: "Back to Home" }).click()
+    await expect(page.getByRole("heading", { name: "Fixture Home" })).toBeVisible()
+    await host.evaluate((host) => host.unmount())
+  },
+)
+
+story("a plugin page that fails to render shows a way back to Home", async ({ page }) => {
+  const host = await page.evaluateHandle(async (fixture) => {
+    const { mountPluginPages } = await import(fixture)
+
+    return mountPluginPages({ failRender: true })
+  }, fixture)
+
+  await page.getByRole("button", { name: "Example plugin page", exact: true }).click()
+  await expect(page.getByRole("heading", { name: "Plugin page unavailable" })).toBeVisible()
+  await page.getByRole("button", { name: "Back to Home" }).click()
+  await expect(page.getByRole("heading", { name: "Fixture Home" })).toBeVisible()
+  await host.evaluate((host) => host.unmount())
+})
+
 story("a plugin that finishes loading after the host unmounts is never set up", async ({ page }) => {
   const setups = await page.evaluate(async (fixture) => {
     const { mountPluginHost } = await import(fixture)

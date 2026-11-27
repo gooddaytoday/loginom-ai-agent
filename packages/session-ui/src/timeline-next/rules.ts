@@ -127,10 +127,18 @@ export function textShows(content: Exclude<Content, { type: "tool" }>) {
  * - `read`: files read one after another, where reads stand on their own.
  * - `file`: a file's changes, as a card.
  */
-export function contentGroup(detail: TimelineDetail, content: Content, commentary: ReadonlySet<Content>) {
+export function contentGroup(
+  detail: TimelineDetail,
+  content: Content,
+  commentary: ReadonlySet<Content>,
+  toolSeparate?: ReadonlySet<string>,
+) {
   if (content.type === "text") return commentary.has(content) ? ("context" as const) : undefined
 
   if (content.type === "reasoning") return detail.thinking.placement === "grouped" ? ("context" as const) : undefined
+
+  if (toolSeparate?.has(content.name)) return undefined
+
   const rule = toolRule(content)
 
   // Starting work that runs on is an action like any other, so it joins the activity group where its setting groups

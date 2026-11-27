@@ -132,7 +132,15 @@ test('a delivery request ID is refused before browser access and points to the u
   execute:async()=>assert.fail('No browser call before source verification')});
  await assert.rejects(drivers.verifySource(r.parameters),error=>{
   assert.match(error.message,/output\.upload_operation_id/);
+  // LAB-2008: name the ready receipt value (bh-a10 lab2006-1 model.stdout:68,73,78).
+  assert.match(error.message,/"delivery" is the dock_artifact_deliver operation_id; set parameters\.source\.upload_operation_id to "delivery:upload"/);
   assert.deepEqual(error.nodePhaseRefusal,{phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});
+  return true;
+ });
+ // Another artifact's upload is never offered as the ready value.
+ await assert.rejects(drivers.verifySource({...r.parameters,source:{...r.parameters.source,artifact_id:'other-artifact'}}),error=>{
+  assert.match(error.message,/^Verified upload operation is missing or ambiguous\. Use output\.upload_operation_id/);
+  assert.doesNotMatch(error.message,/delivery:upload/);
   return true;
  });
  assert.equal((await drivers.verifySource({...r.parameters,source:{...r.parameters.source,upload_operation_id:upload.operation_id}}))

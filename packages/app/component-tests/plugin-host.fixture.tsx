@@ -1,3 +1,4 @@
+import { createMemoryHistory, MemoryRouter, useLocation } from "@solidjs/router"
 import type { PluginInfo, SessionMessageInfo } from "@opencode/client/promise"
 import { DialogProvider, useDialog } from "@opencode/ui/context/dialog"
 import { Menu } from "@opencode/ui/menu"
@@ -30,6 +31,7 @@ import {
   onCleanup,
   runWithOwner,
   Show,
+  type JSX,
   type Component,
   type ParentProps,
 } from "solid-js"
@@ -58,6 +60,8 @@ import { LanguageProvider } from "../src/runtime/i18n/language"
 import { ExtensionPlugins } from "../src/runtime/plugin/extension-plugins"
 import { SessionPluginPills } from "../src/session/composer/plugin-pills"
 import { ui } from "../src/runtime/plugin/ui"
+import { PluginPageNav, PluginPageRoute } from "../src/runtime/plugin/pages"
+import { pagePlugin } from "./page-plugin.fixture"
 
 export {
   bindPlugin,
@@ -169,7 +173,7 @@ export async function until(check: () => boolean) {
 }
 
 /** Mounts the real plugin host with one plugin whose every renderer load settles when the test says so. */
-export function mountPluginHost() {
+export function mountPluginHost(input?: { builtins: ReadonlySet<string>; View?: Component; extra?: readonly Entry[] }) {
   const loads: PromiseWithResolvers<{ default: Plugin.Setup<Entry> }>[] = []
   const [disabled, setDisabled] = createSignal<ReadonlySet<string>>(new Set())
   const hosts: PluginHost[] = []
@@ -179,7 +183,7 @@ export function mountPluginHost() {
   function Capture() {
     hosts.push(usePluginHost())
 
-    return null
+    return input?.View && <input.View />
   }
 
   const dispose = render(
@@ -197,8 +201,10 @@ export function mountPluginHost() {
                   return load.promise
                 },
               },
+              ...(input?.extra ?? []),
             ]}
             disabled={disabled}
+            builtins={input?.builtins}
             apis={fakeApis(unused)}
             whenMounted={mounted}
           >
@@ -224,7 +230,7 @@ export function mountPluginHost() {
     reload: () => hosts[0]?.reload("fixture"),
     disable: () => setDisabled(new Set(["fixture"])),
     enable: () => setDisabled(new Set<string>()),
-    status: () => hosts[0]?.status("fixture"),
+    status: (id = "fixture") => hosts[0]?.status(id),
     /** Contributions the host holds for a registry; readable after the host unmounts. */
     entries: (registry: string) => hosts[0]?.state.entries[registry]?.length ?? 0,
   }
@@ -237,8 +243,8 @@ export function mountPluginHost() {
  */
 export function mountPlugins(input: {
   definitions: readonly Entry[]
+  surface?: () => JSX.Element
   disabled?: readonly string[]
-  children?: Component
   bridge?: Bridge
   stored?: Readonly<Record<string, Json>>
   /** Shows the production Extensions › Plugins rows of the desktop app's own server, which lists these plugins. */
@@ -307,7 +313,7 @@ export function mountPlugins(input: {
           )}
         </Show>
         <PluginSlot at="window.bottom" input={{}} />
-        <Show when={input.children} keyed>{(Children) => <Children />}</Show>
+        {input.surface?.()}
       </Show>
     )
   }
@@ -369,6 +375,35 @@ export function mountPlugins(input: {
     /** Errors that reached the error boundary above the host. */
     escaped: () => [...escaped],
   }
+}
+
+export function mountPluginPages(options?: Parameters<typeof pagePlugin>[0]) {
+  const plugin = pagePlugin(options)
+  const history = createMemoryHistory()
+
+  function Pages() {
+    const location = useLocation()
+
+    return (
+      <>
+        <PluginPageNav />
+        <Show when={location.pathname !== "/"} fallback={<h1>Fixture Home</h1>}>
+          <PluginPageRoute />
+        </Show>
+      </>
+    )
+  }
+
+  const host = mountPlugins({
+    definitions: [plugin],
+    surface: () => (
+      <MemoryRouter history={history}>
+        <Pages />
+      </MemoryRouter>
+    ),
+  })
+
+  return { disable: () => host.disable([plugin.id]), unmount: host.unmount }
 }
 
 const web: Platform = {
@@ -983,7 +1018,7 @@ export function mountPermissionComposer() {
 
   return mountPlugins({
     definitions: [loginom],
-    children: () => (
+    surface: () => (
       <SettingsProvider>
         <SessionComposerRegion
           composer={null}
