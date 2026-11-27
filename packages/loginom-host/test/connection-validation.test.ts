@@ -463,7 +463,9 @@ test("settings reject a bad password through Node IPC without creating an active
       headless: true,
     })
     try {
-      await expect(host.request("connection.settings.check", f.candidate)).rejects.toThrow("LOGINOM_LOGIN_REJECTED")
+      await expect(host.request("connection.settings.check", f.candidate)).rejects.toThrow("LOGINOM_URL_INVALID")
+      const candidate = { ...f.candidate, url: "http://loginom.example/" }
+      await expect(host.request("connection.settings.check", candidate)).rejects.toThrow("LOGINOM_LOGIN_REJECTED")
       expect(await host.request("connection.status", {})).toMatchObject({ revision: 0, generation: 0 })
     } finally {
       await host.close()
@@ -489,7 +491,7 @@ test("settings save waits for the current turn, including first setup, and survi
   try {
     const host = await launchNodeHost(options)
     try {
-      const candidate = { ...f.candidate, url: "http://loginom.example" }
+      const candidate = { ...f.candidate, url: "http://loginom.example/" }
       const legacy = readCheck(await host.request("connection.check", candidate))
       await expect(host.request("connection.settings.save", { revision: 0, validationId: legacy.validationId }))
         .rejects.toThrow("LOGINOM_VALIDATION_EXPIRED")
@@ -527,6 +529,104 @@ test("settings save waits for the current turn, including first setup, and survi
     await f.close()
   }
 }, 30_000)
+
+
+test("settings Save acknowledges persistence while activation is still blocked", async () => {
+  const f = await fixture("")
+  const root = join(f.root, "service")
+  const gate = join(f.root, "allow-activation")
+  try {
+    const host = await launchNodeHost({
+      node: process.env.LOGINOM_AI_AGENT_TEST_NODE!,
+      entry: await buildNodeHost(f.root),
+      root,
+      resources: f.resources,
+      headless: true,
+    })
+    try {
+      const candidate = { ...f.candidate, url: "http://loginom.example/" }
+      const { validationId } = Schema.decodeUnknownSync(Loginom.Validation)(
+        await host.request("connection.settings.check", candidate),
+      )
+      // Hold the knowledge startup for the new generation after validation completed.
+      const entry = join(f.resources, "runtime/src/knowledge-entry.mjs")
+      await rm(entry)
+      await writeFile(entry, `
+        import { existsSync } from 'node:fs';
+        process.on('message', message => {
+          if (message.operation === 'start') {
+            const timer = setInterval(() => {
+              if (!existsSync(${JSON.stringify(gate)})) return;
+              clearInterval(timer);
+              process.send({id:message.id,result:{protocol:1,generation:message.input.generation,started:true}});
+            }, 10);
+          }
+          if (message.operation === 'list') process.send({id:message.id,result:{tools:[]}});
+          if (message.operation === 'interrupt') process.send({id:message.id,result:{interrupted:true}});
+          if (message.operation === 'close') process.send({id:message.id,result:{closed:true}},()=>process.disconnect());
+        });
+      `)
+      expect(await host.request("connection.settings.save", { revision: 0, validationId }, 2000))
+        .toMatchObject({ revision: 1, generation: 0, state: "starting" })
+      const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources: f.resources }))
+      expect(await store.pending()).toMatchObject({ revision: 1, url: candidate.url, username: candidate.username })
+    } finally {
+      await writeFile(gate, "")
+      await host.close()
+    }
+  } finally {
+    await f.close()
+  }
+}, 15_000)
+
+test("aborting a settings check stops its browser without closing the node Host", async () => {
+  const f = await fixture("", "shipped", true)
+  try {
+    const host = await launchNodeHost({
+      node: process.env.LOGINOM_AI_AGENT_TEST_NODE!,
+      entry: await buildNodeHost(f.root),
+      root: join(f.root, "service"),
+      resources: f.resources,
+      headless: true,
+    })
+    const started = Promise.withResolvers<void>()
+    const watcher = watch(join(f.marker, ".."), (_, name) => {
+      if (name === "browser-validation") started.resolve()
+    })
+    const controller = new AbortController()
+    const candidate = { ...f.candidate, url: "http://loginom.example/" }
+    const checking = host.request("connection.settings.check", candidate, 30_000, controller.signal)
+    try {
+      await Promise.race([
+        started.promise,
+        checking.then(() => { throw Error("Expected a pending browser check") }),
+      ])
+      const { pid } = JSON.parse(await readFile(f.marker, "utf8"))
+      controller.abort()
+      await expect(checking).rejects.toMatchObject({ name: "AbortError" })
+      const deadline = Date.now() + 5000
+      while (runtimeAlive(pid) && Date.now() < deadline) await Bun.sleep(25)
+      expect(runtimeAlive(pid)).toBe(false)
+      expect(await host.request("connection.status", {})).toMatchObject({ revision: 0, generation: 0 })
+    } finally {
+      controller.abort()
+      watcher.close()
+      await host.close()
+      await checking.catch(() => undefined)
+    }
+  } finally {
+    await f.close()
+  }
+}, 15_000)
+
+function runtimeAlive(pid: number) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
 
 test.skipIf(!hasConnectionFixture)(
   "CON-02: settings Check signs in and out without contacting the unavailable file service",
