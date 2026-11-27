@@ -115,6 +115,86 @@ test("Loginom settings use the service Location and recover an unconfirmed Save"
   ])
 })
 
+test("Loginom settings count draining tasks and show Applied on the RPC event", async ({ page }) => {
+  const directory = "/service"
+  const oldUrl = "https://old.example/app/"
+  const newUrl = "https://new.example/app/"
+  let generation = 1
+  let revision = 1
+  let tasks = 2
+
+  function status() {
+    return {
+      revision,
+      generation,
+      url: generation === 1 ? oldUrl : newUrl,
+      username: "analyst",
+      folder: "/analyst",
+      hasPassword: false,
+      failed: false,
+      state: revision > generation ? "pending" : "ready",
+      ...(revision === 2 && {
+        application: generation === 1 ? { state: "pending", tasks } : { state: "applied" },
+      }),
+    }
+  }
+
+  const { push } = await mockWorkspace(page, {
+    name: "Loginom",
+    sessions: [],
+    directory,
+    provider: NO_PROVIDER,
+    seed: { locale: "ru" },
+    onRpc: (request) => {
+      if (request.rpcID !== "loginom.connection") return
+
+      switch (request.method) {
+        case "status":
+          return { output: { ok: true, value: status() } }
+        case "check":
+          expect(request.body).toMatchObject({ input: { url: newUrl, revision: 1 } })
+
+          return { output: { ok: true, value: { validationId: "checked", expiresAt: 4102444800000 } } }
+        case "save":
+          expect(request.body).toMatchObject({ input: { revision: 1, validationId: "checked" } })
+          revision = 2
+
+          return { output: { ok: true, value: status() } }
+      }
+    },
+  })
+
+  await page.clock.install()
+  await page.goto("/settings?tab=loginom")
+  const settings = page.getByRole("tabpanel", { name: "Loginom", exact: true })
+  const address = settings.getByRole("textbox", { name: "Адрес" })
+  const notice = settings.getByRole("status")
+  await expect(address).toHaveValue(oldUrl)
+  await address.fill(newUrl)
+  await settings.getByRole("button", { name: "Сохранить", exact: true }).click()
+  await expect(notice).toHaveText("Новые параметры применятся после завершения 2 задач")
+
+  // Keep the next status timer frozen after observing one more update. Only the event can then refresh it.
+  const now = await page.evaluate(() => Date.now())
+  await page.clock.pauseAt(now + 1_000)
+  tasks = 1
+  await page.clock.fastForward(16_000)
+  await expect(notice).toHaveText("Новые параметры применятся после завершения 1 задачи")
+
+  generation = 2
+  await push([
+    {
+      id: "evt_loginom_connection_applied",
+      created: 1,
+      type: "rpc.loginom.connection.applied",
+      location: { directory },
+      data: { revision, generation },
+    },
+  ])
+  await expect(notice.getByText("Применено", { exact: true })).toBeVisible()
+  await expect(address).toHaveValue(newUrl)
+})
+
 test("settings has its own route and returns through app history", async ({ page }) => {
   const { settings } = await open(page)
   const home = page.getByRole("button", { name: "Home", exact: true })

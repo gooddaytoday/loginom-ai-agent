@@ -31,6 +31,12 @@ export const BrowserStatus = Schema.Union([
   Schema.Struct({ state: Schema.Literal("failed"), failure: BrowserFailure }),
 ]).annotate({ identifier: "Loginom.BrowserStatus" })
 export type BrowserStatus = typeof BrowserStatus.Type
+export const ConnectionApplied = Schema.Struct({ revision: NonNegativeInt, generation: NonNegativeInt })
+export type ConnectionApplied = typeof ConnectionApplied.Type
+const Application = Schema.Union([
+  Schema.Struct({ state: Schema.Literal("pending"), tasks: NonNegativeInt }),
+  Schema.Struct({ state: Schema.Literal("applied") }),
+])
 export const View = Schema.Struct({
   revision: NonNegativeInt,
   generation: NonNegativeInt,
@@ -41,6 +47,7 @@ export const View = Schema.Struct({
   folder: Schema.String,
   hasPassword: Schema.Boolean,
   state: State,
+  application: Schema.optionalKey(Application),
   browser: optional(BrowserStatus),
   failure: Schema.optionalKey(Schema.String),
   recoveries: Schema.optionalKey(Schema.Array(Schema.String)),

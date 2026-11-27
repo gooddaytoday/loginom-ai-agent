@@ -9,6 +9,7 @@ import { credentials } from "../src/connection/credentials"
 import { superviseKnowledge } from "../src/supervisor"
 import { writeHelp } from "../../loginom-runtime/client/test/support/help-fixture.mjs"
 import { stageHeldKnowledge } from "./fixtures/knowledge"
+import type { Loginom } from "../src/loginom"
 
 // "held" keeps the first catalog pending in a stub entry; "shipped" and "tampered"
 // run the real entry over a Help fixture.
@@ -24,10 +25,13 @@ async function readinessFixture(help: "held" | "shipped" | "tampered") {
     username: "user", apiKey: "UNIT-NONSECRET", password: "PRIVATE-NONSECRET-PASSWORD" }
   const processes: Awaited<ReturnType<typeof superviseKnowledge>>[] = []
   const readiness: Promise<void>[] = []
+  const applied: Loginom.ConnectionApplied[] = []
   await store.stage(original)
   await store.activate(1)
   const service = await connectionService(store, {
-    async check() {},
+    async check() {
+      return { state: "verified" }
+    },
     async prepare(connection) {
       const child = await superviseKnowledge({
         node,
@@ -40,8 +44,8 @@ async function readinessFixture(help: "held" | "shipped" | "tampered") {
       void ready.catch(() => {})
       return { ready, close: () => child.close() }
     },
-  })
-  return { service, store, original, readiness, processes, catalog,
+  }, undefined, (event) => applied.push(event))
+  return { service, store, original, readiness, processes, catalog, applied,
     async close() {
       await catalog.release()
       await service.close()
@@ -128,4 +132,62 @@ test("a new generation closes pending old readiness and only its own catalog can
     expect((await f.store.read())?.generation).toBe(2)
     expect(await f.service.api.status()).toMatchObject({ generation: 2, state: "ready" })
   } finally { await f.close() }
+})
+
+test("settings wait for both old-generation tasks and notify once the next generation is applied", async () => {
+  const f = await readinessFixture("held")
+  try {
+    await f.service.settled()
+    await f.catalog.release()
+    await f.readiness[0]
+
+    const tasks = ["first", "second"].map((task) => {
+      f.service.turn(task, task, true)
+      const lease = f.service.acquire("lease-" + task, task)
+      if (!lease) throw Error("Expected a ready connection")
+      return { task, lease }
+    })
+    const url = "https://next.example/app/"
+    const validation = await f.service.api.check(
+      { revision: 1, url, username: "analyst", password: { operation: "empty" } },
+      true,
+    )
+    expect(await f.service.api.save({ revision: 1, validationId: validation.validationId }, true)).toMatchObject({
+      revision: 2,
+      generation: 1,
+      application: { state: "pending", tasks: 2 },
+    })
+    expect(f.service.acquire("new")).toBeUndefined()
+
+    for (const [index, { task, lease }] of tasks.entries()) {
+      expect(lease.generation).toBe(1)
+      expect(await f.store.read()).toEqual(f.original)
+      expect(await f.processes[0].request("list")).toHaveProperty("tools")
+      lease.release()
+      expect(await f.service.api.status()).toMatchObject({
+        generation: 1,
+        application: { state: "pending", tasks: 2 - index },
+      })
+      expect(f.applied).toEqual([])
+      f.service.turn(task, task, false)
+    }
+
+    await f.service.settled()
+    await f.readiness[1]
+    expect(f.applied).toEqual([{ revision: 2, generation: 2 }])
+    expect(await f.service.api.status()).toMatchObject({
+      generation: 2,
+      url,
+      state: "ready",
+      application: { state: "applied" },
+    })
+    expect(await f.store.read()).toMatchObject({ generation: 2, url })
+    expect(await f.processes[0].exited).toEqual({ code: 0, signal: null })
+    const third = f.service.acquire("third")
+    expect(third?.generation).toBe(2)
+    expect(await f.processes[1].request("list")).toHaveProperty("tools")
+    third?.release()
+  } finally {
+    await f.close()
+  }
 })

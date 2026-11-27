@@ -25,6 +25,7 @@ type Event =
   | { type: "target"; available: boolean }
   | { type: "disposed" }
   | { type: "refresh" }
+  | { type: "applied"; generation: number }
   | { type: "edit"; patch: Partial<Draft> }
   | { type: "submit"; submit: "check" | "save"; now: number }
   | { type: "status" | "saved"; attempt: number; result: StatusResult; now: number }
@@ -98,6 +99,17 @@ export function transition(state: State, event: Event): Transition {
       if (state.type === "unavailable") return transition(state, { type: "target", available: true })
       if (state.type !== "editing") return keep
       return refresh(state, attempt)
+    case "applied":
+      if (state.type !== "applying" && state.type !== "editing") return keep
+
+      if (!waiting(state.status) || event.generation <= state.status.generation) return keep
+
+      if (state.type === "editing") return refresh(state, attempt)
+
+      return {
+        state: { ...state, attempt },
+        effects: [{ type: "cancel" }, { type: "status", attempt }],
+      }
     case "edit": {
       if (!("draft" in state) || state.type === "saving") return keep
       const draft = { ...state.draft, ...event.patch }
@@ -160,7 +172,12 @@ export function transition(state: State, event: Event): Transition {
       if (waiting(status)) {
         const pendingDraft =
           state.type === "saving" || (recovered && !edited) ? { ...state.draft, password: "" } : draft
-        const until = state.type === "applying" ? state.until : event.now + applicationWait
+
+        // Drains can last as long as the tasks. Bound the wait for startup once the tasks finish.
+        const until =
+          state.type === "applying" && !waitingTasks(state.status) && !waitingTasks(status)
+            ? state.until
+            : event.now + applicationWait
         const remaining = until - event.now
         if (remaining > 1000) {
           return {
@@ -174,6 +191,10 @@ export function transition(state: State, event: Event): Transition {
       return { state: { type: "editing", attempt, status, draft, issue }, effects: [] }
     }
   }
+}
+
+function waitingTasks(status: Status) {
+  return status.application?.state === "pending" ? status.application.tasks : 0
 }
 
 function refresh(state: Form, attempt: number, issue?: Issue): Transition {
@@ -194,10 +215,15 @@ function message(state: State) {
   if (state.type === "disposed") return
   if (state.type === "loading" || state.type === "refreshing") return "loading"
   if (state.type === "unavailable") return "serviceUnavailable"
-  if (state.type === "applying") return state.status.state === "pending" ? "pending" : "starting"
   if (state.type === "verified") return "verified"
   if (!("status" in state)) return
   if (state.status.failed) return "activationFailed"
+
+  if (state.status.application?.state === "applied") return "applied"
+
+  if (state.type === "applying")
+    return state.status.state === "pending" && !state.status.application ? "pending" : "starting"
+
   if (waiting(state.status)) return "applicationPaused"
   if (state.status.state !== "ready") return "disconnected"
 }
@@ -209,6 +235,7 @@ export function view(state: State) {
     draft: form?.draft,
     connected: form?.status.state === "ready" && !form.status.failed ? form.status : undefined,
     message: message(state),
+    waitingTasks: form && !form.status.failed ? waitingTasks(form.status) : 0,
     fieldErrors: {
       url: issue === "invalidAddress" || issue === "loginUnavailable" ? issue : undefined,
       username: issue === "invalidUsername" ? issue : undefined,

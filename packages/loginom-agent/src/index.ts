@@ -180,7 +180,7 @@ export default Plugin.define({
     const hold = (sessionID: string) => {
       const current = runs.get(sessionID)
       if (current) return current.lease
-      const endTurn = ServiceHost.connectionSettings.holdTurn()
+      const endTurn = ServiceHost.connectionSettings.holdTurn(sessionID)
       const lease = dashboard()
         ? Promise.resolve(undefined)
         : ServiceHost.acquire(sessionID).then(
@@ -508,7 +508,7 @@ export default Plugin.define({
         return { granted: true }
       },
     })
-    await ctx.rpc.register(ConnectionSettingsRpc, connectionSettings())
+    const settingsRpc = await ctx.rpc.register(ConnectionSettingsRpc, connectionSettings())
     await ctx.rpc.register(preflight, {
       check: async (value) => {
         const code = await ServiceHost.preflight((value as { automation: boolean }).automation)
@@ -557,7 +557,11 @@ export default Plugin.define({
       },
     })
 
+    const unsubscribeApplied = ServiceHost.connectionSettings.onApplied((event) => {
+      void settingsRpc.events.emit("applied", event).catch(() => undefined)
+    })
     return async () => {
+      unsubscribeApplied()
       stop.abort()
       await Promise.all([...runs.keys()].map(drop))
       await drafts.close()

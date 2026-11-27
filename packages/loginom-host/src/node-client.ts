@@ -1,9 +1,13 @@
 import { fork } from "node:child_process"
 import { isAbsolute } from "node:path"
 import { EventEmitter } from "node:events"
+import { Option, Schema } from "effect"
+import { Loginom } from "./loginom"
 import { runtimeEnvironment } from "./supervisor"
 import { transport, type Port } from "./transport"
 import { hostError } from "./errors"
+
+const decodeApplied = Schema.decodeUnknownOption(Loginom.ConnectionApplied)
 
 export class NodeHostStartupError extends Error {
   constructor(
@@ -34,6 +38,7 @@ export async function launchNodeHost(
     strictRecovery?: boolean
     closeSavedPackageOnShutdown?: boolean
     browserRecovery?: boolean
+    onConnectionApplied?: (event: Loginom.ConnectionApplied) => void
   },
   timing: { start?: number; close?: number; terminate?: number; teardown?: number } = {},
 ) {
@@ -80,7 +85,14 @@ export async function launchNodeHost(
     events.emit("close")
   }
   child.on("disconnect", closePort)
-  child.on("message", (data) => events.emit("message", { data }))
+  child.on("message", (data: unknown) => {
+    if (data && typeof data === "object" && "event" in data && data.event === "connection.applied" && "data" in data) {
+      const applied = decodeApplied(data.data)
+      if (Option.isSome(applied)) input.onConnectionApplied?.(applied.value)
+      return
+    }
+    events.emit("message", { data })
+  })
   const port: Port = {
     postMessage(value) {
       if (state.closed || !child.connected) throw new Error("LOGINOM_HOST_CLOSED")

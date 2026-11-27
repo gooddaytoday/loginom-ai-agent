@@ -3,7 +3,7 @@ import { Schema, Struct } from "effect"
 import { Loginom } from "./loginom"
 
 export const Status = Loginom.View.mapFields((fields) => ({
-  ...Struct.pick(fields, ["revision", "generation", "url", "username", "folder", "hasPassword", "state"]),
+  ...Struct.pick(fields, ["revision", "generation", "url", "username", "folder", "hasPassword", "state", "application"]),
   failed: Schema.Boolean,
 }))
 export const Address = Schema.String.check(
@@ -62,7 +62,7 @@ export const ConnectionSettingsRpc = Rpc.define({
     check: { input: safeInput, output: result(Validation) },
     save: { input: Schema.toStandardSchemaV1(Loginom.Save), output: result(Status) },
   },
-  events: {},
+  events: { applied: { schema: Schema.toStandardSchemaV1(Loginom.ConnectionApplied) } },
 })
 
 export type StatusResult = typeof ConnectionSettingsRpc.methods.status.output.Type

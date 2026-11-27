@@ -476,12 +476,14 @@ test("settings reject a bad password through Node IPC without creating an active
 test("settings save waits for the current turn, including first setup, and survives a Host restart", async () => {
   const f = await fixture("")
   const root = join(f.root, "service")
+  const applied = Promise.withResolvers<Loginom.ConnectionApplied>()
   const options = {
     node: process.env.LOGINOM_AI_AGENT_TEST_NODE!,
     entry: await buildNodeHost(f.root),
     root,
     resources: f.resources,
     headless: true,
+    onConnectionApplied: applied.resolve,
   }
   const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources: f.resources }))
   const readCheck = (reply: unknown) => Schema.decodeUnknownSync(Loginom.Validation)(reply)
@@ -494,19 +496,21 @@ test("settings save waits for the current turn, including first setup, and survi
       await expect(host.request("connection.settings.save", { revision: 0, validationId: legacy.validationId }))
         .rejects.toThrow("LOGINOM_VALIDATION_EXPIRED")
 
-      await host.request("connection.settings.turn", { id: "existing-turn", active: true })
+      await host.request("connection.settings.turn", { id: "existing-turn", session: "first", active: true })
       const checked = readCheck(await host.request("connection.settings.check", candidate))
       expect(await host.request("connection.status", {})).toMatchObject({ revision: 0, generation: 0 })
       expect(await host.request("connection.settings.save", { revision: 0, validationId: checked.validationId }))
-        .toMatchObject({ revision: 1, generation: 0, state: "pending" })
+        .toMatchObject({ revision: 1, generation: 0, state: "pending", application: { state: "pending", tasks: 1 } })
       expect(await store.read()).toBeUndefined()
 
-      await host.request("connection.settings.turn", { id: "new-turn", active: true })
-      await host.request("connection.settings.turn", { id: "existing-turn", active: false })
-      const deadline = Date.now() + 5000
-      while (readStatus(await host.request("connection.status", {})).state !== "ready" && Date.now() < deadline)
-        await Bun.sleep(25)
-      expect(readStatus(await host.request("connection.status", {}))).toMatchObject({ generation: 1, state: "ready" })
+      await host.request("connection.settings.turn", { id: "new-turn", session: "next", active: true })
+      await host.request("connection.settings.turn", { id: "existing-turn", session: "first", active: false })
+      expect(await applied.promise).toEqual({ revision: 1, generation: 1 })
+      expect(readStatus(await host.request("connection.ready", {}))).toMatchObject({
+        generation: 1,
+        state: "ready",
+        application: { state: "applied" },
+      })
       expect(await store.read())
         .toMatchObject({ username: "user", url: candidate.url, generation: 1 })
       const wrongServer = { revision: 1, url: "http://other.example", username: "user", password: { operation: "preserve" } }

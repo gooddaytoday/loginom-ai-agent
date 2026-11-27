@@ -88,7 +88,18 @@ export default function Page() {
   }
 
   const reload = () => dispatch({ type: "target", available: !!client() })
-  createKeyed(client, reload, { otherwise: reload })
+  createKeyed(
+    client,
+    (target) => {
+      onCleanup(
+        target.rpc(ConnectionSettingsRpc).events.on("applied", ({ data }) => {
+          dispatch({ type: "applied", generation: data.generation })
+        }),
+      )
+      reload()
+    },
+    { otherwise: reload },
+  )
   onCleanup(() => dispatch({ type: "disposed" }))
 
   return (
@@ -156,7 +167,12 @@ export default function Page() {
                 <span>{ctx.t("connected", { username: connection().username, folder: connection().folder })}</span>
               )}
             </Show>
-            <Show when={page().message}>{(message) => <span>{ctx.t(message())}</span>}</Show>
+            <Show
+              when={page().waitingTasks}
+              fallback={<Show when={page().message}>{(message) => <span>{ctx.t(message())}</span>}</Show>}
+            >
+              {(tasks) => <span>{ctx.plural("waitingTasks", tasks())}</span>}
+            </Show>
           </div>
           <Show when={page().issue}>
             {(issue) => (

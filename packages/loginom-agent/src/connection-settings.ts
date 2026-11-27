@@ -25,6 +25,7 @@ export function connectionSettings(request: Request = ServiceHost.connectionSett
       folder: view.folder,
       hasPassword: view.hasPassword,
       state: view.state,
+      ...(view.application ? { application: view.application } : {}),
       failed: !!view.failure || view.state === "recoverable-error",
     }
   }
