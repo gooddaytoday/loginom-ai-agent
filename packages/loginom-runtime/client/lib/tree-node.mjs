@@ -200,9 +200,10 @@ export function createTreeNodeSupport(config,{json}){
      if(node.selected_global_index!==wantIndex.includes(path))await clickLeaf(path,true);
     }
     await setBool('pedRepeatParentNodeValues',p.repeat_parents);await setBool('pedCompositeColumnNames',p.composite_names);
-    await setBool('pedCompositeColumnDisplayNames',p.composite_labels);
+    const compositeLabels=p.composite_labels??s.node_tree.composite_labels;
     if(p.label_separator!==undefined&&s.node_tree.label_separator!==p.label_separator){
-     // The native separator combo is enabled only with composite labels; option tids replace spaces with _ (LAB-1815 probe).
+     // Loginom retains the separator after composite labels are turned off.
+     await setBool('pedCompositeColumnDisplayNames',true);
      const names={'.':'Точка (.)','|':'Вертикальная черта (|)',' ':'Пробел ( )','-':'Дефис (-)','_':'Подчёркивание (_)'};
      const control=s.node_tree.base+'pedCompositeDisplayNameSeparator;ValueControl',option=control+';boundlist;'+names[p.label_separator].replaceAll(' ','_');
      await click(control+';trg_picker','open tree label separator');
@@ -210,8 +211,9 @@ export function createTreeNodeSupport(config,{json}){
      await channel.perform({condition:'choose tree label separator',initialObservation:s,ready,identity:s=>s.prepared_node_context,
       resolve:s=>({verb:'click',ref:one(s,e=>e.tid===option&&e.allowed_actions.includes('click'),'Unique tree label separator option required').ref})});
     }
+    await setBool('pedCompositeColumnDisplayNames',compositeLabels);
     s=await observe('complete tree-to-table settings');
-    need(['composite_names','composite_labels','label_separator'].every(k=>p[k]===undefined||s.node_tree[k]===p[k])
+    need(s.node_tree.composite_labels===compositeLabels&&['composite_names','label_separator'].every(k=>p[k]===undefined||s.node_tree[k]===p[k])
      &&treeLabelSeparators.includes(s.node_tree.label_separator)
      &&(wantIndex===undefined||same(indexed(s),wantIndex))&&s.node_tree.nodes.some(n=>!n.is_container&&n.selected),'Tree table stage 1 settings differ');
     const selected=s.node_tree.nodes.filter(n=>!n.is_container&&n.selected);
