@@ -1810,6 +1810,57 @@ test("providers: OpenCode Console signs in from its method list", async ({ page,
   await expect(signIn.getByRole("button", { name: "Copy sign-in link", exact: true })).toBeVisible()
 })
 
+for (const width of [1280, 480]) {
+  test(`providers: Desktop completes device sign-in without a Console return link (${width}px)`, async ({
+    page,
+    context,
+  }) => {
+    const url = "https://auth.example.test/device?user_code=ABCD-EFGH&client_id=opencode-cli"
+    let authorized = false
+    await context.route("https://auth.example.test/**", (route) => route.fulfill({ body: "Device sign-in" }))
+    await mockOpenCodeServer(page, {
+      directory,
+      project: project({ id: projectID, directory, name: "Settings demo" }),
+      provider: () =>
+        authorized
+          ? {
+              all: [{ id: "console-google", integrationID: "opencode", name: "Workspace / Google", models: {} }],
+              connected: ["console-google"],
+              default: {},
+            }
+          : NO_PROVIDER,
+      sessions: [],
+      pageMessages: () => ({ items: [] }),
+      integrations: consoleIntegrations,
+      onIntegrationOAuth: () => ({ url }),
+      onIntegrationOAuthStatus: () => (authorized ? "complete" : "pending"),
+    })
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto(`/e2e/utils/settings-wsl.html?${new URLSearchParams({ server: SERVER, mode: "ready" })}`)
+
+    const settings = page.getByTestId("settings-screen")
+    if (width === 480) {
+      await settings.getByRole("button", { name: "Preferences", exact: true }).click()
+      await page.getByRole("menuitemradio", { name: "Providers", exact: true }).click()
+    } else {
+      await settings.getByRole("tab", { name: "Providers", exact: true }).click()
+    }
+    await settings
+      .locator(".settings-provider-row", { hasText: "OpenCode Console" })
+      .getByRole("button", { name: "Connect", exact: true })
+      .click()
+    const methods = page.getByRole("dialog", { name: "Connect OpenCode Console", exact: true })
+    const popup = context.waitForEvent("page")
+    await methods.getByRole("button", { name: "OpenCode Console account", exact: true }).click()
+    await expect(await popup).toHaveURL(url)
+
+    const signIn = page.getByRole("dialog", { name: "Connecting to OpenCode Console", exact: true })
+    await expect(signIn.getByRole("group", { name: "Device code: ABCD-EFGH", exact: true })).toBeVisible()
+    authorized = true
+    await expect(page.getByText("OpenCode Console connected", { exact: true })).toBeVisible()
+  })
+}
+
 test("providers: OpenCode Go connects with its own methods, not the Console sign-in", async ({ page }) => {
   const attempts: string[] = []
 
