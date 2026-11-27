@@ -22,7 +22,6 @@ import {
 import { startSettingsSearchReveal } from "./search-reveal"
 import {
   isPluginTab,
-  isProjectTab,
   isRootTab,
   parseSettingsView,
   settingsViewUrl,
@@ -124,7 +123,7 @@ export const { use: useSettingsSurface, provider: SettingsSurfaceProvider } = cr
         return
       }
 
-      show({ type: "root", tab: "projects", server: current.server })
+      show({ type: "root", tab: "general", server: current.server })
     }
 
     const stop = () => {
@@ -274,14 +273,9 @@ export const { use: useSettingsSurface, provider: SettingsSurfaceProvider } = cr
         const next: SettingsView =
           current.type === "root" && (isRootTab(tab) || isPluginTab(tab, plugins.tabs()))
             ? { ...current, tab }
-            : current.type === "project" && isProjectTab(tab)
-              ? { ...current, tab }
-              : current
+            : current
 
-        show({ ...next, target: undefined, subtab: undefined })
-      },
-      subtab(subtab: SettingsView["subtab"]) {
-        show({ ...view(), subtab, target: undefined })
+        show({ ...next, target: undefined })
       },
       back,
       close() {

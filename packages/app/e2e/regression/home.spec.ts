@@ -605,7 +605,7 @@ for (const state of [
       await expect(projectItem).toBeFocused()
       await menu.getByRole("menuitem", { name: "Edit project", exact: true }).press("Enter")
       await expect(settings.getByRole("textbox", { name: "Project name", exact: true })).toHaveValue(name)
-      await settings.getByRole("button", { name: "Back to projects", exact: true }).click()
+      await settings.getByRole("button", { name: "Back to settings", exact: true }).click()
       await settings.getByRole("button", { name: "Back to app", exact: true }).click()
       await expect(settings).toBeHidden()
     }

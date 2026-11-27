@@ -74,6 +74,17 @@
       ]
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
+    {
+      "id": "CAT-14",
+      "title": "Settings groups and page visibility (C1.2)",
+      "paths": [
+        "packages/app/src/settings/pages.ts", "packages/app/src/settings/route*.ts",
+        "packages/app/src/settings/surface.tsx", "packages/app/src/settings/shell.tsx",
+        "packages/app/src/settings/navigation.tsx", "packages/app/src/settings/general/general.tsx",
+        "packages/app/src/settings/providers/extensions.tsx", "packages/app/src/settings/search-*.ts",
+        "packages/app/src/runtime/plugin/settings-pages.ts", "packages/plugin/src/gui/registries.ts"
+      ]
+    },
     { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
     { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }

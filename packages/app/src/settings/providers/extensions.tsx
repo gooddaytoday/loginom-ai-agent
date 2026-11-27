@@ -18,7 +18,6 @@ import { ExternalLink } from "@/runtime/platform/external-link"
 import { usePlatform } from "@/runtime/platform/platform"
 import { SettingsList } from "@/settings/list"
 import { createExtensionLoad, ExtensionLoadFailed } from "@/settings/extension-load"
-import type { SettingsView } from "@/settings/surface"
 import { ConsoleName, ConsoleReplaced, createConsoleSources } from "./console-link"
 import "@/settings/settings.css"
 import "@/shell/search-list.css"
@@ -30,10 +29,12 @@ const statusLabels = {
   disabled: "mcp.status.disabled",
 } as const
 
+type ExtensionTab = "mcps" | "plugins" | "skills" | "lsps"
+
 export const SettingsExtensions: Component<{
   directory?: string
-  subtab?: SettingsView["subtab"]
-  onSubtab: (value: SettingsView["subtab"]) => void
+  subtab?: ExtensionTab
+  onSubtab: (value: ExtensionTab | undefined) => void
   headerAction?: JSX.Element
 }> = (props) => {
   const language = useLanguage()

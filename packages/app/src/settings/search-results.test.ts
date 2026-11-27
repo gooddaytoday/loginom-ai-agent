@@ -29,11 +29,11 @@ describe("settings search index", () => {
   test("indexes the selected server's pages and names it only when there are several servers", () => {
     const multi = rankSettings("models", index({ selected: "remote" })).filter((item) => item.topLevel)
     expect(multi.map((item) => item.view)).toEqual([
-      { type: "root", server: "remote", tab: "models", target: undefined, subtab: undefined },
+      { type: "root", server: "remote", tab: "models", target: undefined },
     ])
     const single = rankSettings("models", index({ servers: [servers[0]] })).find((item) => item.topLevel)!
     expect(single.server).toBe("local")
-    expect(single.view).toEqual({ type: "root", tab: "models", target: undefined, subtab: undefined })
+    expect(single.view).toEqual({ type: "root", tab: "models", target: undefined })
   })
 
   test("keeps unavailable servers discoverable without advertising unloaded settings", () => {
@@ -43,7 +43,6 @@ describe("settings search index", () => {
       type: "root",
       tab: "servers",
       target: undefined,
-      subtab: undefined,
     })
     expect(rankSettings("font", items)).toHaveLength(3)
   })
@@ -74,11 +73,7 @@ describe("settings search index", () => {
         .filter((item) => item.title === "Agent")
         .map((item) => item.page),
     ).toEqual(["Desktop notifications", "Sound effects"])
-    expect(rankSettings("follow-up behavior", items)[0].page).toBe("Preferences / General")
-    expect(rankSettings("new question UI", items)[0].view).toMatchObject({
-      tab: "experimental",
-      target: "settings-new-question-ui",
-    })
+    expect(rankSettings("follow-up behavior", items)[0].page).toBe("General / General")
     expect(rankSettings("capsule", items)[0].view).toMatchObject({
       tab: "general",
       target: "settings-background-activity",
@@ -95,13 +90,17 @@ describe("settings search index", () => {
 })
 
 describe("settings search ranking", () => {
-  test("prioritizes top-level pages and omits generic project-setting copies", () => {
+  test("omits hidden pages and their entries, including project worktrees and extensions", () => {
+    const items = index({
+      plugins: [{ plugin: "fixture", value: { id: "experimental", title: "Hidden fixture", render: () => null } }],
+    })
+    for (const query of ["worktrees", "extensions", "mcps", "new question UI", "opencode skills", "Hidden fixture"]) {
+      expect(rankSettings(query, items)).toEqual([])
+    }
+    expect(items.filter((item) => item.topLevel).map((item) => item.title)).not.toContain("Projects")
+    expect(items.some((item) => item.view.target === "settings-auto-accept-permissions")).toBe(false)
     expect(rankSettings("work", index({ servers: [servers[0]] })).map((item) => item.title)).toEqual([
-      "Worktrees",
       "Default environment",
-    ])
-    expect(rankSettings("mcps", index()).map((item) => item.view)).toEqual([
-      { type: "root", server: "local", tab: "extensions", target: undefined, subtab: "mcps" },
     ])
     expect(rankSettings("project name", index())).toEqual([])
     expect(rankSettings("startup", index())).toEqual([])
@@ -109,10 +108,7 @@ describe("settings search ranking", () => {
 
   test("qualifies project settings by project name on the selected server", () => {
     expect(rankSettings("opencode name", index()).map((item) => item.view.target)).toEqual(["settings-project-name"])
-    expect(rankSettings("opencode name", index({ selected: "remote" })).map((item) => item.server)).toEqual([
-      "remote",
-    ])
-    expect(rankSettings("opencode skills", index()).map((item) => item.view.subtab)).toEqual(["skills"])
+    expect(rankSettings("opencode name", index({ selected: "remote" })).map((item) => item.server)).toEqual(["remote"])
   })
 
   test("project names alone find projects, including names that are setting labels", () => {

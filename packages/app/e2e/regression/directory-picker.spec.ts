@@ -1,16 +1,16 @@
 import { expect, test, type Page } from "@playwright/test"
 import { holdRoute } from "../utils/app"
 import type { MockServerConfig } from "../utils/mock-server"
-import { fileNode, openSettings } from "../utils/workspace"
+import { fileNode, mockWorkspace } from "../utils/workspace"
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
 const directory = "C:/OpenCode/Picker"
 
-// Opens the folder picker from Settings > Projects once its root has listed.
+// Opens the folder picker from Home once its root has listed.
 async function openPicker(page: Page, input: Pick<MockServerConfig, "fileList" | "findFiles">) {
-  await openSettings(page, { name: "Picker", seed: { tabs: [] }, ...input })
-  await page.getByTestId("settings-screen").getByRole("tab", { name: "Projects", exact: true }).click()
+  await mockWorkspace(page, { name: "Picker", seed: { tabs: [] }, ...input })
+  await page.goto("/")
   await page.getByRole("button", { name: "Add project", exact: true }).click()
   const picker = page.getByRole("dialog", { name: "Open project", exact: true })
   await expect(picker.getByRole("button", { name: "Select folder", exact: true })).toBeEnabled()
@@ -73,7 +73,7 @@ test("the folder picker's tree scrolls with the mouse wheel inside the modal", a
   const directory = "/projects/big"
   let listing = false
 
-  await openSettings(page, {
+  await mockWorkspace(page, {
     name: "Picker",
     directory,
     fileList: () =>
@@ -84,7 +84,7 @@ test("the folder picker's tree scrolls with the mouse wheel inside the modal", a
         : [],
     seed: { tabs: [] },
   })
-  await page.getByTestId("settings-screen").getByRole("tab", { name: "Projects", exact: true }).click()
+  await page.goto("/")
   listing = true
   await page.getByRole("button", { name: "Add project", exact: true }).click()
   const picker = page.getByRole("dialog", { name: "Open project", exact: true })

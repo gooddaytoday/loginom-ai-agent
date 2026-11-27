@@ -92,23 +92,28 @@ export function SettingsNavigation(props: {
                         <Show when={index() > 0}>
                           <Menu.Separator />
                         </Show>
-                        <For each={group.items}>
-                          {(item) => (
-                            <Menu.RadioItem
-                              value={item.value}
-                              disabled={item.disabled}
-                              closeOnSelect
-                              onPointerEnter={(event: PointerEvent) => {
-                                if (item.disabled || event.pointerType === "touch") return
-                                item.onPrefetch?.()
-                              }}
-                              onFocus={() => !item.disabled && item.onPrefetch?.()}
-                            >
-                              <Icon name={item.icon} />
-                              {item.label}
-                            </Menu.RadioItem>
-                          )}
-                        </For>
+                        <Menu.Group>
+                          <Show when={group.label}>
+                            <Menu.GroupLabel>{group.label}</Menu.GroupLabel>
+                          </Show>
+                          <For each={group.items}>
+                            {(item) => (
+                              <Menu.RadioItem
+                                value={item.value}
+                                disabled={item.disabled}
+                                closeOnSelect
+                                onPointerEnter={(event: PointerEvent) => {
+                                  if (item.disabled || event.pointerType === "touch") return
+                                  item.onPrefetch?.()
+                                }}
+                                onFocus={() => !item.disabled && item.onPrefetch?.()}
+                              >
+                                <Icon name={item.icon} />
+                                {item.label}
+                              </Menu.RadioItem>
+                            )}
+                          </For>
+                        </Menu.Group>
                       </>
                     )}
                   </For>

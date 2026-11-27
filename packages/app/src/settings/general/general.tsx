@@ -21,25 +21,6 @@ import { createOptimisticSetting, type ShellSettingsController } from "./control
 import { InterfaceModeSetting } from "./interface-mode"
 import "@/settings/settings.css"
 
-const AutoApprovePermissionsSetting: Component = () => {
-  const language = useLanguage()
-  const settings = useSettings()
-
-  return (
-    <SettingsRow
-      title={language.t("command.permissions.autoaccept.enable")}
-      description={language.t("settings.permissions.autoAccept.default.description")}
-    >
-      <div data-action="settings-auto-accept-permissions">
-        <Switch
-          checked={settings.permissions.autoApproveDefault()}
-          onChange={(checked) => settings.permissions.setAutoApproveDefault(checked)}
-        />
-      </div>
-    </SettingsRow>
-  )
-}
-
 const WorkspaceDestinationSetting: Component = () => {
   const language = useLanguage()
   const settings = useSettings()
@@ -255,7 +236,6 @@ export const SettingsGeneral: Component = () => {
         <LanguageSetting />
 
         <WorkspaceDestinationSetting />
-        <AutoApprovePermissionsSetting />
 
         <SettingsRow
           title={language.t("settings.general.row.showCustomAgents.title")}

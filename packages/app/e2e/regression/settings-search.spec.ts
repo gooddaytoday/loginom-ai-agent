@@ -239,9 +239,9 @@ test("a search result reveal highlights once and cleans up after it finishes", a
       root.setAttribute("data-search-flashes", String(Number(root.getAttribute("data-search-flashes")) + 1))
     })
   })
-  await view.search.fill("skills")
-  await view.results.getByRole("option").click()
-  await expect(view.settings.getByRole("tab", { name: "Skills", exact: true })).toHaveAttribute("aria-selected", "true")
+  await view.search.fill("color scheme")
+  await view.results.getByRole("option", { name: /^Color scheme/ }).click()
+  await expect(view.settings.getByRole("heading", { name: "Appearance", exact: true })).toBeVisible()
   await expect(view.settings).toHaveAttribute("data-search-flashes", "1")
   await view.settings.evaluate((root) =>
     Promise.all(
@@ -255,7 +255,8 @@ test("a search result reveal highlights once and cleans up after it finishes", a
   )
   await expect(view.settings.locator("[data-search-target]")).toHaveCount(0)
 
-  for (const tab of ["MCPs", "Skills"]) {
+  await view.settings.getByRole("button", { name: "Clear", exact: true }).click()
+  for (const tab of ["Notifications", "Appearance"]) {
     await view.settings.getByRole("tab", { name: tab, exact: true }).click()
     await expect(view.settings.getByRole("tab", { name: tab, exact: true })).toHaveAttribute("aria-selected", "true")
   }
@@ -284,6 +285,7 @@ test("Models and Shortcuts leave focus on navigation until the user types", asyn
 })
 
 test("section search takes typed input, clears in place, and escapes in steps", async ({ page }) => {
+  test.skip(true, "C1.2 hides the Projects page")
   const view = await open(page, { count: 8 })
   await view.settings.getByRole("tab", { name: "Projects", exact: true }).click()
   const field = view.settings.locator('[data-component="settings-filter-search"]')
@@ -312,6 +314,7 @@ test("section search takes typed input, clears in place, and escapes in steps", 
 
 for (const count of [0, 7, 8]) {
   test(`Projects search appears from 8 added projects (${count} projects)`, async ({ page }) => {
+    test.skip(true, "C1.2 hides the Projects page")
     const view = await open(page, {
       count,
       seed: { usedProjects: { local: Array.from({ length: count }, (_, index) => `proj_search_${index}`) } },
@@ -393,20 +396,8 @@ test("project results keep the query, selection, and scroll position on return",
   await expect.poll(() => view.viewport.evaluate((list) => list.scrollTop)).toBe(scroll)
 })
 
-test("a page reached through an opened result keeps its own way back", async ({ page }) => {
+test("a Command Palette jump reveals a project setting", async ({ page }) => {
   const view = await open(page)
-  await view.search.fill("Projects")
-  await view.results.getByRole("option", { name: "Projects, This computer", exact: true }).click()
-  await expect(view.settings.getByRole("heading", { name: "Projects", exact: true })).toBeVisible()
-  await view.settings.getByRole("button", { name: "OpenCode", exact: true }).click()
-  await expect(view.settings.getByRole("heading", { name: "OpenCode", exact: true })).toBeVisible()
-  await expect(view.settings.getByRole("button", { name: "Back to projects", exact: true })).toBeVisible()
-  // Escape leaves the project for its own parent, not for the page the search started on.
-  await page.keyboard.press("Escape")
-  await expect(view.settings.getByRole("heading", { name: "Projects", exact: true })).toBeVisible()
-  await expect(view.search).toHaveValue("Projects")
-
-  // A Command Palette jump reveals its setting without a way back to a search.
   const key = await page.evaluate(() =>
     /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? "Meta+Shift+P" : "Control+Shift+P",
   )
@@ -417,7 +408,7 @@ test("a page reached through an opened result keeps its own way back", async ({ 
   await palette.getByRole("option", { name: /^Project name/ }).click()
   await expect(view.settings.getByRole("textbox", { name: "Project name", exact: true })).toHaveValue("OpenCode")
   await expect(view.settings.locator('[data-search-target="row"]')).toContainText("Project name")
-  await expect(view.settings.getByRole("button", { name: "Back to projects", exact: true })).toBeVisible()
+  await expect(view.settings.getByRole("button", { name: "Back to settings", exact: true })).toBeVisible()
 })
 
 test("project edits queued behind a save reach their project in order across jumps away and back", async ({ page }) => {
@@ -475,7 +466,7 @@ test("IME confirmation does not activate a search result", async ({ page }) => {
   await view.search.fill("font")
   await expect(view.results.getByRole("option")).toHaveCount(3)
   await view.search.dispatchEvent("keydown", { key: "Enter", isComposing: true, bubbles: true, cancelable: true })
-  await expect(view.settings.getByRole("heading", { name: "Preferences", exact: true })).toBeVisible()
+  await expect(view.settings.getByRole("heading", { name: "General", exact: true, level: 2 })).toBeVisible()
   await view.search.press("Enter")
   await expect(view.settings.getByRole("heading", { name: "Appearance", exact: true })).toBeVisible()
 })
@@ -498,17 +489,17 @@ test("multi-server results follow the selected server and keep the query on retu
 
   await view.search.fill("Remote app")
   await expect(view.results.getByRole("option")).toHaveCount(0)
-  await view.search.fill("MCPs")
+  await view.search.fill("Models")
   await expect(view.results.getByRole("option")).toHaveCount(1)
   await view.search.clear()
   await view.settings.getByRole("tab", { name: "Providers", exact: true }).click()
   await view.settings.getByRole("button", { name: "Server This computer", exact: true }).click()
   await page.getByRole("menuitemradio", { name: "Build server", exact: true }).click()
 
-  await view.search.fill("MCPs")
-  await view.results.getByRole("option", { name: "MCPs, Build server, Extensions", exact: true }).click()
+  await view.search.fill("Models")
+  await view.results.getByRole("option", { name: "Models, Build server", exact: true }).click()
   await expect(view.settings.getByRole("button", { name: "Server Build server", exact: true })).toBeVisible()
-  await expect(view.settings.getByRole("tab", { name: "MCPs", exact: true })).toHaveAttribute("aria-selected", "true")
+  await expect(view.settings.getByRole("heading", { name: "Models", exact: true })).toBeVisible()
   await view.search.fill("Remote app name")
   await expect(view.results.getByRole("option")).toHaveCount(1)
   await view.results.getByRole("option").click()
