@@ -63,7 +63,7 @@ export async function readGraph(page, task) {
       const nativeLinks=diagram.FLinks?.FCollection;
       if(model.FCreateDraggedNodeStarted!==false||model.FDraggingOverGraph!==false||model.FDraggedNode
         ||!Array.isArray(nativeLinks)||nativeLinks.length>400)return null;
-      const ports=new Map();
+      const ports=new Map(),tablePorts=new Set();
       const nodes=collection.map(node=>{
         const nativeLabel=node.FLabel,geometry=node.FCell?.geometry;
         if(!node.FGuid||nativeLabel?.parent!==node||nativeLabel.FCell?.parent!==node.FCell
@@ -74,7 +74,7 @@ export async function readGraph(page, task) {
         const tid=body&&containers[0].contains(body)?body.getAttribute('data-tid'):null;
         for(const group of node.FPorts??[])for(const port of group.FCollection??[]){
           if(port.parent!==node)continue;
-          ports.set(port,node.FGuid);
+          ports.set(port,node);
           if(!snapshot_details||!port.FGuid||port.FCell?.parent!==node.FCell||![0,1].includes(port.FType))continue;
           const direction=port.FType===0?'input':'output';
           const rendered=graph.view.getState(port.FCell)?.shape?.node;
@@ -82,6 +82,7 @@ export async function readGraph(page, task) {
           const name=tid&&portTid?.startsWith(tid+';')?portTid.slice(tid.length+1):'';
           const kind=port.FSubType===3?'variables':port.FSubType===4?'control'
             :/^(Input|Output)_DataTree-/.test(name)?'tree':port.FSubType===1?'data':'service';
+          if(kind==='data')tablePorts.add(port);
           const key=direction+'/'+kind,index=ordinals.get(key)??0;
           ordinals.set(key,index+1);
           descriptors.push({guid:port.FGuid,direction,kind,index,name});
@@ -92,10 +93,33 @@ export async function readGraph(page, task) {
         return {guid:node.FGuid,type,label:nativeLabel.FRawValue,position:{x:boundary==='output'?0:geometry.x,y:geometry.y},
           ...(snapshot_details?{ports:descriptors,...(boundary?{boundary_role:boundary}:{})}:{})};
       });
-      const links=nativeLinks.map(({FSourcePort:output,FTargetPort:input})=>{
+      const verifiedExecutions=new Map();
+      const links=nativeLinks.map(link=>{
+        const {FSourcePort:output,FTargetPort:input}=link;
         const source=ports.get(output),target=ports.get(input);
         if(!source||!target||!output.FGuid||!input.FGuid)fail('Native snapshot link endpoints unavailable');
-        return {source,output:output.FGuid,target,input:input.FGuid};
+        const edge={source:source.FGuid,output:output.FGuid,target:target.FGuid,input:input.FGuid};
+        if(!tablePorts.has(output)||!tablePorts.has(input))return edge;
+        const receipt=preparation.schemaPortReceipts?.get(output);
+        const connection=receipt?.links.get(link);
+        if(!connection||receipt.workflow!==workflowNode||receipt.diagram!==diagram
+          ||receipt.node!==source||receipt.nodeGuid!==source.FGuid||receipt.nodeCell!==source.FCell||receipt.nodeData!==source.data
+          ||source.FStatus!==1||source.FRunning!==false||output.FStatus!==1
+          ||receipt.port_guid!==output.FGuid||receipt.portCell!==output.FCell||receipt.portData!==output.data
+          ||connection.linkCell!==link.FCell||connection.input!==input||connection.inputGuid!==input.FGuid
+          ||connection.inputCell!==input.FCell||connection.inputData!==input.data||connection.owner!==target
+          ||connection.ownerGuid!==target.FGuid||connection.ownerCell!==target.FCell||connection.ownerData!==target.data)return edge;
+        if(!verifiedExecutions.has(receipt)){
+          let current=false;
+          try {
+            receipt.inspect({documentId:request.document_id,execution:receipt.execution,nodeData:source.data},
+              ok=>{if(!ok)fail('Execution receipt changed');},receipt.process);
+            current=true;
+          }catch{}
+          verifiedExecutions.set(receipt,current);
+        }
+        return verifiedExecutions.get(receipt)?{...edge,row_count_receipt:{
+          execution_id:receipt.execution.execution_id,port_guid:receipt.port_guid,row_count:receipt.row_count}}:edge;
       });
       return {document:request.document_id,workflow:request.workflow_ref.workflow_id,nodes,links};
     }

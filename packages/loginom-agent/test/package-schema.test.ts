@@ -39,7 +39,25 @@ test("loginom.package.schema reads the requested source and confines it to the c
       limitations: ["active_workflow_only", "no_submodels", "no_node_settings"],
       generation: 2,
       package: { name: "Draft" },
-      workflow: { document_id: "doc", workflow_id: "workflow", navigation_path: [], nodes: [], links: [] },
+      workflow: {
+        document_id: "doc",
+        workflow_id: "workflow",
+        navigation_path: [],
+        nodes: [],
+        links: [
+          {
+            source: {
+              node_guid: "88fa4542-2b78-4dfb-858b-6372f0b0446a",
+              port_guid: "58f7e6c3-511e-39d7-8853-036e0a1a7612",
+            },
+            target: {
+              node_guid: "c34cbf70-4971-4537-8607-d3e5e422556a",
+              port_guid: "9dc72a3f-56bf-3bfc-84ec-f979daf4da6b",
+            },
+            last_execution_row_count: 0,
+          },
+        ],
+      },
     }
     const run = Effect.gen(function* () {
       yield* Effect.acquireRelease(

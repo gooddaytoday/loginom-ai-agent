@@ -130,3 +130,53 @@ test("window identity normalizes UUID spelling and preserves its runtime-only sc
   })
   expect(windowPackageSchema({ workflow_id: "missing scope" })).toBeNull()
 })
+
+test("window and saved links share endpoint GUIDs and only a matching table receipt supplies a row count", async () => {
+  const [savedLink] = (await saved("tasks/filter-active-rows/reference.lgp")).workflows[0].links
+  const native = (id: string | null) => "{" + id?.toUpperCase() + "}"
+  const edge = {
+    source: native(savedLink.source.node_guid),
+    output: native(savedLink.source.port_guid),
+    target: native(savedLink.target.node_guid),
+    input: native(savedLink.target.port_guid),
+  }
+  const snapshot = (row_count_receipt?: unknown, kind = "data") =>
+    windowPackageSchema({
+      name: "Draft",
+      document: "doc",
+      workflow: "window-workflow",
+      navigation_path: [],
+      nodes: [
+        {
+          guid: edge.source,
+          label: "Source",
+          type: "imports.text",
+          position: null,
+          ports: [{ guid: edge.output, direction: "output", kind, index: 4, name: "Output" }],
+        },
+        {
+          guid: edge.target,
+          label: "Target",
+          type: "transform.filter",
+          position: null,
+          ports: [{ guid: edge.input, direction: "input", kind, index: 2, name: "Input" }],
+        },
+      ],
+      links: [{ ...edge, row_count_receipt, row_count: 123 }],
+    })?.workflow.links[0]
+  const windowLink = {
+    source: { ...savedLink.source, kind: "data", index: 4 },
+    target: { ...savedLink.target, kind: "data", index: 2 },
+  }
+  const receipt = { execution_id: "doc:root:1", port_guid: savedLink.source.port_guid, row_count: 0 }
+  expect(snapshot(receipt)).toEqual({ ...windowLink, last_execution_row_count: 0 })
+  expect(savedLink).not.toHaveProperty("last_execution_row_count")
+  expect(snapshot()).toEqual(windowLink)
+  expect(snapshot({ ...receipt, port_guid: edge.input })).toEqual(windowLink)
+  expect(snapshot({ ...receipt, execution_id: "other:root:1" })).toEqual(windowLink)
+  expect(snapshot({ ...receipt, row_count: -1 })).toEqual(windowLink)
+  expect(snapshot(receipt, "variables")).toEqual({
+    source: { ...windowLink.source, kind: "variables" },
+    target: { ...windowLink.target, kind: "variables" },
+  })
+})

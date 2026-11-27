@@ -30,6 +30,12 @@ const WindowLink = Schema.Struct({
   output: Schema.NonEmptyString,
   target: Schema.NonEmptyString,
   input: Schema.NonEmptyString,
+  row_count_receipt: Schema.optionalKey(Schema.Unknown),
+})
+const RowCountReceipt = Schema.Struct({
+  execution_id: Schema.NonEmptyString,
+  port_guid: Schema.NonEmptyString,
+  row_count: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 })
 const WindowGraph = Schema.Struct({
   name: Schema.NullOr(Schema.String),
@@ -125,7 +131,7 @@ export function windowPackageSchema(value: unknown) {
   const nodes = new Map(graph.nodes.map((node) => [node.guid, node]))
   const endpoint = (nodeID: string, portID: string, direction: "input" | "output") => {
     const port = nodes.get(nodeID)?.ports.find((port) => port.direction === direction && port.guid === portID)
-    return { node_guid: guid(nodeID), port_guid: guid(portID), ...(port && { kind: port.kind, index: port.index }) }
+    return { node_guid: nodeID, port_guid: portID, ...(port && { kind: port.kind, index: port.index }) }
   }
   return {
     source: "window" as const,
@@ -143,10 +149,22 @@ export function windowPackageSchema(value: unknown) {
         guid: guid(node.guid),
         ports: node.ports.map((port) => ({ ...port, guid: guid(port.guid) })),
       })),
-      links: graph.links.map((link) => ({
-        source: endpoint(link.source, link.output, "output"),
-        target: endpoint(link.target, link.input, "input"),
-      })),
+      links: graph.links.map((link) => {
+        const edge = normalizedLink({
+          source: endpoint(link.source, link.output, "output"),
+          target: endpoint(link.target, link.input, "input"),
+        })
+        const receipt = link.row_count_receipt
+        if (
+          edge.source.kind === "data" &&
+          edge.target.kind === "data" &&
+          Schema.is(RowCountReceipt)(receipt) &&
+          guid(receipt.port_guid) === edge.source.port_guid &&
+          receipt.execution_id.startsWith(graph.document + ":")
+        )
+          return { ...edge, last_execution_row_count: receipt.row_count }
+        return edge
+      }),
     },
   }
 }
