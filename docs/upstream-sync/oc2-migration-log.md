@@ -26519,7 +26519,7 @@ $ loop.sh <исходники с правкой>       # после
 | datamining-logregression | logreg-forward | 2/2 | PASS | **принят** |
 | integration-restrequest | rest-get-plain | 2/2 | 2 из 3: FAIL (сохранение), PASS, PASS | **принят** |
 | exports-excel | exports-excel | 0/2: r1 возврат из «Файлов» (пробой не воспроизведён, причина открыта), r2 модель | — | не принят |
-| preprocessing-datapartition | partition-random | 0/2: r1 модель, r2 «Файлы» (список хранилища — воспроизведён на `v0.4.2`) | — | не принят |
+| preprocessing-datapartition | partition-random | 0/2: r1 модель, r2 «Файлы» (отказ списка хранилища воспроизведён на `v0.4.2`, зависание сеанса после него не проверялось) | — | не принят |
 | preprocessing-sampling | sampling-random | 0/2: модель | — | не принят |
 | preprocessing-smoothing | smoothing-hp | 1/3: r2, r3 модель | — | не принят |
 | research-autocorrelation | acf-update | 0/2: стенд (UNKNOWN по сроку) | — | не принят |
@@ -26538,8 +26538,9 @@ $ loop.sh <исходники с правкой>       # после
 
 **Браузерная часть на стенде (B6.1-E).** 4 отказа; на `v0.4.2` воспроизведена только часть:
 - воспроизведено пробой без модели и на v2, и целиком на `v0.4.2`: b5-1, b5-2 acf-update (фаза `target` узла `research.auto_correlation` молчит до срока: цикл
-  `readAutoCorrelationRowCount` в `auto-correlation-preflight.mjs` ждёт полей просмотра Loginom) и вторая половина b3-2 partition-random (`STORAGE_SOURCE_REFUSED: Server storage
-  navigation did not complete`, затем `FOREIGN_WORKFLOW_CHANGED`, вкладка «Файлы» осталась активной);
+  `readAutoCorrelationRowCount` в `auto-correlation-preflight.mjs` ждёт полей просмотра Loginom) и отказ списка файлов во второй половине b3-2 partition-random
+  (`STORAGE_SOURCE_REFUSED: Server storage navigation did not complete`). Что было после него в b3-2 — `FOREIGN_WORKFLOW_CHANGED`, вкладка «Файлы» осталась активной, Save
+  недоступен — проба не проверяла: она останавливается на отказе списка;
 - не воспроизведено, причина открыта: b2-1 exports-excel (`NODE_APPLY_STOPPED: Export file read did not return to its workflow` — «Файлы» ~25 с под маской busy, возврат во вкладку
   сценария не уложился в 5 с, операция AMBIGUOUS, Save заблокирован; во всех пробах экспорт с чтением выгрузки прошёл) и первая половина b3-2 (`Node procedure readiness timeout:
   one new node execution group` на экспорте, файл на сервере записан).
