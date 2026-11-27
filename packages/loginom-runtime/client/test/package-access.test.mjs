@@ -43,6 +43,10 @@ test("observes a persisted package and checks only its exact lock marker on dema
     packages: [{ path: packagePath, readOnly: true }], lockMarker: "present",
   })
   assert.deepEqual(f.reads, ["/user/shared/.plan.lgp.lck"])
+  f.storage.FileExists = async (path) => path === packagePath + ".lck"
+  assert.deepEqual(await observePackages(f.page, binding, packagePath), {
+    packages: [{ path: packagePath, readOnly: true }], lockMarker: "present",
+  })
   f.storage.FileExists = async () => false
   assert.deepEqual(await observePackages(f.page, binding, packagePath), {
     packages: [{ path: packagePath, readOnly: true }], lockMarker: "not_observed",

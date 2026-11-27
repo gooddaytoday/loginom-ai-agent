@@ -37,14 +37,18 @@ export async function observePackages(page, binding, packagePath) {
     let lockMarker = "unknown"
     if (readOnly) {
       const slash = path.lastIndexOf("/")
-      // Linux Loginom uses a dot-prefixed sidecar. Its presence is evidence
-      // of a lock marker, and cannot identify a user or prove a live session.
-      const marker = path.slice(0, slash + 1) + "." + path.slice(slash + 1) + ".lck"
+      // Loginom documents the .lgp.lck sidecar. Linux has also been observed
+      // to prefix it with a dot. A sidecar carries no proof of a live session.
+      const markers = [path.slice(0, slash + 1) + "." + path.slice(slash + 1) + ".lck", path + ".lck"]
       try {
         const storage = await session.get_FileStorage()
-        if (!stillOpen()) return null
-        const exists = await storage.FileExists(marker)
-        if (typeof exists === "boolean") lockMarker = exists ? "present" : "not_observed"
+        lockMarker = "not_observed"
+        for (const marker of markers) {
+          if (!stillOpen()) return null
+          const exists = await Promise.resolve().then(() => storage.FileExists(marker)).catch(() => undefined)
+          if (exists === true) { lockMarker = "present"; break }
+          if (exists !== false) lockMarker = "unknown"
+        }
       } catch { /* Storage visibility can be restricted independently of the open package. */ }
     }
     return stillOpen() ? { packages: [{ path, readOnly }], lockMarker } : null
