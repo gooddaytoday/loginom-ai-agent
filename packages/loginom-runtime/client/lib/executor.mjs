@@ -3241,7 +3241,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     receipt.next_step = { tool: 'dock_action_run', original_operation_id: operation.id,
       instruction: 'The exported file is now downloaded and byte-verified (file_artifacts). Do not export again. Save the '
         + 'package with package.save_checkpoint and a NEW operation_id if it is not saved yet, then report the file. '
-        + 'Give the Loginom storage path from `file_artifacts[].destination` in backticks and point to the file card at the export step if shown in Desktop, without claiming you attached the file or looking for or guessing its private local path.' };
+        + 'Give the Loginom storage path from `file_artifacts[].destination` in backticks. Do not claim you attached the file. '
+        + 'Do not look for or guess the local path, which is not provided to the model.' };
     const event = { operation_id: operation.id, action_key: 'node.apply', action_revision: operation.nodeApply.request.contract_revision,
       phase: 'browser_recovery_receipt', receipt };
     const ack = await onRecord(event);
