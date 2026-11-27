@@ -880,7 +880,7 @@ test("Extensions lists open config files and skills in a side tab and start setu
   await list("Plugins").getByRole("button", { name: "Add a plugin with Loginom AI Agent", exact: true }).click()
   await expect(page).toHaveURL(/\/new-session\?/)
   await expect(page.locator('[data-component="composer-editor"]')).toContainText(
-    "Help me add a plugin to my global OpenCode config.",
+    "Help me add a plugin to my global Loginom AI Agent config.",
   )
 })
 
