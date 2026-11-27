@@ -67,10 +67,6 @@ export const dict = {
   "ui.sessionTurn.retry.geminiHot": "جمینی در حال حاضر خیلی داغ است",
   "ui.sessionTurn.error.freeUsageExceeded": "استفاده رایگان بیش از حد است",
   "ui.sessionTurn.error.addCredits": "اعتبار اضافه کنید",
-  "dialog.usageExceeded.freeTier.title": "به حد مجاز رایگان رسیده است",
-  "dialog.usageExceeded.freeTier.description":
-    "برای دسترسی مطمئن به بهترین مدل‌های منبع باز، با قیمت 10 دلار در ماه در OpenCode Go مشترک شوید.",
-  "dialog.usageExceeded.freeTier.actionLabel": "مشترک شوید",
   "ui.sessionTurn.status.delegating": "تفویض کار",
   "ui.sessionTurn.status.planning": "برنامه ریزی مراحل بعدی",
   "ui.sessionTurn.status.gatheringContext": "کاوش",

@@ -272,7 +272,6 @@ export const dict = {
   "dialog.provider.tag.recommended": "Anbefalet",
   "dialog.provider.opencode.note": "Udvalgte modeller inklusive Claude, GPT, Gemini og flere",
   "dialog.provider.opencode.tagline": "Pålidelige optimerede modeller",
-  "dialog.provider.opencodeGo.tagline": "Billigt abonnement for alle",
   "dialog.provider.copilot.note": "AI-modeller til kodningsassistance via GitHub Copilot",
   "dialog.provider.openai.note": "GPT-modeller til hurtige, kompetente generelle AI-opgaver",
   "dialog.provider.google.note": "Gemini-modeller til hurtige, strukturerede svar",
@@ -286,8 +285,6 @@ export const dict = {
   "dialog.model.manage.description": "Tilpas hvilke modeller der vises i modelvælgeren.",
 
   "dialog.model.unpaid.freeModels.title": "Gratis modeller leveret af OpenCode",
-  "dialog.model.unpaid.addMore.title": "Tilføj flere modeller fra populære udbydere",
-  "dialog.model.unpaid.viewMoreProviders": "Se mere end 70 yderligere udbydere",
 
   "dialog.provider.viewAll": "Vis flere udbydere",
 
@@ -400,7 +397,6 @@ export const dict = {
 
   "dialog.project.edit.worktree.startup": "Opstartsscript for arbejdsområde",
   "dialog.project.edit.worktree.startup.placeholder": "f.eks. bun install",
-  "dialog.usageExceeded.dontShowAgain": "Vis ikke igen",
 
   "toast.permissions.autoaccept.on.title": "Accepterer tilladelser automatisk",
   "toast.permissions.autoaccept.on.description": "Anmodninger om tilladelse godkendes automatisk",

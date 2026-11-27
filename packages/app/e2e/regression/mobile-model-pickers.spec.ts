@@ -114,9 +114,9 @@ for (const direction of ["ltr", "rtl"] as const) {
       }
 
       await model.click()
-      await models.getByRole("button", { name: "Connect an integration", exact: true }).click()
+      await models.getByRole("button", { name: "Connect model…", exact: true }).click()
       await expect(models).toBeHidden()
-      const providers = page.getByRole("dialog", { name: "Integrations", exact: true })
+      const providers = page.getByRole("dialog", { name: "Connect provider", exact: true })
       await expect(providers.getByRole("searchbox", { name: "Search providers", exact: true })).toBeFocused()
       await expect(page.getByRole("dialog")).toHaveCount(1)
     })
@@ -297,7 +297,7 @@ test("model dialog opens Manage models from its search row with Enter", async ({
   const manage = dialog.getByRole("button", { name: "Manage models", exact: true })
   await expect(search).toBeFocused()
   await search.press("Tab")
-  await expect(dialog.getByRole("button", { name: "Connect an integration", exact: true })).toBeFocused()
+  await expect(dialog.getByRole("button", { name: "Connect model…", exact: true })).toBeFocused()
   await page.keyboard.press("Tab")
   await expect(manage).toBeFocused()
   await manage.press("Enter")
