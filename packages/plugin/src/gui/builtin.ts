@@ -169,8 +169,30 @@ export interface Page {
  */
 export const Page = Registry.define<Page>("page")
 
+export interface ComposerFileType {
+  readonly mime: string
+  matches(filename: string): boolean
+}
+
+export const ComposerFileType = Registry.define<ComposerFileType>("composer-file-type")
+
+export interface ComposerSlotInput {
+  readonly draft: object
+  readonly files: readonly {
+    readonly id: string
+    readonly filename: string
+    readonly mime: string
+    readonly path: string
+  }[]
+  attach(): void
+  removeFile(id: string): void
+  openPage(plugin: string, page: string, query?: URLSearchParams): void
+}
+
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
+  readonly "composer.add-menu": ComposerSlotInput
+  readonly "composer.above": ComposerSlotInput
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */
   readonly "session.location.branch.menu": SlotMap["session.location.menu"]
   /** Items after the host's copy and reveal actions in the session directory's path submenu. Requires an owning screen. */

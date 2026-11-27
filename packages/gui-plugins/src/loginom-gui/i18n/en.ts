@@ -1,4 +1,18 @@
 export default {
+  composerLoginom: "Package from Loginom…",
+  composerFile: "File from computer",
+  composerCatalog: "Catalog…",
+  composerPickerUnavailable:
+    "Choosing a package from Loginom is not available yet. You can attach an .lgp file from your computer.",
+  composerScheme: "Diagram",
+  composerRemove: "Remove package {{name}}",
+  composerActions: "What to do with the package",
+  composerDocument: "Document",
+  composerCheck: "Check",
+  composerImprove: "Improve",
+  composerCompare: "Compare",
+  composerMore: "More",
+  composerAddAction: "Add from catalog",
   title: "Loginom",
   description: "Choose the Loginom server the agent uses for packages, storage, and scenarios.",
   url: "Address",

@@ -91,6 +91,8 @@ export type ComposerEditorProps = {
   borderUnderlay?: boolean
   class?: string
   modelControl?: JSX.Element
+  customFile?: (file: ComposerAttachment) => boolean
+  pluginAddMenu?: () => JSX.Element
   modelControlsVisible?: boolean
   attachKeybind?: string[]
   attachShortcut?: string
@@ -277,7 +279,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
         >
           <Show when={mode() === "normal"}>
             <ComposerAttachments
-              attachments={props.controller.attachments()}
+              attachments={props.controller
+                .attachments()
+                .filter((part) => part.type !== "path" || !props.customFile?.(part))}
               uploads={props.controller.uploads()}
               comments={props.controller.comments()}
               files={props.controller.files()}
@@ -464,6 +468,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
                 onCommands={props.controller.openCommands}
                 onContext={props.controller.openContext}
                 onShell={props.controller.openShell}
+                pluginItems={props.pluginAddMenu}
               />
             </div>
           </Show>
@@ -553,10 +558,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
         </div>
       </form>
       <Show when={touch()}>
-        <Show when={dock()} fallback={<ComposerEditorTouchBar controller={props.controller} />}>
+        <Show
+          when={dock()}
+          fallback={<ComposerEditorTouchBar controller={props.controller} pluginAddMenu={props.pluginAddMenu} />}
+        >
           {(mount) => (
             <Portal mount={mount()}>
-              <ComposerEditorTouchBar controller={props.controller} docked />
+              <ComposerEditorTouchBar controller={props.controller} pluginAddMenu={props.pluginAddMenu} docked />
             </Portal>
           )}
         </Show>
@@ -984,6 +992,7 @@ function ComposerEditorAddMenu(props: {
   onCommands: () => void
   onContext: () => void
   onShell: () => void
+  pluginItems?: () => JSX.Element
 }) {
   const focus = pointerFocusReturn()
 
@@ -1015,9 +1024,16 @@ function ComposerEditorAddMenu(props: {
             class="[&_[data-slot=menu-v2-item-shortcut]]:w-5 [&_[data-slot=menu-v2-item-shortcut]]:justify-center"
             style={{ "min-width": "180px" }}
           >
-            <Menu.Item onSelect={props.onAttach} shortcut={props.attachShortcut}>
-              {props.attachLabel}
-            </Menu.Item>
+            <Show
+              when={props.pluginItems}
+              fallback={
+                <Menu.Item onSelect={props.onAttach} shortcut={props.attachShortcut}>
+                  {props.attachLabel}
+                </Menu.Item>
+              }
+            >
+              {(items) => items()()}
+            </Show>
             <Menu.Separator />
             <Menu.Item onSelect={props.onCommands} shortcut="/">
               {props.commandsLabel}
@@ -1566,7 +1582,11 @@ function ComposerEditorSubmitButton(props: {
 // The composer's actions on a touch device, where Return only adds a line: this bar is the one way to send, steer,
 // queue or stop, and every target is at least 44px. Docked, it spans the bottom of the shell, which is the top of the
 // keyboard while one is open. Buttons keep the editor focused so the keyboard stays open.
-function ComposerEditorTouchBar(props: { controller: ComposerEditorModel; docked?: boolean }) {
+function ComposerEditorTouchBar(props: {
+  controller: ComposerEditorModel
+  docked?: boolean
+  pluginAddMenu?: () => JSX.Element
+}) {
   const i18n = useI18n()
   const view = props.controller.view
   const keep = (event: MouseEvent) => event.preventDefault()
@@ -1634,16 +1654,40 @@ function ComposerEditorTouchBar(props: { controller: ComposerEditorModel; docked
           </Button>
         }
       >
-        <IconButton
-          data-action="composer-attach-file"
-          variant="ghost-muted"
-          class="size-11 rounded-lg"
-          icon={<Icon name="plus" />}
-          aria-label={i18n.t("ui.promptInput.add")}
-          disabled={view.draftOnly}
-          onMouseDown={keep}
-          onClick={props.controller.attach}
-        />
+        <Show
+          when={props.pluginAddMenu}
+          fallback={
+            <IconButton
+              data-action="composer-attach-file"
+              variant="ghost-muted"
+              class="size-11 rounded-lg"
+              icon={<Icon name="plus" />}
+              aria-label={i18n.t("ui.promptInput.add")}
+              disabled={view.draftOnly}
+              onMouseDown={keep}
+              onClick={props.controller.attach}
+            />
+          }
+        >
+          {(items) => (
+            <Menu gutter={6} modal={false} placement="top-start">
+              <Menu.Trigger
+                as={IconButton}
+                data-action="composer-attach-file"
+                type="button"
+                variant="ghost-muted"
+                class="size-11 rounded-lg"
+                icon={<Icon name="plus" />}
+                aria-label={i18n.t("ui.promptInput.add")}
+                disabled={view.draftOnly}
+                onMouseDown={keep}
+              />
+              <Menu.Portal>
+                <Menu.Content>{items()()}</Menu.Content>
+              </Menu.Portal>
+            </Menu>
+          )}
+        </Show>
         <For
           each={
             [

@@ -99,6 +99,17 @@
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
     {
+      "id": "CAT-15",
+      "title": "Built-in composer contributions (C4.5)",
+      "paths": [
+        "packages/app/src/composer/attachments/attachments.ts",
+        "packages/app/src/composer/composer.tsx",
+        "packages/app/src/composer/editor/editor.tsx",
+        "packages/app/src/composer/model.ts",
+        "packages/app/e2e/regression/composer.spec.ts"
+      ]
+    },
+    {
       "id": "CAT-14",
       "title": "Built-in plugin top-level pages",
       "paths": [

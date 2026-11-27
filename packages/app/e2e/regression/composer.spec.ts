@@ -5,6 +5,99 @@ import { mockPluginsActivating, type MockServerConfig } from "../utils/mock-serv
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] })
 
+const loginomModel = {
+  all: [
+    {
+      id: "test",
+      name: "Test",
+      models: { composer: { id: "composer", name: "Stub composer model", limit: { context: 200_000 } } },
+    },
+  ],
+  connected: ["test"],
+  default: { providerID: "test", modelID: "composer" },
+}
+
+const packageFixture = {
+  name: "Продажи.LGP",
+  mimeType: "application/octet-stream",
+  buffer: Buffer.from("fixture package"),
+}
+
+test("Loginom composer offers the package menu and shows an .lgp above the editor", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+
+  const view = await openDraft(page, {
+    name: "LoginomComposer",
+    provider: loginomModel,
+    seed: { locale: "ru" },
+    onFileWrite: () => {},
+  })
+
+  const plus = page.locator('[data-action="composer-attach"]')
+  const actions = page.getByRole("group", { name: "Что сделать с пакетом", exact: true })
+  await expect(actions).toHaveCount(0)
+  await plus.click()
+  const menu = page.getByRole("menu")
+  await expect(menu.getByRole("menuitem", { name: "Пакет из Loginom…", exact: true })).toBeVisible()
+  await expect(menu.getByRole("menuitem", { name: /Файл с компьютера/ })).toBeVisible()
+  await expect(menu.getByRole("menuitem", { name: "Каталог…", exact: true })).toBeVisible()
+  await menu.getByRole("menuitem", { name: "Пакет из Loginom…", exact: true }).click()
+  await expect(page.getByRole("dialog", { name: "Пакет из Loginom…" })).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(page.getByRole("dialog")).toHaveCount(0)
+
+  await plus.click()
+  const chooser = page.waitForEvent("filechooser")
+  await menu.getByRole("menuitem", { name: /Файл с компьютера/ }).click()
+  await (await chooser).setFiles(packageFixture)
+  const remove = page.getByRole("button", { name: `Убрать пакет ${packageFixture.name}` })
+  await expect(remove).toBeVisible()
+  await expect(page.getByRole("button", { name: "Схема", exact: true })).toBeVisible()
+  await expect(actions.getByRole("button")).toHaveText(["Документировать", "Проверить", "Улучшить", "Сравнить", "Ещё"])
+  await expect(actions.getByRole("button", { name: "Проверить" })).toHaveAttribute("title", "Добавить из каталога")
+  await expect(page.locator('[data-component="composer-attachments"]')).toHaveCount(0)
+  const actionsBounds = await actions.boundingBox()
+  const editorBounds = await view.editor.boundingBox()
+  expect(actionsBounds!.y + actionsBounds!.height).toBeLessThan(editorBounds!.y)
+  await view.editor.pressSequentially("Inspect package")
+  await expect(view.editor).toHaveText("Inspect package")
+
+  await page.screenshot({ path: testInfo.outputPath("composer-1440x900.png"), animations: "disabled" })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(actions).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath("composer-390x844.png"), animations: "disabled" })
+
+  await page.getByRole("button", { name: "Схема", exact: true }).click()
+  await expect(page).toHaveURL(/\/page\/loginom-gui\/packages\?source=file&path=/)
+  await page.goBack()
+  await expect(remove).toBeVisible()
+
+  await actions.getByRole("button", { name: "Проверить" }).click()
+  await expect(page).toHaveURL(/\/page\/loginom-gui\/catalog$/)
+  await page.goBack()
+  await expect(remove).toBeVisible()
+  await remove.click()
+  await expect(actions).toHaveCount(0)
+  await expect(view.editor).toHaveText("Inspect package")
+})
+
+test("without Loginom the composer keeps the native menu and .lgp attachment", async ({ page }) => {
+  await openDraft(page, {
+    name: "ComposerWithoutLoginom",
+    provider: loginomModel,
+    seed: { storage: { "opencode.e2e.disable-loginom-gui": "1" } },
+    onFileWrite: () => {},
+  })
+  await page.locator('[data-action="composer-attach"]').click()
+  const menu = page.getByRole("menu")
+  await expect(menu.getByRole("menuitem", { name: /Images and files/ })).toBeVisible()
+  await expect(menu.getByRole("menuitem", { name: /Package from Loginom|File from computer|Catalog/ })).toHaveCount(0)
+  await page.keyboard.press("Escape")
+  await page.locator('input[type="file"]').setInputFiles(packageFixture)
+  await expect(page.locator('[data-component="composer-attachments"]')).toContainText(packageFixture.name)
+  await expect(page.getByRole("group", { name: "What to do with the package" })).toHaveCount(0)
+})
+
 test("mention a session by title, send its stable token, and open its own tab", async ({ page }) => {
   const target = "ses_0123456789abcdefghijklmnop"
   const prompts: Parameters<NonNullable<MockServerConfig["onPrompt"]>>[0]["body"][] = []
@@ -960,6 +1053,16 @@ test("Enter that confirms an IME candidate never sends, even after Safari's earl
 
 test.describe("touch keyboard", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
+
+  test("the Loginom plus menu is usable from the touch bar", async ({ page }) => {
+    await openDraft(page, { name: "LoginomComposerTouch", provider: loginomModel })
+    const add = page.locator('[data-slot="composer-touch-bar"] [data-action="composer-attach-file"]')
+    await add.tap()
+    const menu = page.getByRole("menu")
+    await expect(menu.getByRole("menuitem", { name: "Package from Loginom…" })).toBeVisible()
+    await expect(menu.getByRole("menuitem", { name: /File from computer/ })).toBeVisible()
+    await expect(menu.getByRole("menuitem", { name: "Catalog…" })).toBeVisible()
+  })
 
   test("Return only adds a line, even over suggestions; the touch bar and Cmd+Return send", async ({ page }) => {
     const prompts: Parameters<NonNullable<MockServerConfig["onPrompt"]>>[0]["body"][] = []

@@ -2,6 +2,9 @@ import { ImagePreview } from "@opencode/ui/image-preview"
 import { useDialog } from "@opencode/ui/context/dialog"
 import type { ReferenceInfo } from "@opencode/client/promise"
 import type { Links, MountedSession } from "@opencode/plugin/gui"
+import { BuiltinSlot, ComposerFileType, type ComposerSlotInput } from "@opencode/plugin/gui/builtin"
+import { useNavigate } from "@solidjs/router"
+import { unwrap } from "solid-js/store"
 import { createComponent, createEffect, createMemo, on, onCleanup } from "solid-js"
 import { Predicate } from "effect"
 import type { ComposerSuggestion } from "./types"
@@ -38,6 +41,11 @@ import { parseClientSlashCommand } from "./client-slash-command"
 
 export type ComposerModel = ComposerEditorModel & {
   readonly model: ComposerControls["model"]
+  readonly extension?: {
+    readonly input: ComposerSlotInput
+    hasMenu(): boolean
+    customFile(file: { filename: string; mime: string }): boolean
+  }
 }
 
 const sendFailedTitle = {
@@ -55,7 +63,13 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     server.conn.type !== "plugin" || !server.conn.managed || server.ctx.sdk.connection.status() === "connected"
 
   const files = useFile()
-  const links = usePluginHost().links
+  const host = usePluginHost()
+  const links = host.links
+  const navigate = useNavigate()
+
+  const referenceMime = (filename: string) =>
+    host.items(ComposerFileType).find(({ value }) => value.matches(filename))?.value.mime
+
   const plugins = usePluginAttachment()
   const comments = useComments()
   const dialog = useDialog()
@@ -471,6 +485,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
       return () => command.trigger(selected.id, "slash")
     },
     attachments: {
+      referenceMime,
       picker: platform.openAttachmentPickerDialog,
       directory: () => sdk().directory,
       destination: useAttachmentDestination(adapter.controls),
@@ -576,6 +591,25 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
 
   Object.defineProperty(controller, "model", { get: () => adapter.controls().model })
 
+  const extension: NonNullable<ComposerModel["extension"]> = {
+    hasMenu: () => host.items(BuiltinSlot).some(({ value }) => value.at === "composer.add-menu"),
+    customFile: (file) => referenceMime(file.filename) === file.mime,
+    input: {
+      get draft() {
+        return unwrap(prompt.store[0]())
+      },
+      get files() {
+        return controller.attachments().filter((part) => part.type === "path")
+      },
+      attach: controller.attach,
+      removeFile: controller.removeAttachment,
+      openPage: (plugin, page, query) => {
+        const path = `/page/${encodeURIComponent(plugin)}/${encodeURIComponent(page)}`
+        navigate(query?.size ? `${path}?${query}` : path)
+      },
+    },
+  }
+
   command.register("composer-editor", () => [
     {
       id: "file.attach",
@@ -610,7 +644,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
   ])
 
   // SAFETY: the `model` getter defined on the controller above completes `ComposerModel`.
-  return controller as ComposerModel
+  return Object.assign(controller, { extension }) as ComposerModel
 }
 
 function composerErrorMessage(language: ReturnType<typeof useLanguage>, cause: unknown) {

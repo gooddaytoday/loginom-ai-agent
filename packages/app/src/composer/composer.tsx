@@ -12,6 +12,7 @@ import { DialogSelectModel, ModelSelectorDrawer } from "@/providers/models/selec
 import { DialogSelectModelUnpaid } from "@/providers/models/unpaid"
 import { formatKeybind, useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
+import { PluginSlot } from "@/runtime/plugin/render"
 import type { ComposerModel } from "./model"
 import type { ComposerModelLabel } from "./model-label"
 import {
@@ -58,8 +59,21 @@ export function Composer(props: {
 
   return (
     <div class="flex flex-col gap-3">
+      <Show when={!props.readOnly && props.model.mode() === "normal" && props.model.extension}>
+        {(extension) => <PluginSlot at="composer.above" input={extension().input} />}
+      </Show>
       <ComposerEditor
         controller={props.model}
+        customFile={props.readOnly ? undefined : props.model.extension?.customFile}
+        pluginAddMenu={
+          props.model.extension?.hasMenu()
+            ? () => (
+                <Show when={props.model.extension}>
+                  {(extension) => <PluginSlot at="composer.add-menu" input={extension().input} />}
+                </Show>
+              )
+            : undefined
+        }
         borderUnderlay={props.borderUnderlay}
         readOnly={props.readOnly}
         class={props.class}
