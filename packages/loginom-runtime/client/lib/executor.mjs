@@ -1491,7 +1491,21 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
           pending.push(...(current.FSubNodes?.FItems ?? []));
         }
         // Cold Open can dirty these observed node types; Save normalizes once.
-        const restReference=diagrams.some(d=>d?.FNodes?.FCollection?.some(n=>['bg-vendor-icon-restclientconnection','bg-vendor-icon-groupdata','bg-vendor-icon-linregression','bg-vendor-icon-clusterization','bg-vendor-icon-condition','bg-vendor-icon-datatovariables'].includes(n.FIconCls)));
+        const restReference=diagrams.some(diagram=>{
+          const nodes=diagram?.FNodes?.FCollection;
+          if(nodes?.some(n=>['bg-vendor-icon-restclientconnection','bg-vendor-icon-linregression','bg-vendor-icon-clusterization','bg-vendor-icon-condition','bg-vendor-icon-datatovariables'].includes(n.FIconCls)))return true;
+          if(!nodes?.some(n=>n.FIconCls==='bg-vendor-icon-groupdata'))return false;
+          // Preserve normalization when the cached diagram cannot prove the inputs.
+          const links=diagram.FLinks?.FCollection;
+          if(!Array.isArray(links))return true;
+          const owners=new Set(nodes);
+          return links.some(link=>{
+            const source=link?.FSourcePort?.parent,target=link?.FTargetPort?.parent;
+            if(!owners.has(source)||!owners.has(target))return true;
+            return target.FIconCls==='bg-vendor-icon-groupdata'
+              &&['bg-vendor-icon-calcdata','bg-vendor-icon-filterdata','bg-vendor-icon-joindata'].includes(source.FIconCls);
+          });
+        });
         const nativeNodes=diagrams[0]?.FNodes?.FCollection?.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))??null;
         if(restReference&&(!nativeNodes?.length||nativeNodes.some(n=>typeof n[0]!=='string'||!n[0])||new Set(nativeNodes.map(n=>n[0])).size!==nativeNodes.length))throw Error('Saved REST graph native identities unavailable');
         return { path: typeof path === 'string' ? path : null, name: node.PackageName ?? null, read_only: node.ReadOnly === true,

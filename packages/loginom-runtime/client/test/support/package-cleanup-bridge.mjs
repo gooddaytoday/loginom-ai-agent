@@ -12,7 +12,7 @@ import * as workspace from '../../lib/workspace.mjs';
 import {serverDownloadTools} from '../../lib/storage-policy.mjs';
 import {createBundledSkillFixture} from './bundled-skill-fixture.mjs';
 import {createActionCatalogFixture} from './action-catalog-fixture.mjs';
-import {Page,runtime} from './executor-fixture.mjs';
+import {Page,runtime,restSavePage} from './executor-fixture.mjs';
 import {closeManagedResources} from '../../../src/managed-resources-close.mjs';
 import {createServer} from 'node:http';
 import {chromium} from 'playwright-core';
@@ -154,6 +154,7 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
       }})});
     return f.runtime;
   }
+  if(f.realPackageSave) return runtime(f.realPackageSave,{getStorageBinding:()=>f.realPackageSave.storageBinding});
   return {tools:f.storageReturn?[...executor.executorTools,...serverDownloadTools]:executor.executorTools,
     serverDownload:async(_args,_name,{onWorkflowReturn})=>{onWorkflowReturn?.(f.storageReturn);return f.storageReceipt;},
     describe:()=>({available_node_types:[],actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},hasUnsettledWork:()=>f.unsettled || (f.scenario==='product-gate-unsettled' && ++f.workChecks>1),async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
@@ -190,6 +191,43 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
   };
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
+
+for(const [upstream,expectedReopen] of [['importtextfile',false],['calcdata',true]])
+test('public checkpoint Save follows the input of Grouping: '+upstream,async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'grouping-save-'));
+ const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+ const page=await restSavePage(expectedReopen?[true,false]:[false],false);
+ const diagram=page.model.FDiagram;
+ const [group,,source]=diagram.FNodes.FCollection;
+ group.FIconCls='bg-vendor-icon-groupdata';
+ source.FIconCls='bg-vendor-icon-'+upstream;
+ diagram.FLinks={FCollection:[{FSourcePort:{parent:source},FTargetPort:{parent:group}}]};
+ page.edges=['Источник|Output_Data-0|Приёмник|Input_Data-0'];
+ const path='/user/data/packages/grouping.lgp';
+ current={scenario:'grouping-save',events:[],catalog,path,realPackageSave:page};
+ const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+  metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+  artifactStore:{list:()=>[],async releaseUploads(){}}};
+ const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,
+  actionManifestSha256:catalog.manifestSha256,mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',
+  stateDir:directory,loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2'},session);
+ const client=new AgentClient({name:'grouping-save',version:'1'});
+ try{
+  const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+  const prepared=await client.callTool({name:'dock_prepare',arguments:{}});
+  assert.notEqual(prepared.isError,true,JSON.stringify(prepared));
+  const response=await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',
+    parameters:{path,conflict_policy:'replace'},operation_id:'save-grouping'}});
+  assert.notEqual(response.isError,true,JSON.stringify(response));
+  const saved=JSON.parse(response.content[0].text);
+  assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved.error));
+  assert.equal(saved.output.reopened,expectedReopen);
+  assert.equal(saved.output.workflow_preserved,!expectedReopen);
+  assert.equal(page.events.includes('package_closed'),expectedReopen);
+  assert.equal(page.events.includes('package_reopened'),expectedReopen);
+  assert.equal(page.saveWrites,expectedReopen?2:1);
+ }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+});
 
 // External Loginom fixture only: a synchronous first menu fetch stalls the real
 // renderer just like lazy menu loading. The bridge serializes production cleanup
