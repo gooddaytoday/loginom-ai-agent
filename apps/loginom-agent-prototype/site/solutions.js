@@ -178,7 +178,7 @@ function runFolder(key, project) {
 function modelLine(state) {
   const model = state.settings?.model;
   if (!model) return [];
-  const where = {local:'работает на этом компьютере', intranet:'работает во внутренней сети', cloud:`облачный сервис ${model.source === 'free' ? 'OpenCode' : model.where} — данные уйдут в интернет`}[model.kind] || '';
+  const where = {local:'работает на этом компьютере', intranet:'работает во внутренней сети', cloud:`${model.where} — данные уйдут в интернет`}[model.kind] || '';
   return [model.name, where, model.kind === 'cloud'];
 }
 
@@ -332,7 +332,7 @@ function renderRunner(state, model) {
   const back = {loginom:['loginom','← Пакеты'], home:['home','← Новый разговор'], chat:['chat','← Разговор']}[state.runnerFrom] || ['hub','← Каталог'];
   const blocked = key === 'regression' && run.values.baseline === 'missing';
   const access = accessFor(key, run, state.projects.find(item => item.id === state.project)?.name);
-  let body = '';
+  let body = '', footer = '';
   if (run.step === 'params') body = `<section class="sl-panel"><form class="sl-form" data-sl-form="run">${run.error ? note(escape(run.error),'warn') : ''}${renderFields(key, run)}
     <div class="sl-actions">${blocked ? `<button type="button" class="btn" data-sl-action="baseline-draft" ${run.baselineDraft ? 'disabled' : ''}>Подготовить черновик эталона</button>` : '<button type="submit" class="btn primary">Далее: доступ</button>'}</div></form></section>`;
   if (run.step === 'access') {
@@ -345,8 +345,9 @@ function renderRunner(state, model) {
       ${access.warn ? `<div class="sl-note sl-note-warn">${icon('alert',16)} ${escape(access.warn)}</div>` : ''}
       ${modelName ? `<div class="sl-data${cloud ? ' sl-data-cloud' : ''}">${icon('cpu',17)}<p><strong>Что увидит модель:</strong> ${escape(access.data)}. Модель «${escape(modelName)}» — ${escape(modelWhere)}.</p></div>`
         : `<div class="sl-note sl-note-warn">${icon('alert',16)} Модель не выбрана — без неё действие не запустится. <button type="button" class="btn quiet" data-settings="providers">Выбрать модель</button></div>`}
-      <div class="sl-actions"><button type="button" class="btn primary" data-sl-action="start" ${modelName ? '' : 'disabled'}>Разрешить и запустить</button><button type="button" class="btn quiet" data-sl-action="to-params">Назад</button></div></section>
+      </section>
       <fieldset class="sl-demo"><legend>Только для прототипа: чем закончится запуск</legend>${outcomes.filter(([value]) => value !== 'recovery' || changesSomething(key)).map(([value,label]) => `<label><input type="radio" name="demo-outcome" value="${value}" ${run.demoOutcome === value ? 'checked' : ''}> ${label}</label>`).join('')}</fieldset>`;
+    footer = `<footer class="sl-actions sl-access-footer"><button type="button" class="btn quiet" data-sl-action="to-params">Назад</button><button type="button" class="btn primary" data-sl-action="start" ${modelName ? '' : 'disabled'}>Разрешить и запустить</button></footer>`;
   }
   if (run.step === 'running') body = `<section class="sl-panel"><ol class="sl-stages" aria-live="polite">${item.stages.map((stage,index) => `<li class="${index < run.stage ? 'is-done' : index === run.stage ? 'is-current' : ''}"><span class="sl-stage-mark" aria-hidden="true">${index < run.stage ? '✓' : index+1}</span><span>${stage}</span><small>${index < run.stage ? 'Готово' : index === run.stage ? 'Идёт' : 'Ожидает'}</small></li>`).join('')}</ol>
       ${details(key, run)}
@@ -354,7 +355,7 @@ function renderRunner(state, model) {
   if (run.step === 'result') body = renderResult(key, run) + details(key, run);
   return `<div class="sl-page sl-runner"><button type="button" class="sl-back-link" data-sl-action="back" data-sl-back="${back[0]}">${back[1]}</button>
     <header class="sl-heading"><h1>${title}</h1><p>${description}</p><p class="sl-meta">${own ? `Своё действие · на основе «${escape(own.baseTitle)}»` : `${tierBadge(item)} ${escape(item.product || item.title)} · версия ${item.version}`}</p></header>
-    ${stepper(run.step)}${body}</div>`;
+    ${stepper(run.step)}${body}${footer}</div>`;
 }
 
 export function initSolutionDrafts(state) {
@@ -446,6 +447,7 @@ export function bindSolutions(root,state,api) {
       case 'stop': clearInterval(run.timer); run.step = 'result'; run.outcome = 'cancelled'; api.render(); return;
       case 'start': {
         run.step = 'running';
+        api.recordActionRun(state, state.ownRun?.name || titles[key][0], chosenPackage(run).name);
         // The rules in «Инструкции» are taken when the run starts: a later change does not rewrite this result.
         run.values.rules = rulesFollowed;
         run.folder = runFolder(key, state.projects.find(entry => entry.id === state.project)?.name);

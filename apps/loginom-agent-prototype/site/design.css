@@ -615,3 +615,40 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .hub-service{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;line-height:1.2;padding:2px 7px;border-radius:5px;border:1px solid var(--amber);color:var(--amber);background:var(--amber-soft)}
 .change-legend{flex-wrap:wrap;gap:4px 14px}.change-legend span{white-space:nowrap}
 .model-menu .badge{margin-left:6px;padding:1px 6px;font-size:11px;vertical-align:1px}
+
+.app-dialog[open],.hub-dialog[open]{display:grid;grid-template-rows:auto minmax(0,1fr) auto;max-height:calc(100dvh - 32px);overflow:hidden}
+.app-dialog-body,.hub-dialog-main{overflow:auto;overscroll-behavior:contain}
+.app-dialog-footer{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;padding:12px 15px;border-top:1px solid var(--line)}
+.app-dialog-footer .btn,.hub-dialog-footer .btn{white-space:normal;text-align:left}
+.replace-unchecked,.change-nodes,.dock-details{margin-top:9px;color:var(--muted)}
+:is(.replace-unchecked,.change-nodes,.dock-details)>summary{width:fit-content;cursor:pointer;font-weight:600}
+.replace-unchecked p{margin-top:6px}
+.change-actions:empty{display:none}
+.change-actions + .change-card{margin-top:12px}
+.change-nodes{padding:0 12px 8px}
+.change-nodes .change-list{padding-inline:0}
+.dock-details .dock-args{margin:6px 0 0}
+.chat-title>div:first-child{min-width:0}
+.chat-title>.button-row{flex-wrap:wrap;justify-content:flex-end;flex-shrink:0}
+:is(.chat-title,.native-heading,.project-head,.st-page-head,.sl-heading,.hub-header) h1{overflow-wrap:break-word;word-break:normal;text-wrap:pretty}
+#announcements{top:64px;bottom:auto;width:max-content;max-width:min(400px,calc(100vw - 36px))}
+.model-limit,.composer-model.limited{color:var(--amber)}
+.hub-type-how{flex-wrap:wrap}
+.hub-filters{flex-basis:100%}
+.hub-filters>strong{min-width:102px;font-size:12px;color:var(--muted)}
+.hub-filters.hub-types{border:0;padding:0}
+.sl-access-footer{position:sticky;bottom:0;z-index:3;justify-content:flex-end;padding:10px 12px;background:var(--paper);border:1px solid var(--line);border-radius:8px;box-shadow:var(--floating-shadow)}
+.st-menu .st-nav{position:static;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:12px}
+.st-menu-open{justify-self:start}
+.st-instructions-dirty:not([hidden]){color:var(--amber);font-weight:650}
+:is(.st-status,.st-locked small,.st-list-row .st-perm small,.sl-stages small,.sl-tag,.tier,.node-mark,.badge.latest,.model-menu .badge,.package-top>.badge,.hub-type,.hub-installed,.hub-version,.hub-offline-tag,.hub-online-tag,.hub-change,.hub-service){font-size:12px}
+:is(button,input,select,textarea,summary,a[href]):focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+@media(max-width:1000px){
+  .st-layout{grid-template-columns:minmax(0,1fr);gap:14px}
+  .review-layer{position:fixed;inset:0 0 0 auto;width:min(340px,calc(100% - 40px));height:100dvh;max-height:none;max-width:none;margin:0;padding:0;border:0;background:var(--paper);color:var(--ink);box-shadow:var(--floating-shadow);overflow:hidden}
+  .review-layer::backdrop{background:#20212866}
+  .review-panel{height:100%;overflow:auto;overscroll-behavior:contain;border:0;padding:15px}
+}
+@media(max-width:690px){
+  .chat-title>.button-row{justify-content:flex-start}
+}

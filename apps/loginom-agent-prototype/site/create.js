@@ -240,15 +240,15 @@ function renderActionEditor(state, edit) {
     (saved ? '<div class="sl-actions">'+publishButton(state, item)+'</div>' : '')+'</aside></div>'+renderPublishDialog(state)+'</div>';
 }
 
-function publishTitle(state, item) {
+function publishTitle(state) {
   if (state.contour === 'closed') return 'Передать администратору';
-  return resendStages.includes(item.publication?.stage) ? 'Отправить новую версию' : 'Опубликовать для всех';
+  return 'Отправить на проверку';
 }
 function publishButton(state, item) {
   const stage = item.publication?.stage;
   if (['confirm','review'].includes(stage)) return '';
   const closed = state.contour === 'closed';
-  const label = publishTitle(state, item)+'…';
+  const label = publishTitle(state);
   return '<button type="button" class="btn" data-own="publish:'+item.id+'">'+icon(closed ? 'download' : 'upload',15)+' '+label+'</button>';
 }
 
@@ -298,7 +298,7 @@ function renderPublishDialog(state) {
   const passwords = leaks.filter((leak) => leak.label === 'пароль или ключ');
   const personal = leaks.filter((leak) => leak.label !== 'пароль или ключ');
   const what = item.type === 'action' ? 'действие' : 'навык';
-  let title = publishTitle(state, item);
+  let title = publishTitle(state);
   let body = '';
   let actions = '';
   const lines = item.body.split('\n').filter((line) => line.trim()).length;
@@ -346,7 +346,7 @@ function renderPublishDialog(state) {
     title = closed ? 'Файл сохранён' : 'Отправлено на проверку';
     body = closed
       ? '<p class="hub-dialog-lead">Файл «'+esc(item.publication.file)+'» сохранён. Передайте его администратору: он проверит и добавит '+(item.type === 'action' ? 'действие' : 'навык')+' в каталог организации.</p>'
-      : '<p class="hub-dialog-lead">Квитанция № <strong>'+esc(item.publication.receipt)+'</strong>. Статус — в «Моих»: приложение узнаёт его по квитанции, ответ придёт и на почту. Обычно проверка занимает несколько рабочих дней.</p>';
+      : '<p class="hub-dialog-lead">Квитанция № <strong>'+esc(item.publication.receipt)+'</strong>. Статус — в «Моих»: приложение узнаёт его по квитанции, ответ придёт и на почту.</p>';
     actions = '<button class="btn primary" data-own="dialog-close">Готово</button>';
   }
   return '<dialog class="hub-dialog own-dialog" aria-labelledby="own-dialog-title"><header><h2 id="own-dialog-title">'+title+' · '+esc(item.name)+'</h2><button class="hub-close" data-own="dialog-close" aria-label="Закрыть">'+icon('close',19)+'</button></header>'+

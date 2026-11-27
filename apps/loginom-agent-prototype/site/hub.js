@@ -192,7 +192,7 @@ export function hubHasInstalled(state, id) {
 
 // Opens one tab of the catalog, e.g. «Мои» after creating a skill.
 export function showHubTab(state, tab) {
-  Object.assign(hubState(state), {tab, dialog:null});
+  Object.assign(hubState(state), {tab, tier:'all', type:'Все', query:'', dialog:null});
 }
 
 // Opens the catalog filtered to one type, e.g. «Действие» from «Ещё действия в каталоге».
@@ -220,10 +220,10 @@ function blockedByPolicy(item, online, byAdmin) {
 function itemCard(item, hub, online, tab) {
   const installed = hub.installed[item.id];
   const update = installed && installed !== item.version && online;
-  const status = item.builtIn ? icon('check',15)+' Встроено' : installed ? icon('check',15)+' Установлено' : '';
+  const status = installed ? icon('check',15)+' Доступно' : '';
   const primary = installed && tab !== 'updates' && (item.prompt || item.runner)
     ? '<button class="btn" data-hub-use="'+item.id+'">'+kinds[item.kind].use+' '+icon('arrow',15)+'</button>'
-    : '<button class="btn" data-hub-detail="'+item.id+'">'+(update ? 'Обновить' : installed ? 'Подробнее' : 'Посмотреть')+' '+icon('arrow',15)+'</button>';
+    : '<button class="btn" data-hub-detail="'+item.id+'">'+(update ? 'Обновить' : !installed && item.kind === 'Подключение' ? kinds[item.kind].use : 'Подробнее')+' '+icon('arrow',15)+'</button>';
   return '<article class="hub-card">'+
     '<div class="hub-card-head"><span class="hub-tile hub-'+item.color+'">'+icon(item.icon,23)+'</span>'+
     '<span class="hub-type" title="'+kinds[item.kind].how+'">'+item.kind+'</span>'+
@@ -246,13 +246,18 @@ function sourceLine(state) {
   return '<div class="hub-source">'+icon(state.policy === 'broken' ? 'alert' : 'lock',16)+'<span>'+text+'</span></div>';
 }
 
+export function recordActionRun(state, name, packageName) {
+  hubState(state).events.unshift({kind:'run',name,packageName,date:now()});
+}
+
 function history(hub) {
-  if (!hub.events.length) return '<div class="hub-empty"><span class="hub-tile hub-sand">'+icon('clock',24)+'</span><h3>Пока нет операций</h3><p>Здесь появятся установки, обновления, удаления и восстановления версий.</p></div>';
-  const labels = {install:'Установлено',update:'Обновлено',remove:'Удалено',import:'Импортировано',revert:'Восстановлено'};
-  return '<div class="hub-history">'+hub.events.map((entry,index) => '<article><span class="hub-tile hub-sage">'+icon(entry.kind==='revert'?'clock':entry.kind==='remove'?'trash':'archive',21)+'</span>'+
-    '<div><h3>'+escape(entry.name)+'</h3><p>'+escape(entry.date)+' · '+entry.ids.length+' '+(entry.ids.length === 1?'компонент':entry.ids.length <= 4?'компонента':'компонентов')+'</p></div>'+
+  if (!hub.events.length) return '<div class="hub-empty"><span class="hub-tile hub-sand">'+icon('clock',24)+'</span><h3>Пока нет операций</h3><p>Здесь появятся запуски действий, установки, обновления, удаления и восстановления версий.</p></div>';
+  const labels = {install:'Установлено',update:'Обновлено',remove:'Удалено',import:'Импортировано',revert:'Восстановлено',run:'Запущено'};
+  const lastChange = hub.events.find(entry => entry.kind !== 'run');
+  return '<div class="hub-history">'+hub.events.map(entry => '<article><span class="hub-tile hub-sage">'+icon(['run','revert'].includes(entry.kind)?'clock':entry.kind==='remove'?'trash':'archive',21)+'</span>'+
+    '<div><h3>'+escape(entry.name)+'</h3><p>'+escape(entry.date)+' · '+(entry.kind === 'run' ? (entry.packageName ? escape(entry.packageName) : 'Без пакета') : entry.ids.length+' '+(entry.ids.length === 1?'компонент':entry.ids.length <= 4?'компонента':'компонентов'))+'</p></div>'+
     '<span class="hub-offline-tag">'+labels[entry.kind]+'</span>'+
-    (index === 0 && entry.before && entry.kind !== 'revert' ? '<button class="btn" data-hub-action="rollback">Вернуть как было</button>':'')+'</article>').join('')+'</div>';
+    (entry === lastChange && entry.before && entry.kind !== 'revert' ? '<button class="btn" data-hub-action="rollback">Вернуть как было</button>':'')+'</article>').join('')+'</div>';
 }
 
 export function renderHub(state) {
@@ -273,10 +278,10 @@ export function renderHub(state) {
     '<nav class="hub-tabs" aria-label="Разделы">'+tabs.map(([id,title])=>'<button data-hub-tab="'+id+'" '+(hub.tab===id?'aria-current="page"':'')+'>'+title+(id in counts?' <span>'+counts[id]+'</span>':'')+'</button>').join('')+'</nav>'+
     (hub.tab === 'mine' ? renderMine(state) : hub.tab === 'history' ? history(hub) :
       (source.length ? '<div class="hub-toolbar"><label class="hub-search">'+icon('search',18)+'<input type="search" aria-label="Поиск в каталоге" placeholder="Что нужно сделать? Например, «проверить данные»" value="'+escape(hub.query)+'"></label>'+
-        '<div class="hub-filters" aria-label="Кто подготовил">'+tierFilters.filter(([id]) => online || id !== 'community').map(([id,label])=>'<button data-hub-tier="'+id+'" aria-pressed="'+(hub.tier===id)+'">'+label+'</button>').join('')+'</div>'+
-        '<div class="hub-filters hub-types" aria-label="Тип">'+types.map(type=>'<button data-hub-type="'+type+'" aria-pressed="'+(hub.type===type)+'"'+(kinds[type]?' title="'+kinds[type].how+'"':'')+'>'+(kinds[type]?.plural || type)+'</button>').join('')+'</div>'+
+        '<div class="hub-filters" role="group" aria-label="Кто подготовил"><strong>Кто подготовил</strong>'+tierFilters.filter(([id]) => online || id !== 'community').map(([id,label])=>'<button data-hub-tier="'+id+'" aria-pressed="'+(hub.tier===id)+'">'+label+'</button>').join('')+'</div>'+
+        '<div class="hub-filters hub-types" role="group" aria-label="Тип"><strong>Тип</strong>'+types.map(type=>'<button data-hub-type="'+type+'" aria-pressed="'+(hub.type===type)+'"'+(kinds[type]?' title="'+kinds[type].how+'"':'')+'>'+(kinds[type]?.plural || type)+'</button>').join('')+'</div>'+
         '<p class="hub-type-how hub-tier-how">'+tierFilters.filter(([id]) => id !== 'all' && (online || id !== 'community')).map(([id,label]) => '<span><strong>'+label+'</strong> — '+tiers[id].title.charAt(0).toLowerCase()+tiers[id].title.slice(1)+'</span>').join('')+'</p>'+
-        (kinds[hub.type] ? '<p class="hub-type-how"><strong>'+hub.type+'</strong> — '+kinds[hub.type].how.charAt(0).toLowerCase()+kinds[hub.type].how.slice(1)+'</p>' : '')+'</div>' : '')+
+        '<p class="hub-type-how"><span><strong>Действие</strong> — '+kinds['Действие'].how+'</span><span><strong>Навык</strong> — '+kinds['Навык'].how+'</span></p>'+'</div>' : '')+
       (items.length ? '<div class="hub-grid">'+items.map(item=>itemCard(item,hub,online,hub.tab)).join('')+'</div>' :
         '<div class="hub-empty"><span class="hub-tile hub-sand">'+icon(hub.tab==='updates'?'check':'search',23)+'</span><h3>'+(source.length?'Ничего не нашлось':hub.tab==='updates'?'Обновлений нет':'Здесь появится установленное')+'</h3>'+
         '<p>'+(source.length?'Измените запрос или фильтры.':online?'Установлены актуальные версии.':'Импортируйте файл каталога от администратора.')+'</p>'+
@@ -311,7 +316,7 @@ function detailDialog(hub, online, current, byAdmin) {
   const actions = '<button class="btn quiet" data-hub-action="close">Закрыть</button>'+
     (installed && !item.builtIn ? '<button class="btn quiet hub-remove" data-hub-action="remove">'+icon('trash',16)+' Удалить</button>' : '')+
     (installed && !update && (item.prompt || item.runner) ? '<button class="btn primary" data-hub-use="'+item.id+'">'+kinds[item.kind].use+'</button>' : '')+
-    (!blocked && (!installed || update) ? '<button class="btn primary" data-hub-action="install-one" '+(needsAck && !current.ack ? 'disabled' : '')+'>'+(update ? 'Обновить до '+item.version : 'Установить')+'</button>' : '');
+    (!blocked && (!installed || update) ? '<button class="btn primary" data-hub-action="install-one" '+(needsAck && !current.ack ? 'disabled' : '')+'>'+(update ? 'Обновить до '+item.version : item.kind === 'Подключение' ? kinds[item.kind].use : 'Установить')+'</button>' : '');
   return ['', body, actions, item.title];
 }
 
@@ -449,7 +454,7 @@ export function bindHub(root, state, api) {
 
   root.querySelectorAll('[data-hub-tab], [data-hub-type], [data-hub-tier], [data-hub-detail], [data-hub-use], [data-hub-pin], [data-hub-sample], [data-hub-favorite], [data-hub-action]').forEach(button=>button.addEventListener('click', () => {
     const data = button.dataset;
-    if (data.hubTab) Object.assign(hub,{tab:data.hubTab,type:'Все',query:'',dialog:null});
+    if (data.hubTab && data.hubTab !== hub.tab) showHubTab(state,data.hubTab);
     if (data.hubType) hub.type = data.hubType;
     if (data.hubTier) hub.tier = data.hubTier;
     if (data.hubDetail) hub.dialog = {kind:'detail',id:data.hubDetail};
@@ -505,7 +510,7 @@ export function bindHub(root, state, api) {
       }
       case 'rollback': hub.dialog = {kind:'rollback'}; break;
       case 'confirm-rollback': {
-        const entry = hub.events[0];
+        const entry = hub.events.find(event=>event.kind !== 'run');
         if (!entry?.before) return;
         hub.installed = {...entry.before};
         hub.events.unshift({kind:'revert',name:entry.name,ids:entry.ids,date:now()});

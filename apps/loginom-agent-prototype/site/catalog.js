@@ -15,7 +15,7 @@ export const tiers = {
 // integration -> Подключение.
 export const kinds = {
   'Действие': { plural: 'Действия', use: 'Запустить', how: 'Запускается для пакета по шагам и даёт отчёт или новый файл.' },
-  'Навык': { plural: 'Навыки', use: 'Начать разговор', how: 'Агент лучше справляется с задачей в разговоре. Отдельно запускать не нужно.' },
+  'Навык': { plural: 'Навыки', use: 'Начать разговор', how: 'Набор указаний, которыми агент пользуется в разговоре.' },
   'Готовый сценарий': { plural: 'Готовые сценарии', use: 'Открыть', how: 'Копия ляжет в вашу папку Loginom: её можно открыть и изменить.' },
   'Подключение': { plural: 'Подключения', use: 'Подключить', how: 'Даёт агенту доступ к внешнему сервису. Нужен интернет.' },
 }
@@ -35,7 +35,7 @@ export const actions = {
 export const catalog = [
   {
     id: 'document', title: 'Документировать', product: 'ИИ Отчёт', kind: 'Действие', icon: 'book', color: 'lilac',
-    version: '1.0.0', tier: 'official', builtIn: true, runner: true, offline: true, size: 'Встроено в приложение',
+    version: '1.0.0', tier: 'official', builtIn: true, runner: true, offline: true, size: 'В составе приложения',
     keywords: 'документация описание отчёт docs',
     description: 'Создаёт понятное описание сценария: назначение, модули, потоки данных и заметки. PDF, Word или Markdown.',
     evidence: { passed: 18, total: 18, loginom: '7.4.2', note: 'на 18 учебных и рабочих пакетах' },
@@ -140,10 +140,10 @@ export const catalog = [
   },
   {
     id: 'help', title: 'Справка Loginom', kind: 'Навык', icon: 'book', color: 'lilac',
-    version: '2026.11', tier: 'official', builtIn: true, offline: true, size: 'Встроено в приложение',
+    version: '2026.11', tier: 'official', builtIn: true, offline: true, size: 'В составе приложения',
     keywords: 'справка документация узлы',
     description: 'Агент знает руководство по узлам, функциям и работе со сценариями и опирается на него в ответах.',
-    evidence: null, can: ['Давать агенту сведения об узлах Loginom'], cannot: [],
+    evidence: null, prompt: 'Помоги разобраться с узлами Loginom.', can: ['Давать агенту сведения об узлах Loginom'], cannot: [],
   },
   // Iteration 9 (run 3, finding 23): Loginom made the connection, the service is a third party's — both are shown.
   {

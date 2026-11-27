@@ -144,7 +144,7 @@ function closedMode(state, s) {
 function loginomBlocked(state, s, url) {
   const mode = closedMode(state, s)
   if (mode === "device" && isWebUrl(url) && !isLocalUrl(url)) return "В режиме «" + deviceName + "» доступен только Loginom на этом компьютере, например http://127.0.0.1:8080."
-  if (mode !== "online" && url.replace(/\/$/, "") === publicStand) return "Публичный стенд работает в интернете. В закрытом контуре укажите адрес Loginom вашей организации."
+  if (mode !== "online" && url.replace(/\/$/, "") === publicStand) return "Учебный сервер Loginom работает в интернете. В закрытом контуре укажите адрес Loginom вашей организации."
   return ""
 }
 function lockReason(state) {
@@ -198,7 +198,7 @@ function policyBanner(state) {
 
 function loginomLine(state, s) {
   const reason = loginomBlocked(state, s, s.connection.url)
-  if (s.connection.url && reason) return status(closedMode(state, s) === "device" ? "Не на этом компьютере — не используется" : "Публичный стенд — не используется в закрытом контуре", "wait")
+  if (s.connection.url && reason) return status(closedMode(state, s) === "device" ? "Не на этом компьютере — не используется" : "Учебный сервер недоступен в закрытом контуре", "wait")
   return s.connection.connected ? status("Подключён как " + s.connection.username + " · папка /" + s.connection.username, "good") : status(s.test?.ok ? "Проверено, ещё не сохранено" : "Не подключён", "wait")
 }
 function loginomTab(state, s) {
@@ -207,7 +207,7 @@ function loginomTab(state, s) {
   const policy = state.policy === "set"
   const device = closedMode(state, s) === "device"
   const closedHint = policy ? "" : device && (!draft.url || !isLocalUrl(draft.url)) ? "В режиме «" + deviceName + "» нужен Loginom на этом компьютере, например http://127.0.0.1:8080."
-    : draft.url && state.contour === "closed" && draft.url.replace(/\/$/, "") === publicStand ? "Публичный стенд в закрытом контуре недоступен — укажите адрес Loginom вашей организации." : ""
+    : draft.url && state.contour === "closed" && draft.url.replace(/\/$/, "") === publicStand ? "Учебный сервер в закрытом контуре недоступен — укажите адрес Loginom вашей организации." : ""
   const feedback = result?.error ? notice("Не удалось подключиться", result.error, "error")
     : result?.ok ? notice("Проверка прошла", "Нажмите «Сохранить», чтобы агент работал с этим Loginom.", "good")
       : s.pendingConnection ? notice("Сохранено", "Новое подключение заработает, когда агент закончит текущий ход. Пока он работает с прежним.", "neutral") : ""
@@ -230,7 +230,7 @@ function providersTab(state, s) {
     card("Подключить провайдера", "", notice("Провайдеров задал администратор", "Подключить другой нельзя. Если нужна другая модель — обратитесь к администратору.", "lock"))
   const mode = closedMode(state, s)
   const offNote = mode === "device" ? "Нужен интернет — недоступно в режиме «" + deviceName + "»" : "Нужен интернет — недоступно в закрытом контуре"
-  const connected = [listRow("OpenCode", "Бесплатные модели без входа, в облачном сервисе OpenCode — данные разговора уходят туда.",
+  const connected = [listRow("Облако OpenCode", "Бесплатные модели без входа. Данные разговора уходят в Облако OpenCode.",
     mode !== "online" ? status(offNote, "wait") : status("Бесплатно", "good"))]
     .concat(s.providers.map((entry) => {
       const provider = providerById(entry.id)
@@ -243,11 +243,11 @@ function providersTab(state, s) {
     listRow(esc(entry.name), esc(entry.tagline), mode !== "online" ? status(offNote, "wait") : btn("Подключить", "connect-open:" + entry.id, "quiet st-button-small"))).join("")
   return card("Подключённые", "Модели подключённых провайдеров видны в выборе модели в поле ввода.", '<div class="st-list">' + connected + "</div>", "",
     btn("Подключить провайдера", "connect-open", "primary st-button-small")) +
-    card("Популярные", mode === "online" ? "Подписка — вход в браузере; ключ API — из личного кабинета провайдера." : "Без интернета они недоступны — ниже свой сервер.",
+    card("Популярные", mode === "online" ? "Подписка — вход в браузере. Ключ API — секретный код из личного кабинета провайдера, который даёт приложению доступ к моделям." : "Без интернета они недоступны — ниже свой сервер.",
       '<div class="st-list">' + popular + "</div>", btn("Показать больше провайдеров", "connect-open", "quiet")) +
     card("Свой сервер и модели на этом компьютере", "",
       '<div class="st-list">' + listRow("Ollama, LM Studio, vLLM на этом компьютере", "Находятся сами, когда запущены: их модели появятся в выборе модели без подключения.", status("Сейчас не найдены", "wait")) +
-      listRow("Свой сервер", esc(mode === "device" ? "OpenAI-совместимый сервер на этом компьютере" : providerById("own").tagline) + " — отличие от OpenCode 2, там он задаётся только в файле настроек.", btn("Подключить", "connect-open:own", "quiet st-button-small")) + "</div>")
+      listRow("Свой сервер", "OpenAI-совместимый сервер принимает запросы в том же формате, что и OpenAI. Можно указать адрес своего сервера.", btn("Подключить", "connect-open:own", "quiet st-button-small")) + "</div>")
 }
 // В-82: as OpenCode 2 «Models» — which models the composer offers. There is no default model: a new chat takes the last one chosen.
 function modelsTab(state, s) {
@@ -296,7 +296,7 @@ function connectDialog(state, s) {
       '<div class="st-connect-list">' + (offline ? group("Без интернета", [providerById("own")]) : "") + group("Подключены", connected.filter((entry) => !offline || entry.id !== "own")) +
       group("Популярные", providerCatalog.filter((entry) => entry.popular && !connected.includes(entry))) +
       group("Остальные", providerCatalog.filter((entry) => !entry.popular && !connected.includes(entry) && !(offline && entry.id === "own")).sort((a, b) => a.name.localeCompare(b.name, "ru"))) +
-      '<p class="st-connect-none"' + (query && providerCatalog.every((entry) => !(entry.name + " " + entry.tagline).toLocaleLowerCase("ru").includes(query)) ? "" : " hidden") + '>Такого провайдера нет в списке.</p></div><p class="st-connect-note">В прототипе — часть списка и упрощённое окно; в продукте — родное окно OpenCode 2, где провайдеров больше 70.</p>')
+      '<p class="st-connect-none"' + (query && providerCatalog.every((entry) => !(entry.name + " " + entry.tagline).toLocaleLowerCase("ru").includes(query)) ? "" : " hidden") + '>Такого провайдера нет в списке.</p></div><p class="st-connect-note">Если нужной модели нет в списке, проверьте, можно ли подключить её через «Свой сервер».</p>')
   }
   if (c.step === "method") return wrap(head("Подключить " + esc(provider.name), esc(provider.tagline) + ".") +
     '<div class="st-connect-list">' + provider.methods.map(([id, label]) => '<button type="button" class="st-connect-row" data-st="connect-method:' + id + '"><span><strong>' + esc(label) +
@@ -359,7 +359,7 @@ function permissionsTab(state, s) {
 function instructionsTab(s) {
   return card("Инструкции для агента", "Агент следует им во всех разговорах. У проекта могут быть свои — агент учтёт и те, и другие.",
     '<label class="st-field"><span>Инструкции</span><textarea data-st-input="instructions" rows="7" placeholder="Например: узлы называй по смыслу, по-русски; перед расчётом выручки — проверка пустых значений">' +
-      esc(s.instructionsDraft) + "</textarea><small>Приёмы для одного вида задач удобнее сделать навыком: «Каталог» → «Создать своё» → «Навык».</small></label>",
+      esc(s.instructionsDraft) + '</textarea><small class="st-instructions-dirty" role="status"' + (s.instructionsDraft === s.instructions ? " hidden" : "") + ">Не сохранено</small><small>Приёмы для одного вида задач удобнее сделать навыком: «Каталог» → «Создать своё» → «Навык».</small></label>",
     btn("Сохранить", "save-instructions", "primary"))
 }
 function contourTab(state, s) {
@@ -384,8 +384,8 @@ function contourTab(state, s) {
     ["Сайты", "Агент их не открывает.", locked("Запрещены")],
     ["Обновления", "Новые версии устанавливает администратор.", locked("Выключены")],
   ] : {
-    online: [["Свои навыки и действия", "Работают у вас; опубликовать для всех — после проверки Loginom."], ["Модели", "Бесплатные OpenCode, провайдеры по подписке или ключу и свой сервер."], ["Loginom", "Любой адрес, в том числе публичный стенд."], ["Каталог", "Loginom Hub из интернета."], ["Сайты", "Агент открывает их, если разрешено в «Разрешениях»."], ["Обновления", "Приходят автоматически."]],
-    intranet: [["Свои навыки и действия", "Работают у вас; поделиться — файлом через администратора."], ["Модели", "Только свои: на этом компьютере и в сети организации."], ["Loginom", "Сервер в сети организации; публичный стенд недоступен."], ["Каталог", "Из файла: «Каталог» → «Импорт из файла»; навыки «Сообщество» — только если разрешил администратор."], ["Сайты", "Агент их не открывает."], ["Обновления", "Сами не приходят: новую версию установщика ставите вы или администратор."]],
+    online: [["Свои навыки и действия", "Работают у вас; опубликовать для всех — после проверки Loginom."], ["Модели", "Бесплатные модели в Облаке OpenCode, провайдеры по подписке или ключу и свой сервер."], ["Loginom", "Любой адрес, в том числе учебный сервер."], ["Каталог", "Loginom Hub из интернета."], ["Сайты", "Агент открывает их, если разрешено в «Разрешениях»."], ["Обновления", "Приходят автоматически."]],
+    intranet: [["Свои навыки и действия", "Работают у вас; поделиться — файлом через администратора."], ["Модели", "Только свои: на этом компьютере и в сети организации."], ["Loginom", "Сервер в сети организации; учебный сервер недоступен."], ["Каталог", "Из файла: «Каталог» → «Импорт из файла»; навыки «Сообщество» — только если разрешил администратор."], ["Сайты", "Агент их не открывает."], ["Обновления", "Сами не приходят: новую версию установщика ставите вы или администратор."]],
     device: [["Свои навыки и действия", "Работают у вас; поделиться — файлом через администратора."], ["Модели", "Только на этом компьютере."], ["Loginom", "Только на этом компьютере."], ["Каталог", "Из файла; навыки «Сообщество» — только если разрешил администратор."], ["Сайты", "Агент их не открывает."], ["Обновления", "Сами не приходят: новую версию установщика ставите вы или администратор."]],
   }[mode]
   return card("Сеть", "Куда приложению и агенту можно обращаться по сети.", choice) +
@@ -427,8 +427,8 @@ function helpTab(state, s) {
   return card("Справка", "Как пользоваться приложением. Документация самого Loginom встроена и доступна агенту.", '<div class="st-about brand"><picture><img class="brand-standard" src="assets/loginom-wordmark.svg" alt="Loginom"><img class="brand-inverse" src="assets/loginom-wordmark-light.png" alt="Loginom"></picture><span>AI Agent · версия 0.5.0 (прототип)</span></div><div class="st-help">' + [
     ["Подключить Loginom", policy ? "Адрес Loginom задал администратор. В «Loginom» введите пользователя и пароль, нажмите «Сохранить»."
       : device ? "Сейчас — только Loginom на этом компьютере. В «Loginom» укажите его адрес, например http://127.0.0.1:8080, пользователя и пароль."
-      : closed ? "В закрытом контуре публичный стенд недоступен. В «Loginom» укажите адрес сервера вашей организации, пользователя и пароль."
-        : "Адрес публичного стенда уже указан. Свой сервер — в «Loginom»: адрес, пользователь, пароль, «Проверить».", "tab:loginom", "Открыть «Loginom»"],
+      : closed ? "В закрытом контуре учебный сервер недоступен. В «Loginom» укажите адрес сервера вашей организации, пользователя и пароль."
+        : "Адрес учебного сервера уже указан. Свой сервер — в «Loginom»: адрес, пользователь, пароль, «Проверить».", "tab:loginom", "Открыть «Loginom»"],
     ["Выбрать модель", policy ? "Модели задал администратор; выберите одну из них в поле ввода."
       : closed ? "«Провайдеры» → «Свой сервер»: Ollama или LM Studio на этом компьютере" + (device ? "." : " или сервер вашей организации.") : "«Провайдеры»: подписка (например, ChatGPT), ключ API или свой сервер. Модель для разговора — в поле ввода.", "tab:providers", "Открыть «Провайдеры»"],
     ["Чтобы ничего не уходило в интернет", policy ? "Настройку сети задал администратор — раздел «Сеть» отмечен замком." : state.policy === "broken" ? "Пока файл политики с ошибкой, приложение и так работает без сети." : "«Сеть» → «Закрытый контур».", "tab:contour", "Открыть «Сеть»"],
@@ -461,15 +461,22 @@ function settingsBody(state, s) {
   }
 }
 
-export function renderSettings(state) {
+export function renderSettings(state, narrow = false) {
   const s = ensureSettings(state)
-  return '<div class="st-suite st-page"><header class="st-page-head"><div><h1>Настройки</h1><p>Loginom, модели, инструкции, разрешения и сеть.</p></div>' +
-    '</header><div class="st-layout"><nav class="st-nav" aria-label="Разделы настроек">' +
+  const nav = '<nav class="st-nav" aria-label="Разделы настроек">' +
     sections.map(([group, tabs]) => '<div class="st-nav-group"><small>' + group + "</small>" + tabs.map(([id, label, glyph]) =>
       '<button type="button" data-st="tab:' + id + '"' + (s.tab === id ? ' aria-current="page"' : "") + ">" + icon(glyph, 16) + "<span>" + label + "</span>" +
       (state.policy === "set" && policyTabs[id] ? '<span class="st-nav-lock" title="Есть настройки администратора">' + icon("lock", 12) + "</span>" : "") + "</button>").join("") +
-      "</div>").join("") + '</nav><div class="st-content">' + (state.policy ? '<div class="st-policy">' + policyBanner(state) + "</div>" : "") + settingsBody(state, s) + "</div></div>" +
+      "</div>").join("") + '</nav>'
+  const menu = narrow ? btn("Разделы настроек", "menu-open", "quiet st-menu-open") +
+    (s.menuOpen ? '<dialog class="st-dialog st-menu" aria-labelledby="st-menu-title"><h2 id="st-menu-title">Разделы настроек</h2>' +
+      nav + '<footer>' + btn("Закрыть", "menu-close", "quiet") + "</footer></dialog>" : "") : nav
+  return '<div class="st-suite st-page"><header class="st-page-head"><div><h1>Настройки</h1><p>Loginom, модели, инструкции, разрешения и сеть.</p></div>' +
+    '</header><div class="st-layout">' + menu + '<div class="st-content">' + (state.policy ? '<div class="st-policy">' + policyBanner(state) + "</div>" : "") + settingsBody(state, s) + "</div></div>" +
     (s.connect && state.policy !== "set" ? connectDialog(state, s) : "") +
+    (s.confirmClosed ? '<dialog class="st-dialog st-confirm-closed" aria-labelledby="st-closed-title"><h2 id="st-closed-title">Включить закрытый контур?</h2><p>Облачные модели, учебный сервер Loginom и сайты станут недоступны. Модели и Loginom вашей организации продолжат работать в её сети. Новое в Каталог добавляется из файла.</p><footer>' +
+      '<button class="btn quiet" data-st="cancel-closed" autofocus>Отмена</button>' +
+      btn("Включить закрытый контур", "enable-closed", "primary") + "</footer></dialog>" : "") +
     (s.leaveTo ? '<dialog aria-labelledby="st-unsaved" class="st-dialog"><h2 id="st-unsaved">Подключение Loginom не сохранено</h2><p>Вернитесь и сохраните или уйдите без сохранения.</p><footer>' +
       btn("Уйти без сохранения", "discard-loginom", "quiet") + btn("Вернуться", "stay-loginom", "primary") +
       "</footer></dialog>" : "") + "</div>"
@@ -631,7 +638,17 @@ export function bindSettings(root, state, api) {
       connect.querySelector("footer .btn.primary")?.click()
     })
   }
-  const dialog = panel.querySelector(".st-dialog:not(.st-connect)")
+  for (const [selector, action] of [[".st-menu", "menu-close"], [".st-confirm-closed", "cancel-closed"]]) {
+    const overlay = panel.querySelector(selector)
+    if (!overlay) continue
+    overlay.showModal()
+    if (selector === ".st-menu") overlay.querySelector("[aria-current]")?.focus()
+    overlay.addEventListener("cancel", event => {
+      event.preventDefault()
+      overlay.querySelector('[data-st="' + action + '"]').click()
+    })
+  }
+  const dialog = panel.querySelector(".st-dialog:has([data-st='stay-loginom'])")
   if (dialog) {
     const stay = dialog.querySelector('[data-st="stay-loginom"]')
     dialog.showModal()
@@ -646,7 +663,11 @@ export function bindSettings(root, state, api) {
     const name = element.dataset.stInput
     if (!name) return
     const value = element.type === "checkbox" ? element.checked : element.value
-    if (name === "instructions") { s.instructionsDraft = value; return }
+    if (name === "instructions") {
+      s.instructionsDraft = value
+      panel.querySelector(".st-instructions-dirty").hidden = value === s.instructions
+      return
+    }
     if (name.startsWith("loginom-")) {
       const key = { "loginom-url": "url", "loginom-user": "username", "loginom-password": "password", "loginom-empty": "empty" }[name]
       s.draft[key] = value
@@ -722,6 +743,8 @@ export function bindSettings(root, state, api) {
     const button = event.target.closest("[data-st]")
     if (!button || !panel.contains(button)) return
     const [action, value] = button.dataset.st.split(":")
+    if (action === "menu-open") s.menuOpen = true
+    if (action === "menu-close" || action === "tab") s.menuOpen = false
     if (action === "tab" || action === "goto") {
       if (!beforeSettingsLeave(state, action === "tab" ? "settings" : value, action === "tab" ? value : undefined)) { api.render(); return }
       if (action === "goto") { api.navigate(value); return }
@@ -737,12 +760,19 @@ export function bindSettings(root, state, api) {
       if (type === "goto") { api.navigate(next); return }
       s.tab = next
     }
-    if (action === "contour") {
+    if (action === "cancel-closed") s.confirmClosed = false
+    if (action === "contour" && value === "closed" && state.contour !== "closed") {
+      s.confirmClosed = true
+      api.render()
+      return
+    }
+    if (action === "contour" || action === "enable-closed") {
+      s.confirmClosed = false
       const before = s.model?.name ?? ""
-      api.setContour(value)
+      api.setContour(action === "enable-closed" ? "closed" : value)
       ensureSettings(state)
       // The public stand is not used in a closed contour: say so, or the Loginom chip turns orange without a reason.
-      announceModel(api, before, s, s.connection.connected && loginomBlocked(state, s, s.connection.url) ? "Публичный стенд Loginom здесь недоступен — укажите сервер организации в «Loginom»." : "")
+      announceModel(api, before, s, s.connection.connected && loginomBlocked(state, s, s.connection.url) ? "Учебный сервер Loginom здесь недоступен — укажите сервер организации в «Loginom»." : "")
       api.render()
       return
     }

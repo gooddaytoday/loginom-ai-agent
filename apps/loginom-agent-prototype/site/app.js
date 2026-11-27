@@ -1,6 +1,6 @@
 import { editedPackageBase64 } from './edited-package.js'
 import { icon } from './icons.js'
-import { renderHub, bindHub, hubHasInstalled, openHubSolution, showHubType, showHubTab, showHubDetail, installForDemo } from './hub.js'
+import { renderHub, bindHub, hubHasInstalled, openHubSolution, showHubType, showHubTab, showHubDetail, installForDemo, recordActionRun } from './hub.js'
 import { renderSettings, bindSettings, ensureSettings, beforeSettingsLeave, availableModels, usableModels, startConnect } from './settings.js'
 import { renderSolutions, bindSolutions, initSolutionDrafts } from './solutions.js'
 import { renderCreate, renderModeration, bindOwn, trialBanner, trialResult, startFromSession, ownActionsGroup, demoOwn } from './create.js'
@@ -193,6 +193,8 @@ const serverPackages = [
     return {id:key + '#' + index, name:name + '.lgp', scope, folder, modified, size:size + ' МБ', view:'local'}
   })),
 ]
+const narrowLayout = matchMedia('(max-width: 1000px)')
+let dialogOpener, clickOpener
 let peek = false, peekWanted = false, peekHeld = false, peekTimer = 0, pointerInPanel = false
 const state = {
   page:'home', policy:read('policy',''), contour:read('policy','') ? 'closed' : read('contour','online'), theme:read('theme','light'),
@@ -200,7 +202,7 @@ const state = {
   projectView:null, projectTab:'chats', menu:null, renameId:null, deleteId:null,
   expanded:stage === 'used' ? ['p-sales','p-report'] : [], showAll:[], detail:read('detail','brief'), editTurn:null,
   sessions:stage === 'used' ? seed.map(item => ({...item})) : [], overlay:null, mobile:false, draft:'', draftFiles:[], mode:'Выполнение',
-  collapsed:read('collapsed',false), draftPackage:null, pickFor:null, connecting:false,
+  collapsed:read('collapsed',false), settingsFocus:false, draftPackage:null, pickFor:null, connecting:false,
   // What the user has already done: things appear after these events and never disappear.
   progress:stage === 'used' ? {ownChats:3, packages:true, catalog:true, examplesHidden:false} : {ownChats:0, packages:false, catalog:false, examplesHidden:false},
   solution:'refactor', review:false, reviewTab:'plan', activeRun:false,
@@ -266,7 +268,7 @@ if (stage === 'used' && state.policy !== 'set') {
 }
 
 const api = {
-  icon, render, toast, navigate, setContour, setTheme, useTemplate, runSolution, discuss, pinSolution, openMine, startTrial, runOwnAction,
+  icon, render, toast, navigate, setContour, setTheme, useTemplate, runSolution, discuss, pinSolution, openMine, startTrial, runOwnAction, recordActionRun,
 }
 // Iteration 6: own skills and actions (create.js).
 function openMine() {
@@ -300,6 +302,9 @@ function pinSolution(solution) {
   state.pinnedActions = [...state.pinnedActions, ...ids]
   toast('Добавлено в строку действий с пакетом')
 }
+function sidebarCollapsed() {
+  return state.collapsed || narrowLayout.matches
+}
 function canNavigate(page, tab) {
   if (beforeSettingsLeave(state,page,tab)) return true
   state.overlay = null
@@ -310,6 +315,7 @@ function canNavigate(page, tab) {
 function navigate(page, keepReturn = false) {
   if (!Object.hasOwn(pages, page) || !canNavigate(page)) return
   if (page === 'settings' && !keepReturn) state.returnTo = null
+  state.settingsFocus = page === 'settings' && state.page === 'chat'
   state.page = page
   state.overlay = null
   state.mobile = false
@@ -319,6 +325,7 @@ function navigate(page, keepReturn = false) {
   render(true)
 }
 function setContour(contour) {
+  if (contour === state.contour) return
   state.contour = contour === 'closed' ? 'closed' : 'online'
   write('contour',state.contour)
   render()
@@ -380,7 +387,8 @@ function improveInChat(pkg) {
   if (state.page !== 'chat') newSession()
   if (pkg) state.draftPackage = pkg
   state.draft = 'Внеси улучшения в этот пакет'
-  send()
+  const turn = send()
+  if (turn) recordActionRun(state, packageActions.improve.title, pkg?.name || turn.files[0])
 }
 function runAction(actionId, pkg, from) {
   if (actionId === 'improve') return improveInChat(pkg)
@@ -549,7 +557,7 @@ function projectTree(project) {
 function chatRow(item, nested = false) {
   const project = nested ? null : projectById(item.project)
   const current = state.page === 'chat' && state.session === item.id
-  return `<div class="side-row chat-row${nested ? ' nested' : ''}"><button class="session-link${current ? ' current' : ''}" data-session="${item.id}">${nested ? '' : icon('message',15)}<span class="row-text"><span>${esc(item.title)}</span>${project ? `<small><i class="pc-dot pc-${project.color}"></i>${esc(project.name)}</small>` : ''}</span>${sessionMark(item)}</button>${moreButton('chat',item.id,`Действия с разговором «${item.title}»`)}</div>`
+  return `<div class="side-row chat-row${nested ? ' nested' : ''}"><button class="session-link${current ? ' current' : ''}" data-session="${item.id}">${nested ? '' : icon('message',15)}<span class="row-text"><span title="${esc(item.title)}">${esc(item.title)}</span>${project ? `<small><i class="pc-dot pc-${project.color}"></i>${esc(project.name)}</small>` : ''}</span>${sessionMark(item)}</button>${moreButton('chat',item.id,`Действия с разговором «${item.title}»`)}</div>`
 }
 // One mark for a whole list: what the collapsed panel shows on the section's icon.
 function chatsMark(list) {
@@ -559,7 +567,7 @@ function chatsMark(list) {
 function sessionMark(item) {
   if (['running','retrying','writing'].includes(item.phase)) return '<i class="conn-dot busy" title="Агент работает"></i><span class="sr-only">— агент работает</span>'
   if (item.phase === 'failed') return item.modelError && !item.modelError.resolved ? '<i class="conn-dot warn" title="Модель не ответила — нужна ваша помощь"></i><span class="sr-only">— модель не ответила</span>' : '<i class="conn-dot warn" title="Шаг не выполнен — нужна ваша помощь"></i><span class="sr-only">— шаг не выполнен</span>'
-  if (['permission','question','plan','connect'].includes(item.phase) || item.phase === 'proposed') return '<i class="conn-dot warn" title="Ждёт вашего ответа"></i><span class="sr-only">— ждёт вашего ответа</span>'
+  if (['permission','upload','question','plan','connect'].includes(item.phase) || item.phase === 'proposed') return '<i class="conn-dot warn" title="Ждёт вашего ответа"></i><span class="sr-only">— ждёт вашего ответа</span>'
   return ''
 }
 function runNotice() {
@@ -606,6 +614,8 @@ function composer() {
   const modelName = currentModel()
   const pkg = state.draftPackage
   const model = chatModel()
+  const limited = modelLimited(model)
+  const alternative = availableModels(state).find(entry => !modelLimited(entry))
   // Where the data goes is said where the user decides to send it, not only in «Модели».
   const note = state.policy === 'broken' && !modelName ? `${icon('alert',14)}<span>Файл политики администратора с ошибкой: модели — только на этом компьютере.</span><button type="button" class="link-btn" data-settings="models">Что делать</button>`
     : modelName && model.kind === 'cloud' && (pkg || state.draftFiles.length) ? `${icon('globe',14)}<span>Модель в облаке: сообщение и то, что агент прочитает в приложенном, уйдут в «${esc(model.where)}».</span><button type="button" class="link-btn" data-settings="models">Модели</button>` : ''
@@ -615,6 +625,8 @@ function composer() {
     ${pkg ? packageContext(pkg) : ''}
     ${state.draftFiles.length ? `<div class="attachment-list">${state.draftFiles.map((file,i) => `<span>${icon('file',14)} ${esc(file)} <button type="button" class="small-icon" aria-label="Убрать ${esc(file)}" data-remove-file="${i}">${icon('close',13)}</button></span>`).join('')}</div>` : ''}
     ${note ? `<div class="composer-note">${note}</div>` : ''}
+    ${limited ? `<div class="composer-note model-limit" role="status">${icon('alert',15)}<span>Лимит модели «${esc(modelName)}» исчерпан.</span>
+      ${alternative ? '<button type="button" class="link-btn" data-menu="model:limit" data-menu-up aria-haspopup="menu" aria-expanded="' + (state.menu?.id === 'limit') + '">Выбрать другую модель</button>' : state.policy !== 'set' ? '<button type="button" class="link-btn" data-action="provider-connect">Подключить другую модель</button>' : ''}</div>` : ''}
     <textarea id="prompt" aria-label="Сообщение агенту" placeholder="${state.page === 'chat' && state.editTurn?.session === state.session ? 'Изменённое сообщение' : state.page === 'chat' && ['running','retrying'].includes(currentItem()?.phase) ? 'Поправка агенту — учтёт после текущего шага' : state.page === 'chat' ? 'Уточните задачу или задайте вопрос' : state.page === 'project' || projectById(state.project) ? esc(`Новый разговор в проекте «${projectById(state.page === 'project' ? state.projectView : state.project)?.name}»`) : esc(placeholder)}" rows="2">${esc(state.draft)}</textarea>
     <div class="composer-toolbar">
       <div class="composer-options">
@@ -624,10 +636,10 @@ function composer() {
       </div>
       <div class="composer-options">
         ${loginomChip()}
-        ${modelName ? `<button class="filter-btn composer-model" type="button" data-menu="model:" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && !state.menu.id}" aria-label="Модель${state.page === 'chat' ? ' этого разговора' : ''}: ${esc(modelName)}${model.kind === 'cloud' ? `, облако — данные уходят в «${esc(model.where)}»` : ''}" title="Модель${state.page === 'chat' ? ' этого разговора' : ''}: ${esc(modelName)}${model.kind === 'cloud' ? ` · облако: данные уходят в «${esc(model.where)}»` : ''}">${icon(model.kind === 'cloud' ? 'globe' : 'cpu',15)} <span class="filter-label">${esc(modelName)}</span> ${icon('down',12)}</button>`
+        ${modelName ? `<button class="filter-btn composer-model${limited ? ' limited' : ''}" type="button" data-menu="model:" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && !state.menu.id}" aria-label="Модель${state.page === 'chat' ? ' этого разговора' : ''}: ${esc(modelName)}${model.kind === 'cloud' ? `, облако — данные уходят в «${esc(model.where)}»` : ''}" title="Модель${state.page === 'chat' ? ' этого разговора' : ''}: ${esc(modelName)}${model.kind === 'cloud' ? ` · облако: данные уходят в «${esc(model.where)}»` : ''}">${icon(limited ? 'alert' : model.kind === 'cloud' ? 'globe' : 'cpu',15)} <span class="filter-label">${esc(modelName)}</span> ${icon('down',12)}</button>`
           : `<button class="filter-btn composer-model lgm-chip off" type="button" data-action="provider-connect" title="Модель">${icon('cpu',15)} <span class="filter-label">Выберите модель</span> ${icon('down',12)}</button>`}
         ${state.page === 'chat' && ['running','retrying','writing'].includes(currentItem()?.phase) ? `<button class="stop-btn" type="button" data-action="stop" title="Остановить агента (Esc)">${icon('stop',14)}<span>Остановить</span></button>` : ''}
-        <button class="send-btn" type="submit" ${state.draft.trim() ? '' : 'disabled'} aria-label="Отправить сообщение" title="Отправить сообщение">${icon('up',20)}</button>
+        <button class="send-btn" type="submit" ${state.draft.trim() && !limited ? '' : 'disabled'} aria-label="Отправить сообщение" title="Отправить сообщение">${icon('up',20)}</button>
       </div>
     </div>
   </form>`
@@ -687,12 +699,12 @@ function rightPanel(item) {
   const attached = edit ? (canUsePackageEdit(item) ? [item.source.name] : []) : item.files
   const created = edit ? (canUsePackageEdit(item) && item.workingPackage?.savedVersion ? [item.workingPackage.name] : []) : createdFiles(item)
   const fileList = (title, list) => list.length ? `<p class="review-label">${title}</p>${list.map(file => `<div class="review-entry">${icon('file',16)}${esc(file)}</div>`).join('')}` : ''
-  return `<aside class="review-panel" aria-label="Проверка результатов">
-    <div class="review-heading"><h2>Контекст разговора</h2><button class="icon-btn" data-action="review" aria-label="Закрыть панель">${icon('close',17)}</button></div>
+  return `${narrowLayout.matches ? '<dialog class="review-layer" aria-labelledby="review-title">' : ''}<aside class="review-panel" aria-label="Файлы и шаги">
+    <div class="review-heading"><h2 id="review-title">Файлы и шаги</h2><button class="icon-btn" data-action="review" aria-label="Закрыть панель">${icon('close',17)}</button></div>
     <div class="review-switch">${[['plan','План'],['files','Файлы'],['log','Журнал']].map(([id,label]) => `<button class="${active === id ? 'active':''}" data-review="${id}" aria-pressed="${active === id}">${label}</button>`).join('')}</div>
     ${active === 'plan' ? plan(item) : active === 'files' ? `<div class="review-stack">${fileList('Приложено', attached) + fileList('Создано', created) + fileList('Копии агента в Loginom · ' + packageFolder('personal') + '/Копии агента', edit ? [] : liveCopies(item)) || '<p class="muted">Файлов пока нет.</p>'}</div>` : `<div class="review-stack">${journal(item)}</div>`}
     ${followedNow(item)}
-  </aside>`
+  </aside>${narrowLayout.matches ? '</dialog>' : ''}`
 }
 function plan(item) {
   if (item.kind === 'package-edit') {
@@ -962,15 +974,16 @@ function changeCard(turn) {
     replaced:`<button class="btn" data-change="open:${at}">${icon('folder',15)} Открыть «Продажи.lgp»</button>${view}${loginomButton('sales')}<button class="link-btn discard-link" data-change="restore:${at}">Вернуть прежнюю версию</button>`,
     discarded:`<button class="link-btn" data-change="undiscard:${at}">Вернуть изменения</button>`,
   }[current]
-  const title = current === 'discarded' ? (turn.change?.downloaded ? 'Копия удалена из Loginom' : 'Изменения отменены') : `Изменил копию «Продажи.lgp»${local ? ' с компьютера' : ''}${turn.kind === 'keep' ? ' ещё раз' : ''}`
+  const title = current === 'saved' ? esc(saved.name) : current === 'discarded' ? (turn.change?.downloaded ? 'Копия удалена из Loginom' : 'Изменения отменены') : `Изменил копию «Продажи.lgp»${local ? ' с компьютера' : ''}${turn.kind === 'keep' ? ' ещё раз' : ''}`
   return `<div class="answer-block change-block"><h2>${title}</h2><p>${status}</p>
+    <div class="change-actions">${actions}</div>
     ${current === 'discarded' ? '' : `<div class="change-card${['draft','continued'].includes(current) ? '' : ' is-' + current}">
       <div class="change-head">${icon('flow',17)}<strong>${esc(current === 'saved' ? saved.name : ['draft','continued'].includes(current) ? agentCopy(turn).name : 'Продажи.lgp')}</strong><span class="badge">${{draft:'копия агента', continued:'продолжено ниже', saved:local ? 'в Loginom' : 'новая версия', replaced:'заменён в Loginom'}[current]}</span><span class="change-counts">${counts.filter(([,count]) => count).map(([kind,count,label]) => `<b class="c-${kind}">${{add:'+',mod:'~',del:'−'}[kind]}${count} ${label}</b>`).join('')}</span></div>
+      <details class="change-nodes" data-facts="${esc(state.session + ':' + at + ':nodes')}"${state.openFacts?.has(state.session + ':' + at + ':nodes') ? ' open' : ''}><summary>Изменённые узлы (${rows.length})</summary>
       ${turn.kind === 'keep' ? `<p class="change-scope">Вся копия против исходного «Продажи.lgp»; этот ответ изменил одну строку — она отмечена.</p>` : ''}
-      <ul class="change-list">${rows.map(([kind,name,what,node]) => `<li class="c-${kind}${turn.kind === 'keep' && node === keptCityFilter[1] ? ' is-latest' : ''}"><span class="mark" aria-label="${{add:'добавлен',mod:'изменён',del:'удалён'}[kind]}">${{add:'+',mod:'~',del:'−'}[kind]}</span><div><strong>${esc(name)}</strong>${turn.kind === 'keep' && node === keptCityFilter[1] ? ' <span class="badge latest">в этом ответе</span>' : ''} — ${esc(what)}${node ? `<details class="change-facts" data-facts="${esc(state.session + ':' + at + ':' + node)}"${state.openFacts?.has(state.session + ':' + at + ':' + node) ? ' open' : ''}><summary>Настройки и связи</summary>${nodeFactsHtml(nodeFacts('sales-improve',node,keep),'diff')}</details>` : ''}</div></li>`).join('')}</ul>
-      <div class="change-check"><strong>Проверено приложением</strong> — по квитанциям запуска копии в Loginom:<ul><li>${icon('check',13)} результат — 120 строк, как у исходного</li><li>${icon('check',13)} у «Проверка пустых значений» на выходе «Не соответствуют условию» — 12 строк: без цены или региона, в расчёт не попадают</li>${local || !salesState().replaced ? `<li>${icon('check',13)} ${local ? 'файл на компьютере' : '«Продажи.lgp» в Loginom'} не изменён</li>` : ''}</ul></div>
+      <ul class="change-list">${rows.map(([kind,name,what,node]) => `<li class="c-${kind}${turn.kind === 'keep' && node === keptCityFilter[1] ? ' is-latest' : ''}"><span class="mark" aria-label="${{add:'добавлен',mod:'изменён',del:'удалён'}[kind]}">${{add:'+',mod:'~',del:'−'}[kind]}</span><div><strong>${esc(name)}</strong>${turn.kind === 'keep' && node === keptCityFilter[1] ? ' <span class="badge latest">в этом ответе</span>' : ''} — ${esc(what)}${node ? `<details class="change-facts" data-facts="${esc(state.session + ':' + at + ':' + node)}"${state.openFacts?.has(state.session + ':' + at + ':' + node) ? ' open' : ''}><summary>Настройки и связи</summary>${nodeFactsHtml(nodeFacts('sales-improve',node,keep),'diff')}</details>` : ''}</div></li>`).join('')}</ul></details>
+      <div class="change-check"><strong>Проверено приложением</strong> — по результатам запуска в Loginom:<ul><li>${icon('check',13)} результат — 120 строк, как у исходного</li><li>${icon('check',13)} у «Проверка пустых значений» на выходе «Не соответствуют условию» — 12 строк: без цены или региона, в расчёт не попадают</li>${local || !salesState().replaced ? `<li>${icon('check',13)} ${local ? 'файл на компьютере' : '«Продажи.lgp» в Loginom'} не изменён</li>` : ''}</ul></div>
     </div>`}
-    <div class="change-actions">${actions}</div>
     ${current === 'draft' ? `<p class="change-note">${local ? `В Loginom — как «${esc(next)}» в ${esc(packageFolder('personal'))}; на компьютер — куда выберете.` : `Новая версия появится рядом с исходным: ${esc(packageFolder('personal'))}/${esc(next)}`}</p>` : ''}
   </div>`
 }
@@ -1020,7 +1033,7 @@ function packageEditBody(item) {
   if (item.workingPackage) {
     const output = item.workingPackage
     const saved = Boolean(output.savedVersion)
-    return `<div class="answer-block"><h2>${saved ? 'Новая версия сохранена' : 'Правки применены к черновику'}</h2>
+    return `<div class="answer-block"><h2>${saved ? esc(item.workingPackage.name) : 'Правки применены к черновику'}</h2>
       <p>${saved ? 'В личной папке Loginom появился учебный пакет.' : 'В черновике есть несохранённые изменения. Сохраните отдельную версию в Loginom или скачайте .lgp.'}</p>
       ${saved ? `<p class="edit-source"><code>${esc(packageFolder(output.scope) + '/' + output.name)}</code></p>` : ''}
       ${editDiff()}
@@ -1153,8 +1166,8 @@ scripts.keepFrom = {...scripts.keep, permission:{...scripts.improve.permission, 
   {plan:0, icon:'flow', ask:'permission', live:'Делаю копию «{from}»', done:'Сделал копию «{copy}» из новой версии «{from}»', short:'сделал копию новой версии', detail:'Новая версия и исходный не меняются', time:3},
   ...scripts.keep.steps.slice(1)]}
 // A package from the computer: the first step uploads the agent's own copy, the rest is the same edit.
-scripts.improveLocal = {...scripts.improve, permission:{...scripts.improve.permission, title:'Загрузить копию «{pkg}» в Loginom?', text:'Чтобы править пакет, агент загрузит его копию с компьютера в вашу папку Loginom. Файл на компьютере не изменится.', trace:'загрузить копию «{pkg}» с компьютера в {home}/Копии агента'}, steps:[
-  {plan:0, icon:'upload', ask:'permission', live:'Загружаю копию «{pkg}» с компьютера в Loginom', done:'Загрузил копию «{pkg}» с компьютера в «Копии агента»', short:'загрузил копию пакета', detail:'Файл на компьютере не меняется — вы решите, куда сохранить изменённый пакет', time:4},
+scripts.improveLocal = {...scripts.improve, permission:{...scripts.improve.permission, title:'Разрешить правку копии «{pkg}»?', text:'Чтобы править пакет, агент загрузит его копию с компьютера в вашу папку Loginom. Файл на компьютере не изменится.', trace:'загрузить копию «{pkg}» с компьютера в {home}/Копии агента'}, steps:[
+  {plan:0, icon:'upload', ask:'permission', live:'Загружаю копию «{pkg}» с компьютера в Loginom', done:'Загрузил «{pkg}» в {home}/Копии агента', short:'загрузил копию пакета', detail:'Файл на компьютере не меняется — вы решите, куда сохранить изменённый пакет', time:4},
   ...scripts.improve.steps.slice(1)]}
 // Kinds the agent answers in words, without steps in Loginom.
 const answerOnly = ['chat','more','nocopy','pick','discuss','noenrich']
@@ -1188,6 +1201,11 @@ function completeTurn(turn) {
   return turn
 }
 // The engine: one step every ~0.7 s; a step that needs the user stops the run until they answer.
+function filesForLoginom(item) {
+  if (item.kind === 'improve' && item.local && item.step === 0 && !item.resumeCopy) return item.files.slice(0, 1)
+  if (item.kind === 'abc' && item.step === 1) return item.localFiles?.length ? item.localFiles : item.local ? item.files.slice(0, 1) : []
+  return []
+}
 function runSteps(item) {
   clearTimeout(item.timer)
   const script = scriptOf(item)
@@ -1223,12 +1241,25 @@ function runSteps(item) {
     if (state.session !== item.id || state.page !== 'chat') toast(`«${item.title}» ждёт вашего ответа`, 'alert', item.id)
     return render()
   }
+  const files = filesForLoginom(item)
+  const connection = state.settings.connection
+  const onStand = files.length && hostOf(connection.url) === 'app.loginom.ai'
+  const uploadAccount = onStand && state.packageAccount
+  if (onStand && item.uploadConsent !== uploadAccount) {
+    item.phase = 'upload'
+    if (state.session !== item.id || state.page !== 'chat') toast(`«${item.title}» ждёт подтверждения загрузки`, 'alert', item.id)
+    return render()
+  }
   item.phase = 'running'
   render()
   item.timer = setTimeout(() => {
     if (item.phase !== 'running') return
     if (item.failAt === item.step) return stepFailed(item)
     if (item.modelFailAt === item.step) return modelFailed(item)
+    if (files.length) {
+      const folder = '/' + connection.username + (item.kind === 'improve' ? '/Копии агента' : '')
+      item.uploads = [...(item.uploads || []), ...files.map(name => ({at:item.step, text:`Загрузил «${name}» в ${folder}` }))]
+    }
     item.step++
     runSteps(item)
   }, 750)
@@ -1264,7 +1295,7 @@ function modelFailed(item) {
   const model = chatModel(item)
   const kind = model?.source === 'free' ? 'free-limit' : model?.kind === 'cloud' ? 'quota' : 'unreachable'
   item.modelError = {at:item.step, kind, model:model?.name || 'модель', where:model?.where || '', blocked:kind !== 'unreachable'}
-  if (kind === 'free-limit') state.freeLimited = true
+  if (item.modelError.blocked && model) (state.limitedModels ??= new Set()).add(model.name)
   item.modelFailAt = null
   item.phase = 'failed'
   render()
@@ -1306,11 +1337,11 @@ function writeAnswer(item, finalPhase) {
 }
 function startRun(item) {
   Object.assign(item, {step:0, decisions:[], cleared:[], steer:[], answer:null, expanded:false, instruction:'', errors:[], failAt:state.failNext && !answerOnly.includes(item.kind) ? 1 : null,
-    modelFailAt:state.failModel && !answerOnly.includes(item.kind) ? 1 : null, modelError:null})
+    modelFailAt:state.failModel && !answerOnly.includes(item.kind) ? 1 : null, modelError:null, uploads:[]})
   state.failNext = false
   if (!answerOnly.includes(item.kind)) state.failModel = false
   // The free model whose daily limit the demo spent stops any turn at once until the page is reloaded («обновится в 03:00»).
-  if (state.freeLimited && chatModel(item)?.source === 'free') return modelFailed(item)
+  if (modelLimited(chatModel(item))) return modelFailed(item)
   if (answerOnly.includes(item.kind)) return writeAnswer(item, 'answer')
   if (state.mode === 'Планирование' && item.kind !== 'document') {
     item.phase = 'plan'
@@ -1362,13 +1393,14 @@ function answerText(turn) {
 }
 function turnAnswer(turn, live = false) {
   if (turn.phase === 'denied') {
+    if (turn.uploadDenied) return '<div class="answer-block"><p>Файл не загружен на учебный сервер.</p></div>'
     if (turn.decisions?.some(entry => entry.choice === 'forbidden')) return `<div class="answer-block"><p>${esc(stepText(scriptOf(turn).permission.forbidden || '', turn) || 'Сохранять пакеты в Loginom мне запрещено: так стоит в «Настройки» → «Разрешения». Сценарий собран и проверен — он остался в этом разговоре.')}</p>${live ? `<button class="btn" data-settings="permissions">${icon('shield',15)} Открыть «Разрешения»</button>` : ''}</div>`
     return `<div class="answer-block"><p>${esc(scriptOf(turn).permission.denied)}</p></div>`
   }
   if (turn.phase === 'failed' && turn.modelError && !turn.modelError.resolved) {
     const [title, reason] = modelErrorText(turn.modelError)
-    const others = availableModels(state).filter(model => model.name !== turn.modelError.model && !(state.freeLimited && model.source === 'free'))
-    return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Ход остановлен: ${esc(title.toLocaleLowerCase('ru'))}</h2><p>${esc(reason)} ${turn.modelError.at ? 'Сделанные шаги выше остались в разговоре: если продолжить, агент начнёт с того же места.' : 'Агент ещё ничего не успел сделать.'}</p>
+    const others = availableModels(state).filter(model => model.name !== turn.modelError.model && !modelLimited(model))
+    return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Агент остановился: ${esc(title.toLocaleLowerCase('ru'))}</h2><p>${esc(reason)} ${turn.modelError.at ? 'Сделанные шаги выше остались в разговоре: если продолжить, агент начнёт с того же места.' : 'Агент ещё ничего не успел сделать.'}</p>
       <p>${others.length ? 'Продолжить можно с другой моделью — она увидит весь разговор.' : state.policy === 'set' ? 'Другой модели нет: модели задаёт администратор вашей организации — обратитесь к нему.' : 'Другой модели в этом режиме сети нет — подключите модель: по подписке, по ключу API или свой сервер.'}${turn.modelError.kind === 'free-limit' ? ' Или дождитесь обновления лимита.' : turn.modelError.blocked ? '' : ' Или продолжите с этой же, когда она заработает.'}</p>
       ${live && copySettled(currentItem()) ? `<p class="muted">${esc(settledNote(copySettled(currentItem())))}</p>` : live ? `<div class="button-row">${others.length ? `<button class="btn primary" type="button" data-menu="model:continue" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && state.menu.id === 'continue'}">${icon('play',15)} Продолжить с другой моделью ${icon('down',12)}</button>` : state.policy === 'set' ? '' : `<button class="btn primary" data-action="provider-connect">${icon('cpu',15)} Подключить модель</button>`}${turn.modelError.blocked ? '' : `<button class="btn" data-action="continue-turn">${icon('refresh',15)} Продолжить с этой же</button>`}<button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
   }
@@ -1398,7 +1430,9 @@ function turnSteps(turn, live, turnIndex) {
       : `<li class="step-trace">${icon('check',14)}<span>${{session:'Вы разрешили в этом разговоре', auto:'Разрешено ранее в этом разговоре', once:'Вы разрешили один раз', setting:'Разрешено в «Разрешениях»'}[decision.choice]}: ${esc(followed(script.permission.trace, turn))}</span></li>`)
     if (step.ask === 'question') rows.push(`<li class="step-trace">${icon('help',14)}<span>${esc(script.question.text)} — <strong>${esc(turn.answer || '')}</strong></span></li>`)
     if (detailed && step.think) rows.push(`<li class="step think">${icon('spark',14)}<span>Думал ${step.think[0]} с<small>${esc(step.think[1])}</small></span></li>`)
-    rows.push(`<li class="step done">${icon(step.icon,15)}<span>${esc(step.ask === 'permission' ? followed(stepText(step.done, turn), turn) : stepText(step.done, turn))}${step.detail && (detailed || turn.open?.includes(index)) ? `<small>${esc(stepText(step.detail, turn))}</small>` : ''}</span>${step.detail && !detailed ? `<button class="small-icon step-more" data-step-detail="${turnIndex}:${index}" aria-label="${turn.open?.includes(index) ? 'Скрыть' : 'Показать'} подробности шага" aria-expanded="${Boolean(turn.open?.includes(index))}">${icon('more',14)}</button>` : ''}</li>`)
+    const uploads = turn.uploads?.filter(entry => entry.at === index) || []
+    for (const entry of uploads) rows.push(`<li class="step done">${icon('upload',15)}<span>${esc(entry.text)}</span></li>`)
+    if (!uploads.length || step.icon !== 'upload') rows.push(`<li class="step done">${icon(step.icon,15)}<span>${esc(step.ask === 'permission' ? followed(stepText(step.done, turn), turn) : stepText(step.done, turn))}${step.detail && (detailed || turn.open?.includes(index)) ? `<small>${esc(stepText(step.detail, turn))}</small>` : ''}</span>${step.detail && !detailed ? `<button class="small-icon step-more" data-step-detail="${turnIndex}:${index}" aria-label="${turn.open?.includes(index) ? 'Скрыть' : 'Показать'} подробности шага" aria-expanded="${Boolean(turn.open?.includes(index))}">${icon('more',14)}</button>` : ''}</li>`)
     ;(turn.steer || []).filter(entry => entry.at === index + 1).forEach(entry => rows.push(`<li class="step-trace steer">${icon('message',14)}<span>Ваша поправка: «${esc(entry.text)}»</span></li>`))
   })
   const denied = turn.decisions?.find(entry => entry.choice === 'deny')
@@ -1422,7 +1456,7 @@ function turnModels(turn) {
   return [...new Set([turn?.modelName, ...(turn?.decisions || []).filter(entry => entry.choice === 'continue').map(entry => entry.model)].filter(Boolean))]
 }
 function modelErrorRow(turn) {
-  return `<li class="step error">${icon('alert',15)}<span>Модель «${esc(turn.modelError.model)}» не ответила<small>${esc(modelErrorText(turn.modelError)[0])} · ход остановлен</small></span></li>`
+  return `<li class="step error">${icon('alert',15)}<span>Модель «${esc(turn.modelError.model)}» не ответила<small>${esc(modelErrorText(turn.modelError)[0])} · агент остановился</small></span></li>`
 }
 function turnPlan(turn) {
   const script = scriptOf(turn)
@@ -1433,22 +1467,22 @@ function turnPlan(turn) {
 function turnView(item, turn, index, live) {
   const script = scriptOf(turn)
   const finished = ['done','answer','denied','stopped','interrupted','failed'].includes(turn.phase)
-  const hasSteps = script.steps.length && turn.step > 0 || (live && ['running','retrying','permission','question','failed'].includes(turn.phase)) || (turn.decisions || []).some(entry => ['deny','forbidden'].includes(entry.choice))
+  const hasSteps = script.steps.length && turn.step > 0 || (live && ['running','retrying','permission','upload','question','failed'].includes(turn.phase)) || (turn.decisions || []).some(entry => ['deny','forbidden'].includes(entry.choice))
   const brief = state.detail !== 'full'
   const objects = [...(turn.rules ? [turn.rules.short] : []), ...script.steps.slice(0, turn.step).map(step => stepText(step.short, turn)), ...((turn.errors || []).some(entry => entry.at < turn.step) ? ['повторил шаг после сбоя Loginom'] : []), ...(turn.modelError?.resolved ? [(turn.decisions || []).some(entry => entry.choice === 'continue' && entry.model !== turn.modelError.model) ? 'продолжил с другой моделью после остановки' : 'продолжил после остановки модели'] : [])]
   const unresolved = (turn.errors || []).some(entry => entry.at >= turn.step) || Boolean(turn.modelError && !turn.modelError.resolved)
   const before = index ? turnModels([...(item.history || []), item][index - 1]).at(-1) : null
   const switched = before && turn.modelName && before !== turn.modelName
   // Nothing done (a declined or forbidden first step): no «Работал 0 с» — the trace row shows why.
-  const summary = (finished || turn.phase === 'writing') && hasSteps && brief && !turn.expanded && !unresolved && turn.step > 0
+  const summary = !turn.uploads?.length && (finished || turn.phase === 'writing') && hasSteps && brief && !turn.expanded && !unresolved && turn.step > 0
   return `<div class="turn">
     ${switched ? `<p class="feed-notice">${icon('cpu',14)} Дальше отвечает «${esc(turn.modelName)}»${cloudNote(turn.modelName)} — ${{switched:'модель сменили в поле ввода', back:'модель разговора снова доступна в этом режиме сети'}[turn.modelNote] || `«${esc(turn.model)}» недоступна в этом режиме сети, отвечает модель по умолчанию`}</p>` : ''}
     <div class="user-turn"><div class="user-message">${esc(turn.prompt)}${turn.files?.length ? `<div class="message-files">${turn.files.map(file => `<span>${icon('file',14)}${esc(file)}</span>`).join('')}</div>` : ''}</div>
-      <div class="msg-actions"><button class="msg-act" data-copy-prompt="${index}">${icon('copy',14)}<span>Копировать</span></button><button class="msg-act" data-edit-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','failed','connect'].includes(turn.phase) ? 'disabled' : ''}>${icon('compose',14)}<span>Изменить</span></button><button class="msg-act" data-fork-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','failed'].includes(turn.phase) ? 'disabled' : ''}>${icon('branch',14)}<span>Ответвить</span></button></div></div>
+      <div class="msg-actions"><button class="msg-act" data-copy-prompt="${index}">${icon('copy',14)}<span>Копировать</span></button><button class="msg-act" data-edit-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','failed','connect'].includes(turn.phase) ? 'disabled' : ''}>${icon('compose',14)}<span>Изменить</span></button><button class="msg-act" data-fork-turn="${index}" title="Новый разговор с историей до этого места" ${live && !['done','answer','denied','stopped','interrupted','failed'].includes(turn.phase) ? 'disabled' : ''}>${icon('branch',14)}<span>Ответвить</span></button></div></div>
     <div class="agent-message"><span class="agent-avatar"><img src="assets/loginom.png" alt="" width="31" height="31"></span><div class="agent-body"><strong class="agent-caption">Loginom AI Agent</strong>
       ${turn.phase === 'connect' ? `<div class="answer-block"><h2>Для этой задачи нужен Loginom</h2><p>Я буду строить и проверять сценарий в Loginom. Подключитесь — и я продолжу.</p>${connectCard()}</div>` : ''}
       ${turn.phase === 'plan' ? `<div class="answer-block"><h2>План работы</h2><p>Проверьте шаги — и я начну.</p>${turnPlan(turn)}<button class="btn primary" data-action="run-plan">Выполнить ${icon('arrow',16)}</button></div>` : ''}
-      ${live && ['running','retrying','permission','question'].includes(turn.phase) && script.plan ? turnPlan(turn) : ''}
+      ${live && ['running','retrying','permission','upload','question'].includes(turn.phase) && script.plan ? turnPlan(turn) : ''}
       ${summary ? `<button class="turn-summary" data-expand-turn="${index}" aria-expanded="false">${icon('chevron',14)}<span>Работал ${turnTime(turn)} · ${esc(objects.join(', '))}</span></button>` : ''}
       ${hasSteps && !summary ? `${finished && brief && !unresolved && turn.step > 0 ? `<button class="turn-summary open" data-expand-turn="${index}" aria-expanded="true">${icon('chevron',14)}<span>Работал ${turnTime(turn)}</span></button>` : finished && turn.step ? `<p class="turn-time">Работал ${turnTime(turn)}</p>` : ''}${turnSteps(turn, live, index)}` : ''}
       ${finished || turn.phase === 'writing' ? turnAnswer({...turn, id:item.id + '-' + index, index}, live) : ''}
@@ -1459,14 +1493,23 @@ function turnView(item, turn, index, live) {
 // The input area of a chat: the agent's question or permission takes the input's place until answered.
 function chatDock(item) {
   const script = scriptOf(item)
+  if (item.phase === 'upload') {
+    const files = filesForLoginom(item)
+    const names = files.map(name => `«${name}»`).join(', ')
+    return `<section class="dock" aria-labelledby="dock-title">
+      <div class="dock-head">${icon('upload',20)}<h2 id="dock-title" tabindex="-1">Загрузить ${esc(names)} на учебный сервер в интернете?</h2></div>
+      <div class="dock-actions"><button class="btn" data-upload="deny">Не загружать</button><button class="btn primary" data-upload="allow">Загрузить</button></div>
+    </section>`
+  }
   if (item.phase === 'permission') {
     const ask = script.permission
     return `<section class="dock" aria-labelledby="dock-title">
       <div class="dock-head">${icon('shield',20)}<h2 id="dock-title" tabindex="-1">${esc(stepText(ask.title, item))}</h2></div>
       <p>${esc(ask.text)}</p>
-      <dl class="dock-args">${ask.args.map(([key,value]) => `<div><dt>${key}</dt><dd>${esc(item.instruction && key === 'Папка' ? 'по вашему указанию' : stepText(value, item))}</dd></div>`).join('')}${item.instruction ? `<div class="dock-instruction"><dt>Ваше указание</dt><dd>«${esc(item.instruction)}»</dd></div>` : ''}</dl>
       <div class="dock-actions"><button class="btn primary" data-permit="once">Разрешить один раз</button><button class="btn" data-permit="session" aria-describedby="dock-scope">Разрешать в этом разговоре</button><button class="btn" data-permit="deny">Отклонить</button></div>
-      <p class="dock-scope" id="dock-scope">«В этом разговоре» — больше не спрашивать только об одном: ${esc(stepText(ask.scope, item))}.</p>
+      <details class="dock-details" data-facts="${esc(item.id + ':permission:' + item.step)}"${state.openFacts?.has(item.id + ':permission:' + item.step) ? ' open' : ''}><summary>Подробности разрешения</summary>
+      <dl class="dock-args">${ask.args.map(([key,value]) => `<div><dt>${key}</dt><dd>${esc(item.instruction && key === 'Папка' ? 'по вашему указанию' : stepText(value, item))}</dd></div>`).join('')}${item.instruction ? `<div class="dock-instruction"><dt>Ваше указание</dt><dd>«${esc(item.instruction)}»</dd></div>` : ''}</dl>
+      <p class="dock-scope" id="dock-scope">«В этом разговоре» — больше не спрашивать только об одном: ${esc(stepText(ask.scope, item))}.</p></details>
       ${ask.noInstead ? '' : item.insteadOpen ? `<form class="dock-instead" id="instead-form"><label for="instead-text">Что сделать иначе</label><div><input id="instead-text" name="text" value="${esc(item.dockDraft?.['instead-text'] || '')}" placeholder="Например: сохрани в папку «Продажи»" autocomplete="off"><button class="btn">Отправить</button></div></form>`
         : `<button class="link-btn dock-more" data-action="open-instead">${icon('message',14)} Сказать, что сделать иначе</button>`}
     </section>`
@@ -1491,7 +1534,7 @@ function chat() {
   const dock = isEdit ? '' : chatDock(item)
   return `<div class="chat-layout${state.review ? ' with-review':''}">
     <div class="chat-main">
-      <div class="chat-title"><div><p class="eyebrow">Разговор</p><h1>${esc(item.title)}</h1></div><div class="button-row">${isEdit ? '' : `<div class="detail-toggle" role="group" aria-label="Подробность ленты"><button data-detail="brief" aria-pressed="${state.detail !== 'full'}">Кратко</button><button data-detail="full" aria-pressed="${state.detail === 'full'}">Подробно</button></div>`}<button class="btn" data-action="review" aria-pressed="${state.review}">${icon('panel',17)} <span>Контекст</span></button>${moreButton('chat',item.id,`Действия с разговором «${item.title}»`).replace('row-more','row-more page-more')}</div></div>
+      <div class="chat-title"><div><p class="eyebrow">Разговор</p><h1>${esc(item.title)}</h1></div><div class="button-row">${isEdit ? '' : `<div class="detail-toggle" role="group" aria-label="Подробность ленты"><button data-detail="brief" aria-pressed="${state.detail !== 'full'}">Кратко</button><button data-detail="full" aria-pressed="${state.detail === 'full'}">Подробно</button></div>`}<button class="btn" data-action="review" aria-label="Файлы и шаги" aria-pressed="${state.review}">${icon('panel',17)} <span>Файлы и шаги</span></button>${moreButton('chat',item.id,`Действия с разговором «${item.title}»`).replace('row-more','row-more page-more')}</div></div>
       ${isEdit && canUsePackageEdit(item) ? `<div class="chat-package-context"><span class="glyph red">${icon('flow',18)}</span><span><strong>${esc(item.source.name)}</strong><small>${esc(item.sourcePath)}</small></span><span class="badge">Пакет в разговоре</span></div>` : ''}
       <div class="chat-timeline">
         ${isEdit ? `${item.prompt ? `<div class="user-message">${esc(item.prompt)}</div>` : ''}<div class="agent-message"><span class="agent-avatar"><img src="assets/loginom.png" alt="" width="31" height="31"></span><div><strong class="agent-caption">Loginom AI Agent</strong>${packageEditBody(item)}</div></div>`
@@ -1499,7 +1542,7 @@ function chat() {
       </div>
       <div class="chat-bottom">${dock || (!isEdit || (canUsePackageEdit(item) && !item.workingPackage && item.phase !== 'proposed') ? composer() : '')}<p class="muted">${isEdit ? 'Учебная формула и файл .lgp для демонстрации.' : 'Демонстрационный разговор. Реальные пакеты и данные не изменяются.'}</p></div>
     </div>
-    ${state.review ? rightPanel(item):''}
+    ${state.review ? rightPanel(item) : ''}
   </div>`
 }
 // Setup happens where it is needed: the public stand is filled in, one button connects.
@@ -1517,8 +1560,8 @@ function connectCard() {
   return `<div class="connect-card"><span class="glyph red">${icon('external',19)}</span><div>
     <strong>Подключиться к Loginom</strong>
     <dl><div><dt>Адрес</dt><dd>${esc(hostOf(c.url))}</dd></div><div><dt>Пользователь</dt><dd>${esc(c.username)}</dd></div></dl>
-    <p class="muted">${stand ? 'Публичный стенд Loginom — чтобы попробовать, пароль не нужен. Для сервера вашей компании — «Свой сервер Loginom».' : c.empty || !c.hasPassword ? 'Пароль не нужен.' : 'Пароль сохранён.'}</p>
-    <div class="button-row"><button class="btn primary" data-action="connect-loginom" ${state.connecting ? 'disabled' : ''}>${state.connecting ? '<span class="spinner"></span> Подключаюсь…' : stand ? 'Подключить публичный стенд' : 'Подключить'}</button><button class="btn${stand ? '' : ' quiet'}" ${stand ? 'data-action="own-server"' : 'data-settings="loginom"'}>${stand ? 'Свой сервер Loginom' : 'Изменить'}</button></div>
+    <p class="muted">${stand ? 'app.loginom.ai — учебный сервер Loginom в интернете, вход под <code>user</code> без пароля. Для рабочих данных — свой сервер Loginom.' : c.empty || !c.hasPassword ? 'Пароль не нужен.' : 'Пароль сохранён.'}</p>
+    <div class="button-row"><button class="btn primary" data-action="connect-loginom" ${state.connecting ? 'disabled' : ''}>${state.connecting ? '<span class="spinner"></span> Подключаюсь…' : stand ? 'Подключить учебный сервер' : 'Подключить'}</button><button class="btn${stand ? '' : ' quiet'}" ${stand ? 'data-action="own-server"' : 'data-settings="loginom"'}>${stand ? 'Свой сервер Loginom' : 'Изменить'}</button></div>
   </div></div>`
 }
 function packageFolder(scope) {
@@ -1817,7 +1860,7 @@ function changedPackage(item) {
   const elsewhere = current === 'draft' && !local && salesState().replaced
   return `<div class="native-page packages-page">
     <div class="native-heading"><div><p class="eyebrow">Loginom · копия агента</p><h1>Изменения в «Продажи.lgp»${local ? ' с компьютера' : ''}</h1><p>${{draft:local ? 'Так будет выглядеть пакет с изменениями. Файл «Продажи.lgp» на компьютере не менялся.' : elsewhere ? `Так будет выглядеть пакет с изменениями. Исходный «Продажи.lgp» уже заменён ${replacedWhere(chat?.id)} — эти изменения можно сохранить новой версией.` : 'Так будет выглядеть пакет с изменениями. Исходный «Продажи.lgp» в Loginom пока не менялся.', saved:local ? 'Изменения сохранены в Loginom; файл на компьютере не менялся.' : 'Изменения сохранены новой версией рядом с исходным; «Продажи.lgp» не менялся.', replaced:'Исходный «Продажи.lgp» в Loginom уже заменён этими изменениями; прежняя версия — «Продажи — до правки.lgp».', discarded:'Изменения отменены; «Продажи.lgp» не менялся.'}[current]}</p></div></div>
-    <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">Продажи.lgp</strong><small>${{draft:`Копия агента · ${esc(turn ? agentCopy(turn).folder + '/' + agentCopy(turn).name : '')}`, saved:'Копия · сохранена новой версией', replaced:'Заменил исходный в Loginom', discarded:'Изменения отменены'}[current]}</small></div>
+    <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">${esc(current === 'saved' ? savedVersion(turn).name : 'Продажи.lgp')}</strong><small>${{draft:`Копия агента · ${esc(turn ? agentCopy(turn).folder + '/' + agentCopy(turn).name : '')}`, saved:'Копия · сохранена новой версией', replaced:'Заменил исходный в Loginom', discarded:'Изменения отменены'}[current]}</small></div>
       <div class="detail-toggle" role="group" aria-label="Что показать"><button data-show-before="0" aria-pressed="${!showBefore}">Изменения</button><button data-show-before="1" aria-pressed="${Boolean(showBefore)}">Как было</button></div></div>
     <div class="change-legend"><span class="c-add">+ новый</span><span class="c-mod">~ изменён</span><span class="c-del">− удалён</span>${showBefore ? '' : '<span class="c-link-add">— новая связь</span><span class="c-link-del">- - связь удалённого узла</span>'}</div>
     ${schemaGraph(shown.map(([glyph,title,,,status,before,facts],i) => ({glyph, title:showBefore && before ? before : title, small:facts[0], index:i,
@@ -1883,7 +1926,7 @@ function review() {
     ['«По умолчанию» в «Разрешениях»','Включится демо-политика администратора и откроются «Разрешения»: строки с замком задал администратор, у остальных — «По умолчанию» или «Вы изменили · по умолчанию «Спрашивать»». Поменяйте строку — пометка сменится; «Всё по умолчанию» вернёт всё. Убрать политику — «убрать» внизу этой страницы.',[['try-policy-permissions','Начать']]],
     ['Данные — стороннему сервису','Откроется «Внешнее обогащение данных» в каталоге: подключение подготовил Loginom, а сервис — Example Data, сторонняя компания; «Куда уходят данные». «Перед отправкой» — разговор: перед первой отправкой агент спросит «Отправить данные в Example Data?» и покажет, что уйдёт и что нет; «Разрешать в этом разговоре» снимает вопрос до конца разговора. Подключение в прототипе поставится само, демо-политика уберётся, лимит бесплатной модели сбросится. Спросите и словами: «Что за сервис Example Data?» — агент ответит, чей он, ничего не отправляя. «В закрытом контуре» включит демо-политику: агент ответит, что подключению нужен интернет.',[['try-enrich','Начать'],['try-enrich-send','Перед отправкой'],['try-enrich-closed','В закрытом контуре']]],
     ['Модели — как в OpenCode 2','Откроется окно «Подключить провайдера», как в OpenCode 2 (В-82): популярные провайдеры и поиск, вход через ChatGPT, GitHub Copilot кодом, ключ API, свой сервер. Вход по подписке в прототипе подтверждаете сами. После «Подключено: … — выберите модель» приложение возвращается в новый разговор с этой моделью. Под демо-политикой администратора окно недоступно — модели задаёт он. В настройках — «Провайдеры» и «Модели», как в OpenCode 2; «Подключить модель» — в меню модели в поле ввода и в блоке «Модель остановила ход».',[['try-connect','Начать'],['try-model-failure','После лимита модели']]],
-    ['Копия агента — с вопросом','Агент правит «Продажи». Перед первой копией в разговоре он спросит «Сделать копию «Продажи.lgp» в «Копии агента»?»; «Разрешать в этом разговоре» снимает вопрос и для следующих копий. Копии видны в «+» → «Пакет из Loginom…» → папка «Копии агента» и в «Контекст → Файлы». «С «Запрещено»» — то же, когда в «Разрешениях» сохранение в Loginom запрещено: агент пакет не правит (В-75).',[['try-improve','Начать'],['try-forbid-save','С «Запрещено»']]],
+    ['Копия агента — с вопросом','Агент правит «Продажи». Перед первой копией в разговоре он спросит «Сделать копию «Продажи.lgp» в «Копии агента»?»; «Разрешать в этом разговоре» снимает вопрос и для следующих копий. Копии видны в «+» → «Пакет из Loginom…» → папка «Копии агента» и в «Файлы и шаги» → «Файлы». «С «Запрещено»» — то же, когда в «Разрешениях» сохранение в Loginom запрещено: агент пакет не правит (В-75).',[['try-improve','Начать'],['try-forbid-save','С «Запрещено»']]],
     ['Замена из сохранённой версии','В карточке правки нажмите «Сохранить новой версией», затем «Заменить исходный…». Окно покажет, что «Города — неделя.lgp» сломается, и предложит «Попросить агента оставить узел»: агент сделает копию новой версии и вернёт узел — после этого обе ссылки рабочие.',[['try-improve','Начать']]],
     ['Свои навыки под политикой','Включится демо-политика администратора и откроется «Создать своё»: свой навык можно составить и передать администратору, но агент его не применит; «Инструкции» работают (В-76). Убрать политику — ссылкой «убрать» внизу этой страницы.',[['try-policy-skills','Начать']]],
     ['Правка ещё раз','Отправьте «Внеси улучшения в сценарий продаж», в карточке — «Заменить исходный…»: у «Города — неделя.lgp» — «Попросить агента оставить узел». Агент продолжит ту же копию: новая карточка показывает всю копию, прежняя — «продолжено ниже»; в окне замены обе ссылки теперь работают.',[['try-improve','Начать']]],
@@ -1933,7 +1976,7 @@ function review() {
     'По вашему замечанию (В-72): «Посмотреть в Loginom» — в карточке правки, на схеме изменений, в окне замены и на странице пакета. Копия, которую правит агент, лежит в Loginom в папке «Копии агента», её тоже можно открыть. Проверено на стенде: пока пакет открыт в Loginom, заменить его нельзя — окно замены об этом говорит; окно Loginom открывается минуту-две.',
     'Итерация 7 (В-67): у замечаний проверки — «Показать на схеме»; выбранный узел «Продажи.lgp» показывает тип, основные настройки и связи; в карточке правки — «Настройки и связи» до и после; перед заменой исходного — какие пакеты ссылаются на него и есть ли в копии их узлы.',
     'По оценке администраторами (задание 3): над полем ввода сказано, что данные уйдут в облачную модель, если к сообщению что-то приложено; при ошибке в политике — причина там же; полоса каталога и тексты запретов зависят от того, действует ли политика; на «открой сайт» при запрете агент отвечает, кто запретил; в закрытом контуре навык отдают только через «Передать администратору…».',
-    'По оценке экспертами (задание 2): «Контекст» показывает план, файлы и шаги этого ответа и что агент учитывает; схема «Продажи» совпадает с проверкой; замена исходного относится к своей карточке; поиск находит разговор по файлу; «Подключить публичный стенд» и «Свой сервер Loginom».',
+    'По оценке экспертами (задание 2): «Файлы и шаги» показывают план, файлы и шаги этого ответа и что агент учитывает; схема «Продажи» совпадает с проверкой; замена исходного относится к своей карточке; поиск находит разговор по файлу; «Подключить учебный сервер» и «Свой сервер Loginom».',
     'По первым оценкам агентами: «Улучшить» правит копию; папка Loginom — по логину; у документа полный путь и имя «… — описание.docx»; запуск очищает поле ввода; в проверке видно «Применил навык» или «Учёл инструкции проекта»; адрес сервера в уведомлении о подключении.',
     '«Создать своё» в каталоге: навык — из разговора, с нуля или из файла; своё действие на основе встроенного.',
     'Карточка навыка: «Сможет / Не сможет»; навык из файла помечен «Не проверен Loginom» и включается после согласия (В-41). Программы в навыке не принимаются (В-37).',
@@ -1953,7 +1996,7 @@ function review() {
   const chosen = [
     'План этапа B и окно моделей (В-83…В-91): <strong>переезд переносом</strong> с коммитом слияния; <strong>Bun 1.4.4</strong>; <strong>дашборды узлов — в паритете</strong>; шлюз B — 25 узлов по 2 из 3 прогонов и перенос данных, проверки через форму Desktop — в шлюзе C; <strong>служба останавливается вместе с приложением</strong>; оценка 45–75 агенто-дней; SDK провайдеров из npm — только в режиме «Интернет»; <strong>«Свой сервер» остаётся</strong> в окне провайдеров; <strong>без рекламы OpenCode Go</strong>.',
     'Шлюз этапа A (В-78…В-81): <strong>ключевые сценарии приняты</strong>; агент — <strong>фоновая служба OpenCode 2 с правкой U5</strong>, своя на продукт и профиль; <strong>сторонние серверные плагины не загружаются</strong> — агента расширяют навыки, действия и подключения из каталога; <strong>итоги spike приняты</strong>: история 0.4 переносится своей командой, оценка этапа B по таблице отчёта — 30–49 агенто-дней.',
-    'По третьему прогону оценки: <strong>копия агента — под правилом «Сохранять пакеты в Loginom»</strong>: при «Спрашивать» — вопрос перед первой копией в разговоре, «Копии агента» — папка в окне выбора, копии разговора — в «Контекст → Файлы» (В-75). <strong>Политика может выключить свои навыки</strong>; по умолчанию они работают, «Инструкции» не выключаются (В-76).',
+    'По третьему прогону оценки: <strong>копия агента — под правилом «Сохранять пакеты в Loginom»</strong>: при «Спрашивать» — вопрос перед первой копией в разговоре, «Копии агента» — папка в окне выбора, копии разговора — в «Файлы и шаги» → «Файлы» (В-75). <strong>Политика может выключить свои навыки</strong>; по умолчанию они работают, «Инструкции» не выключаются (В-76).',
     'По итерации 8: <strong>правки подряд продолжают черновик копии агента</strong>; новая копия — после «Сохранить», «Заменить» или «Отменить изменения» (В-73). <strong>Родные страницы настроек OpenCode 2</strong> — «Проекты», «Рабочие пространства», «Экспериментальное», «Расширения» — в продукте спрятаны (В-74).',
     '<strong>«Посмотреть в Loginom»</strong> — там, где решается, что делать с пакетом: увидеть его в самом Loginom и решить по нему (В-72).',
     'По оценкам экспертами и администраторами: <strong>следующая итерация — глубина Loginom</strong>: замечание ведёт к узлу на схеме, в правке — настройки и порты «было / стало», перед заменой — узлы-ссылки из других пакетов (В-67). <strong>«Терминал»</strong> остаётся у пользователя в «Разрешениях» (В-68). <strong>«Разрешения»</strong> — только про то, что агент делает сам; ваши кнопки работают по правам учётной записи Loginom, а запрет администратора держит сервер продукта, в том числе в разговоре (В-69). <strong>Политика</strong> ограничивает источник того, что ставится; свои навыки не запрещает (В-70). <strong>Журнал действий агента</strong> — в этапе F, в «Диагностике» — строка о нём (В-71).',
@@ -2090,15 +2133,25 @@ function rowMenu() {
 function modelMenu(menu) {
   const failed = menu.id === 'continue' ? currentItem()?.modelError : null
   const current = currentModel()
-  const rows = availableModels(state).map((model, index) => [model, index]).filter(([model]) => !(failed && (model.name === failed.model || (state.freeLimited && model.source === 'free'))))
+  const rows = availableModels(state).map((model, index) => [model, index]).filter(([model]) => !(failed && model.name === failed.model) && !(menu.id && modelLimited(model)))
   return [...rows.map(([model, index]) => {
-    const limited = state.freeLimited && model.source === 'free'
-    return `<button role="menuitemradio" aria-checked="${model.name === current && !failed}" data-menu-act="model:${index}">${icon(model.name === current && !failed ? 'check' : 'cpu',16)}<span>${esc(model.name)}${model.source === 'free' ? ' <span class="badge">Бесплатно</span>' : ''}<small>${limited ? 'лимит на сегодня исчерпан — обновится в 03:00' : esc(model.where) + (model.kind === 'cloud' ? ' — данные уйдут туда' : '')}</small></span></button>`
+    const limited = modelLimited(model)
+    return `<button role="menuitemradio" aria-checked="${model.name === current && !failed}" data-menu-act="model:${index}" ${limited ? 'disabled' : ''}>${icon(model.name === current && !failed ? 'check' : 'cpu',16)}<span>${esc(model.name)}${model.source === 'free' ? ' <span class="badge">Бесплатно</span>' : ''}<small>${limited ? 'лимит исчерпан' : esc(model.where) + (model.kind === 'cloud' ? ' — данные уйдут туда' : '')}</small></span></button>`
   }),
     // В-82: as OpenCode's model dialog — connect a model, manage which models are offered. «Подключить модель…», not
     // OpenCode's «Подключить провайдера»: the word «провайдер» stays in the settings and the window.
     ...(state.policy === 'set' ? [] : [`<button role="menuitem" data-menu-act="provider-connect">${icon('plus',16)}<span>Подключить модель…</span></button>`]),
     `<button role="menuitem" data-menu-act="models-settings">${icon('settings',16)}<span>Управлять моделями…</span></button>`]
+}
+function replaceDialog() {
+  const source = replaceSource()
+  const {body, broken} = replaceRefs()
+  return ['Заменить исходный пакет?', `<p class="dialog-desc">Пакет «Продажи.lgp» в ${esc(packageFolder('personal'))} будет перезаписан ${source.what}. Перед этим сохранится прежняя версия как «Продажи — до правки.lgp» — её можно будет вернуть.</p>${body}
+    <details class="replace-unchecked"><summary>Не проверено</summary><p>Пакеты в папках, к которым у вас нет доступа; подходит ли номер версии пакета к ссылкам — Loginom его сверяет; расписание запусков и кто сейчас открыл пакет — это знает только сервер Loginom. Если «Продажи.lgp» сейчас открыт в Loginom — у коллеги или у вас в окне Loginom, — заменить не получится, пока его не закроют: Loginom держит открытый пакет занятым. Запуски по расписанию после замены пойдут по изменённой версии.</p></details>`,
+    `<footer class="app-dialog-footer"><button class="btn" data-action="dismiss">Отмена</button>
+      ${loginomButton(source.target, source.label)}
+      <button class="btn ${broken ? 'quiet' : 'danger'}" data-action="confirm-replace-package">Заменить исходный</button>
+      ${broken ? `<button class="btn primary" data-action="ask-keep">${icon('message',15)} Попросить агента оставить узел</button>` : ''}</footer>`]
 }
 function overlay() {
   const kind = state.overlay
@@ -2113,7 +2166,8 @@ function overlay() {
     search: ['Поиск', kind === 'search' ? `<label class="sr-only" for="chat-search">Поиск по проектам и разговорам</label><input id="chat-search" class="search-input" type="search" autocomplete="off" placeholder="Название, проект или слова из запроса"><div id="search-results" class="search-results">${searchResults('')}</div>` : ''],
     'new-project': ['Новый проект', kind === 'new-project' ? projectForm(null) : ''],
     'project-settings': ['Настройки проекта', kind === 'project-settings' ? projectForm(projectById(state.settingsProjectId)) : ''],
-    'replace-package': ['Заменить исходный пакет?', kind === 'replace-package' ? `<p class="dialog-desc">Пакет «Продажи.lgp» в ${esc(packageFolder('personal'))} будет перезаписан ${replaceSource().what}. Перед этим сохранится прежняя версия как «Продажи — до правки.lgp» — её можно будет вернуть.</p>${replaceRefs()}<p class="dialog-desc">Не проверено: пакеты в папках, к которым у вас нет доступа; подходит ли номер версии пакета к ссылкам — Loginom его сверяет; расписание запусков и кто сейчас открыл пакет — это знает только сервер Loginom. Если «Продажи.lgp» сейчас открыт в Loginom — у коллеги или у вас в окне Loginom, — заменить не получится, пока его не закроют: Loginom держит открытый пакет занятым. Запуски по расписанию после замены пойдут по изменённой версии.</p><div class="button-row"><button class="btn danger" data-action="confirm-replace-package">Заменить исходный</button>${loginomButton(replaceSource().target, replaceSource().label)}<button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
+    'replace-package': kind === 'replace-package' ? replaceDialog() : null,
+    'restore-sales': ['Вернуть прежнюю версию?', `<p class="dialog-desc">«Продажи.lgp» вернётся к состоянию до замены. Запуски по расписанию снова пойдут по прежней версии. Текущая версия исходного пакета будет перезаписана.</p><div class="button-row"><button class="btn" data-action="dismiss" autofocus>Отмена</button><button class="btn danger" data-action="confirm-restore-sales">Вернуть прежнюю версию</button></div>`],
     'loginom-window': ['Окно Loginom', kind === 'loginom-window' ? loginomWindow() : ''],
     'download-copy': ['Скачать на компьютер', kind === 'download-copy' ? downloadCopyDialog() : ''],
     'remove-copy': [state.removeTurn?.act === 'unsave' ? 'Удалить новую версию из Loginom?' : 'Удалить копию из Loginom?', kind === 'remove-copy' ? removeCopyDialog() : ''],
@@ -2141,7 +2195,8 @@ function overlay() {
     rename:['Переименовать разговор',`<form class="inline-form" id="rename-form"><label class="sr-only" for="session-name">Имя разговора</label><input id="session-name" name="name" maxlength="70" value="${esc(state.sessions.find(x => x.id === state.renameId)?.title)}" required><button class="btn primary">Сохранить</button></form>`],
   }[kind]
   if (!content) return ''
-  return `<dialog class="app-dialog" id="app-dialog" aria-labelledby="app-dialog-title"><div class="app-dialog-heading"><h2 id="app-dialog-title">${content[0]}</h2><button class="icon-btn" data-action="dismiss" aria-label="Закрыть">${icon('close',20)}</button></div><div class="app-dialog-body">${content[1]}</div></dialog>`
+  const [title, body, footer = ''] = content
+  return `<dialog class="app-dialog" id="app-dialog" aria-labelledby="app-dialog-title"><div class="app-dialog-heading"><h2 id="app-dialog-title">${title}</h2><button class="icon-btn" data-action="dismiss" aria-label="Закрыть">${icon('close',20)}</button></div><div class="app-dialog-body">${body}</div>${footer}</dialog>`
 }
 function pageContents() {
   switch (state.page) {
@@ -2149,7 +2204,7 @@ function pageContents() {
     case 'chat': return chat()
     case 'project': return projectPage()
     case 'hub': return renderHub(state)
-    case 'settings': return renderSettings(state)
+    case 'settings': return renderSettings(state, narrowLayout.matches)
     case 'runner': return renderSolutions(state)
     case 'studio': return renderCreate(state)
     case 'moderation': return renderModeration(state)
@@ -2189,11 +2244,16 @@ function render(resetScroll = false) {
   const before = $('#main')
   const atEnd = state.scrollToEnd || (before && state.page === 'chat' && before.scrollHeight - before.scrollTop - before.clientHeight < 140)
   const active = document.activeElement
+  const oldDialog = $('dialog[open]')
+  const oldDialogTitle = oldDialog?.querySelector('h2')?.textContent
+  const oldDialogFocus = oldDialog?.contains(active) ? focusLocator(active) : null
+  const oldDialogBody = oldDialog?.querySelector('.app-dialog-body, .hub-dialog-main, .review-panel')
+  const candidate = clickOpener || focusLocator(active)
   const focused = active?.id && /^(INPUT|TEXTAREA)$/.test(active.tagName) ? [active.id, active.selectionStart, active.selectionEnd] : null
   const dockBefore = $('#dock-title')?.textContent
   setThemeAttribute()
   document.title = pages[state.page] + ' · Loginom AI Agent'
-  app.innerHTML = `<div class="workspace${state.collapsed ? ' collapsed' : ''}${state.collapsed && peek ? ' peek' : ''}">
+  app.innerHTML = `<div class="workspace${sidebarCollapsed() ? ' collapsed' : ''}${sidebarCollapsed() && peek ? ' peek' : ''}">
     ${sidebar()}${state.mobile ? '<button class="mobile-scrim" aria-label="Закрыть меню" data-action="menu"></button>':''}
     <div class="workspace-main">${header()}<main id="main" tabindex="-1" class="page page-${state.page}">${pageContents()}</main>
     </div>
@@ -2217,7 +2277,7 @@ function render(resetScroll = false) {
     const y = rect ? (state.menu.up ? rect.top - 4 : rect.bottom + 4) : state.menu.y
     menu.style.left = Math.max(8, Math.min(x, innerWidth - menu.offsetWidth - 8)) + 'px'
     menu.style.top = Math.max(8, Math.min(state.menu.up ? y - menu.offsetHeight : y, innerHeight - menu.offsetHeight - 8)) + 'px'
-    if (state.menu.keyboard) menu.querySelector('button')?.focus()
+    if (state.menu.keyboard) menu.querySelector('button:not(:disabled)')?.focus()
   }
   const dialog = $('#app-dialog')
   if (dialog) {
@@ -2231,11 +2291,49 @@ function render(resetScroll = false) {
     $('#session-name')?.focus()
     $('#session-name')?.select()
   }
+  const reviewLayer = $('.review-layer')
+  if (reviewLayer) {
+    reviewLayer.showModal()
+    reviewLayer.addEventListener('cancel', event => { event.preventDefault(); actions.review() })
+  }
   if (state.page === 'hub') bindHub(app,state,api)
   if (state.page === 'settings') bindSettings(app,state,api)
   if (state.page === 'runner') bindSolutions(app,state,api)
   bindOwn(app,state,api)
+  const openDialog = $('dialog[open]')
+  if (openDialog && !oldDialog) dialogOpener = candidate
+  if (openDialog && oldDialogTitle === openDialog.querySelector('h2')?.textContent) {
+    oldDialogFocus?.(openDialog)?.focus({preventScroll:true})
+    const body = openDialog.querySelector('.app-dialog-body, .hub-dialog-main, .review-panel')
+    if (body && oldDialogBody) body.scrollTop = oldDialogBody.scrollTop
+  }
+  if (oldDialog && !openDialog) {
+    (dialogOpener?.(app) || $('#main'))?.focus({preventScroll:true})
+    dialogOpener = null
+  }
+  if (state.settingsFocus && !openDialog) {
+    const field = $('.st-content :is(input, textarea, select):not(:disabled):not([hidden])')
+    ;(field || $('.st-content button:not(:disabled)') || $('#main'))?.focus()
+    state.settingsFocus = false
+  }
 }
+function focusLocator(element) {
+  if (!element || !app.contains(element)) return null
+  const origin = element.closest('#row-menu') && state.menu ? menuOpener(state.menu) : element
+  if (!origin) return null
+  if (origin.id) return root => root.querySelector('#' + CSS.escape(origin.id))
+  const attributes = [...origin.attributes].filter(attr => attr.name.startsWith('data-') || attr.name === 'aria-label')
+  if (!attributes.length) return null
+  const selector = origin.localName + attributes.map(({name,value}) => `[${name}="${CSS.escape(value)}"]`).join('')
+  const matches = [...app.querySelectorAll(selector)]
+  const index = matches.indexOf(origin)
+  return root => root === app ? [...root.querySelectorAll(selector)].filter(el => el.checkVisibility())[index] || root.querySelector(selector) : root.querySelector(selector)
+}
+app.addEventListener('click', event => {
+  const target = event.target.closest('button, input, summary, a')
+  clickOpener = focusLocator(target)
+  queueMicrotask(() => { clickOpener = null })
+}, true)
 function dismiss() {
   if (state.overlay === 'loginom-window') {
     const opened = state.loginomView
@@ -2263,6 +2361,9 @@ function attach(name) {
   $('#prompt')?.focus()
 }
 // Closed contour without a model from the administrator: the input says «Выберите модель» before the first send.
+function modelLimited(model) {
+  return state.limitedModels?.has(model?.name) ?? false
+}
 function currentModel(item = state.page === 'chat' ? currentItem() : null) {
   return chatModel(item)?.name || ''
 }
@@ -2277,7 +2378,7 @@ function chatModel(item = state.page === 'chat' ? currentItem() : null) {
 }
 function chooseModel(index) {
   const model = availableModels(state)[index]
-  if (!model) return
+  if (!model || modelLimited(model)) return
   const item = state.page === 'chat' ? currentItem() : null
   if (item) Object.assign(item, {model:model.name, modelSwitched:true})
   else state.nextModel = model.name
@@ -2292,7 +2393,7 @@ function chooseModel(index) {
 function continueTurn(index) {
   const item = currentItem()
   const model = index === null ? chatModel(item) : availableModels(state)[index]
-  if (!item || !item.modelError || !model) return
+  if (!item || !item.modelError || !model || modelLimited(model)) return
   if (copySettled(item)) return toast(settledNote(copySettled(item)), 'alert')
   item.model = model.name
   item.decisions.push({at:item.step, choice:'continue', model:model.name})
@@ -2305,6 +2406,10 @@ function send() {
   const prompt = state.draft.trim()
   if (!prompt) {
     $('#prompt')?.focus()
+    return
+  }
+  if (modelLimited(chatModel())) {
+    $('.model-limit button')?.focus()
     return
   }
   if (!currentModel()) {
@@ -2389,9 +2494,12 @@ function send() {
     clearInterval(old.writer)
   }
   // «Изменить» on a message: the turns from it on are replaced by the new request.
+  const baseTitle = state.templateTitle || (prompt.length > 70 ? prompt.slice(0,70).replace(/\s+\S*$/,'') + '…' : prompt)
+  const titleSuffix = [state.draftPackage?.name, new Date().toLocaleTimeString('ru-RU')].filter(Boolean).join(' · ')
   const next = {
-    id: old?.id ?? 'session-' + Date.now(), date:'Сейчас', title:old?.title || state.templateTitle || (prompt.length > 56 ? prompt.slice(0,57).replace(/\s+\S*$/,'') + '…' : prompt),
+    id: old?.id ?? 'session-' + Date.now(), date:'Сейчас', title:old?.title || baseTitle + ' · ' + titleSuffix,
     kind, phase,
+    uploadConsent:old?.uploadConsent, localFiles:[...state.draftFiles],
     files:[...(state.draftPackage ? [state.draftPackage.name] : []), ...state.draftFiles], prompt,
     project:old ? old.project : state.page === 'project' ? state.projectView : projectById(state.project) ? state.project : null,
     history:kept, allowed:[...(old?.allowed || [])],
@@ -2425,6 +2533,7 @@ function send() {
   state.scrollToEnd = true
   openSession(next.id)
   if (phase === 'starting') startRun(next)
+  return next
 }
 function tryPrompt(text) {
   newSession()
@@ -2482,7 +2591,7 @@ function changeAction(value, keyboard = false) {
   }
   if (act === 'discard-ok') turn.change = {discarded:true, downloaded:turn.change.downloaded}
   if (act === 'undiscard') turn.change = {downloaded:turn.change.downloaded}
-  if (act === 'restore') restoreSales()
+  if (act === 'restore') return actions['restore-sales']()
   render()
   // From the keyboard, focus stays in the card (or the schema's bar) instead of falling to the page.
   if (keyboard) (document.querySelector(`.turn [data-change$=":${head}"]`) || document.querySelector('.package-save-bar button'))?.focus()
@@ -2501,17 +2610,18 @@ function restoreSales() {
 // does to the node each one takes results from. Mechanism: References.xml and reference nodes of those packages, read
 // through Loginom file access; how a reference node stores its target (name or id) is to be checked on real packages.
 function replaceRefs() {
-  if (!state.settings.connection.connected) return '<p class="dialog-desc">Ссылки из других пакетов не проверены: Loginom не подключён.</p>'
+  if (!state.settings.connection.connected) return {body:'<p class="dialog-desc">Ссылки из других пакетов не проверены: Loginom не подключён.</p>', broken:false}
   // Iteration 8: the follow-up edit that kept the city filter turns the broken link into a working one.
   const chat = state.replaceTurn && state.sessions.find(item => item.id === state.replaceTurn.session)
   const turn = chat && turnAt(chat.id, state.replaceTurn.at)
   const saved = turn && changeState(turn) === 'saved' && savedVersion(turn)
   const keep = saved ? Boolean(saved.keep) : chat ? chainKeep(chat, state.replaceTurn.at) : false
-  return `<div class="replace-refs"><strong>Ссылки из других пакетов</strong><p>Среди 14 пакетов в папках Loginom, которые вам доступны, на «Продажи.lgp» ссылаются два:</p><ul>
+  const body = `<div class="replace-refs"><strong>Ссылки из других пакетов</strong><p>Среди 14 пакетов в папках Loginom, которые вам доступны, на «Продажи.lgp» ссылаются два:</p><ul>
     <li>${icon('flow',15)}<span><b>«Отчёт директору.lgp»</b> · ${esc(packageFolder('shared'))} — узел-ссылка на узел «Выручка по регионам». Этот узел и его выход в копии есть. Цифры изменятся: строки без цены или региона в расчёт больше не попадают.</span></li>
     ${keep ? `<li>${icon('flow',15)}<span><b>«Города — неделя.lgp»</b> · ${esc(packageFolder('personal'))} — узел-ссылка на узел «Фильтр по дате (ветка «Города»)». Этот узел в копии оставлен: условие и вход те же, данные для ссылки не изменятся.</span></li>`
       : `<li class="bad">${icon('alert',15)}<span><b>«Города — неделя.lgp»</b> · ${esc(packageFolder('personal'))} — узел-ссылка на узел «Фильтр по дате (ветка «Города»)». В копии этого узла нет — ссылаться будет не на что.</span></li>`}</ul>
-    ${keep ? '' : `<p>${saved ? `Если «Города — неделя.lgp» нужен, попросите агента оставить этот узел: он сделает копию новой версии «${esc(saved.name)}» и вернёт узел. Или не заменяйте исходный — новая версия уже лежит рядом с ним.` : 'Если «Города — неделя.lgp» нужен, попросите агента оставить этот узел или сохраните изменения новой версией: исходный останется как есть.'}</p><div class="button-row"><button class="btn" data-action="ask-keep">${icon('message',15)} Попросить агента оставить узел</button></div>`}</div>`
+    ${keep ? '' : `<p>${saved ? `Если «Города — неделя.lgp» нужен, попросите агента оставить этот узел: он сделает копию новой версии «${esc(saved.name)}» и вернёт узел. Или не заменяйте исходный — новая версия уже лежит рядом с ним.` : 'Если «Города — неделя.lgp» нужен, попросите агента оставить этот узел или сохраните изменения новой версией: исходный останется как есть.'}</p>`}</div>`
+  return {body, broken:!keep}
 }
 // В-72: the agent's copy is a package in Loginom («Копии агента»), so it can be looked at in Loginom itself, like any
 // other. In the product the button opens a separate Loginom window (not the conversation's agent browser, which is
@@ -2568,7 +2678,7 @@ function removeCopyDialog() {
 function downloadName() {
   const turn = state.downloadTurn && turnAt(state.downloadTurn.session, state.downloadTurn.at)
   const saved = turn && changeState(turn) === 'saved' && savedVersion(turn)
-  return saved ? saved.name : 'Продажи — v2.lgp'
+  return saved?.name || proposedVersionName(serverPackages.find(entry => entry.id === 'sales'))
 }
 function downloadCopyDialog() {
   const turn = state.downloadTurn && turnAt(state.downloadTurn.session, state.downloadTurn.at)
@@ -2632,7 +2742,7 @@ function feedAction(d) {
   const base = turns[index]
   // Iteration 8: a copy the agent made stays with this conversation; the fork shows its cards with a link here.
   const owned = turn => turn.copy && !turn.forkOf ? {...turn, forkOf:{session:item.id, title:item.title}} : turn
-  const fork = {...owned(turnSnapshot(base)), id:'session-' + Date.now(), date:'Сейчас', title:'Ветка: ' + item.title, project:item.project, model:item.model,
+  const fork = {...owned(turnSnapshot(base)), id:'session-' + Date.now(), date:'Сейчас', title:'Ветка: ' + item.title + ' · ' + new Date().toLocaleTimeString('ru-RU'), project:item.project, model:item.model, uploadConsent:null,
     history:turns.slice(0, index).map(turn => owned(turn === item ? turnSnapshot(item) : structuredClone(turn))), allowed:[]}
   state.sessions = [fork, ...state.sessions]
   openSession(fork.id)
@@ -2684,7 +2794,9 @@ function downloadResult() {
 const actions = {
   new:newSession,
   menu:() => { state.mobile = !state.mobile; render() },
-  collapse:() => { state.collapsed = !state.collapsed; peekHeld = state.collapsed && pointerInPanel; setPeek(false); write('collapsed',state.collapsed); render() },
+  collapse:() => {
+    if (narrowLayout.matches) return setPeek(!peek)
+    state.collapsed = !state.collapsed; peekHeld = state.collapsed && pointerInPanel; setPeek(false); write('collapsed',state.collapsed); render() },
   'connect-loginom':connectLoginom,
   'hide-examples':() => {
     state.progress.examplesHidden = true
@@ -2735,8 +2847,9 @@ const actions = {
     applyDemoPolicy('')
     // Only for the prototype: the card is about the question before sending, so a free-model limit spent by card 8
     // («Лимит модели») is reset, and the connection is installed without the catalog.
-    const reset = state.freeLimited || state.failModel
-    Object.assign(state, {freeLimited:false, failModel:false})
+    const reset = state.limitedModels?.size || state.failModel
+    state.limitedModels?.clear()
+    state.failModel = false
     const install = state.contour !== 'closed' && !hubHasInstalled(state, 'cloud')
     if (install) installForDemo(state, 'cloud')
     if (reset || install) toast('Только для прототипа: ' + [install && 'подключение «Внешнее обогащение данных» установлено', reset && 'лимит бесплатной модели сброшен'].filter(Boolean).join(', '))
@@ -2808,7 +2921,11 @@ const actions = {
   'open-draft-package':() => { if (state.draftPackage?.item) openPackage(state.draftPackage.item) },
   theme:() => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light':'dark'),
   dismiss,
-  review:() => { state.review = !state.review; render() },
+  review:() => {
+    state.review = !state.review
+    render()
+    $(state.review ? '.review-heading button' : '.chat-title [data-action="review"]')?.focus({preventScroll:true})
+  },
   'run-plan':() => runSteps(currentItem()),
   stop:() => {
     const item = currentItem()
@@ -2964,10 +3081,8 @@ const actions = {
     navigate('studio')
   },
   'confirm-replace-package':replacePackage,
-  'restore-sales':() => {
-    restoreSales()
-    render()
-  },
+  'restore-sales':() => { state.overlay = 'restore-sales'; render() },
+  'confirm-restore-sales':() => { restoreSales(); dismiss() },
   // From the replace dialog: back to the conversation with the request in the input, so the user sees what goes.
   'confirm-download-copy':() => {
     const turn = state.downloadTurn && turnAt(state.downloadTurn.session, state.downloadTurn.at)
@@ -3128,6 +3243,17 @@ app.addEventListener('click', event => {
     return
   }
   if (d.openProject) return openProject(d.openProject)
+  if (d.upload) {
+    const item = currentItem()
+    if (item?.phase !== 'upload') return
+    if (d.upload === 'allow') {
+      item.uploadConsent = state.packageAccount
+      return runSteps(item)
+    }
+    item.phase = 'denied'
+    item.uploadDenied = true
+    return render()
+  }
   if (d.permit) return permit(d.permit)
   if (d.answer) return answerQuestion(d.answer)
   if (d.detail) {
@@ -3164,6 +3290,10 @@ app.addEventListener('click', event => {
   }
   if (d.contour) {
     state.overlay = null
+    if (d.contour === 'closed' && state.contour !== 'closed') {
+      ensureSettings(state).confirmClosed = true
+      return settingsTab('contour')
+    }
     return setContour(d.contour)
   }
 
@@ -3190,7 +3320,9 @@ app.addEventListener('click', event => {
   if (d.node != null) {
     state.node = Number(d.node)
     render()
-    return document.querySelector(`[data-node="${d.node}"]`)?.focus()
+    $(`[data-node="${d.node}"]`)?.focus({preventScroll:true})
+    $('.package-foot, .calculation-inspector')?.scrollIntoView({block:'nearest'})
+    return
   }
   if (d.showBefore != null) {
     state.showBefore = d.showBefore === '1'
@@ -3263,7 +3395,7 @@ app.addEventListener('input', event => {
   }
   if (event.target.id === 'prompt') {
     state.draft = event.target.value
-    $('.send-btn').disabled = !state.draft.trim()
+    $('.send-btn').disabled = !state.draft.trim() || modelLimited(chatModel())
   }
   if (event.target.id === 'package-search') {
     state.packageQuery = event.target.value
@@ -3330,6 +3462,17 @@ app.addEventListener('submit', event => {
   return openProject(project.id)
 })
 document.addEventListener('keydown', event => {
+  const dialog = $('dialog[open]')
+  if (dialog && event.key === 'Tab') {
+    const focusable = [...dialog.querySelectorAll('button, input, textarea, select, a[href], summary, [tabindex]')]
+      .filter(el => el.tabIndex >= 0 && !el.matches(':disabled') && el.checkVisibility())
+    const edge = event.shiftKey ? focusable[0] : focusable.at(-1)
+    if (document.activeElement === edge || !focusable.includes(document.activeElement)) {
+      event.preventDefault()
+      ;(event.shiftKey ? focusable.at(-1) : focusable[0])?.focus()
+    }
+    return
+  }
   if (event.key.toLowerCase() === 'n' && (event.metaKey || event.ctrlKey) && !document.querySelector('dialog[open]')) {
     event.preventDefault()
     newSession()
@@ -3367,13 +3510,13 @@ document.addEventListener('keydown', event => {
   }
   if (state.menu && event.target.closest?.('.row-menu') && ['ArrowDown','ArrowUp','Home','End'].includes(event.key)) {
     event.preventDefault()
-    const items = [...document.querySelectorAll('#row-menu button')]
+    const items = [...document.querySelectorAll('#row-menu button:not(:disabled)')]
     const index = items.indexOf(event.target)
     const next = {ArrowDown:index + 1, ArrowUp:index - 1, Home:0, End:items.length - 1}[event.key]
     items[(next + items.length) % items.length]?.focus()
     return
   }
-  if (state.menu && (event.key === 'Escape' || (event.key === 'Tab' && event.target.closest?.('.row-menu')))) {
+  if (!dialog && state.menu && (event.key === 'Escape' || (event.key === 'Tab' && event.target.closest?.('.row-menu')))) {
     event.preventDefault()
     const menu = state.menu
     state.menu = null
@@ -3385,7 +3528,7 @@ document.addEventListener('keydown', event => {
     actions.stop()
     return
   }
-  if (event.key === 'Escape' && state.collapsed && !document.querySelector('dialog[open]')) {
+  if (event.key === 'Escape' && sidebarCollapsed() && !document.querySelector('dialog[open]')) {
     if (document.activeElement?.closest('.sidebar')) focusPage()
     if (peek) {
       peekHeld = pointerInPanel
@@ -3409,8 +3552,8 @@ function peekSidebar(open) {
 function setPeek(open) {
   clearTimeout(peekTimer)
   peek = peekWanted = open
-  document.querySelector('.workspace')?.classList.toggle('peek', open && state.collapsed)
-  if (!open && state.collapsed && state.menu?.where === 'panel') {
+  document.querySelector('.workspace')?.classList.toggle('peek', open && sidebarCollapsed())
+  if (!open && sidebarCollapsed() && state.menu?.where === 'panel') {
     state.menu = null
     document.querySelector('#row-menu')?.remove()
     document.querySelector('.sidebar [aria-expanded="true"]')?.setAttribute('aria-expanded','false')
@@ -3433,7 +3576,7 @@ document.addEventListener('pointerover', event => {
   const point = event.clientX + ':' + event.clientY
   if (point === lastPoint) return
   lastPoint = point
-  if (event.pointerType !== 'mouse' || event.buttons || !state.collapsed || [app, document.body, document.documentElement].includes(target) || target.closest('dialog')) return
+  if (event.pointerType !== 'mouse' || event.buttons || !sidebarCollapsed() || [app, document.body, document.documentElement].includes(target) || target.closest('dialog')) return
   const inside = inPanel(target)
   pointerInPanel = inside
   if (!inside) peekHeld = false
@@ -3444,9 +3587,10 @@ document.addEventListener('pointerover', event => {
 // Chosen from the keyboard, focus moves on to the page instead of falling back to the panel. Without a
 // mouse (touch screens) a tap on the rail outside its icons opens it and a tap on the page closes it.
 document.addEventListener('click', event => {
-  if (!state.collapsed) return
+  if (!sidebarCollapsed()) return
   const inside = inPanel(event.target)
   if (!inside) return peek && setPeek(false)
+  if (event.target.closest('.collapse-btn')) return
   if (!event.target.closest('.sidebar button:not([data-menu])')) return setPeek(true)
   peekHeld = pointerInPanel
   setPeek(false)
@@ -3455,7 +3599,7 @@ document.addEventListener('click', event => {
 function focusPage() {
   ($('#prompt') || $('#main'))?.focus()
 }
-document.documentElement.addEventListener('pointerleave', () => { peekHeld = false; if (state.collapsed) peekSidebar(false) })
+document.documentElement.addEventListener('pointerleave', () => { peekHeld = false; if (sidebarCollapsed()) peekSidebar(false) })
 $('#announcements').addEventListener('click', event => {
   const id = event.target.closest('[data-toast-session]')?.dataset.toastSession
   if (!id) return
@@ -3463,6 +3607,11 @@ $('#announcements').addEventListener('click', event => {
   openSession(id)
 })
 addEventListener('popstate',() => { route(); state.overlay = null; render(true) })
+narrowLayout.addEventListener('change', () => {
+  if (state.settings) state.settings.menuOpen = false
+  setPeek(false)
+  render()
+})
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',() => { if (state.theme === 'system') render() })
 // Seeds are finished conversations: every step done (the scripts are declared above this line).
 for (const item of state.sessions) completeTurn(item)
