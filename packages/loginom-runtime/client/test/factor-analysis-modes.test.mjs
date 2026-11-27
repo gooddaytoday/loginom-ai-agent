@@ -191,7 +191,7 @@ test('separate PCA loadings reconcile only the requested intrinsic cap width',as
  const execute=runInNewContext('('+configureFactorAnalysisOutputs.toString()+')',{
   need:(v,m)=>assert.ok(v,m),factorAnalysisOutputColumns,
   alignFactorAnalysisOutput:(actual,expected)=>assert.deepEqual(actual.map(f=>f.name),expected.map(f=>f.name)),
-  configureOutputAutosync:async()=>{},reorderOutputFields:async()=>assert.fail('unexpected reorder'),
+  configureRequestedOutputAutosync:async()=>{},
   readOutputDefinitionPages:async()=>({fields:current.target_fields}),
   reconcileCollapseOutput:async(c,s,expected)=>{assert.equal(c,channel);repaired.push(port);current={...current,target_fields:expected.map((f,index)=>({...f,record_id:'t'+index}))};return {...s,node_mapping:current};},
  });

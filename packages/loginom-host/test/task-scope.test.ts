@@ -32,6 +32,7 @@ async function fixture(configured = false, admissionResult?: unknown) {
     const work = { activeWork: false, unsettledWork: false, dispatching: false };
     let prepared = false;
     let holdWork = false, pendingWork, observer;
+    let holdList = false, pendingList, listObserver;
     process.on('disconnect', () => process.exit(0));
     process.on('message', message => {
       const send = result => process.send({ id: message.id, result });
@@ -39,7 +40,27 @@ async function fixture(configured = false, admissionResult?: unknown) {
         appendFileSync(${JSON.stringify(marker)}, JSON.stringify({ operation: 'start', pid: process.pid }) + '\\n');
         send({ protocol: 1, generation: message.input.generation, chat: message.input.chat, ready: true });
       }
-      if (message.operation === 'list') send({ prepared, tools: ['dock_prepare','dock_node_wait'].map(name => ({ name, inputSchema: { type: 'object' } })) });
+      if (message.operation === 'list') {
+        const result = { prepared, tools: [{
+          name: 'dock_node_wait',
+          inputSchema: { type: 'object', properties: { operation_id: { type: 'string' } }, required: ['operation_id'] },
+        }] };
+        if (!holdList) send(result);
+        if (holdList) {
+          pendingList = { id: message.id, result };
+          if (listObserver) process.send({ id: listObserver, result: true });
+        }
+      }
+      if (message.operation === 'fixture.hold_list') { holdList = true; send(true); }
+      if (message.operation === 'fixture.wait_list') {
+        if (pendingList) send(true);
+        if (!pendingList) listObserver = message.id;
+      }
+      if (message.operation === 'fixture.release_list') {
+        holdList = false;
+        if (pendingList) process.send(pendingList);
+        send(true);
+      }
       if (message.operation === 'work') {
         if (!holdWork) send(work);
         if (holdWork) {
@@ -164,6 +185,9 @@ test("pending activation preserves the current catalog and requires application 
       profile: "loginom-automation",
     })
     expect(JSON.stringify(await f.client.request("tools", { run: "one" }))).toContain("dock_prepare")
+    await expect(f.call("dock_workspace_observe")).resolves.toMatchObject({
+      structuredContent: { code: "NOT_PREPARED", next_step: "dock_prepare" },
+    })
     await expect(f.call("dock_prepare")).rejects.toThrow("LOGINOM_CONFIG_REQUIRED")
     await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
   } finally {
@@ -432,7 +456,58 @@ test("automation cannot implicitly create a runtime with a non-prepare call or s
   const f = await fixture(true)
   try {
     await f.scope("bind", "loginom-automation")
-    await expect(f.call("dock_node_wait")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    const listed = (await f.client.request("tools", { run: "one" })) as {
+      tools: { name: string; description: string; inputSchema: { type: string } }[]
+    }
+    const dock = listed.tools.filter((tool) => tool.name.startsWith("dock_"))
+    const names = dock.map((tool) => tool.name)
+    expect(Buffer.byteLength(JSON.stringify({ tools: dock }), "utf8")).toBeLessThanOrEqual(6_000)
+    expect(dock.find((tool) => tool.name === "dock_prepare")?.description).toContain(
+      "archive the redacted task in the shared Dock account",
+    )
+    expect(names.sort()).toEqual([
+      "dock_action_describe",
+      "dock_action_run",
+      "dock_artifact_deliver",
+      "dock_artifact_delivery_cancel",
+      "dock_artifact_delivery_resume",
+      "dock_artifact_delivery_status",
+      "dock_diagnostics",
+      "dock_node_apply",
+      "dock_node_cancel",
+      "dock_node_delete",
+      "dock_node_read",
+      "dock_node_resume",
+      "dock_node_status",
+      "dock_node_stop",
+      "dock_node_wait",
+      "dock_operation_inspect",
+      "dock_operation_recover",
+      "dock_prepare",
+      "dock_storage_download_cancel",
+      "dock_storage_download_cleanup",
+      "dock_storage_download_start",
+      "dock_storage_download_status",
+      "dock_storage_download_wait",
+      "dock_storage_list",
+      "dock_storage_source",
+      "dock_workspace_observe",
+    ])
+    for (const tool of dock) {
+      expect(tool.description).not.toBeEmpty()
+      expect(tool.inputSchema.type).toBe("object")
+      if (tool.name === "dock_prepare" || tool.name === "dock_diagnostics") continue
+      expect(tool.inputSchema).toEqual({ type: "object" })
+      expect(tool.description).toBe("Call dock_prepare.")
+      const result = { code: "NOT_PREPARED", next_step: "dock_prepare" }
+      const reply = await f.call(tool.name)
+      expect(reply).toMatchObject({
+        content: [{ type: "text", text: expect.any(String) }],
+        structuredContent: result,
+      })
+      expect(reply).not.toHaveProperty("isError", true)
+    }
+    await expect(f.call("dock_unadvertised")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
     await expect(
       f.client.request("admit", {
         run: "one",
@@ -443,6 +518,7 @@ test("automation cannot implicitly create a runtime with a non-prepare call or s
     await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
     expect(await readdir(f.root)).not.toContain("runtime")
     expect(await readdir(f.root)).not.toContain("inputs")
+    expect(await readdir(join(f.root, "recovery"))).toEqual([])
   } finally {
     await f.close()
   }
@@ -460,7 +536,9 @@ test("a replacement runtime receives original bytes again before its explicit pr
     const runtime = await f.host.runtime(1, createHash("sha256").update("chat").digest("hex"))
     await runtime.request("fixture.exit")
     await runtime.exited
-    await expect(f.call("dock_node_wait")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    await expect(f.call("dock_node_wait")).resolves.toMatchObject({
+      structuredContent: { code: "NOT_PREPARED", next_step: "dock_prepare" },
+    })
     await prepare()
     const events: { operation: string; userMessage?: string }[] = (await readFile(f.marker, "utf8"))
       .trim()
@@ -488,12 +566,37 @@ test("a failed prepare keeps the existing runtime unavailable to other Dock call
         args: { fixtureFailure: true },
       }),
     ).toMatchObject({ isError: true })
-    expect(JSON.stringify(await f.client.request("tools", { run: "one" }))).not.toContain("dock_node_wait")
-    await expect(f.call("dock_node_wait")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    expect(JSON.stringify(await f.client.request("tools", { run: "one" }))).toContain("dock_node_wait")
+    await expect(f.call("dock_node_wait")).resolves.toMatchObject({
+      structuredContent: { code: "NOT_PREPARED", next_step: "dock_prepare" },
+    })
     expect(await readdir(join(f.root, "recovery"))).toEqual([])
     await f.call("dock_prepare")
-    expect(JSON.stringify(await f.client.request("tools", { run: "one" }))).toContain("dock_node_wait")
+    expect(await f.client.request("tools", { run: "one" })).toMatchObject({
+      tools: expect.arrayContaining([{
+        name: "dock_node_wait",
+        inputSchema: { type: "object", properties: { operation_id: { type: "string" } }, required: ["operation_id"] },
+      }]),
+    })
     await f.call("dock_node_wait")
+    const runtime = await f.host.runtime(1, createHash("sha256").update("chat").digest("hex"))
+    await runtime.request("fixture.hold_list")
+    const staleList = f.client.request("tools", { run: "one" })
+    try {
+      await runtime.request("fixture.wait_list")
+      await f.client.request("call", {
+        run: "one",
+        name: "dock_prepare",
+        userMessage: "msg_original",
+        args: { fixtureFailure: true },
+      })
+    } finally {
+      await runtime.request("fixture.release_list")
+      await staleList
+    }
+    await expect(f.call("dock_node_wait")).resolves.toMatchObject({
+      structuredContent: { code: "NOT_PREPARED", next_step: "dock_prepare" },
+    })
     const events: { operation: string; name?: string }[] = (await readFile(f.marker, "utf8"))
       .trim()
       .split("\n")
@@ -502,6 +605,7 @@ test("a failed prepare keeps the existing runtime unavailable to other Dock call
       "dock_prepare",
       "dock_prepare",
       "dock_node_wait",
+      "dock_prepare",
     ])
   } finally {
     await f.close()

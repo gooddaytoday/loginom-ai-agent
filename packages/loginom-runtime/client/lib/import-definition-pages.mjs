@@ -18,10 +18,14 @@ async function observeDefinition(channel,options,stage){
  return channel.observe(options);
 }
 export async function readImportDefinitionPages(channel,{expectedCount,ready=()=>true}={}) {
-  return readDefinitionPages(channel,{expectedCount,ready,output:false});
+  return (await readDefinitionPages(channel,{expectedCount,ready,output:false})).definition;
 }
 
-export async function readOutputDefinitionPages(channel,{expectedCount,ready=()=>true,stage}={}) {
+export async function readOutputDefinitionPages(channel,options) {
+  return (await observeOutputDefinitions(channel,options)).definition;
+}
+
+export function observeOutputDefinitions(channel,{expectedCount,ready=()=>true,stage}={}) {
   return readDefinitionPages(channel,{expectedCount,ready,output:true,stage});
 }
 
@@ -47,13 +51,13 @@ async function readDefinitionPages(channel,{expectedCount,ready,output,stage}) {
     schemaId=p.schema_id;total=p.total_columns;
     fields.push(...structuredClone(columns.fields));offset+=p.returned;
     if(p.next_offset!==(offset===total?null:offset))throw new Error('Import definition cursor differs');
-    if(offset===total)return {schema_id:schemaId,total_columns:total,fields,definition_complete:true,
-      source_schema_verified:false,settings_applied:false};
+    if(offset===total)return {state,definition:{schema_id:schemaId,total_columns:total,fields,definition_complete:true,
+      source_schema_verified:false,settings_applied:false}};
   }
   throw new Error('Import definition page budget exceeded');
 }
 
-async function revealOutputPage(channel,state,{offset,schemaId,total,ready,stage}) {
+async function revealOutputPage(channel,state,{offset,schemaId,total,ready,stage,readMappings}) {
   const firstPage=state.wizard.output_columns.page;
   const identity={schema_id:schemaId??firstPage.schema_id,total_columns:total??firstPage.total_columns};
   for(let scrolls=0;state.wizard.output_columns.page.status==='rendered_definition_window';scrolls++) {
@@ -73,7 +77,7 @@ async function revealOutputPage(channel,state,{offset,schemaId,total,ready,stage
         if(direction>0?e.scroll.top>=e.scroll.max_top:e.scroll.top<=0)throw new Error('Output definition scroll boundary reached');
         return {verb:'scroll',ref:e.ref,delta_y:direction*500};
       }});
-    state=await channel.observe({condition:'output definition page after native scroll',outputColumnPage:{offset,limit:8},
+    state=await channel.observe({condition:'output definition page after native scroll',outputColumnPage:{offset,limit:8},readMappings,
       ready:s=>outputStage(s,stage) && ['complete_definition_page','rendered_definition_window'].includes(s.wizard.output_columns?.page?.status) && ready(s)});
     const p=state.wizard.output_columns.page;
     if(p.schema_id!==identity.schema_id || p.total_columns!==identity.total_columns)throw new Error('Output definitions changed during scroll');
@@ -81,19 +85,20 @@ async function revealOutputPage(channel,state,{offset,schemaId,total,ready,stage
   return state;
 }
 
-export async function observeOutputDefinitionPage(channel,{offset,ready=()=>true,schemaId,total,field,stage,fieldAction='click'}={}) {
+export async function observeOutputDefinitionPage(channel,{offset,ready=()=>true,schemaId,total,field,stage,fieldAction='click',readMappings}={}) {
   if(!Number.isInteger(offset)||offset<0||offset>=1000)throw new Error('Bounded output definition offset required');
   const accepts=s=>outputStage(s,stage)
     &&['complete_definition_page','rendered_definition_window'].includes(s.wizard.output_columns?.page?.status)&&ready(s);
-  let state=await observeDefinition(channel,{condition:'addressed output definition page at '+offset,outputColumnPage:{offset,limit:8},ready:accepts},stage);
-  state=await revealOutputPage(channel,state,{offset,schemaId,total,ready,stage});
+  let state=await observeDefinition(channel,{condition:'addressed output definition page at '+offset,outputColumnPage:{offset,limit:8},
+    readMappings,ready:accepts},stage);
+  state=await revealOutputPage(channel,state,{offset,schemaId,total,ready,stage,readMappings});
   const p=state.wizard.output_columns.page;
   if(p.status!=='complete_definition_page'||p.offset!==offset||schemaId!==undefined&&p.schema_id!==schemaId
     ||total!==undefined&&p.total_columns!==total)throw new Error('Addressed output definition changed');
   if(!field)return state;
   const {root_ref,root_tid,stage:fieldStage}=state.wizard;
   const owned=s=>s.wizard?.root_ref===root_ref&&s.wizard?.root_tid===root_tid&&s.wizard?.stage===fieldStage&&ready(s);
-  const identity={offset,ready:owned,stage:fieldStage,schemaId:p.schema_id,total:p.total_columns};
+  const identity={offset,ready:owned,stage:fieldStage,schemaId:p.schema_id,total:p.total_columns,readMappings};
   const samePage=s=>{
     const page=s.wizard?.output_columns?.page;
     return owned(s)&&page?.status==='complete_definition_page'&&page.offset===offset
@@ -126,7 +131,7 @@ export async function observeOutputDefinitionPage(channel,{offset,ready=()=>true
     if(!canScroll(grid,delta)){
       if(!isCovered(cell))throw Error(grid?'Output field is obscured':'Output field scroll owner unavailable');
       return channel.observe({condition:'addressed output field becomes unobscured',
-        outputColumnPage:{offset,limit:8},ready:s=>samePage(s)&&cellOf(s)?.allowed_actions.includes(fieldAction)===true});
+        outputColumnPage:{offset,limit:8},readMappings,ready:s=>samePage(s)&&cellOf(s)?.allowed_actions.includes(fieldAction)===true});
     }
     const before=grid.scroll.top;
     await channel.perform({condition:'reveal addressed output field for interaction',initialObservation:state,

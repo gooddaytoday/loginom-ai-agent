@@ -75,6 +75,8 @@ test("final message leaves package cleanup to the host and never links server pa
 
 test("the final report uses results collected before saving", () => {
   const finish = skill.slice(skill.indexOf("## Завершение"))
+  expect(finish).toContain("Сопоставь каждый требуемый результат с выполненным узлом и прочитанным выходом")
+  expect(finish).toContain("Сообщи результаты и ограничения")
   expect(finish).toContain("Собери значения для отчёта до Save")
   expect(finish).toContain("После Save используй проверенные квитанции и выгрузки")
 })

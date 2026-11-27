@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import {journalCopy} from './execution-journal.mjs';
-import { NODE_TYPES, validateNodeTargetRequest } from './node-contracts.mjs';
+import { NODE_ADD_ONLY_MODE, NODE_TYPES, validateNodeTargetRequest } from './node-contracts.mjs';
 import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
 import {variablesColumnUnionTargetRequest} from './variables-coluniondatavar-parameters.mjs';
 
+const joinDesignTitle=NODE_TYPES['transform.join_data'].title;
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])])):value;
 const same = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 const digest = value => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
@@ -11,6 +12,34 @@ const digest = value => createHash('sha256').update(JSON.stringify(canonical(val
 // Its horizontal layout is not a graph edit; GUID, role, ports and y remain bound.
 const domainNode=({dom_epoch,...value})=>value.type==='control.supernode_output'&&value.boundary_role==='output'&&Number.isFinite(value.position?.x)?{...value,position:{...value.position,x:0}}:value;
 const sameDomainGraph=(a,b)=>same({...a,nodes:a.nodes.map(domainNode)},{...b,nodes:b.nodes.map(domainNode)});
+
+export function proveReloadedNode(operation, first, second, {readOnly=false}={}) {
+  const state=operation.nodeApply, target=operation.targetPhase;
+  const original=target?.final_graph, id=state?.node?.node_id, type=state?.request.target.type;
+  const exact=g=>g?.complete===true&&g.workflow_ref&&Array.isArray(g.nodes)&&Array.isArray(g.links)&&Array.isArray(g.foreign_links)
+    &&g.nodes.every(n=>n.ref?.document_id===g.document_id&&n.ref?.workflow_id===g.workflow_ref.workflow_id
+      &&typeof n.ref.node_id==='string'&&n.ref.node_id.length>0)
+    &&new Set(g.nodes.map(n=>n.ref.node_id)).size===g.nodes.length;
+  if(state?.pending?.phase!=='configure'||!target?.completed||!id||target.targetId!==id||!exact(original)
+    ||!original.nodes.some(n=>same(n.ref,state.node)&&n.type===type)||!exact(first)
+    ||first.document_id===original.document_id||first.workflow_ref.workflow_id===original.workflow_ref.workflow_id
+    ||first.interaction_ready!==true||first.nodes.some(n=>n.locked!==false)||!same(first,second))return null;
+  const localTid=(tid,prefix)=>tid.startsWith(prefix+';')?tid.slice(prefix.length):tid;
+  const content=({document_id,workflow_ref,dom_epoch,interaction_ready,nodes,foreign_links,rest_connection_links,...edges},readOnly)=>{
+    const tid=value=>localTid(value,workflow_ref.prefix);
+    return {path:workflow_ref.navigation_path.map((part,i)=>({tid:tid(part.tid),
+      label:i===2&&readOnly?part.label.replace(/ \(только чтение\)$/,''):part.label})),
+      nodes:nodes.map(({ref,...n})=>domainNode({...n,node_id:ref.node_id})),
+      foreign_links:foreign_links.map(tid),rest_connection_links:(rest_connection_links??[]).map(link=>({...link,tid:tid(link.tid)})),...edges};
+  };
+  const node=first.nodes.find(n=>n.ref.node_id===id);
+  // A missing target can only be explained by reverting this operation's
+  // creation. Compare the whole pre-create graph, including unrelated links.
+  const expected=node?original:state.request.target.kind==='new'&&target.baseline;
+  if(!exact(expected)||!same(content(expected,false),content(first,readOnly)))return null;
+  return {node:node?.ref??null,target_state:node?'retained':'absent'};
+}
+
 export function normalizeGraphRefusal(effect,receipt){
  if(effect.kind==='connect'&&receipt?.status==='FAILED'&&receipt.action_key==='link.create'
    &&receipt.operation_id===effect.id&&receipt.phase==='preconditions'&&receipt.effect_possible===false
@@ -46,6 +75,17 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
       ||!same((after.rest_connection_links??[]).filter(e=>!service.includes(e)),before.rest_connection_links??[]))return null;
     const autoKeys=[...auto,...autoVariables].map(edgeKey);
     if([...auto,...autoVariables].some(e=>e.source!==id&&e.target!==id) || !same(keep(before,[id],autoKeys),keep(after,[id],autoKeys)))return null;
+    if(p.add_only===true){
+      // A fresh observation proves the node, but only the completed create
+      // receipt can authorize deleting one of its exact native links.
+      const owned=(edges,key)=>edges.filter(edge=>typeof edge.native_link_guid==='string'&&edge.native_link_guid
+        &&effect.receipt?.status==='SUCCEEDED'&&effect.receipt.cleanup_complete===true
+        &&effect.receipt.drop_link_guids?.includes(edge.native_link_guid)
+        &&effect.receipt.after?.[key]?.some(original=>same(original,edge)));
+      const links=owned(auto,'links'),variables=owned(autoVariables,'variable_links'),services=owned(service,'rest_connection_links');
+      return {node_id:id,auto_created_links:links,auto_created_service_links:services,auto_created_variable_links:variables,
+        add_only_unowned_links:links.length+variables.length+services.length!==auto.length+autoVariables.length+service.length};
+    }
     return {node_id:id,auto_created_links:auto,auto_created_service_links:service,auto_created_variable_links:autoVariables};
   }
   if(kind==='remove_link'&&p.edge.output==='connection:0'&&p.edge.input==='connection:0'){
@@ -112,6 +152,42 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
   return null;
 }
 
+function verifyPreparedTargetEffect(effect, after, positionMatches, request, state) {
+  const proof=verifyNodeTargetEffect(effect,after,positionMatches);
+  if(proof||effect.kind!=='connect'||request?.target?.kind!=='new'||request.target.type!=='transform.join_data')return proof;
+  const before=effect.before;
+  const receipt=effect.receipt;
+  const edge=effect.parameters.edge;
+  if(edge.kind||edge.input!==1||edge.target!==state.targetId||after.interaction_ready!==true
+    ||receipt?.action_key!=='link.create'||receipt.operation_id!==effect.id||receipt.phase!=='applying'
+    ||receipt.status!=='AMBIGUOUS'||receipt.effect_possible!==true||receipt.cleanup_complete!==true
+    ||receipt.output?.reason!=='unrelated graph changed'||!same(receipt.output.added_ports,[]))return null;
+
+  // LAB-2082: the second native Join link changes its default caption and
+  // rewrites the first link's DOM TID. The native node and first edge must stay.
+  const original=before.nodes.find(n=>n.ref.node_id===edge.target);
+  const current=after.nodes.find(n=>n.ref.node_id===edge.target);
+  if(original?.type!=='transform.join_data'||original.label!==joinDesignTitle||current?.label!=='Левое'
+    ||request.target.label!==undefined&&request.target.label!==original.label)return null;
+  const incoming=before.links.filter(link=>link.target===edge.target);
+  if(incoming.length!==1||incoming[0].input!==0)return null;
+  const prior=state.receipts.find(r=>r.verified&&r.kind==='connect'&&same(r.parameters.edge,incoming[0]));
+  const priorReceipt=prior?.receipt?.receipt??prior?.receipt;
+  const firstTid=priorReceipt?.output?.link_ref?.tid;
+  const oldSuffix=`|${joinDesignTitle}|Input_Data-0`;
+  if(priorReceipt?.status!=='SUCCEEDED'||priorReceipt.operation_id!==prior.id||typeof firstTid!=='string'
+    ||!firstTid.startsWith(before.workflow_ref.prefix+';Graph;')||!firstTid.endsWith(oldSuffix))return null;
+  const added=receipt.output.added_links;
+  if(!Array.isArray(added)||added.length!==2
+    ||!added.includes(firstTid.slice(0,-oldSuffix.length)+'|Левое|Input_Data-0')
+    ||!added.some(tid=>typeof tid==='string'&&tid.startsWith(before.workflow_ref.prefix+';Graph;')
+      &&tid.endsWith('|Левое|Input_Data-1')))return null;
+
+  const links=after.links.filter(link=>edgeKey(link)!==edgeKey(edge));
+  const nodes=after.nodes.map(n=>n===current?{...n,label:original.label}:n);
+  return after.links.length===links.length+1 && sameDomainGraph(before,{...after,nodes,links})?{}:null;
+}
+
 function nativeRestServiceEdge(graph,edge){
   const source=graph.nodes.filter(n=>n.ref.node_id===edge.source),target=graph.nodes.filter(n=>n.ref.node_id===edge.target);
   return edge.output==='connection:0'&&edge.input==='connection:0'&&graph.foreign_links?.filter(tid=>tid===edge.tid).length===1
@@ -143,11 +219,33 @@ async function settleMoveMismatch({operation,state,effect,receipt,graph,adapter,
   return true;
 }
 
+function rememberCreatedTarget(state,proof){
+  state.targetId=proof.node_id;
+  state.auto_created_links=proof.auto_created_links;
+  state.auto_created_service_links=proof.auto_created_service_links;
+  state.auto_created_variable_links=proof.auto_created_variable_links;
+  if(proof.add_only_unowned_links)state.add_only_unowned_links=true;
+}
+
+async function reconcileTargetEffect(adapter,effect,graph,deadline,signal){
+  const recovery=await adapter.reconcile(effect,graph,deadline,signal);
+  const receipt=recovery?.receipt;
+  if(effect.kind==='create'&&effect.parameters.add_only===true
+    &&recovery?.completed===true&&recovery.verified===true&&recovery.cleanup_complete===false
+    &&receipt?.add_only_window_pending===true&&receipt.add_only_window_node_id){
+    const proof=verifyNodeTargetEffect({...effect,receipt},graph,adapter.positionMatches);
+    if(proof?.node_id===receipt.add_only_window_node_id&&await adapter.verifyAddOnlyCleanup?.(graph,deadline)===true)
+      return {...recovery,cleanup_complete:true,add_only_window_reobserved:true};
+  }
+  return recovery;
+}
+
 // Internal graph phase of node.apply. The enclosing runtime owns the gate and
 // operation ID; adapters invoke fixed local primitives, never dock_action_run.
 // Effects are committed one at a time. A possible effect never retries a gesture.
 export async function prepareNodeTarget({ request, operation, adapter, record, signal, now = Date.now, beforeTarget }) {
   validateNodeTargetRequest(request);
+  const addOnly=operation.parameters?.mode===NODE_ADD_ONLY_MODE;
   if(request.target.type==='variables.column_union'&&request.target.kind==='new'&&request.target.label===undefined){
     signal?.throwIfAborted();
     request=variablesColumnUnionTargetRequest(request,operation.targetPhase?.baseline??await adapter.observe(request,operation.deadline,signal));
@@ -191,12 +289,14 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       &&graph.links.filter(e=>e.target===p.encoder.node_id&&e.input===0).length===1
       &&graph.links.some(e=>e.source===raw.source.node_id&&e.output===raw.output&&e.target===p.encoder.node_id&&e.input===0);
   };
-  const change = async (kind, parameters, verify) => {
+  const change = async (kind, parameters, verify = () => true) => {
     let original = await observe();
     for(let refresh=0;refresh<3;refresh++){
       budget();
       const before=refresh===0?original:await observe();
       if(!same(before,original))throw new Error('Graph target changed before local refresh');
+      if(addOnly&&kind==='remove_link'&&![...before.links,...before.variable_links??[],...before.rest_connection_links??[]]
+        .some(edge=>same(edge,parameters.edge)))throw Error('Owned add-only link identity changed before deletion');
       if(['remove_link','connect'].includes(kind)&&state.replacements?.some(r=>r.created.target===parameters.edge.target&&r.created.input===parameters.edge.input)){
         if(!sameDomainGraph(state.last_graph??state.baseline,before)
           ||!state.replacements.some(r=>same(kind==='remove_link'?r.removed:r.created,parameters.edge)))
@@ -236,7 +336,8 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       await commit();
       const after = await observe();
       if(await settleMoveMismatch({operation,state,effect,receipt,graph:after,adapter,record}))throw Error(state.result.error);
-      if (receipt?.cleanup_complete !== true || !verifyNodeTargetEffect(effect,after,adapter.positionMatches) || !verify(before, after, effect)) {
+      const proof=verifyPreparedTargetEffect({...effect,receipt},after,adapter.positionMatches,request,state);
+      if (receipt?.cleanup_complete !== true || !proof || !verify(before, after, effect,proof)) {
         if(kind==='connect'&&receipt?.error?.message==='Validated link target is no longer ready'){
           // Omit user captions and foreign tids; hashes still expose changes.
           const snapshot=g=>({complete:g.complete,document_id:g.document_id,workflow_id:g.workflow_ref.workflow_id,dom_epoch:g.dom_epoch,
@@ -276,7 +377,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
     if(state.move_mismatch)return structuredClone(state.result);
     if (state.pending) {
       // Adapter reads the receipt; it is never allowed to reissue the gesture.
-      const recovery = await adapter.reconcile(state.pending, graph, operation.deadline, signal);
+      const recovery = await reconcileTargetEffect(adapter,state.pending,graph,operation.deadline,signal);
       if(recovery?.completed===true&&recovery.cleanup_complete===true
         &&await settleMoveMismatch({operation,state,effect:state.pending,receipt:recovery.receipt,graph,adapter,record}))return structuredClone(state.result);
       const refused=normalizeGraphRefusal(state.pending,recovery?.receipt);
@@ -287,10 +388,10 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         state.pending=null;state.last_graph=structuredClone(graph);state.effect_possible=state.receipts.length>0;
         await commit();graph=await observe();
       }else{
-      const proof=verifyNodeTargetEffect({...state.pending,receipt:recovery.receipt},graph,adapter.positionMatches);
+      const proof=verifyPreparedTargetEffect({...state.pending,receipt:recovery.receipt},graph,adapter.positionMatches,request,state);
       if (!recovery?.verified || recovery.cleanup_complete !== true || !proof) throw new Error('Pending graph effect is unresolved');
       state.receipts.push({ id: state.pending.id, kind: state.pending.kind, parameters: state.pending.parameters, verified: true, receipt: recovery,...(state.pending.kind==='move'?{before:state.pending.before}:{}) });
-      if (state.pending.kind === 'create') {state.targetId = proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;state.auto_created_variable_links=proof.auto_created_variable_links;}
+      if (state.pending.kind === 'create') rememberCreatedTarget(state,proof);
       state.pending = null;state.last_graph=structuredClone(graph); await commit(); graph = await observe();
       }
     }
@@ -400,13 +501,13 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
      }
     }
     if (!state.targetId) {
-      const after = await change('create', {...request.target,position:request.target.position??state.newPosition}, (before, after) => {
-        const proof=verifyNodeTargetEffect({kind:'create',parameters:request.target,before},after,adapter.positionMatches);
-        if(!proof)return false;
-        state.targetId=proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;state.auto_created_variable_links=proof.auto_created_variable_links;return true;
+      const after = await change('create', {...request.target,position:request.target.position??state.newPosition,...(addOnly?{add_only:true}:{})}, (_before, _after, _effect, proof) => {
+        rememberCreatedTarget(state,proof);
+        return true;
       });
       graph = after;
     }
+    if(state.add_only_unowned_links)throw Error('The new node has links that were not proved by its create receipt. Release this operation to preserve them.');
     // An automatic service choice is not the caller's requested connection.
     // Remove only this creation's proven edge through the existing native
     // deletion procedure; the REST handler subsequently binds its own choice.
@@ -432,8 +533,9 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
       });
     }
     const desired = request.inputs.map(i => ({ source: i.source.node_id, output: i.output, target: state.targetId, input: i.input }));
-    for (const edge of graph.links.filter(e => e.target === state.targetId && !desired.some(d => edgeKey(d) === edgeKey(e)))) {
-      const owned = (state.auto_created_links ?? []).some(a => edgeKey(a) === edgeKey(edge))
+    for (const edge of graph.links.filter(e => (e.target === state.targetId || addOnly && e.source===state.targetId)
+      && !desired.some(d => edgeKey(d) === edgeKey(e)))) {
+      const owned = (state.auto_created_links ?? []).some(a => addOnly?same(a,edge):edgeKey(a)===edgeKey(edge))
         ||(state.replacements??[]).some(r=>same(r.removed,edge))
         ||restInputReplacement(graph)&&edgeKey(edge)===edgeKey(operation.restQueryInput.edge);
       // Other existing links not mentioned by the caller are preserved.
@@ -456,8 +558,7 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
             && unchangedExcept(before, after, [state.targetId]);
         });
       }
-      graph = await change('connect', { edge }, (before, after) => after.links.some(e => edgeKey(e) === edgeKey(edge))
-        && unchangedExcept(before, after, [], [edgeKey(edge)]));
+      graph = await change('connect', { edge });
     }
     const variableDesired=(request.variable_inputs??[]).map(i=>({source:i.source.node_id,output:i.output,target:state.targetId,input:i.input,kind:i.kind}));
     if(request.target.type==='variables.column_union'){
@@ -473,8 +574,8 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
           !!verifyNodeTargetEffect({kind:'remove_link',parameters:{edge},before},after,adapter.positionMatches));
       }
     }
-    if(variableDesired.length)for(const edge of state.auto_created_variable_links??[]){
-      if(variableDesired.some(d=>edgeKey(d)===edgeKey(edge))||!(graph.variable_links??[]).some(e=>edgeKey(e)===edgeKey(edge)))continue;
+    if(addOnly||variableDesired.length)for(const edge of state.auto_created_variable_links??[]){
+      if(variableDesired.some(d=>edgeKey(d)===edgeKey(edge))||!(graph.variable_links??[]).some(e=>addOnly?same(e,edge):edgeKey(e)===edgeKey(edge)))continue;
       graph=await change('remove_link',{edge},(before,after)=>!!verifyNodeTargetEffect({kind:'remove_link',parameters:{edge},before},after,adapter.positionMatches));
     }
     if(variableDesired.some(e=>e.kind==='control')&&!node(graph,state.targetId).variable_inputs?.some(p=>p.kind==='control'&&p.port===0)){
@@ -495,18 +596,26 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
       graph=await change('connect',{edge},(before,after)=>(after.variable_links??[]).some(e=>edgeKey(e)===edgeKey(edge))
         &&unchangedExcept(before,normalizeVariablesToTableLinkGraph(before,after,edge),[],[edgeKey(edge)]));
     }
-    // Native variable links derive these default captions. Preserve an explicitly
+    // Native links derive these default captions. Preserve an explicitly
     // requested label after the owned transitions, without relinking.
-    if(request.target.kind==='new'&&['variables.to_table','variables.column_union'].includes(request.target.type)&&request.target.label!==undefined
-      &&node(graph,state.targetId).label!==request.target.label){
-      graph=await change('rename',{ref:node(graph,state.targetId).ref,label:request.target.label},(before,after)=>
-        !!verifyNodeTargetEffect({kind:'rename',parameters:{ref:node(before,state.targetId).ref,label:request.target.label},before},after,adapter.positionMatches));
+    const finalTarget=node(graph,state.targetId);
+    const joinCaption=request.target.type==='transform.join_data'&&request.target.label===joinDesignTitle&&finalTarget.label==='Левое';
+    if(request.target.kind==='new'&&(joinCaption||['variables.to_table','variables.column_union'].includes(request.target.type))
+      &&request.target.label!==undefined&&finalTarget.label!==request.target.label){
+      graph=await change('rename',{ref:finalTarget.ref,label:request.target.label});
+    }
+    if(addOnly){
+      const quiet=await observe();
+      if(!quiet.interaction_ready||!sameDomainGraph(graph,quiet)
+        ||['links','variable_links','foreign_links','rest_connection_links'].some(key=>!same(quiet[key]??[],state.baseline[key]??[])))
+        throw Error('Complete quiet graph without new connections required');
+      graph=quiet;
     }
     state.completed=true;state.final_graph=structuredClone(graph);
     state.result = { status: 'SUCCEEDED', phase: 'target_ready', node: node(graph, state.targetId),
       created: request.target.kind === 'new', links: desired,...(variableDesired.length?{variable_links:graph.variable_links.filter(e=>variableDesired.some(d=>edgeKey(d)===edgeKey(e)))}:{}), auto_created_links: state.auto_created_links ?? [],
       ...((state.replacements??[]).length?{replaced_links:structuredClone(state.replacements)}:{}),
-      effects: state.receipts.map(({ id, kind, verified }) => ({ id, kind, verified })), configured: false, executed: false, package_saved: false };
+      effects: state.receipts.map(({ id, kind, verified }) => ({ id, kind, verified })), ...(addOnly?{unconnected_verified:true}:{}), configured: false, executed: false, package_saved: false };
     await commit(); return structuredClone(state.result);
   } catch (error) {
     if(state.move_mismatch)return structuredClone(state.result);
@@ -525,7 +634,7 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
   const graph=await adapter.observe(request,deadline);
   if(state.pending){
     const effect=state.pending;
-    const recovery=await adapter.reconcile(effect,graph,deadline);
+    const recovery=await reconcileTargetEffect(adapter,effect,graph,deadline);
     if(recovery.completed===true&&recovery.cleanup_complete===true
       &&await settleMoveMismatch({operation,state,effect,receipt:recovery.receipt,graph,adapter,record})){
       operation.targetPhase=state;return structuredClone(state.result);
@@ -536,9 +645,9 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
       (state.refusals??=[]).push({id:effect.id,kind:effect.kind,receipt:structuredClone(refused)});
       state.pending=null;state.last_graph=structuredClone(graph);state.effect_possible=state.receipts.length>0;
     }else{
-    const proof=verifyNodeTargetEffect({...effect,receipt:recovery.receipt},graph,adapter.positionMatches);
+    const proof=verifyPreparedTargetEffect({...effect,receipt:recovery.receipt},graph,adapter.positionMatches,request,state);
     if(!recovery.verified || recovery.cleanup_complete!==true || !proof)return {status:'AMBIGUOUS',phase:'target_incomplete',cleanup_complete:recovery.cleanup_complete===true,pending:effect.id};
-    if(effect.kind==='create'){state.targetId=proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;state.auto_created_variable_links=proof.auto_created_variable_links;}
+    if(effect.kind==='create')rememberCreatedTarget(state,proof);
     state.receipts.push({id:effect.id,kind:effect.kind,parameters:effect.parameters,verified:true,receipt:recovery,...(effect.kind==='move'?{before:effect.before}:{})});
     state.pending=null;state.last_graph=structuredClone(graph);
     }
@@ -549,7 +658,7 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
   operation.targetPhase=state;
   if(state.move_mismatch)return structuredClone(state.result);
   return state.completed?{...structuredClone(state.result),cleanup_complete:true}:{status:'AMBIGUOUS',phase:'target_partial',cleanup_complete:true,pending:null,node_id:state.targetId,
-    resume_available:!(request?.target.kind==='new'&&['transform.cross_table','transform.calculator','preprocessing.data_recovery'].includes(request.target.type)&&!state.baseline&&state.last_graph)};
+    resume_available:!state.add_only_unowned_links&&!(request?.target.kind==='new'&&['transform.cross_table','transform.calculator','preprocessing.data_recovery'].includes(request.target.type)&&!state.baseline&&state.last_graph)};
 }
 
 // A pre-target release observes only. In particular, it cannot finish creation,

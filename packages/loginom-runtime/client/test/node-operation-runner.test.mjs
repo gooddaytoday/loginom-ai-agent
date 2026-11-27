@@ -3,6 +3,20 @@ import assert from 'node:assert/strict';
 import {createNodeOperationRunner} from '../lib/node-operation-runner.mjs';
 import {compactNodeResult} from '../lib/user-results.mjs';
 
+test('waiting for a running job returns its settlement without reaching the 60-second timer',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const finish=Promise.withResolvers();
+ const runner=createNodeOperationRunner({validate:()=>1,progress:()=>null,run:()=>finish.promise});
+ runner.start({operation_id:'own'});
+ const waiting=runner.wait('own',{timeoutMs:60000});
+ t.mock.timers.tick(59999);
+ assert.equal(runner.status('own').state,'running');
+ finish.resolve({status:'SUCCEEDED'});
+ const result=await waiting;
+ assert.equal(result.state,'settled');
+ assert.equal(result.outcome.status,'SUCCEEDED');
+});
+
 test('shutdown cancels locally, drains the original worker and preserves uncertainty',async()=>{
  const finish=Promise.withResolvers();let signal,stopSignal;
  const runner=createNodeOperationRunner({validate:()=>1,progress:()=>null,
