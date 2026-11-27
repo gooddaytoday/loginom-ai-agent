@@ -27,7 +27,8 @@ import {javascriptContextInitialSchema,javascriptContextReceiptSchema,validateJa
 
 const object=(properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 const text=(maxLength=128)=>({type:'string',minLength:1,maxLength});
-const fieldName={...text(128),pattern:'^[A-Za-z_][A-Za-z0-9_]{0,127}$',description:'ASCII name; title=label.'};
+export const nodeFieldNamePattern=/^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
+const fieldName={...text(128),pattern:nodeFieldNamePattern.source,description:'ASCII name; title=label.'};
 const id={...text(),pattern:'^[A-Za-z0-9_.:-]+$'};
 const integer=(minimum,maximum)=>({type:'integer',minimum,maximum});
 const choice=(...values)=>({type:'string',enum:values});

@@ -94,7 +94,8 @@ test('managed user preparation returns local pins and dynamic knowledge without 
         ? { status: 'READY', target: compatibility, authenticated: true, created_draft: !expectedPackage,
           effect_possible: true, document_id: 'fixture-document', target_verified: true,
           operation_id:expectedOperation??'prepare',package_ref: { path: expectedPackage, persisted: !!expectedPackage },loginom_account:'user',
-          workflow_ref: { tab_tid: 'fixture-tab', prefix: 'fixture-prefix', workflow_id: expectedPackage?'local-workflow':'fixture-workflow', navigation_path: [] } }
+          workflow_ref: { tab_tid: 'MF;cntMain;cntWorkspace;Workspace;t.br;tb', prefix: 'MF;TF',
+            workflow_id: expectedPackage?'local-workflow':'fixture-workflow', navigation_path: [{tid:'crumb',label:'Fixture scenario'}] } }
         : { version: 1, source: 'prepare_same_browser_page', observed: { document_id: 'fixture-document' }, fixture: true };
       assert.ok(code.includes('async function prepareWorkspace(') || code.includes('async function observeGeometry('));
       if(stepFixture&&code.includes('async function prepareWorkspace(')){
@@ -250,6 +251,23 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const crossTableCardBytes=Buffer.byteLength(JSON.stringify(crossTableCard));
     assert.ok(crossTableCardBytes<=12000,`CrossTable card is ${crossTableCardBytes} bytes`);
     assert.match(crossTableCard.semantics,/Loginom rejects YYYY-MM as an output column name\. Use name: M_2026_01, label: 2026-01\./);
+
+    for(const [layout,name] of [['changes','2026-01'],['fields','Revenue-total'],['changes','Сумма']]){
+      const operation_id='invalid-mapping-'+layout+'-'+name.length;
+      const refused=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,operation_id,
+        target:{kind:'existing',type:'transform.cross_table',ref:{document_id:undescribed.document_id,
+          workflow_id:undescribed.workflow_ref.workflow_id,node_id:'existing-cross-table'}},
+        mode:'pivot',finish:'execute',mappings:[{direction:'output',port:0,[layout]:[
+          {source:{kind:'configured_field',name:'C_1'},name,label:'2026-01'}]}]}});
+      const failure=JSON.parse(refused.content[0].text);
+      assert.equal(failure.status,'NOT_APPLIED',JSON.stringify(failure));
+      assert.equal(failure.operation_id,operation_id);
+      assert.equal(failure.effect_possible,false);
+      assert.equal(failure.cleanup_complete,true);
+      assert.equal(failure.error.parameter_path,`mappings[0].${layout}[0].name`);
+      assert.match(failure.error.message,/идентификатор.*2026-01.*подписью/);
+      assert.equal(browserCalls.length,beforeDescription,'invalid output names cannot start browser work');
+    }
 
     const invalidMode=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,mode:'invented'}});
     assert.equal(JSON.parse(invalidMode.content[0].text).error.code,'REQUEST_REJECTED');
