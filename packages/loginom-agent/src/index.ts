@@ -18,6 +18,7 @@ import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
 import { packageDocs } from "./package-docs"
+import { packageStateRpc } from "./package-state-contract"
 import {
   classify,
   declinedText,
@@ -513,6 +514,16 @@ export default Plugin.define({
     await ctx.rpc.register(DashboardTarget.rpc, {
       prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),
       find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),
+    })
+    await ctx.rpc.register(packageStateRpc, {
+      snapshot: async (value, call) => {
+        if (!value || typeof value !== "object" || !("sessionID" in value) || typeof value.sessionID !== "string")
+          return call.error("invalid_session", "A conversation ID is required", {})
+        const session = await ctx.session.get({ sessionID: value.sessionID }).catch(() => undefined)
+        if (session?.location.directory !== ctx.location.directory)
+          return call.error("invalid_session", "The conversation is unavailable in this location", {})
+        return ServiceHost.packageState(value.sessionID)
+      },
     })
     await ctx.rpc.register(permission, {
       conversation: async (value, call) => {
