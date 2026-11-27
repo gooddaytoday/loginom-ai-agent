@@ -1,6 +1,6 @@
 const title = 'Собрать вместе с Loginom'
 const importPrompt = 'Импортируй файл продаж'
-const filterPrompt = 'Добавь фильтр после импорта, только 2026 год'
+const filterPrompt = 'Вставь фильтр перед «Результат»: только 2026 год'
 const savePrompt = 'Сохрани как «Продажи — сборка» в моей папке'
 const fixPrompt = 'Исправь имя узла «Левое» на «Слияние»'
 const workWarning = 'Агент работает в окне Loginom — не меняйте схему до конца шага'
@@ -98,8 +98,15 @@ export function createBuildTogether({state, esc, icon, render, composer, openSes
       turn.answer = `Добавил узел «Импорт» для sales-demo.csv. Связал с узлом «${pkg.nodes.result}». Запустил импорт без ошибок · ${pkg.rows.length} строк.`
     } else if (turn.step === 'filter') {
       pkg.nodes.filter = 'Только 2026 год'
+      // «Вставь … перед/между» rewires the existing link; «добавь после» only adds a branch — the agent does not touch neighbours unasked.
+      const insert = /встав|между|перед/iu.test(turn.prompt || '')
+      const direct = pkg.links.some(([from, to]) => from === 'import' && to === 'result')
+      if (insert) pkg.links = pkg.links.filter(([from, to]) => from !== 'import' || to !== 'result')
       pkg.links.push(['import', 'filter'])
-      turn.answer = `Добавил фильтр «Только 2026 год» после узла «${pkg.nodes.import}». Запустил без ошибок · ${rowsIn2026(pkg)} из ${pkg.rows.length} строк.`
+      if (insert) pkg.links.push(['filter', 'result'])
+      turn.answer = insert
+        ? `Вставил фильтр «Только 2026 год» ${direct ? `между «${pkg.nodes.import}» и «${pkg.nodes.result}»` : `перед «${pkg.nodes.result}»`}. Запустил без ошибок · ${rowsIn2026(pkg)} из ${pkg.rows.length} строк, «${pkg.nodes.result}» получает ${rowsIn2026(pkg)} строк.`
+        : `Добавил фильтр «Только 2026 год» отдельной веткой от «${pkg.nodes.import}»: «${pkg.nodes.result}» по-прежнему получает все ${pkg.rows.length} строк. Чтобы фильтр стоял перед «${pkg.nodes.result}», попросите: «вставь фильтр перед «${pkg.nodes.result}»». Запустил без ошибок · ${rowsIn2026(pkg)} из ${pkg.rows.length} строк.`
     } else {
       pkg.nodes.merge = 'Слияние'
       turn.answer = 'Переименовал узел «Левое» в «Слияние». Связи не менял. Запуск для переименования не нужен.'
