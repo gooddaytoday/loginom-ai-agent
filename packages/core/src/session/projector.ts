@@ -891,6 +891,8 @@ const layer = Layer.effectDiscard(
           .get()
           .pipe(Effect.orDie)
         if (!stored) return yield* Effect.die(new SessionAlreadyProjected())
+        if (event.data.instructionEntries)
+          yield* InstructionEntry.initialize(db, event.data.sessionID, event.data.instructionEntries, event.created)
       }),
     )
     yield* bus.project(SessionEvent.Moved, (event) =>

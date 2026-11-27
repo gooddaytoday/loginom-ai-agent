@@ -1,4 +1,4 @@
-import { InstructionsDefinition } from "@loginom-ai-agent/loginom-host/settings-rpc"
+import { InstructionsDefinition, instructionsBytes, instructionsMaxBytes } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { usePlugin } from "@opencode/plugin/gui"
 import { TextField } from "@opencode/ui/text-field"
 import { createMemo, createResource, createSignal, onCleanup, Show } from "solid-js"
@@ -40,9 +40,11 @@ function Editor(props: { client: NonNullable<ReturnType<typeof profileClient>> }
   const [failed, setFailed] = createSignal(false)
   const text = () => draft() ?? saved()?.text ?? ""
   const dirty = () => text() !== saved()?.text
+  const bytes = createMemo(() => instructionsBytes(text()))
+  const tooLong = () => bytes() > instructionsMaxBytes
 
   const save = async () => {
-    if (!saved() || !dirty() || saving()) return
+    if (!saved() || !dirty() || saving() || tooLong()) return
     setSaving(true)
     setFailed(false)
     const result = await rpc.save({ text: text() }, options()).catch(() => undefined)
@@ -81,15 +83,20 @@ function Editor(props: { client: NonNullable<ReturnType<typeof profileClient>> }
           <TextField
             label={ctx.t("instructionsTitle")}
             placeholder={ctx.t("instructionsExample")}
-            description={ctx.t("instructionsSkillHint")}
+            description={`${ctx.t("instructionsSkillHint")} ${ctx.t("instructionsCount", {
+              used: bytes(),
+              limit: instructionsMaxBytes,
+            })}`}
+            validationState={tooLong() ? "invalid" : "valid"}
+            error={tooLong() ? ctx.t("instructionsLimitExceeded") : undefined}
             multiline
-            class="min-h-40"
+            class="min-h-40 max-h-80 overflow-y-auto"
             value={text()}
             disabled={saving()}
             onChange={setDraft}
           />
           <div class="flex flex-wrap items-center gap-3">
-            <ctx.ui.Button variant="contrast" type="submit" disabled={!dirty() || saving()}>
+            <ctx.ui.Button variant="contrast" type="submit" disabled={!dirty() || saving() || tooLong()}>
               {ctx.t(saving() ? "saving" : "save")}
             </ctx.ui.Button>
             <span role="status" class="text-12-regular text-text-base">

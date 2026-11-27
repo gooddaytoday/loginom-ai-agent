@@ -2391,6 +2391,7 @@ export type SessionCreated = {
     model?: ModelRef
     metadata?: SessionMetadata
     permissions?: PermissionRuleset
+    instructionEntries?: InstructionEntrySnapshot
     version: string
   }
 }

@@ -5,7 +5,10 @@ export default {
   instructionsHeading: "Инструкции для агента",
   instructionsExample: "Например: узлы называй по смыслу, по-русски; перед расчётом выручки проверяй пустые значения.",
   instructionsSkillHint: "Приёмы для одного вида задач удобнее оформить как навык.",
-  instructionsDescription: "Агент учитывает их во всех разговорах вместе с инструкциями проекта.",
+  instructionsDescription:
+    "Действуют вместе с инструкциями проекта в новых разговорах этого профиля приложения. Не меняют существующие разговоры и не действуют в CLI.",
+  instructionsCount: "{{used}} / {{limit}} байт (UTF-8)",
+  instructionsLimitExceeded: "Чтобы сохранить инструкции, сократите их до 16 КиБ.",
   instructionsUnsaved: "Не сохранено",
   instructionsLoading: "Загружаем инструкции…",
   instructionsLoadFailed: "Не удалось загрузить инструкции. Откройте страницу ещё раз.",

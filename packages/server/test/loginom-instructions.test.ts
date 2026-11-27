@@ -5,6 +5,7 @@ import { llmClient } from "@opencode/core/effect/app-node-platform"
 import { Session } from "@opencode/core/session"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { Location } from "@opencode/schema/location"
+import { Provider } from "@opencode/schema/provider"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Global } from "@opencode/util/global"
 import { Context, Effect, Layer } from "effect"
@@ -16,18 +17,19 @@ import { it } from "../../core/test/lib/effect"
 import { serveRoutes } from "./fixture/routes"
 
 it.live(
-  "applies saved profile instructions alongside project instructions, omitting empty profile text",
+  "snapshots profile instructions for new sessions and sends them to Claude Code across request kinds",
   () =>
     Effect.gen(function* () {
       const profile = (yield* tmpdirScoped("loginom-instructions-profile-")).path
       const project = (yield* tmpdirScoped("loginom-instructions-project-")).path
       const projectText = "Project instructions: use test data."
       const profileText = "Profile instructions: answer in Russian."
+      const provider = Provider.ID.claudeAgent
       yield* Effect.promise(() => Bun.write(path.join(project, "AGENTS.md"), projectText))
       const llm = yield* TestLLM.Test.pipe(Effect.provide(TestLLM.testLayer()))
-    yield* llm.always(TestLLM.text("Done", "reply"))
+      yield* llm.always(TestLLM.text("Done", "reply"))
       const model = SessionRunnerModel.resolved(
-        LanguageModel.make({ id: "test-model", provider: "test", route: OpenAIChat.route }),
+        LanguageModel.make({ id: "test-model", provider, route: OpenAIChat.route }),
         {
           capabilities: { tools: true, input: ["text"], output: ["text"] },
           cost: [],
@@ -64,43 +66,91 @@ it.live(
       )
       yield* server.pluginsLoaded(profile)
       yield* server.pluginsLoaded(project)
-      const rpc = (directory: string, method: "read" | "save", input: { text?: string } = {}) =>
+      const rpc = (directory: string, method: "read" | "save", input: { text?: string } = {}, status = 200) =>
         Effect.promise(async () => {
           const response = await server.fetch(
             `http://test.local/api/rpc/loginom.instructions/${method}?location[directory]=${encodeURIComponent(directory)}`,
             { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input }) },
           )
-          expect(response.status).toBe(200)
+          expect(response.status).toBe(status)
           return response.json()
         })
       const sessions = Context.get(server.context, Session.Service)
-      const context = (title: string) =>
+      const create = (title: string) =>
+        sessions.create({
+          title,
+          agent: Agent.ID.make("build"),
+          model: model.ref,
+          location: Location.Ref.make({ directory: AbsolutePath.make(project) }),
+        })
+      const entries = (sessionID: string) =>
+        Effect.promise(async () => {
+          const response = await server.fetch(`http://test.local/api/experimental/session/${sessionID}/instructions/entries`)
+          expect(response.status).toBe(200)
+          return response.json()
+        })
+      const checkRequest = (sessionID: string, kind: string, expected?: string) =>
         Effect.gen(function* () {
-          const session = yield* sessions.create({
-            title,
-            agent: Agent.ID.make("build"),
-            model: model.ref,
-            location: Location.Ref.make({ directory: AbsolutePath.make(project) }),
-          })
-          const start = (yield* llm.requests()).length
-          yield* sessions.prompt({ sessionID: session.id, text: "Test conversation" })
-          yield* sessions.wait(session.id)
-          const request = (yield* llm.requests()).slice(start).find((request) => request.tools.length > 0)
-      expect(request?.model.provider).toBe(model.model.provider)
-          return request?.system.map((part) => part.text).join("\n")
+          const requests = yield* llm.requests()
+          const request = requests.findLast(
+            (item) =>
+              item.headers?.["x-opencode-session-id"] === sessionID &&
+              item.headers?.["x-opencode-claude-agent-kind"] === kind,
+          )
+          expect(request?.model.provider).toBe(model.model.provider)
+          const system = request?.system.map((part) => part.text).join("\n")
+          const instructions = request?.providerOptions?.claudeCodeInstructions
+          expect(typeof instructions).toBe("string")
+          expect(system).toContain(projectText)
+          expect(instructions).toContain(projectText)
+          if (expected) {
+            expect(system).toContain(expected)
+            expect(instructions).toContain(expected)
+          } else {
+            expect(system).not.toContain(profileText)
+            expect(instructions).not.toContain(profileText)
+          }
         })
       expect(yield* rpc(profile, "read")).toEqual({ output: { text: "" } })
+      const boundary = "я".repeat(8192)
+      expect(yield* rpc(profile, "save", { text: boundary })).toEqual({ output: { text: boundary } })
+      expect(yield* rpc(profile, "save", { text: boundary + "a" }, 400)).toMatchObject({
+        type: "rpc.invalid_input",
+        message: expect.stringContaining("16 KiB"),
+      })
+      expect(yield* rpc(project, "read")).toEqual({ output: { text: boundary } })
+
       expect(yield* rpc(profile, "save", { text: profileText })).toEqual({ output: { text: profileText } })
       expect(yield* rpc(project, "read")).toEqual({ output: { text: profileText } })
-      const withProfile = yield* context("Saved instructions")
-      expect(withProfile).toContain(profileText)
-      expect(withProfile).toContain(projectText)
+      const original = yield* create("Saved instructions")
+      expect(yield* entries(original.id)).toEqual({ data: [{ key: "loginom-profile", value: profileText }] })
+      yield* sessions.prompt({ sessionID: original.id, text: "Test conversation" })
+      yield* sessions.wait(original.id)
+      yield* checkRequest(original.id, "primary", profileText)
+
+      yield* rpc(profile, "save", { text: "New defaults" })
+      const newer = yield* create("New instructions")
+      expect(yield* entries(newer.id)).toEqual({ data: [{ key: "loginom-profile", value: "New defaults" }] })
+      const child = yield* sessions.create({ parentID: original.id })
+      expect(yield* entries(child.id)).toEqual(yield* entries(original.id))
+      const forked = yield* sessions.fork({ sessionID: original.id })
+      expect(yield* entries(forked.id)).toEqual({ data: [{ key: "loginom-profile", value: profileText }] })
+
+      yield* sessions.prompt({ sessionID: original.id, text: "Follow up" })
+      yield* sessions.wait(original.id)
+      yield* checkRequest(original.id, "primary", profileText)
+      yield* sessions.generate({ sessionID: original.id, prompt: "Side question" })
+      yield* checkRequest(original.id, "generate", profileText)
+      yield* sessions.compact({ sessionID: original.id })
+      yield* sessions.wait(original.id)
+      yield* checkRequest(original.id, "compaction", profileText)
 
       for (const text of ["", " \n "]) {
         expect(yield* rpc(profile, "save", { text })).toEqual({ output: { text } })
-        const withoutProfile = yield* context("Empty instructions")
-        expect(withoutProfile).not.toContain("User instructions for this Loginom profile")
-        expect(withoutProfile).toContain(projectText)
+        const session = yield* create("Empty instructions")
+        expect(yield* entries(session.id)).toEqual({ data: [] })
+        yield* sessions.generate({ sessionID: session.id, prompt: "Side question" })
+        yield* checkRequest(session.id, "generate")
       }
     }).pipe(Effect.scoped),
   30_000,

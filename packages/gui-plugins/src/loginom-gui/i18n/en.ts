@@ -6,7 +6,9 @@ export default {
   instructionsExample: "For example: give nodes meaningful names; check for missing values before calculating revenue.",
   instructionsSkillHint: "For techniques you use on one kind of task, create a skill instead.",
   instructionsDescription:
-    "The agent follows these instructions in every conversation, alongside any project instructions.",
+    "These instructions apply alongside project instructions in new conversations in this app profile. Existing conversations and the CLI are unaffected.",
+  instructionsCount: "{{used}} / {{limit}} bytes (UTF-8)",
+  instructionsLimitExceeded: "Shorten the instructions to 16 KiB or less to save them.",
   instructionsUnsaved: "Not saved",
   instructionsLoading: "Loading instructions…",
   instructionsLoadFailed: "Could not load instructions. Reopen this page to try again.",

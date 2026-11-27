@@ -51,6 +51,7 @@ export interface MockServerConfig {
   // The machine name `/api/info` reports; omitted like a server that predates it.
   hostname?: string
   provider: Resolvable<MockProviderCatalog>
+  rpc?: (input: { rpcID: string; method: string; body: unknown }) => { output: unknown } | undefined
   integrations?: Resolvable<unknown[]>
   // Runs on POST /api/credential/:id/activate; the fixture swaps its integrations and catalog to the new account.
   onCredentialActivate?: (credentialID: string) => void
@@ -1221,14 +1222,17 @@ function mockHandlers(
           })
         },
         // The goal plugin's pill reads each routed session's goal; no scenario sets one.
-        rpcCall: (ctx) =>
-          ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get"
+        rpcCall: (ctx) => {
+          const result = config.rpc?.({ ...ctx.params, body: ctx.payload })
+          if (result) return Effect.succeed(result)
+          return ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get"
             ? Effect.succeed({ output: null })
             : Effect.fail(
                 new MockUnsupported({
                   message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC`,
                 }),
-              ),
+              )
+        },
         sessionActive: () => {
           const status = resolve(config.sessionStatus ?? {})
 

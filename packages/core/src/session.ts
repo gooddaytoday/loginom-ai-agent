@@ -15,6 +15,8 @@ import { Bus } from "./bus.js"
 import { Instance } from "./instance/service.js"
 import { Plugin } from "./plugin/service.js"
 import { PluginHooks } from "./plugin/hooks.js"
+import { PluginProduct } from "./plugin/product.js"
+import { KV } from "./kv.js"
 import { Database } from "./database/database.js"
 import { SessionProjector } from "./session/projector.js"
 import { SessionMessageTable } from "./session/sql.js"
@@ -270,6 +272,7 @@ const layer = Layer.effect(
     const app = yield* App.Service
     const database = yield* Database.Service
     const db = database.db
+    const kv = yield* KV.Service
     const bus = yield* Bus.Service
     const projects = yield* Project.Service
     const execution = yield* SessionExecution.Service
@@ -297,6 +300,10 @@ const layer = Layer.effect(
         if (location === undefined)
           return yield* Effect.die(new Error("Session.create requires either location or an existing parentID"))
         const project = yield* projects.resolve(location.directory)
+        const instructionEntries = yield* PluginProduct.initialInstructions(
+          kv,
+          parent && (yield* InstructionEntry.snapshot(db, parent.id)),
+        )
         const projected = yield* bus
           .publish(
             SessionEvent.Created,
@@ -315,6 +322,7 @@ const layer = Layer.effect(
               metadata: input.metadata ?? parent?.metadata,
               permissions: input.permissions ?? parent?.permissions,
               model: input.model,
+              instructionEntries,
             },
             { location },
           )
@@ -560,6 +568,7 @@ export const node: LayerNode.Provider<Service, never, typeof Node.tags.values.gl
     Job.node,
     SessionEnvironment.node,
     Database.node,
+    KV.node,
     Bus.node,
     Project.node,
     SessionExecution.node,
