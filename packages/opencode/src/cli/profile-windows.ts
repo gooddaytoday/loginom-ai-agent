@@ -5,7 +5,9 @@ import { windowsPowerShellArguments } from "@loginom-ai-agent/loginom-host/windo
 
 // Called before creating the writer guard or writing profile data. Existing
 // profiles are inspected, never recursively rewritten to hide unsafe ACLs.
-export async function protectWindowsProfile(root: string) {
+// The error stays the bare code machine consumers match; the refused path and
+// ACE go to the person through notice.
+export async function protectWindowsProfile(root: string, notice?: (text: string) => void) {
   const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
   if (process.platform !== "win32" || !systemRoot || !win32.isAbsolute(systemRoot) || !win32.isAbsolute(root))
     throw Error("PROFILE_PERMISSIONS_INVALID")
@@ -14,10 +16,20 @@ $ErrorActionPreference = 'Stop'
 try {
   $path = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String([Console]::In.ReadToEnd()))
   $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
+  function Reject($at, $reason) {
+    [Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes(('{0}: {1}' -f $at, $reason))))
+    exit 1
+  }
+  function Format-Ace($access) {
+    'ACE {0} {1}, rights 0x{2:X8} ({3}), inheritance {4}, propagation {5}, inherited {6}' -f $access.IdentityReference.Value,
+      $access.AccessControlType, [int]$access.FileSystemRights, $access.FileSystemRights, $access.InheritanceFlags,
+      $access.PropagationFlags, $access.IsInherited
+  }
   $item = Get-Item -LiteralPath $path -Force
-  if (!$item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { exit 1 }
+  if (!$item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { Reject $path 'not a directory, or a reparse point' }
   $acl = Get-Acl -LiteralPath $path
-  if ($acl.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $sid.Value) { exit 1 }
+  $owner = $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value
+  if ($owner -ne $sid.Value) { Reject $path ('owner {0}, expected {1}' -f $owner, $sid.Value) }
   $children = @(Get-ChildItem -LiteralPath $path -Force)
   if ($children.Count -eq 0) {
     $acl = New-Object Security.AccessControl.DirectorySecurity
@@ -31,9 +43,10 @@ try {
   $items.Enqueue($item)
   while ($items.Count -gt 0) {
     $entry = $items.Dequeue()
-    if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { exit 1 }
+    if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { Reject $entry.FullName 'reparse point' }
     $security = Get-Acl -LiteralPath $entry.FullName
-    if ($security.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $sid.Value) { exit 1 }
+    $owner = $security.GetOwner([Security.Principal.SecurityIdentifier]).Value
+    if ($owner -ne $sid.Value) { Reject $entry.FullName ('owner {0}, expected {1}' -f $owner, $sid.Value) }
     # On Windows the runtime keeps Chromium's user-data-dir in cache/tmp/lbXXXXXX
     # (mkdtemp under the profile TMP, for MAX_PATH) and the validation login its
     # disk cache in loginom/validation/http-cache. Normal shutdown removes both;
@@ -55,7 +68,7 @@ try {
       # deny to some LevelDB files, so rejecting denials makes a valid profile
       # impossible to reopen without weakening its confidentiality.
       if ($access.AccessControlType -eq [Security.AccessControl.AccessControlType]::Deny) { continue }
-      if ($access.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow) { exit 1 }
+      if ($access.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow) { Reject $entry.FullName (Format-Ace $access) }
       # Loginom runtime directories deliberately retain LocalSystem so that
       # Windows can service Chromium files. Other allows are handled narrowly.
       if ($access.IdentityReference.Value -ne $sid.Value -and $access.IdentityReference.Value -ne 'S-1-5-18') {
@@ -75,11 +88,11 @@ try {
         $browserCapability = ($chromiumCache -or (@($entry.FullName.Split([IO.Path]::DirectorySeparatorChar)) -contains 'browser-profile')) -and
           $access.IdentityReference.Value -match '^S-1-15-3-1024-(?:[0-9]+-){7}[0-9]+$' -and
           ($mapped -band -bnot 0x1301BF) -eq 0
-        if (!$browserCapability) { exit 1 }
+        if (!$browserCapability) { Reject $entry.FullName (Format-Ace $access) }
       }
       if ($access.IdentityReference.Value -eq $sid.Value -and ($access.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -eq [Security.AccessControl.FileSystemRights]::FullControl) { $userFull = $true }
     }
-    if (!$userFull) { exit 1 }
+    if (!$userFull) { Reject $entry.FullName ('no FullControl ACE for {0}' -f $sid.Value) }
     if ($entry.PSIsContainer) {
       foreach ($child in @(Get-ChildItem -LiteralPath $entry.FullName -Force)) { $items.Enqueue($child) }
     }
@@ -87,7 +100,7 @@ try {
   [Console]::Out.Write('OK')
 } catch { exit 1 }
 `
-  await runPowerShell(systemRoot, script, root, "PROFILE_PERMISSIONS_INVALID")
+  await runPowerShell(systemRoot, script, root, "PROFILE_PERMISSIONS_INVALID", notice)
 }
 
 const abandonedBrowserDirectory = /^lb[A-Za-z0-9]{6}$/
@@ -135,14 +148,25 @@ try {
   await runPowerShell(systemRoot, script, root, "PROFILE_CLEANUP_FAILED")
 }
 
-function runPowerShell(systemRoot: string, script: string, root: string, code: string) {
+function runPowerShell(
+  systemRoot: string,
+  script: string,
+  root: string,
+  code: string,
+  notice?: (text: string) => void,
+) {
   return new Promise<void>((resolve, reject) => {
     const child = execFile(
       win32.join(systemRoot, "System32/WindowsPowerShell/v1.0/powershell.exe"),
       windowsPowerShellArguments(script),
-      { env: { SystemRoot: systemRoot }, windowsHide: true, timeout: 30000, maxBuffer: 1024 },
+      { env: { SystemRoot: systemRoot }, windowsHide: true, timeout: 30000, maxBuffer: 1 << 20 },
       (error, stdout) => {
-        if (error || stdout !== "OK") return reject(Error(code))
+        if (error || stdout !== "OK") {
+          // A refusal reason arrives as base64 UTF-16, unaffected by the console code page.
+          if (notice && /^[A-Za-z0-9+/]+=*$/.test(stdout))
+            notice(`${code}: ${Buffer.from(stdout, "base64").toString("utf16le")}`)
+          return reject(Error(code))
+        }
         resolve()
       },
     )

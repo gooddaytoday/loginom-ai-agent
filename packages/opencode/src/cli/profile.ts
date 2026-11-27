@@ -22,7 +22,7 @@ export async function acquireProfile(
   }
   if (process.platform === "win32") {
     const { protectWindowsProfile } = await import("./profile-windows")
-    await protectWindowsProfile(canonical)
+    await protectWindowsProfile(canonical, options.notice ?? terminalNotice)
   }
   if (process.platform !== "win32") {
     const info = await fs.stat(canonical)

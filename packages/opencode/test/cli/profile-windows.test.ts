@@ -53,7 +53,18 @@ test.skipIf(process.platform !== "win32")(
         stderr: "ignore",
       })
       expect(await child.exited).toBe(0)
-      await expect(protectWindowsProfile(root)).rejects.toThrow("PROFILE_PERMISSIONS_INVALID")
+      // The error stays the bare code; the person is told the path and the ACE.
+      const notices: string[] = []
+      const refused = await acquireProfile(root, "dev", { notice: (text) => notices.push(text) }).then(
+        () => undefined,
+        (error: Error) => error,
+      )
+      expect(refused?.message).toBe("PROFILE_PERMISSIONS_INVALID")
+      expect(notices).toHaveLength(1)
+      expect(notices[0]).toStartWith(`PROFILE_PERMISSIONS_INVALID: ${root}: ACE S-1-1-0 Allow, rights 0x`)
+      expect(notices[0]).toMatch(
+        /rights 0x[0-9A-F]{8} \([^)]+\), inheritance ContainerInherit, ObjectInherit, propagation None, inherited False$/,
+      )
     } finally {
       await rm(temporary, { recursive: true, force: true })
     }
@@ -173,7 +184,16 @@ test.skipIf(process.platform !== "win32")(
         const rejected = await profile(directory)
         await icacls(join(rejected, directory), grant)
         if (grant.endsWith("(IO)(GA)")) expect(await aces(join(rejected, directory))).toContain("268435456 InheritOnly")
-        await expect(protectWindowsProfile(rejected)).rejects.toThrow("PROFILE_PERMISSIONS_INVALID")
+        const notices: string[] = []
+        await expect(protectWindowsProfile(rejected, (text) => notices.push(text))).rejects.toThrow(
+          "PROFILE_PERMISSIONS_INVALID",
+        )
+        // The refused entry and the offending ACE, as stored.
+        const sid = grant.slice(1, grant.indexOf(":"))
+        expect(notices).toEqual([expect.stringContaining(`: ${join(rejected, directory)}: ACE ${sid} Allow, rights 0x`)])
+        if (grant.endsWith("(M,WDAC)")) expect(notices[0]).toContain("rights 0x001701BF")
+        if (grant.endsWith("(IO)(GA)"))
+          expect(notices[0]).toContain("rights 0x10000000 (268435456), inheritance ContainerInherit, ObjectInherit, propagation InheritOnly")
       }
     } finally {
       await rm(temporary, { recursive: true, force: true })
