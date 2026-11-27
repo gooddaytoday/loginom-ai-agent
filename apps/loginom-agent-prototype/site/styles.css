@@ -330,4 +330,4 @@ code{font:12px/1.5 ui-monospace,Menlo,monospace;overflow-wrap:anywhere}
 .correction-row > span { flex: 1 0 160px; overflow-wrap: anywhere; white-space: pre-wrap; }
 .correction-row > input { flex: 1 0 160px; min-width: 0; padding: 5px 8px; color: var(--ink); background: var(--soft); border: 1px solid var(--line); border-radius: 6px; }
 .sl-stage-clock { display: block; margin-top: 3px; color: var(--muted); font-weight: normal; }
-.session-link .row-text .session-decision { white-space: normal; }
+.session-link .row-text .session-decision { white-space: normal; font-size: 12px; }
