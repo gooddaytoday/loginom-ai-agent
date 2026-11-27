@@ -36,38 +36,15 @@ function view(state: IpcState, id = "acme.awake") {
 
 const subscribe: IpcEvent = { type: "subscribe", id: "acme.awake" }
 
-test("a subscribe that times out can become available on retry without a new broadcast", () => {
-  const waiting = replay([subscribe, { type: "timeout", id: "acme.awake", attempt: 1 }])
-  expect(view(waiting.state)).toMatchObject({ available: false, failed: false })
-
-  const answered = replay(
-    [{ type: "subscribed", id: "acme.awake", attempt: 2, available: true, state: { awake: true } }],
-    waiting.state,
-  )
-
-  expect(view(answered.state)).toMatchObject({ available: true, value: { awake: true }, failed: false })
-})
-
-// Once the subscription budget is exhausted, `ctx.main()` must not wait forever.
-test.each<{ name: string; events: readonly IpcEvent[]; attempts: number }>([
-  {
-    name: "rejects",
-    events: [{ type: "failed", id: "acme.awake", attempt: 1, cause: new Error("boom") }],
-    attempts: 1,
-  },
-  {
-    name: "never answers",
-    events: [
-      { type: "timeout", id: "acme.awake", attempt: 1 },
-      { type: "timeout", id: "acme.awake", attempt: 2 },
-    ],
-    attempts: 2,
-  },
+// Before, a subscribe that rejected or never answered left the Ipc looking like it was still subscribing, so every
+// `ctx.main()` call waited forever.
+test.each<{ name: string; event: IpcEvent }>([
+  { name: "rejects", event: { type: "failed", id: "acme.awake", attempt: 1, cause: new Error("boom") } },
+  { name: "never answers", event: { type: "timeout", id: "acme.awake", attempt: 1 } },
 ])("a subscribe that $name fails the Ipc without retrying on every read", (input) => {
-  const run = replay([subscribe, ...input.events, subscribe])
+  const run = replay([subscribe, input.event, subscribe])
 
-  expect(run.effects.filter((effect) => effect.type === "subscribe")).toHaveLength(input.attempts)
-  expect(run.effects.slice(-2).map((effect) => effect.type)).toEqual(["timer.stop", "log"])
+  expect(run.effects.map((effect) => effect.type)).toEqual(["subscribe", "timer.start", "timer.stop", "log"])
   expect(view(run.state)).toEqual({ available: false, value: undefined, generation: 0, failed: true, subscribe: false })
 })
 

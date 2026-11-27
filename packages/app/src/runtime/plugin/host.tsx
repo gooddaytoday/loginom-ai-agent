@@ -129,7 +129,7 @@ type HostState = {
   contracts: Record<string, number | undefined>
 }
 
-// How long a plugin may load its window entry and global stores before it fails.
+// How long a plugin may load its window entry before it fails.
 const moduleLoadTimeout = 30_000
 
 type Stores = Record<string, Persisted<object> | ((session: SessionRef) => Persisted<object>)>

@@ -372,15 +372,11 @@ function fail<I>(state: PluginHostState<I>, id: string, entry: Running<I>, cause
   )
 }
 
-/** Stops whatever the entry runs: its activation timer and its instance. */
+/** Stops whatever the entry runs: its module load timer or its instance. */
 function teardown<I>(id: string, entry: PluginEntry<I>): PluginHostEffect<I>[] {
   if (entry.status === "loading") return [{ type: "timer.stop", id }]
 
-  if (entry.status === "preparing")
-    return [
-      { type: "timer.stop", id },
-      { type: "dispose", instance: entry.instance },
-    ]
+  if (entry.status === "preparing") return [{ type: "dispose", instance: entry.instance }]
 
   if (entry.status === "active" && entry.instance !== undefined) return [{ type: "dispose", instance: entry.instance }]
 

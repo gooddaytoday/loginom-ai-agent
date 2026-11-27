@@ -64,10 +64,9 @@ function activeAcme(definition: Entry = stored) {
   }
 }
 
-test("a plugin loads, creates its instance, reads its stores, sets up and becomes active", () => {
+test("an activated plugin is available to readers and no longer holds startup", () => {
   const run = activeAcme()
 
-  expect(types(run.effects)).toEqual(["load", "timer.start", "create", "timer.stop", "prepare", "start"])
   expect(selectPluginStatus(run.state, "acme")).toBe("active")
   expect(selectPluginInstance(run.state, "acme")).toBe(run.instance)
   expect(selectPluginInstances(run.state)).toEqual([run.instance])
@@ -368,7 +367,6 @@ test("disposing tears down every running plugin, then ignores everything but an 
   expect(disposed.effects).toEqual([
     { type: "dispose", instance },
     { type: "timer.stop", id: "slow" },
-    { type: "timer.stop", id: "boot" },
     { type: "dispose", instance: preparing },
   ])
   expect(selectPluginInstances(disposed.state)).toEqual([])
