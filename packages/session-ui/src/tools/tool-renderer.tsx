@@ -1,4 +1,5 @@
 // Current Session tool presentation grouped by visual family.
+import { markToolsChanged, setToolSeparate, setToolTitle, toolRevision, toolTitleFor } from "./tool-titles"
 import {
   Component,
   batch,
@@ -326,7 +327,7 @@ function toolTitle(tool: SessionMessageAssistantTool, i18n: UiI18n) {
     case "skill":
       return i18n.t("ui.tool.skill")
     default:
-      return tool.name
+      return toolTitleFor(tool.name) ?? tool.name
   }
 }
 
@@ -1168,13 +1169,21 @@ const state: Record<
   }
 > = {}
 
-function registerTool(input: { name: string; render?: ToolComponent }) {
+function registerTool(input: { name: string; render?: ToolComponent; title?: () => string; separate?: boolean }) {
   state[input.name] = input
+
+  if (input.title) setToolTitle(input.name, input.title)
+
+  if (input.separate) setToolSeparate(input.name)
+
+  markToolsChanged()
 
   return input
 }
 
 function getTool(name: string) {
+  toolRevision()
+
   return state[name]?.render
 }
 

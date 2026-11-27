@@ -17,6 +17,7 @@ import {
 } from "../message/current-tool-state"
 import { TimelineRow, type PartGroup, type PartRef, type TimelineRowMap } from "./timeline-row"
 import { timelineCategory, timelineNoticePlacement, timelineNoticeRequired, type TimelineDetail } from "./detail"
+import { toolSeparate } from "../tools/tool-titles"
 import {
   IDLE_TURN_PHASE,
   isInterruptedError,
@@ -1080,6 +1081,9 @@ function toolGroupType(
 ) {
   if (detail) {
     if (content.name === "question" && !currentToolFailed(content)) return undefined
+
+    if (currentToolFailed(content) || toolSeparate(content.name)) return undefined
+
     const category = timelineCategory(content)!
 
     if (detail[category].placement === "grouped") return "context"

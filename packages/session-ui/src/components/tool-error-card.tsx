@@ -1,3 +1,4 @@
+import { toolTitleFor } from "../tools/tool-titles"
 import { type ComponentProps, createMemo, onMount, Show, splitProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Card, CardDescription } from "@opencode/ui/card"
@@ -86,7 +87,7 @@ export function ToolErrorCard(props: ToolErrorCardProps) {
 
     const key = map.get(split.tool)
 
-    if (!key) return split.tool
+    if (!key) return toolTitleFor(split.tool) ?? split.tool
 
     if (!key.includes(".")) return key
 

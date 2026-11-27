@@ -30,6 +30,7 @@
     "./tool-count-label": "./src/components/tool-count-label.tsx",
     "./tool-count-summary": "./src/components/tool-count-summary.tsx",
     "./tool-error-card": "./src/components/tool-error-card.tsx",
+    "./tool-renderer": "./src/tools/tool-renderer.tsx",
     "./tool-status-title": "./src/components/tool-status-title.tsx",
     "./session-diff": "./src/components/session-diff.ts",
     "./message-file": "./src/components/message-file.ts",

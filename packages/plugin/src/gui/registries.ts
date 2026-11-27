@@ -970,6 +970,26 @@ export const Panel = Registry.define<Panel>("panel")
  */
 export const SettingsPage = Registry.define<SettingsPage>("settings-page")
 
+/** A top-level page the app routes to at `/page/<plugin>/<id>`. */
+export interface Page {
+  /** Page id within this plugin, used as a route segment. */
+  readonly id: string
+  /** Label shown in app navigation. */
+  readonly title: string
+  /** Optional icon for hosts that show one in their navigation. */
+  readonly icon?: IconName
+  /** Lists the page in the app navigation, lowest `order` first. */
+  readonly nav?: {
+    /** Sort position in app navigation; defaults to zero. */
+    readonly order?: number
+  }
+  /** Renders the page inside the plugin's contribution boundary. */
+  render(): JSX.Element
+}
+
+/** The registry of top-level pages. */
+export const Page = Registry.define<Page>("page")
+
 /**
  * The registry of server sources the app lists.
  *
