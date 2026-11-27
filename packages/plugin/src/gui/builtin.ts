@@ -96,6 +96,31 @@ export interface BuiltinPanel extends Panel {
  */
 export const BuiltinPanel = Registry.define<BuiltinPanel>("panel")
 
+/** A top-level page at `/page/<plugin>/<id>`. */
+export interface Page {
+  /** Nonempty page id within this plugin, used as a route segment. */
+  readonly id: string
+  /** Label shown in app navigation. */
+  readonly title: string
+  /** Lists the page in app navigation, lowest `order` first. */
+  readonly nav?: {
+    /** Sort position in app navigation; defaults to zero. */
+    readonly order?: number
+  }
+  /** Renders the page inside the plugin's contribution boundary. */
+  render(): JSX.Element
+}
+
+/**
+ * The registry of top-level pages contributed by built-in plugins.
+ *
+ * @example
+ * ```ts
+ * ctx.add(Page, { id: "overview", title: ctx.t("overview"), nav: {}, render: () => <Overview /> })
+ * ```
+ */
+export const Page = Registry.define<Page>("page")
+
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */
