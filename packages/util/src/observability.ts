@@ -23,13 +23,15 @@ export function layer(
     endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
     headers: process.env.OTEL_EXPORTER_OTLP_HEADERS,
   },
+  fileLogger?: Logger.Logger<unknown, void>,
 ) {
   const app = {
     client: options.client ?? Product.slug,
     version: options.version ?? "unknown",
     channel: options.channel ?? "local",
   }
-  const local = Logger.layer(Logging.loggers(app.channel === "local", app.channel), { mergeWithExisting: false }).pipe(
+  const localLoggers = Logging.loggers(app.channel === "local", app.channel, fileLogger)
+  const local = Logger.layer(localLoggers, { mergeWithExisting: false }).pipe(
     Layer.provide(NodeFileSystem.layer),
     Layer.orDie,
     Layer.merge(Layer.succeed(References.MinimumLogLevel, Logging.minimumLogLevel())),
@@ -37,7 +39,7 @@ export function layer(
   return Layer.unwrap(
     Effect.gen(function* () {
       const logs = Logger.layer(
-        [...Logging.loggers(app.channel === "local", app.channel), ...Otlp.loggers(options, app)],
+        [...localLoggers, ...Otlp.loggers(options, app)],
         { mergeWithExisting: false },
       ).pipe(
         Layer.provide(NodeFileSystem.layer),

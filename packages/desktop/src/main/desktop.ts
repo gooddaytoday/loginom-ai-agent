@@ -1,6 +1,6 @@
 import { NodeFileSystem, NodePath } from "@effect/platform-node"
 import { app } from "electron"
-import { Effect, Layer, Runtime } from "effect"
+import { Cause, Effect, Exit, Layer, Runtime } from "effect"
 import { Plugins } from "./plugin"
 import { Ipc } from "./ipc"
 import { DesktopInitialization } from "./lifecycle/desktop-initialization"
@@ -8,6 +8,7 @@ import { DesktopCredentials } from "./loginom/credentials"
 import { installContextMenu } from "./lifecycle/environment"
 import { ApplicationLifecycle } from "./lifecycle"
 import { DesktopLogging } from "./native/logging"
+import { writeCrash } from "./native/log-files"
 import { BackgroundService } from "./service/background-service"
 import { DesktopCli } from "./service/desktop-cli"
 import { marks } from "./lifecycle/marks"
@@ -49,11 +50,13 @@ const runIpc = Effect.fn("Desktop.runIpc")(function* () {
 // plugins and the background service first, as 0.4's signal handler did. `NodeRuntime.runMain` is this runner plus its
 // own SIGINT and SIGTERM handler, which interrupts the main fiber and exits before any `Shutdown` participant stops.
 const runMain = Runtime.makeRunMain(({ fiber, teardown }) => {
-  fiber.addObserver((exit) =>
+  fiber.addObserver((exit) => {
+    if (Exit.isFailure(exit) && !Cause.hasInterruptsOnly(exit.cause))
+      writeCrash("main process failed", { error: Cause.squash(exit.cause) })
     teardown(exit, (code) => {
       if (code !== 0) process.exit(code)
-    }),
-  )
+    })
+  })
 })
 
 runIpc().pipe(

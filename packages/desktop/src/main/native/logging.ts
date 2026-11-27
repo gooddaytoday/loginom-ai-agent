@@ -2,25 +2,16 @@ export * as DesktopLogging from "./logging"
 
 import log from "electron-log/main.js"
 import { app, crashReporter, netLog, shell } from "electron"
-import {
-  Cause,
-  Context,
-  Effect,
-  Exit,
-  FiberSet,
-  FileSystem,
-  Layer,
-  Logger,
-  Option,
-  Path,
-  Predicate,
-  References,
-  Stream,
-} from "effect"
+import { LOG_DAY_MS, redactLogValues } from "@loginom-ai-agent/loginom-host/local-logs"
+import { Product } from "@loginom-ai-agent/product"
+import { Cause, Context, Effect, Exit, FiberSet, FileSystem, Layer, Logger, Path, Predicate, References } from "effect"
 import { homedir } from "node:os"
+import { join } from "node:path"
 import { VERSION } from "../constants"
 import { marks } from "../lifecycle/marks"
-import { directory } from "../service/service-identity"
+import { LoginomResources } from "../loginom/resources"
+import { directory, serviceData } from "../service/service-identity"
+import { logFiles, NET_LOG_SIZE, serviceSecrets, stamp } from "./log-files"
 import {
   EXPORT_ARCHIVE_TIMEOUT_MS,
   initialLoggingState,
@@ -30,18 +21,6 @@ import {
   type LoggingCommand,
   type LoggingEvent,
 } from "./logging-machine"
-
-const MAX_LOG_AGE_DAYS = 7
-
-const EXPORT_WINDOW = 24 * 60 * 60 * 1000
-
-const MAX_EXPORT_FILE_SIZE = 50 * 1024 * 1024
-
-const NET_LOG_SIZE = 20 * 1024 * 1024
-
-let root = ""
-
-let run = ""
 
 export interface Interface {
   readonly startNetwork: Effect.Effect<void>
@@ -56,9 +35,7 @@ const serviceLayer = Layer.effect(
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    yield* initLogging(fs, path).pipe(Effect.orDie)
-    // Old run directories go away in the background; listing them is not worth a wait at startup.
-    yield* Effect.forkScoped(cleanup(fs, path).pipe(Effect.catch(() => Effect.void)))
+    yield* initLogging()
     marks.logging = Date.now()
     yield* Effect.logInfo("app starting", {
       version: VERSION,
@@ -105,7 +82,7 @@ const serviceLayer = Layer.effect(
 
         return report(
           Effect.suspend(() => {
-            const target = path.join(run, "network.netlog")
+            const target = path.join(logFiles().run, "network.netlog")
 
             if (netLog.currentlyLogging) return Effect.succeed(target)
 
@@ -197,7 +174,7 @@ const serviceLayer = Layer.effect(
 
 const nativeLogger = Logger.make((options) => {
   try {
-    if (!run) return
+    if (!log.transports.retained) return
     const entry = Logger.formatStructured.log(options)
     const scope = Predicate.isString(entry.annotations.scope) ? entry.annotations.scope : "main"
     const annotations = Object.fromEntries(Object.entries(entry.annotations).filter(([key]) => key !== "scope"))
@@ -237,19 +214,34 @@ const nativeLoggerLayer = Layer.merge(
 
 export const layer = serviceLayer.pipe(Layer.provideMerge(nativeLoggerLayer))
 
-function initLogging(fs: FileSystem.FileSystem, path: Path.Path) {
+function initLogging() {
   return Effect.gen(function* () {
-    yield* initRunDirectory(fs, path)
-    yield* Effect.sync(() => {
-      log.transports.file.maxSize = 5 * 1024 * 1024
-      log.transports.file.resolvePathFn = (_vars, message) =>
-        path.join(
-          run,
-          `${safeLogName(message?.scope ?? (message?.variables?.processType === "renderer" ? "renderer" : "main"))}.log`,
+    const files = logFiles()
+    files.prune()
+    const timer = setInterval(files.prune, LOG_DAY_MS).unref()
+    log.hooks.push((message) => ({ ...message, data: redactLogValues(message.data, serviceSecrets()) }))
+    log.transports.file.level = false
+    log.transports.retained = Object.assign(
+      (message: Parameters<typeof log.transports.file>[0]) => {
+        const scope = safeLogName(
+          message.scope ?? (message.variables?.processType === "renderer" ? "renderer" : "main"),
         )
-      log.initialize({ preload: false, spyRendererConsole: true })
-      initConsoleTransport()
-    })
+
+        files.append(
+          join(files.run, `${scope}.log`),
+          JSON.stringify({
+            timestamp: message.date.toISOString(),
+            level: message.level,
+            scope,
+            data: message.data,
+          }),
+        )
+      },
+      { level: "silly", transforms: [] } satisfies Pick<typeof log.transports.file, "level" | "transforms">,
+    )
+    log.initialize({ preload: false, spyRendererConsole: true })
+    initConsoleTransport()
+    yield* Effect.addFinalizer(() => Effect.sync(() => clearInterval(timer)))
   })
 }
 
@@ -267,66 +259,49 @@ function initCrashReporter(fs: FileSystem.FileSystem, path: Path.Path) {
 
 function writeDebugArchive(fs: FileSystem.FileSystem, path: Path.Path, netLogPath: string | undefined) {
   return Effect.gen(function* () {
-    const output = path.join(app.getPath("downloads"), `opencode-debug-${stamp()}.zip`)
+    const output = path.join(app.getPath("downloads"), `${Product.slug}-debug-${stamp()}.zip`)
     yield* Effect.logInfo("exporting debug logs", { output })
 
-    const files = [
-      ...(yield* collect(fs, path, root, "desktop")),
-      ...(yield* Effect.forEach(serverLogRoots(path), (dir, i) => collect(fs, path, dir, `server-${i + 1}`))).flat(),
-      ...(yield* collect(fs, path, app.getPath("crashDumps"), "crashpad")),
-    ]
+    const { zip } = yield* Effect.tryPromise(async () => {
+      const { cliCredentials } = await import("@loginom-ai-agent/loginom-host/connection/cli-credentials")
 
-    const truncated = files.flatMap((file) => (file.offset > 0 ? [file.name] : []))
-    yield* writeZip(fs, output, [
-      {
-        name: "manifest.json",
-        data: Buffer.from(JSON.stringify({ ...manifest(path, netLogPath), truncated }, null, 2)),
-      },
-      ...files,
-    ])
+      const { buildDiagnosticsArchive, profileSecrets } = await import(
+        "@loginom-ai-agent/loginom-host/diagnostics-export"
+      )
+
+      const data = serviceData()
+      const loginom = path.join(data, "loginom")
+      const installation = LoginomResources.installation(app)
+      const resources = installation.packaged ? installation.resources : process.env.LOGINOM_AI_AGENT_RESOURCES
+
+      const known = await profileSecrets({
+        loginom,
+        data,
+        codec: cliCredentials(process.platform, resources ? { root: loginom, resources } : undefined),
+        dockHome: process.env.LOGINOM_DOCK_HOME || path.join(homedir(), ".loginom-dock"),
+        extra: serviceSecrets(),
+      })
+
+      return buildDiagnosticsArchive({
+        logs: [
+          { dir: logFiles().root, prefix: "desktop", match: /\.(?:log|netlog)$/ },
+          ...serverLogRoots(path).map((dir, i) => ({ dir, prefix: `server-${i + 1}`, match: /\.log$/ })),
+        ],
+        knownSecrets: known.secrets,
+        users: known.users,
+        manifest: { ...manifest(path, netLogPath), knownSecrets: known.status },
+      })
+    })
+
+    yield* fs.writeFile(output, zip, { mode: 0o600 })
     yield* Effect.sync(() => shell.showItemInFolder(output))
 
     return output
   })
 }
 
-function initRunDirectory(fs: FileSystem.FileSystem, path: Path.Path) {
-  root = path.join(app.getPath("userData"), "logs")
-  run = path.join(root, stamp())
-
-  return fs.makeDirectory(run, { recursive: true })
-}
-
-function stamp() {
-  return new Date()
-    .toISOString()
-    .replace(/[-:]/g, "")
-    .replace(/\.\d+Z$/, "")
-}
-
 function safeLogName(name: string) {
   return name.replace(/[^a-z0-9_.-]/gi, "_") || "main"
-}
-
-function cleanup(fs: FileSystem.FileSystem, path: Path.Path) {
-  return Effect.gen(function* () {
-    const dir = root || path.dirname(log.transports.file.getFile().path)
-    const cutoff = Date.now() - MAX_LOG_AGE_DAYS * 24 * 60 * 60 * 1000
-    const entries = yield* fs.readDirectory(dir)
-    yield* Effect.forEach(
-      entries,
-      (entry) =>
-        Effect.gen(function* () {
-          const file = path.join(dir, entry)
-          const info = yield* fs.stat(file)
-
-          if (Option.getOrElse(info.mtime, () => new Date(0)).getTime() < cutoff) {
-            yield* fs.remove(file, { recursive: true, force: true })
-          }
-        }).pipe(Effect.catch(() => Effect.void)),
-      { discard: true },
-    )
-  })
 }
 
 function manifest(path: Path.Path, netLogPath: string | undefined) {
@@ -340,8 +315,8 @@ function manifest(path: Path.Path, netLogPath: string | undefined) {
     versions: process.versions,
     uptime: process.uptime(),
     userData: app.getPath("userData"),
-    logs: root,
-    currentRun: run,
+    logs: logFiles().root,
+    currentRun: logFiles().run,
     crashDumps: app.getPath("crashDumps"),
     serverLogs: serverLogRoots(path),
     netLog: netLogPath,
@@ -352,59 +327,6 @@ function serverLogRoots(path: Path.Path) {
   const xdgData = process.env.XDG_DATA_HOME || path.join(homedir(), ".local", "share")
 
   return [...new Set([path.join(xdgData, directory, "log"), path.join(app.getPath("userData"), directory, "log")])]
-}
-
-type Entry = { name: string; path: string; offset: number } | { name: string; data: Uint8Array }
-
-function collect(fs: FileSystem.FileSystem, path: Path.Path, dir: string, prefix: string) {
-  return Effect.gen(function* () {
-    if (!(yield* fs.exists(dir).pipe(Effect.orElseSucceed(() => false)))) return []
-    const cutoff = Date.now() - EXPORT_WINDOW
-    const entries = yield* fs.readDirectory(dir, { recursive: true })
-
-    return (yield* Effect.forEach(entries, (entry) =>
-      Effect.gen(function* () {
-        const file = path.join(dir, entry)
-        const info = yield* fs.stat(file)
-
-        if (info.type === "Directory") return null
-
-        if (Option.getOrElse(info.mtime, () => new Date(0)).getTime() < cutoff) return null
-
-        if (file.endsWith(".heapsnapshot")) return null
-        // Server logs append forever without rotation, so the active log is often the largest
-        // file. Export its tail rather than dropping the most relevant file from the bundle.
-        const offset = Math.max(0, Number(info.size) - MAX_EXPORT_FILE_SIZE)
-
-        return { name: path.join(prefix, entry).replace(/\\/g, "/"), path: file, offset }
-      }),
-    )).filter((entry) => entry !== null)
-  })
-}
-
-function writeZip(fs: FileSystem.FileSystem, output: string, entries: Entry[]) {
-  return Effect.gen(function* () {
-    const { BlobReader, BlobWriter, ZipWriter } = yield* Effect.promise(() => import("@zip.js/zip.js"))
-    // macOS Archive Utility and ditto reject bit-3 data descriptors without the PK\x07\x08 signature.
-    const writer = new ZipWriter(new BlobWriter("application/zip"), { dataDescriptorSignature: true })
-    yield* Effect.forEach(
-      entries,
-      (entry) =>
-        Effect.gen(function* () {
-          const data =
-            "data" in entry
-              ? entry.data
-              : entry.offset === 0
-                ? yield* fs.readFile(entry.path)
-                : Buffer.concat(yield* Stream.runCollect(fs.stream(entry.path, { offset: entry.offset })))
-
-          yield* Effect.tryPromise(() => writer.add(entry.name, new BlobReader(new Blob([new Uint8Array(data)]))))
-        }),
-      { concurrency: 1, discard: true },
-    )
-    const zip = yield* Effect.tryPromise(() => writer.close())
-    yield* fs.writeFile(output, new Uint8Array(yield* Effect.tryPromise(() => zip.arrayBuffer())))
-  })
 }
 
 function initConsoleTransport() {
