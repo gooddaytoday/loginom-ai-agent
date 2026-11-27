@@ -242,3 +242,31 @@ test.skipIf(process.platform !== "win32")(
   },
   60000,
 )
+
+test.skipIf(process.platform !== "win32")(
+  "native profile takeover from a dead owner removes abandoned Chromium directories, a normal start does not",
+  async () => {
+    const temporary = await mkdtemp(join(tmpdir(), "loginom-takeover-cleanup-test-"))
+    const root = join(temporary, "profile")
+    try {
+      const first = await acquireProfile(root, "dev")
+      const abandoned = join(first.paths.tmp, "lbC1wMfr")
+      await mkdir(join(abandoned, "Default", "Network"), { recursive: true })
+      await first.release()
+      // Normal start: the previous owner released the guard, nothing is removed.
+      const normal = await acquireProfile(root, "dev")
+      expect((await lstat(abandoned)).isDirectory()).toBe(true)
+      // Killed CLI: the guard stays; the next start takes it over from a dead owner.
+      const taken = await acquireProfile(root, "dev", {
+        probe: { owner: async () => "dead", survivors: async () => [] },
+      })
+      await expect(lstat(abandoned)).rejects.toThrow()
+      expect((await lstat(taken.paths.tmp)).isDirectory()).toBe(true)
+      await expect(normal.release()).rejects.toThrow("PROFILE_OWNER_CHANGED")
+      await taken.release()
+    } finally {
+      await rm(temporary, { recursive: true, force: true })
+    }
+  },
+  60000,
+)

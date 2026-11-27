@@ -30,7 +30,7 @@ export async function acquireProfile(
       throw new Error("PROFILE_PERMISSIONS_INVALID")
   }
   const lock = path.join(canonical, ".writer")
-  const owner = await admitWriter(canonical, lock, options)
+  const { owner, takeover } = await admitWriter(canonical, lock, options)
   const release = async () => {
     if ((await fs.readFile(path.join(lock, "owner"), "utf8")) !== owner) throw new Error("PROFILE_OWNER_CHANGED")
     await fs.unlink(path.join(lock, "owner"))
@@ -72,6 +72,13 @@ export async function acquireProfile(
         ((process.getuid && info.uid !== process.getuid()) || (info.mode & 0o077) !== 0)
       )
         throw new Error("PROFILE_PERMISSIONS_INVALID")
+    }
+    // Taken over from a dead owner whose run is gone (profile-lock-recovery):
+    // its Windows Chromium user-data-dirs are abandoned. A failed cleanup only
+    // leaves them for the next takeover.
+    if (takeover && process.platform === "win32") {
+      const { removeAbandonedBrowserDirectories } = await import("./profile-windows")
+      await removeAbandonedBrowserDirectories(canonical).catch(() => undefined)
     }
     return { paths, release }
   } catch (error) {
@@ -172,7 +179,7 @@ async function admitWriter(root: string, lock: string, options: WriterOptions) {
     )
     if (created) {
       await fs.writeFile(ownerPath, owner, { flag: "wx", mode: 0o600 })
-      return owner
+      return { owner, takeover: false }
     }
     const observed = await readOwner(ownerPath)
     let pending: string
@@ -197,7 +204,7 @@ async function admitWriter(root: string, lock: string, options: WriterOptions) {
         )
       if (!survivors.length) {
         const outcome = await replaceOwner(lock, observed, owner, nonce)
-        if (outcome === "taken") return owner
+        if (outcome === "taken") return { owner, takeover: true }
         pending =
           outcome === "claimed"
             ? `Profile ${root} is being taken over by another start (${path.join(lock, "takeover")} exists). ` +
