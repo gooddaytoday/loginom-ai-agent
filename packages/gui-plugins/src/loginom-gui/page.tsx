@@ -1,5 +1,6 @@
 import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
+import type { CopyPath } from "./copy"
 import { createMemo, createSignal, For, onCleanup, Show, type Accessor } from "solid-js"
 import type { Node, Port } from "./contract"
 import { buildDiagram, cardHeight, cardWidth, componentKey, nativePortKey, type Diagram } from "./graph"
@@ -156,7 +157,42 @@ function NodeDetails(props: { diagram: Diagram; index: number; t: Translate }) {
   )
 }
 
-function WorkflowView(props: { state: Ready; dispatch: (event: Event) => void; t: Translate }) {
+function PackagePath(props: { value?: CopyPath | null; t: Translate; copy: (text: string) => void }) {
+  return (
+    <div class="loginom-schema-section loginom-schema-title">
+      <Show when={props.value} fallback={<span class="loginom-schema-muted">{props.t("copy.pathUnavailable")}</span>}>
+        {(value) => (
+          <span class="min-w-0">
+            <Show when={value().lastSave}>
+              <span class="loginom-schema-muted block">{props.t("copy.lastSave")}</span>
+            </Show>
+            <code>{value().path}</code>
+          </span>
+        )}
+      </Show>
+      <Button
+        type="button"
+        size="small"
+        variant="ghost"
+        disabled={!props.value}
+        onClick={() => {
+          if (props.value) props.copy(props.value.path)
+        }}
+      >
+        <Icon name="copy" size="small" />
+        {props.t("copy.path")}
+      </Button>
+    </div>
+  )
+}
+
+function WorkflowView(props: {
+  state: Ready
+  dispatch: (event: Event) => void
+  t: Translate
+  packageCopy?: CopyPath | null
+  copyText: (text: string) => void
+}) {
   const snapshot = () => props.state.snapshot
 
   const savedSnapshot = () => {
@@ -253,6 +289,9 @@ function WorkflowView(props: { state: Ready; dispatch: (event: Event) => void; t
           )}
         </Show>
       </header>
+      <Show when={snapshot().source === "window" && props.packageCopy !== undefined}>
+        <PackagePath value={props.packageCopy} t={props.t} copy={props.copyText} />
+      </Show>
       <Show when={crumbs().length > 0}>
         <div class="loginom-schema-section loginom-schema-crumbs">
           <span>{[packageName(), ...crumbs()].join(" › ")}</span>
@@ -276,7 +315,17 @@ function WorkflowView(props: { state: Ready; dispatch: (event: Event) => void; t
                 observer.observe(element)
                 onCleanup(() => observer.disconnect())
                 queueMicrotask(() => {
-                  if (!element.isConnected || !finding()) return
+                  if (!element.isConnected) return
+
+                  if (props.state.request.node) {
+                    const target = element.querySelector<HTMLButtonElement>('button[aria-pressed="true"]')
+                    target?.focus({ preventScroll: true })
+                    target?.scrollIntoView({ block: "nearest", inline: "nearest" })
+
+                    return
+                  }
+
+                  if (!finding()) return
                   const initial = current.nodes.find((node) => "index" in node && node.index === props.state.selected)
 
                   if (initial && initial.x + cardWidth > element.clientWidth) element.scrollLeft = initial.x - 28
@@ -395,6 +444,24 @@ function WorkflowView(props: { state: Ready; dispatch: (event: Event) => void; t
         <Show when={selection() && diagram()} fallback={props.t("select")}>
           {(current) => <NodeDetails diagram={current()} index={props.state.selected ?? -1} t={props.t} />}
         </Show>
+        <Show when={selection()}>
+          {(node) => (
+            <Button
+              type="button"
+              size="small"
+              variant="ghost"
+              onClick={() => {
+                const branch = snapshot().source === "window" ? crumbs() : path().map((model) => model.label)
+                props.copyText(
+                  [snapshot().package.name, ...branch, nodeLabel(node(), props.t)].filter(Boolean).join(" › "),
+                )
+              }}
+            >
+              <Icon name="copy" size="small" />
+              {props.t("copy.node")}
+            </Button>
+          )}
+        </Show>
         <Show when={nested()}>
           {(model) => (
             <Button
@@ -420,7 +487,15 @@ export default function SchemaPage(props: {
   t: Translate
   retry: () => void
   back: () => void
+  packageCopy: Accessor<CopyPath | null | undefined>
+  copyText: (text: string) => void
 }) {
+  const missing = () => {
+    const current = props.state()
+
+    if (current.status === "missing") return current.reason
+  }
+
   const ready = () => {
     const current = props.state()
 
@@ -434,7 +509,18 @@ export default function SchemaPage(props: {
         <h1>{props.t("packages")}</h1>
         <section class="loginom-schema-frame">
           <Show when={ready()}>
-            {(current) => <WorkflowView state={current()} dispatch={props.dispatch} t={props.t} />}
+            {(current) => (
+              <WorkflowView
+                state={current()}
+                dispatch={props.dispatch}
+                t={props.t}
+                packageCopy={props.packageCopy()}
+                copyText={props.copyText}
+              />
+            )}
+          </Show>
+          <Show when={props.state().status === "empty" && props.packageCopy()}>
+            <PackagePath value={props.packageCopy()} t={props.t} copy={props.copyText} />
           </Show>
           <Show when={!ready()}>
             <div class="loginom-schema-section" role="status">
@@ -442,6 +528,7 @@ export default function SchemaPage(props: {
               <Show when={props.state().status === "empty" || props.state().status === "closed"}>
                 {props.t("empty")}
               </Show>
+              <Show when={missing()}>{(reason) => props.t(`target.${reason()}`)}</Show>
               <Show when={props.state().status === "failed"}>
                 <p>{props.t("failed")}</p>
                 <Button type="button" variant="neutral" onClick={props.retry}>

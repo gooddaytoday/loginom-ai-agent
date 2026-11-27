@@ -31,6 +31,8 @@ test("a finding opens its nested saved workflow, not an identically labelled nod
   )
 
   expect(finding).toEqual({ text: "Check the input", packageGuid, nodeGuids: [nodeGuid] })
+
+  if (!finding) throw Error("Expected a finding")
   const target: Request = { ...request, finding }
   const loading = transition({ status: "closed" }, { type: "open", request: target })
 

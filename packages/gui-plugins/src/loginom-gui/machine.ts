@@ -1,10 +1,15 @@
-import type { Finding, Snapshot, Workflow } from "./contract"
+import type { Finding, Snapshot, StepNode, Workflow } from "./contract"
 
-export type Request = { sessionID: string; serverID: string; directory: string; finding?: Finding }
+export type Request = { sessionID: string; serverID: string; directory: string } & (
+  | { finding: Finding; node?: never }
+  | { node: StepNode; finding?: never }
+  | { finding?: never; node?: never }
+)
 
 export type State =
   | { status: "closed" }
   | { status: "loading" | "empty" | "failed"; request: Request }
+  | { status: "missing"; request: Request; reason: "unavailable" | "otherSnapshot" | "removed" }
   | { status: "ready"; request: Request; snapshot: Snapshot; path: readonly Workflow[]; selected?: number }
 
 export type Event =
@@ -37,7 +42,29 @@ export function transition(state: State, event: Event): State {
     case "loaded": {
       if (state.status !== "loading" || state.request !== event.request) return state
       const snapshot = event.snapshot
-      const finding = state.request.finding
+      const { request } = state
+      const { finding, node } = request
+
+      if (node) {
+        if (!snapshot) return { status: "missing", request, reason: "unavailable" }
+
+        if (
+          snapshot.source !== "window" ||
+          snapshot.workflow.document_id !== node.document_id ||
+          snapshot.workflow.workflow_id !== node.workflow_id
+        ) {
+          return { status: "missing", request, reason: "otherSnapshot" }
+        }
+
+        const index = snapshot.workflow.nodes.findIndex((candidate) => candidate.guid === node.node_id)
+
+        if (index < 0) return { status: "missing", request, reason: "removed" }
+
+        if (snapshot.workflow.nodes.findLastIndex((candidate) => candidate.guid === node.node_id) !== index)
+          return { status: "missing", request, reason: "unavailable" }
+
+        return { status: "ready", request, snapshot, path: [], selected: index }
+      }
 
       if (!snapshot || (finding && (snapshot.source !== "saved" || snapshot.package.guid !== finding.packageGuid))) {
         return { ...state, status: "empty" }

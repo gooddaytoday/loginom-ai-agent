@@ -696,6 +696,7 @@ test('package schema observes unsaved graph edits and keeps native node and port
   source.FCell.geometry.x=120;
   const after=await snapshot();
   assert.equal(after.name,'Draft');
+  assert.deepEqual(after.navigation_path,['Module','Workflow']);
   assert.equal(after.document,prepared.document_id);
   assert.equal(after.workflow,prepared.workflow_ref.workflow_id);
   assert.deepEqual(after.nodes.map(n=>n.guid),before.nodes.map(n=>n.guid));

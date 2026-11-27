@@ -166,3 +166,109 @@ export function openLoginomSchemaConversation(page: Page, source: "saved" | "win
     },
   })
 }
+
+export type NodeLinksFixture = {
+  packageState: "saved" | "draft" | "dirty" | "resaved"
+  graph?: "submodel" | "removed" | "other"
+  newTimeline?: boolean
+}
+
+export async function openLoginomNodeConversation(page: Page, options: NodeLinksFixture) {
+  const sessionID = "ses_schema"
+  const node = root.submodels[0].nodes[0]
+  const target = { document_id: "doc", workflow_id: "submodel", node_id: node.guid }
+  let packageState = options.packageState
+  const packageName = () => (packageState === "resaved" ? "Продажи — версия 2.lgp" : "Продажи.lgp")
+  const branch = ["Сценарий продаж", "Контроль качества"]
+  const selectedNode = { ...node, position: point(405, 100) }
+  const sameName = { ...node, guid: id(9), position: point(25, 30) }
+  const foreign = options.graph === "other"
+
+  const snapshot = {
+    ...windowSnapshot,
+    get package() {
+      return { name: packageName() }
+    },
+    workflow: {
+      ...windowSnapshot.workflow,
+      document_id: target.document_id,
+      workflow_id: foreign ? "other-workflow" : target.workflow_id,
+      navigation_path: branch,
+      nodes: options.graph === "removed" ? [sameName] : [sameName, selectedNode],
+    },
+  }
+
+  const messages: SessionMessageInfo[] = [
+    { id: "msg_node_user", type: "user", time: { created: T0 }, text: "Выполни внутреннюю проверку" },
+    {
+      id: "msg_node_assistant",
+      type: "assistant",
+      time: { created: T0 + 1, completed: T0 + 2 },
+      model: { id: "schema-fixture", providerID: "test" },
+      agent: "build",
+      cost: 0,
+      tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+      finish: "stop",
+      content: [
+        {
+          id: "tool_node",
+          type: "tool",
+          name: "loginom_dock_node_apply",
+          time: { created: T0 + 1, completed: T0 + 2 },
+          state: {
+            status: "completed",
+            input: {},
+            content: [{ type: "text", text: "Результат выполнения" }],
+            metadata: {
+              loginom: { v: 1, state: "settled", status: "SUCCEEDED", kind: "execute", node },
+              loginomNode: { ...target, label: ["Продажи.lgp", ...branch, node.label].join(" › ") },
+            },
+          },
+        },
+      ],
+    },
+  ]
+
+  const conversation = await openSession(page, {
+    name: "Schema",
+    sessions: [{ id: sessionID, title: "Продажи" }],
+    seed: { locale: "ru", settings: { newTimeline: options.newTimeline ?? true } },
+    pageMessages: pageMessagesFrom({ [sessionID]: messages }),
+    rpc: (params, payload) => {
+      if (JSON.stringify(payload) !== JSON.stringify({ input: { sessionID } })) return
+
+      if (params.rpcID === "loginom.package" && params.method === "schema") return { output: { snapshot } }
+
+      if (params.rpcID === "loginom.package-state" && params.method === "snapshot") {
+        const dirty = packageState === "dirty"
+        const draft = packageState === "draft"
+        const path = draft ? null : `/analyst/Пакеты/${packageName()}`
+
+        return {
+          output: {
+            open: true,
+            path,
+            modified: dirty || draft,
+            modifiedDetectedAt: dirty || draft ? T0 : null,
+            lastSave: path ? { path, confirmedAt: T0 - 10_000 } : null,
+            copy: path
+              ? {
+                  document_id: target.document_id,
+                  workflow_id: snapshot.workflow.workflow_id,
+                  path,
+                  lastSave: dirty,
+                }
+              : null,
+          },
+        }
+      }
+    },
+  })
+
+  return {
+    ...conversation,
+    resave() {
+      packageState = "resaved"
+    },
+  }
+}

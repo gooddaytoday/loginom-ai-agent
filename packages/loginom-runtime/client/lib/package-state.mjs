@@ -49,7 +49,7 @@ export async function readPackageState({ origin, build, documentId, operationId,
 export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
   const origin = loginomUrl && new URL(loginomUrl).origin;
   let dirty;
-  return async (context, lastSavedPackage, busy) => {
+  return async (context, lastSavedPackage, busy, openedPackage) => {
     const preparation = metadata.workspacePreparation;
     const prepared = preparation?.state;
     const lastSave = lastSavedPackage ? { path: lastSavedPackage.path, confirmedAt: lastSavedPackage.confirmedAt } : null;
@@ -71,12 +71,26 @@ export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
     const identity = JSON.stringify([prepared?.document_id, prepared?.workflow_ref?.tab_tid, observation?.path]);
     if (observation?.open === false || observation?.modified === false) dirty = undefined;
     if (observation?.modified === true && dirty?.identity !== identity) dirty = { identity, at: now() };
+    const current = metadata.workspacePreparation === preparation && metadata.workspaceReady === true
+      && prepared?.status === 'READY';
+    const savedPath = lastSavedPackage?.document_id === prepared?.document_id ? lastSavedPackage?.path : undefined;
+    const openedPath = openedPackage?.documentID === prepared?.document_id ? openedPackage?.path : undefined;
+    const knownPath = savedPath ?? openedPath;
+    const copy = current && typeof knownPath === 'string' && knownPath.startsWith('/') && /\.lgp$/i.test(knownPath)
+      ? {
+          document_id: prepared.document_id,
+          workflow_id: prepared.workflow_ref.workflow_id,
+          path: knownPath,
+          lastSave: observation?.path !== knownPath || observation?.modified !== false,
+        }
+      : null;
     return {
       open: observation?.open ?? null,
       path: observation?.path ?? null,
       modified: observation?.modified ?? null,
       modifiedDetectedAt: observation?.modified === true ? dirty.at : null,
       lastSave,
+      ...(copy ? { copy } : {}),
     };
   };
 }

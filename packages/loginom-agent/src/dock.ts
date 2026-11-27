@@ -285,7 +285,10 @@ export async function dockTools(input: {
         signal,
         // Help and connection diagnostics carry no attachments (0.4 `toolPolicy.isLocalLoginom`).
         local.has(key) ? undefined : await admissions(call.sessionID),
-        packageSource && { admissionID: JSON.stringify(["local-file", call.messageID, call.id]), file: packageSource.file },
+        packageSource && {
+          admissionID: JSON.stringify(["local-file", call.messageID, call.id]),
+          file: packageSource.file,
+        },
         scanReceipt,
         (update) => {
           publishing = publishing
@@ -320,10 +323,17 @@ export async function dockTools(input: {
       state === "pending" ? "running" : "settled",
     )
     const output = notice ? `${notice.text}\n\n${content}` : content
+    const node = result._meta?.loginomNode
+    const navigation = node ? { loginomNode: node } : {}
     if (state === "failed")
       throw new Tool.Error({
         message: output || "LOGINOM_TOOL_FAILED",
-        metadata: { generation: lease.generation, isError: true, ...(notice ? { loginom: notice.loginom } : {}) },
+        metadata: {
+          generation: lease.generation,
+          isError: true,
+          ...navigation,
+          ...(notice ? { loginom: notice.loginom } : {}),
+        },
       })
     const schemaRef = name === "dock_prepare" ? decodeSchemaRef(result._meta?.packageSchema) : undefined
     if (schemaRef?._tag === "Some" && forwarded.intent !== "existing_workflow") {
@@ -348,6 +358,7 @@ export async function dockTools(input: {
       metadata: {
         generation: lease.generation,
         ...(Object.keys(loginom).length ? { loginom } : {}),
+        ...navigation,
         ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
         // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
         ...(outputPath ? { truncated: true, outputPath } : {}),

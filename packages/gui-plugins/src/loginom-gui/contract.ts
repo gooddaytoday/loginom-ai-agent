@@ -103,6 +103,17 @@ const snapshot = Schema.Union([
 
 export type Snapshot = typeof snapshot.Type
 
+const StepNode = Schema.Struct({
+  document_id: Schema.NonEmptyString,
+  workflow_id: Schema.NonEmptyString,
+  node_id: Schema.NonEmptyString,
+  label: Schema.optionalKey(Schema.NonEmptyString),
+})
+
+export type StepNode = typeof StepNode.Type
+
+export const readStepNode = Schema.decodeUnknownOption(StepNode)
+
 export const PackageSchema = Rpc.define({
   id: "loginom.package",
   methods: {

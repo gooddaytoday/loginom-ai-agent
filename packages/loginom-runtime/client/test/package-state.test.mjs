@@ -39,12 +39,12 @@ function fixture() {
     sessionId: 'chat', workspaceReady: true, targetIdentity: { loginom_build: '7.4.2' },
     workspacePreparation: {
       operation_id: 'prepare',
-      state: { document_id: 'doc', loginom_account: 'user', workflow_ref: { tab_tid: 'owned' } },
+      state: { status: 'READY', document_id: 'doc', loginom_account: 'user', workflow_ref: { tab_tid: 'owned', workflow_id: 'workflow' } },
     },
   };
   const page = { url: () => origin, evaluate: (read, input) => runInNewContext(`(${read})(input)`, { ...globals, input, setTimeout, clearTimeout }) };
   const read = createPackageStateReader(metadata, origin, () => data.time);
-  const snapshot = (save) => read({ pages: () => [page] }, save);
+  const snapshot = (save, opened) => read({ pages: () => [page] }, save && { ...save, document_id: 'doc' }, false, opened);
   return { snapshot, data, owned, packages, connection };
 }
 
@@ -70,16 +70,17 @@ test('reports confirmed Save independently of current dirty state and package cl
   const { snapshot, data, owned, packages } = fixture();
   owned.PackageFileName = 'user\\result.lgp';
   const lastSave = { path: '/user/result.lgp', confirmedAt: 90 };
+  const copy = { document_id: 'doc', workflow_id: 'workflow', path: lastSave.path, lastSave: false };
   assert.deepEqual(await snapshot(lastSave), {
-    open: true, path: '/user/result.lgp', modified: false, modifiedDetectedAt: null, lastSave,
+    open: true, path: '/user/result.lgp', modified: false, modifiedDetectedAt: null, lastSave, copy,
   });
   data.modified = true;
   assert.deepEqual(await snapshot(lastSave), {
-    open: true, path: '/user/result.lgp', modified: true, modifiedDetectedAt: 100, lastSave,
+    open: true, path: '/user/result.lgp', modified: true, modifiedDetectedAt: 100, lastSave, copy: { ...copy, lastSave: true },
   });
   packages.shift();
   assert.deepEqual(await snapshot(lastSave), {
-    open: false, path: null, modified: null, modifiedDetectedAt: null, lastSave,
+    open: false, path: null, modified: null, modifiedDetectedAt: null, lastSave, copy: { ...copy, lastSave: true },
   });
 });
 
@@ -93,5 +94,23 @@ test('keeps open state when dirty status is unavailable and rejects a changed na
   data.onRead = () => { connection.Session = {}; };
   assert.deepEqual(await snapshot(), {
     open: null, path: null, modified: null, modifiedDetectedAt: null, lastSave: null,
+  });
+});
+
+test('copy uses an opened file or a confirmed Save, ignoring a draft filename', async () => {
+  const { snapshot, data, owned } = fixture();
+  owned.PackageFileName = 'user/temporary.lgp';
+  assert.equal((await snapshot()).copy, undefined);
+  const opened = { documentID: 'doc', path: '/user/original.lgp' };
+  owned.PackageFileName = 'user/original.lgp';
+  assert.deepEqual((await snapshot(undefined, opened)).copy, {
+    document_id: 'doc', workflow_id: 'workflow', path: '/user/original.lgp', lastSave: false,
+  });
+  data.modified = true;
+  assert.equal((await snapshot(undefined, opened)).copy.lastSave, true);
+  owned.PackageFileName = 'user/revised.lgp';
+  data.modified = false;
+  assert.deepEqual((await snapshot({ path: '/user/revised.lgp', confirmedAt: 200 })).copy, {
+    document_id: 'doc', workflow_id: 'workflow', path: '/user/revised.lgp', lastSave: false,
   });
 });

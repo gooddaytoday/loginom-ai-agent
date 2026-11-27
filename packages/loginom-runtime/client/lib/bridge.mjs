@@ -154,6 +154,9 @@ export async function createBridge(config, session, { browserTransport: managedB
   const savedPackages = new Map();
   const saveAdmissions = new Map();
   let saveSequence=0;
+  // A newly prepared package must never inherit confirmations from the previous one.
+  let packageSaveFloor=0;
+  let openedPackage=null;
   let lastSavedPackage = null;
   let ownedUnsavedDraft = null;
   // Save As closes the package and reopens it in a new tab. Until a new
@@ -245,6 +248,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         throw error;
       }
       lastSavedPackage=null;
+      openedPackage={documentID:opened.document_id,path};
       reopenedSave=null;
       ownedUnsavedDraft=null;
       nativeStepDocument=reopenedNativeStepDocument;
@@ -474,6 +478,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           let workspace = null;
           if (actionRuntime) {
             workspace = await dockGate(request.params.name, async () => {
+              const previous = session.metadata.workspacePreparation;
               const state = await prepareWorkspaceSession({ metadata: session.metadata,
               request: preparationRequest, signal: extra.signal,
               assertAllowed() {
@@ -535,6 +540,13 @@ export async function createBridge(config, session, { browserTransport: managedB
               assertTarget: target => assertCatalogTarget(pinnedActions, target), record: recordExecution,
               save: () => session.save(catalog),
               });
+              if (state.status === 'READY' && preparationRequest.intent !== 'existing_workflow'
+                  && (state.operation_id !== previous?.operation_id || state.document_id !== previous?.state?.document_id)) {
+                packageSaveFloor = saveSequence;
+                const path = preparationRequest.package_path;
+                openedPackage = preparationRequest.intent === 'open_package' && state.package_ref?.persisted === true
+                  && path && state.package_ref.path === path ? { documentID: state.document_id, path } : null;
+              }
               if(state.status==='READY'&&preparationRequest.intent==='new_draft'&&state.created_draft===true
                 &&state.package_ref?.persisted===false&&state.package_ref.path===null)
                 ownedUnsavedDraft={document_id:state.document_id,tab_tid:state.workflow_ref?.tab_tid,account:state.loginom_account};
@@ -805,6 +817,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             if(admission&&confirmedSave.status==='SUCCEEDED'&&confirmedSave.action_key===admission.action_key
               &&confirmedSave.output?.package_ref?.path===admission.path
               &&admission.document_id===session.metadata.workspacePreparation?.state?.document_id
+              &&admission.sequence>=packageSaveFloor
               &&(!lastSavedPackage||admission.sequence>lastSavedPackage.sequence)) {
               savedPackages.set(admission.path,confirmedSave.operation_id);
               lastSavedPackage={path:admission.path,operation_id:confirmedSave.operation_id,
@@ -1012,7 +1025,8 @@ export async function createBridge(config, session, { browserTransport: managedB
         return snapshot?redactor.redact(snapshot):null;
       },
       packageState(context, busy) {
-        return readPackageState(context, lastSavedPackage, busy);
+        const save = lastSavedPackage?.sequence >= packageSaveFloor ? lastSavedPackage : null;
+        return readPackageState(context, save, busy, openedPackage);
       },
       applyWithScanReceipt(args,receipt,extra) {
         return callTool({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);

@@ -69,6 +69,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       new URL("../../loginom-runtime/client/lib/redact.mjs", import.meta.url),
       "utf8",
     ),
+    "runtime/client/lib/saved-package-reader.mjs": await readFile(
+      new URL("../../loginom-runtime/client/lib/saved-package-reader.mjs", import.meta.url),
+      "utf8",
+    ),
     "runtime/client/lib/browser-downloads.mjs": await readFile(
       new URL("../../loginom-runtime/client/lib/browser-downloads.mjs", import.meta.url),
       "utf8",
@@ -117,9 +121,18 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     "runtime/client/node_modules/@modelcontextprotocol/sdk/client/index.js": `
       exports.Client = class {
         async connect() {} async close() {}
-        async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }] }; }
+        async listTools() {
+          return { tools: ['fixture', 'dock_node_apply'].map(name => ({ name, inputSchema: { type: 'object' } })) };
+        }
         async callTool(input, _unused, { signal }) {
           if (input.arguments.failAfterDispatch) throw Error('LOGINOM_FILE_CHANGED');
+          if (input.name === 'dock_node_apply' && input.arguments.nodeFixture) {
+            return { content: [{ type: 'text', text: 'original node result' }], structuredContent: {
+              result_version: 'user-v1', state: 'settled', status: 'SUCCEEDED', operation_id: 'node-step',
+              node: { document_id: 'fixture-doc', workflow_id: 'fixture-workflow',
+                node_id: '{FCA4EE21-7521-4B4B-B99F-000000000008}' },
+            } };
+          }
           if (input.arguments.progressFixture) {
             const { stepPhase } = await import('../../../../lib/step-progress.mjs');
             stepPhase('configuring', 'transform.group_data', { kind: 'fields', index: 2, total: 3 });
@@ -165,7 +178,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared }))
       expect(await runtime.request("list")).toEqual({
         prepared,
-        tools: [{ name: "fixture", inputSchema: { type: "object" } }],
+        tools: ["fixture", "dock_node_apply"].map((name) => ({ name, inputSchema: { type: "object" } })),
       })
     }
     for (const state of [
@@ -356,6 +369,46 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     ])
     await Bun.sleep(1_600)
     expect(updates).toHaveLength(2)
+    const nodeID = "fca4ee21-7521-4b4b-b99f-000000000008"
+    const nodeTool = tools.get("loginom_dock_node_apply")
+    if (!nodeTool) throw Error("Node tool not registered")
+    await Bun.write(
+      work,
+      JSON.stringify({
+        activeWork: false,
+        unsettledWork: false,
+        prepared: true,
+        graph: {
+          ...snapshot,
+          name: "Продажи.lgp",
+          navigation_path: ["Подготовка"],
+          nodes: [{ guid: nodeID, label: "Фильтр по дате", type: "transform.filter_rows", position: { x: 70, y: 70 } }],
+        },
+      }),
+    )
+    const nodeResult = await nodeTool.execute(
+      { nodeFixture: true },
+      {
+        sessionID,
+        messageID,
+        agent: Agent.ID.make("fixture"),
+        id: Tool.CallID.make("node-fixture"),
+        signal: new AbortController().signal,
+        progress: async () => undefined,
+      },
+    )
+    expect(nodeResult).toEqual({
+      content: "original node result",
+      metadata: {
+        generation: 1,
+        loginomNode: {
+          document_id: "fixture-doc",
+          workflow_id: "fixture-workflow",
+          node_id: nodeID,
+          label: "Продажи.lgp › Подготовка › Фильтр по дате",
+        },
+      },
+    })
     for (const [name, code] of [
       ["missing", "LOGINOM_FILE_NOT_FOUND"],
       ["directory", "LOGINOM_FILE_NOT_REGULAR"],

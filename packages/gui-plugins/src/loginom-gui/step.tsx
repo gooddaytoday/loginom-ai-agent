@@ -1,16 +1,21 @@
 import { Button } from "@opencode/ui/button"
+import { Menu } from "@opencode/ui/menu"
 import { Icon } from "@opencode/ui/icon"
 import { Spinner } from "@opencode/ui/spinner"
 import { Option } from "effect"
-import { createMemo, createSignal, createUniqueId, For, onCleanup, Show } from "solid-js"
-import { createKeyed, Slot, usePlugin, type Plugin } from "@opencode/plugin/gui"
+import { createMemo, createResource, createSignal, createUniqueId, For, onCleanup, Show } from "solid-js"
+import { createKeyed, Slot, usePlugin, type MountedSession, type Plugin } from "@opencode/plugin/gui"
 import { builtinContext, BuiltinSlot, ToolRenderer, type ToolRendererProps } from "@opencode/plugin/gui/builtin"
+import { readStepNode, type StepNode } from "./contract"
+import { copyText, readPackageCopy } from "./copy"
 import type definition from "./index"
 import { decodeFacts, decodeProgress, failureTitle, loginomStepPhrase, stepDetails } from "./step-phrase"
 
 const modes = ["compact", "detailed"] as const
 
-const setup: Plugin.Setup<typeof definition> = (ctx) => {
+type OpenNode = (session: MountedSession, node: StepNode) => void
+
+function registerSteps(ctx: Parameters<Plugin.Setup<typeof definition>>[0], openNode: OpenNode) {
   const timeline = builtinContext(ctx).timeline
 
   const renderDetail = () => (
@@ -45,15 +50,83 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     },
     separate: true,
     handlesFailure: true,
-    render: (props) => <Step {...props} />,
+    render: (props) => <Step {...props} openNode={openNode} />,
   })
 }
 
-function Step(props: ToolRendererProps) {
+function StepActions(props: { node: StepNode; openNode: OpenNode }) {
+  const ctx = usePlugin<typeof definition>()
+  const [request, setRequest] = createSignal<{ serverID: string; sessionID: string; directory: string }>()
+  const [path] = createResource(request, (location) => readPackageCopy(ctx, location))
+
+  const copy = () => {
+    if (path.loading) return
+    const current = path()
+
+    if (current?.document_id === props.node.document_id && current.workflow_id === props.node.workflow_id)
+      return current
+  }
+
+  const showNode = () => {
+    const session = ctx.sessions.current()
+
+    if (session) props.openNode(session, props.node)
+  }
+
+  return (
+    <>
+      <Button type="button" size="small" variant="ghost" onClick={showNode}>
+        {ctx.t("showOnSchema")}
+      </Button>
+      <Menu
+        modal={false}
+        placement="bottom-end"
+        onOpenChange={(open) => {
+          const session = open && ctx.sessions.current()
+          setRequest(
+            session ? { serverID: session.server.id, sessionID: session.id, directory: session.directory } : undefined,
+          )
+        }}
+      >
+        <Menu.Trigger as={Button} size="small" variant="ghost" aria-label={ctx.t("step.actions")}>
+          <Icon name="outline-dots" size="small" />
+        </Menu.Trigger>
+        <Menu.Portal>
+          <Menu.Content>
+            <Menu.Item
+              disabled={!copy()}
+              badge={path.loading ? ctx.t("copy.loading") : copy()?.lastSave ? ctx.t("copy.lastSave") : undefined}
+              onSelect={() => {
+                const current = copy()
+
+                if (current) void copyText(ctx, current.path)
+              }}
+            >
+              {ctx.t("copy.path")}
+            </Menu.Item>
+            <Menu.Item
+              disabled={!props.node.label}
+              onSelect={() => {
+                const name = props.node.label
+
+                if (name) void copyText(ctx, name)
+              }}
+            >
+              {ctx.t("copy.node")}
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Portal>
+      </Menu>
+    </>
+  )
+}
+
+function Step(props: ToolRendererProps & { openNode: OpenNode }) {
   const ctx = usePlugin<typeof definition>()
   const timeline = builtinContext(ctx).timeline
   const outcome = createMemo(() => decodeFacts(props.metadata.loginom))
   const facts = () => Option.getOrUndefined(outcome())
+  const node = createMemo(() => Option.getOrUndefined(readStepNode(props.metadata.loginomNode)))
 
   const failed = () =>
     props.status === "error" ||
@@ -147,10 +220,19 @@ function Step(props: ToolRendererProps) {
               props.onOpenChange?.(next)
             }}
           >
-            …
+            <Show when={node()} fallback="…">
+              <Icon name={open() ? "chevron-up" : "chevron-down"} size="small" />
+            </Show>
           </button>
         </Show>
       </div>
+      <Show when={node()}>
+        {(current) => (
+          <div class="flex flex-wrap items-center gap-1 ps-7">
+            <StepActions node={current()} openNode={props.openNode} />
+          </div>
+        )}
+      </Show>
       <ul id={id} hidden={!open() || details().length === 0} class="min-w-0 break-words ps-7 text-v2-text-text-faint">
         <For each={details()}>{(detail) => <li>{detail}</li>}</For>
       </ul>
@@ -158,4 +240,4 @@ function Step(props: ToolRendererProps) {
   )
 }
 
-export default setup
+export default registerSteps

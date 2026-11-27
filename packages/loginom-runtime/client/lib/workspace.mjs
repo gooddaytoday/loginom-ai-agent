@@ -959,8 +959,9 @@ export function makeWorkspaceStepCode({loginomUrl,build,sessionId,workflowRef,re
         types:${JSON.stringify(icons)},origin:options.origin,build:options.expectedBuild,step_rebaseline:!snapshotOnly,snapshot_only:snapshotOnly,
         snapshot_details:snapshotDetails,
         window_blocker_selector:snapshotOnly?'.x-window,.bg-dialog,.x-message-box,[data-tid$=";WizrdMCF;btnClose"]':undefined});
-      if(snapshotOnly)state.snapshot=graph&&snapshotDetails?{...graph,name:state.package_ref.name,
-        navigation_path:state.workflow_ref.navigation_path.map(crumb=>crumb.label)}:graph;
+      // The native path starts with server, package list and package.
+      if(snapshotOnly)state.snapshot=graph&&{...graph,name:state.package_ref.name,
+        navigation_path:state.workflow_ref.navigation_path.slice(3).map(crumb=>crumb.label)};
     }
     return {status:'SUCCEEDED',phase:'observed',action_key:'workspace.step',action_revision:'1',
       effect_possible:false,error:null,trace:[],output:state};

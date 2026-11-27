@@ -1,8 +1,9 @@
 import { CodeBlock, Slot, Style, type MountedSession, type Plugin } from "@opencode/plugin/gui"
 import { Page, builtinContext } from "@opencode/plugin/gui/builtin"
 import { Button } from "@opencode/ui/button"
-import { createSignal, lazy, onCleanup, Show, Suspense, untrack } from "solid-js"
-import { PackageSchema, readFinding, type Finding } from "./contract"
+import { createResource, createSignal, lazy, onCleanup, Show, Suspense, untrack } from "solid-js"
+import { PackageSchema, readFinding } from "./contract"
+import { copyText, readPackageCopy } from "./copy"
 import { transition, type Event, type Request, type State } from "./machine"
 import type definition from "./index"
 import styles from "./schema.css?inline"
@@ -13,7 +14,6 @@ const pageID = "package-schema"
 const SchemaPage = lazy(() => import("./page"))
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
-  registerSteps(ctx)
   ctx.add(Style, styles)
   const [state, setState] = createSignal<State>({ status: "closed" })
   const dispatch = (event: Event) => setState((current) => transition(current, event))
@@ -47,10 +47,20 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     )
   }
 
-  const open = (session: MountedSession, finding?: Finding) => {
-    load({ sessionID: session.id, serverID: session.server.id, directory: session.directory, finding })
+  const open = (session: MountedSession, target?: Pick<Request, "finding" | "node">) => {
+    const location = { sessionID: session.id, serverID: session.server.id, directory: session.directory }
+
+    const request = target?.finding
+      ? { ...location, finding: target.finding }
+      : target?.node
+        ? { ...location, node: target.node }
+        : location
+
+    load(request)
     builtinContext(ctx).layout.openPage(pageID)
   }
+
+  registerSteps(ctx, (session, node) => open(session, { node }))
 
   const back = () => {
     const current = untrack(state)
@@ -67,6 +77,32 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     render() {
       onCleanup(close)
 
+      const [copy] = createResource(
+        () => {
+          const current = state()
+
+          if (current.status === "ready" && current.snapshot.source === "window") return current.request
+
+          if (current.status === "empty" && !current.request.finding) return current.request
+        },
+        (request) => readPackageCopy(ctx, request),
+      )
+
+      const verifiedCopy = () => {
+        const current = state()
+
+        if (copy.loading || copy.state === "unresolved") return
+        const path = copy()
+
+        if (current.status === "empty" && !current.request.finding) return path ?? null
+
+        if (current.status === "ready" && current.snapshot.source === "window") {
+          const workflow = current.snapshot.workflow
+
+          return path?.document_id === workflow.document_id && path.workflow_id === workflow.workflow_id ? path : null
+        }
+      }
+
       return (
         <Suspense fallback={<p role="status">{ctx.t("loading")}</p>}>
           <SchemaPage
@@ -79,6 +115,8 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
               if (current.status !== "closed") load({ ...current.request })
             }}
             back={back}
+            packageCopy={verifiedCopy}
+            copyText={(text) => void copyText(ctx, text)}
           />
         </Suspense>
       )
@@ -128,7 +166,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
             onClick={() => {
               const session = block.session
 
-              if (session) open(session, finding)
+              if (session) open(session, { finding })
             }}
           >
             {ctx.t("showOnSchema")}

@@ -21,6 +21,17 @@ export const packageStateRpc = {
           path: { type: ["string", "null"] },
           modified: { type: ["boolean", "null"] },
           modifiedDetectedAt: { type: ["integer", "null"] },
+          copy: {
+            type: ["object", "null"],
+            properties: {
+              document_id: { type: "string" },
+              workflow_id: { type: "string" },
+              path: { type: "string" },
+              lastSave: { type: "boolean" },
+            },
+            required: ["document_id", "workflow_id", "path", "lastSave"],
+            additionalProperties: false,
+          },
           lastSave: {
             type: ["object", "null"],
             properties: { path: { type: "string" }, confirmedAt: { type: "integer" } },
