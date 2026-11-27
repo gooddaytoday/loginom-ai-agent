@@ -9,10 +9,10 @@ const column = {index:0, name:'Value', label:'Значение', type:'string'};
 const cell = value => ({type:'string', is_null:false, value});
 const port = (sample, index=0) => ({port:index, port_guid:'port-'+index, fresh:true, execution_id:'exec',
   schema:[column], row_count:sample.length, sample, sample_complete:true});
-const receipt = ({ports, artifacts, failure, status='SUCCEEDED', execution={status:'completed', execution_id:'exec'}} = {}) => ({
+const receipt = ({ports, artifacts, failure, warnings=['Read limitation'], status='SUCCEEDED', execution={status:'completed', execution_id:'exec'}} = {}) => ({
   operation_id:'operation', attempt:1, state:'settled', outcome:{status, action_key:'node.apply', phase:'node_ready',
     effect_possible:true, cleanup_complete:true, error:failure, output:{node, execution, configuration:{status:'applied'},
-      output:{...(ports && {ports}), ...(artifacts && {file_artifacts:artifacts})}, warnings:['Read limitation']}},
+      output:{...(ports && {ports}), ...(artifacts && {file_artifacts:artifacts})}, warnings}},
 });
 
 test('configuration keeps the model text and exposes only the observed node and signals', () => {
@@ -93,4 +93,68 @@ test('projection masks credential columns and recognizable tokens but preserves 
   const reply = nodeResultReply(receipt({ports:[sensitive, ordinary]}), {userProfile:true, tool});
   const {ports} = loginomFeedMetadata(reply, {tool, knownSecrets:['known-example']});
   assert.deepEqual(ports.map(table => table.preview.sample.map(row => row[0].value)), [['[redacted]', null], ['[redacted]', '[redacted]']]);
+});
+
+test('projection masks pwd, pass, ключ and credential columns without masking ordinary words', () => {
+  const tool = 'dock_node_wait';
+  const names = ['db_pwd', 'dbPass', 'Ключ доступа', 'credential', 'compass'];
+  const sample = {...port([names.map(() => cell('visible'))]), schema:names.map((name, index) => ({...column, name, index}))};
+  const reply = nodeResultReply(receipt({ports:[sample]}), {userProfile:true, tool});
+  const {ports} = loginomFeedMetadata(reply, {tool});
+  assert.deepEqual(ports[0].preview.sample[0].map(cell => cell.value),
+    ['[redacted]', '[redacted]', '[redacted]', '[redacted]', 'visible']);
+});
+
+test('projection preserves identifiers that contain a known secret', () => {
+  const tool = 'dock_node_wait';
+  const sample = {...port([[cell('secret-example')]]), port_guid:'secret-example-port', execution_id:'secret-example-exec'};
+  const artifact = {artifact_id:'secret-example-file', bytes:42};
+  const outcome = receipt({ports:[sample], artifacts:[artifact], execution:{status:'completed', execution_id:sample.execution_id}});
+  outcome.operation_id = 'secret-example-op';
+  outcome.outcome.output.node = {...node, node_id:'secret-example-node'};
+  const reply = nodeResultReply(outcome, {userProfile:true, tool});
+  const metadata = loginomFeedMetadata(reply, {tool, knownSecrets:['secret-example'],
+    facts:{...facts, node:{...facts.node, ref:outcome.outcome.output.node}},
+    outputFiles:[{artifact_id:artifact.artifact_id, name:'report.csv'}]});
+  assert.equal(metadata.operationId, outcome.operation_id);
+  assert.equal(metadata.node.guid, outcome.outcome.output.node.node_id);
+  assert.equal(metadata.executionId, sample.execution_id);
+  assert.equal(metadata.ports[0].guid, sample.port_guid);
+  assert.equal(metadata.files[0].artifactId, artifact.artifact_id);
+  assert.equal(metadata.ports[0].preview.sample[0][0].value, '[redacted]');
+});
+
+test('projected text truncates at a Unicode code point boundary', () => {
+  const tool = 'dock_node_wait';
+  const label = 'a'.repeat(999) + '😀';
+  const reply = nodeResultReply(receipt(), {userProfile:true, tool});
+  const metadata = loginomFeedMetadata(reply, {tool, facts:{...facts, node:{...facts.node, label:label+'z'}}});
+  assert.equal(metadata.node.label.isWellFormed(), true);
+  assert.equal(metadata.node.label, label);
+});
+
+test('the block budget reduces preview rows before dropping limitations', () => {
+  const tool = 'dock_node_wait';
+  const warnings = Array.from({length:6}, (_, index) => index+'Ж'.repeat(999));
+  const sample = port(Array.from({length:10}, (_, index) => [cell(index+'Ю'.repeat(499))]));
+  const reply = nodeResultReply(receipt({ports:[sample], warnings}), {userProfile:true, tool});
+  const {ports, limitations, ...rest} = loginomFeedMetadata(reply, {tool, facts});
+  assert.deepEqual(limitations.slice(0, warnings.length), warnings);
+  assert.equal(ports[0].rowCount, 10);
+  assert.ok(ports[0].preview.sample.length > 0 && ports[0].preview.sample.length < 10);
+  assert.deepEqual(ports[0].preview.sample, sample.sample.slice(0, ports[0].preview.sample.length));
+  assert.equal(ports[0].preview.sampleComplete, false);
+  assert.ok(Buffer.byteLength(JSON.stringify({...rest, ports, limitations})) <= 16 * 1024);
+});
+
+test('the block budget also applies to results without previews', () => {
+  const tool = 'dock_node_apply';
+  const warnings = Array.from({length:8}, (_, index) => index+'Ж'.repeat(800)+'😀'.repeat(199));
+  const reply = nodeResultReply(receipt({warnings}), {userProfile:true, tool});
+  const metadata = loginomFeedMetadata(reply, {tool, facts});
+  assert.equal(metadata.operationId, 'operation');
+  assert.equal(metadata.status, 'SUCCEEDED');
+  assert.deepEqual(metadata.limitations, warnings.slice(0, metadata.limitations.length));
+  assert.ok(metadata.limitations.length > 0 && metadata.limitations.length < warnings.length);
+  assert.ok(Buffer.byteLength(JSON.stringify(metadata)) <= 16 * 1024);
 });

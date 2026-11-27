@@ -62,3 +62,21 @@ test("Dock accepts older or malformed private metadata without affecting the too
     })
   }
 })
+
+test("Dock enforces the metadata byte budget for multibyte JSON", async () => {
+  const limit = 16 * 1024
+  const empty = { ...feed, limitations: [""] }
+  const available = limit - Buffer.byteLength(JSON.stringify(empty))
+  const line = "Ж".repeat(Math.floor(available / 2)) + "a".repeat(available % 2)
+  const loginom = { ...feed, limitations: [line] }
+  const oversized = { ...feed, limitations: [line + "a"] }
+  expect(JSON.stringify(oversized).length).toBeLessThan(limit)
+  expect(await dockToolResult(reply(receipt, loginom), 4)).toEqual({
+    content: JSON.stringify(receipt),
+    metadata: { generation: 4, loginom },
+  })
+  expect(await dockToolResult(reply(receipt, oversized), 4)).toEqual({
+    content: JSON.stringify(receipt),
+    metadata: { generation: 4 },
+  })
+})

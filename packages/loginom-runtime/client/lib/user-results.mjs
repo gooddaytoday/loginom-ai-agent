@@ -192,6 +192,9 @@ export function compactKnowledgeBundle(description) {
   };
 }
 
+const FEED_MAX_BYTES = 16 * 1024;
+const FEED_PREVIEW_MAX_BYTES = 12 * 1024;
+
 export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts}) {
   const receipt = reply.structuredContent;
   if (!['dock_node_apply', 'dock_node_wait', 'dock_node_status', 'dock_node_read', 'dock_node_resume', 'dock_node_cancel', 'dock_node_stop'].includes(tool)
@@ -199,22 +202,23 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
       || typeof receipt.operation_id !== 'string' || !receipt.operation_id) return;
 
   const redactor = createRedactor(knownSecrets);
-  const text = (value, max = 1000) => typeof value === 'string' ? redactor.text(value).slice(0, max) : undefined;
+  const text = (value, max = 1000) => typeof value === 'string'
+    ? [...redactor.text(value).toWellFormed()].slice(0, max).join('') : undefined;
   const reference = receipt.node ?? receipt.progress?.node;
   const matchingFacts = facts && facts.node.ref.node_id === (reference?.ref?.node_id ?? reference?.node_id) ? facts : undefined;
   const node = matchingFacts?.node ?? reference;
-  const guid = text(node?.ref?.node_id ?? node?.node_id, 128);
+  const guid = node?.ref?.node_id ?? node?.node_id;
   const label = text(node?.label);
   const type = text(node?.type, 128);
   const execution = receipt.execution ?? receipt.progress?.execution;
   const state = receipt.state;
   const succeeded = state === 'settled' && receipt.status === 'SUCCEEDED' && !reply.isError;
   const result = {
-    v: 1, operationId: text(receipt.operation_id, 128), state,
+    v: 1, operationId: receipt.operation_id, state,
     attempt: receipt.attempt, status: state === 'settled' ? receipt.status : undefined,
     phase: text(receipt.phase ?? receipt.progress?.pending_phase, 128),
-    node: guid && label !== undefined && type ? {guid, label, type} : undefined,
-    executionId: text(execution?.execution_id, 256), executionStatus: execution?.status,
+    node: typeof guid === 'string' && guid && label !== undefined && type ? {guid, label, type} : undefined,
+    executionId: typeof execution?.execution_id === 'string' ? execution.execution_id : undefined, executionStatus: execution?.status,
     effectPossible: receipt.effect_possible, cleanupComplete: receipt.cleanup_complete,
     limitations: receipt.limitations?.slice(0, 8).map(value => text(value)),
     nextStep: typeof receipt.next_step?.instruction === 'string'
@@ -235,7 +239,7 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
   const artifacts = succeeded ? receipt.output?.file_artifacts ?? [] : [];
   const files = artifacts.flatMap(file => {
     const verifiedFile = outputFiles.find(output => output.artifact_id === file.artifact_id);
-    return verifiedFile ? [{artifactId: text(file.artifact_id, 128), name: text(verifiedFile.name), bytes: file.bytes}] : [];
+    return verifiedFile ? [{artifactId: file.artifact_id, name: text(verifiedFile.name), bytes: file.bytes}] : [];
   });
   if (files.length) result.files = files;
   if (matchingFacts?.kind) result.kind = matchingFacts.kind;
@@ -244,31 +248,57 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
   else if (execution?.execution_id || ['completed', 'failed', 'pending', 'cancelled'].includes(execution?.status)) result.kind = 'execute';
   else if (receipt.configuration?.status === 'applied') result.kind = 'configure';
 
-  if (!succeeded) return result;
-  let ports = receipt.output?.ports;
-  if (!ports && tool === 'dock_node_wait' && reply.content[0]?.type === 'text') {
+  let ports = succeeded ? receipt.output?.ports : undefined;
+  if (succeeded && !ports && tool === 'dock_node_wait' && reply.content[0]?.type === 'text') {
     try {
       const delivered = JSON.parse(reply.content[0].text);
       if (delivered.result_version === 'user-v1' && delivered.operation_id === receipt.operation_id
         && delivered.attempt === receipt.attempt && delivered.state === state && delivered.status === receipt.status) ports = delivered.output?.ports;
     } catch {}
   }
-  let remaining = 12 * 1024;
   const safeCount = value => Number.isSafeInteger(value) && value >= 0;
   const tables = (ports ?? []).flatMap(port => {
     if (port.port_kind === 'tree' || port.fresh !== true || !safeCount(port.port) || !safeCount(port.row_count)
         || typeof port.port_guid !== 'string' || !Array.isArray(port.schema)
         || execution?.execution_id && port.execution_id !== execution.execution_id) return [];
-    const table = {index: port.port, guid: text(port.port_guid, 128), rowCount: port.row_count, columnCount: port.schema.length};
+    const table = {index: port.port, guid: port.port_guid, rowCount: port.row_count, columnCount: port.schema.length};
+    return [{table, port}];
+  });
+  if (tables.length) result.ports = tables.map(({table}) => table);
+
+  const bytes = value => Buffer.byteLength(JSON.stringify(value), 'utf8');
+  // Reserve space for the receipt and table summaries before adding rows.
+  let blockRemaining = FEED_MAX_BYTES - bytes(result);
+  while (blockRemaining < 0 && result.limitations?.length) {
+    result.limitations.pop();
+    blockRemaining = FEED_MAX_BYTES - bytes(result);
+  }
+  for (const key of ['ports', 'files']) {
+    if (blockRemaining >= 0) break;
+    delete result[key];
+    blockRemaining = FEED_MAX_BYTES - bytes(result);
+  }
+  if (blockRemaining < 0) return;
+  if (!result.ports) return result;
+
+  let previewRemaining = FEED_PREVIEW_MAX_BYTES;
+  const previewKeyBytes = ',"preview":'.length;
+  for (const {table, port} of tables) {
+    const remaining = Math.min(previewRemaining, blockRemaining - previewKeyBytes);
+    if (remaining <= 0) break;
     const rows = port.sample ?? [];
-    if (!rows.length && (table.rowCount !== 0 || !port.sample_complete)) return [table];
-    const sensitive = port.schema.map(column => /password|passwd|secret|token|api.?key|access.?key|authorization|cookie|private.?key|пароль|токен/i.test(`${column.name} ${column.label}`));
+    if (!rows.length && (table.rowCount !== 0 || !port.sample_complete)) continue;
+    const sensitive = port.schema.map(column => {
+      const name = `${column.name} ${column.label}`;
+      const words = name.replace(/(\p{Ll})(\p{Lu})/gu, '$1 $2');
+      return /password|passwd|secret|token|api.?key|access.?key|authorization|cookie|private.?key|пароль|токен|credential/i.test(name)
+        || /(?:^|[^\p{L}\p{N}])(?:pwd|pass|ключ)(?=$|[^\p{L}\p{N}])/iu.test(words);
+    });
     const schema = port.schema.map(column => ({index: column.index, name: text(column.name), label: text(column.label),
       type: text(column.type, 128), data_kind: text(column.data_kind, 128)}));
     const sample = [];
     const preview = {schema, sample, sampleComplete: false};
-    const size = () => Buffer.byteLength(JSON.stringify(preview), 'utf8');
-    if (size() > remaining) return [table];
+    if (bytes(preview) > remaining) continue;
     for (const row of rows.slice(0, 10)) {
       if (row.length !== schema.length) break;
       sample.push(row.map((cell, index) => {
@@ -278,13 +308,14 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
           value === null || ['string', 'number', 'boolean'].includes(typeof value)
             ? [[key, typeof value === 'string' ? redactor.text(value) : value]] : []));
       }));
-      if (size() > remaining) { sample.pop(); break; }
+      if (bytes(preview) > remaining) { sample.pop(); break; }
     }
-    if (rows.length && !sample.length) return [table];
+    if (rows.length && !sample.length) continue;
     preview.sampleComplete = port.sample_complete === true && sample.length === rows.length && sample.length === table.rowCount;
-    remaining -= size();
-    return [{...table, preview}];
-  });
-  if (tables.length) result.ports = tables;
+    const previewBytes = bytes(preview);
+    previewRemaining -= previewBytes;
+    blockRemaining -= previewBytes + previewKeyBytes;
+    table.preview = preview;
+  }
   return result;
 }

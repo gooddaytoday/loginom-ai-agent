@@ -1,6 +1,8 @@
 import { Schema } from "effect"
 
 const count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
+const maxBytes = 16 * 1024
+const utf8 = new TextEncoder()
 const cell = Schema.Struct({
   type: Schema.String,
   is_null: Schema.optional(Schema.Boolean),
@@ -69,5 +71,9 @@ export const LoginomMetadata = Schema.Struct({
   files: Schema.optional(
     Schema.Array(Schema.Struct({ artifactId: Schema.NonEmptyString, name: Schema.String, bytes: count })),
   ),
-})
+}).check(
+  Schema.makeFilter((metadata) => utf8.encode(JSON.stringify(metadata)).byteLength <= maxBytes, {
+    expected: "Loginom metadata of at most 16 KiB in UTF-8 JSON",
+  }),
+)
 export type LoginomMetadata = typeof LoginomMetadata.Type

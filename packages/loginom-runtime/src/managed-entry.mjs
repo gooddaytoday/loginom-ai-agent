@@ -246,7 +246,7 @@ async function handle(message) {
       )
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
-      const knownSecrets = [input.connection.apiKey, input.connection.password, input.connection.username]
+      const knownSecrets = [input.connection.apiKey, input.connection.password]
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
         presentNodeReply: async (reply, project) => {
