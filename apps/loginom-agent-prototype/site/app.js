@@ -2750,8 +2750,8 @@ function feedAction(d) {
 }
 function turnSnapshot(item) {
   // A copy, not shared references: a fork's decisions must not show up in the original.
-  return structuredClone({instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:item.phase === 'writing' ? item.writeFinal : ['running','retrying','permission','question','plan','connect','starting'].includes(item.phase) ? 'interrupted' : item.phase,
-    step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, copy:item.copy, rules:item.rules, web:item.web, nosend:item.nosend, local:item.local, from:item.from, resumeCopy:item.resumeCopy, about:item.about, aboutKeep:item.aboutKeep, nocopy:item.nocopy, modelNote:item.modelNote, forkOf:item.forkOf, model:item.model, modelName:item.modelName, modelError:item.modelError})
+  return structuredClone({instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:item.phase === 'writing' ? item.writeFinal : ['running','retrying','permission','upload','question','plan','connect','starting'].includes(item.phase) ? 'interrupted' : item.phase,
+    step:item.step, uploads:item.uploads, uploadDenied:item.uploadDenied, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, copy:item.copy, rules:item.rules, web:item.web, nosend:item.nosend, local:item.local, from:item.from, resumeCopy:item.resumeCopy, about:item.about, aboutKeep:item.aboutKeep, nocopy:item.nocopy, modelNote:item.modelNote, forkOf:item.forkOf, model:item.model, modelName:item.modelName, modelError:item.modelError})
 }
 function connectLoginom() {
   if (state.connecting) return
