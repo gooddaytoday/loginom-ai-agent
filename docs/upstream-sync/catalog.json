@@ -7,6 +7,9 @@
       "title": "Tool decision forms and timeline groups (C3 B6)",
       "paths": [
         "packages/core/src/plugin/host.ts",
+        "packages/core/test/lib/tool.ts",
+        "packages/core/test/plugin/host.ts",
+        "packages/core/test/plugin/plan.test.ts",
         "packages/plugin/src/effect/tool.ts",
         "packages/plugin/src/promise/adapter.ts",
         "packages/plugin/src/promise/tool.ts",
