@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createArtifactStore } from '../../lib/artifacts.mjs';
+import { packageReadOnlyAdvice } from '../../lib/workspace.mjs';
 import { createBundledSkillFixture } from './bundled-skill-fixture.mjs';
 import { createActionCatalogFixture } from './action-catalog-fixture.mjs';
 import { Page } from './workspace-ui-fixture.mjs';
@@ -31,7 +32,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     stepFixture.admissions.push(request);
     return {status:'SUCCEEDED',operation_id:request.operation_id,cleanup_complete:true};
   }});
-  const packageDeliveries=[];let expectedPackage=null,expectedOperation=null,openFailure=null,deliveryAbort=null,unconfirmedUpload=false,reloadedPage=null,identityPage=null,identityFault=null;
+  const packageDeliveries=[];let expectedPackage=null,expectedPackageReadOnly=false,expectedOperation=null,openFailure=null,deliveryAbort=null,unconfirmedUpload=false,reloadedPage=null,identityPage=null,identityFault=null;
   class ExternalClient {
     constructor(identity) { this.browser = identity.name === 'loginom-dock-browser'; }
     async connect(transport) { this.transport = transport; }
@@ -93,7 +94,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
         : code.includes('async function prepareWorkspace(')
         ? { status: 'READY', target: compatibility, authenticated: true, created_draft: !expectedPackage,
           effect_possible: true, document_id: 'fixture-document', target_verified: true,
-          operation_id:expectedOperation??'prepare',package_ref: { path: expectedPackage, persisted: !!expectedPackage },loginom_account:'user',
+          operation_id:expectedOperation??'prepare',package_ref: { path: expectedPackage, persisted: !!expectedPackage, ...(expectedPackageReadOnly?{read_only:true}:{}) },loginom_account:'user',
           workflow_ref: { tab_tid: 'MF;cntMain;cntWorkspace;Workspace;t.br;tb', prefix: 'MF;TF',
             workflow_id: expectedPackage?'local-workflow':'fixture-workflow', navigation_path: [{tid:'crumb',label:'Fixture scenario'}] } }
         : { version: 1, source: 'prepare_same_browser_page', observed: { document_id: 'fixture-document' }, fixture: true };
@@ -346,7 +347,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       package_ref:{...packageRef,read_only:true}};
     const readOnlyStep=JSON.parse((await apply('step-read-only')).content[0].text);
     assert.equal(readOnlyStep.status,'NOT_APPLIED');
-    assert.match(readOnlyStep.error.message,/read-only/);
+    assert.equal(readOnlyStep.error.message,packageReadOnlyAdvice);
     assert.equal(stepFixture.admissions.length,1,'native read-only refresh must not start Apply');
     assert.equal(session.metadata.workspacePreparation.state.package_ref.read_only,true);
     session.metadata.workspacePreparation=beforeReadOnlyStep;
@@ -467,6 +468,8 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       const reply=JSON.parse((await client.callTool(request)).content[0].text);
       assert.equal(reply.error.code,'PACKAGE_READ_ONLY',JSON.stringify(reply));
       assert.equal(reply.effect_possible,false);
+      const advice=request.name==='dock_action_run'?reply.output.user_action:reply.next_step.instruction;
+      assert.equal(advice,packageReadOnlyAdvice);
     }
     assert.equal(browserCalls.length,beforeReadOnly);
     original.package_ref=originalPackage;
@@ -538,9 +541,17 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.equal(session.metadata.workspaceReady,false);
     assert.equal(session.metadata.workspacePreparation.state.trace[0].blocking_windows.windows[0].message_box.text,'[redacted]');
     const deliveriesBefore=packageDeliveries.length;
+    expectedPackageReadOnly=true;
     const resumed=await client.callTool({name:openRefusal.next_step.tool,arguments:openRefusal.next_step.arguments});
+    expectedPackageReadOnly=false;
     assert.notEqual(resumed.isError,true,JSON.stringify(resumed));
-    assert.equal(JSON.parse(resumed.content[0].text).prepared,true);
+    const readOnlyOpen=JSON.parse(resumed.content[0].text);
+    assert.equal(readOnlyOpen.prepared,true);
+    assert.equal(readOnlyOpen.workspace.package_ref.read_only,true);
+    const advice=readOnlyOpen.next_step.instruction;
+    assert.equal(advice,packageReadOnlyAdvice);
+    assert.ok(advice.includes('package.save_as'));
+    assert.ok(advice.includes('workspace.package_ref.read_only'));
     assert.equal(packageDeliveries.length,deliveriesBefore,'server-path continuation must not upload again');
     const opening=browserCalls.filter(call=>call.arguments.code.includes('async function prepareWorkspace(')).at(-1);
     assert.match(opening.arguments.code,/"recoverOnly":false/);
