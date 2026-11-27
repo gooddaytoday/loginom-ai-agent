@@ -10,7 +10,9 @@ const metadata = Schema.decodeUnknownOption(StepMetadata)
 
 const writeID = Schema.decodeUnknownOption(Schema.String.check(Schema.isPattern(/^[a-f0-9-]{36}$/)))
 
-const reads = new Set(["loginom_dock_workspace_observe", "loginom_dock_action_describe"])
+function isRead(tool: string) {
+  return tool === "loginom_dock_workspace_observe" || tool === "loginom_dock_action_describe"
+}
 
 export function failedStep(messages: readonly SessionMessageInfo[]): Failure | undefined {
   const tools = messages
@@ -29,12 +31,12 @@ export function failedStep(messages: readonly SessionMessageInfo[]): Failure | u
     facts?.step.outcome === "check_required" ||
     facts?.step.outcome === "not_applied" ||
     journalID ||
-    (!reads.has(latest.name) && latest.state.error.message.includes("LOGINOM_CALL_UNCERTAIN"))
+    (!isRead(latest.name) && latest.state.error.message.includes("LOGINOM_CALL_UNCERTAIN"))
   ) {
     return { ...identity, kind: "write", operationId: facts?.operationId, step: facts?.step, writeID: journalID }
   }
 
-  if (!reads.has(latest.name)) return
+  if (!isRead(latest.name)) return
   const previous = tools[tools.indexOf(latest) - 1]
 
   if (

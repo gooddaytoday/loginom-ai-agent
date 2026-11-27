@@ -102,7 +102,7 @@ export default function Block(props: {
     const client = props.session.server.client
     let result: Check = { kind: "unknown" }
 
-    if (failure.operationId && !failure.writeID) {
+    if (failure.operationId) {
       const response = await client
         .rpc(StepRpc)
         .checkState({ sessionID, operationId: failure.operationId }, options)
