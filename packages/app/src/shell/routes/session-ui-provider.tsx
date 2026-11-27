@@ -1,4 +1,4 @@
-import { DataProvider, type TurnDiffInput } from "@opencode/session-ui/context"
+import { DataProvider, type TurnDiffInput, type ToolRenderers } from "@opencode/session-ui/context"
 import { MarkdownProvider, type ReadMarkdownImage } from "@opencode/session-ui/context/markdown"
 import { useNavigate, useParams } from "@solidjs/router"
 import { useQuery } from "@tanstack/solid-query"
@@ -36,6 +36,7 @@ export function SessionUIProvider(
   props: ParentProps<{
     directory: string
     server: ServerConnection.Key
+    toolRenderers?: ToolRenderers
   }>,
 ) {
   const navigate = useNavigate()
@@ -266,6 +267,7 @@ export function SessionUIProvider(
         readMedia={(uri, mime, signal) => serverSDK.media.load(uri, mime, signal)}
         peekMedia={(uri, mime) => serverSDK.media.peek(uri, mime)}
         turnDiff={turnDiff()}
+        toolRenderers={props.toolRenderers}
         onNavigateToSession={navigateToSession}
         onSessionHref={href}
         backgroundCompaction={backgroundCompaction()}

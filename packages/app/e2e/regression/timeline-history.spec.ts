@@ -1,4 +1,5 @@
 import type { SessionMessageAssistant, SessionMessageInfo } from "@opencode/client/promise"
+import { timelinePresets } from "@opencode/session-ui/timeline/detail"
 import { expect, test, type Page } from "@playwright/test"
 import { sessionHref } from "../utils/app"
 import { trackPageErrors } from "../utils/errors"
@@ -14,6 +15,7 @@ import {
   setupTimeline,
   status,
   textPart,
+  toolPart,
   userID,
   userMessage,
   validateTimelineMessages,
@@ -24,6 +26,108 @@ import { openSession } from "../utils/workspace"
 test.use({ serviceWorkers: "block" })
 
 test.describe("timeline history", () => {
+  test("keeps the scroll surface attached while a file card rechecks on window focus", async ({ page }) => {
+    const history = historyMessages(18)
+    const prompt = history[16]
+    const middle = history[17]
+
+    if (!prompt || !middle) throw new Error("Missing middle turn")
+    history[17] = assistantMessage(
+      [
+        toolPart("prt_focus_card", "fixture_focus_card", "completed", {}),
+        textPart("prt_middle_answer", "Middle answer with export"),
+      ],
+      { id: middle.id, parentID: prompt.id, created: middle.time.created },
+    )
+
+    const refresh = Promise.withResolvers<void>()
+    let fileReads = 0
+    await setupTimeline(page, {
+      focusCard: true,
+      reducedMotion: true,
+      settings: { timelineDetail: timelinePresets[0].value },
+      viewport: { width: 1400, height: 700 },
+      provider: {
+        all: [{ id: "test", name: "Test", models: { timeline: { id: "timeline", name: "Test timeline" } } }],
+        connected: ["test"],
+        default: { providerID: "test", modelID: "timeline" },
+      },
+      messages: [...history, userMessage(), assistantMessage([textPart("prt_last_answer", "Last answer")])].map(
+        (message) =>
+          message.type === "assistant" ? { ...message, model: { providerID: "test", id: "timeline" } } : message,
+      ),
+      fileContent: async (path) => {
+        expect(path).toBe("result.csv")
+
+        if (++fileReads === 1) return "Export available"
+        await refresh.promise
+
+        return "Export rechecked"
+      },
+    })
+
+    const scroller = timelineScroller(page)
+    const last = scroller.getByText("Last answer", { exact: true })
+    const first = scroller.getByText(/^Historical response 0\./)
+    const card = scroller.locator('[data-component="attachment-card"]').filter({ hasText: "result.csv" })
+    await expect(last).toBeInViewport()
+    await scroller.hover()
+    const bottom = await scroller.evaluate((element) => element.scrollTop)
+    await page.mouse.wheel(0, -Math.round(bottom / 2))
+    await expect(card).toContainText("Export available")
+    await card.scrollIntoViewIfNeeded()
+    await expect(card).toBeInViewport()
+    await expect(last).not.toBeInViewport()
+    await expect(first).not.toBeInViewport()
+
+    const original = await scroller.evaluateHandle((element) => element)
+
+    const position = await original.evaluate((element) => {
+      const observer = new MutationObserver((records) => {
+        if (!records.some((record) => [...record.removedNodes].some((node) => node.contains(element)))) return
+        element.setAttribute("data-focus-probe-detached", "")
+        observer.disconnect()
+      })
+
+      observer.observe(document.body, { childList: true, subtree: true })
+
+      return element.scrollTop
+    })
+
+    try {
+      await page.evaluate(() => {
+        const setBackground = (hidden: boolean) => {
+          Object.defineProperties(document, {
+            visibilityState: { configurable: true, value: hidden ? "hidden" : "visible" },
+            hidden: { configurable: true, value: hidden },
+          })
+          document.hasFocus = () => !hidden
+          window.dispatchEvent(new Event(hidden ? "blur" : "focus"))
+          document.dispatchEvent(new Event("visibilitychange"))
+        }
+
+        setBackground(true)
+        setBackground(false)
+      })
+      await expect.poll(() => fileReads).toBe(2)
+      expect(await original.evaluate((element) => element.isConnected), "timeline stays attached during refetch").toBe(
+        true,
+      )
+    } finally {
+      refresh.resolve()
+    }
+
+    await expect(card).toContainText("Export rechecked")
+    expect(await scroller.evaluate((element, before) => element === before, original)).toBe(true)
+    expect(await original.getAttribute("data-focus-probe-detached")).toBeNull()
+    expect(Math.abs((await original.evaluate((element) => element.scrollTop)) - position)).toBeLessThanOrEqual(50)
+
+    await page.mouse.wheel(0, 100_000)
+    await expect(last).toBeInViewport()
+    await page.mouse.wheel(0, -100_000)
+    await expect(first).toBeInViewport()
+  })
+
   test("jump to message searches offscreen history without moving the reader until selection", async ({ page }) => {
     const target = userMessage([textPart("prt_dispatch_note", "Use the loading dock for delivery")], {
       id: "msg_00000_dispatch",
