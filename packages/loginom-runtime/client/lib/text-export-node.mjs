@@ -11,7 +11,7 @@ import {configureTextExport} from './text-export-procedure.mjs';
 import {textExportParametersSchema} from './node-api.mjs';
 import {readNativeExportFile} from './text-export-output.mjs';
 import {exportContinuationSurface,verifyExportContinuation} from './text-export-continuation.mjs';
-import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
+import {isRecoverableInputOpening,releasePendingNode,verifyRecoveredPendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);},one=xs=>{need(xs.length===1,'Unique export control required');return xs[0];};
 const verified=v=>({verified:true,cleanup_complete:true,effect_possible:false,...v});
 export async function synchronizeTextExportInput(channel,state){
@@ -104,6 +104,15 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
    signal:{throwIfAborted:()=>signal?.throwIfAborted(),get aborted(){return signal?.aborted;},get reason(){return signal?.reason;}},
    preparedNodeContext:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node},
    wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});};
+  const releasePendingPhases=['input_mapping','open','configure','output_mapping','finish','execute'];
+  const releasePending=async(state,{signal:releaseSignal}={},verify=releasePendingNode)=>{
+   need(releasePendingPhases.includes(state.pending?.phase),'Only a stopped text export phase before file reading can be released here');
+   releaseSignal?.throwIfAborted();
+   const deadline=now()+NODE_RELEASE_BUDGET_MS;
+   enter({signal:releaseSignal,deadline,document_id:state.request.document_id,
+    workflow_ref:state.request.workflow_ref,node:state.node});
+   return verify({operation,channel,deadline,now,readReceipt:options.readReceipt});
+  };
   const finish=async(mode,ctx,port=false,definition)=>{
    enter(ctx);if(mode==='close')return closePreparedWizard(channel);
    const verb=mode==='execute'?'execute_wizard':'finish_wizard',key=mode==='execute'?'btnExecute':'btnDone';
@@ -195,15 +204,9 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
     const output=await readNativeExportFile({...options,artifactStore,targetOrigin,targetBuild,storageDirectories,storageContinuation,
      rememberStorageContinuation:value=>{storageContinuation=structuredClone(value);}},ctx,configuration,execution);
     return verified({effect_possible:true,status:'complete',ports:[],execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,file_artifacts:[output]});},
-   releasePendingPhases:['input_mapping','open','configure','output_mapping','finish','execute'],
-   async releasePending(state,{signal:releaseSignal}={}){
-    need(['input_mapping','open','configure','output_mapping','finish','execute'].includes(state.pending?.phase),
-     'Only a stopped text export phase before file reading can be released here');
-    releaseSignal?.throwIfAborted();
-    const deadline=now()+NODE_RELEASE_BUDGET_MS;
-    enter({signal:releaseSignal,deadline,document_id:state.request.document_id,
-     workflow_ref:state.request.workflow_ref,node:state.node});
-    return releasePendingNode({operation,channel,deadline,now,readReceipt:options.readReceipt});
+   releasePendingPhases,releasePending,
+   recoveryReleasePending(state,context){
+    return releasePending(state,context,isRecoverableInputOpening(operation)?verifyRecoveredPendingNode:releasePendingNode);
    },
    // Browser recovery T4: after the model cleared what blocked the download, the
    // runtime repeats only the idempotent file read of the same completed export.

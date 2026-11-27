@@ -140,6 +140,41 @@ test('handoff reads the original target ledger without a parent receipt: '+fault
   assert.deepEqual(f.calls,['create']);
 });
 
+for(const fault of [null,'changed graph','unknown receipt','effect possible'])
+test('public target release after a lost create reply: '+(fault??'proved refusal'),async()=>{
+  const f=fixture('target','transform.group_data');
+  const page={};
+  const browser=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',execute:async code=>{
+    if(code.includes('"receipt_read":true'))return runInNewContext('('+code+')(page)',{page});
+    return structuredClone(f.state.graph);
+  }});
+  await browser.observe(f.request,Date.now()+10000);
+  f.adapter.mutate=async effect=>{
+    f.calls.push(effect.kind);
+    page[Symbol.for('loginom-dock.operation-receipts.v1')]=new Map([['node-target:doc/'+effect.id,{
+      state:fault==='unknown receipt'?'unknown':'completed',
+      signature:createHash('sha256').update(JSON.stringify(effect)).digest('hex'),
+      outcome:{status:'NOT_APPLIED',cleanup_complete:true,effect_possible:fault==='effect possible',
+        error:'Graph deadline'},
+    }]]);
+    throw Error('MCP error -32001: Request timed out');
+  };
+  f.adapter.reconcile=browser.reconcile;
+  await stop(f);
+  if(fault==='changed graph')f.state.graph.nodes.push({ref:node,type:'imports.text',locked:false});
+  const released=await release(f);
+  if(fault){
+    assert.equal(released.error.code,'NODE_RELEASE_REFUSED');
+    assert.equal(f.runtime.hasUnsettledWork(),true);
+  }else{
+    assert.equal(released.status,'SUCCEEDED',JSON.stringify(released));
+    assert.equal(released.output.original_outcome.output.node,null);
+    assert.equal(f.runtime.hasUnsettledWork(),false);
+    f.runtime.assertPreparationAllowed();
+  }
+  assert.deepEqual(f.calls,['create']);
+});
+
 for(const phase of ['source','workflow','target'])test('release before accepted node: '+phase,async()=>{
   const f=fixture(phase);await stop(f);
   assert.equal(f.state.operation.nodeApply.node,null);

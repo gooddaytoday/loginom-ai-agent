@@ -11,7 +11,7 @@ import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePac
 import {createArtifactDelivery} from './artifact-delivery.mjs';
 import {findNativeStorageRow} from './text-export-output.mjs';
 import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingWorkflowReceipt, proveReloadedNode } from './node-target.mjs';
-import {isPythonInputOpening,settledPythonInputOpening,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
+import {isRecoverableInputOpening,settledRecoverableInputOpening,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 import { createNodeTargetBrowserAdapter } from './node-target-browser.mjs';
 import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
 import { NODE_ADD_ONLY_MODE, validateNodeTargetRequest } from './node-contracts.mjs';
@@ -2553,15 +2553,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     phase:result.status==='SUCCEEDED'?'node_ready':result.checkpoint_kind==='local_node_released'?'node_released':result.pending_phase??'node_incomplete',
     effect_possible:result.effect_possible,cleanup_complete:result.cleanup_complete,
     output:structuredClone(result),error:result.error??null,trace:[]});
-  const inspectPythonInputOpening=async operation=>{
-    if(!operation.transportUncertain||!isPythonInputOpening(operation))return;
+  const inspectInputPortOpening=async operation=>{
+    if(!operation.transportUncertain||!isRecoverableInputOpening(operation))return;
     running=true;
     try{
       // A lost MCP reply can leave a completed browser receipt. Inspection
       // settles transport only; release still has to prove the quiet graph and
       // rebind and close the port wizard if it is open.
       const state=await readReceipt(operation).catch(()=>null);
-      if(state?.state!=='completed'||!settledPythonInputOpening(operation,state.receipt))return;
+      if(state?.state!=='completed'||!settledRecoverableInputOpening(operation,state.receipt))return;
       await remember(operation,'receipt_recovered',state.receipt);
       operation.transportUncertain=false;
       operation.cleanupConfirmed=state.receipt.cleanup_complete===true;
@@ -2601,7 +2601,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // verifier is available. A durable node checkpoint is safe to redeliver.
     if(running)return failed(operation,'OPERATION_STILL_PENDING','The original node operation is not yet confirmed. Inspect its operation_id after the active Dock call completes; do not repeat effects.');
     if(await inspectChangedNodeDocument(operation,signal))return structuredClone(operation.outcome);
-    if(!nodeJobs.busy)await inspectPythonInputOpening(operation);
+    if(!nodeJobs.busy)await inspectInputPortOpening(operation);
     if(operation.storageAdmissionChild?.transportUncertain){
       const child=operation.storageAdmissionChild;
       running=true;
@@ -2848,8 +2848,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const releaseApply=async(operation,{strategy,recoveryOperationId,signature,signal})=>{
     if(strategy!=='abandon_operation')throw new Error('Only abandon_operation can release a stopped node operation; every other strategy is refused for it. If abandon_operation is refused too, follow its next_step instead of another strategy');
     if(running||nodeJobs.busy)throw new Error('Another Dock action is still running');
-    if(operation.transportUncertain&&isPythonInputOpening(operation)){
-      await inspectPythonInputOpening(operation);
+    if(operation.transportUncertain&&isRecoverableInputOpening(operation)){
+      await inspectInputPortOpening(operation);
       signal?.throwIfAborted();
       if(running||nodeJobs.busy||pending!==operation)throw new Error('The stopped Dock operation is no longer available for release');
     }

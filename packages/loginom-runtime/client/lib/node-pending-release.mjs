@@ -17,21 +17,30 @@ const inputOpeningReference=operation=>{
   &&typeof ref.operation_id==='string'&&ref.operation_id.startsWith(operation.id+':n');
 };
 
-export const isPythonInputOpening=operation=>operation.nodeApply?.request?.target?.type==='programming.python'
- &&inputOpeningReference(operation);
+const isPythonInputOpening=operation=>operation.nodeApply?.request?.target?.type==='programming.python'&&inputOpeningReference(operation);
+const isTextExportInputOpening=operation=>operation.nodeApply?.request?.target?.type==='exports.text'&&inputOpeningReference(operation);
+export const isRecoverableInputOpening=operation=>isPythonInputOpening(operation)||isTextExportInputOpening(operation);
 
-const pythonInputOpeningReceipt=(operation,receipt)=>isPythonInputOpening(operation)
+const inputOpeningReceipt=(operation,receipt)=>isRecoverableInputOpening(operation)
  &&receipt?.operation_id===operation.lastReceipt.operation_id&&receipt.action_key===operation.lastReceipt.action_key
  &&receipt.action_revision==='1'&&receipt.phase==='port_open';
 
-export function settledPythonInputOpening(operation,receipt) {
- if(!pythonInputOpeningReceipt(operation,receipt))return false;
- const ref=operation.lastReceipt,owner=receipt?.output;
+const completedInputOpening=(operation,receipt)=>inputOpeningReceipt(operation,receipt)
+ &&receipt.status==='SUCCEEDED'&&receipt.cleanup_complete===true&&sameNode(receipt.output,operation.nodeApply.node)
+ &&receipt.output.direction==='input'&&receipt.output.port===0&&receipt.output.native_index===0
+ &&typeof receipt.output.port_guid==='string'&&receipt.output.port_guid
+ &&receipt.output.opening_operation_id===operation.lastReceipt.operation_id;
+
+const refusedExportInputOpening=(operation,receipt)=>isTextExportInputOpening(operation)&&inputOpeningReceipt(operation,receipt)
+ &&receipt.status==='NOT_APPLIED'&&receipt.effect_possible===false&&receipt.cleanup_complete===true
+ &&receipt.output?.verified===false&&receipt.output.effect_possible===false&&receipt.output.cleanup_complete===true
+ &&receipt.error?.code==='OUTPUT_PORT_OPEN_UNCONFIRMED';
+
+export function settledRecoverableInputOpening(operation,receipt) {
+ if(!inputOpeningReceipt(operation,receipt))return false;
  const stopped=stoppedInputOpening(operation,receipt);
- return stopped?.surface==='wizard'&&stopped.port===0&&stopped.native_index===0
-  ||receipt.status==='SUCCEEDED'&&receipt.cleanup_complete===true&&sameNode(owner,operation.nodeApply.node)
-   &&owner.direction==='input'&&owner.port===0&&owner.native_index===0&&typeof owner.port_guid==='string'&&owner.port_guid
-   &&owner.opening_operation_id===ref.operation_id;
+ return stopped?.port===0&&stopped.native_index===0&&(stopped.surface==='wizard'||isTextExportInputOpening(operation))
+  ||completedInputOpening(operation,receipt)||refusedExportInputOpening(operation,receipt);
 }
 
 // Only completed, synchronous mapping refusals before Done are cancellable.
@@ -143,7 +152,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  requireValue(Number.isFinite(deadline),'Release requires an explicit finite deadline');
  requireValue(!operation.transportUncertain,'The last browser call has not confirmed completion; inspect the operation again later');
  let settleWizard,beforeSettlement,openingConfirmation,portOpening,releasePortOpening,completedPortOpening;
- let draftReceipt=false,variableDraft=false,pythonOpeningRefused=false;
+ let draftReceipt=false,variableDraft=false,inputOpeningRefused=false;
  const bindInputOpening=async(ref,expected)=>{
   const opening=await channel.reconcileInputPortOpening(ref,expected);
   requireValue(opening.port_guid===expected.port_guid,'The stopped input opening port identity changed');
@@ -181,12 +190,16 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   if(ref.action_key==='node.input_port.open.internal'&&trace.some(e=>e.event==='input_port_menu_closed'
    ||e.event==='input_port_menu_issued'&&r.cleanup_complete===true&&r.status!=='SUCCEEDED'))
    requireValue(inputOpening?.surface==='graph','The port-menu cleanup receipt identity changed');
-  if(isPythonInputOpening(operation)){
-   requireValue(pythonInputOpeningReceipt(operation,r),'The original Python input opening receipt is unconfirmed');
-   pythonOpeningRefused=!inputOpening&&r.status==='NOT_APPLIED'&&r.effect_possible===false&&r.cleanup_complete===true;
-   if(r.status==='SUCCEEDED'&&settledPythonInputOpening(operation,r))
+  if(isRecoverableInputOpening(operation)){
+   requireValue(inputOpeningReceipt(operation,r),'The original input opening receipt is unconfirmed');
+   inputOpeningRefused=!inputOpening&&(isPythonInputOpening(operation)
+    ?r.status==='NOT_APPLIED'&&r.effect_possible===false&&r.cleanup_complete===true
+    :refusedExportInputOpening(operation,r));
+   if(completedInputOpening(operation,r))
     completedPortOpening={surface:'wizard',port:r.output.port,native_index:r.output.native_index,port_guid:r.output.port_guid};
-   requireValue(inputOpening||pythonOpeningRefused||completedPortOpening,'The original Python input opening receipt is unconfirmed');
+   requireValue(inputOpening||inputOpeningRefused||completedPortOpening,'The original input opening receipt is unconfirmed');
+   if(isTextExportInputOpening(operation)&&inputOpening)
+    requireValue(inputOpening.port===0&&inputOpening.native_index===0,'The stopped export input opening port identity changed');
   }
   const draft=restDraft||exportDraft||wizardDraft||variableDraft||!!inputOpening||!!completedPortOpening;
   draftReceipt=draft;
@@ -226,7 +239,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  }
  const cleanup={wizard_closed:false,read_view_restored:false,views_returned:false};
  if(restoreRead)cleanup.read_view_restored=await restoreRead();
- if(pythonOpeningRefused)return verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup,openingConfirmation});
+ if(inputOpeningRefused)return verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup,openingConfirmation});
  // A heavy wizard can exceed the observation budget; only the user can then
  // cancel it. Its unsaved settings are lost, which the agent must say first.
  const observeSurface=()=>channel.observe({condition:'stopped node release surface',releaseWizard:true,
@@ -323,8 +336,7 @@ export async function verifyRecoveredPendingNode({operation,channel,readReceipt,
  requireValue(response.receipt?.operation_id===reference.operation_id&&response.receipt.action_key===reference.action_key,
   'The last browser receipt identity changed');
  const receipt=response.receipt;
- const completedPythonOpening=receipt.status==='SUCCEEDED'&&settledPythonInputOpening(operation,receipt);
- const stoppedPort=state.pending.phase==='input_mapping'&&!completedPythonOpening
+ const stoppedPort=state.pending.phase==='input_mapping'&&!completedInputOpening(operation,receipt)
   &&reference.action_key==='node.input_port.open.internal'
   &&(receipt.effect_possible===true||Array.isArray(receipt.trace)&&receipt.trace.some(e=>e.event==='input_port_menu_closed'));
  const opening=stoppedPort&&stoppedInputOpening(operation,receipt,{recovered:true});

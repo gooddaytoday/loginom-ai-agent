@@ -124,26 +124,66 @@ test('text export release checks cancellation before observing or closing',async
  await assert.rejects(f.run(c.signal),/release cancelled/);assert.deepEqual(f.gestures,[]);assert.equal(f.operation.deadline,1);
 });
 
-async function stoppedRuntime(phase,{browserRecovery=false,blocked=false,record=async e=>e}={}) {
+async function stoppedRuntime(phase,{browserRecovery=false,blocked=false,record=async e=>e,lostOpening}={}) {
  const calls=[],events=[];
- const state={blocked};
+ const state={blocked,open:false};
  const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[{
   ref:node,type:'exports.text',label:'Export',position:{x:320,y:280},inputs:[0],outputs:[]}],links:[],foreign_links:[]};
  const support=createCandidateNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2'});
  const snapshot={origin:'http://test',loginom_build:'7.4.2',workflow_ref:workflow,dom_epoch:{document:'browser',revision:1},scan:{complete:true},
-  prepared_node_context:{...node,verified:true,surface:'graph',locked:false},wizard:{status:'absent'},
+  prepared_node_context:{...node,tid:'Export',verified:true,surface:'graph',locked:false},wizard:{status:'absent'},
   ui:{elements:[],dialogs:[],masks:[],truncated:{elements:false,dialogs:false,masks:false}}};
  const ok=async()=>({verified:true,cleanup_complete:true,effect_possible:false});
  const stop=name=>{calls.push(name);if(name===phase)throw Error('Stopped export '+phase);};
  const runtime=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,browserRecovery,
   targetOrigin:'http://test',targetBuild:'7.4.2',onRecord:async e=>{events.push(e);return record(e);},
-  execute:async()=>{
+  execute:async code=>{
    if(state.blocked)throw Error('Blocking dialog');
-   return {status:'SUCCEEDED',output:{value:{status:'SUCCEEDED',output:structuredClone(snapshot)}}};
+   const step=events.find(e=>e.phase==='node_step_prepared'&&e.action.verb==='open_input_port');
+   const port={...node,direction:'input',port:0,native_index:0,port_guid:'input',opening_operation_id:step?.internal_operation_id};
+   if(lostOpening&&code.includes('"receipt_read":true')){
+    assert.ok(code.includes(JSON.stringify(step.signature)));
+    const opened=lostOpening==='wizard';
+    return {status:'SUCCEEDED',action_key:'operation.inspect',action_revision:'1',operation_id:'apply-export',
+     phase:'observed',effect_possible:false,error:null,trace:[],output:lostOpening==='running'?{state:'running'}:{
+      state:'completed',receipt:{status:opened?'AMBIGUOUS':'NOT_APPLIED',action_key:'node.input_port.open.internal',action_revision:'1',
+       operation_id:lostOpening==='foreign'?'other:n1':step.internal_operation_id,phase:'port_open',
+       effect_possible:opened,cleanup_complete:!opened,output:{verified:false,effect_possible:opened,cleanup_complete:!opened},
+       error:{code:'OUTPUT_PORT_OPEN_UNCONFIRMED',message:'Port opening deadline elapsed'},trace:opened?[
+        {event:'input_port_reserved',port:0,native_index:0,port_guid:'input'},{event:'input_port_menu_issued'},
+        {event:'input_port_open_issued'},{event:'input_port_open_returned'},
+       ]:[]}}};
+   }
+   const result=value=>({status:'SUCCEEDED',output:{value}});
+   if(state.autoRebindBlocked&&code.includes('"reconcile_only":true'))throw Error('Port wizard owner observation timed out');
+   if(code.includes('"reconcile_only":true')||code.includes('"release_opening":{')){
+    const surface=state.open?'wizard':'graph';
+    return result({...port,verified:true,cleanup_complete:true,status:'SUCCEEDED',surface,phase:state.open?'verified':'released'});
+   }
+   if(lostOpening&&code.includes('"receipt_namespace"')){
+    const action=events.findLast(e=>e.phase==='node_step_prepared');
+    calls.push(action.action.verb);
+    if(action.action.verb==='open_input_port'){
+     state.open=lostOpening==='wizard';
+     throw Error('MCP error -32001: Request timed out');
+    }
+    assert.deepEqual(action.action,{verb:'click',ref:'ui-close'});
+    assert.equal(state.open,true);state.open=false;
+    return result({status:'SUCCEEDED',operation_id:action.internal_operation_id,action_key:'ui.act',cleanup_complete:true,
+     effect_possible:true,output:structuredClone(snapshot)});
+   }
+   const output=structuredClone(snapshot);
+   if(state.open){
+    Object.assign(output.prepared_node_context,{surface:'wizard',locked:true,input_port:port});
+    output.wizard={status:'observed',root_ref:'ui-w',root_tid:'W',stage:'input_mapping',owner_context:{status:'observed',node:{tid:'owner'}}};
+    output.ui.elements=[{tid:'W;btnClose',ref:'ui-close',allowed_actions:['click']}];
+   }
+   return result({status:'SUCCEEDED',output});
   },
   nodeTargetAdapterFactory:()=>({observe:async()=>structuredClone(graph),preflight:ok,positionMatches:()=>true}),
   nodeApplyHandlers:support.nodeApplyHandlers,nodeApplyDriverFactory:options=>({
-   ...support.nodeApplyDriverFactory(options),verifySource:ok,mapPorts:async()=>{stop('input_mapping');return ok();},openWizard:ok,
+   ...support.nodeApplyDriverFactory(options),verifySource:ok,
+   ...(!lostOpening?{mapPorts:async()=>{stop('input_mapping');return ok();}}:{}),openWizard:ok,
    configureExport:async()=>{stop('configure');return ok();},
    finish:async mode=>({verified:true,cleanup_complete:true,mode,execution_id:'exec',execution_started:true}),
    waitExecution:async()=>{stop('execute');return {verified:true,cleanup_complete:true,status:'completed',execution_id:'exec'};},
@@ -156,6 +196,45 @@ async function stoppedRuntime(phase,{browserRecovery=false,blocked=false,record=
  assert.equal(job.outcome.output.pending_phase,phase,JSON.stringify(job));
  return {runtime,calls,events,state};
 }
+
+for(const lostOpening of ['completed','wizard','running','foreign'])test('public export recovery after a lost input-port reply: '+lostOpening,async()=>{
+ const f=await stoppedRuntime('input_mapping',{lostOpening});
+ const advice=(await f.runtime.inspect({operationId:'apply-export'})).output;
+ assert.equal(advice.state,'pending');
+ if(['completed','wizard'].includes(lostOpening)){
+  assert.deepEqual(advice.recovery_options,['abandon_operation']);
+  const released=await f.runtime.recover('apply-export',{strategy:'abandon_operation',recoveryOperationId:'release-export'});
+  assert.equal(released.status,'SUCCEEDED',JSON.stringify(released));
+  assert.equal(released.output.original_outcome.phase,'node_released');
+  assert.deepEqual(released.output.original_outcome.output.configuration,{status:'unknown'});
+  assert.equal(f.runtime.hasUnsettledWork(),false);
+  f.runtime.assertPreparationAllowed();
+ }else{
+  assert.deepEqual(advice.recovery_options,[]);
+  await assert.rejects(f.runtime.recover('apply-export',{strategy:'abandon_operation',recoveryOperationId:'release-export'}),/unconfirmed/);
+  assert.equal(f.runtime.hasUnsettledWork(),true);
+ }
+ assert.deepEqual(f.calls,lostOpening==='wizard'?['open_input_port','click']:['open_input_port']);
+});
+
+test('public export browser recovery releases a completed opening after the wizard was closed',async()=>{
+ const f=await stoppedRuntime('input_mapping',{lostOpening:'wizard',browserRecovery:true});
+ f.state.autoRebindBlocked=true;
+ const refused=await f.runtime.recover('apply-export',{strategy:'abandon_operation',recoveryOperationId:'release-export'});
+ assert.equal(refused.error.code,'NODE_RELEASE_REFUSED');
+ const basis=f.runtime.browserRecoveryBasis('apply-export');
+ assert.equal((await f.runtime.browserRecoveryHandoff('apply-export')).stopped,true);
+
+ f.state.open=false;
+ const recovered=await f.runtime.verifyBrowserRecovery({operationId:'apply-export',step:basis.step,attested:{actions_performed:['closed the input wizard']}});
+ assert.equal(recovered.status,'continuable',JSON.stringify(recovered));
+ assert.equal(recovered.original_operation.phase,'node_released');
+ assert.deepEqual(recovered.original_operation.configuration,{status:'unknown'});
+ assert.equal(f.runtime.hasUnsettledWork(),false);
+ f.runtime.assertPreparationAllowed();
+ assert.deepEqual(f.calls,['open_input_port']);
+});
+
 for(const phase of ['configure','execute'])test('public export '+phase+' refusal offers abandon and settles without repeating the phase',async()=>{
  const f=await stoppedRuntime(phase),advice=(await f.runtime.inspect({operationId:'apply-export'})).output;
  assert.deepEqual(advice.recovery_options,['abandon_operation']);
