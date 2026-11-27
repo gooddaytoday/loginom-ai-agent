@@ -18,6 +18,7 @@ export type Launch = {
   actionManifestSha256?: string
   validation?: boolean
   packageFolder?: string
+  packageScan?: boolean
   // Host-owned HTTP cache only; browser profiles and authentication remain fresh.
   validationHttpCache?: boolean
   headless?: boolean
@@ -124,7 +125,9 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
   )
   const ready = runtime.ready
   if (
-    input.packageFolder !== undefined
+    input.packageScan === true
+      ? !("packageScan" in ready) || ready.packageScan !== true
+      : input.packageFolder !== undefined
       ? !("listing" in ready)
       : input.validation
         ? !("checked" in ready) || ready.checked !== true

@@ -148,8 +148,9 @@ async function handle(message) {
       state.starting = true
       const input = message.input
       const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
-      const packageReader = input.packageFolder === undefined ? undefined : await import("./package-folder.mjs")
-      if (packageReader && (!packageReader.isPackageFolder(input.packageFolder) || input.validation === true
+      const packageReader = input.packageFolder === undefined && input.packageScan !== true
+        ? undefined : await import("./package-folder.mjs")
+      if (packageReader && ((input.packageScan === true ? input.packageFolder !== undefined : !packageReader.isPackageFolder(input.packageFolder)) || input.validation === true
           || acceptanceCleanupPackage || closeSavedPackageOnShutdown || browserRecovery)) throw Error("LOGINOM_START_INVALID")
       state.owner = { chat: input.chat, generation: input.generation }
       state.startupStateDir = input.stateDir
@@ -204,13 +205,20 @@ async function handle(message) {
         return
       }
       if (packageReader) {
-        const { listing, readMs } = await packageReader.withPackageFolderSession({
+        const storage = {
           login: () => loginBrowser({ ...login, keepOpen: true, reportSessionLimit: true }),
           folder: input.packageFolder,
           origin: new URL(input.connection.url).origin,
           username: input.connection.username,
           signal: state.startupController.signal,
-        })
+        }
+        if (input.packageScan === true) {
+          state.browser = await packageReader.openPackageStorage({ ...storage, scan: true })
+          state.packageStorage = state.browser
+          send({ id: message.id, result: { packageScan: true, protocol: 1, generation: input.generation } })
+          return
+        }
+        const { listing, readMs } = await packageReader.withPackageFolderSession(storage)
         await startupPhase({ phase: "packages.read", status: "ready", duration_ms: readMs })
         send({ id: message.id, result: { listing, protocol: 1, generation: input.generation } })
         return
@@ -300,6 +308,13 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (state.packageStorage) {
+      if (message.operation !== "packageList" && message.operation !== "packageRead") throw Error("LOGINOM_REQUEST_INVALID")
+      const result = message.operation === "packageList" ? await state.packageStorage.list(message.input)
+        : await state.packageStorage.read(message.input)
+      send({ id: message.id, result })
+      return
+    }
     if (["dashboardRead", "dashboardPublish", "dashboardVersions", "dashboardDelete"].includes(message.operation)) {
       if (message.operation === "dashboardVersions" || message.operation === "dashboardDelete") {
         if (message.input?.generation !== state.owner.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")

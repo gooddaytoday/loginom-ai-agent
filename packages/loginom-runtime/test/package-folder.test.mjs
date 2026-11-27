@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { runInNewContext } from "node:vm"
-import { withPackageFolderSession } from "../src/package-folder.mjs"
+import { openPackageStorage, withPackageFolderSession } from "../src/package-folder.mjs"
 
 const origin = "https://stand.example.test"
 const folder = "/user"
@@ -67,10 +67,11 @@ function fixture() {
     },
   }
   const evaluate = (fn, input) => runInNewContext(`(${fn})(input)`, {
-    Date, input, location: new URL(origin),
+    Date, btoa, input, location: new URL(origin),
     ReleaseObject: (value, awaited) => { assert.equal(awaited, true); released.push(value) },
     bg: {
       app: { Application: { FInstance: app } },
+      TBGFileOpenMode: { fomRead: 0 },
       selectAllAsync: async (items, project) => {
         if (!Array.isArray(items)) throw Error("unknown collection")
         if (items.length) project(items[0])
@@ -94,7 +95,9 @@ function fixture() {
   const login = async () => ({
     context: { pages: () => [page], close: async () => { events.push(["close browser"]) } },
   })
-  return { events, fileList, released, form, app, read: (signal, path = folder) => withPackageFolderSession({
+  return { events, fileList, released, form, app, storage,
+    openScan: (signal) => openPackageStorage({ login, origin, username, signal, scan: true }),
+    read: (signal, path = folder) => withPackageFolderSession({
     login, folder: path, origin, username, signal,
   }) }
 }
@@ -142,4 +145,33 @@ test("a Files window for a different folder does not become a successful empty r
   f.form.SetCurrentDirLockWrapper = async () => {}
   await assert.rejects(f.read(), { message: "LOGINOM_PACKAGE_FOLDER_UNAVAILABLE" })
   assert.deepEqual(f.events, [["open Files"], ["logout"], ["close browser"]])
+})
+
+test("scan reads package bytes in one storage session and refuses paths outside it", async () => {
+  const sample = fixture()
+  const path = `/${username}/Отчёт.lgp`
+  const archive = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0xff, 0x00])
+  const info = { Size: archive.length }
+  const stream = { ReadBuffer: async (output) => output.set(archive) }
+  sample.storage.GetFileInfo = async (name) => { assert.equal(name, path); return info }
+  sample.storage.OpenFile = async (name, mode) => { assert.equal(name, path); assert.equal(mode, 0); return stream }
+  const scan = await sample.openScan()
+  try {
+    assert.equal((await scan.list(`/${username}`)).entries[0].path, `/${username}/Архив`)
+    assert.deepEqual(Buffer.from(await scan.read(path), "base64"), archive)
+    assert.throws(() => scan.read("/someone-else/Отчёт.lgp"), { message: "LOGINOM_PACKAGE_FOLDER_INVALID" })
+    assert.ok(sample.released.includes(info))
+    assert.ok(sample.released.includes(stream))
+  } finally { await scan.close() }
+  assert.deepEqual(sample.events.slice(-2), [["logout"], ["close browser"]])
+})
+
+test("scan reports explicit ACL denial without opening Files or skipping logout", async () => {
+  const sample = fixture()
+  sample.fileList.GetDirectoryItems = () => { throw Error("System error, (OS Code 13): Permission denied") }
+  const scan = await sample.openScan()
+  try {
+    await assert.rejects(scan.list("/common/Private"), { message: "LOGINOM_PACKAGE_FOLDER_ACCESS_DENIED" })
+  } finally { await scan.close() }
+  assert.deepEqual(sample.events, [["logout"], ["close browser"]])
 })

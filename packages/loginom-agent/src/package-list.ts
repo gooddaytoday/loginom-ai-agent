@@ -16,7 +16,9 @@ type Continuation = {
 const normalize = (text: string) => text.normalize("NFC").toLocaleLowerCase("ru")
 const isCode = (error: unknown, code: string) => error instanceof Error && error.message === code
 
-export function packageListHandlers(host = ServiceHost.packageFolders): RpcHandlers<typeof Definition> {
+export function packageListHandlers(
+  host: Pick<typeof ServiceHost.packageFolders, "generation" | "read"> = ServiceHost.packageFolders,
+): RpcHandlers<typeof Definition> {
   const continuations = new Map<string, Continuation>()
 
   return {

@@ -1,24 +1,34 @@
 import { Option, Schema } from "effect"
-import { packageFolderPath } from "../../loginom-runtime/src/package-folder-path.mjs"
+import { packageFolderPath, packageStoragePath } from "../../loginom-runtime/src/package-folder-path.mjs"
 
-export const Folder = Schema.String.check(Schema.isMaxLength(1024), Schema.isPattern(packageFolderPath))
+export const StoragePath = Schema.String.check(Schema.isMaxLength(1024), Schema.isPattern(packageStoragePath))
+export const Folder = StoragePath.check(Schema.isPattern(packageFolderPath))
 const Name = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(1024))
 const Bytes = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
-const Directory = Schema.Struct({ kind: Schema.Literal("folder"), name: Name, path: Folder })
-export const Package = Schema.Struct({
+export const StoragePackagePath = StoragePath.check(Schema.isPattern(/\.lgp$/i))
+const directory = { kind: Schema.Literal("folder"), name: Name }
+const pkg = {
   kind: Schema.Literal("package"),
   name: Name,
-  path: Folder.check(Schema.isPattern(/\.lgp$/i)),
   modifiedAt: Schema.String,
   sizeBytes: Bytes,
-})
+}
+export const Package = Schema.Struct({ ...pkg, path: Folder.check(Schema.isPattern(/\.lgp$/i)) })
 export const FolderListing = Schema.Struct({
   folder: Folder,
-  entries: Schema.Array(Schema.Union([Directory, Package])),
+  entries: Schema.Array(Schema.Union([Schema.Struct({ ...directory, path: Folder }), Package])),
   slow: Schema.Boolean,
 })
 export type FolderListing = typeof FolderListing.Type
+const StorageListing = Schema.Struct({
+  folder: StoragePath,
+  entries: Schema.Array(Schema.Union([
+    Schema.Struct({ ...directory, path: StoragePath }),
+    Schema.Struct({ ...pkg, path: StoragePackagePath }),
+  ])),
+  slow: Schema.Boolean,
+})
 
 export const ReadFolder = Schema.Struct({
   folder: Folder,
@@ -26,9 +36,8 @@ export const ReadFolder = Schema.Struct({
 })
 export type ReadFolder = typeof ReadFolder.Type
 
-const decodeListing = Schema.decodeUnknownOption(FolderListing, { onExcessProperty: "error" })
-export function decodeFolderListing(value: unknown, folder: string): FolderListing {
-  const result = decodeListing(value)
+export function decodeFolderListing(value: unknown, folder: string, scan = false): FolderListing {
+  const result = Schema.decodeUnknownOption(scan ? StorageListing : FolderListing, { onExcessProperty: "error" })(value)
   if (
     Option.isNone(result) ||
     result.value.folder !== folder ||

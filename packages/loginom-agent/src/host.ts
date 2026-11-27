@@ -11,6 +11,7 @@ import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
 import { decodeFolderListing, type ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
+import { ReferenceResult, type ReadReferences } from "@loginom-ai-agent/loginom-host/package-references-contract"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { Option, Schema } from "effect"
@@ -141,23 +142,33 @@ export const packageFolders = {
     return generation
   },
   async read(input: ReadFolder, signal: AbortSignal) {
-    signal.throwIfAborted()
-    const current = state.current
-    const connection = await current?.ready
-    signal.throwIfAborted()
-    if (!connection?.request || current?.closing) throw Error("LOGINOM_HOST_NOT_READY")
-    const { request } = connection
-    const requestId = randomUUID()
-    const cancel = () => { void request("packages.cancel", { requestId }).catch(() => undefined) }
-    signal.addEventListener("abort", cancel, { once: true })
-    try {
-      const result = await request("packages.list", { ...input, requestId })
-      signal.throwIfAborted()
-      return decodeFolderListing(result, input.folder)
-    } finally {
-      signal.removeEventListener("abort", cancel)
-    }
+    return decodeFolderListing(await requestPackages("packages.list", input, signal), input.folder)
   },
+  async references(input: ReadReferences, signal: AbortSignal) {
+    const result = await requestPackages("packages.references", input, signal)
+    const decoded = Schema.decodeUnknownOption(ReferenceResult, { onExcessProperty: "error" })(result)
+    if (Option.isNone(decoded)) throw Error("LOGINOM_REPLY_INVALID")
+    return decoded.value
+  },
+}
+
+async function requestPackages(method: "packages.list" | "packages.references", input: ReadFolder | ReadReferences, signal: AbortSignal) {
+  signal.throwIfAborted()
+  const current = state.current
+  const connection = await current?.ready
+  signal.throwIfAborted()
+  if (!connection?.request || current?.closing) throw Error("LOGINOM_HOST_NOT_READY")
+  const { request } = connection
+  const requestId = randomUUID()
+  const cancel = () => { void request("packages.cancel", { requestId }).catch(() => undefined) }
+  signal.addEventListener("abort", cancel, { once: true })
+  try {
+    const result = await request(method, { ...input, requestId })
+    signal.throwIfAborted()
+    return result
+  } finally {
+    signal.removeEventListener("abort", cancel)
+  }
 }
 
 async function request(method: string, input: unknown) {

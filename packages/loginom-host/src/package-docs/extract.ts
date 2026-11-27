@@ -18,19 +18,7 @@ const portNames: Record<string, string> = {
 export type PackageStructure = Awaited<ReturnType<typeof extractPackage>>
 
 export async function extractPackage(path: string) {
-  // zip.js slices must own their buffers; Buffer.slice retains the original byte offset.
-  const zip = new ZipReader(new Uint8ArrayReader(new Uint8Array(await readFile(path))), { useWebWorkers: false })
-  try {
-    const entries = await zip.getEntries()
-    const members = new Map(entries.map((entry) => [normalized(entry.filename), entry]))
-    async function xml(name: string) {
-      const entry = members.get(normalized(name))
-      if (!entry?.getData || entry.directory) return undefined
-      const bytes = await entry.getData(new Uint8ArrayWriter())
-      const fail = () => { throw Error("PACKAGE_DOCS_XML_INVALID") }
-      return new DOMParser({ errorHandler: { warning: fail, error: fail, fatalError: fail } })
-        .parseFromString(new TextDecoder("utf-8", { fatal: true }).decode(bytes), "application/xml").documentElement
-    }
+  return withPackageXml(new Uint8Array(await readFile(path)), async ({ xml, units }) => {
     const info = await xml("PackageInfo.xml")
     if (!info) throw Error("PACKAGE_DOCS_PACKAGE_INFO_MISSING")
     const references = await xml("References.xml")
@@ -38,14 +26,7 @@ export async function extractPackage(path: string) {
       .filter((element): element is Element => !!element && element.localName === "Item")
       .map((element) => element.getAttribute("Name") || element.getAttribute("DisplayName") || element.getAttribute("Path") || "")
       .filter(Boolean)
-    const index = await xml("PackageIndex.xml")
-    const indexed = items(child(index, "Units")).map((unit) => (unit.getAttribute("BasePath") ?? "").replaceAll("\\", "/").replace(/^\/+|\/+$/g, ""))
-      .filter(Boolean)
-    const units = indexed.length ? indexed : [...new Set(entries.flatMap((entry) => {
-      const match = /^(Unit_\d+)\/Unit\.xml$/i.exec(entry.filename.replaceAll("\\", "/"))
-      return match ? [match[1]] : []
-    }))].toSorted()
-    const modules = await Promise.all(units.map(async (base, number) => {
+    const modules = await Promise.all((await units()).map(async (base, number) => {
       const metadata = await xml(base + "/Info.xml")
       const unit = await xml(base + "/Unit.xml")
       if (!unit) throw Error("PACKAGE_DOCS_UNIT_MISSING")
@@ -69,7 +50,85 @@ export async function extractPackage(path: string) {
         programming_nodes: total("programming_nodes"), reference_nodes: total("reference_nodes"), derived_nodes: total("derived_nodes") },
       modules, unique_engine_types: [...new Set(modules.flatMap((module) => workflowBodies(module).flatMap((body) => body.workflow_nodes.map((node) => node.engine_type))).filter(Boolean))].toSorted(),
     }
+  })
+}
+
+async function withPackageXml<Result>(bytes: Uint8Array, read: (archive: {
+  xml(name: string): Promise<Element | undefined>
+  units(): Promise<string[]>
+  has(name: string): boolean
+}) => Promise<Result>, limits?: { remaining: number; signal: AbortSignal }) {
+  const zip = new ZipReader(new Uint8ArrayReader(bytes), { useWebWorkers: false })
+  try {
+    const entries = await zip.getEntries()
+    const members = new Map(entries.map((entry) => [normalized(entry.filename), entry]))
+    async function xml(name: string) {
+      limits?.signal.throwIfAborted()
+      const entry = members.get(normalized(name))
+      if (!entry?.getData || entry.directory) return undefined
+      if (limits) {
+        limits.remaining -= entry.uncompressedSize
+        if (limits.remaining < 0) throw Error("PACKAGE_DOCS_XML_LIMIT")
+      }
+      const bytes = await entry.getData(new Uint8ArrayWriter(), limits && { signal: limits.signal, checkSignature: true })
+      const fail = () => { throw Error("PACKAGE_DOCS_XML_INVALID") }
+      return new DOMParser({ errorHandler: { warning: fail, error: fail, fatalError: fail } })
+        .parseFromString(new TextDecoder("utf-8", { fatal: true }).decode(bytes), "application/xml").documentElement
+    }
+    async function units() {
+      const index = await xml("PackageIndex.xml")
+      const indexed = items(child(index, "Units")).map((unit) => (unit.getAttribute("BasePath") ?? "").replaceAll("\\", "/").replace(/^\/+|\/+$/g, ""))
+        .filter(Boolean)
+      return indexed.length ? indexed : [...new Set(entries.flatMap((entry) => {
+        const match = /^\/?(Unit_\d+)\/Unit\.xml$/i.exec(entry.filename.replaceAll("\\", "/"))
+        return match ? [match[1]] : []
+      }))].toSorted()
+    }
+    return await read({ xml, units, has: (name) => members.has(normalized(name)) })
   } finally { await zip.close() }
+}
+
+const guidOf = (value?: string | null) => value && /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(value)
+  ? value.toLowerCase() : undefined
+
+type ReferenceNode = { guid: string; label: string; globalID?: string; outputGuids: string[]; targetGuid?: string }
+
+export function extractPackageReferences(bytes: Uint8Array, signal: AbortSignal) {
+  return withPackageXml(bytes, async ({ xml, units, has }) => {
+    const guid = guidOf((await xml("PackageInfo.xml"))?.getAttribute("Guid"))
+    const references = await xml("References.xml")
+    if (!guid || (!references && has("References.bin")) || (!has("PackageIndex.xml") && has("PackageIndex.bin")))
+      throw Error("PACKAGE_DOCS_REFERENCES_UNAVAILABLE")
+    const dependencies = items(references).map((item) => ({
+      guid: guidOf(child(item, "Name")?.getAttribute("Guid")),
+      hint: item.getAttribute("HintPath"),
+    }))
+    const nodes: ReferenceNode[] = []
+    for (const base of await units()) {
+      const root = child(await xml(base + "/Unit.xml"), "WorkFlow")
+      if (!root) throw Error("PACKAGE_DOCS_UNIT_MISSING")
+      const pending = [root]
+      for (const workflow of pending) {
+        signal.throwIfAborted()
+        for (const node of [...items(child(workflow, "Nodes")), ...items(child(workflow, "ServiceNodes"))]) {
+          const engine = child(child(node, "Component"), "Engine")
+          const nested = child(child(engine, "ModelUnit"), "WorkFlow")
+          if (nested) pending.push(nested)
+          const guid = guidOf(node.getAttribute("Guid"))
+          if (!guid) continue
+          const type = engine?.getAttributeNS("http://www.w3.org/2001/XMLSchema-instance", "type")
+          const targetGuid = type === "TBGReferenceNodeComponentEngine" ? guidOf(engine?.getAttribute("GlobalNodeID")) : undefined
+          const outputGuids = items(child(node, "OutputPorts")).flatMap((port) => {
+            const guid = guidOf(port.getAttribute("Guid"))
+            return guid ? [guid] : []
+          })
+          nodes.push({ guid, targetGuid, outputGuids, globalID: guidOf(node.getAttribute("GlobalNodeID")),
+            label: node.getAttribute("DisplayName") || node.getAttribute("Name") || guid })
+        }
+      }
+    }
+    return { guid, dependencies, nodes }
+  }, { remaining: 32 * 1024 * 1024, signal })
 }
 
 function normalized(name: string) { return name.replaceAll("\\", "/").replace(/^\/+/, "").toLowerCase() }

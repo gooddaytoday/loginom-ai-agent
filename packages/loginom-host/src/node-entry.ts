@@ -8,6 +8,7 @@ import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
 import { DashboardRead } from "./dashboard"
 import { ReadFolder } from "./package-folder"
+import { ReadReferences } from "./package-references-contract"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
@@ -133,7 +134,7 @@ async function dispatch(message: unknown) {
       reply({ id: message.id, result })
       return
     }
-    if (message.method === "packages.list" || message.method === "packages.cancel") {
+    if (message.method === "packages.list" || message.method === "packages.references" || message.method === "packages.cancel") {
       if (!input || typeof input !== "object" || !("requestId" in input) || typeof input.requestId !== "string")
         throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
       if (message.method === "packages.cancel") {
@@ -141,11 +142,17 @@ async function dispatch(message: unknown) {
         reply({ id: message.id, result: {} })
         return
       }
-      if (!Schema.is(ReadFolder)(input) || folderReads.has(input.requestId)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      if (folderReads.has(input.requestId)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      const decoded = message.method === "packages.list"
+        ? (Schema.is(ReadFolder)(input) ? { method: "list", input } as const : undefined)
+        : (Schema.is(ReadReferences)(input) ? { method: "references", input } as const : undefined)
+      if (!decoded) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
       const controller = new AbortController()
       folderReads.set(input.requestId, controller)
       try {
-        const result = await state.host.readPackageFolder(input, controller.signal)
+        const result = decoded.method === "list"
+          ? await state.host.readPackageFolder(decoded.input, controller.signal)
+          : await state.host.readPackageReferences(decoded.input, controller.signal)
         reply({ id: message.id, result })
       } finally {
         folderReads.delete(input.requestId)
