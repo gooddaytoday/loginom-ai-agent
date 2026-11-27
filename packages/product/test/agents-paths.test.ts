@@ -19,6 +19,8 @@ const NOT_PATHS: Record<string, string> = {
   "packages/dashboard/AGENTS.md: builds/state.json": "state file in the runtime data directory",
   "packages/gui-plugins/AGENTS.md: i18n/en.ts": "file every plugin has in its own directory (src/<plugin>/i18n/en.ts)",
   "packages/loginom-host/AGENTS.md: dashboard/template": "directory inside the staged resource tree, not in the repository",
+  "packages/loginom-runtime/AGENTS.md: ../opencode/src/provider/transform.ts":
+    "v1 source reference in the byte-exact v0.4.3 runtime; the v2 provider path is documented in the root AGENTS.md",
 }
 
 const FILE_EXTENSION = /\.(ts|tsx|js|mjs|cjs|json|jsonc|md|mdx|ya?ml|ps1|sh|py|nix|toml|sql|css|html)$/

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureTextImportFields,importFieldRevealDelta,ImportColumnCountError,ImportColumnBindingError} from '../lib/text-import-procedure.mjs';
 import {textImportStepBudget} from '../lib/text-import-limits.mjs';
+import {validateNodeUiAction} from '../lib/workspace-ui.mjs';
 
 function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=null,dateFormat=null,dateValue='Не задано (dd/mm/yyyy)',editorChange=null,fillChange=null,verticalClip=false,previewOwnScroll=false}={}) {
  const columns=Array.from({length:count},(_,index)=>({index,status:'observed',name:'F'+index,label:'F'+index,type:'string',data_kind:'Дискретный',used:true,
@@ -240,6 +241,54 @@ for(const layout of ['stale','already current','settled before refresh','still w
  if(layout==='still wrong')await assert.rejects(configure,ImportColumnCountError);
  else assert.equal((await configure()).columns.length,8);
  assert.equal(refreshes,settled?0:1);
+});
+
+for(const alreadyDelimited of [false,true])test('prepared import writes each format field separately before checking its dependent layout (delimiter already set='+alreadyDelimited+')',async()=>{
+ const f=fixture(8,{nullMarker:'NULL'}),observe=f.channel.observe,act=f.channel.act;
+ // Delimiter arrives last. The exact preset uses its picker and the unchanged
+ // qualifier needs no write.
+ f.parameters.format={decimal_separator:'.',null_marker:'NULL',text_qualifier:'"',delimiter:','};
+ const values={delimiter:alreadyDelimited?',':';',decimal_separator:','},actions=[];
+ const ref=name=>'ui-'+name.replace('_','-'),nameOf=ref=>ref.slice(3).replace('-','_');
+ let refreshed=false;
+ f.channel.observe=async options=>{
+  const state=await observe({...options,ready:()=>true}),wizard=state.wizard;
+  state.prepared_node_context={verified:true,surface:'wizard',document_id:'doc',workflow_id:'wf',node_id:'n'};
+  for(const [name,value] of Object.entries(values)){
+   const owner_ref='owner-'+name;
+   Object.assign(wizard.settings.fields[name],{value,input_ref:ref(name),owner_ref});
+   state.ui.elements.push({ref:ref(name),tid:name,allowed_actions:['set_wizard_field'],
+    wizard_field:{scope:'import_format',name,owner_ref,root_ref:wizard.root_ref}});
+  }
+  state.ui.elements.push({ref:'refresh-all',tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;btnRefreshAll',allowed_actions:['click']});
+  if(!alreadyDelimited&&!refreshed){
+   const definitions=wizard.import_columns;
+   definitions.fields=definitions.fields.slice(0,1);
+   Object.assign(definitions.page,{schema_id:'one',returned:1,total_columns:1,next_offset:null});
+  }
+  assert.equal(options.ready(state),true,options.condition);
+  return state;
+ };
+ f.channel.act=async action=>{
+  if(action.verb==='set_wizard_field'||action.verb==='set_wizard_fields'){
+   const snapshot=await f.channel.observe({ready:()=>true});
+   validateNodeUiAction(action,snapshot,snapshot.prepared_node_context);
+   actions.push(action);
+   for(const {ref,text} of action.fields??[action])values[nameOf(ref)]=text;
+   return;
+  }
+  if(action.ref==='refresh-all'){assert.equal(values.delimiter,',');actions.push(action);refreshed=true;return;}
+  if(action.verb==='select_wizard_option')actions.push(action);
+  return act(action);
+ };
+ const result=await configureTextImportFields(f.channel,f.parameters,f.owner);
+ assert.equal(result.columns.length,8);
+ assert.deepEqual(actions,[
+  ...(!alreadyDelimited?[{verb:'set_wizard_field',ref:ref('delimiter'),text:','}]:[]),
+  {verb:'set_wizard_field',ref:ref('decimal_separator'),text:'.'},
+  {verb:'select_wizard_option',ref:'option-NULL'},
+  ...(!alreadyDelimited?[{verb:'click',ref:'refresh-all'}]:[])
+ ]);
 });
 
 for(const fault of ['incomplete','changing','foreign_owner','transport'])test(`${fault} page is not converted to a typed count refusal`,async()=>{

@@ -92,6 +92,7 @@ export type TimelineProjectionInput = {
   pendingInputIDs?: ReadonlySet<string>
   queuedCompactionIDs?: readonly string[]
   turnDiffs?: boolean
+  toolSeparate?: ReadonlySet<string>
   previousRows?: TimelineRow.TimelineRow[]
 }
 
@@ -109,6 +110,7 @@ export function createTimelineProjection(input: TimelineProjectionInput) {
     input.timelineDetail,
     input.queuedCompactionIDs,
     input.turnDiffs,
+    input.toolSeparate,
   )
 
   const rows = reuseTimelineRows(input.previousRows, projection.rows)
@@ -150,6 +152,7 @@ export function createReactiveTimelineProjection(input: {
   queuedCompactionIDs?: Accessor<readonly string[]>
   /** Summarize each finished turn's changed files after it. */
   turnDiffs?: Accessor<boolean>
+  toolSeparate?: Accessor<ReadonlySet<string> | undefined>
 }) {
   const sessionMessageByID = createMemo(
     () => new Map(input.sessionMessages().map((message) => [message.id, message] as const)),
@@ -196,6 +199,7 @@ export function createReactiveTimelineProjection(input: {
       input.timelineDetail?.(),
       input.queuedCompactionIDs?.(),
       input.turnDiffs?.(),
+      input.toolSeparate?.(),
     ),
   )
 
@@ -271,6 +275,7 @@ export namespace Timeline {
     detail?: TimelineDetail,
     queuedCompactionIDs: readonly string[] = [],
     turnDiffs = false,
+    toolSeparate?: ReadonlySet<string>,
   ) {
     type Turn = {
       id: string
@@ -463,6 +468,7 @@ export namespace Timeline {
           visible,
           detail,
           commentary,
+          toolSeparate,
         )
       }),
     ]
@@ -521,6 +527,7 @@ export namespace Timeline {
     isRenderable = renderable,
     detail?: TimelineDetail,
     commentary: ReadonlySet<Content> = new Set(),
+    toolSeparate?: ReadonlySet<string>,
   ) {
     const rows: TimelineRow.TimelineRow[] = []
     const assistantMessages = entries.flatMap((entry) => (entry.type === "assistant" ? [entry.message] : []))
@@ -557,20 +564,22 @@ export namespace Timeline {
 
       const appendGroups = (items: typeof refs) => {
         let offset = 0
-        groupContent(items, shellToolDefaultOpen, editToolDefaultOpen, commentary, detail).forEach((group) => {
-          const tool = group.type !== "part" || items[offset]?.content.type !== "text"
-          offset += group.type === "part" ? 1 : group.refs.length
-          rows.push(
-            new TimelineRow.AssistantPart({
-              userMessageID: turnID,
-              group,
-              previousAssistantPart: assistantGroupIndex > 0,
-              spacing: assistantGroupIndex > 0 ? (previousAssistantTool && tool ? "tool" : "content") : undefined,
-            }),
-          )
-          assistantGroupIndex += 1
-          previousAssistantTool = tool
-        })
+        groupContent(items, shellToolDefaultOpen, editToolDefaultOpen, commentary, detail, toolSeparate).forEach(
+          (group) => {
+            const tool = group.type !== "part" || items[offset]?.content.type !== "text"
+            offset += group.type === "part" ? 1 : group.refs.length
+            rows.push(
+              new TimelineRow.AssistantPart({
+                userMessageID: turnID,
+                group,
+                previousAssistantPart: assistantGroupIndex > 0,
+                spacing: assistantGroupIndex > 0 ? (previousAssistantTool && tool ? "tool" : "content") : undefined,
+              }),
+            )
+            assistantGroupIndex += 1
+            previousAssistantTool = tool
+          },
+        )
       }
 
       appendGroups(before)
@@ -995,6 +1004,7 @@ function groupContent(
   editToolDefaultOpen: boolean,
   commentary: ReadonlySet<Content>,
   detail?: TimelineDetail,
+  toolSeparate?: ReadonlySet<string>,
 ): PartGroup[] {
   const groups: PartGroup[] = []
   let adjacent: { type: "context" | "file" | "read"; refs: PartRef[]; tools: boolean } | undefined
@@ -1033,6 +1043,7 @@ function groupContent(
       adjacent?.type === "context" && adjacent.tools,
       commentary,
       detail,
+      toolSeparate,
     )
 
     if (type) {
@@ -1063,8 +1074,13 @@ function contentGroupType(
   hasContextGroup: boolean,
   commentary: ReadonlySet<Content>,
   detail?: TimelineDetail,
+  toolSeparate?: ReadonlySet<string>,
 ) {
-  if (content.type === "tool") return toolGroupType(content, shellExpanded, editExpanded, hasContextGroup, detail)
+  if (content.type === "tool") {
+    if (toolSeparate?.has(content.name)) return undefined
+
+    return toolGroupType(content, shellExpanded, editExpanded, hasContextGroup, detail)
+  }
 
   if (content.type === "text") return commentary.has(content) ? "context" : undefined
 

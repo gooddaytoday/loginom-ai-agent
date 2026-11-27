@@ -1,7 +1,7 @@
 import {DATE_TIME_OPERATIONS} from './date-time-parameters.mjs';
 import {expandOutputChanges} from './output-mapping-changes.mjs';
 import {ensureGroupingOutputSources} from './grouping-output-sources.mjs';
-import {configureOutputFields,configureOutputAutosync,reorderOutputFields} from './port-mapping-procedure.mjs';
+import {configureOutputFields,configureOutputAutosync,configureRequestedOutputAutosync,requestedOutputAutosync,reorderOutputFields} from './port-mapping-procedure.mjs';
 import {ensureDateTimeRequestedOutputs} from './date-time-output-additions.mjs';
 import {removeDateTimeOrphans} from './date-time-removal.mjs';
 const need=(v,m)=>{if(!v)throw Error('Date/time output: '+m);};
@@ -47,10 +47,10 @@ export async function configureDateTimeOutput(channel,c,p,mapping={},options={})
   const ids=planned.map(f=>{const matches=edited.target_fields.filter(t=>(t.source??t.exclusion_source)?.record_id===f.source.record_id);need(matches.length===1,'mapped source changed');return matches[0].record_id;});
   changes.push(await reorderOutputFields(channel,ids));
  }
- // Native autosync appends passthrough fields after generated fields on the
- // next node validation. An explicit layout must therefore disable it.
- if(mapping.fields||mapping.changes||mapping.autosync!==undefined)changes.push(await configureOutputAutosync(channel,mapping.autosync??false));
- else if(removal.receipts.length)changes.push(await configureOutputAutosync(channel,originalAutosync));
+ const namedOutputs=p.fields?.some(field=>field.transformations.length>0);
+ await configureRequestedOutputAutosync(channel,mapping,changes,namedOutputs);
+ if(requestedOutputAutosync(mapping,namedOutputs)===undefined&&removal.receipts.length)
+  changes.push(await configureOutputAutosync(channel,originalAutosync));
  const final=(await channel.observe({condition:'date/time final output mapping',readMappings:true,ready})).node_mapping;
  // Excluded records are service records, not output columns. Loginom gives
  // them the source name as label; compare the retained source label instead.

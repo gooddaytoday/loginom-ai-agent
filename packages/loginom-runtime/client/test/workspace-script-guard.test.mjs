@@ -87,7 +87,7 @@ function classifyOnly(f) {
   const context=vm.createContext({bg:{app:f.page.app},graphContainer,graphQueryable:true,graphPrefix:'MF;TF-1;Graph;',
     nativeGraphElements:f.page.document.all().filter(e=>graphContainer.contains(e)&&e.getAttribute('data-tid')?.includes(';Graph;')),
     ownedGraph:e=>graphContainer.contains(e)&&e.getAttribute('data-tid')?.startsWith('MF;TF-1;Graph;'),
-    getTid:e=>e?.getAttribute('data-tid'),charge:()=>{},refOf:()=> 'opaque-test-ref',target:f.body});
+    getTid:e=>e?.getAttribute('data-tid'),charge:()=>{},refOf:()=> 'opaque-test-ref',target:f.body,inventoryTypes:null});
   return vm.runInContext('(()=>{'+classifierBlock+'return nativeGraphControl(target);})()',context);
 }
 for(const icon of ['bg-vendor-icon-importtextfile','bg-vendor-icon-javascript'])test('own FItems classifier never invokes inherited Items: '+icon,()=>{

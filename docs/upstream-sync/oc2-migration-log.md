@@ -26773,3 +26773,82 @@ exports-excel, preprocessing-datapartition, preprocessing-sampling и разбо
 заново; research-autocorrelation — ограничение, общее с `v0.4.2` (В-113). В-117 — D1 (ошибки плагинов при первом запуске Desktop на Windows) исправляется на этапе C, в проверку
 установленного приложения шлюза C входят несколько первых запусков только что доставленной сборки. В-114 — номер версии продукта меняется на этапе G с повтором итоговых проверок
 шлюза. Отчёт — `docs/testing/loginom-ai-agent/reports/2026-11-26-gate-b.md`. Заморозка `packages` на время B6.1 снята; сборка `<lrun>/b61a/cli5` хранится до разбора D5.
+
+## C0.0 Слияние v0.4.3
+
+27.11.2026. Ветка `c0-v043-sync` от `oc2-migration` (`50224d5efe`). По решению П7 и уточнению владельца эталон шлюза C — выпуск
+`32c19008ff6502a13dfac1cb386c8631e13f9b7d` из `origin/loginom` вместе с хотфиксом прокрутки
+`c91531e881cafb8ab4044bfcc3f31a739a86047e` из `origin/hotfix-044`. Хотфикс ответвился от `f87ca45e20`, родителя релизного
+коммита: на этой ветке два коммита интерфейса, без повышения версии. Оба вошли в историю C0.0 отдельным слиянием.
+Между деревьями релизов — 222 файла; в диапазоне
+`2b328b36dd..32c19008ff` — 233 коммита. Релизные коммиты 0.4.2 и 0.4.3 разошлись от `da28492df7` (база слияния).
+
+`packages/loginom-runtime` взят целиком из 0.4.3; дерево не отличается от релиза. Перенесены материалы пошаговой работы
+(действовать в пределах запроса, проверять в Loginom, сохранять только по просьбе), справочники узлов и их тесты.
+В `loginom-host` обновлена фикстура IPC: теперь `managed-entry` импортирует `reauthenticateReloadedPage`.
+В `.oxlintrc.json` исключён только `no-restricted-globals` в шести тестовых файлах и пробах 0.4.3 с настоящим `Reflect`;
+остальной lint сохранён (`CAT-02`). Ссылку из неизменённого runtime-руководства на трансформер v1 проверка путей
+учитывает как историческую; корневой `AGENTS.md` указывает соответствующую область v2 (`CAT-07`).
+
+### Решения по конфликтам
+
+При слиянии релиза Git выдал 16 конфликтов: 5 `content`, 11 `modify/delete`. `packages/app/package.json` не конфликтовал, также оставлен `ours`.
+При слиянии хотфикса — ещё два `modify/delete`, оба разрешены сохранением удаления.
+
+| Файл | Правка 0.4.3 | Решение |
+|---|---|---|
+| `package.json`, `bun.lock`, `packages/desktop/package.json` | версия и зависимости 0.4.3 | `ours`; версии и lockfile v2 |
+| `AGENTS.md` | решение о пошаговом построении, описание backend v1 | добавлено решение; архитектура и независимые службы v2 сохранены |
+| `packages/loginom-host/AGENTS.md` | подсказки о bootstrap-каталоге и ссылке на scope v1 | `ours`; bootstrap требует согласованного переноса Host и реестра v2 |
+| `packages/opencode/AGENTS.md` | контракт наследования skill и инструкции до prepare | путь удалён; различия перечислены ниже |
+| `packages/opencode/src/cli/profile.ts`, `test/cli/profile-windows.test.ts`, `test/cli/profile.test.ts` | захват writer после аварии, границы профиля и ACL | пути удалены; не брать частично автоматически слитый `packages/cli/src/profile-windows.ts` без остального контракта и нативных тестов |
+| `packages/opencode/src/product/turn-lifecycle.ts`, `src/session/prompt.ts`, `src/session/task-scope.ts` | наследование активации и подсказка о prepare на ход | пути удалены; сохраняется разрешение только на текущий запрос v2 |
+| `packages/opencode/test/product/tool-contributor.test.ts`, `test/product/turn-lifecycle.test.ts`, `test/session/prompt.test.ts`, `test/session/task-scope.test.ts` | проверки каталога, наследования, прав и восстановления | пути удалены; переносить проверки вместе с поведением |
+| `packages/app/src/components/package-docs-tool.tsx`, `packages/app/e2e/regression/generated-file-cards.spec.ts` | хотфикс удерживает чат смонтированным во время проверки файла при фокусе окна; e2e проверяет отсутствие перемонтирования | пути удалены в v2 и не восстановлены |
+
+Отдельно по пошаговой сборке:
+
+- В навыке вручную сохранена область активации v2: разрешение действует на текущий запрос, а не наследуется чатом.
+  Это единственное отличие `SKILL.md` от 0.4.3; раздел «Пошаговая сборка» и справочники совпадают с релизом.
+- В runtime конфликтов Git не было. Для побайтового совпадения с релизом поверх автослияния взяты релизные версии восьми
+  файлов: `AGENTS.md`, `package.json`, `client/test/artifact-download.test.mjs` и проб
+  `tools/loginom-acceptance/javascript-{calibration-wizard,native-details-discovery,native-input-binding,native-roundtrip-binding,native-zero}.mjs`.
+  Файлы реализации и тесты обновления исходной схемы между шагами не потребовали выбора.
+- Исключение из побайтового совпадения — `packages/loginom-runtime/package.json`: блок `"dependencies": {"acorn": "8.15.0"}` из v2 (B1.7, `05374fa0bb`) возвращён после ревью. Без него `bun.lock` расходится с манифестом, а `bun test` в `packages/product` на свежем дереве падает с `Cannot find package 'acorn'` (тест маршрутов узлов грузит `client/lib/javascript-module-policy.mjs` из workspace). Это единственное записанное отличие runtime от 0.4.3.
+
+### Не перенесено
+
+| Что | Где в 0.4.3 / hotfix-044 | Куда в v2 |
+|---|---|---|
+| После аварии доказать смерть прежнего владельца, убрать только его процессы и атомарно забрать `.writer`; сохранить `PROFILE_BUSY` при неопределённости | `packages/opencode/src/cli/profile.ts`, `profile-windows.ts` и тесты; `packages/loginom-host/script/cli-owner-crash.ts`; дизайн §6.3 и runbook. См. `ff1373427a`, `b5ef032586`, `497d46b1ec`, `a381dd44` | `packages/cli/src/profile.ts`, `profile-windows.ts`, жизненный цикл своей службы, CLI-тесты и crash-driver; действующий runbook v2 не менялся |
+| Root-relative ACL для оставшихся кэшей Chromium на Windows | `packages/opencode/src/cli/profile-windows.ts` и `profile-windows.test.ts` (`11002b90`, `2eb50a16bb`) | CLI v2, вместе с нативной проверкой ACL и захвата writer |
+| Наследовать активацию `loginom-automation` между запросами с проверкой видимой истории, разрешений, digest и Host scope, включая запрос только с вложением | `packages/opencode/src/product/turn-lifecycle.ts`, `src/session/{task-scope,prompt}.ts`, тесты; описание skill (`e35f392db8`, `e077953232`, `c7a6e43d6e`) | `packages/loginom-agent/src/index.ts`, Host scope, тесты server; до переноса skill честно просит активацию на каждый запрос |
+| Заглушки Dock до prepare, `NOT_PREPARED`, обновление схем после замены runtime и подсказки до prepare. Указание об архивации не обещается без проверки адаптера | `packages/loginom-host/src/{dock-catalog,host-port}.ts`, тесты Host и `packages/opencode/src/product/turn-lifecycle.ts` | `packages/loginom-host` + `packages/loginom-agent/src/dock.ts` и server-тесты: реестр v2 общий для поколения, заглушки одного чата не должны заменять полные схемы другого |
+| Изменения интерфейса/установленного Desktop | В диффе 0.4.2 → 0.4.3 нет файлов интерфейса; у Desktop меняется только версия манифеста | Ничего не переносить по UI; версия v2 остаётся прежней (В-114) |
+| Сохранение прокрутки чата при возврате фокуса окна и e2e на отсутствие перемонтирования | `packages/app/src/components/package-docs-tool.tsx`, `packages/app/e2e/regression/generated-file-cards.spec.ts` (`93a6292ce`, `c91531e88`) | Оба файла относятся к интерфейсу 0.4 и отсутствуют в v2. При необходимости проверить аналогичное поведение в ленте v2 (`packages/app/src/session/timeline`) и добавить тест на её интерфейсе |
+
+### Проверки
+
+Bun 1.4.4, Node 24.19.0, зависимости клиента и шаблона через `npm ci`, тестовые HOME/XDG. Серверные модели — подставные; настоящая модель не вызывалась.
+
+| Команда | Выход | Реальный итог |
+|---|---:|---|
+| `git merge-base --is-ancestor 32c19008ff6502a13dfac1cb386c8631e13f9b7d HEAD` | 0 | релиз — второй родитель слияния |
+| `git merge-base --is-ancestor c91531e881cafb8ab4044bfcc3f31a739a86047e HEAD` | 0 | hotfix-044 — второй родитель дополнительного слияния |
+| `git merge-base --is-ancestor 56ba60c300 HEAD`; `git merge-base --is-ancestor c59849f1fe HEAD` | 0, 0 | оба коммита обновления исходной схемы входят через 0.4.3 |
+| `git diff --exit-code 32c19008ff6502a13dfac1cb386c8631e13f9b7d HEAD -- packages/loginom-runtime` | 0 | пустой вывод |
+| `packages/product`: `bun test --timeout 60000` | 0 | 125 pass, 0 fail |
+| `packages/product`: `bun test --timeout 60000 test/automation-guidance.test.ts` | 0 | 19 pass, 0 fail; навык требует наблюдать текущий граф с учётом ручных правок и сохранять итоговый пакет только по явной просьбе, без безусловного сохранения в конце хода |
+| `packages/loginom-runtime/client`: `node --test --test-concurrency=4 test/*baseline*.test.mjs test/{node-target-port-render,workspace-script-guard,workspace,workspace-ui}.test.mjs` | 0 | 893 pass, 0 fail, 0 skip; в том числе восемь случаев принятия ручной правки между шагами в `workspace.test.mjs` |
+| `packages/loginom-host`: `bun test --timeout 60000` | 1 | 548 pass, 14 skip, 2 timeout; `ci-inputs` и `file-reference-ipc` прошли отдельно, тест `managed-work-entry` также прошёл |
+| `packages/loginom-runtime`: `node --test --test-concurrency=3 test/*.test.mjs` | 0 | 148 pass, 0 fail |
+| `packages/loginom-runtime/client`: `node --test --test-concurrency=4 test/*.test.mjs` | 0 | 10 997 pass, 5 skip, 0 fail; закреплённый Chromium |
+| `packages/loginom-agent`: `bun test --timeout 60000` | 0 | 131 pass, 0 fail |
+| `packages/server`: `bun test --timeout 60000 test/loginom-*.test.ts` | 1 | 177 pass, 1 fail; `loginom-dashboard-target` сравнивает несортированный `readdir`, то же на базе (2 pass, 1 fail в файле) |
+| `bun run check` | 0 | lint: 0 ошибок; typecheck: 39/39 |
+| `python3 -I scripts/upstream-sync/catalog-check.py --summary` | 0 | все расхождения классифицированы |
+| `python3 -I scripts/upstream-sync/apply-identity.py --check` | 0 | `would change: 0 files` |
+
+Не запускались нативные сборки Windows/macOS, установленный Desktop и живые приёмочные прогоны на стенде. Переходы между ручными правками
+в живом Loginom и отдельные переносы из таблицы остаются риском для шлюза C. Дополнительное слияние меняет только журнал;
+проверка прокрутки интерфейса v2 при фокусе окна в эту задачу не входила.

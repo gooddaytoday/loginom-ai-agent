@@ -11,7 +11,7 @@ import { closeManagedResources } from "./managed-resources-close.mjs"
 import { dashboardStorage } from "./dashboard-storage.mjs"
 import { runtimeCallTimeout } from "./call-timeout.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
-import { loginBrowser, loginomAddress } from "./connection-check.mjs"
+import { loginBrowser, loginomAddress, reauthenticateReloadedPage } from "./connection-check.mjs"
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
@@ -248,6 +248,7 @@ async function handle(message) {
       await state.browserServer.connect(browserServerTransport)
       const knownSecrets = [input.connection.apiKey, input.connection.password, input.connection.username]
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+        reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
         presentNodeReply: async (reply, project) => {
           const outputFiles = await session.artifactStore.outputFiles(reply.structuredContent)
           let loginom
