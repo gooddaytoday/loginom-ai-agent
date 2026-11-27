@@ -8,7 +8,7 @@ import { launchNodeHost, NodeHostStartupError } from "../src/node-client"
 import { verifyInstallationResources } from "../src/host"
 import { connectionStore } from "../src/connection/connection-store"
 import { cliCredentials } from "../src/connection/cli-credentials"
-import { stageHeldKnowledge } from "./fixtures/knowledge"
+import { stageHeldKnowledge, stageKnowledgeFixture } from "./fixtures/knowledge"
 import { constants } from "node:fs"
 
 const fixture = { directory: "", entry: "", node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? "" }
@@ -34,6 +34,104 @@ beforeAll(async () => {
 afterAll(async () => {
   if (fixture.directory) await rm(fixture.directory, { recursive: true, force: true })
 })
+
+test("Desktop checks the original write, allows reads, and never unlocks an unknown write on reconnect or restart", async () => {
+  const directory = await mkdtemp(join(fixture.directory, "desktop-writes-"))
+  const root = join(directory, "profile")
+  const resources = join(directory, "resources")
+  const effects = join(directory, "effects.jsonl")
+  const reconnect = join(directory, "reconnected")
+  const target = "/fixture/packages/original.lgp"
+  await mkdir(join(resources, "runtime/src"), { recursive: true })
+  await mkdir(join(resources, "bin"))
+  await symlink(fixture.node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
+  await stageKnowledgeFixture(resources)
+  await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({}))
+  await writeFile(join(resources, "runtime/src/managed-entry.mjs"), `
+    import { randomUUID } from 'node:crypto';
+    import { appendFileSync, existsSync } from 'node:fs';
+    const owner = randomUUID(), receipts = new Map();
+    let path, validation;
+    process.on('message', message => {
+      const {operation,input,id} = message;
+      const reply = result => process.send({id,result});
+      if (operation === 'start') {
+        validation=input.validation;
+        reply({protocol:1, generation:input.generation, chat:input.chat, ready:true, checked:validation === true});
+      }
+      if (operation === 'close') process.send({id,result:{closed:true}},()=>process.disconnect());
+      if (operation === 'interrupt') reply({interrupted:true});
+      if (operation === 'list') reply({prepared:true,tools:['dock_action_run','dock_workspace_observe'].map(name=>({name,inputSchema:{type:'object'}}))});
+      if (operation === 'write-outcome.prepare') {
+        const args=input.arguments;
+        if (input.name !== 'dock_action_run') return reply({effect:'read'});
+        reply({effect:'save',operation:args.action_key,paths:[path], receipt:{owner,operationID:args.operation_id,fresh:true},
+          baseline:{document:'doc',workflow:'workflow',packagePath:path,savedDigest:'a'.repeat(64),draft:false}});
+      }
+      if (operation === 'write-outcome.check') reply(input.receipt.owner === owner
+        ? receipts.get(input.receipt.operationID) ?? 'unknown' : 'owner_lost');
+      if (operation === 'write-outcome.readback') reply(input.packagePath === ${JSON.stringify(target)} ? 'changed' : 'unavailable');
+      if (operation !== 'call') return;
+      if (input.name === 'dock_prepare') path=input.arguments.package_path;
+      const answer = result => reply({result,recoveryPending:false,writeSettled:true});
+      if (input.name !== 'dock_action_run') return answer({path,reconnected:existsSync(${JSON.stringify(reconnect)})});
+      const operationID=input.arguments.operation_id;
+      appendFileSync(${JSON.stringify(effects)}, JSON.stringify({path,operationID})+'\\n');
+      if (operationID === 'partial' || operationID === 'committed') {
+        receipts.set(operationID, operationID === 'committed' ? 'applied' : 'unknown');
+        return process.send({id,error:'LOGINOM_RUNTIME_FAILED'});
+      }
+      answer({saved:true});
+    });
+  `)
+  if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
+  const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
+  await store.stage({ generation: 1, revision: 1, url: "http://127.0.0.1:1/app/", username: "fixture", apiKey: "fixture", password: "" })
+  await store.activate(1)
+  const launch = () => launchNodeHost({ node: fixture.node, entry: fixture.entry, root, resources, headless: true, desktopWriteOutcomes: true })
+  let host = await launch()
+  const check = (sessionID = "chat", writeID?: string) => host.request("loginom.write-outcome.check", { sessionID, writeID })
+  const call = (run: string, name: string, args: object = {}) => host.request("call", { run, name, args,
+    userMessage: "msg_original", invocation: { turn: "msg_current", call: "tool-call" } })
+  const write = (operationID: string, run = "one") => call(run, "dock_action_run", { action_key: "package.save_checkpoint", operation_id: operationID })
+  async function prepare(run: string, session: string, path = target) {
+    await host.request("acquire", { run, session })
+    await host.request("scope", { run, mode: "bind", scope: { taskMessageID: "msg_original", profile: "loginom-automation" } })
+    await call(run, "dock_prepare", { intent: "open_package", package_path: path })
+    await host.request("tools", { run })
+  }
+  try {
+    await host.request("connection.ready", {})
+    await prepare("one", "chat")
+    await expect(write("committed")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+    await expect(write("blocked-first")).rejects.toThrow("LOGINOM_WRITE_OUTCOME_UNKNOWN")
+    expect(await check()).toMatchObject({ status: "applied", writeID: expect.any(String) })
+    await expect(write("partial")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+    const unknown = await check()
+    expect(unknown).toMatchObject({ status: "unknown", writeID: expect.any(String) })
+    await writeFile(reconnect, "online")
+    await host.request("connection.ready", {})
+    expect(await call("one", "dock_workspace_observe")).toEqual({ path: target, reconnected: true })
+    expect(await check()).toEqual(unknown)
+    await expect(write("partial")).rejects.toMatchObject({ message: "LOGINOM_WRITE_OUTCOME_UNKNOWN", details: { reason: expect.stringContaining("Прочитайте") } })
+    await prepare("peer", "another-chat")
+    await expect(write("blocked-other-chat", "peer")).rejects.toThrow("LOGINOM_WRITE_OUTCOME_UNKNOWN")
+    expect(await check("another-chat")).toEqual({ status: "unknown" })
+    await prepare("other", "third-chat", "/fixture/packages/different.lgp")
+    expect(await write("unrelated", "other")).toEqual({ saved: true })
+    await host.close()
+    host = await launch()
+    await host.request("connection.ready", {})
+    expect(await check()).toMatchObject({ status: "unknown", writeID: expect.any(String), readback: "changed" })
+    await prepare("one", "chat")
+    expect(await call("one", "dock_workspace_observe")).toEqual({ path: target, reconnected: true })
+    await expect(write("blocked-restart")).rejects.toThrow("LOGINOM_WRITE_OUTCOME_UNKNOWN")
+    expect((await readFile(effects, "utf8")).trim().split("\n").map((line) => JSON.parse(line).operationID))
+      .toEqual(["committed", "partial", "unrelated"])
+  } finally {
+    await host.close()
+  }
+}, 30_000)
 
 test.each(["rejected", "invalid"])(
   "failed host startup confirms cleanup and exit before rejecting: %s",

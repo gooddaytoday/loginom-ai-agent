@@ -78,6 +78,31 @@ const preflight = {
   events: {},
 } as const
 
+const writeOutcome = {
+  id: "loginom.write-outcome",
+  methods: {
+    check: {
+      input: {
+        type: "object",
+        properties: { sessionID: { type: "string", minLength: 1 }, writeID: { type: "string" } },
+        required: ["sessionID"],
+        additionalProperties: false,
+      },
+      output: {
+        type: "object",
+        properties: {
+          status: { type: "string", enum: ["applied", "not_applied", "unknown"] },
+          writeID: { type: "string" },
+          readback: { type: "string", enum: ["unchanged", "changed", "observed", "unavailable"] },
+        },
+        required: ["status"],
+        additionalProperties: false,
+      },
+    },
+  },
+  events: {},
+} as const
+
 // Prompt metadata key that carries the wizard's one-time token to the `prompt` hook; the hook removes it.
 const token = "loginom.runner"
 // Permission request metadata key of the product's own check of the rules (B2.6b).
@@ -514,6 +539,7 @@ export default Plugin.define({
       prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),
       find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),
     })
+    await ctx.rpc.register(writeOutcome, { check: ServiceHost.checkWriteOutcome })
     await ctx.rpc.register(permission, {
       conversation: async (value, call) => {
         const input = value as { sessionID: string; requestID: string }

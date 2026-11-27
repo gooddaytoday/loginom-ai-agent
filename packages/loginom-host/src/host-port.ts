@@ -9,6 +9,7 @@ import { DashboardDelete, DashboardRead, DashboardPublish } from "./dashboard"
 import { Schema } from "effect"
 import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
 import { browserRecoveryToolName, isBrowserRecoveryTool } from "../../loginom-runtime/client/lib/browser-recovery.mjs"
+import { WriteIntent, type WriteRecord } from "./connection/write-outcomes"
 
 const knowledgeTools = new Set(["find", "search", "read", "grep", "glob", "list", "tree"])
 const Admissions = Schema.Array(
@@ -24,6 +25,7 @@ const PackageInput = Schema.Struct({
 const PackageAdmission = Schema.Tuple([
   Schema.Struct({ artifact_id: Schema.NonEmptyString, upload: Schema.Struct({ grant_id: Schema.NonEmptyString }) }),
 ])
+const Invocation = Schema.Struct({ turn: Schema.NonEmptyString, call: Schema.NonEmptyString })
 const diagnosticTool = {
   name: "dock_diagnostics",
   description:
@@ -589,6 +591,9 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         if (input.name !== prepareTool.name && !service.hasRuntime(lease.generation, run.chat))
           throw new Error("LOGINOM_SCOPE_DENIED")
         const recovery = { id: undefined as string | undefined }
+        const writes = service.writes
+        let write: WriteRecord | undefined
+        let dispatched = false
         try {
           const packageAdmission = packageInput
             ? {
@@ -624,26 +629,51 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             (state.closed || run.released || preparation.signal.aborted || Date.now() >= preparation.deadline)
           )
             throw new Error("LOGINOM_CONNECTION_NOT_READY")
-          recovery.id = await service.journal.begin(run.chat, lease.generation)
-          run.active.add(recovery.id)
+          const server = writes ? service.writeServer(lease.generation) : undefined
+          if (writes && server) {
+            const intent = Schema.decodeUnknownSync(WriteIntent)(await runtime.request("write-outcome.prepare", {
+              name: input.name, arguments: args, ...(packageArtifact ? { packageArtifact } : {}),
+            }, 8_000))
+            if (intent.effect !== "read") {
+              const invocation = "invocation" in input ? Schema.decodeUnknownSync(Invocation)(input.invocation)
+                : { turn: input.userMessage, call: data.id }
+              write = await writes.begin({ ...intent, ...invocation, generation: lease.generation, chat: run.chat, server })
+            }
+          } else {
+            recovery.id = await service.journal.begin(run.chat, lease.generation)
+            run.active.add(recovery.id)
+          }
           if (!service.hasRuntime(lease.generation, run.chat) || packageAborted()) {
             // Exit during journal admission precedes dispatch. Settle this unused
             // record, and require explicit preparation before a replacement owner.
-            await service.journal.settle(recovery.id, true)
-            run.active.delete(recovery.id)
-            recovery.id = undefined
+            if (recovery.id) {
+              await service.journal.settle(recovery.id, true)
+              run.active.delete(recovery.id)
+              recovery.id = undefined
+            }
             throw new Error(packageAborted() ? "LOGINOM_RUN_ABORTED" : "LOGINOM_SCOPE_DENIED")
           }
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
           const remaining = preparation?.waited ? preparation.deadline - Date.now() : undefined
           if (remaining !== undefined && (remaining <= 0 || preparation!.signal.aborted || run.released)) {
-            await service.journal.settle(recovery.id, true)
-            run.active.delete(recovery.id)
-            recovery.id = undefined
+            if (recovery.id) {
+              await service.journal.settle(recovery.id, true)
+              run.active.delete(recovery.id)
+              recovery.id = undefined
+            }
             throw new Error("LOGINOM_CONNECTION_NOT_READY")
           }
           const requestID = data.id
           const stepProgress = "stepProgress" in input && input.stepProgress === true
+          if (writes && write) {
+            await writes.dispatch(write)
+            if (state.closed || run.released || run.packagePreparation?.signal.aborted ||
+              (preparation?.waited && Date.now() >= preparation.deadline) || !service.hasRuntime(lease.generation, run.chat)) {
+              await writes.finish(write, "not_applied")
+              throw Error("LOGINOM_WRITE_NOT_DISPATCHED")
+            }
+            dispatched = true
+          }
           const result = await runtime.request(
             "call",
             {
@@ -652,6 +682,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
               ...(packageArtifact ? { packageArtifact } : {}),
               ...(input.name === "dock_node_apply" && "scanReceipt" in input ? { scanReceipt: input.scanReceipt } : {}),
               ...(stepProgress ? { stepProgress: true } : {}),
+              ...(write ? { writeReceipt: write.receipt } : {}),
+              ...(!write && writes && server && writes.hasPending(server) ? { observeOnly: true } : {}),
             },
             runtimeCallTimeout(input.name, "args" in input ? input.args : undefined) + 15_000,
             stepProgress ? (progress) => reply({ id: requestID, progress }) : undefined,
@@ -664,11 +696,27 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             !("result" in result)
           )
             throw new Error("LOGINOM_REPLY_INVALID")
-          if (result.recoveryPending && !("activeWork" in result && result.activeWork === true)) {
+          if (writes) {
+            if (write && "writeSettled" in result && result.writeSettled === true)
+              await writes.finish(write, "complete")
+            if (!write && result.recoveryPending === false && input.name === "dock_node_wait" &&
+              args && typeof args === "object" && "operation_id" in args) {
+              for (const entry of writes.pending(run.chat)) {
+                if (!writes.active(entry) && entry.receipt.operationID === args.operation_id && writes.reserveCheck(entry)) {
+                  try {
+                    const verdict = await service.liveWriteVerdict(entry)
+                    if (verdict === "applied" || verdict === "not_applied") await writes.finish(entry, "complete")
+                  } finally {
+                    writes.release(entry)
+                  }
+                }
+              }
+            }
+          } else if (result.recoveryPending && !("activeWork" in result && result.activeWork === true)) {
             await abandon(run)
             service.markRuntimeStale(run.chat)
           }
-          if (result.recoveryPending === false) {
+          if (!writes && result.recoveryPending === false) {
             // Only this owner and runtime can prove completion of its prior async work.
             // Keep records durable across wait timeouts; a restart recovers them.
             for (const id of run.active) await service.journal.settle(id, true)
@@ -681,6 +729,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           if (isBrowserRecoveryTool(input.name)) run.recovery = recoveryPhase(result.result, run.recovery)
           reply({ id: data.id, result: result.result }, lease.generation)
         } catch (error) {
+          if (dispatched) throw Error("LOGINOM_CALL_UNCERTAIN")
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE") throw error
           // A journal write failure precedes runtime dispatch and cannot establish
           // an uncertain external operation without an admitted journal identity.
@@ -688,6 +737,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           await abandon(run)
           service.markRuntimeStale(run.chat)
           throw new Error("LOGINOM_CALL_UNCERTAIN")
+        } finally {
+          if (write) writes?.release(write)
         }
       } finally {
         if (data.method === "call" || referenceCall) {

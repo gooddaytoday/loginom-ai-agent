@@ -12,6 +12,7 @@ import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
+import { WriteOutcomeInput, WriteOutcomeResult } from "@loginom-ai-agent/loginom-host/write-outcomes"
 import { Option, Schema } from "effect"
 
 export type Lease = NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>
@@ -139,6 +140,11 @@ async function request(method: string, input: unknown) {
   return connection.request(method, input)
 }
 
+export async function checkWriteOutcome(input: unknown) {
+  const reply = await request("loginom.write-outcome.check", Schema.decodeUnknownSync(WriteOutcomeInput)(input))
+  return Schema.decodeUnknownSync(WriteOutcomeResult)(reply)
+}
+
 /** Releases every lease still held, disconnects and closes the Host. Idempotent: soft stop (B2.3b) may call it first. */
 export function close() {
   const current = state.current
@@ -215,6 +221,7 @@ function nodeHost(root: string, resources: string) {
           : undefined,
       strictRecovery:
         process.env.LOGINOM_AI_AGENT_CLI_ROOT !== undefined && process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
+      desktopWriteOutcomes: process.env.LOGINOM_AI_AGENT_CLI_ROOT === undefined,
       // 0.4.2 enabled it for the CLI's `run` only (`standalone-run.ts`): `forward` marks the private server of a run, so a
       // service, Desktop's server and `serve` never close a package. The runtime then writes `saved-package-cleanup.json`.
       closeSavedPackageOnShutdown:

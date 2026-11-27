@@ -2,7 +2,7 @@ import { inputStore, type InputFile } from "./inputs"
 import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { tmpdir } from "node:os"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
@@ -10,6 +10,7 @@ import { connectionService } from "./connection/connection-service"
 import { connectionStore, type ActiveConnection } from "./connection/connection-store"
 import type { CredentialCodec } from "./connection/credentials"
 import { recoveryStore } from "./connection/recovery-store"
+import { SavedCopyReadback, WriteVerdict, writeOutcomes, type WriteRecord } from "./connection/write-outcomes"
 import { fileReferences } from "./file-reference"
 import { dashboardRequest, type DashboardStorageOperation } from "../../loginom-runtime/src/dashboard-storage.mjs"
 import { DashboardRead, DashboardDelete, DashboardDeleteResult, DashboardPublish, PublicationRef, PublicationSet, PublicationSource, PublicationWrite, decodeDashboardDeleteResult } from "./dashboard"
@@ -211,6 +212,7 @@ export async function createLoginomHost(options: {
   headless?: boolean
   preflightHeadless?: boolean
   strictRecovery?: boolean
+  desktopWriteOutcomes?: boolean
   closeSavedPackageOnShutdown?: boolean
   // Private launcher capability baked into packaged release builds; never from env or the model.
   browserRecovery?: boolean
@@ -223,6 +225,8 @@ export async function createLoginomHost(options: {
   const references = fileReferences(join(root, "file-references"))
   await references.cleanup()
   const journal = await recoveryStore(join(root, "recovery"), { strict: options.strictRecovery === true })
+  const writes = options.desktopWriteOutcomes && !options.strictRecovery
+    ? await writeOutcomes(join(root, "write-outcomes")) : undefined
   const generations = new Map<
     number,
     {
@@ -751,6 +755,44 @@ export async function createLoginomHost(options: {
     },
     journal,
     recoveries,
+    writes,
+    writeServer(generation: number) {
+      const current = generations.get(generation)
+      if (!current) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
+      return writeServer(current.connection.url)
+    },
+    async liveWriteVerdict(entry: WriteRecord): Promise<typeof WriteVerdict.Type | "owner_lost"> {
+      const child = generations.get(entry.generation)?.children.get(entry.chat)
+      if (!child) return "owner_lost"
+      const result = await child.then((runtime) => runtime.request("write-outcome.check", entry, 24_000)).catch(() => undefined)
+      if (result === "owner_lost" || !generations.get(entry.generation)?.children.has(entry.chat)) return "owner_lost"
+      return Schema.is(WriteVerdict)(result) ? result : "unknown"
+    },
+    async readSavedWriteTarget(entry: WriteRecord): Promise<typeof SavedCopyReadback.Type> {
+      const path = entry.baseline.packagePath
+      if (!path) return "unavailable"
+      const lease = service.acquire(randomUUID())
+      if (!lease) return "unavailable"
+      const chat = createHash("sha256").update(randomUUID()).digest("hex")
+      try {
+        const current = generations.get(lease.generation)
+        if (!current || lease.generation !== entry.generation || writeServer(current.connection.url) !== entry.server)
+          return "unavailable"
+        const child = await retain(current, chat, launch(current.connection, chat, "dashboard"))
+        try {
+          const result = await child.request("write-outcome.readback", entry.baseline, 7_000)
+          return Schema.is(SavedCopyReadback)(result) ? result : "unavailable"
+        } finally {
+          await child.close().catch(() => { shutdown.failed = true })
+          current.children.delete(chat)
+          lost.delete(chat)
+        }
+      } catch {
+        return "unavailable"
+      } finally {
+        lease.release()
+      }
+    },
     knowledge(generation: number) {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
@@ -855,4 +897,9 @@ export async function createLoginomHost(options: {
       )
     },
   }
+}
+
+function writeServer(url: string) {
+  const target = new URL(url)
+  return createHash("sha256").update(target.origin).digest("hex")
 }

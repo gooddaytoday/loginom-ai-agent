@@ -288,6 +288,7 @@ export async function dockTools(input: {
             })
             .catch(() => undefined)
         },
+        { turn: call.messageID, call: call.id },
       )
       .finally(() => publishing)
       .then(decodeReply)

@@ -148,7 +148,7 @@ async function handle(message) {
       state.starting = true
       const input = message.input
       const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
-      state.owner = { chat: input.chat, generation: input.generation }
+      state.owner = { chat: input.chat, generation: input.generation, attempt: randomUUID() }
       state.startupStateDir = input.stateDir
       state.startupStarted = performance.now()
       state.uploadDirectory = `/${input.connection.username}`
@@ -172,7 +172,7 @@ async function handle(message) {
         "chats",
         input.chat,
         "attempts",
-        randomUUID(),
+        state.owner.attempt,
       )
       await mkdir(directory, { recursive: true, mode: 0o700 })
       // Chromium creates nested files below user-data-dir. The normal Desktop
@@ -285,6 +285,37 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (message.operation === "write-outcome.prepare") {
+      if (state.controller) throw Error("LOGINOM_CALL_BUSY")
+      const { writeIntent } = await import("../client/lib/write-outcome.mjs")
+      const pair = message.input.packageArtifact
+      const uploadPath = pair && state.session.artifactStore.getUploadGrant(pair.artifactID, pair.uploadGrantID).upload.destination
+      const workspace = state.session.metadata.workspacePreparation?.state
+      const intent = writeIntent(message.input, workspace, {
+        owner: state.owner.attempt, uploadPath, knownOperation: state.bridge.knowsWriteOperation,
+      })
+      if (intent.effect === "save") {
+        const { savedCopyDigest } = await import("./saved-copy-readback.mjs")
+        intent.baseline.savedDigest = await savedCopyDigest(state.browser, intent.baseline.packagePath)
+      }
+      send({ id: message.id, result: intent })
+      return
+    }
+    if (message.operation === "write-outcome.check") {
+      const entry = message.input
+      const result = entry.receipt.owner !== state.owner.attempt || entry.chat !== state.owner.chat || entry.generation !== state.owner.generation
+        ? "owner_lost" : state.controller ? "unknown" : await state.bridge.checkWriteOutcome(entry)
+      send({ id: message.id, result })
+      return
+    }
+    if (message.operation === "write-outcome.readback") {
+      const { savedCopyDigest } = await import("./saved-copy-readback.mjs")
+      const { packagePath, savedDigest } = message.input
+      const digest = await savedCopyDigest(state.browser, packagePath)
+      const result = !digest ? "unavailable" : !savedDigest ? "observed" : digest === savedDigest ? "unchanged" : "changed"
+      send({ id: message.id, result })
+      return
+    }
     if (["dashboardRead", "dashboardPublish", "dashboardVersions", "dashboardDelete"].includes(message.operation)) {
       if (message.operation === "dashboardVersions" || message.operation === "dashboardDelete") {
         if (message.input?.generation !== state.owner.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
@@ -372,6 +403,9 @@ async function handle(message) {
         signal: controller.signal,
         timeout: runtimeCallTimeout(message.input.name, message.input.arguments),
       }
+      const receipt = message.input.writeReceipt
+      const args = message.input.name === "dock_action_run" && receipt?.operationID && message.input.arguments?.operation_id === undefined
+        ? { ...message.input.arguments, operation_id: receipt.operationID } : message.input.arguments
       const result = await withStepProgress({
         name: message.input.name,
         signal: controller.signal,
@@ -383,14 +417,18 @@ async function handle(message) {
           })
         : message.input.scanReceipt !== undefined
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
-          : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options))
+          : message.input.observeOnly === true && message.input.name === "dock_operation_inspect"
+            ? await state.bridge.inspectWithoutRecovery(args, options)
+            : await state.client.callTool({name:message.input.name,arguments:args}, undefined, options))
       const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
+      const writeSettled = receipt ? (await import("../client/lib/write-outcome.mjs")).writeReplySettled(result, message.input.name) : undefined
       send({
         id: message.id,
         result: {
           result: outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result,
           recoveryPending: state.bridge.hasUnsettledWork(),
           activeWork: state.bridge.hasActiveWork(),
+          ...(receipt ? { writeSettled } : {}),
         },
       })
     } finally {

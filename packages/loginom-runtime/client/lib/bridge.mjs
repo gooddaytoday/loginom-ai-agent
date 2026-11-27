@@ -966,6 +966,12 @@ export async function createBridge(config, session, { browserTransport: managedB
         ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
     });
     return { server, catalog,
+      knowsWriteOperation: id => actionRuntime?.knowsWriteOperation(id) === true,
+      checkWriteOutcome: entry => actionRuntime?.checkWriteOutcome(entry) ?? 'unknown',
+      async inspectWithoutRecovery(args, options) {
+        requirePreparedWorkspace(session.metadata);
+        return actionReply(await actionRuntime.inspect({ operationId: args?.operation_id, signal: options.signal, observeOnly: true }), { userProfile });
+      },
       applyWithScanReceipt(args,receipt,extra) {
         return callTool({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);
       },

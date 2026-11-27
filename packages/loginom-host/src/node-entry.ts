@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { EventEmitter } from "node:events"
 import { isAbsolute } from "node:path"
 import { Option, Schema } from "effect"
@@ -7,6 +8,7 @@ import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
 import { DashboardRead } from "./dashboard"
+import { WriteOutcomeInput } from "./connection/write-outcomes"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
@@ -97,6 +99,7 @@ async function dispatch(message: unknown) {
         typeof input.headless !== "boolean" ||
         ("resourceVersion" in input && typeof input.resourceVersion !== "string") ||
         ("strictRecovery" in input && typeof input.strictRecovery !== "boolean") ||
+        ("desktopWriteOutcomes" in input && typeof input.desktopWriteOutcomes !== "boolean") ||
         ("closeSavedPackageOnShutdown" in input && typeof input.closeSavedPackageOnShutdown !== "boolean") ||
         ("browserRecovery" in input && typeof input.browserRecovery !== "boolean")
       )
@@ -109,6 +112,7 @@ async function dispatch(message: unknown) {
         resourceVersion:
           "resourceVersion" in input && typeof input.resourceVersion === "string" ? input.resourceVersion : undefined,
         strictRecovery: "strictRecovery" in input && input.strictRecovery === true,
+        desktopWriteOutcomes: "desktopWriteOutcomes" in input && input.desktopWriteOutcomes === true,
         closeSavedPackageOnShutdown:
           "closeSavedPackageOnShutdown" in input && input.closeSavedPackageOnShutdown === true,
         browserRecovery: "browserRecovery" in input && input.browserRecovery === true,
@@ -131,6 +135,11 @@ async function dispatch(message: unknown) {
       reply({ id: message.id, result })
       return
     }
+    if (message.method === "loginom.write-outcome.check") {
+      const { sessionID, writeID } = Schema.decodeUnknownSync(WriteOutcomeInput)(input)
+      reply({ id: message.id, result: await checkWriteOutcome(state.host, sessionID, writeID) })
+      return
+    }
     if (!message.method.startsWith("connection.")) {
       events.emit("message", { data: message })
       return
@@ -139,6 +148,26 @@ async function dispatch(message: unknown) {
     reply({ id: message.id, result })
   } catch (error) {
     reply({ id: message.id, ...hostFailure(error) })
+  }
+}
+
+async function checkWriteOutcome(host: Awaited<ReturnType<typeof createLoginomHost>>, sessionID: string, writeID?: string) {
+  const journal = host.writes
+  const entry = journal?.find(createHash("sha256").update(sessionID).digest("hex"), writeID)
+  if (!journal || !entry) return { status: "unknown" }
+  if (journal.active(entry)) return { status: "unknown", writeID: entry.id }
+  if (entry.status !== "unknown") return { status: entry.status, writeID: entry.id }
+  if (!journal.reserveCheck(entry)) return { status: "unknown", writeID: entry.id }
+  try {
+    const verdict = await host.liveWriteVerdict(entry)
+    if (verdict === "applied" || verdict === "not_applied") {
+      await journal.finish(entry, verdict)
+      return { status: verdict, writeID: entry.id }
+    }
+    if (verdict === "owner_lost") return { status: "unknown", writeID: entry.id, readback: await host.readSavedWriteTarget(entry) }
+    return { status: "unknown", writeID: entry.id }
+  } finally {
+    journal.release(entry)
   }
 }
 

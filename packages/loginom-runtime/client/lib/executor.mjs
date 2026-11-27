@@ -22,6 +22,7 @@ import { requireCapability } from './capability-registry.mjs';
 import { actionDescribeTool, actionRunTool, assertActionOutcome, validateActionParameters } from './action-catalog.mjs';
 import { makeWorkspaceUiCode, validateUiAction, uiActionSchema } from './workspace-ui.mjs';
 import { createObservationPages } from './observation-pages.mjs';
+import { writeVerdict } from './write-outcome.mjs';
 import { makeWorkspaceBootstrapCode, packageReadOnlyAdvice } from './workspace.mjs';
 import { createNodeProcedure } from './node-procedure.mjs';
 import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow, releaseNodeApply, NodeVariableInputError } from './node-apply.mjs';
@@ -3277,7 +3278,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         observation_error: 'Observation could not fit a page; request a narrower workspace scope and inspect the operation.' } };
     }
   };
-  const inspect = async ({ operationId, signal } = {}) => {
+  const inspect = async ({ operationId, signal, observeOnly } = {}) => {
     signal?.throwIfAborted();
     const operation = operationId ? operations.get(operationId) : pending;
     if(operationId&&!operation&&!auxiliary.has(operationId)&&!nodeJobs.has(operationId)&&!sourceReads.has(operationId)){
@@ -3287,7 +3288,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           next_steps:[{tool:'dock_action_describe',instruction:'Request selected node_types and modes for complete rules. This is the retained preparation receipt, not a fresh workspace observation.'}]},error:null,trace:[]};
     }
     if (operationId && !operation) throw new Error('Operation is not known in this session');
-    if (!operation || pending !== operation) return view(operation);
+    if (observeOnly || !operation || pending !== operation) return view(operation);
     return view(operation, await reconcilePending(signal));
   };
   const nodeResumeRefusal='Resume requires the original inspected node checkpoint without an unresolved phase';
@@ -4873,6 +4874,28 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // explicitly bounded status/resume tools instead of dead-ending in global
     // recovery mode.
     hasActiveWork:()=>!!(storageNavigating||serverDownloads?.unsettled||running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
+    knowsWriteOperation: id => operations.has(id) || auxiliary.has(id) || nodeJobs.has(id),
+    async checkWriteOutcome(entry) {
+      const operation = operations.get(entry.receipt.operationID);
+      if (!operation || running || nodeJobs.busy || !entry.receipt.fresh) return 'unknown';
+      const binding = operation.checkpoint?.graph_binding ?? operation.checkpoint;
+      const workflow = operation.checkpoint?.workflow_ref?.workflow_id;
+      if (entry.baseline.document && binding?.document_id && entry.baseline.document !== binding.document_id
+        || entry.baseline.workflow && workflow && entry.baseline.workflow !== workflow) return 'unknown';
+      const verdict = writeVerdict(operation.outcome, operation.action, entry);
+      if (verdict !== 'unknown' || !operation.transportUncertain || operation.action.capability === 'node.apply'
+        || operation.outcome?.error?.code === 'SAVE_RESULT_MISMATCH') return verdict;
+      const observed = await readReceipt(operation).catch(() => null);
+      if (observed?.state !== 'completed') return 'unknown';
+      const recovered = writeVerdict(observed.receipt, operation.action, entry);
+      if (recovered !== 'unknown' && pending === operation && !running) {
+        operation.outcome = observed.receipt;
+        operation.transportUncertain = false;
+        operation.cleanupConfirmed = true;
+        pending = null;
+      }
+      return recovered;
+    },
     hasUnsettledWork:()=>!!(storageNavigating||serverDownloads?.unsettled||running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
     deliverArtifact:(request,options)=>delivery.deliver(request,options),
     deliverPackageArtifact:(request,options)=>delivery.deliver(request,{...options,packageUpload:true}),

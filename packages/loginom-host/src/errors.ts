@@ -14,6 +14,9 @@ const codes = new Set([
   "LOGINOM_SCOPE_DENIED",
   "LOGINOM_RECOVERY_REQUIRED",
   "LOGINOM_CALL_UNCERTAIN",
+  "LOGINOM_WRITE_OUTCOME_UNKNOWN",
+  "LOGINOM_WRITE_NOT_DISPATCHED",
+  "LOGINOM_WRITE_JOURNAL_INVALID",
   "LOGINOM_CALL_BUSY",
   "LOGINOM_CANDIDATE_INVALID",
   "LOGINOM_SAVE_INVALID",
@@ -77,6 +80,7 @@ export function hostError(value: unknown) {
 }
 
 const reasons: Record<string, string> = {
+  LOGINOM_WRITE_OUTCOME_UNKNOWN: "Исход предыдущей записи в целевой пакет неизвестен. Не повторяйте запись. Прочитайте текущее состояние пакета и запросите проверку исхода исходного вызова.",
   DASHBOARD_CANCELLED: "Операция dashboard отменена.",
   DASHBOARD_WRITE_UNKNOWN: "Результат публикации неизвестен. Проверьте версию на стенде; повторная запись автоматически не выполняется.",
   DASHBOARD_DELETE_BUSY: "Этот дашборд уже удаляется. Повторите запрос после завершения операции.",
