@@ -45,7 +45,8 @@ test("actual managed entry reads live bridge work and dispatching over private I
     }`,
     "runtime/src/connection-check.mjs": `
       export const loginomAddress = value => value;
-      export const loginBrowser = async () => ({ context: { close: async () => {} } });`,
+      export const loginBrowser = async () => ({ context: { close: async () => {} } });
+      export const reauthenticateReloadedPage = async () => { throw Error('work state fixture does not log in again'); };`,
     "runtime/client/package.json": JSON.stringify({ type: "module" }),
     "runtime/client/lib/execution-journal.mjs": await readFile(
       new URL("../../loginom-runtime/client/lib/execution-journal.mjs", import.meta.url),

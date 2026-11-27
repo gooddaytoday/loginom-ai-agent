@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { prepareNodeTarget, verifyNodeTargetEffect } from '../lib/node-target.mjs';
+import { inspectNodeTarget, prepareNodeTarget, releaseNodeTarget, verifyNodeTargetEffect } from '../lib/node-target.mjs';
 import { describeNodeTypes, validateNodeTargetRequest } from '../lib/node-contracts.mjs';
 import {journalCopy} from '../lib/execution-journal.mjs';
 const ref = id => ({ document_id: 'doc', workflow_id: 'wf', node_id: id });
@@ -535,3 +535,133 @@ for(const fault of ['none','y','ordinary','identity','port'])test('connect verif
  const result=verifyNodeTargetEffect({kind:'connect',before,parameters:{edge}},after);
  if(fault==='none')assert.ok(result);else assert.equal(result,null);
 });
+
+test('add_only link ownership is the native GUID recorded at drop',()=>{
+ const ref=node_id=>({document_id:'doc',workflow_id:'wf',node_id});
+ const before={complete:true,document_id:'doc',workflow_ref:{workflow_id:'wf'},dom_epoch:1,
+  nodes:[{ref:ref('source'),type:'imports.text'}],links:[],foreign_links:[]};
+ const native={source:'source',output:0,target:'new',input:0,native_link_guid:'drop-link'};
+ const after={...before,nodes:[...before.nodes,{ref:ref('new'),type:'exports.text'}],links:[native]};
+ const receipt={status:'SUCCEEDED',cleanup_complete:true,after,drop_link_guids:[native.native_link_guid]};
+ const effect={kind:'create',before,parameters:{type:'exports.text',add_only:true},receipt};
+ assert.deepEqual(verifyNodeTargetEffect(effect,after).auto_created_links,[native]);
+ for(const observation of [
+  {...after,links:[{...native,native_link_guid:'manual-replacement'}]},
+  {...after,links:[{...native,native_link_guid:undefined}]},
+ ]){
+  const proof=verifyNodeTargetEffect(effect,observation);
+  assert.equal(proof.add_only_unowned_links,true);
+  assert.deepEqual(proof.auto_created_links,[]);
+ }
+ const late=verifyNodeTargetEffect({...effect,receipt:{...receipt,drop_link_guids:[]}},after);
+ assert.equal(late.add_only_unowned_links,true);
+ assert.deepEqual(late.auto_created_links,[]);
+});
+
+for(const fault of ['none','inspect','inspect foreign edit','release','foreign edit','first link changed','explicit label',
+ 'resume explicit label','other explicit label','other caption','other receipt','incomplete cleanup','missing rewritten link']){
+ test('LAB-2082 second Join input with native caption change: '+fault,async()=>{
+  const ref=node_id=>({document_id:'doc',workflow_id:'wf',node_id});
+  const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',
+    navigation_path:[{tid:'path',label:'Сценарий'}]};
+  const graph={complete:true,document_id:'doc',workflow_ref:workflow,dom_epoch:1,interaction_ready:true,foreign_links:[],links:[],
+    nodes:[['source','Заказы'],['customers','Клиенты']].map(([id,label],index)=>({
+      ref:ref(id),type:'imports.text',label,position:{x:240+index*320,y:80},inputs:[],outputs:[0],locked:false,
+    }))};
+  const calls=[],operation={id:'op',deadline:Date.now()+10000};
+  const adapter={observe:async()=>structuredClone(graph),preflight:async()=>{},
+    positionMatches:(node,position)=>JSON.stringify(node.position)===JSON.stringify(position)};
+  const r={document_id:'doc',workflow_ref:workflow,target:{kind:'new',type:'transform.join_data',position:{x:400,y:208}},inputs:[
+   {source:ref('source'),output:0,input:0},{source:ref('customers'),output:0,input:1},
+  ]};
+  const explicitLabel=fault==='explicit label'||fault==='resume explicit label';
+  if(explicitLabel)r.target.label='Слияние';
+  if(fault==='other explicit label')r.target.label='Ручное слияние';
+  const tid=(label,caption,input)=>workflow.prefix+`;Graph;${label}|Output_Data-0|${caption}|Input_Data-${input}`;
+  const observe=adapter.observe;
+  let secondReceipt,beforeSecond;
+  adapter.observe=async()=>{
+   if(!beforeSecond)return observe();
+   const previous=beforeSecond;
+   beforeSecond=null;
+   return previous;
+  };
+  adapter.mutate=async effect=>{
+   calls.push(effect.kind);
+   if(effect.kind==='create'){
+    graph.nodes.push({ref:ref('target'),type:effect.parameters.type,label:'Слияние',position:effect.parameters.position,
+      inputs:[0,1],outputs:[0],locked:false});
+    return {status:'SUCCEEDED',cleanup_complete:true,effect_possible:true};
+   }
+   const target=graph.nodes[2];
+   if(effect.kind==='rename'){
+    target.label=effect.parameters.label;
+    return {status:'SUCCEEDED',cleanup_complete:true,effect_possible:true};
+   }
+   graph.links.push(effect.parameters.edge);
+   const receipt={action_key:'link.create',operation_id:effect.id,cleanup_complete:true,effect_possible:true};
+   if(effect.parameters.edge.input===0)return {...receipt,status:'SUCCEEDED',phase:'verified',
+    output:{link_ref:{kind:'link',tid:tid('Заказы','Слияние',0)}}};
+   // Windows 608/588: the original first edge now has a different DOM TID,
+   // alongside the second edge. The independent graph keeps the first GUID pair.
+   target.label=fault==='other caption'?'Правое':'Левое';
+   target.dom_epoch=4;
+   if(fault==='foreign edit'||fault==='inspect foreign edit')graph.nodes[0].label='Ручная правка';
+   if(fault==='first link changed')graph.links[0]={...graph.links[0],source:'customers'};
+   secondReceipt={...receipt,status:'AMBIGUOUS',phase:'applying',output:{reason:'unrelated graph changed',
+    added_links:[tid('Заказы','Левое',0),tid('Клиенты','Левое',1)],added_ports:[]}};
+   if(fault==='other receipt')secondReceipt.operation_id='other';
+   if(fault==='incomplete cleanup')secondReceipt.cleanup_complete=false;
+   if(fault==='missing rewritten link')secondReceipt.output.added_links.shift();
+   if(['inspect','inspect foreign edit','release','resume explicit label'].includes(fault))beforeSecond=structuredClone(effect.before);
+   return secondReceipt;
+  };
+  const apply=()=>prepareNodeTarget({request:r,operation,adapter,record:async e=>e});
+  const result=await apply();
+  if(fault==='none'||fault==='explicit label'){
+   assert.equal(result.status,'SUCCEEDED',result.error);
+   assert.equal(result.node.ref.node_id,'target');
+   assert.equal(operation.targetPhase.final_graph.nodes[2].label,explicitLabel?'Слияние':'Левое');
+   assert.deepEqual(calls,explicitLabel?['create','connect','connect','rename']:['create','connect','connect']);
+   assert.deepEqual(result.links.map(edge=>[edge.source,edge.input]),[['source',0],['customers',1]]);
+   return;
+  }
+  assert.deepEqual(calls,fault==='other explicit label'?['create','rename','connect','connect']:['create','connect','connect']);
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(operation.targetPhase.pending.kind,'connect');
+  if(fault==='inspect'||fault==='inspect foreign edit'){
+   const pending=operation.targetPhase.pending.id;
+   adapter.reconcile=async()=>({completed:true,verified:true,cleanup_complete:true,receipt:secondReceipt});
+   const inspected=await inspectNodeTarget({request:r,operation,adapter,record:async event=>event,deadline:operation.deadline});
+   assert.deepEqual(calls,['create','connect','connect']);
+   if(fault==='inspect foreign edit'){
+    assert.equal(inspected.phase,'target_incomplete');
+    assert.equal(inspected.pending,pending);
+    assert.equal(operation.targetPhase.pending.id,pending);
+   }else{
+    assert.equal(inspected.phase,'target_partial');
+    assert.equal(inspected.resume_available,true);
+    assert.equal(operation.targetPhase.pending,null);
+    assert.deepEqual(operation.targetPhase.receipts.map(receipt=>receipt.kind),calls);
+    assert.equal(operation.targetPhase.last_graph.nodes[2].label,'Левое');
+    assert.deepEqual(operation.targetPhase.last_graph.links.map(edge=>[edge.source,edge.input]),[['source',0],['customers',1]]);
+   }
+  }
+  if(fault==='resume explicit label'){
+   adapter.reconcile=async()=>({completed:true,verified:true,cleanup_complete:true,receipt:secondReceipt});
+   const resumed=await apply();
+   assert.equal(resumed.status,'SUCCEEDED',resumed.error);
+   assert.equal(resumed.node.label,'Слияние');
+   assert.deepEqual(calls,['create','connect','connect','rename']);
+  }
+  if(fault==='release'){
+   operation.nodeApply={request:r,pending:{phase:'target'}};
+   adapter.reconcile=async()=>({completed:true,verified:true,cleanup_complete:true,receipt:secondReceipt});
+   adapter.verifyWorkflow=async value=>({...value,verified:true,status:'SUCCEEDED',cleanup_complete:true,effect_possible:false});
+   const released=await releaseNodeTarget({operation,adapter,record:async e=>e,deadline:operation.deadline});
+   assert.deepEqual(released.node,ref('target'));
+   assert.equal(operation.targetPhase.pending,null);
+   assert.deepEqual(calls,['create','connect','connect']);
+  }
+ });
+}

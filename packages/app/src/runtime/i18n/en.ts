@@ -591,6 +591,9 @@ export const dict = {
   "notification.session.error.title": "Session error",
   "notification.session.error.fallbackDescription": "An error occurred",
 
+  "plugin.page.unavailable": "Plugin page unavailable",
+  "plugin.page.backHome": "Back to Home",
+  "plugin.page.navigation": "Plugin pages",
   "home.title": "Home",
   "home.projects": "Projects",
   "home.projects.all": "All projects",

@@ -143,6 +143,7 @@ export function createTimelineCache(
                 readMedia: data.readMedia,
                 peekMedia: data.peekMedia,
                 shellRunning: data.shellRunning,
+                toolRenderers: data.toolRenderers,
                 // A hidden running shell stops polling its output and resumes from its cursor once selected.
                 get shellOutput() {
                   return active() ? data.shellOutput : undefined

@@ -103,7 +103,7 @@ export const dict = {
   "command.settings.open": "Открыть настройки",
 
   "command.config.reload": "Обновить конфигурацию",
-  "command.config.reload.description": "Заново загрузить агентов, команды, навыки, MCP-серверы и плагины из конфигурации",
+  "command.config.reload.description": "Заново загрузить агентов, команды, навыки, подключения и расширения из конфигурации",
   "command.config.reload.pending": "Обновляем конфигурацию…",
   "command.config.reload.done": "Конфигурация обновлена",
   "command.config.reload.failed": "Не удалось обновить конфигурацию",
@@ -212,7 +212,7 @@ export const dict = {
   "dialog.model.unfavorite": "Убрать из избранного",
   "dialog.model.unpaid.freeModels.title": "Бесплатные модели от OpenCode",
   "dialog.model.unpaid.addMore.title": "Добавьте модели из других сервисов",
-  "dialog.model.unpaid.viewMoreProviders": "Посмотреть ещё более 70 сервисов моделей",
+  "dialog.model.unpaid.viewMoreProviders": "Посмотреть других провайдеров (более 70)",
 
   "dialog.provider.viewAll": "Показать больше сервисов",
 
@@ -314,7 +314,7 @@ export const dict = {
   "model.tooltip.context.label": "Контекст",
   "model.tooltip.inputs": "Входные данные",
   "model.tooltip.model": "Модель",
-  "model.tooltip.provider": "Сервис моделей",
+  "model.tooltip.provider": "Провайдер",
   "model.tooltip.reasoning": "Рассуждение",
   "model.tooltip.reasoning.allowed": "Поддерживает рассуждения",
   "model.tooltip.reasoning.none": "Без рассуждений",
@@ -524,6 +524,9 @@ export const dict = {
   "notification.session.error.title": "Ошибка разговора",
   "notification.session.error.fallbackDescription": "Произошла ошибка",
 
+  "plugin.page.unavailable": "Страница расширения недоступна",
+  "plugin.page.backHome": "Вернуться на главную",
+  "plugin.page.navigation": "Страницы расширений",
   "home.title": "Главная",
   "home.projects": "Проекты",
   "home.project.add": "Добавить проект",
@@ -544,7 +547,7 @@ export const dict = {
   "home.sessions.group.yesterday": "Вчера",
   "home.sessions.group.older": "Ранее",
   "home.providerTip":
-    "Подключите один из более чем 75 сервисов моделей, чтобы использовать Claude, GPT, Gemini и другие модели",
+    "Подключите один из более чем 75 провайдеров, чтобы использовать Claude, GPT, Gemini и другие модели",
 
   "session.tab.session": "Разговор",
   "session.tab.more": "Ещё…",
@@ -987,15 +990,15 @@ export const dict = {
   "session.new.workspace.search.placeholder": "Поиск рабочих пространств",
   "settings.tab.workspaces": "Рабочие пространства",
   "settings.workspaces.filter.all": "Все проекты",
-  "settings.workspaces.empty": "Нет рабочих мест",
+  "settings.workspaces.empty": "Нет рабочих пространств",
   "settings.workspaces.count.one": "{{count}} рабочее пространство",
   "settings.workspaces.count.other": "{{count}} рабочего пространства",
   "settings.workspaces.sessions.one": "{{count}} разговор в проекте «{{project}}»",
   "settings.workspaces.sessions.other": "{{count}} разговора в проекте «{{project}}»",
   "settings.workspaces.lastActiveSession": "Последний активный разговор",
-  "settings.workspaces.deleteAll": "Удалить все рабочие области",
+  "settings.workspaces.deleteAll": "Удалить все рабочие пространства",
   "settings.workspaces.delete.warning":
-    "Каталог и ветка рабочей области будут удалены без возможности восстановления, включая все несвязанные изменения, показанные ниже.",
+    "Каталог и ветка рабочего пространства будут удалены без возможности восстановления, включая все несвязанные изменения, показанные ниже.",
   "settings.workspaces.deleteAll.warning":
     "Рабочие деревья с неслитыми изменениями, связанными разговорами или активными расположениями будут сохранены.",
   "settings.workspaces.delete.blocked.active": "Активное рабочее пространство не может быть удалено.",
@@ -1008,9 +1011,9 @@ export const dict = {
   "settings.workspaces.default.lastUsed": "Последнее использование в проекте",
   "settings.workspaces.default.local": "Локальный каталог",
   "settings.workspaces.default.new": "Новое рабочее пространство",
-  "workspace.onboarding.title": "Изолируйте разговоры с помощью рабочих областей",
+  "workspace.onboarding.title": "Изолируйте разговоры с помощью рабочих пространств",
   "workspace.onboarding.description":
-    "Каждая получает собственную рабочую копию, поэтому ничто не затрагивает локальный репозиторий",
+    "У каждого пространства своя рабочая копия, поэтому ничто не затрагивает локальный репозиторий",
   "session.summary.basedOn": "На основе {{branch}}",
   "settings.workspaces.count.few": "{{count}} рабочих пространства",
   "settings.workspaces.count.many": "{{count}} рабочих пространств",

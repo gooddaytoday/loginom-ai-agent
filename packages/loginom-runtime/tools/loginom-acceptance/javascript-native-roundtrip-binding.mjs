@@ -1,4 +1,3 @@
-/* oxlint-disable no-restricted-globals -- Genuine reflection: these serialized page probes count own string and symbol keys of native Loginom objects. */
 import {captureJavascriptNativeZero} from './javascript-native-zero.mjs';
 export function javascriptNativeRoundtripSnapshot(b,zeroCapture){
   const v=(o,k)=>Object.getOwnPropertyDescriptor(o??{},k)?.value;
