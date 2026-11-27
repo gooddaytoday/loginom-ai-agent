@@ -43,8 +43,11 @@ test("shipped skill metadata conforms to the Agent Skills specification", async 
     expect(typeof skill.data.description, `${name}/SKILL.md: description must be a nonempty string`).toBe("string")
     expect(skill.data.description.trim().length).toBeGreaterThan(0)
     expect(skill.data.description.length).toBeLessThanOrEqual(1024)
-    expect(typeof skill.data.compatibility).toBe("string")
-    expect(skill.data.compatibility.length).toBeLessThanOrEqual(500)
+    if (skill.data.compatibility !== undefined) {
+      expect(typeof skill.data.compatibility).toBe("string")
+      expect(skill.data.compatibility.length).toBeGreaterThan(0)
+      expect(skill.data.compatibility.length).toBeLessThanOrEqual(500)
+    }
     const supported = ["name", "description", "compatibility", "license", "metadata", "allowed-tools"]
     expect(Object.keys(skill.data).filter((key) => !supported.includes(key)), `${name}/SKILL.md: remove unsupported frontmatter fields`).toEqual([])
   }
@@ -310,7 +313,7 @@ it.live("the same skill realpath is discovered only once through two configured 
       )
       const skills = yield* Skill.Service
       expect((yield* skills.all()).filter((skill) => skill.name === "sample")).toHaveLength(1)
-      expect(yield* skills.dirs()).toHaveLength(reservedSkillNames.length + 1)
+      expect((yield* skills.dirs()).filter((candidate) => candidate === join(source, "sample"))).toHaveLength(1)
       expect((yield* skills.require("sample")).location).toBe(join(source, "sample/SKILL.md"))
     }),
     { git: true },

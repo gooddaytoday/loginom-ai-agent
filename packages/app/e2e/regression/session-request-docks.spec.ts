@@ -105,6 +105,40 @@ test("asks once to publish the named dashboard and package", async ({ page }) =>
   expect(request.postDataJSON()).toEqual({ reply: "once" })
 })
 
+test("asks once to install the prepared skill revision", async ({ page }) => {
+  await mockServer(page, {
+    permissions: [
+      {
+        id: "skill-install-request",
+        sessionID,
+        permission: "skill_install",
+        patterns: ["check-columns"],
+        always: [],
+        metadata: {
+          operationId: "prepared-revision",
+          skillInstall: ["Install check-columns", "Source: /fixture/columns", "Revision: chosen-revision"],
+        },
+      },
+    ],
+  })
+  await page.goto(`/${base64Encode(directory)}/session/${sessionID}`)
+  await expectSessionTitle(page, title)
+
+  const permission = page.locator('[data-component="dock-prompt"][data-kind="permission"]')
+  await expect(permission.getByText("Install check-columns", { exact: true })).toBeVisible()
+  await expect(permission.getByText("Source: /fixture/columns", { exact: true })).toBeVisible()
+  await expect(permission.getByText("Revision: chosen-revision", { exact: true })).toBeVisible()
+  await expect(permission.getByText("check-columns", { exact: true })).toHaveCount(0)
+  await expect(permission.getByRole("button")).toHaveCount(2)
+
+  const reply = page.waitForRequest((request) =>
+    request.method() === "POST" &&
+    new URL(request.url()).pathname === `/api/session/${sessionID}/permission/skill-install-request/reply`,
+  )
+  await permission.getByRole("button", { name: "Allow once" }).click()
+  expect((await reply).postDataJSON()).toEqual({ reply: "once" })
+})
+
 test("restores the draft caret before typing after a request dock closes", async ({ page }) => {
   const transport = await installSseTransport(page, {
     server: `http://${process.env.PLAYWRIGHT_SERVER_HOST ?? "127.0.0.1"}:${process.env.PLAYWRIGHT_SERVER_PORT ?? "4096"}`,

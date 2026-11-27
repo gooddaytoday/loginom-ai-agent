@@ -1,8 +1,15 @@
-import { verifyProductSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
+import { readSkillDocument, verifyProductSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
 import { isReservedSkillName, reservedSkillNames } from "@loginom-ai-agent/product/skills"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { Effect } from "effect"
+import { createHash } from "node:crypto"
+import { readFile, realpath, stat } from "node:fs/promises"
+import { join } from "node:path"
+import { Glob } from "@opencode-ai/core/util/glob"
 import type { EventV2Bridge } from "@/event-v2-bridge"
+
+const externalPattern = "skills/**/SKILL.md"
+const agentsDirectory = ".agents"
 
 type Events = EventV2Bridge.Service["Service"]
 
@@ -12,6 +19,35 @@ const reportError = Effect.fnUntraced(function* (events: Events, message: string
 })
 
 export const skillSource = {
+  agentsDirectory,
+  externalPattern,
+  portable: async (location: string) => readSkillDocument(await readFile(location, "utf8")),
+
+  revision: Effect.fnUntraced(function* (home: string) {
+    return yield* Effect.tryPromise(async () => {
+      const root = join(home, agentsDirectory)
+      const info = await stat(root).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== "ENOENT") throw error
+      })
+      if (!info?.isDirectory()) return ""
+      const digest = createHash("sha256")
+      const matches = await Glob.scan(externalPattern, {
+        cwd: root, absolute: true, include: "file", symlink: true, dot: true,
+      })
+      for (const file of matches.toSorted()) {
+        const resolved = await realpath(file).catch(() => undefined)
+        const bytes = resolved && await readFile(resolved).catch(() => undefined)
+        if (bytes) digest.update(JSON.stringify([file, resolved, createHash("sha256").update(bytes).digest("hex")]))
+      }
+      return digest.digest("hex")
+    }).pipe(
+      Effect.catch(() => Effect.logWarning("Could not refresh user skill catalog").pipe(Effect.as(undefined))),
+    )
+  }),
+
+  commandParts: (body: string, args: string) =>
+    [body, ...(args.trim() ? [args] : [])].map((text) => ({ type: "text" as const, text })),
+
   isReserved: isReservedSkillName,
 
   admits: (name: string, source: string | undefined) => source === "bundled" || !isReservedSkillName(name),

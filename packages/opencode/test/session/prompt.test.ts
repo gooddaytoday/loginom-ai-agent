@@ -1,3 +1,4 @@
+import { Global } from "@opencode-ai/core/global"
 import {
   createAttachmentReceipt,
   attachmentReceiptSource,
@@ -1349,7 +1350,7 @@ for (const scenario of [
         if (scenario.literalArguments) {
           const fs = yield* FSUtil.Service
           expect(yield* fs.exists(argumentFile)).toBe(false)
-          expect(body?.type === "text" && body.text).toContain(literalArguments)
+          expect(user?.parts.some((part) => part.type === "text" && part.text === literalArguments)).toBe(true)
         }
         if (scenario.failure) {
           expect(Exit.isFailure(result)).toBe(true)
@@ -2445,7 +2446,7 @@ it.instance("concurrent loop callers all receive same error result", () =>
   }),
 )
 
-it.instance("prompt submitted during an active run is included in the next LLM input", () =>
+it.instance("prompt submitted during an active run refreshes the skill catalog without stopping the run", () =>
   Effect.gen(function* () {
     const { llm } = yield* useServerConfig(providerCfg)
     const gate = yield* Deferred.make<void>()
@@ -2468,6 +2469,11 @@ it.instance("prompt submitted during an active run is included in the next LLM i
     yield* llm.wait(1)
     yield* waitForBusy(chat.id)
 
+    const skillDir = path.join(Global.Path.home, ".agents/skills/active-answer-skill")
+    yield* Effect.addFinalizer(() => Effect.promise(() => rm(skillDir, { recursive: true, force: true })))
+    yield* Effect.promise(() => Bun.write(path.join(skillDir, "SKILL.md"),
+      "---\nname: active-answer-skill\ndescription: A catalog refresh during an active response.\n---\n"))
+
     const id = MessageID.ascending()
     const b = yield* prompt
       .prompt({
@@ -2488,6 +2494,8 @@ it.instance("prompt submitted during an active run is included in the next LLM i
       "timed out waiting for second prompt to save",
     )
 
+    const catalog = yield* Skill.Service
+    expect((yield* catalog.get("active-answer-skill"))?.name).toBe("active-answer-skill")
     yield* Deferred.succeed(gate, void 0)
 
     const [ea, eb] = yield* Effect.all([Fiber.await(a), Fiber.await(b)])
@@ -2883,7 +2891,7 @@ for (const subtask of [false, true]) {
 }
 
 unix(
-  "command ! expansion uses configured shell over env shell",
+  "command ! expansion uses configured shell and appends arguments without a placeholder",
   () =>
     withSh(() =>
       Effect.gen(function* () {
@@ -2904,12 +2912,12 @@ unix(
         const result = yield* prompt.command({
           sessionID: chat.id,
           command: "probe",
-          arguments: "",
+          arguments: "additional context",
         })
 
         expect(result.info.role).toBe("assistant")
         const inputs = yield* llm.inputs
-        expect(JSON.stringify(inputs.at(-1)?.messages)).toContain("configured")
+        expect(JSON.stringify(inputs.at(-1)?.messages)).toContain("Probe: configured\\n\\nadditional context")
       }),
     ),
   30_000,
@@ -4171,4 +4179,42 @@ noLLMServer.instance(
       if (Exit.isFailure(check)) expect(String(Cause.squash(check.cause))).toContain("LOGINOM_FILE_CHANGED")
     }),
   { config: cfg },
+)
+
+unix("a skill command delivers literal instructions plus explicit arguments and files", () =>
+  Effect.gen(function* () {
+    const test = yield* TestInstance
+    const name = "literal-columns"
+    const body = "Example mentions @ignored.txt and $ARGUMENTS with literal marker !`printf SKILL_LITERAL`."
+    const attachment = path.join(test.directory, "input.lgp")
+    yield* Effect.promise(async () => {
+      await Bun.write(path.join(test.directory, ".agents/skills", name, "SKILL.md"),
+        `---\nname: ${name}\ndescription: Checks columns.\n---\n${body}\n`)
+      await Bun.write(path.join(test.directory, "ignored.txt"), "example file")
+      await Bun.write(attachment, "selected user input")
+    })
+    const { llm } = yield* useServerConfig(providerCfg)
+    const { prompt, chat } = yield* boot()
+    const sessions = yield* Session.Service
+    const command = Schema.decodeUnknownSync(SessionPrompt.CommandInput)({
+      sessionID: chat.id,
+      command: name,
+      arguments: "actual argument",
+      parts: [{ type: "file", mime: "application/x-loginom-package", url: pathToFileURL(attachment).href, filename: "input.lgp" }],
+    })
+    yield* llm.text("done")
+    yield* prompt.command(command)
+    const user = (yield* sessions.messages({ sessionID: chat.id })).find((message) => message.info.role === "user")!
+    expect(user.parts.flatMap((part) => part.type === "text" && !part.synthetic ? [part.text] : [])).toEqual([
+      expect.stringContaining(body),
+      "actual argument",
+    ])
+    expect(user.parts.filter((part) => part.type === "file").map((part) => part.url)).toEqual([pathToFileURL(attachment).href])
+
+    const denied = yield* sessions.create({ permission: [{ permission: "skill", pattern: name, action: "deny" }] })
+    const refusal = yield* Effect.exit(prompt.command({ ...command, sessionID: denied.id }))
+    expect(Exit.isFailure(refusal)).toBe(true)
+    expect(yield* sessions.messages({ sessionID: denied.id })).toHaveLength(0)
+  }),
+  30_000,
 )

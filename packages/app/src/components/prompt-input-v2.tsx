@@ -25,6 +25,7 @@ import { usePermission } from "@/context/permission"
 import { type ImageAttachmentPart, isCommentItem, usePrompt } from "@/context/prompt"
 import { usePlatform } from "@/context/platform"
 import { useSDK } from "@/context/sdk"
+import { useServerSync } from "@/context/server-sync"
 import { useSync } from "@/context/sync"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { showToast } from "@/utils/toast"
@@ -89,6 +90,7 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
 export function usePromptInputV2Controller(props: PromptInputV2ControllerProps): PromptInputV2ComposerController {
   const sdk = useSDK()
   const sync = useSync()
+  const serverSync = useServerSync()
   const files = useFile()
   const layout = useLayout()
   const comments = useComments()
@@ -101,6 +103,13 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
   let editor: HTMLDivElement | undefined
 
   const interaction = createPromptInputV2State()
+  const commandsOpen = createMemo(() => {
+    const type = interaction[0].popover.type
+    return type === "command-inline" || type === "command-menu"
+  })
+  createEffect(on(commandsOpen, (open) => {
+    if (open) void serverSync().refreshCommands(sdk().directory).catch(() => {})
+  }))
   const mode = () => interaction[0].mode
   const history = props.history ?? createPersistedPromptInputHistory()
   const tabs = () => props.controls.session.tabs

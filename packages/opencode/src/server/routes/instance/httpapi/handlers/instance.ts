@@ -20,6 +20,7 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
     const lsp = yield* LSP.Service
     const skill = yield* Skill.Service
     const vcs = yield* Vcs.Service
+    const refreshSkills = () => skill.refresh(Effect.andThen(command.invalidate(), agent.invalidate()))
 
     const dispose = Effect.fn("InstanceHttpApi.dispose")(function* () {
       yield* markInstanceForDisposal(yield* InstanceState.context)
@@ -74,6 +75,7 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
     })
 
     const getCommand = Effect.fn("InstanceHttpApi.command")(function* () {
+      yield* refreshSkills()
       return yield* command.list()
     })
 
@@ -82,6 +84,7 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
     })
 
     const getSkill = Effect.fn("InstanceHttpApi.skill")(function* () {
+      yield* refreshSkills()
       return yield* skill.all()
     })
 

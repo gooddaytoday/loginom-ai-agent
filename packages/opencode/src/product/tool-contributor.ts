@@ -311,10 +311,14 @@ const definitions = Effect.fnUntraced(function* (profile: TaskScope.Profile) {
       { ...(yield* Tool.init(remove)), origin: "builtin" as const },
     ]
   }
-  if (profile !== "package-docs") return []
-  const { PackageDocsTool } = yield* Effect.promise(() => import("@/tool/package-docs"))
-  const docs = yield* PackageDocsTool
-  return [{ ...(yield* Tool.init(docs)), origin: "builtin" as const }]
+  if (profile === "package-docs") {
+    const { PackageDocsTool } = yield* Effect.promise(() => import("@/tool/package-docs"))
+    const docs = yield* PackageDocsTool
+    return [{ ...(yield* Tool.init(docs)), origin: "builtin" as const }]
+  }
+  const { SkillInstallTool } = yield* Effect.promise(() => import("./skill-install"))
+  const install = yield* SkillInstallTool
+  return [{ ...(yield* Tool.init(install)), origin: "builtin" as const }]
 })
 
 export const toolContributor = { contribute, definitions }

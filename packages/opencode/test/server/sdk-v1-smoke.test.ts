@@ -3,6 +3,9 @@
 // (2025-12-07) so types may be stale, but runtime calls should still work
 // for endpoints the v1 SDK was generated against.
 import { afterEach, describe, expect, test } from "bun:test"
+import { rm } from "node:fs/promises"
+import { join } from "node:path"
+import { Global } from "@opencode-ai/core/global"
 import { createOpencodeClient } from "@opencode-ai/sdk"
 import { Server } from "../../src/server/server"
 import { tmpdir, disposeAllInstances } from "../fixture/fixture"
@@ -44,6 +47,34 @@ describe("v1 SDK runtime smoke", () => {
     const result = await sdk.config.get()
     expect(result.error).toBeUndefined()
     expect(result.data).toBeDefined()
+  })
+
+  test("skill and command endpoints refresh their warm catalogs after home skills change", async () => {
+    await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
+    const name = "catalog-smoke"
+    const folder = join(Global.Path.home, ".agents", "skills", name)
+    const writeSkill = (description: string) =>
+      Bun.write(join(folder, "SKILL.md"), `---\nname: ${name}\ndescription: ${description}\n---\n`)
+    const catalogEntry = async (route: "/skill" | "/command") => {
+      const response = await Server.Default().app.request(route, { headers: { "x-opencode-directory": tmp.path } })
+      expect(response.status).toBe(200)
+      const entries: { name: string; description: string }[] = await response.json()
+      return entries.find((entry) => entry.name === name)?.description
+    }
+    try {
+      expect(await catalogEntry("/skill")).toBeUndefined()
+      expect(await catalogEntry("/command")).toBeUndefined()
+
+      await writeSkill("First revision")
+      expect(await catalogEntry("/skill")).toBe("First revision")
+      expect(await catalogEntry("/command")).toBe("First revision")
+
+      await writeSkill("Second revision")
+      expect(await catalogEntry("/command")).toBe("Second revision")
+      expect(await catalogEntry("/skill")).toBe("Second revision")
+    } finally {
+      await rm(folder, { recursive: true, force: true })
+    }
   })
 
   test("session 404: result-tuple path returns the error body", async () => {

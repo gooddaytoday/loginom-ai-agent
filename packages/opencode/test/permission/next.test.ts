@@ -910,8 +910,8 @@ it.instance(
   { git: true },
 )
 
-it.instance(
-  "reply - publishes replied event",
+for (const replyKind of ["once", "interrupt"] as const) it.instance(
+  `permission ${replyKind} closes the client request`,
   () =>
     Effect.gen(function* () {
       const events = yield* EventV2Bridge.Service
@@ -945,8 +945,13 @@ it.instance(
       })
       yield* Effect.addFinalizer(() => unsub)
 
-      yield* reply({ requestID: PermissionV1.ID.make("per_test7"), reply: "once" })
-      yield* Fiber.join(fiber)
+      if (replyKind === "once") {
+        yield* reply({ requestID: PermissionV1.ID.make("per_test7"), reply: "once" })
+        yield* Fiber.join(fiber)
+      } else {
+        yield* Fiber.interrupt(fiber)
+      }
+      expect(yield* list()).toEqual([])
       expect(
         yield* Deferred.await(seen).pipe(
           Effect.timeoutOrElse({
@@ -957,7 +962,7 @@ it.instance(
       ).toEqual({
         sessionID: SessionID.make("session_test"),
         requestID: PermissionV1.ID.make("per_test7"),
-        reply: "once",
+        reply: replyKind === "once" ? "once" : "reject",
       })
     }),
   { git: true },
@@ -1171,4 +1176,40 @@ it.instance(
       if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toBeInstanceOf(PermissionV1.RejectedError)
     }),
   { git: true },
+)
+
+it.live("a skill write requires a fresh once reply despite a general allow", () =>
+  Effect.gen(function* () {
+    const directory = yield* tmpdirScoped()
+    const store = yield* InstanceStore.Service
+    yield* store.provide({ directory }, Effect.gen(function* () {
+      const input = {
+        sessionID: SessionID.make("ses_skill_write"),
+        permission: "skill_install",
+        patterns: ["columns"],
+        metadata: { operationId: "write-snapshot", skillInstall: ["Install columns from a local folder"] },
+        always: ["*"],
+        ruleset: [{ permission: "*", pattern: "*", action: "allow" }] as const,
+      }
+      const first = yield* Effect.forkChild(Effect.exit(ask(input)))
+      const initial = (yield* waitForPending(1))[0]
+      expect(initial.always).toEqual([])
+      yield* reply({ requestID: initial.id, reply: "always" })
+      const refused = yield* Fiber.join(first)
+      expect(Exit.isFailure(refused)).toBe(true)
+
+      const second = yield* Effect.forkChild(ask(input))
+      const fresh = (yield* waitForPending(1))[0]
+      expect(fresh.id).not.toBe(initial.id)
+      yield* reply({ requestID: fresh.id, reply: "once" })
+      yield* Fiber.join(second)
+
+      const denied = yield* fail(ask({
+        ...input,
+        ruleset: [...input.ruleset, { permission: "skill_install", pattern: "columns", action: "deny" }],
+      }))
+      expect(denied).toBeInstanceOf(PermissionV1.DeniedError)
+      expect(yield* list()).toHaveLength(0)
+    }))
+  }),
 )

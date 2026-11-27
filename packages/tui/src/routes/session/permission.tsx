@@ -1,3 +1,4 @@
+import { skillInstallConfirmation } from "@loginom-ai-agent/product"
 import { createStore } from "solid-js/store"
 import { dirname } from "node:path"
 import { createMemo, For, Match, Show, Switch } from "solid-js"
@@ -381,6 +382,7 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
           }
 
           const current = info()
+          const installation = skillInstallConfirmation(props.request)
 
           const header = () => (
             <box flexDirection="column" gap={0}>
@@ -392,7 +394,7 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
                 <text fg={theme.textMuted} flexShrink={0}>
                   {current.icon}
                 </text>
-                <text fg={theme.text}>{current.title}</text>
+                <text fg={theme.text}>{installation?.[0] ?? current.title}</text>
               </box>
             </box>
           )
@@ -401,8 +403,14 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
             <Prompt
               title="Permission required"
               header={header()}
-              body={current.body}
-              options={{ once: "Allow once", always: "Allow always", reject: "Reject" }}
+              body={installation ? (
+                <box paddingLeft={1}>
+                  <For each={installation.slice(1)}>{(line) => <text fg={theme.text}>{line}</text>}</For>
+                </box>
+              ) : current.body}
+              options={installation
+                ? { once: "Allow once", reject: "Reject" }
+                : { once: "Allow once", always: "Allow always", reject: "Reject" }}
               escapeKey="reject"
               fullscreen
               onSelect={(option) => {

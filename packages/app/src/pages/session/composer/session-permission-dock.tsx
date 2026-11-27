@@ -1,3 +1,4 @@
+import { skillInstallConfirmation } from "@loginom-ai-agent/product"
 import { For, Show } from "solid-js"
 import type { PermissionRequest } from "@opencode-ai/sdk/v2"
 import { Button } from "@opencode-ai/ui/button"
@@ -11,6 +12,7 @@ export function SessionPermissionDock(props: {
   onDecide: (response: "once" | "always" | "reject") => void
 }) {
   const language = useLanguage()
+  const skillInstall = () => skillInstallConfirmation(props.request)
   const deletion = () => props.request.permission === "dashboard_delete"
   const publicationCount = () => props.request.metadata.publicationCount
   const confirmedRemoved = () => {
@@ -101,7 +103,16 @@ export function SessionPermissionDock(props: {
         </div>
       </Show>
 
-      <Show when={props.request.patterns.length > 0}>
+      <Show when={skillInstall()}>
+        {(lines) => <div data-slot="permission-row">
+          <span data-slot="permission-spacer" aria-hidden="true" />
+          <div data-slot="permission-hint" class="break-all">
+            <For each={lines()}>{(line) => <div>{line}</div>}</For>
+          </div>
+        </div>}
+      </Show>
+
+      <Show when={!skillInstall() && props.request.patterns.length > 0}>
         <div data-slot="permission-row">
           <span data-slot="permission-spacer" aria-hidden="true" />
           <div data-slot="permission-patterns">

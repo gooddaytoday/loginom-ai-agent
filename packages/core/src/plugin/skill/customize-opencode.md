@@ -1,7 +1,7 @@
 <!--
   Built-in skill. Name and description are registered in code at
   packages/core/src/plugin/skill.ts
-  and CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION). The body below becomes the
+  and packages/opencode/src/skill/index.ts. The body below becomes the
   skill's content.
 -->
 
@@ -30,7 +30,7 @@ mistakes as they type.
 ## Applying changes
 
 Config is loaded once when opencode starts and is not hot-reloaded. After
-saving changes to `loginom-ai-agent.json`, an agent file, a skill, a plugin, or any
+saving changes to `loginom-ai-agent.json`, an agent file, a plugin, or any
 other config-time file, **tell the user to quit and restart opencode** for
 the changes to take effect. The running session will keep using the
 already-loaded config until then.
@@ -160,34 +160,12 @@ Shape notes worth being explicit about:
 
 ## Skills
 
-opencode's skill loader scans for `**/SKILL.md` inside skill directories. The
-file is named `SKILL.md` exactly, and lives in its own folder named after the
-skill:
+Use this section to configure skill discovery. For authoring or installing
+Loginom Agent Skills, load `loginom-create-skill` if it is available. The shared
+user location for installed Loginom skills is `~/.agents/skills/<name>/SKILL.md`.
 
-```
-.loginom-ai-agent/skills/my-skill/SKILL.md
-```
-
-Frontmatter:
-
-```markdown
----
-name: my-skill
-description: One sentence covering what this skill does AND when to trigger it. Front-load the literal keywords or filenames the user is likely to say.
----
-
-# My Skill
-
-(skill body in markdown: instructions, examples, references)
-```
-
-- `name` is required, lowercase hyphen-separated, up to 64 chars, and matches the folder name.
-- `description` is effectively required: skills without one are filtered out and never surfaced to the model. Cover both _what_ the skill does and _when_ to use it. Write in third person ("Use when...", not "I help with..."). Front-load concrete trigger keywords and filenames; gate with "Use ONLY when..." if the skill should stay quiet on adjacent topics.
-- Optional: `license`, `compatibility`, `metadata` (string-string map).
-
-Register skills from non-default locations via `skills.paths` (scanned
-recursively for `**/SKILL.md`) and `skills.urls` (each URL serves a list of
-skills).
+Register additional discovery locations via `skills.paths` (scanned recursively
+for `**/SKILL.md`) and `skills.urls` (each URL serves a list of skills).
 
 ## References
 
@@ -444,7 +422,7 @@ When a user's config is broken and opencode won't start, these env vars help:
   exact shape, or the field is not covered in this skill, fetch
   `https://opencode.ai/config.json` and read the schema rather than guessing.
 - Preserve `$schema` and any existing fields the user did not ask to change.
-- For agent, command, skill, and plugin definitions, prefer creating new files
+- For agent, command, and plugin definitions, prefer creating new files
   in the correct location over inlining everything in `loginom-ai-agent.json`.
 - If the user's existing config is malformed, point them at the env-var escape
   hatches above so they can edit from inside opencode without breaking their
