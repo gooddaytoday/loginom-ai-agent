@@ -22,6 +22,7 @@ import sys
 import tempfile
 import time
 from urllib.parse import quote
+from urllib.request import Request, urlopen
 from zipfile import ZipFile
 
 REPO = Path(__file__).resolve().parents[2]
@@ -35,6 +36,8 @@ SCENARIOS = {
 MODEL = os.environ.get('RUN_CHECK_MODEL') or 'openai/gpt-6.1-sol'
 VARIANT = os.environ.get('RUN_CHECK_VARIANT', 'medium' if MODEL == 'openai/gpt-6.1-sol' else '')
 AUTH = Path(os.environ['RUN_CHECK_AUTH']).expanduser() if os.environ.get('RUN_CHECK_AUTH') else Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json'
+MODELS_URL = 'https://models.opencode.ai/api.json'
+MODELS_TTL = 60 * 60
 D76_STATUS = 'PASS с ограничением платформы D76'
 MAX_CASE_TURNS = 8
 DB_FIELD = re.compile(r'\[\[DB:(DB_[A-Z0-9_]+)\]\]')
@@ -82,6 +85,68 @@ def write(path, value):
     temporary = path.with_suffix(path.suffix + '.tmp')
     temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n')
     temporary.replace(path)
+
+
+def checked_model_catalog(catalog):
+    if not isinstance(catalog, dict) or not catalog or not all(
+        isinstance(provider, dict) and isinstance(provider.get('models'), dict)
+        for provider in catalog.values()
+    ):
+        raise ValueError('Invalid model catalog')
+    return catalog
+
+
+def fresh_model_catalog():
+    host_cache = Path.home() / '.cache/loginom-run-check' / socket.gethostname()
+    host_cache.mkdir(parents=True, exist_ok=True)
+    path = host_cache / 'models.json'
+    with (host_cache / 'models.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            if time.time() - path.stat().st_mtime < MODELS_TTL:
+                return checked_model_catalog(read(path))
+        except (OSError, ValueError):
+            pass
+        request = Request(MODELS_URL, headers={'User-Agent': 'loginom-run-check/1.0'})
+        with urlopen(request, timeout=15) as response:
+            catalog = checked_model_catalog(json.load(response))
+        write(path, catalog)
+        return catalog
+
+
+def model_catalog(head):
+    provider, separator, model_id = MODEL.partition('/')
+    if not (provider and separator and model_id):
+        raise ValueError(f'RUN_CHECK_MODEL_INVALID: {MODEL!r}; expected provider/model')
+    refresh_error = None
+    try:
+        catalog = fresh_model_catalog()
+    except (OSError, ValueError) as error:
+        catalog, refresh_error = {}, error
+    if model_id in catalog.get(provider, {}).get('models', {}):
+        return catalog
+    snapshot_file = 'packages/product/models.json'
+    source = subprocess.run(['git', 'show', f'{head}:{snapshot_file}'], cwd=REPO,
+                            capture_output=True, text=True, check=False)
+    snapshot = json.loads(source.stdout) if source.returncode == 0 else {}
+    fallback = snapshot.get(provider, {})
+    if model_id in fallback.get('models', {}):
+        if not catalog:
+            return snapshot
+        # ModelsDev uses the profile catalog as a whole. Include the requested
+        # snapshot entry there when it has disappeared from the live catalog.
+        current = catalog.get(provider, fallback)
+        return {**catalog, provider: {**current, 'models': {
+            **current['models'], model_id: fallback['models'][model_id],
+        }}}
+    if refresh_error is not None:
+        # The default Sol is already configured in each profile for older SHAs.
+        if not os.environ.get('RUN_CHECK_MODEL') and MODEL == 'openai/gpt-6.1-sol' and snapshot:
+            return snapshot
+        raise ValueError(f'MODEL_CATALOG_UNAVAILABLE: could not refresh {MODELS_URL} ({refresh_error}); '
+                         f'{MODEL!r} not found in {snapshot_file} at {head}') from refresh_error
+    raise ValueError(f'RUN_CHECK_MODEL_NOT_FOUND: {MODEL!r} is absent from {MODELS_URL} '
+                     f'and {snapshot_file} at {head}')
 
 
 class DatabasePrompt:
@@ -4189,7 +4254,7 @@ class Runner:
                 folder.mkdir()
                 profile, workspace = folder / 'profile', folder / 'workspace'
                 workspace.mkdir()
-                r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp', model=MODEL + ('/' + VARIANT if VARIANT else ''))
+                r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp', model=MODEL, variant=VARIANT)
                 env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile))
                 active_turn = live = None
                 try:
@@ -4202,6 +4267,9 @@ class Runner:
                         self.prepared_case = self.prepare_d87(r['scenario'], folder)
                     self.phase('setup', [build / 'bin/loginom-ai-agent-cli', 'loginom', 'setup', '--headless', '--stdin-json', '--format', 'json'], folder, timeout=180, env=env, stdin=json.dumps(dict(url=login['url'], username=login['username'], password=login['password'])))
                     assert read(folder / 'setup.stdout').get('browser', {}).get('state') == 'verified', 'SETUP_NOT_VERIFIED'
+                    if catalog := self.options.get('model_catalog'):
+                        # Setup initializes the empty profile and its cache directory.
+                        shutil.copyfile(catalog, profile / 'cache/models.json')
                     (profile / 'data/auth.json').symlink_to(AUTH)
                     write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
                     if spec.get('fs_case') == 'paths':
@@ -4413,6 +4481,10 @@ def main():
     out = (args.out or Path.home() / '.cache/loginom-runs' / str(time.time_ns())).expanduser().resolve()
     if not args.case_root and any(name in D87 for name in names) and (out == REPO or REPO in out.parents):
         raise ValueError('D87 result directory and generated data must be outside Git checkout')
+    try:
+        catalog = None if args.prepare_only else model_catalog(head)
+    except ValueError as error:
+        sys.exit(str(error))
     out.mkdir(parents=True)
     temporary = out / 'tmp'
     temporary.mkdir()
@@ -4423,6 +4495,10 @@ def main():
     request = vars(args) | {'pair': str(pair), 'build': str(build) if build else None, 'out': str(out),
                             'cases': str(args.cases.expanduser().resolve()) if args.cases else None,
                             'case_root': str(args.case_root.expanduser().resolve()) if args.case_root else None}
+    if catalog is not None:
+        path = out / 'models.json'
+        write(path, catalog)
+        request['model_catalog'] = str(path)
     write(out / 'request.json', request)
     write(out / 'results.json', {'head': head, 'tree': git('rev-parse', head + '^{tree}'), 'started': time.time(), 'phase': 'build', 'runs': [{'scenario': n, 'status': 'PENDING'} for n in names]})
     with (out / 'worker.log').open('wb') as log:

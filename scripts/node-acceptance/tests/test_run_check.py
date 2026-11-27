@@ -1,4 +1,5 @@
 import copy
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stdout
 import csv
 import hashlib
@@ -759,7 +760,7 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
         with self.assertRaisesRegex(AssertionError, 'INVALID_CSV_HEADER'):
             self.csv_result(dict(output, header='false'), '1,1\n2,3\n')
 
-    def refusal_run(self, root, variant=None, *, expected_text=None, answer=None, data_files=(), commands=None):
+    def refusal_run(self, root, variant=None, *, expected_text=None, answer=None, data_files=(), commands=None, catalog=None):
         case = root / 'cases/safe-refusal'
         (case / 'data').mkdir(parents=True)
         for name in data_files: (case / 'data' / name).write_text('x')
@@ -775,7 +776,11 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
         (root / 'pair').mkdir()
         runner.write(root / 'pair/worker.json', dict(package_directory='/test', loginom=dict(
             username='test', password='test', url='https://example.test')))
-        runner.write(out / 'request.json', dict(cases=str(case.parent), pair=str(root / 'pair'), cold=True))
+        request = dict(cases=str(case.parent), pair=str(root / 'pair'), cold=True)
+        if catalog is not None:
+            runner.write(out / 'models.json', catalog)
+            request['model_catalog'] = str(out / 'models.json')
+        runner.write(out / 'request.json', request)
         runner.write(out / 'results.json', dict(head='a' * 40, tree='b' * 40, started=time.time(),
                      runs=[dict(scenario=case.name, status='PENDING')]))
         instance = runner.Runner(out)
@@ -786,10 +791,15 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
             instance.report['phase'] = name
             profile = out / case.name / 'profile'
             if name == 'setup':
+                self.assertFalse(profile.exists())
                 (profile / 'data').mkdir(parents=True)
                 (profile / 'config').mkdir()
+                (profile / 'cache').mkdir()
                 runner.write(folder / 'setup.stdout', dict(browser=dict(state='verified')))
             if name != 'model': return
+            if catalog is not None:
+                self.assertEqual(Path(kwargs['env']['LOGINOM_AI_AGENT_CLI_PROFILE']), profile)
+                self.assertEqual(runner.read(profile / 'cache/models.json'), catalog)
             # Honor any generated export instruction at the process boundary;
             # the old runner then indexes outputs[0] although the list is empty.
             for destination in re.findall(r'/test/[\w-]+\.csv', command[-1]):
@@ -2266,6 +2276,55 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
         self.assertEqual((module.MODEL, module.VARIANT, module.AUTH), ('opencode-go/deepseek-v4.1-flash', '', Path('/tmp/auth-go.json')))
         self.assertEqual((runner.MODEL, runner.VARIANT), ('openai/gpt-6.1-sol', 'medium'))
 
+    def test_prepare_profile_seeds_catalog_between_setup_and_model(self):
+        model = 'openai/gpt-6.1-terra'
+        catalog = {'openai': {'models': {'gpt-6.1-terra': {'id': 'gpt-6.1-terra'}}}}
+        with tempfile.TemporaryDirectory() as directory, patch.object(runner, 'MODEL', model), \
+             patch.object(runner, 'VARIANT', 'medium'):
+            result, phases, _ = self.refusal_run(Path(directory), catalog=catalog)
+        self.assertEqual(result['status'], 'PASS', result)
+        self.assertEqual(phases, ['setup', 'model'])
+        self.assertEqual((result['model'], result['variant']), (model, 'medium'))
+
+    def test_host_model_catalog_shares_download_and_refreshes_after_one_hour(self):
+        live = {'openai': {'models': {'gpt-6.1-terra': {}}}}
+        updated = {'openai': {'models': {'gpt-6.1-sol': {}}}}
+        def response(body):
+            return io.BytesIO(json.dumps(body).encode())
+
+        with tempfile.TemporaryDirectory() as directory, patch.object(runner.Path, 'home', return_value=Path(directory)), \
+             patch.object(runner, 'urlopen', side_effect=[response(live), response(updated), response({})]) as download:
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                first, second = [executor.submit(runner.fresh_model_catalog) for _ in range(2)]
+                self.assertEqual((first.result(), second.result()), (live, live))
+            download.assert_called_once()
+            path = next(Path(directory).rglob('models.json'))
+            stale = time.time() - runner.MODELS_TTL - 1
+            os.utime(path, (stale, stale))
+            self.assertEqual(runner.fresh_model_catalog(), updated)
+            self.assertEqual(download.call_count, 2)
+            os.utime(path, (stale, stale))
+            with self.assertRaisesRegex(ValueError, 'Invalid model catalog'):
+                runner.fresh_model_catalog()
+            self.assertEqual(runner.read(path), updated)
+            self.assertEqual(list(path.parent.glob('*.tmp')), [])
+
+    def test_missing_live_model_uses_snapshot_for_the_product_head(self):
+        live = {'example': {'models': {'fresh': {'id': 'fresh'}}}}
+        snapshot = {'example': {'models': {'fallback': {'id': 'fallback'}}}}
+        source = subprocess.CompletedProcess([], 0, stdout=json.dumps(snapshot))
+        with patch.object(runner, 'MODEL', 'example/fallback'), \
+             patch.object(runner, 'fresh_model_catalog', return_value=live), \
+             patch.object(runner.subprocess, 'run', return_value=source) as git_show:
+            head = 'a' * 40
+            self.assertEqual(runner.model_catalog(head), {'example': {'models': {
+                **live['example']['models'], **snapshot['example']['models'],
+            }}})
+            self.assertEqual(git_show.call_args.args[0], ['git', 'show', f'{head}:packages/product/models.json'])
+            with patch.object(runner, 'MODEL', 'example/unknown'):
+                with self.assertRaisesRegex(ValueError, 'RUN_CHECK_MODEL_NOT_FOUND:.*example/unknown'):
+                    runner.model_catalog(head)
+
     def test_flat_pair_preserves_the_assigned_account(self):
         config = {'username': 'test', 'url': 'https://app.loginom.ai', 'api_key': 'private', 'password': 'private', 'package_directory': '/test'}
         self.assertEqual(runner.pair_login(config, 'worker.json'), config)
@@ -3552,7 +3611,8 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                 try:
                     with patch.dict(os.environ, inherited), patch.object(sys, 'argv', argv), redirect_stdout(io.StringIO()), patch.object(runner.subprocess, 'Popen', side_effect=detach) as spawn:
                         spawn.return_value.pid = 123
-                        with patch.object(runner.Path, 'home', return_value=path), patch.object(runner.time, 'time_ns', return_value=123):
+                        with patch.object(runner.Path, 'home', return_value=path), patch.object(runner.time, 'time_ns', return_value=123), \
+                             patch.object(runner, 'model_catalog', return_value={'openai': {'models': {'gpt-6.1-sol': {}}}}):
                             self.assertEqual(runner.main(), 0)
                         environment = spawn.call_args.kwargs.get('env', dict(os.environ))
                     for key in ['TMPDIR', 'TMP', 'TEMP']:
