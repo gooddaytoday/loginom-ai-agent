@@ -246,8 +246,16 @@ async function handle(message) {
       )
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
+      const knownSecrets = [input.connection.apiKey, input.connection.password]
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
+        presentNodeReply: async (reply, project) => {
+          const outputFiles = await session.artifactStore.outputFiles(reply.structuredContent)
+          let loginom
+          try { loginom = project({ outputFiles, knownSecrets }) } catch {}
+          return outputFiles.length || loginom ? { ...reply, _meta: { ...reply._meta,
+            ...(loginom ? { loginom } : {}), ...(outputFiles.length ? { outputFiles } : {}) } } : reply
+        },
         startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {
           state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error,
             [input.connection.apiKey, input.connection.password, input.connection.username]) })
@@ -372,7 +380,8 @@ async function handle(message) {
         : message.input.scanReceipt !== undefined
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
           : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options)
-      const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
+      const outputFiles = result._meta?.loginom && Array.isArray(result._meta.outputFiles)
+        ? result._meta.outputFiles : await state.session.artifactStore.outputFiles(result.structuredContent)
       send({
         id: message.id,
         result: {
