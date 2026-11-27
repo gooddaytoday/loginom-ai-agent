@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { timelinePresets } from "@opencode/session-ui/timeline/detail"
+import { setupPackageChanges } from "../utils/loginom-package-changes"
 import { assistantMessage, partUpdated, setupTimeline, textPart, toolPart, userMessage } from "../utils/timeline"
 
 test("keeps shell and question failures in their Used group", async ({ page }) => {
@@ -87,6 +88,102 @@ test("keeps rendering when a plugin tool reports progress metadata that is not a
   await expect(page.getByText("Still polling the image task.")).toBeVisible()
   await expect(page.locator(`[data-timeline-part-id="${toolID}"]`)).toBeVisible()
   await expect(page.getByRole("heading", { name: "Something went wrong" })).toHaveCount(0)
+})
+
+test("shows a package changes result and saves and undoes a version", async ({ page }, testInfo) => {
+  const { card, calls, sessionID, version, copyUrl } = await setupPackageChanges(page)
+  await expect(card.getByText("копия агента")).toBeVisible()
+  await expect(card.getByRole("list", { name: "Счётчики изменений" }).getByRole("listitem")).toHaveText([
+    "+1 добавлено",
+    "~3 изменено",
+    "−1 удалено",
+  ])
+  const nodes = card.getByRole("list", { name: "Изменённые узлы" })
+  await expect(nodes.getByRole("listitem")).toHaveCount(5)
+  await expect(nodes.getByText("Импорт продаж — изменены связи", { exact: true })).toBeVisible()
+  await expect(nodes.getByText(/Фильтр по дате — .*изменены связи/)).toBeVisible()
+  await expect(nodes.getByText(/Итоги продаж — переименован из «Группировка»/)).toBeVisible()
+  await expect(nodes.locator("del")).toHaveText("Промежуточная выгрузка")
+  await expect(card.getByText("Сверка запуском: в копии 120 строк, как в исходном пакете.")).toBeVisible()
+  const loginom = card.getByRole("button", { name: "Посмотреть в Loginom" })
+  await expect(loginom).toBeVisible()
+  await expect(card.getByRole("button", { name: "Посмотреть на схеме" })).toHaveCount(0)
+  await card.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: testInfo.outputPath("package-changes-1280.png"), animations: "disabled" })
+  const opened = page.context().waitForEvent("page")
+  await loginom.click()
+  const loginomPage = await opened
+  await loginomPage.waitForURL(copyUrl)
+  await loginomPage.close()
+
+  const save = card.getByRole("button", { name: "Сохранить новой версией" })
+  await save.click()
+  await expect(card.getByRole("status")).toHaveText("Сохранено новой версией: Продажи — v2.lgp")
+  await expect(card.getByRole("button", { name: "Открыть", exact: true })).toBeVisible()
+  await card.getByRole("button", { name: "Отменить сохранение" }).click()
+  await expect(save).toBeEnabled()
+  expect(calls).toEqual([
+    { method: "save-version", input: { sessionID } },
+    { method: "undo-save", input: { sessionID, path: version } },
+  ])
+  await card.getByRole("button", { name: "Отменить изменения" }).click()
+  await expect(card.getByRole("status")).toHaveText("Изменения отменены.")
+  await expect(save).toHaveCount(0)
+  expect(calls.at(-1)).toEqual({ method: "discard", input: { sessionID } })
+})
+
+test("confirms replacement on a narrow screen and restores the previous version", async ({ page }, testInfo) => {
+  const { card, calls, sessionID, backup, schemaUrl } = await setupPackageChanges(page, { width: 390, schema: true })
+  const replace = card.getByRole("button", { name: "Заменить исходный…" })
+  await expect(replace).toBeEnabled()
+  await card.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: testInfo.outputPath("package-changes-390.png"), animations: "disabled" })
+  const opened = page.context().waitForEvent("page")
+  await card.getByRole("button", { name: "Посмотреть на схеме" }).click()
+  const schemaPage = await opened
+  await schemaPage.waitForURL(schemaUrl)
+  await schemaPage.close()
+
+  await replace.click()
+  const dialog = page.getByRole("dialog", { name: "Заменить исходный пакет?" })
+  await expect(dialog).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(dialog).toHaveCount(0)
+  expect(calls).toEqual([])
+
+  await replace.click()
+  await dialog.getByRole("button", { name: "Заменить", exact: true }).click()
+  await expect(card.getByRole("status")).toHaveText(`Исходный пакет заменён. Резервная копия: ${backup}`)
+  await card.getByRole("button", { name: "Вернуть прежнюю версию" }).click()
+  await expect(card.getByRole("status")).toHaveText("Прежняя версия восстановлена.")
+  expect(calls).toEqual([
+    { method: "replace-original", input: { sessionID, confirmed: true } },
+    { method: "restore-previous", input: { sessionID, backupPath: backup } },
+  ])
+})
+
+test("keeps the draft when Loginom says the package is busy", async ({ page }) => {
+  const { card, calls, sessionID } = await setupPackageChanges(page, { busy: true })
+  await card.getByRole("button", { name: "Заменить исходный…" }).click()
+  await page
+    .getByRole("dialog", { name: "Заменить исходный пакет?" })
+    .getByRole("button", { name: "Заменить", exact: true })
+    .click()
+  await expect(card.getByRole("alert")).toHaveText("Пакет занят. Закройте его в Loginom и попробуйте ещё раз.")
+  await expect(card.getByRole("button", { name: "Сохранить новой версией" })).toBeEnabled()
+  await expect(card.getByRole("button", { name: "Вернуть прежнюю версию" })).toHaveCount(0)
+  expect(calls).toEqual([{ method: "replace-original", input: { sessionID, confirmed: true } }])
+})
+
+test("does not send a package mutation from a superseded turn", async ({ page }) => {
+  const { card, calls } = await setupPackageChanges(page, { stale: true })
+  const save = card.getByRole("button", { name: "Сохранить новой версией" })
+  await save.click()
+  await expect(card.getByRole("alert")).toHaveText(
+    "Карточка не относится к последнему завершённому ходу. Пакет не изменён.",
+  )
+  await expect(save).toBeDisabled()
+  expect(calls).toEqual([])
 })
 
 function questionInput() {
