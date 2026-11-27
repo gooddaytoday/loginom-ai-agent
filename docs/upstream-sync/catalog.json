@@ -32,9 +32,12 @@
     },
     { "id": "CAT-05", "title": "Session, tools, attachments, permissions, server", "paths": [], "pending": "B2.5, B2.6, B2.9" },
     {
-      "id": "CAT-14",
+      "id": "CAT-20",
       "title": "Profile permission settings",
-      "paths": ["packages/core/src/config.ts", "packages/schema/src/config.ts"]
+      "paths": [
+        "packages/core/src/config.ts", "packages/schema/src/config.ts", "packages/plugin/src/gui/registries.ts",
+        "packages/app/src/settings/shell.tsx", "packages/app/src/runtime/plugin/settings-page-view.tsx"
+      ]
     },
     {
       "id": "CAT-06",

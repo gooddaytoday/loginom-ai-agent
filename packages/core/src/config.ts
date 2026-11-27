@@ -555,7 +555,7 @@ function patchDocument(text: string, patch: Patch) {
   const incoming = new Map(patch.permissions?.map((rule) => [key(rule), rule]))
   const removed = new Set(patch.removePermissions?.map(key))
   const existing = permissions ?? []
-  const remaining = existing.flatMap((rule) => {
+  const updated = existing.flatMap((rule) => {
     if (!rule) return [rule]
     const pair = key(rule)
     if (removed.has(pair)) return []
@@ -563,10 +563,14 @@ function patchDocument(text: string, patch: Patch) {
     return [replacement ?? rule]
   })
   const present = new Set(existing.filter(Boolean).map(key))
-  const updated = [
-    ...remaining,
-    ...[...incoming].filter(([pair]) => !present.has(pair) || removed.has(pair)).map(([, rule]) => rule),
-  ]
+  for (const [pair, rule] of incoming) {
+    if (present.has(pair) && !removed.has(pair)) continue
+    const narrower =
+      rule.resource === "*"
+        ? updated.findIndex((entry) => entry?.action === rule.action && typeof entry.resource === "string")
+        : -1
+    updated.splice(narrower === -1 ? updated.length : narrower, 0, rule)
+  }
   if (isDeepStrictEqual(existing, updated)) return shell
   return applyEdits(shell, modify(shell, ["permissions"], updated, options))
 }

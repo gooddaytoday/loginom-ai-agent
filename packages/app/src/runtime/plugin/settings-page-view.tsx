@@ -4,7 +4,7 @@ import { useSettingsSurface } from "@/settings/surface"
 import { Contribution } from "./render"
 
 /** One settings panel per plugin page; the tab value is the SettingsPage id. */
-export function PluginSettingsPages() {
+export function PluginSettingsPages(props: { server?: string; directory?: string }) {
   const surface = useSettingsSurface()
 
   return (
@@ -18,6 +18,11 @@ export function PluginSettingsPages() {
                   const view = surface.view()
 
                   return view.tab === item.value.id ? view.target : undefined
+                },
+                get workspace() {
+                  const { server, directory } = props
+
+                  return server && directory ? { server, directory } : undefined
                 },
               })
             }

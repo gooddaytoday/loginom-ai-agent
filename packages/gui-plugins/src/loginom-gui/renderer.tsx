@@ -23,9 +23,9 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     get title() {
       return ctx.t("permissionsTitle")
     },
-    render: () => (
+    render: (input) => (
       <Suspense>
-        <Permissions />
+        <Permissions workspace={input.workspace} />
       </Suspense>
     ),
   })

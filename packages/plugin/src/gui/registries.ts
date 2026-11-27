@@ -416,11 +416,18 @@ export interface SettingsPage {
    * Renders the page, section or rows: `Ui.SettingsLayout` frames a page, `Ui.SettingsSection` a section, and
    * `Ui.SettingsRow` is one row, each as the app's own settings render them.
    *
-   * @param input - `target` is the entry search is revealing.
+   * @param input - The search target and workspace, when available.
    */
   render(input: {
     /** The `SettingEntry.id` search is revealing, if any. */
     readonly target?: string
+    /** The workspace Settings opened from, if known on the selected server. */
+    readonly workspace?: {
+      /** The workspace server's `ServerRef.id`. */
+      readonly server: string
+      /** The workspace directory on that server. */
+      readonly directory: string
+    }
   }): JSX.Element
 }
 

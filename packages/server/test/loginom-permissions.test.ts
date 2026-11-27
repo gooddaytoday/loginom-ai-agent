@@ -338,24 +338,40 @@ describe("loginom.product permissions (B2.6a)", () => {
           test
             .call(`/api/experimental/config?${at}`, body, "PATCH")
             .pipe(Effect.map((response) => expect(response.status).toBe(204)))
-        for (const effect of ["ask", "deny"]) {
-          yield* patch({ permissions: [{ ...edit, effect }] })
+        for (const effect of ["ask", "deny"] as const) {
+          yield* patch(
+            effect === "ask"
+              ? { removePermissions: settingRules("write") }
+              : { permissions: settingRules("write", effect) },
+          )
+          const expected = effect === "ask" ? [other, exception] : [other, ...settingRules("write", effect), exception]
           const current = yield* until(() =>
             test.call(`/api/config?${at}`).pipe(
               Effect.map((response) => {
                 const rules = response.body.find((entry: { profile?: boolean }) => entry.profile)?.info.permissions
-                return rules?.some(
-                  (rule: { action: string; resource: string; effect: string }) =>
-                    rule.action === "edit" && rule.resource === "*" && rule.effect === effect,
+                if (!rules) return
+                const broad = rules.find(
+                  (rule: { action: string; resource: string }) =>
+                    rule.action === edit.action && rule.resource === edit.resource,
                 )
-                  ? rules
-                  : undefined
+                return (effect === "ask" ? !broad : broad?.effect === effect) ? rules : undefined
               }),
             ),
           )
-          expect(current).toEqual([other, { ...edit, effect }, exception])
+          expect(current).toEqual(expected)
         }
-        yield* patch({ removePermissions: [edit, exception, other] })
+        yield* until(() =>
+          agents().pipe(
+            Effect.map((current) => {
+              const build = current.find((agent: { id: string }) => agent.id === "build")
+              return build && settingEffect("write", build.permissions) === "deny" ? true : undefined
+            }),
+          ),
+        )
+        const editor = yield* test.create("docs edit exception")
+        expect((yield* test.ask(editor, { action: "edit", resources: ["src/main.ts"], source })).effect).toBe("deny")
+        expect((yield* test.ask(editor, { action: "edit", resources: ["docs/report.md"], source })).effect).toBe("allow")
+        yield* patch({ removePermissions: [...settingRules("write"), exception, other] })
         yield* until(() =>
           agents().pipe(
             Effect.map((current) => (JSON.stringify(current) === JSON.stringify(installed) ? true : undefined)),
@@ -369,10 +385,19 @@ describe("loginom.product permissions (B2.6a)", () => {
         )
         const reader = yield* test.create("read asks")
         const read = { action: "read", resources: ["inside.txt"], source }
+        const outside = { action: "external_directory", resources: ["/elsewhere/*"], source }
+        const external = yield* test.ask(reader, outside)
+        expect(external.effect).toBe("ask")
         const first = yield* test.ask(reader, read)
         expect(first.effect).toBe("ask")
         expect((yield* test.conversation(reader, first.id)).body).toEqual({ output: { kind: "read" } })
+        expect((yield* test.open(reader)).map((item) => item.id)).toEqual([external.id])
         expect((yield* test.ask(reader, read)).effect).toBe("allow")
+        expect((yield* test.ask(reader, outside)).effect).toBe("ask")
+        expect((yield* test.conversation(reader, external.id)).body).toMatchObject({
+          type: "not_grantable",
+          data: { action: "external_directory" },
+        })
         expect((yield* test.ask(reader, { action: "shell", resources: ["echo test"], source })).effect).toBe("ask")
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
@@ -429,8 +454,7 @@ describe("loginom.product permissions (B2.6a)", () => {
     () =>
       Effect.gen(function* () {
         const test = yield* boot()
-        // A dashboard's deletion asks every time (В-102): below.
-        for (const request of asked.filter((item) => item.action !== "dashboard_delete")) {
+        for (const request of asked.filter((item) => !["dashboard_delete", "external_directory"].includes(item.action))) {
           const id = yield* test.create(`conversation ${request.action}`)
           const first = yield* test.ask(id, request)
           expect(first.effect).toBe("ask")

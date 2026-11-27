@@ -266,14 +266,7 @@ export default Plugin.define({
     // The product's defaults and settings: the rules of the default agent `build`, which has none of its own (B2.6b2).
     const settings: Permission.Rule[] = []
     const eligible = (entry: ReturnType<typeof classify>) =>
-      grantable(
-        entry,
-        entry?.action === "external_directory" || !entry
-          ? entry?.effect
-          : settingEffect(entry.kind, settings) === "ask"
-            ? "ask"
-            : "allow",
-      )
+      entry !== undefined && settingEffect(entry.kind, settings) === "ask" && grantable(entry, "ask")
     await ctx.agent.transform((editor) => {
       subagents.clear()
       editor.list().forEach((agent) => {

@@ -259,7 +259,7 @@ function RootSettings() {
       <Tabs.Content value="shortcuts" class="settings-panel">
         <SettingsKeybinds active={surface.view().tab === "shortcuts"} />
       </Tabs.Content>
-      <PluginSettingsPages />
+      <PluginSettingsPages server={surface.server()?.key} directory={activeDirectory()} />
       <Tabs.Content value="experimental" class="settings-panel">
         <SettingsExperimental />
       </Tabs.Content>

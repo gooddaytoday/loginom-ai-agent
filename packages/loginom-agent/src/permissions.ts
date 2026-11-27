@@ -64,11 +64,16 @@ export function classify(action: string, resources: readonly string[]) {
 }
 
 /**
- * The kinds a conversation grant may cover: where the product asks by default, except the terminal (В-31) and a
- * dashboard's deletion (В-102), which ask every time.
+ * Whether a request can share a conversation grant. External-directory access isn't part of the project read grant.
  */
 export function grantable(entry: Entry | undefined, effect = entry?.effect) {
-  return entry !== undefined && entry.kind !== "terminal" && entry.action !== "dashboard_delete" && effect === "ask"
+  return (
+    entry !== undefined &&
+    entry.kind !== "terminal" &&
+    entry.action !== "dashboard_delete" &&
+    entry.action !== "external_directory" &&
+    effect === "ask"
+  )
 }
 
 type Request = {
