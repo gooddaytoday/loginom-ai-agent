@@ -117,13 +117,17 @@ export class Info extends Schema.Class<Info>("Config.Info")({
 }) {}
 
 export const Patch = Schema.Struct({
-  shell: Schema.NullOr(Schema.String),
+  shell: Schema.NullOr(Schema.String).pipe(optional),
+  permissions: Permission.Ruleset.pipe(optional).annotate({
+    description: "Replace rules with the same action and resource, appending the supplied rules in order",
+  }),
 }).annotate({ identifier: "Config.Patch" })
 export interface Patch extends Schema.Schema.Type<typeof Patch> {}
 
 export class Document extends Schema.Class<Document>("Config.Document")({
   type: Schema.Literal("document"),
   path: AbsolutePath.pipe(optional),
+  profile: Schema.Literal(true).pipe(optional),
   info: Info,
 }) {}
 

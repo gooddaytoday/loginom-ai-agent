@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./dashboard-root": "./src/dashboard-root.ts",
     "./cli-profile": "./src/cli-profile.ts",
+    "./permissions": "./src/permissions.ts",
     "./skills": "./src/skills.ts",
     "./update-signature": "./src/update-signature.ts"
   },

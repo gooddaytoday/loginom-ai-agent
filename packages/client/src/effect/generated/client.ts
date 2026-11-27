@@ -1952,9 +1952,11 @@ const adaptGroupConfig = (raw: RawClient["server.config"]) => ({
   shells: EndpointConfigShells(raw),
 })
 
-const EndpointExperimentalConfigUpdate = (raw: RawClient["server.config"]) => (input: ExperimentalConfigUpdateInput) =>
+const EndpointExperimentalConfigUpdate = (raw: RawClient["server.config"]) => (input?: ExperimentalConfigUpdateInput) =>
   preserveEffect<ExperimentalConfigUpdateOutput>()(
-    raw["config.update"]({ payload: { shell: input["shell"] } }).pipe(Effect.mapError(mapClientError)),
+    raw["config.update"]({ payload: { shell: input?.["shell"], permissions: input?.["permissions"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
   )
 
 const adaptGroupExperimentalConfig = (raw: RawClient["server.config"]) => ({

@@ -17,11 +17,12 @@
 //   applies in its `permission.evaluate` hook after every rule and before the product's. The product never lifts it
 //   (`settle`), refuses the conversation grant for a kind it touches, and tells the model who denied (`refusal`).
 import { setTimeout } from "node:timers/promises"
+import { permissionTable, wildcard, type Kind } from "@loginom-ai-agent/product/permissions"
 import type { Plugin } from "@opencode/plugin"
 import type { ToolContext } from "@opencode/plugin/promise/tool"
 import type { Permission } from "@opencode/schema/permission"
 
-export type Kind = "read" | "write" | "save" | "export" | "web" | "terminal"
+export type { Kind } from "@loginom-ai-agent/product/permissions"
 
 /** The kinds as the user sees them in «Настройки → Разрешения». */
 export const kinds: Record<Kind, string> = {
@@ -33,50 +34,14 @@ export const kinds: Record<Kind, string> = {
   terminal: "Терминал",
 }
 
-type Entry = {
-  readonly action: string
-  readonly resource: string
-  readonly kind: Kind
-  readonly effect: Permission.Effect
-}
+type Entry = (typeof permissionTable)[number]
 
 /**
  * Every permission action of the server's tools and Dock operations that belongs to a kind, with its default (В-30).
  * An action that is not here — `question`, `skill`, `subagent`, `todowrite`, CodeMode `execute`, MCP tools, the other
  * Dock operations — belongs to no kind and keeps OpenCode's rules.
  */
-export const table: readonly Entry[] = [
-  // Project files are read without a question: OpenCode's file tools and the Loginom file tools (each also asks `read`
-  // for the file). `package_docs_run` asks `read` and `edit` itself.
-  ...[
-    "read",
-    "glob",
-    "grep",
-    "loginom_file_admit",
-    "loginom_file_profile",
-    "loginom_file_scan",
-    "loginom_file_sample",
-  ].map((action) => ({ action, resource: "*", kind: "read" as const, effect: "allow" as const })),
-  // The kind covers the project only: OpenCode asks `external_directory` before it touches anything outside, and the
-  // product keeps that question (OpenCode's `build` agent allows it without one).
-  { action: "external_directory", resource: "*", kind: "read", effect: "ask" },
-  // `edit`, `write`, `patch`, image generation and `package_docs_run` all write through the `edit` action.
-  { action: "edit", resource: "*", kind: "write", effect: "ask" },
-  // In the product's Dock profile `dock_action_run` only saves the package (`package.save_as`, `package.save_checkpoint`).
-  { action: "loginom_dock_action_run", resource: "*", kind: "save", effect: "ask" },
-  // A local package opened through `local_package_path` is uploaded into Loginom as a copy (В-75).
-  { action: "loginom_dock_prepare", resource: "local_package", kind: "save", effect: "ask" },
-  // Dashboards (B2.9): publishing sends sources to Loginom, deleting removes the published versions there.
-  { action: "dashboard_publish", resource: "*", kind: "save", effect: "ask" },
-  { action: "dashboard_delete", resource: "*", kind: "save", effect: "ask" },
-  // An export node writes outside the package; the Dock call names the node type as its resource.
-  { action: "loginom_dock_node_apply", resource: "exports.*", kind: "export", effect: "ask" },
-  { action: "webfetch", resource: "*", kind: "web", effect: "ask" },
-  { action: "websearch", resource: "*", kind: "web", effect: "ask" },
-  // The terminal is off until the user turns it on (decision 12, В-68); on, it asks for every command (В-31), and a
-  // schedule's `run` check never runs (`settle`).
-  { action: "shell", resource: "*", kind: "terminal", effect: "deny" },
-]
+export const table = permissionTable
 
 /** The product's defaults as rules. */
 export const rules: Permission.Ruleset = table.map((entry) => ({
@@ -198,6 +163,7 @@ export const policyDeniedText = (entry: Pick<Entry, "action" | "kind">) =>
  * session's; a later rule wins, as in OpenCode's `Permission.evaluate`.
  */
 export function deniedKinds(rules: readonly Permission.Rule[]) {
+  const ignoreCase = process.platform === "win32"
   return (Object.keys(kinds) as Kind[]).filter(
     (kind) =>
       kind !== "terminal" &&
@@ -205,8 +171,10 @@ export function deniedKinds(rules: readonly Permission.Rule[]) {
         .filter((entry) => entry.kind === kind)
         .every(
           (entry) =>
-            rules.findLast((rule) => wildcard(entry.action, rule.action) && wildcard(entry.resource, rule.resource))
-              ?.effect === "deny",
+            rules.findLast(
+              (rule) =>
+                wildcard(entry.action, rule.action, ignoreCase) && wildcard(entry.resource, rule.resource, ignoreCase),
+            )?.effect === "deny",
         ),
   )
 }
@@ -271,18 +239,6 @@ function blockedError(value: unknown) {
     resources: "resources" in value && Array.isArray(value.resources) ? value.resources.map(String) : [],
     reason: "reason" in value && typeof value.reason === "string" ? value.reason : undefined,
   }
-}
-
-// OpenCode's `Wildcard.match` (`core/src/util/wildcard.ts`), which the plugin cannot import: `*` and `?` in the pattern,
-// `/` for `\`, and a pattern ending in ` *` also matches without its arguments.
-function wildcard(input: string, pattern: string) {
-  const escaped = pattern
-    .replaceAll("\\", "/")
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*/g, ".*")
-    .replace(/\?/g, ".")
-  const tail = escaped.endsWith(" .*") ? escaped.slice(0, -3) + "( .*)?" : escaped
-  return new RegExp("^" + tail + "$", process.platform === "win32" ? "si" : "s").test(input.replaceAll("\\", "/"))
 }
 
 /**

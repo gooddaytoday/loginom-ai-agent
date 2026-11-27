@@ -16,6 +16,19 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       </Suspense>
     ),
   })
+  const Permissions = lazy(() => import("./permissions-page"))
+  ctx.add(SettingsPage, {
+    id: "permissions",
+    icon: "lock",
+    get title() {
+      return ctx.t("permissionsTitle")
+    },
+    render: () => (
+      <Suspense>
+        <Permissions />
+      </Suspense>
+    ),
+  })
 }
 
 export default setup

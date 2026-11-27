@@ -170,13 +170,13 @@ export const layer = (options?: Options) =>
         })
       })
 
-      const loadFile = Effect.fnUntraced(function* (filepath: string) {
+      const loadFile = Effect.fnUntraced(function* (filepath: string, profile?: true) {
         const text = yield* fs.readFileStringSafe(filepath)
         if (text === undefined) return
         const substituted = yield* ConfigVariable.substitute({ type: "path", path: filepath, text })
         const info = yield* parseInfo(substituted, filepath)
         if (!info) return
-        return new Document({ type: "document", path: AbsolutePath.make(filepath), info })
+        return new Document({ type: "document", path: AbsolutePath.make(filepath), info, ...(profile && { profile }) })
       })
 
       const loadWellknownEntry = Effect.fnUntraced(function* (entry: WellKnown.Entry) {
@@ -267,11 +267,11 @@ export const layer = (options?: Options) =>
         return info ? [new Document({ type: "document", path: plist, info })] : []
       })
 
-      const loadDirectory = Effect.fnUntraced(function* (directory: AbsolutePath) {
+      const loadDirectory = Effect.fnUntraced(function* (directory: AbsolutePath, profile?: true) {
         return [
-          ...(yield* Effect.forEach(ConfigDiscovery.names, (file) => loadFile(path.join(directory, file))).pipe(
-            Effect.map((configs) => configs.filter((config): config is Document => config !== undefined)),
-          )),
+          ...(yield* Effect.forEach(ConfigDiscovery.names, (file) =>
+            loadFile(path.join(directory, file), profile),
+          ).pipe(Effect.map((configs) => configs.filter((config): config is Document => config !== undefined)))),
           new Directory({ type: "directory", path: directory }),
         ]
       })
@@ -331,7 +331,7 @@ export const layer = (options?: Options) =>
         // Integration documents load right after managed policies: every remote, user, and project layer overrides
         // their settings, and since policies evaluate earliest-loaded first, only managed policies outrank theirs.
         // Global entries sit below explicit and direct files; project directories rank above them.
-        const globalSupplementary = sources.global ? yield* loadDirectory(sources.global).pipe(Effect.orDie) : []
+        const globalSupplementary = sources.global ? yield* loadDirectory(sources.global, true).pipe(Effect.orDie) : []
         const projectSupplementary = yield* Effect.forEach(
           sources.project.filter((root) => root.present),
           (root) => loadDirectory(root.path),
@@ -468,19 +468,14 @@ export const layer = (options?: Options) =>
 
       const update = Effect.fn("Config.update")(
         function* (patch: Patch) {
+          if (patch.shell === undefined && !patch.permissions?.length) return
           const directory = initial.global ?? AbsolutePath.make(globalService.config)
           const candidates = ConfigDiscovery.names.map((name) => path.join(directory, name))
           const filepath =
             (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "loginom-ai-agent.jsonc")
           const text = (yield* fs.readFileStringSafe(filepath)) ?? "{}\n"
           const updated = yield* Effect.try({
-            try: () =>
-              applyEdits(
-                text,
-                modify(text, ["shell"], patch.shell ?? undefined, {
-                  formattingOptions: { tabSize: 2, insertSpaces: true },
-                }),
-              ),
+            try: () => patchDocument(text, patch),
             catch: (cause) => new FSUtil.FileSystemError({ method: "config.update", cause }),
           })
           yield* fs.writeWithDirs(filepath, updated.endsWith("\n") ? updated : `${updated}\n`)
@@ -528,6 +523,27 @@ export function configured(options?: Options) {
       AppProcess.node,
     ],
   })
+}
+
+function patchDocument(text: string, patch: Patch) {
+  const options = { formattingOptions: { tabSize: 2, insertSpaces: true } }
+  const errors: ParseError[] = []
+  const document: unknown = parse(text, errors, { allowTrailingComma: true, allowEmptyContent: true })
+  if (
+    errors.length ||
+    (document !== undefined && (!document || typeof document !== "object" || Array.isArray(document)))
+  )
+    throw new Error("Invalid configuration document")
+  const shell =
+    patch.shell === undefined ? text : applyEdits(text, modify(text, ["shell"], patch.shell ?? undefined, options))
+  if (!patch.permissions?.length) return shell
+  const permissions = document && "permissions" in document ? document.permissions : undefined
+  if (permissions !== undefined && !Array.isArray(permissions)) throw new Error("Invalid configuration permissions")
+  const replaced = new Set(patch.permissions.map((rule) => JSON.stringify([rule.action, rule.resource])))
+  const remaining = (permissions ?? []).filter(
+    (rule) => !rule || !replaced.has(JSON.stringify([rule.action, rule.resource])),
+  )
+  return applyEdits(shell, modify(shell, ["permissions"], [...remaining, ...patch.permissions], options))
 }
 
 export const node = configured()

@@ -32,6 +32,7 @@ import {
   type Kind,
 } from "../../loginom-agent/src/permissions"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
+import { settingEffect, settingRules } from "../../product/src/permissions"
 import { createEmbeddedRoutes } from "../src/routes"
 import { pluginsLoaded } from "./fixture/routes"
 
@@ -135,11 +136,11 @@ const boot = (
     const handler = Context.get(context, HttpRouter.HttpRouter)
       .asHttpEffect()
       .pipe(HttpEffect.toWebHandlerWith(context))
-    const call = (route: string, body?: unknown) =>
+    const call = (route: string, body?: unknown, method = body === undefined ? "GET" : "POST") =>
       Effect.promise(async () => {
         const response = await handler(
           new Request(`http://opencode.local${route}`, {
-            method: body === undefined ? "GET" : "POST",
+            method,
             headers: { "content-type": "application/json" },
             body: body === undefined ? undefined : JSON.stringify(body),
           }),
@@ -243,6 +244,88 @@ const boot = (
   })
 
 describe("loginom.product permissions (B2.6a)", () => {
+  it.live(
+    "a profile save denial blocks a package save requested by the model without changing other settings",
+    () =>
+      Effect.gen(function* () {
+        const commits: string[] = []
+        const test = yield* boot({}, (ctx) =>
+          ctx.tool.transform((editor) =>
+            editor.add({
+              name: "package_save_probe",
+              description: "Save a package to the fake Loginom host",
+              input: Schema.Struct({ path: Schema.String }),
+              output: Schema.String,
+              options: { codemode: false },
+              execute: (input, call) =>
+                ctx.permission
+                  .assert({
+                    sessionID: call.sessionID,
+                    action: "loginom_dock_action_run",
+                    resources: ["*"],
+                    source: { type: "tool", messageID: call.messageID, id: call.id },
+                  })
+                  .pipe(
+                    Effect.map(() => {
+                      commits.push(input.path)
+                      return { output: "saved", content: "saved" }
+                    }),
+                  ),
+            }),
+          ),
+        )
+        const profile = path.join(test.dir, "global", "config", "loginom-ai-agent.jsonc")
+        const at = `location[directory]=${encodeURIComponent(test.dir)}`
+        const other = { action: "other_tool", resource: "*", effect: "deny" }
+        yield* Effect.promise(() =>
+          Bun.write(
+            profile,
+            `{
+  // keep this comment
+  "shell": "bash",
+  "permissions": [${JSON.stringify(other)}]
+}\n`,
+          ),
+        )
+        const rules = (effect: "allow" | "deny" | "ask") =>
+          Effect.gen(function* () {
+            const patch = yield* test.call(
+              `/api/experimental/config?${at}`,
+              { permissions: settingRules("save", effect) },
+              "PATCH",
+            )
+            expect(patch.status).toBe(204)
+            return yield* until(() =>
+              test.call(`/api/config?${at}`).pipe(
+                Effect.map((response) => {
+                  const entry = response.body.find((entry: { profile?: boolean }) => entry.profile)
+                  return entry && settingEffect("save", entry.info.permissions) === effect ? entry.info : undefined
+                }),
+              ),
+            )
+          })
+
+        yield* rules("allow")
+        const allowed = yield* test.create("package save allowed")
+        yield* test.prompt(allowed, script({ tool: "package_save_probe", input: { path: "allowed.lgp" } }))
+        expect(commits).toEqual(["allowed.lgp"])
+
+        const denied = yield* rules("deny")
+        const id = yield* test.create("package save denied")
+        yield* test.prompt(id, script({ tool: "package_save_probe", input: { path: "denied.lgp" } }))
+        expect(commits).toEqual(["allowed.lgp"])
+        expect(yield* test.open(id)).toEqual([])
+        expect(yield* test.tools(id)).toMatchObject([{ state: { status: "error" } }])
+        expect(denied.permissions).toEqual([other, ...settingRules("save", "deny")])
+        expect(denied.shell).toBe("bash")
+        expect(yield* Effect.promise(() => Bun.file(profile).text())).toContain("// keep this comment")
+
+        const reset = yield* rules("ask")
+        expect(reset.permissions).toEqual([other, ...settingRules("save")])
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
   it.live(
     "defaults: project files without a question, the other kinds ask, reading outside the project asks, the terminal is off",
     () =>
