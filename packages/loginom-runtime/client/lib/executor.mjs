@@ -3451,7 +3451,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const owner=state=>[state.origin,state.loginom_build,state.dom_epoch?.document,state.workflow_ref];
         const binding=state=>[...owner(state),state.active_tab_ref,state.package_identity,state.file_storage?.directory??null];
         const quiet=state=>state?.authenticated===true&&!state.ui?.masks?.length&&!state.ui?.dialogs?.length;
-        let workflowBeforeFiles,filesEntered,filesCheckpoint,navigationUncertain=false;
+        const strip='MF;cntMain;cntWorkspace;Workspace;t.br';
+        const tabStrip=state=>detail(state,one(state.ui.elements.filter(e=>e.tid===strip)));
+        const tabMatches=(tab,state)=>tab.tid===state.workflow_ref.tab_tid&&tab.ref===state.active_tab_ref;
+        let workflowBeforeFiles,tabsBeforeFiles,filesEntered,filesCheckpoint,navigationUncertain=false;
         const noGesture=result=>result.status==='NOT_APPLIED'&&result.phase==='preconditions'&&result.effect_possible===false
           &&result.cleanup_complete===true&&Array.isArray(result.trace)
           &&!result.trace.some(t=>['ui_preconditions_verified','ui_gesture_applied','ui_scroll_applied'].includes(t.event));
@@ -3543,7 +3546,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           }
           throw Error('Server storage UI is not ready');
         };
-        const directory=(expected,owner)=>ready(async()=>{
+        const directory=(expected,previous)=>ready(async()=>{
           const s=await roots();
           // The confirmed Files click can precede its tab/region mounting.
           // Reading the previous graph's NavigationPanel races its detach.
@@ -3555,10 +3558,23 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           // Loginom can replace the newly mounted Files tab with the previous
           // one after a confirmed click. Its route belongs to a different tab;
           // stop waiting for that route and plan from the restored breadcrumbs.
-          if(owner&&fresh.file_storage?.status==='observed'
-            &&fresh.dom_epoch.document===owner.dom_epoch.document
-            &&JSON.stringify(fresh.workflow_ref)!==JSON.stringify(owner.workflow_ref))
+          if(previous&&fresh.file_storage?.status==='observed'
+            &&fresh.dom_epoch.document===previous.dom_epoch.document
+            &&!same(fresh.workflow_ref,previous.workflow_ref)){
+            if(workflowBeforeFiles){
+              const tabs=await tabStrip(s);
+              if(!quiet(tabs)||!same(binding(tabs),binding(fresh))||!previous.active_tab_ref
+                ||!same(owner(previous),owner(filesEntered))||previous.active_tab_ref!==filesEntered.active_tab_ref
+                ||!same(owner(fresh).slice(0,3),owner(workflowBeforeFiles).slice(0,3))
+                ||!tabsBeforeFiles.some(tab=>tabMatches(tab,fresh))
+                ||tabs.ui.elements.filter(tab=>tabMatches(tab,fresh)).length!==1
+                ||tabsBeforeFiles.some(tab=>tab.tid===previous.workflow_ref.tab_tid||tab.ref===previous.active_tab_ref)
+                ||tabs.ui.elements.some(tab=>tab.tid===previous.workflow_ref.tab_tid||tab.ref===previous.active_tab_ref))
+                throw Error('Original Files owner could not be verified');
+              filesEntered=fresh;
+            }
             throw Object.assign(Error('Files tab restored'),{storageRestored:fresh});
+          }
           return fresh;
         },s=>s.file_storage?.status==='observed'&&(expected===undefined||s.file_storage.directory===expected));
         const restoreWorkflow=async()=>{
@@ -3569,8 +3585,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           // Reserve bounded cleanup after lookup expiry and leave five seconds
           // to deliver a public receipt before the 105 s IPC timeout.
           deadline=Math.min(now()+15000,deadlineAt??Infinity,consume?Infinity:started+100000);
-          const strip='MF;cntMain;cntWorkspace;Workspace;t.br',r=await roots();
-          const tabs=await detail(r,one(r.ui.elements.filter(e=>e.tid===strip)));
+          const tabs=await tabStrip(await roots());
           if(!quiet(tabs)||!same(binding(tabs),binding(filesCheckpoint)))throw Error('Files owner changed before return');
           const tab=one(tabs.ui.elements.filter(e=>e.tid===workflowBeforeFiles.workflow_ref.tab_tid&&e.ref===workflowBeforeFiles.active_tab_ref));
           if(!await act(tabs,tab,'click',{},tab.ref))return 'refused';
@@ -3588,9 +3603,21 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const initial=await roots();
           if(!initial.ui.elements.some(e=>e.tid?.includes(';FileStorageForm;'))){
             const toolbar=await detail(initial,one(initial.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'main_toolbar'));
+            if(toolbar.navigation_context?.kind==='workflow'&&toolbar.navigation_context.status==='observed'
+              &&toolbar.active_tab_ref&&toolbar.package_identity){
+              const tabs=await tabStrip(initial);
+              if(!quiet(tabs)||!same(binding(tabs),binding(toolbar))||!same(tabs.navigation_context,toolbar.navigation_context)
+                ||tabs.ui.elements.filter(tab=>tabMatches(tab,toolbar)).length!==1)
+                throw Error('Original workflow owner could not be verified');
+              tabsBeforeFiles=tabs.ui.elements.filter(tab=>tab.tid?.startsWith(strip+';tb'));
+            }
             const before=await act(toolbar,one(toolbar.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'),'files_button'));
             if(before.navigation_context?.kind==='workflow'&&before.navigation_context.status==='observed'
-              &&before.active_tab_ref&&before.package_identity)workflowBeforeFiles=before;
+              &&before.active_tab_ref&&before.package_identity){
+              workflowBeforeFiles=before;
+              if(!same(before.navigation_context,toolbar.navigation_context))tabsBeforeFiles=[];
+              tabsBeforeFiles??=[];
+            }
           }
           let current=await directory();const destination=listing?path:path.slice(0,path.lastIndexOf('/'));
           filesEntered=filesCheckpoint=current;

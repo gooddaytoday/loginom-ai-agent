@@ -232,10 +232,18 @@ for(const fault of ['owner','directory','target'])test('source epoch refresh ref
 async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,extension='csv',returnFault,signal,abortReturn,beforeReturnClick,options}={}){
  const f=await fixture(t),page=new Page(),base=page.uiSnapshot(),records=[];
  const toolbar='MF;cntMain;tlbMainToolbar',button=toolbar+';btnFilestorage';
- const strip='MF;cntMain;cntWorkspace;Workspace;t.br',files={tab_tid:strip+';tb-2',prefix:'MF;TF-2'};
- const nav=files.prefix+';NavigationBar;NavigationPanel',table=files.prefix+';FileStorageForm;pnlFileStorage;tbl';
+ const strip='MF;cntMain;cntWorkspace;Workspace;t.br';
+ const temporary={tab_tid:strip+';tb-3',prefix:'MF;TF-3'};
+ const restored=fault==='native restore'||fault==='foreign restore';
+ let files={tab_tid:strip+';tb-2',prefix:'MF;TF-2'};
+ const originalFiles=files;
+ let nav,table,row,folder,anchor,file;
  const filename='full.'+extension;
- const row=files.prefix+';FileStorageForm;colName_',folder=row+'worker',anchor=row+'..',file=row+filename;
+ const setFiles=tab=>{
+  files=tab;nav=files.prefix+';NavigationBar;NavigationPanel';table=files.prefix+';FileStorageForm;pnlFileStorage;tbl';
+  row=files.prefix+';FileStorageForm;colName_';folder=row+'worker';anchor=row+'..';file=row+filename;
+ };
+ setFiles(originalFiles);
  const element=(tid,label='',allowed_actions=[])=>({ref:page.uiReference(tid),tid,label,allowed_actions,
   identity:{anchor_tid:tid,path:[]},signature:{tag:'div',tid},kind:'control',scope:'workspace',visible:true,enabled:true,
   bounding_box:{x:10,y:10,width:20,height:20},interaction:{state:'point_observed',point:{x:20,y:20}}});
@@ -249,7 +257,7 @@ async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,exte
  const evaluate=page.evaluate.bind(page),elements=page.elements.bind(page),click=page.click.bind(page);
  page.elements=()=>[...elements(),page.element(button),page.element(folder)];
  page.click=async item=>{
-  if(item.tid===button){directory='/';top=0;revision++;return;}
+  if(item.tid===button){if(restored)setFiles(temporary);directory='/';top=0;revision++;return;}
   if(item.tid===base.workflow_ref.tab_tid){
    returnClicked=true;
    if(fault==='return uncertain'||returnFault==='unknown click')throw Error('Return click outcome was lost');
@@ -260,6 +268,10 @@ async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,exte
  };
  page.afterDoubleClick=async()=>{
   page.editor=null;directory='/worker';revision++;
+  if(restored&&files===temporary){
+   if(fault==='foreign restore')page.uiRefs.set(originalFiles.tab_tid,'ui-foreign-tab');
+   setFiles(originalFiles);
+  }
   if(fault==='files replaced')page.uiRefs.set(files.tab_tid,'ui-replacement-files');
  };
  const stateFor=({rootRef,discoverRoots,storageName}={})=>{
@@ -286,13 +298,13 @@ async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,exte
    directory_entries:2,row_ref:'ui-file-row'}};
   const scenario=element(base.workflow_ref.tab_tid,'Сценарий',['click']);
   if(returnFault==='clipped')scenario.interaction={state:'point_not_observed',point:null};
-  state.ui.elements=!inFiles?[element(button,'',['click'])]
+  state.ui.elements=!inFiles?(rootRef===page.uiReference(strip)?[scenario,...(restored?[element(originalFiles.tab_tid,'worker')]:[])]:[element(button,'',['click'])])
    :rootRef===scenario.ref?[scenario]
    :rootRef===page.uiReference(strip)?[scenario,element(files.tab_tid,'Файлы')]
    :directory==='/'?[{...element(folder,'worker',['double_click']),storage_entry:{kind:'folder'}}]
    :rootRef===page.uiReference(table)?[up,...(top&&fault!=='missing'?[csv]:[])]:rootRef===page.uiReference(file)?[csv]:[];
-  if(rootRef)state.observation_root={ref:rootRef,identity:element(inFiles
-   ?[nav,table,strip,folder,file,base.workflow_ref.tab_tid].find(tid=>page.uiReference(tid)===rootRef):toolbar).identity};
+  if(rootRef)state.observation_root={ref:rootRef,identity:element(rootRef===page.uiReference(strip)?strip:inFiles
+   ?[nav,table,folder,file,base.workflow_ref.tab_tid].find(tid=>page.uiReference(tid)===rootRef):toolbar).identity};
   return state;
  };
  page.evaluate=async(fn,arg)=>{
@@ -300,7 +312,7 @@ async function storageScrollAfterFolder(t,{listing,fault,startInFiles=false,exte
   if(fn.toString().includes("Symbol.for('loginom-dock.workspace-ui.identity.v1')")){
    if(returnClicked&&['unknown verification','lost return verification'].includes(returnFault)&&arg.discoverRoots)
     throw Error('Return observation was lost');
-   if(arg.rootRef===page.uiReference(strip))abortReturn?.();
+   if(directory!==null&&arg.rootRef===page.uiReference(strip))abortReturn?.();
    if(fault==='repaint'&&attempts===1&&arg.rootRef===page.uiReference(table)&&++retrySamples===2)revision++;
    return stateFor(arg);
   }
@@ -396,6 +408,19 @@ for(const listing of [false,true])test('Save works after a successful Files '+(l
  assert.equal(f.result.status,'SUCCEEDED',JSON.stringify(f.result));
  const save=await f.r.run('package.save_checkpoint',{path:'/user/data/packages/saved.lgp',conflict_policy:'fail'},{operationId:'save'});
  assert.equal(save.status,'SUCCEEDED',JSON.stringify(save));
+});
+
+for(const listing of [false,true])test('Files '+(listing?'list':'source')+' returns after native Files tab restoration',async t=>{
+ const f=await storageScrollAfterFolder(t,{listing,fault:'native restore'});
+ assert.equal(f.result.status,'SUCCEEDED',JSON.stringify(f.records.filter(record=>record.phase.endsWith('_failed'))));
+ assert.deepEqual(f.notices,['restored']);
+ assert.equal((await f.r.run('package.save_checkpoint',{path:'/user/data/packages/saved.lgp',conflict_policy:'fail'},{operationId:'save'})).status,'SUCCEEDED');
+});
+
+test('Files list refuses a replacement tab with the same native tab ID',async t=>{
+ const f=await storageScrollAfterFolder(t,{listing:true,fault:'foreign restore'});
+ assert.equal(f.result.status,'FAILED');assert.deepEqual(f.notices,[]);
+ assert.equal(f.page.events.filter(event=>event==='mouse_click').length,2);
 });
 
 test('Files scroll waits for two stable observations before reissuing',async t=>{
