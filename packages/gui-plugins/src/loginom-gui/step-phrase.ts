@@ -137,7 +137,7 @@ export function failureTitle(copy: Copy, facts?: Facts) {
   return action
 }
 
-export function stepDetails(copy: Copy, facts?: Facts) {
+export function stepDetails(copy: Copy, facts?: Facts, options?: { outputCounts: boolean }) {
   if (!facts) return []
 
   return [
@@ -145,7 +145,7 @@ export function stepDetails(copy: Copy, facts?: Facts) {
     ...(facts.node?.label ? [copy.t("field.node", { name: facts.node.label })] : []),
     ...(facts.nodeCount === undefined ? [] : [copy.t("field.nodes", { count: facts.nodeCount })]),
     ...(facts.package ? [copy.t("field.package", facts.package)] : []),
-    ...(facts.ports ?? []).map(({ index, rowCount, columnCount }) =>
+    ...(options?.outputCounts === false ? [] : (facts.ports ?? [])).map(({ index, rowCount, columnCount }) =>
       copy.t("field.port", { port: index + 1, rows: rowCount, columns: columnCount }),
     ),
     ...(facts.files ?? []).map((file) => copy.t("field.file", file)),

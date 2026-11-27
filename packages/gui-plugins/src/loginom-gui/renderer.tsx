@@ -6,12 +6,35 @@ import { createMemo, createSignal, createUniqueId, For, onCleanup, Show } from "
 import { createKeyed, Slot, usePlugin, type Plugin } from "@opencode/plugin/gui"
 import { builtinContext, BuiltinSlot, ToolRenderer, type ToolRendererProps } from "@opencode/plugin/gui/builtin"
 import type definition from "./index"
+import { decodeNodeOutput, decodeOutputCounters } from "./node-output"
+import { NodeOutputPort } from "./node-output-view"
 import { decodeFacts, decodeProgress, failureTitle, loginomStepPhrase, stepDetails } from "./step-phrase"
 
 const modes = ["compact", "detailed"] as const
 
+type OutputSelection = {
+  current(turn: string): string | undefined
+  toggle(turn: string, port: string): void
+}
+
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   const timeline = builtinContext(ctx).timeline
+  const [openPorts, setOpenPorts] = createSignal(new Map<string, string>())
+  createKeyed(
+    () => ctx.sessions.current()?.visit,
+    () => setOpenPorts(new Map()),
+  )
+
+  const selection: OutputSelection = {
+    current: (turn) => openPorts().get(turn),
+    toggle: (turn, port) => {
+      const next = new Map(openPorts())
+
+      if (next.get(turn) === port) next.delete(turn)
+      else next.set(turn, port)
+      setOpenPorts(next)
+    },
+  }
 
   const renderDetail = () => (
     <div
@@ -45,15 +68,30 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     },
     separate: true,
     handlesFailure: true,
-    render: (props) => <Step {...props} />,
+    render: (props) => <Step {...props} selection={selection} />,
   })
 }
 
-function Step(props: ToolRendererProps) {
+function Step(props: ToolRendererProps & { selection: OutputSelection }) {
   const ctx = usePlugin<typeof definition>()
   const timeline = builtinContext(ctx).timeline
   const outcome = createMemo(() => decodeFacts(props.metadata.loginom))
   const facts = () => Option.getOrUndefined(outcome())
+  const output = createMemo(() => Option.getOrUndefined(decodeNodeOutput(props.metadata.loginom)))
+
+  const counters = createMemo(() => {
+    if (output()) return []
+    const receipt = Option.getOrUndefined(decodeOutputCounters(props.metadata.loginom))
+
+    return (receipt?.evidence ?? []).flatMap((fact) =>
+      fact.kind === "tableRead"
+        ? [{ ...fact, columns: receipt?.ports?.find((port) => port.guid === fact.portGuid)?.columnCount }]
+        : [],
+    )
+  })
+
+  const rowID = createUniqueId()
+  const turnID = () => props.call?.turnID ?? rowID
 
   const failed = () =>
     props.status === "error" ||
@@ -102,7 +140,7 @@ function Step(props: ToolRendererProps) {
   }
 
   const details = createMemo(() => {
-    const values = stepDetails(ctx, facts())
+    const values = stepDetails(ctx, facts(), { outputCounts: !output() && counters().length === 0 })
     const substep = progress()?.substep
 
     return substep ? [...values, ctx.t("phase.fields", substep)] : values
@@ -154,6 +192,43 @@ function Step(props: ToolRendererProps) {
       <ul id={id} hidden={!open() || details().length === 0} class="min-w-0 break-words ps-7 text-v2-text-text-faint">
         <For each={details()}>{(detail) => <li>{detail}</li>}</For>
       </ul>
+      <Show when={output()}>
+        {(receipt) => (
+          <For each={receipt().ports}>
+            {(port) => {
+              const id = () => JSON.stringify([props.call?.messageID, props.call?.toolCallID ?? rowID, port.portGuid])
+
+              return (
+                <NodeOutputPort
+                  output={receipt()}
+                  port={port}
+                  nodeLabel={facts()?.node?.label}
+                  call={props.call}
+                  detailed={detailed()}
+                  open={props.selection.current(turnID()) === id()}
+                  onToggle={() => props.selection.toggle(turnID(), id())}
+                />
+              )
+            }}
+          </For>
+        )}
+      </Show>
+      <For each={counters()}>
+        {(counter) => (
+          <div class="min-w-0 ps-7 leading-5">
+            {detailed() && counter.columns !== undefined
+              ? ctx.t("output.count", {
+                  rows: ctx.plural("output.rows", counter.rowCount),
+                  columns: ctx.plural("output.columns", counter.columns),
+                })
+              : ctx.plural("output.rows", counter.rowCount)}
+            <Show when={detailed() && counter.rowsRead < counter.rowCount}>
+              {" · "}
+              {ctx.t("output.agentSeen", { seen: counter.rowsRead, total: counter.rowCount })}
+            </Show>
+          </div>
+        )}
+      </For>
     </div>
   )
 }

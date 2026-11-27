@@ -46,6 +46,15 @@ export interface ToolRendererProps {
   /** Tool-specific data attached to this call. */
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- A renderer decodes the metadata for its own tool.
   readonly metadata: Readonly<Record<string, unknown>>
+  /** Identifies this call in the transcript. Omitted for displays outside a turn. */
+  readonly call?: {
+    /** The user message that anchors this turn. */
+    readonly turnID: string
+    /** The assistant message that owns the call. */
+    readonly messageID: string
+    /** The original tool call ID within the assistant message. */
+    readonly toolCallID: string
+  }
   /** The call's current status. */
   readonly status?: string
   /** The output text, once available. */

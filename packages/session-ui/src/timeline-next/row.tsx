@@ -559,6 +559,7 @@ export function createNextTimelineRowRenderer(input: {
                 message={message()}
                 content={content()}
                 contentID={ref()!.partID}
+                turnID={row().userMessageID}
                 showAssistantCopyPartID={copyContentID(row().userMessageID)}
                 turnDurationMs={duration(row().userMessageID)}
                 turnTokensPerSecond={turnTokensPerSecond()}

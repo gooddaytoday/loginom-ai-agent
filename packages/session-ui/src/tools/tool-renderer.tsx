@@ -1146,6 +1146,7 @@ export interface ToolProps {
   metadata: Record<string, unknown>
   tool: string
   sessionID?: string
+  call?: { turnID: string; messageID: string; toolCallID: string }
   output?: string
   status?: string
   hideDetails?: boolean
