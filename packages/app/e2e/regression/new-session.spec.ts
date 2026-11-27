@@ -114,8 +114,10 @@ test("Loginom examples stay until the third conversation started without a templ
   await nextDraft(1)
   await examples.getByRole("button", { name: /ABC analysis of products/ }).click()
   await expect(draft.editor).toContainText("Build an ABC analysis")
-  await draft.editor.fill("")
+  await draft.editor.press("ControlOrMeta+a")
+  await draft.editor.press("Backspace")
   await expect(page.getByText(/Describe the task:/)).toBeVisible()
+
   for (const count of [2, 3, 4]) {
     await expect(examples).toBeVisible()
     await draft.editor.fill(`My own task ${count - 1}`)
