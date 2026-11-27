@@ -306,6 +306,16 @@ const BundleDefinition = Schema.Struct({
 const matchesPlugin = Schema.is(BundleDefinition)
 
 /**
+ * Whether a plugin's namespace owns an Ipc id.
+ * @param plugin - The providing plugin id.
+ * @param ipc - The Ipc id to check.
+ * @returns True for the plugin's id or one of its dot-separated children.
+ */
+export function ownsIpc(plugin: string, ipc: string) {
+  return ipc === plugin || ipc.startsWith(`${plugin}.`)
+}
+
+/**
  * Whether a plugin's GUI may take an id. Built-ins win: a plugin cannot take a built-in's id, an id that nests under
  * one or that one nests under (tokens and stored keys resolve by dot-separated prefix), or the `opencode` namespace.
  * Both hosts check it, each against its own built-ins.

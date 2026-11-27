@@ -29,7 +29,8 @@ test("administrator report allows only four fields and excludes profile credenti
   const key = "fixture-provider-key"
   const codec = credentials("linux")
   const store = connectionStore(join(loginom, "connection"), codec)
-  const address = "https://loginom.example.org/app"
+  const origin = "https://loginom.example.org:8443"
+  const address = `${origin}/app`
   await store.stage({ url: address, username: "analyst", password, apiKey: "", revision: 1, generation: 1 })
   await store.activate(1)
   put(join(data, "auth.json"), JSON.stringify({ test: { key, chat: "private conversation" } }))
@@ -37,14 +38,15 @@ test("administrator report allows only four fields and excludes profile credenti
   expect(known.status).toBe("ok")
   const input = { network: "online", policy: "present", knownSecrets: known.secrets } as const
   const clean = administratorReport({ ...input, address: `${address}?password=${password}#private`, model: "test/model" })
-  expect(JSON.parse(clean)).toEqual({ network: "online", policy: "present", loginom: address, model: "test/model" })
+  expect(JSON.parse(clean)).toEqual({ network: "online", policy: "present", loginom: origin, model: "test/model" })
+  const pathTokens = ["Zq81cqcfB6UvEr", "E5Nmr0QG7G30"]
   const contaminated = administratorReport({
     ...input,
-    address: `${address}/${encodeURIComponent(password)}`,
+    address: `${address}/s/${pathTokens[0]}/${encodeURIComponent(password)};jsessionid=${pathTokens[1]}`,
     model: `test/${key}`,
   })
-  expect(JSON.parse(contaminated)).toMatchObject({ loginom: "[redacted]", model: "[redacted]" })
-  for (const secret of [password, encodeURIComponent(password), key, "private conversation"]) {
+  expect(JSON.parse(contaminated)).toMatchObject({ loginom: origin, model: "[redacted]" })
+  for (const secret of [password, encodeURIComponent(password), key, "private conversation", ...pathTokens]) {
     expect(clean).not.toContain(secret)
     expect(contaminated).not.toContain(secret)
   }

@@ -101,19 +101,11 @@ export function administratorReport(input: {
     return value
   }
   const url = URL.canParse(input.address) ? new URL(input.address) : undefined
-  const address = url && (url.protocol === "http:" || url.protocol === "https:") ? url.origin + url.pathname : null
-  const cleanAddress = (value: string) => {
-    try {
-      if (clean(decodeURIComponent(value)) === "[redacted]") return "[redacted]"
-      return clean(value)
-    } catch {
-      return "[redacted]"
-    }
-  }
+  const address = url && (url.protocol === "http:" || url.protocol === "https:") ? url.origin : null
   return JSON.stringify({
     network: input.network,
     policy: input.policy,
-    loginom: address && cleanAddress(address),
+    loginom: address && clean(address),
     model: input.model && clean(input.model),
   }, null, 2) + "\n"
 }

@@ -24,7 +24,7 @@ export type Connection = {
 type Started = {
   readonly directory: string
   readonly deviceOnly: boolean
-  readonly diagnostics: { root: string; data: string; resources?: string }
+  readonly diagnostics: { root: string; resources?: string }
   ready: Promise<Connection | undefined>
   connected?: boolean
   held: Map<Lease, string>
@@ -78,7 +78,7 @@ export async function start(input: {
   const current: Started = {
     directory,
     deviceOnly: input.deviceOnly ?? false,
-    diagnostics: { root, data: input.data, resources: input.resources },
+    diagnostics: { root, resources: input.resources },
     ready: Promise.resolve(undefined),
     held: new Map(),
   }

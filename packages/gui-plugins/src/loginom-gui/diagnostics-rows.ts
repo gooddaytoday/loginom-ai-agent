@@ -9,6 +9,6 @@ export function diagnosticsRows(status: DiagnosticsStatus | undefined) {
     { id: "policy", ok: !!status && status.policy !== "invalid", tab: undefined },
     { id: "network", ok: !!status?.network && status.policy !== "invalid", tab: "general" },
     { id: "service", ok: !!status, tab: "servers" },
-    { id: "journal", ok: false, tab: undefined },
+    { id: "journal", ok: null, tab: undefined },
   ] as const
 }
