@@ -1,4 +1,5 @@
 import type { ElectronAPI } from "../api-types"
+import { dashboardLinkEvent } from "@loginom-ai-agent/product/dashboard-link"
 
 const deepLinkEvent = "opencode:deep-link"
 
@@ -6,7 +7,15 @@ const deepLinkEvent = "opencode:deep-link"
 // never handles it again.
 export function startDeepLinks(api: ElectronAPI) {
   api.onDeepLink((delivery) => {
-    emitDeepLinks(delivery.urls)
+    emitDeepLinks(delivery.urls.filter((payload) => typeof payload === "string"))
+    const dashboards = delivery.urls.flatMap((payload) =>
+      typeof payload === "string" ? [] : [{ id: payload.id, ...payload.result }],
+    )
+    if (dashboards.length) {
+      const pending = (window.loginomDashboardLinks ??= [])
+      pending.push(...dashboards)
+      window.dispatchEvent(new Event(dashboardLinkEvent))
+    }
     api.acknowledgeDeepLinks(delivery.attempt)
   })
   api.readyDeepLinks()

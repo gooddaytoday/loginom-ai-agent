@@ -6,7 +6,7 @@ import test from "node:test"
 import { createRequire, syncBuiltinESMExports } from "node:module"
 import { prepareDashboard, readDashboardBinding, removeDashboard } from "../../src/agent/folder.ts"
 import { dashboardResources } from "../../src/agent/resources.ts"
-import { draftDashboard, NO_SAMPLE } from "../../src/agent/draft.ts"
+import { draftDashboard, NO_SAMPLE, previewDashboard } from "../../src/agent/draft.ts"
 
 const template = resolve(import.meta.dirname, "../../template")
 const resources = {
@@ -51,6 +51,9 @@ test("a prepared folder builds and serves its coherent sample using one shared s
   assert.deepEqual(data.parameters, [{ name: "Count", value: 2 }, { name: "Label", value: null }])
   const again = await draftDashboard({ work: prepared.directory, resources })
   assert.equal(again.match(/http:\/\/localhost:\d+\/[a-f0-9]{64}\//)?.[0], url)
+  const control = await readDashboardBinding(prepared.directory, dirname(dirname(prepared.directory)))
+  assert.equal(await previewDashboard({ work: prepared.directory, resources, snapshotId: control.snapshotId }), url)
+  assert.equal(await previewDashboard({ work: prepared.directory, resources, snapshotId: crypto.randomUUID() }), undefined)
 })
 
 test("a request admitted for an earlier draft cannot start a preview for its replacement", async t => {

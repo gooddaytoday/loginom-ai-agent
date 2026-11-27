@@ -99,12 +99,13 @@
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
     {
-      "id": "CAT-14",
-      "title": "Built-in plugin top-level pages",
+      "id": "CAT-15",
+      "title": "Built-in plugin top-level pages and navigation",
       "paths": [
         "packages/app/src/shell/routes/routes.tsx", "packages/app/src/shell/state/layout.tsx",
         "packages/app/src/shell/state/layout.test.ts", "packages/app/vite.config.ts",
-        "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
+        "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts",
+        "packages/app/src/runtime/plugin/host-apis.tsx"
       ]
     },
     {

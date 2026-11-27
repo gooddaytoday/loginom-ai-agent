@@ -1,14 +1,15 @@
 import { consoleReturnWindow } from "../lifecycle/deep-link"
+import type { DeepLinkPayload } from "../../shared/ipc-rpc/events"
 
 export type DeepLinkWindow = { readonly status: "loading" } | { readonly status: "ready"; readonly clientID: number }
 
 // `target` is the window a console return names; a link without one, or whose window is gone, opens in the
 // preferred window.
 export type DeepLink =
-  | { readonly status: "queued"; readonly url: string; readonly target: string | undefined }
+  | { readonly status: "queued"; readonly url: DeepLinkPayload; readonly target: string | undefined }
   | {
       readonly status: "delivered"
-      readonly url: string
+      readonly url: DeepLinkPayload
       readonly target: string | undefined
       readonly clientID: number
       readonly attempt: number
@@ -22,7 +23,7 @@ export type DeepLinkState = {
 }
 
 export type DeepLinkEvent =
-  | { readonly type: "links.received"; readonly urls: readonly string[] }
+  | { readonly type: "links.received"; readonly urls: readonly DeepLinkPayload[] }
   | { readonly type: "window.opened"; readonly windowID: string }
   | { readonly type: "window.focused"; readonly windowID: string }
   | { readonly type: "window.ready"; readonly windowID: string; readonly clientID: number }
@@ -36,7 +37,7 @@ export type DeepLinkCommand =
       readonly windowID: string
       readonly clientID: number
       readonly attempt: number
-      readonly urls: readonly string[]
+      readonly urls: readonly DeepLinkPayload[]
     }
   | { readonly type: "window.focus"; readonly windowID: string }
 
@@ -53,7 +54,11 @@ export function transitionDeepLinks(state: DeepLinkState, event: DeepLinkEvent):
   switch (event.type) {
     case "links.received": {
       if (event.urls.length === 0) return unchanged(state)
-      const links = event.urls.map((url): DeepLink => ({ status: "queued", url, target: consoleReturnWindow(url) }))
+      const links = event.urls.map((url): DeepLink => ({
+        status: "queued",
+        url,
+        target: typeof url === "string" ? consoleReturnWindow(url) : undefined,
+      }))
       const focus = links.find((link) => link.target && state.windows[link.target])?.target ?? preferredWindowID(state)
       const next = drain({ ...state, links: [...state.links, ...links] })
 

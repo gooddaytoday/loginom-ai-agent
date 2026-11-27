@@ -370,6 +370,7 @@ export interface BuiltinContext extends Context {
   readonly locale: BuiltinLocale
   /** The session layout, with `command`. */
   readonly layout: BuiltinLayout
+  readonly router: Context["router"] & { openPage(id: string): void }
   /** Stores whose older homes may be parts of shared app keys. */
   readonly storage: BuiltinStorage
 }

@@ -41,6 +41,51 @@ story.beforeEach(async ({ mount }) => {
   await mount("ui-line-comment--editor")
 })
 
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  story(`a Studio link opens a dashboard and its edit draft at ${viewport.width}px`, async ({ page }, info) => {
+    await page.setViewportSize(viewport)
+    const target = {
+      id: "665afd45-1298-4c90-9086-1dd73ca94902",
+      directory: "/data/dashboards/orders/work",
+      nodeName: "Заказы",
+      action: "edit" as const,
+    }
+    const host = await page.evaluateHandle(
+      async ({ fixture, target }) => {
+        const { mountDashboard } = await import(fixture)
+        const dashboard = mountDashboard()
+        dashboard.deliver(target)
+        return dashboard
+      },
+      { fixture, target },
+    )
+
+    const panel = page.getByRole("region", { name: "Дашборд", exact: true })
+    await expect(panel.getByRole("heading", { name: "Заказы" })).toBeVisible()
+    await expect(panel.getByText("Строк в результате: 2")).toBeVisible()
+    await page.screenshot({ path: info.outputPath(`dashboard-${viewport.width}x${viewport.height}.png`) })
+
+    await host.evaluate((dashboard, id) => dashboard.deliver({ id, code: "DASHBOARD_SNAPSHOT_UNAVAILABLE" }), target.id)
+    await expect(page.getByRole("alert")).toHaveText(/Ссылка из Studio уже использована.*получите новую ссылку/)
+    await expect(panel.getByRole("heading", { name: "Заказы" })).toBeVisible()
+    await panel.getByRole("button", { name: "Изменить в чате" }).click()
+    await expect
+      .poll(() => host.evaluate((dashboard) => dashboard.drafts))
+      .toEqual([
+        {
+          server: "sidecar",
+          directory: target.directory,
+          prompt: "Помоги изменить дашборд для узла «Заказы».",
+        },
+      ])
+    expect(await host.evaluate((dashboard) => dashboard.previews.length)).toBe(1)
+    await host.evaluate((dashboard) => dashboard.unmount())
+  })
+}
+
 story(
   "a plugin page uses its contribution context and becomes unavailable when its plugin is disabled",
   async ({ page }) => {

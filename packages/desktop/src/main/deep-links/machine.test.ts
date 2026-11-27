@@ -31,6 +31,14 @@ const ready = (windowID: string, clientID: number): DeepLinkEvent[] => [
 ]
 
 describe("deep link delivery", () => {
+  test("delivers dashboard answers that arrive before the window is ready", () => {
+    const dashboard = { id: "665afd45-1298-4c90-9086-1dd73ca94902", result: { code: "DASHBOARD_SNAPSHOT_UNAVAILABLE" } }
+    const result = replay([{ type: "links.received", urls: [dashboard] }, ...ready("a", 1)])
+    expect(result.commands.at(-1)).toEqual([
+      { type: "links.deliver", windowID: "a", clientID: 1, attempt: 1, urls: [dashboard] },
+    ])
+  })
+
   test("never hands an acknowledged link to a reloaded or new window", () => {
     const live = replay([
       ...ready("a", 1),
