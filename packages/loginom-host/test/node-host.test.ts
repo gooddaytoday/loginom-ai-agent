@@ -141,24 +141,37 @@ test("package recheck distinguishes a live app conversation, an external marker 
   const resources = join(directory, "resources")
   const root = join(directory, "profile")
   const stateFile = join(directory, "packages.json")
+  const startupGate = join(directory, "startup-release")
   const packagePath = "/user/shared/plan.lgp"
   const writer = "ses_writer"
   const reader = "ses_reader"
   const writerChat = createHash("sha256").update(writer).digest("hex")
+  const starting = "ses_starting"
+  const startingChat = createHash("sha256").update(starting).digest("hex")
   await stageKnowledgeFixture(resources)
   await mkdir(join(resources, "bin"))
   await symlink(fixture.node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
   await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
   await writeFile(join(resources, "runtime/src/managed-entry.mjs"), `
-    import { readFileSync } from 'node:fs';
+    import { existsSync, readFileSync, writeFileSync } from 'node:fs';
     let writer = false;
     const packagePath = ${JSON.stringify(packagePath)};
     process.on('message', m => {
       const send = result => process.send({id:m.id,result});
       switch (m.operation) {
-        case 'start':
+        case 'start': {
           writer = m.input.chat === ${JSON.stringify(writerChat)};
-          return send({protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true});
+          const ready = () => send({protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true});
+          if (m.input.chat !== ${JSON.stringify(startingChat)}) return ready();
+          const gate = ${JSON.stringify(startupGate)};
+          writeFileSync(gate + '.entered', '');
+          const timer = setInterval(() => {
+            if (!existsSync(gate)) return;
+            clearInterval(timer);
+            ready();
+          }, 5);
+          return;
+        }
         case 'call':
           return send({result:{content:[],_meta:{existing:true}}, recoveryPending:false,
             ...(!writer && {packagePath})});
@@ -202,7 +215,24 @@ test("package recheck distinguishes a live app conversation, an external marker 
     await prepare(writer)
     const owned = { packagePath, kind: "other_conversation", sessionID: writer }
     expect(await prepare(reader)).toEqual({ content: [], _meta: { existing: true, packageAccess: owned } })
-    expect(await recheck()).toEqual(owned)
+    const pending = prepare(starting)
+    try {
+      const signal = AbortSignal.timeout(2_000)
+      while (!(await Bun.file(startupGate + ".entered").exists())) {
+        signal.throwIfAborted()
+        await Bun.sleep(5)
+      }
+      const timeout = Promise.withResolvers<undefined>()
+      const timer = setTimeout(() => timeout.resolve(undefined), 2_000)
+      try {
+        expect(await Promise.race([recheck(), timeout.promise])).toEqual(owned)
+      } finally {
+        clearTimeout(timer)
+      }
+    } finally {
+      await writeFile(startupGate, "")
+      await pending
+    }
 
     await setPackages("/another-folder/plan.lgp", "present")
     expect(await recheck()).toEqual({ packagePath, kind: "other_loginom_session" })

@@ -906,7 +906,10 @@ export async function createLoginomHost(options: {
           },
         ),
       )
-      if (Schema.is(SessionID)(sessionID)) conversations.set(child, sessionID)
+      if (Schema.is(SessionID)(sessionID)) {
+        // Index ready windows so a recheck does not wait for another chat to log in.
+        void child.then(() => conversations.set(child, sessionID), () => undefined)
+      }
       return child
     },
   }
