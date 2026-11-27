@@ -102,6 +102,8 @@
       "id": "CAT-10",
       "title": "Web app, UI kit, session UI",
       "paths": [
+        "packages/app/e2e/user-story/document-package.spec.ts", "packages/app/e2e/utils/document-package.ts",
+        "packages/server/test/loginom-package-docs.test.ts",
         "packages/app/**", "packages/ui/**", "packages/session-ui/**",
         "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**"
       ]

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
@@ -24,10 +24,12 @@ import { HttpEffect, HttpRouter, HttpServer } from "effect/http"
 import { LanguageModel, LLMClient, type LLMRequest } from "../../ai/src/effect"
 import { OpenAIChat } from "../../ai/src/protocols/openai-chat"
 import { TestLLM } from "../../ai/src/testing"
+import { OpenCode } from "../../client/src/promise"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { localFiles } from "../../loginom-agent/src/local-file"
 import { packageDocs, Parameters } from "../../loginom-agent/src/package-docs"
+import { documentationPermissions, Runner, waitForRunner } from "../../loginom-host/src/runner-rpc"
 import { deniedText } from "../../loginom-agent/src/permissions"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { productSkillsDirectory } from "../../product/src/skills"
@@ -234,6 +236,13 @@ const boot = Effect.gen(function* () {
   return {
     dir,
     sessions,
+    model: model.ref,
+    client: OpenCode.make({
+      baseUrl: "http://opencode.local",
+      fetch: Object.assign((input: RequestInfo | URL, init?: RequestInit) => handler(new Request(input, init)), {
+        preconnect: () => undefined,
+      }),
+    }),
     plugin: harness.plugin,
     tool: harness.tool,
     hooks,
@@ -307,6 +316,88 @@ const withScript = <A, E, R>(content: string | undefined, body: Effect.Effect<A,
 }
 
 describe("package_docs_run (B2.5c)", () => {
+  it.live(
+    "the documentation wizard publishes its custom report with a scripted model and cannot edit the package",
+    () =>
+      Effect.gen(function* () {
+        const home = (yield* tmpdirScoped("loginom-documentation-wizard-")).path
+        yield* Effect.acquireRelease(
+          Effect.sync(() => {
+            const previous = {
+              home: process.env.LOGINOM_AI_AGENT_TEST_HOME,
+              resources: process.env.LOGINOM_AI_AGENT_RESOURCES,
+            }
+            process.env.LOGINOM_AI_AGENT_TEST_HOME = home
+            process.env.LOGINOM_AI_AGENT_RESOURCES = resources
+            return previous
+          }),
+          (previous) =>
+            Effect.sync(() => {
+              if (previous.home === undefined) delete process.env.LOGINOM_AI_AGENT_TEST_HOME
+              else process.env.LOGINOM_AI_AGENT_TEST_HOME = previous.home
+              if (previous.resources === undefined) delete process.env.LOGINOM_AI_AGENT_RESOURCES
+              else process.env.LOGINOM_AI_AGENT_RESOURCES = previous.resources
+            }),
+        )
+        const test = yield* boot
+        const prepared = yield* Effect.promise(() =>
+          test.client.rpc(Runner).prepareDocumentation({ packagePath: fixture }, { location: { directory: test.dir } }),
+        )
+        const location = { directory: prepared.directory }
+        const copy = path.join(prepared.directory, prepared.filename)
+        const hash = createHash("sha256").update(copy).digest("hex").slice(0, 8)
+        const report = `# Памятка для коллеги\n\nПроверьте входные данные.\n`
+        const session = yield* Effect.promise(() =>
+          test.client.session.create({
+            title: "Документировать пакет",
+            agent: "build",
+            model: test.model,
+            location,
+            permissions: documentationPermissions(prepared.filename, ["md"]),
+          }),
+        )
+        yield* Effect.promise(() => waitForRunner(() => test.client.rpc(Runner).ready({}, { location })))
+        const result = yield* Effect.promise(() =>
+          test.client.rpc(Runner).start(
+            {
+              sessionID: session.id,
+              profile: "package-docs",
+              documentationFile: prepared.filename,
+              customDocumentation: true,
+              text: script(
+                { tool: "write", input: { path: prepared.filename, content: "no" } },
+                { tool: "package_docs_run", input: { operation: "extract", lgp: prepared.filename } },
+                { tool: "write", input: { path: `.work/package-docs/demo-${hash}/report.md`, content: report } },
+                { tool: "package_docs_run", input: { operation: "emit", lgp: prepared.filename, format: "md" } },
+                { text: "Готово." },
+              ),
+            },
+            { location },
+          ),
+        )
+        expect(result).toEqual({ granted: true })
+        yield* Effect.promise(() => test.client.experimental.session.wait({ sessionID: session.id }))
+        const messages = yield* Effect.promise(() => test.client.session.context({ sessionID: session.id }))
+        expect(messages.at(-1)).toMatchObject({ type: "idle", outcome: "succeeded" })
+        const emitted = messages.flatMap((message) => (message.type === "assistant" ? message.content : []))
+        expect(emitted).toContainEqual(
+          expect.objectContaining({
+            name: "package_docs_run",
+            state: expect.objectContaining({
+              status: "completed",
+              input: expect.objectContaining({ operation: "emit" }),
+            }),
+          }),
+        )
+        expect(
+          yield* Effect.promise(() => fs.readFile(path.join(prepared.directory, "demo — описание.md"), "utf8")),
+        ).toBe(report)
+        expect(yield* Effect.promise(() => fs.readFile(copy))).toEqual(
+          yield* Effect.promise(() => fs.readFile(fixture)),
+        )
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
   it.live(
     "extracts an original user attachment with bundled Node and requests only session writes",
     () =>

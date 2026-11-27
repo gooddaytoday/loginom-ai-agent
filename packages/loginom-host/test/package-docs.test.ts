@@ -222,6 +222,30 @@ test("emit rejects a draft missing mandatory sections without publishing a repor
   } finally { await rm(directory, { recursive: true, force: true }) }
 }, 20_000)
 
+test("the custom wizard publishes a non-template draft in every requested format", async () => {
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-custom-")))
+  try {
+    const lgp = join(fixtures, "demo.lgp")
+    const previous = await readFile(lgp)
+    const options = ["--lgp", lgp, "--directory", directory]
+    const skeleton = await docsCommand(["skeleton", ...options], directory)
+    expect(skeleton.code).toBe(0)
+    const text = "# Памятка для коллеги\n\nПроверьте входные данные.\n"
+    await writeFile(JSON.parse(skeleton.stdout).report, text)
+    for (const format of ["md", "docx", "pdf"]) {
+      const file = join(directory, `demo — описание.${format}`)
+      const result = await docsCommand(["emit", ...options, "--custom", "true", "--format", format, "--output", file], directory)
+      expect(result.code).toBe(0)
+      expect(JSON.parse(result.stdout).output).toBe(file)
+      const bytes = await readFile(file)
+      if (format === "md") expect(bytes.toString()).toBe(text)
+      if (format === "pdf") expect(pdfText(bytes).join(" ")).toContain("Памятка для коллеги")
+      if (format === "docx") expect(bytes.subarray(0, 4)).toEqual(Buffer.from([80, 75, 3, 4]))
+    }
+    expect(await readFile(lgp)).toEqual(previous)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 20_000)
+
 test("emit preserves existing reports and chooses the next free collision suffix", async () => {
   const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-collision-")))
   try {

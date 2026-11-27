@@ -1,7 +1,8 @@
 // Loginom AI Agent product plugin. Core runs it as a built-in server plugin: last in `post`, with a guarded and
 // reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host itself belongs to the server process
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
-import { join } from "node:path"
+import { basename, extname, join, resolve } from "node:path"
+import { Runner } from "@loginom-ai-agent/loginom-host/runner-rpc"
 import { Definition as ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Plugin } from "@opencode/plugin"
@@ -9,13 +10,14 @@ import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
-import { grants, next, permits, type Grant, type Profile } from "./access"
+import { next, permits, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
 import { connectionSettings } from "./connection-settings"
 import { Dashboard } from "./dashboard"
 import { DashboardTarget } from "./dashboard-target"
 import { dashboardTools } from "./dashboard-tools"
 import { dockTools } from "./dock"
+import { prepareDocumentation } from "./documentation-run"
 import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
@@ -40,27 +42,6 @@ import {
 import { apply, bundled, hub } from "./skills"
 
 export { Dashboard }
-
-// The wizard's RPC: grant a profile to one prompt and admit it. The UI is stage C.
-const runner = {
-  id: "loginom.runner",
-  methods: {
-    start: {
-      input: {
-        type: "object",
-        properties: {
-          sessionID: { type: "string" },
-          profile: { type: "string", enum: [...grants] },
-          text: { type: "string" },
-        },
-        required: ["sessionID", "profile", "text"],
-        additionalProperties: false,
-      },
-      output: { type: "object", properties: { granted: { type: "boolean" } }, required: ["granted"] },
-    },
-  },
-  events: {},
-} as const
 
 // The checks 0.4's product CLI made before the model (B2.7a4b): its `run` asks them of this server's Host before it
 // prompts (`ServiceHost.preflight`). The answer is a product code, or none when the run may go on.
@@ -115,7 +96,8 @@ export default Plugin.define({
     // prompt or skill activation that issued it until the session admits its next prompt. It is not tied to an execution:
     // a scheduled wake joins a running execution as a steer prompt. Memory only, so a restart drops every grant.
     const granted = new Map<string, Profile>()
-    const pending = new Map<string, { sessionID: string; profile: Grant }>()
+    const pending = new Map<string, typeof Runner.methods.start.input.Type>()
+    const documentation = new Map<string, { filename: string; custom: boolean }>()
     // A dashboard's work folder confines every session of its Location to `loginom-dashboard` for good (B2.9b, 0.4
     // `baseProfile`): no skill, attachment or wizard grant changes it, and a subsession or a fork lives here too.
     const dashboard = Dashboard.latch(ctx.location.directory)
@@ -184,15 +166,15 @@ export default Plugin.define({
       const lease = dashboard()
         ? Promise.resolve(undefined)
         : ServiceHost.acquire(sessionID).then(
-          (lease) => {
-            refused.delete(sessionID)
-            return lease
-          },
-          (error) => {
-            refused.set(sessionID, "acquire: " + hostErrorText(error))
-            return undefined
-          },
-        )
+            (lease) => {
+              refused.delete(sessionID)
+              return lease
+            },
+            (error) => {
+              refused.set(sessionID, "acquire: " + hostErrorText(error))
+              return undefined
+            },
+          )
       runs.set(sessionID, { lease, endTurn })
       return lease
     }
@@ -347,7 +329,7 @@ export default Plugin.define({
         }),
       )
       fileTools(files, profiles).forEach((tool) => editor.add(tool))
-      editor.add(packageDocs(files, ctx.location.directory, resources))
+      editor.add(packageDocs(files, ctx.location.directory, resources, (sessionID) => documentation.get(sessionID)))
     })
 
     // The Dock catalog of the session's Host run (B2.5d): its tools come and go with the connection generation. The
@@ -420,6 +402,18 @@ export default Plugin.define({
       await bound(event.sessionID)
       if (!permits(profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
+      const docsRun = documentation.get(event.sessionID)
+      if (docsRun && event.tool === "package_docs_run") {
+        const input = event.input
+        if (
+          typeof input !== "object" ||
+          input === null ||
+          !("lgp" in input) ||
+          typeof input.lgp !== "string" ||
+          resolve(ctx.location.directory, input.lgp) !== join(ctx.location.directory, docsRun.filename)
+        )
+          throw new Error("PACKAGE_DOCS_LGP_REQUIRED")
+      }
       // A dashboard session's file tools stay in its work folder (B2.9c); a client counts the refusal as a denied
       // permission, as it counts the hook's (`permission.rejected`).
       const reason = dashboard() ? Dashboard.callError(ctx.location.directory, event.tool, event.input) : undefined
@@ -483,6 +477,12 @@ export default Plugin.define({
       const value = event.metadata?.[token]
       if (event.metadata) delete event.metadata[token]
       const wizard = typeof value === "string" ? pending.get(value) : undefined
+      if (wizard?.sessionID === event.sessionID && wizard.documentationFile)
+        documentation.set(event.sessionID, {
+          filename: wizard.documentationFile,
+          custom: wizard.customDocumentation === true,
+        })
+      else documentation.delete(event.sessionID)
       const requested =
         wizard?.sessionID === event.sessionID
           ? wizard.profile
@@ -493,15 +493,23 @@ export default Plugin.define({
     })
     await ctx.session.hook("fork", async (event) => {
       granted.delete(event.sessionID)
+      documentation.delete(event.sessionID)
       await binding.fork(event.sessionID)
     })
 
-    await ctx.rpc.register(runner, {
-      start: async (value) => {
-        // The RPC host validates the call against the JSON Schema above before the handler runs.
-        const input = value as { sessionID: string; profile: Grant; text: string }
+    await ctx.rpc.register(Runner, {
+      ready: async () => ({}),
+      prepareDocumentation: ({ packagePath }) => prepareDocumentation(packagePath),
+      start: async (input) => {
+        if (
+          input.documentationFile &&
+          (input.profile !== "package-docs" ||
+            basename(input.documentationFile) !== input.documentationFile ||
+            extname(input.documentationFile).toLowerCase() !== ".lgp")
+        )
+          throw new Error("PACKAGE_DOCS_LGP_REQUIRED")
         const key = crypto.randomUUID()
-        pending.set(key, { sessionID: input.sessionID, profile: input.profile })
+        pending.set(key, input)
         await ctx.session
           .prompt({ sessionID: input.sessionID, text: input.text, metadata: { [token]: key } })
           .finally(() => pending.delete(key))
