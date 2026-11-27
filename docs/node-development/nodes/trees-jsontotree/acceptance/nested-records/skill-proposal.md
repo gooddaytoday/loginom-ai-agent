@@ -38,7 +38,7 @@
 Подключай этот же порт к `trees.to_table`, `mode:"selected_nodes"`.
 На новом узле обязательны `selected_paths` (пути листьев схемы в её порядке,
 например `/id`, `/items/sku`, без индексов массива), `repeat_parents`,
-`composite_names:false`, `composite_labels:false`, `label_separator:"."`.
+`composite_names:false`, `composite_labels:false`. Разделитель опусти.
 `repeat_parents:true` повторяет выбранных родителей для каждой позиции;
 `false` оставляет их только в первой строке, далее NULL. Выход 0 — таблица.
 Полностью прочитай её, проверь типы и порядок, затем экспортируй и сохрани пакет.

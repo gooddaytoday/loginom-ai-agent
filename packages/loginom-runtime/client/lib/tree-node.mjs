@@ -3,7 +3,8 @@ import {makeNodeOutputContextCode} from './node-output-context.mjs';
 import {existingOutputExecution} from './node-execution-evidence.mjs';
 import {makeNodeProcessContextCode} from './node-process-context.mjs';
 import {makeNodePortOutputCode} from './node-port-output.mjs';
-import {jsonToTreeParametersSchema,treeToTableParametersSchema,treeLabelSeparators,validateTreeParameters,validateTreeJsonScope,validateJsonTreeSchema,validateSelectedTreePaths,treeColumnNames} from './tree-parameters.mjs';
+import {closePreparedWizard} from './node-wizard-close.mjs';
+import {jsonToTreeParametersSchema,treeToTableParametersSchema,treeLabelSeparators,TREE_LABEL_SEPARATOR_REQUIRES_COMPOSITE,validateTreeParameters,validateTreeJsonScope,validateJsonTreeSchema,validateSelectedTreePaths,treeColumnNames} from './tree-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'
  ?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
@@ -130,6 +131,12 @@ export function createTreeNodeSupport(config,{json}){
     s=await observe('tree checkbox readback');need(s.node_tree[fields[key]]===value,'Tree checkbox did not settle');
    };
    if(request.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:false,configuration:s.node_tree};
+   if(!json&&request.target.kind==='existing'&&p.label_separator!==undefined&&p.composite_labels===undefined&&s.node_tree.composite_labels===false){
+    const closed=await closePreparedWizard(channel,{initialObservation:s});
+    throw Object.assign(Error(TREE_LABEL_SEPARATOR_REQUIRES_COMPOSITE),{
+     nodePhaseRefusal:{phase:'configure',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,
+      verification:'tree_label_separator_disabled',proof:{closed}}});
+   }
    let jsonField;
    if(json){
     // The picker displays native input labels (REST: Response → Ответ сервера),

@@ -313,7 +313,7 @@ export const deliveryApiTools=Object.freeze([
 export const isNodeApiTool=name=>[...nodeApiTools,...deliveryApiTools].some(tool=>tool.name===name);
 export function validateNodeApplyEnvelope(args) {
  if(args.mode===NODE_ADD_ONLY_MODE)return args;
- if(args.target?.type==='trees.to_table'&&args.mode==='selected_nodes')validateTreeLabelSeparator(args.parameters);
+ if(args.target?.type==='trees.to_table'&&args.mode==='selected_nodes')validateTreeLabelSeparator(args.parameters,args.target);
  // LAB-1324: refuse the unsupported external partition before graph/input checks.
  if(args.target?.type==='preprocessing.coarse_classes'&&args.mode==='internal'&&args.parameters?.coarse_classes?.partition==='external')validateCoarseClassesParameters(args.parameters,'internal');
  if(args.target?.type==='research.quality'){

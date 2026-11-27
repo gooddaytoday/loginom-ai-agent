@@ -125,10 +125,11 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
      await selectPreparedGraphNode(channel,before,'select node before internal preparation',{refreshReplacedBody:true});
      preconfiguration=await implementation.beforeOpen(channel,operation.nodeApply.request);
     }
-    await openPreparedWizard(channel);
+    const opening=await openPreparedWizard(channel);
     if(implementation?.afterOpen)await implementation.afterOpen(channel,operation.nodeApply.request);
     const opened=await channel.observe(implementation?.configurationObservation??{condition:'calculator expression page',readCalculator:true,ready:s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true});
-    return verified({effect_possible:true,node_context:opened.prepared_node_context,...(preconfiguration?{preconfiguration}: {})});
+    return verified({effect_possible:true,node_context:opened.prepared_node_context,...(preconfiguration?{preconfiguration}: {}),
+     ...(implementation?.type==='trees.to_table'?{deactivation_required:opening.deactivation_required}:{})});
    },
    async configureCalculator(ctx,p) {
     enter(ctx);
