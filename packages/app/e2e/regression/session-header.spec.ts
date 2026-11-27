@@ -1,4 +1,5 @@
 import type { SessionMessageInfo } from "@opencode/client/promise"
+import { openLoginomWindowFixture } from "../utils/loginom-windows"
 import { expect, test, type Page } from "@playwright/test"
 import { REMOTE_SERVER, seed, sessionHref } from "../utils/app"
 import { fixture, mockStressTimeline } from "../utils/session-fixture"
@@ -887,4 +888,61 @@ test.describe("revert", () => {
     const menu = await openUserMessageMenu(page, page.locator('[data-message-id="msg_second"]'))
     await expect(menu.getByRole("menuitem", { name: /^(Revert to here|Undo)$/ })).toHaveCount(0)
   })
+})
+
+for (const width of [1280, 390]) {
+  test(`Loginom package state and window menu at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+    const loginom = await openLoginomWindowFixture(page)
+    const row = page.getByRole("status", { name: "Рабочий пакет", exact: true })
+    await expect(row).toBeInViewport()
+    await expect(row.getByText("Продажи.lgp", { exact: true })).toBeVisible()
+    await expect(row.getByText("не сохранено", { exact: true })).toBeVisible()
+
+    await loginom.save()
+    await expect(row.getByText("сохранено", { exact: true })).toBeVisible()
+    await expect(row.getByText("не сохранено", { exact: true })).toHaveCount(0)
+
+    await loginom.setReadOnlyAndBusy()
+    await expect(row.getByText("только чтение", { exact: true })).toBeVisible()
+    await expect(row.getByText("Агент работает в окне", { exact: true })).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath(`package-row-${width}.png`) })
+
+    const trigger = page.getByRole("button", { name: "Loginom", exact: true })
+    await trigger.click()
+    const menu = page.getByRole("menu", { name: "Loginom", exact: true })
+    const own = menu.getByRole("menuitem", { name: /Продажи по регионам.*Показать окно/ })
+    const other = menu.getByRole("menuitem", { name: /Проверка импорта.*Показать окно/ })
+    await expect(menu.getByRole("menuitem")).toHaveCount(2)
+    await expect(own).toContainText("Продажи.lgp")
+    await expect(other).toContainText("Продажи.lgp")
+    await expect(other).toContainText("свёрнуто")
+    await expect(own.getByText("Показать окно", { exact: true })).toBeInViewport({ ratio: 1 })
+    await expect(other.getByText("Показать окно", { exact: true })).toBeInViewport({ ratio: 1 })
+    await page.screenshot({ path: testInfo.outputPath(`windows-menu-${width}.png`) })
+
+    await other.click()
+    await expect(page.getByText("Выберите окно Loginom на панели задач", { exact: true })).toBeVisible()
+    expect(loginom.focusRequests).toEqual([{ sessionID: fixture.sourceID }])
+
+    await trigger.click()
+    await expect(other).toBeVisible()
+    await loginom.finishAndCloseOther()
+    await expect(menu.getByRole("menuitem")).toHaveCount(1)
+    await expect(own).toBeVisible()
+    await page.keyboard.press("Escape")
+    await expect(menu).toBeHidden()
+    await expect(row.getByText("Агент работает в окне", { exact: true })).toHaveCount(0)
+  })
+}
+
+test("Loginom package state stays in the header at the newest message of a long conversation", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await openLoginomWindowFixture(page, 23)
+
+  await expect(page.getByText("Обсуждение отчёта, шаг 23.", { exact: true })).toBeInViewport()
+  await expect(page.getByText("Обсуждение отчёта, шаг 1.", { exact: true })).not.toBeInViewport()
+  const row = page.getByRole("status", { name: "Рабочий пакет", exact: true })
+  await expect(row).toBeInViewport()
+  await expect(row.getByText("не сохранено", { exact: true })).toBeVisible()
 })

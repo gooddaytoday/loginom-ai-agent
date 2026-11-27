@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show, type Accessor, type JSX } from "solid-js"
 import { Predicate } from "effect"
+import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { abort } from "@opencode/util/abort"
 import { createAnimatedPresence } from "@/runtime/animated-presence"
 import type { SessionMessageUser } from "@opencode/client/promise"
@@ -193,6 +194,7 @@ function MessageTimelineView(
   const turnPadding = () => "px-4 md:px-6"
   const showHeader = createMemo(() => !props.hideHeader && (props.data.showHeader() || workspaceSession()))
   const messageByID = projection.messageByID
+  const [extraHeaderHeight, setExtraHeaderHeight] = createSignal(0)
 
   const virtualized = createTimelineVirtualizer({
     active: () => props.active !== false,
@@ -202,6 +204,7 @@ function MessageTimelineView(
     keepsDisclosure: props.next,
     projection,
     showHeader,
+    extraHeaderHeight,
     follow: props.follow,
     scroll: () => props.scroll,
     onResumeScroll: props.onResumeScroll,
@@ -573,7 +576,30 @@ function MessageTimelineView(
       )}
       header={
         <Show when={!props.hideHeader}>
-          <SessionTitleHeader>
+          <SessionTitleHeader
+            extraHeight={extraHeaderHeight()}
+            extra={
+              <div
+                class="pointer-events-auto flow-root bg-v2-background-bg-base"
+                ref={(element) => createResizeObserver(element, ({ height }) => setExtraHeaderHeight(height))}
+              >
+                <PluginSlot
+                  at="session.header.below"
+                  input={{
+                    get session() {
+                      return props.view
+                    },
+                    get screen() {
+                      return props.screen
+                    },
+                    get active() {
+                      return props.active !== false
+                    },
+                  }}
+                />
+              </div>
+            }
+          >
             <SessionHeaderLayout
               title={title().editing ? title().draft : childTitle()}
               location={

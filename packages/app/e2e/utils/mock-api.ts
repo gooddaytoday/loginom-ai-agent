@@ -367,7 +367,7 @@ const Group = HttpApiGroup.make("mock")
   .add(
     HttpApiEndpoint.post("rpcCall", "/api/rpc/:rpcID/:method", {
       params: { rpcID: Schema.String, method: Schema.String },
-      payload: JsonPayload,
+      payload: Schema.Struct({ input: Schema.optionalKey(Schema.Unknown) }),
       success: Json,
       error: Unsupported,
     }),
