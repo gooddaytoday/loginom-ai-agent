@@ -72,14 +72,14 @@ export async function readNodeVariableOutput(page,task,readNode,readOutputs,read
    if(windows.length||exact('mn').some(visible))throw Error('A previous preview or menu is open');
    const drawings=exact(task.builtin_snapshot?cached.tid:task.port_tid).filter(e=>g.container.contains(e));
    const gb=g.container.getBoundingClientRect(),nativeHit=e=>{const box=e.getBoundingClientRect();return g.getCellAt(box.x-gb.x+g.container.scrollLeft+box.width/2,box.y-gb.y+g.container.scrollTop+box.height/2)===port.FCell;};
-   let drawing=drawings[0];
+   const native=task.builtin_snapshot?g.view.getState(port.FCell)?.shape?.node:undefined;
    if(task.builtin_snapshot){
-    const native=g.view.getState(port.FCell)?.shape?.node,tid=native?.getAttribute('data-tid');
-    if(!native||!g.container.contains(native)||drawings.length>1||tid!==null&&(tid!==cached.tid||drawing!==native))throw Error('Unique variable port drawing required');
-    if(!nativeHit(native))throw Error('Variable output native hit changed');
-    drawing??=native;
+    const tid=native?.getAttribute('data-tid');
+    if(!native||!g.container.contains(native)||drawings.length>1||tid!==null&&(tid!==cached.tid||drawings[0]!==native))throw Error('Unique variable port drawing required');
    }else if(drawings.length!==1)throw Error('Unique variable port drawing required');
-   if(!nativeHit(drawing))throw Error('Variable output native hit changed');
+   // The SVG retaining the port data-tid can cover the unlabelled native <g>.
+   const drawing=drawings[0]??native;
+   if((native&&native!==drawing&&!nativeHit(native))||!nativeHit(drawing))throw Error('Variable output native hit changed');
    return point(drawing);
   }
   if(mode==='menu'){
