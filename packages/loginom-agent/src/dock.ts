@@ -18,7 +18,7 @@ import { Identifier } from "@opencode/schema/identifier"
 import type { Model } from "@opencode/schema/model"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 import { local, type Profile } from "./access"
 import { exactScanReceipt } from "./file-profile-core"
 import type { ServiceHost } from "./host"
@@ -47,6 +47,7 @@ const Reply = Schema.Struct({
 })
 const decodeCatalog = Schema.decodeUnknownSync(Catalog)
 const decodeReply = Schema.decodeUnknownSync(Reply)
+const decodeLoginomMetadata = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Unknown))
 
 // The product's own tools that 0.4 offered only beside a prepared Dock: the catalog then describes Dock actions.
 const prepared = ["loginom_file_admit", "loginom_file_profile", "loginom_file_scan", "loginom_file_sample"]
@@ -315,10 +316,15 @@ export async function dockTools(input: {
       state === "pending" ? "running" : "settled",
     )
     const output = notice ? `${notice.text}\n\n${content}` : content
+    const facts = Option.getOrUndefined(decodeLoginomMetadata(result._meta?.loginom))
+    const metadata = {
+      generation: lease.generation,
+      ...(notice || facts ? { loginom: { ...notice?.loginom, ...facts } } : {}),
+    }
     if (state === "failed")
       throw new Tool.Error({
         message: output || "LOGINOM_TOOL_FAILED",
-        metadata: { generation: lease.generation, isError: true, ...(notice ? { loginom: notice.loginom } : {}) },
+        metadata: { ...metadata, isError: true },
       })
     const images = result.content.flatMap((block) =>
       block.type === "image" && typeof block.data === "string" && typeof block.mimeType === "string"
@@ -328,10 +334,8 @@ export async function dockTools(input: {
     return {
       content: images.length ? [{ type: "text", text: output }, ...images] : output,
       metadata: {
-        generation: lease.generation,
-        ...(notice ? { loginom: notice.loginom } : {}),
+        ...metadata,
         ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
-        ...(result._meta?.loginom ? { loginom: result._meta.loginom } : {}),
         // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
         ...(outputPath ? { truncated: true, outputPath } : {}),
         ...(state === "pending" ? { loginomPending: true } : {}),

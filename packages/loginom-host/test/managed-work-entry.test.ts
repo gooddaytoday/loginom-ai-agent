@@ -114,6 +114,13 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }] }; }
         async callTool(input, _unused, { signal }) {
           if (input.arguments.failAfterDispatch) throw Error('LOGINOM_FILE_CHANGED');
+          if (input.arguments.graphFactsFixture) return {
+            content: [{ type: 'text', text: 'package saved' }],
+            _meta: {
+              loginomManualEdits: [{ kind: 'node_renamed', guid: 'import', from: 'Импорт', to: 'Продажи' }],
+              loginom: { saved_package_graph: { status: 'compared', changes: [] } },
+            },
+          };
           if (input.arguments.progressFixture) {
             const { stepPhase } = await import('../../../../lib/step-progress.mjs');
             stepPhase('configuring', 'transform.group_data', { kind: 'fields', index: 2, total: 3 });
@@ -334,6 +341,23 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     ])
     await Bun.sleep(1_600)
     expect(updates).toHaveLength(2)
+    const save = await tool.execute({ graphFactsFixture: true }, {
+      sessionID,
+      messageID,
+      agent: Agent.ID.make("fixture"),
+      id: Tool.CallID.make("fixture_save"),
+      signal: new AbortController().signal,
+      progress: async () => undefined,
+    })
+    expect(save).toMatchObject({
+      content: "Учёл ваши правки в Loginom: переименовали «Импорт» → «Продажи».\n\npackage saved",
+      metadata: {
+        loginom: {
+          manualEdits: [{ kind: "node_renamed", guid: "import", from: "Импорт", to: "Продажи" }],
+          saved_package_graph: { status: "compared", changes: [] },
+        },
+      },
+    })
     for (const [name, code] of [
       ["missing", "LOGINOM_FILE_NOT_FOUND"],
       ["directory", "LOGINOM_FILE_NOT_REGULAR"],
