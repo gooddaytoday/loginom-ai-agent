@@ -385,6 +385,7 @@
         "@opencode/plugin": "workspace:*",
         "@opencode/schema": "workspace:*",
         "@opencode/ui": "workspace:*",
+        "@playwright/test": "catalog:",
         "@sentry/solid": "catalog:",
         "@solidjs/router": "catalog:",
         "@types/bun": "catalog:",

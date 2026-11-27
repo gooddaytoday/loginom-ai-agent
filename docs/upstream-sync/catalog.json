@@ -97,7 +97,7 @@
         "packages/ui/src/i18n/en.ts"
       ]
     },
-    { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
+    { "id": "CAT-09", "title": "Desktop main process, preload, renderer and window tests", "paths": ["packages/desktop/**"] },
     {
       "id": "CAT-14",
       "title": "Built-in plugin top-level pages",
