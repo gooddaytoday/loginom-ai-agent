@@ -80,6 +80,8 @@ PY
       scp -O -q "$out/credentials.cjs" winstand:C:/lab/b62c/tools/
       ;;
     send)
+      # `fetch` may have run in this very call: the ZIP name is only known now
+      zip=$(ls "$unsigned"/loginom-ai-agent-cli-*-win32-x64.zip | head -1)
       mkdir -p "$out/chunks"
       (cd "$out/chunks" && rm -f inst.* cli.* && split -b 20M -d -a 3 "$installer" inst. && split -b 20M -d -a 3 "$zip" cli.)
       send() { # one part, retried; skipped when the stand already has it with the same size
