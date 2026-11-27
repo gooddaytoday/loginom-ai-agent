@@ -24,13 +24,19 @@ const node = Schema.Struct({
   ports: Schema.Array(port),
   boundary_role: Schema.optionalKey(Schema.Literals(["input", "output"])),
 })
+const WindowLink = Schema.Struct({
+  source: Schema.NonEmptyString,
+  output: Schema.NonEmptyString,
+  target: Schema.NonEmptyString,
+  input: Schema.NonEmptyString,
+})
 const WindowGraph = Schema.Struct({
   name: Schema.NullOr(Schema.String),
-  document_id: Schema.NonEmptyString,
-  workflow_id: Schema.NonEmptyString,
+  document: Schema.NonEmptyString,
+  workflow: Schema.NonEmptyString,
   navigation_path: Schema.Array(Schema.String),
   nodes: Schema.Array(node),
-  links: Schema.Array(link),
+  links: Schema.Array(WindowLink),
 })
 
 export const PackageSchemaSession = Schema.Struct({ sessionID: Schema.NonEmptyString })
@@ -116,6 +122,11 @@ export async function savedPackageSchema(name: string, bytes: Uint8Array) {
 export function windowPackageSchema(value: unknown) {
   if (!Schema.is(WindowGraph)(value) || Buffer.byteLength(JSON.stringify(value)) > maxSchemaBytes) return null
   const graph = Schema.decodeUnknownSync(WindowGraph)(value)
+  const nodes = new Map(graph.nodes.map((node) => [node.guid, node]))
+  const endpoint = (nodeID: string, portID: string, direction: "input" | "output") => {
+    const port = nodes.get(nodeID)?.ports.find((port) => port.direction === direction && port.guid === portID)
+    return { node_guid: guid(nodeID), port_guid: guid(portID), ...(port && { kind: port.kind, index: port.index }) }
+  }
   return {
     source: "window" as const,
     observed_at: new Date().toISOString(),
@@ -123,15 +134,18 @@ export function windowPackageSchema(value: unknown) {
     complete: false as const,
     package: { name: graph.name },
     workflow: {
-      document_id: graph.document_id,
-      workflow_id: graph.workflow_id,
+      document_id: graph.document,
+      workflow_id: graph.workflow,
       navigation_path: graph.navigation_path,
       nodes: graph.nodes.map((node) => ({
         ...node,
         guid: guid(node.guid),
         ports: node.ports.map((port) => ({ ...port, guid: guid(port.guid) })),
       })),
-      links: graph.links.map(normalizedLink),
+      links: graph.links.map((link) => ({
+        source: endpoint(link.source, link.output, "output"),
+        target: endpoint(link.target, link.input, "input"),
+      })),
     },
   }
 }

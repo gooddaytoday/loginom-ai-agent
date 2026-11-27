@@ -321,7 +321,7 @@ async function handle(message) {
       const controller = new AbortController()
       state.controller = controller
       try {
-        state.schemaRead = state.bridge.packageSchema(controller.signal).catch(() => null)
+        state.schemaRead = state.bridge.graphSnapshot(controller.signal,{details:true}).catch(() => null)
         const result = await state.schemaRead
         send({ id: message.id, result: controller.signal.aborted ? null : result })
       } finally {
@@ -399,6 +399,9 @@ async function handle(message) {
         signal: controller.signal,
         timeout: runtimeCallTimeout(message.input.name, message.input.arguments),
       }
+      const snapshot = () => state.bridge.graphSnapshot(controller.signal).catch(() => null)
+      const graphBefore = message.input.graphBefore === true ? await snapshot() : null
+      controller.signal.throwIfAborted()
       const before = state.session.metadata.workspacePreparation
       const result = await withStepProgress({
         name: message.input.name,
@@ -419,6 +422,7 @@ async function handle(message) {
           document_id: prepared.document_id, workflow_id: prepared.workflow_ref.workflow_id,
         } : null
       const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
+      const graphAfter = await snapshot()
       send({
         id: message.id,
         result: {
@@ -427,6 +431,8 @@ async function handle(message) {
           } } : result,
           recoveryPending: state.bridge.hasUnsettledWork(),
           activeWork: state.bridge.hasActiveWork(),
+          ...(graphBefore ? { graphBefore } : {}),
+          ...(graphAfter ? { graphAfter } : {}),
         },
       })
     } finally {

@@ -24,7 +24,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "managed-work-entry-"))
   const work = join(directory, "work.json")
-  const snapshot = { document_id: "fixture-doc", workflow_id: "fixture-workflow", nodes: [], links: [] }
+  const snapshot = { document: "fixture-doc", workflow: "fixture-workflow", nodes: [], links: [] }
   const src = join(directory, "runtime/src")
   const files = {
     "runtime/src/managed-entry.mjs": await readFile(
@@ -102,7 +102,8 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
-        packageSchema: async (signal) => {
+        graphSnapshot: async (signal, options) => {
+          if (!options?.details) return work().graph ?? null;
           if (work().holdSchema) await new Promise((resolve, reject) =>
             signal.addEventListener('abort', () => reject(Error('aborted')), { once: true }));
           return work().schema;
@@ -255,6 +256,45 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
   try {
     await waitForKnowledge(host)
     expect(await host.packageSchema("file-errors")).toBeNull()
+    for (const [task, label] of [
+      ["msg_step_one", "Импорт"],
+      ["msg_step_two", "Продажи"],
+    ] as const) {
+      const turn = await LoginomHost.acquire("manual-edits")
+      if (!turn) throw Error("Adapter unavailable")
+      await turn.scope(
+        "bind",
+        Schema.decodeUnknownSync(HostTaskScope.Info)({
+          taskMessageID: task,
+          profile: "loginom-automation",
+        }),
+      )
+      await Bun.write(
+        work,
+        JSON.stringify({
+          activeWork: false,
+          unsettledWork: false,
+          prepared: true,
+          graph: {
+            document: "doc",
+            workflow: "wf",
+            nodes: [{ guid: "import", label, type: "import", position: { x: 0, y: 0 } }],
+            links: [],
+          },
+        }),
+      )
+      expect(await turn.call("dock_prepare", {}, task)).toEqual(
+        task === "msg_step_one"
+          ? { content: [] }
+          : {
+              content: [],
+              _meta: { loginomManualEdits: [{ kind: "node_renamed", guid: "import", from: "Импорт", to: "Продажи" }] },
+            },
+      )
+      await turn.tools()
+      expect(await turn.call("fixture", {}, task)).toEqual({ content: [] })
+      await turn.release()
+    }
     const run = await LoginomHost.acquire("file-errors")
     if (!run) throw Error("Adapter unavailable")
     await run.scope(
@@ -266,7 +306,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       schema: { ...snapshot, name: "Fixture", navigation_path: [] } }))
     expect(await host.packageSchema("other-conversation")).toBeNull()
     expect(await host.packageSchema("file-errors")).toMatchObject({
-      source: "window", generation: 1, workflow: snapshot,
+      source: "window", generation: 1, workflow: { document_id: snapshot.document, workflow_id: snapshot.workflow },
     })
     await run.tools()
     const sessionID = Session.ID.make("ses_file_errors")

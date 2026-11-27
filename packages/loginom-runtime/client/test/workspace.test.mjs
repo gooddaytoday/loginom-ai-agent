@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runInNewContext, createContext, runInContext } from 'node:vm';
-import { makeWorkspacePrepareCode, makeWorkspaceBootstrapCode, makeWorkspaceStepCode, makeWorkspaceSchemaCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace } from '../lib/workspace.mjs';
+import { makeWorkspacePrepareCode, makeWorkspaceBootstrapCode, makeWorkspaceStepCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace } from '../lib/workspace.mjs';
 import {readGraph} from '../lib/node-target-browser.mjs';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
 import {prepareTool} from '../lib/skill.mjs';
@@ -672,38 +672,36 @@ test('package schema observes unsaved graph edits and keeps native node and port
   };
   const source=add('48FC4BE7-DCBE-4621-91D7-86D822FD3292','Source','Output','source-port');
   const target=add('320790e8-3d1c-4612-b1b3-86c025cddb81','Target','Input','target-port');
-  elements.push({getAttribute:()=>prepared.workflow_ref.prefix+';Graph;'+source.FLabel.FRawValue+'|Output_Data-0|Target|Input_Data-0'});
   const query=fixture.context.document.querySelectorAll;
   fixture.context.document.querySelectorAll=selector=>{
     if(selector==='[role="dialog"],.bg-mask-message,.x-mask-msg')return query('[role="dialog"]');
     return [...query(selector),...elements.filter(element=>selector==='[data-tid='+JSON.stringify(element.getAttribute())+']')];
   };
   Object.assign(tab.model,{FCreateDraggedNodeStarted:false,FDraggingOverGraph:false});
-  Object.assign(tab.model.FDiagram,{FNodes:{FCollection:[source,target]}});
+  Object.assign(tab.model.FDiagram,{FNodes:{FCollection:[source,target]},FLinks:{FCollection:[{
+    FSourcePort:source.FPorts[0].FCollection[0],FTargetPort:target.FPorts[0].FCollection[0],
+  }]}});
   tab.graph.contains=element=>elements.includes(element);
   tab.graph.querySelectorAll=()=>elements;
   tab.model.FDiagram.FmxGraph.view={getState:cell=>shapes.get(cell)};
-  const read=runInNewContext(makeWorkspaceSchemaCode({loginomUrl:'http://loginom.example/app',build,
-    sessionId:'standalone',workflowRef:{...prepared.workflow_ref,document_id:prepared.document_id},readGraph,types:NODE_TYPES}));
+  const read=runInNewContext(makeWorkspaceStepCode({loginomUrl:'http://loginom.example/app',build,
+    sessionId:'standalone',workflowRef:{...prepared.workflow_ref,document_id:prepared.document_id},readGraph,types:NODE_TYPES,snapshotOnly:true,snapshotDetails:true}));
   const events=[...fixture.events];
-  const snapshot=async()=>JSON.parse(JSON.stringify((await read(fixture.page)).output.snapshot));
+  const snapshot=async()=>JSON.parse(JSON.stringify((await read(fixture.page)).output.snapshot??null));
   const before=await snapshot();
   source.FLabel.FRawValue='Renamed';
   source.FCell.geometry.x=120;
   const after=await snapshot();
   assert.equal(after.name,'Draft');
-  assert.equal(after.document_id,prepared.document_id);
-  assert.equal(after.workflow_id,prepared.workflow_ref.workflow_id);
+  assert.equal(after.document,prepared.document_id);
+  assert.equal(after.workflow,prepared.workflow_ref.workflow_id);
   assert.deepEqual(after.nodes.map(n=>n.guid),before.nodes.map(n=>n.guid));
   assert.deepEqual(after.nodes.find(n=>n.guid===source.FGuid),{
     guid:source.FGuid,label:'Renamed',type:'transform.calculator',position:{x:120,y:80},
     ports:[{direction:'output',index:0,name:'Output_Data-0',kind:'data',guid:'source-port'}],
   });
   assert.deepEqual(after.links,before.links);
-  assert.deepEqual(after.links,[{
-    source:{node_guid:source.FGuid,index:0,kind:'data',port_guid:'source-port'},
-    target:{node_guid:target.FGuid,index:0,kind:'data',port_guid:'target-port'},
-  }]);
+  assert.deepEqual(after.links,[{source:source.FGuid,output:'source-port',target:target.FGuid,input:'target-port'}]);
   fixture.setBlocked(true);
   assert.equal(await snapshot(),null);
   fixture.setBlocked(false);

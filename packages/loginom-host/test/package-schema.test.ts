@@ -69,11 +69,11 @@ test("window identity normalizes UUID spelling and preserves its runtime-only sc
   const id = "{C34CBF70-4971-4537-8607-D3E5E422556A}"
   const schema = windowPackageSchema({
     name: "Draft",
-    document_id: "doc",
-    workflow_id: "window-workflow",
+    document: "doc",
+    workflow: "window-workflow",
     navigation_path: ["Module", "Scenario"],
     nodes: [{ guid: id, label: "Filter", type: "transform.filter", ports: [], position: { x: 2, y: 3 } }],
-    links: [{ source: { node_guid: id, port_guid: null }, target: { node_guid: id, port_guid: null } }],
+    links: [{ source: id, output: "out", target: id, input: "in" }],
   })
   expect(schema).toMatchObject({
     source: "window",
