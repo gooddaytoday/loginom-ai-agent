@@ -1,6 +1,7 @@
 import { batch, createEffect, createMemo, createSignal, on, onCleanup, untrack, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Option, Schema, SchemaGetter } from "effect"
+import { Product } from "@loginom-ai-agent/product"
 import { createSimpleContext } from "@opencode/ui/context"
 import { showToast } from "@opencode/ui/toast"
 import {
@@ -222,7 +223,7 @@ function readStoredLocale() {
   }
 }
 
-const defaultLocale = "ru"
+const defaultLocale = Product.defaultLocale
 
 const warm = readStoredLocale() ?? defaultLocale
 

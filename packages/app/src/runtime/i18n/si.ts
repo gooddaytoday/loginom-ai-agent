@@ -672,7 +672,6 @@ export const dict = {
   "settings.about.firstPublished": "මුලින්ම ඇමරිකා එක්සත් ජනපදයේ මිසූරිහි ප්‍රකාශයට පත් කරන ලදී",
   "settings.about.firstIllustrated": "මුලින්ම එංගලන්තයේ ලන්ඩන්හි රූප සටහන් කරන ලදී",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, විවෘත මූලාශ්‍ර කේතකරණ නියෝජිතයා",
   "settings.about.trademark": "OpenCode යනු Anomaly Innovations, Inc. හි ලියාපදිංචි වෙළඳ ලකුණකි.",
   "settings.about.typeset": "Inter සහ IBM Plex Mono අකුරුවලින් සකසා ඇත",
   "settings.about.tagline": "ඔබ නොමැතිව AI හට විශිෂ්ට මෘදුකාංග තැනිය නොහැක",

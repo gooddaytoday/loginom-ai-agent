@@ -668,7 +668,6 @@ export const dict = {
   "settings.about.firstPublished": "Esmakordselt avaldati USA-s Missouris",
   "settings.about.firstIllustrated": "Esmakordselt illustreeritud Londonis, Inglismaal",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, avatud lähtekoodiga kodeerimisagent",
   "settings.about.trademark": "OpenCode on ettevõtte Anomaly Innovations, Inc. registreeritud kaubamärk.",
   "settings.about.typeset": "Sisestatud Inter ja IBM Plex Mono",
   "settings.about.tagline": "AI ei saa ilma sinuta suurepärast tarkvara luua",

@@ -686,7 +686,6 @@ export const dict = {
   "settings.about.firstPublished": "نخستین انتشار در \u2068Missouri, USA\u2069",
   "settings.about.firstIllustrated": "نخستین تصویرسازی در \u2068London, England\u2069",
   "settings.about.website": "\u2068loginom.ru\u2069",
-  "settings.about.description": "\u2068Loginom AI Agent\u2069، عامل کدنویسی متن‌باز",
   "settings.about.trademark": "\u2068OpenCode\u2069 علامت تجاری ثبت‌شدهٔ \u2068Anomaly Innovations, Inc.\u2069 است",
   "settings.about.typeset": "حروف‌چینی با \u2068Inter\u2069 و \u2068IBM Plex Mono\u2069",
   "settings.about.tagline": "هوش مصنوعی بدون شما نمی‌تواند نرم‌افزار عالی بسازد",

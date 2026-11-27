@@ -673,7 +673,6 @@ export const dict = {
   "settings.about.firstPublished": "Առաջին անգամ հրատարակվել է Միսուրիում, ԱՄՆ",
   "settings.about.firstIllustrated": "Առաջին անգամ նկարազարդվել է Լոնդոնում, Անգլիա",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent՝ բաց կոդով կոդավորման գործակալ",
   "settings.about.trademark": "OpenCode-ը Anomaly Innovations, Inc.-ի գրանցված ապրանքային նշանն է։",
   "settings.about.typeset": "Շարված է Inter և IBM Plex Mono տառատեսակներով",
   "settings.about.tagline": "AI-ը չի կարող հիանալի ծրագրակազմ ստեղծել առանց ձեզ",

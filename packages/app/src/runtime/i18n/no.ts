@@ -145,7 +145,6 @@ export const dict = {
   "settings.about.firstPublished": "Først utgitt i Missouri, USA",
   "settings.about.firstIllustrated": "Først illustrert i London, England",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, kodeagenten med åpen kildekode",
   "settings.about.trademark": "OpenCode er et registrert varemerke for Anomaly Innovations, Inc.",
   "settings.about.typeset": "Satt med Inter og IBM Plex Mono",
   "settings.about.tagline": "KI kan ikke bygge fantastisk programvare uten deg",

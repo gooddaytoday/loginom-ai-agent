@@ -677,7 +677,6 @@ export const dict = {
   "settings.about.firstPublished": "Pertama kali diterbitkan di Missouri, Amerika Syarikat",
   "settings.about.firstIllustrated": "Pertama digambarkan di London, England",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, ejen pengekodan sumber terbuka",
   "settings.about.trademark": "OpenCode ialah tanda dagangan berdaftar Anomaly Innovations, Inc.",
   "settings.about.typeset": "Set taip dalam Inter dan IBM Plex Mono",
   "settings.about.tagline": "AI tidak boleh membina perisian yang hebat, tanpa anda",

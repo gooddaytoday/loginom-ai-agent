@@ -726,7 +726,6 @@ export const dict = {
   "settings.about.firstPublished": "首次在美國密蘇裏州發佈",
   "settings.about.firstIllustrated": "首次在英國倫敦展出",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent ，開源編碼代理",
   "settings.about.trademark": "OpenCode是Anomaly Innovations, Inc.的註冊商標。",
   "settings.about.typeset": "Inter和IBM Plex Mono中的排版",
   "settings.about.tagline": "如果沒有您， AI就無法構建出色的軟件",

@@ -682,7 +682,6 @@ export const dict = {
   "settings.about.firstPublished": "Először az Egyesült Államokban, Missouriban jelent meg",
   "settings.about.firstIllustrated": "Először Londonban, Angliában illusztrálták",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, a nyílt forráskódú kódoló ügynök",
   "settings.about.trademark": "A OpenCode a Anomaly Innovations, Inc. bejegyzett védjegye.",
   "settings.about.typeset": "Betűkészlet Inter és IBM Plex Mono nyelven",
   "settings.about.tagline": "Az AI nem tud nagyszerű szoftvert készíteni nélküled",

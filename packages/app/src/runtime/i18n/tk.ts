@@ -671,7 +671,6 @@ export const dict = {
   "settings.about.firstPublished": "Ilkinji gezek Missuri, ABŞ-da neşir edildi",
   "settings.about.firstIllustrated": "Ilkinji gezek London, Angliýada suratlandyryldy",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, açyk çeşmeli kodlaşdyrma agenti",
   "settings.about.trademark": "OpenCode Anomaly Innovations, Inc. kompaniýasynyň bellige alnan söwda nyşanydyr.",
   "settings.about.typeset": "Inter we IBM Plex Mono bilen düzüldi",
   "settings.about.tagline": "AI sizsiz ajaýyp programma üpjünçiligini döredip bilmez",

@@ -660,7 +660,6 @@ export const dict = {
   "settings.about.firstPublished": "መጀመሪያ የታተመው በሚዙሪ፣ አሜሪካ",
   "settings.about.firstIllustrated": "መጀመሪያ ምስል የተሰራለት በለንደን፣ እንግሊዝ",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent፣ ክፍት ምንጭ የኮድ ወኪል",
   "settings.about.trademark": "OpenCode የAnomaly Innovations, Inc. የተመዘገበ የንግድ ምልክት ነው።",
   "settings.about.typeset": "በInter እና IBM Plex Mono ተሰድሯል",
   "settings.about.tagline": "ያለ እርስዎ AI ምርጥ ሶፍትዌር መገንባት አይችልም",

@@ -141,7 +141,6 @@ export const dict = {
   "settings.about.firstPublished": "Julkaistu ensimmäisen kerran Missourissa, Yhdysvalloissa",
   "settings.about.firstIllustrated": "Kuvitettu ensimmäisen kerran Lontoossa, Englannissa",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, avoimen lähdekoodin koodausagentti",
   "settings.about.trademark": "OpenCode on Anomaly Innovations, Inc:n rekisteröity tavaramerkki.",
   "settings.about.typeset": "Kirjasinlajit Inter ja IBM Plex Mono",
   "settings.about.tagline": "Tekoäly ei voi rakentaa erinomaista ohjelmistoa ilman sinua",

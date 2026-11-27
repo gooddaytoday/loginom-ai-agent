@@ -750,7 +750,6 @@ export const dict = {
   "settings.about.firstPublished": "İlk olarak Missouri, ABD'de yayınlandı",
   "settings.about.firstIllustrated": "İlk kez Londra, İngiltere'de resmedildi",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, açık kaynak kodlama aracısı",
   "settings.about.trademark": "OpenCode, Anomaly Innovations, Inc.'in tescilli ticari markasıdır.",
   "settings.about.typeset": "Inter ve IBM Plex Mono'da dizgi",
   "settings.about.tagline": "Yapay zeka siz olmadan mükemmel yazılım geliştiremez",

@@ -150,7 +150,6 @@ export const dict = {
   "settings.about.firstPublished": "Voor het eerst gepubliceerd in Missouri, VS",
   "settings.about.firstIllustrated": "Voor het eerst geïllustreerd in Londen, Engeland",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, de open-source programmeeragent",
   "settings.about.trademark": "OpenCode is een geregistreerd handelsmerk van Anomaly Innovations, Inc.",
   "settings.about.typeset": "Opgemaakt in Inter en IBM Plex Mono",
   "settings.about.tagline": "AI kan geen geweldige software bouwen zonder jou",

@@ -766,7 +766,6 @@ export const dict = {
   "settings.about.firstPublished": "Вперше опубліковано в Міссурі, США",
   "settings.about.firstIllustrated": "Вперше проілюстровано в Лондоні, Англія",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, агент кодування з відкритим кодом",
   "settings.about.trademark": "OpenCode є зареєстрованою торговою маркою Anomaly Innovations, Inc.",
   "settings.about.typeset": "Набір на Inter та IBM Plex Mono",
   "settings.about.tagline": "AI не може створити чудове програмне забезпечення без вас",

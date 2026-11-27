@@ -682,7 +682,6 @@ export const dict = {
   "settings.about.firstPublished": "Πρωτοδημοσιεύτηκε στο Μιζούρι των Η.Π.Α",
   "settings.about.firstIllustrated": "Εικονογραφήθηκε για πρώτη φορά στο Λονδίνο της Αγγλίας",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, ο παράγοντας κωδικοποίησης ανοιχτού κώδικα",
   "settings.about.trademark": "Το OpenCode είναι σήμα κατατεθέν της Anomaly Innovations, Inc.",
   "settings.about.typeset": "Δακτυλογράφηση σε Inter και IBM Plex Mono",
   "settings.about.tagline": "Το AI δεν μπορεί να δημιουργήσει εξαιρετικό λογισμικό, χωρίς εσάς",

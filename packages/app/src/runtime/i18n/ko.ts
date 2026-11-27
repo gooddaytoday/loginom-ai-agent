@@ -687,7 +687,6 @@ export const dict = {
   "settings.about.firstPublished": "미국 미주리 주에서 처음 출판됨",
   "settings.about.firstIllustrated": "영국 런던에서 처음으로 그림이 그려졌습니다.",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "오픈소스 코딩 에이전트 Loginom AI Agent",
   "settings.about.trademark": "OpenCode는 Anomaly Innovations, Inc.의 등록 상표입니다.",
   "settings.about.typeset": "Inter 및 IBM Plex Mono의 조판",
   "settings.about.tagline": "AI는 당신 없이는 훌륭한 소프트웨어를 만들 수 없습니다",

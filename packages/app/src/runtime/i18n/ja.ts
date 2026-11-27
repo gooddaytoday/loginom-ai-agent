@@ -688,7 +688,6 @@ export const dict = {
   "settings.about.firstPublished": "米国ミズーリ州で初公開",
   "settings.about.firstIllustrated": "イングランド、ロンドンで最初のイラスト",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "オープンソースのコーディングエージェントであるLoginom AI Agent",
   "settings.about.trademark": "OpenCodeはAnomaly Innovations, Inc.の登録商標です。",
   "settings.about.typeset": "InterおよびIBM Plex Monoのタイプセット",
   "settings.about.tagline": "AIはあなたなしで素晴らしいソフトウェアを構築することはできません",

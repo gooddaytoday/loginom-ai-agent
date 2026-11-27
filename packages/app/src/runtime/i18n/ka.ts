@@ -672,7 +672,6 @@ export const dict = {
   "settings.about.firstPublished": "პირველად გამოქვეყნდა მისურიში, აშშ",
   "settings.about.firstIllustrated": "პირველად ილუსტრირდა ლონდონში, ინგლისი",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, ღია კოდის მქონე კოდირების აგენტი",
   "settings.about.trademark": "OpenCode არის Anomaly Innovations, Inc.-ის რეგისტრირებული სავაჭრო ნიშანი.",
   "settings.about.typeset": "აწყობილია Inter და IBM Plex Mono შრიფტებით",
   "settings.about.tagline": "AI ვერ შექმნის შესანიშნავ პროგრამულ უზრუნველყოფას თქვენ გარეშე",

@@ -681,7 +681,6 @@ export const dict = {
   "settings.about.firstPublished": "Publicat per primera vegada a Missouri, EUA",
   "settings.about.firstIllustrated": "Il·lustrat per primera vegada a Londres, Anglaterra",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, l'agent de codificació de codi obert",
   "settings.about.trademark": "OpenCode és una marca registrada de Anomaly Innovations, Inc.",
   "settings.about.typeset": "Tipografia en Inter i IBM Plex Mono",
   "settings.about.tagline": "La IA no pot crear un gran programari sense tu",

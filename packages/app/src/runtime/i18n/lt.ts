@@ -689,7 +689,6 @@ export const dict = {
   "settings.about.firstPublished": "Pirmą kartą išleista Misūrio valstijoje, JAV",
   "settings.about.firstIllustrated": "Pirmą kartą iliustruotas Londone, Anglijoje",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, atvirojo kodo kodavimo agentas",
   "settings.about.trademark": "OpenCode yra registruotasis Anomaly Innovations, Inc. prekės ženklas.",
   "settings.about.typeset": "Rinkinys „Inter“ ir „IBM Plex Mono“.",
   "settings.about.tagline": "AI negali sukurti puikios programinės įrangos be jūsų",

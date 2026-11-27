@@ -7,7 +7,6 @@ import {
   DESKTOP_NATIVE_KEYS,
   DESKTOP_NATIVE_LOCALES,
   DESKTOP_NATIVE_LOCALE_TAGS,
-  detectDesktopNativeLocale,
   DESKTOP_NATIVE_MAX_PAYLOAD_BYTES,
   formatDesktopNativeMessage,
   parseDesktopNativeBundle,
@@ -42,31 +41,6 @@ describe("desktop native translations", () => {
 
   test("interpolates native templates without changing unknown placeholders", () => {
     expect(formatDesktopNativeMessage("{{known}} {{unknown}}", { known: "yes" })).toBe("yes {{unknown}}")
-  })
-})
-
-describe("desktop native locale detection", () => {
-  test("follows preference order and skips invalid or unsupported tags", () => {
-    expect(detectDesktopNativeLocale(["not_a_locale", "fr-FR"])).toBe("fr")
-    expect(detectDesktopNativeLocale(["eo", "de-DE"])).toBe("de")
-  })
-
-  test.each([
-    [["zh-TW"], "zht"],
-    [["zh-SG"], "zh"],
-    [["pa-PK"], "pa"],
-    [["pa-IN", "fr"], "fr"],
-    [["az-Cyrl", "de"], "de"],
-    [["sr-Cyrl"], "sr"],
-    [["sr-Latn", "en"], "en"],
-    [["uz-Latn"], "uz"],
-    [["no"], "no"],
-    [["nb-NO"], "no"],
-    [["nn-NO"], "no"],
-    [["he"], "he"],
-    [["he-IL"], "he"],
-  ])("uses Unicode likely subtags to map %p to %p", (tags, locale) => {
-    expect<string | undefined>(detectDesktopNativeLocale([...tags])).toBe(locale)
   })
 })
 

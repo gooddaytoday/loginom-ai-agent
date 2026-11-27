@@ -683,7 +683,6 @@ export const dict = {
   "settings.about.firstPublished": "Xuất bản lần đầu ở Missouri, Mỹ",
   "settings.about.firstIllustrated": "Minh họa đầu tiên ở London, Anh",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, tác nhân mã hóa nguồn mở",
   "settings.about.trademark": "OpenCode là nhãn hiệu đã đăng ký của Anomaly Innovations, Inc.",
   "settings.about.typeset": "Bộ sắp chữ trong Inter và IBM Plex Mono",
   "settings.about.tagline": "AI không thể xây dựng phần mềm tuyệt vời nếu không có bạn",

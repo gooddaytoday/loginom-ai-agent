@@ -675,7 +675,6 @@ export const dict = {
   "settings.about.firstPublished": "Fyrst gefin út í Missouri í Bandaríkjunum",
   "settings.about.firstIllustrated": "Fyrst myndskreytt í London á Englandi",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, opinn kóðunaraðili",
   "settings.about.trademark": "OpenCode er skráð vörumerki Anomaly Innovations, Inc.",
   "settings.about.typeset": "Tegund í Inter og IBM Plex Mono",
   "settings.about.tagline": "AI getur ekki smíðað frábæran hugbúnað án þín",

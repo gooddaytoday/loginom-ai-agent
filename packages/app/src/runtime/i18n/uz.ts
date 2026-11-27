@@ -677,7 +677,6 @@ export const dict = {
   "settings.about.firstPublished": "Ilk bor Missuri, AQSHda nashr etilgan",
   "settings.about.firstIllustrated": "Ilk bor London, Angliyada bezatilgan",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, ochiq manbali kodlash agenti",
   "settings.about.trademark": "OpenCode — Anomaly Innovations, Inc. kompaniyasining ro‘yxatdan o‘tgan savdo belgisi.",
   "settings.about.typeset": "Inter va IBM Plex Mono shriftlarida terilgan",
   "settings.about.tagline": "Sizsiz AI ajoyib dasturiy ta’minot yarata olmaydi",

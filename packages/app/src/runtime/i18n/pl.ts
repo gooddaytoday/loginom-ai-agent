@@ -696,7 +696,6 @@ export const dict = {
   "settings.about.firstPublished": "Opublikowano po raz pierwszy w Missouri, USA",
   "settings.about.firstIllustrated": "Pierwsza ilustracja w Londynie, w Anglii",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, agent kodujący typu open source",
   "settings.about.trademark": "OpenCode jest zastrzeżonym znakiem towarowym firmy Anomaly Innovations, Inc.",
   "settings.about.typeset": "Zestaw w Inter i IBM Plex Mono",
   "settings.about.tagline": "AI nie może zbudować świetnego oprogramowania bez Ciebie",

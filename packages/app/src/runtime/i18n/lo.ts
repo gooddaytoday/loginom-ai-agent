@@ -673,7 +673,6 @@ export const dict = {
   "settings.about.firstPublished": "ພິມ​ເຜີຍ​ແຜ່​ຄັ້ງ​ທຳ​ອິດ​ຢູ່​ລັດ Missouri, ສະ​ຫະ​ລັດ",
   "settings.about.firstIllustrated": "ຮູບ​ພາບ​ຄັ້ງ​ທໍາ​ອິດ​ໃນ​ລອນ​ດອນ​, ປະ​ເທດ​ອັງ​ກິດ​",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, ຕົວແທນລະຫັດແຫຼ່ງເປີດ",
   "settings.about.trademark": "OpenCode ເປັນເຄື່ອງໝາຍການຄ້າທີ່ຈົດທະບຽນຂອງ Anomaly Innovations, Inc.",
   "settings.about.typeset": "Typeset ໃນ Inter ແລະ IBM Plex Mono",
   "settings.about.tagline": "AI ບໍ່ສາມາດສ້າງຊອບແວທີ່ດີໄດ້, ຖ້າບໍ່ມີທ່ານ",

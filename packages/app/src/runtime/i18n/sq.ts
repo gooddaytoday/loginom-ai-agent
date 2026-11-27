@@ -673,7 +673,6 @@ export const dict = {
   "settings.about.firstPublished": "Botuar për herë të parë në Misuri, SHBA",
   "settings.about.firstIllustrated": "Ilustruar për herë të parë në Londër, Angli",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, agjenti kodues me burim të hapur",
   "settings.about.trademark": "OpenCode është një markë e regjistruar e Anomaly Innovations, Inc.",
   "settings.about.typeset": "Llojet në Inter dhe IBM Plex Mono",
   "settings.about.tagline": "AI nuk mund të ndërtojë softuer të shkëlqyeshëm, pa ju",

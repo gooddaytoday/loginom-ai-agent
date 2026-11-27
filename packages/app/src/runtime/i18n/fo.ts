@@ -672,7 +672,6 @@ export const dict = {
   "settings.about.firstPublished": "Fyrst útgivið í Missouri í USA",
   "settings.about.firstIllustrated": "Fyrst myndprýdd í London í Onglandi",
   "settings.about.website": "www.opna koda.ai",
-  "settings.about.description": "Loginom AI Agent, opna keldukoduumboðnum",
   "settings.about.trademark": "OpenCode er eitt skrásett vørumerki hjá Anomaly Innovations, Inc.",
   "settings.about.typeset": "Skriftsett í Inter og IBM Plex Mono",
   "settings.about.tagline": "AI kann ikki byggja góða ritbúnað, uttan teg",

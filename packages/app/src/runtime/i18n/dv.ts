@@ -690,7 +690,6 @@ export const dict = {
   "settings.about.firstPublished": "ފުރަތަމަ ޗާޕުކުރީ އެމެރިކާގެ މިޒޫރީގައެވެ",
   "settings.about.firstIllustrated": "ފުރަތަމަ ކުރެހީ އިނގިރޭސިވިލާތުގެ ލަންޑަންގައެވެ",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent، އޯޕަން ސޯސް ކޯޑިންގ އޭޖެންޓް",
   "settings.about.trademark": "OpenCode އަކީ Anomaly Innovations, Inc. ގެ ރަޖިސްޓަރޑް ޓްރޭޑްމާކެވެ.",
   "settings.about.typeset": "Inter އަދި IBM Plex Mono އިން ޓައިޕްސެޓްކޮށްފައި",
   "settings.about.tagline": "ތިބާ ނެތި AI އަށް ރަނގަޅު ސޮފްޓްވެއަރ ނުހެދޭނެ",

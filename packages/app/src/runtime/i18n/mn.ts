@@ -677,7 +677,6 @@ export const dict = {
   "settings.about.firstPublished": "Анх АНУ-ын Миссури мужид хэвлэгдсэн",
   "settings.about.firstIllustrated": "Анх Английн Лондон хотод зурагласан",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, нээлттэй эхийн кодчиллын агент",
   "settings.about.trademark": "OpenCode нь Anomaly Innovations, Inc.-ийн бүртгэлтэй барааны тэмдэг юм.",
   "settings.about.typeset": "Inter болон IBM Plex Mono үсгийн хэвээр өрсөн",
   "settings.about.tagline": "Тангүйгээр AI гайхалтай програм хангамж бүтээж чадахгүй",

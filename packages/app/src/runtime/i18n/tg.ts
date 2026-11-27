@@ -676,7 +676,6 @@ export const dict = {
   "settings.about.firstPublished": "Бори аввал дар Миссури, ИМА нашр шудааст",
   "settings.about.firstIllustrated": "Бори аввал дар Лондон, Англия мусаввар шудааст",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, агенти рамзнависии манбаи кушода",
   "settings.about.trademark": "OpenCode тамғаи тиҷории бақайдгирифтаи Anomaly Innovations, Inc. мебошад.",
   "settings.about.typeset": "Бо Inter ва IBM Plex Mono ҳуруфчинӣ шудааст",
   "settings.about.tagline": "AI бе шумо нармафзори олӣ сохта наметавонад",

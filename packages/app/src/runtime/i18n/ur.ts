@@ -685,7 +685,6 @@ export const dict = {
   "settings.about.firstPublished": "پہلی بار میزوری، امریکہ میں شائع ہوا",
   "settings.about.firstIllustrated": "پہلی بار لندن، انگلینڈ میں مصور کیا گیا",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent، اوپن سورس کوڈنگ ایجنٹ",
   "settings.about.trademark": "OpenCode، Anomaly Innovations, Inc. کا رجسٹرڈ ٹریڈ مارک ہے۔",
   "settings.about.typeset": "Inter اور IBM Plex Mono میں ٹائپ سیٹ",
   "settings.about.tagline": "آپ کے بغیر AI بہترین سافٹ ویئر نہیں بنا سکتا",

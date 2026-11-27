@@ -698,7 +698,6 @@ export const dict = {
   "settings.about.firstPublished": "Prvič objavljeno v Missouriju, ZDA",
   "settings.about.firstIllustrated": "Prvič ilustrirano v Londonu v Angliji",
   "settings.about.website": "loginom.ru",
-  "settings.about.description": "Loginom AI Agent, odprtokodni agent za kodiranje",
   "settings.about.trademark": "OpenCode je registrirana blagovna znamka Anomaly Innovations, Inc.",
   "settings.about.typeset": "Vrsta v Inter in IBM Plex Mono",
   "settings.about.tagline": "AI ne more zgraditi odlične programske opreme brez vas",
