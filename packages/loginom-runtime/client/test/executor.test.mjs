@@ -12,6 +12,8 @@ import {withStorageIdentity} from '../lib/storage-policy.mjs';
 import {readPreparedNodeContext} from '../lib/node-context.mjs';
 import {readUserVariablesSnapshot} from '../lib/crosstable-variables.mjs';
 import {makePackageCleanupCode} from '../lib/package-cleanup.mjs';
+import {makeWorkspaceStepCode} from '../lib/workspace.mjs';
+import {readGraph} from '../lib/node-target-browser.mjs';
 
 test('a retained preparation cannot mask a settled node worker using the same ID',async()=>{
  const page=new Page(),receipt={status:'READY',operation_id:'shared'};
@@ -1329,6 +1331,33 @@ test('saved continuation returns current navigation with the same native workflo
  assert.equal(continuation.workflow_ref.workflow_id,'workflow');assert.equal(continuation.previous_workflow_ref.workflow_id,'workflow');
  assert.equal(continuation.previous_workflow_ref.navigation_path[2].label,'Draft');assert.equal(continuation.workflow_ref.navigation_path[2].label,'Saved');
  assert.equal(continuation.workflow_ref.tab_tid,continuation.previous_workflow_ref.tab_tid);
+});
+
+test('checkpoint publishes the saved breadcrumb to the next native Apply preflight',async()=>{
+ const page=await restSavePage([false],false);
+ const prep=page.context.__loginomDockPreparationV1;
+ const receipt=prep.receipts.get('prepared');
+ const connection=page.app.Application.FInstance.FMainForm.FMapTree.FServerConnection;
+ const url=new URL('https://loginom.invalid/');
+ page.context.location={origin:url.origin,pathname:url.pathname};
+ receipt.stepSession={connection,nativeSession:connection.Session,account:connection.UserName};
+ receipt.crumbs=page.context.document.querySelectorAll('[data-tid^="MF;TF-1;cnrNaviMode;b.s_"]')
+  .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
+ const path='/user/data/packages/continued.lgp';
+ const saved=await run(page,'package.save_checkpoint',{path,conflict_policy:'fail'});
+ assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));
+ const [continuation]=saved.output.workflow_continuations;
+ const diagram=page.model.FDiagram.FmxGraph.container;
+ diagram.getBoundingClientRect=()=>({width:100,height:100});
+ const step=async workflow_ref=>(await page.execute(makeWorkspaceStepCode({
+  loginomUrl:url.href,build,sessionId:'save-session',workflowRef:{...workflow_ref,document_id:prep.id},readGraph,types:{},
+ }))).output;
+ const ready=await step(continuation.workflow_ref);
+ assert.equal(ready.status,'READY',JSON.stringify(ready));
+ assert.equal(ready.package_ref.path,path);
+ assert.equal((await step(continuation.previous_workflow_ref)).reason,'WORKFLOW_CHANGED');
+ connection.Session={};
+ assert.equal((await step(continuation.workflow_ref)).reason,'WORKFLOW_CHANGED');
 });
 
 test('saved continuation ends at its native workflow after a visible ExportCSV breadcrumb',async()=>{

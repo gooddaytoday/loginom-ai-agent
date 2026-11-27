@@ -73,7 +73,7 @@ export function userNodeTool(tool) {
   // still expose explicit immutable budgets.
   delete copy.inputSchema.properties.budgets;
   copy.inputSchema.properties.parameters={type:'object',properties:{},additionalProperties:true,
-    description:'Type-specific settings. First call dock_action_describe with node_types:[target.type], modes:[mode]; follow its parameter_schema and guidance.'};
+    description:'Follow parameter_schema and guidance for this type and mode from dock_action_describe or the card included in NODE_TYPE_NOT_DESCRIBED.'};
   copy.inputSchema.properties.mode={type:'string',minLength:1,maxLength:128,
     description:'Select a mode from the node card. Use add_only on an explicit request to add an unconnected node: new target, done, empty parameters, inputs, mappings and reads.'};
   // The full runtime schema and handler still validate type-specific modes,
@@ -93,7 +93,7 @@ export function userNodeTool(tool) {
   copy.inputSchema.properties={finish:copy.inputSchema.properties.finish,...copy.inputSchema.properties};
   copy.description = tool.name==='dock_node_resume'
     ? 'Continue the original node operation with identical original parameters after inspecting it. Never repeat an unresolved effect with a new ID.'
-    : 'Create or update ONE node. Include REQUIRED top-level finish beside parameters: "finish":"execute" runs and reads output, "done" commits only, "close" discards. First read dock_action_describe({node_types:[type],modes:[mode]}) for rules and parameter_schema. Use issued document_id/workflow_id; choose analytical settings yourself. Position, mappings and read are optional; deadlines are managed. Wait on the SAME operation_id; save the package separately.';
+    : 'Create or update ONE node. Include REQUIRED top-level finish beside parameters: "finish":"execute" runs and reads output, "done" commits only, "close" discards. Read the card from dock_action_describe({node_types:[type],modes:[mode]}), or use the card delivered with NODE_TYPE_NOT_DESCRIBED. Use issued document_id/workflow_id; choose analytical settings yourself. Position, mappings and read are optional; deadlines are managed. Wait on the SAME operation_id; save the package separately.';
   return copy;
 }
 

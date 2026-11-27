@@ -124,7 +124,8 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
    const prepared=parse(await call('dock_prepare'));
    assert.equal(prepared.prepared,true);
    const before=browserCalls;
-   const apply=type=>call('dock_node_apply',{operation_id:'apply-'+applied.length,contract_revision:'1.0.0',
+   let requestCount=0;
+   const apply=type=>call('dock_node_apply',{operation_id:'apply-'+ ++requestCount,contract_revision:'1.0.0',
     document_id:'fixture-document',workflow_ref:{workflow_id:'fixture-workflow'},target:{kind:'new',type},
     inputs:[],mode:type==='transform.sorting'?'keys':'expression',parameters:{},finish:'execute'});
    await call('dock_action_describe',{node_types:['transform.sorting'],modes:['keys']});
@@ -135,10 +136,22 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
    const refused=await call('dock_action_describe',args);
    assert.equal(refused.isError,true);
    assert.equal(parse(refused).error.code,'USER_RESPONSE_BUDGET');
-   assert.equal(parse(await apply('transform.calculator')).error.code,'NODE_TYPE_NOT_DESCRIBED');
+   const refusedApply=await apply('transform.calculator');
+   const refusal=parse(refusedApply);
+   assert.equal(refusal.error.code,'NODE_TYPE_NOT_DESCRIBED');
+   assert.equal(refusal.effect_possible,false);
+   assert.equal(refusal.cleanup_complete,true);
    assert.equal(applied.length,1,'refused cards must not authorize node application');
+   assert.equal(refusal.next_step.tool,'dock_node_apply');
+   const [card]=JSON.parse(refusedApply.content[1].text).node_types;
+   assert.equal(card.type,'transform.calculator');
+   assert.ok(card.parameter_schema);
+   assert.match(card.guidance,/Калькулятор/);
+   assert.ok(Buffer.byteLength(JSON.stringify(card))<=12000);
+   assert.equal(parse(await apply('transform.calculator')).status,'SUCCEEDED');
+   assert.equal(applied.length,2,'the delivered card permits a separate validated request');
    assert.equal(parse(await apply('transform.sorting')).status,'SUCCEEDED');
-   assert.equal(applied.length,2,'earlier descriptions survive a later delivery refusal');
+   assert.equal(applied.length,3,'earlier descriptions survive a later delivery refusal');
    const next=parse(refused).next_step;
    const requests=[next.arguments,...next.remaining_requests];
    assert.ok(requests.length<args.node_types.length,JSON.stringify(requests));
@@ -148,11 +161,13 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
     const delivered=await call(next.tool,request);
     assert.notEqual(delivered.isError,true,JSON.stringify(delivered));
     assert.ok(size(delivered)<=46000);
-    assert.deepEqual(parse(delivered).node_types.map(card=>card.type).sort(),[...request.node_types].sort());
-    for(const card of parse(delivered).node_types){assert.ok(card.parameter_schema);assert.ok(card.guidance);}
+    const description=parse(delivered);
+    assert.deepEqual([...description.node_types,...(description.reused_node_types??[])].map(node=>node.type).sort(),[...request.node_types].sort());
+    for(const node of description.node_types){assert.ok(node.parameter_schema);assert.ok(node.guidance);}
+    for(const reused of description.reused_node_types??[])assert.deepEqual(reused,{type:card.type,cache_key:card.cache_key});
    }
    assert.equal(parse(await apply('transform.calculator')).status,'SUCCEEDED');
-   assert.equal(applied.length,3);
+   assert.equal(applied.length,4);
    assert.equal(browserCalls,before);
    return;
   }
