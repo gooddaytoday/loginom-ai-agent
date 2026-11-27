@@ -169,29 +169,56 @@ export interface Page {
  */
 export const Page = Registry.define<Page>("page")
 
+/** A file a built-in plugin presents separately from the composer's standard attachments. */
 export interface ComposerFileType {
+  /** The MIME type stored with the draft's file reference. */
   readonly mime: string
+  /**
+   * Recognizes the file without opening it. The composer passes a matching file by path, not as inline media.
+   * @param filename - The basename from the picker, file drop or clipboard.
+   */
   matches(filename: string): boolean
 }
 
+/** The registry of file types claimed by built-in plugins in the composer. */
 export const ComposerFileType = Registry.define<ComposerFileType>("composer-file-type")
 
+/** The current draft and its file actions. Read draft and files reactively. */
 export interface ComposerSlotInput {
+  /** Identity of the current draft store, for state kept in a WeakMap. */
   readonly draft: object
+  /** Path attachments already available to this draft; excludes pending uploads and inline media. */
   readonly files: readonly {
+    /** The attachment's identity in the draft. */
     readonly id: string
+    /** The display name already stored with the attachment. */
     readonly filename: string
+    /** The MIME type stored with the attachment. */
     readonly mime: string
+    /** The attachment path on the server that runs the draft. */
     readonly path: string
   }[]
+  /** Opens the composer's standard attachment picker. */
   attach(): void
+  /**
+   * Removes a file from the current draft without touching the file itself.
+   * @param id - The attachment's identity in the draft.
+   */
   removeFile(id: string): void
+  /**
+   * Opens a built-in plugin page without submitting the draft.
+   * @param plugin - The id of the built-in plugin that owns the page.
+   * @param page - The id of that plugin's registered page.
+   * @param query - Optional parameters understood by the destination page.
+   */
   openPage(plugin: string, page: string, query?: URLSearchParams): void
 }
 
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
+  /** Rows in the composer's Add menu in place of the standard attachment row. Render with `Ui.MenuItem`. */
   readonly "composer.add-menu": ComposerSlotInput
+  /** Content immediately above the editable prompt in normal mode. */
   readonly "composer.above": ComposerSlotInput
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */
   readonly "session.location.branch.menu": SlotMap["session.location.menu"]
