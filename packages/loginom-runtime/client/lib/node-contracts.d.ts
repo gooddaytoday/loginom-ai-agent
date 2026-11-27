@@ -288,6 +288,7 @@ export interface NodeJobSnapshot {
   outcome: NodeApplyOutcome | null; error: NodeError | null;
 }
 export const NODE_CONTRACT_REVISION: string;
+export const nodeFieldNamePattern: RegExp;
 export const NODE_TYPES: Readonly<Record<NodeType, {type: NodeType; title: string; palette_group: 'Переменные' | 'Data_Mining' | 'Импорт' | 'Трансформация' | 'Предобработка' | 'Исследование' | 'Экспорт' | 'Программирование'; tabular_inputs: number; tabular_outputs: number; additional_tabular_inputs: boolean; modes: readonly string[]}>>;
 export function validateNodeReference(ref: unknown): void;
 export function validateNodeTargetRequest(request: unknown): NodeTargetRequest;
