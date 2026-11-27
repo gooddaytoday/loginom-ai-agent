@@ -138,14 +138,19 @@ test("a lost Save reply refreshes the revision before another check", () => {
   })
   expect(refreshing.effects).toMatchObject([{ type: "status", attempt: refreshing.state.attempt }])
   expect(view(refreshing.state).issue).toBeUndefined()
-  const current = transition(refreshing.state, {
+  const edited = transition(refreshing.state, { type: "edit", patch: { username: "next-user" } }).state
+  const current = transition(edited, {
     type: "status",
     attempt: refreshing.state.attempt,
     now: 5000,
     result: { ok: true, value: { ...fresh, revision: 1, generation: 1, state: "ready" } },
   }).state
-  expect(view(current)).toMatchObject({ issue: undefined, connected: { username: "user" } })
-  expect(check(current).effects).toMatchObject([{ type: "check", input: { revision: 1 } }])
+  expect(view(current)).toMatchObject({
+    issue: undefined,
+    connected: { username: "user" },
+    draft: { username: "next-user" },
+  })
+  expect(check(current).effects).toMatchObject([{ type: "check", input: { revision: 1, username: "next-user" } }])
 })
 
 test("polling is bounded and keeps edits made while the connection is pending", () => {

@@ -17,7 +17,7 @@ type State = { attempt: number } & (
   | (Form & { type: "checking"; submit: "check" | "save" })
   | (Form & { type: "verified"; validation: Validation })
   | (Form & { type: "saving" })
-  | (Form & { type: "refreshing"; issue?: Issue })
+  | (Form & { type: "refreshing"; issue?: Issue; edited: boolean })
   | (Form & { type: "applying"; until: number; edited: boolean })
 )
 
@@ -103,7 +103,7 @@ export function transition(state: State, event: Event): Transition {
       const draft = { ...state.draft, ...event.patch }
       if (draft.noPassword) draft.password = ""
       if (state.type === "applying") return { state: { ...state, draft, edited: true }, effects: [] }
-      if (state.type === "refreshing") return { state: { ...state, draft }, effects: [] }
+      if (state.type === "refreshing") return { state: { ...state, draft, edited: true }, effects: [] }
       return {
         state: { type: "editing", attempt, draft, status: state.status },
         effects: state.type === "checking" ? [{ type: "cancel" }] : [],
@@ -154,10 +154,12 @@ export function transition(state: State, event: Event): Transition {
       const status = event.result.value
       const recovered =
         state.type === "refreshing" && state.issue === "saveFailed" && state.status.revision !== status.revision
-      const edited = (state.type === "applying" && state.edited) || (state.type === "refreshing" && !recovered)
+      const edited =
+        (state.type === "applying" && state.edited) || (state.type === "refreshing" && (state.edited || !recovered))
       const draft = "draft" in state && edited ? state.draft : form(status).draft
       if (waiting(status)) {
-        const pendingDraft = state.type === "saving" || recovered ? { ...state.draft, password: "" } : draft
+        const pendingDraft =
+          state.type === "saving" || (recovered && !edited) ? { ...state.draft, password: "" } : draft
         const until = state.type === "applying" ? state.until : event.now + applicationWait
         const remaining = until - event.now
         if (remaining > 1000) {
@@ -176,7 +178,7 @@ export function transition(state: State, event: Event): Transition {
 
 function refresh(state: Form, attempt: number, issue?: Issue): Transition {
   return {
-    state: { type: "refreshing", attempt, status: state.status, draft: state.draft, issue },
+    state: { type: "refreshing", attempt, status: state.status, draft: state.draft, issue, edited: false },
     effects: [{ type: "status", attempt }],
   }
 }
