@@ -8,6 +8,7 @@ import { supervise } from "../src/supervisor"
 import { createLoginomHost } from "../src/host"
 import { loginomHostPort } from "../src/host-port"
 import { LoginomHost } from "../src/adapter"
+import { transport } from "../src/transport"
 import { HostTaskScope } from "../src/task-scope"
 import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
@@ -85,6 +86,12 @@ test("actual managed entry reads live bridge work and dispatching over private I
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
+        trackedStep: (_name, _args, dispatch) => dispatch(),
+        checkStepState: async id => id!==work().checkId ? { state: 'unavailable', retryAvailable: false } : {
+          state: 'observed', retryAvailable: true, window: { path: null, modified: true, nodeCount: 1, linkCount: 0 },
+          lastConfirmedStep: null, graphSinceLastConfirmedStep: 'unknown',
+          step: { outcome: 'not_applied', retryAvailable: true, persistence: 'step_unsaved', save: null },
+        },
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
           return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
@@ -94,7 +101,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
     "runtime/client/node_modules/@modelcontextprotocol/sdk/client/index.js": `
       exports.Client = class {
         async connect() {} async close() {}
-        async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }] }; }
+        async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }, { name: 'dock_node_apply', inputSchema: { type: 'object' } }] }; }
         async callTool(input, _unused, { signal }) {
           if (input.arguments.failAfterDispatch) throw Error('LOGINOM_FILE_CHANGED');
           if (!input.arguments.hold) return { content: [] };
@@ -133,7 +140,10 @@ test("actual managed entry reads live bridge work and dispatching over private I
       await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared }))
       expect(await runtime.request("list")).toEqual({
         prepared,
-        tools: [{ name: "fixture", inputSchema: { type: "object" } }],
+        tools: [
+          { name: "fixture", inputSchema: { type: "object" } },
+          { name: "dock_node_apply", inputSchema: { type: "object" } },
+        ],
       })
     }
     for (const state of [
@@ -155,6 +165,9 @@ test("actual managed entry reads live bridge work and dispatching over private I
       .request("call", { name: "fixture", arguments: { hold: true } })
       .catch((error: unknown) => error)
     expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: true })
+    expect(await runtime.request("checkStepState", { operationId: "pending" })).toEqual({
+      state: "busy", retryAvailable: false,
+    })
     expect(await runtime.request("interrupt")).toEqual({ interrupted: true })
     expect(await call).toMatchObject({ message: "LOGINOM_RUNTIME_FAILED" })
     expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: false })
@@ -191,11 +204,14 @@ test("actual managed entry reads live bridge work and dispatching over private I
     },
     host,
   )
-  LoginomHost.connect({
-    postMessage: (data) => channel.port2.postMessage(data),
-    on: (_event, listener) => channel.port2.on("message", (data) => listener({ data })),
+  const sharedPort = {
+    postMessage: (data: unknown) => channel.port2.postMessage(data),
+    on: (_event: "message", listener: (event: { data: unknown }) => void) =>
+      channel.port2.on("message", (data) => listener({ data })),
     start: () => channel.port2.start(),
-  })
+  }
+  LoginomHost.connect(sharedPort)
+  const privateHost = transport(sharedPort)
   const original = host.inputs
   const fault = { name: "" }
   // Deterministically reproduce a source disappearing/changing after the Host
@@ -255,6 +271,20 @@ test("actual managed entry reads live bridge work and dispatching over private I
         .catch((error: unknown) => error)
       expect(callError).toMatchObject({ message: code })
     }
+    fault.name = ""
+    const lostArgs = { operation_id: "lost-write", failAfterDispatch: true }
+    const blocked = { _meta: { loginomStep: { operationId: "lost-write", step: {
+      outcome: "check_required", retryAvailable: false,
+    } } } }
+    expect(await run.call("dock_node_apply", lostArgs, "msg_original")).toMatchObject(blocked)
+    expect(await run.call("dock_node_apply", { operation_id: "premature" }, "msg_original")).toMatchObject(blocked)
+    await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared: true, checkId: "lost-write" }))
+    expect(await privateHost.request("checkStepState", { sessionID: "foreign-chat", operationId: "lost-write" }))
+      .toEqual({ state: "unavailable", retryAvailable: false })
+    expect(await privateHost.request("checkStepState", { sessionID: "file-errors", operationId: "lost-write" }))
+      .toMatchObject({ state: "observed", retryAvailable: true })
+    expect(await run.call("dock_node_apply", { operation_id: "next" }, "msg_original")).toMatchObject({ content: [] })
+
     // Once dispatch has started, a thrown file-shaped error cannot certify
     // no effect and must still become CALL_UNCERTAIN.
     fault.name = ""

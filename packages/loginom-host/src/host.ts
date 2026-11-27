@@ -808,6 +808,17 @@ export async function createLoginomHost(options: {
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true
     },
+    async checkStepState(chat: string, operationId: string, originalGeneration?: number) {
+      const unavailable = { state: "unavailable", retryAvailable: false }
+      const status = await service.api.status()
+      if (originalGeneration !== undefined && status.generation !== originalGeneration) return unavailable
+      const children = generations.get(status.generation)?.children
+      const child = children?.get(chat)
+      if (!child || lost.has(chat) || stale.has(chat)) return unavailable
+      const result = await (await child).request("checkStepState", { operationId }, 25000).catch(() => unavailable)
+      const after = await service.api.status()
+      return children?.get(chat) === child && status.generation === after.generation ? result : unavailable
+    },
     async workState(generation: number, chat: string) {
       // Inspect only the existing owner. Losing it is uncertainty, not evidence of idle work.
       if (lost.has(chat) || stale.has(chat)) throw new Error("LOGINOM_RUNTIME_UNAVAILABLE")

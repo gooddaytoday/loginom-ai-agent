@@ -353,6 +353,21 @@ async function handle(message) {
       send({ id: message.id, result: { interrupted: true } })
       return
     }
+    if (message.operation === "checkStepState") {
+      if (state.controller) {
+        send({ id: message.id, result: { state: "busy", retryAvailable: false } })
+        return
+      }
+      const controller = new AbortController()
+      state.controller = controller
+      try {
+        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)])
+        send({ id: message.id, result: await state.bridge.checkStepState(message.input.operationId, signal) })
+      } finally {
+        state.controller = undefined
+      }
+      return
+    }
     if (message.operation !== "call" || state.controller) throw Error("LOGINOM_REQUEST_INVALID")
     if (message.input.packageArtifact !== undefined && message.input.name !== "dock_prepare")
       throw Error("LOGINOM_REQUEST_INVALID")
@@ -365,13 +380,15 @@ async function handle(message) {
         signal: controller.signal,
         timeout: runtimeCallTimeout(message.input.name, message.input.arguments),
       }
-      const result = message.input.packageArtifact !== undefined
-        ? await state.bridge.prepareLocalPackage(message.input.arguments, message.input.packageArtifact, {
+      const { name, arguments: args, packageArtifact, scanReceipt } = message.input
+      const result = await state.bridge.trackedStep(name, args, () => {
+        if (packageArtifact !== undefined)
+          return state.bridge.prepareLocalPackage(args, packageArtifact, {
             signal: AbortSignal.any([controller.signal, AbortSignal.timeout(options.timeout)]),
           })
-        : message.input.scanReceipt !== undefined
-          ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
-          : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options)
+        if (scanReceipt !== undefined) return state.bridge.applyWithScanReceipt(args, scanReceipt, options)
+        return state.client.callTool({ name, arguments: args }, undefined, options)
+      }, controller.signal)
       const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
       send({
         id: message.id,

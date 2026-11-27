@@ -3,11 +3,13 @@
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
+import { StepCheckRequest, StepCheckResult } from "@loginom-ai-agent/loginom-host/step-state"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
+import { Schema } from "effect"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
 import { Dashboard } from "./dashboard"
@@ -73,6 +75,17 @@ const preflight = {
         additionalProperties: false,
       },
       output: { type: "object", properties: { code: { type: "string" } }, additionalProperties: false },
+    },
+  },
+  events: {},
+} as const
+
+const loginomStep = {
+  id: "loginom.step",
+  methods: {
+    checkState: {
+      input: Schema.toStandardSchemaV1(StepCheckRequest),
+      output: Schema.toStandardSchemaV1(StepCheckResult),
     },
   },
   events: {},
@@ -501,6 +514,14 @@ export default Plugin.define({
           .prompt({ sessionID: input.sessionID, text: input.text, metadata: { [token]: key } })
           .finally(() => pending.delete(key))
         return { granted: true }
+      },
+    })
+    await ctx.rpc.register(loginomStep, {
+      checkState: async (input, call) => {
+        await bound(input.sessionID)
+        await ctx.session.get({ sessionID: input.sessionID })
+        call.signal.throwIfAborted()
+        return ServiceHost.checkStepState(input)
       },
     })
     await ctx.rpc.register(preflight, {
