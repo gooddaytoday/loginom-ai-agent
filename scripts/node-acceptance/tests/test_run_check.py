@@ -1,5 +1,5 @@
 import copy
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 import csv
 import importlib.util
 import io
@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import types
@@ -751,7 +752,7 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
         with self.assertRaisesRegex(AssertionError, 'INVALID_CSV_HEADER'):
             self.csv_result(dict(output, header='false'), '1,1\n2,3\n')
 
-    def refusal_run(self, root, variant=None, *, expected_text=None, answer=None, data_files=(), commands=None):
+    def refusal_run(self, root, variant=None, *, expected_text=None, answer=None, data_files=(), commands=None, before_model=None):
         case = root / 'cases/safe-refusal'
         (case / 'data').mkdir(parents=True)
         for name in data_files: (case / 'data' / name).write_text('x')
@@ -782,6 +783,7 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                 (profile / 'config').mkdir()
                 runner.write(folder / 'setup.stdout', dict(browser=dict(state='verified')))
             if name != 'model': return
+            if before_model: before_model(profile)
             # Honor any generated export instruction at the process boundary;
             # the old runner then indexes outputs[0] although the list is empty.
             for destination in re.findall(r'/test/[\w-]+\.csv', command[-1]):
@@ -1925,22 +1927,44 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
             self.assertEqual(model[model.index('--model') + 1], 'deepseek/deepseek-flash')
             self.assertNotIn('--variant', model)
 
-    def test_model_variant_and_oauth_are_applied_to_the_run_profile(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            auth = root / 'auth.json'
-            payload = '{"openai":{"type":"oauth","refresh":"test-refresh"}}'
-            auth.write_text(payload)
-            commands = []
-            with patch.dict(os.environ, RUN_CHECK_MODEL='openai/gpt-6.1-terra', RUN_CHECK_VARIANT='medium', RUN_CHECK_AUTH=str(auth)):
-                self.refusal_run(root, commands=commands)
-            model = next(command for name, command in commands if name == 'model')
-            self.assertEqual(model[model.index('--model') + 1], 'openai/gpt-6.1-terra')
-            self.assertEqual(model[model.index('--variant') + 1], 'medium')
-            copied = root / 'run/safe-refusal/profile/data/auth.json'
-            self.assertEqual(copied.read_text(), payload)
-            copied.write_text('{}')
-            self.assertEqual(auth.read_text(), payload)
+    def test_oauth_is_private_and_removed_after_success_or_failure(self):
+        for use_auth, fail in [(True, False), (True, True), (False, False)]:
+            with self.subTest(oauth=use_auth, failure=fail), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                auth = root / 'auth.json'
+                payload = '{"openai":{"type":"oauth","refresh":"test-refresh"}}'
+                auth.write_text(payload)
+                copied = root / 'run/safe-refusal/profile/data/auth.json'
+                database = copied.with_name('loginom-ai-agent.db')
+                sidecars = [database.with_suffix('.db-wal'), database.with_suffix('.db-shm')]
+                observed = []
+                commands = []
+
+                def import_auth(profile):
+                    self.assertEqual(profile, copied.parent.parent)
+                    observed.append((copied.read_text(), stat.S_IMODE(copied.stat().st_mode)) if copied.exists() else None)
+                    if use_auth:
+                        for path in [database, *sidecars]: path.write_text(payload)
+                        copied.write_text('{}')
+                    if fail: raise RuntimeError('test model failure')
+
+                mask = os.umask(0o022)
+                try:
+                    with patch.dict(os.environ, RUN_CHECK_MODEL='openai/gpt-6.1-terra', RUN_CHECK_VARIANT='medium'):
+                        os.environ.pop('RUN_CHECK_AUTH', None)
+                        if use_auth: os.environ['RUN_CHECK_AUTH'] = str(auth)
+                        result, _, _ = self.refusal_run(root, commands=commands, before_model=import_auth)
+                finally:
+                    os.umask(mask)
+                model = next(command for name, command in commands if name == 'model')
+                self.assertEqual(model[model.index('--model') + 1], 'openai/gpt-6.1-terra')
+                self.assertEqual(model[model.index('--variant') + 1], 'medium')
+                self.assertEqual(result['status'], 'FAIL' if fail else 'PASS', result)
+                if fail: self.assertEqual(result['detail'], 'test model failure')
+                self.assertEqual(observed, [(payload, 0o600) if use_auth else None])
+                for path in [copied, database, *sidecars]: self.assertFalse(path.exists(), path.name)
+                self.assertEqual(copied.parent.parent.exists(), not use_auth)
+                self.assertEqual(auth.read_text(), payload)
 
     def test_flat_pair_preserves_the_assigned_account(self):
         config = {'username': 'test', 'url': 'https://app.loginom.ai', 'api_key': 'private', 'password': 'private', 'package_directory': '/test'}
@@ -3154,6 +3178,45 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse(out.exists())
                 self.assertEqual(result.stdout, '')
+
+    def test_start_validates_oauth_before_detach(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            pair = root / 'pair'
+            pair.mkdir()
+            for role in ['worker', 'reviewer']:
+                runner.write(pair / (role + '.json'), {'loginom': {'username': 'test'}, 'package_directory': '/test'})
+            for scenario, env, out, error in [
+                ('missing-zero', {'RUN_CHECK_AUTH': str(root / 'missing.json')}, root / 'results', 'RUN_CHECK_AUTH'),
+                ('read-no-rerun', {'RUN_CHECK_VARIANT': 'medium'}, root / 'results', 'TWO_TURN_VARIANT_UNSUPPORTED'),
+                ('missing-zero', {}, runner.REPO, 'outside Git checkout'),
+            ]:
+                with self.subTest(error=error), patch.dict(os.environ, env, clear=True):
+                    argv = ['run-check.py', 'start', '--head', 'HEAD', '--scenarios', scenario, '--pair', str(pair), '--out', str(out)]
+                    mask = os.umask(0o022)
+                    try:
+                        with patch.object(sys, 'argv', argv), patch.object(runner, 'git', return_value='a' * 40), \
+                             patch.object(runner.subprocess, 'Popen') as spawn:
+                            with self.assertRaisesRegex(ValueError, error): runner.main()
+                            spawn.assert_not_called()
+                    finally:
+                        os.umask(mask)
+                    self.assertFalse((root / 'results').exists())
+
+            auth = root / 'auth.json'
+            auth.write_text('{}')
+            argv = ['run-check.py', 'start', '--head', 'HEAD', '--scenarios', 'missing-zero', '--pair', str(pair), '--out', str(root / 'results')]
+            errors = io.StringIO()
+            mask = os.umask(0o022)
+            try:
+                with patch.dict(os.environ, {'RUN_CHECK_AUTH': str(auth)}, clear=True), patch.object(sys, 'argv', argv), \
+                     patch.object(runner, 'git', return_value='a' * 40), redirect_stderr(errors), redirect_stdout(io.StringIO()), \
+                     patch.object(runner.subprocess, 'Popen', return_value=types.SimpleNamespace(pid=123)) as spawn:
+                    self.assertEqual(runner.main(), 0)
+                    spawn.assert_called_once()
+            finally:
+                os.umask(mask)
+            self.assertIn('parallel', errors.getvalue())
 
     def test_worker_and_phase_survive_missing_launcher_temp(self):
         for exists in [True, False]:

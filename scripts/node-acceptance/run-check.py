@@ -3521,6 +3521,7 @@ class Runner:
             login = pair_login(account, 'worker.json')
             model_id = self.env.get('RUN_CHECK_MODEL') or MODEL
             variant = self.env.get('RUN_CHECK_VARIANT')
+            auth = self.env.get('RUN_CHECK_AUTH')
             for r in self.report['runs']:
                 self.current = r
                 if time.time() >= self.deadline:
@@ -3530,6 +3531,7 @@ class Runner:
                 folder = self.out / r['scenario']
                 folder.mkdir()
                 profile, workspace = folder / 'profile', folder / 'workspace'
+                auth_path = profile / 'data/auth.json'
                 workspace.mkdir()
                 r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp', model=model_id)
                 if variant: r['variant'] = variant
@@ -3539,8 +3541,11 @@ class Runner:
                         self.prepared_case = self.prepare_d87(r['scenario'], folder)
                     self.phase('setup', [build / 'bin/loginom-ai-agent-cli', 'loginom', 'setup', '--headless', '--stdin-json', '--format', 'json'], folder, timeout=180, env=env, stdin=json.dumps(dict(url=login['url'], username=login['username'], password=login['password'])))
                     assert read(folder / 'setup.stdout').get('browser', {}).get('state') == 'verified', 'SETUP_NOT_VERIFIED'
-                    if auth := self.env.get('RUN_CHECK_AUTH'):
-                        shutil.copyfile(Path(auth).expanduser(), profile / 'data/auth.json')
+                    if auth:
+                        with Path(auth).expanduser().open('rb') as source, os.fdopen(
+                            os.open(auth_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600), 'wb'
+                        ) as target:
+                            shutil.copyfileobj(source, target)
                     write(profile / 'config/loginom-ai-agent.json', dict(model=model_id))
                     case = r['scenario']
                     spec = scenario(case, self.options.get('case_root'), cases=self.options.get('cases'))
@@ -3600,6 +3605,16 @@ class Runner:
                     else:
                         self.failure(r, error, folder)
                 finally:
+                    if auth:
+                        try:
+                            if profile.exists():
+                                try: auth_path.unlink(missing_ok=True)
+                                finally: shutil.rmtree(profile)
+                        except OSError as error:
+                            r['oauth_cleanup_error'] = str(error)
+                            if r['status'] != 'FAIL': self.failure(r, error, folder)
+                        else:
+                            r.pop('profile', None)
                     if r.get('dataset'):
                         try: self.cleanup_d87(folder, login, build)
                         except Exception as error:
@@ -3632,11 +3647,26 @@ def main():
                 print(f"{ready}/{len(report['runs'])} готово, идёт {current}")
                 return 2
             time.sleep(min(1, max(0, end - time.monotonic())))
+    # Chromium also puts its Unix singleton socket under TMPDIR. Keep the
+    # default short enough even when the checkout is in a deep task directory.
+    out = (args.out or Path.home() / '.cache/loginom-runs' / str(time.time_ns())).expanduser().resolve()
+    if any((parent / '.git').exists() for parent in (out, *out.parents)):
+        raise ValueError('Result directory must be outside Git checkout')
+    auth = os.environ.get('RUN_CHECK_AUTH')
+    if auth:
+        auth_path = Path(auth).expanduser().resolve()
+        if not auth_path.is_file() or not os.access(auth_path, os.R_OK):
+            raise ValueError('RUN_CHECK_AUTH must point to a readable file')
+    variant = os.environ.get('RUN_CHECK_VARIANT')
     head = git('rev-parse', '--verify', args.head + '^{commit}')
     names = scenario_names(args.scenarios, args.case_root)
     assert 'types300' not in names or args.cold, 'TYPES300_COLD_REQUIRED'
     for name in names:
         spec = scenario(name, args.case_root, cases=args.cases)
+        base = spec['base']
+        if variant and (spec.get('two_turn') or
+                        isinstance(base, str) and scenario(base, args.case_root, cases=args.cases).get('two_turn')):
+            raise ValueError('TWO_TURN_VARIANT_UNSUPPORTED')
         if spec.get('generated'): continue
         assert spec['prompt'].is_file(), 'Scenario prompt missing'
         assert args.case_root or spec.get('oracle', spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
@@ -3648,11 +3678,6 @@ def main():
     if build:
         meta = read(build / 'cli-manifest.json')['metadata']
         assert meta['sourceCommit'] == head and meta['sourceDirty'] is False, 'Build SHA/cleanliness mismatch'
-    # Chromium also puts its Unix singleton socket under TMPDIR. Keep the
-    # default short enough even when the checkout is in a deep task directory.
-    out = (args.out or Path.home() / '.cache/loginom-runs' / str(time.time_ns())).expanduser().resolve()
-    if not args.case_root and any(name in D87 for name in names) and (out == REPO or REPO in out.parents):
-        raise ValueError('D87 result directory and generated data must be outside Git checkout')
     out.mkdir(parents=True)
     temporary = out / 'tmp'
     temporary.mkdir()
@@ -3660,6 +3685,10 @@ def main():
     # Set this before spawning so direct children (including oracles) inherit it.
     env = {k: v for k, v in os.environ.items() if not k.startswith('CODEX_')}
     env.update(TMPDIR=str(temporary), TMP=str(temporary), TEMP=str(temporary))
+    if auth:
+        env['RUN_CHECK_AUTH'] = str(auth_path)
+        print('Warning: do not run scenarios in parallel with the same OAuth file. '
+              'Refresh-token rotation can invalidate copies; the source is not updated.', file=sys.stderr)
     request = vars(args) | {'pair': str(pair), 'build': str(build) if build else None, 'out': str(out),
                             'cases': str(args.cases.expanduser().resolve()) if args.cases else None,
                             'case_root': str(args.case_root.expanduser().resolve()) if args.case_root else None}

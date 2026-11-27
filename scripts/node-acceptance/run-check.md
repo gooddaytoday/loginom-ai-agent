@@ -497,8 +497,9 @@ intermediate cached Helper, reorder); only the task and `fixtures/modes.csv` rea
 keep the machine available and collect it with `wait` before handing off the
 task. `wait` returns 0 for all PASS, 1 for a finished failed/unknown/incomplete batch, or 2
 for its own timeout. A timeout does not cancel the worker; repeat `wait`.
-The result directory is private (0700); `summary.md` and atomic `results.json`
-contain the report. Configs, profiles and raw logs stay private there.
+The result directory is private (0700) and must be outside any Git checkout.
+`summary.md` and atomic `results.json` contain the report. Configs, retained
+profiles and raw logs stay private there.
 Results default to `~/.cache/loginom-runs/<timestamp>/`. The worker and its
 children use the result directory's `tmp/` for `TMPDIR`, `TMP` and `TEMP`;
 task-owned `CODEX_*` settings are not inherited. On Linux, keep an explicit
@@ -511,8 +512,19 @@ the file, required fields and supplied keys; credential values are never printed
 Runs use the worker account. The default is `deepseek/deepseek-flash` without a
 variant, using `DEEPSEEK_API_KEY`. Set `RUN_CHECK_MODEL` to select another model
 and `RUN_CHECK_VARIANT` for a `run` variant (not supported by the two-turn TUI
-cases). Set `RUN_CHECK_AUTH` to the path of a legacy `auth.json` to copy it into
-the fresh CLI profile for import, without writing back to the source.
+cases). A variant on a two-turn TUI case or an unreadable `RUN_CHECK_AUTH` file
+is rejected before detach. `RUN_CHECK_AUTH` points to a legacy `auth.json`;
+the runner copies it with mode `0600` into each fresh CLI profile for import.
+On success or failure the runner removes the copy and the entire OAuth profile,
+including its database and sidecars. If the worker is forcibly killed before
+cleanup, remove that run's OAuth profile manually before sharing any evidence.
+Without `RUN_CHECK_AUTH`, no copy is made and the profile is retained.
+
+The source file is never updated. If the provider rotates the refresh token,
+the next copy (even in a sequential batch) can be stale, and reusing it can
+revoke the OAuth session. The runner warns on OAuth starts: do not run scenarios
+in parallel with the same file. If a run rotates the token, obtain fresh OAuth
+credentials before reusing the account for another scenario.
 `make-pair.py` builds the pair in a
 0700 temporary directory from `LOGINOM_{WORKER,REVIEWER}_{USER,PASS}` (see its
 docstring); remove it with `make-pair.py --remove DIR` after `wait`. Requires git, Python 3.9+, the pinned Bun/Node/browser bootstrap cache,
