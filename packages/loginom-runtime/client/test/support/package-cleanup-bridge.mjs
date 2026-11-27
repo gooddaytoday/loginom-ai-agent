@@ -192,18 +192,40 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
 
-for(const [upstream,expectedReopen] of [['importtextfile',false],['calcdata',true],['filterdata',true],['joindata',true],['foreign',true]])
-test('public checkpoint Save follows the input of Grouping: '+upstream,async t=>{
+for(const [scenario,inputs,expectedReopen] of [
+ ['importtextfile',['importtextfile'],false],
+ ['sorting',['sorting'],true],
+ ['uniondata',['uniondata'],true],
+ ['calcdata',['calcdata'],true],
+ ['filterdata',['filterdata'],true],
+ ['joindata',['joindata'],true],
+ ['mixed',['importtextfile','calcdata'],true],
+ ['unknown',['unknown'],true],
+ ['foreign',['importtextfile'],true],
+ ['non-array',['importtextfile'],true],
+ ['read-error',['importtextfile'],true],
+ ['second-group-without-input',['importtextfile'],true],
+])test('public checkpoint Save follows the input of Grouping: '+scenario,async t=>{
  const directory=await mkdtemp(join(tmpdir(),'grouping-save-'));
  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
  const page=await restSavePage(expectedReopen?[true,false]:[false],false);
  const diagram=page.model.FDiagram;
- const [group,,source]=diagram.FNodes.FCollection;
+ const [group,second,source]=diagram.FNodes.FCollection;
  group.FIconCls='bg-vendor-icon-groupdata';
- source.FIconCls='bg-vendor-icon-'+(upstream==='foreign'?'importtextfile':upstream);
- const parent=upstream==='foreign'?{...source}:source;
- diagram.FLinks={FCollection:[{FSourcePort:{parent},FTargetPort:{parent:group}}]};
+ const sources=[source,second];
+ const links=inputs.map((name,index)=>{
+  const node=sources[index];
+  node.FIconCls='bg-vendor-icon-'+name;
+  return {FSourcePort:{parent:scenario==='foreign'?{...node}:node},FTargetPort:{parent:group}};
+ });
+ diagram.FLinks={FCollection:scenario==='non-array'?{}:links};
+ if(scenario==='read-error')Object.defineProperty(diagram,'FLinks',{get(){throw Error('Cannot read native links');}});
+ if(scenario==='second-group-without-input')second.FIconCls='bg-vendor-icon-groupdata';
  page.edges=['Источник|Output_Data-0|Приёмник|Input_Data-0'];
+ if(inputs.length>1){
+  page.addNode('Второй источник',104,208,['Output_Data-0']);
+  page.edges.push('Второй источник|Output_Data-0|Приёмник|Input_Data-0');
+ }
  const path='/user/data/packages/grouping.lgp';
  current={scenario:'grouping-save',events:[],catalog,path,realPackageSave:page};
  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
