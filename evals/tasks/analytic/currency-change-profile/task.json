@@ -16,7 +16,7 @@
     },
     {
       "id": "calculation",
-      "text": "По target_currency составь описательную сводку исходных rate и change_pct. observations — число строк; mean_rate=AVG(rate); mean_change_pct=AVG(change_pct); min_change_pct=MIN(change_pct); max_change_pct=MAX(change_pct); change_span_pp=MAX(change_pct)-MIN(change_pct); negative_change_pct=100*число строк change_pct<0 / observations. Исходный change_pct уже выражен в процентах; его среднее/min/max повторно на100 не умножаются, диапазон измеряется в процентных пунктах. Отрицательные значения сохраняй. high,low,даты и timestamp не используются.",
+      "text": "По target_currency составь описательную сводку исходных rate и change_pct. observations — число строк; mean_rate=AVG(rate); mean_change_pct=AVG(change_pct); min_change_pct=MIN(change_pct); max_change_pct=MAX(change_pct); change_span_pp=MAX(change_pct)-MIN(change_pct); negative_change_pct=100*число строк change_pct<0 / observations. Исходный change_pct уже выражен в процентах; его среднее/min/max повторно на100 не умножаются, диапазон измеряется в процентных пунктах. Отрицательные значения сохраняй. high,low,даты и timestamp не используются. В узле «Группировка» Loginom gdCount по конкретному полю считает все строки группы, включая строки с пустым значением или NULL в этом поле. gdNullCount считает только NULL, а gdUniqueCount — различные значения. Они не заменяют подсчёт всех строк, даже если итог на этих данных совпадает.",
       "required": true
     },
     {

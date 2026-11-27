@@ -8,6 +8,7 @@ import { unzip } from "./artifact"
 import { EvalFailure } from "./fail"
 import { checkOracle } from "./oracle"
 import { superviseProcess } from "./process-supervisor"
+import { inputDelivery } from "./input-delivery"
 import { runJudgeUnit } from "./judge-unit"
 import type { AttemptResult } from "./report"
 
@@ -28,7 +29,7 @@ export type JudgeSettings = {
   env?: Record<string, string>
   systemd?: boolean
 }
-type RunView = Pick<AgentRun, "finalText" | "tools" | "nodeReceipts" | "nodeReceiptsDropped">
+type RunView = Pick<AgentRun, "finalText" | "tools" | "nodeReceipts" | "nodeReceiptsDropped"> & Partial<Pick<AgentRun, "sessionId">>
 
 export function parseVerdict(text: string): Verdict | undefined {
   const parsed = parseJson(text) as Partial<Verdict> | undefined
@@ -178,6 +179,10 @@ export async function prepareJudgeDir(input: {
     cp(verdictSchemaFile, path.join(input.dir, "verdict.schema.json")),
     cp(input.artifactDir, path.join(input.dir, "artifact"), { recursive: true }),
   ])
+  if (input.run?.sessionId) {
+    const evidence = await inputDelivery(input.task, input.artifactDir, input.run.sessionId)
+    if (evidence) await Bun.write(path.join(input.dir, "input-delivery.json"), JSON.stringify(evidence, null, 2))
+  }
   if (!(await unzip(path.join(input.task.dir, input.task.reference), path.join(input.dir, "reference"))))
     throw new EvalFailure(`${input.task.id}: эталон ${input.task.reference} не распакован или не содержит Unit.xml`, 1)
 }

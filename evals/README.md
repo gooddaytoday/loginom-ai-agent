@@ -218,10 +218,11 @@ bun run script/check-compare-noise.ts > /tmp/evals-compare-noise.json # offline 
 побайтово из принятой серии CLI **0.2.2**, `openai/gpt-6.1-sol/xhigh`.
 Новые кейсы используют `oracle_tolerance=1e-6` и лимит попытки 3600000 мс.
 
-Хэши всех 65 задач:
+Хэши всех 65 задач для версии `eval-reference-2026-11-26-r1`. [Манифест корпуса](docs/2026-11-26-eval-reference-corpus.json)
+
 ```text
 agent_inputs_hash dd1a21c6be4e0482ea3d1fd700ec1f5e4140abb037502d0310f16fda8e9773cc
-rubric_hash       a39049e6d2660ce57f9ae23dd3e1ddbc99ea4d1adb8cfa8c953c2c7582579377
+rubric_hash       06d756a78dc89ecb6046355a34aaa5953c8e623e3f679cbafda466715a07fbdb
 ```
 
 Обычная калибровка только новых 30 прошла судьёй `gpt-6-sol/xhigh`:

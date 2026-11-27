@@ -16,7 +16,7 @@
     },
     {
       "id": "calculation",
-      "text": "Составь сводку погодных наблюдений по city. observations — число строк; mean_temperature, mean_wind_speed, mean_cloudiness — простые средние temperature, wind_speed, cloudiness. adverse_weather_pct=100*число строк с точным weather_main из множества Rain,Snow,Mist / observations. Все строки включены; timestamp, season и feels_like не используются. Категории weather_main сравниваются точно и не исправляются.",
+      "text": "Составь сводку погодных наблюдений по city. observations — число строк; mean_temperature, mean_wind_speed, mean_cloudiness — простые средние temperature, wind_speed, cloudiness. adverse_weather_pct=100*число строк с точным weather_main из множества Rain,Snow,Mist / observations. Все строки включены; timestamp, season и feels_like не используются. Категории weather_main сравниваются точно и не исправляются. В Loginom Enterprise 7.4.2 проверен RegExMatch(\"\\A(?:Rain|Snow|Mist)\\z\", Concat(weather_main, \"\")): Rain принят, rain, RAIN и Rain с завершающим LF исключены. Целый флаг на основе этого выражения допустим без (?-i). Вариант, принимающий другой регистр или завершающий перевод строки, нарушает точное сравнение.",
       "required": true
     },
     {

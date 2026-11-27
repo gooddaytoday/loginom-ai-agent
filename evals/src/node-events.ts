@@ -25,11 +25,12 @@ function firstObject(source: string): ObjectValue {
   throw Error("Incomplete tool output JSON")
 }
 
-export function readNodeEvents(source: string): NodeEvents {
+export function readNodeEvents(source: string, scope?: { sessionId: string; tools: ReadonlySet<string> }): NodeEvents {
   const calls: NodeCall[] = [], failures: string[] = [], seen = new Map<string, string>()
   for (const [index, line] of source.split(/\r?\n/).entries()) {
     if (!line.trim()) continue
     const event = JSON.parse(line), part = event.part, state = part?.state
+    if (scope && (event.sessionID !== scope.sessionId || part?.type !== "tool" || !scope.tools.has(part.tool))) continue
     if (event.type !== "tool_use" || !part.tool?.startsWith("loginom_") || state?.status !== "completed") continue
     const key = part.id ?? part.callID
     if (!key) { failures.push("events: tool-part identity missing"); continue }
@@ -54,12 +55,13 @@ export function successful(call: NodeCall) {
   return call.output.status === "SUCCEEDED" && call.output.cleanup_complete === true && call.output.error == null
 }
 
-export function operationReceipts(events: NodeEvents) {
+export function operationReceipts(events: NodeEvents, isRequest = (call: NodeCall) =>
+  call.tool.endsWith("node_apply") || call.tool.endsWith("node_read"), include = successful) {
   const requests = new Map<string, NodeCall>()
   const receipts: { request: NodeCall; receipt: NodeCall }[] = []
   const failures = [...events.failures]
   for (const call of events.calls) {
-    if (call.tool.endsWith("node_apply") || call.tool.endsWith("node_read")) {
+    if (isRequest(call)) {
       const op = call.input.operation_id
       if (typeof op !== "string") { failures.push("events: missing operation_id"); continue }
       const previous = requests.get(op)
@@ -67,7 +69,7 @@ export function operationReceipts(events: NodeEvents) {
       else if (!previous) requests.set(op, call)
     }
     const request = requests.get(call.output.operation_id)
-    if (request && successful(call) && call.output.state === "settled") receipts.push({ request, receipt: call })
+    if (request && include(call) && call.output.state === "settled") receipts.push({ request, receipt: call })
   }
   return { receipts, failures }
 }

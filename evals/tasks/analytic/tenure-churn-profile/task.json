@@ -24,7 +24,7 @@
     {
       "id": "churn-measures",
       "required": true,
-      "text": "По tenure_band вычислены customers=count(rows), churned=count(churn=1), churn_pct=100*churned/customers, avg_monthly_charges=mean(monthly_charges), avg_support_calls=mean(support_calls)."
+      "text": "По tenure_band вычислены customers=count(rows), churned=count(churn=1), churn_pct=100*churned/customers, avg_monthly_charges=mean(monthly_charges), avg_support_calls=mean(support_calls). В узле «Группировка» Loginom gdCount по конкретному полю считает все строки группы, включая строки с пустым значением или NULL в этом поле. gdNullCount считает только NULL, а gdUniqueCount — различные значения. Они не заменяют подсчёт всех строк, даже если итог на этих данных совпадает."
     },
     {
       "id": "sort-final",
