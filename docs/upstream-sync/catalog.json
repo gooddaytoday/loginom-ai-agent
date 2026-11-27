@@ -102,6 +102,8 @@
       "id": "CAT-14",
       "title": "Built-in plugin top-level pages",
       "paths": [
+        "packages/app/src/runtime/plugin/host-apis.tsx", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/main.ts",
+        "packages/gui-plugins/src/browser/panel.fixture.tsx",
         "packages/app/src/shell/routes/routes.tsx", "packages/app/src/shell/state/layout.tsx",
         "packages/app/src/shell/state/layout.test.ts", "packages/app/vite.config.ts",
         "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
