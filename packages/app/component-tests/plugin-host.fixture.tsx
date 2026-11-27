@@ -69,6 +69,7 @@ export {
   createKeyed,
   Ipc,
   Panel,
+  Registry,
   Slot,
   Store,
   Theme,
@@ -238,6 +239,7 @@ export function mountPluginHost(input?: { builtins: ReadonlySet<string>; View: C
  */
 export function mountPlugins(input: {
   definitions: readonly Entry[]
+  builtins?: ReadonlySet<string>
   surface?: () => JSX.Element
   disabled?: readonly string[]
   bridge?: Bridge
@@ -331,6 +333,7 @@ export function mountPlugins(input: {
               {/* With a bridge, main's plugin manager holds the enable settings, as in a desktop window. */}
               <PluginHostProvider
                 definitions={definitions}
+                builtins={input.builtins}
                 disabled={input.bridge ? undefined : disabled}
                 bridge={input.bridge}
                 apis={fakeApis(storage)}
@@ -372,6 +375,20 @@ export function mountPlugins(input: {
   }
 }
 
+export function mountLoadingPluginPage() {
+  const history = createMemoryHistory()
+  history.set({ value: "/page/fixture/overview" })
+
+  return mountPluginHost({
+    builtins: new Set(["fixture"]),
+    View: () => (
+      <MemoryRouter history={history}>
+        <PluginPageRoute />
+      </MemoryRouter>
+    ),
+  })
+}
+
 export function mountPluginPages(options?: Parameters<typeof pagePlugin>[0]) {
   const plugin = pagePlugin(options)
   const history = createMemoryHistory()
@@ -391,6 +408,7 @@ export function mountPluginPages(options?: Parameters<typeof pagePlugin>[0]) {
 
   const host = mountPlugins({
     definitions: [plugin],
+    builtins: new Set([plugin.id]),
     surface: () => (
       <MemoryRouter history={history}>
         <Pages />

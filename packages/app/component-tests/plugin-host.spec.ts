@@ -80,6 +80,41 @@ story("a plugin page that fails to render shows a way back to Home", async ({ pa
   await host.evaluate((host) => host.unmount())
 })
 
+story("a restored plugin page shows a loader until its plugin fails to load", async ({ page }) => {
+  const host = await page.evaluateHandle(async (fixture) => {
+    const { mountLoadingPluginPage } = await import(fixture)
+
+    return mountLoadingPluginPage()
+  }, fixture)
+
+  const loader = page.getByRole("img", { name: "Loading", exact: true })
+  const unavailable = page.getByRole("heading", { name: "Plugin page unavailable" })
+  await expect(loader).toBeVisible()
+  await expect(unavailable).toHaveCount(0)
+  await host.evaluate((host) => host.fail(0, new Error("Fixture load failed")))
+  await expect(unavailable).toBeVisible()
+  await expect(loader).toHaveCount(0)
+  await host.evaluate((host) => host.unmount())
+})
+
+story("a third-party plugin cannot register a page with a public registry token", async ({ page }) => {
+  const result = await page.evaluate(async (fixture) => {
+    const { mountPluginHost, Registry, until } = await import(fixture)
+    const host = mountPluginHost()
+
+    try {
+      host.load((ctx: Context) => ctx.add(Registry.define("page"), { id: "overview", title: "Third-party page" }))
+      await until(() => host.status() === "failed" || host.status() === "active")
+
+      return { status: host.status(), pages: host.entries("page") }
+    } finally {
+      host.unmount()
+    }
+  }, fixture)
+
+  expect(result).toEqual({ status: "failed", pages: 0 })
+})
+
 story("a plugin that finishes loading after the host unmounts is never set up", async ({ page }) => {
   const setups = await page.evaluate(async (fixture) => {
     const { mountPluginHost } = await import(fixture)
