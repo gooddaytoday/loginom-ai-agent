@@ -136,7 +136,7 @@ class Page extends EventEmitter {
   contains(box, point) { return box && point && point.x >= box.x && point.x <= box.x + box.width && point.y >= box.y && point.y <= box.y + box.height; }
   ref(label) { return { kind: 'node', node_label: label, workflow_ref: { tab_tid: this.tabTid, prefix: this.prefix } }; }
   addNode(label, x, y, ports = []) { this.nodes.push({ label, x, y, ports: [...ports] }); }
-  element(tid, props = {}) { const page=this;return { tid,ownerDocument:page.dom, visible: true, box: { x: 10, y: 10, width: 20, height: 20 }, ...props,
+  element(tid, props = {}) { const page=this;return { tid,ownerDocument:page.dom, isConnected: true, visible: true, box: { x: 10, y: 10, width: 20, height: 20 }, ...props,
     querySelectorAll(selector) {const descendants=item=>(item.children??[]).flatMap(child=>[child,...descendants(child)]);return page.match(selector,descendants(this));},
     getBoundingClientRect() { return { ...this.box, left: this.box.x, top: this.box.y, right: this.box.x + this.box.width, bottom: this.box.y + this.box.height }; },
     getAttribute(name) { return name === 'data-tid' ? this.tid : this.attributes?.[name] ?? null; } }; }
@@ -302,4 +302,74 @@ function runtime(page, options = {}) { return createActionRuntime({ pinned: { ac
   execute: code => page.execute(code), now: () => page.clock, targetOrigin: 'https://loginom.invalid', ...options }); }
 
 
-export { actions, selectors, build, clone, Page, Locator, nodeParameters, linkPage, linkParameters, run, runtime };
+async function continuationPage() {
+ const page=linkPage();await page.execute('async page=>true');
+ page.url=()=> 'https://loginom.invalid/app';
+ Object.assign(page.context,{location:{origin:'https://loginom.invalid',pathname:'/app'},
+  innerWidth:1600,innerHeight:1000,outerWidth:1600,outerHeight:1000,screen:{availWidth:1600,availHeight:1000}});
+ class WorkFlowTreeNode{};page.app.WorkFlowTreeNode=WorkFlowTreeNode;
+ let pkg=new page.app.PackageTreeNode(),flow=new WorkFlowTreeNode();flow.ParentNode=pkg;
+ const activeTab=()=>page.element(page.tabTid,{classList:{contains:name=>name==='x-tab-active'}});
+ let tab=activeTab();
+ const card={Controller:{FController:page.model,Node:{data:{node:flow}}}};
+ page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>card;
+ let parentLength=0;const components=new Map();
+ const up=page.element(page.prefix+';up',{id:'save-up',kind:'save_up',attributes:{'data-qtip':'Вверх'}});
+ up.closest=()=>({});up.querySelectorAll=()=>[{}];
+ components.set(up.id,{el:{dom:up},disabled:false});
+ const crumbs=()=>{
+  const labels=['Server','Packages',page.packagePath?'Saved':'Draft','Module','Workflow',...(page.continuationSuffix?[page.continuationSuffix]:[])];
+  return labels.slice(0,parentLength||labels.length).map((label,i)=>{
+   // Save can update captions before the native NavigationBar rebuilds its keys.
+   const keys=[...labels];if(page.staleSavedNavigation&&!page.canonicalSavedNavigation)keys[2]='Draft';
+   const element=page.element(page.prefix+';cnrNaviMode;b.s_'+keys.slice(0,i+1).join('>'),{id:'save-crumb-'+i,text:label,textContent:label,kind:i>=3?'save_nav_parent':'save_crumb',navigationLength:i+1,visible:(!page.hiddenAncestors||i>=3)&&!(page.hiddenSaveParent&&page.packagePath&&i===3)});
+   components.set(element.id,{el:{dom:element},_node:{data:{node:i===4?flow:null}}});return element;
+  });
+ };
+ const elements=page.elements.bind(page),click=page.click.bind(page);
+ page.elements=()=>[...elements(),...crumbs(),...(page.missingSaveUp?[]:[up]),...(parentLength?[page.element(page.prefix+';ListViewForm;MapTreeForm;colNavigation_Server>Packages>Saved>Module>Workflow;TreeText',{text:'Workflow',textContent:'Workflow',kind:'save_tree'})]:[])];
+ page.click=async item=>{if(item.kind==='save_up'){page.canonicalSavedNavigation=true;parentLength=4;return;}if(item.kind==='save_nav_parent'){page.canonicalSavedNavigation=true;parentLength=item.navigationLength;return;}return click(item);};
+ page.afterDoubleClick=async()=>{parentLength=0;page.editor=null;};
+ const document={querySelectorAll:selector=>{
+   if(selector.includes('cnrNaviMode'))return crumbs().filter(e=>selector.includes('^=')||selector==='[data-tid='+JSON.stringify(e.tid)+']');
+   if(selector==='[data-tid='+JSON.stringify(page.prefix+';ModelForm;cmpDiagram')+']'){
+    const graph=page.model.FDiagram.FmxGraph.container;
+    return page.active&&graph?[graph]:[];
+   }
+   if(selector.includes('Workspace;t.br;tb'))return page.active?page.match(selector,[tab]):[];
+   return selector.startsWith('[data-tid')?page.match(selector):[];
+ }};
+ page.context.Ext={getCmp:id=>components.get(id)};
+ page.context.document=document;
+ page.context.__loginomDockPreparationV1={document,id:'doc',receipts:new Map([['prepared',{phase:'verified',workflowId:'workflow',tab,packageNode:pkg,nodeTargetWorkflowNode:flow}]])};
+ return {page,flow,card,reopenNative(){
+  pkg=new page.app.PackageTreeNode();flow=new WorkFlowTreeNode();flow.ParentNode=pkg;
+  card.Controller.Node.data.node=flow;
+  tab=activeTab();
+  return pkg;
+ }};
+}
+
+async function restSavePage(modified, restReference = true) {
+ const {page,flow,card,reopenNative}=await continuationPage(),pkg=flow.ParentNode;
+ page.storageBinding={session_id:'save-session',document_id:'doc',loginom_account:'save-user',origin:'https://loginom.invalid'};
+ pkg.Package={};pkg.HasRunningNodes=()=>false;Object.defineProperty(pkg,'ReadOnly',{value:false});
+ page.model.FDiagram.FNodes={FCollection:[{FGuid:'reference',FIconCls:restReference?'bg-vendor-icon-restclientconnection':'bg-vendor-icon-restclient'},
+  {FGuid:'rest',FIconCls:'bg-vendor-icon-restclient'},{FGuid:'source',FIconCls:'source'}]};
+ page.onReopen=()=>{const fresh=reopenNative();fresh.Package={};fresh.HasRunningNodes=()=>false;fresh.ReadOnly=false;};
+ page.app.Application.FInstance.FMainForm.FMapTree={PackageNodes:{Count:1,Items:()=>card.Controller.Node.data.node.ParentNode},
+  FServerConnection:{Connected:true,UserName:'save-user',Session:{IsPackageModified:async()=>{
+   page.modifiedReads++;return modified[Math.min(page.modifiedReads-1,modified.length-1)];
+  }}}};
+ page.context.__loginomDockPreparationV1.receipts.get('prepared').request=JSON.stringify({session:'save-session'});
+ await page.execute('async page=>{const p=globalThis.__loginomDockPreparationV1;p.receipts=new Map(p.receipts);return true;}');
+ page.context.setTimeout=(callback,ms)=>page.waitForTimeout(ms).then(callback);
+ page.saveWrites=0;page.modifiedReads=0;
+ const save=page.save.bind(page),elements=page.elements.bind(page),click=page.click.bind(page);
+ page.save=()=>{page.saveWrites++;save();};
+ page.elements=()=>[...elements(),...(page.menu?[page.element('MF;MainMenuForm;btnSavePackage',{symbol:'native-save'})]:[])];
+ page.click=async item=>{if(item.symbol==='native-save'){page.events.push('native_save');page.save();page.menu=false;return;}return click(item);};
+ return page;
+}
+
+export { actions, selectors, build, clone, Page, Locator, nodeParameters, linkPage, linkParameters, run, runtime, continuationPage, restSavePage };

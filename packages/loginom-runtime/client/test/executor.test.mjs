@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateActionParameters } from '../lib/action-catalog.mjs';
-import { actions, selectors, build, Page, nodeParameters, linkPage, linkParameters, run, runtime } from './support/executor-fixture.mjs';
+import { actions, selectors, build, Page, nodeParameters, linkPage, linkParameters, run, runtime, continuationPage, restSavePage } from './support/executor-fixture.mjs';
 import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from '../../tools/loginom-acceptance/javascript-persistence-save.mjs';
 import { compactActionResult } from '../lib/user-results.mjs';
 import {createRestRequestNodeSupport} from '../lib/rest-request-node.mjs';
@@ -12,7 +12,7 @@ import {withStorageIdentity} from '../lib/storage-policy.mjs';
 import {readPreparedNodeContext} from '../lib/node-context.mjs';
 import {readUserVariablesSnapshot} from '../lib/crosstable-variables.mjs';
 import {makePackageCleanupCode} from '../lib/package-cleanup.mjs';
-import {makeWorkspaceStepCode} from '../lib/workspace.mjs';
+import {makeWorkspacePrepareCode, makeWorkspaceStepCode} from '../lib/workspace.mjs';
 import {readGraph} from '../lib/node-target-browser.mjs';
 
 test('a retained preparation cannot mask a settled node worker using the same ID',async()=>{
@@ -918,69 +918,6 @@ test('save conflict cleanup is not complete while its native dialog remains open
  assert.deepEqual(page.storage.get(path),{nodes:[],edges:[]});
 });
 
-async function continuationPage() {
- const page=linkPage();await page.execute('async page=>true');
- class WorkFlowTreeNode{};page.app.WorkFlowTreeNode=WorkFlowTreeNode;
- let pkg=new page.app.PackageTreeNode(),flow=new WorkFlowTreeNode();flow.ParentNode=pkg;
- let tab={tid:page.tabTid,getAttribute(){return this.tid;},classList:{contains:name=>name==='x-tab-active'}};
- const card={Controller:{FController:page.model,Node:{data:{node:flow}}}};
- page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>card;
- let parentLength=0;const components=new Map();
- const up=page.element(page.prefix+';up',{id:'save-up',kind:'save_up',attributes:{'data-qtip':'Вверх'}});
- up.closest=()=>({});up.querySelectorAll=()=>[{}];
- components.set(up.id,{el:{dom:up},disabled:false});
- const crumbs=()=>{
-  const labels=['Server','Packages',page.packagePath?'Saved':'Draft','Module','Workflow',...(page.continuationSuffix?[page.continuationSuffix]:[])];
-  return labels.slice(0,parentLength||labels.length).map((label,i)=>{
-   // Save can update captions before the native NavigationBar rebuilds its keys.
-   const keys=[...labels];if(page.staleSavedNavigation&&!page.canonicalSavedNavigation)keys[2]='Draft';
-   const element=page.element(page.prefix+';cnrNaviMode;b.s_'+keys.slice(0,i+1).join('>'),{id:'save-crumb-'+i,text:label,textContent:label,kind:i>=3?'save_nav_parent':'save_crumb',navigationLength:i+1,visible:(!page.hiddenAncestors||i>=3)&&!(page.hiddenSaveParent&&page.packagePath&&i===3)});
-   components.set(element.id,{el:{dom:element},_node:{data:{node:i===4?flow:null}}});return element;
-  });
- };
- const elements=page.elements.bind(page),click=page.click.bind(page);
- page.elements=()=>[...elements(),...crumbs(),...(page.missingSaveUp?[]:[up]),...(parentLength?[page.element(page.prefix+';ListViewForm;MapTreeForm;colNavigation_Server>Packages>Saved>Module>Workflow;TreeText',{text:'Workflow',textContent:'Workflow',kind:'save_tree'})]:[])];
- page.click=async item=>{if(item.kind==='save_up'){page.canonicalSavedNavigation=true;parentLength=4;return;}if(item.kind==='save_nav_parent'){page.canonicalSavedNavigation=true;parentLength=item.navigationLength;return;}return click(item);};
- page.afterDoubleClick=async()=>{parentLength=0;page.editor=null;};
- const document={querySelectorAll:selector=>{
-   if(selector.includes('cnrNaviMode'))return crumbs().filter(e=>selector.includes('^=')||selector==='[data-tid='+JSON.stringify(e.tid)+']');
-   if(selector.includes('cmpDiagram'))return [page.model.FDiagram.FmxGraph.container];
-   if(selector==='[data-tid='+JSON.stringify(page.tabTid)+']'&&page.active)return [tab];return [];
- }};
- page.context.Ext={getCmp:id=>components.get(id)};
- page.context.document=document;
- page.context.__loginomDockPreparationV1={document,id:'doc',receipts:new Map([['prepared',{phase:'verified',workflowId:'workflow',tab,packageNode:pkg,nodeTargetWorkflowNode:flow}]])};
- return {page,flow,card,reopenNative(){
-  pkg=new page.app.PackageTreeNode();flow=new WorkFlowTreeNode();flow.ParentNode=pkg;
-  card.Controller.Node.data.node=flow;
-  tab={tid:page.tabTid,getAttribute(){return this.tid;},classList:{contains:name=>name==='x-tab-active'}};
-  return pkg;
- }};
-}
-
-async function restSavePage(modified, restReference = true) {
- const {page,flow,card,reopenNative}=await continuationPage(),pkg=flow.ParentNode;
- page.storageBinding={session_id:'save-session',document_id:'doc',loginom_account:'save-user',origin:'https://loginom.invalid'};
- pkg.Package={};pkg.HasRunningNodes=()=>false;Object.defineProperty(pkg,'ReadOnly',{value:false});
- page.model.FDiagram.FNodes={FCollection:[{FGuid:'reference',FIconCls:restReference?'bg-vendor-icon-restclientconnection':'bg-vendor-icon-restclient'},
-  {FGuid:'rest',FIconCls:'bg-vendor-icon-restclient'},{FGuid:'source',FIconCls:'source'}]};
- page.onReopen=()=>{const fresh=reopenNative();fresh.Package={};fresh.HasRunningNodes=()=>false;fresh.ReadOnly=false;};
- page.app.Application.FInstance.FMainForm.FMapTree={PackageNodes:{Count:1,Items:()=>card.Controller.Node.data.node.ParentNode},
-  FServerConnection:{Connected:true,UserName:'save-user',Session:{IsPackageModified:async()=>{
-   page.modifiedReads++;return modified[Math.min(page.modifiedReads-1,modified.length-1)];
-  }}}};
- page.context.location={origin:'https://loginom.invalid'};
- page.context.__loginomDockPreparationV1.receipts.get('prepared').request=JSON.stringify({session:'save-session'});
- await page.execute('async page=>{const p=globalThis.__loginomDockPreparationV1;p.receipts=new Map(p.receipts);return true;}');
- page.context.setTimeout=(callback,ms)=>page.waitForTimeout(ms).then(callback);
- page.saveWrites=0;page.modifiedReads=0;
- const save=page.save.bind(page),elements=page.elements.bind(page),click=page.click.bind(page);
- page.save=()=>{page.saveWrites++;save();};
- page.elements=()=>[...elements(),...(page.menu?[page.element('MF;MainMenuForm;btnSavePackage',{symbol:'native-save'})]:[])];
- page.click=async item=>{if(item.symbol==='native-save'){page.events.push('native_save');page.save();page.menu=false;return;}return click(item);};
- return page;
-}
-
 test('ordinary Save As rebinds preparation before the next workflow activation',async()=>{
  const page=await restSavePage([false],false);
  const original=page.context.__loginomDockPreparationV1.receipts.get('prepared');
@@ -1003,6 +940,35 @@ test('ordinary Save As rebinds preparation before the next workflow activation',
  assert.match((await activate()).error,/Prepared workflow receipt changed/);
  assert.equal(page.modifiedReads,0);assert.equal(page.saveWrites,1);
  assert.equal(saved.trace.some(e=>e.event==='rest_package_normalization'),false);
+});
+
+test('checkpoint Save provides the binding used by bind-only preparation on the same page',async()=>{
+ const page=await restSavePage([false]);
+ const preparation=page.context.__loginomDockPreparationV1;
+ const earlier=preparation.receipts.get('prepared');
+ preparation.receipts.set('current',{...earlier,workflowId:'current-workflow'});
+ const path='/user/data/packages/rebind.lgp',saveOperationId='save-for-bind';
+ const saved=await run(page,'package.save_checkpoint',{path,conflict_policy:'fail'},{operation_id:saveOperationId});
+ assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved.error));
+ assert.equal(saved.output.reopened,true);
+ const [other,current]=saved.output.workflow_continuations;
+ assert.equal(other.workflow_ref.workflow_id,'workflow');
+ assert.equal(current.workflow_ref.workflow_id,'current-workflow');
+ assert.equal(current.workflow_ref.tab_tid,other.workflow_ref.tab_tid);
+ assert.notEqual(current.workflow_ref.tab_tid,current.previous_workflow_ref.tab_tid);
+
+ const gestures=page.events.slice();
+ const rebound=await page.execute(makeWorkspacePrepareCode({loginomUrl:page.url(),platform:'linux',
+  compatibility:{profile_id:'test',loginom_build:build,platform:'linux',browser:'chromium'},
+  sessionId:page.storageBinding.session_id,operationId:'bind-after-save',intent:'open_package',
+  packagePath:saved.output.package_ref.path,bindOpenOnly:true,saveOperationId:saved.operation_id,
+  workflowRef:{...current.workflow_ref,document_id:current.document_id},timeoutMs:500}));
+ assert.equal(rebound.status,'READY',JSON.stringify(rebound));
+ assert.equal(rebound.effect_possible,false);
+ assert.equal(rebound.document_id,current.document_id);
+ assert.equal(rebound.package_ref.path,path);
+ assert.deepEqual(rebound.workflow_ref,current.workflow_ref);
+ assert.deepEqual(page.events,gestures);
 });
 
 for(const fault of ['native-node','package-path'])test('ordinary Save As refuses a foreign reopened identity: '+fault,async()=>{

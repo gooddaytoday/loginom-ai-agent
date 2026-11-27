@@ -11,6 +11,7 @@ import { createSkillLoader, prepareTool } from './skill.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {randomUUID} from 'node:crypto';
+import {isDeepStrictEqual} from 'node:util';
 import { openArchive } from './archive.mjs';
 import { diagnoseConnection } from './diagnostics.mjs';
 import { actionDescribeTool, pinActionCatalog, assertCatalogTarget, validateActionParameters, BUNDLED_CATALOG_RELEASES } from './action-catalog.mjs';
@@ -799,10 +800,11 @@ export async function createBridge(config, session, { browserTransport: managedB
             const admission=confirmedSave&&saveAdmissions.get(confirmedSave.operation_id);
             // Reconciliation confirms the original admission, not a new Save.
             // An older receipt can never supersede a later confirmed mutation.
-            if(admission&&confirmedSave.status==='SUCCEEDED'&&confirmedSave.action_key===admission.action_key
+            const newlyConfirmed=admission&&confirmedSave.status==='SUCCEEDED'&&confirmedSave.action_key===admission.action_key
               &&confirmedSave.output?.package_ref?.path===admission.path
               &&admission.document_id===session.metadata.workspacePreparation?.state?.document_id
-              &&(!lastSavedPackage||admission.sequence>lastSavedPackage.sequence)) {
+              &&(!lastSavedPackage||admission.sequence>lastSavedPackage.sequence);
+            if(newlyConfirmed) {
               savedPackages.set(admission.path,confirmedSave.operation_id);
               lastSavedPackage={path:admission.path,operation_id:confirmedSave.operation_id,
                 document_id:admission.document_id,sequence:admission.sequence};
@@ -815,24 +817,28 @@ export async function createBridge(config, session, { browserTransport: managedB
             let workspaceBindingAdvice = null;
             const saveContinuations = savedOutcome.output?.workflow_continuations
               ?? savedOutcome.trace?.find(e => e.event === 'save_continuations_observed' && e.native_identity_verified === true)?.continuations ?? [];
-            if (savedOutcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(savedOutcome.action_key)
+            if (newlyConfirmed
                 && savedOutcome.trace?.some(e => e.event === 'save_continuations_observed' && e.native_identity_verified === true
                   && (savedOutcome.output?.reopened === true && e.reopened === true || e.recovered_reopen === true))) {
               const beforeBinding = Object.fromEntries(['workspacePreparation','workspaceReady','targetIdentity','workflowRef']
                 .map(key => [key,session.metadata[key]]));
               const previous = beforeBinding.workspacePreparation?.state;
+              const continuation = saveContinuations.find(c => c.document_id === previous?.document_id
+                && c.workflow_ref.workflow_id === previous?.workflow_ref.workflow_id);
               const bindingRequest = {intent:'open_package',package_path:savedOutcome.output.package_ref.path,operation_id:'rest-save-bind-'+randomUUID()};
               try {
+                if(!continuation)throw Error('Current workflow missing from the verified Save receipt');
                 normalizedWorkspace = await prepareWorkspaceSession({metadata:session.metadata,request:bindingRequest,signal:extra.signal,
                   assertAllowed:() => actionRuntime.assertPreparationAllowed(),
                   prepare:async () => {
                     const code = makeWorkspacePrepareCode({loginomUrl:config.loginomUrl,compatibility:pinnedActions.compatibility,
                       sessionId:session.metadata.sessionId,operationId:bindingRequest.operation_id,intent:'open_package',
-                      packagePath:bindingRequest.package_path,bindOpenOnly:true,timeoutMs:5000});
+                      packagePath:bindingRequest.package_path,bindOpenOnly:true,saveOperationId:savedOutcome.operation_id,
+                      workflowRef:{...continuation.workflow_ref,document_id:continuation.document_id},timeoutMs:5000});
                     const state = parseWorkspacePreparation(await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,{timeout:6000}));
                     if(state.status!=='READY'||state.effect_possible!==false||state.document_id!==previous.document_id
                       ||state.loginom_account!==previous.loginom_account||state.package_ref?.path!==bindingRequest.package_path
-                      ||state.workflow_ref.workflow_id!==previous.workflow_ref.workflow_id)
+                      ||!isDeepStrictEqual(state.workflow_ref,continuation.workflow_ref))
                       throw Error('Save succeeded, but its reopened workspace could not be bound');
                     return state;
                   },assertTarget:target=>assertCatalogTarget(pinnedActions,target),record:recordExecution,save:()=>session.save(catalog)});
@@ -843,15 +849,13 @@ export async function createBridge(config, session, { browserTransport: managedB
                 Object.assign(session.metadata,beforeBinding);
                 try { await session.save(catalog); } catch {}
                 normalizedWorkspace = null;
-                const continuation = saveContinuations.find(c => c.document_id === previous?.document_id
-                  && c.workflow_ref.workflow_id === previous?.workflow_ref.workflow_id);
                 workspaceBindingAdvice = {kind:'dock_saved_package_workspace',state:'unbound',package_ref:savedOutcome.output.package_ref,
                   instruction:'Save succeeded. Do not repeat Save. Use dock_prepare existing_workflow to bind the saved workflow before continuing.',
                   next_step:{tool:'dock_prepare',arguments:{intent:'existing_workflow',operation_id:'rest-save-prepare-'+randomUUID(),
                     workflow_ref:{document_id:previous?.document_id,...(continuation?.workflow_ref??previous?.workflow_ref)}}}};
               }
             }
-            if (userProfile && savedOutcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(savedOutcome.action_key))
+            if (userProfile && newlyConfirmed)
               for (const continuation of saveContinuations) userWorkflows.remember(continuation);
             const reply = actionReply(userProfile?compactActionResult(outcome,{
               wireSize:value=>Buffer.byteLength(JSON.stringify(actionReply(value,{userProfile})),'utf8'),

@@ -1480,19 +1480,49 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       seen.add(node);
       if (app.PackageTreeNode && node instanceof app.PackageTreeNode) {
         const path = node.PackageFileName;
-        const diagrams = [app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController?.FDiagram];
-        const pending = [node], seen = new Set();
-        while (pending.length) {
-          const current = pending.pop();
-          if (seen.has(current)) continue;
-          if (seen.size >= 10000) throw Error('Package reference inventory exceeds bound');
-          seen.add(current);
-          diagrams.push(current.FCustomForm?.FDiagram);
-          pending.push(...(current.FSubNodes?.FItems ?? []));
+        const controller=app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
+        let activeDiagram,restReference;
+        try {
+          activeDiagram=controller?.FDiagram;
+          const diagrams=new Set([activeDiagram]);
+          const pending=[node], visited=new Set();
+          while(pending.length){
+            const current=pending.pop();
+            if(visited.has(current))continue;
+            if(visited.size>=10000)throw Error('Package reference inventory exceeds bound');
+            visited.add(current);
+            diagrams.add(current.FCustomForm?.FDiagram);
+            pending.push(...(current.FSubNodes?.FItems??[]));
+          }
+          // LAB-2096: l2096-narrow-native-r/2/probe.jsonl:11,17 and
+          // 3/probe.jsonl:11,12 verify Text Import -> Grouping stays clean after Open.
+          const verifiedGroupingImports=['bg-vendor-icon-importtextfile'];
+          // Cold Open can dirty these observed node types; Save normalizes once.
+          restReference=[...diagrams].some(diagram=>{
+            const nodes=diagram?.FNodes?.FCollection;
+            if(nodes==null)return false;
+            if(!Array.isArray(nodes))return true;
+            if(nodes.some(n=>['bg-vendor-icon-restclientconnection','bg-vendor-icon-linregression','bg-vendor-icon-clusterization','bg-vendor-icon-condition','bg-vendor-icon-datatovariables'].includes(n.FIconCls)))return true;
+            const withoutProvenInput=new Set(nodes.filter(n=>n.FIconCls==='bg-vendor-icon-groupdata'));
+            if(!withoutProvenInput.size)return false;
+            const links=diagram.FLinks?.FCollection;
+            if(!Array.isArray(links))return true;
+            const owners=new Set(nodes);
+            for(const link of links){
+              const source=link?.FSourcePort?.parent,target=link?.FTargetPort?.parent;
+              if(!source||!target||!owners.has(source)||!owners.has(target))return true;
+              if(target.FIconCls==='bg-vendor-icon-groupdata'){
+                if(!verifiedGroupingImports.includes(source.FIconCls))return true;
+                withoutProvenInput.delete(target);
+              }
+            }
+            return withoutProvenInput.size>0;
+          });
+        } catch {
+          // An unreadable cached graph cannot prove that a reopen is unnecessary.
+          restReference=true;
         }
-        // Cold Open can dirty these observed node types; Save normalizes once.
-        const restReference=diagrams.some(d=>d?.FNodes?.FCollection?.some(n=>['bg-vendor-icon-restclientconnection','bg-vendor-icon-groupdata','bg-vendor-icon-linregression','bg-vendor-icon-clusterization','bg-vendor-icon-condition','bg-vendor-icon-datatovariables'].includes(n.FIconCls)));
-        const nativeNodes=diagrams[0]?.FNodes?.FCollection?.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))??null;
+        const nativeNodes=(activeDiagram??controller?.FDiagram)?.FNodes?.FCollection?.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))??null;
         if(restReference&&(!nativeNodes?.length||nativeNodes.some(n=>typeof n[0]!=='string'||!n[0])||new Set(nativeNodes.map(n=>n[0])).size!==nativeNodes.length))throw Error('Saved REST graph native identities unavailable');
         return { path: typeof path === 'string' ? path : null, name: node.PackageName ?? null, read_only: node.ReadOnly === true,
           running: node.HasRunningNodes?.() === true,
@@ -1560,7 +1590,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     }
     return continuations;
   },{binding,saved});
-  const bindSavedContinuations = async (before, previous, mode) => page.evaluate(({previous,current,path,nativeNodes,binding,mode})=>{
+  const bindSavedContinuations = async (before, previous, mode) => page.evaluate(({previous,current,path,nativeNodes,binding,mode,operationId})=>{
       const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
       if(!binding)return [];
       const pending=prep?.savedPackageReopen;
@@ -1621,8 +1651,11 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
           workflow_ref:{...current,workflow_id:prior.workflow_ref.workflow_id,navigation_path:crumbs}});
       }
       delete prep.savedPackageReopen;
+      prep.savedWorkspaceBinding={operationId,path,packageNode,workflowNode,tab:tabs[0],nativeNodes,connection,
+        serverSession:connection.Session,account:connection.UserName};
       return rebound;
-    },{previous,current:workflow,path:before.path,nativeNodes:before.package_identity.native_nodes,binding:task.storage_binding,mode});
+    },{previous,current:workflow,path:before.path,nativeNodes:before.package_identity.native_nodes,binding:task.storage_binding,mode,
+      operationId:task.operation_id});
 
   const refreshSavedNavigation = async current => {
     const crumbs=current.workflow_ref.navigation_path, binding=current.workflow_ref;

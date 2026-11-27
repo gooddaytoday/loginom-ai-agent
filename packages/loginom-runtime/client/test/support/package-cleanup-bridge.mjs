@@ -12,7 +12,7 @@ import * as workspace from '../../lib/workspace.mjs';
 import {serverDownloadTools} from '../../lib/storage-policy.mjs';
 import {createBundledSkillFixture} from './bundled-skill-fixture.mjs';
 import {createActionCatalogFixture} from './action-catalog-fixture.mjs';
-import {Page,runtime} from './executor-fixture.mjs';
+import {Page,runtime,restSavePage} from './executor-fixture.mjs';
 import {closeManagedResources} from '../../../src/managed-resources-close.mjs';
 import {createServer} from 'node:http';
 import {chromium} from 'playwright-core';
@@ -66,8 +66,11 @@ class ExternalClient {
         if(o.bindOpenOnly&&this.f.bindingError)throw Error('Binding response lost');
         this.f.events.push('prepare:'+o.intent+(o.bindOpenOnly?':bind':''));
         if(o.bindOpenOnly)this.f.bindBudget={timeoutMs:o.timeoutMs,timeout:options?.timeout};
+        const savedWorkflows=this.f.receipts.get(o.saveOperationId??'own-save')?.trace?.find(e=>e.event==='save_continuations_observed')?.continuations;
+        const savedWorkflow=o.bindOpenOnly&&savedWorkflows?.find(c=>c.workflow_ref.workflow_id===(o.workflowRef?.workflow_id
+          ?? savedWorkflows[0].workflow_ref.workflow_id));
         value={...value,operation_id:o.operationId,created_draft:false,ownership_verified:false,effect_possible:false,
-          workflow_ref:{...value.workflow_ref,tab_tid:this.f.activeTab,prefix:'MF;TF-5'},package_ref:{path:o.packagePath,persisted:true},
+          workflow_ref:savedWorkflow?.workflow_ref??{...value.workflow_ref,tab_tid:this.f.activeTab,prefix:'MF;TF-5'},package_ref:{path:o.packagePath,persisted:true},
           ...(o.bindOpenOnly?this.f.rebind:{})};
       }
       if(this.f.drafts){
@@ -151,6 +154,7 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
       }})});
     return f.runtime;
   }
+  if(f.realPackageSave) return runtime(f.realPackageSave,{getStorageBinding:()=>f.realPackageSave.storageBinding});
   return {tools:f.storageReturn?[...executor.executorTools,...serverDownloadTools]:executor.executorTools,
     serverDownload:async(_args,_name,{onWorkflowReturn})=>{onWorkflowReturn?.(f.storageReturn);return f.storageReceipt;},
     describe:()=>({available_node_types:[],actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},hasUnsettledWork:()=>f.unsettled || (f.scenario==='product-gate-unsettled' && ++f.workChecks>1),async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
@@ -174,6 +178,7 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
         const continuations=[{document_id:'own-doc',workflow_ref:{workflow_id:'own-workflow',tab_tid:f.activeTab,prefix:'MF;TF-5',
           navigation_path:['Server','Packages','Saved','Module','Workflow'].map((label,index,labels)=>({
             tid:'MF;TF-5;cnrNaviMode;b.s_'+labels.slice(0,index+1).join('>'),label:index===0?'':label}))}}];
+        if(f.duplicateWorkflow)continuations.unshift({...continuations[0],workflow_ref:{...continuations[0].workflow_ref,workflow_id:'older-workflow'}});
         result.trace=[...(f.normalized?[{event:'rest_package_normalization',modified_after:false}]:[]),
           {event:'save_continuations_observed',continuations,...(f.recovered?{recovered_reopen:true}:{reopened:true}),native_identity_verified:true}];
         if(key==='package.save_checkpoint')result.output.workflow_continuations=continuations;
@@ -186,6 +191,66 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
   };
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
+
+for(const [scenario,inputs,expectedReopen] of [
+ ['importtextfile',['importtextfile'],false],
+ ['sorting',['sorting'],true],
+ ['uniondata',['uniondata'],true],
+ ['calcdata',['calcdata'],true],
+ ['filterdata',['filterdata'],true],
+ ['joindata',['joindata'],true],
+ ['mixed',['importtextfile','calcdata'],true],
+ ['unknown',['unknown'],true],
+ ['foreign',['importtextfile'],true],
+ ['non-array',['importtextfile'],true],
+ ['read-error',['importtextfile'],true],
+ ['second-group-without-input',['importtextfile'],true],
+])test('public checkpoint Save follows the input of Grouping: '+scenario,async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'grouping-save-'));
+ const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+ const page=await restSavePage(expectedReopen?[true,false]:[false],false);
+ const diagram=page.model.FDiagram;
+ const [group,second,source]=diagram.FNodes.FCollection;
+ group.FIconCls='bg-vendor-icon-groupdata';
+ const sources=[source,second];
+ const links=inputs.map((name,index)=>{
+  const node=sources[index];
+  node.FIconCls='bg-vendor-icon-'+name;
+  return {FSourcePort:{parent:scenario==='foreign'?{...node}:node},FTargetPort:{parent:group}};
+ });
+ diagram.FLinks={FCollection:scenario==='non-array'?{}:links};
+ if(scenario==='read-error')Object.defineProperty(diagram,'FLinks',{get(){throw Error('Cannot read native links');}});
+ if(scenario==='second-group-without-input')second.FIconCls='bg-vendor-icon-groupdata';
+ page.edges=['Источник|Output_Data-0|Приёмник|Input_Data-0'];
+ if(inputs.length>1){
+  page.addNode('Второй источник',104,208,['Output_Data-0']);
+  page.edges.push('Второй источник|Output_Data-0|Приёмник|Input_Data-0');
+ }
+ const path='/user/data/packages/grouping.lgp';
+ current={scenario:'grouping-save',events:[],catalog,path,realPackageSave:page};
+ const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+  metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+  artifactStore:{list:()=>[],async releaseUploads(){}}};
+ const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,
+  actionManifestSha256:catalog.manifestSha256,mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',
+  stateDir:directory,loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2'},session);
+ const client=new AgentClient({name:'grouping-save',version:'1'});
+ try{
+  const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+  const prepared=await client.callTool({name:'dock_prepare',arguments:{}});
+  assert.notEqual(prepared.isError,true,JSON.stringify(prepared));
+  const response=await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',
+    parameters:{path,conflict_policy:'replace'},operation_id:'save-grouping'}});
+  assert.notEqual(response.isError,true,JSON.stringify(response));
+  const saved=JSON.parse(response.content[0].text);
+  assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved.error));
+  assert.equal(saved.output.reopened,expectedReopen);
+  assert.equal(saved.output.workflow_preserved,!expectedReopen);
+  assert.equal(page.events.includes('package_closed'),expectedReopen);
+  assert.equal(page.events.includes('package_reopened'),expectedReopen);
+  assert.equal(page.saveWrites,expectedReopen?2:1);
+ }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+});
 
 // External Loginom fixture only: a synchronous first menu fetch stalls the real
 // renderer just like lazy menu loading. The bridge serializes production cleanup
@@ -654,12 +719,12 @@ for(const mode of ['isolated','product','normal'])for(const scenario of mode==='
   }finally{try{await client?.close();await bridge?.close();}finally{await rm(directory,{recursive:true,force:true});}}
 });
 
-for(const profile of ['executor','user-v1'])for(const action of ['package.save_checkpoint','package.save_as'])for(const fault of ['none','transport','identity'])for(const normalized of [true,false])
+for(const profile of ['executor','user-v1'])for(const action of ['package.save_checkpoint','package.save_as'])for(const fault of ['none','duplicate','transport','identity'])for(const normalized of [true,false])
 test('verified reopened Save keeps its successful receipt when workspace binding fails: '+profile+' '+action+' '+fault+' '+normalized,async t=>{
  const directory=await mkdtemp(join(tmpdir(),'normalized-save-bind-'));
  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
  const f=current={scenario:'normalized',events:[],saves:0,path,receipts:new Map(),catalog,normalized,verifiedReopen:true,
-  bindingError:fault==='transport',rebind:fault==='identity'?{workflow_ref:{workflow_id:'foreign-workflow'}}:{}};
+  duplicateWorkflow:fault==='duplicate',bindingError:fault==='transport',rebind:fault==='identity'?{workflow_ref:{workflow_id:'foreign-workflow'}}:{}};
  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
   metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:{list:()=>[],async releaseUploads(){}}};
  const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
@@ -669,15 +734,22 @@ test('verified reopened Save keeps its successful receipt when workspace binding
  try{
   const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
   await client.callTool({name:'dock_prepare',arguments:{}});
-  const reply=await client.callTool({name:'dock_action_run',arguments:{action_key:action,parameters:{path},operation_id:'own-save'}});
+  const saveCall={name:'dock_action_run',arguments:{action_key:action,parameters:{path},operation_id:'own-save'}};
+  const reply=await client.callTool(saveCall);
   assert.notEqual(reply.isError,true,JSON.stringify(reply));
   const parts=reply.content.filter(c=>c.type==='text'&&c.text.startsWith('{')).map(c=>JSON.parse(c.text));
   assert.equal(parts[0].status,'SUCCEEDED');assert.equal(parts[0].operation_id,'own-save');assert.equal(f.saves,1);
   const advice=parts.find(p=>p.kind==='dock_saved_package_workspace');assert.ok(advice);
-  if(fault==='none'){
+  if(fault==='none'||fault==='duplicate'){
+   assert.notEqual(advice.state,'unbound','Save must bind the current workflow without another dock_prepare');
    assert.equal(advice.workflow_ref.workflow_id,'own-workflow');
    assert.equal(session.metadata.workflowRef.tab_tid,f.activeTab);
    assert.equal(session.metadata.workspacePreparation.state.workflow_ref.tab_tid,f.activeTab);
+   if(fault==='duplicate'){
+    const replay=await client.callTool(saveCall);
+    assert.equal(JSON.parse(replay.content[0].text).status,'SUCCEEDED');
+    assert.equal(f.bindAttempts,1,'replaying Save must not rebind a stale workspace');
+   }
   }
   else{
    assert.equal(advice.state,'unbound');assert.match(advice.instruction,/do not repeat.*Save/i);
