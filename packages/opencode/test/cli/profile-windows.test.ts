@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { protectWindowsProfile, removeAbandonedBrowserDirectories } from "../../src/cli/profile-windows"
@@ -61,7 +61,7 @@ test.skipIf(process.platform !== "win32")(
       )
       expect(refused?.message).toBe("PROFILE_PERMISSIONS_INVALID")
       expect(notices).toHaveLength(1)
-      expect(notices[0]).toStartWith(`PROFILE_PERMISSIONS_INVALID: ${root}: ACE S-1-1-0 Allow, rights 0x`)
+      expect(notices[0]).toStartWith(`PROFILE_PERMISSIONS_INVALID: ${await realpath(root)}: ACE S-1-1-0 Allow, rights 0x`)
       expect(notices[0]).toMatch(
         /rights 0x[0-9A-F]{8} \([^)]+\), inheritance ContainerInherit, ObjectInherit, propagation None, inherited False$/,
       )
@@ -148,10 +148,11 @@ test.skipIf(process.platform !== "win32")(
       // Chromium's own grant (LAB-2078 readback): Modify, Synchronize on the
       // directory plus an inherit-only entry with these generic rights.
       await icacls(join(root, httpCache), capability + "(OI)(CI)(GR,GW,GE,D)")
-      // The generic-bit mapping must be exercised: same raw entries as on Windows.
+      // Generic bits must reach the check: same raw entries as on Windows.
       const chromium = await aces(join(root, httpCache))
       // icacls adds Synchronize (0xE0110000); Chromium writes 0xE0010000
-      // (-536805376). Both carry GENERIC_READ|WRITE|EXECUTE bits to map.
+      // (-536805376). GENERIC_READ|WRITE|EXECUTE stay within Modify,
+      // Synchronize and are accepted; only GENERIC_ALL is refused.
       expect(chromium).toContain("-535756800 InheritOnly")
       expect(chromium).toContain("1245631 None")
       await writeFile(join(root, network, "Cookies"), "test")
@@ -283,6 +284,49 @@ test.skipIf(process.platform !== "win32")(
       await expect(lstat(abandoned)).rejects.toThrow()
       expect((await lstat(taken.paths.tmp)).isDirectory()).toBe(true)
       await expect(normal.release()).rejects.toThrow("PROFILE_OWNER_CHANGED")
+      await taken.release()
+    } finally {
+      await rm(temporary, { recursive: true, force: true })
+    }
+  },
+  60000,
+)
+
+test.skipIf(process.platform !== "win32")(
+  "native takeover survives a failed cleanup, and an unreadable entry is refused with its reason",
+  async () => {
+    const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
+    if (!systemRoot) throw Error("SystemRoot required")
+    const run = async (tool: string, ...args: string[]) => {
+      const child = Bun.spawn([join(systemRoot, "System32", tool), ...args], { stdout: "ignore", stderr: "ignore" })
+      expect(await child.exited).toBe(0)
+    }
+    const temporary = await mkdtemp(join(tmpdir(), "loginom-refusal-test-"))
+    try {
+      const first = await acquireProfile(join(temporary, "profile"), "dev")
+      // A read-only file makes the cleanup fail; the takeover still succeeds.
+      const stuck = join(first.paths.tmp, "lbR3adOn")
+      await mkdir(stuck)
+      await writeFile(join(stuck, "locked"), "test")
+      await run("attrib.exe", "+R", join(stuck, "locked"))
+      const taken = await acquireProfile(join(temporary, "profile"), "dev", {
+        probe: { owner: async () => "dead", survivors: async () => [] },
+      })
+      expect(await readFile(join(stuck, "locked"), "utf8")).toBe("test")
+      await run("attrib.exe", "-R", join(stuck, "locked"))
+      // A directory the check cannot list is refused with its path and the error.
+      const unreadable = join(taken.paths.data, "unreadable")
+      await mkdir(unreadable)
+      await run("icacls.exe", unreadable, "/deny", "*S-1-1-0:(RD)")
+      const notices: string[] = []
+      await expect(protectWindowsProfile(taken.paths.root, (text) => notices.push(text))).rejects.toThrow(
+        "PROFILE_PERMISSIONS_INVALID",
+      )
+      await run("icacls.exe", unreadable, "/remove:d", "*S-1-1-0")
+      const prefix = `PROFILE_PERMISSIONS_INVALID: ${unreadable}: `
+      expect(notices).toHaveLength(1)
+      expect(notices[0]).toStartWith(prefix)
+      expect(notices[0].length).toBeGreaterThan(prefix.length)
       await taken.release()
     } finally {
       await rm(temporary, { recursive: true, force: true })

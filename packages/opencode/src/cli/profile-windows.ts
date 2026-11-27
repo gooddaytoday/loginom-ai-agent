@@ -13,18 +13,18 @@ export async function protectWindowsProfile(root: string, notice?: (text: string
     throw Error("PROFILE_PERMISSIONS_INVALID")
   const script = `
 $ErrorActionPreference = 'Stop'
+function Reject($at, $reason) {
+  [Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes(('{0}: {1}' -f $at, $reason))))
+  exit 1
+}
+function Format-Ace($access) {
+  'ACE {0} {1}, rights 0x{2:X8} ({3}), inheritance {4}, propagation {5}, inherited {6}' -f $access.IdentityReference.Value,
+    $access.AccessControlType, [int]$access.FileSystemRights, $access.FileSystemRights, $access.InheritanceFlags,
+    $access.PropagationFlags, $access.IsInherited
+}
 try {
   $path = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String([Console]::In.ReadToEnd()))
   $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
-  function Reject($at, $reason) {
-    [Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes(('{0}: {1}' -f $at, $reason))))
-    exit 1
-  }
-  function Format-Ace($access) {
-    'ACE {0} {1}, rights 0x{2:X8} ({3}), inheritance {4}, propagation {5}, inherited {6}' -f $access.IdentityReference.Value,
-      $access.AccessControlType, [int]$access.FileSystemRights, $access.FileSystemRights, $access.InheritanceFlags,
-      $access.PropagationFlags, $access.IsInherited
-  }
   $item = Get-Item -LiteralPath $path -Force
   if (!$item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { Reject $path 'not a directory, or a reparse point' }
   $acl = Get-Acl -LiteralPath $path
@@ -76,18 +76,14 @@ try {
         # to cache/network directories. Accept that narrow SID class only
         # inside browser-profile or the Chromium caches above. Chromium asks for
         # GENERIC_READ|WRITE|EXECUTE|DELETE: Windows stores Modify, Synchronize
-        # plus an inherit-only entry with the generic bits. Map generic bits
-        # through the file mapping and allow nothing beyond Modify, Synchronize:
-        # no ChangePermissions, TakeOwnership, DeleteSubdirectoriesAndFiles.
+        # plus an inherit-only entry with the generic bits. GENERIC_READ, WRITE
+        # and EXECUTE map into Modify, Synchronize; GENERIC_ALL maps to
+        # FullControl. Allow nothing beyond Modify, Synchronize: no
+        # GENERIC_ALL, ChangePermissions, TakeOwnership, DeleteSubdirectoriesAndFiles.
         $rights = [int]$access.FileSystemRights
-        $mapped = $rights -band 0x0FFFFFFF
-        if ($rights -band [int]::MinValue) { $mapped = $mapped -bor 0x120089 }
-        if ($rights -band 0x40000000) { $mapped = $mapped -bor 0x120116 }
-        if ($rights -band 0x20000000) { $mapped = $mapped -bor 0x1200A0 }
-        if ($rights -band 0x10000000) { $mapped = $mapped -bor 0x1F01FF }
         $browserCapability = ($chromiumCache -or (@($entry.FullName.Split([IO.Path]::DirectorySeparatorChar)) -contains 'browser-profile')) -and
           $access.IdentityReference.Value -match '^S-1-15-3-1024-(?:[0-9]+-){7}[0-9]+$' -and
-          ($mapped -band -bnot 0x1301BF) -eq 0
+          !($rights -band 0x10000000) -and (($rights -band 0x0FFFFFFF) -band -bnot 0x1301BF) -eq 0
         if (!$browserCapability) { Reject $entry.FullName (Format-Ace $access) }
       }
       if ($access.IdentityReference.Value -eq $sid.Value -and ($access.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -eq [Security.AccessControl.FileSystemRights]::FullControl) { $userFull = $true }
@@ -98,7 +94,12 @@ try {
     }
   }
   [Console]::Out.Write('OK')
-} catch { exit 1 }
+} catch {
+  # An unreadable entry (for example access denied) is refused with its reason.
+  $at = $path
+  if ($entry) { $at = $entry.FullName }
+  Reject $at $_.Exception.Message
+}
 `
   await runPowerShell(systemRoot, script, root, "PROFILE_PERMISSIONS_INVALID", notice)
 }
@@ -163,8 +164,16 @@ function runPowerShell(
       (error, stdout) => {
         if (error || stdout !== "OK") {
           // A refusal reason arrives as base64 UTF-16, unaffected by the console code page.
-          if (notice && /^[A-Za-z0-9+/]+=*$/.test(stdout))
-            notice(`${code}: ${Buffer.from(stdout, "base64").toString("utf16le")}`)
+          if (notice)
+            notice(
+              `${code}: ${
+                /^[A-Za-z0-9+/]+=*$/.test(stdout)
+                  ? Buffer.from(stdout, "base64").toString("utf16le")
+                  : error?.killed
+                    ? "the Windows permission check did not finish within 30 s"
+                    : "the Windows permission check failed without a reason"
+              }`,
+            )
           return reject(Error(code))
         }
         resolve()
