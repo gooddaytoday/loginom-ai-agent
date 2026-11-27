@@ -615,3 +615,32 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .hub-service{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;line-height:1.2;padding:2px 7px;border-radius:5px;border:1px solid var(--amber);color:var(--amber);background:var(--amber-soft)}
 .change-legend{flex-wrap:wrap;gap:4px 14px}.change-legend span{white-space:nowrap}
 .model-menu .badge{margin-left:6px;padding:1px 6px;font-size:11px;vertical-align:1px}
+
+/* Iteration 10 — node output and run receipts. */
+.turn-steps .receipt-step{padding:0 6px 8px 34px}
+.receipt-output,.receipt-inline{min-width:0;width:100%}
+.output-count{min-height:28px;font-variant-numeric:tabular-nums}
+.receipt-source,.output-tally,.answer-files{color:var(--muted);font-size:13px;line-height:1.45}
+.receipt-source strong,.answer-files strong{font-weight:600}
+.receipt-inline{display:grid;justify-items:start;gap:8px;margin-top:7px}
+.receipt-table{max-width:100%;width:100%;max-height:270px;overflow:auto;background:var(--paper);border:1px solid var(--line);border-radius:7px}
+.receipt-table table{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px;font-variant-numeric:tabular-nums}
+.receipt-table th,.receipt-table td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.receipt-table th{position:sticky;top:0;background:var(--sidebar);z-index:1}
+.receipt-table tr:last-child td{border-bottom:0}
+.receipt-inline .receipt-table th,.receipt-inline .receipt-table td,.output-dialog .receipt-table th,.output-dialog .receipt-table td{white-space:nowrap}
+.output-dialog.app-dialog{width:min(730px,calc(100% - 27px))}
+.output-dialog .receipt-table{max-height:min(55dvh,410px)}
+.output-dialog .node-facts{margin-bottom:0}
+.receipt-tabs{margin-bottom:12px;flex-wrap:wrap}
+.receipt-summary{display:grid;gap:9px;margin-top:10px}
+.run-verification{display:grid;gap:9px;padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:var(--paper);font-size:14px}
+.run-verification h3{font-size:16px;color:var(--success)}
+.run-verification ul{margin:0;padding-left:18px}
+.export-card{background:var(--paper)}
+.graph-details,.graph-node-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:9px 14px}
+.graph-details{border-bottom:1px solid var(--line);color:var(--muted)}
+.graph-row-count{fill:var(--ink);stroke:var(--paper);stroke-width:3px;paint-order:stroke;stroke-linejoin:round;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none}
+.package-variables{border-top:1px solid var(--line);padding:10px 14px}
+.package-variables summary{font-weight:600;cursor:pointer}
+.package-variables .receipt-table{margin-top:9px}
