@@ -92,8 +92,15 @@ export async function acquire(session: string) {
     get generation() {
       return queue.generation
     },
-    async admit(userMessage: string, files: InputFile[]) {
-      return queued(() => connection.request("admit", { run, userMessage, files }, undefined, observe))
+    async uploadTarget() {
+      return queued(async () =>
+        Schema.decodeUnknownSync(Schema.Struct({ generation: Schema.Number, training: Schema.Boolean }))(
+          await connection.request("uploadTarget", { run }, undefined, observe),
+        ),
+      )
+    },
+    async admit(userMessage: string, files: InputFile[], uploadConsent?: number) {
+      return queued(() => connection.request("admit", { run, userMessage, files, uploadConsent }, undefined, observe))
     },
     // Private backend API: never advertise grants or OS paths as MCP arguments.
     async reserveReference(userMessage: string, name: string, snapshot: ReferenceSnapshot): Promise<FileReference> {
@@ -107,8 +114,8 @@ export async function acquire(session: string) {
         return value as FileReference
       })
     },
-    async admitReference(reference: FileReference) {
-      return queued(() => connection.request("referenceAdmit", { run, reference }, undefined, observe))
+    async admitReference(reference: FileReference, uploadConsent?: number) {
+      return queued(() => connection.request("referenceAdmit", { run, reference, uploadConsent }, undefined, observe))
     },
     async discardReference(grant: string) {
       return queued(() => connection.request("referenceDiscard", { run, grant }, undefined, observe))
@@ -133,6 +140,7 @@ export async function acquire(session: string) {
       packageInput?: { admissionID: string; file: InputFile },
       scanReceipt?: { profile_id: string; records: number; sha256: string; bytes: number; identity: unknown; basis: "backend_exact_scan" },
       progress?: (value: StepProgress) => void,
+      uploadConsent?: number,
     ) {
       // Serialize before transport admission so waiting does not consume the IPC timeout
       // or create durable recovery records for calls that have not started.
@@ -145,7 +153,7 @@ export async function acquire(session: string) {
           signal?.addEventListener("abort", abort, { once: true })
           return await connection.request(
             "call",
-            { run, name, args, userMessage, admissions, ...(packageInput ? { packageInput } : {}), ...(scanReceipt ? { scanReceipt } : {}), ...(progress ? { stepProgress: true } : {}) },
+            { run, name, args, userMessage, admissions, uploadConsent, ...(packageInput ? { packageInput } : {}), ...(scanReceipt ? { scanReceipt } : {}), ...(progress ? { stepProgress: true } : {}) },
             Math.max(180_000, runtimeCallTimeout(name, args) + 30_000),
             observe,
             progress && ((value) => {

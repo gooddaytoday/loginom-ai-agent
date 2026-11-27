@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import { constants } from "node:fs"
 import { link, lstat, mkdir, open, readdir, rename, rm } from "node:fs/promises"
 import { dirname, join } from "node:path"
+import { isTrainingServer } from "@loginom-ai-agent/product"
 import { Option, Schema } from "effect"
 import { credentials, type CredentialCodec } from "./credentials"
 
@@ -127,7 +128,7 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
     function foreign(record: ConnectionRecord | undefined) {
       if (!record) return false
       if (!URL.canParse(record.url)) throw new Error("LOGINOM_STORE_INVALID")
-      return new URL(record.url).hostname !== "app.loginom.ai"
+      return !isTrainingServer(record.url)
     }
     if (migration || foreign(await read(active)) || foreign(await read(pending))) {
       // Persist the intent first: an interrupted reset must finish removing

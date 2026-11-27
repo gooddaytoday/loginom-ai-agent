@@ -78,3 +78,52 @@ export function loginomResultState(result: {
   })
   return states.includes("failed") ? "failed" : states.includes("pending") ? "pending" : "completed"
 }
+
+const uploadProof = Schema.Struct({
+  status: Schema.Literal("SUCCEEDED"),
+  upload_operation_id: Schema.NonEmptyString,
+  destination: Schema.NonEmptyString,
+  upload_completion_verified: Schema.Literal(true),
+  cleanup_complete: Schema.Literal(true),
+  bytes_source: Schema.optional(Schema.String),
+  reused: Schema.optional(Schema.Boolean),
+})
+const packageUpload = Schema.decodeUnknownOption(Schema.Struct({ local_package_upload: uploadProof }))
+const artifactUpload = Schema.decodeUnknownOption(
+  Schema.Struct({ state: Schema.Literal("settled"), status: Schema.Literal("SUCCEEDED"), output: uploadProof }),
+)
+const deliveryTools = new Set([
+  "dock_artifact_deliver",
+  "dock_artifact_delivery_status",
+  "dock_artifact_delivery_resume",
+  "dock_artifact_delivery_cancel",
+])
+
+export function verifiedUpload(
+  tool: string,
+  result: { structuredContent?: unknown; content: readonly Record<string, unknown>[] },
+) {
+  const first = result.content[0]
+  const isPackage = tool === "dock_prepare"
+  const proof = isPackage
+    ? Option.getOrUndefined(packageUpload(Option.getOrUndefined(fromJSON(first?.text))))?.local_package_upload
+    : deliveryTools.has(tool)
+      ? Option.getOrUndefined(artifactUpload(result.structuredContent))?.output
+      : undefined
+  if (!proof || proof.reused) return
+  const slash = proof.destination.lastIndexOf("/")
+  if (!proof.destination.startsWith("/") || slash === proof.destination.length - 1) return
+  const serverName = proof.destination.slice(slash + 1)
+  // Byte admissions add the Host's opaque input identity to the server filename. Original references keep their name.
+  const name = isPackage || proof.bytes_source !== "native_file_store"
+    ? serverName.replace(/^[a-f0-9]{64}-\d+-/, "")
+    : serverName
+  return {
+    v: 1,
+    kind: "upload",
+    state: "settled",
+    status: "SUCCEEDED",
+    operationId: proof.upload_operation_id,
+    upload: { name, folder: proof.destination.slice(0, slash) || "/", destination: proof.destination },
+  }
+}

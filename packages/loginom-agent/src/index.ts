@@ -351,6 +351,7 @@ export default Plugin.define({
     const dock = await dockTools({
       plugin: ctx,
       files,
+      uploadConsent: files.uploadConsent,
       profiles,
       lease: hold,
       // Before the Host's handshake every lease, even one already asked for, would wait for it.

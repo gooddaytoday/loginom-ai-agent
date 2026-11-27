@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
-import { Product, productChannel, productName, productSlug } from "../src/index"
+import { isTrainingServer, Product, productChannel, productName, productSlug } from "../src/index"
 import release from "../loginom-release.json"
 
 test("first-run Loginom defaults use the public service address and no knowledge service is pinned", () => {
@@ -19,6 +19,13 @@ test("release channels cannot share application storage identity", () => {
   expect(new Set(channels.map(productName)).size).toBe(3)
   expect(productChannel("upstream")).toBe("dev")
   expect(productChannel(undefined)).toBe("dev")
+})
+
+test("training-server recognition uses the connection hostname", () => {
+  expect(isTrainingServer("https://APP.LOGINOM.AI/app/?lang=ru")).toBe(true)
+  expect(isTrainingServer("https://app.loginom.ai./app/")).toBe(true)
+  expect(isTrainingServer("https://app.loginom.ai.example.test/")).toBe(false)
+  expect(isTrainingServer("https://example.test/app.loginom.ai")).toBe(false)
 })
 
 test("identity cannot be changed after startup and has no update fallback", () => {

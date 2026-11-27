@@ -2,9 +2,43 @@
 // summary half of `loginom-truncation.test.ts`: OpenCode 2 truncates outside the plugin, so the truncation service is
 // not part of this case (the Dock tool's own truncation is covered in `packages/server/test/loginom-dock-catalog.test.ts`).
 import { expect, test } from "bun:test"
-import { loginomResultState, loginomResultSummary } from "../src/loginom-result"
+import { loginomResultState, loginomResultSummary, verifiedUpload } from "../src/loginom-result"
 
 const reply = (value: unknown) => ({ content: [{ type: "text", text: JSON.stringify(value) }] })
+
+test("the feed gets the verified destination and display name from the upload receipt", () => {
+  const destination = `/user/data/${"a".repeat(64)}-0-sales.csv`
+  const proof = {
+    status: "SUCCEEDED",
+    upload_operation_id: "delivery:upload",
+    destination,
+    upload_completion_verified: true,
+    cleanup_complete: true,
+  }
+  const delivery = {
+    content: [],
+    structuredContent: { state: "settled", status: "SUCCEEDED", output: proof },
+  }
+  expect(verifiedUpload("dock_artifact_delivery_status", delivery)).toEqual({
+    v: 1,
+    kind: "upload",
+    state: "settled",
+    status: "SUCCEEDED",
+    operationId: "delivery:upload",
+    upload: { name: "sales.csv", folder: "/user/data", destination },
+  })
+  expect(verifiedUpload("dock_prepare", reply({
+    local_package_upload: { ...proof, destination: "/user/Demo.lgp" },
+  }))?.upload).toEqual({ name: "Demo.lgp", folder: "/user", destination: "/user/Demo.lgp" })
+  for (const structuredContent of [
+    { state: "running", status: "SUCCEEDED", output: proof },
+    { state: "settled", status: "SUCCEEDED", output: { ...proof, upload_completion_verified: false } },
+    { state: "settled", status: "SUCCEEDED", output: { ...proof, cleanup_complete: false } },
+    { state: "settled", status: "SUCCEEDED", output: { ...proof, reused: true } },
+    { state: "settled", status: "SUCCEEDED", output: { destination } },
+  ])
+    expect(verifiedUpload("dock_artifact_deliver", { content: [], structuredContent })).toBeUndefined()
+})
 
 test("control summaries use only top-level receipts and preserve text-only delivery", () => {
   const value = { operation_id: "op", status: "FAILED", error: { code: "FAILED", message: "Причина" } }
