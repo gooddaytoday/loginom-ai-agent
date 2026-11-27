@@ -73,7 +73,7 @@ export function userNodeTool(tool) {
   // still expose explicit immutable budgets.
   delete copy.inputSchema.properties.budgets;
   copy.inputSchema.properties.parameters={type:'object',properties:{},additionalProperties:true,
-    description:'Follow parameter_schema and guidance for this type and mode from dock_action_describe or the card included in NODE_TYPE_NOT_DESCRIBED.'};
+    description:'Read dock_action_describe with node_types:[target.type], modes:[mode] unless NODE_TYPE_NOT_DESCRIBED returned the card. Follow parameter_schema and guidance.'};
   copy.inputSchema.properties.mode={type:'string',minLength:1,maxLength:128,
     description:'Select a mode from the node card. Use add_only on an explicit request to add an unconnected node: new target, done, empty parameters, inputs, mappings and reads.'};
   // The full runtime schema and handler still validate type-specific modes,

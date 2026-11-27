@@ -164,8 +164,9 @@ patch по схеме его типа. Дождись подтверждённо
 их композиции. Перед выбором JavaScript проверь, можно ли выразить каждый
 требуемый шаг доступными стандартными узлами и режимами.
 
-После `loginom_dock_prepare` получи карточку типа и нужного `modes` через `dock_action_describe` до Apply.
-Если `NODE_TYPE_NOT_DESCRIBED` уже вернул карточку, прочитай её `guidance` и `parameter_schema` и следуй `next_step` без отдельного Describe. [Разметка правил](references/nodes/README.md).
+Перед `dock_node_apply` вызови `dock_action_describe` с типом узла и нужными `modes`: правила узла — в `guidance` карточки, параметры — в `parameter_schema`; [разметка правил](references/nodes/README.md).
+После каждого `loginom_dock_prepare` (и `open_package`) карточки сброшены: снова `dock_action_describe` с типом и `modes` перед apply.
+Если отказ `NODE_TYPE_NOT_DESCRIBED` уже вернул карточку, прочитай её и следуй `next_step` без отдельного Describe.
 Для вычисляемой формулы или разбора произвольного текста выбирай Калькулятор;
 для словаря соответствий с другим типом результата — Замену.
 На просьбу о неподдерживаемом режиме явно сообщи: «Этот режим пока не поддерживается».
