@@ -6,6 +6,7 @@ import {inspectPythonSourcePolicy as inspectPolicy,pythonCodeSkeleton} from '../
 import {execFileSync} from 'node:child_process';
 import {validatePythonParameters} from '../lib/python-parameters.mjs';
 import {configurePython} from '../lib/python-procedure.mjs';
+import {createPythonNodeSupport} from '../lib/python-node.mjs';
 import {pythonConfigurationReadback} from '../lib/python-readback.mjs';
 import {readPythonOutputs} from '../lib/python-output.mjs';
 import {makePythonColumnsCode,configurePythonColumnsPage} from '../lib/python-columns.mjs';
@@ -21,6 +22,47 @@ const corpus=new Set();
 const inspectPythonSourcePolicy=source=>{corpus.add(source);return inspectPolicy(source);};
 const sha=text=>createHash('sha256').update(text,'utf8').digest('hex');
 const request=(kind='new',extra={})=>({target:{kind,type:'programming.python'},inputs:[{input:0}],mappings:[],read:{ports:[0]},finish:'execute',...extra});
+
+for(const [kind,input] of [
+ ['new','unconnected'],['existing','unconnected'],['existing','connected'],['existing','unknown'],
+ ['new','requested'],['existing','incomplete'],['existing','locked'],['existing','foreign-document'],
+ ['existing','foreign-workflow'],['existing','foreign-node'],
+])
+test('Python input mapping respects the live graph: '+kind+' '+input,async()=>{
+ const node={document_id:'doc',workflow_id:'workflow',node_id:'python'};
+ const workflow_ref={workflow_id:'workflow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',
+  navigation_path:[{tid:'path',label:'Scenario'}]};
+ const graph={complete:true,document_id:'doc',workflow_ref,nodes:[{ref:node,type:'programming.python',inputs:[0],locked:false}],
+  links:[{source:'python',target:'downstream',output:0,input:0}],foreign_links:[]};
+ if(input==='connected')graph.links.push({source:'upstream',target:'python',output:0,input:0});
+ if(input==='unknown')graph.foreign_links.push('unclassified-link');
+ if(input==='incomplete')graph.complete=false;
+ if(input==='locked')graph.nodes[0].locked=true;
+ if(input==='foreign-document')graph.document_id='other-doc';
+ if(input==='foreign-workflow')graph.workflow_ref={...workflow_ref,workflow_id:'other-workflow'};
+ if(input==='foreign-node')graph.nodes[0].ref={...node,node_id:'other-node'};
+ let graphReads=0;
+ const inputs=input==='requested'?[{input:0}]:[];
+ const operation={id:'apply',nodeApply:{node,request:request(kind,{document_id:'doc',workflow_ref,inputs,finish:'done'})},
+  nodeTargetAdapter:{observe:async identity=>{
+   graphReads++;
+   assert.deepEqual(identity,{document_id:'doc',workflow_ref});
+   return graph;
+  }}};
+ const {nodeApplyDriverFactory}=createPythonNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2'});
+ const drivers=nodeApplyDriverFactory({operation,now:Date.now,onRecord:async event=>event,
+  execute:async()=>assert.fail('Browser procedure reached')});
+ const mapInput=()=>drivers.mapPorts([],{document_id:'doc',workflow_ref,node,deadline:Date.now()+1000,receipt_id:'apply:input_mapping'});
+ if(input!=='unconnected'){
+  await assert.rejects(mapInput,/Browser procedure reached/);
+  assert.equal(graphReads,input==='requested'?0:1);
+  return;
+ }
+ const result=await mapInput();
+ assert.equal(result.not_applicable,true);
+ assert.equal(result.verified,true);
+ assert.equal(result.effect_possible,false);
+});
 const declared=[['Id','integer'],['Amount','real'],['AmountScaled','real'],['Text','string'],['Flag','boolean'],['Date','datetime']].map(([name,type])=>({name,label:name,type}));
 
 test('acceptance sources pass python-module-v1 with the file digest',()=>{
@@ -250,14 +292,21 @@ test('f-string literal text, escaped braces and nested specs stay admitted; only
 // Fake columns page: Add → EditColumnDefForm → type picker → Apply. After each
 // Apply, `cover` probes of elementFromPoint hit a foreign mask (closing editor),
 // as on mas3 (LAB-1640: second Add refused 'Python column control covered').
-function columnsPage({cover=0,coverAfterApply=false,missingType=null,deadline=Date.now()+20000}={}){
+function columnsPage({initialColumns=[],cover=0,coverAfterApply=false,missingType=null,afterApply,afterGridRead,deadline=Date.now()+20000}={}){
  const root='MF;TF;WizrdMCF',base=root+';PythonColumnsWizard',form=root+';EditColumnDefForm',els=new Map(),cmps=new Map();
  const names={1:'Логический',2:'Дата/Время',3:'Вещественный',4:'Целый',5:'Строковый'};
- const records=[],at=new Map();let open=false,pickerShown=false,draft=null,covering=coverAfterApply?0:cover,probes=0,clicks=0,ids=0;
+ const codes={integer:4,real:3,string:5,boolean:1,datetime:2};
+ const records=initialColumns.map(c=>({Name:c.name,DisplayName:c.label,DataType:codes[c.type]}));
+ const at=new Map();let open=false,pickerShown=false,draft=null,covering=coverAfterApply?0:cover,probes=0,clicks=0,ids=0;
  const el=(tid,x,y,visible=()=>true)=>{const e={id:'e'+(++ids),tid,getAttribute:k=>k==='data-tid'?tid:null,checkVisibility:()=>visible(),
   getBoundingClientRect:()=>({x:x-5,y:y-5,width:10,height:10}),contains:o=>o===e,closest:()=>e};if(tid)els.set(tid,e);at.set(x+','+y,e);return e;};
  const mask={className:'x-mask',closest:()=>null};
- const grid=el(base+';grdTargetColumns;tbl',300,300);cmps.set(grid.id,{el:{dom:grid},getStore:()=>({isLoading:()=>false,getData:()=>({items:records.map(data=>({data}))})})});
+ const grid=el(base+';grdTargetColumns;tbl',300,300);
+ cmps.set(grid.id,{el:{dom:grid},getStore:()=>({isLoading:()=>false,getData:()=>{
+  const items=records.map(data=>({data:{...data}}));
+  afterGridRead?.(records);
+  return {items};
+ }})});
  el(base+';btnAddMappingColumn',10,10);
  const formEl=el(form,500,500,()=>open);
  const field=(key,get)=>{const e=el(form+';'+key,500,400+ids,()=>open);cmps.set(e.id,{el:{dom:e},getValue:get,getRawValue:get});};
@@ -280,13 +329,75 @@ function columnsPage({cover=0,coverAfterApply=false,missingType=null,deadline=Da
    count:async()=>open&&['edtName','edtDisplayName'].includes(key)?1:0,
    fill:async v=>{draft[key==='edtName'?'name':'label']=v;},press:async()=>{},
    click:async()=>{if(!open)throw Error('hidden');if(key==='cbxDataType;trg_picker')pickerShown=true;
-    else if(key==='btnApply'){records.push({Name:draft.name,DisplayName:draft.label,DataType:draft.type});open=false;draft=null;if(coverAfterApply)covering=cover;}
+    else if(key==='btnApply'){
+     records.push({Name:draft.name,DisplayName:draft.label,DataType:draft.type});
+     open=false;draft=null;
+     afterApply?.(records);
+     if(coverAfterApply)covering=cover;
+    }
     else if(key==='btnCancel'){open=false;draft=null;}},
    waitFor:async()=>{}};}};
- const task={binding:{workflow_ref:{prefix:'MF;TF'}},columns:declared.map(c=>({...c,code:{integer:4,real:3,string:5,boolean:1,datetime:2}[c.type]})),deadline};
+ const task={binding:{workflow_ref:{prefix:'MF;TF'}},columns:declared.map(c=>({...c,code:codes[c.type]})),deadline};
  const readNode=async()=>({verified:true,surface:'wizard',document_id:'doc',workflow_id:'wf',node_id:'py'});
  return {run:()=>configurePythonColumnsPage(page,task,readNode),records,get probes(){return probes;}};
 }
+
+test('an existing declared schema can be extended in place with the remaining columns',async()=>{
+ const fixture=columnsPage({initialColumns:declared.slice(0,2)});
+ const original=fixture.records.slice();
+ const result=await fixture.run();
+ assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.equal(result.verified,true);
+ assert.deepEqual(JSON.parse(JSON.stringify(result.columns)),declared);
+ for(const [index,record] of original.entries())assert.equal(fixture.records[index],record);
+});
+
+test('declared column extension refuses to remove, reorder or modify existing columns',async()=>{
+ for(const initialColumns of [
+  [...declared,{name:'Extra',label:'Extra',type:'real'}],
+  [declared[1],declared[0]],
+  [{...declared[0],type:'real'}],
+  [{...declared[0],label:'Another label'}],
+ ]){
+  const fixture=columnsPage({initialColumns});
+  const original=structuredClone(fixture.records);
+  const result=await fixture.run();
+  assert.equal(result.status,'NOT_APPLIED');
+  assert.ok(result.error.endsWith(': '+initialColumns.map(c=>c.name).join(',')),result.error);
+  assert.equal(result.effect_possible,false);
+  assert.deepEqual(fixture.records,original);
+  assert.equal(fixture.probes,0);
+ }
+});
+
+test('declared columns refuse a grid change during Add before adding another column',async()=>{
+ const fixture=columnsPage({
+  initialColumns:declared.slice(0,2),
+  afterApply:records=>{records[0].DisplayName='Changed during Add';},
+ });
+ const result=await fixture.run();
+ assert.equal(result.status,'AMBIGUOUS');
+ assert.equal(result.verified,false);
+ assert.equal(result.effect_possible,true);
+ assert.equal(result.cleanup_complete,true);
+ assert.match(result.error,/grid readback differs after adding AmountScaled/);
+ assert.deepEqual(fixture.records.map(record=>record.Name),['Id','Amount','AmountScaled']);
+});
+
+test('declared columns refuse a grid change between the last Add readback and the final read',async()=>{
+ const fixture=columnsPage({
+  initialColumns:declared.slice(0,-1),
+  afterGridRead:records=>{
+   if(records.length===declared.length)records[0].DisplayName='Changed before final read';
+  },
+ });
+ const result=await fixture.run();
+ assert.equal(result.status,'AMBIGUOUS');
+ assert.equal(result.verified,false);
+ assert.equal(result.effect_possible,true);
+ assert.equal(result.cleanup_complete,true);
+ assert.match(result.error,/^Python declared columns readback differs$/);
+});
 
 test('declared columns wait out a transient cover over Add after Apply and still refuse a lasting one',{timeout:30000},async()=>{
  const transient=columnsPage({cover:3,coverAfterApply:true});

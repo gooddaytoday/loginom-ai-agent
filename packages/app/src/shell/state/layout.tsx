@@ -76,6 +76,15 @@ export type LayoutRoute =
   | { type: "components" }
   | { type: "draft"; draftID: string }
   | { type: "session"; sessionId: string; server: ServerConnection.Key }
+  | { type: "page"; plugin: string; page: string }
+
+function decodeRouteSegment(segment: string) {
+  try {
+    return decodeURIComponent(segment)
+  } catch {
+    return segment
+  }
+}
 
 export const currentRoute = (pathname: string, search: string): LayoutRoute => {
   const parts = pathname.split("/").filter(Boolean)
@@ -87,6 +96,9 @@ export const currentRoute = (pathname: string, search: string): LayoutRoute => {
   if (parts[0] === "connect") return { type: "connect" }
 
   if (parts[0] === "components") return { type: "components" }
+
+  if (parts[0]?.toLowerCase() === "page" && parts[1] && parts[2])
+    return { type: "page", plugin: decodeRouteSegment(parts[1]), page: decodeRouteSegment(parts[2]) }
 
   if (parts[0] === "new-session") {
     const draftID = new URLSearchParams(search).get("draftId")

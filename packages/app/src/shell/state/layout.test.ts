@@ -10,6 +10,14 @@ test.each(["settings", "connect"] as const)("%s has its own layout route", (type
   expect(currentRoute(`/${type}`, "")).toEqual({ type })
 })
 
+test.each([
+  ["/page/fixture/overview", "fixture", "overview"],
+  ["/page/%40acme%2Fopencode-gui/package%2Fdetails", "@acme/opencode-gui", "package/details"],
+  ["/page/%40acme%252Fgui/overview", "@acme%2Fgui", "overview"],
+])("parses the plugin page route %s", (path, plugin, page) => {
+  expect(currentRoute(path, "")).toEqual({ type: "page", plugin, page })
+})
+
 describe("layout persistence", () => {
   const schema = Persistence.withInitial(layoutPersistence, initialLayout(ServerConnection.Key.make("local")))
   const decode = Schema.decodeUnknownSync(schema)

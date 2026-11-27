@@ -67,6 +67,11 @@
 
 [trees.from_json](nodes/trees.from_json.md) · [trees.to_table](nodes/trees.to_table.md)
 
+Для вложенных массивов объектов используй нативную связь между узлами и
+`repeat_parents:true` для повтора родителей. Dock показывает до 256
+экземпляров в предпросмотре дерева. Для передачи всего дерева выполни
+источник с `read.ports:[]` и подключи его выход к следующему узлу.
+
 ## Автокорреляция
 
 [research.auto_correlation](nodes/research.auto_correlation.md)

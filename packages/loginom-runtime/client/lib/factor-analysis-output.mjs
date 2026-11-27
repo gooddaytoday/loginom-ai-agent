@@ -1,6 +1,6 @@
-import {configureOutputAutosync,reorderOutputFields} from './port-mapping-procedure.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 import {reconcileCollapseOutput} from './collapse-output-reconcile.mjs';
+import {alignReadSchema} from './node-read-contract.mjs';
 const need=(v,m)=>{if(!v)throw Error('Factor analysis output: '+m);};
 export function factorAnalysisOutputColumns(c,port){
  const features=c.fields.filter(f=>f.usage_type===3);
@@ -34,32 +34,27 @@ export function factorAnalysisInlineSources(c,native,port=0){
  need(retained.every(f=>native.target_fields.some(t=>t.name===f.name&&t.source)),'original PCA input or loadings metadata fields must remain linked');
  return obsolete;
 }
-export async function configureFactorAnalysisOutputs(channel,c,p,mappings,finishWizard){
+export async function configureFactorAnalysisOutputs(channel,c,_parameters,mappings,finishWizard){
  need(mappings.length===0,'output overrides unsupported');
  const ports=[];
  for(const port of [0,1]){
   await channel.openOutputPort(port);
   const observe=condition=>channel.observe({condition,readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true});
-  let s=await observe('complete PCA port '+port+' mapping');const expected=factorAnalysisOutputColumns(c,port);
-  let baseline=s.node_mapping;
-  if(baseline.target_fields.length!==expected.length&&(c.output_cap||c.output_schema_changed)){
+  const s=await observe('complete PCA port '+port+' mapping'),expected=factorAnalysisOutputColumns(c,port);
+  let mapping=s.node_mapping;
+  if(mapping.target_fields.length!==expected.length&&(c.output_cap||c.output_schema_changed)){
    const full=factorAnalysisOutputColumns({...c,output_cap:false},port);
-   need(baseline.target_fields.every(f=>!f.excluded&&!f.inherited&&f.required===false&&full.some(e=>['name','label','type'].every(k=>f[k]===e[k])))
-    &&expected.filter(f=>!/^Factor[1-9][0-9]*$/.test(f.name)).every(e=>baseline.target_fields.some(f=>f.name===e.name)),'only intrinsic PCA factor width may change');
-   s=await reconcileCollapseOutput(channel,s,expected);baseline=s.node_mapping;
+   need(mapping.target_fields.every(f=>!f.excluded&&!f.inherited&&f.required===false&&full.some(e=>['name','label','type'].every(k=>f[k]===e[k])))
+    &&expected.filter(f=>!/^Factor[1-9][0-9]*$/.test(f.name)).every(e=>mapping.target_fields.some(f=>f.name===e.name)),'only intrinsic PCA factor width may change');
+   mapping=(await reconcileCollapseOutput(channel,s,expected)).node_mapping;
   }
-  need(baseline.target_fields.length===expected.length&&expected.every(e=>baseline.target_fields.some(f=>f.name===e.name&&f.label===e.label&&f.type===e.type&&!f.excluded)),'native output fields differ');
-  await configureOutputAutosync(channel,false);
-  s=await observe('PCA mapping before ordering');
-  if(s.node_mapping.target_fields.some((f,i)=>f.name!==expected[i].name))
-   await reorderOutputFields(channel,expected.map(e=>s.node_mapping.target_fields.find(f=>f.name===e.name).record_id));
-  s=await observe('stable PCA output mapping');const mapping=s.node_mapping;
-  need(mapping.autosync===false,'autosync must be disabled');
-  alignFactorAnalysisOutput(mapping.target_fields,expected);
+  need(mapping.target_fields.length===expected.length&&expected.every(e=>mapping.target_fields.filter(f=>f.name===e.name&&f.label===e.label&&f.type===e.type&&!f.excluded).length===1),'native output fields differ');
+  const schema=mapping.target_fields.map(f=>expected.find(e=>e.name===f.name));
+  alignFactorAnalysisOutput(mapping.target_fields,schema);
   const definition=await readOutputDefinitionPages(channel,{expectedCount:expected.length});
-  need(definition.fields.every((f,i)=>['name','label','type'].every(k=>f[k]===expected[i][k])),'rendered output differs');
+  need(definition.fields.every((f,i)=>['name','label','type'].every(k=>f[k]===schema[i][k])),'rendered output differs');
   await finishWizard('done',true,definition);
-  ports.push({port,schema:expected,mapping});
+  ports.push({port,schema,mapping});
  }
  return {verified:true,cleanup_complete:true,effect_possible:true,ports};
 }
@@ -67,8 +62,14 @@ export async function readFactorAnalysisOutputs(channel,read,ctx,mapped){
  const ports=[];
  for(const port of read.ports){
   const {output}=await channel.readOutputPort({port,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
-  const expected=mapped.ports.find(p=>p.port===port)?.schema;need(expected,'missing configured schema');
-  output.schema=alignFactorAnalysisOutput(output.schema,expected);ports.push(output);
+  const mappedPort=mapped.ports.find(p=>p.port===port);
+  need(mappedPort?.schema,'missing configured schema');
+  if(mappedPort.mapping?.autosync===false)output.schema=alignFactorAnalysisOutput(output.schema,mappedPort.schema);
+  else {
+   const aligned=alignReadSchema(output.schema,mappedPort.schema);
+   output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
+  }
+  ports.push(output);
  }
  need(new Set(ports.map(p=>p.port_guid)).size===ports.length,'distinct native output ports required');
  return {verified:true,cleanup_complete:true,effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports};
