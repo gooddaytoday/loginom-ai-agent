@@ -95,6 +95,46 @@ test('question discovery cannot replace button verification',()=>{
 test('settings opening requires one control of the prepared graph node',()=>{
  const {state}=fixture();assert.throws(()=>wizardOpenBinding(state));
 });
+
+for(const fault of [null,'node','component','path','owner TID','caption']){
+ test('LAB-2082 host binds the Join design name to its exact automatic graph caption: '+fault,async()=>{
+  const {state}=fixture();
+  const graphNode=state.prepared_node_context;
+  graphNode.tid='MF;TF-1;Graph;Левое';
+  const path=state.navigation_context.path;
+  state.ui={masks:[],dialogs:[],elements:[
+   {ref:'settings',tid:graphNode.tid+';Setting',allowed_actions:['begin_wizard'],
+    wizard_open:{node:{node_label:'Левое'},workflow_path:path}},
+   {tid:graphNode.tid+';Label;Label',label:fault==='caption'?'Правое':'Левое',graph_node:{part:'label'},
+    signature:{native_graph:{status:'non_script',icon:fault==='component'?'bg-vendor-icon-calcdata':'bg-vendor-icon-joindata'}}},
+  ]};
+  const after=structuredClone(state);
+  after.prepared_node_context.surface='wizard';
+  after.prepared_node_context.tid='MF;TF-1;WizrdMCF';
+  if(fault==='node')after.prepared_node_context.node_id='foreign';
+  const node={tid:fault==='owner TID'?'flow>Другой':'flow>Слияние',label:'Слияние'};
+  const wizardPath=fault==='path'?[{tid:'other',label:'Another scenario'}]:path;
+  after.wizard={status:'observed',stage:'join',owner_context:{status:'observed',node,
+   path:[...wizardPath,node,{tid:node.tid+'>Настройка',label:'Настройка'}]}};
+  let gestures=0;
+  const channel={
+   observe:async step=>{
+    const current=gestures?after:state;
+    assert.equal(step.ready(current),true);
+    return current;
+   },
+   perform:async step=>{
+    assert.equal(step.ready(state),true);
+    assert.deepEqual(step.resolve(state),{verb:'begin_wizard',ref:'settings'});
+    gestures++;
+   },
+  };
+  if(fault)await assert.rejects(openPreparedWizard(channel),/Opened wizard owner differs/);
+  else assert.equal((await openPreparedWizard(channel)).node_context.node_id,graphNode.node_id);
+  assert.equal(gestures,1);
+ });
+}
+
 test('deactivation gestures cannot run without a native prepared-node binding',()=>{
  for(const verb of ['begin_wizard','confirm_wizard_deactivation'])assert.throws(()=>
   makeWorkspaceUiCode({mode:'act',action:{verb,ref:'ui-question'}}),/prepared native node binding/);
@@ -102,18 +142,30 @@ test('deactivation gestures cannot run without a native prepared-node binding',(
 
 
 test('wizard opening reconciles duplicate native keys through the exact prepared GUID and label',async()=>{
- for(const fault of [null,'node','document','workflow','label','path']){
+ for(const fault of [null,'node','document','workflow','label','path','receipt','receipt-owner']){
   const {state}=fixture();state.ui={masks:[],dialogs:[],elements:[
    {ref:'settings',tid:state.prepared_node_context.tid+';Setting',allowed_actions:['begin_wizard'],wizard_open:{node:{node_label:'Import@1'},workflow_path:[{tid:'flow',label:'Scenario'}]}},
    {tid:state.prepared_node_context.tid+';Label;Label',label:'Import',graph_node:{part:'label'}}]};
   const after=structuredClone(state);after.prepared_node_context.surface='wizard';
-  after.wizard={status:'observed',owner_context:{status:'observed',node:{tid:'flow>Import-3',label:'Import'},path:[{tid:'flow',label:'Scenario'},{tid:'flow>Import-3',label:'Import'},{tid:'flow>Import-3>Settings',label:'Settings'}]}};
+  after.wizard={status:'observed',root_ref:'wizard',owner_context:{status:'observed',node:{tid:'flow>Import-3',label:'Import'},path:[{tid:'flow',label:'Scenario'},{tid:'flow>Import-3',label:'Import'},{tid:'flow>Import-3>Settings',label:'Settings'}]}};
   if(['node','document','workflow'].includes(fault))after.prepared_node_context[fault+'_id']='foreign';
+  if(fault==='receipt-owner')after.prepared_node_context.node_id='foreign';
   if(fault==='label')after.wizard.owner_context.node.label='Foreign';if(fault==='path')after.wizard.owner_context.path[0].tid='foreign';
-  let opened=false,gestures=0;const channel={observe:async()=>opened?after:state,perform:async()=>{opened=true;gestures++;}};
-  if(fault)await assert.rejects(openPreparedWizard(channel),/owner differs/);
+  let opened=false,gestures=0,observations=0;
+  const channel={observe:async options=>{
+   observations++;const current=opened?after:state;
+   assert.ok(options.ready(current));return current;
+  },perform:async()=>{
+   opened=true;gestures++;
+   if(fault?.startsWith('receipt'))return {status:'SUCCEEDED',action_key:'ui.act',action_revision:'1',
+    cleanup_complete:true,output:{...after,gesture_applied:true},trace:[{event:'wizard_open_verified',settings_applied:false,
+     wizard_root_ref:after.wizard.root_ref,owner_node:after.wizard.owner_context.node,workflow_path:state.navigation_context.path}]};
+  }};
+  if(fault&&fault!=='receipt')await assert.rejects(openPreparedWizard(channel),/owner differs/);
   else assert.equal((await openPreparedWizard(channel)).verified,true);
   assert.equal(gestures,1);
+  assert.equal(observations,fault?.startsWith('receipt')?1:2,
+   'the receipted wizard is already observed; otherwise take one post-open observation');
  }
 });
 

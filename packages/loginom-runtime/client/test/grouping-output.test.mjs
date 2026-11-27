@@ -132,3 +132,23 @@ test('Grouping preserves explicit autosync for an already ordered layout with or
   assert.ok(!f.actions.some(a=>a.ref==='auto'));
  }
 });
+
+test('Grouping with only keys keeps native autosync and field order',async()=>{
+ const f=outputChannel();
+ f.config.measures=[];
+ f.params.measures=[];
+ f.native.source_fields=f.native.source_fields.slice(0,2);
+ f.native.target_fields=f.native.target_fields.filter(field=>f.native.source_fields.some(source=>source.record_id===field.source.record_id))
+  .map((field,index)=>({...field,index,group_index:index}));
+ const before=structuredClone(f.native);
+ await configureGroupingOutput(f.channel,f.config,f.params);
+ assert.deepEqual(f.native,before);
+ assert.deepEqual(f.actions,[]);
+});
+test('Grouping with a sort binding alone leaves the saved output autosync setting',async()=>{
+ const f=outputChannel(),before=structuredClone(f.native);
+ f.config.options={pedSortResult:{switch_pressed:true}};
+ await configureGroupingOutput(f.channel,f.config,{});
+ assert.deepEqual(f.native,before);
+ assert.deepEqual(f.actions,[]);
+});

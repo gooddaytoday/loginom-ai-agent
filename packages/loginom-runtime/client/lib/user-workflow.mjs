@@ -1,5 +1,7 @@
 // The user supplies an issued workflow identity. Long UI paths remain pinned
 // locally; the normal node contract and all live identity guards stay intact.
+import {NODE_ADD_ONLY_MODE} from './node-contracts.mjs';
+
 export const userActionKeys=['package.save_checkpoint','package.save_as'];
 const exportCreationDefaults=Object.freeze({encoding:'UTF-8',delimiter:',',header:'names',bom:false,line_ending:'LF',decimal_separator:'.',null_marker:'',text_qualifier:'"'});
 export function userActionTool(tool) {
@@ -7,6 +9,12 @@ export function userActionTool(tool) {
   const copy=structuredClone(tool),p=copy.inputSchema.properties;
   p.action_key.enum=[...userActionKeys];
   if(p.action_keys)p.action_keys.items.enum=[...userActionKeys];
+  if(tool.name==='dock_action_describe'){
+    p.refresh={type:'boolean',description:'With node_types, set true to return full cards even if they were already delivered.'};
+    const batch=copy.inputSchema.allOf[0].oneOf[1];
+    batch.properties.refresh={type:'boolean'};
+    batch.dependencies={refresh:['node_types']};
+  }
   copy.description=tool.name==='dock_action_run'
     ? 'Save the completed scenario with package.save_checkpoint. REST connection references require Close/Open and at most one extra Save; the application rebinds issued workflow/node identities for continued work. Use package.save_as for explicitly requested reopen. Request missing parameters with dock_action_describe; create/configure nodes through dock_node_apply.'
     : 'List nodes with {}. Single: action_key alone; never combine action_key with a batch. Pass JSON arrays directly for action_keys, node_types and modes, even for one item. For example: {"action_keys":["package.save_checkpoint"],"node_types":["imports.text"]}. Cards contain parameter_schema and prepared skill guidance. Without modes get common guidance and guidance_modes; request selected modes for their rules before applying. Read-only.';
@@ -26,7 +34,7 @@ export function userActionInventory(value) {
   }
   for(const node of copy.node_types??[])if(node.type==='exports.text'&&node.parameter_schema){
     node.creation_defaults={required_parameters:['destination'],parameters:{...exportCreationDefaults}};
-    node.parameter_schema.description='For target.kind=new, destination is required and omitted technical settings use creation_defaults. Explicit settings are preserved. For existing nodes, parameters remain a patch; omitted settings are unchanged. Overwrite defaults to reject.';
+    node.parameter_schema.description='New: supply destination; omitted settings use creation_defaults. Existing: patch explicit parameters only. Overwrite defaults to reject.';
   }
   return copy;
 }
@@ -67,7 +75,7 @@ export function userNodeTool(tool) {
   copy.inputSchema.properties.parameters={type:'object',properties:{},additionalProperties:true,
     description:'Type-specific settings. First call dock_action_describe with node_types:[target.type], modes:[mode]; follow its parameter_schema and guidance.'};
   copy.inputSchema.properties.mode={type:'string',minLength:1,maxLength:128,
-    description:'Select a mode from the node card returned by dock_action_describe.'};
+    description:'Select a mode from the node card. Use add_only on an explicit request to add an unconnected node: new target, done, empty parameters, inputs, mappings and reads.'};
   // The full runtime schema and handler still validate type-specific modes,
   // parameters and read restrictions before any browser work.
   delete copy.inputSchema.allOf;
@@ -92,18 +100,26 @@ export function userNodeTool(tool) {
 export function createUserWorkflowBindings() {
   const references = new Map();
   const described=new Set();
+  const deliveredDescriptions=new Set();
   let describedDocument;
   const deliveryArtifacts=new Map(),uploads=new Map();
   const key = (document, workflow) => JSON.stringify([document, workflow]);
+  const descriptionKey=(card,modes)=>JSON.stringify([card.type,card.cache_key,modes.filter(mode=>card.modes.includes(mode)).sort()]);
+  const resetDescriptions=()=>{described.clear();deliveredDescriptions.clear();};
   const samePath = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length
     && a.every((part, i) => part.tid === b[i].tid && part.label === b[i].label);
   return {
-    resetDescriptions() { described.clear(); },
+    resetDescriptions,
+    hasDescription(card,modes=[]) {
+      return deliveredDescriptions.has(descriptionKey(card,modes));
+    },
     rememberDescriptions(description, modes=[]) {
+      for(const card of description.node_types??[])if(typeof card.cache_key==='string')deliveredDescriptions.add(descriptionKey(card,modes));
       for(const card of description.node_types??[])for(const mode of modes)
         if(card.modes?.includes(mode))described.add(JSON.stringify([card.type,mode]));
     },
     checkNodeDescription(request) {
+      if(request.mode===NODE_ADD_ONLY_MODE)return null;
       if(describedDocument&&describedDocument!==request.document_id)return null;
       if(described.has(JSON.stringify([request.target?.type,request.mode])))return null;
       return {result_version:'user-v1',operation_id:request.operation_id??null,
@@ -122,7 +138,7 @@ export function createUserWorkflowBindings() {
     },
     remember({ document_id, workflow_ref, previous_workflow_ref }) {
       if (typeof document_id !== 'string' || !workflow_ref?.workflow_id || !Array.isArray(workflow_ref.navigation_path)) return;
-      if(describedDocument!==document_id)described.clear();
+      if(describedDocument!==document_id)resetDescriptions();
       describedDocument=document_id;
       if(previous_workflow_ref?.workflow_id)references.delete(key(document_id,previous_workflow_ref.workflow_id));
       references.set(key(document_id, workflow_ref.workflow_id), structuredClone(workflow_ref));
@@ -152,9 +168,10 @@ export function createUserWorkflowBindings() {
       const ports=request.finish!=='execute'||['variables.from_table','exports.text','exports.excel','exports.lgd'].includes(request.target.type)?[]:
         request.target.type==='research.quality'?[0,1,2,3,4]:request.target.type==='preprocessing.coarse_classes'?[0,1,2]:['datamining.assn_rules','transform.filter_data','integration.rest_request','datamining.clustering'].includes(request.target.type)?[0,1]:[0];
       let parameters=request.parameters;
-      if(request.target.kind==='new'&&request.target.type==='exports.text'&&parameters&&typeof parameters==='object'&&!Array.isArray(parameters))
+      const firstConfiguration=request.mode!==NODE_ADD_ONLY_MODE&&request.target.kind==='new';
+      if(firstConfiguration&&request.target.type==='exports.text'&&parameters&&typeof parameters==='object'&&!Array.isArray(parameters))
         parameters={...exportCreationDefaults,...parameters};
-      if(request.target.kind==='new'&&request.target.type==='imports.text'&&parameters?.settings&&parameters.preview_only!==true){
+      if(firstConfiguration&&request.target.type==='imports.text'&&parameters?.settings&&parameters.preview_only!==true){
         const settings=parameters.settings,upload=uploads.get(parameters.source?.upload_operation_id);
         parameters={...parameters,settings:{...settings,
           source:{encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true,

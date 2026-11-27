@@ -8,7 +8,7 @@
       "title": "CI, build, release and repository hygiene",
       "paths": [
         ".github/**", ".husky/**", "script/**", "nix/**", "patches/**", "turbo.json", ".gitignore", ".gitleaksignore",
-        ".gitattributes", ".dockerignore", "install", "packages/*/script/**", "packages/*/scripts/**", "packages/desktop/electron*.ts",
+        ".gitattributes", ".dockerignore", ".oxlintrc.json", "install", "packages/*/script/**", "packages/*/scripts/**", "packages/desktop/electron*.ts",
         "packages/cli/bin/**", "strobe.json"
       ]
     },
@@ -73,7 +73,42 @@
         "packages/desktop/src/main/service/background-service-machine.test.ts"
       ]
     },
+    {
+      "id": "CAT-14",
+      "title": "Built-in GUI tool renderers (C3.0, accepted timeline row exception)",
+      "paths": [
+        "packages/app/component-tests/plugin-host.fixture.tsx",
+        "packages/app/component-tests/plugin-tool-renderer.spec.ts",
+        "packages/app/component-tests/tool-renderer.fixture.tsx",
+        "packages/app/src/runtime/plugin/host.tsx",
+        "packages/app/src/runtime/plugin/render.tsx",
+        "packages/app/src/session/route.tsx",
+        "packages/app/src/session/timeline/cache.ts",
+        "packages/app/src/session/timeline/controller.tsx",
+        "packages/app/src/session/timeline/tool-renderers.tsx",
+        "packages/app/src/shell/routes/session-ui-provider.tsx",
+        "packages/plugin/src/gui/builtin.ts",
+        "packages/session-ui/src/context/data.tsx",
+        "packages/session-ui/src/timeline-next/projection.ts",
+        "packages/session-ui/src/timeline-next/rules.ts",
+        "packages/session-ui/src/timeline-next/tools/context-group.tsx",
+        "packages/session-ui/src/timeline-next/tools/tool-display.tsx",
+        "packages/session-ui/src/timeline-next/projection.test.ts",
+        "packages/session-ui/src/timeline/projection.ts",
+        "packages/session-ui/src/tools/tool-renderer.tsx",
+        "packages/ui/src/i18n/en.ts"
+      ]
+    },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
+    {
+      "id": "CAT-14",
+      "title": "Built-in plugin top-level pages",
+      "paths": [
+        "packages/app/src/shell/routes/routes.tsx", "packages/app/src/shell/state/layout.tsx",
+        "packages/app/src/shell/state/layout.test.ts", "packages/app/vite.config.ts",
+        "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
+      ]
+    },
     {
       "id": "CAT-10",
       "title": "Web app, UI kit, session UI",

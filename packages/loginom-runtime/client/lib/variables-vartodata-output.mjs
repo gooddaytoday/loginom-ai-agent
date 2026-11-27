@@ -1,6 +1,6 @@
 import {validateVariablesToTableOutputFields} from './variables-vartodata-parameters.mjs';
 import {ensureGroupingOutputSources} from './grouping-output-sources.mjs';
-import {resolveConfiguredOutputMapping,configureOutputFields,reorderOutputFields,configureOutputAutosync} from './port-mapping-procedure.mjs';
+import {resolveConfiguredOutputMapping,configureOutputFields,reorderOutputFields,configureRequestedOutputAutosync} from './port-mapping-procedure.mjs';
 const need=(value,message)=>{if(!value)throw Error('Variables-to-table output: '+message);};
 export async function configureVariablesToTableOutput(channel,configuration,parameters,mapping={}){
  const node=configuration.node_context;
@@ -37,7 +37,7 @@ export async function configureVariablesToTableOutput(channel,configuration,para
   const resolved=resolveConfiguredOutputMapping(requested,sources,state.node_mapping);
   if(resolved.fields)changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));
  }
- if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
+ await configureRequestedOutputAutosync(channel,requested,changes);
  state=await channel.observe({condition:'variables-to-table complete output readback',readMappings:true,ready});
  need(JSON.stringify(state.node_mapping.source_fields)===JSON.stringify(baseline.source_fields),'derived sources changed');
  return {verified:true,cleanup_complete:true,effect_possible:changes.length>0,source_identity_verified:true,native_mapping:state.node_mapping,changes};
