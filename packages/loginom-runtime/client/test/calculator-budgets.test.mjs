@@ -11,6 +11,7 @@ test('calculator fits the apply, type card, node reference and route budgets and
  const card=describeNodeTypes(['transform.calculator'],{},new Map(),createCandidateNodeSupport({}).nodeApplyHandlers)[0];
  assert.ok(Buffer.byteLength(JSON.stringify(card))<=12000);
  assert.ok(JSON.stringify(card).includes('"syntax"'));
+ assert.ok(JSON.stringify(card).includes('Loginom 7.4.2 returns NULL when the same this.Expr.X is read twice in one expression; read it once into a local variable: var h=this.Expr.X; return h+h;'));
  const skill=await readFile(new URL('../../../product/skills/loginom-automation/SKILL.md',import.meta.url),'utf8');
  assert.ok(Buffer.byteLength(skill)<=40000);
  const route=skill.split('\n').find(line=>line.includes('references/nodes/transform.calculator.md'));
