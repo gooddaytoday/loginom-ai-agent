@@ -1,5 +1,5 @@
-import { appendFileSync, lstatSync, mkdirSync, readdirSync, renameSync, rmdirSync, unlinkSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { appendFileSync, lstatSync, mkdirSync, readdirSync, realpathSync, renameSync, rmdirSync, unlinkSync } from "node:fs"
+import { dirname, join, relative } from "node:path"
 import { createRedactor } from "../../loginom-runtime/client/lib/redact.mjs"
 
 export const LOG_DAY_MS = 24 * 60 * 60 * 1000
@@ -8,32 +8,35 @@ export const DESKTOP_LOG_BYTES = 100 * 1024 * 1024 - SIDECAR_LOG_BYTES
 const FILE_BYTES = 5 * 1024 * 1024
 const ENTRY_BYTES = 64 * 1024
 
-export function retainedLogs(root: string, maxBytes: number, excluded: readonly string[] = []) {
+export function retainedLogs(root: string, maxBytes: number, excluded: readonly string[] = [], scope: "desktop" | "service" = "desktop") {
   let used = 0
+  const exclusions = excluded.map((path) => relative(root, path))
 
   function prune(keep?: string, incoming = 0) {
     const cutoff = Date.now() - 7 * LOG_DAY_MS
     const files: { path: string; size: number; mtimeMs: number }[] = []
     const directories: string[] = []
+    const resolved = attempt(() => realpathSync(root))
     const walk = (dir: string) => {
       const entries = attempt(() => readdirSync(dir, { withFileTypes: true })) ?? []
       for (const entry of entries) {
         const path = join(dir, entry.name)
-        if (excluded.includes(path)) continue
-        if (entry.isDirectory()) {
+        if (resolved && exclusions.includes(relative(resolved, path))) continue
+        if (scope === "desktop" && entry.isDirectory()) {
           walk(path)
           directories.push(path)
-        } else if (entry.isFile() && /\.(?:log|netlog)$/.test(entry.name)) {
+        } else if (entry.isFile() && (scope === "service" ? /^service-.+\.log$/.test(entry.name) : /\.(?:log|netlog)$/.test(entry.name))) {
           const info = attempt(() => lstatSync(path))
           if (info?.isFile()) files.push({ path, size: info.size, mtimeMs: info.mtimeMs })
         }
       }
     }
-    if (attempt(() => lstatSync(root))?.isDirectory()) walk(root)
+    if (resolved) walk(resolved)
+    const kept = resolved && keep && join(resolved, relative(root, keep))
 
     used = files.reduce((sum, file) => sum + file.size, 0)
     for (const file of files.sort((a, b) => a.mtimeMs - b.mtimeMs)) {
-      if (file.path === keep || (file.mtimeMs >= cutoff && used + incoming <= maxBytes)) continue
+      if (file.path === kept || (file.mtimeMs >= cutoff && used + incoming <= maxBytes)) continue
       try {
         unlinkSync(file.path)
         used -= file.size
@@ -64,6 +67,17 @@ export function retainedLogs(root: string, maxBytes: number, excluded: readonly 
   }
 
   return { prune: () => prune(), append }
+}
+
+export function pruneLegacyLogs(roots: readonly string[]) {
+  const cutoff = Date.now() - 7 * LOG_DAY_MS
+  for (const root of roots) {
+    for (const name of ["loginom-ai-agent.log", "loginom-ai-agent-local.log", "loginom-ai-agent-beta.log", "loginom-ai-agent-dev.log"]) {
+      const path = join(root, name)
+      const info = attempt(() => lstatSync(path))
+      if (info?.isFile() && info.mtimeMs < cutoff) attempt(() => unlinkSync(path))
+    }
+  }
 }
 
 export function redactLogValues(values: unknown[], known: string[] = []): unknown[] {

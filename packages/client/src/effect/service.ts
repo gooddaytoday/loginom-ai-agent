@@ -63,7 +63,9 @@ export const ensure = Effect.fn("service.ensure")(function* (options: EnsureOpti
     const env = yield* Effect.tryPromise(() => PtyHandoff.environment(options.file ?? fallback(), options.env))
     return yield* Effect.try({
       try: () => {
-        return spawnServiceContender(command, args, env)
+        const contender = spawnServiceContender(command, args, env)
+        options.onSpawn?.(contender.child)
+        return contender
       },
       catch: (cause) => new Error("Failed to start server", { cause }),
     })

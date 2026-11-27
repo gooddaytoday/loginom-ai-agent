@@ -100,6 +100,8 @@ const Handlers = Runtime.handlers(Commands, {
   serve: () => import("./commands/handlers/serve"),
 })
 
+const serviceLogs = desktopServiceLogger()
+
 Effect.gen(function* () {
   yield* Heap.listen
   yield* CpuProfile.listen
@@ -155,7 +157,7 @@ Effect.gen(function* () {
         version: LOGINOM_AI_AGENT_VERSION,
         channel: LOGINOM_AI_AGENT_CHANNEL,
       },
-      desktopServiceLogger(),
+      serviceLogs?.logger,
     ),
   ),
   Effect.provide(NodeServices.layer),
@@ -183,7 +185,10 @@ Effect.gen(function* () {
               : (code === 1 && process.exitCode) || code
         // process.exit drops output still queued for a pipe; ending the streams waits for it.
         void Promise.all(
-          [process.stdout, process.stderr].map((stream) => new Promise<void>((resolve) => stream.end(() => resolve()))),
+          [
+            ...[process.stdout, process.stderr].map((stream) => new Promise<void>((resolve) => stream.end(() => resolve()))),
+            serviceLogs?.flush(),
+          ],
         ).then(() => process.exit(status))
       }),
   }),

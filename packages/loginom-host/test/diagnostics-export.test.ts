@@ -383,3 +383,20 @@ test("P2.3: the Dock configuration api_key is a known value", async () => {
   })
   expectAbsent(bytes, ["fixture-dock-api-value", "fixture-hermes-api-value"])
 })
+
+test("diagnostics retains the journal containing a credential-bearing URL", async () => {
+  const p = profile()
+  const fakeKey = `AIza${"A".repeat(35)}`
+  put(join(p.logs, "run", "main.log"), [
+    "starting fixture",
+    `request https://app.loginom.ai/app/?key=${fakeKey}&page=2&access_token=fixture-query-bearer#event`,
+    "finished fixture",
+  ].join("\n"))
+  const { zip } = await buildDiagnosticsArchive({ logs: [{ dir: p.logs, prefix: "desktop" }] })
+  const archive = await unpack(zip)
+  const text = archive.text("desktop/run/main.log")
+  for (const context of ["starting fixture", "finished fixture", "page=2"]) expect(text).toContain(context)
+  expect(text).toContain("key=%5Bredacted%5D&page=2&access_token=%5Bredacted%5D#event")
+  expect(text).not.toContain("fixture-query-bearer")
+  expect(text).not.toContain(fakeKey)
+})

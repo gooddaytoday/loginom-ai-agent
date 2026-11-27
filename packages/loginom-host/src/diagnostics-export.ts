@@ -194,14 +194,15 @@ function runtimeSources(runtime: string, sessionID: string | undefined, recent: 
 export function hasExportSecret(text: string) {
   if (
     /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----|\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{16,}|glpat-[A-Za-z0-9_-]{12,}|eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\b/.test(text) ||
+    /AIza[A-Za-z0-9_-]{35}/.test(text) ||
     /\b(?:bearer|basic)\s+(?!\[redacted\])[A-Za-z0-9+/_=.-]+/i.test(text)
   )
     return true
   const fields =
-    /\b(?:api[_-]?key|authorization|password|passwd|cookie|set-cookie|access[_-]?token|refresh[_-]?token)\b["']?\s*[:=]\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;}&]+)/gi
+    /\b(?:api[_-]?key|authorization|password|passwd|cookie|set-cookie|access[_-]?token|refresh[_-]?token)\b["']?\s*[:=]\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;}&#]+)/gi
   for (const match of text.matchAll(fields)) {
     const value = match[1].replace(/^["']|["']$/g, "")
-    if (value !== "[redacted]" && value !== "") return true
+    if (value !== "[redacted]" && !/^%5bredacted%5d$/i.test(value) && value !== "") return true
   }
   return false
 }

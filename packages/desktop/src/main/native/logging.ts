@@ -2,7 +2,7 @@ export * as DesktopLogging from "./logging"
 
 import log from "electron-log/main.js"
 import { app, crashReporter, netLog, shell } from "electron"
-import { LOG_DAY_MS, redactLogValues } from "@loginom-ai-agent/loginom-host/local-logs"
+import { LOG_DAY_MS, pruneLegacyLogs } from "@loginom-ai-agent/loginom-host/local-logs"
 import { Product } from "@loginom-ai-agent/product"
 import { Cause, Context, Effect, Exit, FiberSet, FileSystem, Layer, Logger, Path, Predicate, References } from "effect"
 import { homedir } from "node:os"
@@ -12,6 +12,7 @@ import { marks } from "../lifecycle/marks"
 import { LoginomResources } from "../loginom/resources"
 import { directory, serviceData } from "../service/service-identity"
 import { logFiles, NET_LOG_SIZE, serviceSecrets, stamp } from "./log-files"
+import { redactElectronLog } from "./log-redaction"
 import {
   EXPORT_ARCHIVE_TIMEOUT_MS,
   initialLoggingState,
@@ -217,9 +218,16 @@ export const layer = serviceLayer.pipe(Layer.provideMerge(nativeLoggerLayer))
 function initLogging() {
   return Effect.gen(function* () {
     const files = logFiles()
-    files.prune()
-    const timer = setInterval(files.prune, LOG_DAY_MS).unref()
-    log.hooks.push((message) => ({ ...message, data: redactLogValues(message.data, serviceSecrets()) }))
+    const path = yield* Path.Path
+
+    const prune = () => {
+      pruneLegacyLogs(serverLogRoots(path))
+      void files.prune()
+    }
+
+    prune()
+    const timer = setInterval(prune, LOG_DAY_MS).unref()
+    log.hooks.push(redactElectronLog(serviceSecrets))
     log.transports.file.level = false
     log.transports.retained = Object.assign(
       (message: Parameters<typeof log.transports.file>[0]) => {
@@ -324,9 +332,7 @@ function manifest(path: Path.Path, netLogPath: string | undefined) {
 }
 
 function serverLogRoots(path: Path.Path) {
-  const xdgData = process.env.XDG_DATA_HOME || path.join(homedir(), ".local", "share")
-
-  return [...new Set([path.join(xdgData, directory, "log"), path.join(app.getPath("userData"), directory, "log")])]
+  return [...new Set([path.join(serviceData(), "log"), path.join(app.getPath("userData"), directory, "log")])]
 }
 
 function initConsoleTransport() {

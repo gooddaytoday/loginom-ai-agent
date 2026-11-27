@@ -1,39 +1,16 @@
 import { app } from "electron"
-import {
-  DESKTOP_LOG_BYTES,
-  redactLogValues,
-  retainedLogs,
-  SIDECAR_LOG_BYTES,
-} from "@loginom-ai-agent/loginom-host/local-logs"
-import { randomUUID } from "node:crypto"
+import { redactLogValues } from "@loginom-ai-agent/loginom-host/local-logs"
 import { join } from "node:path"
 import { SidecarCredentials } from "../service/sidecar-credentials"
 import type { CrashReport } from "./crash-logging"
+import { createLogFiles } from "./log-retention"
 
-export const NET_LOG_SIZE = 20 * 1024 * 1024
+export { NET_LOG_SIZE, stamp } from "./log-retention"
 
 let files: ReturnType<typeof createLogFiles> | undefined
 
 export function logFiles() {
-  return (files ??= createLogFiles())
-}
-
-function createLogFiles() {
-  const root = join(app.getPath("userData"), "logs")
-  const run = join(root, `${stamp()}-${randomUUID()}`)
-  const sidecar = serviceLogDirectory()
-  const desktopLogs = retainedLogs(root, DESKTOP_LOG_BYTES - NET_LOG_SIZE, [sidecar, join(run, "network.netlog")])
-  const sidecarLogs = retainedLogs(sidecar, SIDECAR_LOG_BYTES)
-
-  return {
-    root,
-    run,
-    append: desktopLogs.append,
-    prune() {
-      desktopLogs.prune()
-      sidecarLogs.prune()
-    },
-  }
+  return (files ??= createLogFiles(join(app.getPath("userData"), "logs")))
 }
 
 export function serviceLogDirectory() {
@@ -57,11 +34,4 @@ export const writeCrash: CrashReport = (message, details) => {
   } catch {
     // A logging error must not replace the original uncaught error.
   }
-}
-
-export function stamp() {
-  return new Date()
-    .toISOString()
-    .replace(/[-:]/g, "")
-    .replace(/\.\d+Z$/, "")
 }

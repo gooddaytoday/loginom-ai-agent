@@ -1,3 +1,5 @@
+import type { ChildProcess } from "node:child_process"
+
 /** Connection details for a local OpenCode service. */
 export type Endpoint = {
   /** Base URL of the service. */
@@ -32,6 +34,8 @@ export type EnsureOptions = DiscoverOptions & {
   readonly env?: Readonly<Record<string, string>>
   /** Called once before spawning a new service process. */
   readonly onStart?: (reason: EnsureReason, previousVersion?: string) => void
+  /** Observe a local start attempt, including its eventual exit after discovery. */
+  readonly onSpawn?: (child: ChildProcess) => void
 }
 
 /** Options used to stop the local OpenCode service. */

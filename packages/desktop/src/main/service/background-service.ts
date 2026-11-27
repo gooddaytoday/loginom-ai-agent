@@ -109,8 +109,9 @@ const ensure = Effect.fn("BackgroundService.ensure")(function* (
         "--service",
         ...(setup.isolated ? ["--hostname", "0.0.0.0", "--port", String(0x0c0c)] : []),
       ]),
+      onSpawn: monitor.onSpawn,
       onStart: (reason, previousVersion) => {
-        if (reason === "version-mismatch") monitor.stop()
+        monitor.onStart(reason)
         runFork(Effect.logInfo("v2 CLI background service starting", { reason, previousVersion }))
       },
     })
@@ -188,8 +189,7 @@ const adopt = Effect.fn("BackgroundService.adopt")(function* (
     Effect.orElseSucceed(() => undefined),
   )
 
-  if (registration?.url === service.url && registration.pid !== undefined && registration.pid > 0)
-    monitor.watch(registration.pid)
+  monitor.watch(service.url, registration)
   const runningVersion = registration?.version
 
   yield* Effect.logInfo("v2 CLI background service ready", {

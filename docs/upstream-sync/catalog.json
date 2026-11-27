@@ -64,7 +64,7 @@
         "packages/util/src/observability.ts", "packages/util/src/observability/logging.ts",
         "packages/process-daemon/src/daemon.rs", "packages/process-daemon/src/daemon/unix.rs", "packages/process-daemon/src/client.rs",
         "packages/server/src/process.ts", "packages/client/src/service-timing.ts", "packages/client/src/promise/service.ts",
-        "packages/client/src/effect/service.ts", "packages/cli/src/shutdown-deadline.ts",
+        "packages/client/src/effect/service.ts", "packages/client/src/service.ts", "packages/cli/src/shutdown-deadline.ts",
         "packages/server/test/process.test.ts", "packages/client/test/fixture/service.ts",
         "packages/client/test/fixture/service-timing.ts", "packages/client/test/promise-service.test.ts",
         "packages/client/test/service.test.ts", "packages/cli/test/service.test.ts",
