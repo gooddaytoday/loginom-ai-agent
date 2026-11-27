@@ -23,6 +23,7 @@ const Facts = Schema.Struct({
   maxAttempts: Schema.optionalKey(positive),
   error: Schema.optionalKey(
     Schema.Struct({
+      code: Schema.optionalKey(text),
       message: text,
       timeoutMs: Schema.optionalKey(positive),
     }),
@@ -40,9 +41,27 @@ const Progress = Schema.Struct({
   substep: Schema.NullOr(Schema.Struct({ kind: Schema.Literal("fields"), index: positive, total: positive })),
 })
 
+const Busy = Schema.Struct({
+  busy: Schema.Struct({
+    version: Schema.Literal(1),
+    windowId: Schema.String.check(Schema.isUUID()),
+    operationId: Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_.:-]{1,128}$/)),
+    active: Schema.Boolean,
+  }),
+})
+
+const NativeFailure = Schema.Struct({
+  kind: Schema.Literals(["node_failed", "post_launch_message"]),
+  message: text.check(Schema.isMaxLength(1000)),
+})
+
 export const decodeFacts = Schema.decodeUnknownOption(Facts)
 
 export const decodeProgress = Schema.decodeUnknownOption(Progress)
+
+export const decodeBusy = Schema.decodeUnknownOption(Busy)
+
+export const decodeNativeFailure = Schema.decodeUnknownOption(NativeFailure)
 
 type Facts = Option.Option.Value<ReturnType<typeof decodeFacts>>
 
@@ -98,7 +117,11 @@ function completedTitle(copy: Copy, input: ReturnType<typeof decodeFacts>, pendi
   return copy.t("step.done")
 }
 
-export function failureTitle(copy: Copy, facts?: Facts) {
+export function failureTitle(copy: Copy, facts?: Facts, native?: typeof NativeFailure.Type) {
+  if (facts?.error?.code === "LOGINOM_FOREIGN_GRAPH_EDIT") return copy.t("failure.manualEdit")
+
+  if (native) return copy.t(`failure.${native.kind}`, { message: native.message })
+
   const action = (() => {
     const kind = operation(facts)
 

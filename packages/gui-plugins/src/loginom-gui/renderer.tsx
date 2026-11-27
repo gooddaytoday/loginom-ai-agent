@@ -6,7 +6,15 @@ import { createMemo, createSignal, createUniqueId, For, onCleanup, Show } from "
 import { createKeyed, Slot, usePlugin, type Plugin } from "@opencode/plugin/gui"
 import { builtinContext, BuiltinSlot, ToolRenderer, type ToolRendererProps } from "@opencode/plugin/gui/builtin"
 import type definition from "./index"
-import { decodeFacts, decodeProgress, failureTitle, loginomStepPhrase, stepDetails } from "./step-phrase"
+import {
+  decodeBusy,
+  decodeFacts,
+  decodeNativeFailure,
+  decodeProgress,
+  failureTitle,
+  loginomStepPhrase,
+  stepDetails,
+} from "./step-phrase"
 
 const modes = ["compact", "detailed"] as const
 
@@ -66,6 +74,10 @@ function Step(props: ToolRendererProps) {
     running() ? Option.getOrUndefined(decodeProgress(props.metadata.loginomStep)) : undefined,
   )
 
+  const busy = createMemo(
+    () => running() && Option.getOrUndefined(decodeBusy(props.metadata.loginom))?.busy.active === true,
+  )
+
   const [showSpinner, setShowSpinner] = createSignal(false)
   const [seconds, setSeconds] = createSignal(0)
   createKeyed(running, () => {
@@ -73,32 +85,34 @@ function Step(props: ToolRendererProps) {
     onCleanup(() => clearTimeout(timer))
   })
 
-  const waitingSince = () => {
-    const step = progress()
-
-    if (!step || (step.phase !== "waiting" && step.stalledSince === null)) return
-
-    return step.stalledSince ?? Math.max(step.startedAt, step.lastReplyAt ?? 0)
-  }
-
-  createKeyed(waitingSince, (since) => {
-    const tick = () => setSeconds(Math.max(0, Math.floor((Date.now() - since) / 1000)))
-    tick()
-    const timer = setInterval(tick, 1000)
-    onCleanup(() => clearInterval(timer))
-  })
+  createKeyed(
+    () => progress()?.startedAt,
+    (since) => {
+      const tick = () => setSeconds(Math.max(0, Math.floor((Date.now() - since) / 1000)))
+      tick()
+      const timer = setInterval(tick, 1000)
+      onCleanup(() => clearInterval(timer))
+    },
+  )
 
   const title = () => {
-    if (failed()) return failureTitle(ctx, facts())
+    if (failed()) return failureTitle(ctx, facts(), Option.getOrUndefined(decodeNativeFailure(props.metadata.loginom)))
 
     if (!running()) return loginomStepPhrase(ctx, outcome(), { pending: props.metadata.loginomPending === true })
     const step = progress()
 
     if (!step) return ctx.t("step.running")
 
-    if (step.phase === "waiting" || step.stalledSince !== null) return ctx.t("phase.waiting", { seconds: seconds() })
+    const elapsed = seconds()
 
-    return ctx.t(`phase.${step.phase}`)
+    const duration =
+      elapsed < 60
+        ? ctx.t("duration.seconds", { seconds: elapsed })
+        : ctx.t("duration.minutes", { minutes: Math.floor(elapsed / 60), seconds: elapsed % 60 })
+
+    if (step.phase === "waiting") return ctx.t("phase.waiting", { duration })
+
+    return ctx.t("phase.elapsed", { phase: ctx.t(`phase.${step.phase}`), duration })
   }
 
   const details = createMemo(() => {
@@ -151,6 +165,25 @@ function Step(props: ToolRendererProps) {
           </button>
         </Show>
       </div>
+      <Show when={busy()}>
+        <p
+          role="status"
+          class="mt-1 flex items-start gap-2 rounded-md bg-v2-state-bg-warning px-2 py-1 font-medium text-v2-text-text-base"
+        >
+          <Icon
+            name="outline-hexagonal-warning"
+            size="small"
+            class="mt-0.5 shrink-0 text-v2-state-fg-warning"
+            aria-hidden="true"
+          />
+          {ctx.t("phase.protected")}
+        </p>
+      </Show>
+      <Show when={(progress()?.stalledSince ?? null) !== null}>
+        <p role="status" class="ps-7 font-medium text-v2-text-text-base">
+          {ctx.t("phase.stalled")}
+        </p>
+      </Show>
       <ul id={id} hidden={!open() || details().length === 0} class="min-w-0 break-words ps-7 text-v2-text-text-faint">
         <For each={details()}>{(detail) => <li>{detail}</li>}</For>
       </ul>
