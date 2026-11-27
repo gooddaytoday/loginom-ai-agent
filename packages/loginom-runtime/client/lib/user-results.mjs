@@ -87,6 +87,8 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   if (data?.format_restoration) output.format_restoration = pick(data.format_restoration, ['restored', 'table']);
   if (data?.workflow_return) output.workflow_returned = data.workflow_return.verified === true;
   const limitations=[...(node?.warnings??[])];
+  if(outcome?.status==='SUCCEEDED'&&output.file_artifacts?.length)
+    limitations.push('Не утверждай, что приложил файл. Укажи путь в хранилище Loginom из `file_artifacts[].destination` в обратных кавычках. В Desktop файл доступен через карточку у шага экспорта. Локальный путь модели не передаётся. Не ищи и не придумывай локальный путь, не скачивай и не копируй экспорт ради вложения.');
   for(const proof of data?.full_import_verification??[])if(proof.status!=='verified')
     limitations.push('N не сверено: '+proof.reason+'. В итоговом ответе явно укажи «N не сверено» и эту причину; N scan и число строк группировки не подтверждают полный импорт.');
   if(outcome?.status==='SUCCEEDED')limitations.push(...calculatorPrecisionWarnings(node));

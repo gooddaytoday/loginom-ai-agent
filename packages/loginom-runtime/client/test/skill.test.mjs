@@ -26,6 +26,19 @@ test('local product skill preparation never reads the Skills API and returns the
   assert.equal(await loader.prepare(), first);
 });
 
+test('bundled automation tells the model how to answer export attachment requests before using tools', async t => {
+  const source = await createBundledSkillFixture(t);
+  const { detail: { content } } = await createSkillLoader({ resources: source.resources }).prepare();
+  const introduction = content.slice(0, content.indexOf('Считай и сверяй итоги в Loginom'));
+  assert.match(introduction, /не утверждай, что приложил файл/);
+  assert.match(introduction, /`file_artifacts\[\]\.destination` в обратных кавычках/);
+  assert.match(introduction, /В Desktop файл доступен через карточку у шага экспорта/);
+  assert.match(introduction, /Локальный путь модели не передаётся/);
+  assert.match(introduction, /Не ищи и не придумывай локальный путь/);
+  assert.match(introduction, /не скачивай и не копируй экспорт ради вложения/);
+  assert.ok(Buffer.byteLength(content, 'utf8') <= 40000);
+});
+
 test('local preparation rejects a skill file not covered by the resource manifest', async t => {
   const source = await createBundledSkillFixture(t);
   await writeFile(join(source.directory, 'unlisted.mjs'), 'unlisted');
