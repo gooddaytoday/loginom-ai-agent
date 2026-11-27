@@ -139,7 +139,9 @@ test.skipIf(process.platform !== "win32")(
       await icacls(join(root, httpCache), capability + "(OI)(CI)(GR,GW,GE,D)")
       // The generic-bit mapping must be exercised: same raw entries as on Windows.
       const chromium = await aces(join(root, httpCache))
-      expect(chromium).toContain("-536805376 InheritOnly")
+      // icacls adds Synchronize (0xE0110000); Chromium writes 0xE0010000
+      // (-536805376). Both carry GENERIC_READ|WRITE|EXECUTE bits to map.
+      expect(chromium).toContain("-535756800 InheritOnly")
       expect(chromium).toContain("1245631 None")
       await writeFile(join(root, network, "Cookies"), "test")
       await writeFile(join(root, httpCache, "index"), "test")
