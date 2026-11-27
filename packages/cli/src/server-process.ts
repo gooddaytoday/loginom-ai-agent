@@ -115,7 +115,7 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
           ServiceHost.start({
             data: profile?.root ?? global.data,
             resources: process.env.LOGINOM_AI_AGENT_RESOURCES,
-            deviceOnly: network === "device",
+            network,
           }),
         ),
         () => Effect.promise(() => ServiceHost.close().catch(() => undefined)),

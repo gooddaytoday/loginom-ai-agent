@@ -11,16 +11,16 @@ import { connectionSettings } from "./connection-settings"
 import { ServiceHost } from "./host"
 
 export function diagnostics(
-  context: Pick<Context, "model">,
+  models: Pick<Context["model"], "default">,
   bundledCatalog: boolean,
   connection = connectionSettings(),
 ) {
-  async function snapshot(check: boolean): Promise<DiagnosticsStatus> {
+  async function snapshot(check: boolean, signal: AbortSignal): Promise<DiagnosticsStatus> {
     const profile = ServiceHost.diagnosticsProfile()
     const policyFile = policyPath()
     const [saved, model, help, policy] = await Promise.all([
       connection.status(),
-      context.model.default().then(
+      models.default().then(
         ({ data }) => (data?.enabled ? `${data.providerID}/${data.id}` : null),
         () => null,
       ),
@@ -36,12 +36,15 @@ export function diagnostics(
     async function loginom() {
       if (!status?.url || !status.username || status.state === "unconfigured") return "failed"
       if (!check) return status.failed ? "failed" : status.state === "ready" ? "ready" : "unchecked"
-      const result = await connection.check({
-        revision: status.revision,
-        url: status.url,
-        username: status.username,
-        password: { operation: status.hasPassword ? "preserve" : "empty" },
-      })
+      const result = await connection.check(
+        {
+          revision: status.revision,
+          url: status.url,
+          username: status.username,
+          password: { operation: status.hasPassword ? "preserve" : "empty" },
+        },
+        { signal },
+      )
       return result.ok ? "ready" : "failed"
     }
     return {
@@ -56,9 +59,9 @@ export function diagnostics(
     }
   }
   return {
-    status: ({ check }) => snapshot(check),
-    async report() {
-      const status = await snapshot(false)
+    status: ({ check }, { signal }) => snapshot(check, signal),
+    async report(_input, { signal }) {
+      const status = await snapshot(false, signal)
       const profile = ServiceHost.diagnosticsProfile()
       const secrets = await profileSecrets({
         loginom: profile?.root,

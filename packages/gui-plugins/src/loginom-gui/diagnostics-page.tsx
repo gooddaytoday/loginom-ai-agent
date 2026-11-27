@@ -4,13 +4,14 @@ import { createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-j
 import { reportName, ReportSave } from "./contract"
 import { initial, transition, view } from "./diagnostics-machine"
 import type definition from "./index"
-import { loginomClient } from "./target"
+import { loginomLocation, loginomService } from "./target"
 
 export default function DiagnosticsPage() {
   const ctx = usePlugin<typeof definition>()
   const ui = ctx.ui
   const nativeSave = ctx.use(ReportSave)
-  const client = createMemo(() => loginomClient(ctx))
+  const service = createMemo(() => loginomService(ctx))
+  const client = () => service()?.client
   const saveAvailable = () => !ctx.desktop || nativeSave().status === "active"
   const [state, setState] = createSignal(initial)
   const page = createMemo(() => view(state(), saveAvailable()))
@@ -37,7 +38,8 @@ export default function DiagnosticsPage() {
     const request = new AbortController()
     requests.set(effect.attempt, request)
     const signal = AbortSignal.any([ctx.signal, request.signal])
-    const rpc = untrack(client)?.rpc(DiagnosticsRpc)
+    const server = untrack(service)
+    const rpc = server?.client.rpc(DiagnosticsRpc)
 
     const timeout = AbortSignal.any([
       signal,
@@ -45,7 +47,11 @@ export default function DiagnosticsPage() {
     ])
 
     if (effect.type === "status") {
-      void Promise.try(() => rpc?.status({ check: effect.check }, { signal: timeout }))
+      void Promise.try(async () => {
+        const location = server && (await loginomLocation(server, timeout))
+
+        return location && rpc?.status({ check: effect.check }, { location, signal: timeout })
+      })
         .then(
           (status) => dispatch({ type: "status", attempt: effect.attempt, status }),
           () => dispatch({ type: "status", attempt: effect.attempt, status: undefined }),
@@ -56,7 +62,8 @@ export default function DiagnosticsPage() {
     }
 
     void Promise.try(async () => {
-      const content = await rpc?.report({}, { signal: timeout })
+      const location = server && (await loginomLocation(server, timeout))
+      const content = location && (await rpc?.report({}, { location, signal: timeout }))
       signal.throwIfAborted()
 
       if (!content) throw new Error("REPORT_UNAVAILABLE")

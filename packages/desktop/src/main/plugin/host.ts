@@ -1,7 +1,6 @@
 import { app, BrowserWindow } from "electron"
 import { builtins } from "@opencode/gui-plugins/main"
 import {
-  ownsIpc,
   pluginIdAvailable,
   runsOn,
   shipsPluginGui,
@@ -747,7 +746,7 @@ export function createHost(input: {
       const ipc = token.id
 
       // A plugin provides only under its own id, so windows find the provider from the Ipc's id.
-      if (!ownsIpc(id, ipc)) throw new Error(`${id} provides only its own Ipcs, not "${ipc}"`)
+      if (ipc !== id && !ipc.startsWith(`${id}.`)) throw new Error(`${id} provides only its own Ipcs, not "${ipc}"`)
 
       const current = ipcs.get(ipc)
 
@@ -1005,7 +1004,7 @@ export function createHost(input: {
       if (ipcs.has(ipc)) return
 
       const id = [...local.map((definition) => definition.id), ...plugins.keys()].find(
-        (id) => ownsIpc(id, ipc),
+        (id) => ipc === id || ipc.startsWith(`${id}.`),
       )
 
       if (id) void lifecycle.activate(id)

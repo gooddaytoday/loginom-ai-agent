@@ -100,18 +100,21 @@ describe("product defaults of the server", () => {
       root,
       async (call) => {
         await active(call, project)
-        const models = (await call("GET", `/api/model?location[directory]=${encodeURIComponent(project)}`)).data as {
+        const query = `location[directory]=${encodeURIComponent(project)}`
+        const models = (await call("GET", `/api/model?${query}`)).data as {
           providerID: string
         }[]
-        return models.map((item) => item.providerID)
+        const diagnostics = await call("POST", `/api/rpc/loginom.diagnostics/status?${query}`, { input: { check: false } })
+        return { models: models.map((item) => item.providerID), network: diagnostics.output.network }
       },
       {},
       ["--service"],
     )
     expect(result.requests).toEqual([])
     // The server read the moved config (its provider is listed) and offers no free model.
-    expect(result.value).toContain("stub")
-    expect(result.value).not.toContain("opencode")
+    expect(result.value.models).toContain("stub")
+    expect(result.value.models).not.toContain("opencode")
+    expect(result.value.network).toBe("device")
   }, 60_000)
 
   test("«Интернет» by default asks the model catalog and answers with OpenCode's free model", async () => {
