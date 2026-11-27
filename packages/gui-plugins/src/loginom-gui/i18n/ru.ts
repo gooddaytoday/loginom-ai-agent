@@ -1,4 +1,6 @@
 import type { dict as en } from "./en"
+import graphRu from "./graph-ru"
+import schemaRu from "./schema-ru"
 
 export const dict = {
   "detail.label": "Подробность ленты",
@@ -47,3 +49,5 @@ export const dict = {
   "failure.withAttempt": "{{action}} · {{attempt}}",
   "failure.withReasonAndAttempt": "{{action}} · {{reason}} · {{attempt}}",
 } satisfies Record<keyof typeof en | "step.build.few" | "step.build.many", string>
+
+export default { ...dict, ...graphRu, ...schemaRu }

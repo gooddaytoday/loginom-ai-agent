@@ -994,14 +994,15 @@ export async function createBridge(config, session, { browserTransport: managedB
         ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
     });
     return { server, catalog,
-      async graphSnapshot(signal) {
+      async graphSnapshot(signal,{details=false}={}) {
         const prepared=session.metadata.workspacePreparation?.state;
         if(!userProfile||!session.metadata.workspaceReady||prepared?.status!=='READY'
-          ||nativeStepDocument!==prepared.document_id||actionRuntime?.hasUnsettledWork()||recovery.unsettled()||clipboardUncertain)
+          ||nativeStepDocument!==prepared.document_id||actionRuntime?.hasUnsettledWork()||actionRuntime?.hasActiveWork()
+          ||recovery.unsettled()||clipboardUncertain||heldLeases.size>0)
           return null;
         const code=makeWorkspaceStepCode({loginomUrl:config.loginomUrl,build:session.metadata.targetIdentity.loginom_build,
           sessionId:session.metadata.sessionId,workflowRef:{...prepared.workflow_ref,document_id:prepared.document_id},
-          readGraph,types:NODE_TYPES,snapshotOnly:true});
+          readGraph,types:NODE_TYPES,snapshotOnly:true,snapshotDetails:details});
         const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{
           code:config.storageDirectories?withStorageIdentity(code,session.metadata.storageBinding):code,
         }},undefined,{timeout:3000,signal});

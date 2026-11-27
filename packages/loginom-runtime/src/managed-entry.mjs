@@ -31,6 +31,7 @@ const state = {
   bridge: undefined,
   client: undefined,
   controller: undefined,
+  schemaRead: undefined,
   session: undefined,
   browser: undefined,
   browserProfile: undefined,
@@ -312,6 +313,25 @@ async function handle(message) {
       }
       return
     }
+    if (message.operation === "packageSchema") {
+      if (state.controller) {
+        send({ id: message.id, result: null })
+        return
+      }
+      const controller = new AbortController()
+      state.controller = controller
+      try {
+        state.schemaRead = state.bridge.graphSnapshot(controller.signal,{details:true}).catch(() => null)
+        const result = await state.schemaRead
+        send({ id: message.id, result: controller.signal.aborted ? null : result })
+      } finally {
+        if (state.controller === controller) {
+          state.controller = undefined
+          state.schemaRead = undefined
+        }
+      }
+      return
+    }
     if (message.operation === "work") {
       send({
         id: message.id,
@@ -360,12 +380,19 @@ async function handle(message) {
       send({ id: message.id, result: { interrupted: true } })
       return
     }
-    if (message.operation !== "call" || state.controller) throw Error("LOGINOM_REQUEST_INVALID")
+    if (message.operation !== "call" || (state.controller && !state.schemaRead)) throw Error("LOGINOM_REQUEST_INVALID")
     if (message.input.packageArtifact !== undefined && message.input.name !== "dock_prepare")
       throw Error("LOGINOM_REQUEST_INVALID")
+    const schemaRead = state.schemaRead
+    if (schemaRead) {
+      state.controller?.abort()
+      state.schemaRead = undefined
+    }
     const controller = new AbortController()
     state.controller = controller
     try {
+      if (schemaRead) await schemaRead
+      controller.signal.throwIfAborted()
       // Allow the bounded owned read and cleanup to return before the outer IPC
       // deadlines. Other tools retain room for a 60-second dock_node_wait.
       const options = {
@@ -374,6 +401,8 @@ async function handle(message) {
       }
       const snapshot = () => state.bridge.graphSnapshot(controller.signal).catch(() => null)
       const graphBefore = message.input.graphBefore === true ? await snapshot() : null
+      controller.signal.throwIfAborted()
+      const before = state.session.metadata.workspacePreparation
       const result = await withStepProgress({
         name: message.input.name,
         signal: controller.signal,
@@ -386,12 +415,20 @@ async function handle(message) {
         : message.input.scanReceipt !== undefined
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
           : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options))
+      const preparation = state.session.metadata.workspacePreparation
+      const prepared = preparation?.state
+      const schemaRef = message.input.name === "dock_prepare" && !result.isError && preparation !== before
+        && prepared?.status === "READY" && state.session.metadata.workspaceReady === true ? {
+          document_id: prepared.document_id, workflow_id: prepared.workflow_ref.workflow_id,
+        } : null
       const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
       const graphAfter = await snapshot()
       send({
         id: message.id,
         result: {
-          result: outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result,
+          result: outputFiles.length || schemaRef ? { ...result, _meta: { ...result._meta,
+            ...(outputFiles.length ? { outputFiles } : {}), ...(schemaRef ? { packageSchema: schemaRef } : {}),
+          } } : result,
           recoveryPending: state.bridge.hasUnsettledWork(),
           activeWork: state.bridge.hasActiveWork(),
           ...(graphBefore ? { graphBefore } : {}),

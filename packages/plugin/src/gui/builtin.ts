@@ -351,6 +351,12 @@ export interface BuiltinDesktop extends Desktop {
 /** `Layout` with the abilities only built-ins use. */
 export interface BuiltinLayout extends Layout {
   /**
+   * Opens a top-level page registered by this plugin.
+   *
+   * @param id - The id of the page in the plugin's `Page` contribution.
+   */
+  openPage(id: string): void
+  /**
    * Runs an app command as the command palette does, e.g. `mcp.toggle` (the `/mcp` dialog). Does nothing when the
    * command is unavailable or disabled. App command ids are the app's own, not a plugin contract.
    *

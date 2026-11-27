@@ -4,6 +4,7 @@ import {browserDownloadsPath} from './browser-downloads.mjs';
 import {journalCopy} from './execution-journal.mjs';
 import {readSavedPackageState} from './package-persistence.mjs';
 import {readSaveGraph} from './saved-package-graph.mjs';
+import {normalizePackageGuid} from './saved-package-reader.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,requireServerDownloadFormat,serverDownloadTools,storageListPattern,listStorageDirectory,readStorageDestination} from './storage-policy.mjs';
 import {preflightExcelExportDestination} from './exports-excel-procedure.mjs';
 import {buildNodeReadRequest,NODE_READ_MODE} from './node-read-contract.mjs';
@@ -3789,7 +3790,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const node=result?.node;
         if(result?.status!=='SUCCEEDED'||result.cleanup_complete!==true||request?.finish==='close'
           ||node?.document_id!==documentId||node.workflow_id!==workflowId)continue;
-        const id=node.node_id.toLowerCase();
+        const id=normalizePackageGuid(node.node_id);
         if(typeof request?.target?.label==='string')intendedLabels.set(id,request.target.label);
         const readback=result.configuration?.readback;
         if(readback?.kind==='sorting')sorting.set(id,{

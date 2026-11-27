@@ -1,5 +1,9 @@
 import { Plugin } from "@opencode/plugin/gui"
+import { builtinCatalog } from "@opencode/plugin/gui/builtin"
 import { dict as en } from "./i18n/en"
-import { dict as ru } from "./i18n/ru"
+import graphEn from "./i18n/graph-en"
+import schemaEn from "./i18n/schema-en"
 
-export default Plugin.define({ i18n: { en, ru } })
+export default Plugin.define({
+  i18n: builtinCatalog({ en: { ...en, ...graphEn, ...schemaEn }, ru: () => import("./i18n/ru") }),
+})

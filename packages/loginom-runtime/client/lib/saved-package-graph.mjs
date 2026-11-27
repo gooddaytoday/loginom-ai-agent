@@ -1,11 +1,6 @@
-import {DOMParser} from '@xmldom/xmldom';
-import {Uint8ArrayReader, Uint8ArrayWriter, ZipReader} from '@zip.js/zip.js';
+import {child,items,normalizePackageGuid,readSavedWorkflow,requirePackageGuid,withSavedPackage} from './saved-package-reader.mjs';
 
 const maxBytes = 2 * 1024 * 1024;
-const guid = value => {
-  if (!/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(value)) throw Error('Missing package GUID');
-  return value.toLowerCase();
-};
 
 export function readSaveGraph() {
   const app = globalThis.bg?.app;
@@ -123,57 +118,42 @@ export function parseSavedPackageBytes(response) {
   throw Error('Saved package read unavailable');
 }
 
-const child = (parent, name) => Array.from(parent?.childNodes ?? []).find(element => element.nodeType === 1 && element.localName === name);
-const items = parent => Array.from(parent?.childNodes ?? []).filter(element => element.nodeType === 1 && element.localName === 'Item');
 const type = element => element?.getAttributeNS('http://www.w3.org/2001/XMLSchema-instance', 'type');
 const names = columns => items(columns).map(column => column.getAttribute('Name'));
 
+function* workflows(graph) {
+  if(!graph.root)throw Error('Invalid package workflow');
+  yield graph;
+  for(const node of graph.nodes)if(node.submodel)yield* workflows(node.submodel);
+}
+
 async function savedGraphs(bytes) {
   if (bytes.length > maxBytes) throw Error('Saved package size outside bound');
-  const archive = new ZipReader(new Uint8ArrayReader(new Uint8Array(bytes)), {useWebWorkers:false});
-  try {
-    const entries = await archive.getEntries();
-    const units = entries.filter(entry => /^Unit_\d+[\\/]Unit\.xml$/.test(entry.filename));
-    if (!units.length || new Set(units.map(unit => unit.filename.replaceAll('\\', '/'))).size !== units.length
-      || units.reduce((size, unit) => size + unit.uncompressedSize, 0) > 8 * maxBytes)
+  return withSavedPackage(bytes, 8 * maxBytes, async archive=>{
+    const units=await archive.units();
+    if(!units.length||new Set(units.map(unit=>unit.toLowerCase())).size!==units.length)
       throw Error('Saved package XML inventory outside bound');
-    const graphs = [];
-    const walk = (workflow, depth=0) => {
-      if (!workflow || depth > 32) throw Error('Invalid package workflow');
-      const graph = {nodes:items(child(workflow, 'Nodes')),
-        links:[...items(child(workflow, 'Links')), ...items(child(workflow, 'ServiceLinks'))]};
-      graphs.push(graph);
-      for (const node of graph.nodes) {
-        const unit = child(child(child(node, 'Component'), 'Engine'), 'ModelUnit');
-        if (unit) walk(child(unit, 'WorkFlow'), depth+1);
-      }
-    };
-    for (const unit of units) {
-      const xml = new TextDecoder('utf-8', {fatal:true}).decode(await unit.getData(new Uint8ArrayWriter(), {checkSignature:true}));
-      const fail = () => { throw Error('Invalid saved package XML'); };
-      if (/<!DOCTYPE/i.test(xml)) fail();
-      const doc = new DOMParser({errorHandler:{warning:fail, error:fail, fatalError:fail}}).parseFromString(xml, 'application/xml');
-      walk(child(doc.documentElement, 'WorkFlow'));
-    }
-    return graphs;
-  } finally { await archive.close(); }
+    const result=await Promise.all(units.map(async unit=>
+      [...workflows(readSavedWorkflow(child(await archive.xml(unit+'/Unit.xml'),'WorkFlow'),32))]));
+    return result.flat();
+  });
 }
 
 export async function compareSavedPackageGraph({bytes, before, sorting = new Map(), intendedLabels = new Map()}) {
-  const expected = new Map(before.nodes.map(node => [guid(node.id), node]));
+  const expected = new Map(before.nodes.map(node => [requirePackageGuid(node.id), node]));
   if (!expected.size || expected.size !== before.nodes.length) throw Error('Pre-save node identity unavailable');
   const graphs = await savedGraphs(bytes);
-  const matching = graphs.filter(({nodes}) => nodes.some(node => expected.has(guid(node.getAttribute('Guid')))));
+  const matching = graphs.filter(({nodes}) => nodes.some(node => expected.has(requirePackageGuid(node.guid))));
   if (matching.length !== 1) throw Error('Saved workflow identity unavailable');
   const {nodes, links} = matching[0];
-  const observed = new Map(nodes.map(node => [guid(node.getAttribute('Guid')), node]));
+  const observed = new Map(nodes.map(node => [requirePackageGuid(node.guid), node]));
   if (observed.size !== nodes.length) throw Error('Duplicate saved node GUID');
   const changes = [], uncheckedSorting = [];
   const savedLabels = [];
   for (const [id, previous] of expected) {
     const node = observed.get(id);
     if (!node) { changes.push({kind:'node_missing', node_id:id, before:previous.label}); continue; }
-    const label = node.getAttribute('DisplayName') || node.getAttribute('Name');
+    const label = node.label;
     if (!label) throw Error('Saved node name unavailable');
     savedLabels.push({node_id:id, label});
     const previousLabel = intendedLabels.get(id) ?? previous.label;
@@ -184,7 +164,7 @@ export async function compareSavedPackageGraph({bytes, before, sorting = new Map
     }
     if (!previous.sorting) continue;
     const intended = sorting.get(id);
-    const component = child(node, 'Component'), engine = child(component, 'Engine');
+    const component = child(node.element, 'Component'), engine = child(component, 'Engine');
     const keys = child(engine, 'SortingColumns');
     const sheet = section => child(child(items(child(component, section)).find(socket => socket.getAttribute('Name') === 'DataSource'), 'Socket'), 'DataSource');
     const output = sheet('OutputSockets'), input = sheet('InputSockets');
@@ -197,12 +177,11 @@ export async function compareSavedPackageGraph({bytes, before, sorting = new Map
       if (JSON.stringify(prior) !== JSON.stringify(saved)) changes.push({kind, node_id:id, label, before:prior, saved});
     }
   }
-  const edge = values => values.map(guid).join('/');
+  const edge = values => values.map(requirePackageGuid).join('/');
   const oldLinks = new Set(before.links.map(edge));
-  const savedLinks = new Set(links.map(link => ['SourcePort','TargetPort'].flatMap(endpoint => {
-    const port = child(link, endpoint);
-    return [port?.getAttribute('NodeGuid'), port?.getAttribute('PortGuid')];
-  })).filter(([source,,target]) => observed.has(source?.toLowerCase()) && observed.has(target?.toLowerCase())).map(edge));
+  const savedLinks = new Set(links.map(link => [
+    link.source_node_guid, link.source_port_guid, link.target_node_guid, link.target_port_guid,
+  ]).filter(([source,,target]) => observed.has(normalizePackageGuid(source)) && observed.has(normalizePackageGuid(target))).map(edge));
   for (const [kind, left, right] of [['link_removed', oldLinks, savedLinks], ['link_added', savedLinks, oldLinks]])
     for (const link of left) if (!right.has(link)) changes.push({kind, endpoints:link.split('/')});
   return {scope:'active_workflow', saved_labels:savedLabels, changes, unchecked_sorting:uncheckedSorting};

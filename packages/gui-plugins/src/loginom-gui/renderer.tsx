@@ -5,13 +5,16 @@ import { Option } from "effect"
 import { createMemo, createSignal, createUniqueId, For, onCleanup, Show } from "solid-js"
 import { createKeyed, Slot, usePlugin, type Plugin } from "@opencode/plugin/gui"
 import { builtinContext, BuiltinSlot, ToolRenderer, type ToolRendererProps } from "@opencode/plugin/gui/builtin"
+import { GraphNotices } from "./graph-notices"
 import type definition from "./index"
+import { setupSchemaView, type SchemaNavigation } from "./schema-view"
 import { decodeFacts, decodeProgress, failureTitle, loginomStepPhrase, stepDetails } from "./step-phrase"
 
 const modes = ["compact", "detailed"] as const
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   const timeline = builtinContext(ctx).timeline
+  const navigation = setupSchemaView(ctx)
 
   const renderDetail = () => (
     <div
@@ -45,11 +48,11 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     },
     separate: true,
     handlesFailure: true,
-    render: (props) => <Step {...props} />,
+    render: (props) => <Step {...props} navigation={navigation} />,
   })
 }
 
-function Step(props: ToolRendererProps) {
+function Step(props: ToolRendererProps & { navigation: SchemaNavigation }) {
   const ctx = usePlugin<typeof definition>()
   const timeline = builtinContext(ctx).timeline
   const outcome = createMemo(() => decodeFacts(props.metadata.loginom))
@@ -115,6 +118,7 @@ function Step(props: ToolRendererProps) {
 
   return (
     <div class="min-w-0 text-13-regular text-v2-text-text-muted">
+      <GraphNotices ctx={ctx} metadata={props.metadata} detailed={detailed()} navigation={props.navigation} />
       <div class="flex min-w-0 items-start gap-2">
         <span class="flex size-5 shrink-0 items-center justify-center" aria-hidden="true">
           <Show

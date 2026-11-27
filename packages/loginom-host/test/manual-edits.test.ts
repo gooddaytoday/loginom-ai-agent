@@ -52,3 +52,18 @@ test("does not compare other conversations, generations, workflows or missing ch
   expect(step("chat", "four", 2).settle(null, null)).toEqual([])
   expect(step("chat", "five", 2).readBefore).toBe(false)
 })
+
+test("the same node and port GUIDs keep their identity across UUID spellings", () => {
+  const source = "88fa4542-2b78-4dfb-858b-6372f0b0446a"
+  const output = "58f7e6c3-511e-39d7-8853-036e0a1a7612"
+  const before = { ...graph, nodes: [{ ...imported, guid: source }, grouped], links: [{ ...link, source, output }] }
+  const changed = `{${source.toUpperCase()}}`
+  const after = {
+    ...graph,
+    nodes: [{ ...imported, guid: changed }, grouped],
+    links: [{ ...link, source: changed, output: output.toUpperCase() }],
+  }
+  const step = graphSteps()
+  step("chat", "one", 1).settle(null, before)
+  expect(step("chat", "two", 1).settle(after, after)).toEqual([])
+})

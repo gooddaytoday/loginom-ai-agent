@@ -130,6 +130,7 @@ type TimelineServerInput = Partial<
     | "onPermissionReply"
     | "shellCommands"
     | "shellOutput"
+    | "rpc"
   >
 >
 

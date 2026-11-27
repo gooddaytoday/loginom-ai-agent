@@ -10,9 +10,11 @@ import { fileURLToPath } from "node:url"
 import { fileError, hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import {
   inspectReferenceFile,
+  openReferenceFile,
   type FileReference,
   type ReferenceSnapshot,
 } from "@loginom-ai-agent/loginom-host/file-reference"
+import { maxPackageBytes } from "@loginom-ai-agent/loginom-host/package-schema"
 import type { Plugin } from "@opencode/plugin"
 import type { Info, ToolContext } from "@opencode/plugin/promise/tool"
 import { Tool } from "@opencode/schema/tool"
@@ -30,13 +32,19 @@ const sampleReceipt = Schema.decodeUnknownOption(
 const receiptKey = (sessionID: string, messageID: string, uri: string) =>
   `attachment-receipt:${sessionID}:${messageID}:${uri}`
 const carriedKey = (sessionID: string, compactionID: string) => `compacted-attachments:${sessionID}:${compactionID}`
-const decodeReceipt = Schema.decodeUnknownOption(
+const AttachmentReceipt = Schema.Struct({
+  canonical_path: Schema.String,
+  size: Schema.Number,
+  mtime: Schema.Number,
+  ctime: Schema.Number,
+  file_id: Schema.String,
+})
+const decodeReceipt = Schema.decodeUnknownOption(AttachmentReceipt)
+const decodePackageReceipt = Schema.decodeUnknownOption(
   Schema.Struct({
-    canonical_path: Schema.String,
-    size: Schema.Number,
-    mtime: Schema.Number,
-    ctime: Schema.Number,
-    file_id: Schema.String,
+    ...AttachmentReceipt.fields,
+    mtime_ns: Schema.String,
+    ctime_ns: Schema.String,
   }),
 )
 const decodeCarried = Schema.decodeUnknownOption(
@@ -199,9 +207,46 @@ export async function localFiles(
     const bytes = await fileSnapshot(source.canonicalPath, MAX_BYTE_ADMISSION).catch((error) => {
       throw Error(hostErrorText(error) + " Путь: " + source.sourcePath)
     })
+    await source.verifyAttachment(bytes)
     return {
       sourcePath: source.sourcePath,
+      canonicalPath: source.canonicalPath,
       file: { name: basename(source.canonicalPath), data: bytes.toString("base64") },
+    }
+  }
+
+  const attachedPackage = async (sessionID: string, signal: AbortSignal) => {
+    const history = await plugin.session.context({ sessionID })
+    const local = (await attachments(sessionID, history)).flatMap((file) => {
+      const path = attachedPath(file.uri)
+      return path?.toLowerCase().endsWith(".lgp") ? [{ ...file, path }] : []
+    })
+    const inline = history.flatMap((message) =>
+      message.type === "user" ? (message.files ?? []).flatMap((file) =>
+        file.source.type === "inline" && file.name?.toLowerCase().endsWith(".lgp")
+          ? [{ message: message.id, name: basename(file.name), data: file.data }] : [],
+      ) : [],
+    )
+    const packages = [...local, ...inline]
+    const packageMessages = new Set(packages.map((file) => file.message))
+    const message =
+      history.findLast((item) => item.type === "user" && packageMessages.has(item.id))?.id ?? local.at(-1)?.message
+    const candidates = packages.filter((file) => file.message === message)
+    if (candidates.length !== 1) return null
+    const file = candidates[0]
+    if ("data" in file) {
+      if (file.data.length > Math.ceil(maxPackageBytes / 3) * 4) throw Error("PACKAGE_SCHEMA_TOO_LARGE")
+      return { name: file.name, bytes: Buffer.from(file.data, "base64") }
+    }
+    const identity = decodePackageReceipt(await plugin.storage.get(receiptKey(sessionID, file.message, file.uri)))
+    if (Option.isNone(identity)) return null
+    if (identity.value.size > maxPackageBytes) throw Error("PACKAGE_SCHEMA_TOO_LARGE")
+    if ((await realpath(file.path)) !== identity.value.canonical_path) return null
+    const handle = await openReferenceFile({ ...identity.value, sha256: null }, { signal })
+    try {
+      return { name: basename(file.path), bytes: await handle.readBytes(maxPackageBytes) }
+    } finally {
+      await handle.close()
     }
   }
 
@@ -369,7 +414,7 @@ export async function localFiles(
     },
   })
 
-  return { ask, authorize, admit, admitReference, snapshot, admitTool }
+  return { ask, authorize, admit, admitReference, snapshot, attachedPackage, admitTool }
 }
 
 /**

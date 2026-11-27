@@ -1,0 +1,26 @@
+import type en from "./graph-en"
+
+export default {
+  "graph.edits": "Учёл ваши правки",
+  "graph.edits.summary": "Учёл ваши правки: {{edits}}.",
+  "graph.edits.more.one": "ещё {{count}} правка",
+  "graph.edits.more.few": "ещё {{count}} правки",
+  "graph.edits.more.many": "ещё {{count}} правок",
+  "graph.edits.more.other": "ещё {{count}} правки",
+  "graph.edit.node_added": "добавили «{{node}}»",
+  "graph.edit.node_removed": "удалили «{{node}}»",
+  "graph.edit.node_renamed": "переименовали «{{before}}» в «{{node}}»",
+  "graph.edit.node_moved": "переместили «{{node}}»",
+  "graph.edit.link_added": "добавили связь «{{source}}» → «{{target}}»",
+  "graph.edit.link_removed": "удалили связь «{{source}}» → «{{target}}»",
+  "graph.detail.node_added": "Узел добавлен",
+  "graph.detail.node_removed": "Узел удалён",
+  "graph.detail.node_renamed": "Было «{{before}}»",
+  "graph.detail.node_moved": "Переместили из ({{fromX}}, {{fromY}}) в ({{toX}}, {{toY}})",
+  "graph.detail.link_added": "Добавили связь · выход {{output}} → вход {{input}}",
+  "graph.detail.link_removed": "Удалили связь · выход {{output}} → вход {{input}}",
+  "graph.detail.endpoints": "→",
+  "graph.node.unnamed": "Узел без имени",
+  "graph.saved.renamed": "Loginom переименовал узел «{{before}}» в «{{after}}»",
+  "graph.saved.different": "В сохранённом пакете имя узла изменилось с «{{before}}» на «{{after}}»",
+} satisfies Record<keyof typeof en | "graph.edits.more.few" | "graph.edits.more.many", string>

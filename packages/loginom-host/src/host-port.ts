@@ -1,5 +1,5 @@
-import { createHash, randomUUID } from "node:crypto"
-import type { createLoginomHost } from "./host"
+import { randomUUID } from "node:crypto"
+import { runtimeChat, type createLoginomHost } from "./host"
 import type { InputFile } from "./inputs"
 import type { FileReference } from "./file-reference"
 import { hostException, hostFailure } from "./errors"
@@ -223,7 +223,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           acquiring.has(input.run)
         )
           throw new Error("LOGINOM_RUN_INVALID")
-        const chat = createHash("sha256").update(input.session).digest("hex")
+        const chat = runtimeChat(input.session)
         if (service.recoveries.has(chat) || service.journal.pending().length)
           throw new Error("LOGINOM_RECOVERY_REQUIRED")
         if ([...runs.values()].some((run) => run.chat === chat) || [...acquiring.values()].includes(chat))
