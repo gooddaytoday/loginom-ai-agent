@@ -1,12 +1,13 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { protectWindowsProfile } from "../../src/cli/profile-windows"
+import { protectWindowsProfile, removeAbandonedBrowserDirectories } from "../../src/cli/profile-windows"
 import { acquireProfile } from "../../src/cli/profile"
 
 test.skipIf(process.platform === "win32")("Windows ACL protection fails closed on other platforms", async () => {
   await expect(protectWindowsProfile("C:\\profile")).rejects.toThrow("PROFILE_PERMISSIONS_INVALID")
+  await expect(removeAbandonedBrowserDirectories("C:\\profile")).rejects.toThrow("PROFILE_CLEANUP_FAILED")
 })
 
 test.skipIf(process.platform !== "win32")(
@@ -52,7 +53,18 @@ test.skipIf(process.platform !== "win32")(
         stderr: "ignore",
       })
       expect(await child.exited).toBe(0)
-      await expect(protectWindowsProfile(root)).rejects.toThrow("PROFILE_PERMISSIONS_INVALID")
+      // The error stays the bare code; the person is told the path and the ACE.
+      const notices: string[] = []
+      const refused = await acquireProfile(root, "dev", { notice: (text) => notices.push(text) }).then(
+        () => undefined,
+        (error: Error) => error,
+      )
+      expect(refused?.message).toBe("PROFILE_PERMISSIONS_INVALID")
+      expect(notices).toHaveLength(1)
+      expect(notices[0]).toStartWith(`PROFILE_PERMISSIONS_INVALID: ${await realpath(root)}: ACE S-1-1-0 Allow, rights 0x`)
+      expect(notices[0]).toMatch(
+        /rights 0x[0-9A-F]{8} \([^)]+\), inheritance ContainerInherit, ObjectInherit, propagation None, inherited False$/,
+      )
     } finally {
       await rm(temporary, { recursive: true, force: true })
     }
@@ -98,6 +110,23 @@ test.skipIf(process.platform !== "win32")(
       })
       expect(await child.exited).toBe(0)
     }
+    // Raw rights and propagation of each ACE, as the profile check reads them.
+    const aces = async (target: string) => {
+      const child = Bun.spawn(
+        [
+          join(systemRoot, "System32/WindowsPowerShell/v1.0/powershell.exe"),
+          "-NoLogo",
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          "(Get-Acl -LiteralPath $env:ACL_TARGET).Access | ForEach-Object { '' + [int]$_.FileSystemRights + ' ' + $_.PropagationFlags }",
+        ],
+        { env: { ...process.env, ACL_TARGET: target }, stdout: "pipe", stderr: "ignore" },
+      )
+      const text = await new Response(child.stdout).text()
+      expect(await child.exited).toBe(0)
+      return text.split(/\r?\n/)
+    }
     const capability =
       "*S-1-15-3-1024-1528657515-1944437972-2795272136-1227674495-293963776-353393192-4060142787-1908764039:"
     const temporary = await mkdtemp(join(tmpdir(), "loginom-acl-cache-test-"))
@@ -116,7 +145,16 @@ test.skipIf(process.platform !== "win32")(
       const httpCache = join("loginom", "validation", "http-cache", "Default", "Cache")
       const root = await profile(network, httpCache)
       await icacls(join(root, network), capability + "(OI)(CI)M")
-      await icacls(join(root, httpCache), capability + "(OI)(CI)M")
+      // Chromium's own grant (LAB-2078 readback): Modify, Synchronize on the
+      // directory plus an inherit-only entry with these generic rights.
+      await icacls(join(root, httpCache), capability + "(OI)(CI)(GR,GW,GE,D)")
+      // Generic bits must reach the check: same raw entries as on Windows.
+      const chromium = await aces(join(root, httpCache))
+      // icacls adds Synchronize (0xE0110000); Chromium writes 0xE0010000
+      // (-536805376). GENERIC_READ|WRITE|EXECUTE stay within Modify,
+      // Synchronize and are accepted; only GENERIC_ALL is refused.
+      expect(chromium).toContain("-535756800 InheritOnly")
+      expect(chromium).toContain("1245631 None")
       await writeFile(join(root, network, "Cookies"), "test")
       await writeFile(join(root, httpCache, "index"), "test")
       await protectWindowsProfile(root)
@@ -128,6 +166,11 @@ test.skipIf(process.platform !== "win32")(
         [join("loginom", "validation", "other", "Default"), capability + "(OI)(CI)M"],
         [join("config", "Default"), capability + "(OI)(CI)M"],
         [network, capability + "(OI)(CI)F"],
+        // Only Modify + Synchronize: 0.4.3 accepted these because they are not FullControl.
+        [network, capability + "(OI)(CI)(M,WDAC)"],
+        [network, capability + "(OI)(CI)(M,WO)"],
+        [network, capability + "(OI)(CI)(M,DC)"],
+        [network, capability + "(OI)(CI)(IO)(GA)"],
         [network, "*S-1-15-2-1:(OI)(CI)M"],
         // Another principal inside an anchor is what the check exists for.
         [network, "*S-1-1-0:(OI)(CI)R"],
@@ -141,11 +184,153 @@ test.skipIf(process.platform !== "win32")(
       ]) {
         const rejected = await profile(directory)
         await icacls(join(rejected, directory), grant)
-        await expect(protectWindowsProfile(rejected)).rejects.toThrow("PROFILE_PERMISSIONS_INVALID")
+        if (grant.endsWith("(IO)(GA)")) expect(await aces(join(rejected, directory))).toContain("268435456 InheritOnly")
+        const notices: string[] = []
+        await expect(protectWindowsProfile(rejected, (text) => notices.push(text))).rejects.toThrow(
+          "PROFILE_PERMISSIONS_INVALID",
+        )
+        // The refused entry and the offending ACE, as stored.
+        const sid = grant.slice(1, grant.indexOf(":"))
+        expect(notices).toEqual([expect.stringContaining(`: ${join(rejected, directory)}: ACE ${sid} Allow, rights 0x`)])
+        if (grant.endsWith("(M,WDAC)")) expect(notices[0]).toContain("rights 0x001701BF")
+        if (grant.endsWith("(IO)(GA)"))
+          expect(notices[0]).toContain("rights 0x10000000 (268435456), inheritance ContainerInherit, ObjectInherit, propagation InheritOnly")
       }
     } finally {
       await rm(temporary, { recursive: true, force: true })
     }
   },
   100000,
+)
+
+test.skipIf(process.platform !== "win32")(
+  "native cleanup removes only abandoned Chromium directories directly in the profile cache\\tmp",
+  async () => {
+    const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
+    if (!systemRoot) throw Error("SystemRoot required")
+    // Standard users may create junctions but not symlinks.
+    const junction = async (link: string, target: string) => {
+      const child = Bun.spawn([join(systemRoot, "System32/cmd.exe"), "/d", "/c", "mklink", "/J", link, target], {
+        stdout: "ignore",
+        stderr: "ignore",
+      })
+      expect(await child.exited).toBe(0)
+    }
+    const temporary = await mkdtemp(join(tmpdir(), "loginom-acl-cleanup-test-"))
+    try {
+      const outside = join(temporary, "outside")
+      await mkdir(join(outside, "lbC1wMfr"), { recursive: true })
+      await writeFile(join(outside, "keep.txt"), "keep")
+      const root = join(temporary, "profile")
+      await mkdir(root)
+      await protectWindowsProfile(root)
+      const abandoned = join(root, "cache", "tmp", "lbC1wMfr")
+      await mkdir(join(abandoned, "Default", "Network"), { recursive: true })
+      await writeFile(join(abandoned, "Default", "Network", "Cookies"), "test")
+      // A junction inside an abandoned directory is unlinked, never entered.
+      await junction(join(abandoned, "Default", "link"), outside)
+      const kept = [
+        join("cache", "tmp", "lbC1wMf"),
+        join("cache", "tmp", "lbC1wMfr0"),
+        // NTFS names are case-insensitive: a different name, not LBC1wMfr.
+        join("cache", "tmp", "LBx9Yz00"),
+        join("cache", "tmp", "lb-1wMfr"),
+        join("cache", "tmp", "other", "lbC1wMfr"),
+        join("config", "cache", "tmp", "lbC1wMfr"),
+      ]
+      for (const directory of kept) await mkdir(join(root, directory, "Default"), { recursive: true })
+      await writeFile(join(root, "cache", "tmp", "lbAbCd12"), "not a directory")
+      await junction(join(root, "cache", "tmp", "lbJunct1"), outside)
+      await removeAbandonedBrowserDirectories(root)
+      await expect(lstat(abandoned)).rejects.toThrow()
+      for (const directory of kept) expect((await lstat(join(root, directory, "Default"))).isDirectory()).toBe(true)
+      expect(await readFile(join(root, "cache", "tmp", "lbAbCd12"), "utf8")).toBe("not a directory")
+      await lstat(join(root, "cache", "tmp", "lbJunct1"))
+      expect(await readFile(join(outside, "keep.txt"), "utf8")).toBe("keep")
+      expect((await lstat(join(outside, "lbC1wMfr"))).isDirectory()).toBe(true)
+      // Nothing left to remove: returns without starting PowerShell.
+      await removeAbandonedBrowserDirectories(root)
+
+      // The anchor is the profile root itself: a redirected cache\tmp is refused.
+      const redirected = join(temporary, "redirected")
+      await mkdir(join(redirected, "cache"), { recursive: true })
+      await junction(join(redirected, "cache", "tmp"), outside)
+      await expect(removeAbandonedBrowserDirectories(redirected)).rejects.toThrow("PROFILE_CLEANUP_FAILED")
+      expect((await lstat(join(outside, "lbC1wMfr"))).isDirectory()).toBe(true)
+    } finally {
+      await rm(temporary, { recursive: true, force: true })
+    }
+  },
+  60000,
+)
+
+test.skipIf(process.platform !== "win32")(
+  "native profile takeover from a dead owner removes abandoned Chromium directories, a normal start does not",
+  async () => {
+    const temporary = await mkdtemp(join(tmpdir(), "loginom-takeover-cleanup-test-"))
+    const root = join(temporary, "profile")
+    try {
+      const first = await acquireProfile(root, "dev")
+      const abandoned = join(first.paths.tmp, "lbC1wMfr")
+      await mkdir(join(abandoned, "Default", "Network"), { recursive: true })
+      await first.release()
+      // Normal start: the previous owner released the guard, nothing is removed.
+      const normal = await acquireProfile(root, "dev")
+      expect((await lstat(abandoned)).isDirectory()).toBe(true)
+      // Killed CLI: the guard stays; the next start takes it over from a dead owner.
+      const taken = await acquireProfile(root, "dev", {
+        probe: { owner: async () => "dead", survivors: async () => [] },
+      })
+      await expect(lstat(abandoned)).rejects.toThrow()
+      expect((await lstat(taken.paths.tmp)).isDirectory()).toBe(true)
+      await expect(normal.release()).rejects.toThrow("PROFILE_OWNER_CHANGED")
+      await taken.release()
+    } finally {
+      await rm(temporary, { recursive: true, force: true })
+    }
+  },
+  60000,
+)
+
+test.skipIf(process.platform !== "win32")(
+  "native takeover survives a failed cleanup, and an unreadable entry is refused with its reason",
+  async () => {
+    const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
+    if (!systemRoot) throw Error("SystemRoot required")
+    const run = async (tool: string, ...args: string[]) => {
+      const child = Bun.spawn([join(systemRoot, "System32", tool), ...args], { stdout: "ignore", stderr: "ignore" })
+      expect(await child.exited).toBe(0)
+    }
+    const temporary = await mkdtemp(join(tmpdir(), "loginom-refusal-test-"))
+    try {
+      const first = await acquireProfile(join(temporary, "profile"), "dev")
+      // A read-only file makes the cleanup fail; the takeover still succeeds.
+      const stuck = join(first.paths.tmp, "lbR3adOn")
+      await mkdir(stuck)
+      await writeFile(join(stuck, "locked"), "test")
+      await run("attrib.exe", "+R", join(stuck, "locked"))
+      const taken = await acquireProfile(join(temporary, "profile"), "dev", {
+        probe: { owner: async () => "dead", survivors: async () => [] },
+      })
+      expect(await readFile(join(stuck, "locked"), "utf8")).toBe("test")
+      await run("attrib.exe", "-R", join(stuck, "locked"))
+      // A directory the check cannot list is refused with its path and the error.
+      const unreadable = join(taken.paths.data, "unreadable")
+      await mkdir(unreadable)
+      await run("icacls.exe", unreadable, "/deny", "*S-1-1-0:(RD)")
+      const notices: string[] = []
+      await expect(protectWindowsProfile(taken.paths.root, (text) => notices.push(text))).rejects.toThrow(
+        "PROFILE_PERMISSIONS_INVALID",
+      )
+      await run("icacls.exe", unreadable, "/remove:d", "*S-1-1-0")
+      const prefix = `PROFILE_PERMISSIONS_INVALID: ${unreadable}: `
+      expect(notices).toHaveLength(1)
+      expect(notices[0]).toStartWith(prefix)
+      expect(notices[0].length).toBeGreaterThan(prefix.length)
+      await taken.release()
+    } finally {
+      await rm(temporary, { recursive: true, force: true })
+    }
+  },
+  60000,
 )

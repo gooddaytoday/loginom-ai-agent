@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createArtifactStore } from '../../lib/artifacts.mjs';
+import { packageReadOnlyAdvice } from '../../lib/workspace.mjs';
 import { createBundledSkillFixture } from './bundled-skill-fixture.mjs';
 import { createActionCatalogFixture } from './action-catalog-fixture.mjs';
 import { Page } from './workspace-ui-fixture.mjs';
@@ -31,7 +32,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     stepFixture.admissions.push(request);
     return {status:'SUCCEEDED',operation_id:request.operation_id,cleanup_complete:true};
   }});
-  const packageDeliveries=[];let expectedPackage=null,expectedOperation=null,openFailure=null,deliveryAbort=null,unconfirmedUpload=false,reloadedPage=null,identityPage=null,identityFault=null;
+  const packageDeliveries=[];let expectedPackage=null,expectedPackageReadOnly=false,expectedOperation=null,openFailure=null,deliveryAbort=null,unconfirmedUpload=false,reloadedPage=null,identityPage=null,identityFault=null;
   class ExternalClient {
     constructor(identity) { this.browser = identity.name === 'loginom-dock-browser'; }
     async connect(transport) { this.transport = transport; }
@@ -93,8 +94,9 @@ test('managed user preparation returns local pins and dynamic knowledge without 
         : code.includes('async function prepareWorkspace(')
         ? { status: 'READY', target: compatibility, authenticated: true, created_draft: !expectedPackage,
           effect_possible: true, document_id: 'fixture-document', target_verified: true,
-          operation_id:expectedOperation??'prepare',package_ref: { path: expectedPackage, persisted: !!expectedPackage },loginom_account:'user',
-          workflow_ref: { tab_tid: 'fixture-tab', prefix: 'fixture-prefix', workflow_id: expectedPackage?'local-workflow':'fixture-workflow', navigation_path: [] } }
+          operation_id:expectedOperation??'prepare',package_ref: { path: expectedPackage, persisted: !!expectedPackage, ...(expectedPackageReadOnly?{read_only:true}:{}) },loginom_account:'user',
+          workflow_ref: { tab_tid: 'MF;cntMain;cntWorkspace;Workspace;t.br;tb', prefix: 'MF;TF',
+            workflow_id: expectedPackage?'local-workflow':'fixture-workflow', navigation_path: [{tid:'crumb',label:'Fixture scenario'}] } }
         : { version: 1, source: 'prepare_same_browser_page', observed: { document_id: 'fixture-document' }, fixture: true };
       assert.ok(code.includes('async function prepareWorkspace(') || code.includes('async function observeGeometry('));
       if(stepFixture&&code.includes('async function prepareWorkspace(')){
@@ -242,6 +244,45 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.notEqual(cardReply.isError,true,JSON.stringify(cardReply));
     const card=JSON.parse(cardReply.content[0].text).node_types[0];
     assert.match(card.guidance,/Сортировка/);assert.deepEqual(card.guidance_modes,['keys']);
+
+    const crossTableReply=await client.callTool({name:'dock_action_describe',arguments:{node_types:['transform.cross_table'],modes:['pivot']}});
+    assert.notEqual(crossTableReply.isError,true,JSON.stringify(crossTableReply));
+    const [crossTableCard]=JSON.parse(crossTableReply.content[0].text).node_types;
+    assert.equal(crossTableCard.type,'transform.cross_table');
+    const crossTableCardBudget=12000-64;
+    const crossTableCardBytes=Buffer.byteLength(JSON.stringify(crossTableCard));
+    assert.ok(crossTableCardBytes<=crossTableCardBudget,`CrossTable card is ${crossTableCardBytes} bytes, budget ${crossTableCardBudget}`);
+    assert.match(crossTableCard.semantics,/Loginom rejects YYYY-MM names\. Use name: M_2026_01, label: 2026-01\./);
+
+    for(const [layout,name] of [['changes','2026-01'],['fields','Revenue-total'],['changes','Сумма']]){
+      const operation_id='invalid-mapping-'+layout+'-'+name.length;
+      const refused=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,operation_id,
+        target:{kind:'existing',type:'transform.cross_table',ref:{document_id:undescribed.document_id,
+          workflow_id:undescribed.workflow_ref.workflow_id,node_id:'existing-cross-table'}},
+        mode:'pivot',finish:'execute',mappings:[{direction:'output',port:0,[layout]:[
+          {source:{kind:'configured_field',name:'C_1'},name,label:'2026-01'}]}]}});
+      const failure=JSON.parse(refused.content[0].text);
+      assert.equal(failure.status,'NOT_APPLIED',JSON.stringify(failure));
+      assert.equal(failure.operation_id,operation_id);
+      assert.equal(failure.effect_possible,false);
+      assert.equal(failure.cleanup_complete,true);
+      assert.equal(failure.error.parameter_path,`mappings[0].${layout}[0].name`);
+      assert.match(failure.error.message,/identifier.*2026-01.*label.*Omit name to keep the current name/);
+      assert.equal(browserCalls.length,beforeDescription,'invalid output names cannot start browser work');
+    }
+
+    await client.callTool({name:'dock_action_describe',arguments:{node_types:['exports.text'],modes:['delimited']}});
+    const rejectedExport=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,operation_id:'invalid-export-mapping',
+      target:{kind:'existing',type:'exports.text',ref:{document_id:undescribed.document_id,
+        workflow_id:undescribed.workflow_ref.workflow_id,node_id:'existing-export'}},
+      mode:'delimited',finish:'execute',mappings:[{direction:'input',port:0,fields:[
+        {source:{kind:'configured_field',name:'C_1'},name:'2026-01'}]}]}});
+    const exportFailure=JSON.parse(rejectedExport.content[0].text);
+    assert.equal(exportFailure.status,'NOT_APPLIED');
+    assert.equal(exportFailure.error.parameter_path,'mappings');
+    assert.match(exportFailure.next_step.instruction,/mappings:\[\].*transform\.reform_columns/);
+    assert.equal(browserCalls.length,beforeDescription,'unsupported export mappings cannot start browser work');
+
     const invalidMode=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,mode:'invented'}});
     assert.equal(JSON.parse(invalidMode.content[0].text).error.code,'REQUEST_REJECTED');
     assert.equal(browserCalls.length,beforeDescription,'mode validation remains before mutation');
@@ -306,7 +347,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       package_ref:{...packageRef,read_only:true}};
     const readOnlyStep=JSON.parse((await apply('step-read-only')).content[0].text);
     assert.equal(readOnlyStep.status,'NOT_APPLIED');
-    assert.match(readOnlyStep.error.message,/read-only/);
+    assert.equal(readOnlyStep.error.message,packageReadOnlyAdvice);
     assert.equal(stepFixture.admissions.length,1,'native read-only refresh must not start Apply');
     assert.equal(session.metadata.workspacePreparation.state.package_ref.read_only,true);
     session.metadata.workspacePreparation=beforeReadOnlyStep;
@@ -427,6 +468,8 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       const reply=JSON.parse((await client.callTool(request)).content[0].text);
       assert.equal(reply.error.code,'PACKAGE_READ_ONLY',JSON.stringify(reply));
       assert.equal(reply.effect_possible,false);
+      const advice=request.name==='dock_action_run'?reply.output.user_action:reply.next_step.instruction;
+      assert.equal(advice,packageReadOnlyAdvice);
     }
     assert.equal(browserCalls.length,beforeReadOnly);
     original.package_ref=originalPackage;
@@ -498,9 +541,17 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.equal(session.metadata.workspaceReady,false);
     assert.equal(session.metadata.workspacePreparation.state.trace[0].blocking_windows.windows[0].message_box.text,'[redacted]');
     const deliveriesBefore=packageDeliveries.length;
+    expectedPackageReadOnly=true;
     const resumed=await client.callTool({name:openRefusal.next_step.tool,arguments:openRefusal.next_step.arguments});
+    expectedPackageReadOnly=false;
     assert.notEqual(resumed.isError,true,JSON.stringify(resumed));
-    assert.equal(JSON.parse(resumed.content[0].text).prepared,true);
+    const readOnlyOpen=JSON.parse(resumed.content[0].text);
+    assert.equal(readOnlyOpen.prepared,true);
+    assert.equal(readOnlyOpen.workspace.package_ref.read_only,true);
+    const advice=readOnlyOpen.next_step.instruction;
+    assert.equal(advice,packageReadOnlyAdvice);
+    assert.ok(advice.includes('package.save_as'));
+    assert.ok(advice.includes('workspace.package_ref.read_only'));
     assert.equal(packageDeliveries.length,deliveriesBefore,'server-path continuation must not upload again');
     const opening=browserCalls.filter(call=>call.arguments.code.includes('async function prepareWorkspace(')).at(-1);
     assert.match(opening.arguments.code,/"recoverOnly":false/);
