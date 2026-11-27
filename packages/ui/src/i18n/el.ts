@@ -67,10 +67,6 @@ export const dict = {
   "ui.sessionTurn.retry.geminiHot": "Το Gemini είναι υπερφορτωμένο αυτήν τη στιγμή",
   "ui.sessionTurn.error.freeUsageExceeded": "Υπέρβαση της δωρεάν χρήσης",
   "ui.sessionTurn.error.addCredits": "Προσθήκη πιστώσεων",
-  "dialog.usageExceeded.freeTier.title": "Συμπληρώθηκε το δωρεάν όριο",
-  "dialog.usageExceeded.freeTier.description":
-    "Εγγραφείτε στο OpenCode Go για 10 $/μήνα και αποκτήστε αξιόπιστη πρόσβαση στα καλύτερα μοντέλα ανοιχτού κώδικα.",
-  "dialog.usageExceeded.freeTier.actionLabel": "Εγγραφή",
   "ui.sessionTurn.status.delegating": "Ανάθεση εργασίας",
   "ui.sessionTurn.status.planning": "Σχεδιασμός επόμενων βημάτων",
   "ui.sessionTurn.status.gatheringContext": "Εξερεύνηση",

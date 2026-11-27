@@ -179,7 +179,7 @@ async function superviseProcess(
   })
   const pending = new Map<
     string,
-    { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
+    { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout>; progress?(value: unknown): void }
   >()
   const startupFailure: { value?: ReturnType<typeof knowledgeStartupFailure> } = {}
   const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
@@ -200,6 +200,10 @@ async function superviseProcess(
     if (!message || typeof message !== "object" || !("id" in message) || typeof message.id !== "string") return
     const request = pending.get(message.id)
     if (!request) return
+    if ("progress" in message) {
+      request.progress?.(message.progress)
+      return
+    }
     pending.delete(message.id)
     clearTimeout(request.timer)
     // Setup may close an admitted knowledge child while its background catalog
@@ -235,7 +239,7 @@ async function superviseProcess(
     }
     request.resolve("result" in message ? message.result : undefined)
   })
-  function request(operation: string, value?: unknown, timeout = 120_000) {
+  function request(operation: string, value?: unknown, timeout = 120_000, progress?: (value: unknown) => void) {
     if (!child.connected) return Promise.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     const id = randomUUID()
     return new Promise<unknown>((resolve, reject) => {
@@ -243,7 +247,7 @@ async function superviseProcess(
         pending.delete(id)
         reject(new Error("LOGINOM_RUNTIME_TIMEOUT"))
       }, timeout)
-      pending.set(id, { resolve, reject, timer })
+      pending.set(id, { resolve, reject, timer, progress })
       child.send({ id, operation, input: value }, (error) => {
         if (error) fail()
       })

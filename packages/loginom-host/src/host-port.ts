@@ -127,7 +127,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     run.lease?.release()
     runs.delete(id)
   }
-  function reply(value: { id: string; result?: unknown; error?: string }, generation?: number) {
+  function reply(value: { id: string; result?: unknown; error?: string; progress?: unknown }, generation?: number) {
     if (state.closed) return
     port.postMessage(generation === undefined ? value : { ...value, generation })
   }
@@ -645,6 +645,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             recovery.id = undefined
             throw new Error("LOGINOM_CONNECTION_NOT_READY")
           }
+          const requestID = data.id
+          const stepProgress = "stepProgress" in input && input.stepProgress === true
           const result = await runtime.request(
             "call",
             {
@@ -652,8 +654,10 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
               arguments: remaining === undefined ? args : { ...(args as object), timeout_ms: remaining },
               ...(packageArtifact ? { packageArtifact } : {}),
               ...(input.name === "dock_node_apply" && "scanReceipt" in input ? { scanReceipt: input.scanReceipt } : {}),
+              ...(stepProgress ? { stepProgress: true } : {}),
             },
             runtimeCallTimeout(input.name, "args" in input ? input.args : undefined) + 15_000,
+            stepProgress ? (progress) => reply({ id: requestID, progress }) : undefined,
           )
           if (
             !result ||

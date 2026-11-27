@@ -15,6 +15,7 @@ import { loginBrowser, loginomAddress, reauthenticateReloadedPage } from "./conn
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
+import { observeLoginomReplies, withStepProgress } from "../client/lib/step-progress.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -34,6 +35,7 @@ const state = {
   browser: undefined,
   browserProfile: undefined,
   browserServer: undefined,
+  lastLoginomReplyAt: null,
   inputs: new Map(),
   owner: undefined,
   uploadDirectory: undefined,
@@ -202,7 +204,12 @@ async function handle(message) {
       const { createSession } = await import("../client/lib/session.mjs")
       const { createBridge } = await import("../client/lib/bridge.mjs")
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:browserDownloadsPath(directory),
-        onContextCreated: context => { state.browser = context } })
+        onContextCreated: context => {
+          state.browser = context
+          observeLoginomReplies(context, new URL(input.connection.url).origin, () => {
+            state.lastLoginomReplyAt = Date.now()
+          })
+        } })
       state.browser = authenticated.context
       state.owner.origin = new URL(input.connection.url).origin
       state.owner.account = input.connection.username
@@ -374,13 +381,18 @@ async function handle(message) {
         signal: controller.signal,
         timeout: runtimeCallTimeout(message.input.name, message.input.arguments),
       }
-      const result = message.input.packageArtifact !== undefined
+      const result = await withStepProgress({
+        name: message.input.name,
+        signal: controller.signal,
+        lastReply: () => state.lastLoginomReplyAt,
+        send: message.input.stepProgress === true ? progress => send({ id: message.id, progress }) : undefined,
+      }, async () => message.input.packageArtifact !== undefined
         ? await state.bridge.prepareLocalPackage(message.input.arguments, message.input.packageArtifact, {
             signal: AbortSignal.any([controller.signal, AbortSignal.timeout(options.timeout)]),
           })
         : message.input.scanReceipt !== undefined
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
-          : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options)
+          : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options))
       const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
       const pkg = state.session.metadata.workspacePreparation?.state?.package_ref
       const packagePath = message.input.name === "dock_prepare" && result.isError !== true

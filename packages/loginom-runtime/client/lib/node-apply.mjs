@@ -1,4 +1,5 @@
 import {validateVariableBindings} from './variable-binding-parameters.mjs';
+import {stepPhase} from './step-progress.mjs';
 import {validateVariablePortMapping} from './variable-port-mapping.mjs';
 import {calculatorVariableMappingRefusal,restVariableMappingNoEffectRefusal,unionWizardOpeningRefusal,variablesCalculatorDeactivationRefusal} from './node-pending-release.mjs';
 import {createHash} from 'node:crypto';
@@ -279,6 +280,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
     const deadline=Math.min(state.deadline,now()+budget,configuration?state.configure_deadline:Infinity,
       executionPhase&&state.execution_wait?.phase===name?state.execution_wait.deadline:Infinity);
     requireValue(now()<deadline,'node.apply configuration deadline elapsed');
+    stepPhase(name==='read'?'reading':executionPhase||name==='materialization_start'
+      ||name==='finish'&&request.finish==='execute'?'executing':configuration?'configuring':'waiting',request.target.type);
     const oldConfigure=continuingConfigure&&name==='configure',oldOpen=continuingOpen&&name==='open',oldFinish=continuingFinish&&name==='finish';
     const pending=oldConfigure||oldOpen||oldFinish?state.pending:{phase:name,receipt_id:operation.id+':'+name,deadline,
       effect_possible:mutation,before_node:structuredClone(state.node)};
