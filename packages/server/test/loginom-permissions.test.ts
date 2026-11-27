@@ -165,8 +165,8 @@ const boot = (
       call(`/api/session/${sessionID}/permission?${at}`).pipe(
         Effect.map((response) => response.body.data as { id: string; action: string; resources: string[] }[]),
       )
-    const reply = (sessionID: string, requestID: string, decision: "once" | "always" | "reject") =>
-      call(`/api/session/${sessionID}/permission/${requestID}/reply?${at}`, { decision }).pipe(
+    const reply = (sessionID: string, requestID: string, decision: "once" | "always" | "reject", message?: string) =>
+      call(`/api/session/${sessionID}/permission/${requestID}/reply?${at}`, { decision, message }).pipe(
         Effect.map((response) => response.status),
       )
     const conversation = (sessionID: string, requestID: string) =>
@@ -615,6 +615,39 @@ describe("loginom.product permissions (B2.6a)", () => {
 })
 
 describe("loginom.product refusals of built-in tools (B2.6b, В-75)", () => {
+  it.live(
+    "permission feedback reaches the model and a revised write asks for approval again",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const id = yield* test.create("correct a permission")
+        const running = yield* test
+          .prompt(
+            id,
+            script(
+              { tool: "write", input: { path: "first.md", content: "draft" } },
+              { tool: "write", input: { path: "revised.md", content: "draft" } },
+              { text: "end" },
+            ),
+          )
+          .pipe(Effect.forkScoped)
+        const first = yield* until(() => test.open(id).pipe(Effect.map((items) => items[0])))
+        const feedback = "Use revised.md instead"
+        expect(first.resources).toEqual(["first.md"])
+        expect(yield* test.reply(id, first.id, "reject", feedback)).toBe(204)
+        const next = yield* until(() =>
+          test.open(id).pipe(Effect.map((items) => items.find((item) => item.id !== first.id))),
+        )
+        expect(next.resources).toEqual(["revised.md"])
+        expect(told((yield* test.requests(id)).at(-1)).join("\n")).toContain(feedback)
+        expect(yield* test.reply(id, next.id, "once")).toBe(204)
+        yield* Fiber.join(running)
+        expect(yield* Effect.promise(() => Bun.file(path.join(test.dir, "first.md")).exists())).toBe(false)
+        expect(yield* Effect.promise(() => Bun.file(path.join(test.dir, "revised.md")).text())).toBe("draft")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
   it.live(
     "«Отклонить» on a write and «Запрещено» for files, a site and a hidden tool: nothing is done, the model is told why, the turn goes on",
     () =>

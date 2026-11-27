@@ -242,9 +242,17 @@ export async function dockTools(input: {
     // node writes outside the package.
     const target = name === "dock_node_apply" ? (args.target as { type?: unknown } | undefined)?.type : undefined
     const resource = localPackage ? "local_package" : typeof target === "string" ? target : "*"
-    await input.files.ask(call, { action: key, resources: [resource], save: ["*"] }).catch((error) => {
-      throw packagePath ? permissionFailure(resolve(directory, packagePath), error) : error
-    })
+    const actionInput = args.parameters
+    const path = actionInput && typeof actionInput === "object" && "path" in actionInput ? actionInput.path : undefined
+    const details = {
+      operation: args.action_key,
+      path: packagePath ?? (typeof path === "string" ? path : args.package_path),
+    }
+    await input.files
+      .ask(call, { action: key, resources: [resource], save: ["*"], metadata: { loginom: details } })
+      .catch((error) => {
+        throw packagePath ? permissionFailure(resolve(directory, packagePath), error) : error
+      })
     const forwarded = { ...args }
     const packageInput = packagePath
       ? await (async () => {

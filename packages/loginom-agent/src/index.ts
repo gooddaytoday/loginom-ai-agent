@@ -3,6 +3,7 @@
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
 import { Definition as ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
+import { PermissionConversation } from "@loginom-ai-agent/loginom-host/permission-rpc"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
@@ -84,28 +85,6 @@ const preflight = {
 const token = "loginom.runner"
 // Permission request metadata key of the product's own check of the rules (B2.6b).
 const marker = "loginom.permission.probe"
-
-// «Разрешать в этом разговоре» (B2.6a): the answer to one open request that also allows its kind for the rest of the
-// session. The button is stage C.
-const permission = {
-  id: "loginom.permission",
-  methods: {
-    conversation: {
-      input: {
-        type: "object",
-        properties: { sessionID: { type: "string" }, requestID: { type: "string" } },
-        required: ["sessionID", "requestID"],
-        additionalProperties: false,
-      },
-      output: { type: "object", properties: { kind: { type: "string" } }, required: ["kind"] },
-      // The terminal (В-31) and a request the product does not ask by default are answered one at a time.
-      errors: {
-        not_grantable: { type: "object", properties: { action: { type: "string" } }, required: ["action"] },
-      },
-    },
-  },
-  events: {},
-} as const
 
 export default Plugin.define({
   id: "loginom.product",
@@ -520,7 +499,7 @@ export default Plugin.define({
       prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),
       find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),
     })
-    await ctx.rpc.register(permission, {
+    await ctx.rpc.register(PermissionConversation, {
       conversation: async (value, call) => {
         const input = value as { sessionID: string; requestID: string }
         const request = await ctx.permission.get(input)

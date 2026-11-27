@@ -1,3 +1,7 @@
+import type { OpenCodeClient } from "@opencode/client/promise"
+import { PermissionDock } from "@opencode/plugin/gui/builtin"
+import { usePluginHost } from "@/runtime/plugin/host"
+import { Contribution } from "@/runtime/plugin/render"
 import { createMemo, Show, type JSX } from "solid-js"
 import { SessionElicitationDock } from "@/session/requests/session-elicitation-dock"
 import { SessionPermissionDock } from "@/session/requests/session-permission-dock"
@@ -29,9 +33,15 @@ export function SessionComposerRegion(props: {
   above?: JSX.Element
   composer: JSX.Element
   subagent: JSX.Element
+  permission?: {
+    client: OpenCodeClient
+    directory: string
+    record: (text: string, sessionID: string, requestID: string) => void
+  }
 }) {
   const controller = props.controller
   const settings = useSettings()
+  const host = props.permission && usePluginHost()
 
   const face = createMemo(() => {
     const websearch = controller.state.websearch.request()
@@ -82,16 +92,48 @@ export function SessionComposerRegion(props: {
                 </Grow>
 
                 <Grow when={current().permission} fade card class={controller.child() ? "mb-2" : undefined}>
-                  {(request) => (
-                    <SessionPermissionDock
-                      request={request}
-                      responding={controller.state.permissionResponding()}
-                      onDecide={(response) => {
-                        controller.onResponseSubmit()
-                        controller.state.decide(response)
-                      }}
-                    />
-                  )}
+                  {(request) => {
+                    const item = createMemo(() =>
+                      host?.items(PermissionDock).find((entry) => entry.value.matches(request)),
+                    )
+
+                    return (
+                      <Show
+                        when={item()}
+                        keyed
+                        fallback={
+                          <SessionPermissionDock
+                            request={request}
+                            responding={controller.state.permissionResponding()}
+                            onDecide={(response) => {
+                              controller.onResponseSubmit()
+                              controller.state.decide(response)
+                            }}
+                          />
+                        }
+                      >
+                        {(entry) => (
+                          <Contribution plugin={entry.plugin}>
+                            {() => {
+                              const permission = props.permission
+
+                              if (!permission) return
+
+                              return entry.value.render({
+                                request,
+                                client: permission.client,
+                                directory: permission.directory,
+                                record: (text) => {
+                                  permission.record(text, request.sessionID, request.id)
+                                  controller.onResponseSubmit()
+                                },
+                              })
+                            }}
+                          </Contribution>
+                        )}
+                      </Show>
+                    )
+                  }}
                 </Grow>
 
                 <Show when={current().composer}>

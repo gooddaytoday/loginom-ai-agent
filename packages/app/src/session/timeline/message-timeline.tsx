@@ -99,6 +99,7 @@ type MessageTimelineProps = {
   setPage?: (fn: (direction: 1 | -1) => void) => void
   reveal?: TimelineRouteReveal
   search?: JSX.Element
+  footer?: JSX.Element
 }
 
 export function MessageTimeline(props: MessageTimelineProps) {
@@ -549,7 +550,12 @@ function MessageTimelineView(
 
   return (
     <VirtualizedTimeline
-      bottomSpacer={activity(() => !activityRow())}
+      bottomSpacer={
+        <>
+          {props.footer}
+          {activity(() => !activityRow())}
+        </>
+      }
       deferred={(row) => {
         if (!Predicate.isTagged(row, "AssistantPart") || row.group.type !== "part") return false
         const content = Timeline.resolveContent(messageByID().get(row.group.ref.messageID), row.group.ref.partID)

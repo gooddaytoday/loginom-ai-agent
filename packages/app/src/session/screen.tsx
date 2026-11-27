@@ -1,3 +1,5 @@
+import { PermissionDock } from "@opencode/plugin/gui/builtin"
+import { usePluginHost } from "@/runtime/plugin/host"
 import {
   batch,
   ErrorBoundary,
@@ -264,6 +266,13 @@ function SessionScreenContent(props: {
   }
 
   const platform = usePlatform()
+  const pluginHost = usePluginHost()
+  const permissionWaiting = createMemo(() => {
+    const request = composer.requests.permissionRequest()
+
+    return request && pluginHost.items(PermissionDock).find((item) => item.value.matches(request))?.value.waiting
+  })
+  const [permissionTraces, setPermissionTraces] = createStore<Record<string, readonly string[]>>({})
   const [headerGap, setHeaderGap] = createSignal<HTMLElement>()
 
   const registerHeaderGap = (gap: HTMLElement) => {
@@ -310,6 +319,20 @@ function SessionScreenContent(props: {
             reserveReviewToggle={!sideVisible()}
             onContentResize={timeline.view.contentResized}
             bottomInset={timeline.inset()}
+            footer={
+              <div classList={{ "md:max-w-session md:mx-auto": screen.centered() }}>
+                <For each={permissionTraces[source.identity.sessionID() ?? ""]}>
+                  {(text) => <div class="px-4 py-1 text-sm text-text-weak break-words">{text}</div>}
+                </For>
+                <Show when={active() && permissionWaiting()}>
+                  {(text) => (
+                    <div role="status" class="px-4 py-1 text-sm text-text-weak">
+                      {text()}
+                    </div>
+                  )}
+                </Show>
+              </div>
+            }
             setVisibleRef={timeline.view.setVisibleRef}
             anchor={timeline.view.anchor}
             setRevealMessage={timeline.view.setRevealMessage}
@@ -438,6 +461,9 @@ function SessionScreenContent(props: {
               screen={props.screen}
               model={model}
               suggestionBoundary={timeline.visible}
+              recordPermission={(text, sessionID) =>
+                setPermissionTraces(sessionID, (previous) => [...(previous ?? []), text])
+              }
             />
           )}
         </Show>

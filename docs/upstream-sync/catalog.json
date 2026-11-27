@@ -78,7 +78,7 @@
       "id": "CAT-10",
       "title": "Web app, UI kit, session UI",
       "paths": [
-        "packages/app/**", "packages/ui/**", "packages/session-ui/**",
+        "packages/app/**", "packages/ui/**", "packages/session-ui/**", "packages/plugin/src/gui/builtin.ts",
         "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**"
       ]
     },

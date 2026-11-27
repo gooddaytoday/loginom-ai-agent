@@ -245,7 +245,7 @@ test("keeps a choice when a custom answer with its value is turned off, and repl
   expect(replies).toEqual([{ answer: { q0: ["files"] } }])
 })
 
-test("shows a pending permission dock", async ({ page }) => {
+test("offers only one-time consent for a terminal permission", async ({ page }) => {
   const replies: { sessionID: string; permissionID: string; body: unknown }[] = []
   await mockServer(page, {
     onPermissionReply: (reply) => replies.push(reply),
@@ -270,7 +270,7 @@ test("shows a pending permission dock", async ({ page }) => {
   await expect(permission).toBeVisible()
   await expect(permission.getByText("git status")).toBeVisible()
   await expect(permission.getByText("git diff")).toBeVisible()
-  await expect(permission.locator('[data-slot="permission-footer-actions"] button')).toHaveCount(3)
+  await expect(permission.getByRole("button")).toHaveCount(1)
   await expect(page.locator('[data-component="composer"]')).toHaveCount(0)
 
   const reply = page.waitForResponse((response) => response.request().method() === "POST")
@@ -317,8 +317,7 @@ test("sends one permission reply and closes the dock when it lands, before permi
   await permission.getByRole("button", { name: "Allow once" }).dblclick()
   await expect.poll(() => replies.length).toBe(1)
 
-  for (const name of ["Deny", "Allow always", "Allow once"])
-    await expect(actions.getByRole("button", { name, exact: true })).toBeDisabled()
+  await expect(actions.getByRole("button", { name: "Allow once", exact: true })).toBeDisabled()
 
   released.resolve()
   await expect(permission).toHaveCount(0)
@@ -486,7 +485,7 @@ test("names the MCP tool, the hook's message and the full input in the permissio
   // The user approves these arguments, so a long one stays whole and scrolls inside the dock instead of being cut
   await expect(input.getByText(`body: ${body}`, { exact: true })).toBeVisible()
   await expect.poll(() => input.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
-  // "Allow always" saves the wildcard, so its scope stays visible next to this call's input
+  // The effective resource stays visible next to the call input.
   await expect(permission.locator('[data-slot="permission-patterns"]').getByText("*", { exact: true })).toBeVisible()
 })
 
@@ -624,4 +623,77 @@ test("restores the draft caret before typing after a request dock closes", async
 
 function mockServer(page: Page, requests: Pick<WorkspaceInput, "sessionPermissions" | "onPermissionReply" | "forms">) {
   return mockWorkspace(page, { name: "RequestDocks", directory, sessions: [{ id: sessionID, title }], ...requests })
+}
+
+for (const decision of ["once", "conversation", "reject", "feedback"] as const) {
+  test(`answers package permission with ${decision} and records it in the conversation`, async ({ page }, info) => {
+    const id = "per_save_package"
+    const replies: unknown[] = []
+    await mockWorkspace(page, {
+      name: "RequestDocks",
+      directory,
+      sessions: [{ id: sessionID, title }],
+      seed: { locale: "ru" },
+      onPermissionReply: (reply) => replies.push(reply.body),
+      sessionPermissions: {
+        [sessionID]: [
+          {
+            id,
+            sessionID,
+            action: "loginom_dock_action_run",
+            resources: ["*"],
+            save: ["*"],
+            metadata: { loginom: { path: "/user/ABC-анализ.lgp", operation: "package.save_as" } },
+          },
+        ],
+      },
+    })
+    const grants: unknown[] = []
+    await page.route("**/api/rpc/loginom.permission/conversation**", async (route) => {
+      grants.push(route.request().postDataJSON())
+      await route.fulfill({ json: { output: { kind: "save" } } })
+    })
+    await page.goto(sessionHref(sessionID))
+    await expectSessionTitle(page, title)
+    const dock = page.locator('[data-component="dock-prompt"][data-kind="permission"]')
+    await expect(dock.getByRole("table")).toBeVisible()
+    await expect(dock.getByRole("table")).toContainText("ABC-анализ.lgp")
+    await expect(dock.getByRole("table")).toContainText("/user")
+    await expect(page.getByText("Жду вашего разрешения — внизу")).toBeVisible()
+    await expect(dock.getByText("В этом разговоре: сохранять пакеты в Loginom")).toBeVisible()
+    await expect(page.locator('[data-component="composer"]')).toHaveCount(0)
+    if (decision === "once") {
+      for (const [width, height] of [
+        [1440, 900],
+        [390, 844],
+      ]) {
+        await page.setViewportSize({ width, height })
+        await expect(dock.getByRole("button", { name: "Разрешить один раз" })).toBeVisible()
+
+        if (width === 1440) {
+          await expect(page.locator('[data-titlebar-tab][data-status="attention"]')).toBeVisible()
+        }
+
+        await page.screenshot({ path: info.outputPath(`permission-${width}x${height}.png`), animations: "disabled" })
+      }
+      await dock.getByRole("button", { name: "Разрешить один раз" }).click()
+      await expect(page.getByText(/^Вы разрешили один раз:/)).toBeVisible()
+      expect(replies).toEqual([{ decision: "once" }])
+    } else if (decision === "conversation") {
+      await dock.getByRole("button", { name: /^Разрешать в этом разговоре/ }).click()
+      await expect(page.getByText(/^Вы разрешили в этом разговоре:/)).toBeVisible()
+      expect(grants).toEqual([{ input: { sessionID, requestID: id } }])
+      expect(replies).toEqual([])
+    } else if (decision === "feedback") {
+      await dock.getByRole("textbox", { name: "Или скажите, что сделать иначе" }).fill("Сохрани в другую папку")
+      await dock.getByRole("button", { name: "Отправить", exact: true }).click()
+      await expect(page.getByText("Вы попросили иначе: «Сохрани в другую папку»")).toBeVisible()
+      expect(replies).toEqual([{ decision: "reject", message: "Сохрани в другую папку" }])
+    } else {
+      await dock.getByRole("button", { name: "Отклонить" }).click()
+      await expect(page.getByText(/^Вы отклонили:/)).toBeVisible()
+      expect(replies).toEqual([{ decision: "reject" }])
+    }
+    await expect(dock).toHaveCount(0)
+  })
 }
