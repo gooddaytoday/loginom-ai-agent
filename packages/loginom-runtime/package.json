@@ -6,6 +6,8 @@
   "license": "AGPL-3.0-only",
   "description": "Bundled Loginom executor and browser runtime",
   "dependencies": {
+    "@xmldom/xmldom": "0.8.15",
+    "@zip.js/zip.js": "2.7.62",
     "acorn": "8.15.0"
   },
   "scripts": {
