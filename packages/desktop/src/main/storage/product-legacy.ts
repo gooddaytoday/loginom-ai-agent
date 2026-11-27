@@ -25,13 +25,15 @@ export const importProductLegacyStores = Effect.fn("DesktopStorage.importProduct
       const file = path.join(userData, source.file)
       const stats = yield* fs.stat(file).pipe(Effect.orElseSucceed(() => undefined))
 
-      if (stats && stats.type !== "File") return
+      if (stats?.type !== "File") return
       const raw = yield* fs.readFileString(file).pipe(Effect.orElseSucceed(() => undefined))
+
+      if (raw === undefined) return
 
       return {
         ...source,
-        modified: stats ? Option.getOrElse(stats.mtime, () => new Date(0)).getTime() : 0,
-        entries: stats ? Option.getOrUndefined(decode(raw)) : undefined,
+        modified: Option.getOrElse(stats.mtime, () => new Date(0)).getTime(),
+        entries: Option.getOrUndefined(decode(raw)),
       }
     }),
     { concurrency: 5 },
@@ -53,7 +55,7 @@ export const importProductLegacyStores = Effect.fn("DesktopStorage.importProduct
   const result = yield* Effect.try(() =>
     db.transaction((tx) => {
       const record = db.$client.prepare("INSERT OR IGNORE INTO migration (id, time_completed) VALUES (?, ?)")
-      const unreadable: string[] = []
+      const malformed: string[] = []
       let imported = 0
 
       for (const file of candidates) {
@@ -61,7 +63,7 @@ export const importProductLegacyStores = Effect.fn("DesktopStorage.importProduct
         if (!record.run(legacyStoreImportID(file.file), Date.now()).changes) continue
 
         if (!file.entries) {
-          unreadable.push(file.file)
+          malformed.push(file.file)
 
           continue
         }
@@ -83,12 +85,12 @@ export const importProductLegacyStores = Effect.fn("DesktopStorage.importProduct
         }
       }
 
-      return { imported, unreadable }
+      return { imported, malformed }
     }),
   )
 
-  for (const name of result.unreadable) {
-    yield* Effect.logWarning("legacy store is not readable, leaving it in place", { name })
+  for (const name of result.malformed) {
+    yield* Effect.logWarning("legacy store has invalid data, leaving it in place", { name })
   }
 
   return result.imported

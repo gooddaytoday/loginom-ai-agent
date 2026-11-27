@@ -31,16 +31,18 @@ export const importLegacyStores = Effect.fn("DesktopStorage.importLegacyStores")
       const file = path.join(userData, name)
       const stats = yield* fs.stat(file).pipe(Effect.orElseSucceed(() => undefined))
 
-      if (stats && stats.type !== "File") return
+      if (stats?.type !== "File") return
       const raw = yield* fs.readFileString(file).pipe(Effect.orElseSucceed(() => undefined))
+
+      if (raw === undefined) return
 
       const entries = decode(raw)
 
-      if (Option.isNone(entries) || !stats) {
+      if (Option.isNone(entries)) {
         const record = db.$client.prepare("INSERT OR IGNORE INTO migration (id, time_completed) VALUES (?, ?)")
 
         if (record.run(legacyStoreImportID(name), Date.now()).changes)
-          yield* Effect.logWarning("legacy store is not readable, leaving it in place", { name })
+          yield* Effect.logWarning("legacy store has invalid data, leaving it in place", { name })
 
         return
       }
