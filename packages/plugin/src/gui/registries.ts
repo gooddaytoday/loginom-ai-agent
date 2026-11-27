@@ -861,6 +861,39 @@ export interface Theme {
 
 /** The places a `Slot` renders, with the input each passes to `render`. */
 export interface SlotMap {
+  /** Contributions around the draft composer, before a session exists. */
+  readonly "session.new":
+    | {
+        /** Above the composer, in place of the default wordmark. */
+        readonly placement: "heading"
+      }
+    | {
+        /** At the end of the composer's Add menu. Render rows with `Ui.MenuItem`. */
+        readonly placement: "add-menu"
+      }
+    | {
+        /** In the composer's control strip. */
+        readonly placement: "toolbar"
+        /** Display name of the destination project, if one is selected. */
+        readonly project?: string
+        /** Opens the destination picker. */
+        openProject(): void
+      }
+    | {
+        /** Under the composer and its location controls. */
+        readonly placement: "below"
+        /**
+         * Prefills the draft and tags its origin without submitting it.
+         * @param text - The replacement text, leaving attachments in place.
+         * @param origin - A plugin-prefixed identifier for the source of the text.
+         */
+        insertPrompt(text: string, origin: string): void
+        /**
+         * Listen for successful promotion of this draft. Returns a function that unregisters the listener.
+         * @param listener - Receives the origin captured at submit time, if any.
+         */
+        onStarted(listener: (origin: string | undefined) => void): () => void
+      }
   /** Full-width strip under the window content, above toasts. */
   readonly "window.bottom": Record<string, never>
   /** The timeline title row. Cached timelines stay mounted while hidden; `active` is false then. */

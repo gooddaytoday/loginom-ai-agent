@@ -59,6 +59,74 @@ test("the new session screen does not show session details", async ({ page }) =>
   await expect(page.getByRole("button", { name: "Session details", exact: true })).toHaveCount(0)
 })
 
+test("Loginom examples fill the draft without starting a conversation and can be dismissed and restored", async ({
+  page,
+}) => {
+  const creates: unknown[] = []
+  const draft = await openDraft(page, {
+    name: "LoginomExamples",
+    seed: { locale: "ru" },
+    onSessionCreate: (body) => void creates.push(body),
+  })
+  const examples = page.getByRole("region", { name: "Примеры задач" })
+
+  await expect(page.getByText("Опишите задачу: собрать сценарий, разобрать пакет, проверить данные")).toBeVisible()
+  await expect(draft.editor).toBeFocused()
+  await page.getByRole("button", { name: "Проект: LoginomExamples" }).click()
+  await expect(page.getByRole("combobox", { name: "Поиск проектов" })).toBeFocused()
+  await page.keyboard.press("Escape")
+  await expect(examples.getByRole("button")).toHaveCount(5)
+  await examples.getByRole("button", { name: /Задокументировать пакет/ }).click()
+  await expect(draft.editor).toHaveText(
+    "Задокументируй этот пакет: назначение, входные данные и что делает каждый узел.",
+  )
+  await expect(draft.editor).toBeFocused()
+  await expectPath(page, draftHref(draft.draftID))
+  expect(creates).toEqual([])
+
+  await examples.getByRole("button", { name: "Скрыть примеры задач" }).click()
+  await expect(examples).toHaveCount(0)
+  await page.reload()
+  await page.locator('[data-action="composer-attach"]').click()
+  await page.getByRole("menuitem", { name: "Примеры задач" }).click()
+  await expect(examples).toBeVisible()
+})
+
+test("Loginom examples stay until the third conversation started without a template", async ({ page }) => {
+  const creates: string[] = []
+  const draft = await openDraft(page, {
+    name: "LoginomExampleProgress",
+    onSessionCreate: (body) => void creates.push(String(body.id)),
+    createdSessionTitle: "Started conversation",
+  })
+  const examples = page.getByRole("region", { name: "Example tasks" })
+  const nextDraft = async (count: number) => {
+    await submit(page).click()
+    await expect.poll(() => creates).toHaveLength(count)
+    await expectPath(page, sessionHref(creates.at(-1)!))
+    await expect(tabLink(page, creates.at(-1)!)).toContainText("Started conversation")
+    await page.getByRole("button", { name: "New session", exact: true }).click()
+    await expect(draft.editor).toBeEditable()
+  }
+
+  await examples.getByRole("button", { name: /ABC analysis of products/ }).click()
+  await expect(draft.editor).toContainText("Build an ABC analysis")
+  await nextDraft(1)
+  await examples.getByRole("button", { name: /ABC analysis of products/ }).click()
+  await expect(draft.editor).toContainText("Build an ABC analysis")
+  await draft.editor.fill("")
+  await expect(page.getByText(/Describe the task:/)).toBeVisible()
+  for (const count of [2, 3, 4]) {
+    await expect(examples).toBeVisible()
+    await draft.editor.fill(`My own task ${count - 1}`)
+    await nextDraft(count)
+  }
+  await expect(examples).toHaveCount(0)
+  await page.locator('[data-action="composer-attach"]').click()
+  await page.getByRole("menuitem", { name: "Example tasks" }).click()
+  await expect(examples).toBeVisible()
+})
+
 test("the location shortcuts choose worktrees from every state and keep cycling", async ({ page }) => {
   const root = "C:/OpenCode/LocationShortcut"
 

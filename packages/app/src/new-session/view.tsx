@@ -31,6 +31,9 @@ import { NEW_SESSION_CONTENT_WIDTH } from "@/new-session/layout"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import { useSettings } from "@/settings/model"
+import { PluginSlot } from "@/runtime/plugin/render"
+import { usePluginHost } from "@/runtime/plugin/host"
+import { BuiltinSlot } from "@opencode/plugin/gui/builtin"
 import type { NewSessionWorkspaceController } from "./workspace/controller"
 import {
   CHECKOUT_PLACEHOLDER_DELAY_MS,
@@ -66,6 +69,8 @@ export function NewSessionView(props: {
   project: PromptProjectController
   workspace: NewSessionWorkspaceController
   location: ReturnType<typeof useNewSessionLocationDialog>
+  insertPrompt: (text: string, origin: string) => void
+  onStarted: (listener: (origin: string | undefined) => void) => () => void
 }) {
   const [onboarding, setOnboarding, , onboardingReady] = persisted(
     Persist.global("workspace-onboarding"),
@@ -74,6 +79,8 @@ export function NewSessionView(props: {
   )
 
   const settings = useSettings()
+  const host = usePluginHost()
+  const contributed = () => host.items(BuiltinSlot).some((item) => item.value.at === "session.new")
 
   const [wordmark, setWordmark] = createSignal(createWordmarkState(false))
   const [logo, setLogo] = createSignal<HTMLDivElement>()
@@ -112,19 +119,41 @@ export function NewSessionView(props: {
           active={props.composer.state.drag === "active"}
           input={props.composer.model.selection.current()?.capabilities.input}
         />
-        <div class="absolute inset-x-0 top-[25.375%] flex justify-center px-6">
-          <div class={NEW_SESSION_CONTENT_WIDTH}>
-            <NewSessionWordmark
-              ref={setLogo}
-              state={wordmark}
-              onEvent={dispatchWordmark}
-              play
-              sound={settings.sounds.interfaceEnabled}
+        <div data-scrollable class="absolute inset-x-0 bottom-0 top-[25.375%] overflow-y-auto px-6 @max-xl:top-[8%]">
+          <div class={`${NEW_SESSION_CONTENT_WIDTH} mx-auto pb-6`}>
+            <PluginSlot
+              at="session.new"
+              input={{ placement: "heading" }}
+              fallback={
+                <NewSessionWordmark
+                  ref={setLogo}
+                  state={wordmark}
+                  onEvent={dispatchWordmark}
+                  play
+                  sound={settings.sounds.interfaceEnabled}
+                />
+              }
             />
             <div class="mt-8 flex flex-col gap-3">
               <div data-slot="new-session-composer" class="flex flex-col gap-1">
                 <div class="relative z-10">
-                  <Composer model={props.composer} />
+                  <Composer
+                    model={props.composer}
+                    addMenu={contributed() ? <PluginSlot at="session.new" input={{ placement: "add-menu" }} /> : undefined}
+                    toolbar={
+                      <PluginSlot
+                        at="session.new"
+                        input={{
+                          placement: "toolbar",
+                          get project() {
+                            const project = props.project.selected()
+                            return project && displayName(project)
+                          },
+                          openProject: () => location(),
+                        }}
+                      />
+                    }
+                  />
                 </div>
                 <Show when={props.project.selected()}>
                   {(project) => (
@@ -149,6 +178,10 @@ export function NewSessionView(props: {
               <Show when={props.project.empty()}>
                 <PromptProjectAddButton controller={props.project} />
               </Show>
+              <PluginSlot
+                at="session.new"
+                input={{ placement: "below", insertPrompt: props.insertPrompt, onStarted: props.onStarted }}
+              />
             </div>
           </div>
         </div>

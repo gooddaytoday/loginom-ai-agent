@@ -91,6 +91,8 @@ export type ComposerEditorProps = {
   borderUnderlay?: boolean
   class?: string
   modelControl?: JSX.Element
+  addMenu?: JSX.Element
+  toolbar?: JSX.Element
   modelControlsVisible?: boolean
   attachKeybind?: string[]
   attachShortcut?: string
@@ -301,7 +303,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
           <div
             data-component="composer-scroll"
             data-scrollable
-            class="relative overflow-y-auto"
+            class="relative grid grid-cols-[minmax(0,1fr)] overflow-y-auto"
             classList={{ "max-h-[180px]": historyHeight() === undefined }}
             onScroll={updateScroll}
             ref={viewport}
@@ -324,7 +326,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
               spellcheck={mode() === "normal"}
               // @ts-expect-error
               autocomplete="off"
-              class="relative z-10 block w-full whitespace-pre-wrap bg-transparent ps-4 pe-[var(--composer-scroll-end)] pt-4 pb-2 text-[13px] font-[440] leading-5 text-v2-text-text-base focus:outline-none [&_[data-mention=file]]:text-syntax-property [&_[data-mention=agent]]:text-syntax-type [&_[data-mention=reference]]:text-v2-text-text-muted"
+              class="relative z-10 col-start-1 row-start-1 block w-full whitespace-pre-wrap bg-transparent ps-4 pe-[var(--composer-scroll-end)] pt-4 pb-2 text-[13px] font-[440] leading-5 text-v2-text-text-base focus:outline-none [&_[data-mention=file]]:text-syntax-property [&_[data-mention=agent]]:text-syntax-type [&_[data-mention=reference]]:text-v2-text-text-muted"
               classList={{ "font-mono! tracking-[-0.04px]": mode() === "shell", "opacity-50": props.disabled }}
               style={{
                 "unicode-bidi": mode() === "normal" ? "plaintext" : undefined,
@@ -430,7 +432,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
             <Show when={!props.controller.value()}>
               <div
                 dir={mode() === "normal" ? "auto" : "ltr"}
-                class="pointer-events-none absolute inset-x-0 top-0 ps-4 pe-[var(--composer-scroll-end)] pt-4 text-[13px] font-[440] leading-5 text-v2-text-text-faint"
+                class="pointer-events-none col-start-1 row-start-1 ps-4 pe-[var(--composer-scroll-end)] pt-4 pb-2 text-[13px] font-[440] leading-5 text-v2-text-text-faint"
                 classList={{ "font-mono! tracking-[-0.04px]": mode() === "shell" }}
                 style={{ "unicode-bidi": mode() === "normal" ? "plaintext" : undefined, "text-align": "start" }}
               >
@@ -444,7 +446,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         </div>
 
         <div class="flex h-11 shrink-0 items-center px-2" classList={{ hidden: touch() && mode() === "shell" }}>
-          <Show when={!touch()}>
+          <Show when={!touch() || props.addMenu}>
             <div
               class="flex shrink-0 items-center"
               aria-hidden={mode() === "shell"}
@@ -464,6 +466,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
                 onCommands={props.controller.openCommands}
                 onContext={props.controller.openContext}
                 onShell={props.controller.openShell}
+                extra={props.addMenu}
               />
             </div>
           </Show>
@@ -482,6 +485,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
             style={buttons()}
           >
             <div ref={controlsContent} class="flex h-full w-max min-w-full items-center gap-0.5">
+              {props.toolbar}
               <Show when={view.agent} keyed>
                 {(control) => (
                   <ComposerEditorConfiguredSelect
@@ -973,6 +977,7 @@ function ComposerAttachments(props: {
 
 function ComposerEditorAddMenu(props: {
   disabled?: boolean
+  extra?: JSX.Element
   title: string
   keybind?: string[]
   attachLabel: string
@@ -1028,6 +1033,7 @@ function ComposerEditorAddMenu(props: {
             <Menu.Item onSelect={props.onShell} shortcut="!">
               {props.shellLabel}
             </Menu.Item>
+            {props.extra}
           </Menu.Content>
         </Menu.Portal>
       </Menu>

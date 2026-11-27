@@ -301,6 +301,9 @@ export function mountPlugins(input: {
           )}
         </Show>
         <PluginSlot at="window.bottom" input={{}} />
+        <div data-testid="draft-heading">
+          <PluginSlot at="session.new" input={{ placement: "heading" }} />
+        </div>
       </Show>
     )
   }
