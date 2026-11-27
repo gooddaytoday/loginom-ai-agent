@@ -1,3 +1,4 @@
+import { createBuildTogether } from './build-together.js'
 import { editedPackageBase64 } from './edited-package.js'
 import { icon } from './icons.js'
 import { renderHub, bindHub, hubHasInstalled, openHubSolution, showHubType, showHubTab, showHubDetail, installForDemo } from './hub.js'
@@ -234,6 +235,7 @@ const route = () => {
   if (state.page === 'chat') state.project = state.sessions.find(item => item.id === state.session)?.project ?? null
 }
 route()
+const buildTogether = createBuildTogether({state, esc, icon, render, composer, openSession, newSession, currentItem, moreButton})
 // «Проекты» on the review page reloads as a returning user and opens a project.
 const pendingChat = read('openChat', null)
 if (pendingChat) {
@@ -602,7 +604,17 @@ function header() {
     </div>
   </header>`
 }
-function composer() {
+function composer(buildItem) {
+  if (buildItem) {
+    const busy = buildTogether.working(buildItem)
+    return `<form class="composer" id="composer">
+      <textarea id="prompt" aria-label="Сообщение агенту" placeholder="Что сделать в Loginom?" rows="2">${esc(state.draft)}</textarea>
+      <div class="composer-toolbar build-composer-toolbar">
+        <button class="lgm-chip" type="button" data-overlay="loginom-status" aria-haspopup="dialog">${icon('panel',15)} Loginom ${icon('down',12)}</button>
+        <button class="send-btn" type="submit" ${busy || !state.draft.trim() ? 'disabled' : ''} aria-label="Отправить сообщение" title="Отправить сообщение">${icon('up',20)}</button>
+      </div>
+    </form>`
+  }
   const modelName = currentModel()
   const pkg = state.draftPackage
   const model = chatModel()
@@ -1486,6 +1498,7 @@ function chatDock(item) {
 function chat() {
   const item = state.sessions.find(x => x.id === state.session)
   if (!item) return home()
+  if (item.build) return buildTogether.chat(item)
   const isEdit = item.kind === 'package-edit'
   const turns = isEdit ? [] : [...(item.history || []), item]
   const dock = isEdit ? '' : chatDock(item)
@@ -1893,7 +1906,7 @@ function review() {
     ['Консоль модерации','Только для прототипа: служебный экран Loginom. Одобрить, вернуть с замечанием, отозвать — статус сразу виден автору в «Моих».',[['own-moderation','Открыть']]],
     ['Сайт каталога','hub.loginom.ai для администратора: посмотреть, что внутри навыка, скачать один или архивом. Скачанный архив можно поставить в прототип: «Каталог» → «Импорт из файла».',[['open-hub-site','Открыть']]],
   ]
-  // Key scenarios accepted at the stage A gate (В-78), kept for walking again. Cards that change the app's state come last.
+  // Key scenarios from В-78 and the gate split from В-125.
   const accept = [
     ['Первый запуск','Приложение откроется как у нового пользователя: подключите Loginom — публичный стенд или свой сервер — и задайте первый вопрос; бесплатная модель OpenCode уже выбрана. Всё, что вы делали в прототипе, сбросится.',[['stage-new','Начать']]],
     ['Описать пакет для коллеги','Откроется «Документировать: какой пакет?» — выберите «Качество данных», в «Формат документа» добавьте Word. «Доступ» покажет, что агент прочитает и что сделает; там же «Только для прототипа: чем закончится запуск» — можно посмотреть и неудачу. В итоге — файлы в папке разговора, «Проверено приложением» и «Обсудить в чате».',[['try-document','Начать']]],
@@ -1904,6 +1917,7 @@ function review() {
     ['Каталог и своё','Каталог: кто подготовил — Loginom, «Проверено Loginom» или «Сообщество» — и что будет разрешено; навык «Сообщество» ставится только после вашего согласия. «Создать своё» — навык из разговора, с нуля или из файла; «Попробовать», а после «Включить» — «Опубликовать для всех…».',[['plus-catalog','Начать'],['own-chat','Создать своё']]],
     ['Сбои','Отправьте запрос: шаг в Loginom не удастся — блок скажет, что случилось, с «Повторить шаг» и «Проверить подключение»; «Проверить снова» вернёт Loginom. «Лимит модели» — на втором шаге у бесплатной модели кончится дневной лимит: что случилось, что уже сделано, другая модель или «Подключить модель». После лимита бесплатная модель в прототипе молчит до перезагрузки страницы; в карточке 9 работает модель администратора.',[['try-failure','Начать'],['try-model-failure','Лимит модели']]],
     ['Закрытый контур','Включится политика администратора: только сеть организации, в настройках — «Задано администратором», модель — от администратора. Дополнение «Контроль полноты загрузок» администратор скачивает на сайте каталога и передаёт файлом: в приложении — «Каталог» → «Импорт из файла». Сайт откроется вместо приложения; после возврата разговоры, подключение Loginom и инструкции прототипа сбросятся, политика останется. Убрать политику — «убрать» внизу этой страницы.',[['policy-set','Начать'],['open-hub-site','Сайт каталога']]],
+    ['Собрать вместе с Loginom','Импортируйте учебную таблицу, поправьте схему в окне Loginom и попросите агента добавить фильтр. Сохраните пакет, когда он готов.',[['try-build-together','Начать']]],
   ]
   // Stage B gate (report: docs/testing/loginom-ai-agent/reports/2026-11-26-gate-b.md on oc2-migration): owner questions, each with a recommendation and its risk.
   // Stage C plan (kit: plans/2026-11-27-stage-c-plan.md): owner questions, each with options, a recommendation and a risk.
@@ -1995,7 +2009,7 @@ function review() {
     '<strong>Пакеты улучшений А–Ж</strong> приняты: видно, что агент работает; честное состояние пакета и файлов; сбои и повторы; данные и узлы в разговоре; компоновка и клавиатура; словарь; недопустимые регрессии (В-125).',
   ]
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · этап B закрыт, план этапа C, итерация 9</p><h1>Что решить</h1><p>Этап B — перенос на OpenCode 2 — закрыт (В-116, В-117); итоги и открытые вопросы к плану этапа C в начале страницы. Итерация 9 (В-77) — три находки третьего прогона оценки: схема пакета с ветвями, связями, портами и подмоделями; в «Разрешениях» под политикой видно, что задал администратор, а что стоит по умолчанию; у подключения к стороннему сервису видно, чей он, и перед первой отправкой данных агент спрашивает. Попробовать — карточки А–В в разделе «Новое», два вопроса — ниже ключевых сценариев. Ключевые сценарии 1–9 — для повторного прохода. Вернуться сюда — «Прототип 2 · что решить» внизу левой панели.</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · этап B закрыт, план этапа C, итерация 9</p><h1>Что решить</h1><p>Этап B — перенос на OpenCode 2 — закрыт (В-116, В-117); итоги и открытые вопросы к плану этапа C в начале страницы. Итерация 9 (В-77) — три находки третьего прогона оценки: схема пакета с ветвями, связями, портами и подмоделями; в «Разрешениях» под политикой видно, что задал администратор, а что стоит по умолчанию; у подключения к стороннему сервису видно, чей он, и перед первой отправкой данных агент спрашивает. Попробовать — карточки А–В в разделе «Новое», два вопроса — ниже ключевых сценариев. Ключевые сценарии 1–10 — для повторного прохода. Вернуться сюда — «Прототип 2 · что решить» внизу левой панели.</p></div></div>
     <h2 class="rv-heading">План этапа C — что решить</h2>
     <p class="rv-lead">Шлюз этапа B закрыт 27.11 вашими решениями В-116 и В-117: 21 узел из 25; три узла и разбор четырёх сбоев — первой задачей этапа C; ошибки первого запуска на Windows исправляем на этапе C. Отчёт — в репозитории, ветка <code>oc2-migration</code>: <code>docs/testing/loginom-ai-agent/reports/2026-11-26-gate-b.md</code>. Ниже — итоги и четыре открытых вопроса к подробному плану этапа C (план — в kit, проект loginom-newapp: <code>plans/2026-11-27-stage-c-plan.md</code>). Ответ — мне в рабочем чате: номер (П2–П6) и вариант.</p>
     <ul class="rv-changes">${stageCDecided.map(text => `<li>${text}</li>`).join('')}</ul>
@@ -2003,8 +2017,9 @@ function review() {
     <h2 class="rv-heading">Разбор макета перед разработкой — решено 27.11</h2>
     <p class="rv-lead">Пять независимых разборов (работа вместе с Loginom, справка Loginom, первое знакомство, лучшие практики похожих продуктов, живой проход всех сценариев на двух ширинах) и сверка по коду 0.4.3. Главное: в макете не показана пошаговая сборка в окне Loginom агента — основной путь 0.4.3; шаги в макете длятся меньше секунды, поэтому долгие шаги, разрывы связи и повторы модели не прожиты; в разговоре нет данных на выходе узла. Вы приняли все рекомендации — итерация 10 макета идёт.</p>
     <ul class="rv-changes">${uxReviewDecided.map(text => `<li>${text}</li>`).join('')}</ul>
-    <h2 class="rv-heading">Ключевые сценарии — приняты 20.11.2026</h2>
-    <div class="rv-grid">${accept.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${index + 1}</span><h3>${title}</h3><p>${text}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
+    <h2 class="rv-heading">Ключевые сценарии</h2>
+    <p class="rv-lead">Шлюз C · сценарии 1, 2, 4, 7, 8, 9 и 10.</p>
+    <div class="rv-grid">${accept.map(([title,text,buttons],index) => `<article class="rv-card"><div class="build-review-mark"><span class="rv-num">${index + 1}</span>${[3,5,6].includes(index + 1) ? '<span class="badge">шлюз D (копия агента)</span>' : ''}</div><h3>${title}</h3><p>${text}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
     ${questions.length ? `<h2 class="rv-heading">Вопросы</h2><ol class="rv-questions">${questions.map(text => `<li>${text}</li>`).join('')}</ol>` : ''}
     <h2 class="rv-heading">Новое: итерация 9, модели, третий прогон</h2>
     <p class="rv-lead">А–В — итерация 9 по находкам 10, 22, 23 третьего прогона оценки (В-77); Г — модели и провайдеры как в OpenCode 2 (В-82); Д–Ж — по третьему прогону и решениям В-75, В-76; дальше — итерация 8.</p>
@@ -2080,7 +2095,7 @@ function rowMenu() {
     ? [item('back','chevron','Назад','class="menu-back"'), ...state.projects.filter(entry => entry.id !== chat.project).map(entry => `<button role="menuitem" data-menu-act="move:${entry.id}"><span class="pc-${entry.color}">${icon('folder',16)}</span><span>${esc(entry.name)}</span></button>`),
        item('new-project-move','folder-plus','Новый проект…')]
     : chat ? [item('rename','file','Переименовать'), item('pin','pin',chat.pinned ? 'Открепить' : 'Закрепить'), item('move','folder','Перенести в проект'),
-       chat.project ? item('unmove','close','Убрать из проекта') : '', menu.where === 'page' && !currentPackageEdit() ? item('download','download','Скачать демонстрационный отчёт CSV') : '', item('delete','alert','Удалить','class="danger"')]
+       chat.project ? item('unmove','close','Убрать из проекта') : '', chat.build ? item('close-chat','close','Закрыть разговор') : menu.where === 'page' && !currentPackageEdit() ? item('download','download','Скачать демонстрационный отчёт CSV') : '', item('delete','alert','Удалить','class="danger"')]
     : project ? [item('pin','pin',project.pinned ? 'Открепить' : 'Закрепить'), item('settings','settings','Настройки проекта'), item('delete','alert','Удалить проект','class="danger"')]
     : menu.kind === 'model' ? modelMenu(menu)
     : [item('dest:', projectById(state.project) ? 'circle' : 'check', 'Без проекта'), ...state.projects.map(entry => `<button role="menuitem" data-menu-act="dest:${entry.id}"><span class="pc-${entry.color}">${icon(entry.id === state.project ? 'check' : 'folder',16)}</span><span>${esc(entry.name)}</span></button>`)]
@@ -2103,7 +2118,7 @@ function modelMenu(menu) {
 function overlay() {
   const kind = state.overlay
   if (!kind) return ''
-  const content = {
+  const content = ['build-close','build-view'].includes(kind) ? buildTogether.dialog(kind) : {
     'package-edit-example':['Изменение на учебном пакете',`<p class="dialog-desc">Сценарий правки формулы в прототипе доступен для пакета «Расчёт суммы.lgp». Откройте его в чате, чтобы увидеть сравнение, подтверждение и сохранение.</p><div class="button-row package-picker-actions"><button class="btn quiet" type="button" data-action="dismiss">Отмена</button><button class="btn primary" type="button" data-action="ask-example-package-edit">Открыть учебный пакет в чате</button></div>`],
     'package-version':['Сохранить новую версию', kind === 'package-version' ? versionDialog() : ''],
     'all-actions':['Действия с пакетом', kind === 'all-actions' ? allActions() : ''],
@@ -2128,7 +2143,7 @@ function overlay() {
       </div>
       <p class="pkg-section">Учебные файлы</p>
       <div class="dialog-options"><button data-file="sales-demo.csv"><span class="glyph blue">${icon('database',18)}</span><span><strong>sales-demo.csv</strong><small>Пример таблицы продаж</small></span>${icon('plus',18)}</button><button data-file="Продажи.lgp"><span class="glyph red">${icon('flow',19)}</span><span><strong>Продажи.lgp</strong><small>Учебный пакет Loginom</small></span>${icon('plus',18)}</button></div>`],
-    'loginom-status': ['Loginom', kind === 'loginom-status' ? (state.loginomDown
+    'loginom-status': ['Loginom', kind === 'loginom-status' ? (state.page === 'chat' && currentItem()?.build ? buildTogether.windowsList() : (state.loginomDown
       ? `<div class="connect-card"><span class="glyph red">${icon('alert',19)}</span><div><strong>Loginom не отвечает</strong>
           <p class="muted">Последний запрос к ${esc(hostOf(state.settings.connection.url))} остался без ответа 30 секунд. Проверьте, открывается ли Loginom в браузере. Если нет — он выключен или недоступна сеть: обратитесь к администратору.</p>
           <div class="button-row"><button class="btn primary" data-action="recheck-loginom">${icon('refresh',15)} Проверить снова</button><button class="btn quiet" data-settings="loginom">${icon('settings',15)} Настройки подключения</button></div></div></div>`
@@ -2136,7 +2151,7 @@ function overlay() {
       ? `<div class="connect-card"><span class="glyph green">${icon('check',19)}</span><div><strong>Подключено</strong>
           <dl><div><dt>Адрес</dt><dd>${esc(hostOf(state.settings.connection.url))}</dd></div><div><dt>Пользователь</dt><dd>${esc(state.settings.connection.username)}</dd></div><div><dt>Папка</dt><dd>${esc(packageFolder('personal'))}</dd></div></dl>
           <div class="button-row"><button class="btn quiet" data-settings="loginom">${icon('settings',15)} Настройки подключения</button></div></div></div>`
-      : `<p class="dialog-desc">Без Loginom агент отвечает на вопросы, но не открывает и не меняет пакеты.</p>${connectCard()}`) : ''],
+      : `<p class="dialog-desc">Без Loginom агент отвечает на вопросы, но не открывает и не меняет пакеты.</p>${connectCard()}`) + (buildTogether.hasWindows() ? buildTogether.windowsList() : '')) : ''],
     'agent-mode':['Режим агента',`<div class="dialog-options">${[['Выполнение','Предлагает план и запрашивает разрешения на действия'],['Планирование','Готовит план до начала выполнения']].map(([mode,detail]) => `<button data-agent-mode="${mode}"><span class="glyph red">${icon(mode === 'Планирование' ? 'layers':'spark',19)}</span><span><strong>${mode}</strong><small>${detail}</small></span>${state.mode === mode ? icon('check',18):''}</button>`).join('')}</div>`],
     rename:['Переименовать разговор',`<form class="inline-form" id="rename-form"><label class="sr-only" for="session-name">Имя разговора</label><input id="session-name" name="name" maxlength="70" value="${esc(state.sessions.find(x => x.id === state.renameId)?.title)}" required><button class="btn primary">Сохранить</button></form>`],
   }[kind]
@@ -2237,6 +2252,7 @@ function render(resetScroll = false) {
   bindOwn(app,state,api)
 }
 function dismiss() {
+  if (state.overlay === 'build-close') return buildTogether.cancelClose()
   if (state.overlay === 'loginom-window') {
     const opened = state.loginomView
     state.overlay = opened?.back || null
@@ -2307,11 +2323,12 @@ function send() {
     $('#prompt')?.focus()
     return
   }
+  const old = state.page === 'chat' ? currentItem() : null
+  if (old?.build) return buildTogether.request(old, prompt)
   if (!currentModel()) {
     toast('Сначала выберите модель — без неё агент не ответит', 'alert')
     return openConnect()
   }
-  const old = state.page === 'chat' ? state.sessions.find(x => x.id === state.session) : null
   if (old?.kind === 'package-edit') {
     if (!canUsePackageEdit(old) || old.workingPackage) return
     old.prompt = prompt
@@ -2748,6 +2765,7 @@ const actions = {
     tryPrompt('Дополни таблицу «sales-demo.csv» данными о регионах из Example Data')
   },
   'try-diagnostics':() => applyDemoPolicy('', 'diagnostics'),
+  'try-build-together':buildTogether.start,
   'try-run':() => tryPrompt('Построй ABC-анализ товаров по выручке'),
   'try-check':() => tryPrompt('Проверь сценарий продаж'),
   'try-improve':() => tryPrompt('Внеси улучшения в сценарий продаж'),
@@ -3009,26 +3027,33 @@ const actions = {
     const project = sessionProjectOf(id)
     const withFolder = Boolean($('#delete-chat-folder')?.checked)
     const copies = $('#delete-chat-copies') ? ($('#delete-chat-copies').checked ? ', копии агента — тоже' : '; копии агента остались в Loginom') : ''
-    state.sessions = state.sessions.filter(item => item.id !== id)
-    state.overlay = null
-    toast((withFolder ? 'Разговор и его папка удалены' : 'Разговор удалён') + copies)
-    if (state.page === 'chat' && state.session === id) return projectById(project) ? openProject(project) : newSession()
-    render()
+    const remove = () => {
+      state.sessions = state.sessions.filter(item => item.id !== id)
+      state.overlay = null
+      toast((withFolder ? 'Разговор и его папка удалены' : 'Разговор удалён') + copies)
+      if (state.page === 'chat' && state.session === id) return projectById(project) ? openProject(project) : newSession()
+      render()
+    }
+    return buildTogether.close(state.sessions.filter(item => item.id === id), remove, 'chat')
   },
   'confirm-delete-project':() => {
     // As in ChatGPT, a project's chats go with it (owner's decision).
     const id = state.deleteId
-    const gone = state.sessions.filter(item => item.project === id).map(item => item.id)
+    const items = state.sessions.filter(item => item.project === id)
+    const gone = items.map(item => item.id)
     const copies = $('#delete-project-copies') ? ($('#delete-project-copies').checked ? ', копии агента — тоже' : '; копии агента остались в Loginom') : ''
     const leave = (state.page === 'chat' && gone.includes(state.session)) || (state.page === 'project' && state.projectView === id)
-    state.projects = state.projects.filter(item => item.id !== id)
-    state.sessions = state.sessions.filter(item => item.project !== id)
-    state.expanded = state.expanded.filter(item => item !== id)
-    if (state.project === id) state.project = null
-    state.overlay = null
-    toast('Проект и его разговоры удалены' + copies)
-    if (leave) return newSession()
-    render()
+    const remove = () => {
+      state.projects = state.projects.filter(item => item.id !== id)
+      state.sessions = state.sessions.filter(item => item.project !== id)
+      state.expanded = state.expanded.filter(item => item !== id)
+      if (state.project === id) state.project = null
+      state.overlay = null
+      toast('Проект и его разговоры удалены' + copies)
+      if (leave) return newSession()
+      render()
+    }
+    return buildTogether.close(items, remove, 'chat')
   },
 }
 function sessionProjectOf(id) {
@@ -3045,6 +3070,10 @@ function menuAction(act) {
     return render()
   }
   state.menu = null
+  if (act === 'close-chat') return buildTogether.close([chat], () => {
+    if (state.page === 'chat' && state.session === chat.id) return newSession()
+    render()
+  }, 'chat')
   if (act === 'download') return downloadResult()
   if (act.startsWith('model:')) return menu.id === 'continue' ? continueTurn(Number(act.slice(6))) : chooseModel(Number(act.slice(6)))
   if (act === 'models-settings') return settingsTab('models')
@@ -3118,6 +3147,7 @@ app.addEventListener('click', event => {
   const el = event.target.closest('button')
   if (!el) return
   const d = el.dataset
+  if (d.build) return buildTogether.command(d.build, d.buildId)
   if (d.go) return navigate(d.go)
   if (d.settings) return settingsTab(d.settings)
   if (d.overlay) { state.overlay = d.overlay; return render() }
@@ -3263,7 +3293,8 @@ app.addEventListener('input', event => {
   }
   if (event.target.id === 'prompt') {
     state.draft = event.target.value
-    $('.send-btn').disabled = !state.draft.trim()
+    const item = state.page === 'chat' ? currentItem() : null
+    $('.send-btn').disabled = !state.draft.trim() || Boolean(item?.build && buildTogether.working(item))
   }
   if (event.target.id === 'package-search') {
     state.packageQuery = event.target.value
@@ -3382,7 +3413,7 @@ document.addEventListener('keydown', event => {
     return
   }
   if (event.key === 'Escape' && !peek && !document.querySelector('dialog[open]') && state.page === 'chat' && ['running','retrying','writing'].includes(currentItem()?.phase)) {
-    actions.stop()
+    if (!currentItem()?.build) actions.stop()
     return
   }
   if (event.key === 'Escape' && state.collapsed && !document.querySelector('dialog[open]')) {

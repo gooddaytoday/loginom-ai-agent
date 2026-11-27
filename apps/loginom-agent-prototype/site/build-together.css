@@ -1,0 +1,58 @@
+.build-review-mark{display:flex;align-items:center;gap:8px}
+.build-layout-open{justify-content:stretch}
+.build-layout-open .chat-main{padding-inline:clamp(14px,2.1vw,32px)}
+.build-chat-title{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.build-chat-title h1{font-size:clamp(26px,3vw,37px);letter-spacing:-.035em;margin-top:5px}
+.build-package{position:sticky;top:0;z-index:3;display:flex;align-items:flex-start;gap:8px;margin-top:14px;padding:9px 11px;background:var(--paper);border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}
+.build-package>.icon{margin-top:3px;color:var(--muted)}
+.build-package small,.build-window-package small,.build-windows-list small{color:var(--muted)}
+.build-toolbar{margin-top:12px}
+.build-layout .chat-timeline{padding-top:16px}
+.build-intro{display:grid;justify-items:start;gap:10px}
+.build-layout .chat-bottom{padding-bottom:8px}
+.build-layout .build-suggestion{margin:0 0 9px 2px}
+.build-composer-toolbar .lgm-chip{padding-inline:6px}
+.build-turn .user-turn{margin-bottom:9px}
+.build-answer{display:grid;justify-items:start;gap:9px;overflow-wrap:anywhere}
+.build-answer>p,.build-verified p{margin:0}
+.build-answer .build-warning,.build-edits,.build-verified{width:100%}
+.build-warning{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:6px;background:var(--amber-soft);color:var(--amber);font-weight:600}
+.build-warning .icon{margin-top:3px}
+.build-wait{display:flex;flex-wrap:wrap;align-items:center;gap:5px 11px;font-size:13px;color:var(--muted)}
+.build-wait progress{width:64px;height:9px;accent-color:var(--accent)}
+.build-edits{padding:8px 10px;border-left:3px solid var(--blue);background:var(--blue-soft);border-radius:4px}
+.build-edits .link-btn{margin-top:5px}
+.build-verified{padding:10px;border:1px solid var(--line);border-radius:8px}
+.build-verified h2{display:flex;align-items:center;gap:6px;font-size:16px;color:var(--success)}
+.build-verified ul{margin:8px 0;padding-left:20px}
+.build-verified .btn{margin-top:9px}
+.build-window{position:sticky;top:0;align-self:flex-start;flex:0 0 clamp(245px,27vw,365px);display:grid;gap:10px;margin:14px 12px 14px 0;padding:0 10px 10px;min-width:0;max-height:calc(100dvh - 78px);overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--paper);box-shadow:var(--shadow)}
+.build-window-title{display:flex;align-items:center;gap:8px;margin:0 -10px;padding:4px 7px 4px 11px;background:var(--soft);border-bottom:1px solid var(--line)}
+.build-window-title h2{flex:1;font-size:16px}
+.build-window-package{padding-inline:2px;overflow-wrap:anywhere}
+.build-canvas{display:grid;gap:10px;padding:9px;border:1px solid var(--line);border-radius:8px;background:radial-gradient(var(--line) 1px,transparent 1px) 0 0/12px 12px var(--bg)}
+.build-nodes,.build-links ul,.build-windows-list ul{list-style:none;padding:0;margin:0}
+.build-nodes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.build-nodes li{display:flex;align-items:center;gap:5px;min-height:53px;padding:5px;border:1px solid var(--line);border-radius:6px;background:var(--paper);font-size:13px;line-height:1.18;overflow-wrap:anywhere}
+.build-nodes .glyph{width:25px;height:25px;border-radius:5px}
+.build-nodes small{margin-top:2px;color:var(--muted);font-size:11px}
+.build-links{padding:6px 8px;border-radius:6px;background:var(--paper);font-size:13px}
+.build-links p,.build-links li{color:var(--muted)}
+.build-window-controls{display:flex;flex-wrap:wrap;gap:6px}
+.build-window-controls .btn{white-space:normal;text-align:left;font-size:13px;min-height:32px;padding:5px 8px}
+.build-windows-list{display:grid;justify-items:start;gap:10px}
+.connect-card+.build-windows-list,.dialog-desc+.build-windows-list{margin-top:16px}
+.build-windows-list ul{width:100%;display:grid;gap:6px}
+.build-windows-list li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 9px;border:1px solid var(--line);border-radius:7px;overflow-wrap:anywhere}
+.build-windows-list .link-btn{margin-top:3px}
+.build-view-path{margin-bottom:10px;overflow-wrap:anywhere}
+@media(max-width:1000px){
+  .build-nodes{gap:4px}
+  .build-nodes li{gap:4px;font-size:12px}
+  .build-nodes .glyph{width:19px;height:22px}
+}
+@media(max-width:690px){
+  .build-layout-open{flex-direction:column}
+  .build-window{position:static;order:-1;flex:auto;width:calc(100% - 22px);max-height:none;margin:10px 11px 0}
+  .build-nodes li{font-size:14px}
+}
