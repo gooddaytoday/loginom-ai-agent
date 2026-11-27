@@ -41,6 +41,10 @@ export default {
   modelServerDiscoveryFailed: "Не удалось найти модели. Проверьте адрес, ключ и доступ к серверу.",
   modelServerNoModels: "Сервер не вернул доступных моделей.",
   modelServerSaveFailed: "Не удалось сохранить сервер моделей.",
+  modelServerAddressBlocked: "Этот адрес нельзя использовать для подключения сервера моделей.",
+  modelServerRemove: "Удалить сервер",
+  modelServerRemoveConfirm: "Удалить сервер «{{server}}», его модели из списка и сохранённый ключ?",
+  modelServerRemoveFailed: "Не удалось удалить сервер моделей.",
   modelServerDenied: "Подключение своего сервера запрещено настройками организации.",
   modelServerDeviceOnly: "В этом режиме можно подключить только сервер на этом компьютере.",
 }

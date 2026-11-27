@@ -4,7 +4,7 @@ import { useDialog } from "@opencode/ui/context/dialog"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Menu } from "@opencode/ui/menu"
-import { BuiltinProviderSetup } from "@opencode/plugin/gui/builtin"
+import { BuiltinProviderSetup, type ProviderSetup } from "@opencode/plugin/gui/builtin"
 import { OpenCodeLogo } from "@/providers/opencode-logo"
 import { showToast } from "@/shell/notifications/toast"
 import { popularProviders, useProviders } from "@/providers/catalog/providers"
@@ -65,6 +65,7 @@ export const SettingsProviders: Component<{
   const accountActions = useProviderAccountActions(() => props.directory)
 
   const [consoleExpanded, setConsoleExpanded] = createSignal(false)
+  const [removing, setRemoving] = createSignal(false)
   const [pageState, setPageState] = createSignal(createSettingsProvidersState<ProviderItem>())
   const accountView = createMemo(() => providerAccountView(pageState()))
 
@@ -233,6 +234,7 @@ export const SettingsProviders: Component<{
 
   const local = (id: string) =>
     ["ollama", "lmstudio", "vllm"].includes(id) || setups().some((entry) => entry.matchesProvider?.(id))
+
   const displayedBySource = createMemo(() =>
     displayed().toSorted((left, right) => Number(local(left.id)) - Number(local(right.id))),
   )
@@ -317,6 +319,18 @@ export const SettingsProviders: Component<{
       integrationID: item.integrationID ?? item.id,
       providerName: name,
     })
+  }
+
+  const removeConfigured = async (item: ProviderItem, action: NonNullable<ProviderSetup["removal"]>) => {
+    setRemoving(true)
+
+    try {
+      if (await action.run(serverSdk.api, item, props.directory)) await accountActions.refresh().catch(() => undefined)
+    } catch (error) {
+      showToast({ title: language.t("common.requestFailed"), description: formatServerError(error, language.t) })
+    } finally {
+      setRemoving(false)
+    }
   }
 
   const activate = (provider: ProviderItem, providerName: string, account: ProviderAccount) =>
@@ -476,6 +490,7 @@ export const SettingsProviders: Component<{
               <For each={displayedBySource()}>
                 {(item) => {
                   const managedGroup = () => (consoleGroup()?.root.id === item.id ? consoleGroup() : undefined)
+                  const removal = () => setups().find((entry) => entry.matchesProvider?.(item.id))?.removal
 
                   return (
                     <Show
@@ -491,21 +506,41 @@ export const SettingsProviders: Component<{
                             </div>
                           </div>
                           <Show
-                            when={canManageAccounts(item)}
+                            when={!removal() && canManageAccounts(item)}
                             fallback={
                               <Show
-                                when={canDisconnect(item)}
+                                when={removal()}
                                 fallback={
-                                  <Show when={source(item) === "env"}>
-                                    <span class="settings-provider-env-hint">
-                                      {language.t("settings.providers.connected.environmentDescription")}
-                                    </span>
+                                  <Show
+                                    when={canDisconnect(item)}
+                                    fallback={
+                                      <Show when={source(item) === "env"}>
+                                        <span class="settings-provider-env-hint">
+                                          {language.t("settings.providers.connected.environmentDescription")}
+                                        </span>
+                                      </Show>
+                                    }
+                                  >
+                                    <Button
+                                      size="normal"
+                                      variant="ghost-muted"
+                                      onClick={() => disconnect(item, item.name)}
+                                    >
+                                      {language.t("common.disconnect")}
+                                    </Button>
                                   </Show>
                                 }
                               >
-                                <Button size="normal" variant="ghost-muted" onClick={() => disconnect(item, item.name)}>
-                                  {language.t("common.disconnect")}
-                                </Button>
+                                {(action) => (
+                                  <Button
+                                    size="normal"
+                                    variant="ghost-muted"
+                                    disabled={removing()}
+                                    onClick={() => void removeConfigured(item, action())}
+                                  >
+                                    {action().title}
+                                  </Button>
+                                )}
                               </Show>
                             }
                           >

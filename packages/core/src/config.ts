@@ -30,7 +30,9 @@ export function latest<K extends keyof Info>(entries: readonly Entry[], key: K):
     ?.info[key]
 }
 
-type ProfilePatch = Partial<Patch> & Pick<Info, "providers">
+type ProfilePatch = Partial<Patch> & {
+  readonly providers?: Readonly<Record<string, NonNullable<Info["providers"]>[string] | undefined>>
+}
 
 export interface Interface {
   /** Returns location config documents and discovery sources from lowest to highest priority. */
@@ -48,6 +50,8 @@ export interface Interface {
   readonly changes: () => Stream.Stream<Watcher.Update>
   /** Updates supported global config fields while preserving unrelated JSONC content. */
   readonly update?: (patch: ProfilePatch) => Effect.Effect<void, FSUtil.Error>
+  /** Reads the profile document used by `update`, without project or managed overlays. */
+  readonly profile?: () => Effect.Effect<Info | undefined, FSUtil.Error>
   /**
    * Replaces, or clears with `undefined`, the document an integration connection contributes. It loads right after
    * managed policies: its settings layer below remote, user, and project config, while its policies outrank theirs.
@@ -468,12 +472,15 @@ export const layer = (options?: Options) =>
       )
       yield* reloadLock.withPermit(reconcile(initial))
 
+      const profilePath = Effect.fnUntraced(function* () {
+        const directory = initial.global ?? AbsolutePath.make(globalService.config)
+        const candidates = ConfigDiscovery.names.map((name) => path.join(directory, name))
+        return (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "loginom-ai-agent.jsonc")
+      })
+
       const update = Effect.fn("Config.update")(
         function* (patch: ProfilePatch) {
-          const directory = initial.global ?? AbsolutePath.make(globalService.config)
-          const candidates = ConfigDiscovery.names.map((name) => path.join(directory, name))
-          const filepath =
-            (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "loginom-ai-agent.jsonc")
+          const filepath = yield* profilePath()
           const text = (yield* fs.readFileStringSafe(filepath)) ?? "{}\n"
           const updated = yield* Effect.try({
             try: () => {
@@ -504,6 +511,12 @@ export const layer = (options?: Options) =>
           }),
         changes: () => Stream.fromPubSub(updates),
         update,
+        profile: () =>
+          profilePath().pipe(
+            Effect.flatMap(loadFile),
+            Effect.provide(context),
+            Effect.map((file) => file?.info),
+          ),
         integration: Effect.fn("Config.integration")(function* (integrationID, document) {
           if (isDeepStrictEqual(integrations.get(integrationID), document)) return
           integrations.delete(integrationID)

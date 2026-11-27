@@ -31,6 +31,22 @@ export interface ProviderSetup {
   readonly title: string
   /** Identifies configured providers to place alongside the action in Settings. */
   readonly matchesProvider?: (id: string) => boolean
+  /** Removal action for providers that own a profile entry rather than just a credential. */
+  readonly removal?: {
+    /** Localized label for the removal button. */
+    readonly title: string
+    /** Runs confirmation and removal, returning true only when the server confirmed it. */
+    readonly run: (
+      client: OpenCodeClient,
+      provider: {
+        /** ID sent to the server. */
+        readonly id: string
+        /** Name shown in confirmation. */
+        readonly name: string
+      },
+      directory?: string,
+    ) => Promise<boolean>
+  }
   /** Renders the form inside the host's provider dialog. */
   readonly render: (props: ProviderSetupProps) => JSX.Element
 }

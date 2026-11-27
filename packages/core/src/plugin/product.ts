@@ -2,11 +2,15 @@ export * as PluginProduct from "./product.js"
 
 // Fork seam U1 (catalog CAT-07): the Loginom AI Agent product plugin is built in, runs last in `post`, and its ID is
 // guarded against config removals and reserved against packages that claim it.
-import LoginomAgent, { Dashboard, modelServerHandlers, ModelServerRpc } from "@loginom-ai-agent/loginom-agent"
+import LoginomAgent, {
+  Dashboard,
+  isModelServerID,
+  modelServerHandlers,
+  ModelServerRpc,
+} from "@loginom-ai-agent/loginom-agent"
 import { Integration } from "@opencode/schema/integration"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
-import { Context, Effect, Layer } from "effect"
-import { FetchHttpClient } from "effect/http"
+import { Context, Effect, Layer, Semaphore } from "effect"
 import { Config } from "../config.js"
 import { Credential } from "../credential.js"
 import { Formatter } from "../formatter.js"
@@ -15,6 +19,7 @@ import type { InternalPlugin } from "./internal.js"
 import { PluginPromise } from "./promise.js"
 
 const product = PluginPromise.fromPromise(LoginomAgent)
+const modelServerWrites = Semaphore.makeUnsafe(1)
 
 // No formatter runs in a dashboard's work folder, whatever the config says (B2.9d, guarantee G1): a formatter loads
 // its own config from the folder of the file it formats (Prettier runs `src/.prettierrc.cjs`), and there the model
@@ -32,34 +37,68 @@ export const plugins: readonly InternalPlugin[] = [
         yield* product.effect(ctx)
         const config = yield* Config.Service
         const credential = yield* Credential.Service
-        const fetch = yield* FetchHttpClient.Fetch
+        const allowed = (id: string) =>
+          config
+            .entries()
+            .pipe(
+              Effect.map(
+                (entries) =>
+                  ManagedPolicy.decision(ManagedPolicy.statements(entries), "integration.connect", id) !== "deny",
+              ),
+            )
+        const mutate = <A, E>(effect: Effect.Effect<A, E>) =>
+          modelServerWrites.withPermit(Effect.uninterruptible(effect))
         yield* ctx.rpc
           .register(
             ModelServerRpc,
             modelServerHandlers({
-              fetch,
-              allowed: (id) =>
-                config
-                  .entries()
-                  .pipe(
-                    Effect.map(
-                      (entries) =>
-                        ManagedPolicy.decision(ManagedPolicy.statements(entries), "integration.connect", id) !== "deny",
-                    ),
-                  ),
+              allowed,
               save: (id, provider, key) =>
-                Effect.gen(function* () {
-                  if (!config.update) return yield* Effect.fail("Config updates are unavailable")
-                  const stored = key
-                    ? yield* credential.create({
-                        integrationID: Integration.ID.make(id),
-                        value: Credential.Key.make({ type: "key", key }),
-                      })
-                    : undefined
-                  yield* config
-                    .update({ providers: { [id]: provider } })
-                    .pipe(Effect.onError(() => (stored ? credential.remove(stored.id) : Effect.void)))
-                }).pipe(Effect.uninterruptible),
+                mutate(
+                  Effect.gen(function* () {
+                    if (!config.update || !config.profile) return yield* Effect.fail("Config updates are unavailable")
+                    const profile = yield* config.profile()
+                    const providerID =
+                      Object.entries(profile?.providers ?? {}).find(
+                        ([existing, value]) =>
+                          isModelServerID(existing) && value.settings?.baseURL === provider.settings?.baseURL,
+                      )?.[0] ?? id
+                    if (!(yield* allowed(providerID))) return
+                    const integrationID = Integration.ID.make(providerID)
+                    const previous = yield* credential.list(integrationID)
+                    const active = key ? previous.find((entry) => entry.value.type === "key") : undefined
+                    const value = key ? Credential.Key.make({ type: "key", key }) : undefined
+                    const stored =
+                      value && !active
+                        ? yield* credential.create({
+                            integrationID,
+                            value,
+                          })
+                        : undefined
+                    yield* config
+                      .update({ providers: { [providerID]: provider } })
+                      .pipe(Effect.onError(() => (stored ? credential.remove(stored.id) : Effect.void)))
+                    if (active && value) {
+                      yield* credential.update(active.id, { value })
+                      yield* credential.activate(active.id)
+                    }
+                    yield* Effect.forEach(
+                      previous.filter((entry) => entry.id !== active?.id),
+                      (entry) => credential.remove(entry.id),
+                    )
+                    return providerID
+                  }),
+                ),
+              remove: (id) =>
+                mutate(
+                  Effect.gen(function* () {
+                    if (!config.update || !config.profile) return yield* Effect.fail("Config updates are unavailable")
+                    const profile = yield* config.profile()
+                    if (profile?.providers?.[id]) yield* config.update({ providers: { [id]: undefined } })
+                    const stored = yield* credential.list(Integration.ID.make(id))
+                    yield* Effect.forEach(stored, (entry) => credential.remove(entry.id))
+                  }),
+                ),
             }),
           )
           .pipe(Effect.orDie)

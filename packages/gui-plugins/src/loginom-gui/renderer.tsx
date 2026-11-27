@@ -1,4 +1,4 @@
-import { providerPrefix } from "@loginom-ai-agent/loginom-host/model-server-rpc"
+import { isModelServerID } from "@loginom-ai-agent/loginom-host/model-server-id"
 import { bindPlugin, SettingsPage, type Plugin } from "@opencode/plugin/gui"
 import { BuiltinProviderSetup, type ProviderSetupProps } from "@opencode/plugin/gui/builtin"
 import { lazy, Suspense } from "solid-js"
@@ -12,7 +12,36 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     get title() {
       return ctx.t("modelServerTitle")
     },
-    matchesProvider: (id) => id.startsWith(providerPrefix),
+    matchesProvider: isModelServerID,
+    removal: {
+      get title() {
+        return ctx.t("modelServerRemove")
+      },
+      async run(client, provider, directory) {
+        const confirmed = await ctx.dialogs.confirm({
+          title: ctx.t("modelServerRemove"),
+          description: ctx.t("modelServerRemoveConfirm", { server: provider.name }),
+          confirm: ctx.t("modelServerRemove"),
+          danger: true,
+        })
+
+        if (!confirmed) return false
+
+        try {
+          const { ModelServerRpc } = await import("@loginom-ai-agent/loginom-host/model-server-rpc")
+
+          const result = await client
+            .rpc(ModelServerRpc)
+            .remove({ providerID: provider.id }, { location: directory ? { directory } : undefined })
+
+          if (result.ok) return true
+        } catch {}
+
+        ctx.toast.show({ variant: "error", title: ctx.t("modelServerRemoveFailed") })
+
+        return false
+      },
+    },
     render: bindPlugin((props: ProviderSetupProps) => (
       <Suspense>
         <ModelServer {...props} />

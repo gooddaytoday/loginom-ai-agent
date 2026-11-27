@@ -42,6 +42,10 @@ export default {
   modelServerDiscoveryFailed: "Could not find models. Check the address, key, and access to the server.",
   modelServerNoModels: "The server did not return any available models.",
   modelServerSaveFailed: "Could not save the model server.",
+  modelServerAddressBlocked: "This address cannot be used to connect a model server.",
+  modelServerRemove: "Remove server",
+  modelServerRemoveConfirm: "Remove {{server}}, its models from the list, and the saved key?",
+  modelServerRemoveFailed: "Could not remove the model server.",
   modelServerDenied: "Your organization does not allow connecting a custom server.",
   modelServerDeviceOnly: "In this mode, you can only connect to a server on this computer.",
 }

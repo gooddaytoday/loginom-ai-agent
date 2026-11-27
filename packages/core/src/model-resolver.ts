@@ -1,6 +1,7 @@
 export * as ModelResolver from "./model-resolver.js"
 
 import { makeLocationNode } from "@opencode/util/effect/app-node"
+import { isModelServerID, modelServerFetch } from "@loginom-ai-agent/loginom-agent"
 import {
   DecisionModel,
   DecisionModelCompatibility,
@@ -491,13 +492,25 @@ export const layer = Layer.effect(
     const load = Effect.fn("ModelResolver.resolveModel")(function* (selected: Info, variant?: VariantID) {
       const { provider, credential, runtimeInfo } = yield* prepare(selected, variant)
       const model = yield* fromCatalogModel(runtimeInfo, credential, dependencies)
-      const runtime =
+      const authenticated =
         provider?.activation === "enabled" &&
         credential === undefined &&
         !hasConfiguredAuth(runtimeInfo) &&
         usesAPIKeyAuth(runtimeInfo.package)
           ? LanguageModel.update(model, { route: model.route.with({ auth: Auth.none }) })
           : model
+      const route = authenticated.route
+      const runtime =
+        isModelServerID(runtimeInfo.providerID) &&
+        Provider.packageName(runtimeInfo.package) === "@opencode/ai/providers/openai-compatible"
+          ? LanguageModel.update(authenticated, {
+              route: {
+                ...route,
+                prepareTransport: (body, request, options) =>
+                  route.prepareTransport(body, { ...request, fetch: modelServerFetch }, options),
+              },
+            })
+          : authenticated
       return {
         model: runtime,
         ref: Ref.make({

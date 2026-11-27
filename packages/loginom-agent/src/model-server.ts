@@ -1,10 +1,12 @@
-import { ModelID, ModelServerRpc, providerPrefix } from "@loginom-ai-agent/loginom-host/model-server-rpc"
+import { providerPrefix } from "@loginom-ai-agent/loginom-host/model-server-id"
+import { ModelID, ModelServerRpc } from "@loginom-ai-agent/loginom-host/model-server-rpc"
 import type { RpcHandlers } from "@opencode/plugin/effect/rpc"
 import type { ConfigProvider } from "@opencode/schema/config/provider"
 import { Model } from "@opencode/schema/model"
 import { Effect, Schema } from "effect"
-import { randomUUID } from "node:crypto"
+import { createHash } from "node:crypto"
 import { ServiceHost } from "./host"
+import { resolveModelServer } from "./model-server-network"
 
 const response = Schema.Struct({ data: Schema.Array(Schema.Struct({ id: Schema.String })) })
 
@@ -22,12 +24,6 @@ function addressOf(address: string, key?: string) {
   if (!key || !baseURL.includes(key)) return baseURL
 }
 
-function deviceAddressAllowed(address: string) {
-  if (!ServiceHost.connectionSettings.deviceOnly()) return true
-  const { hostname } = new URL(address)
-  return hostname === "localhost" || hostname === "[::1]" || /^127(?:\.\d{1,3}){3}$/u.test(hostname)
-}
-
 async function readModels(reply: Response) {
   if (!reply.ok || !reply.body) throw new Error("Model discovery failed")
   const decoder = new TextDecoder()
@@ -42,25 +38,34 @@ async function readModels(reply: Response) {
 }
 
 const usable = (id: string, key?: string) => Schema.is(ModelID)(id) && (!key || !id.includes(key))
+const providerIDFor = (address: string) => `${providerPrefix}${createHash("sha256").update(address).digest("hex")}`
 
 export function modelServerHandlers(options: {
-  fetch: (url: string, options: RequestInit) => Promise<Response>
   allowed: (id: string) => Effect.Effect<boolean>
-  save: (id: string, provider: ConfigProvider.Info, key: string | undefined) => Effect.Effect<void, unknown>
+  save: (
+    id: string,
+    provider: ConfigProvider.Info,
+    key: string | undefined,
+  ) => Effect.Effect<string | undefined, unknown>
+  remove: (id: string) => Effect.Effect<void, unknown>
 }) {
   return {
     discover: (input) =>
       Effect.gen(function* () {
         const baseURL = addressOf(input.address, input.key)
         if (!baseURL) return { ok: false, issue: "modelServerAddressInvalid" }
-        if (!deviceAddressAllowed(baseURL)) return { ok: false, issue: "modelServerDeviceOnly" }
-        if (!(yield* options.allowed(`${providerPrefix}${randomUUID()}`)))
-          return { ok: false, issue: "modelServerDenied" }
+        if (!(yield* options.allowed(providerIDFor(baseURL)))) return { ok: false, issue: "modelServerDenied" }
         return yield* Effect.promise(async (signal) => {
           try {
-            const reply = await options.fetch(`${baseURL}/models`, {
-              redirect: "error",
-              signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
+            const deadline = AbortSignal.any([signal, AbortSignal.timeout(10_000)])
+            const target = await resolveModelServer(
+              `${baseURL}/models`,
+              ServiceHost.connectionSettings.deviceOnly(),
+              deadline,
+            )
+            if (!target.ok) return target
+            const reply = await target.request({
+              signal: deadline,
               headers: input.key ? { Authorization: `Bearer ${input.key}` } : undefined,
             })
             const entries = await readModels(reply)
@@ -79,13 +84,20 @@ export function modelServerHandlers(options: {
       Effect.gen(function* () {
         const baseURL = addressOf(input.address, input.key)
         if (!baseURL) return { ok: false, issue: "modelServerAddressInvalid" }
-        if (!deviceAddressAllowed(baseURL)) return { ok: false, issue: "modelServerDeviceOnly" }
         if (!input.models.every((id) => usable(id, input.key))) return { ok: false, issue: "modelServerSaveFailed" }
-        const providerID = `${providerPrefix}${randomUUID()}`
-        if (!(yield* options.allowed(providerID))) return { ok: false, issue: "modelServerDenied" }
+        const verdict = yield* Effect.tryPromise({
+          try: (signal) =>
+            resolveModelServer(
+              baseURL,
+              ServiceHost.connectionSettings.deviceOnly(),
+              AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
+            ),
+          catch: () => ({ ok: false, issue: "modelServerAddressInvalid" }) as const,
+        }).pipe(Effect.catch(Effect.succeed))
+        if (!verdict.ok) return verdict
         return yield* options
           .save(
-            providerID,
+            providerIDFor(baseURL),
             {
               name: new URL(baseURL).host,
               package: "@opencode/ai/providers/openai-compatible",
@@ -97,9 +109,18 @@ export function modelServerHandlers(options: {
             input.key || undefined,
           )
           .pipe(
-            Effect.as({ ok: true, value: { providerID } } as const),
+            Effect.map((providerID) =>
+              providerID
+                ? ({ ok: true, value: { providerID } } as const)
+                : ({ ok: false, issue: "modelServerDenied" } as const),
+            ),
             Effect.catchCause(() => Effect.succeed({ ok: false, issue: "modelServerSaveFailed" } as const)),
           )
       }),
+    remove: ({ providerID }) =>
+      options.remove(providerID).pipe(
+        Effect.as({ ok: true, value: true } as const),
+        Effect.catchCause(() => Effect.succeed({ ok: false, issue: "modelServerRemoveFailed" } as const)),
+      ),
   } satisfies RpcHandlers<typeof ModelServerRpc>
 }

@@ -26,6 +26,7 @@ export default function ModelServer(props: ProviderSetupProps) {
 
   const submit = async (action: "discover" | "save") => {
     if (busy() || !address().trim()) return
+
     const selection = selected()
     const visible = models()
     const input = { address: address(), key: key() || undefined }
@@ -33,19 +34,28 @@ export default function ModelServer(props: ProviderSetupProps) {
     const signal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(15_000)])
     setIssue(undefined)
     setBusy(action)
+
     try {
       if (action === "save") {
         const result = await rpc.save({ ...input, models: visible }, { signal })
+
         if (lifetime.signal.aborted) return
+
         if (!result.ok) return void setIssue(result.issue)
+
         setKey("")
+
         return await props.onConnected(result.value.providerID, visible, selection, lifetime.signal)
       }
+
       setModels([])
       setSelected("")
       const result = await rpc.discover(input, { signal })
+
       if (lifetime.signal.aborted) return
+
       if (!result.ok) return void setIssue(result.issue)
+
       setModels(result.value)
       setSelected(result.value[0])
     } catch {

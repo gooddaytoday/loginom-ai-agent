@@ -1,7 +1,7 @@
 import { Rpc } from "@opencode/schema/rpc"
 import { Schema } from "effect"
+import { isModelServerID } from "./model-server-id"
 
-export const providerPrefix = "loginom-model-server-"
 export const ModelID = Schema.String.check(
   Schema.isMinLength(1),
   Schema.isMaxLength(256),
@@ -31,6 +31,8 @@ export const Issue = Schema.Literals([
   "modelServerSaveFailed",
   "modelServerDenied",
   "modelServerDeviceOnly",
+  "modelServerAddressBlocked",
+  "modelServerRemoveFailed",
 ])
 const failure = Schema.Struct({ ok: Schema.Literal(false), issue: Issue })
 const output = <S extends Schema.ConstraintDecoder<unknown>>(value: S) =>
@@ -43,6 +45,10 @@ export const ModelServerRpc = Rpc.define({
     save: {
       input: input(Schema.Struct({ ...fields, models: Models })),
       output: output(Schema.Struct({ providerID: Schema.String })),
+    },
+    remove: {
+      input: input(Schema.Struct({ providerID: Schema.String.check(Schema.makeFilter(isModelServerID)) })),
+      output: output(Schema.Boolean),
     },
   },
   events: {},

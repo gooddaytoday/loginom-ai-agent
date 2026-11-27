@@ -280,7 +280,9 @@ export const DialogConnectProvider: Component<{
                 client: sdk.api,
                 onConnected: async (providerID, models, selected, signal) => {
                   const completed = await controller.completeSetup(providerID, models, selected, signal)
+
                   if (signal.aborted) return
+
                   setSetupCompleted(completed)
                   dialog.close()
                 },
@@ -307,6 +309,8 @@ function ProviderPicker(props: {
   const integrations = useIntegrations(() => props.directory)
   const language = useLanguage()
   const [offline, setOffline] = createSignal(false)
+
+  // Until stage F, use the browser's connectivity signal; it does not detect all WAN outages.
   onMount(() => {
     const update = () => setOffline(!navigator.onLine)
     update()
@@ -357,10 +361,12 @@ function ProviderPicker(props: {
 
   const actions = createMemo(() => {
     const query = store.filter.trim().toLowerCase()
+
     return props.setups
       .filter((entry) => !query || entry.title.toLowerCase().includes(query))
       .map((entry) => ({ id: entry.id, name: entry.title, connections: undefined }))
   })
+
   const groups = () => [
     ...(offline() ? [{ title: "", items: actions }] : []),
     { title: language.t("dialog.provider.connected"), items: connected },

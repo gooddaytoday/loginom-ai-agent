@@ -545,9 +545,11 @@ export function createProviderDialogController(options: {
   }
 
   const [pendingSetup, setPendingSetup] = createSignal<ModelChoice>()
+
   const setupSettler = createConsoleCatalogSettler({
     isLoaded: () => {
       const pending = pendingSetup()
+
       return (
         !!pending &&
         providers
@@ -646,14 +648,20 @@ export function createProviderDialogController(options: {
       signal.addEventListener("abort", setupSettler.cancel, { once: true })
       const outcome = await setupSettler.settle()
       signal.removeEventListener("abort", setupSettler.cancel)
+
       if (signal.aborted) return false
+
       global.models.show(models.map((id) => ({ providerID, modelID: id })))
       options.onConnected?.(providerID)
+
       if (outcome !== "loaded") {
         showToast({ variant: "error", title: language.t("provider.connect.setup.modelUnavailable") })
+
         return false
       }
+
       applyModel(selection)
+
       return true
     },
     dispatch,
