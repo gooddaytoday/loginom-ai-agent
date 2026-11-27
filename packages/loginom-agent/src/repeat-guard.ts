@@ -34,6 +34,14 @@ const stepNames = new Map([
   ["loginom_file_admit", "регистрацию файла для доставки в Loginom"],
 ])
 
+const pollingTools = new Set([
+  "loginom_dock_node_wait",
+  "loginom_dock_node_status",
+  "loginom_dock_artifact_delivery_status",
+  "loginom_dock_storage_download_wait",
+  "loginom_dock_storage_download_status",
+])
+
 // These tools take a new request identity. For recovery, resume, cancel and stop, operation_id names the target.
 const newOperation = new Set([
   "loginom_dock_action_run",
@@ -76,6 +84,7 @@ export function repeatGuard(options: {
 
   return {
     before: (sessionID: string, tool: string) => {
+      if (pollingTools.has(tool)) return
       if (recent.get(sessionID)?.name !== tool) recent.delete(sessionID)
     },
     reset: (sessionID: string) => recent.delete(sessionID),

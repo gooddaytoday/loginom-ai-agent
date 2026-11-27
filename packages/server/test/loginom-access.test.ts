@@ -383,7 +383,7 @@ describe("loginom.product access and tool gate (G1)", () => {
   )
 
   it.live(
-    "the third consecutive Loginom call pauses for a decision across model steps",
+    "the third identical Loginom call pauses for a decision across waits and status checks",
     () =>
       Effect.gen(function* () {
         const applyTool = dockTool("dock_node_apply")
@@ -393,7 +393,9 @@ describe("loginom.product access and tool gate (G1)", () => {
               ...applyTool,
               inputSchema: { type: "object", required: ["host_context_token"], additionalProperties: true },
             },
-            ...["dock_prepare", "dock_node_wait", "dock_operation_inspect"].map((name) => dockTool(name)),
+            ...["dock_prepare", "dock_node_wait", "dock_node_status", "dock_operation_inspect"].map((name) =>
+              dockTool(name),
+            ),
           ],
         })
         const test = yield* boot(undefined, { catalog: "missing", host })
@@ -410,14 +412,24 @@ describe("loginom.product access and tool gate (G1)", () => {
         const reply = (id: Form.ID, answer: Form.Answer) =>
           test.post(`/api/session/${sessionID}/form/${id}/reply`, { answer })
 
-        const continued = yield* Effect.forkScoped(start(step, reordered, third, { text: "continued" }))
+        const wait = { tool: "loginom_dock_node_wait", input: { path: "one" } }
+        const status = { tool: "loginom_dock_node_status", input: { path: "two" } }
+        const continued = yield* Effect.forkScoped(
+          start(step, wait, reordered, wait, status, third, { text: "continued" }),
+        )
         const confirmation = yield* question()
         expect(confirmation.metadata?.timelineGroup).toMatchObject({
           attempt: 3,
           formID: confirmation.id,
           summary: "Агент дважды вызвал применение настроек узла Loginom с теми же параметрами",
         })
-        expect(executed()).toBe(2)
+        expect(host.requests("call").map((input) => input.name)).toEqual([
+          "dock_node_apply",
+          "dock_node_wait",
+          "dock_node_apply",
+          "dock_node_wait",
+          "dock_node_status",
+        ])
 
         const replies = yield* Effect.all(
           [reply(confirmation.id, { decision: "continue" }), reply(confirmation.id, { decision: "continue" })],
@@ -464,13 +476,19 @@ describe("loginom.product access and tool gate (G1)", () => {
         expect(executed()).toBe(13)
         expect(yield* test.forms(sessionID)).toEqual([])
 
+        const beforePolling = host.requests("call").length
         const polling = ["dock_prepare", "dock_node_wait", "dock_operation_inspect"].flatMap((name) =>
           Array.from({ length: 3 }, () => ({ tool: `loginom_${name}`, input: { path: "same" } })),
         )
         yield* start(step, step, ...polling, step, { text: "polling and repeated prepare never ask" })
         expect(executed()).toBe(16)
         for (const name of ["dock_prepare", "dock_node_wait", "dock_operation_inspect"])
-          expect(host.requests("call").filter((input) => input.name === name)).toHaveLength(3)
+          expect(
+            host
+              .requests("call")
+              .slice(beforePolling)
+              .filter((input) => input.name === name),
+          ).toHaveLength(3)
 
         const exportStep = { tool, input: { ...step.input, target: { type: "exports.csv" } } }
         const exportRun = yield* Effect.forkScoped(

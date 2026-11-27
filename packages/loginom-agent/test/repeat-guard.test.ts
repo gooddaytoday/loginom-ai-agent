@@ -64,6 +64,36 @@ test("uses business parameters for the group and forwards the original operation
   ])
 })
 
+test.each([
+  "loginom_dock_node_wait",
+  "loginom_dock_node_status",
+  "loginom_dock_artifact_delivery_status",
+  "loginom_dock_storage_download_wait",
+  "loginom_dock_storage_download_status",
+])("%s neither breaks nor counts toward a repeat streak", async (name) => {
+  const { guard, tool, call, sessionID, forms } = setup()
+  const apply = tool()
+  const poll = tool(name)
+  const run = (next: typeof apply) => {
+    guard.before(sessionID, next.name)
+    return next.execute({ operation_id: "same" }, call())
+  }
+
+  const first = await run(apply)
+  for (let checks = 0; checks < 3; checks++) {
+    expect((await run(poll)).metadata?.timelineGroup).toBeUndefined()
+  }
+  const second = await run(apply)
+  await run(poll)
+  expect(forms).toEqual([])
+  const third = await run(apply)
+
+  const id = first.metadata?.timelineGroup.id
+  expect(second.metadata?.timelineGroup).toEqual({ id, attempt: 2 })
+  expect(forms).toHaveLength(1)
+  expect(third.metadata?.timelineGroup).toMatchObject({ id, attempt: 3, formID: forms[0] })
+})
+
 test("different calls, parameters, turns and sessions end a streak", async () => {
   const { guard, tool, call, sessionID, forms, executed } = setup()
   const apply = tool()
