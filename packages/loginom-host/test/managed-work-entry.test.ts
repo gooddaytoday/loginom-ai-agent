@@ -357,6 +357,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     })
     await Promise.race([entered.promise, running])
     const active = await run.busy()
+    if (!active) throw Error("Protected operation did not publish a live snapshot")
     expect(active).toMatchObject({ version: 1, windowId: expect.any(String), operationId: "progress-operation", active: true })
     const result = await running
     const settled = { ...active, active: false }
