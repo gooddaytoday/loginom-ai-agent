@@ -1,3 +1,4 @@
+import { createSignal } from "solid-js"
 import { render } from "solid-js/web"
 import { ConversationSidebar, type SidebarConversation } from "@opencode/gui-plugins/conversation-sidebar"
 
@@ -16,6 +17,8 @@ export function mountSidebar() {
     }),
   )
 
+  const [pins, setPins] = createSignal<string[]>([])
+
   render(
     () => (
       <ConversationSidebar
@@ -24,9 +27,34 @@ export function mountSidebar() {
           { directory: "/reports", title: "Отчёты", conversations: items },
           { directory: "/other", title: "Другой проект", conversations: [] },
         ]}
-        conversations={[{ id: "loose", title: "Разговор без проекта", active: false, activity: "running" }]}
+        conversations={[{ id: "loose", title: "Разговор без проекта", active: false, activity: "idle" }]}
         onCreate={async () => false}
-        onOpenProject={() => {}}
+        pins={pins()}
+        onPin={(id) =>
+          setPins((current) => (current.includes(id) ? current.filter((pin) => pin !== id) : [...current, id]))
+        }
+        canManageProject={() => true}
+        onProjectSettings={(directory) => {
+          host.dataset.settings = directory
+        }}
+        onRename={async (id, title) => {
+          host.dataset.renamed = `${id}:${title}`
+          return true
+        }}
+        onMove={async (id, target) => {
+          const name = target ? ("name" in target ? target.name : target.directory) : "/loose"
+          host.dataset.moved = `${id}:${name}`
+          return "directory" in (target ?? {}) ? name : "/other"
+        }}
+        onCountFiles={async (id) => (id === "loose" ? 2 : undefined)}
+        onDeleteConversation={async (id, files) => {
+          host.dataset.deleted = `${id}:${files}`
+          return true
+        }}
+        onDeleteProject={async (directory) => {
+          host.dataset.deletedProject = directory
+          return true
+        }}
         onNewInProject={() => {}}
         onOpenConversation={(id) => {
           host.dataset.opened = id

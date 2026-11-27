@@ -81,6 +81,7 @@
         "packages/app/src/new-session/composer-adapter.ts", "packages/app/src/runtime/server/runtime.tsx",
         "packages/app/src/shell/shell.tsx", "packages/app/src/shell/titlebar/titlebar.tsx",
         "packages/app/src/shell/sidebar-peek.ts", "packages/app/src/shell/sidebar-toggle.tsx",
+        "packages/app/src/shell/titlebar/managed-sidebar.tsx", "packages/app/component-tests/conversation-sidebar.*",
         "packages/app/**", "packages/ui/**", "packages/session-ui/**",
         "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**"
       ]

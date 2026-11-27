@@ -10,6 +10,17 @@ export const ManagedFolders = Ipc.define({
     draftDirectory: { output: Schema.String },
     project: { input: Schema.String, output: Schema.String },
     conversation: { input: Schema.String, output: Schema.String },
+    validateProject: { input: Schema.String, output: Schema.Void },
+    countFiles: { input: Schema.String, output: Schema.Number },
+    remove: { input: Schema.String, output: Schema.Void },
+    moveFiles: {
+      input: Schema.Struct({ source: Schema.String, project: Schema.String, title: Schema.String }),
+      output: Schema.Struct({ directory: Schema.String, count: Schema.Number }),
+    },
+    restoreFiles: {
+      input: Schema.Struct({ source: Schema.String, project: Schema.String, original: Schema.String }),
+      output: Schema.Void,
+    },
   },
 })
 
@@ -34,4 +45,9 @@ export function isConversationFolder(directory: string) {
 export function conversationTitle(prompt: string, fallback: string) {
   const line = prompt.trim().split(/\r?\n/, 1)[0] ?? ""
   return [...(line.replace(/\s+/g, " ") || fallback)].slice(0, 60).join("").trimEnd()
+}
+
+export function isManagedProject(directory: string) {
+  const segments = parts(directory)
+  return segments.at(-3) === workspaceFolder && segments.at(-2) === "Проекты"
 }

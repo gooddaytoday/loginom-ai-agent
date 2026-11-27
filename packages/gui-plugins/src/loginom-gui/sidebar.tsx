@@ -4,6 +4,7 @@ import { IconButton } from "@opencode/ui/icon-button"
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import en from "./i18n/en"
+import { createSidebarActions, projectPin, sessionPin, type SidebarActions } from "./sidebar-actions"
 
 export type SidebarActivity = "input" | "running" | "idle"
 export type SidebarConversation = { id: string; title: string; active: boolean; activity: SidebarActivity }
@@ -36,15 +37,16 @@ function Activity(props: { value: SidebarActivity; text: SidebarText }) {
   )
 }
 
-export function ConversationSidebar(props: {
-  projects: readonly SidebarProject[]
-  conversations: readonly SidebarConversation[]
-  text: SidebarText
-  onCreate(name: string): Promise<boolean>
-  onOpenProject(directory: string): void
-  onNewInProject(directory: string): void
-  onOpenConversation(id: string): void
-}) {
+export function ConversationSidebar(
+  props: {
+    projects: readonly SidebarProject[]
+    conversations: readonly SidebarConversation[]
+    text: SidebarText
+    onCreate(name: string): Promise<boolean>
+    onNewInProject(directory: string): void
+    onOpenConversation(id: string): void
+  } & SidebarActions,
+) {
   const [expanded, setExpanded] = createStore<Record<string, number | undefined>>({})
   const [form, setForm] = createSignal<"closed" | "editing" | "saving">("closed")
   const open = (directory: string) => setExpanded(directory, (limit) => limit || pageSize)
@@ -57,29 +59,102 @@ export function ConversationSidebar(props: {
     setForm((await props.onCreate(name.trim())) ? "closed" : "editing")
   }
 
-  const conversation = (item: SidebarConversation, directory?: string) => (
-    <button
-      type="button"
-      class={row}
-      classList={{ "ps-7": !!directory, "bg-v2-overlay-simple-overlay-hover": item.active }}
-      aria-current={item.active ? "page" : undefined}
-      onClick={() => {
-        if (directory) open(directory)
-        props.onOpenConversation(item.id)
-      }}
-    >
-      <span class="min-w-0 flex-1 truncate" dir="auto">
-        {item.title}
-      </span>
-      <Activity value={item.activity} text={props.text} />
-    </button>
+  const { ConversationMenu, ProjectMenu, ActionDialog } = createSidebarActions(props, open)
+  const isPinned = (id: string) => props.pins.includes(id)
+  const pinnedProjects = () => props.projects.filter((project) => isPinned(projectPin(project.directory)))
+  const pinnedConversations = () =>
+    [
+      ...props.conversations.map((item) => ({ item, project: undefined })),
+      ...props.projects.flatMap((project) => project.conversations.map((item) => ({ item, project }))),
+    ].filter(({ item }) => isPinned(sessionPin(item.id)))
+
+  const conversation = (item: SidebarConversation, project?: SidebarProject, pinned = false) => (
+    <div class="group flex min-w-0 items-center">
+      <button
+        type="button"
+        class={row}
+        classList={{ "ps-7": !!project && !pinned, "bg-v2-overlay-simple-overlay-hover": item.active }}
+        aria-current={item.active ? "page" : undefined}
+        onClick={() => {
+          if (project) open(project.directory)
+          props.onOpenConversation(item.id)
+        }}
+      >
+        <span class="min-w-0 flex-1" dir="auto">
+          <span class="block truncate">{item.title}</span>
+          <Show when={pinned && project}>
+            <span class="block truncate text-xs text-v2-text-text-muted">{project?.title}</span>
+          </Show>
+        </span>
+        <Activity value={item.activity} text={props.text} />
+      </button>
+      <ConversationMenu item={item} project={project} />
+    </div>
   )
+
+  const projectRow = (project: SidebarProject) => {
+    const visible = () => project.conversations.filter((item) => !isPinned(sessionPin(item.id)))
+    const limit = () => expanded[project.directory] ?? (visible().some((item) => item.active) ? pageSize : 0)
+    return (
+      <div>
+        <div class="group flex items-center">
+          <button
+            type="button"
+            class={row}
+            aria-expanded={limit() > 0}
+            onClick={() => setExpanded(project.directory, limit() ? 0 : pageSize)}
+          >
+            <Icon name="folder" size="small" class="shrink-0" />
+            <span class="min-w-0 flex-1 truncate" dir="auto">
+              {project.title}
+            </span>
+            <Show when={!limit()}>
+              <Activity value={folderActivity(project.conversations)} text={props.text} />
+            </Show>
+          </button>
+          <IconButton
+            icon={<Icon name="edit" size="small" />}
+            class="[@media(hover:hover)]:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+            size="small"
+            variant="ghost"
+            aria-label={props.text("newInProject")}
+            title={props.text("newInProject")}
+            onClick={() => {
+              open(project.directory)
+              props.onNewInProject(project.directory)
+            }}
+          />
+          <ProjectMenu project={project} />
+        </div>
+        <Show when={limit() > 0}>
+          <For each={visible().slice(0, limit())}>{(item) => conversation(item, project)}</For>
+          <Show when={visible().length > limit()}>
+            <Button
+              variant="ghost-muted"
+              size="small"
+              class="ms-5"
+              onClick={() => setExpanded(project.directory, limit() + pageSize)}
+            >
+              {props.text("showMoreConversations")}
+            </Button>
+          </Show>
+        </Show>
+      </div>
+    )
+  }
 
   return (
     <nav
       aria-label={props.text("conversationNavigation")}
       class="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto pb-2"
     >
+      <Show when={pinnedProjects().length || pinnedConversations().length}>
+        <section aria-label={props.text("pinned")}>
+          <h2 class="px-2 text-sm font-medium text-v2-text-text-muted">{props.text("pinned")}</h2>
+          <For each={pinnedProjects()}>{projectRow}</For>
+          <For each={pinnedConversations()}>{({ item, project }) => conversation(item, project, true)}</For>
+        </section>
+      </Show>
       <section aria-label={props.text("projects")}>
         <h2 class="px-2 text-sm font-medium text-v2-text-text-muted">{props.text("projects")}</h2>
         <button
@@ -120,74 +195,15 @@ export function ConversationSidebar(props: {
             </div>
           </form>
         </Show>
-        <For each={props.projects}>
-          {(project) => {
-            const limit = () =>
-              expanded[project.directory] ?? (project.conversations.some((item) => item.active) ? pageSize : 0)
-            return (
-              <div>
-                <div class="flex items-center">
-                  <button
-                    type="button"
-                    class={row}
-                    aria-expanded={limit() > 0}
-                    onClick={() => setExpanded(project.directory, limit() ? 0 : pageSize)}
-                  >
-                    <Icon name="folder" size="small" class="shrink-0" />
-                    <span class="min-w-0 flex-1 truncate" dir="auto">
-                      {project.title}
-                    </span>
-                    <Show when={!limit()}>
-                      <Activity value={folderActivity(project.conversations)} text={props.text} />
-                    </Show>
-                  </button>
-                  <IconButton
-                    icon={<Icon name="plus" size="small" />}
-                    size="small"
-                    variant="ghost"
-                    aria-label={props.text("newInProject")}
-                    title={props.text("newInProject")}
-                    onClick={() => {
-                      open(project.directory)
-                      props.onNewInProject(project.directory)
-                    }}
-                  />
-                  <IconButton
-                    icon={<Icon name="edit" size="small" />}
-                    size="small"
-                    variant="ghost"
-                    aria-label={props.text("openProject")}
-                    title={props.text("openProject")}
-                    onClick={() => {
-                      open(project.directory)
-                      props.onOpenProject(project.directory)
-                    }}
-                  />
-                </div>
-                <Show when={limit() > 0}>
-                  <For each={project.conversations.slice(0, limit())}>
-                    {(item) => conversation(item, project.directory)}
-                  </For>
-                  <Show when={project.conversations.length > limit()}>
-                    <Button
-                      variant="ghost-muted"
-                      size="small"
-                      class="ms-5"
-                      onClick={() => setExpanded(project.directory, limit() + pageSize)}
-                    >
-                      {props.text("showMoreConversations")}
-                    </Button>
-                  </Show>
-                </Show>
-              </div>
-            )
-          }}
-        </For>
+        <For each={props.projects.filter((project) => !isPinned(projectPin(project.directory)))}>{projectRow}</For>
       </section>
       <section aria-label={props.text("conversations")}>
         <h2 class="px-2 text-sm font-medium text-v2-text-text-muted">{props.text("conversations")}</h2>
-        <For each={props.conversations}>{(item) => conversation(item)}</For>
+        <For each={props.conversations.filter((item) => !isPinned(sessionPin(item.id)))}>
+          {(item) => conversation(item)}
+        </For>
       </section>
+      <ActionDialog />
     </nav>
   )
 }
