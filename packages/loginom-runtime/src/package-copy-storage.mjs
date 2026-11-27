@@ -81,8 +81,18 @@ export function packageCopyStorage(context, {url, account}) {
     },
     async remove(path, expected) {
       if (await digest(path) !== expected) throw uncertain();
-      await evaluate('delete', path, {guard:true});
-      if (await evaluate('exists', path)) throw uncertain();
+      const part = posix.join(posix.dirname(path), '.agent-copy-' + randomUUID() + '.part');
+      await evaluate('move', path, {target:part, guard:true});
+      try {
+        // Verify the file we actually moved before deleting anything. A
+        // competing save can change the public path after the first read.
+        if (await digest(part) !== expected || await evaluate('busy', path) || await evaluate('exists', path)) {
+          if (!await evaluate('exists', path)) await evaluate('move', part, {target:path});
+          throw uncertain();
+        }
+        await evaluate('delete', part);
+        if (await evaluate('exists', part) || await evaluate('exists', path)) throw uncertain();
+      } catch { throw uncertain(); }
     },
     async close(path, discard) {
       const state = await evaluate('workspace', path);
@@ -196,12 +206,12 @@ async function native({origin, pathname, account, mode, path, target, discard, g
       if (await bool('CopyFile', path, target, false, false)) return true;
     }
     if (mode === 'move') {
+      if (guard && await busy()) return {error:'package_busy', noEffect:true};
       if (await bool('FileExists', target)) return {error:'path_exists', noEffect:true};
       writing = true;
       if (await bool('MoveFile', path, target, false)) return true;
     }
     if (mode === 'delete') {
-      if (guard && await busy()) return {error:'package_busy', noEffect:true};
       writing = true;
       if (await bool('DeleteFile', path)) return true;
     }

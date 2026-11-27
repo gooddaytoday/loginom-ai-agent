@@ -199,3 +199,16 @@ test('restore refuses to overwrite a later external save', async t => {
   assert.equal(files.get(original), 'later manual changes');
   assert.equal(files.get(backupPath), 'original package');
 });
+
+test('undo preserves a competing update made just before the server moves the version', async t => {
+  const {files, native, server} = await fixture(t);
+  const version = await server.execute('save-version');
+  const move = native.MoveFile.bind(native);
+  native.MoveFile = (source, target, overwrite) => {
+    if (source === version.path) files.set(source, 'another operator saved here');
+    return move(source, target, overwrite);
+  };
+  await assert.rejects(server.execute('undo-save', version), {code:'state_check_required'});
+  assert.equal(files.get(version.path), 'another operator saved here');
+  assert.equal([...files.keys()].some(path => path.endsWith('.part')), false);
+});

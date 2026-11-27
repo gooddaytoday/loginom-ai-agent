@@ -143,6 +143,7 @@ export function createPackageCopy({ file, root, storage, flush, saveFrom, record
     if (!copy) throw missing();
     if (action === 'discard') {
       if (copy.discarded) return {};
+      if (!await storage.exists(copy.path)) throw missing();
       return transaction(state, action, [copy.path], async () => {
         await storage.close(copy.path, true);
         await unlocked(copy.path);
@@ -156,7 +157,7 @@ export function createPackageCopy({ file, root, storage, flush, saveFrom, record
     }
     if (action === 'save-version') {
       if (copy.version) return {path:copy.version, name:posix.basename(copy.version)};
-      if (copy.discarded || copy.replacement) throw missing();
+      if (copy.discarded || copy.replacement || !await storage.exists(copy.path)) throw missing();
       const stem = posix.basename(copy.original).slice(0,-4).replace(/ — v\d+$/u, '');
       const path = await nextPath(posix.dirname(copy.original), n => stem + ' — v' + n + '.lgp', 2);
       return transaction(state, action, [copy.path, path], async id => {
