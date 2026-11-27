@@ -310,7 +310,9 @@ async function prepareWorkspace(page, options) {
       loginom_account:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName??null};
     const request = JSON.stringify({session:options.sessionId,intent:options.intent,packagePath:options.packagePath,workflowRef:options.workflowRef});
     const knownWorkflow = options.intent==='existing_workflow' ? [...state.receipts.values()].find(r=>r.workflowId===options.workflowRef.workflow_id && r.tab && r.phase==='verified')
-      : options.bindOpenOnly ? [...state.receipts.values()].find(r=>r.phase==='verified'&&r.tab===tab&&r.packageNode===packageNode&&JSON.stringify(r.crumbs)===JSON.stringify(crumbs)) : null;
+      : options.bindOpenOnly ? [...state.receipts.values()].find(r=>r.phase==='verified'&&r.tab===tab&&r.packageNode===packageNode
+        &&JSON.stringify(r.crumbs)===JSON.stringify(crumbs)&&(!options.workflowRef||r.workflowId===options.workflowRef.workflow_id
+          &&r.nodeTargetWorkflowNode===workflowNode&&JSON.parse(r.request).session===options.sessionId)) : null;
     const receipt = state.receipts.get(options.operationId);
     if(options.recoveryAccount&&(location.origin!==options.origin||location.pathname!==options.pathname
       ||app?.Version!==options.expectedBuild||serverConnection?.Connected!==true||mainForm.FReconnecting===true
@@ -500,6 +502,22 @@ async function prepareWorkspace(page, options) {
         ...(settled==='waiting'?{connection_restore:'attempted'}:{}),blocking_windows:blockingWindows};
       if(settled==='waiting')return {pending:true,connection_restore:'awaiting_original_attempt',blocking_windows:blockingWindows};
       if (!ready) return blockingWindows?{pending:true,blocking_windows:blockingWindows}:null;
+      if(options.saveOperationId!==null){
+        const saved=state.savedWorkspaceBinding,ref=options.workflowRef,diagram=form?.FDiagram;
+        // Only the Save's exact active owner can refresh the bridge binding.
+        // Later steps still take their own fresh graph baseline.
+        if(!knownWorkflow||saved?.operationId!==options.saveOperationId||state.id!==ref.document_id
+          ||location.origin!==options.origin||location.pathname!==options.pathname||app?.Version!==options.expectedBuild
+          ||path!==options.packagePath||saved.path!==path||tabTid!==ref.tab_tid||prefix!==ref.prefix||exact(tabTid).length!==1
+          ||saved.tab!==tab||saved.packageNode!==packageNode||saved.workflowNode!==workflowNode
+          ||JSON.stringify(crumbs)!==JSON.stringify(ref.navigation_path)
+          ||serverConnection?.Connected!==true||mainForm.FReconnecting===true||saved.connection!==serverConnection
+          ||!saved.serverSession||saved.serverSession!==serverConnection.Session||saved.account!==serverConnection.UserName
+          ||!(form instanceof app.ModelForm)||diagram?.FmxGraph?.container!==graph[0]||!Array.isArray(diagram.FNodes?.FCollection))
+          return {error:'WORKFLOW_CHANGED'};
+        const nativeNodes=diagram.FNodes.FCollection.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+        if(JSON.stringify(nativeNodes)!==JSON.stringify(saved.nativeNodes)) return {error:'WORKFLOW_CHANGED'};
+      }
       if (current?.tab && (tab!==current.tab || packageNode!==current.packageNode
           || JSON.stringify(crumbs)!==JSON.stringify(current.crumbs))) return {error:'WORKFLOW_CHANGED'};
       if (!current?.tab && options.intent==='new_draft') {
@@ -897,7 +915,7 @@ async function navigatePreparedGraph(page, options) {
   }
 }
 
-export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestLogin = false, testLoginUser = null, platform = process.platform, sessionId = "standalone", operationId = "prepare", intent = "new_draft", packagePath = null, workflowRef = null, graphNavigation = null, timeoutMs = 120000, recoverOnly = false, refreshVerified = false, identityOnly = false, storageBinding = null, bindOpenOnly = false, recoveryAccount = null }) {
+export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestLogin = false, testLoginUser = null, platform = process.platform, sessionId = "standalone", operationId = "prepare", intent = "new_draft", packagePath = null, workflowRef = null, graphNavigation = null, timeoutMs = 120000, recoverOnly = false, refreshVerified = false, identityOnly = false, storageBinding = null, bindOpenOnly = false, recoveryAccount = null, saveOperationId = null }) {
   const url = new URL(loginomUrl);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash
       || [...url.searchParams.keys()].some(key => /token|password|secret|auth|api.?key/i.test(key))) {
@@ -912,10 +930,12 @@ export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestL
   if (intent !== 'open_package' && packagePath !== null) throw new Error('A new draft cannot specify a stored package');
   if (bindOpenOnly !== false && (bindOpenOnly !== true || intent !== 'open_package' || allowTestLogin || recoverOnly || identityOnly))
     throw new Error('Bind-only preparation requires an exact open_package binding without login or recovery');
+  if(saveOperationId!==null&&(!bindOpenOnly||typeof saveOperationId!=='string'||!/^[a-zA-Z0-9_.:-]{1,128}$/.test(saveOperationId)))
+    throw new Error('A Save receipt requires an exact bind-only preparation');
   if(recoveryAccount!==null&&(typeof recoveryAccount!=='string'||!recoveryAccount.trim()
     ||intent!=='open_package'||allowTestLogin||identityOnly||bindOpenOnly))
     throw new Error('Reload requires an authenticated account and an exact saved package');
-  if (intent === 'existing_workflow') {
+  if (intent === 'existing_workflow'||saveOperationId!==null) {
     if (!workflowRef || Object.keys(workflowRef).some(k=>!['document_id','tab_tid','prefix','navigation_path','workflow_id'].includes(k))
         || typeof workflowRef.workflow_id !== 'string' || !workflowRef.workflow_id || workflowRef.workflow_id.length>160
         || typeof workflowRef.document_id !== 'string' || !workflowRef.document_id || workflowRef.document_id.length>128
@@ -934,7 +954,7 @@ export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestL
   }
   if (!compatibility?.loginom_build) throw new Error('An exact Loginom build pin is required');
   const options = { url: url.href, origin: url.origin, pathname: url.pathname,
-    sessionId, operationId, intent, packagePath, workflowRef, graphNavigation, timeoutMs, recoverOnly, refreshVerified, identityOnly, storageBinding, bindOpenOnly, recoveryAccount,
+    sessionId, operationId, intent, packagePath, workflowRef, graphNavigation, timeoutMs, recoverOnly, refreshVerified, identityOnly, storageBinding, bindOpenOnly, recoveryAccount, saveOperationId,
     expectedBuild: compatibility?.loginom_build ?? null, profileId: compatibility?.profile_id,
     platform: ({ darwin: 'macos', linux: 'linux', win32: 'windows' })[platform] ?? platform,
     allowTestLogin: allowTestLogin === true, testLoginUser: allowTestLogin ? testLoginUser : null };

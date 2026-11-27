@@ -339,6 +339,34 @@ test('bindOpenOnly retains an already rebound logical workflow identity',async()
  assert.deepEqual(f.events,['navigate']);
 });
 
+for(const fault of ['none','GUID','account','session','owner','tab','path','operation'])test('Save binds only its current workflow and freshly checked native owner: '+fault,async()=>{
+ const f=pageFixture({authenticated:true,workflow:true,nativeWorkflow:true});
+ await f.page.goto('http://loginom.example/app?testable=true');
+ const [tab]=f.tabs,workflowNode=tab.workflowNode,packageNode=workflowNode.ParentNode,path='/user/B.lgp';
+ packageNode.PackageFileName=path;
+ const old=await execute(f,{intent:'open_package',operationId:'earlier',packagePath:path,bindOpenOnly:true});
+ assert.equal(old.status,'READY');
+ const prep=f.context.__loginomDockPreparationV1,connection=f.context.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection;
+ prep.receipts.set('current',{...prep.receipts.get('earlier'),workflowId:'current-workflow',nodeTargetWorkflowNode:workflowNode});
+ const nativeNode={FGuid:'node-guid',FIconCls:'grouping'};
+ tab.model.FDiagram.FNodes={FCollection:[nativeNode]};
+ prep.savedWorkspaceBinding={operationId:'save',path,packageNode,workflowNode,tab,nativeNodes:[['node-guid','grouping']],
+   connection,serverSession:connection.Session,account:connection.UserName};
+ if(fault==='GUID')nativeNode.FGuid='different';
+ if(fault==='account')connection.UserName='foreign';
+ if(fault==='session')connection.Session={};
+ if(fault==='owner')tab.workflowNode=Object.assign(new f.context.bg.app.WorkFlowTreeNode(),{ParentNode:packageNode});
+ if(fault==='tab')prep.savedWorkspaceBinding.tab={};
+ if(fault==='path')packageNode.PackageFileName='/user/other.lgp';
+ const state=await execute(f,{intent:'open_package',operationId:'bridge-bind',packagePath:path,bindOpenOnly:true,
+   saveOperationId:fault==='operation'?'older-save':'save',workflowRef:{...old.workflow_ref,workflow_id:'current-workflow',document_id:old.document_id}});
+ assert.equal(state.status,fault==='none'?'READY':'NOT_READY',JSON.stringify(state));
+ assert.equal(state.effect_possible,false);
+ if(fault==='none')assert.equal(state.workflow_ref.workflow_id,'current-workflow');
+ else assert.notEqual(prep.receipts.get('bridge-bind')?.phase,'verified');
+ assert.deepEqual(f.events,['navigate']);
+});
+
 for(const situation of ['home','other-package','blank-page'])test('bindOpenOnly refuses without a package gesture: '+situation,async()=>{
   const fixture=pageFixture({authenticated:true,workflow:situation!=='home'});
   if(situation!=='blank-page')await fixture.page.goto('http://loginom.example/app?testable=true');

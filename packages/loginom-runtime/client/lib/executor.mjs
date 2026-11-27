@@ -1546,7 +1546,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     }
     return [...result.values()];
   },binding);
-  const bindSavedContinuations = async (before, previous, mode) => page.evaluate(({previous,current,path,nativeNodes,binding,mode})=>{
+  const bindSavedContinuations = async (before, previous, mode) => page.evaluate(({previous,current,path,nativeNodes,binding,mode,operationId})=>{
       const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
       if(!binding)return [];
       const pending=prep?.savedPackageReopen;
@@ -1607,8 +1607,11 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
           workflow_ref:{...current,workflow_id:prior.workflow_ref.workflow_id,navigation_path:crumbs}});
       }
       delete prep.savedPackageReopen;
+      prep.savedWorkspaceBinding={operationId,path,packageNode,workflowNode,tab:tabs[0],nativeNodes,connection,
+        serverSession:connection.Session,account:connection.UserName};
       return rebound;
-    },{previous,current:workflow,path:before.path,nativeNodes:before.package_identity.native_nodes,binding:task.storage_binding,mode});
+    },{previous,current:workflow,path:before.path,nativeNodes:before.package_identity.native_nodes,binding:task.storage_binding,mode,
+      operationId:task.operation_id});
 
   const refreshSavedNavigation = async current => {
     const crumbs=current.workflow_ref.navigation_path, binding=current.workflow_ref;
