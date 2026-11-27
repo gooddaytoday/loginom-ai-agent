@@ -46,6 +46,14 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       new URL("../../loginom-runtime/src/dashboard-storage.mjs", import.meta.url),
       "utf8",
     ),
+    "runtime/src/package-copy-storage.mjs": await readFile(
+      new URL("../../loginom-runtime/src/package-copy-storage.mjs", import.meta.url),
+      "utf8",
+    ),
+    "runtime/client/lib/package-copy.mjs": await readFile(
+      new URL("../../loginom-runtime/client/lib/package-copy.mjs", import.meta.url),
+      "utf8",
+    ),
     "runtime/src/resources.mjs": `export async function verifyResources() {
       return { manifestHash: 'fixture', manifest: { actionManifestSha256: 'fixture' } };
     }`,
@@ -101,6 +109,11 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
+        async packageCopy(action, input, signal) {
+          signal.throwIfAborted();
+          if (action !== 'replace-original' || input.confirmed !== true) throw Error('unexpected copy action');
+          return { path:'/user/Plan.lgp', backupPath:'/user/Plan — до правки.lgp' };
+        },
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
           return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
@@ -175,6 +188,9 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       result: { content: [{ type: "text", text: JSON.stringify({ args, pair: packageArtifact, private: true }) }] },
       recoveryPending: false,
       activeWork: false,
+    })
+    expect(await runtime.request("packageCopy", { action: "replace-original", confirmed: true })).toEqual({
+      output: { path: "/user/Plan.lgp", backupPath: "/user/Plan — до правки.lgp" },
     })
     const call = runtime
       .request("call", { name: "fixture", arguments: { hold: true } })
