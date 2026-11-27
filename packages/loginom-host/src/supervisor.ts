@@ -5,6 +5,7 @@ import { isAbsolute, join } from "node:path"
 import { hostError, hostException } from "./errors"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { recordLocalDiagnostics } from "../../loginom-runtime/client/lib/local-diagnostics.mjs"
+import type { UploadInput } from "./package-upload"
 
 export type Launch = {
   node: string
@@ -17,8 +18,12 @@ export type Launch = {
   actionManifestUri?: string
   actionManifestSha256?: string
   validation?: boolean
+  packageFolder?: string
+  packageUpload?: UploadInput
+  packageDownload?: { path: string; maxBytes: number }
   // Host-owned HTTP cache only; browser profiles and authentication remain fresh.
   validationHttpCache?: boolean
+  validationLogout?: boolean
   headless?: boolean
   environment?: NodeJS.ProcessEnv
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
@@ -123,9 +128,11 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
   )
   const ready = runtime.ready
   if (
-    input.validation
-      ? !("checked" in ready) || ready.checked !== true
-      : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat
+    input.packageFolder !== undefined
+      ? !((input.packageDownload ? "downloaded" : input.packageUpload ? "uploaded" : "listing") in ready)
+      : input.validation
+        ? !("checked" in ready) || ready.checked !== true
+        : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat
   ) {
     const cleanupConfirmed = await runtime.close().then(
       () => true,

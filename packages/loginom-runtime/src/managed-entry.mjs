@@ -147,7 +147,10 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
+      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache, validationLogout } = validateStartInput(input)
+      const packageReader = input.packageFolder === undefined ? undefined : await import("./package-folder.mjs")
+      if (packageReader && (!packageReader.isPackageFolder(input.packageFolder) || input.validation === true
+          || acceptanceCleanupPackage || closeSavedPackageOnShutdown || browserRecovery)) throw Error("LOGINOM_START_INVALID")
       state.owner = { chat: input.chat, generation: input.generation }
       state.startupStateDir = input.stateDir
       state.startupStarted = performance.now()
@@ -196,11 +199,33 @@ async function handle(message) {
           clientRevision: resources.manifestHash, actionManifestDigest: resources.manifest.actionManifestSha256 } }),
       }
       if (input.validation === true) {
-        await loginBrowser(login)
+        await loginBrowser({ ...login, validationLogout })
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
-      // Connection validation never needs the executor's large dependency tree.
+      if (packageReader) {
+        const storage = {
+          login: () => loginBrowser({ ...login, keepOpen: true, reportSessionLimit: true }),
+          origin: new URL(input.connection.url).origin,
+          username: input.connection.username,
+          signal: state.startupController.signal,
+        }
+        if (input.packageDownload) {
+          const downloaded = await packageReader.withPackageDownloadSession({ ...storage, ...input.packageDownload })
+          send({ id: message.id, result: { downloaded, protocol: 1, generation: input.generation } })
+          return
+        }
+        if (input.packageUpload) {
+          const uploaded = await packageReader.withPackageUploadSession({ ...storage, upload: input.packageUpload, temporary: input.chat })
+          send({ id: message.id, result: { uploaded, protocol: 1, generation: input.generation } })
+          return
+        }
+        const { listing, readMs } = await packageReader.withPackageFolderSession({ ...storage, folder: input.packageFolder })
+        await startupPhase({ phase: "packages.read", status: "ready", duration_ms: readMs })
+        send({ id: message.id, result: { listing, protocol: 1, generation: input.generation } })
+        return
+      }
+      // Connection validation and package listing do not load the executor.
       const { createSession } = await import("../client/lib/session.mjs")
       const { createBridge } = await import("../client/lib/bridge.mjs")
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:browserDownloadsPath(directory),

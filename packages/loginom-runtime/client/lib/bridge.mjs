@@ -573,7 +573,8 @@ export async function createBridge(config, session, { browserTransport: managedB
             // retain its full receipt locally without spending delivery space.
             if(preparationRequest.intent==='open_package')delete delivered.workspace.browser_geometry;
             const budget={tool:'dock_prepare',operationId:preparationRequest.operation_id};
-            let reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},budget);
+            const meta=ready&&localPackageUpload?{_meta:{confirmedLocalPackage:true}}:{};
+            let reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}],...meta},budget);
             if(first&&ready&&reply.isError===true){
               // Preparation is a discovery step. Node rules/schemas are still
               // required through describe before apply; do not let the number
@@ -581,7 +582,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               delivered.knowledge={...bundle,node_types:bundle.node_types.map(node=>({
                 type:node.type,candidate_node_apply_available:node.candidate_node_apply_available,modes:node.modes}))};
               delivered.next_step={tool:'dock_action_describe',instruction:'The preparation catalog lists types and modes only. Request selected node_types and modes for complete semantics, rules and parameter schemas before applying nodes.'};
-              reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},budget);
+              reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}],...meta},budget);
             }
             if (ready && reply.isError !== true) userBundleDelivered = true;
             undeliveredDraft = ready && reply.isError === true && workspace?.created_draft === true

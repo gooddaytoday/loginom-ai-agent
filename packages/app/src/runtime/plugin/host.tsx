@@ -144,8 +144,12 @@ const inactive = {
 
 const HostContext = createContext<ReturnType<typeof createHost>>()
 
+export function useOptionalPluginHost() {
+  return useContext(HostContext)
+}
+
 export function usePluginHost() {
-  const host = useContext(HostContext)
+  const host = useOptionalPluginHost()
 
   if (!host) throw new Error("Plugin host is unavailable")
 

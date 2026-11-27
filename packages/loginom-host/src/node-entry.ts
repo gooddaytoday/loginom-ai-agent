@@ -7,10 +7,13 @@ import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
 import { DashboardRead } from "./dashboard"
+import { ReadFolder, ReadStoredPackage } from "./package-folder"
+import { UploadInput } from "./package-upload"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
 const events = new EventEmitter()
+const folderReads = new Map<string, AbortController>()
 const operations = new Set<Promise<void>>()
 const stopped = Promise.withResolvers<void>()
 const state: {
@@ -30,6 +33,7 @@ const port: HostPort = {
 }
 const candidate = Schema.decodeUnknownOption(Loginom.Candidate)
 const save = Schema.decodeUnknownOption(Loginom.Save)
+const turn = Schema.decodeUnknownOption(Schema.Struct({ id: Schema.String, active: Schema.Boolean }))
 const cancel = Schema.decodeUnknownOption(Loginom.Cancel)
 const recover = Schema.decodeUnknownOption(Loginom.AcknowledgeRecovery)
 
@@ -131,6 +135,29 @@ async function dispatch(message: unknown) {
       reply({ id: message.id, result })
       return
     }
+    if (message.method === "packages.list" || message.method === "packages.upload" || message.method === "packages.variables" || message.method === "packages.cancel") {
+      if (!input || typeof input !== "object" || !("requestId" in input) || typeof input.requestId !== "string")
+        throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      if (message.method === "packages.cancel") {
+        folderReads.get(input.requestId)?.abort(Error("LOGINOM_PACKAGE_FOLDER_CANCELLED"))
+        reply({ id: message.id, result: {} })
+        return
+      }
+      if (folderReads.has(input.requestId)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      const controller = new AbortController()
+      folderReads.set(input.requestId, controller)
+      try {
+        const result = message.method === "packages.upload"
+          ? await state.host.uploadPackage(Schema.decodeUnknownSync(UploadInput)(input), controller.signal)
+          : message.method === "packages.variables"
+            ? await state.host.readPackageVariables(Schema.decodeUnknownSync(ReadStoredPackage)(input), controller.signal)
+            : await state.host.readPackageFolder(Schema.decodeUnknownSync(ReadFolder)(input), controller.signal)
+        reply({ id: message.id, result })
+      } finally {
+        folderReads.delete(input.requestId)
+      }
+      return
+    }
     if (!message.method.startsWith("connection.")) {
       events.emit("message", { data: message })
       return
@@ -169,19 +196,27 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
     state.setupVerified = true
     return { verified: true }
   }
-  if (method === "connection.check") {
+  if (method === "connection.settings.turn") {
+    const value = turn(input)
+    if (Option.isNone(value)) throw new Error("LOGINOM_INPUT_INVALID")
+    host.turn(value.value.id, value.value.active)
+    return {}
+  }
+  if (method === "connection.check" || method === "connection.settings.check") {
     const value = candidate(input)
     if (Option.isNone(value)) throw new Error("LOGINOM_CANDIDATE_INVALID")
-    return host.api.check(value.value)
+    return host.api.check(value.value, method === "connection.settings.check")
   }
-  if (method === "connection.save") {
+  if (method === "connection.save" || method === "connection.settings.save") {
     const value = save(input)
     if (Option.isNone(value)) throw new Error("LOGINOM_SAVE_INVALID")
-    // Setup prepares resources before check mints its five-minute token.
-    // No hashing may consume that validation lifetime between check and save.
-    if (!state.setupVerified) throw new Error("LOGINOM_RUNTIME_START_FAILED")
-    state.setupVerified = false
-    await host.api.save(value.value)
+    const settings = method === "connection.settings.save"
+    if (!settings) {
+      // CLI setup verifies resources explicitly before check mints its token.
+      if (!state.setupVerified) throw new Error("LOGINOM_RUNTIME_START_FAILED")
+      state.setupVerified = false
+    }
+    await host.api.save(value.value, settings)
     await host.settled()
     return host.api.status()
   }

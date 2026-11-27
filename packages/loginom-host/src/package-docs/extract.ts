@@ -18,19 +18,7 @@ const portNames: Record<string, string> = {
 export type PackageStructure = Awaited<ReturnType<typeof extractPackage>>
 
 export async function extractPackage(path: string) {
-  // zip.js slices must own their buffers; Buffer.slice retains the original byte offset.
-  const zip = new ZipReader(new Uint8ArrayReader(new Uint8Array(await readFile(path))), { useWebWorkers: false })
-  try {
-    const entries = await zip.getEntries()
-    const members = new Map(entries.map((entry) => [normalized(entry.filename), entry]))
-    async function xml(name: string) {
-      const entry = members.get(normalized(name))
-      if (!entry?.getData || entry.directory) return undefined
-      const bytes = await entry.getData(new Uint8ArrayWriter())
-      const fail = () => { throw Error("PACKAGE_DOCS_XML_INVALID") }
-      return new DOMParser({ errorHandler: { warning: fail, error: fail, fatalError: fail } })
-        .parseFromString(new TextDecoder("utf-8", { fatal: true }).decode(bytes), "application/xml").documentElement
-    }
+  return withPackageXml(await readFile(path), async (xml, entries) => {
     const info = await xml("PackageInfo.xml")
     if (!info) throw Error("PACKAGE_DOCS_PACKAGE_INFO_MISSING")
     const references = await xml("References.xml")
@@ -38,13 +26,7 @@ export async function extractPackage(path: string) {
       .filter((element): element is Element => !!element && element.localName === "Item")
       .map((element) => element.getAttribute("Name") || element.getAttribute("DisplayName") || element.getAttribute("Path") || "")
       .filter(Boolean)
-    const index = await xml("PackageIndex.xml")
-    const indexed = items(child(index, "Units")).map((unit) => (unit.getAttribute("BasePath") ?? "").replaceAll("\\", "/").replace(/^\/+|\/+$/g, ""))
-      .filter(Boolean)
-    const units = indexed.length ? indexed : [...new Set(entries.flatMap((entry) => {
-      const match = /^(Unit_\d+)\/Unit\.xml$/i.exec(entry.filename.replaceAll("\\", "/"))
-      return match ? [match[1]] : []
-    }))].toSorted()
+    const units = unitPaths(await xml("PackageIndex.xml"), entries)
     const modules = await Promise.all(units.map(async (base, number) => {
       const metadata = await xml(base + "/Info.xml")
       const unit = await xml(base + "/Unit.xml")
@@ -69,7 +51,108 @@ export async function extractPackage(path: string) {
         programming_nodes: total("programming_nodes"), reference_nodes: total("reference_nodes"), derived_nodes: total("derived_nodes") },
       modules, unique_engine_types: [...new Set(modules.flatMap((module) => workflowBodies(module).flatMap((body) => body.workflow_nodes.map((node) => node.engine_type))).filter(Boolean))].toSorted(),
     }
+  })
+}
+
+type ReadXml = (name: string) => Promise<Element | undefined>
+
+class BoundedXmlWriter extends Uint8ArrayWriter {
+  constructor(private remaining: number) { super() }
+
+  override writeUint8Array(chunk: Uint8Array) {
+    if (chunk.byteLength > this.remaining) throw Error("PACKAGE_VARIABLES_XML_LIMIT")
+    this.remaining -= chunk.byteLength
+    return super.writeUint8Array(chunk)
+  }
+}
+
+async function withPackageXml<Result>(
+  bytes: Uint8Array,
+  read: (xml: ReadXml, entries: readonly string[]) => Promise<Result>,
+  remaining?: number,
+) {
+  // zip.js slices must own their buffers; Buffer.slice retains the original byte offset.
+  const zip = new ZipReader(new Uint8ArrayReader(new Uint8Array(bytes)), { useWebWorkers: false })
+  try {
+    const entries = await zip.getEntries()
+    const members = new Map(entries.map((entry) => [normalized(entry.filename), entry]))
+    async function xml(name: string) {
+      const entry = members.get(normalized(name))
+      if (!entry?.getData || entry.directory) return undefined
+      const budget = remaining
+      if (budget !== undefined && entry.uncompressedSize > budget) throw Error("PACKAGE_VARIABLES_XML_LIMIT")
+      const writer = budget === undefined ? new Uint8ArrayWriter() : new BoundedXmlWriter(budget)
+      const decoded = await entry.getData(writer, { checkSignature: budget !== undefined })
+      if (budget !== undefined) remaining = budget - decoded.byteLength
+      const fail = () => { throw Error("PACKAGE_DOCS_XML_INVALID") }
+      return new DOMParser({ errorHandler: { warning: fail, error: fail, fatalError: fail } })
+        .parseFromString(new TextDecoder("utf-8", { fatal: true }).decode(decoded), "application/xml").documentElement
+    }
+    return await read(xml, entries.map((entry) => entry.filename))
   } finally { await zip.close() }
+}
+
+function unitPaths(index: Element | undefined, entries: readonly string[]) {
+  const indexed = items(child(index, "Units")).map((unit) => (unit.getAttribute("BasePath") ?? "").replaceAll("\\", "/").replace(/^\/+|\/+$/g, ""))
+    .filter(Boolean)
+  return indexed.length ? indexed : [...new Set(entries.flatMap((name) => {
+    const match = /^(Unit_\d+)\/Unit\.xml$/i.exec(name.replaceAll("\\", "/"))
+    return match ? [match[1]] : []
+  }))].toSorted()
+}
+
+export async function extractPackageVariables(bytes: Uint8Array) {
+  return withPackageXml(bytes, async (xml, entries) => {
+    if ((await xml("PackageInfo.xml"))?.localName !== "PackageInfo") throw Error("PACKAGE_DOCS_PACKAGE_INFO_MISSING")
+    const registry = await xml("Variables.xml")
+    const elements = registry?.localName === "Variables" ? child(registry, "Elements") : undefined
+    const definitions: { name: string; type: string }[] = []
+    const defaults: { name: string; value: string }[] = []
+    let definitionsCoverage: "complete" | "partial" | "unavailable" = elements ? "complete" : "unavailable"
+    for (const entry of children(elements)) {
+      const name = entry.getAttribute("Name"), type = entry.getAttribute("DataType")
+      if (entry.localName !== "Item" || !name || !type) {
+        definitionsCoverage = "partial"
+        continue
+      }
+      definitions.push({ name, type })
+      const value = child(entry, "DefaultValue")
+      if (value?.hasAttribute("Value")) defaults.push({ name, value: value.getAttribute("Value") ?? "" })
+    }
+
+    const modules = unitPaths(await xml("PackageIndex.xml"), entries)
+    const usages: { name: string; kind: "template" | "binding"; scope: "control"; module: string; branch: string[];
+      nodeID: string; nodeLabel: string; parameter: string }[] = []
+    for (const module of modules) {
+      const unit = await xml(module + "/Unit.xml")
+      if (!unit) throw Error("PACKAGE_DOCS_UNIT_MISSING")
+      const pending = [{ root: child(unit, "WorkFlow"), branch: new Array<string>() }]
+      while (pending.length) {
+        const flow = pending.pop()
+        if (!flow) break
+        for (const node of items(child(flow.root, "Nodes"))) {
+          const component = child(node, "Component")
+          const engine = child(component, "Engine")
+          const { guid: nodeID, label: nodeLabel } = nodeIdentity(node, engine)
+          if (!nodeID) continue
+          const location = { module, branch: flow.branch, nodeID, nodeLabel, scope: "control" as const }
+          for (const parameter of ["FileName", "TableName"]) {
+            const setting = engine?.getAttribute(parameter) ?? ""
+            const names = new Set(Array.from(setting.matchAll(/%([\p{L}_][\p{L}\p{N}_]*)%/gu), (match) => match[1]))
+            for (const name of names) usages.push({ ...location, name, parameter, kind: "template" })
+          }
+          for (const binding of items(child(child(component, "PropBinder"), "PropertyBindSavers"))) {
+            const name = binding.getAttribute("VariableName"), parameter = binding.getAttribute("PropertyPath")
+            if (name && parameter) usages.push({ ...location, name, parameter, kind: "binding" })
+          }
+          const inner = child(child(engine, "ModelUnit"), "WorkFlow")
+          if (inner) pending.push({ root: inner, branch: [...flow.branch, nodeLabel] })
+        }
+      }
+    }
+    return { source: "saved" as const, definitionsCoverage, usagesCoverage: "partial" as const,
+      definitions: elements ? definitions : null, defaults: elements ? defaults : null, usages }
+  }, 16 * 1024 * 1024)
 }
 
 function normalized(name: string) { return name.replaceAll("\\", "/").replace(/^\/+/, "").toLowerCase() }
@@ -80,14 +163,19 @@ function children(parent?: Element) {
 function child(parent: Element | undefined, name: string) { return children(parent).find((node) => node.localName === name) }
 function items(parent?: Element) { return children(parent).filter((node) => node.localName === "Item") }
 
-function nodeEntry(node: Element, path: string, depth: number) {
-  const component = child(node, "Component")
-  const engine = child(component, "Engine") ?? component
+function nodeIdentity(node: Element, engine?: Element) {
   const engine_type = engine?.getAttributeNS("http://www.w3.org/2001/XMLSchema-instance", "type") || engine?.getAttribute("type") || ""
   const guid = node.getAttribute("Guid") ?? ""
   const name = node.getAttribute("Name") ?? ""
   const display_name = node.getAttribute("DisplayName") ?? ""
   const label = display_name || name || engine_type || guid.slice(0, 8)
+  return { guid, name, display_name, label, engine_type }
+}
+
+function nodeEntry(node: Element, path: string, depth: number) {
+  const component = child(node, "Component")
+  const engine = child(component, "Engine") ?? component
+  const { guid, name, display_name, label, engine_type } = nodeIdentity(node, engine)
   const service_name = engine_type === "TBGModelGenericComponentEngine" ? "Подмодель" : engine_type.replace(/^TBG/, "") || name || "Узел"
   const ports = (section: string) => items(child(node, section)).map((port) => {
     const guid = port.getAttribute("Guid") ?? ""

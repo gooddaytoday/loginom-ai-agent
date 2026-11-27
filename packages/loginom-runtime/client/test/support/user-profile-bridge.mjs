@@ -482,6 +482,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const local=await bridge.prepareLocalPackage({intent:'open_package',operation_id:expectedOperation},
       {artifactID:artifact.artifact_id,uploadGrantID:artifact.upload.grant_id},{signal:new AbortController().signal});
     assert.notEqual(local.isError,true,JSON.stringify(local));
+    assert.equal(local._meta?.confirmedLocalPackage,true);
     const opened=JSON.parse(local.content[0].text);
     assert.equal(packageDeliveries.length,1);assert.equal(packageDeliveries[0].artifact_id,artifact.artifact_id);
     assert.equal(packageDeliveries[0].upload_grant_id,artifact.upload.grant_id);
@@ -493,6 +494,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const failed=await bridge.prepareLocalPackage({intent:'open_package',operation_id:expectedOperation},
       {artifactID:artifact.artifact_id,uploadGrantID:artifact.upload.grant_id},{signal:new AbortController().signal});
     assert.equal(failed.isError,true,JSON.stringify(failed));
+    assert.equal(failed._meta?.confirmedLocalPackage,undefined);
     const openRefusal=JSON.parse(failed.content[0].text);
     assert.deepEqual(openRefusal.next_step.arguments,{intent:'open_package',operation_id:expectedOperation,package_path:expectedPackage});
     assert.equal(session.metadata.workspaceReady,false);
