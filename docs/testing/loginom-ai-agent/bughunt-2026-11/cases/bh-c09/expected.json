@@ -25,6 +25,7 @@
       "output_node_type": "export_input",
       "ordered": true,
       "export_destination": "/bughunt/bh-c09.csv",
+      "column_order": "exact",
       "columns": [
         {
           "name": "Category",
@@ -34,12 +35,14 @@
         {
           "name": "2026-01",
           "label": "2026-01",
-          "type": "real"
+          "type": "real",
+          "name_any": true
         },
         {
           "name": "2026-02",
           "label": "2026-02",
-          "type": "real"
+          "type": "real",
+          "name_any": true
         }
       ],
       "rows": [
