@@ -1,3 +1,4 @@
+import { refreshStepProgress, stepProgress } from './step-progress.js';
 import { byId, tierBadge } from './catalog.js';
 import { icon } from './icons.js';
 
@@ -346,11 +347,17 @@ function renderRunner(state, model) {
       ${modelName ? `<div class="sl-data${cloud ? ' sl-data-cloud' : ''}">${icon('cpu',17)}<p><strong>Что увидит модель:</strong> ${escape(access.data)}. Модель «${escape(modelName)}» — ${escape(modelWhere)}.</p></div>`
         : `<div class="sl-note sl-note-warn">${icon('alert',16)} Модель не выбрана — без неё действие не запустится. <button type="button" class="btn quiet" data-settings="providers">Выбрать модель</button></div>`}
       <div class="sl-actions"><button type="button" class="btn primary" data-sl-action="start" ${modelName ? '' : 'disabled'}>Разрешить и запустить</button><button type="button" class="btn quiet" data-sl-action="to-params">Назад</button></div></section>
-      <fieldset class="sl-demo"><legend>Только для прототипа: чем закончится запуск</legend>${outcomes.filter(([value]) => value !== 'recovery' || changesSomething(key)).map(([value,label]) => `<label><input type="radio" name="demo-outcome" value="${value}" ${run.demoOutcome === value ? 'checked' : ''}> ${label}</label>`).join('')}</fieldset>`;
+      <fieldset class="sl-demo"><legend>Только для прототипа: чем закончится запуск</legend>${outcomes.filter(([value]) => value !== 'recovery' || changesSomething(key)).map(([value,label]) => `<label><input type="radio" name="demo-outcome" value="${value}" ${run.demoOutcome === value ? 'checked' : ''}> ${label}</label>`).join('')}
+      <label><input type="checkbox" name="demo-long" ${run.demoLong ? 'checked' : ''}> Долгий шаг</label></fieldset>`;
   }
-  if (run.step === 'running') body = `<section class="sl-panel"><ol class="sl-stages" aria-live="polite">${item.stages.map((stage,index) => `<li class="${index < run.stage ? 'is-done' : index === run.stage ? 'is-current' : ''}"><span class="sl-stage-mark" aria-hidden="true">${index < run.stage ? '✓' : index+1}</span><span>${stage}</span><small>${index < run.stage ? 'Готово' : index === run.stage ? 'Идёт' : 'Ожидает'}</small></li>`).join('')}</ol>
+  if (run.step === 'running') {
+    const progress = stepProgress(run, run.demoLong && run.stage === 0);
+    body = `<section class="sl-panel"><ol class="sl-stages">${item.stages.map((stage,index) => `<li class="${index < run.stage ? 'is-done' : index === run.stage ? 'is-current' : ''}" ${index === run.stage ? 'aria-current="step"' : ''}><span class="sl-stage-mark" aria-hidden="true">${index < run.stage ? '✓' : index+1}</span><span>${stage}${index === run.stage ? `<small class="sl-stage-clock" data-step-clock>${progress.text}</small>` : ''}</span>${index === run.stage ? '' : `<small>${index < run.stage ? 'Готово' : 'Ожидает'}</small>`}</li>`).join('')}</ol>
+      <div class="step-stalled" data-step-stalled ${progress.stalled ? '' : 'hidden'}><strong>Похоже, шаг завис</strong><div class="button-row">
+        <button type="button" class="btn" data-sl-action="wait">Подождать</button><button type="button" class="btn" data-sl-action="stop">Остановить</button><button type="button" class="btn" data-overlay="loginom-status">Проверить Loginom</button></div></div>
       ${details(key, run)}
       <div class="sl-actions"><button type="button" class="btn" data-sl-action="stop">Остановить</button><small class="muted">Остановка прерывает агента, но не отменяет уже сделанное.</small></div></section>`;
+  }
   if (run.step === 'result') body = renderResult(key, run) + details(key, run);
   return `<div class="sl-page sl-runner"><button type="button" class="sl-back-link" data-sl-action="back" data-sl-back="${back[0]}">${back[1]}</button>
     <header class="sl-heading"><h1>${title}</h1><p>${description}</p><p class="sl-meta">${own ? `Своё действие · на основе «${escape(own.baseTitle)}»` : `${tierBadge(item)} ${escape(item.product || item.title)} · версия ${item.version}`}</p></header>
@@ -386,6 +393,11 @@ function validateRun(key, values) {
   return '';
 }
 
+export function updateRunnerProgress(state, root) {
+  const run = state.solutions.runs[runKey(state)];
+  if (run?.step === 'running') refreshStepProgress(root, run, run.demoLong && run.stage === 0);
+}
+
 export function bindSolutions(root,state,api) {
   const panel = root.querySelector('.sl-page');
   if (!panel) return;
@@ -400,6 +412,7 @@ export function bindSolutions(root,state,api) {
     if (input.type !== 'checkbox') run.values[input.name] = input.value;
   });
   panel.addEventListener('change', async event => {
+    if (event.target.name === 'demo-long') { run.demoLong = event.target.checked; return; }
     if (event.target.name === 'demo-outcome') { run.demoOutcome = event.target.value; return; }
     if (event.target.type === 'radio' && event.target.closest('[data-sl-form="run"]')) {
       run.values[event.target.name] = event.target.value;
@@ -443,7 +456,8 @@ export function bindSolutions(root,state,api) {
         api.discuss(titles[key][0] + ' · ' + run.values.package, 'Разберём результат запуска «' + titles[key][0] + '»: ' + (ok ? reportData(key, run.values, pkg).summary : outcomeView[run.outcome][2] + '. ' + outcomeText(key, run)) + ' Что стоит сделать дальше?', ok ? resultFiles(key, run).map(([file]) => file) : [], pkg.source && key !== 'migration' ? {name:pkg.name, where:pkg.where, source:pkg.source} : null);
         return;
       }
-      case 'stop': clearInterval(run.timer); run.step = 'result'; run.outcome = 'cancelled'; api.render(); return;
+      case 'wait': run.waitedAt = Date.now(); updateRunnerProgress(state, root); return;
+      case 'stop': clearTimeout(run.timer); run.step = 'result'; run.outcome = 'cancelled'; api.render(); return;
       case 'start': {
         run.step = 'running';
         // The rules in «Инструкции» are taken when the run starts: a later change does not rewrite this result.
@@ -458,23 +472,45 @@ export function bindSolutions(root,state,api) {
         }
         run.stage = 0;
         run.details = false;
-        const finalStage = item.stages.length;
-        run.timer = setInterval(() => {
-          run.stage += 1;
-          const failAt = run.demoOutcome === 'failed' ? 1 : run.demoOutcome === 'recovery' ? 3 : finalStage;
-          if (run.stage >= failAt) {
-            clearInterval(run.timer);
+        run.lastReply = null;
+        const failAt = run.demoOutcome === 'failed' ? 1 : run.demoOutcome === 'recovery' ? 3 : item.stages.length;
+        const nextStage = () => {
+          const long = run.demoLong && run.stage === 0;
+          const loginom = long || (chosenPackage(run).source !== 'local' && run.stage < 3 &&
+            (key !== 'document' || run.stage === 0) && (key !== 'migration' || run.stage > 0));
+          const write = changesSomething(key) && run.stage > 0 && run.stage < 3;
+          Object.assign(run, {stepStarted:Date.now(), waitedAt:null, signal:'thinking', stepKind:loginom ? (write ? 'write' : 'read') : 'model'});
+          if (long) run.lastReply = Date.now();
+          const visible = () => state.page === 'runner' && runKey(state) === key;
+          const finish = () => {
+            if (loginom) run.lastReply = Date.now();
+            if (run.stage + 1 < failAt) {
+              run.stage++;
+              nextStage();
+              if (visible()) api.render();
+              return;
+            }
             run.step = 'result';
             run.outcome = run.demoOutcome;
-            if (state.page !== 'runner' || runKey(state) !== key) {
+            if (!visible()) {
               run.unseen = true;
-              api.toast(titles[key][0] + (run.outcome === 'success' ? ': готово' : ': нужно посмотреть результат'));
+              if (state.settings.preferences[run.outcome === 'recovery' ? 'notifyDecision' : 'notifyFinished'])
+                api.toast(titles[key][0] + (run.outcome === 'success' ? ': готово' : ': нужно посмотреть результат'));
             }
-            run.stage = Math.min(run.stage, finalStage) - 1;
-          }
-          // Off the runner page, re-render once at the end so the «Выполняется» card disappears.
-          if ((state.page === 'runner' && runKey(state) === key) || run.step === 'result') api.render();
-        }, 700);
+            api.render();
+          };
+          const call = () => {
+            run.signal = 'waiting';
+            if (long) run.lastReply = Date.now();
+            run.timer = setTimeout(finish, long ? 16000 : 350);
+          };
+          const work = () => {
+            run.signal = 'working';
+            run.timer = setTimeout(call, long ? 2800 : 200);
+          };
+          run.timer = setTimeout(loginom ? work : finish, loginom ? (long ? 1500 : 150) : 700);
+        };
+        nextStage();
         api.render(true);
         return;
       }
