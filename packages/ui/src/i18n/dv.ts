@@ -68,10 +68,6 @@ export const dict = {
   "ui.sessionTurn.retry.geminiHot": "ޖެމިނީ މިވަގުތު މާ ހޫނުވެއްޖެއެވެ",
   "ui.sessionTurn.error.freeUsageExceeded": "ހިލޭ ބޭނުންކުރުން ފަހަނައަޅައި ދިޔައެވެ",
   "ui.sessionTurn.error.addCredits": "ކްރެޑިޓްތައް އިތުރުކުރުން",
-  "dialog.usageExceeded.freeTier.title": "ހިލޭ ލިމިޓަށް އާދެވިއްޖެއެވެ",
-  "dialog.usageExceeded.freeTier.description":
-    "އެންމެ ރަނގަޅު އޮޕަން ސޯސް މޮޑެލްތަކަށް އިތުބާރުހުރި ގޮތެއްގައި އެކްސެސް ހޯދުމަށް މަހަކު 10 ޑޮލަރަށް OpenCode Go އަށް ސަބްސްކްރައިބް ކޮށްލައްވާ.",
-  "dialog.usageExceeded.freeTier.actionLabel": "ސަބްސްކްރައިބް ކޮށްލައްވާ",
   "ui.sessionTurn.status.delegating": "މަސައްކަތް ހަވާލުކުރުން",
   "ui.sessionTurn.status.planning": "ދެން އަޅަންޖެހޭ ފިޔަވަޅުތައް ރޭވުން",
   "ui.sessionTurn.status.gatheringContext": "އެކްސްޕްލޯރ ކުރަމުންނެވެ",
