@@ -513,11 +513,14 @@ Runs use the worker account. The default is `deepseek/deepseek-flash` without a
 variant, using `DEEPSEEK_API_KEY`. Set `RUN_CHECK_MODEL` to select another model
 and `RUN_CHECK_VARIANT` for a `run` variant (not supported by the two-turn TUI
 cases). A variant on a two-turn TUI case or an unreadable `RUN_CHECK_AUTH` file
-is rejected before detach. `RUN_CHECK_AUTH` points to a legacy `auth.json`;
-the runner copies it with mode `0600` into each fresh CLI profile for import.
-On success or failure the runner removes the copy and the entire OAuth profile,
-including its database and sidecars. If the worker is forcibly killed before
-cleanup, remove that run's OAuth profile manually before sharing any evidence.
+is rejected before detach. `RUN_CHECK_AUTH` points to a legacy `auth.json`.
+The path is private to the runner and is not passed in the phase environment.
+The runner copies the file with mode `0600` into the fresh CLI profile for
+import and unlinks it as soon as the first model phase succeeds. On success,
+failure, or worker SIGTERM, cleanup removes any remaining copy and the entire
+OAuth profile, including its database, sidecars, and `execution-events.jsonl`.
+If the worker is forcibly killed before cleanup (for example with SIGKILL),
+remove that run's OAuth profile manually before sharing any evidence.
 Without `RUN_CHECK_AUTH`, no copy is made and the profile is retained.
 
 The source file is never updated. If the provider rotates the refresh token,

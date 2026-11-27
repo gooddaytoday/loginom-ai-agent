@@ -752,7 +752,8 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
         with self.assertRaisesRegex(AssertionError, 'INVALID_CSV_HEADER'):
             self.csv_result(dict(output, header='false'), '1,1\n2,3\n')
 
-    def refusal_run(self, root, variant=None, *, expected_text=None, answer=None, data_files=(), commands=None, before_model=None):
+    def refusal_run(self, root, variant=None, *, expected_text=None, answer=None, data_files=(), commands=None,
+                    auth_source=None, on_phase=None):
         case = root / 'cases/safe-refusal'
         (case / 'data').mkdir(parents=True)
         for name in data_files: (case / 'data' / name).write_text('x')
@@ -771,7 +772,7 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
         runner.write(out / 'request.json', dict(cases=str(case.parent), pair=str(root / 'pair'), cold=True))
         runner.write(out / 'results.json', dict(head='a' * 40, tree='b' * 40, started=time.time(),
                      runs=[dict(scenario=case.name, status='PENDING')]))
-        instance = runner.Runner(out)
+        instance = runner.Runner(out, auth_source=auth_source)
         phases = []
         def phase(name, command, folder, **kwargs):
             phases.append(name)
@@ -782,8 +783,8 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                 (profile / 'data').mkdir(parents=True)
                 (profile / 'config').mkdir()
                 runner.write(folder / 'setup.stdout', dict(browser=dict(state='verified')))
+            if on_phase: on_phase(name, profile, kwargs.get('env', instance.env))
             if name != 'model': return
-            if before_model: before_model(profile)
             # Honor any generated export instruction at the process boundary;
             # the old runner then indexes outputs[0] although the list is empty.
             for destination in re.findall(r'/test/[\w-]+\.csv', command[-1]):
@@ -1940,7 +1941,10 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                 observed = []
                 commands = []
 
-                def import_auth(profile):
+                def import_auth(name, profile, env):
+                    self.assertNotIn('RUN_CHECK_AUTH', env)
+                    self.assertNotIn(str(auth), env.values())
+                    if name != 'model': return
                     self.assertEqual(profile, copied.parent.parent)
                     observed.append((copied.read_text(), stat.S_IMODE(copied.stat().st_mode)) if copied.exists() else None)
                     if use_auth:
@@ -1948,16 +1952,23 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                         copied.write_text('{}')
                     if fail: raise RuntimeError('test model failure')
 
+                def records(path):
+                    if path.name == 'model.stdout': self.assertFalse(copied.exists())
+                    return original_records(path)
+
+                original_records = runner.records
                 mask = os.umask(0o022)
                 try:
-                    with patch.dict(os.environ, RUN_CHECK_MODEL='openai/gpt-6.1-terra', RUN_CHECK_VARIANT='medium'):
-                        os.environ.pop('RUN_CHECK_AUTH', None)
+                    with patch.dict(os.environ, RUN_CHECK_MODEL='test/fake', RUN_CHECK_VARIANT='medium'), \
+                         patch.object(runner, 'records', side_effect=records):
                         if use_auth: os.environ['RUN_CHECK_AUTH'] = str(auth)
-                        result, _, _ = self.refusal_run(root, commands=commands, before_model=import_auth)
+                        else: os.environ.pop('RUN_CHECK_AUTH', None)
+                        result, _, _ = self.refusal_run(root, commands=commands, on_phase=import_auth,
+                                                        auth_source=auth if use_auth else None)
                 finally:
                     os.umask(mask)
                 model = next(command for name, command in commands if name == 'model')
-                self.assertEqual(model[model.index('--model') + 1], 'openai/gpt-6.1-terra')
+                self.assertEqual(model[model.index('--model') + 1], 'test/fake')
                 self.assertEqual(model[model.index('--variant') + 1], 'medium')
                 self.assertEqual(result['status'], 'FAIL' if fail else 'PASS', result)
                 if fail: self.assertEqual(result['detail'], 'test model failure')
@@ -1965,6 +1976,89 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                 for path in [copied, database, *sidecars]: self.assertFalse(path.exists(), path.name)
                 self.assertEqual(copied.parent.parent.exists(), not use_auth)
                 self.assertEqual(auth.read_text(), payload)
+
+    def test_oauth_does_not_overwrite_existing_profile_file_or_symlink(self):
+        for symlink in [False, True]:
+            with self.subTest(symlink=symlink), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                auth = root / 'source.json'
+                auth.write_text('{}')
+                target = root / 'untouched'
+                target.write_text('original')
+
+                def seed_auth(name, profile, env):
+                    if name != 'setup': return
+                    destination = profile / 'data/auth.json'
+                    if symlink: destination.symlink_to(target)
+                    else: os.link(target, destination)
+
+                result, phases, folder = self.refusal_run(root, auth_source=auth, on_phase=seed_auth)
+                self.assertEqual(result['status'], 'FAIL', result)
+                self.assertIn('File exists', result['detail'])
+                self.assertEqual(phases, ['setup'])
+                self.assertEqual(target.read_text(), 'original')
+                self.assertEqual(auth.read_text(), '{}')
+                self.assertFalse((folder.parent / 'profile').exists())
+
+    def test_oauth_cleanup_failure_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            auth = root / 'source.json'
+            auth.write_text('{}')
+            with patch.object(runner.shutil, 'rmtree', side_effect=PermissionError('test cleanup denied')):
+                result, _, folder = self.refusal_run(root, auth_source=auth)
+            self.assertEqual(result['status'], 'FAIL', result)
+            self.assertEqual(result['oauth_cleanup_error'], 'test cleanup denied')
+            self.assertTrue(Path(result['profile']).is_dir())
+            self.assertFalse((folder.parent / 'profile/data/auth.json').exists())
+
+    def test_oauth_worker_sigterm_stops_model_and_removes_profile(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            build = root / 'build'
+            (build / 'bin').mkdir(parents=True)
+            help_manifest = build / 'resources/loginom/help/help-manifest.json'
+            help_manifest.parent.mkdir(parents=True)
+            help_manifest.touch()
+            cli = build / 'bin/loginom-ai-agent-cli'
+            cli.write_text(f'#!{sys.executable}\n' + """import os, signal, sys, threading
+from pathlib import Path
+profile = Path(os.environ['LOGINOM_AI_AGENT_CLI_PROFILE'])
+assert 'RUN_CHECK_AUTH' not in os.environ
+if sys.argv[1:3] == ['loginom', 'setup']:
+    (profile / 'data').mkdir(parents=True)
+    (profile / 'config').mkdir()
+    print('{"browser":{"state":"verified"}}')
+else:
+    assert sys.argv[sys.argv.index('--model') + 1] == 'test/fake'
+    assert (profile / 'data/auth.json').is_file()
+    (profile / 'data/loginom-ai-agent.db').touch()
+    (profile / 'execution-events.jsonl').touch()
+    try:
+        os.kill(os.getppid(), signal.SIGTERM)
+        threading.Event().wait(15)
+    except KeyboardInterrupt:
+        (profile / 'stopped').touch()
+        print('model stopped before profile removal')
+""")
+            cli.chmod(0o700)
+            daemon = root / 'fake-multica'
+            daemon.write_text('#!/bin/sh\nprintf \'%s\\n\' \'{"pid":1}\'\n')
+            daemon.chmod(0o700)
+            instance = self.make_runner(root, ('missing-zero',))
+            runner.write(build / 'cli-manifest.json', {'metadata': {'sourceCommit': instance.report['head'], 'sourceDirty': False}})
+            runner.write(root / 'request.json', dict(instance.options, build=str(build), spacing=0, host_load_max=1000000))
+            auth = root / 'source.json'
+            auth.write_text('{}')
+            environment = dict(os.environ, HOME=str(root), RUN_CHECK_MODEL='test/fake', MULTICA_CLI_PATH=str(daemon))
+            environment.pop('RUN_CHECK_AUTH', None)
+            completed = subprocess.run([sys.executable, '-B', str(Path(runner.__file__)), '_worker', str(root)],
+                                       env=environment, input=str(auth), capture_output=True, text=True, timeout=20)
+            self.assertEqual(completed.returncode, 143, completed.stderr)
+            self.assertIn('model stopped before profile removal', (root / 'missing-zero/missing-zero/model.stdout').read_text())
+            self.assertFalse((root / 'missing-zero/profile').exists())
+            self.assertEqual(auth.read_text(), '{}')
+            self.assertTrue(runner.read(root / 'results.json')['finished'])
 
     def test_flat_pair_preserves_the_assigned_account(self):
         config = {'username': 'test', 'url': 'https://app.loginom.ai', 'api_key': 'private', 'password': 'private', 'package_directory': '/test'}
@@ -3211,9 +3305,12 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
             try:
                 with patch.dict(os.environ, {'RUN_CHECK_AUTH': str(auth)}, clear=True), patch.object(sys, 'argv', argv), \
                      patch.object(runner, 'git', return_value='a' * 40), redirect_stderr(errors), redirect_stdout(io.StringIO()), \
-                     patch.object(runner.subprocess, 'Popen', return_value=types.SimpleNamespace(pid=123)) as spawn:
+                     patch.object(runner.subprocess, 'Popen') as spawn:
+                    spawn.return_value.pid = 123
                     self.assertEqual(runner.main(), 0)
                     spawn.assert_called_once()
+                    self.assertNotIn('RUN_CHECK_AUTH', spawn.call_args.kwargs['env'])
+                    spawn.return_value.stdin.__enter__.return_value.write.assert_called_once_with(os.fsencode(auth))
             finally:
                 os.umask(mask)
             self.assertIn('parallel', errors.getvalue())

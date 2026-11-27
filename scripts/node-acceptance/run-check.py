@@ -72,7 +72,19 @@ def write(path, value):
 
 
 def daemon_pid():
-    return json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))['pid']
+    return json.loads(subprocess.check_output([os.environ.get('MULTICA_CLI_PATH', 'multica'), 'daemon', 'status', '--output', 'json']))['pid']
+
+
+def stop_phase(child):
+    assert child.pid != daemon_pid(), 'Cannot terminate daemon'
+    child.send_signal(signal.SIGINT)
+    try: child.wait(timeout=100)
+    except subprocess.TimeoutExpired:
+        os.killpg(child.pid, signal.SIGINT)
+        try: child.wait(timeout=40)
+        except subprocess.TimeoutExpired:
+            os.killpg(child.pid, signal.SIGKILL)
+            child.wait()
 
 
 def git(*args, cwd=REPO):
@@ -2202,14 +2214,15 @@ def downloaded_csv(profile, destination):
 
 
 class Runner:
-    def __init__(self, directory):
+    def __init__(self, directory, *, auth_source=None):
         self.out = directory
         self.report = read(directory / 'results.json')
         self.options = read(directory / 'request.json')
         self.deadline = self.report['started'] + 85 * 60
         self.last_start = 0
         self.current = None
-        self.env = {k: v for k, v in os.environ.items() if not k.startswith(('MULTICA_', 'CODEX_'))}
+        self.auth_source = auth_source
+        self.env = {k: v for k, v in os.environ.items() if k != 'RUN_CHECK_AUTH' and not k.startswith(('MULTICA_', 'CODEX_'))}
         self.env['LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT'] = self.options.get('viewport', '1280x800')
         self.env.update(LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS='false', HTTP_PROXY='http://127.0.0.1:2080', HTTPS_PROXY='http://127.0.0.1:2080', NO_PROXY='localhost,127.0.0.1,::1,app.loginom.ai,mcp.loginom.ai,mas.kartamyshev.dev')
 
@@ -2251,6 +2264,7 @@ class Runner:
         self.report['phase'] = 'gate:' + name
         self.report['phase_folder'] = str(folder)
         self.save()
+        child = None
         try:
             while True:
                 if time.time() >= self.deadline: raise TimeoutError('load/spacing budget')
@@ -2274,23 +2288,16 @@ class Runner:
                     loads.write(json.dumps({'at': time.time(), 'phase': name, 'load': os.getloadavg(), 'rss_bytes': self.memory(child.pid)}) + '\n')
                     loads.flush()
                     if time.time() >= end:
-                        daemon = json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))
-                        assert child.pid != daemon['pid'], 'Cannot terminate daemon'
                         # The CLI owns runtime close/ACK. Let it close children
                         # before interrupting the whole process group.
-                        child.send_signal(signal.SIGINT)
-                        # Host teardown already allows up to 90 seconds.
-                        try: child.wait(timeout=100)
-                        except subprocess.TimeoutExpired:
-                            os.killpg(child.pid, signal.SIGINT)
-                            try: child.wait(timeout=40)
-                            except subprocess.TimeoutExpired:
-                                os.killpg(child.pid, signal.SIGKILL)
-                                child.wait()
+                        stop_phase(child)
                         raise TimeoutError(name + ' deadline')
                     try: child.wait(timeout=1)
                     except subprocess.TimeoutExpired: pass
                 assert child.returncode == 0, f'{name} exit={child.returncode}: {folder / (name + ".stderr")}:1'
+        except SystemExit:
+            if child is not None and child.poll() is None: stop_phase(child)
+            raise
         finally:
             timing['finished'] = time.time()
             timing['queue_seconds'] = (timing['started'] if timing['started'] is not None else timing['finished']) - timing['queued']
@@ -2766,6 +2773,11 @@ class Runner:
                        folder / 'two-turn.json'], folder, timeout=1800, env=env, cwd=workspace)
         else:
             self.phase('model', command + ['--', prompt], folder, timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace)
+        if getattr(self, 'auth_source', None):
+            try: (profile / 'data/auth.json').unlink(missing_ok=True)
+            except OSError as error:
+                self.current['oauth_cleanup_error'] = str(error)
+                raise
         events = list(records(folder / 'model.stdout'))
         session = next(e['sessionID'] for _, e in events if e.get('sessionID'))
         replies = model_replies(events)
@@ -3521,7 +3533,7 @@ class Runner:
             login = pair_login(account, 'worker.json')
             model_id = self.env.get('RUN_CHECK_MODEL') or MODEL
             variant = self.env.get('RUN_CHECK_VARIANT')
-            auth = self.env.get('RUN_CHECK_AUTH')
+            auth = self.auth_source
             for r in self.report['runs']:
                 self.current = r
                 if time.time() >= self.deadline:
@@ -3542,7 +3554,7 @@ class Runner:
                     self.phase('setup', [build / 'bin/loginom-ai-agent-cli', 'loginom', 'setup', '--headless', '--stdin-json', '--format', 'json'], folder, timeout=180, env=env, stdin=json.dumps(dict(url=login['url'], username=login['username'], password=login['password'])))
                     assert read(folder / 'setup.stdout').get('browser', {}).get('state') == 'verified', 'SETUP_NOT_VERIFIED'
                     if auth:
-                        with Path(auth).expanduser().open('rb') as source, os.fdopen(
+                        with auth.open('rb') as source, os.fdopen(
                             os.open(auth_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600), 'wb'
                         ) as target:
                             shutil.copyfileobj(source, target)
@@ -3633,7 +3645,10 @@ class Runner:
 def main():
     os.umask(0o077)
     args = arguments()
-    if args.command == '_worker': return Runner(args.directory.resolve()).run()
+    if args.command == '_worker':
+        signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+        source = sys.stdin.buffer.read()
+        return Runner(args.directory.resolve(), auth_source=Path(os.fsdecode(source)) if source else None).run()
     if args.command == 'wait':
         end = time.monotonic() + args.timeout
         while True:
@@ -3652,7 +3667,7 @@ def main():
     out = (args.out or Path.home() / '.cache/loginom-runs' / str(time.time_ns())).expanduser().resolve()
     if any((parent / '.git').exists() for parent in (out, *out.parents)):
         raise ValueError('Result directory must be outside Git checkout')
-    auth = os.environ.get('RUN_CHECK_AUTH')
+    auth = os.environ.pop('RUN_CHECK_AUTH', None)
     if auth:
         auth_path = Path(auth).expanduser().resolve()
         if not auth_path.is_file() or not os.access(auth_path, os.R_OK):
@@ -3686,7 +3701,6 @@ def main():
     env = {k: v for k, v in os.environ.items() if not k.startswith('CODEX_')}
     env.update(TMPDIR=str(temporary), TMP=str(temporary), TEMP=str(temporary))
     if auth:
-        env['RUN_CHECK_AUTH'] = str(auth_path)
         print('Warning: do not run scenarios in parallel with the same OAuth file. '
               'Refresh-token rotation can invalidate copies; the source is not updated.', file=sys.stderr)
     request = vars(args) | {'pair': str(pair), 'build': str(build) if build else None, 'out': str(out),
@@ -3695,7 +3709,9 @@ def main():
     write(out / 'request.json', request)
     write(out / 'results.json', {'head': head, 'tree': git('rev-parse', head + '^{tree}'), 'started': time.time(), 'phase': 'build', 'runs': [{'scenario': n, 'status': 'PENDING'} for n in names]})
     with (out / 'worker.log').open('wb') as log:
-        child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '_worker', str(out)], env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
+        child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '_worker', str(out)], env=env, stdin=subprocess.PIPE if auth else subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
+        if auth:
+            with child.stdin as channel: channel.write(os.fsencode(auth_path))
     write(out / 'worker.json', {'pid': child.pid})
     print(out)
     return 0
