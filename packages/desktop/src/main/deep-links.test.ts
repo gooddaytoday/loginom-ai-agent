@@ -28,6 +28,7 @@ test("opens a startup dashboard link in the form Windows passes it", () => {
     "loginom-ai-agent://dashboard/publish?id=1&action=create",
   ])
 })
+
 test("opens a dashboard link that arrives before the first window like a cold start", () => {
   const link = "loginom-ai-agent://dashboard?id=1&action=create"
   const queue = createDeepLinkQueue(["/Applications/Example.app/Contents/MacOS/Example"])
