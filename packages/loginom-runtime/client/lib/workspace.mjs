@@ -1,6 +1,9 @@
 import { isDeepStrictEqual } from 'node:util';
 
-export const packageReadOnlyAdvice = 'The saved package is read-only and the lock owner is unverified. Ask the user for permission to use Save As with a new name before proceeding.';
+export const packageReadOnlyAdvice =
+  'Пакет открыт только для чтения. После разрыва Loginom может держать блокировку прежней сессии около 30 минут. ' +
+  'Предложи варианты на языке пользователя. Подождать и открыть пакет заново (проверь ReadOnly=false и сверь граф). ' +
+  'С согласия пользователя сохранить копию под новым именем. Попросить администратора закрыть прежнюю сессию в Диспетчере Loginom.';
 // A settled preparation can attest the current contents of the same native
 // scenario in one read. Historical snapshots remain with their operations.
 async function captureWorkspaceStep(page, options) {
