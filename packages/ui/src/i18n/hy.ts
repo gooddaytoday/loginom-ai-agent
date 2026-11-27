@@ -67,10 +67,6 @@ export const dict = {
   "ui.sessionTurn.retry.geminiHot": "Gemini-ն այժմ չափազանց ծանրաբեռնված է",
   "ui.sessionTurn.error.freeUsageExceeded": "Անվճար օգտագործումը գերազանցել է",
   "ui.sessionTurn.error.addCredits": "Ավելացնել միավորներ",
-  "dialog.usageExceeded.freeTier.title": "Ազատ սահմանաչափը հասել է",
-  "dialog.usageExceeded.freeTier.description":
-    "Բաժանորդագրվեք OpenCode Go-ին՝ բաց կոդով լավագույն մոդելներին հուսալի մուտք ունենալու համար՝ ամսական $10 արժեքով:",
-  "dialog.usageExceeded.freeTier.actionLabel": "Բաժանորդագրվել",
   "ui.sessionTurn.status.delegating": "Պատվիրակում է աշխատանքը",
   "ui.sessionTurn.status.planning": "Հաջորդ քայլերի պլանավորում",
   "ui.sessionTurn.status.gatheringContext": "Ուսումնասիրում",
