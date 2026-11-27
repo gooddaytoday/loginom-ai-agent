@@ -12,7 +12,7 @@ import {lgdImportSettingsSchema,lgdExportSettingsSchema} from './lgd-parameters.
 import {databaseImportParametersSchema} from './imports-database-parameters.mjs';
 import {tableToTreeParametersSchema,treeToJsonParametersSchema} from './tree-conversion-parameters.mjs';
 import {excelExportSettingsSchema} from './exports-excel-parameters.mjs';
-import {jsonToTreeParametersSchema,treeToTableParametersSchema} from './tree-parameters.mjs';
+import {jsonToTreeParametersSchema,treeToTableParametersSchema,validateTreeLabelSeparator} from './tree-parameters.mjs';
 import {excelSettingsSchema} from './imports-excel-parameters.mjs';
 import {importSourceSchema} from './storage-policy.mjs';
 import {restRequestParametersSchema} from './rest-request-parameters.mjs';
@@ -313,6 +313,7 @@ export const deliveryApiTools=Object.freeze([
 export const isNodeApiTool=name=>[...nodeApiTools,...deliveryApiTools].some(tool=>tool.name===name);
 export function validateNodeApplyEnvelope(args) {
  if(args.mode===NODE_ADD_ONLY_MODE)return args;
+ if(args.target?.type==='trees.to_table'&&args.mode==='selected_nodes')validateTreeLabelSeparator(args.parameters);
  // LAB-1324: refuse the unsupported external partition before graph/input checks.
  if(args.target?.type==='preprocessing.coarse_classes'&&args.mode==='internal'&&args.parameters?.coarse_classes?.partition==='external')validateCoarseClassesParameters(args.parameters,'internal');
  if(args.target?.type==='research.quality'){

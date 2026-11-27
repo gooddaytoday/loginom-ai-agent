@@ -10,13 +10,19 @@ export const treeToTableParametersSchema={type:'object',properties:{
  label_separator:{type:'string',enum:treeLabelSeparators,description:'Composite label separator; names always use _.'},
  global_index_paths:{type:'array',maxItems:1,items:text('JSON Pointer of the repeated array schema node.',512),description:'Optional: arrays whose native global index integer column is added; [] removes it. Read the generated name.'}},required:[],additionalProperties:false};
 const optionalOnNew=new Set(['global_index_paths']);
+export function validateTreeLabelSeparator(parameters){
+ if(parameters.label_separator!==undefined&&parameters.composite_labels!==true)
+  throw Error('label_separator applies only with composite_labels:true; drop label_separator or enable composite labels');
+}
 export function validateTreeParameters(parameters,mode,request){
  const json=request.target.type==='trees.from_json',schema=json?jsonToTreeParametersSchema:treeToTableParametersSchema;
  if(mode!==(json?'auto_structure':'selected_nodes')||!parameters||typeof parameters!=='object'||Array.isArray(parameters)
   ||Object.keys(parameters).some(k=>!Object.hasOwn(schema.properties,k))||request.mappings.length)
   throw Error('Tree stage 1 requires its documented mode, parameters and mappings:[]');
  if(request.inputs.length>1||request.inputs.some(i=>i.input!==0)||request.target.kind==='new'&&request.inputs.length!==1)throw Error('Tree stage 1 requires one input 0');
- if(request.target.kind==='new'&&Object.keys(schema.properties).some(k=>!optionalOnNew.has(k)&&!Object.hasOwn(parameters,k)))throw Error('New tree node requires every documented parameter');
+ if(!json)validateTreeLabelSeparator(parameters);
+ if(request.target.kind==='new'&&Object.keys(schema.properties).some(k=>!optionalOnNew.has(k)
+  &&(k!=='label_separator'||parameters.composite_labels===true)&&!Object.hasOwn(parameters,k)))throw Error('New tree node requires every documented parameter');
  if(json){
   if(parameters.json_field!==undefined&&(typeof parameters.json_field!=='string'||!parameters.json_field||parameters.json_field.length>128))throw Error('Invalid parameters.json_field');
   if(parameters.root_mode!==undefined&&parameters.root_mode!=='auto')throw Error('Invalid parameters.root_mode: only auto is supported');

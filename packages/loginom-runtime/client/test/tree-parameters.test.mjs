@@ -101,7 +101,7 @@ for(const saved of [false,true])test('JSON tree configure confirms '+(saved?'sav
 
 test('tree-to-table global index is optional on new nodes, bounded and bound to the repeated array',()=>{
  const request={target:{kind:'new',type:'trees.to_table'},inputs:[{input:0}],mappings:[]};
- const base={selected_paths:['/items/sku'],repeat_parents:true,composite_names:false,composite_labels:false,label_separator:'.'};
+ const base={selected_paths:['/items/sku'],repeat_parents:true,composite_names:false,composite_labels:false};
  validateTreeParameters(base,'selected_nodes',request);
  validateTreeParameters({...base,global_index_paths:['/items']},'selected_nodes',request);
  validateTreeParameters({...base,global_index_paths:[]},'selected_nodes',request);
@@ -402,10 +402,10 @@ test('JSON tree Variant preflight admits scalar subtype changes and retains cont
 
 test('tree-to-table admits native composite names, labels and the five separators; other values refuse before UI',()=>{
  const request={target:{kind:'new',type:'trees.to_table'},inputs:[{input:0}],mappings:[]};
- const base={selected_paths:['/items/code'],repeat_parents:true,composite_names:false,composite_labels:false,label_separator:'.'};
+ const base={selected_paths:['/items/code'],repeat_parents:true,composite_names:false,composite_labels:false};
  validateTreeParameters(base,'selected_nodes',request);
  for(const label_separator of ['.','|',' ','-','_'])validateTreeParameters({...base,composite_names:true,composite_labels:true,label_separator},'selected_nodes',request);
- for(const label_separator of [';','','..','/',1])assert.throws(()=>validateTreeParameters({...base,label_separator},'selected_nodes',request),/label_separator/);
+ for(const label_separator of [';','','..','/',1])assert.throws(()=>validateTreeParameters({...base,composite_labels:true,label_separator},'selected_nodes',request),/Invalid parameters.label_separator/);
  for(const k of ['composite_names','composite_labels'])assert.throws(()=>validateTreeParameters({...base,[k]:'true'},'selected_nodes',request),new RegExp(k));
 });
 function compositeState(){
@@ -416,25 +416,16 @@ function compositeState(){
   {tid:W+'pedCompositeDisplayNameSeparator;ValueControl;trg_picker',ref:'picker',allowed_actions:['click']});
  return state;
 }
-function compositeChannel(state,performed,{failOn,keepSeparator=false}={}){
+function compositeChannel(state,performed){
  const W='W;',options={'Вертикальная_черта_(|)':'|','Пробел_(_)':' ','Подчёркивание_(_)':'_','Точка_(.)':'.','Дефис_(-)':'-'};
- const observe=()=>{
-  const observed=structuredClone(state);
-  if(!observed.node_tree.composite_labels)observed.ui.elements=observed.ui.elements.filter(e=>e.ref!=='picker');
-  return observed;
- };
- return {observe:async o=>{const observed=observe();assert.ok(o.ready(observed));return observed;},perform:async o=>{
-  const action=o.resolve(observe());if(action.verb!=='click'){state.wizard.stage='done';return;}
+ return {observe:async o=>{assert.ok(o.ready(state));return structuredClone(state);},perform:async o=>{
+  const action=o.resolve(state);if(action.verb!=='click'){state.wizard.stage='done';return;}
   performed.push(action.ref);const t=state.node_tree;
-  if(action.ref===failOn)throw Error('Separator gesture failed');
   if(action.ref==='pedCompositeColumnNames')t.composite_names=!t.composite_names;
   else if(action.ref==='pedCompositeColumnDisplayNames')t.composite_labels=!t.composite_labels;
   else if(action.ref==='picker')for(const [name,value] of Object.entries(options))
    state.ui.elements.push({tid:W+'pedCompositeDisplayNameSeparator;ValueControl;boundlist;'+name,ref:'option:'+value,label:name,role:'option',allowed_actions:['click']});
-  else if(action.ref.startsWith('option:')){
-   if(!keepSeparator)t.label_separator=action.ref.slice(7);
-   state.ui.elements=state.ui.elements.filter(e=>!e.tid.includes(';boundlist;'));
-  }
+  else if(action.ref.startsWith('option:')){t.label_separator=action.ref.slice(7);state.ui.elements=state.ui.elements.filter(e=>!e.tid.includes(';boundlist;'));}
  }};
 }
 for(const [label_separator,clicks] of [['|',['picker','option:|']],[' ',['picker','option: ']],['_',['picker','option:_']],['.',[]]])
@@ -445,9 +436,9 @@ for(const [label_separator,clicks] of [['|',['picker','option:|']],[' ',['picker
   assert.deepEqual(performed,['pedCompositeColumnNames','pedCompositeColumnDisplayNames',...clicks]);
   assert.deepEqual([result.configuration.composite_names,result.configuration.composite_labels,result.configuration.label_separator],[true,true,label_separator]);
  });
-for(const initiallyComposite of [true,false])test('tree-to-table request admission and configure set a separator with plain labels, starting with composite labels '+initiallyComposite,async()=>{
+for(const composite_labels of [true,false])test('tree-to-table request admission and configure accept '+(composite_labels?'an explicit separator with composite labels':'plain labels without a separator'),async()=>{
  const state=compositeState(),performed=[],implementation=tableImplementation();
- state.node_tree.composite_labels=initiallyComposite;
+ state.ui.elements.push({tid:'W;btnSelectAll',ref:'btnSelectAll',allowed_actions:['click']});
  const channel=compositeChannel(state,performed);
  const {nodeApplyHandlers}=createTreeNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'},{json:false});
  const runtime={tools:nodeApiTools,startNodeApply:request=>{
@@ -456,57 +447,29 @@ for(const initiallyComposite of [true,false])test('tree-to-table request admissi
    configureCalculator:(_ctx,parameters)=>implementation.configure(channel,parameters,{request}),
   });
  }};
- const request={operation_id:'tree-plain-labels',contract_revision:'1.0.0',document_id:'doc',
+ const node={document_id:'doc',workflow_id:'wf',node_id:'source'};
+ const request={operation_id:'tree-labels',contract_revision:'1.0.0',document_id:'doc',
   workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',
    navigation_path:[{tid:'path',label:'Scenario'}]},
   target:{kind:'new',type:'trees.to_table',position:{x:320,y:280}},
-  inputs:[{source:{document_id:'doc',workflow_id:'wf',node_id:'source'},input:0,output:0}],
-  mode:'selected_nodes',parameters:{selected_paths:['/batch','/items/code','/items/qty'],repeat_parents:true,
-   composite_names:false,composite_labels:false,label_separator:'_'},
+  inputs:[{source:node,input:0,output:0}],mode:'selected_nodes',
+  parameters:{selected_paths:['/batch','/items/code','/items/qty'],repeat_parents:true,composite_names:false,composite_labels,
+   ...(composite_labels?{label_separator:'_'}:{})},
   mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false},
   budgets:{configure_ms:1000,execute_ms:1000,total_ms:1000}};
- state.ui.elements.push({tid:'W;btnSelectAll',ref:'btnSelectAll',allowed_actions:['click']});
  const {verified,configuration}=await dispatchNodeApi(runtime,'dock_node_apply',request);
  assert.equal(verified,true);
- assert.equal(configuration.composite_labels,false);
- assert.equal(configuration.label_separator,'_');
- const toggle='pedCompositeColumnDisplayNames';
- assert.deepEqual(performed,['btnSelectAll',...(!initiallyComposite?[toggle]:[]),'picker','option:_',toggle]);
+ assert.deepEqual([configuration.composite_labels,configuration.label_separator],[composite_labels,composite_labels?'_':'.']);
+ assert.deepEqual(performed,composite_labels?['btnSelectAll','pedCompositeColumnDisplayNames','picker','option:_']:['btnSelectAll']);
 });
-test('tree-to-table keeps the plain dot settings without clicks',async()=>{
- const state=compositeState(),performed=[];
+test('tree-to-table keeps the plain dot settings without clicks and refuses a separator that does not settle',async()=>{
+ let state=compositeState(),performed=[];
  const plain=await tableImplementation().configure(compositeChannel(state,performed),
-  {repeat_parents:true,composite_names:false,composite_labels:false,label_separator:'.'},{request:{finish:'execute',target:{kind:'new'}}});
+  {repeat_parents:true,composite_names:false,composite_labels:false},{request:{finish:'execute',target:{kind:'new'}}});
  assert.deepEqual(performed,[]);assert.equal(plain.configuration.label_separator,'.');
-});
-test('tree-to-table separator-only edit keeps an existing plain label setting',async()=>{
- const state=compositeState(),performed=[];
- const {configuration}=await tableImplementation().configure(compositeChannel(state,performed),
-  {label_separator:'_'},{request:{finish:'done',target:{kind:'existing'}}});
- assert.deepEqual(performed,['pedCompositeColumnDisplayNames','picker','option:_','pedCompositeColumnDisplayNames']);
- assert.equal(configuration.composite_labels,false);
- assert.equal(configuration.label_separator,'_');
- assert.equal(state.wizard.stage,'done');
-});
-test('tree-to-table stops in the draft if the separator gesture fails after temporarily enabling composite labels',async()=>{
- const state=compositeState(),performed=[];
- const channel=compositeChannel(state,performed,{failOn:'option:_'});
- await assert.rejects(tableImplementation().configure(channel,
-  {label_separator:'_'},{request:{finish:'done',target:{kind:'existing'}}}),/Separator gesture failed/);
- assert.deepEqual(performed,['pedCompositeColumnDisplayNames','picker','option:_']);
- assert.equal(state.node_tree.composite_labels,true);
- assert.equal(state.node_tree.label_separator,'.');
- assert.equal(state.wizard.stage,'tree_table');
-});
-for(const composite_labels of [true,false])test('tree-to-table refuses a separator that does not settle with composite labels '+composite_labels,async()=>{
- const state=compositeState(),performed=[];
- const channel=compositeChannel(state,performed,{keepSeparator:true});
- await assert.rejects(tableImplementation().configure(channel,
-  {composite_labels,label_separator:'|'},{request:{finish:'done',target:{kind:'existing'}}}),/settings differ/);
- assert.deepEqual(performed,['pedCompositeColumnDisplayNames','picker','option:|',...(!composite_labels?['pedCompositeColumnDisplayNames']:[])]);
- assert.equal(state.node_tree.composite_labels,composite_labels);
- assert.equal(state.node_tree.label_separator,'.');
- assert.equal(state.wizard.stage,'tree_table');
+ state=compositeState();performed=[];const channel=compositeChannel(state,performed),perform=channel.perform;
+ channel.perform=async o=>{const a=o.resolve(state);if(a.ref?.startsWith?.('option:')){performed.push(a.ref);return;}return perform(o);};
+ await assert.rejects(tableImplementation().configure(channel,{composite_labels:true,label_separator:'|'},{request:{finish:'execute',target:{kind:'existing'}}}),/settings differ/);
 });
 test('tree-to-table read expects native composite names Root_<path> in leaf order',async()=>{
  const configuration={...compositeState().node_tree,composite_names:true,composite_labels:true},implementation=tableImplementation();
