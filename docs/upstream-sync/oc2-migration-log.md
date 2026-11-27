@@ -26749,12 +26749,12 @@ FAIL и UNKNOWN — прогоны; недействителен только р
 | preprocessing-smoothing | smoothing-hp | 2/2 (c2-1, c2-2) | PASS (c2-k) | **принят** |
 | preprocessing-sampling | sampling-random | 1/3: c2-1 модель (`SAMPLING_CONFIGURATION_MISSING`), c2-2 PASS, c2-3 холодное чтение | — | не принят |
 | preprocessing-datapartition | partition-random | 1/3: c1-1 модель (`SAMPLING_PORTS_INCOMPLETE`), c1-2 PASS, c1-3 холодное чтение | — | не принят |
-| exports-excel | exports-excel | 0/2: c2-1, c2-2 — отказ стенда, затем встроенный инструмент модели | — | не принят |
+| exports-excel | exports-excel | 0/2: c2-1, c2-2 — отказ Loginom в разделе файлов, затем встроенный инструмент модели | — | не принят |
 
 10 прогонов исполнителя и 1 проверяющего. Отказов 6:
 - **модель** — 2: c2-1 sampling-random (выборка не настроена — как в b4-1, b4-2), c1-1 partition-random (у результата не все порты);
-- **отказ стенда, затем модель** — 2: в обоих прогонах exports-excel `dock_storage_source`/`dock_storage_list` → `STORAGE_SOURCE_REFUSED` (`navigation_unconfirmed`) — тот же отказ, что в
-  B6.1-E и на `v0.4.2`; после него модель взяла встроенный инструмент: c2-1 — `read` бинарного XLSX (по отчёту модели книга и пакет сохранены; проверки сохранения не запускались — прогон остановился на фазе модели), c2-2 — `glob /agent4`;
+- **отказ Loginom в разделе файлов, затем модель** — 2: в обоих прогонах exports-excel `dock_storage_source`/`dock_storage_list` → `STORAGE_SOURCE_REFUSED` (`navigation_unconfirmed`) — тот же отказ, что в
+  B6.1-E и на `v0.4.2` (стенд или окружение машины — не разделено); после него модель взяла встроенный инструмент: c2-1 — `read` бинарного XLSX (по отчёту модели книга и пакет сохранены; проверки сохранения не запускались — прогон остановился на фазе модели), c2-2 — `glob /agent4`;
   оба → `CLI_TOOL_FAILED` по контракту 0.4.2. `Export file read did not return` (b2-1) не повторилось;
 - **холодное чтение сохранённого пакета в новом браузере** — 2, в первой серии этой фазы среди отказов не было: c1-3 partition-random (`NodeProcedureStepError: … Observed control
   geometry changed`, `ui.act`, фаза `preconditions`, `NOT_APPLIED`), c2-3 sampling-random (`NodeReadinessTimeout: native execution control for selected node`). В обоих модель,
