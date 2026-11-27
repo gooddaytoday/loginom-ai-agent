@@ -227,19 +227,21 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       document_id:result.workspace.document_id,workflow_ref:{workflow_id:result.workspace.workflow_ref.workflow_id},
       target:{kind:'new',type:'transform.sorting'},inputs:[],mode:'keys',parameters:{},finish:'done'};
     const beforeDescription=browserCalls.length;
-    await describe({node_types:['transform.sorting']});
+    for(const kind of ['new','existing']){
+      const blocked=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,target:{...undescribed.target,kind,...(kind==='existing'?{ref:{document_id:undescribed.document_id,workflow_id:undescribed.workflow_ref.workflow_id,node_id:'existing-sorting'}}:{})}}});
+      const refusal=JSON.parse(blocked.content[0].text);
+      assert.equal(refusal.error.code,'NODE_TYPE_NOT_DESCRIBED',JSON.stringify(refusal));assert.equal(refusal.effect_possible,false);
+      assert.equal(browserCalls.length,beforeDescription,'undelivered cards cannot mutate the browser');
+    }
+    await client.callTool({name:'dock_action_describe',arguments:{node_types:['transform.sorting']}});
     const indexed=await client.callTool({name:'dock_node_apply',arguments:undescribed});
-    const refusal=JSON.parse(indexed.content[0].text);
-    assert.equal(refusal.error.code,'NODE_TYPE_NOT_DESCRIBED');
-    assert.equal(refusal.effect_possible,false);
-    assert.equal(browserCalls.length,beforeDescription,'a card without its mode cannot admit Apply');
+    assert.equal(JSON.parse(indexed.content[0].text).error.code,'NODE_TYPE_NOT_DESCRIBED');
     const unknownType=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,target:{kind:'new',type:'unknown.type'}}});
     assert.equal(JSON.parse(unknownType.content[0].text).error.code,'REQUEST_REJECTED');
-    const cardReply=await describe({node_types:['transform.sorting'],modes:['keys'],refresh:true});
+    const cardReply=await client.callTool({name:'dock_action_describe',arguments:{node_types:['transform.sorting'],modes:['keys']}});
     assert.notEqual(cardReply.isError,true,JSON.stringify(cardReply));
     const card=JSON.parse(cardReply.content[0].text).node_types[0];
     assert.match(card.guidance,/Сортировка/);assert.deepEqual(card.guidance_modes,['keys']);
-    assert.deepEqual(JSON.parse(indexed.content[1].text).node_types,[card]);
     const invalidMode=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,mode:'invented'}});
     assert.equal(JSON.parse(invalidMode.content[0].text).error.code,'REQUEST_REJECTED');
     assert.equal(browserCalls.length,beforeDescription,'mode validation remains before mutation');
@@ -347,19 +349,11 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.equal(rebound.workspace.package_ref.path,'/user/existing.lgp');
     assert.notEqual(rebound.workspace.document_id,'fixture-document');
     assert.equal(session.metadata.storageBinding.document_id,rebound.workspace.document_id);
-    const reopenedNode={document_id:rebound.workspace.document_id,
-      workflow_id:rebound.workspace.workflow_ref.workflow_id,node_id:'existing-sorting'};
-    const beforeExisting=browserCalls.length;
     const afterPrepare=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,
-      document_id:reopenedNode.document_id,workflow_ref:{workflow_id:reopenedNode.workflow_id},
-      target:{kind:'existing',type:'transform.sorting',ref:reopenedNode}}});
-    const existingRefusal=JSON.parse(afterPrepare.content[0].text);
-    assert.equal(existingRefusal.error.code,'NODE_TYPE_NOT_DESCRIBED');
-    assert.equal(existingRefusal.effect_possible,false);
-    assert.deepEqual(JSON.parse(afterPrepare.content[1].text).node_types,[card]);
-    assert.equal(browserCalls.length,beforeExisting);
+      document_id:rebound.workspace.document_id,workflow_ref:{workflow_id:rebound.workspace.workflow_ref.workflow_id}}});
+    assert.equal(JSON.parse(afterPrepare.content[0].text).error.code,'NODE_TYPE_NOT_DESCRIBED');
     const refreshed=JSON.parse((await describe({node_types:['transform.sorting'],modes:['keys']})).content[0].text);
-    assert.deepEqual(refreshed.reused_node_types,[{type:card.type,cache_key:card.cache_key}]);
+    assert.equal(refreshed.node_types[0].type,'transform.sorting');
     assert.equal(reloadedPage.events.filter(selector=>selector.includes('OpenDialogForm;btnOpen')).length,1);
     reloadedPage=null;
     const original=session.metadata.workspacePreparation.state;

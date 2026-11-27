@@ -163,13 +163,6 @@ export async function createBridge(config, session, { browserTransport: managedB
   let actionRuntime = null;
   let pinnedActions = null;
   let recoveryContext = null;
-  const describeUserResult=async(description,modes)=>{
-    if(description.node_types?.length){
-      requirePreparedWorkspace(session.metadata);
-      description.node_types=await skill.describeNodes(description.node_types,modes);
-    }
-    return userActionInventory(description);
-  };
   const redactor=createRedactor([config.apiKey]);
   const recordExecution = createExecutionJournal({ directory: session.directory,
     metadata: session.metadata, redactor });
@@ -631,33 +624,10 @@ export async function createBridge(config, session, { browserTransport: managedB
                 if(args.mode!==NODE_ADD_ONLY_MODE)validateActionParameters({type:'string',enum:NODE_TYPES[args.target.type].modes},args.mode,'parameters.mode');
                 const refusal=userWorkflows.checkNodeDescription(args);
                 if(refusal){
-                  const nodeType=args.target.type,modes=[args.mode];
-                  let description,cardError;
-                  try{
-                    description=await describeUserResult(actionRuntime.describe({node_types:[nodeType]}),modes);
-                  }catch(error){
-                    cardError=redactor.text(String(error?.message??error)).slice(0,1000);
-                  }
-                  const card=description?.node_types?.[0];
-                  let reply={content:[{type:'text',text:JSON.stringify(refusal)}],structuredContent:refusal};
-                  let cardDelivered=false;
-                  if(card?.parameter_schema&&card.candidate_modes?.includes(args.mode)
-                    &&Buffer.byteLength(JSON.stringify(card),'utf8')<=12000){
-                    const result={...refusal,next_step:{tool:'dock_node_apply',
-                      instruction:'Read guidance and parameter_schema in the node card in this reply. Submit the complete request with a NEW operation_id. No node operation started.'}};
-                    const withCard=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(result)},
-                      {type:'text',text:JSON.stringify({node_types:[card]})}],structuredContent:result},
-                    {tool:'dock_node_apply',operationId:args.operation_id});
-                    if(!withCard.isError){reply=withCard;cardDelivered=true;}
-                  }
-                  extra.signal.throwIfAborted();
                   await recordExecution({phase:'node_type_not_described',operation_id:args.operation_id,
-                    node_type:nodeType,result:reply.structuredContent,
-                    ...(cardError===undefined?{}:{card_error:cardError}),
-                    ...(cardDelivered?{card_delivered:{mode:args.mode,cache_key:card.cache_key}}:{})});
-                  extra.signal.throwIfAborted();
-                  if(cardDelivered)userWorkflows.rememberDescriptions(description,modes);
-                  return reply;
+                    node_type:args.target?.type,result:refusal});
+                  return {content:[{type:'text',text:JSON.stringify(refusal)}],
+                    ...(userProfile?{structuredContent:refusal}:{isError:true})};
                 }
               }
               if(userProfile&&['dock_node_apply','dock_node_delete','dock_node_resume'].includes(request.params.name)
@@ -745,7 +715,11 @@ export async function createBridge(config, session, { browserTransport: managedB
               }
               const description=actionRuntime.describe(query);
               if(modes!==undefined&&!query.node_types)throw Error('modes requires node_types');
-              const delivered=userProfile?await describeUserResult(description,modes):description;
+              if(userProfile&&description.node_types?.length){
+                requirePreparedWorkspace(session.metadata);
+                description.node_types=await skill.describeNodes(description.node_types,modes);
+              }
+              const delivered=userProfile?userActionInventory(description):description;
               if(userProfile&&!refresh&&delivered.node_types?.length){
                 const cards=[],reused=[];
                 for(const card of delivered.node_types){
