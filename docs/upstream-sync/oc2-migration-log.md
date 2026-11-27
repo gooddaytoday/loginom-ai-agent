@@ -26773,3 +26773,56 @@ exports-excel, preprocessing-datapartition, preprocessing-sampling и разбо
 заново; research-autocorrelation — ограничение, общее с `v0.4.2` (В-113). В-117 — D1 (ошибки плагинов при первом запуске Desktop на Windows) исправляется на этапе C, в проверку
 установленного приложения шлюза C входят несколько первых запусков только что доставленной сборки. В-114 — номер версии продукта меняется на этапе G с повтором итоговых проверок
 шлюза. Отчёт — `docs/testing/loginom-ai-agent/reports/2026-11-26-gate-b.md`. Заморозка `packages` на время B6.1 снята; сборка `<lrun>/b61a/cli5` хранится до разбора D5.
+
+## C0 · Окно Loginom рядом с приложением (LAB-2142)
+
+27.11.2026. Исследование Р2 и отдельная Linux-проба `scripts/candidate-check/window-layout-probe.mjs`.
+База `origin/oc2-migration` (`50224d5efe`).
+
+### 1. Геометрия окна
+
+- На первом запуске передавать в Chromium `--window-position=x,y` и `--window-size=w,h` без `--start-maximized` для сценария с рассчитанными границами. Chromium применяет эти флаги при создании окна и выставляет обычное состояние. Для существующего окна получить `windowId` по CDP-цели страницы через `Browser.getWindowForTarget`, затем задать `left/top/width/height` через `Browser.setWindowBounds` и прочитать результат через `Browser.getWindowBounds`. Если окно свёрнуто, развёрнуто или в fullscreen, для изменения геометрии сначала отдельно запросить `{windowState: "normal"}` и дождаться восстановления. Playwright предоставляет `context.newCDPSession(page)`. `page.setViewportSize()` задаёт область страницы, поэтому для нативного окна оставить `viewport: null`. [Код запуска Chromium](https://github.com/chromium/chromium/blob/main/chrome/browser/ui/browser_window_state.cc), [CDP Browser](https://chromedevtools.github.io/devtools-protocol/tot/Browser/#method-setWindowBounds), [Playwright CDPSession](https://playwright.dev/docs/api/class-browsercontext#browser-context-new-cdp-session), [Playwright viewport](https://playwright.dev/docs/api/class-page#page-set-viewport-size).
+- Геометрию вычислять в Electron main по `BrowserWindow.fromWebContents(sender(handoff, context))`, как в `packages/desktop/src/main/ipc-handlers/window.ts`. Использовать `win.getBounds()`, `win.isMaximized()`, `win.isFullScreen()` и `screen.getDisplayMatching(bounds).workArea`. Снимать актуальные границы в момент первого запуска для разговора и учитывать `screen.getAllDisplays()`. Начальная координата X равна максимуму из начала рабочей области и правого края приложения плюс зазор. Ширину ограничить оставшимся местом, Y и высоту удержать в `workArea`. На втором мониторе использовать глобальный origin его рабочей области, включая отрицательные X/Y. Если справа не помещается минимально пригодное окно, например приложение развёрнуто, проверить рабочую область соседнего монитора справа с вертикальным пересечением. Если места нет и там, для выполнения Р2 окна придётся разложить рядом после восстановления приложения. Автоматическое уменьшение приложения или подсказку пользователю сначала согласовать с владельцем. На macOS для обычных окон использовать `workArea` с учётом меню и Dock. Chromium передаёт границы нативному NSWindow. Native fullscreen в отдельном Space остаётся отдельным сценарием. [Electron BrowserWindow](https://www.electronjs.org/docs/latest/api/browser-window), [Electron screen](https://www.electronjs.org/docs/latest/api/screen), [Electron Display](https://www.electronjs.org/docs/latest/api/structures/display/), [Chromium Views на macOS](https://chromium.googlesource.com/chromium/src/%2B/9b237b9e8db397b65498a879445efbda59824840/ui/views/widget/native_widget_mac.mm), [Apple NSScreen](https://developer.apple.com/documentation/appkit/nsscreen/visibleframe).
+- На Windows считать в DIP. Например, 700 DIP на одном дисплее соответствуют 875 физическим пикселям при 125 % и 1050 при 150 %. Chromium Views преобразует DIP в физические координаты по дисплею. Умножение глобального X/Y на масштаб основного экрана даст неверный origin на смешанном DPI. Текущий headful запуск задаёт `--force-device-scale-factor=1`, поэтому совпадение DIP-систем Electron и Chromium нельзя предполагать. Для будущей интеграции проверить системный масштаб Chromium в интерактивном режиме и сохранить детерминированный режим проверок. Если принудительный масштаб нужен в продукте, на границе Win32 преобразовывать прямоугольник для целевого дисплея через `screen.dipToScreenRect(null, rect)` и переводить его в координаты Chromium с учётом его масштаба. Приёмка на Windows должна сверять реальные оконные границы и отсутствие перекрытия на основном и вторичном дисплеях при 125/150 %. На Linux X11 размещение зависит от WM. На нативном Wayland Electron возвращает нулевые глобальные X/Y и раскладку определяет композитор. Там нужен согласованный ручной вариант, либо проверенный запуск обоих окон на X11/XWayland. [Chromium Views на Windows](https://github.com/chromium/chromium/blob/main/ui/views/widget/desktop_aura/desktop_window_tree_host_win.cc), [Electron DIP ↔ физические координаты](https://www.electronjs.org/docs/latest/api/screen#screendiptoscreenrectwindow-rect-windows), [Electron на Wayland](https://www.electronjs.org/docs/latest/api/base-window#wingetbounds).
+- Передавать из main в Loginom Host рассчитанный прямоугольник с явными единицами и идентификатором разговора через служебный RPC. Для ленивого запуска передать его далее в `start` supervised runtime по существующему приватному каналу (`packages/loginom-host/src/host.ts`, `packages/loginom-runtime/src/managed-entry.mjs`), затем в `loginBrowser` → `browserLaunch`. Main определяет границы окна отправителя. Renderer передаёт идентификатор текущего разговора. Геометрия из Desktop нужна только видимому интерактивному runtime.
+
+### 2. «Показать окно Loginom»
+
+Отправить команду владельцу уже открытого Playwright-контекста в `managed-entry.mjs`. У целевой страницы получить `windowId`, восстановить свёрнутое окно отдельным `Browser.setWindowBounds({windowId, bounds: {windowState: "normal"}})`, затем отправить `Page.bringToFront` через сессию этой страницы. В Chromium команда активирует WebContents и запрашивает фокус. Успех CDP означает, что команда выполнена браузером. Фактическое активное окно определяет ОС. В пробе Openbox активировал окно уже при восстановлении, а отдельный вызов `Page.bringToFront` также переключил фокус с другого процесса Chrome. [CDP Page](https://chromedevtools.github.io/devtools-protocol/tot/Page/#method-bringToFront), [Chromium BrowserHandler](https://github.com/chromium/chromium/blob/main/chrome/browser/devtools/protocol/browser_handler.cc), [Chromium PageHandler](https://github.com/chromium/chromium/blob/main/content/browser/devtools/protocol/page_handler.cc).
+
+На Windows длительно работающий процесс Chromium может получить отказ в foreground даже после пользовательского клика в Electron. При необходимости нативное подтверждение можно получить через `GetForegroundWindow` и HWND выбранного окна. Передачу права конкретному PID через `AllowSetForegroundWindow` стоит рассматривать только при наличии штатного Win32 моста. Если Windows или WM удерживает фокус, чат остаётся активным. Если активацию не удалось подтвердить, показать короткую подсказку «Окно Loginom доступно на панели задач» или эквивалент для платформы. Windows может подсветить кнопку на панели задач. На macOS переключение между приложениями и Spaces определяет система. Пользователь может выбрать окно через Dock или Mission Control. На X11/Wayland применяются правила активации WM или композитора. [Microsoft SetForegroundWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow), [Microsoft AllowSetForegroundWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-allowsetforegroundwindow), [Apple NSRunningApplication](https://developer.apple.com/documentation/appkit/nsrunningapplication/activate(from:options:)), [X11 EWMH](https://specifications.freedesktop.org/wm/latest/ar01s03.html).
+
+### 3. Разговор без окна и несколько разговоров
+
+До первого запуска держать «Показать окно Loginom» недоступной с пояснением «Окно появится после первого обращения к Loginom». При запуске сообщать, что окно открывается. Команда показа обращается только к уже существующему контексту текущего разговора. Идентичность в Host уже включает поколение подключения и SHA-256 идентификатора разговора (`host-port.ts`, `host.ts`). Использовать поиск существующего владельца, поскольку `runtime(...)` при отсутствии владельца может запустить новый. Окно другого разговора сохраняет свой контекст. После ручного закрытия, падения, смены поколения или остановки runtime сбрасывать доступность, а при гонке с закрытием вернуть состояние «окно недоступно». Жизнь конкретного окна может закончиться раньше выхода из приложения, например при замене устаревшего runtime. Следующее обращение к Loginom использует обычный путь подготовки.
+
+### 4. Проба на Linux
+
+Xvfb 1600×900, Openbox 3.6.1, Google Chrome 156.0.8078.73, Node 24.19.0 и `playwright-core` 1.64.0-alpha-1789764292000 (пин Loginom runtime). Одно окно Chrome имитирует приложение, другое живёт в отдельном процессе и профиле. Вкладки загружают локальные `data:`-страницы. `xwininfo` проверяет реальные координаты, `xprop` сверяет `_NET_ACTIVE_WINDOW`.
+
+Из корня ветки с установленными Xvfb, Openbox, `xprop`, `xwininfo`, Google Chrome и доступным `playwright-core`. При отдельной установке Playwright задать `PLAYWRIGHT_MODULE` абсолютным путём к его `index.mjs`.
+
+```bash
+probe_home=$(mktemp -d)
+(
+  export HOME="$probe_home" TMPDIR="$probe_home/tmp" LC_ALL=C
+  export XDG_CACHE_HOME="$HOME/cache" XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+  export XDG_RUNTIME_DIR="$HOME/runtime" XDG_STATE_HOME="$HOME/state"
+  mkdir -m 700 "$TMPDIR" "$XDG_RUNTIME_DIR"
+  xvfb-run -a -s '-screen 0 1600x900x24' bash -euc '
+    openbox >"$HOME/openbox.log" 2>&1 &
+    wm_pid=$!
+    trap "kill $wm_pid 2>/dev/null || true; wait $wm_pid 2>/dev/null || true" EXIT
+    for ((attempt=0; attempt<50; attempt++)); do
+      if xprop -root _NET_SUPPORTING_WM_CHECK | grep -q "window id #"; then break; fi
+      sleep 0.1
+    done
+    xprop -root _NET_SUPPORTING_WM_CHECK | grep -q "window id #"
+    node scripts/candidate-check/window-layout-probe.mjs
+  '
+)
+```
+
+Код возврата 0. Флаги дали `(660,80) 680×620`. CDP и X11 подтвердили `(700,100) 700×640` после изменения, правее тестового приложения. X11 подтвердил переход фокуса с `Application window probe` на `Loginom window probe` по CDP. После сворачивания активным стало приложение, после восстановления и запроса активации — Loginom.
+
+Windows, macOS, нативный Wayland, два физических монитора и 125/150 % на Windows не проверены запуском. Проба использует установленный Chrome и содержимое `data:`. Сквозная интеграция Electron → Host → runtime и работа поставляемого Chromium остаются для продуктовой проверки.
