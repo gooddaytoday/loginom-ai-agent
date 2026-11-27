@@ -50,7 +50,11 @@
         "packages/sdk/test/embedded.test.ts", "packages/core/src/schedule/check.ts",
         "packages/core/src/tool/plugin/shell.ts", "packages/core/src/tool.ts", "packages/core/src/formatter.ts",
         "packages/core/src/session/execution/restart.ts", "packages/core/test/session-execution.test.ts",
-        "packages/core/test/subagent-idle-e2e.test.ts"
+        "packages/core/test/subagent-idle-e2e.test.ts", "packages/core/src/plugin/product.ts",
+        "packages/core/src/session/execution.ts", "packages/core/src/session/history.ts",
+        "packages/core/src/session/message-updater.ts", "packages/schema/src/session-event.ts",
+        "packages/schema/src/session-message.ts", "packages/client/src/effect/api/api.ts",
+        "packages/app/src/runtime/server/data.test.ts"
       ]
     },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7" },

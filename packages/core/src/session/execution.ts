@@ -7,6 +7,7 @@ import { Job } from "../job.js"
 import { Instance } from "../instance/service.js"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { SessionEvent } from "./event.js"
+import { SessionHistory } from "./history.js"
 import { SessionInbox } from "./inbox.js"
 import { SubagentReport } from "./execution/subagent-report.js"
 import { SessionRunCoordinator } from "./run-coordinator.js"
@@ -89,8 +90,14 @@ export const layer = Layer.effect(
       store,
       jobs,
       inbox,
-      wake: (sessionID) =>
-        Effect.suspend(() => (holder.coordinator ? holder.coordinator.wake(sessionID) : Effect.void)),
+      wake: Effect.fnUntraced(function* (sessionID) {
+        const coordinator = holder.coordinator
+        if (!coordinator) return
+        // A recovered child can report after the startup sweep has already parked its parent.
+        if (!(yield* coordinator.isActive(sessionID)) && (yield* SessionHistory.wasInterruptedByRestart(db, sessionID)))
+          return
+        yield* coordinator.wake(sessionID)
+      }),
       draining: Effect.suspend<ReadonlySet<SessionSchema.ID>, never, never>(() =>
         holder.coordinator ? holder.coordinator.draining : Effect.succeed(new Set<SessionSchema.ID>()),
       ),

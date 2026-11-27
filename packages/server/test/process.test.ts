@@ -1,6 +1,9 @@
 import { expect } from "bun:test"
-import { Effect, Option } from "effect"
+import path from "node:path"
+import { OpenCode } from "@opencode/client"
+import { Effect, Exit, Option, Scope } from "effect"
 import { HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http"
+import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { ServerProcess } from "../src/process"
 
@@ -283,6 +286,238 @@ it.live("a managed service shuts down on an authenticated stop request only", ()
     yield* server.shutdown.pipe(Effect.timeout("5 seconds"))
   }),
 )
+
+it.live(
+  "distinguishes a disconnected window, a user stop and an orphaned Loginom turn",
+  () =>
+    Effect.gen(function* () {
+      const dir = (yield* tmpdirScoped("loginom-restart-")).path
+      const config = path.join(dir, "config")
+      yield* Effect.promise(() =>
+        Bun.write(
+          path.join(config, "plugins", "test-tool.js"),
+          `export default {
+            id: "test.loginom-restart",
+            async setup(ctx) {
+              await ctx.tool.transform(editor => editor.add({
+                name: "loginom_find",
+                description: "Fixture Loginom tool",
+                input: { type: "object", properties: {} },
+                options: { codemode: false },
+                execute: async () => ({ content: "Fixture result" }),
+              }))
+            },
+          }`,
+        ),
+      )
+
+      const window = modelProbe("window disconnect probe", true)
+      const manual = modelProbe("user stop probe")
+      const loginom = modelProbe("Loginom restart probe", true)
+      const ordinary = modelProbe("ordinary restart probe")
+      const probes = [ordinary, loginom, manual, window]
+      let restarted = false
+      const model = Bun.serve({
+        hostname: "127.0.0.1",
+        port: 0,
+        async fetch(request) {
+          const body = await request.text()
+          const probe = probes.find((probe) => body.includes(probe.prompt))
+          if (!probe || new URL(request.url).pathname !== "/v1/chat/completions" || !body.includes('"model":"chat"'))
+            return new Response("Unexpected model request", { status: 422 })
+          probe.requests++
+          if (!restarted && probe.withTool && probe.requests === 1) return modelStream({ tool: true })
+          if (restarted) probe.recovered.resolve()
+          return modelStream(restarted ? {} : { probe })
+        },
+      })
+      yield* Effect.addFinalizer(() => Effect.promise(() => model.stop(true)))
+
+      const headers = { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` }
+      const modelRef = { providerID: "test", id: "chat" }
+      const boot = Effect.gen(function* () {
+        const service = yield* ServerProcess.start<never, never>(
+          {
+            hostname: "127.0.0.1",
+            port: 0,
+            password: "secret",
+            database: { path: path.join(dir, "sessions.db") },
+            events: { persist: true },
+            models: { fetch: false, snapshot: false },
+            fs: { filewatcher: false, fff: false },
+            config: {
+              directory: config,
+              project: false,
+              content: JSON.stringify({
+                model: "test/chat",
+                experimental: { part_rows: true },
+                providers: {
+                  test: {
+                    name: "Loopback test provider",
+                    package: "@opencode/ai/providers/openai-compatible",
+                    settings: { baseURL: `http://127.0.0.1:${model.port}/v1` },
+                    models: {
+                      chat: { name: "Mock chat", capabilities: { tools: true, input: ["text"], output: ["text"] } },
+                    },
+                  },
+                },
+              }),
+            },
+          },
+          { onListen: () => Effect.succeed(Effect.void) },
+        )
+        const base = HttpServer.formatAddress(service.address)
+        return { base, api: OpenCode.make({ baseUrl: base, headers }) }
+      })
+      const firstScope = yield* Scope.fork(yield* Effect.scope)
+      const first = yield* boot.pipe(Effect.provideService(Scope.Scope, firstScope))
+      const before = yield* Effect.promise(async () => {
+        await first.api.model.list({ location: { directory: dir } })
+        const plugins = await first.api.plugin.list({ location: { directory: dir } })
+        expect(plugins.data.find((item) => item.id === "test.loginom-restart")?.state.status).toBe("active")
+        await first.api.integration.connect.key({
+          integrationID: "test",
+          key: "test-key",
+          location: { directory: dir },
+        })
+        const create = (title: string) =>
+          first.api.session.create({
+            title,
+            location: { directory: dir },
+            model: modelRef,
+            permissions: [{ action: "*", resource: "*", effect: "allow" }],
+          })
+        const live = await create("Window disconnect")
+        const stream = await fetch(new URL("/api/event", first.base), { headers })
+        const reader = stream.body?.getReader()
+        if (!reader) throw new Error("Event response has no body")
+        try {
+          await readUntil(reader, "server.connected")
+          await first.api.session.prompt({ sessionID: live.id, text: window.prompt })
+          await window.started.promise
+        } finally {
+          await reader.cancel()
+        }
+        window.release.resolve()
+        await first.api.experimental.session.wait({ sessionID: live.id })
+        expect((await first.api.session.get({ sessionID: live.id })).outcome).toBe("succeeded")
+        expect(await interruptionLog(first.api, live.id)).toEqual([])
+
+        const stopped = await create("Manual stop")
+        await first.api.session.prompt({ sessionID: stopped.id, text: manual.prompt })
+        await manual.started.promise
+        expect(await first.api.session.interrupt({ sessionID: stopped.id })).toEqual({ interrupted: true })
+        await first.api.experimental.session.wait({ sessionID: stopped.id })
+        expect(await interruptionLog(first.api, stopped.id)).toMatchObject([{ data: { reason: "user" } }])
+
+        const pending = await create("Loginom recovery")
+        await first.api.session.prompt({ sessionID: pending.id, text: loginom.prompt })
+        await loginom.started.promise
+        const history = await first.api.message.list({ sessionID: pending.id })
+        expect(history.data).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              type: "assistant",
+              content: expect.arrayContaining([
+                expect.objectContaining({
+                  type: "tool",
+                  name: "loginom_find",
+                  state: expect.objectContaining({ status: "completed" }),
+                }),
+              ]),
+            }),
+          ]),
+        )
+        // Reuse the successful Loginom session to exercise a later turn without Loginom tools.
+        await first.api.session.prompt({ sessionID: live.id, text: ordinary.prompt })
+        await ordinary.started.promise
+        return { loginom: pending.id, ordinary: live.id, stopped: stopped.id }
+      })
+      yield* Scope.close(firstScope, Exit.void)
+      for (const probe of probes) probe.release.resolve()
+      restarted = true
+      const beforeRestart = Date.now()
+      const second = yield* boot
+      yield* Effect.promise(async () => {
+        // Recovery runs in the background. A request to the ordinary turn proves it reached the auto-resume path.
+        await ordinary.recovered.promise
+        await second.api.experimental.session.wait({ sessionID: before.ordinary })
+        await second.api.experimental.session.wait({ sessionID: before.loginom })
+        expect((await second.api.session.get({ sessionID: before.ordinary })).outcome).toBe("succeeded")
+        expect((await second.api.session.get({ sessionID: before.loginom })).outcome).toBe("interrupted")
+        const history = await second.api.message.list({ sessionID: before.loginom, order: "desc" })
+        const step = history.data.find((message) => message.type === "assistant")
+        const end = history.data.find((message) => message.type === "idle")
+        const known = end?.interruption?.lastKnown
+        if (!known || !step) throw new Error("Missing restart progress")
+        expect(end?.interruption?.reason).toBe("restart")
+        expect(known.stepID).toBe(step.id)
+        expect(known.at).toBeGreaterThanOrEqual(step.time.created)
+        expect(known.at).toBeLessThanOrEqual(beforeRestart)
+        expect(await interruptionLog(second.api, before.loginom)).toMatchObject([
+          { data: { reason: "shutdown" } },
+          { data: end?.interruption },
+        ])
+        expect(await interruptionLog(second.api, before.stopped)).toMatchObject([{ data: { reason: "user" } }])
+        expect([window.requests, manual.requests, loginom.requests, ordinary.requests]).toEqual([2, 1, 2, 2])
+      })
+    }),
+  45_000,
+)
+
+function modelProbe(prompt: string, withTool = false) {
+  return {
+    prompt,
+    withTool,
+    requests: 0,
+    started: Promise.withResolvers<void>(),
+    release: Promise.withResolvers<void>(),
+    recovered: Promise.withResolvers<void>(),
+  }
+}
+
+function modelStream(input: { tool?: boolean; probe?: ReturnType<typeof modelProbe> }) {
+  const base = { id: "test", object: "chat.completion.chunk", created: 0, model: "chat" }
+  const encoder = new TextEncoder()
+  let cancelled = false
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const send = (data: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
+      const chunk = (delta: unknown, finish_reason: string | null = null) =>
+        send({ ...base, choices: [{ index: 0, delta, finish_reason }] })
+      chunk(
+        input.tool
+          ? {
+              role: "assistant",
+              tool_calls: [
+                { index: 0, id: "test-call", type: "function", function: { name: "loginom_find", arguments: "{}" } },
+              ],
+            }
+          : { role: "assistant", content: "Test answer" },
+      )
+      input.probe?.started.resolve()
+      return (input.probe?.release.promise ?? Promise.resolve()).then(() => {
+        if (cancelled) return
+        chunk({}, input.tool ? "tool_calls" : "stop")
+        send({ ...base, choices: [], usage: { prompt_tokens: 10, completion_tokens: 1, total_tokens: 11 } })
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"))
+        controller.close()
+      })
+    },
+    cancel() {
+      cancelled = true
+    },
+  })
+  return new Response(stream, { headers: { "content-type": "text/event-stream" } })
+}
+
+async function interruptionLog(api: ReturnType<typeof OpenCode.make>, sessionID: string) {
+  const interruptions = []
+  for await (const event of api.experimental.session.log({ sessionID })) {
+    if (event.type === "session.execution.interrupted") interruptions.push(event)
+  }
+  return interruptions
+}
 
 it.live("a server without a managed lifecycle has no stop request", () =>
   Effect.gen(function* () {

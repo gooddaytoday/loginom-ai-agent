@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm"
+import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql } from "drizzle-orm"
 import { Message } from "@opencode/ai/effect"
 import { Effect, Option, Schema } from "effect"
 import type { Model } from "@opencode/schema/model"
@@ -12,7 +12,7 @@ import { Instructions } from "../instructions/index.js"
 import { InstructionState } from "./instruction-state.js"
 import { SessionBlob } from "./blob.js"
 import { SessionRecentText } from "./recent-text.js"
-import { SessionMessageTable, SessionPartTable } from "./sql.js"
+import { SessionMessageTable, SessionPartTable, SessionTable } from "./sql.js"
 import { SessionStored } from "./stored.js"
 
 type DatabaseService = Database.Interface["db"]
@@ -382,6 +382,71 @@ export const incompleteAssistants = Effect.fn("SessionHistory.incompleteAssistan
     .all()
     .pipe(Effect.orDie)
   return yield* decodeMessageRows(db, rows)
+})
+
+const latestIdle = (db: DatabaseService, sessionID: SessionSchema.ID) =>
+  db
+    .select({ seq: SessionMessageTable.seq, data: SessionMessageTable.data })
+    .from(SessionMessageTable)
+    .where(and(eq(SessionMessageTable.session_id, sessionID), eq(SessionMessageTable.type, "idle")))
+    .orderBy(desc(SessionMessageTable.seq))
+    .get()
+    .pipe(Effect.orDie)
+
+export const wasInterruptedByRestart = Effect.fnUntraced(function* (db: DatabaseService, sessionID: SessionSchema.ID) {
+  const row = yield* latestIdle(db, sessionID)
+  return row !== undefined && "interruption" in row.data && row.data.interruption?.reason === "restart"
+})
+
+export const readTurnForRestart = Effect.fnUntraced(function* (
+  db: DatabaseService,
+  sessionID: SessionSchema.ID,
+  blocksResume?: (tool: string) => boolean,
+) {
+  const claim = yield* db
+    .select({ started: SessionTable.time_suspended, busy: SessionTable.time_busy })
+    .from(SessionTable)
+    .where(eq(SessionTable.id, sessionID))
+    .get()
+    .pipe(Effect.orDie)
+  if (claim?.started == null) return { blocked: false }
+
+  // A claim spans each resume of the same turn. The idle boundary also excludes earlier turns with the same timestamp.
+  const boundary = yield* latestIdle(db, sessionID)
+  const query = db
+    .select()
+    .from(SessionMessageTable)
+    .where(
+      and(
+        eq(SessionMessageTable.session_id, sessionID),
+        eq(SessionMessageTable.type, "assistant"),
+        gte(SessionMessageTable.time_created, claim.started),
+        boundary && gt(SessionMessageTable.seq, boundary.seq),
+      ),
+    )
+    .orderBy(desc(SessionMessageTable.seq))
+  const rows = yield* (blocksResume ? query.all() : query.limit(1).all()).pipe(Effect.orDie)
+  const steps = blocksResume ? yield* withParts(db, rows) : rows
+  const blocked =
+    !!blocksResume &&
+    steps.some(
+      (row) =>
+        "content" in row.data && row.data.content.some((part) => part.type === "tool" && blocksResume(part.name)),
+    )
+  const step = steps[0]
+  const started = Math.max(claim.started, claim.busy ?? 0)
+  if (!step) return { blocked, lastKnown: { at: started } }
+
+  const parts = yield* db
+    .select({ updated: sql<number | null>`max(${SessionPartTable.time_updated})` })
+    .from(SessionPartTable)
+    .where(eq(SessionPartTable.message_id, step.id))
+    .get()
+    .pipe(Effect.orDie)
+  return {
+    blocked,
+    lastKnown: { at: Math.max(started, step.time_created, step.time_updated, parts?.updated ?? 0), stepID: step.id },
+  }
 })
 
 /** The id and text of the session's first user message. */
