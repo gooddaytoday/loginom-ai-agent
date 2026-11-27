@@ -34,8 +34,9 @@ SCENARIOS = {
 }
 # Model under test. Default is the established shared-OAuth model; RUN_CHECK_AUTH
 # points to an auth.json linked (never copied) into each profile for other providers.
-MODEL = os.environ.get('RUN_CHECK_MODEL') or 'openai/gpt-6.1-sol'
-VARIANT = os.environ.get('RUN_CHECK_VARIANT', 'medium' if MODEL == 'openai/gpt-6.1-sol' else '')
+DEFAULT_MODEL = 'openai/gpt-6.1-sol'
+MODEL = os.environ.get('RUN_CHECK_MODEL') or DEFAULT_MODEL
+VARIANT = os.environ.get('RUN_CHECK_VARIANT', 'medium' if MODEL == DEFAULT_MODEL else '')
 AUTH = Path(os.environ['RUN_CHECK_AUTH']).expanduser() if os.environ.get('RUN_CHECK_AUTH') else Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json'
 MODELS_URL = 'https://models.opencode.ai/api.json'
 MODELS_TTL = 60 * 60
@@ -147,7 +148,7 @@ def model_catalog(head):
         }}}, 'snapshot'
     if refresh_error is not None:
         # The default Sol is already configured in each profile for older SHAs.
-        if not os.environ.get('RUN_CHECK_MODEL') and MODEL == 'openai/gpt-6.1-sol':
+        if not os.environ.get('RUN_CHECK_MODEL') and MODEL == DEFAULT_MODEL:
             if catalog:
                 return catalog, catalog_source
             if snapshot:
@@ -4281,7 +4282,16 @@ class Runner:
                         # Setup initializes the empty profile and its cache directory.
                         shutil.copyfile(catalog, profile / 'cache/models.json')
                     (profile / 'data/auth.json').symlink_to(AUTH)
-                    write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
+                    profile_config = {
+                        'provider': {'openai': {'models': {'gpt-6.1-sol': {
+                            'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True,
+                            'limit': {'context': 400000, 'output': 128000},
+                            'variants': {'medium': {'reasoningEffort': 'medium'}},
+                        }}}},
+                    }
+                    if MODEL != DEFAULT_MODEL:
+                        profile_config['small_model'] = MODEL
+                    write(profile / 'config/loginom-ai-agent.json', profile_config)
                     if spec.get('fs_case') == 'paths':
                         r['package'] = self.fs_directory('paths', login) + '/original/paths.lgp'
                     if spec.get('source_package'):

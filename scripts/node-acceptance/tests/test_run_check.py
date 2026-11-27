@@ -2287,6 +2287,17 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
         self.assertEqual(phases, ['setup', 'model'])
         self.assertEqual((result['model'], result['variant']), (model, 'medium'))
 
+    def test_profile_pins_small_model_only_for_custom_run_model(self):
+        for model in ('openai/gpt-6.1-sol', 'openai/gpt-6.1-terra'):
+            with self.subTest(model=model), tempfile.TemporaryDirectory() as directory, patch.object(runner, 'MODEL', model):
+                result, _, _ = self.refusal_run(Path(directory))
+                self.assertEqual(result['status'], 'PASS', result)
+                config = runner.read(Path(result['profile']) / 'config/loginom-ai-agent.json')
+                if model == 'openai/gpt-6.1-sol':
+                    self.assertNotIn('small_model', config)
+                else:
+                    self.assertEqual(config['small_model'], model)
+
     def test_host_model_catalog_shares_download_and_refreshes_after_one_hour(self):
         live = {'openai': {'models': {'gpt-6.1-terra': {}}}}
         updated = {'openai': {'models': {'gpt-6.1-sol': {}}}}
