@@ -19,7 +19,11 @@ export function readWindowSnapshot(userData: string, names: readonly string[]): 
     try {
       migrateDatabase(db)
 
-      const legacy = pendingLegacyStores(db, readdirSync(userData)).length > 0
+      const files = readdirSync(userData, { withFileTypes: true }).flatMap((entry) =>
+        entry.isDirectory() ? [] : [entry.name],
+      )
+
+      const legacy = pendingLegacyStores(db, files).length > 0
       const rows = db.prepare("SELECT key, value FROM state WHERE name = ?")
 
       return {

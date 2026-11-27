@@ -7,6 +7,7 @@ import { sql } from "drizzle-orm"
 import { Effect, Layer } from "effect"
 import { openDatabase } from "./database"
 import { importLegacyStores } from "./legacy"
+import { importProductLegacyStores } from "./product-legacy"
 import { createStateStore } from "./state"
 import { readWindowSnapshot } from "./window-snapshot"
 
@@ -43,11 +44,16 @@ const rows = (db: ReturnType<typeof openDatabase>["db"]) =>
 
 const run = (db: ReturnType<typeof openDatabase>["db"], root: string) =>
   Effect.runPromise(
-    importLegacyStores(db, root).pipe(Effect.provide(Layer.merge(NodeFileSystem.layer, NodePath.layer))),
+    Effect.gen(function* () {
+      const native = yield* importLegacyStores(db, root)
+      const product = yield* importProductLegacyStores(db, root)
+
+      return { imported: native.imported + product }
+    }).pipe(Effect.provide(Layer.merge(NodeFileSystem.layer, NodePath.layer))),
   )
 
 describe("legacy store import", () => {
-  test("copies native namespaces into state and keeps the source files", async () => {
+  test("copies native namespaces into state and removes the imported files", async () => {
     const root = tempRoot()
     const database = openDatabase(":memory:")
     writeStore(root, "opencode.global.dat", JSON.stringify({ model: "m", layout: { sidebar: 1 } }))
@@ -65,13 +71,7 @@ describe("legacy store import", () => {
       { name: "opencode.global.dat", key: "model", value: "m" },
       { name: "opencode.window.w1.dat", key: "tabs", value: "[]" },
     ])
-    expect(listing(root)).toEqual([
-      "default.dat",
-      "loginom-ai-agent.settings",
-      "opencode.global.dat",
-      "opencode.window.w1.dat",
-      "unrelated.txt",
-    ])
+    expect(listing(root)).toEqual(["loginom-ai-agent.settings", "unrelated.txt"])
   })
 
   test("restores 0.4 window tabs in the current namespace and imports the profile once", async () => {
@@ -119,35 +119,50 @@ describe("legacy store import", () => {
     }
   })
 
-  test("merges both file sets with SQLite first and native files second", async () => {
+  test("skips a 0.4 namespace if SQLite or a native store supplied any row", async () => {
     const root = tempRoot()
     const database = openDatabase(":memory:")
-    database.db.run(sql`INSERT INTO state VALUES ('opencode.global.dat', 'model', 'new', 0)`)
-    writeStore(root, "opencode.global.dat", JSON.stringify({ model: "native", language: "en" }))
-    writeStore(root, "loginom-ai-agent.global.dat", JSON.stringify({ model: "0.4", language: "ru", layout: "{}" }))
+    database.db.run(sql`INSERT INTO state VALUES ('opencode.window.w1.dat', 'tabs', '["new"]', 0)`)
+    writeStore(root, "loginom-ai-agent.window.w1.dat", JSON.stringify({ tabs: '["old"]', "tabs.recent": "{}" }))
+    writeStore(root, "opencode.global.dat", JSON.stringify({ language: "en" }))
+    writeStore(root, "loginom-ai-agent.global.dat", JSON.stringify({ language: "ru", layout: "{}" }))
 
     await run(database.db, root)
 
     expect(rows(database.db)).toEqual([
       { name: "opencode.global.dat", key: "language", value: "en" },
-      { name: "opencode.global.dat", key: "layout", value: "{}" },
-      { name: "opencode.global.dat", key: "model", value: "new" },
+      { name: "opencode.window.w1.dat", key: "tabs", value: '["new"]' },
     ])
-    expect(listing(root)).toEqual(["loginom-ai-agent.global.dat", "opencode.global.dat"])
+    expect(listing(root)).toEqual(["loginom-ai-agent.global.dat", "loginom-ai-agent.window.w1.dat"])
+
+    database.db.run(sql`DELETE FROM state`)
+    expect((await run(database.db, root)).imported).toBe(0)
+    expect(rows(database.db)).toEqual([])
+    database.close()
   })
 
-  test("leaves unreadable files in place", async () => {
-    const root = tempRoot()
-    const database = openDatabase(":memory:")
-    writeStore(root, "loginom-ai-agent.global.dat", "{not json")
-    writeStore(root, "loginom-ai-agent.workspace.x.dat", JSON.stringify({ terminal: "{}" }))
+  test.each(["loginom-ai-agent.global.dat", "opencode.global.dat"])(
+    "keeps corrupt store %s without suppressing later early snapshots",
+    async (corrupt) => {
+      const root = tempRoot()
+      const file = path.join(root, "drafts.sqlite")
+      const name = "opencode.workspace.x.dat"
+      writeStore(root, corrupt, "{not json")
+      writeStore(root, "loginom-ai-agent.workspace.x.dat", JSON.stringify({ terminal: "{}" }))
+      const database = openDatabase(file)
 
-    const result = await run(database.db, root)
-
-    expect(result.imported).toBe(1)
-    expect(rows(database.db)).toEqual([{ name: "opencode.workspace.x.dat", key: "terminal", value: "{}" }])
-    expect(readFileSync(path.join(root, "loginom-ai-agent.global.dat"), "utf8")).toBe("{not json")
-  })
+      try {
+        expect((await run(database.db, root)).imported).toBe(1)
+        expect(readWindowSnapshot(root, [name]).storage).toEqual({
+          [name]: { items: { terminal: "{}" }, revision: 0 },
+        })
+        expect((await run(database.db, root)).imported).toBe(0)
+        expect(readFileSync(path.join(root, corrupt), "utf8")).toBe("{not json")
+      } finally {
+        database.close()
+      }
+    },
+  )
 
   test("applies draft retention: skips empty, stale, and excess draft files", async () => {
     const root = tempRoot()

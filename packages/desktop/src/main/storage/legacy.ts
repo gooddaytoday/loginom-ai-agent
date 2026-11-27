@@ -1,4 +1,4 @@
-import { Effect, FileSystem, Option, Path, Predicate, Schema } from "effect"
+import { Effect, FileSystem, Option, Path, Schema } from "effect"
 import type { Database } from "./database"
 import { legacyStoreImportID, pendingLegacyStores } from "./legacy-files"
 import { state } from "./schema"
@@ -11,46 +11,51 @@ const Entries = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknow
 
 const decode = Schema.decodeUnknownOption(Entries)
 
+type Candidate = { name: string; path: string; modified: number; entries: Record<string, unknown> }
+
 // Before the state table existed, every namespace the renderer persisted was an electron-store
-// JSON file in userData. Copy it once before serving renderer state and leave the source intact.
+// JSON file in userData. Copy them into SQLite once and remove them; this is the only place the
+// storage layer touches the filesystem, and it runs before the first renderer request.
 export const importLegacyStores = Effect.fn("DesktopStorage.importLegacyStores")(function* (
   db: Database,
   userData: string,
 ) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
-  const names = yield* fs.readDirectory(userData).pipe(Effect.orElseSucceed(() => []))
+  const entries = yield* fs.readDirectory(userData).pipe(Effect.orElseSucceed(() => []))
+  const names = pendingLegacyStores(db.$client, entries).filter((entry) => entry.file === entry.name)
 
   const files = yield* Effect.forEach(
-    pendingLegacyStores(db.$client, names),
-    Effect.fnUntraced(function* (source) {
-      const file = path.join(userData, source.file)
+    names,
+    Effect.fnUntraced(function* ({ file: name }) {
+      const file = path.join(userData, name)
       const stats = yield* fs.stat(file).pipe(Effect.orElseSucceed(() => undefined))
 
-      if (stats?.type !== "File") return
+      if (stats && stats.type !== "File") return
       const raw = yield* fs.readFileString(file).pipe(Effect.orElseSucceed(() => undefined))
 
-      if (raw === undefined) return
       const entries = decode(raw)
 
-      if (Option.isNone(entries)) {
-        yield* Effect.logWarning("legacy store is not readable, leaving it in place", { name: source.file })
+      if (Option.isNone(entries) || !stats) {
+        const record = db.$client.prepare("INSERT OR IGNORE INTO migration (id, time_completed) VALUES (?, ?)")
+
+        if (record.run(legacyStoreImportID(name), Date.now()).changes)
+          yield* Effect.logWarning("legacy store is not readable, leaving it in place", { name })
 
         return
       }
 
       return {
-        ...source,
+        name,
+        path: file,
         modified: Option.getOrElse(stats.mtime, () => new Date(0)).getTime(),
         entries: entries.value,
-      }
+      } satisfies Candidate
     }),
     { concurrency: 5 },
   )
 
   const candidates = files.filter((file) => !!file)
-
-  if (candidates.length === 0) return { imported: 0, files: [] }
 
   const kept = new Set(
     candidates
@@ -58,42 +63,33 @@ export const importLegacyStores = Effect.fn("DesktopStorage.importLegacyStores")
       .filter((file) => Date.now() - file.modified <= DRAFT_RETENTION_MS)
       .sort((a, b) => b.modified - a.modified)
       .slice(0, DRAFT_KEEP_RECENT)
-      .map((file) => file.file),
+      .map((file) => file.name),
   )
 
-  // Existing rows win. Among files, the current namespace takes precedence over aliases.
-  candidates.sort((a, b) => Number(b.file === b.name) - Number(a.file === a.name))
+  const rows = candidates
+    .filter((file) => !isDraft(file.name) || kept.has(file.name))
+    .flatMap((file) =>
+      Object.entries(file.entries).map(([key, value]) => ({
+        name: file.name,
+        key,
+        value: typeof value === "string" ? value : JSON.stringify(value),
+        updated_at: file.modified,
+      })),
+    )
 
-  return db.transaction((tx) => {
-    const record = db.$client.prepare("INSERT OR IGNORE INTO migration (id, time_completed) VALUES (?, ?)")
-    const completed: string[] = []
-    let imported = 0
+  // Existing rows win: a file left behind by an interrupted import must not overwrite newer state.
+  if (rows.length > 0) {
+    db.transaction((tx) => {
+      rows.forEach((row) => tx.insert(state).values(row).onConflictDoNothing().run())
+    })
+  }
 
-    for (const file of candidates) {
-      // Mark files in the same transaction as their rows so later startup cannot restore deleted values.
-      if (!record.run(legacyStoreImportID(file.file), Date.now()).changes) continue
-      completed.push(file.file)
-
-      if (isDraft(file.name) && !kept.has(file.file)) continue
-
-      for (const [key, value] of Object.entries(file.entries)) {
-        const result = tx
-          .insert(state)
-          .values({
-            name: file.name,
-            key,
-            value: Predicate.isString(value) ? value : JSON.stringify(value),
-            updated_at: file.modified,
-          })
-          .onConflictDoNothing()
-          .run()
-
-        imported += Number(result.changes)
-      }
-    }
-
-    return { imported, files: completed }
+  yield* Effect.forEach(candidates, (file) => fs.remove(file.path, { force: true }), {
+    concurrency: "unbounded",
+    discard: true,
   })
+
+  return { imported: rows.length, removed: candidates.map((file) => file.name) }
 })
 
 function isDraft(name: string) {
