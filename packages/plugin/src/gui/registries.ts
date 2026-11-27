@@ -642,7 +642,7 @@ export interface ComposerPillView {
   readonly label: string
   /** The capsule's icon. Omit it for none. */
   readonly icon?: IconName
-  /** Colors the capsule's icon. */
+  /** Colors the capsule's icon, or shows a colored dot when there is no icon. */
   readonly tone?: ComposerPillTone
   /**
    * Accessible name, and the heading of the menu or popover the pill opens, when it differs from `label`. The heading

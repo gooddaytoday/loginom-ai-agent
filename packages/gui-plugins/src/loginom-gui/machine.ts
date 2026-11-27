@@ -24,7 +24,7 @@ type Event =
   | { type: "disposed" }
   | { type: "edit"; patch: Partial<Draft> }
   | { type: "submit"; submit: "check" | "save"; now: number }
-  | { type: "status" | "saved"; attempt: number; result: StatusResult }
+  | { type: "status" | "saved"; attempt: number; result: StatusResult; blank?: boolean }
   | { type: "checked"; attempt: number; result: CheckResult }
 
 type Effect =
@@ -133,7 +133,10 @@ export function transition(state: State, event: Event): Transition {
           effects: [{ type: "status", attempt, delay: 1000 }],
         }
       }
-      return { state: { type: "editing", attempt, ...form(status) }, effects: [] }
+      const current = form(status)
+      if (event.blank && state.type === "loading")
+        current.draft = { url: "", username: "", password: "", noPassword: false }
+      return { state: { type: "editing", attempt, ...current }, effects: [] }
     }
   }
 }

@@ -1,5 +1,16 @@
 export default {
   title: "Loginom",
+  connectTitle: "Подключиться к Loginom",
+  connectPublic: "Подключить публичный стенд",
+  publicStandDescription:
+    "app.loginom.ai — учебный сервер Loginom в интернете, вход под user без пароля. Для рабочих данных — свой сервер Loginom.",
+  ownServer: "Свой сервер Loginom",
+  connect: "Подключить",
+  connectionSettings: "Настройки подключения",
+  connectedTo: "Подключено к {{url}}",
+  continueTask: "Loginom подключён. Продолжи предыдущую задачу пользователя.",
+  resumeFailed: "Loginom подключён. Отправьте сообщение, чтобы продолжить задачу.",
+  unavailable: "Служба Loginom недоступна",
   description: "С каким Loginom работает агент: пакеты, хранилище, запуск сценариев.",
   url: "Адрес",
   username: "Пользователь",

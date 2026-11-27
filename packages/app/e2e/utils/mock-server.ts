@@ -161,6 +161,8 @@ export interface MockServerConfig {
   sessionStatus?: Resolvable<Record<string, { type: string }>>
   inbox?: unknown[] | (() => unknown[])
   onPrompt?: (input: { sessionID: string; body: Schema.JsonObject }) => void
+  onSynthetic?: (input: { sessionID: string; body: Schema.Json }) => Schema.Json
+  onRpc?: (input: { rpcID: string; method: string; body: Schema.Json }) => Schema.Json | undefined
   onCompact?: (input: { sessionID: string; body: Schema.JsonObject }) => void
   // POST /api/session/:id/fork creates `<id>_fork` in the same directory. The hook may hold the request, or return an
   // answer to replace the response.
@@ -1220,15 +1222,15 @@ function mockHandlers(
             cursor: { next: offset + limit < ordered.length ? String(offset + limit) : undefined },
           })
         },
-        // The goal plugin's pill reads each routed session's goal; no scenario sets one.
-        rpcCall: (ctx) =>
-          ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get"
-            ? Effect.succeed({ output: null })
-            : Effect.fail(
-                new MockUnsupported({
-                  message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC`,
-                }),
-              ),
+        rpcCall: (ctx) => {
+          const output = config.onRpc?.({ ...ctx.params, body: ctx.payload })
+          if (output !== undefined) return Effect.succeed({ output })
+          if (ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get")
+            return Effect.succeed({ output: null })
+          return Effect.fail(
+            new MockUnsupported({ message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC` }),
+          )
+        },
         sessionActive: () => {
           const status = resolve(config.sessionStatus ?? {})
 
@@ -1319,6 +1321,12 @@ function mockHandlers(
               },
             }
           }),
+        sessionSynthetic: (ctx) => {
+          const synthetic = config.onSynthetic
+          return synthetic
+            ? Effect.sync(() => ({ data: synthetic({ sessionID: ctx.params.sessionID, body: ctx.payload }) }))
+            : Effect.fail(new MockUnsupported({ message: "The mock server cannot resume a session" }))
+        },
         // Like the server, a compaction is admitted as a steered inbox item under the proposed ID.
         sessionCompact: (ctx) =>
           Effect.sync(() => {

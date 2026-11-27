@@ -2,7 +2,10 @@
 // reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host itself belongs to the server process
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
-import { Definition as ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
+import {
+  connectionRequiredTool,
+  Definition as ConnectionSettingsRpc,
+} from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
@@ -339,7 +342,28 @@ export default Plugin.define({
     // `package-docs` grant.
     const profiles = join(Global.Path.data, "file-profiles")
     const files = await localFiles(ctx, profiles)
+    const loginomSettings = connectionSettings()
+    const needsConnection = async () => {
+      if (!ServiceHost.connected()) return false
+      const status = await loginomSettings.status()
+      return status.ok && status.value.state === "unconfigured"
+    }
     await ctx.tool.transform((editor) => {
+      editor.add({
+        name: connectionRequiredTool,
+        description:
+          "Only when the user's task requires opening or changing a Loginom server package, show the connection card and end the turn. Do not use for questions or local package documentation.",
+        input: { type: "object", properties: {}, additionalProperties: false },
+        options: { codemode: false },
+        execute: async () => {
+          if (!(await needsConnection())) return { content: "No Loginom setup is required." }
+          return {
+            content:
+              "Loginom is not connected. The connection card is visible to the user. End this turn without retrying or opening packages. The application will signal when the user connects.",
+            metadata: { connectionRequired: true },
+          }
+        },
+      })
       editor.add(
         files.admitTool(async (sessionID) => {
           const host = await hold(sessionID)
@@ -401,6 +425,7 @@ export default Plugin.define({
       void hold(event.sessionID)
       await dock.refresh(event.sessionID, profile(event.sessionID), event.model)
       hide(event)
+      if (event.tools[connectionRequiredTool] && !(await needsConnection())) delete event.tools[connectionRequiredTool]
       offered.set(event.sessionID, new Set(Object.keys(event.tools)))
       dock.system(event.sessionID).forEach((text) => event.system.push({ type: "text", text }))
       // The kinds the settings deny, named before the model tries them: OpenCode does not offer their tools (B2.6b2).
@@ -508,7 +533,7 @@ export default Plugin.define({
         return { granted: true }
       },
     })
-    await ctx.rpc.register(ConnectionSettingsRpc, connectionSettings())
+    await ctx.rpc.register(ConnectionSettingsRpc, loginomSettings)
     await ctx.rpc.register(preflight, {
       check: async (value) => {
         const code = await ServiceHost.preflight((value as { automation: boolean }).automation)

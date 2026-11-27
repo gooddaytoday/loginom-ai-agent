@@ -1,5 +1,16 @@
 export default {
   title: "Loginom",
+  connectTitle: "Connect to Loginom",
+  connectPublic: "Connect to the public demo server",
+  publicStandDescription:
+    "app.loginom.ai is a public Loginom training server. Sign in as user without a password. Use your own Loginom server for work data.",
+  ownServer: "Your own Loginom server",
+  connect: "Connect",
+  connectionSettings: "Connection settings",
+  connectedTo: "Connected to {{url}}",
+  continueTask: "Loginom is connected. Continue the user's previous task.",
+  resumeFailed: "Loginom is connected. Send a message to continue the task.",
+  unavailable: "Loginom service unavailable",
   description: "Choose the Loginom server the agent uses for packages, storage, and scenarios.",
   url: "Address",
   username: "Username",

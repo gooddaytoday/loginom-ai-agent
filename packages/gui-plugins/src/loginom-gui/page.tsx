@@ -1,12 +1,17 @@
-import { Definition, type Issue } from "@loginom-ai-agent/loginom-host/settings-rpc"
-import { createKeyed, usePlugin } from "@opencode/plugin/gui"
+import { Definition, type Issue, type Status } from "@loginom-ai-agent/loginom-host/settings-rpc"
+import { createKeyed, usePlugin, type ServerRef } from "@opencode/plugin/gui"
 import { Checkbox } from "@opencode/ui/checkbox"
 import { TextField } from "@opencode/ui/text-field"
 import { createMemo, createSignal, onCleanup, Show, untrack } from "solid-js"
 import type definition from "./index"
 import { initial, transition, view } from "./machine"
 
-export default function Page() {
+export default function Page(props: {
+  server?: ServerRef
+  blank?: boolean
+  onSaved(status: Status): void
+  onClose(): void
+}) {
   const ctx = usePlugin<typeof definition>()
   const ui = ctx.ui
   const [state, setState] = createSignal(initial)
@@ -14,15 +19,8 @@ export default function Page() {
 
   const errorText = (issue: Issue | undefined) => (issue ? ctx.t(issue) : undefined)
 
-  const client = createMemo(() => {
-    const servers = ctx.servers.list().flatMap((id) => ctx.servers.get(id) ?? [])
-    // Desktop owns the sidecar. Web uses the serving origin, or the single local service in development.
-    if (ctx.desktop) return servers.find((server) => server.builtin)?.client
-    const serving = ctx.servers.get(location.origin)
-    if (serving) return serving.client
-    const local = servers.filter((server) => server.local)
-    if (local.length === 1) return local.at(0)?.client
-  })
+  const client = () => props.server?.client
+  let saved = false
 
   let controller: AbortController | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -48,7 +46,14 @@ export default function Page() {
       switch (effect.type) {
         case "status": {
           const result = await rpc?.status({}, { signal }).catch(() => undefined)
-          dispatch({ type: "status", attempt: effect.attempt, result: result ?? { ok: false, issue: "unavailable" } })
+          const active = untrack(state).attempt === effect.attempt
+          dispatch({
+            type: "status",
+            attempt: effect.attempt,
+            blank: props.blank,
+            result: result ?? { ok: false, issue: "unavailable" },
+          })
+          if (active && saved && result?.ok && result.value.state === "ready") props.onSaved(result.value)
           break
         }
         case "check": {
@@ -58,7 +63,10 @@ export default function Page() {
         }
         case "save": {
           const result = await rpc?.save(effect.input, { signal }).catch(() => undefined)
+          const active = untrack(state).attempt === effect.attempt
+          if (active) saved = result?.ok ?? false
           dispatch({ type: "saved", attempt: effect.attempt, result: result ?? { ok: false, issue: "saveFailed" } })
+          if (active && result?.ok && result.value.state === "ready") props.onSaved(result.value)
           break
         }
       }
@@ -70,9 +78,15 @@ export default function Page() {
     void request()
   }
 
-  const reload = () => dispatch({ type: "target", available: !!client() })
+  const reload = () => {
+    saved = false
+    dispatch({ type: "target", available: !!client() })
+  }
   createKeyed(client, reload, { otherwise: reload })
-  onCleanup(() => dispatch({ type: "disposed" }))
+  onCleanup(() => {
+    dispatch({ type: "disposed" })
+    props.onClose()
+  })
 
   return (
     <ui.SettingsLayout title={ctx.t("title")} description={ctx.t("description")}>

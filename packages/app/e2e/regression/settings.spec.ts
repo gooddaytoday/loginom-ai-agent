@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises"
 import { expect, test, type Page } from "@playwright/test"
+import type { Schema } from "effect"
 import type { ConfigEntry, OpenCodeEvent, SessionMessageInfo, WorktreeDirectory } from "@opencode/client/promise"
 import { NO_PROVIDER, REMOTE_SERVER, SERVER, holdRoute, project, seed, session } from "../utils/app"
 import { mockMissingLocation, mockOpenCodeServer } from "../utils/mock-server"
@@ -20,6 +21,157 @@ const override =
 const contributors = "https://api.github.com/repos/anomalyco/opencode/contributors?anon=1&per_page=1"
 
 test.use({ serviceWorkers: "block" })
+
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  test(`Loginom setup resumes the original session (${viewport.width})`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport)
+    const id = "ses_loginom_setup"
+    const request = "Открой пакет из Loginom"
+    const own = viewport.width === 390
+    const address = own ? "https://loginom.example.test/" : "https://app.loginom.ai/"
+    const username = own ? "analyst" : "user"
+    const captures: { sessionID: string; body: Schema.Json }[] = []
+    const checks: Schema.Json[] = []
+    const saves: Schema.Json[] = []
+    let prompted = false
+    let saved = false
+    let ready = false
+    const task: SessionMessageInfo[] = [
+      { id: "msg_loginom_user", type: "user", text: request, time: { created: 1 } },
+      {
+        id: "msg_loginom_assistant",
+        type: "assistant",
+        agent: "build",
+        model: { id: "test", providerID: "opencode" },
+        content: [
+          {
+            type: "tool",
+            id: "call_loginom_connect",
+            name: "loginom_connection_required",
+            state: {
+              status: "completed",
+              input: {},
+              content: [{ type: "text", text: "Loginom is not connected." }],
+              metadata: { connectionRequired: true },
+            },
+            time: { created: 2, completed: 3 },
+          },
+        ],
+        time: { created: 2 },
+      },
+    ]
+    const view = () => ({
+      ok: true,
+      value: {
+        revision: saved ? 1 : 0,
+        generation: ready ? 1 : 0,
+        url: ready ? address : "https://app.loginom.ai/",
+        username: ready ? username : "user",
+        folder: ready ? `/${username}` : "/user",
+        hasPassword: false,
+        failed: false,
+        deviceOnly: false,
+        state: ready ? "ready" : saved ? "pending" : "unconfigured",
+      },
+    })
+    const { editor } = await openSession(page, {
+      name: "Loginom setup",
+      sessions: [{ id, title: "Loginom setup" }],
+      seed: { locale: "ru" },
+      pageMessages: () => ({ items: prompted ? task : [] }),
+      onPrompt: ({ sessionID, body }) => {
+        prompted = sessionID === id && body.text === request
+      },
+      onRpc: ({ rpcID, method, body }) => {
+        if (rpcID !== "loginom.connection") return
+        if (method === "status") {
+          ready = saved
+          return view()
+        }
+        if (method === "check") {
+          checks.push(body)
+          return { ok: true, value: { validationId: "fixture-check", expiresAt: Date.now() + 60_000 } }
+        }
+        if (method === "save") {
+          saves.push(body)
+          saved = true
+          return view()
+        }
+      },
+      onSynthetic: (input) => {
+        captures.push(input)
+        return {
+          id: "inb_loginom_resume",
+          sessionID: id,
+          type: "synthetic",
+          delivery: "steer",
+          time: { created: 4 },
+          payload: { text: "Loginom подключён. Продолжи предыдущую задачу пользователя." },
+        }
+      },
+    })
+
+    const pill = page.getByRole("button", { name: "Loginom · Не подключён" })
+    const card = page.getByRole("region", { name: "Подключиться к Loginom" })
+    await expect(card).toHaveCount(0)
+    await pill.click()
+    await expect(page.getByText("https://app.loginom.ai/", { exact: true })).toBeVisible()
+    await expect(page.getByText("user", { exact: true })).toBeVisible()
+    await page.keyboard.press("Escape")
+    await editor.fill(request)
+    await editor.press("Enter")
+    await expect.poll(() => prompted).toBe(true)
+    await page.reload()
+    await expect(card).toBeVisible()
+    await expect(pill).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath(`loginom-card-${viewport.width}.png`) })
+
+    if (own) {
+      await card.getByRole("button", { name: "Свой сервер Loginom" }).click()
+      await expect(page).toHaveURL(/\/settings/)
+      const url = page.getByRole("textbox", { name: "Адрес", exact: true })
+      const user = page.getByRole("textbox", { name: "Пользователь", exact: true })
+      await expect(url).toHaveValue("")
+      await expect(user).toHaveValue("")
+      await url.fill(address)
+      await user.fill(username)
+      const noPassword = page.getByRole("checkbox", { name: "Пароль не нужен" })
+      await page.getByText("Пароль не нужен", { exact: true }).click()
+      await expect(noPassword).toBeChecked()
+      await page.getByRole("button", { name: "Сохранить", exact: true }).click()
+      await expect(page).toHaveURL(new RegExp(id))
+    } else {
+      await expect(card.getByText(/учебный сервер Loginom/)).toBeVisible()
+      await card.getByRole("button", { name: "Подключить публичный стенд" }).click()
+    }
+
+    await expect(page.getByText(`Подключено к ${address}`, { exact: true })).toBeVisible()
+    await expect(card).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "Loginom", exact: true })).toBeVisible()
+    await expect
+      .poll(() => captures)
+      .toEqual([
+        {
+          sessionID: id,
+          body: { resume: true, text: "Loginom подключён. Продолжи предыдущую задачу пользователя." },
+        },
+      ])
+    expect(checks).toEqual([
+      {
+        input: {
+          url: own ? address : "https://app.loginom.ai",
+          username,
+          revision: 0,
+          password: { operation: "empty" },
+        },
+      },
+    ])
+    expect(saves).toEqual([{ input: { revision: 0, validationId: "fixture-check" } }])
+  })
+}
 
 // One project with 12 worktrees, each with one session, and a configured zsh shell.
 function open(page: Page, input: Partial<WorkspaceInput> = {}) {
