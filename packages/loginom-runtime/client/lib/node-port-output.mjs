@@ -70,8 +70,17 @@ export async function readNodeVariableOutput(page,task,readNode,readOutputs,read
   const root=b.workflow_ref.prefix+';ModelForm;PreviewWindow',pf=m.FPreviewManager?.FPreviewForm,windows=exact(root).filter(visible);
   if(mode==='port'){
    if(windows.length||exact('mn').some(visible))throw Error('A previous preview or menu is open');
-   const es=task.builtin_snapshot?[g.view.getState(port.FCell)?.shape?.node].filter(e=>e&&g.container.contains(e)&&(e.getAttribute('data-tid')===null||e.getAttribute('data-tid')===cached.tid)):exact(task.port_tid).filter(e=>g.container.contains(e));if(es.length!==1)throw Error('Unique variable port drawing required');
-   const box=es[0].getBoundingClientRect(),gb=g.container.getBoundingClientRect();if(g.getCellAt(box.x-gb.x+g.container.scrollLeft+box.width/2,box.y-gb.y+g.container.scrollTop+box.height/2)!==port.FCell)throw Error('Variable output native hit changed');return point(es[0]);
+   const drawings=exact(task.builtin_snapshot?cached.tid:task.port_tid).filter(e=>g.container.contains(e));
+   const gb=g.container.getBoundingClientRect(),nativeHit=e=>{const box=e.getBoundingClientRect();return g.getCellAt(box.x-gb.x+g.container.scrollLeft+box.width/2,box.y-gb.y+g.container.scrollTop+box.height/2)===port.FCell;};
+   let drawing=drawings[0];
+   if(task.builtin_snapshot){
+    const native=g.view.getState(port.FCell)?.shape?.node,tid=native?.getAttribute('data-tid');
+    if(!native||!g.container.contains(native)||drawings.length>1||tid!==null&&(tid!==cached.tid||drawing!==native))throw Error('Unique variable port drawing required');
+    if(!nativeHit(native))throw Error('Variable output native hit changed');
+    drawing??=native;
+   }else if(drawings.length!==1)throw Error('Unique variable port drawing required');
+   if(!nativeHit(drawing))throw Error('Variable output native hit changed');
+   return point(drawing);
   }
   if(mode==='menu'){
    const menus=exact('mn').filter(visible),es=exact('mn;mniShowDataPreview').filter(visible);
