@@ -4,7 +4,7 @@ import { runInNewContext } from "node:vm"
 import { observePackages } from "../../src/package-access.mjs"
 
 const packagePath = "/user/shared/plan.lgp"
-const binding = { origin: "https://loginom.example", account: "user" }
+const binding = { origin: "https://loginom.example", pathname: "/app/", account: "user" }
 
 function windowFixture() {
   const node = { Package: {}, PackageFileName: "user\\shared\\plan.lgp", ReadOnly: true }
@@ -28,7 +28,9 @@ function windowFixture() {
   const app = { Version: "7.4.2", Application: { FInstance: { FMainForm: { FMapTree: map, FReconnecting: false } } } }
   const page = {
     async evaluate(fn, args) {
-      const value = await runInNewContext(`(${fn})(args)`, { args, bg: { app }, location: { origin: binding.origin } })
+      const value = await runInNewContext(`(${fn})(args)`, {
+        args, bg: { app }, location: { origin: binding.origin, pathname: binding.pathname },
+      })
       return structuredClone(value)
     },
   }
@@ -66,6 +68,7 @@ test("retains read-only when storage denies access and drops observations for a 
   })
   assert.equal(await observePackages(f.page, binding, "/user/other.lgp"), null)
   assert.equal(await observePackages(f.page, { ...binding, account: "other" }, packagePath), null)
+  assert.equal(await observePackages(f.page, { ...binding, pathname: "/other-app/" }, packagePath), null)
   f.storage.FileExists = async () => {
     f.connection.Session = {}
     f.nodes.shift()

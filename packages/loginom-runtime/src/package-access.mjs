@@ -1,13 +1,14 @@
 // Inspect the existing managed Loginom window without changing its workspace.
 export async function observePackages(page, binding, packagePath) {
-  const observation = page.evaluate(async ({ origin, account, packagePath, deadline }) => {
+  const observation = page.evaluate(async ({ origin, pathname, account, packagePath, deadline }) => {
     const app = globalThis.bg?.app
     const form = app?.Application?.FInstance?.FMainForm
     const map = form?.FMapTree
     const connection = map?.FServerConnection
     const session = connection?.Session
     const packages = map?.PackageNodes
-    const bound = () => Date.now() < deadline && location.origin === origin && globalThis.bg?.app === app
+    const bound = () => Date.now() < deadline && location.origin === origin && location.pathname === pathname
+      && globalThis.bg?.app === app
       && app?.Version === "7.4.2" && app.Application.FInstance?.FMainForm === form
       && form.FMapTree === map && form.FReconnecting === false && map.FServerConnection === connection
       && connection.Connected === true && connection.UserName === account && session && connection.Session === session

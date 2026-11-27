@@ -211,12 +211,15 @@ async function handle(message) {
           })
         } })
       state.browser = authenticated.context
-      state.owner.origin = new URL(input.connection.url).origin
+      const loginomUrl = loginomAddress(input.connection.url)
+      const address = new URL(loginomUrl)
+      state.owner.origin = address.origin
+      state.owner.pathname = address.pathname
       state.owner.account = input.connection.username
       const config = {
         resources: input.resources,
         // Preparation must bind to the same canonical path used by private login.
-        loginomUrl: loginomAddress(input.connection.url),
+        loginomUrl,
         stateDir: input.stateDir,
         agent: "loginom-ai-agent",
         adapterRevision: "1",
@@ -289,7 +292,7 @@ async function handle(message) {
     if (message.operation === "packageAccess") {
       const { observePackages } = await import("./package-access.mjs")
       const page = state.browser.pages()[0]
-      const binding = { origin: state.owner.origin, account: state.owner.account }
+      const binding = { origin: state.owner.origin, pathname: state.owner.pathname, account: state.owner.account }
       const result = page ? await observePackages(page, binding, message.input?.packagePath) : null
       send({ id: message.id, result })
       return
