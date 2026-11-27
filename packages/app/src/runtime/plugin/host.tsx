@@ -129,8 +129,8 @@ type HostState = {
   contracts: Record<string, number | undefined>
 }
 
-// How long a plugin may load its window entry before it fails.
-const moduleLoadTimeout = 30_000
+// Give Desktop's 30 s port handshake time to finish, with 15 s of headroom for store reads.
+const activationTimeout = 45_000
 
 type Stores = Record<string, Persisted<object> | ((session: SessionRef) => Persisted<object>)>
 
@@ -545,7 +545,7 @@ function createHost(input: HostInput) {
       clearTimeout(timers.get(effect.id))
       timers.set(
         effect.id,
-        setTimeout(() => dispatch({ type: "timeout", id: effect.id, attempt: effect.attempt }), moduleLoadTimeout),
+        setTimeout(() => dispatch({ type: "timeout", id: effect.id, attempt: effect.attempt }), activationTimeout),
       )
 
       return

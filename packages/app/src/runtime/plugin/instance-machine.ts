@@ -187,7 +187,7 @@ export function transitionPluginHost<I>(state: PluginHostState<I>, event: Plugin
         instance: event.instance,
         setup: event.setup,
       }),
-      [{ type: "timer.stop", id: event.id }, effect],
+      [effect],
     )
   }
 
@@ -226,6 +226,7 @@ export function transitionPluginHost<I>(state: PluginHostState<I>, event: Plugin
         instance: entry.instance,
         renderError: undefined,
       }),
+      [{ type: "timer.stop", id: event.id }],
     )
   }
 
@@ -235,7 +236,7 @@ export function transitionPluginHost<I>(state: PluginHostState<I>, event: Plugin
     return fail(state, event.id, entry, event.cause)
   }
 
-  if (entry.status !== "loading") return step(state)
+  if (entry.status !== "loading" && entry.status !== "preparing") return step(state)
 
   if (entry.attempt !== event.attempt) return step(state)
 
@@ -372,11 +373,15 @@ function fail<I>(state: PluginHostState<I>, id: string, entry: Running<I>, cause
   )
 }
 
-/** Stops whatever the entry runs: its module load timer or its instance. */
+/** Stops whatever the entry runs: its activation timer and its instance. */
 function teardown<I>(id: string, entry: PluginEntry<I>): PluginHostEffect<I>[] {
   if (entry.status === "loading") return [{ type: "timer.stop", id }]
 
-  if (entry.status === "preparing") return [{ type: "dispose", instance: entry.instance }]
+  if (entry.status === "preparing")
+    return [
+      { type: "timer.stop", id },
+      { type: "dispose", instance: entry.instance },
+    ]
 
   if (entry.status === "active" && entry.instance !== undefined) return [{ type: "dispose", instance: entry.instance }]
 
