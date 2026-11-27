@@ -1499,8 +1499,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
           const verifiedGroupingImports=['bg-vendor-icon-importtextfile'];
           // Cold Open can dirty these observed node types; Save normalizes once.
           restReference=[...diagrams].some(diagram=>{
-            if(!diagram)return false;
-            const nodes=diagram.FNodes?.FCollection;
+            const nodes=diagram?.FNodes?.FCollection;
+            if(nodes==null)return false;
             if(!Array.isArray(nodes))return true;
             if(nodes.some(n=>['bg-vendor-icon-restclientconnection','bg-vendor-icon-linregression','bg-vendor-icon-clusterization','bg-vendor-icon-condition','bg-vendor-icon-datatovariables'].includes(n.FIconCls)))return true;
             const withoutProvenInput=new Set(nodes.filter(n=>n.FIconCls==='bg-vendor-icon-groupdata'));
