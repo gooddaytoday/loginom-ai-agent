@@ -141,6 +141,25 @@ export const make = Effect.fn("Session.make")(function* () {
     (sessionID: SessionSchema.ID, inboxID: SessionMessage.ID) => mutatePending(sessionID, inboxID, admission.cancel),
     Effect.uninterruptible,
   )
+  const editInbox = Effect.fn("Session.editInbox")(function* (
+    sessionID: SessionSchema.ID,
+    inboxID: SessionMessage.ID,
+    input: Omit<SessionPrompt.Input, "delivery">,
+  ) {
+    const session = yield* get(sessionID)
+    const item = yield* SessionPrompt.prepare({
+      session,
+      messageID: inboxID,
+      input: { ...input, delivery: "queue" },
+    }).pipe(
+      instances.provide(session),
+      Effect.provideService(Database.Service, database),
+      Effect.provideService(FSUtil.Service, fs),
+    )
+    yield* mutatePending(sessionID, inboxID, (ref) => admission.edit({ ...ref, payload: item.payload })).pipe(
+      Effect.uninterruptible,
+    )
+  })
   const steerInbox = Effect.fn("Session.steerInbox")(function* (
     sessionID: SessionSchema.ID,
     inboxID: SessionMessage.ID,
@@ -184,7 +203,8 @@ export const make = Effect.fn("Session.make")(function* () {
         }).pipe(
           Effect.catchTag("SessionInbox.LifecycleConflict", () => new PromptConflictError({ sessionID, messageID })),
         )
-        if (input.resume !== false) yield* execution.wake(sessionID)
+        if (input.resume !== false)
+          yield* execution.wake(sessionID, admitted.delivery === "queue" ? "queue" : undefined)
         return admitted
       }),
     ),
@@ -320,7 +340,8 @@ export const make = Effect.fn("Session.make")(function* () {
                 () => new SyntheticConflictError({ sessionID, inputID }),
               ),
             )
-          if (input.resume !== false && !(yield* get(sessionID)).revert) yield* execution.wake(sessionID)
+          if (input.resume !== false && !(yield* get(sessionID)).revert)
+            yield* execution.wake(sessionID, admitted.delivery === "queue" ? "queue" : undefined)
           return admitted
         }),
       ),
@@ -377,6 +398,7 @@ export const make = Effect.fn("Session.make")(function* () {
     resume,
     interrupt,
     cancelInbox,
+    editInbox,
     steerInbox,
     queueInbox,
     revert,
@@ -403,6 +425,7 @@ export const make = Effect.fn("Session.make")(function* () {
     const resume = operations.resume.bind(undefined, sessionID)
     const interrupt = operations.interrupt.bind(undefined, sessionID)
     const cancelInbox = operations.cancelInbox.bind(undefined, sessionID)
+    const editInbox = operations.editInbox.bind(undefined, sessionID)
     const steerInbox = operations.steerInbox.bind(undefined, sessionID)
     const queueInbox = operations.queueInbox.bind(undefined, sessionID)
     const stage = operations.revert.stage.bind(undefined, sessionID)
@@ -432,6 +455,7 @@ export const make = Effect.fn("Session.make")(function* () {
       resume,
       interrupt,
       cancelInbox,
+      editInbox,
       steerInbox,
       queueInbox,
       revert,

@@ -10108,6 +10108,7 @@
                     "session.inbox.delivered",
                     "session.inbox.enqueued",
                     "session.inbox.cancelled",
+                    "session.inbox.edited",
                     "session.inbox.delivery.changed",
                     "session.execution.started",
                     "session.execution.succeeded",
@@ -10219,6 +10220,7 @@
                           "session.inbox.delivered",
                           "session.inbox.enqueued",
                           "session.inbox.cancelled",
+                          "session.inbox.edited",
                           "session.inbox.delivery.changed",
                           "session.execution.started",
                           "session.execution.succeeded",
@@ -22923,6 +22925,9 @@
             "$ref": "#/components/schemas/session.inbox.cancelled"
           },
           {
+            "$ref": "#/components/schemas/session.inbox.edited"
+          },
+          {
             "$ref": "#/components/schemas/session.inbox.delivery.changed"
           },
           {
@@ -25437,6 +25442,9 @@
           },
           {
             "$ref": "#/components/schemas/session.inbox.cancelled"
+          },
+          {
+            "$ref": "#/components/schemas/session.inbox.edited"
           },
           {
             "$ref": "#/components/schemas/session.inbox.delivery.changed"
@@ -28228,6 +28236,61 @@
               }
             },
             "required": ["sessionID", "inboxID", "delivery"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "created", "type", "durable", "data"],
+        "additionalProperties": false
+      },
+      "session.inbox.edited": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Event.ID"
+          },
+          "created": {
+            "type": "number"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["session.inbox.edited"]
+          },
+          "durable": {
+            "type": "object",
+            "properties": {
+              "aggregateID": {
+                "type": "string"
+              },
+              "seq": {
+                "$ref": "#/components/schemas/Event.Seq"
+              },
+              "version": {
+                "$ref": "#/components/schemas/Event.VersionEncoded_c77c5abcb68d"
+              }
+            },
+            "required": ["aggregateID", "seq", "version"],
+            "additionalProperties": false
+          },
+          "location": {
+            "$ref": "#/components/schemas/Location.Ref"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "sessionID": {
+                "$ref": "#/components/schemas/Session.ID"
+              },
+              "inboxID": {
+                "$ref": "#/components/schemas/Session.Message.ID"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/Session.Inbox.UserPayload"
+              }
+            },
+            "required": ["sessionID", "inboxID", "payload"],
             "additionalProperties": false
           }
         },

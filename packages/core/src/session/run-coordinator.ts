@@ -12,9 +12,9 @@ export interface Coordinator<Key, E, Reason = never> {
   /** Checks ownership for one key, including cleanup and terminal settlement. */
   readonly isActive: (key: Key) => Effect.Effect<boolean>
   /** Starts an execution while idle, or joins the active execution and returns its exit. */
-  readonly run: (key: Key) => Effect.Effect<void, E>
-  /** Rings the doorbell: an idle key starts an execution; an active one drains again before settling. */
-  readonly wake: (key: Key, scope?: Promotable) => Effect.Effect<void>
+  readonly run: (key: Key, options?: { readonly continuation?: boolean }) => Effect.Effect<void, E>
+  /** A queue wake starts idle work, but only follows a successful active execution. */
+  readonly wake: (key: Key, scope?: Promotable | "queue") => Effect.Effect<void>
   /**
    * Stops the active execution and clears its doorbell. No-op when idle. Resolves once the
    * interruption is accepted, not when cleanup settles: the execution fiber finishes its
@@ -41,6 +41,7 @@ type Execution<E, Reason> = {
   owner?: Fiber.Fiber<void>
   scope: Promotable
   pendingWake?: Promotable
+  pendingQueueWake: boolean
   stopping: boolean
   interruptionReason?: Reason
 }
@@ -57,7 +58,7 @@ type Execution<E, Reason> = {
  * ```
  */
 export const make = <Key, E, Reason = never>(options: {
-  readonly drain: (key: Key, force: boolean, scope: Promotable) => Effect.Effect<void, E>
+  readonly drain: (key: Key, force: boolean, scope: Promotable, continuation?: boolean) => Effect.Effect<void, E>
   /** Runs once when a process-local busy period begins, before its first drain. */
   readonly started?: (key: Key) => Effect.Effect<void>
   /**
@@ -70,23 +71,31 @@ export const make = <Key, E, Reason = never>(options: {
     const executions = new Map<Key, Execution<E, Reason>>()
     const fork = yield* FiberSet.makeRuntime<never, void, never>()
 
-    const loop = (key: Key, execution: Execution<E, Reason>, force: boolean): Effect.Effect<void, E> =>
-      Effect.suspend(() => options.drain(key, force, execution.scope)).pipe(
+    const loop = (
+      key: Key,
+      execution: Execution<E, Reason>,
+      force: boolean,
+      continuation?: boolean,
+    ): Effect.Effect<void, E> =>
+      Effect.suspend(() => options.drain(key, force, execution.scope, continuation)).pipe(
         Effect.andThen(
           Effect.suspend(() => {
-            if (execution.stopping || execution.pendingWake === undefined) return Effect.void
-            execution.scope = execution.pendingWake
+            const pending = execution.pendingQueueWake ? "input" : execution.pendingWake
+            if (execution.stopping || pending === undefined) return Effect.void
+            execution.scope = pending
             execution.pendingWake = undefined
+            execution.pendingQueueWake = false
             // Trampoline so drains that complete synchronously cannot grow the stack.
             return Effect.yieldNow.pipe(Effect.andThen(loop(key, execution, false)))
           }),
         ),
       )
 
-    const start = (key: Key, force: boolean, scope: Promotable) => {
+    const start = (key: Key, force: boolean, scope: Promotable, continuation?: boolean) => {
       const execution: Execution<E, Reason> = {
         done: Deferred.makeUnsafe<void, E>(),
         scope,
+        pendingQueueWake: false,
         stopping: false,
       }
       executions.set(key, execution)
@@ -96,7 +105,7 @@ export const make = <Key, E, Reason = never>(options: {
       execution.owner = fork(
         Effect.yieldNow.pipe(
           Effect.andThen(Effect.uninterruptible(options.started?.(key) ?? Effect.void)),
-          Effect.andThen(loop(key, execution, force)),
+          Effect.andThen(loop(key, execution, force, continuation)),
           Effect.onExit((exit) =>
             Effect.sync(() => {
               execution.owner = undefined
@@ -110,37 +119,42 @@ export const make = <Key, E, Reason = never>(options: {
       return execution
     }
 
-    // A doorbell that survives the execution loop (rung after the loop decided to end, or
-    // during failure or interruption cleanup) starts a fresh execution for the remaining work.
+    // A late wake starts a fresh execution for the remaining work. A queue-only wake
+    // waits for success, including when it arrives during terminal settlement.
     const settle = (key: Key, execution: Execution<E, Reason>, exit: Exit.Exit<void, E>) => {
-      if (execution.pendingWake) start(key, false, execution.pendingWake)
+      const pending = execution.pendingQueueWake && Exit.isSuccess(exit) ? "input" : execution.pendingWake
+      if (pending) start(key, false, pending)
       else executions.delete(key)
       Deferred.doneUnsafe(execution.done, exit)
     }
 
     const isActive = (key: Key) => Effect.sync(() => executions.has(key))
 
-    const run = (key: Key): Effect.Effect<void, E> =>
+    const run: Coordinator<Key, E, Reason>["run"] = (key, options) =>
       Effect.suspend(() => {
         const execution = executions.get(key)
         if (execution !== undefined) {
           // A stopping execution refuses joiners: wait out its cleanup, then run fresh.
           if (execution.stopping)
-            return Deferred.await(execution.done).pipe(Effect.ignoreCause, Effect.andThen(run(key)))
+            return Deferred.await(execution.done).pipe(Effect.ignoreCause, Effect.andThen(run(key, options)))
           return Deferred.await(execution.done)
         }
-        return Deferred.await(start(key, true, "input").done)
+        return Deferred.await(start(key, true, "input", options?.continuation).done)
       })
 
-    const wake = (key: Key, scope: Promotable = "input") =>
+    const wake = (key: Key, scope: Promotable | "queue" = "input") =>
       Effect.sync(() => {
         const execution = executions.get(key)
         if (execution !== undefined) {
+          if (scope === "queue") {
+            execution.pendingQueueWake = true
+            return
+          }
           // Coalesced wakes keep the widest scope: "input" subsumes "steer".
           execution.pendingWake = execution.pendingWake === "input" ? "input" : scope
           return
         }
-        start(key, false, scope)
+        start(key, false, scope === "queue" ? "input" : scope)
       })
 
     const interrupt = (key: Key, reason?: Reason): Effect.Effect<boolean> =>
@@ -152,12 +166,14 @@ export const make = <Key, E, Reason = never>(options: {
           // terminal outcome is already decided, so no reason attaches — but the interrupt
           // still claims the recorded wakes so settle does not start a dead-intent successor.
           execution.pendingWake = undefined
+          execution.pendingQueueWake = false
           return false
         }
         execution.stopping = true
         // Wakes recorded so far belong to the interrupted intent; the interrupt claims them.
-        // Wakes arriving during cleanup are new admissions and restart normally at settle.
+        // Wakes arriving during cleanup are new admissions and use the normal settle policy.
         execution.pendingWake = undefined
+        execution.pendingQueueWake = false
         execution.interruptionReason = reason
         // Fire and forget: nobody benefits from waiting out cleanup here, and callers like
         // the interrupt endpoint must acknowledge immediately even when finalizers are slow.

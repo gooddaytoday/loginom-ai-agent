@@ -2635,6 +2635,16 @@ export type SessionInboxUser = {
   delivery: SessionInboxDelivery
 }
 
+export type SessionInboxEdited = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "session.inbox.edited"
+  durable: { aggregateID: string; seq: EventSeq; version: 1 }
+  location?: LocationRef
+  data: { sessionID: SessionID; inboxID: SessionMessageID; payload: SessionInboxUserPayload1 }
+}
+
 export type SessionMessageAssistantTool = {
   type: "tool"
   id: string
@@ -2853,6 +2863,7 @@ export type SessionEventDurable =
   | SessionInboxDelivered
   | SessionInboxEnqueued
   | SessionInboxCancelled
+  | SessionInboxEdited
   | SessionInboxDeliveryChanged
   | SessionExecutionStarted
   | SessionExecutionSucceeded
@@ -2912,6 +2923,7 @@ export type V2Event =
   | SessionInboxDelivered
   | SessionInboxEnqueued
   | SessionInboxCancelled
+  | SessionInboxEdited
   | SessionInboxDeliveryChanged
   | SessionExecutionStarted
   | SessionExecutionSucceeded
@@ -4411,6 +4423,7 @@ export type EventSubscribeInput = {
         | "session.inbox.delivered"
         | "session.inbox.enqueued"
         | "session.inbox.cancelled"
+        | "session.inbox.edited"
         | "session.inbox.delivery.changed"
         | "session.execution.started"
         | "session.execution.succeeded"

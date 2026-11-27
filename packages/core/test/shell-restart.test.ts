@@ -2,9 +2,9 @@
 // handoff and is torn down mid-call, server 2 recovers the command from the same process daemon and resumes the session.
 import { describe, expect } from "bun:test"
 import path from "path"
-import { Context, Effect, Exit, Fiber, Layer, Scope } from "effect"
+import { Context, Effect, Exit, Fiber, Layer, Scope, Stream } from "effect"
 import type { ChildProcess } from "effect/process"
-import { LanguageModel, LLMClient } from "@opencode/ai/effect"
+import { AIError, InvalidRequestError, LanguageModel, LLMClient } from "@opencode/ai/effect"
 import { OpenAIChat } from "@opencode/ai/protocols/openai-chat"
 import { TestLLM } from "@opencode/ai/testing"
 import { Agent } from "@opencode/core/agent"
@@ -53,7 +53,7 @@ const model = SessionRunnerModel.node.replace(
   }),
 )
 
-// Everything both servers share: the process daemon, the data directory, the database and the model.
+// Both servers share the process daemon, data directory, database file and model.
 const world = Effect.gen(function* () {
   const daemon = yield* fakeDaemon()
   const root = (yield* tmpdirScoped()).path
@@ -68,7 +68,7 @@ const world = Effect.gen(function* () {
     log: path.join(data, "log"),
     repos: path.join(data, "repos"),
   })
-  const database = yield* Layer.build(Database.layer())
+  const database = Database.configured({ path: path.join(root, "session.sqlite") })
   const llm = yield* Layer.build(TestLLM.testLayer({ fallback: TestLLM.text("Done", "done") }))
   const project = (yield* tmpdirScoped()).path
   // Every command the servers spawn instead of handing to the daemon.
@@ -88,7 +88,7 @@ const world = Effect.gen(function* () {
         ]),
         [
           Global.node.replace(global),
-          Database.node.replace(Layer.succeedContext(database)),
+          Database.node.replace(database),
           LayerNodePlatform.llmClient.replace(Layer.succeedContext(Context.pick(LLMClient.Service)(llm))),
           PersistentPty.node.replace(PersistentPty.configured(daemon.options)),
           Environment.node.replace(recordingEnvironmentLayer(spawns)),
@@ -120,6 +120,75 @@ const until = (check: () => boolean) =>
   Effect.gen(function* () {
     while (!check()) yield* Effect.sleep(5)
   })
+
+describe("queued prompts across a graceful restart", () => {
+  for (const recovery of ["manual", "fails", "succeeds"] as const)
+    it.live(`reopens the inbox when recovery is ${recovery}`, () =>
+      Effect.gen(function* () {
+        const { llm, project, server } = yield* world
+        const scope = yield* Effect.scope
+        const first = yield* Scope.fork(scope)
+        const sessions = Context.get(yield* server(first), Session.Service)
+        const { id: sessionID } = yield* sessions.create({
+          location: { directory: AbsolutePath.make(project) },
+          title: "Queued prompts",
+          agent: Agent.ID.make("build"),
+          model: Model.Ref.make({ id: Model.ID.make("restart"), providerID: Provider.ID.make("test") }),
+        })
+        const active = yield* llm.gate()
+        yield* sessions.prompt({ sessionID, text: "Finish the active turn" })
+        yield* active.started
+        const one = yield* sessions.prompt({ sessionID, text: "Original", delivery: "queue" })
+        const two = yield* sessions.prompt({ sessionID, text: "Second queued", delivery: "queue" })
+        yield* sessions.editInbox({ sessionID, inboxID: one.id, text: "First queued" })
+        yield* Scope.close(first, Exit.void)
+        yield* active.release
+
+        const second = yield* Scope.fork(scope)
+        const reopened = yield* server(second, { resumeTurns: recovery !== "manual" })
+        const restored = Context.get(reopened, Session.Service)
+        const pending = restored.inbox(sessionID)
+        const queued = [
+          { id: one.id, delivery: "queue", payload: { text: "First queued" } },
+          { id: two.id, delivery: "queue", payload: { text: "Second queued" } },
+        ]
+        expect(yield* pending).toMatchObject(queued)
+
+        const three = yield* restored.prompt({ sessionID, text: "Queued during startup", delivery: "queue" })
+        queued.push({ id: three.id, delivery: "queue", payload: { text: "Queued during startup" } })
+        yield* restored.wait(sessionID)
+        expect(yield* llm.requests()).toHaveLength(1)
+        expect(yield* pending).toMatchObject(queued)
+
+        if (recovery === "fails")
+          yield* llm.push(Stream.fail(new AIError({ reason: new InvalidRequestError({ message: "Recovery failed" }) })))
+        const resumed = yield* llm.gate()
+        yield* Context.get(reopened, SessionRestart.Service).resumeSuspendedSessions
+        if (recovery !== "manual") {
+          yield* resumed.started
+          expect(yield* pending).toMatchObject(queued)
+          const transcript = JSON.stringify((yield* llm.requests())[1]?.messages)
+          expect(transcript).toContain("Finish the active turn")
+          expect(transcript).not.toContain("First queued")
+          yield* resumed.release
+        }
+        yield* restored.wait(sessionID)
+        expect((yield* restored.get(sessionID)).outcome).toBe(
+          recovery === "manual" ? "interrupted" : recovery === "fails" ? "failed" : "succeeded",
+        )
+        const requests = yield* llm.requests()
+        expect(requests).toHaveLength(recovery === "manual" ? 1 : recovery === "fails" ? 2 : 5)
+        expect(yield* pending).toMatchObject(recovery === "succeeds" ? [] : queued)
+        if (recovery === "succeeds") {
+          expect(JSON.stringify(requests[2]?.messages)).toContain("First queued")
+          expect(JSON.stringify(requests[2]?.messages)).not.toContain("Second queued")
+          expect(JSON.stringify(requests[3]?.messages)).toContain("Second queued")
+          expect(JSON.stringify(requests[3]?.messages)).not.toContain("Queued during startup")
+          expect(JSON.stringify(requests[4]?.messages)).toContain("Queued during startup")
+        }
+      }),
+    )
+})
 
 describe("shell commands across a graceful restart", () => {
   for (const finished of [false, true])

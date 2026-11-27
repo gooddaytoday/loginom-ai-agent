@@ -488,7 +488,7 @@ export const layer = (options?: Options) =>
             direct,
             Effect.fnUntraced(function* (sessionID) {
               suspended.delete(sessionID)
-              yield* execution.resume(sessionID).pipe(Effect.ignore, Effect.forkIn(scope))
+              yield* execution.resume(sessionID, { continuation: true }).pipe(Effect.ignore, Effect.forkIn(scope))
             }),
             { concurrency: "unbounded", discard: true },
           )

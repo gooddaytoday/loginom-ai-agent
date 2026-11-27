@@ -53,6 +53,19 @@
         "packages/core/test/subagent-idle-e2e.test.ts"
       ]
     },
+    {
+      "id": "CAT-15",
+      "title": "Durable next-turn queue and atomic queued prompt edits (C3.15)",
+      "paths": [
+        "packages/core/src/session.ts", "packages/core/src/session/session.ts",
+        "packages/core/src/session/execution.ts", "packages/core/src/session/run-coordinator.ts",
+        "packages/core/src/session/runner/llm.ts", "packages/core/src/session/subagent-job.ts",
+        "packages/core/src/session/inbox.ts", "packages/core/src/session/projector.ts", "packages/core/src/session/store.ts",
+        "packages/core/src/session/message-updater.ts", "packages/core/test/session-runner.test.ts",
+        "packages/schema/src/session-event.ts", "packages/protocol/openapi.json",
+        "packages/client/src/effect/api/api.ts"
+      ]
+    },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7" },
     {
       "id": "CAT-13",
