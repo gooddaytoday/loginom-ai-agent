@@ -10,6 +10,7 @@ import { Session } from "@opencode/core/session"
 import { Tool } from "@opencode/core/tool"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { define } from "@opencode/plugin/effect/plugin"
+import { Form } from "@opencode/schema/form"
 import { Location } from "@opencode/schema/location"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Skill } from "@opencode/schema/skill"
@@ -182,7 +183,7 @@ const boot = (
               editor.add({
                 name,
                 description: `Stand-in Loginom tool ${name}`,
-                input: Schema.Struct({}),
+                input: Schema.Struct({ path: Schema.optional(Schema.String), rows: Schema.optional(Schema.Number) }),
                 output: Schema.String,
                 ...(name === probe ? { options: { codemode: false } } : {}),
                 execute: (_input, call) =>
@@ -287,7 +288,28 @@ const boot = (
       Effect.flatMap((response) => Effect.promise(() => response.json())),
       Effect.map((body) => Schema.decodeUnknownSync(Schema.Struct({ data: Schema.Array(Skill.Info) }))(body).data),
     )
-    return { sessions, create, prompt, wizard, post, skills, requests, ran, answered, prompts, held, gate, resources }
+    const forms = (sessionID: Session.ID) =>
+      Effect.promise(async () => {
+        const response = await handler(new Request(`http://opencode.local/api/session/${sessionID}/form`))
+        expect(response.status).toBe(200)
+        return Schema.decodeUnknownSync(Schema.Struct({ data: Schema.Array(Form.Info) }))(await response.json()).data
+      })
+    return {
+      sessions,
+      create,
+      prompt,
+      wizard,
+      post,
+      forms,
+      skills,
+      requests,
+      ran,
+      answered,
+      prompts,
+      held,
+      gate,
+      resources,
+    }
   })
 
 // A dashboard's folder with its `work` folder, under the root the product plugin reads: the case's temporary data
@@ -303,6 +325,86 @@ const dashboardWork = Effect.acquireRelease(
 ).pipe(Effect.map((folder) => path.join(folder, "work")))
 
 describe("loginom.product access and tool gate (G1)", () => {
+  it.live(
+    "the third consecutive Loginom call pauses for a decision across model steps",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot(undefined, { catalog: "missing" })
+        const sessionID = yield* test.create("repeats")
+        const step = { tool: probe, input: { path: "one.csv", rows: 2 } }
+        const reordered = { tool: probe, input: { rows: 2, path: "one.csv" } }
+        const different = { tool: probe, input: { path: "two.csv", rows: 2 } }
+        const start = (...steps: Step[]) => test.wizard(sessionID, "loginom-automation", script(...steps))
+        const question = () => until(() => test.forms(sessionID).pipe(Effect.map((forms) => forms[0])))
+        const reply = (id: Form.ID, value: string) =>
+          test
+            .post(`/api/session/${sessionID}/form/${id}/reply`, { answer: { q0: value } })
+            .pipe(Effect.map((response) => expect(response.status).toBe(204)))
+
+        const stopped = yield* Effect.forkScoped(start(step, reordered, step, { text: "stopped" }))
+        const repeat = yield* question()
+        expect(repeat.fields[0]?.description).toContain("Агент третий раз подряд делает одно и то же")
+        expect(test.ran(sessionID)).toBe(2)
+        yield* reply(repeat.id, "Остановить")
+        yield* Fiber.join(stopped)
+        expect(test.ran(sessionID)).toBe(2)
+        expect(JSON.stringify((yield* test.requests(sessionID)).at(-1)?.messages)).toContain(
+          "Пользователь остановил повторный вызов",
+        )
+
+        yield* start(step, step, different, different, { text: "different paths" })
+        expect(test.ran(sessionID)).toBe(6)
+        expect(yield* test.forms(sessionID)).toEqual([])
+
+        const hinted = yield* Effect.forkScoped(start(step, step, step, { text: "hinted" }))
+        yield* reply((yield* question()).id, "Подсказать агенту")
+        yield* reply((yield* question()).id, "Проверь только заголовок")
+        yield* Fiber.join(hinted)
+        expect(test.ran(sessionID)).toBe(8)
+        expect(JSON.stringify((yield* test.requests(sessionID)).at(-1)?.messages)).toContain("Проверь только заголовок")
+
+        const ordinary = {
+          tool: "question",
+          input: {
+            questions: [
+              { header: "Обычный вопрос", question: "Проверка?", options: [{ label: "Да", description: "Да" }] },
+            ],
+          },
+        }
+        const continued = yield* Effect.forkScoped(
+          start(step, step, step, step, step, ordinary, step, { text: "continued" }),
+        )
+        const confirmation = yield* question()
+        const permission = yield* test.post(`/api/session/${sessionID}/permission`, {
+          action: "edit",
+          resources: ["unrelated.txt"],
+        })
+        expect(permission.status).toBe(200)
+        const { data: separate } = yield* Effect.promise(() => permission.json())
+        expect(separate.effect).toBe("ask")
+        yield* reply(confirmation.id, "Продолжить")
+        const next = yield* question()
+        expect(next.fields[0]?.title).toBe("Обычный вопрос")
+        yield* reply(next.id, "Да")
+        const allowed = yield* test.post(`/api/session/${sessionID}/permission/${separate.id}/reply`, {
+          decision: "once",
+        })
+        expect(allowed.status).toBe(204)
+        yield* Fiber.join(continued)
+        expect(test.ran(sessionID)).toBe(14)
+        expect(yield* test.forms(sessionID)).toEqual([])
+
+        const interrupted = yield* Effect.forkScoped(start(step, step, step, { text: "not executed" }))
+        yield* question()
+        const response = yield* test.post(`/api/session/${sessionID}/interrupt`, {})
+        expect(response.status).toBe(200)
+        yield* Fiber.join(interrupted)
+        expect(test.ran(sessionID)).toBe(16)
+        expect(yield* test.forms(sessionID)).toEqual([])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
   it.live(
     "S1: without a grant a Loginom tool is hidden and rejected, directly, from CodeMode and with permissive session rules",
     () =>

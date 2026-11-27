@@ -35,6 +35,7 @@ import {
   withDefaults,
   type Kind,
 } from "./permissions"
+import { repeatGuard } from "./repeat-guard"
 import { apply, bundled, hub } from "./skills"
 
 export { Dashboard }
@@ -358,6 +359,8 @@ export default Plugin.define({
       failure: (sessionID) => refused.get(sessionID),
       task,
     })
+    const repeats = repeatGuard()
+    await ctx.tool.transform(repeats.wrap)
 
     // The lease events start once the catalog that `drop` clears exists.
     const stop = new AbortController()
@@ -370,7 +373,10 @@ export default Plugin.define({
       ] as const
       for await (const event of ctx.event.subscribe({ types: [...types], signal: stop.signal })) {
         if (event.type === "session.execution.started") void hold(event.data.sessionID)
-        else await drop(event.data.sessionID)
+        else {
+          repeats.reset(event.data.sessionID)
+          await drop(event.data.sessionID)
+        }
       }
     })().catch(() => undefined)
 
@@ -412,6 +418,7 @@ export default Plugin.define({
       hide(event)
     })
     await ctx.tool.hook("execute.before", async (event) => {
+      if (!event.tool.startsWith("loginom_")) repeats.reset(event.sessionID)
       await bound(event.sessionID)
       if (!permits(profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
@@ -475,6 +482,7 @@ export default Plugin.define({
       if (event.prompt.agents?.length && dashboard())
         throw new Error("LOGINOM_SCOPE_DENIED: a dashboard session does not run subagents")
       tasks.set(event.sessionID, event.messageID)
+      repeats.reset(event.sessionID)
       const value = event.metadata?.[token]
       if (event.metadata) delete event.metadata[token]
       const wizard = typeof value === "string" ? pending.get(value) : undefined
