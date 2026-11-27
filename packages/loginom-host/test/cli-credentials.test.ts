@@ -47,6 +47,36 @@ test.each((["win32", "darwin"] as const).filter((platform) => platform !== "win3
   },
 )
 
+test.skipIf(process.platform !== "linux")("Desktop does not stage credentials without Secret Service", async () => {
+  const root = await mkdtemp(join(tmpdir(), "loginom-desktop-codec-"))
+  try {
+    const child = Bun.spawn({
+      cmd: [
+        process.execPath,
+        "-e",
+        `import { cliCredentials } from ${JSON.stringify(new URL("../src/connection/cli-credentials.ts", import.meta.url).href)};
+         import { connectionStore } from ${JSON.stringify(new URL("../src/connection/connection-store.ts", import.meta.url).href)};
+         const root = process.argv[1];
+         const store = connectionStore(root, cliCredentials("linux", { root, resources: root, desktop: true }));
+         try {
+           await store.stage({ generation: 1, revision: 1, url: "https://app.loginom.ai/", username: "test", apiKey: "fixture", password: "fixture" });
+           process.exitCode = 1;
+         } catch (error) {
+           if (error.message !== "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE") throw error;
+         }`,
+        root,
+      ],
+      env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: `unix:path=${root}/no-session-bus` },
+      stdout: "ignore",
+      stderr: "pipe",
+    })
+    expect(await child.exited).toBe(0)
+    expect(await connectionStore(root).latestGeneration()).toBe(0)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test("Windows codec rejects plaintext and malformed ciphertext without a native call", async () => {
   for (const value of [
     { format: "loginom-cli-secrets-v1" as const, protection: "plaintext" as const, payload: "{}" },

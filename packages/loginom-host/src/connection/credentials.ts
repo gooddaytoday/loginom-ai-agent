@@ -1,7 +1,7 @@
 export type Secrets = { apiKey: string; password: string }
 export type CliSecrets = {
   format: "loginom-cli-secrets-v1"
-  protection: "plaintext" | "dpapi" | "keychain"
+  protection: "plaintext" | "dpapi" | "keychain" | "secret-service"
   payload: string
 }
 export type ProtectedSecrets = { encrypted: string } | Secrets | CliSecrets

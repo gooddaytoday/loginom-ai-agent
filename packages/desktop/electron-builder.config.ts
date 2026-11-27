@@ -30,6 +30,7 @@ const debDepends = [
   "libatspi2.0-0",
   "libuuid1",
   "libsecret-1-0",
+  "libsecret-tools",
   "libgbm1",
   // Ubuntu 24's unversioned libasound2 virtual package can select the incomplete OSS shim.
   "libasound2t64 | libasound2 (>= 1.0.16)",
@@ -45,6 +46,8 @@ const debDepends = [
 // refuse to install or update. They only serve debuginfo lookup, so skip them.
 // fpm only accepts flags before the first src=dest mapping, so keep this first.
 const rpmNoBuildIdLinksFpm = "--rpm-rpmbuild-define=_build_id_links none"
+
+const rpmSecretToolFpm = ["--depends", "/usr/bin/secret-tool"]
 
 const metainfoFpm = (appId: string) =>
   `${path.join(packageDir, "resources", `${appId}.metainfo.xml`)}=/usr/share/metainfo/${appId}.metainfo.xml`
@@ -306,7 +309,7 @@ export function getConfig() {
         deb: { packageName, depends: debDepends, fpm: [...previewCompressionFpm("deb"), metainfoFpm(appId)] },
         rpm: {
           packageName,
-          fpm: [rpmNoBuildIdLinksFpm, ...previewCompressionFpm("rpm"), metainfoFpm(appId)],
+          fpm: [rpmNoBuildIdLinksFpm, ...rpmSecretToolFpm, ...previewCompressionFpm("rpm"), metainfoFpm(appId)],
         },
       }
     }
@@ -317,7 +320,7 @@ export function getConfig() {
         deb: { packageName, depends: debDepends, fpm: [...previewCompressionFpm("deb"), metainfoFpm(appId)] },
         rpm: {
           packageName,
-          fpm: [rpmNoBuildIdLinksFpm, ...previewCompressionFpm("rpm"), metainfoFpm(appId)],
+          fpm: [rpmNoBuildIdLinksFpm, ...rpmSecretToolFpm, ...previewCompressionFpm("rpm"), metainfoFpm(appId)],
         },
       }
     }
@@ -327,7 +330,7 @@ export function getConfig() {
         ...base,
         // Loginom AI Agent (B4.6): the 0.4 icons have no Icon Composer package, so prod keeps the shared ICNS.
         deb: { packageName, depends: debDepends, fpm: [metainfoFpm(appId)] },
-        rpm: { packageName, fpm: [rpmNoBuildIdLinksFpm, metainfoFpm(appId)] },
+        rpm: { packageName, fpm: [rpmNoBuildIdLinksFpm, ...rpmSecretToolFpm, metainfoFpm(appId)] },
       }
     }
   }

@@ -16,7 +16,7 @@ const RecordSchema = Schema.Struct({
     Schema.Struct({ encrypted: Schema.String }),
     Schema.Struct({
       format: Schema.Literal("loginom-cli-secrets-v1"),
-      protection: Schema.Literals(["plaintext", "dpapi", "keychain"]),
+      protection: Schema.Literals(["plaintext", "dpapi", "keychain", "secret-service"]),
       payload: Schema.String,
     }),
   ]),

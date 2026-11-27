@@ -7,7 +7,7 @@ const decode = Schema.decodeUnknownOption(
 
 export function cliCredentials(
   platform: NodeJS.Platform,
-  paths?: { root: string; resources: string },
+  paths?: { root: string; resources: string; desktop?: boolean },
 ): CredentialCodec {
   if (!["linux", "win32", "darwin"].includes(platform)) throw new Error("LOGINOM_CREDENTIAL_PLATFORM_UNSUPPORTED")
   return {
@@ -36,6 +36,16 @@ export function cliCredentials(
         }
       }
       if (platform !== "linux") throw new Error("LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE")
+      if (paths?.desktop) {
+        const { linuxSecretService } = await import("./linux-secret-service")
+        const { sealKeychain } = await import("./keychain-envelope")
+        const identity = await linuxSecretService(paths.root, true)
+        try {
+          return sealKeychain(value, identity.key, identity.profile, "secret-service")
+        } finally {
+          identity.key.fill(0)
+        }
+      }
       return {
         format: "loginom-cli-secrets-v1",
         protection: "plaintext",
@@ -76,6 +86,16 @@ export function cliCredentials(
         return decoded.value
       }
       if (platform !== "linux") throw new Error("LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE")
+      if (paths && "format" in value && value.protection === "secret-service") {
+        const { linuxSecretService } = await import("./linux-secret-service")
+        const { openKeychain } = await import("./keychain-envelope")
+        const identity = await linuxSecretService(paths.root, false)
+        try {
+          return openKeychain(value, identity.key, identity.profile, "secret-service")
+        } finally {
+          identity.key.fill(0)
+        }
+      }
       if (!("format" in value) || value.format !== "loginom-cli-secrets-v1" || value.protection !== "plaintext")
         throw new Error("LOGINOM_CREDENTIAL_FORMAT_INVALID")
       const decoded = decode(value.payload)
