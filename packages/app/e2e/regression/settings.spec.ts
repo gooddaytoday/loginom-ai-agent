@@ -1839,12 +1839,14 @@ for (const width of [1280, 480]) {
     await page.goto(`/e2e/utils/settings-wsl.html?${new URLSearchParams({ server: SERVER, mode: "ready" })}`)
 
     const settings = page.getByTestId("settings-screen")
+
     if (width === 480) {
       await settings.getByRole("button", { name: "Preferences", exact: true }).click()
       await page.getByRole("menuitemradio", { name: "Providers", exact: true }).click()
     } else {
       await settings.getByRole("tab", { name: "Providers", exact: true }).click()
     }
+
     await settings
       .locator(".settings-provider-row", { hasText: "OpenCode Console" })
       .getByRole("button", { name: "Connect", exact: true })
