@@ -30,6 +30,7 @@ import {
   onCleanup,
   runWithOwner,
   Show,
+  type Component,
   type ParentProps,
 } from "solid-js"
 import { createStore, produce } from "solid-js/store"
@@ -164,7 +165,7 @@ export async function until(check: () => boolean) {
 }
 
 /** Mounts the real plugin host with one plugin whose every renderer load settles when the test says so. */
-export function mountPluginHost() {
+export function mountPluginHost(input?: { builtins: ReadonlySet<string>; View: Component }) {
   const loads: PromiseWithResolvers<{ default: Plugin.Setup<Entry> }>[] = []
   const [disabled, setDisabled] = createSignal<ReadonlySet<string>>(new Set())
   const hosts: PluginHost[] = []
@@ -174,7 +175,7 @@ export function mountPluginHost() {
   function Capture() {
     hosts.push(usePluginHost())
 
-    return null
+    return input && <input.View />
   }
 
   const dispose = render(
@@ -194,6 +195,7 @@ export function mountPluginHost() {
               },
             ]}
             disabled={disabled}
+            builtins={input?.builtins}
             apis={fakeApis(unused)}
             whenMounted={mounted}
           >
