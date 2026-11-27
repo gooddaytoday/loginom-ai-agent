@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import { createObservationPages } from '../lib/observation-pages.mjs';
 import { makeWorkspaceUiCode, validateUiAction, validateNodeUiAction, workspaceUiCapability, makeBlockingWindowDiagnosticCode } from '../lib/workspace-ui.mjs';
 import { assertActionOutcome } from '../lib/action-catalog.mjs';
+import { NODE_TYPES } from '../lib/node-contracts.mjs';
 
 import {Page,Element,Document,build,origin,clone,fixtureClock,scriptGraphFixture} from './support/workspace-ui-fixture.mjs';
 
@@ -6657,10 +6658,15 @@ test('union continues the observed unmapped-variable warning with one fresh Next
 });
 async function inputPortFinishFixture(mode='valid') {
   const clock=fixtureClock(),f=await inputMappingLiveFixture(false,clock.Date),{page,owner,base,nodes}=f;
+  const joinCaption=mode.startsWith('join_caption');
+  const joinIcon=mode==='join_caption_other_component'?'bg-vendor-icon-calcdata':'bg-vendor-icon-joindata';
   const {inputPortBreadcrumbs}=await import('./input-port-breadcrumbs.fixture.mjs');
   const panel=page.add('div','MF;TF-5;NavigationBar;NavigationPanel','',{x:48,y:35,width:1392,height:36});
   const crumbs=inputPortBreadcrumbs.map((n,i)=>{
-    const multiline=mode==='multiline'; const crumb=page.add('a',multiline?n.tid.replace('Revenue','Duplicates:__in:_Key_Sub'):n.tid,multiline&&i===5?'Duplicates: in: Key, Sub':n.label,n.rect,panel),icon={4:'maptree-icon-workflow',5:'bg-vendor-icon-calcdata',8:'maptree-icon-wizard'}[i];
+    const multiline=mode==='multiline';
+    const tid=joinCaption?n.tid.replace('Revenue','Слияние'):multiline?n.tid.replace('Revenue','Duplicates:__in:_Key_Sub'):n.tid;
+    const caption=joinCaption?n.label.replace('Revenue','Слияние'):multiline&&i===5?'Duplicates: in: Key, Sub':n.label;
+    const crumb=page.add('a',tid,caption,n.rect,panel),icon={4:'maptree-icon-workflow',5:joinCaption?joinIcon:'bg-vendor-icon-calcdata',8:'maptree-icon-wizard'}[i];
     if(icon)page.add('span',null,'',{x:n.rect.x+1,y:n.rect.y+1,width:16,height:16},crumb).attrs.class=icon;return crumb;
   });
   const done=page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:1300,y:950,width:100,height:25},owner);
@@ -6682,10 +6688,11 @@ async function inputPortFinishFixture(mode='valid') {
       prompt.remove();
     }
     owner.remove();for(const c of crumbs.slice(5))c.remove();
-    if(mode==='wrong_workflow')crumbs[4].ownText='Другой сценарий';
+    if(mode==='wrong_workflow'||mode==='join_caption_foreign_workflow')crumbs[4].ownText='Другой сценарий';
     graph=page.add('div','MF;TF-5;ModelForm;cmpDiagram','',{x:48,y:71,width:1392,height:929});
-    const key=mode==='wrong_node'?'Other':mode==='multiline'?'Duplicates:__in:_Key_Sub':mode.startsWith('suffix')?'Revenue@1':'Revenue';node=page.add('g','MF;TF-5;Graph;'+key,'',{x:100,y:200,width:150,height:80},graph);
+    const key=joinCaption?'Левое':mode==='wrong_node'?'Other':mode==='multiline'?'Duplicates:__in:_Key_Sub':mode.startsWith('suffix')?'Revenue@1':'Revenue';node=page.add('g','MF;TF-5;Graph;'+key,'',{x:100,y:200,width:150,height:80},graph);
     label=page.add('span','MF;TF-5;Graph;'+key+';Label;Label',mode==='multiline'?'Duplicates:in: Key, Sub':key,{x:110,y:220,width:120,height:30},node);
+    if(mode==='join_caption_other_text')label.ownText='Правое';
     if(mode.startsWith('suffix')){label.ownText='Revenue';const other=page.add('g','MF;TF-5;Graph;Revenue','',{x:300,y:200,width:150,height:80},graph);page.add('span','MF;TF-5;Graph;Revenue;Label;Label','Revenue',{x:310,y:220,width:120,height:30},other);}
     if(mode.startsWith('ellipsis'))label.ownText=mode==='ellipsis_wrong_text'?'Other…':'Reve…';
     if(mode==='duplicate_node')page.add('g','MF;TF-5;Graph;'+key,'',node.box,graph);
@@ -6703,6 +6710,13 @@ async function inputPortFinishFixture(mode='valid') {
   if((mode.startsWith('ellipsis')&&mode!=='ellipsis_unbound')||mode.startsWith('suffix')||mode.startsWith('late_loading')||mode.startsWith('lost_links_native'))page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
     {expected_build:build,expected_origin:origin,...(mode==='late_loading_long'?{settlement_timeout_ms:120000}:{}),prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},
     async()=>({verified:true,node_id:mode==='suffix_wrong_id'||mode==='late_loading_foreign_node'&&waits>=3||mode==='lost_links_native_foreign'&&prompt?'other':'node',surface:graph?'graph':'wizard',tid:graph?(mode==='ellipsis_wrong_body'?'foreign':node.attrs['data-tid']):'MF;TF-5;WizrdMCF',...(!graph?{input_port:{direction:'input',port:0}}:{})})));
+  if(joinCaption)page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {expected_build:build,expected_origin:origin,join_design_title:NODE_TYPES['transform.join_data'].title,
+      prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},
+    async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:graph&&mode==='join_caption_foreign_node'?'foreign':'node',
+      surface:graph?'graph':'wizard',tid:graph?node.attrs['data-tid']:'MF;TF-5;WizrdMCF',
+      ...(graph?{}:{input_port:{direction:'input',port:0,native_index:0,port_guid:'input-0',opening_operation_id:'open-input',node_icon_class:joinIcon},
+        navigation_node:{tid:crumbs[5].attrs['data-tid'],label:'Слияние'}})})));
   return {...f,done,crumbs,waits:()=>waits};
 }
 
@@ -6804,6 +6818,60 @@ test('typed input-port finish uses one gesture and quiet exact graph return with
     if(mode==='late_body')assert.equal(waits(),5);if(mode==='churn')assert.equal(waits(),12);
   }
 });
+
+for(const fault of ['none','foreign node','foreign workflow','other component','other title']){
+  test('LAB-2082 opens the bound Join wizard from its automatic graph caption: '+fault,async()=>{
+    const icon=fault==='other component'?'bg-vendor-icon-calcdata':'bg-vendor-icon-joindata';
+    const {page,tid,body,node}=scriptGraphFixture('Левое',icon),prefix='MF;TF-1';
+    node.FGuid='node';
+    const panel=page.add('div',prefix+';NavigationBar;NavigationPanel');
+    const crumbs=['Сервер','Пакеты','Package1','Модуль1','Сценарий'];
+    const breadcrumb=prefix+';cnrNaviMode;b.s_';
+    crumbs.forEach((label,i)=>{
+      const element=page.add('a',breadcrumb+crumbs.slice(0,i+1).join('>'),label,undefined,panel);
+      if(i===4)page.add('span',null,'',undefined,element).attrs.class='maptree-icon-workflow';
+    });
+    let opened=false;
+    const binding=async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:opened&&fault==='foreign node'?'foreign':'node',
+      surface:opened?'wizard':'graph',tid:opened?prefix+';WizrdMCF':tid,...(opened?{}:{locked:false})});
+    page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+      {expected_build:build,expected_origin:origin,join_design_title:NODE_TYPES['transform.join_data'].title,
+        prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix,navigation_path:[]}},...options},binding));
+    const snapshot=await page.observe();
+    const settings=snapshot.ui.elements.find(element=>element.wizard_open);
+    assert.ok(settings);
+    const click=page.mouse.click;
+    page.mouse.click=async(...args)=>{
+      await click(...args);
+      opened=true;
+      body.parentElement.remove();
+      const wizard=page.add('div',prefix+';WizrdMCF');
+      page.add('table',prefix+';WizrdMCF;JoinDataWizard;grdSourceColumns;tbl','',undefined,wizard);
+      const name=fault==='other title'?'Другой':'Слияние';
+      const path=crumbs.join('>').replace('Модуль1',fault==='foreign workflow'?'Модуль2':'Модуль1');
+      const owner=page.add('a',breadcrumb+path+'>'+name,name,undefined,panel);
+      page.add('span',null,'',undefined,owner).attrs.class='bg-vendor-icon-joindata';
+      const last=page.add('a',breadcrumb+path+'>'+name+'>Настройка','Настройка',undefined,panel);
+      page.add('span',null,'',undefined,last).attrs.class='maptree-icon-wizard';
+    };
+    const result=await page.act({verb:'begin_wizard',ref:settings.ref},snapshot);
+    assert.equal(page.events.filter(event=>event==='click').length,1);
+    assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result.error));
+    assert.equal(result.trace.some(event=>event.event==='wizard_open_verified'),fault==='none');
+  });
+}
+
+for(const mode of ['join_caption','join_caption_foreign_node','join_caption_foreign_workflow','join_caption_other_component','join_caption_other_text']){
+  test('LAB-2082 input Done uses the bound Join graph caption: '+mode,async()=>{
+    const {page}=await inputPortFinishFixture(mode),snapshot=await page.observe();
+    const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port');
+    assert.ok(done,mode);
+    const result=await page.act({verb:'finish_wizard',ref:done.ref},snapshot);
+    assert.equal(page.events.filter(event=>event==='click').length,1);
+    assert.equal(result.status,mode==='join_caption'?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result.error));
+    assert.equal(result.trace.some(event=>event.event==='input_port_finish_verified'),mode==='join_caption');
+  });
+}
 
 test('input-port Done confirms the exact lost-links question once and retains all refusal cases',async()=>{
   for(const mode of ['lost_links','lost_links_native','lost_links_text','lost_links_title','lost_links_button','lost_links_disabled','lost_links_duplicate','lost_links_workflow','lost_links_mask','lost_links_native_foreign','lost_links_repeat','lost_links_lost_reply']){

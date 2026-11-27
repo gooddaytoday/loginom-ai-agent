@@ -95,6 +95,46 @@ test('question discovery cannot replace button verification',()=>{
 test('settings opening requires one control of the prepared graph node',()=>{
  const {state}=fixture();assert.throws(()=>wizardOpenBinding(state));
 });
+
+for(const fault of [null,'node','component','path','owner TID','caption']){
+ test('LAB-2082 host binds the Join design name to its exact automatic graph caption: '+fault,async()=>{
+  const {state}=fixture();
+  const graphNode=state.prepared_node_context;
+  graphNode.tid='MF;TF-1;Graph;Левое';
+  const path=state.navigation_context.path;
+  state.ui={masks:[],dialogs:[],elements:[
+   {ref:'settings',tid:graphNode.tid+';Setting',allowed_actions:['begin_wizard'],
+    wizard_open:{node:{node_label:'Левое'},workflow_path:path}},
+   {tid:graphNode.tid+';Label;Label',label:fault==='caption'?'Правое':'Левое',graph_node:{part:'label'},
+    signature:{native_graph:{status:'non_script',icon:fault==='component'?'bg-vendor-icon-calcdata':'bg-vendor-icon-joindata'}}},
+  ]};
+  const after=structuredClone(state);
+  after.prepared_node_context.surface='wizard';
+  after.prepared_node_context.tid='MF;TF-1;WizrdMCF';
+  if(fault==='node')after.prepared_node_context.node_id='foreign';
+  const node={tid:fault==='owner TID'?'flow>Другой':'flow>Слияние',label:'Слияние'};
+  const wizardPath=fault==='path'?[{tid:'other',label:'Another scenario'}]:path;
+  after.wizard={status:'observed',stage:'join',owner_context:{status:'observed',node,
+   path:[...wizardPath,node,{tid:node.tid+'>Настройка',label:'Настройка'}]}};
+  let gestures=0;
+  const channel={
+   observe:async step=>{
+    const current=gestures?after:state;
+    assert.equal(step.ready(current),true);
+    return current;
+   },
+   perform:async step=>{
+    assert.equal(step.ready(state),true);
+    assert.deepEqual(step.resolve(state),{verb:'begin_wizard',ref:'settings'});
+    gestures++;
+   },
+  };
+  if(fault)await assert.rejects(openPreparedWizard(channel),/Opened wizard owner differs/);
+  else assert.equal((await openPreparedWizard(channel)).node_context.node_id,graphNode.node_id);
+  assert.equal(gestures,1);
+ });
+}
+
 test('deactivation gestures cannot run without a native prepared-node binding',()=>{
  for(const verb of ['begin_wizard','confirm_wizard_deactivation'])assert.throws(()=>
   makeWorkspaceUiCode({mode:'act',action:{verb,ref:'ui-question'}}),/prepared native node binding/);
