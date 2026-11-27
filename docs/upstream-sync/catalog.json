@@ -99,7 +99,7 @@
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
     {
-      "id": "CAT-14",
+      "id": "CAT-21",
       "title": "Built-in plugin top-level pages",
       "paths": [
         "packages/app/src/shell/routes/routes.tsx", "packages/app/src/shell/state/layout.tsx",
