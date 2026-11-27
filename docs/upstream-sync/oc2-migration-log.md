@@ -26814,6 +26814,7 @@ exports-excel, preprocessing-datapartition, preprocessing-sampling и разбо
   файлов: `AGENTS.md`, `package.json`, `client/test/artifact-download.test.mjs` и проб
   `tools/loginom-acceptance/javascript-{calibration-wizard,native-details-discovery,native-input-binding,native-roundtrip-binding,native-zero}.mjs`.
   Файлы реализации и тесты обновления исходной схемы между шагами не потребовали выбора.
+- Исключение из побайтового совпадения — `packages/loginom-runtime/package.json`: блок `"dependencies": {"acorn": "8.15.0"}` из v2 (B1.7, `05374fa0bb`) возвращён после ревью. Без него `bun.lock` расходится с манифестом, а `bun test` в `packages/product` на свежем дереве падает с `Cannot find package 'acorn'` (тест маршрутов узлов грузит `client/lib/javascript-module-policy.mjs` из workspace). Это единственное записанное отличие runtime от 0.4.3.
 
 ### Не перенесено
 

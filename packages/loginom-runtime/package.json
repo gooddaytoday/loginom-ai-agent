@@ -5,6 +5,9 @@
   "type": "module",
   "license": "AGPL-3.0-only",
   "description": "Bundled Loginom executor and browser runtime",
+  "dependencies": {
+    "acorn": "8.15.0"
+  },
   "scripts": {
     "test:upstream": "cd client && node --test test/*.test.mjs"
   }
