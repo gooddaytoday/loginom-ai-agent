@@ -24,6 +24,7 @@ import { exactScanReceipt } from "./file-profile-core"
 import type { ServiceHost } from "./host"
 import { permissionFailure, type localFiles } from "./local-file"
 import { loginomResultState, loginomResultSummary } from "./loginom-result"
+import { packageAccessMetadata } from "./package-access"
 
 type Lease = ServiceHost.Lease
 type Files = Awaited<ReturnType<typeof localFiles>>
@@ -301,11 +302,15 @@ export async function dockTools(input: {
         ? [{ type: "file" as const, uri: `data:${block.mimeType};base64,${block.data}`, mime: block.mimeType }]
         : [],
     )
+    const metadata = name === "dock_prepare"
+      ? await packageAccessMetadata(result._meta?.packageAccess, (sessionID) => plugin.session.get({ sessionID }))
+      : {}
     return {
       content: images.length ? [{ type: "text", text: content }, ...images] : content,
       metadata: {
         generation: lease.generation,
         ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
+        ...metadata,
         // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
         ...(outputPath ? { truncated: true, outputPath } : {}),
         ...(state === "pending" ? { loginomPending: true } : {}),

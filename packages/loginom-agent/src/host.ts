@@ -11,6 +11,7 @@ import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
+import { PackageRecheck } from "@loginom-ai-agent/loginom-host/package-access"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { Option, Schema } from "effect"
 
@@ -130,6 +131,10 @@ export const dashboard = {
     if (Option.isNone(source)) throw new Error("LOGINOM_REPLY_INVALID")
     return source.value
   },
+}
+
+export function recheckPackage(input: typeof PackageRecheck.Type) {
+  return request("package.recheck", input)
 }
 
 async function request(method: string, input: unknown) {

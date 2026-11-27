@@ -205,6 +205,7 @@ async function handle(message) {
         onContextCreated: context => { state.browser = context } })
       state.browser = authenticated.context
       state.owner.origin = new URL(input.connection.url).origin
+      state.owner.account = input.connection.username
       const config = {
         resources: input.resources,
         // Preparation must bind to the same canonical path used by private login.
@@ -278,6 +279,14 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (message.operation === "packageAccess") {
+      const { observePackages } = await import("./package-access.mjs")
+      const page = state.browser.pages()[0]
+      const binding = { origin: state.owner.origin, account: state.owner.account }
+      const result = page ? await observePackages(page, binding, message.input?.packagePath) : null
+      send({ id: message.id, result })
+      return
+    }
     if (["dashboardRead", "dashboardPublish", "dashboardVersions", "dashboardDelete"].includes(message.operation)) {
       if (message.operation === "dashboardVersions" || message.operation === "dashboardDelete") {
         if (message.input?.generation !== state.owner.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
@@ -373,10 +382,15 @@ async function handle(message) {
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
           : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options)
       const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
+      const pkg = state.session.metadata.workspacePreparation?.state?.package_ref
+      const packagePath = message.input.name === "dock_prepare" && result.isError !== true
+        && state.session.metadata.workspaceReady === true && pkg?.persisted === true && pkg.read_only === true
+        ? pkg.path : undefined
       send({
         id: message.id,
         result: {
           result: outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result,
+          ...(typeof packagePath === "string" ? { packagePath } : {}),
           recoveryPending: state.bridge.hasUnsettledWork(),
           activeWork: state.bridge.hasActiveWork(),
         },
