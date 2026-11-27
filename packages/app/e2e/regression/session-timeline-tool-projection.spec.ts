@@ -99,11 +99,20 @@ test("shows a package changes result and saves and undoes a version", async ({ p
     "−1 удалено",
   ])
   const nodes = card.getByRole("list", { name: "Изменённые узлы" })
+  await expect(nodes).toBeHidden()
+  await card.getByText("Изменённые узлы", { exact: true }).click()
   await expect(nodes.getByRole("listitem")).toHaveCount(5)
   await expect(nodes.getByText("Импорт продаж — изменены связи", { exact: true })).toBeVisible()
   await expect(nodes.getByText(/Фильтр по дате — .*изменены связи/)).toBeVisible()
   await expect(nodes.getByText(/Итоги продаж — переименован из «Группировка»/)).toBeVisible()
   await expect(nodes.locator("del")).toHaveText("Промежуточная выгрузка")
+  const filter = nodes.getByRole("listitem").filter({ has: page.getByText("Фильтр по дате", { exact: true }) })
+  await filter.getByText("Настройки и связи", { exact: true }).click()
+  await expect(filter.getByRole("row", { name: /^Вход / }).getByRole("cell")).toHaveText(
+    ["← «Импорт продаж»", "← «Импорт продаж»"],
+    { useInnerText: true },
+  )
+  await filter.getByText("Настройки и связи", { exact: true }).click()
   await expect(card.getByText("Сверка запуском: в копии 120 строк, как в исходном пакете.")).toBeVisible()
   const loginom = card.getByRole("button", { name: "Посмотреть в Loginom" })
   await expect(loginom).toBeVisible()
@@ -160,6 +169,95 @@ test("confirms replacement on a narrow screen and restores the previous version"
     { method: "replace-original", input: { sessionID, confirmed: true } },
     { method: "restore-previous", input: { sessionID, backupPath: backup } },
   ])
+})
+
+test("shows settings and connections before and after each package change", async ({ page }, testInfo) => {
+  const { card } = await setupPackageChanges(page, { facts: true })
+  await page.setViewportSize({ width: 1280, height: 1080 })
+  const disclosure = card.getByText("Изменённые узлы", { exact: true })
+  await expect(card.getByRole("button", { name: "Сохранить новой версией" })).toBeVisible()
+  await expect(card.getByRole("list", { name: "Изменённые узлы" })).toBeHidden()
+  await disclosure.click()
+  const nodes = card.getByRole("list", { name: "Изменённые узлы" })
+  await expect(nodes.getByRole("listitem")).toHaveCount(5)
+
+  const importer = nodes.getByRole("listitem").filter({ has: page.getByText("Импорт продаж", { exact: true }) })
+  await expect(importer.getByText("изменены настройки")).toBeVisible()
+  await importer.getByText("Настройки и связи", { exact: true }).click()
+  const settings = importer.getByRole("table", { name: "Настройки и связи" })
+  await expect(settings.getByRole("columnheader")).toHaveText(["Настройка или порт", "Было", "Стало"])
+  await expect(settings.getByRole("row", { name: /^Разделитель столбцов / }).getByRole("cell")).toHaveText(
+    ["точка с запятой (;)", "запятая (,)"],
+    { useInnerText: true },
+  )
+  const file = settings.getByRole("row", { name: /^Имя файла\/URL / }).getByRole("cell")
+  await expect(file).toHaveText("продажи.csv · не менялось")
+  await expect(file).toHaveAttribute("colspan", "2")
+  await importer.getByText("Настройки и связи", { exact: true }).click()
+
+  const added = nodes.getByRole("listitem").filter({ has: page.getByText("Проверка пустых значений", { exact: true }) })
+  await added.getByText("Настройки и связи", { exact: true }).click()
+  await expect(added.getByRole("row", { name: /^Условие / }).getByRole("cell")).toHaveText(["—", "Цена не пустое"], {
+    useInnerText: true,
+  })
+  await expect(added.getByRole("row", { name: /^Выход «Не соответствуют условию» / }).getByRole("cell")).toHaveText(
+    ["—", "не подключён"],
+    { useInnerText: true },
+  )
+  await added.getByText("Настройки и связи", { exact: true }).click()
+
+  const removed = nodes.getByRole("listitem").filter({ has: page.getByText("Промежуточная выгрузка", { exact: true }) })
+  await removed.getByText("Настройки и связи", { exact: true }).click()
+  await expect(removed.getByRole("row", { name: /^Имя / }).getByRole("cell")).toHaveText(
+    ["Промежуточная выгрузка", "—"],
+    { useInnerText: true },
+  )
+  await removed.getByText("Настройки и связи", { exact: true }).click()
+
+  const revenue = nodes.getByRole("listitem").filter({ has: page.getByText("Выручка по регионам", { exact: true }) })
+  await expect(revenue.getByText("Изменён", { exact: true })).toBeVisible()
+  await expect(revenue.getByText("изменены связи")).toBeVisible()
+  await revenue.getByText("Настройки и связи", { exact: true }).click()
+  await expect(revenue.getByRole("row", { name: /^Показатели / }).getByRole("cell")).toHaveText(
+    "Выручка — сумма · не менялось",
+  )
+  await expect(revenue.getByRole("row", { name: /^Вход «Входной источник данных» / }).getByRole("cell")).toHaveText(
+    ["← «Фильтр по дате»", "← «Проверка пустых значений»"],
+    { useInnerText: true },
+  )
+  await importer.getByText("Настройки и связи", { exact: true }).click()
+  await card.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: testInfo.outputPath("settings-and-connections-1280.png"), animations: "disabled" })
+})
+
+test("stacks a setting name over its labelled values on a narrow screen", async ({ page }, testInfo) => {
+  const { card } = await setupPackageChanges(page, { facts: true, width: 390 })
+  await page.setViewportSize({ width: 390, height: 1080 })
+  await card.getByText("Изменённые узлы", { exact: true }).click()
+  const node = card.getByRole("listitem").filter({ has: page.getByText("Выручка по регионам", { exact: true }) })
+  await node.getByText("Настройки и связи", { exact: true }).click()
+  const row = node.getByRole("row", { name: /^Вход «Входной источник данных» / })
+  await expect(row.getByText("Было:", { exact: true })).toBeVisible()
+  await expect(row.getByText("Стало:", { exact: true })).toBeVisible()
+  expect(
+    await row.evaluate((element) => {
+      const boxes = Array.from(element.children, (cell) => cell.getBoundingClientRect())
+      const [label, before, after] = boxes
+
+      return (
+        !!label &&
+        !!before &&
+        !!after &&
+        label.bottom <= before.top &&
+        label.bottom <= after.top &&
+        label.width > before.width &&
+        label.width > after.width &&
+        after.right <= window.innerWidth
+      )
+    }),
+  ).toBe(true)
+  await card.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: testInfo.outputPath("settings-and-connections-390.png"), animations: "disabled" })
 })
 
 test("keeps the draft when Loginom says the package is busy", async ({ page }) => {

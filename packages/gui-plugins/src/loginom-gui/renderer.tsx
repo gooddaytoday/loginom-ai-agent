@@ -7,6 +7,7 @@ import { decodePackageChanges, packageChangesTool } from "./package-changes-data
 
 const Card = lazy(async () => {
   const { PackageChangesCard } = await import("./package-changes")
+
   return { default: PackageChangesCard }
 })
 
@@ -23,8 +24,9 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
           ? Option.getOrUndefined(decodePackageChanges(props.metadata))?.loginom.packageChanges
           : undefined,
       )
+
       return (
-        <Show when={changes()?.edits.length ? changes() : undefined} keyed>
+        <Show when={changes()?.edits.length || changes()?.schemas ? changes() : undefined} keyed>
           {(value) => (
             <Suspense>
               <Card changes={value} />
