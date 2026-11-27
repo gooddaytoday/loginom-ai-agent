@@ -263,7 +263,7 @@ async function handle(message) {
         presentNodeReply: async (reply, project) => {
           const outputFiles = await session.artifactStore.outputFiles(reply.structuredContent)
           let loginom
-          try { loginom = project({ outputFiles, knownSecrets }) } catch {}
+          try { loginom = project({ outputFiles, knownSecrets, busy: state.protectedOperation.snapshot() }) } catch {}
           return outputFiles.length || loginom ? { ...reply, _meta: { ...reply._meta,
             ...(loginom ? { loginom } : {}), ...(outputFiles.length ? { outputFiles } : {}) } } : reply
         },
@@ -403,15 +403,10 @@ async function handle(message) {
           : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options))
       const outputFiles = result._meta?.loginom && Array.isArray(result._meta.outputFiles)
         ? result._meta.outputFiles : await state.session.artifactStore.outputFiles(result.structuredContent)
-      const busy = state.protectedOperation.snapshot()
-      const metadata = { ...result._meta,
-        ...(outputFiles.length ? { outputFiles } : {}),
-        ...(busy && result._meta?.loginom?.operationId === busy.operationId
-          ? { loginom: { ...result._meta.loginom, busy } } : {}) }
       send({
         id: message.id,
         result: {
-          result: Object.keys(metadata).length ? { ...result, _meta: metadata } : result,
+          result: outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result,
           recoveryPending: state.bridge.hasUnsettledWork(),
           activeWork: state.bridge.hasActiveWork(),
         },

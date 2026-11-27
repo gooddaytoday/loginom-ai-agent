@@ -110,9 +110,8 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
         applyWithScanReceipt: async reply => {
           const end = await protectOperation(reply.structuredContent.operation_id);
-          try { return await presentNodeReply(reply, options =>
-            loginomFeedMetadata(reply, {...options, tool:'dock_node_apply'})); }
-          finally { await end(); }
+          await end();
+          return presentNodeReply(reply, options => loginomFeedMetadata(reply, {...options, tool:'dock_node_apply'}));
         },
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();

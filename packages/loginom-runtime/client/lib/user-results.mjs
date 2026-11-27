@@ -198,9 +198,9 @@ export function compactKnowledgeBundle(description) {
 const FEED_MAX_BYTES = 16 * 1024;
 const FEED_PREVIEW_MAX_BYTES = 12 * 1024;
 
-export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts}) {
+export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts, busy}) {
   const receipt = reply.structuredContent;
-  if (!['dock_node_apply', 'dock_node_wait', 'dock_node_status', 'dock_node_read', 'dock_node_resume', 'dock_node_cancel', 'dock_node_stop'].includes(tool)
+  if (!['dock_node_apply', 'dock_node_wait', 'dock_node_status', 'dock_node_read', 'dock_node_resume', 'dock_node_cancel', 'dock_node_stop', 'dock_node_delete'].includes(tool)
       || receipt?.result_version !== 'user-v1' || !['running', 'settled'].includes(receipt.state)
       || typeof receipt.operation_id !== 'string' || !receipt.operation_id) return;
 
@@ -218,6 +218,7 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
   const succeeded = state === 'settled' && receipt.status === 'SUCCEEDED' && !reply.isError;
   const result = {
     v: 1, operationId: receipt.operation_id, state,
+    busy: busy?.operationId === receipt.operation_id ? busy : undefined,
     attempt: receipt.attempt, status: state === 'settled' ? receipt.status : undefined,
     phase: text(receipt.phase ?? receipt.progress?.pending_phase, 128),
     node: typeof guid === 'string' && guid && label !== undefined && type ? {guid, label, type} : undefined,

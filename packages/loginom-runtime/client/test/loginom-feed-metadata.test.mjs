@@ -147,13 +147,16 @@ test('the block budget reduces preview rows before dropping limitations', () => 
   assert.ok(Buffer.byteLength(JSON.stringify({...rest, ports, limitations})) <= 16 * 1024);
 });
 
-test('the block budget also applies to results without previews', () => {
+test('the block budget retains the matching busy snapshot even without previews', () => {
   const tool = 'dock_node_apply';
   const warnings = Array.from({length:8}, (_, index) => index+'Ж'.repeat(800)+'😀'.repeat(199));
   const reply = nodeResultReply(receipt({warnings}), {userProfile:true, tool});
-  const metadata = loginomFeedMetadata(reply, {tool, facts});
+  const busy = {version:1, windowId:'09a4db75-00cf-4ee0-912d-c252afbaba0f', operationId:'operation', active:false};
+  const metadata = loginomFeedMetadata(reply, {tool, facts, busy});
   assert.equal(metadata.operationId, 'operation');
   assert.equal(metadata.status, 'SUCCEEDED');
+  assert.deepEqual(metadata.busy, busy);
+  assert.equal(loginomFeedMetadata(reply, {tool, facts, busy:{...busy, operationId:'other'}}).busy, undefined);
   assert.deepEqual(metadata.limitations, warnings.slice(0, metadata.limitations.length));
   assert.ok(metadata.limitations.length > 0 && metadata.limitations.length < warnings.length);
   assert.ok(Buffer.byteLength(JSON.stringify(metadata)) <= 16 * 1024);
