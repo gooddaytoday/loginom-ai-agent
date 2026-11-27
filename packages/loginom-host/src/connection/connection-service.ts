@@ -1,14 +1,20 @@
 import { randomUUID } from "node:crypto"
+import { addAbortListener } from "node:events"
 import { Option, Schema } from "effect"
 import { Loginom } from "../loginom"
 import { Product } from "@loginom-ai-agent/product"
 import { connectionStore, type ActiveConnection } from "./connection-store"
 import type { recoveryStore } from "./recovery-store"
 
-export type RuntimeHandle = { close(): Promise<void>; reset?(): Promise<void>; ready?: Promise<void> }
+export type RuntimeHandle = {
+  close(): Promise<void>
+  reset?(): Promise<void>
+  ready?: Promise<void>
+  beforeActivate?(): void
+}
 export type ConnectionRuntime = {
   check(candidate: ActiveConnection, signal?: AbortSignal): Promise<void | Loginom.BrowserStatus>
-  prepare(candidate: ActiveConnection): Promise<RuntimeHandle>
+  prepare(candidate: ActiveConnection, switchSignal?: AbortSignal): Promise<RuntimeHandle>
 }
 const decodeCandidate = Schema.decodeUnknownOption(Loginom.Candidate)
 
@@ -49,6 +55,7 @@ export async function connectionService(
   >()
   const leases = new Map<string, { generation: number; recovery: boolean; active: boolean }>()
   const checks = new Map<AbortController, Promise<void | Loginom.BrowserStatus>>()
+  const switching = new AbortController()
   function loadProfile() {
     if (state.loading) return state.loading
     state.loading = (async () => ({
@@ -129,6 +136,7 @@ export async function connectionService(
   function beginClose() {
     if (state.closing) return
     state.closing = true
+    switching.abort(Error("LOGINOM_HOST_CLOSED"))
     clearValidations()
     for (const controller of checks.keys()) controller.abort(Error("LOGINOM_HOST_CLOSED"))
   }
@@ -148,27 +156,47 @@ export async function connectionService(
       ...(state.failure ? { failure: state.failure } : {}),
     }
   }
+  function failPending(failure: string) {
+    state.failure = failure
+    state.pending = undefined
+    state.pendingBrowser = undefined
+    state.phase = state.handle ? state.readiness : "recoverable-error"
+  }
   function progress() {
     if (state.closing || !state.pending || leases.size || state.applying || state.writing || recovery?.pending().length)
       return
     const candidate = state.pending
     state.phase = "starting"
     state.applying = (async () => {
-      const prepared = await runtime.prepare(candidate).catch(() => {
-        state.failure = "LOGINOM_RUNTIME_START_FAILED"
-        return undefined
-      })
-      if (!prepared) {
-        if (state.pending === candidate) {
-          state.pending = undefined
-          state.phase = state.handle ? state.readiness : "recoverable-error"
+      const signal = state.active ? switching.signal : undefined
+      let prepared: RuntimeHandle | undefined
+      try {
+        prepared = await runtime.prepare(candidate, signal)
+        if (signal && prepared.ready) {
+          // A replacement must serve its catalog before it can retire the active runtime.
+          const aborted = Promise.withResolvers<never>()
+          const listener = addAbortListener(signal, () => aborted.reject(signal.reason))
+          try {
+            await Promise.race([prepared.ready, aborted.promise])
+          } finally {
+            listener[Symbol.dispose]()
+          }
         }
+      } catch (error) {
+        await prepared?.close().catch(() => undefined)
+        if (!state.closing)
+          failPending(
+            error instanceof Error && error.message === "LOGINOM_RUNTIME_TIMEOUT"
+              ? error.message
+              : "LOGINOM_RUNTIME_START_FAILED",
+          )
         return
       }
-      // Local activation may commit before the background catalog request settles.
-      void prepared.ready?.catch(() => undefined)
-      if (state.pending !== candidate) {
-        await prepared.close().catch(() => undefined)
+      const next = prepared
+      // First setup can commit with the catalog still loading in the background.
+      void next.ready?.catch(() => undefined)
+      if (state.closing || state.pending !== candidate) {
+        await next.close().catch(() => undefined)
         return
       }
       const committed = await store
@@ -185,7 +213,10 @@ export async function connectionService(
           )
             throw Error("LOGINOM_GENERATION_CONFLICT")
         })
-        .then(() => store.activate(candidate.generation))
+        .then(() => {
+          next.beforeActivate?.()
+          return store.activate(candidate.generation)
+        })
         .then(
           () => true,
           async () => {
@@ -204,23 +235,23 @@ export async function connectionService(
           },
         )
       if (!committed) {
-        state.failure = "LOGINOM_STORE_WRITE_FAILED"
-        await prepared.close().catch(() => undefined)
-        state.pending = undefined
-        state.phase = state.handle ? state.readiness : "recoverable-error"
+        await next.close().catch(() => undefined)
+        // A failed pointer commit requires a new save. Reopening keeps the active settings.
+        await store.clearPending().catch(() => undefined)
+        failPending("LOGINOM_STORE_WRITE_FAILED")
         return
       }
       const previous = state.handle
       state.active = candidate
       state.browser = state.pendingBrowser ?? { state: "unknown" }
       state.pendingBrowser = undefined
-      state.handle = prepared
+      state.handle = next
       state.pending = undefined
       // Finish the store writes before a window can observe successful activation.
       await store.clearPending().catch(() => {
         state.failure = "LOGINOM_STORE_WRITE_FAILED"
       })
-      observeReadiness(prepared)
+      observeReadiness(next)
       await previous?.close().catch(() => undefined)
     })().finally(() => {
       state.applying = undefined

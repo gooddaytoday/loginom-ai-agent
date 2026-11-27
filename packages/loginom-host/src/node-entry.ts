@@ -8,6 +8,8 @@ import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
 import { DashboardRead } from "./dashboard"
 
+declare const LOGINOM_AI_AGENT_CON08_TEST_BUILD: boolean | undefined
+
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
 const events = new EventEmitter()
@@ -114,6 +116,10 @@ async function dispatch(message: unknown) {
         browserRecovery: "browserRecovery" in input && input.browserRecovery === true,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
+        prepareConnectionSwitch:
+          typeof LOGINOM_AI_AGENT_CON08_TEST_BUILD !== "undefined" && LOGINOM_AI_AGENT_CON08_TEST_BUILD
+            ? (await import("./connection/con08-fixture")).connectionSwitchFixture(input.root)
+            : undefined,
       }
       state.starting = createLoginomHost(options).then(async (host) => {
         state.host = host

@@ -1,6 +1,6 @@
 import { isAbsolute, join } from "node:path"
 
-export async function buildNodeHost(output: string) {
+export async function buildNodeHost(output: string, options: { con08TestBuild?: boolean } = {}) {
   if (!isAbsolute(output)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const result = await Bun.build({
     entrypoints: [join(import.meta.dir, "../src/node-entry.ts")],
@@ -9,6 +9,7 @@ export async function buildNodeHost(output: string) {
     target: "node",
     packages: "bundle",
     splitting: false,
+    define: { LOGINOM_AI_AGENT_CON08_TEST_BUILD: JSON.stringify(options.con08TestBuild === true) },
     metafile: true,
   })
   if (!result.success) throw new AggregateError(result.logs, "LOGINOM_HOST_BUILD_FAILED")
@@ -19,5 +20,5 @@ export async function buildNodeHost(output: string) {
 
 if (import.meta.main) {
   if (!process.argv[2]) throw new Error("Provide an absolute host output directory")
-  await buildNodeHost(process.argv[2])
+  await buildNodeHost(process.argv[2], { con08TestBuild: process.env.LOGINOM_AI_AGENT_CON08_TEST_BUILD === "1" })
 }
