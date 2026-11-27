@@ -23,7 +23,11 @@ export async function extractPackage(path: string) {
   return extractPackageBytes(path, await readFile(path))
 }
 
-export async function extractPackageBytes(fileName: string, bytes: Uint8Array, xmlBudget?: number) {
+export async function extractPackageBytes(
+  fileName: string,
+  bytes: Uint8Array,
+  { xmlBudget, includeTextImport = false }: { xmlBudget?: number; includeTextImport?: boolean } = {},
+) {
   return withSavedPackage(bytes, xmlBudget, async ({ xml, units }) => {
     const info = await xml("PackageInfo.xml")
     if (!info) throw Error("PACKAGE_DOCS_PACKAGE_INFO_MISSING")
@@ -36,7 +40,11 @@ export async function extractPackageBytes(fileName: string, bytes: Uint8Array, x
       const metadata = await xml(base + "/Info.xml")
       const unit = await xml(base + "/Unit.xml")
       if (!unit) throw Error("PACKAGE_DOCS_UNIT_MISSING")
-      const body = workflow(readSavedWorkflow(child(unit, "WorkFlow"), xmlBudget === undefined ? undefined : 32), base)
+      const body = workflow(
+        readSavedWorkflow(child(unit, "WorkFlow"), xmlBudget === undefined ? undefined : 32),
+        base,
+        includeTextImport,
+      )
       const stats = statistics(body)
       const views = items(child(child(unit, "ModelViews"), "Nodes")).map((node) => {
         const entry = nodeEntry(readSavedNode(node), base, 0)
@@ -59,7 +67,18 @@ export async function extractPackageBytes(fileName: string, bytes: Uint8Array, x
   })
 }
 
-function nodeEntry(identity: SavedNode, path: string, depth: number) {
+function readTextImport(engine: XmlElement | undefined) {
+  if (!engine) return
+  const file_or_url = engine.hasAttribute("FileName") ? engine.getAttribute("FileName") : null
+  const column_separator = engine.hasAttribute("DelimiterChar") ? engine.getAttribute("DelimiterChar") : null
+  if (file_or_url === null && column_separator === null) return
+  return {
+    ...(file_or_url !== null ? { file_or_url } : {}),
+    ...(column_separator !== null ? { column_separator } : {}),
+  }
+}
+
+function nodeEntry(identity: SavedNode, path: string, depth: number, includeTextImport = false) {
   const node = identity.element
   const component = child(node, "Component")
   const engine = child(component, "Engine") ?? component
@@ -98,7 +117,9 @@ function nodeEntry(identity: SavedNode, path: string, depth: number) {
         functions: extension?.getAttribute("GroupFunctions") || null }]
     }),
   ) : undefined
+  const text_import = includeTextImport && engine_type === "TBGImportTextFile" ? readTextImport(engine) : undefined
   return { guid, name, display_name, label, service_name, engine_type,
+    ...(text_import ? { text_import } : {}),
     ...(position ? { position } : {}),
     ...(filter_conditions ? { filter_conditions } : {}),
     ...(grouping ? { grouping_fields: grouping } : {}),
@@ -122,8 +143,8 @@ type Workflow = {
   submodels: (Workflow & { label: string; guid: string; depth: number; path: string })[]
 }
 
-function workflow(graph: SavedWorkflow, path: string, depth = 0): Workflow {
-  const workflow_nodes = graph.nodes.map((node) => nodeEntry(node, path, depth))
+function workflow(graph: SavedWorkflow, path: string, includeTextImport: boolean, depth = 0): Workflow {
+  const workflow_nodes = graph.nodes.map((node) => nodeEntry(node, path, depth, includeTextImport))
   const nodes = new Map(workflow_nodes.map((node) => [node.guid, node]))
   const portName = (node: ReturnType<typeof nodeEntry> | undefined, guid: string) =>
     node && [...node.input_ports, ...node.output_ports, ...node.service_input_ports, ...node.service_output_ports].find((port) => port.guid.toLowerCase() === guid.toLowerCase())?.display_name || portNames[guid.toLowerCase()] || ""
@@ -143,7 +164,7 @@ function workflow(graph: SavedWorkflow, path: string, depth = 0): Workflow {
     const entry = workflow_nodes[index]
     if (entry.engine_type !== "TBGModelGenericComponentEngine") return []
     const nested = path + "/" + entry.label
-    return [{ label: entry.label, guid: entry.guid, depth: depth + 1, path: nested, ...workflow(node.submodel ?? readSavedWorkflow(), nested, depth + 1) }]
+    return [{ label: entry.label, guid: entry.guid, depth: depth + 1, path: nested, ...workflow(node.submodel ?? readSavedWorkflow(), nested, includeTextImport, depth + 1) }]
   })
   const noteFields = ["Text", "Caption", "Comment", "Description"]
   const notes = children(child(graph.root, "Annotations")).flatMap((item) => {

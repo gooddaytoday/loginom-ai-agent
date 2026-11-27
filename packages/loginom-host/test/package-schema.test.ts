@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { TextReader, Uint8ArrayWriter, ZipWriter } from "@zip.js/zip.js"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { extractPackage } from "../src/package-docs/extract"
@@ -27,6 +28,46 @@ test("saved schema reads positions, endpoints and filter conditions from evaluat
   expect(
     threshold.workflows.flatMap((workflow) => workflow.nodes.flatMap((node) => node.filter_conditions ?? [])),
   ).toContainEqual({ field: "current_ratio", relation: "frtLess", join: "ctAnd", value: "1" })
+})
+
+test("saved schema reports text-import settings without attributing them to other nodes", async () => {
+  const schema = await saved("tasks/filter-active-rows/reference.lgp")
+  const nodes = schema.workflows[0].nodes
+  expect(nodes.find((node) => node.type === "TBGImportTextFile")?.text_import).toEqual({
+    file_or_url: "data/orders.csv",
+    column_separator: ",",
+  })
+  expect(nodes.find((node) => node.type === "TBGExportTextFile")).not.toHaveProperty("text_import")
+})
+
+test("saved schema keeps the file URL and explicit separator without inferring missing settings", async () => {
+  const url = "https://example.invalid/" + "a".repeat(500)
+  const zip = new ZipWriter(new Uint8ArrayWriter())
+  await zip.add("PackageInfo.xml", new TextReader('<PackageInfo Name="Fixture"/>'), { useWebWorkers: false })
+  await zip.add(
+    "Unit_0/Unit.xml",
+    new TextReader(`
+    <Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <WorkFlow><Nodes>
+        <Item Name="With source">
+          <Component><Engine xsi:type="TBGImportTextFile" FileName="${url}" DelimiterChar="&#9;"/></Component>
+        </Item>
+        <Item Name="With separator">
+          <Component><Engine xsi:type="TBGImportTextFile" DelimiterChar=""/></Component>
+        </Item>
+        <Item Name="Unconfigured">
+          <Component><Engine xsi:type="TBGImportTextFile"/></Component>
+        </Item>
+      </Nodes></WorkFlow>
+    </Unit>
+  `),
+    { useWebWorkers: false },
+  )
+  const schema = await savedPackageSchema("import.lgp", await zip.close())
+  const nodes = schema.workflows[0].nodes
+  expect(nodes[0].text_import).toEqual({ file_or_url: url, column_separator: "\t" })
+  expect(nodes[1].text_import).toEqual({ column_separator: "" })
+  expect(nodes[2]).not.toHaveProperty("text_import")
 })
 
 test("saved schema reports grouping keys and measures and keeps the nested workflow keys", async () => {
@@ -79,6 +120,7 @@ test("window identity normalizes UUID spelling and preserves its runtime-only sc
     source: "window",
     scope: "active_workflow",
     complete: false,
+    limitations: ["active_workflow_only", "no_submodels", "no_node_settings"],
     workflow: {
       document_id: "doc",
       workflow_id: "window-workflow",

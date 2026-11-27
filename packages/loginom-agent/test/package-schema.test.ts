@@ -36,6 +36,7 @@ test("loginom.package.schema reads the requested source and confines it to the c
       observed_at: "2026-11-27T00:00:00.000Z",
       scope: "active_workflow",
       complete: false,
+      limitations: ["active_workflow_only", "no_submodels", "no_node_settings"],
       generation: 2,
       package: { name: "Draft" },
       workflow: { document_id: "doc", workflow_id: "workflow", navigation_path: [], nodes: [], links: [] },
@@ -147,6 +148,10 @@ test("loginom.package.schema reads the requested source and confines it to the c
                 {
                   nodes: expect.arrayContaining([
                     expect.objectContaining({ label: "Filter", position: { x: 480, y: 224 } }),
+                    expect.objectContaining({
+                      type: "TBGImportTextFile",
+                      text_import: { file_or_url: "data/orders.csv", column_separator: "," },
+                    }),
                   ]),
                 },
               ],
