@@ -47,6 +47,11 @@ export function normalizeGraphRefusal(effect,receipt){
    return {...receipt,status:'NOT_APPLIED',native_status:'FAILED'};
  return receipt;
 }
+
+const settledGraphRefusal=(effect,recovery,receipt,graph)=>recovery?.completed===true&&recovery.cleanup_complete===true
+ &&receipt?.status==='NOT_APPLIED'&&receipt.effect_possible===false&&receipt.cleanup_complete===true
+ &&(receipt.native_status==='FAILED'||effect.kind==='create')&&sameDomainGraph(effect.before,graph);
+
 const edgeKey = e => [e.source, e.output, e.target, e.input,...(e.kind?[e.kind]:[])].join('|');
 const node = (graph, id) => {
   const matches = graph.nodes.filter(n => n.ref.node_id === id);
@@ -381,8 +386,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       if(recovery?.completed===true&&recovery.cleanup_complete===true
         &&await settleMoveMismatch({operation,state,effect:state.pending,receipt:recovery.receipt,graph,adapter,record}))return structuredClone(state.result);
       const refused=normalizeGraphRefusal(state.pending,recovery?.receipt);
-      if(recovery?.completed===true&&refused?.status==='NOT_APPLIED'&&refused.native_status==='FAILED'
-        &&recovery.cleanup_complete===true&&sameDomainGraph(state.pending.before,graph)){
+      if(settledGraphRefusal(state.pending,recovery,refused,graph)){
         await save('node_target_refusal_observed',{refusal:{effect:state.pending,receipt:structuredClone(refused),after_graph:graph}});
         (state.refusals??=[]).push({id:state.pending.id,kind:state.pending.kind,receipt:structuredClone(refused)});
         state.pending=null;state.last_graph=structuredClone(graph);state.effect_possible=state.receipts.length>0;
@@ -640,8 +644,7 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
       operation.targetPhase=state;return structuredClone(state.result);
     }
     const refused=normalizeGraphRefusal(effect,recovery.receipt);
-    if(recovery.completed===true&&refused?.native_status==='FAILED'&&refused.status==='NOT_APPLIED'
-      &&recovery.cleanup_complete===true&&sameDomainGraph(effect.before,graph)){
+    if(settledGraphRefusal(effect,recovery,refused,graph)){
       (state.refusals??=[]).push({id:effect.id,kind:effect.kind,receipt:structuredClone(refused)});
       state.pending=null;state.last_graph=structuredClone(graph);state.effect_possible=state.receipts.length>0;
     }else{

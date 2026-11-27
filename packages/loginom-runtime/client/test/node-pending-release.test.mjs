@@ -56,7 +56,7 @@ for(const fault of ['none','transport','pending','receipt','action','phase','tra
   operation.transportUncertain=fault==='transport';
   operation.receipt={state:fault==='pending'?'pending':'completed',receipt:{
    operation_id:fault==='receipt'?'foreign':'apply:n7',action_key:fault==='action'?'ui.act':'node.input_port.open.internal',
-   status:'AMBIGUOUS',phase:'port_open',effect_possible:true,cleanup_complete:false,
+   status:'AMBIGUOUS',action_revision:'1',phase:'port_open',effect_possible:true,cleanup_complete:false,
    output:{verified:false,cleanup_complete:false},error:{code:'OUTPUT_PORT_OPEN_UNCONFIRMED'},
    trace:fault==='trace'?[]:[{event:'input_port_reserved',port_guid:'port',native_index:0},
     {event:'input_port_open_issued',port_guid:'port'},{event:'input_port_open_returned'}]}};

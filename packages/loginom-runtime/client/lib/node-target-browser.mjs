@@ -924,7 +924,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
   const task = extra => ({request,types:NODE_TYPES,origin,build,
     ...(requireNoNativeWindow?{window_blocker_selector:nativeWindowBlockers,track_link_guids:true}:{}),...extra});
   const readCode = t => `async page => (${readGraph.toString()})(page,${JSON.stringify(t)})`;
-  const call = (code,deadline) => execute(code,{timeout:Math.max(1,deadline-Date.now())});
+  const call = (code,deadline,replyMargin=0) => execute(code,{timeout:Math.max(1,deadline-Date.now())+replyMargin});
   const observeGraph=async(value,deadline,{readBindings=false}={})=>{
       request=value;
       const renderDeadline=Math.min(deadline,Date.now()+15000);
@@ -1142,7 +1142,8 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
       }
       const options={receipt_namespace:'node-target:'+request.document_id,receipt_id:effect.id,
         operation_id:effect.id,receipt_signature:createHash('sha256').update(JSON.stringify(effect)).digest('hex')};
-      return await call(withBrowserReceipt(`(${mutateGraph.toString()})(page,${JSON.stringify(t)},${readGraph.toString()},${exportPaletteScroll.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${revealNodePlacement.toString()},${samePlacementGraph.toString()},${nodePlacementOverflow.toString()},${nodePlacementGap.toString()},{bind:${bindAddOnlyDrop.toString()},read:${readAddOnlyDrop.toString()},settle:${settleAddOnlyDrop.toString()}})`,options),deadline);
+      // Allow bounded cleanup and delivery after the original create deadline.
+      return await call(withBrowserReceipt(`(${mutateGraph.toString()})(page,${JSON.stringify(t)},${readGraph.toString()},${exportPaletteScroll.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${revealNodePlacement.toString()},${samePlacementGraph.toString()},${nodePlacementOverflow.toString()},${nodePlacementGap.toString()},{bind:${bindAddOnlyDrop.toString()},read:${readAddOnlyDrop.toString()},${settleAddOnlyDrop.toString()}})`,options),deadline,effect.kind==='create'?5000:0);
       }finally{signal?.removeEventListener('abort',cancel);if(cancellation){await cancellation;await call(`async page=>{page[Symbol.for('loginom-dock.node-target-cancel')]?.delete(${JSON.stringify(effect.id)});return true;}`,Date.now()+3000);}}
     },
     async verifyAddOnlyCleanup(graph,deadline){
