@@ -476,6 +476,68 @@ test('an unresolved started download is never dispatched again on resume',async(
  assert.equal(f.calls.filter(c=>c==='verify').length,1);assert.equal(f.calls.filter(c=>c==='upload').length,1);
 });
 
+// LAB-2054 follow-up (#1391): the executor answers an upload with
+// unconfirmed own cleanup (receipt cleanup_complete:false, no verification)
+// with a terminal blocker; delivery gives the same answer. Receipts below are
+// the ones the executor can produce; a started verification is never blocked.
+for(const variant of ['receipt','lost-receipt','transient','verification-started'])test('delivery of an upload with unconfirmed own cleanup: '+variant,async()=>{
+ const f=fixture(),inspect=f.runtime.inspect,upload=f.runtime.uploadDeliveredArtifact,verify=f.runtime.verifyDeliveredArtifact;
+ let unconfirmed=variant!=='verification-started';
+ const code=variant==='transient'?'OPERATION_STILL_PENDING':'CLEANUP_RECEIPT_MISSING';
+ f.runtime.uploadDeliveredArtifact=async options=>{const r=await upload(options);
+  return variant==='verification-started'?r:{...r,cleanup_complete:false,...(variant==='lost-receipt'?{error:{code:'BROWSER_CALL_UNCERTAIN'}}:{})};};
+ // A compared server copy whose temporary file was not released (executor.mjs:2522).
+ if(variant==='verification-started')f.runtime.verifyDeliveredArtifact=async options=>{await verify(options);unconfirmed=true;
+  return {status:'AMBIGUOUS',cleanup_complete:false,error:{code:'TRANSFER_CLEANUP_FAILED'},output:{bytes_verified:true}};};
+ f.runtime.inspect=async()=>{const r=await inspect();r.output.operation_id='delivery:upload';r.output.outcome.operation_id='delivery:upload';
+  if(unconfirmed){r.output.cleanup_confirmed=false;r.output.state='pending';
+   r.output.outcome={...r.output.outcome,status:'AMBIGUOUS',action_key:'artifact.upload',error:{code,message:'unconfirmed'}};}
+  else r.output.outcome.cleanup_complete=true;
+  return r;};
+ const resume=id=>f.service.resume({operation_id:'delivery',resume_id:id,budget_ms:120000});
+ const blocker=result=>{assert.match(result.error.message,/cleanup is unconfirmed.*report it as a blocker/);
+  assert.match(result.outcome.next_step.instruction,/report it as a blocker/);assert.doesNotMatch(result.outcome.next_step.instruction,/Continue verification/);};
+ const open=result=>{assert.equal(result.outcome.status,'AMBIGUOUS');assert.doesNotMatch(result.error.message,/report it as a blocker/);
+  assert.doesNotMatch(result.outcome.next_step.instruction,/cleanup is unconfirmed/);};
+ const first=await f.service.deliver(request);
+ if(variant==='lost-receipt')blocker(first);
+ else {open(first);if(variant==='receipt')assert.match(first.error.message,/Upload submission requires inspection/);}
+ const second=await resume('resume-1');
+ if(['receipt','lost-receipt'].includes(variant)){blocker(second);assert.equal(f.calls.filter(c=>c==='verify').length,0);}
+ else {
+  open(second);assert.match(second.error.message,/Original delivery receipt remains uncertain/);
+  unconfirmed=false;
+  const third=await resume('resume-2');assert.equal(third.outcome.status,'SUCCEEDED',JSON.stringify(third.error));
+ }
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);
+});
+
+// LAB-2054: only the executor's settled verification without confirmed
+// cleanup is terminal. A lost verification reply may still reconcile.
+for(const variant of ['unresolved','lost'])test('resume after a dispatched verification with unconfirmed cleanup: '+variant,async()=>{
+ const f=fixture(variant==='unresolved'?'verify':undefined),inspect=f.runtime.inspect,verify=f.runtime.verifyDeliveredArtifact;
+ let lost=false;
+ if(variant==='lost')f.runtime.verifyDeliveredArtifact=async options=>{await verify(options);lost=true;
+  return {status:'AMBIGUOUS',cleanup_complete:false,error:{code:'BROWSER_CALL_UNCERTAIN'}};};
+ f.runtime.inspect=async()=>{const r=await inspect();r.output.operation_id='delivery:upload';r.output.outcome.operation_id='delivery:upload';
+  if(variant==='unresolved'&&f.calls.includes('verify')){r.output.cleanup_confirmed=false;r.output.outcome.error={code:'TRANSFER_VERIFICATION_UNRESOLVED'};}
+  if(lost){r.output.cleanup_confirmed=false;r.output.state='pending';r.output.outcome={...r.output.outcome,status:'AMBIGUOUS',error:{code:'BROWSER_CALL_UNCERTAIN'}};}
+  return r;};
+ assert.equal((await f.service.deliver(request)).outcome.status,'AMBIGUOUS');
+ const result=await f.service.resume({operation_id:'delivery',resume_id:'resume-1',budget_ms:120000});
+ assert.equal(result.outcome.status,'AMBIGUOUS');
+ if(variant==='unresolved'){
+  assert.match(result.error.message,/existing verification remains unresolved/);
+  assert.match(result.outcome.next_step.instruction,/existing verification remains unresolved/);
+ }else{
+  assert.doesNotMatch(result.error.message,/existing verification remains unresolved/);
+  assert.match(result.error.message,/Original delivery receipt remains uncertain/);
+  lost=false;
+  assert.equal((await f.service.resume({operation_id:'delivery',resume_id:'resume-2',budget_ms:120000})).outcome.status,'SUCCEEDED');
+ }
+ assert.equal(f.calls.filter(c=>c==='verify').length,1);assert.equal(f.calls.filter(c=>c==='upload').length,1);
+});
+
 test('folder navigation waits for the requested breadcrumb without repeating its gesture',async()=>{
  const f=fixture(undefined,'/user/another-folder'),observe=f.runtime.observe,act=f.runtime.uiAct;
  let stale,remaining=0;

@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 import {createArtifactStore} from '../lib/artifacts.mjs';
 import {Page,runtime} from './support/executor-fixture.mjs';
 
-async function fixture({submissionFailure=false,name='sales.csv',bytes=Buffer.from('abc'),conflict=false}={}) {
+async function fixture({submissionFailure=false,name='sales.csv',bytes=Buffer.from('abc'),conflict=false,uncleanUpload=false}={}) {
   const directory=await mkdtemp(join(tmpdir(),'dock-verify-'));
   const sourcePath=join(directory,'source');await writeFile(sourcePath,bytes);
   const store=await createArtifactStore({directory:join(directory,'store')});
@@ -44,6 +44,7 @@ async function fixture({submissionFailure=false,name='sales.csv',bytes=Buffer.fr
       effect_possible:true,cleanup_complete:true,error:{code:'UPLOAD_PATH_CONFLICT',message:'UPLOAD_PATH_CONFLICT'},trace:[],
       output:{upload_submitted:false,conflict_rejected:true,destination:'/test/'+name}};
     const result=await page.execute(code);
+    if(uncleanUpload&&result.action_key==='artifact.upload')result.cleanup_complete=false;
     if(page.dropReply && result.action_key==='artifact.download'){page.dropReply=false;throw new Error('response lost');}
     return result;
   }});
@@ -170,6 +171,58 @@ test('unconfirmed cleanup preserves the pending gate despite matching bytes',asy
     assert.equal((await f.rt.inspect({operationId:'upload'})).output.state,'pending');
     assert.equal(f.events.filter(e=>e.phase==='transfer_completed').length,0);
     assert.deepEqual(f.counts,{uploads:1,downloads:1,verifications:1});
+  } finally {await f.cleanup();}
+});
+
+// LAB-2054: inspect advised restore_control, recover refused it for uploads,
+// and the model cycled. Both now name one terminal step and stay fail-closed.
+test('verification without a download event leaves one terminal blocker, not a recovery cycle',async()=>{
+  const f=await fixture();
+  try {
+    const request=await f.request();
+    // The gesture lands; Loginom emits no download event inside the window.
+    let expire;const clicked=f.page.mouse.click;
+    f.page.waitForEvent=async()=>new Promise((_,reject)=>{expire=()=>reject(Object.assign(new Error('Timeout 15000ms exceeded'),{name:'TimeoutError'}));});
+    f.page.mouse.click=async(...args)=>{await clicked(...args).catch(()=>{});expire();};
+    const result=await f.rt.verifyArtifact(request);
+    assert.equal(result.status,'AMBIGUOUS');assert.equal(result.error.code,'DOWNLOAD_EVENT_MISSING');
+    const inspected=await f.rt.inspect({operationId:'upload'});
+    assert.equal(inspected.output.state,'pending');
+    const refusal=inspected.output.outcome.error;
+    assert.equal(refusal.code,'TRANSFER_VERIFICATION_UNRESOLVED');
+    assert.doesNotMatch(refusal.message,/restore_control/);assert.match(refusal.message,/report it as a blocker/);
+    for(const strategy of ['restore_control','abandon_operation'])
+      await assert.rejects(f.rt.recover('upload',{recoveryOperationId:'recover-'+strategy,strategy}),/report it as a blocker/);
+    assert.throws(()=>f.rt.assertPreparationAllowed(),/action/);
+    assert.deepEqual(f.counts,{uploads:1,downloads:0,verifications:0});
+  } finally {await f.cleanup();}
+});
+
+// LAB-2054 review: an upload with unconfirmed own cleanup and no verification
+// got restore_control from inspect while recover refused it. Both now agree.
+test('upload with unconfirmed cleanup and no verification gets one consistent refusal',async()=>{
+  const f=await fixture({uncleanUpload:true});
+  try {
+    const inspected=await f.rt.inspect({operationId:'upload'});
+    assert.equal(inspected.output.state,'pending');
+    const refusal=inspected.output.outcome.error;
+    assert.equal(refusal.code,'CLEANUP_RECEIPT_MISSING');
+    assert.doesNotMatch(refusal.message,/restore_control/);assert.match(refusal.message,/report it as a blocker/);
+    assert.doesNotMatch(refusal.message,/verification/);
+    for(const strategy of ['restore_control','abandon_operation']){
+      const error=await f.rt.recover('upload',{recoveryOperationId:'recover-'+strategy,strategy}).then(()=>null,e=>e);
+      assert.equal(error?.message,refusal.message);
+    }
+    assert.throws(()=>f.rt.assertPreparationAllowed(),/action/);
+  } finally {await f.cleanup();}
+});
+
+test('recover of a confirmed upload awaiting verification keeps the non-terminal refusal',async()=>{
+  const f=await fixture();
+  try {
+    const error=await f.rt.recover('upload',{recoveryOperationId:'recover-early',strategy:'abandon_operation'}).then(()=>null,e=>e);
+    assert.match(error?.message??'',/requires server transfer verification/);assert.doesNotMatch(error.message,/report it as a blocker/);
+    assert.equal((await f.rt.verifyArtifact(await f.request())).status,'SUCCEEDED');
   } finally {await f.cleanup();}
 });
 

@@ -1,7 +1,7 @@
 import {ensureGroupingOutputSources} from './grouping-output-sources.mjs';
 import {expandOutputChanges} from './output-mapping-changes.mjs';
 import {GROUPING_FUNCTIONS,supportedGroupingMeasure} from './grouping-parameters.mjs';
-import {configureOutputFields,reorderOutputFields,configureOutputAutosync,excludeOutputField} from './port-mapping-procedure.mjs';
+import {configureOutputFields,reorderOutputFields,configureRequestedOutputAutosync,excludeOutputField} from './port-mapping-procedure.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export function groupingOutputDefinitions(configuration){
@@ -42,7 +42,7 @@ export function resolveGroupingOutput(configuration,parameters,native,mapping={}
   return {current,source,name:preserved?current.name:desired?.name??e.name,label:preserved?current.label:desired?.label??e.label,
    field:e.field,function:e.function,excluded:current.excluded};
  });
- if(preserved&&mapping.fields===undefined&&mapping.changes===undefined)return {fields:null};
+ if((preserved||parameters.measures.length===0)&&mapping.fields===undefined&&mapping.changes===undefined)return {fields:null};
  let ordered=preserved?actual.map(f=>resolved.find(r=>r.current.record_id===f.record_id)):
   [...configuration.keys.map(f=>resolved.find(r=>r.field===f.name&&!r.function)),...parameters.measures.map(m=>resolved.find(r=>r.field===m.field.name&&r.function===m.function))];
  mapping=expandOutputChanges(mapping,ordered.map(r=>({source:{kind:'configured_field',name:r.name},name:r.name,label:r.label,excluded:r.excluded})));
@@ -61,28 +61,22 @@ export function resolveGroupingOutput(configuration,parameters,native,mapping={}
  return {fields:ordered};
 }
 export async function configureGroupingOutput(channel,configuration,parameters,mapping={}){
- // A binding reruns the saved node without reapplying its output definition.
- // Freeze its declared layout before Save, including an initially matching
- // native order; autosync can otherwise reorder exported columns on reopen.
- if(configuration.options?.pedSortResult?.switch_pressed&&mapping.autosync===undefined)mapping={...mapping,autosync:false};
  const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
  let initial=await channel.observe({condition:'grouping output inventory',readMappings:true,ready});
  initial=await ensureGroupingOutputSources(channel,initial);
  const planned=resolveGroupingOutput(configuration,parameters,initial.node_mapping,mapping),changes=[];
- // Native regeneration can reorder even an initially matching layout after
- // reopen (LAB-1100: Region,Metric -> Metric,Region with autosync=true).
- // Freeze every newly configured layout, retaining an explicit autosync
- // choice and options-only/legacy preservation requests.
- if(mapping.autosync!==undefined||planned.fields)changes.push(await configureOutputAutosync(channel,mapping.autosync??false));
+ // The requested measure names and labels are part of the output layout.
+ const namedMeasures=parameters.measures?.some(measure=>measure.name!==undefined||measure.label!==undefined);
+ await configureRequestedOutputAutosync(channel,mapping,changes,namedMeasures);
  if(planned.fields){
   // Finish table edits before exclusion introduces a separate native group.
   // Existing exclusions stay excluded; new exclusions use the same guarded
   // native gesture only after names, labels and relative order are settled.
   const requested={direction:'output',port:0,fields:planned.fields.map(f=>({source:{kind:'configured_field',name:f.source.name},name:f.name,label:f.label,excluded:f.current.excluded}))};
   changes.push(await configureOutputFields(channel,requested,resolveGeneratedGroupingSources(configuration,initial.node_mapping).map(f=>({...f,name:f.source.name,used:true}))));
-  const edited=(await channel.observe({condition:'grouping mapped fields before reorder',readMappings:true,ready})).node_mapping;
-  const ids=planned.fields.map(f=>{const matches=edited.target_fields.filter(t=>(t.source??t.exclusion_source)?.record_id===f.source.record_id);need(matches.length===1,'Grouping mapped source changed');return matches[0].record_id;});
-  changes.push(await reorderOutputFields(channel,ids));
+  const edited=await channel.observe({condition:'grouping mapped fields before reorder',readMappings:true,ready});
+  const ids=planned.fields.map(f=>{const matches=edited.node_mapping.target_fields.filter(t=>(t.source??t.exclusion_source)?.record_id===f.source.record_id);need(matches.length===1,'Grouping mapped source changed');return matches[0].record_id;});
+  changes.push(await reorderOutputFields(channel,ids,edited));
   for(const field of planned.fields.filter(f=>f.excluded&&!f.current.excluded))changes.push(await excludeOutputField(channel,field.source.record_id));
  }
  const final=await channel.observe({condition:'grouping output names and order applied',readMappings:true,ready});

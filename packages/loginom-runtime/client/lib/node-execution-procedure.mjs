@@ -123,6 +123,10 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
   }
   const processes=s=>s.node_processes?.verified===true&&s.node_processes.show_completed===true;
   async function revealChildren(s,group) {
+    // The current guarded inventory can already contain the expanded tree.
+    // An empty group still needs the regular rendering and load path.
+    if(group.rendered===true&&group.expanded===true&&group.children_loaded===true
+      &&s.node_processes.processes.some(p=>p.parent_id===group.process_id))return s;
     // A cached process can be complete while its virtualized row is offscreen.
     // Buffered split grids can retain matching DOM cells (rendered=true)
     // below the viewport, before the snapshot annotates their expander tid.
@@ -234,12 +238,12 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       requireValue(proof?.verified===true&&proof.launch_effect===false&&baseline&&!execution,'A proved no-effect launch refusal is required');
       launchAttempted=false;deactivationAttempted=false;
     },
-    async launchGraph() {
+    async launchGraph(graph) {
       requireValue(baseline&&!execution&&!launchAttempted&&!deactivationAttempted,'A prepared, not-yet-launched graph execution is required');
       const same=s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
         &&s.prepared_node_context.locked===false&&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k])
         &&s.wizard?.status==='absent'&&s.node_outputs?.verified===true;
-      let s=await channel.observe({condition:'configured graph node ready for execution',readOutputs:true,ready:same});
+      let s=graph&&same(graph)?graph:await channel.observe({condition:'configured graph node ready for execution',readOutputs:true,ready:same});
       const body=s.ui.elements.filter(e=>e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body');
       if(body.length===1&&body[0].interaction?.state==='outside_viewport') {
         await channel.revealGraphNode();
@@ -252,26 +256,28 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
           refreshReplacedBody:isPreparedBodyReplacement,
           ready:s=>same(s)&&s.ui.elements.some(e=>e.tid===tid&&e.graph_node?.part==='body'&&e.allowed_actions.includes('click')),
           resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===tid&&e.graph_node?.part==='body'),'Exact graph body required').ref}),identity:()=>({node})});
+        s=undefined;
       }
       const launch=s=>s.ui.elements.filter(e=>e.graph_execution?.node_id===node.node_id&&e.allowed_actions.includes('execute_graph_node'));
+      const launchReady=s=>same(s)&&s.node_outputs.node_selected&&launch(s).length===1;
       if(allowDeactivate){
         const deactivate=s=>s.ui.elements.filter(e=>e.graph_execution?.node_id===node.node_id&&e.graph_execution.mode==='deactivate'&&e.allowed_actions.includes('deactivate_graph_node'));
-        s=await channel.observe({condition:'selected node execution state',readOutputs:true,
-          ready:s=>same(s)&&s.node_outputs.node_selected&&(launch(s).length===1||deactivate(s).length===1)});
+        const selected=s=>same(s)&&s.node_outputs.node_selected&&(launch(s).length===1||deactivate(s).length===1);
+        if(!s||!selected(s))s=await channel.observe({condition:'selected node execution state',readOutputs:true,ready:selected});
         if(deactivate(s).length===1){
           deactivationAttempted=true;
           await channel.perform({condition:'deactivate the owned completed node before fresh execution',initialObservation:s,
             ready:s=>same(s)&&s.node_outputs.node_selected&&deactivate(s).length===1,
             resolve:s=>({verb:'deactivate_graph_node',ref:one(deactivate(s),'Unique native deactivation control required').ref}),
             identity:s=>({node,deactivation:one(deactivate(s),'Unique native deactivation control required').graph_execution})});
+          s=undefined;
         }
       }
-      s=await channel.observe({condition:'native execution control for selected node',readOutputs:true,
-        ready:s=>same(s)&&s.node_outputs.node_selected&&launch(s).length===1});
+      if(!s||!launchReady(s))s=await channel.observe({condition:'native execution control for selected node',readOutputs:true,ready:launchReady});
       // Never repeat an issued or uncertain launch in this driver instance.
       launchAttempted=true;
       const result=await channel.perform({condition:'execute the configured graph node',initialObservation:s,
-        ready:s=>same(s)&&s.node_outputs.node_selected&&launch(s).length===1,
+        ready:launchReady,
         resolve:s=>({verb:'execute_graph_node',ref:one(launch(s),'Unique native execution control required').ref}),
         identity:s=>{
           // A native graph redraw replaces the opaque body ref without changing
@@ -284,11 +290,11 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
     },
     async identify() {
       requireValue(baseline&&!execution,'A pre-launch baseline without an identified execution is required');
+      const old=new Set(baseline.roots.map(p=>p.process_id));
       const s=await openConsole('one new node execution group',s=>{
         if(!processes(s))return false;
-        const old=new Set(baseline.roots.map(p=>p.process_id));
         return s.node_processes.processes.some(p=>p.parent_id===null&&!old.has(p.process_id));
-      });
+      },{pollExecution:true});
       execution=identifyNewExecution(baseline,s.node_processes);
       return structuredClone(execution);
     },
@@ -374,7 +380,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
             }
             stopSignal?.throwIfAborted();
             return false;
-          });
+          },{pollExecution:true});
           break;
         } catch(error) {
           // Only this loop is read-only. Once ownership/console gestures begin,
@@ -470,7 +476,7 @@ export async function finishConfiguredGraph(channel,driver,mode,node) {
   let launch,execution;
   if(mode==='execute') {
     requireValue(driver&&typeof driver.launchGraph==='function'&&typeof driver.identify==='function','Common graph execution driver required');
-    launch=await driver.launchGraph();
+    launch=await driver.launchGraph(graph);
     requireValue(launch.verified===true&&launch.launch_gesture_verified===true&&launch.receipt?.status==='SUCCEEDED'
       &&launch.receipt.cleanup_complete===true&&typeof launch.receipt.operation_id==='string'&&launch.receipt.operation_id.length>0
       &&launch.receipt.action_key==='ui.act'&&launch.receipt.action_revision==='1'&&launch.receipt.output?.gesture_applied===true,'Graph launch is unconfirmed');
