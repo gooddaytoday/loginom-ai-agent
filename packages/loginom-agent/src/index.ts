@@ -530,12 +530,18 @@ export default Plugin.define({
       const result = await ServiceHost.packageAction({ sessionID: session.id, path, decision, close })
         .then(Schema.decodeUnknownPromise(PackageActionReply))
         .catch(() => ({ status: "blocked" as const, lastSave: undefined }))
-      if (result.lastSave) {
+      const saved = decision === "save" && result.lastSave ? { decision, path: result.lastSave.path } : undefined
+      const lastClose = close && result.status === "closed" ? saved ?? (decision === "discard" ? { decision } : undefined) : undefined
+      if (result.lastSave || lastClose) {
         const current = await ctx.session.get({ sessionID: session.id })
         const loginom = current.metadata?.loginom
         await ctx.session.update({ sessionID: session.id, metadata: {
           ...current.metadata,
-          loginom: { ...(loginom && typeof loginom === "object" && !Array.isArray(loginom) ? loginom : {}), lastSave: result.lastSave },
+          loginom: {
+            ...(loginom && typeof loginom === "object" && !Array.isArray(loginom) ? loginom : {}),
+            ...(result.lastSave ? { lastSave: result.lastSave } : {}),
+            ...(lastClose ? { lastClose } : {}),
+          },
         } })
       }
       return { status: result.status, ...(result.lastSave ? { lastSave: result.lastSave } : {}) }

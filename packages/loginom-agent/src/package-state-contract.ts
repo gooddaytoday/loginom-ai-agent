@@ -30,9 +30,24 @@ const actionOutput = {
   additionalProperties: false,
 } as const
 
+export const PackageCloseRecord = Schema.Union([
+  Schema.Struct({ decision: Schema.Literal("save"), path: Schema.String }),
+  Schema.Struct({ decision: Schema.Literal("discard") }),
+])
+
+const SaveReceipt = Schema.Struct({ path: Schema.String, confirmedAt: Schema.Int })
+
+export const PackageSnapshot = Schema.Struct({
+  open: Schema.NullOr(Schema.Boolean),
+  path: Schema.NullOr(Schema.String),
+  modified: Schema.NullOr(Schema.Boolean),
+  modifiedDetectedAt: Schema.NullOr(Schema.Int),
+  lastSave: Schema.NullOr(SaveReceipt),
+})
+
 export const PackageActionReply = Schema.Struct({
   status: Schema.Literals(statuses),
-  lastSave: Schema.optional(Schema.Struct({ path: Schema.String, confirmedAt: Schema.Int })),
+  lastSave: Schema.optional(SaveReceipt),
 })
 
 export const packageStateRpc = {

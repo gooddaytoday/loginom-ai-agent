@@ -5,7 +5,7 @@ import { useNavigate } from "@solidjs/router"
 import { createEffect, createMemo, createSignal, on, onCleanup, untrack, type Accessor } from "solid-js"
 import { Option, Predicate, Schema } from "effect"
 import { notifySessionTabsRemoved } from "@/shell/titlebar/session-events"
-import { useDialog } from "@opencode/ui/context/dialog"
+import { useDialog, useDialogLayer } from "@opencode/ui/context/dialog"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useSettings } from "@/settings/model"
 import { useWorkspaceLocation } from "@/workspaces/location"
@@ -381,7 +381,24 @@ export function createTimelineController(input: {
     }
 
     onCleanup(() => dispatch({ type: "disposed" }))
-    const busy = () => selectSessionDeleteView(deleteState()).busy
+    const layer = useDialogLayer()
+    const [checking, setChecking] = createSignal(false)
+    const busy = () => checking() || selectSessionDeleteView(deleteState()).busy
+    let disposed = false
+    onCleanup(() => (disposed = true))
+
+    const confirm = async () => {
+      if (busy()) return
+      const id = props.sessionID
+      setChecking(true)
+
+      try {
+        if ((await server.ctx.beforeSessionRemove(id)) && !disposed && !layer?.closing())
+          dispatch({ type: "confirm.requested", target: deleteTarget(id) })
+      } finally {
+        if (!disposed) setChecking(false)
+      }
+    }
 
     return (
       <Dialog fit>
@@ -395,11 +412,7 @@ export function createTimelineController(input: {
           <Button variant="ghost" autofocus disabled={busy()} onClick={() => dispatch({ type: "cancel.requested" })}>
             {language.t("common.cancel")}
           </Button>
-          <Button
-            variant="danger"
-            disabled={busy()}
-            onClick={() => dispatch({ type: "confirm.requested", target: deleteTarget(props.sessionID) })}
-          >
+          <Button variant="danger" disabled={busy()} onClick={confirm}>
             {language.t("session.delete.button")}
           </Button>
         </DialogFooter>

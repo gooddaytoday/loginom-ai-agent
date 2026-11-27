@@ -159,6 +159,10 @@ ctx.add(Command, () => ({
 }))
 ```
 
+Built-in window plugins can register `BeforeSessionClose` to check the conversation a user is closing or deleting.
+Returning false keeps it open. Use `BuiltinSlot` with `session.timeline.end` to show a contribution below the messages.
+
+
 ### Referencing a subject
 
 Attach a `type: "note"` part to reference a subject outside workspace lines. Set `comment: ""` to attach only the
@@ -774,6 +778,7 @@ export const builtins = compose({
   "microsoft-office": microsoftOffice,
   sources,
   goal,
+  "loginom-gui": loginom,
 })
 ```
 
@@ -799,6 +804,7 @@ export const builtins = compose({
   "microsoft-office": { ...microsoftOffice, windowEntry: eager(microsoftOfficeRenderer) },
   sources: { ...sources, windowEntry: eager(sourcesRenderer) },
   goal: { ...goal, windowEntry: eager(goalRenderer) },
+  "loginom-gui": { ...loginom, windowEntry: eager(loginomRenderer) },
 })
 ```
 

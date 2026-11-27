@@ -70,14 +70,14 @@ export function ProjectSessionRow(props: {
   )
 
   function DeleteDialog() {
-    const confirm = () => {
+    const confirm = async () => {
       const current = ctx()
 
       const server = props.server
 
       dialog.close()
 
-      if (!current) return
+      if (!current || !(await current.beforeSessionRemove(props.session.id))) return
 
       const ids = sessionTreeIDs(current.data.session.list(), props.session.id)
 

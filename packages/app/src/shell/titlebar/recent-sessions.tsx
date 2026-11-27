@@ -770,10 +770,10 @@ export function RecentSessions() {
       .catch(requestFailed)
   }
 
-  const remove = (item: RecentSession) => {
+  const remove = async (item: RecentSession) => {
     const ctx = ctxOf(item)
 
-    if (!ctx) return
+    if (!ctx || !(await ctx.beforeSessionRemove(item.session.id))) return
 
     const ids = sessionTreeIDs(ctx.data.session.list(), item.session.id)
 

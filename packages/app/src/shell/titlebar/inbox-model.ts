@@ -483,7 +483,8 @@ export function createSessionInbox(options: { archived?: boolean } = {}) {
         .update({ sessionID: entry.session.id, archived: false })
         .then(() => move(entry, undefined))
         .catch(requestFailed),
-    remove: (entry: InboxEntry) => {
+    remove: async (entry: InboxEntry) => {
+      if (!(await entry.ctx.beforeSessionRemove(entry.session.id))) return
       const ids = sessionTreeIDs(entry.ctx.data.session.list(), entry.session.id)
 
       return entry.ctx.data.session

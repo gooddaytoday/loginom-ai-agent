@@ -13,6 +13,7 @@ import {
   MockBadRequest,
   MockInternal,
   MockNotFound,
+  MockRpcError,
   MockPtyFeatureUnsupported,
   MockPtyNotFound,
   MockServiceUnavailable,
@@ -1225,7 +1226,8 @@ function mockHandlers(
           ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get"
             ? Effect.succeed({ output: null })
             : Effect.fail(
-                new MockUnsupported({
+                new MockRpcError({
+                  type: "rpc.method_not_found",
                   message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC`,
                 }),
               ),
@@ -1603,6 +1605,7 @@ export function currentSession(session: MockSession, fallbackDirectory?: string)
     location: { directory: seed.location?.directory ?? seed.directory ?? fallbackDirectory },
     subpath: session.subpath ?? session.path,
     revert: session.revert,
+    metadata: session.metadata,
   }
 }
 

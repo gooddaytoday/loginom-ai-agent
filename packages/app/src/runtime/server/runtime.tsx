@@ -1,4 +1,6 @@
 import { createSimpleContext } from "@opencode/ui/context"
+import { useBeforeSessionClose } from "@/runtime/plugin/session-close"
+import { sessionTreeIDs } from "@/session/requests/session-request-tree"
 import {
   Accessor,
   batch,
@@ -209,6 +211,7 @@ function createServerController(
   const tabs = useTabs()
   const currentRoute = useCurrentRoute()
   const connKey = ServerConnection.key(conn)
+  const beforeSessionClose = useBeforeSessionClose()
   const sdk = createServerSdkContext(conn, scope)
 
   const source = createData({
@@ -350,6 +353,10 @@ function createServerController(
   }
 
   return {
+    beforeSessionRemove: (sessionID: string) =>
+      beforeSessionClose(
+        sessionTreeIDs(data.session.list(), sessionID).map((id) => ({ server: connKey, sessionID: id })),
+      ),
     data,
     sdk,
     sync,
