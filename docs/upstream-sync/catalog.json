@@ -73,8 +73,27 @@
         "packages/desktop/src/main/service/background-service-machine.test.ts"
       ]
     },
-    { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
-    { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
+    {
+      "id": "CAT-09",
+      "title": "Desktop main process, preload, renderer",
+      "paths": ["packages/desktop/**"],
+      "changes": { "C0.5a D1": ["packages/desktop/src/renderer/startup/machine.test.ts"] }
+    },
+    {
+      "id": "CAT-10",
+      "title": "Web app, UI kit, session UI",
+      "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"],
+      "changes": {
+        "C0.5a D1": [
+          "packages/app/src/runtime/plugin/host.tsx",
+          "packages/app/src/runtime/plugin/instance-machine.ts",
+          "packages/app/src/runtime/plugin/instance-machine.test.ts",
+          "packages/app/src/runtime/plugin/ipc.ts",
+          "packages/app/src/runtime/plugin/ipc-machine.ts",
+          "packages/app/src/runtime/plugin/ipc-machine.test.ts"
+        ]
+      }
+    },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
     { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }
   ]

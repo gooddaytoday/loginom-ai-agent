@@ -130,7 +130,7 @@ type HostState = {
 }
 
 // How long a plugin may load its window entry and global stores before it fails.
-const activationTimeout = 30_000
+const moduleLoadTimeout = 30_000
 
 type Stores = Record<string, Persisted<object> | ((session: SessionRef) => Persisted<object>)>
 
@@ -545,7 +545,7 @@ function createHost(input: HostInput) {
       clearTimeout(timers.get(effect.id))
       timers.set(
         effect.id,
-        setTimeout(() => dispatch({ type: "timeout", id: effect.id, attempt: effect.attempt }), activationTimeout),
+        setTimeout(() => dispatch({ type: "timeout", id: effect.id, attempt: effect.attempt }), moduleLoadTimeout),
       )
 
       return

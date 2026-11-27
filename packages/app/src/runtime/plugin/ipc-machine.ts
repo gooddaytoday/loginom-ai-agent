@@ -8,6 +8,7 @@ export type IpcChannel =
   | {
       readonly status: "subscribing"
       readonly attempt: number
+      readonly retried: boolean
       readonly generation: number
       readonly available: boolean
       readonly moved: boolean
@@ -109,6 +110,14 @@ export function transitionIpc(state: IpcState, event: IpcEvent): IpcTransition {
     )
   }
 
+  if (event.type === "timeout" && !channel.retried)
+    return subscribe(
+      state,
+      event.id,
+      { generation: channel.generation, available: channel.available, moved: false },
+      true,
+    )
+
   const cause = event.type === "failed" ? event.cause : new Error(`Ipc "${event.id}" did not answer the subscribe`)
 
   return step(put(state, event.id, { status: "failed", generation: channel.generation }), [
@@ -195,13 +204,17 @@ function subscribe(
   state: IpcState,
   id: string,
   input: { readonly generation: number; readonly available: boolean; readonly moved: boolean },
+  retried = false,
 ) {
   const attempt = state.issued + 1
 
-  return step(put({ ...state, issued: attempt }, id, { status: "subscribing", attempt, pushed: undefined, ...input }), [
-    { type: "subscribe", id, attempt },
-    { type: "timer.start", id, attempt },
-  ])
+  return step(
+    put({ ...state, issued: attempt }, id, { status: "subscribing", attempt, retried, pushed: undefined, ...input }),
+    [
+      { type: "subscribe", id, attempt },
+      { type: "timer.start", id, attempt },
+    ],
+  )
 }
 
 function put(state: IpcState, id: string, channel: IpcChannel): IpcState {

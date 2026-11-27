@@ -25,7 +25,7 @@ type Encoded = Codec["Encoded"]
 
 type View = { available: boolean; generation: number; failed: boolean; value: Decoded }
 
-// How long main may take to answer a subscribe before the Ipc counts as failed.
+// How long main may take to answer each subscribe attempt.
 const subscribeTimeout = 10_000
 
 /** Renderer-side clients for the Ipcs that plugins provide in the main process. */

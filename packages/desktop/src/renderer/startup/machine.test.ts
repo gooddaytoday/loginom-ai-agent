@@ -64,6 +64,18 @@ const mounted: StartupEvent[] = [
 ]
 
 describe("desktop startup", () => {
+  test("keeps the splash while the local server is still starting, then reveals the app", () => {
+    const { state } = replay(mounted.filter((event) => event.type !== "sidecar.ready"))
+
+    expect(selectOverlayMounted(state)).toBe(true)
+    expect(selectInterfaceMounted(state)).toBe(false)
+    expect(selectStartupFailure(state)).toBeUndefined()
+
+    const ready = replay([{ type: "sidecar.ready", data: sidecar }, { type: "tabs.ready" }], state)
+    expect(selectInterfaceMounted(ready.state)).toBe(true)
+    expect(selectStartupRevealed(ready.state)).toBe(true)
+  })
+
   test("shows the error page when the local server never answers", () => {
     const result = replay([
       { type: "theme.applied" },

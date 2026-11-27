@@ -67,7 +67,7 @@ function activeAcme(definition: Entry = stored) {
 test("a plugin loads, creates its instance, reads its stores, sets up and becomes active", () => {
   const run = activeAcme()
 
-  expect(types(run.effects)).toEqual(["load", "timer.start", "create", "prepare", "start", "timer.stop"])
+  expect(types(run.effects)).toEqual(["load", "timer.start", "create", "timer.stop", "prepare", "start"])
   expect(selectPluginStatus(run.state, "acme")).toBe("active")
   expect(selectPluginInstance(run.state, "acme")).toBe(run.instance)
   expect(selectPluginInstances(run.state)).toEqual([run.instance])
@@ -89,8 +89,24 @@ test("a plugin without stores starts as soon as its instance exists", () => {
   expect(selectPluginInstance(run.state, "acme")).toBe(instance)
 })
 
-// Before, a window entry or store read that never settled left the plugin "Loading" forever.
-test("an activation that never settles times out into failed and disposes what it created", () => {
+test("a plugin starts when its stores are finally ready, even after the module watchdog deadline", () => {
+  const instance = { name: "first" }
+
+  const { state } = replay([
+    { type: "reconcile", definitions: [stored], disabled: enabled },
+    { type: "loaded", id: "acme", attempt: 1, setup, messages: {} },
+    { type: "created", id: "acme", attempt: 1, instance, setup },
+    { type: "timeout", id: "acme", attempt: 1 },
+  ])
+
+  expect(selectPluginStatus(state, "acme")).toBe("loading")
+  const ready = transitionPluginHost(state, { type: "prepared", id: "acme", attempt: 1 })
+  expect(ready.effects).toContainEqual({ type: "start", id: "acme", attempt: 1, instance, setup })
+  const started = transitionPluginHost(ready.state, { type: "started", id: "acme", attempt: 1 })
+  expect(selectPluginStatus(started.state, "acme")).toBe("active")
+})
+
+test("a module load that never settles times out into failed", () => {
   const loading = replay([
     { type: "reconcile", definitions: [acme], disabled: enabled },
     { type: "timeout", id: "acme", attempt: 1 },
@@ -99,22 +115,6 @@ test("an activation that never settles times out into failed and disposes what i
   expect(types(loading.effects)).toEqual(["load", "timer.start", "timer.stop", "log"])
   expect(selectPluginStatus(loading.state, "acme")).toBe("failed")
   expect(selectPluginFailure(loading.state, "acme")?.error).toContain("Plugin activation timed out")
-
-  const instance = { name: "first" }
-
-  const preparing = replay([
-    { type: "reconcile", definitions: [stored], disabled: enabled },
-    { type: "loaded", id: "acme", attempt: 1, setup, messages: {} },
-    { type: "created", id: "acme", attempt: 1, instance, setup },
-    { type: "timeout", id: "acme", attempt: 1 },
-  ])
-
-  expect(preparing.effects.slice(-3)).toEqual([
-    { type: "timer.stop", id: "acme" },
-    { type: "dispose", instance },
-    { type: "log", id: "acme", cause: expect.any(Error) },
-  ])
-  expect(selectPluginStatus(preparing.state, "acme")).toBe("failed")
 })
 
 test("a failed load, store read or setup fails the plugin with its error", () => {
