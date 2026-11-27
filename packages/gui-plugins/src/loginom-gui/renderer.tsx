@@ -4,6 +4,7 @@ import type definition from "./index"
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   const Page = lazy(() => import("./page"))
+  const Instructions = lazy(() => import("./instructions"))
   ctx.add(SettingsPage, {
     id: "loginom",
     icon: "arrow-up-right",
@@ -13,6 +14,18 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     render: () => (
       <Suspense>
         <Page />
+      </Suspense>
+    ),
+  })
+  ctx.add(SettingsPage, {
+    id: "instructions",
+    icon: "file-document",
+    get title() {
+      return ctx.t("instructionsTitle")
+    },
+    render: () => (
+      <Suspense>
+        <Instructions />
       </Suspense>
     ),
   })

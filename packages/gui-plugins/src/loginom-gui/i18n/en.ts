@@ -1,6 +1,16 @@
 export default {
   title: "Loginom",
   description: "Choose the Loginom server the agent uses for packages, storage, and scenarios.",
+  instructionsTitle: "Instructions",
+  instructionsHeading: "Instructions for the agent",
+  instructionsExample: "For example: give nodes meaningful names; check for missing values before calculating revenue.",
+  instructionsSkillHint: "For techniques you use on one kind of task, create a skill instead.",
+  instructionsDescription:
+    "The agent follows these instructions in every conversation, alongside any project instructions.",
+  instructionsUnsaved: "Not saved",
+  instructionsLoading: "Loading instructions…",
+  instructionsLoadFailed: "Could not load instructions. Reopen this page to try again.",
+  instructionsSaveFailed: "Could not save instructions. Try again.",
   url: "Address",
   username: "Username",
   password: "Password",

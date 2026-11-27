@@ -2,10 +2,13 @@
 // reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host itself belongs to the server process
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
-import { Definition as ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
+import {
+  Definition as ConnectionSettingsRpc,
+  InstructionsDefinition,
+} from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Plugin } from "@opencode/plugin"
-import type { SessionContext } from "@opencode/plugin/promise/session"
+import type { SessionContext, SessionRequest } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
@@ -110,6 +113,15 @@ const permission = {
 export default Plugin.define({
   id: "loginom.product",
   setup: async (ctx) => {
+    const instructionsKey = "profile-instructions"
+    const readInstructions = async () => {
+      const text = await ctx.storage.get(instructionsKey)
+      return { text: typeof text === "string" ? text : "" }
+    }
+    const addInstructions = async ({ system }: Pick<SessionRequest, "system">) => {
+      const { text } = await readInstructions()
+      if (text.trim()) system.push({ type: "text", text: `User instructions for this Loginom profile:\n${text}` })
+    }
     // Access grants (G1), keyed by the exact session ID: a subsession, a fork and a scheduled wake run in another
     // session or arrive as a new prompt, so none of them inherits a grant. A grant lives for one task, as in 0.4: from the
     // prompt or skill activation that issued it until the session admits its next prompt. It is not tied to an execution:
@@ -388,6 +400,7 @@ export default Plugin.define({
       dock.hide(event)
     }
     await ctx.session.hook("context", async (event) => {
+      await addInstructions(event)
       // After its dashboard's deletion the turn ends, as in 0.4: the request offers no tools, so the model answers once.
       // The folder is gone, and the chat's next prompt is refused.
       if (deleted.has(event.sessionID)) {
@@ -410,10 +423,12 @@ export default Plugin.define({
     })
     await ctx.session.hook("compaction", async (event) => {
       await bound(event.sessionID)
+      await addInstructions(event)
       hide(event)
     })
     await ctx.session.hook("generate", async (event) => {
       await bound(event.sessionID)
+      await addInstructions(event)
       hide(event)
     })
     await ctx.tool.hook("execute.before", async (event) => {
@@ -509,6 +524,13 @@ export default Plugin.define({
       },
     })
     await ctx.rpc.register(ConnectionSettingsRpc, connectionSettings())
+    await ctx.rpc.register(InstructionsDefinition, {
+      read: readInstructions,
+      save: async ({ text }) => {
+        await ctx.storage.set(instructionsKey, text)
+        return { text }
+      },
+    })
     await ctx.rpc.register(preflight, {
       check: async (value) => {
         const code = await ServiceHost.preflight((value as { automation: boolean }).automation)

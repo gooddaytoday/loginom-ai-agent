@@ -61,3 +61,14 @@ export const Definition = Rpc.define({
 
 export type StatusResult = typeof Definition.methods.status.output.Type
 export type CheckResult = typeof Definition.methods.check.output.Type
+
+const instructions = Schema.toStandardSchemaV1(Schema.Struct({ text: Schema.String }))
+
+export const InstructionsDefinition = Rpc.define({
+  id: "loginom.instructions",
+  methods: {
+    read: { input: Schema.toStandardSchemaV1(Schema.Struct({})), output: instructions },
+    save: { input: instructions, output: instructions },
+  },
+  events: {},
+})
