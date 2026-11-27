@@ -23,7 +23,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import { LifetimeContext, liveAccessor, PluginContext, type Bridge, type Entry } from "@opencode/plugin/gui/host"
-import type { BuiltinCatalog, BuiltinContext } from "@opencode/plugin/gui/builtin"
+import { ToolRenderer, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
 import { Predicate } from "effect"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { pluralCategory, resolveTemplate } from "@opencode/ui/context/i18n"
@@ -131,6 +131,48 @@ type HostState = {
 
 // How long a plugin may load its window entry and global stores before it fails.
 const activationTimeout = 30_000
+
+// OpenCode's own tool names, including names found in older transcripts.
+const nativeToolNames = new Set([
+  "apply_patch",
+  "bash",
+  "browser",
+  "edit",
+  "execute",
+  "experimental_image_generate",
+  "glob",
+  "grep",
+  "list",
+  "opencode_artifact_create",
+  "opencode_artifact_delete",
+  "opencode_artifact_read",
+  "opencode_artifact_update",
+  "opencode_list_mcp_resources",
+  "opencode_models",
+  "opencode_read_mcp_resource",
+  "opencode_schedule_create",
+  "opencode_schedule_delete",
+  "opencode_schedule_list",
+  "opencode_schedule_pause",
+  "opencode_schedule_resume",
+  "opencode_session_move",
+  "opencode_session_rename",
+  "opencode_watch_mcp_event",
+  "opencode_worktree_create",
+  "opencode_worktree_list",
+  "opencode_worktree_remove",
+  "patch",
+  "question",
+  "read",
+  "shell",
+  "skill",
+  "subagent",
+  "task",
+  "todowrite",
+  "webfetch",
+  "websearch",
+  "write",
+])
 
 type Stores = Record<string, Persisted<object> | ((session: SessionRef) => Persisted<object>)>
 
@@ -814,19 +856,44 @@ function createHost(input: HostInput) {
       add<T>(registry: Registry<T>, item: T | (() => T | undefined)) {
         if (late()) return () => {}
 
+        const toolRenderer = registry.id === ToolRenderer.id
+
+        if (toolRenderer && !input.builtins?.has(plugin))
+          throw new Error("Only built-in plugins can add tool renderers")
+
+        const validate = (value: T | undefined) => {
+          if (
+            toolRenderer &&
+            Predicate.hasProperty(value, "tool") &&
+            Predicate.isString(value.tool) &&
+            nativeToolNames.has(value.tool)
+          )
+            throw new Error(`Cannot register a renderer for native tool "${value.tool}"`)
+
+          return value
+        }
+
         // Promise callbacks may have no owner; fall back to the plugin root.
-        const read =
-          // SAFETY: a function item is the SDK's reactive form; registries take no function values.
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- see SAFETY above
-          typeof item === "function"
-            ? runWithOwner(getOwner() ?? root, () => createMemo(item as () => T | undefined))
-            : () => item
+        // SAFETY: a function item is the SDK's reactive form; registries take no function values.
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- see SAFETY above
+        const reactive = typeof item === "function"
+
+        const read = reactive
+          ? runWithOwner(getOwner() ?? root, () => {
+              // SAFETY: the function branch above is the registry's reactive form.
+              const getValue = item as () => T | undefined
+
+              return createMemo(toolRenderer ? () => validate(getValue()) : getValue)
+            })
+          : undefined
+
+        const fixed = reactive ? undefined : validate(item)
 
         const key = `${plugin}/${++sequence.value}`
 
         setState("entries", registry.id, (entries = []) => [
           ...entries,
-          { key, registry: registry.id, plugin, value: read ?? (() => undefined) },
+          { key, registry: registry.id, plugin, value: read ?? (() => fixed) },
         ])
 
         return register(() =>
