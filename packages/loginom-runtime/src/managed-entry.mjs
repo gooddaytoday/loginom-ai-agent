@@ -253,7 +253,7 @@ async function handle(message) {
       )
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
-      state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+      state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport, nodeOutputViews: true,
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
         startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {
           state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error,
@@ -352,6 +352,19 @@ async function handle(message) {
         id: message.id,
         result: { ...(await state.client.listTools()), prepared: state.session.metadata.workspaceReady === true },
       })
+      return
+    }
+    if (message.operation === "nodeOutput") {
+      if (state.controller || message.input?.generation !== state.owner.generation) {
+        send({ id: message.id, result: null })
+        return
+      }
+      state.controller = new AbortController()
+      try {
+        send({ id: message.id, result: await state.bridge.readNodeOutput(message.input) })
+      } finally {
+        state.controller = undefined
+      }
       return
     }
     if (message.operation === "interrupt") {

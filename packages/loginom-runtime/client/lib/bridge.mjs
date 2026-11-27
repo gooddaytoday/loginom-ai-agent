@@ -93,7 +93,7 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
   return inherited;
 }
 
-export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, reauthenticateReload } = {}) {
+export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, reauthenticateReload, nodeOutputViews=false } = {}) {
   if (config.closeSavedPackageOnShutdown !== undefined && typeof config.closeSavedPackageOnShutdown !== 'boolean'
       || config.closeSavedPackageOnShutdown === true && config.acceptanceCleanupPackage)
     throw Error('Invalid private saved-package cleanup policy');
@@ -164,6 +164,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   let pinnedActions = null;
   let recoveryContext = null;
   const redactor=createRedactor([config.apiKey]);
+  const nodeOutputRedactor=nodeOutputViews?createRedactor([config.apiKey]):null;
   const recordExecution = createExecutionJournal({ directory: session.directory,
     metadata: session.metadata, redactor });
   const startup = catalogStartup(startupOptions);
@@ -278,7 +279,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         },
         getNodeContractPins: () => ({...pinned.pins, skillRevision:session.metadata.skillRevision, loginomProfile:session.metadata.targetIdentity ?? pinned.compatibility}),
         artifactStore:session.artifactStore, allowCandidate: replay, onRecord:recordExecution, redactor,
-        browserRecovery: config.browserRecovery === true && userProfile,
+        browserRecovery: config.browserRecovery === true && userProfile,nodeOutputRedactor,
         ...(userProfile ? { probePreparedPage } : {}),
         ...(userProfile && config.storageDirectories && reauthenticateReload ? {
           reopenNodePackage: input => reopenNodePackage({...input,saveWorkspace:()=>session.save(catalog)}),
@@ -678,10 +679,11 @@ export async function createBridge(config, session, { browserTransport: managedB
               const result=await dispatchNodeApi(runtime,request.params.name,args,{signal:extra.signal,scanReceipt});
               if(userProfile)userWorkflows.rememberDelivery(result,args);
               await logResult(request.params.name,result);
-              const reply=nodeResultReply(result,{userProfile,tool:request.params.name});
+              const reply=nodeResultReply(result,{userProfile,tool:request.params.name,outputView:nodeOutputViews,redactor:nodeOutputRedactor,
+                inputCount:port=>actionRuntime.nodeOutputInput(result.operation_id,port)});
               if(observedPackage&&!reply.isError){
                 reply.content.push({type:'text',text:JSON.stringify({kind:'dock_package_observation',package_ref:observedPackage})});
-                return boundedUserToolReply(reply,{tool:request.params.name,operationId:args.operation_id});
+                return boundReply(reply,{tool:request.params.name,operationId:args.operation_id});
               }
               return reply;
             };
@@ -960,12 +962,22 @@ export async function createBridge(config, session, { browserTransport: managedB
         return { isError: true, content: [{ type: 'text', text: message }] };
       }
     };
+    const boundReply=(reply,options)=>{
+      if(!reply._meta?.loginomNodeOutput)return boundedUserToolReply(reply,options);
+      const {_meta,...modelReply}=reply;
+      const bounded=boundedUserToolReply(modelReply,options);
+      return bounded===modelReply?reply:bounded;
+    };
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       const reply=await callTool(request,extra);
       return userProfile && ['local','action'].includes(catalog.routes.get(request.params.name))
-        ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
+        ?boundReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
     });
     return { server, catalog,
+      readNodeOutput(receipt) {
+        if(shutdownStarted||!nodeOutputViews||!userProfile||recovery.unsettled()||clipboardUncertain||heldLeases.size)return null;
+        return actionRuntime?.readNodeOutput(receipt)??null;
+      },
       applyWithScanReceipt(args,receipt,extra) {
         return callTool({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);
       },

@@ -136,6 +136,68 @@ function deliveredUpload(result,outcome) {
     +`not the delivery operation_id "${result.operation_id}".`};
 }
 
+export function confirmedTablePort(port,executionId) {
+  return port?.fresh===true&&port.freshness_basis==='completed_execution_port_source'
+    &&port.execution_id===executionId&&typeof port.port_guid==='string'&&!!port.port_guid
+    &&Number.isSafeInteger(port.port)&&port.port>=0&&Number.isSafeInteger(port.row_count)&&port.row_count>=0
+    &&Array.isArray(port.schema)&&Array.isArray(port.sample)&&port.sample.length<=Math.min(100,port.row_count);
+}
+
+export function nodeOutputView(result,delivered,inputCount,redactor) {
+  const outcome=result.outcome,node=outcome?.output,executionId=node?.execution?.execution_id;
+  if(result.state!=='settled'||outcome?.status!=='SUCCEEDED'||outcome.cleanup_complete!==true
+    ||node?.execution?.status!=='completed'||!executionId||!node.node)return;
+  const ports=(node.output?.ports??[]).filter(port=>confirmedTablePort(port,executionId)).map(port=>{
+    const visible=delivered?.output?.ports?.find(item=>item.port_guid===port.port_guid);
+    const sample=visible?.sample??[],exact=visible?.exact_table?.rows;
+    const rows=exact??sample,seen=rows.length;
+    const signals=[];
+    if(port.row_count===0)signals.push({kind:'zero_rows'});
+    else if(seen<port.row_count)signals.push({kind:'seen_of_total',seen,total:port.row_count});
+    const columns=visible?.schema??null;
+    const nullColumns=(columns??[]).flatMap((_,index)=>seen>0&&rows.every(row=>row[index]?.is_null===true)?[index]:[]);
+    if(nullColumns.length)signals.push({kind:'null_in_read_rows',columns:nullColumns});
+    const before=inputCount?.(port);
+    if(before)signals.push({kind:'before_after',input:before,after:port.row_count});
+    const targetRows=Math.min(port.row_count,100);
+    return {port:port.port,portGuid:port.port_guid,summary:{rowCount:port.row_count},
+      detail:visible?{kind:'delivered',sample,...(exact?{exactRows:exact}:{})}:{kind:'unavailable',reason:'rows_not_delivered'},
+      expanded:{sample:{targetRows,availableRows:seen,...(seen<targetRows?{limitation:'more_rows_not_delivered'}:{})},columns},signals};
+  });
+  if(!ports.length)return;
+  const view={version:1,operationId:result.operation_id,executionId,node:node.node,ports};
+  const fits=value=>Buffer.byteLength(JSON.stringify(value),'utf8')<=USER_PREVIEW_WIRE_BUDGET;
+  for(const port of ports){
+    if(port.expanded.columns)continue;
+    const schema=node.output.ports.find(output=>output.port_guid===port.portGuid).schema;
+    const columns=redactor?redactor.redact(schema):schema;
+    if(Array.isArray(columns))port.expanded.columns=columns;
+    if(!port.expanded.columns||!fits(view)){
+      port.expanded.columns=null;
+      port.expanded.columnsLimitation='columns_projection_limit';
+    }
+  }
+  const readback=node.configuration?.status==='applied'?node.configuration.readback:null;
+  if(readback){
+    try{
+      const configuration=redactor?redactor.redact(readback):readback;
+      const expanded={...view,how:{configuration}};
+      if(configuration?.type!=='redaction_failure'&&fits(expanded))return expanded;
+    }catch{}
+    return {...view,how:{configuration:null,limitation:'configuration_projection_limit'}};
+  }
+  return {...view,how:{configuration:null,limitation:'configuration_not_confirmed'}};
+}
+
+export function nodeInputCount(port,source,node) {
+  const outcome=source?.outcome,receipt=outcome?.output;
+  if(outcome?.status!=='SUCCEEDED'||outcome.cleanup_complete!==true||receipt?.execution?.status!=='completed'
+    ||receipt.execution.execution_id!==port.executionId||receipt.node?.node_id!==port.nodeId
+    ||!['document_id','workflow_id'].every(key=>receipt.node[key]===node[key]))return;
+  const output=receipt.output?.ports?.find(output=>output.port_guid===port.portGuid&&confirmedTablePort(output,port.executionId));
+  if(output)return {...port,rowCount:output.row_count};
+}
+
 function previewLimitations(output) {
   const limitations=[];
   for(const port of output.ports??[])if(port.port_kind==='tree'&&port.sample_complete===false)

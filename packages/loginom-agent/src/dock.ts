@@ -24,6 +24,7 @@ import { exactScanReceipt } from "./file-profile-core"
 import type { ServiceHost } from "./host"
 import { permissionFailure, type localFiles } from "./local-file"
 import { loginomResultState, loginomResultSummary } from "./loginom-result"
+import { isNodeOutputTool } from "./node-output"
 
 type Lease = ServiceHost.Lease
 type Files = Awaited<ReturnType<typeof localFiles>>
@@ -298,7 +299,10 @@ export async function dockTools(input: {
       .flatMap((block) => (block.type === "text" && typeof block.text === "string" ? [block.text] : []))
       .join("\n\n")
     const state = loginomResultState(result as Parameters<typeof loginomResultState>[0])
-    const summary = oversized(text)
+    const nodeOutput = result._meta?.loginomNodeOutput
+    const exceedsLimit = oversized(text)
+    const loginom = isNodeOutputTool(key) && !exceedsLimit && Schema.is(Schema.Json)(nodeOutput) ? { loginom: nodeOutput } : {}
+    const summary = exceedsLimit
       ? loginomResultSummary(result as Parameters<typeof loginomResultSummary>[0])
       : undefined
     const outputPath = summary ? await retain(text) : undefined
@@ -309,7 +313,7 @@ export async function dockTools(input: {
     if (state === "failed")
       throw new Tool.Error({
         message: content || "LOGINOM_TOOL_FAILED",
-        metadata: { generation: lease.generation, isError: true },
+        metadata: { generation: lease.generation, isError: true, ...loginom },
       })
     const images = result.content.flatMap((block) =>
       block.type === "image" && typeof block.data === "string" && typeof block.mimeType === "string"
@@ -320,6 +324,7 @@ export async function dockTools(input: {
       content: images.length ? [{ type: "text", text: content }, ...images] : content,
       metadata: {
         generation: lease.generation,
+        ...loginom,
         ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
         // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
         ...(outputPath ? { truncated: true, outputPath } : {}),

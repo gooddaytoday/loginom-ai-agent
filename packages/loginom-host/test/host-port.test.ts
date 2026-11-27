@@ -46,6 +46,8 @@ test.each(["finish", "reject", "release", "close", "uncertain", "disconnect", "k
         if (m.operation === 'start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
         if (m.operation === 'close') { owner.port1.close(); owner.port2.close(); process.send({id:m.id,result:{closed:true}},()=>process.disconnect()); }
         if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
+        if (m.operation === 'nodeOutput') process.send({id:m.id,result:m.input.operationId==='confirmed'&&m.input.executionId==='execution'&&m.input.portGuid==='port'
+          ?{rows:[[{value:'live sample'}]],targetRows:1}:null});
         if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
         if (m.operation !== 'call') return;
         const action = m.input.arguments.action;
@@ -130,6 +132,15 @@ test.each(["finish", "reject", "release", "close", "uncertain", "disconnect", "k
         expect(await call("finish")).toEqual({ action: "finish" })
         expect(await readdir(join(root, "recovery"))).toEqual([])
         await client.request("release", { run: "one" })
+        if (ending === "finish") {
+          const receipt = { generation: 1, operationId: "confirmed", executionId: "execution", portGuid: "port" }
+          const sample = (session: string, generation: number) => client.request("nodeOutput", {
+            run: "ui-read", session, receipt: { ...receipt, generation },
+          })
+          expect(await sample("chat", 1)).toEqual({ rows: [[{ value: "live sample" }]], targetRows: 1 })
+          expect(await sample("another-chat", 1)).toBeNull()
+          expect(await sample("chat", 2)).toBeNull()
+        }
         expect(await client.request("acquire", { run: "next", session: "chat" })).toEqual({ generation: 1 })
         if (ending === "reject") {
           await client.request("scope", {

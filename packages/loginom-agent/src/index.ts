@@ -17,6 +17,7 @@ import { dockTools } from "./dock"
 import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
+import { nodeOutputRpc, readNodeOutput } from "./node-output"
 import { packageDocs } from "./package-docs"
 import {
   classify,
@@ -513,6 +514,9 @@ export default Plugin.define({
     await ctx.rpc.register(DashboardTarget.rpc, {
       prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),
       find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),
+    })
+    await ctx.rpc.register(nodeOutputRpc, {
+      sample: (value) => readNodeOutput((input) => ctx.session.context(input), value),
     })
     await ctx.rpc.register(permission, {
       conversation: async (value, call) => {

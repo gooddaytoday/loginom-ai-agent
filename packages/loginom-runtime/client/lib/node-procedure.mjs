@@ -287,6 +287,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(request.requireExactNumbers===true&&['transform.collapse_columns','transform.replace_columns','transform.group_data','transform.sorting','trees.to_table'].includes(readType))
         request={...request,typedVariants:true,...(readType==='transform.replace_columns'?{variantEmptyIsNull:true}:{})};
       if(!preparedNodeContext)throw Error('Prepared node required for direct output read');
+      if(operation.nodeOutputWitnesses&&operation.parameters.finish==='execute')request={...request,captureInput:true};
       const code=makeNodePortOutputCode(preparedNodeContext,request,{origin:targetOrigin,build:targetBuild,deadline:operation.deadline});
       snapshot=null;evidenceSnapshot=null;
       // Only an actual dispatch invalidates the previous read's cleanup proof.
@@ -318,9 +319,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         }
         throw error;
       }
-      await entry('node_port_output_read',{outcome:structuredClone(result)});
+      const {input_source,...outputRead}=result;
+      if(operation.nodeOutputWitnesses&&result.output.port_kind!=='tree')operation.nodeOutputWitnesses.set(result.output.port_guid,{
+        binding:structuredClone(preparedNodeContext),request:structuredClone(request),input:input_source,
+      });
+      await entry('node_port_output_read',{outcome:structuredClone(outputRead)});
       checkBudget();
-      return structuredClone(result);
+      return structuredClone(outputRead);
     },
     async openJavascriptPreview(port){
       checkBudget();

@@ -6,6 +6,7 @@ import { hostException, hostFailure } from "./errors"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 import { HostTaskScope } from "./task-scope"
 import { DashboardDelete, DashboardRead, DashboardPublish } from "./dashboard"
+import { NodeOutputReceipt } from "./node-output"
 import { Schema } from "effect"
 import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
 import { browserRecoveryToolName, isBrowserRecoveryTool } from "../../loginom-runtime/client/lib/browser-recovery.mjs"
@@ -194,6 +195,16 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       return
     }
     try {
+      if (data.method === "nodeOutput") {
+        const request = Schema.decodeUnknownSync(Schema.Struct({ session: Schema.NonEmptyString, receipt: NodeOutputReceipt }))(input)
+        const chat = createHash("sha256").update(request.session).digest("hex")
+        const busy = [...acquiring.values()].includes(chat) || [...runs.values()].some((run) => run.chat === chat && run.calls > 0)
+        const result = busy || service.recoveries.has(chat) || service.journal.pending().length
+          ? null
+          : await service.readNodeOutput(chat, request.receipt)
+        reply({ id: data.id, result })
+        return
+      }
       const hasPackageInput = "packageInput" in input && input.packageInput !== undefined
       if (hasPackageInput && (data.method !== "call" || !("name" in input) || input.name !== prepareTool.name))
         throw new Error("LOGINOM_SCOPE_DENIED")
