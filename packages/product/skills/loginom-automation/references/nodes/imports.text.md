@@ -26,7 +26,7 @@ Keep `settings.source`/`settings.format`/`mappings` and field order.
 Attachment `overwrite=reject`; compare server bytes before reuse.
 No path/policy/saved-node activation bypass of `UPLOAD_PATH_CONFLICT`.
 
-Verified delivery: use `output.upload_operation_id`.
+Verified `output.upload_operation_id`: omit `source_path`.
 Fallback: UTF-8, header, skip 0, comma, dot, empty NULL, double quote.
 
 `source_switch`: [switch to full file](../large-files.md#переключение-на-полный-файл); no separate Import Execute.
