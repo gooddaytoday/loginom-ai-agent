@@ -139,6 +139,11 @@ export const dashboard = {
   },
 }
 
+export async function packageState(sessionID: string) {
+  const result = await request("package.state", { sessionID }).catch(() => null)
+  return result ?? { open: null, path: null, modified: null, modifiedDetectedAt: null, lastSave: null }
+}
+
 async function request(method: string, input: unknown) {
   const current = state.current
   const connection = await current?.ready

@@ -810,6 +810,20 @@ export async function createLoginomHost(options: {
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
       return inputs.admit(`${generation}:${chat}`, userMessage, files, `/${current.connection.username}`)
     },
+    async packageState(sessionID: string) {
+      const chat = createHash("sha256").update(sessionID).digest("hex")
+      const { generation } = await service.api.status()
+      const child = generations.get(generation)?.children.get(chat)
+      if (!child) {
+        if (lost.has(chat) || stale.has(chat) || [...generations.values()].some((entry) => entry.children.has(chat)))
+          return null
+        return { open: false, path: null, modified: null, modifiedDetectedAt: null, lastSave: null }
+      }
+      const result = await (await child).request("packageState", undefined, 5000)
+      if ((await service.api.status()).generation !== generation || generations.get(generation)?.children.get(chat) !== child)
+        return null
+      return result
+    },
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true
     },

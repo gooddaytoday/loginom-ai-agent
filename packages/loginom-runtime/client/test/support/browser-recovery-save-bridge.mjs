@@ -110,11 +110,19 @@ test('inspection of an ambiguous Save delivers the original saved-package follow
     const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
     await client.callTool({name:'dock_prepare',arguments:{}});
     await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path,conflict_policy:'replace'},operation_id:'own-save'}});
+    const browser = { pages: () => [] };
+    assert.equal((await bridge.packageState(browser, false)).lastSave, null);
+    const beforeConfirmation = Date.now();
     const inspected=await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:'own-save'}});
     const blocks=inspected.content.map(c=>{try{return JSON.parse(c.text);}catch{return {};}});
     assert.equal(blocks[0].action_key,'operation.inspect');
     const state=blocks.find(v=>v.kind==='dock_saved_package_state');
     assert.equal(state?.save_operation_id,'own-save',JSON.stringify(inspected));
+    const { lastSave } = await bridge.packageState(browser, false);
+    assert.equal(lastSave?.path, path);
+    assert.ok(lastSave.confirmedAt >= beforeConfirmation && lastSave.confirmedAt <= Date.now());
     assert.equal(state.package_path,path);assert.equal(state.modified,false);assert.equal(f.stateReads,2);
+    await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:'own-save'}});
+    assert.deepEqual((await bridge.packageState(browser, false)).lastSave, lastSave);
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
 });

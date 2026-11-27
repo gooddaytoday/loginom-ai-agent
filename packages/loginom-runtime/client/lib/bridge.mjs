@@ -32,6 +32,7 @@ import { compactActionResult, compactNodeRequestFailure, userResultSchema, compa
 import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory, userActionKeys } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
+import { createPackageStateReader } from './package-state.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState,readSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
 import {compareSavedPackageGraph,makeSavedPackageGraphCode,parseSavedPackageBytes,savedGraphMessage} from './saved-package-graph.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
@@ -330,6 +331,7 @@ export async function createBridge(config, session, { browserTransport: managedB
     // T4 for saves: a confirmed Save whose package state could not be read. The
     // runtime rereads path and dirty state itself after the model's browser work.
     const saveRecoveries = new Map();
+    const readPackageState = createPackageStateReader(session.metadata, config.loginomUrl);
     const readSavedState = async save => {
       const prepared = session.metadata.workspacePreparation?.state;
       const options = { sessionId: session.metadata.sessionId, documentId: prepared?.document_id,
@@ -806,7 +808,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               &&(!lastSavedPackage||admission.sequence>lastSavedPackage.sequence)) {
               savedPackages.set(admission.path,confirmedSave.operation_id);
               lastSavedPackage={path:admission.path,operation_id:confirmedSave.operation_id,
-                document_id:admission.document_id,sequence:admission.sequence};
+                document_id:admission.document_id,sequence:admission.sequence,confirmedAt:Date.now()};
               admission.confirmed=true;
               if(confirmedSave.output?.reopened===true||confirmedSave.trace?.some(e=>e.event==='save_continuations_observed'
                 &&e.recovered_reopen===true&&e.native_identity_verified===true))
@@ -1008,6 +1010,9 @@ export async function createBridge(config, session, { browserTransport: managedB
         }},undefined,{timeout:3000,signal});
         const snapshot=parseCapabilityResult(response,{redactor}).output?.snapshot;
         return snapshot?redactor.redact(snapshot):null;
+      },
+      packageState(context, busy) {
+        return readPackageState(context, lastSavedPackage, busy);
       },
       applyWithScanReceipt(args,receipt,extra) {
         return callTool({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);
