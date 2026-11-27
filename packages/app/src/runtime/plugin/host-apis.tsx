@@ -55,7 +55,7 @@ import { terminalFontFamily, useSettings } from "@/settings/model"
 import { useSettingsSurface } from "@/settings/surface"
 import { formatKeybindParts, useCommand } from "@/shell/commands/command"
 import { createMediaQuery } from "@solid-primitives/media"
-import { useIsRouting, useLocation } from "@solidjs/router"
+import { useIsRouting, useLocation, useNavigate } from "@solidjs/router"
 import { useLanguage } from "@/runtime/i18n/language"
 import {
   createHostApiAttachState,
@@ -104,7 +104,7 @@ type Attached = {
   scope: (server: string) => ServerScope
   /** Records a session-scoped store so layout pruning drops it with the session. */
   scoped: (name: string) => void
-  layout: Omit<Layout, "narrow" | "settings" | "project" | "draft" | "command" | "stored" | "side"> & {
+  layout: Omit<Layout, "narrow" | "settings" | "project" | "draft" | "command" | "openPage" | "stored" | "side"> & {
     stored(plugin: string, session: SessionRef): readonly string[]
     /** `width` and `resize` take the panel's host key, `${plugin}:${panel id}`. */
     side: Layout["side"]
@@ -113,6 +113,7 @@ type Attached = {
   project: (server: string, title: string) => void
   draft: Layout["draft"]
   command: (id: string) => void
+  openPage: (plugin: string, id: string) => void
   run: (id: string) => boolean
   notify: (plugin: string, options: NotifyOptions) => Promise<NotifyResult>
   font: Accessor<string>
@@ -483,6 +484,7 @@ export function createHostApis() {
       project: (server, title) => write((value) => value.project(server, title)),
       draft: (input) => write((value) => value.draft(input)),
       command: (id) => write((value) => value.command(id)),
+      openPage: (id) => write((value) => value.openPage(plugin, id)),
     }),
     embeds: () => embeds,
     ui: () => ui,
@@ -523,6 +525,7 @@ export function createPluginAttachment(apis: HostApis) {
   const host = usePluginHost()
   const command = useCommand()
   const location = useLocation()
+  const navigate = useNavigate()
   const platform = usePlatform()
   const theme = useTheme()
   const menu = createSessionPanelMenu()
@@ -1170,6 +1173,7 @@ export function createPluginAttachment(apis: HostApis) {
       if (server) void tabs.newDraft({ server: ServerConnection.key(server), directory: input.directory }, input.prompt)
     },
     command: (id) => void run(id),
+    openPage: (plugin, id) => navigate(`/page/${encodeURIComponent(plugin)}/${encodeURIComponent(id)}`),
     font: () => terminalFontFamily(settings.appearance.terminalFont()),
     routing: useIsRouting(),
     path: () => `${location.pathname}${location.search}`,
