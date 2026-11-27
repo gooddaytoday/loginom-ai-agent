@@ -1,0 +1,34 @@
+[data-component="radio-v2"].loginom-network-modes [data-slot="radio-v2-items"] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 8px;
+}
+
+.loginom-network-modes [data-slot="radio-v2-item"] {
+  align-items: start;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--v2-border-border-base);
+  border-radius: 8px;
+}
+
+.loginom-network-modes [data-slot="radio-v2-item"][data-checked] {
+  border-color: var(--v2-border-border-strong);
+  background: var(--v2-background-bg-base);
+}
+
+.loginom-network-proxy {
+  max-width: min(20rem, 100%);
+  overflow-wrap: anywhere;
+}
+
+.loginom-network-port {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.loginom-network-port-field {
+  width: 6rem;
+}

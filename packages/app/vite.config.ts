@@ -34,6 +34,7 @@ export default defineConfig({
         }
       : undefined,
   },
+  // SAFETY: these plugins implement the Vite hooks exercised by the app build; their packages carry different Vite types.
   plugins: [
     desktopPlugin,
     icons(channel),
@@ -46,18 +47,17 @@ export default defineConfig({
     port: 3000,
   },
   build: {
-    ...(testFixtures
+    rolldownOptions: testFixtures
       ? {
-          rolldownOptions: {
-            input: [
-              "index.html",
-              "e2e/utils/settings-wsl.html",
-              "e2e/utils/app-direction.html",
-              "e2e/utils/windows-menu.html",
-            ],
-          },
+          input: [
+            "index.html",
+            "e2e/utils/settings-wsl.html",
+            "e2e/utils/settings-network.html",
+            "e2e/utils/app-direction.html",
+            "e2e/utils/windows-menu.html",
+          ],
         }
-      : {}),
+      : undefined,
     assetsDir: "_assets",
     target: "esnext",
     sourcemap: true,

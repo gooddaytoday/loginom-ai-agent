@@ -3,6 +3,8 @@ import fs from "node:fs/promises"
 import net from "node:net"
 import os from "node:os"
 import path from "node:path"
+import { Definition } from "@loginom-ai-agent/loginom-host/network-settings-rpc"
+import { OpenCode } from "@opencode/client/promise"
 import { NetworkMode } from "../src/network-mode"
 import { isolatedEnv } from "./fixture/environment"
 import { scriptedModel } from "./fixture/product-run"
@@ -39,6 +41,79 @@ describe("network mode in the global config", () => {
     expect(await NetworkMode.read(config)).toBe("device")
   })
 })
+
+test("settings RPC writes the global network mode and keeps the active port until restart", async () => {
+  const root = await temporary("cli-network-settings-")
+  const file = path.join(root, "config", "loginom-ai-agent.jsonc")
+  await Bun.write(file, '{\n  // Keep the user comment\n  "network": "online",\n  "network": "online",\n}\n')
+  const occupied = await listen()
+  const starting = await listen()
+  const next = await listen()
+  const current = boundPort(starting)
+  const saved = boundPort(next)
+  await close(starting)
+  await close(next)
+  await Bun.write(path.join(root, "config", "service-local.json"), JSON.stringify({ port: current }))
+
+  try {
+    const result = await serve(
+      root,
+      async (call, client) => {
+        await active(call, root)
+        const settings = client.rpc(Definition)
+        expect(await settings.status({})).toEqual({
+          mode: "online",
+          activeMode: "online",
+          port: { current, saved: current, editable: true },
+        })
+        expect((await settings.setMode({ mode: "device" })).mode).toBe("device")
+        expect(await NetworkMode.read(path.dirname(file))).toBe("device")
+        expect(await Bun.file(file).text()).toContain("// Keep the user comment")
+        expect(await settings.savePort({ port: boundPort(occupied) })).toBe("occupied")
+        expect((await settings.status({})).port?.saved).toBe(current)
+        expect(await settings.savePort({ port: saved })).toBe("saved")
+        expect(await settings.status({})).toEqual({
+          mode: "device",
+          activeMode: "online",
+          port: { current, saved, editable: true },
+        })
+      },
+      { LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "true" },
+      ["--service"],
+    )
+    expect(result.requests).toEqual([])
+    await serve(
+      root,
+      async (call, client) => {
+        await active(call, root)
+        expect(await client.rpc(Definition).status({})).toEqual({
+          mode: "device",
+          activeMode: "device",
+          port: { current: saved, saved, editable: true },
+        })
+      },
+      {},
+      ["--service"],
+    )
+  } finally {
+    await close(occupied)
+  }
+}, 60_000)
+
+function listen() {
+  const server = net.createServer()
+  return new Promise<net.Server>((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)))
+}
+
+function boundPort(server: net.Server) {
+  const address = server.address()
+  if (!address || typeof address === "string") throw new Error("No test port bound")
+  return address.port
+}
+
+function close(server: net.Server) {
+  return new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+}
 
 describe("product defaults of the server", () => {
   test("«Только этот компьютер» repeats S6 without a request off loopback", async () => {
@@ -253,7 +328,7 @@ type Call = ReturnType<typeof api>
 // `serve --port 0` (or `args`) in an isolated home with a recording proxy stub; `run` drives it, then the server stops.
 async function serve<A>(
   root: string,
-  run: (call: Call) => Promise<A>,
+  run: (call: Call, client: ReturnType<typeof OpenCode.make>) => Promise<A>,
   overrides: Record<string, string | undefined> = {},
   args = ["--port", "0"],
 ) {
@@ -300,7 +375,11 @@ async function serve<A>(
     const secret = args.includes("--service")
       ? (await Bun.file(path.join(root, "config", "service-local.json")).json()).password
       : password
-    const value = await run(api(url, secret))
+    const client = OpenCode.make({
+      baseUrl: url,
+      headers: { authorization: `Basic ${btoa(`loginom-ai-agent:${secret}`)}` },
+    })
+    const value = await run(api(url, secret), client)
     return { value, requests }
   } finally {
     child.kill("SIGTERM")

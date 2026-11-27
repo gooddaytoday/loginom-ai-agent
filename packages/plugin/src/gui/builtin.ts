@@ -331,8 +331,27 @@ export interface BuiltinStorage extends WindowStorage {
   ): void
 }
 
+/** The applied service proxy. Only host and port cross the desktop boundary. */
+export interface ServiceProxyStatus {
+  /** Settings source, or the reason no proxy was detected. */
+  readonly source:
+    | "windows"
+    | "macos"
+    | "gnome"
+    | "kde"
+    | "chromium"
+    | "environment"
+    | "none"
+    | "disabled"
+    | "unavailable"
+  /** Proxy host names with their ports, without credentials or other URL parts. */
+  readonly hosts: readonly string[]
+}
+
 /** `Desktop` with the abilities only built-ins use. */
 export interface BuiltinDesktop extends Desktop {
+  /** Reads the proxy applied when starting Desktop's service. Undefined when the RPC is unavailable. */
+  serviceProxy(): Promise<ServiceProxyStatus | undefined>
   /**
    * Keeps the window focused for automation and debugging.
    *

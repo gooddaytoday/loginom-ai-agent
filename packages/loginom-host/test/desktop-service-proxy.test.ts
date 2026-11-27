@@ -19,6 +19,7 @@ test("WinINET reaches the Desktop service but not its Loginom runtime", async ()
     },
   })
   expect(proxy.state).toBe("applied")
+  expect(proxy.status).toEqual({ source: "windows", hosts: ["proxy.example:8080", "secure.example:8080"] })
   expect(proxy.environment.HTTPS_PROXY).toBe("http://secure.example:8080")
   expect(proxy.environment.NO_PROXY?.split(",")).toEqual(
     expect.arrayContaining([...loopback, "private.example", "another.example", "internal.example"]),
@@ -29,7 +30,11 @@ test("WinINET reaches the Desktop service but not its Loginom runtime", async ()
 })
 
 test("explicit HTTPS_PROXY skips system and PAC readers and survives in the runtime", async () => {
-  const environment = { ...inherited, HTTPS_PROXY: "http://explicit.example:8080", NODE_USE_ENV_PROXY: "1" }
+  const environment = {
+    ...inherited,
+    HTTPS_PROXY: "http://sample-user:sample-pass@explicit.example:8080",
+    NODE_USE_ENV_PROXY: "1",
+  }
   const proxy = await desktopServiceProxy({
     platform: "linux",
     environment,
@@ -41,6 +46,7 @@ test("explicit HTTPS_PROXY skips system and PAC readers and survives in the runt
     },
   })
   expect(proxy.state).toBe("environment")
+  expect(proxy.status).toEqual({ source: "environment", hosts: ["explicit.example:8080"] })
   const noProxy = [...loopback, "private.example", "another.example"].join(",")
   expect(runtimeEnvironment({ ...environment, ...proxy.environment }, "linux")).toEqual({
     ...environment,

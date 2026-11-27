@@ -13,6 +13,7 @@ import { PersistentPty } from "@opencode/schema/persistent-pty"
 import { HttpServer } from "effect/http"
 import { NetAddress } from "effect/net"
 import { Env } from "./env"
+import { networkSettings } from "./services/network-settings"
 import { PortOwner } from "./services/port-owner"
 import { ServiceConfig } from "./services/service-config"
 import { RetainedImage } from "./services/retained-image"
@@ -102,9 +103,14 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       // Loginom AI Agent (B2.8, U4): the network mode comes from the product's global config, not from Desktop's
       // environment: the directory the server below reads, which a saved service environment may move. "device" closes
       // the model catalog and OpenCode's free models, whose switch core reads from the environment only.
-      const network = yield* Effect.promise(() =>
-        NetworkMode.read(process.env.LOGINOM_AI_AGENT_CONFIG_DIR ?? global.config),
-      )
+      const configDirectory = process.env.LOGINOM_AI_AGENT_CONFIG_DIR || global.config
+      const network = yield* Effect.promise(() => NetworkMode.read(configDirectory))
+      const settings = yield* networkSettings({
+        directory: configDirectory,
+        activeMode: network,
+        editable: options.port === undefined,
+        hostname: options.hostname,
+      })
       if (network === "device") process.env.LOGINOM_AI_AGENT_DISABLE_FREE_MODELS = "1"
       // Loginom AI Agent (B2.3): the product's Loginom Host lives as long as this server. It recovers the leases a stopped
       // process left before any Location activates or a suspended session resumes.
@@ -116,6 +122,7 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
             data: profile?.root ?? global.data,
             resources: process.env.LOGINOM_AI_AGENT_RESOURCES,
             deviceOnly: network === "device",
+            networkSettings: settings.handlers,
           }),
         ),
         () => Effect.promise(() => ServiceHost.close().catch(() => undefined)),
@@ -195,6 +202,7 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
                   if (!config.password) yield* ServiceConfig.password(password)
                   // Loginom AI Agent (B4.16, В-97 п. 3): Desktop's service stops when its window is gone.
                   yield* ServiceOwner.watch(shutdown)
+                  if (NetAddress.isInetAddress(address)) settings.listening(address.port)
                   return yield* ServiceRegistration.register({
                     address,
                     password,

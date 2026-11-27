@@ -325,6 +325,7 @@ export function createHostApis() {
             launch: (path, app) => platform.openPath?.(path, app) ?? Promise.resolve(),
             reveal: (path) => platform.revealPath?.(path) ?? Promise.resolve(false),
             installed: (app) => platform.checkAppExists?.(app) ?? Promise.resolve(false),
+            serviceProxy: async () => (await platform.getSystemProxySetting?.())?.status,
             forceFocus: (enabled) => platform.setForceFocus?.(enabled) ?? Promise.resolve(),
             async pick(options) {
               if (options?.directory) {

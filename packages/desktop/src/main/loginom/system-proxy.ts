@@ -62,12 +62,13 @@ export function setSystemProxyEnabled(enabled: boolean) {
 }
 
 export async function systemProxySetting() {
-  const { notices } = await detection()
+  const { notices, status } = await detection()
 
   return {
     enabled: systemProxyEnabled(),
     unreachable: notices.includes("unreachable"),
     socksOnly: notices.includes("socks-only"),
+    status,
   }
 }
 

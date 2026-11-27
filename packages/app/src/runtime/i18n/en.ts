@@ -855,6 +855,7 @@ export const dict = {
   "sidebar.project.clearNotifications": "Clear notifications",
 
   "settings.section.server": "Server",
+  "settings.group.application": "Application",
   "settings.backToApp": "Back to app",
   "settings.backToSettings": "Back to settings",
   "settings.backToProjects": "Back to projects",

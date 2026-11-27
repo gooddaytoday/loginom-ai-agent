@@ -12,6 +12,8 @@ import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
+import type { Definition as NetworkSettingsRpc } from "@loginom-ai-agent/loginom-host/network-settings-rpc"
+import type { RpcHandlers } from "@opencode/plugin/promise/rpc"
 import { Option, Schema } from "effect"
 
 export type Lease = NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>
@@ -24,6 +26,7 @@ export type Connection = {
 type Started = {
   readonly directory: string
   readonly deviceOnly: boolean
+  readonly networkSettings?: RpcHandlers<typeof NetworkSettingsRpc>
   ready: Promise<Connection | undefined>
   connected?: boolean
   held: Map<Lease, string>
@@ -52,6 +55,7 @@ export async function start(input: {
   data: string
   resources?: string
   deviceOnly?: boolean
+  networkSettings?: RpcHandlers<typeof NetworkSettingsRpc>
   connect?: () => Promise<Connection>
 }) {
   if (state.current && !state.current.closing) throw Error("LOGINOM_HOST_ALREADY_STARTED")
@@ -77,6 +81,7 @@ export async function start(input: {
   const current: Started = {
     directory,
     deviceOnly: input.deviceOnly ?? false,
+    networkSettings: input.networkSettings,
     ready: Promise.resolve(undefined),
     held: new Map(),
   }
@@ -142,6 +147,8 @@ export const dashboard = {
     return source.value
   },
 }
+
+export const networkSettings = () => state.current?.networkSettings
 
 export const connectionSettings = {
   request,

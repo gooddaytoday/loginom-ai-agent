@@ -713,6 +713,7 @@ export const dict = {
   "session.queue.remove": "Удалить",
   "session.queue.reorder": "Изменить порядок запроса в очереди",
   "session.new.worktree.creating": "Создание worktree",
+  "settings.group.application": "Приложение",
   "settings.backToApp": "Назад в приложение",
   "settings.appearance.row.tabs.title": "Вкладки",
   "settings.appearance.row.tabs.description": "Выберите расположение вкладок сессий",

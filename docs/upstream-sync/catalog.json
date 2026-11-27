@@ -2,6 +2,18 @@
   "comment": "Source of truth for which fork changes inside upstream files are described in catalog.md. First matching entry wins. An entry with `pending` names the stage B task or stage that brings its 0.4 change to OpenCode 2; until then it has no divergent files. Checked by scripts/upstream-sync/catalog-check.py.",
   "against": "a6b15d33daf6ab7d35569f6d711fdb630b9f04e7",
   "entries": [
+    {
+      "id": "CAT-15",
+      "title": "Loginom network settings (C2.8)",
+      "paths": [
+        "packages/app/src/settings/shell.tsx", "packages/app/src/settings/general/general.tsx",
+        "packages/app/src/runtime/i18n/en.ts", "packages/app/src/runtime/i18n/ru.ts",
+        "packages/app/src/runtime/plugin/host-apis.tsx", "packages/app/src/runtime/platform/platform.tsx",
+        "packages/app/vite.config.ts", "packages/cli/src/server-process.ts", "packages/cli/src/services/service-config.ts",
+        "packages/desktop/src/shared/ipc-rpc/app.ts", "packages/desktop/src/renderer/api-types.ts",
+        "packages/gui-plugins/src/loginom-gui/**", "packages/plugin/src/gui/builtin.ts"
+      ]
+    },
     { "id": "CAT-01", "title": "Manifests and lockfile", "paths": ["bun.lock", "**/package.json"] },
     {
       "id": "CAT-02",

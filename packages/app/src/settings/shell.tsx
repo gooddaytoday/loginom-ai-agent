@@ -213,6 +213,7 @@ function RootSettings() {
       })),
     },
     {
+      label: language.t("settings.group.application"),
       items: [
         ...rootClientTabs.map((item) => ({ ...item, label: language.t(item.label) })),
         ...pluginTabs(),
