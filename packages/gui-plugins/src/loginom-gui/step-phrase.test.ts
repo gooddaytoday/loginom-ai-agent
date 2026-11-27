@@ -3,13 +3,15 @@ import { dict } from "./i18n/ru"
 import { decodeFacts, failureTitle, loginomStepPhrase } from "./step-phrase"
 import { Option } from "effect"
 
-const messages = new Map(Object.entries(dict))
+const messages = Object.entries(dict)
 
 const rules = new Intl.PluralRules("ru")
 
 const copy = {
   t: (key: string, params?: Record<string, string | number | boolean>) =>
-    (messages.get(key) ?? key).replace(/{{(\w+)}}/g, (_, name: string) => String(params?.[name] ?? "")),
+    (messages.find(([name]) => name === key)?.[1] ?? key).replace(/{{(\w+)}}/g, (_, name: string) =>
+      String(params?.[name] ?? ""),
+    ),
   plural: (key: string, count: number) => copy.t(`${key}.${rules.select(count)}`, { count }),
 }
 

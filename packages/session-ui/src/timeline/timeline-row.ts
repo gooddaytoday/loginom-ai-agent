@@ -28,6 +28,11 @@ export namespace TimelineRow {
     userMessageID: string
   }> {}
 
+  /** The host's optional plan or completed activity summary, directly below the user message. */
+  export class TurnPresentation extends Data.TaggedClass("TurnPresentation")<{
+    userMessageID: string
+  }> {}
+
   export class UserMessage extends Data.TaggedClass("UserMessage")<{
     userMessageID: string
   }> {}
@@ -110,6 +115,7 @@ export namespace TimelineRow {
 
   export type TimelineRow =
     | TurnGap
+    | TurnPresentation
     | UserMessage
     | Shell
     | Notice
@@ -124,6 +130,7 @@ export namespace TimelineRow {
     | Activity
 
   export const key: (row: TimelineRow) => string = Match.typeTags<TimelineRow>()({
+    TurnPresentation: (row) => `turn-presentation:${row.userMessageID}`,
     TurnGap: (row) => `turn-gap:${row.userMessageID}`,
     UserMessage: (row) => `user-message:${row.userMessageID}`,
     Shell: (row) => `shell:${row.messageID}`,
@@ -147,6 +154,7 @@ export namespace TimelineRow {
   // every nested group and ref of the new row first, which cost milliseconds per change on long sessions. A field added
   // to a row needs a comparison here, or a change to only that field keeps the previous row.
   const sameFields: (row: TimelineRow) => (other: TimelineRow) => boolean = Match.typeTags<TimelineRow>()({
+    TurnPresentation: () => (other: TimelineRow) => Predicate.isTagged(other, "TurnPresentation"),
     TurnGap: () => (other: TimelineRow) => Predicate.isTagged(other, "TurnGap"),
     UserMessage: () => (other: TimelineRow) => Predicate.isTagged(other, "UserMessage"),
     Shell: (row) => (other: TimelineRow) => Predicate.isTagged(other, "Shell") && other.messageID === row.messageID,
@@ -206,6 +214,7 @@ function sameRef(a: PartRef, b: PartRef) {
 }
 
 export type TimelineRowMap = {
+  TurnPresentation: { userMessageID: string }
   TurnGap: { userMessageID: string }
   UserMessage: { userMessageID: string }
   Shell: { userMessageID: string; messageID: string }

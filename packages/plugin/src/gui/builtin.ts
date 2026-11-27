@@ -1,6 +1,7 @@
 // The parts of the SDK only the app's built-in plugins use, for workspace imports only: `tsconfig.build.json` leaves it
 // out of `dist`, and `script/pack.ts` exports it as `null`. Public SDK modules never import it.
 
+import type { SessionMessageAssistant } from "@opencode/client/promise"
 import type { Schema } from "effect"
 import type { Context } from "./context.js"
 import { Registry, type Catalog, type Messages, type Persisted, type StoreDeclaration, type StoreFrom } from "./core.js"
@@ -81,6 +82,75 @@ export interface ToolRenderer {
  * ```
  */
 export const ToolRenderer = Registry.define<ToolRenderer>("tool.renderer")
+
+/** A task from the latest todo list recorded in a turn. */
+export interface TurnTodo {
+  /** The task text supplied by the agent. */
+  readonly content: string
+  /** The agent's recorded state: waiting, underway, done, or cancelled. */
+  readonly status: "pending" | "in_progress" | "completed" | "cancelled"
+}
+
+/** A completed or active turn as seen by a timeline contribution. */
+export type TurnPresentationInput = {
+  /** Assistant messages in transcript order. */
+  readonly messages: readonly SessionMessageAssistant[]
+} & (
+  | {
+      /** The agent is still working. */
+      readonly phase: "working"
+      /** The latest todo list in this turn, or an empty list before the agent sets it. */
+      readonly todos: readonly TurnTodo[]
+    }
+  | {
+      /** The turn completed successfully. */
+      readonly phase: "completed"
+      /** Elapsed milliseconds from the opening prompt to the last assistant message. */
+      readonly durationMs: number
+    }
+)
+
+/** A localized row to show before the turn's activity. */
+export type TurnPresentationValue =
+  | {
+      /** Display an ordered plan without changing the live activity rows. */
+      readonly kind: "plan"
+      /** Accessible name of the ordered list. */
+      readonly label: string
+      /** Tasks in display order. */
+      readonly items: readonly {
+        /** The task text to display. */
+        readonly text: string
+        /** An accessible description of the task's state. */
+        readonly statusLabel: string
+        /** Which of the completed, current, or upcoming markers to show. */
+        readonly status: "completed" | "in_progress" | "pending"
+      }[]
+    }
+  | {
+      /** A disclosure button for the completed turn's activity rows. */
+      readonly kind: "summary"
+      /** The localized summary shown on the button. */
+      readonly label: string
+    }
+
+/** Supplies optional plan and summary rows for a built-in plugin's turns. */
+export interface TurnPresentation {
+  /**
+   * Describes a turn owned by this plugin. Return undefined to leave the timeline's presentation in place.
+   * @param input - The turn's messages and state.
+   */
+  describe(input: TurnPresentationInput): TurnPresentationValue | undefined
+}
+
+/**
+ * Registry for built-in turn presentations. The first contribution to describe a turn supplies its row.
+ * @example
+ * ```ts
+ * ctx.add(TurnPresentation, { describe })
+ * ```
+ */
+export const TurnPresentation = Registry.define<TurnPresentation>("turn.presentation")
 
 /** A `Command` with the fields only built-ins set. */
 export interface BuiltinCommand extends Command {

@@ -208,6 +208,11 @@ already registered tool names and withdraws the renderer when the plugin unloads
 their own row in grouped timelines. The renderer receives live data, including partial input. The timeline shows a tool
 error card if rendering throws and retries rendering at the next call status.
 
+Built-ins can also register a `TurnPresentation` with `ctx.add(TurnPresentation, { describe })`. The callback
+receives the turn's assistant messages, plus its todos while working or its duration once completed. Returning
+`undefined` leaves the turn's presentation in place. A completed summary lets the reader disclose the activity;
+the answer and rows that carry results stay in view.
+
 [Lifetimes](#lifetimes) shows `createKeyed` in files.
 
 ```ts
@@ -774,6 +779,7 @@ export const builtins = compose({
   "microsoft-office": microsoftOffice,
   sources,
   goal,
+  "loginom-gui": loginomGui,
 })
 ```
 
@@ -799,6 +805,7 @@ export const builtins = compose({
   "microsoft-office": { ...microsoftOffice, windowEntry: eager(microsoftOfficeRenderer) },
   sources: { ...sources, windowEntry: eager(sourcesRenderer) },
   goal: { ...goal, windowEntry: eager(goalRenderer) },
+  "loginom-gui": { ...loginomGui, windowEntry: eager(loginomTurnPresentation) },
 })
 ```
 
