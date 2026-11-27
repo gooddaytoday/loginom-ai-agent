@@ -812,8 +812,8 @@ export function rebindNodeTargetLinkEpochs(context,observed) {
 
 // Cached UI state only: calling Loginom's validation methods here would start
 // another server request. The held native drag owns that request and its cache.
-export async function readNodeTargetLinkValidation(page, context, parameters) {
-  return page.evaluate(({context,parameters})=>{
+export async function readNodeTargetLinkValidation(page, context, parameters, endpointsOnly=false) {
+  return page.evaluate(({context,parameters,endpointsOnly})=>{
     const preparation=globalThis.__loginomDockPreparationV1,request=context.request;
     const receipt=preparation&&[...preparation.receipts.values()].find(r=>r.workflowId===request.workflow_ref.workflow_id&&r.phase==='verified');
     const roots=document.querySelectorAll('[data-tid='+JSON.stringify(request.workflow_ref.prefix+';ModelForm;cmpDiagram')+']');
@@ -834,6 +834,14 @@ export async function readNodeTargetLinkValidation(page, context, parameters) {
       return {port:ports[0],element:elements[0]};
     };
     const source=bind(context.nodes[0],'Output',parameters.source_port),target=bind(context.nodes[1],'Input',parameters.target_port);
+    if(endpointsOnly){
+      const point=({element})=>{
+        const box=element.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2;
+        const hit=document.elementFromPoint(x,y);
+        return box.width>0&&box.height>0&&hit&&(element===hit||element.contains(hit))?{x,y}:null;
+      };
+      return {source:point(source),target:point(target)};
+    }
     const handler=graph.connectionHandler;
     const ownership={graph_mouse_down:!!graph.isMouseDown,connection_first:!!handler.first,source_cell:handler.previous?.cell===source.port.FCell,
       delegation_mouse_down:diagram.FHandlers?.FConnectionHandler?.FDelegationHandler?.FMouseDown===true};
@@ -854,7 +862,7 @@ export async function readNodeTargetLinkValidation(page, context, parameters) {
       marker_cell:{id:cellId(handler.marker?.validState?.cell),target:handler.marker?.validState?.cell===target.port.FCell},
       target_cell_id:cellId(target.port.FCell),
       target_ready:handler.error==null&&handler.marker?.validState?.cell===target.port.FCell};
-  },{context,parameters});
+  },{context,parameters,endpointsOnly});
 }
 
 function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, readLinkValidation, normalizeVariablesToTableLinkGraph, readSavedState) {
