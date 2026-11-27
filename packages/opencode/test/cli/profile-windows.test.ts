@@ -187,7 +187,8 @@ test.skipIf(process.platform !== "win32")(
       const kept = [
         join("cache", "tmp", "lbC1wMf"),
         join("cache", "tmp", "lbC1wMfr0"),
-        join("cache", "tmp", "LBC1wMfr"),
+        // NTFS names are case-insensitive: a different name, not LBC1wMfr.
+        join("cache", "tmp", "LBx9Yz00"),
         join("cache", "tmp", "lb-1wMfr"),
         join("cache", "tmp", "other", "lbC1wMfr"),
         join("config", "cache", "tmp", "lbC1wMfr"),
