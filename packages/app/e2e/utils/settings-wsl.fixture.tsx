@@ -16,13 +16,14 @@ type FixtureInput = { id?: string; name?: string; target?: string; prompt?: stri
 /** A main-side method: SSH `start` answers with the state revision, the others with nothing. */
 type FixtureMethod = (input: FixtureInput) => number | void
 
-// A desktop window. `wsl` is the Ubuntu server's endpoint (default `server`); updating OpenCode restarts it on `restart`
+// A desktop window. `wsl` is the Ubuntu server's endpoint (default `server`); updating Loginom AI Agent CLI restarts it on `restart`
 // (default `wsl`). `ssh` adds a saved SSH server `box`, ready on that endpoint with password `ssh-1`; each connect
 // brings up a new remote server with the next password (`ssh-2`, ...). `storage=async` stores in localStorage behind
 // asynchronous reads like the desktop app's; reads of keys matching the pattern `hold` wait for "Load held storage".
 export function mount(input: {
   server: string
   mode: "failed" | "stopped" | "ready"
+  locale: "en" | "ru"
   wsl?: string | null
   restart?: string | null
   path?: string | null
@@ -97,7 +98,7 @@ export function mount(input: {
             }))
           : [],
         distroProbes: Object.fromEntries(
-          distros.map((name) => [name, { name, canExecute: true, hasBash: true, hasCurl: true, error: null }]),
+          distros.map((name) => [name, { name, canExecute: true, hasBash: true, hasArchiveTools: true, error: null }]),
         ),
         pendingRestart: false,
         hostJob: input.busy ? "busy" : "idle",
@@ -130,7 +131,7 @@ export function mount(input: {
           ),
           Ubuntu: {
             distro: "Ubuntu",
-            resolvedPath: "/usr/bin/opencode",
+            resolvedPath: "/usr/bin/loginom-ai-agent-cli",
             version: "old",
             expectedVersion: "current",
             matchesDesktop: false,
@@ -160,7 +161,7 @@ export function mount(input: {
       }))
 
     const wsl = {
-      // Like main: stops the distro's server, updates OpenCode, then starts the server again on a new endpoint.
+      // Like main: stops the distro's server, updates the product CLI, then starts the server again on a new endpoint.
       installOpencode(value) {
         const name = value.name ?? ""
         const id = store.state.servers.find((server) => server.config.distro === name)?.config.id
@@ -302,7 +303,7 @@ export function mount(input: {
 
     return (
       <PlatformProvider value={platform}>
-        <AppBaseProviders locale="en">
+        <AppBaseProviders locale={input.locale}>
           <div>
             <output aria-label="WSL actions">{store.calls.join(",")}</output>
             {/* The WSL plugin's main side going away, as on a reload or failure, and coming back. */}

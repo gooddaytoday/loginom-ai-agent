@@ -4,6 +4,7 @@ import type { Plugin } from "@opencode/plugin/gui/main"
 import { Wsl } from "./contract"
 import { createWslRuntime } from "./runtime"
 import { createWslServersController, wslServerIdForDistro } from "./servers"
+import { discoverProductCli, installProductCli } from "./product-cli"
 import { spawnWslSidecar } from "./sidecar"
 
 // A record is kept when it names a distro; an id that is missing or not a non-empty string is derived from the distro.
@@ -18,7 +19,7 @@ const setup: Plugin.MainSetup = (ctx) => {
   const packaged = ctx.app.packaged
   const desktopLog = ctx.log
   const t = ctx.t
-  const runtime = createWslRuntime(t)
+  const runtime = createWslRuntime(t, { discover: discoverProductCli })
 
   // The distros main serves; stored before in the desktop settings file. Read leniently like that file: one bad record
   // must not drop the others.
@@ -27,12 +28,6 @@ const setup: Plugin.MainSetup = (ctx) => {
     initial: { servers: [] },
     from: { settings: "wslServers" },
   })
-
-  // Development builds of the desktop app can build the Linux CLI from this checkout.
-  const local =
-    packaged || !process.env.LOGINOM_AI_AGENT_DESKTOP_WSL_CLI_BUILD || !process.env.LOGINOM_AI_AGENT_DESKTOP_WSL_CLI_OUTPUT
-      ? undefined
-      : { script: process.env.LOGINOM_AI_AGENT_DESKTOP_WSL_CLI_BUILD, output: process.env.LOGINOM_AI_AGENT_DESKTOP_WSL_CLI_OUTPUT }
 
   const log = <Data extends Readonly<Record<string, unknown>>>(level: "info" | "error", message: string, data: Data) =>
     desktopLog.write(level, `[wsl] ${message}`, data)
@@ -53,13 +48,7 @@ const setup: Plugin.MainSetup = (ctx) => {
         return [{ id: Option.isSome(id) ? id.value.id : wslServerIdForDistro(distro), distro }]
       }),
     writeServers: (servers) => saved.set({ servers }),
-    installCli: local
-      ? async (distro) => {
-          const { buildLocalWslCli } = await import("./local")
-          const binary = await buildLocalWslCli({ ...local, version: cli.version })
-          await runtime.installCli(distro, { version: cli.version, binary })
-        }
-      : (distro, build) => runtime.installCli(distro, build),
+    installCli: (distro, build) => installProductCli(runtime, distro, build.version, t, ctx.signal),
     spawnSidecar: (distro, signal) => {
       log("info", "spawning wsl sidecar", { distro })
 
@@ -89,9 +78,7 @@ const setup: Plugin.MainSetup = (ctx) => {
   ctx.onCleanup(controller.subscribe(() => provider.changed()))
   // Finalizers run in reverse: the servers stop before the state stops being published.
   ctx.onCleanup(() => controller.stopServers())
-  // Loginom AI Agent: the product window does not load WSL (src/renderer.ts), so main starts none of the saved servers;
-  // 0.4 saved them under `wslServers` too. The records stay. Call `controller.startConfiguredServers()` here again when
-  // the window loads WSL.
+  // В-101: saved 0.4 distros stay stopped until the user starts them.
 }
 
 export default setup

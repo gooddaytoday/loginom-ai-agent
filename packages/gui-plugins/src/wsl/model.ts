@@ -68,7 +68,7 @@ function wslDistroReady(state: WslServersState | undefined, name: string) {
 
   if (installed.version === 1) return false
 
-  return probe.canExecute && probe.hasBash && probe.hasCurl
+  return probe.canExecute && probe.hasBash && probe.hasArchiveTools
 }
 
 export function addServerViewModel(input: {
@@ -186,7 +186,7 @@ function addServerDistroStatus(input: {
     return { label: { key: "onboarding.openDistroOnce", params: { distro: input.name } }, tone: "warning" }
   }
 
-  if (!probe.hasBash || !probe.hasCurl) {
+  if (!probe.hasBash || !probe.hasArchiveTools) {
     return { label: { key: "onboarding.distroStatus.missingTools" }, tone: "warning" }
   }
 

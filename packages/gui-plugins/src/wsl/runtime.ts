@@ -3,7 +3,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import type { MainContext } from "@opencode/plugin/gui/main"
 import type { WslDistroProbe, WslInstalledDistro, WslOnlineDistro, WslRuntimeCheck } from "./contract"
-import { discoverScript, installScript, parseVersion, versionScript } from "./remote-cli"
+import { discoverScript, parseVersion, versionScript } from "./remote-cli"
 
 export type WslCommandLine = {
   stream: "stdout" | "stderr"
@@ -32,7 +32,6 @@ export type RunWslOptions = {
 
 export type WslCliBuild = {
   version: string
-  binary?: string
 }
 
 export type WslRuntime = ReturnType<typeof createWslRuntime>
@@ -45,13 +44,6 @@ export function wslArgs(args: string[], distro?: string | null, user?: string | 
   // `--` hands the command line to the distro's default shell, which expands `$VAR` and `$(...)`
   // inside our inline scripts before `sh -lc` ever runs them. `--exec` runs the command directly.
   return [...(distro ? ["-d", distro] : []), ...(user ? ["--user", user] : []), "--exec", ...args]
-}
-
-export function wslCliInstallCommand(cli: WslCliBuild) {
-  return installScript({
-    version: cli.version,
-    binary: cli.binary ? `"$(wslpath -a ${shellEscape(cli.binary)})"` : undefined,
-  })
 }
 
 export function summarize(value: string) {
@@ -67,7 +59,7 @@ export function shellEscape(value: string) {
 }
 
 /** WSL commands; `t` resolves the plugin's copy for errors the user sees. */
-export function createWslRuntime(t: MainContext["t"]) {
+export function createWslRuntime(t: MainContext["t"], cli = { discover: discoverScript }) {
   const runWsl = (args: string[], opts: RunWslOptions = {}) => runCommand("wsl", args, opts)
 
   const runPowerShell = (command: string, opts: RunWslOptions = {}) =>
@@ -296,17 +288,6 @@ export function createWslRuntime(t: MainContext["t"]) {
       requireSuccess(result, t("error.installDistro", { distro }))
     },
 
-    async installCli(distro: string, cli: WslCliBuild, opts?: RunWslOptions) {
-      const result = await runInteractiveCommand(
-        system32("wsl.exe"),
-        wslArgs(["bash", "-lc", wslCliInstallCommand(cli)], distro),
-        withTimeout(opts, DEFAULT_WSL_INSTALL_TIMEOUT_MS),
-        DEFAULT_WSL_INSTALL_TIMEOUT_MS,
-      )
-
-      requireSuccess(result, t("error.installOpencode"))
-    },
-
     async probeDistro(name: string, opts?: RunWslOptions): Promise<WslDistroProbe> {
       const executable = await runWslInDistro(["/bin/true"], name, opts).catch((error) => ({
         code: 1,
@@ -320,27 +301,27 @@ export function createWslRuntime(t: MainContext["t"]) {
           name,
           canExecute: false,
           hasBash: false,
-          hasCurl: false,
+          hasArchiveTools: false,
           error: summarize(executable.stderr || executable.stdout) || t("error.executeDistro"),
         }
       }
 
-      const [bash, curl] = await Promise.all([
+      const [bash, tools] = await Promise.all([
         runWslSh("command -v bash >/dev/null && printf yes || printf no", name, opts),
-        runWslSh("command -v curl >/dev/null && printf yes || printf no", name, opts),
+        runWslSh("command -v tar >/dev/null && command -v sha256sum >/dev/null && printf yes || printf no", name, opts),
       ])
 
       return {
         name,
         canExecute: true,
         hasBash: bash.code === 0 && summarize(bash.stdout) === "yes",
-        hasCurl: curl.code === 0 && summarize(curl.stdout) === "yes",
+        hasArchiveTools: tools.code === 0 && summarize(tools.stdout) === "yes",
         error: null,
       }
     },
 
     async resolveCli(distro: string, opts?: RunWslOptions) {
-      return firstLine((await runWslSh(discoverScript(), distro, opts)).stdout)
+      return firstLine((await runWslSh(cli.discover(), distro, opts)).stdout)
     },
 
     async readCliVersion(command: string, distro: string, opts?: RunWslOptions) {

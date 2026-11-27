@@ -12,7 +12,7 @@ import { wslRowView } from "./row-view"
 
 const ubuntu: WslServerConfig = { id: "wsl:Ubuntu", distro: "Ubuntu" }
 
-const readyProbe = { name: "Debian", canExecute: true, hasBash: true, hasCurl: true, error: null }
+const readyProbe = { name: "Debian", canExecute: true, hasBash: true, hasArchiveTools: true, error: null }
 
 function check(distro: string, version: string): WslOpencodeCheck {
   return {

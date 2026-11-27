@@ -47,7 +47,7 @@ export const WslDistroProbe = Schema.Struct({
   name: Schema.String,
   canExecute: Schema.Boolean,
   hasBash: Schema.Boolean,
-  hasCurl: Schema.Boolean,
+  hasArchiveTools: Schema.Boolean,
   error: Schema.NullOr(Schema.String),
 })
 

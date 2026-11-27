@@ -13,6 +13,13 @@
       ]
     },
     {
+      "id": "CAT-15",
+      "title": "Desktop WSL product CLI (C5.7, В-101)",
+      "paths": ["packages/gui-plugins/README.md", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/wsl/**",
+        "packages/app/e2e/regression/settings-wsl.spec.ts", "packages/app/e2e/utils/settings-wsl.*",
+        "packages/app/test-browser/builtin-plugins.test.ts"]
+    },
+    {
       "id": "CAT-03",
       "title": "Brand: documentation, icons, repository dotdirs",
       "paths": [

@@ -17,9 +17,8 @@ afterEach(async () => {
 })
 
 // A 0.4 Desktop on Windows kept the WSL servers it served in its settings file under `wslServers`, and main imports them.
-// The product window does not load WSL (B4.11e), so main must not start them: no `wsl` for a CLI probe or `serve`, no
-// install from the network, and the saved records stay as they are.
-test("main starts nothing for WSL servers saved by 0.4 while the window does not load WSL", async () => {
+// The restored WSL window lists these servers, but opening Desktop leaves them stopped.
+test("main starts nothing for WSL servers saved by 0.4 before the user starts them", async () => {
   const dir = await mkdtemp(join(tmpdir(), "wsl-main-"))
   cleanups.push(() => rm(dir, { recursive: true, force: true }))
   const calls = join(dir, "calls")

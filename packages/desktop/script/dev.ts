@@ -2,7 +2,6 @@ import { $ } from "bun"
 import { constants, setPriority } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { Product } from "@loginom-ai-agent/product"
 import { prepareDevElectron } from "./dev-electron"
 
 async function main() {
@@ -40,13 +39,6 @@ function selectElectronArgs() {
 async function prepareServer() {
   buildWebUi()
   process.env.LOGINOM_AI_AGENT_DESKTOP_CLI_DEV = join(import.meta.dirname, "../../cli")
-
-  if (process.platform !== "win32") return
-  process.env.LOGINOM_AI_AGENT_DESKTOP_WSL_CLI_BUILD = join(import.meta.dirname, "../../cli/script/build.ts")
-  process.env.LOGINOM_AI_AGENT_DESKTOP_WSL_CLI_OUTPUT = join(
-    import.meta.dirname,
-    `../resources/${Product.cliExecutable}-wsl`,
-  )
 }
 
 // The source CLI serves packages/app/dist only to paired devices, and nothing on the way to the
