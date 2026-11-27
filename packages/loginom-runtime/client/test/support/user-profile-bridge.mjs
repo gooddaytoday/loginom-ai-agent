@@ -94,7 +94,8 @@ test('managed user preparation returns local pins and dynamic knowledge without 
         ? { status: 'READY', target: compatibility, authenticated: true, created_draft: !expectedPackage,
           effect_possible: true, document_id: 'fixture-document', target_verified: true,
           operation_id:expectedOperation??'prepare',package_ref: { path: expectedPackage, persisted: !!expectedPackage },loginom_account:'user',
-          workflow_ref: { tab_tid: 'fixture-tab', prefix: 'fixture-prefix', workflow_id: expectedPackage?'local-workflow':'fixture-workflow', navigation_path: [] } }
+          workflow_ref: { tab_tid: 'MF;cntMain;cntWorkspace;Workspace;t.br;tb', prefix: 'MF;TF',
+            workflow_id: expectedPackage?'local-workflow':'fixture-workflow', navigation_path: [{tid:'crumb',label:'Fixture scenario'}] } }
         : { version: 1, source: 'prepare_same_browser_page', observed: { document_id: 'fixture-document' }, fixture: true };
       assert.ok(code.includes('async function prepareWorkspace(') || code.includes('async function observeGeometry('));
       if(stepFixture&&code.includes('async function prepareWorkspace(')){
@@ -242,6 +243,45 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.notEqual(cardReply.isError,true,JSON.stringify(cardReply));
     const card=JSON.parse(cardReply.content[0].text).node_types[0];
     assert.match(card.guidance,/Сортировка/);assert.deepEqual(card.guidance_modes,['keys']);
+
+    const crossTableReply=await client.callTool({name:'dock_action_describe',arguments:{node_types:['transform.cross_table'],modes:['pivot']}});
+    assert.notEqual(crossTableReply.isError,true,JSON.stringify(crossTableReply));
+    const [crossTableCard]=JSON.parse(crossTableReply.content[0].text).node_types;
+    assert.equal(crossTableCard.type,'transform.cross_table');
+    const crossTableCardBudget=12000-64;
+    const crossTableCardBytes=Buffer.byteLength(JSON.stringify(crossTableCard));
+    assert.ok(crossTableCardBytes<=crossTableCardBudget,`CrossTable card is ${crossTableCardBytes} bytes, budget ${crossTableCardBudget}`);
+    assert.match(crossTableCard.semantics,/Loginom rejects YYYY-MM names\. Use name: M_2026_01, label: 2026-01\./);
+
+    for(const [layout,name] of [['changes','2026-01'],['fields','Revenue-total'],['changes','Сумма']]){
+      const operation_id='invalid-mapping-'+layout+'-'+name.length;
+      const refused=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,operation_id,
+        target:{kind:'existing',type:'transform.cross_table',ref:{document_id:undescribed.document_id,
+          workflow_id:undescribed.workflow_ref.workflow_id,node_id:'existing-cross-table'}},
+        mode:'pivot',finish:'execute',mappings:[{direction:'output',port:0,[layout]:[
+          {source:{kind:'configured_field',name:'C_1'},name,label:'2026-01'}]}]}});
+      const failure=JSON.parse(refused.content[0].text);
+      assert.equal(failure.status,'NOT_APPLIED',JSON.stringify(failure));
+      assert.equal(failure.operation_id,operation_id);
+      assert.equal(failure.effect_possible,false);
+      assert.equal(failure.cleanup_complete,true);
+      assert.equal(failure.error.parameter_path,`mappings[0].${layout}[0].name`);
+      assert.match(failure.error.message,/identifier.*2026-01.*label.*Omit name to keep the current name/);
+      assert.equal(browserCalls.length,beforeDescription,'invalid output names cannot start browser work');
+    }
+
+    await client.callTool({name:'dock_action_describe',arguments:{node_types:['exports.text'],modes:['delimited']}});
+    const rejectedExport=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,operation_id:'invalid-export-mapping',
+      target:{kind:'existing',type:'exports.text',ref:{document_id:undescribed.document_id,
+        workflow_id:undescribed.workflow_ref.workflow_id,node_id:'existing-export'}},
+      mode:'delimited',finish:'execute',mappings:[{direction:'input',port:0,fields:[
+        {source:{kind:'configured_field',name:'C_1'},name:'2026-01'}]}]}});
+    const exportFailure=JSON.parse(rejectedExport.content[0].text);
+    assert.equal(exportFailure.status,'NOT_APPLIED');
+    assert.equal(exportFailure.error.parameter_path,'mappings');
+    assert.match(exportFailure.next_step.instruction,/mappings:\[\].*transform\.reform_columns/);
+    assert.equal(browserCalls.length,beforeDescription,'unsupported export mappings cannot start browser work');
+
     const invalidMode=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,mode:'invented'}});
     assert.equal(JSON.parse(invalidMode.content[0].text).error.code,'REQUEST_REJECTED');
     assert.equal(browserCalls.length,beforeDescription,'mode validation remains before mutation');

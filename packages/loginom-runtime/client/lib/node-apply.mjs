@@ -8,7 +8,7 @@ import {verifiedNativeReadRefusal,verifiedExportReadRefusal,verifiedJavascriptUi
 import {verifiedJavascriptExistingSchemaRefusal} from './javascript-existing-schema-refusal.mjs';
 import {verifiedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs';
 import {verifiedJavascriptSourcePolicyRefusal,verifiedJavascriptEffectsSourceRefusal,JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT} from './javascript-source-policy-refusal.mjs';
-import {NODE_ADD_ONLY_MODE, NODE_CONTRACT_REVISION, validateNodeTargetRequest} from './node-contracts.mjs';
+import {NODE_ADD_ONLY_MODE, NODE_CONTRACT_REVISION, nodeFieldNamePattern, validateNodeTargetRequest} from './node-contracts.mjs';
 import {NODE_READ_MODE,nodeReadHandler,isUnchangedTextImportExecution,isUnchangedTransformExecution} from './node-read-contract.mjs';
 
 const stable = v => Array.isArray(v) ? v.map(stable) : v && typeof v === 'object'
@@ -163,6 +163,15 @@ export function validateNodeApplyRequest(request, handlers, {fresh=false}={}) {
     handler.validate(request.parameters,request.mode,legacyRequest);
     throw new NodeVariableInputError(request,capabilities,'mappings',error.message,
       'Remove or correct the variable mapping according to the handler error.');
+  }
+  if(fresh)for(const [mappingIndex,mapping] of request.mappings.entries()){
+    if(mapping.kind!==undefined)continue;
+    const layout=mapping.fields===undefined?'changes':'fields';
+    const fields=mapping[layout]??[];
+    const fieldIndex=fields.findIndex(field=>field.name!==undefined&&!nodeFieldNamePattern.test(field.name));
+    if(fieldIndex>=0)throw Error(`Invalid parameters.mappings[${mappingIndex}].${layout}[${fieldIndex}].name: `
+      +'Column name must be a 1 to 128 character identifier starting with an ASCII letter or _. '
+      +'Use ASCII letters, digits and _ only. Put text such as 2026-01 in label. Omit name to keep the current name.');
   }
   return {graph,handler};
 }
