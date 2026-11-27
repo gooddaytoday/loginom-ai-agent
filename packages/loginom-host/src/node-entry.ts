@@ -138,6 +138,22 @@ async function dispatch(message: unknown) {
       reply({ id: message.id, result })
       return
     }
+    if (message.method === "package.inventory") {
+      if (!Array.isArray(input) || !input.every((sessionID): sessionID is string => typeof sessionID === "string"))
+        throw new Error("LOGINOM_INPUT_INVALID")
+      reply({ id: message.id, result: await state.host.packageInventory(input) })
+      return
+    }
+    if (message.method === "package.action") {
+      if (!input || typeof input !== "object" || !("sessionID" in input) || typeof input.sessionID !== "string"
+        || !("path" in input) || (input.path !== null && typeof input.path !== "string")
+        || !("decision" in input) || (input.decision !== "save" && input.decision !== "discard" && input.decision !== "clean")
+        || !("close" in input) || typeof input.close !== "boolean") throw new Error("LOGINOM_INPUT_INVALID")
+      reply({ id: message.id, result: await state.host.packageAction({
+        sessionID: input.sessionID, decision: input.decision, path: input.path, close: input.close,
+      }) })
+      return
+    }
     if (!message.method.startsWith("connection.")) {
       events.emit("message", { data: message })
       return

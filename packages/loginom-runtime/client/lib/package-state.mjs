@@ -1,6 +1,6 @@
 // Runs in the Loginom page. A verified preparation receipt identifies the
 // conversation's package even when another package is active.
-export async function readPackageState({ origin, build, documentId, operationId, account, sessionId }) {
+export async function readPackageState({ origin, build, documentId, operationId, account, sessionId, save }) {
   const snapshot = () => {
     const app = globalThis.bg?.app;
     const form = app?.Application?.FInstance?.FMainForm;
@@ -20,30 +20,84 @@ export async function readPackageState({ origin, build, documentId, operationId,
     const path = open && typeof node.PackageFileName === 'string' && node.PackageFileName
       ? '/' + node.PackageFileName.replaceAll('\\', '/').replace(/^\/+/, '')
       : null;
-    return { receipt, connection, session: connection.Session, proxy: open ? node.Package : null, open, path };
+    return { receipt, connection, session: connection.Session, node, form, proxy: open ? node.Package : null,
+      open, path, packageCount: map.PackageNodes.Count };
   };
 
   const before = snapshot();
   if (!before) return null;
-  if (!before.open) return { open: false, path: null, modified: null };
-  let modified = null;
-  if (before.proxy) {
+  if (!before.open) return { open: false, path: null, modified: null, packageCount: before.packageCount };
+  const readModified = async (timeout = 3000) => {
+    if (!before.proxy || timeout <= 0) return null;
     let timer;
     try {
       const value = await Promise.race([
         before.session.IsPackageModified(before.proxy),
-        new Promise(resolve => { timer = setTimeout(resolve, 3000); }),
+        new Promise(resolve => { timer = setTimeout(resolve, timeout); }),
       ]);
-      if (typeof value === 'boolean') modified = value;
+      return typeof value === 'boolean' ? value : null;
     } catch {
-      // The inventory can still establish that the package is open.
+      return null;
     } finally {
       clearTimeout(timer);
     }
-  }
+  };
+  const modified = await readModified();
   const after = snapshot();
   if (!after || Object.keys(before).some(key => before[key] !== after[key])) return null;
+  if (save) {
+    if (save.path !== before.path || typeof modified !== 'boolean') return null;
+    if (!modified) return { status: 'clean' };
+    if (before.node.ReadOnly !== false || before.node.HasRunningNodes() !== false) return null;
+    const active = () => {
+      let node = before.form.Items.Workspace.getActiveTab()?.Controller?.Node?.data?.node;
+      for (let depth = 0; node && depth < 32; depth++, node = node.ParentNode) if (node === before.node) return true;
+      return false;
+    };
+    const visible = element => element.getClientRects().length > 0 && getComputedStyle(element).visibility !== 'hidden';
+    const blocked = () => [...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible);
+    const button = tid => {
+      const matches = [...document.querySelectorAll(`[data-tid="${tid}"]`)].filter(visible);
+      return matches.length === 1 && !matches[0].closest('[aria-disabled="true"],.x-item-disabled,.x-btn-disabled,[disabled]') ? matches[0] : null;
+    };
+    const same = (allowNewPath = false) => {
+      const current = snapshot();
+      return current && Object.keys(before).every(key => key === 'path' && allowNewPath && before.path === null
+        || current[key] === before[key]) ? current : null;
+    };
+    const saveButton = () => button(before.path === null ? 'MF;MainMenuForm;btnSaveAsPackage' : 'MF;MainMenuForm;btnSavePackage');
+    if (!active() || blocked()) return null;
+    if (!saveButton()) button('MF;cntMain;tlbMainToolbar;btnPackagesMenu')?.click();
+    const menuDeadline = Date.now() + 2000;
+    const wait = () => new Promise(resolve => setTimeout(resolve, 100));
+    while (!saveButton() && Date.now() < menuDeadline && same() && active() && !blocked()) await wait();
+    const control = saveButton();
+    if (!control || Date.now() >= menuDeadline || !same() || !active() || blocked() || before.node.HasRunningNodes() !== false) return null;
+    control.click();
+    const deadline = Date.now() + (before.path === null ? 45000 : 8000);
+    while (Date.now() < deadline && same(true)) {
+      if (!blocked() && !saveButton() && await readModified(Math.min(3000, deadline - Date.now())) === false) {
+        const confirmed = same(true);
+        if (confirmed?.path?.endsWith('.lgp') && !blocked())
+          return { status: 'saved', lastSave: { path: confirmed.path, confirmedAt: Date.now() } };
+      }
+      await wait();
+    }
+    return null;
+  }
   return { open: true, path: before.path, modified };
+}
+
+export function packageTarget(metadata, context, origin) {
+  const preparation = metadata.workspacePreparation;
+  const prepared = preparation?.state;
+  if (!prepared || metadata.workspaceReady !== true || !origin) return null;
+  const pages = context.pages().filter(page => URL.canParse(page.url()) && new URL(page.url()).origin === origin);
+  if (pages.length !== 1) return null;
+  return { page: pages[0], owner: {
+    origin, build: metadata.targetIdentity?.loginom_build, documentId: prepared.document_id,
+    operationId: preparation.operation_id, account: prepared.loginom_account, sessionId: metadata.sessionId,
+  } };
 }
 
 export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
@@ -55,16 +109,9 @@ export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
     const lastSave = lastSavedPackage ? { path: lastSavedPackage.path, confirmedAt: lastSavedPackage.confirmedAt } : null;
     let observation = null;
     if (!preparation && !busy) observation = { open: false, path: null, modified: null };
-    if (prepared && metadata.workspaceReady === true && origin && !busy) {
-      const pages = context.pages().filter(page => URL.canParse(page.url()) && new URL(page.url()).origin === origin);
-      if (pages.length === 1) observation = await pages[0].evaluate(readPackageState, {
-        origin,
-        build: metadata.targetIdentity?.loginom_build,
-        documentId: prepared.document_id,
-        operationId: preparation.operation_id,
-        account: prepared.loginom_account,
-        sessionId: metadata.sessionId,
-      }).catch(() => null);
+    const target = !busy && packageTarget(metadata, context, origin);
+    if (target) {
+      observation = await target.page.evaluate(readPackageState, target.owner).catch(() => null);
       if (metadata.workspacePreparation !== preparation || metadata.workspaceReady !== true) observation = null;
     }
 

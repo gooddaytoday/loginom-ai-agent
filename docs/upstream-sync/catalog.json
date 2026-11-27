@@ -99,6 +99,20 @@
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
     {
+      "id": "CAT-15",
+      "title": "Desktop quit confirmation before stopping the background service (S10-11)",
+      "paths": [
+        "packages/desktop/src/main/lifecycle/index.ts",
+        "packages/desktop/src/main/lifecycle/machine.ts",
+        "packages/desktop/src/main/lifecycle/machine.test.ts",
+        "packages/desktop/src/main/loginom/quit-packages.ts",
+        "packages/desktop/src/main/loginom/quit-packages.test.ts",
+        "packages/desktop/src/main/windows/index.ts",
+        "packages/app/src/runtime/i18n/desktop-native.ts",
+        "packages/app/src/runtime/i18n/ru.ts"
+      ]
+    },
+    {
       "id": "CAT-14",
       "title": "Built-in plugin top-level pages",
       "paths": [

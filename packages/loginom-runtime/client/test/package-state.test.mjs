@@ -1,15 +1,22 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
-import { createPackageStateReader } from '../lib/package-state.mjs';
+import { createPackageStateReader, packageTarget, readPackageState } from '../lib/package-state.mjs';
 
 function fixture() {
   const origin = 'https://loginom.test';
-  const document = {};
-  const owned = { PackageFileName: '', Package: {} };
+  const owned = { PackageFileName: '', Package: {}, ReadOnly: false, HasRunningNodes: () => false };
   const other = { PackageFileName: 'user/other.lgp', Package: {} };
   const packages = [owned, other];
-  const data = { time: 100, modified: false, onRead: () => {} };
+  const data = { time: 100, modified: false, active: other, onRead: () => {}, onSave: () => {}, clicks: 0 };
+  let menuOpen = false;
+  const button = click => ({ getClientRects: () => [1], closest: () => null, click });
+  const document = { querySelectorAll(selector) {
+    if (selector.includes('btnPackagesMenu')) return [button(() => { menuOpen = true; })];
+    if (/btnSave(?:As)?Package/.test(selector) && menuOpen)
+      return [button(() => { menuOpen = false; data.clicks++; data.onSave(selector); })];
+    return [];
+  } };
   const session = {
     async IsPackageModified(proxy) {
       assert.equal(proxy, owned.Package);
@@ -24,14 +31,14 @@ function fixture() {
   };
   const form = {
     FMapTree: map,
-    Items: { Workspace: { getActiveTab: () => ({ Controller: { Node: { data: { node: other } } } }) } },
+    Items: { Workspace: { getActiveTab: () => ({ Controller: { Node: { data: { node: data.active } } } }) } },
   };
   const receipt = {
     phase: 'verified', request: JSON.stringify({ session: 'chat' }), packageNode: owned,
     openConnection: connection, openServerSession: session,
   };
   const globals = {
-    document, location: { origin },
+    document, location: { origin }, getComputedStyle: () => ({ visibility: 'visible' }),
     bg: { app: { Version: '7.4.2', Application: { FInstance: { FMainForm: form } } } },
     __loginomDockPreparationV1: { document, id: 'doc', receipts: new Map([['prepare', receipt]]) },
   };
@@ -44,9 +51,46 @@ function fixture() {
   };
   const page = { url: () => origin, evaluate: (read, input) => runInNewContext(`(${read})(input)`, { ...globals, input, setTimeout, clearTimeout }) };
   const read = createPackageStateReader(metadata, origin, () => data.time);
-  const snapshot = (save) => read({ pages: () => [page] }, save);
-  return { snapshot, data, owned, packages, connection };
+  const context = { pages: () => [page] };
+  const snapshot = (save) => read(context, save);
+  const save = (path) => page.evaluate(readPackageState, { ...packageTarget(metadata, context, origin).owner, save: { path } });
+  return { snapshot, save, data, owned, packages, connection };
 }
+
+test('native Save only targets the active owned path and receipts confirmed clean readback', async () => {
+  const { save, data, owned, snapshot, connection } = fixture();
+  const path = '/user/package.lgp';
+  owned.PackageFileName = path;
+  data.modified = true;
+  assert.equal(await save(path), null);
+  data.active = owned;
+  assert.equal(await save('/user/other.lgp'), null);
+  assert.equal(data.clicks, 0);
+  data.onSave = () => { data.modified = false; };
+  const result = await save(path);
+  assert.equal(data.clicks, 1);
+  assert.equal(result.status, 'saved');
+  assert.equal(result.lastSave.path, path);
+  assert.ok(Number.isSafeInteger(result.lastSave.confirmedAt));
+  assert.equal((await snapshot()).modified, false);
+  data.modified = true;
+  data.onSave = () => { connection.Session = {}; };
+  assert.equal(await save(path), null);
+});
+
+test('a new package uses the native Save As and receipts the path chosen in Loginom', async () => {
+  const { save, data, owned } = fixture();
+  data.modified = true;
+  data.active = owned;
+  data.onSave = (control) => {
+    assert.match(control, /btnSaveAsPackage/);
+    owned.PackageFileName = 'user/chosen.lgp';
+    data.modified = false;
+  };
+  const result = await save(null);
+  assert.equal(result.status, 'saved');
+  assert.equal(result.lastSave.path, '/user/chosen.lgp');
+});
 
 test('reads the conversation draft even when another package is active', async () => {
   const { snapshot, data } = fixture();

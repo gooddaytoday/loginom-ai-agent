@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { createHash } from "node:crypto"
 import { access, mkdir, mkdtemp, readFile, readdir, rm, symlink } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -55,6 +56,10 @@ async function fixture() {
         send({ protocol: 1, generation: message.input.generation, chat: message.input.chat, ready: true });
       }
       if (message.operation === 'work') send(work);
+      if (message.operation === 'packageState')
+        send({ open: true, path: '/user/package.lgp', modified: true, modifiedDetectedAt: 101, lastSave: null });
+      if (message.operation === 'packageAction')
+        send({ status: message.input?.decision === 'discard' && message.input?.path === '/user/package.lgp' && message.input?.close ? 'closed' : 'blocked' });
       if (message.operation === 'fixture.state') { work = message.input; send(true); }
       if (message.operation === 'fixture.exit') {
         process.send({ id: message.id, result: true }, () => process.disconnect());
@@ -88,6 +93,28 @@ async function fixture() {
     },
   }
 }
+
+test("package inventory reads only existing conversation runtimes, and explicit close releases that owner", async () => {
+  const f = await fixture()
+  const sessionID = "ses_package"
+  const chat = createHash("sha256").update(sessionID).digest("hex")
+  const path = "/user/package.lgp"
+  try {
+    expect(await f.host.packageInventory([sessionID])).toEqual([])
+    await expect(access(f.launches)).rejects.toMatchObject({ code: "ENOENT" })
+    await f.host.runtime(1, chat)
+    expect(await f.host.packageInventory([sessionID, "ses_other"])).toEqual([
+      { sessionID, state: { open: true, path, modified: true, modifiedDetectedAt: 101, lastSave: null } },
+    ])
+    expect(await f.host.packageAction({ sessionID, path: "/user/other.lgp", decision: "discard", close: true }))
+      .toEqual({ status: "blocked" })
+    expect(await f.host.packageAction({ sessionID, path, decision: "discard", close: true })).toEqual({ status: "closed" })
+    expect(await f.host.packageInventory([sessionID])).toEqual([])
+    expect((await readFile(f.launches, "utf8")).trim().split("\n")).toHaveLength(1)
+  } finally {
+    await f.close()
+  }
+})
 
 test("work state rereads the existing child after asynchronous changes and never creates another chat", async () => {
   const f = await fixture()

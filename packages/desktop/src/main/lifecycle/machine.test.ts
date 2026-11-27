@@ -32,6 +32,21 @@ const replay = (events: readonly Event[], from = initialState()) =>
   )
 
 describe("app lifecycle machine", () => {
+  test("a Desktop exit keeps the service running until approved, and retries after cancellation", () => {
+    const request = { type: "exit.confirmation.requested", mode: "quit" } satisfies Event
+    const first = transition(initialState(), request)
+    expect(first.commands).toEqual([{ type: "confirm-exit", attempt: 1 }])
+    expect(isQuitting(first.state)).toBe(false)
+    expect(transition(first.state, request).commands).toEqual([])
+    const cancelled = transition(first.state, { type: "exit.confirmation.completed", attempt: 1, approved: false })
+    expect(cancelled.state.status).toBe("running")
+    expect(cancelled.commands).toEqual([])
+    const retry = transition(cancelled.state, request)
+    expect(transition(retry.state, { type: "exit.confirmation.completed", attempt: 1, approved: true }).commands).toEqual([])
+    expect(transition(retry.state, { type: "exit.confirmation.completed", attempt: 2, approved: true }).commands)
+      .toEqual([{ type: "stop-plugins", attempt: 3 }])
+  })
+
   test("a failed handoff starts the stopped plugins again before it rejects, and a retry stops them again", () => {
     const first = reply()
     const second = reply()

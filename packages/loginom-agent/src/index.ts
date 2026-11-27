@@ -8,6 +8,7 @@ import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
+import { Schema } from "effect"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
 import { Dashboard } from "./dashboard"
@@ -18,7 +19,7 @@ import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
 import { packageDocs } from "./package-docs"
-import { packageStateRpc } from "./package-state-contract"
+import { PackageActionReply, packageStateRpc } from "./package-state-contract"
 import {
   classify,
   declinedText,
@@ -515,14 +516,58 @@ export default Plugin.define({
       prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),
       find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),
     })
+    const packageActionInput = Schema.Struct({ sessionID: Schema.String, path: Schema.NullOr(Schema.String) })
+    const closePackageInput = Schema.Struct({
+      ...packageActionInput.fields,
+      decision: Schema.Literals(["clean", "save", "discard", "cancel"]),
+    })
+    const packageConversation = async (sessionID: string) => {
+      const session = await ctx.session.get({ sessionID }).catch(() => undefined)
+      return session?.location.directory === ctx.location.directory ? session : undefined
+    }
+    const actOnPackage = async (session: NonNullable<Awaited<ReturnType<typeof packageConversation>>>,
+      path: string | null, decision: "clean" | "save" | "discard", close: boolean) => {
+      const result = await ServiceHost.packageAction({ sessionID: session.id, path, decision, close })
+        .then(Schema.decodeUnknownPromise(PackageActionReply))
+        .catch(() => ({ status: "blocked" as const, lastSave: undefined }))
+      if (result.lastSave) {
+        const current = await ctx.session.get({ sessionID: session.id })
+        const loginom = current.metadata?.loginom
+        await ctx.session.update({ sessionID: session.id, metadata: {
+          ...current.metadata,
+          loginom: { ...(loginom && typeof loginom === "object" && !Array.isArray(loginom) ? loginom : {}), lastSave: result.lastSave },
+        } })
+      }
+      return { status: result.status, ...(result.lastSave ? { lastSave: result.lastSave } : {}) }
+    }
     await ctx.rpc.register(packageStateRpc, {
       snapshot: async (value, call) => {
         if (!value || typeof value !== "object" || !("sessionID" in value) || typeof value.sessionID !== "string")
           return call.error("invalid_session", "A conversation ID is required", {})
-        const session = await ctx.session.get({ sessionID: value.sessionID }).catch(() => undefined)
-        if (session?.location.directory !== ctx.location.directory)
+        if (!(await packageConversation(value.sessionID)))
           return call.error("invalid_session", "The conversation is unavailable in this location", {})
         return ServiceHost.packageState(value.sessionID)
+      },
+      active: async () => {
+        const entries = Schema.decodeUnknownSync(Schema.Array(Schema.Struct({ sessionID: Schema.String, state: Schema.Unknown })))(
+          await ServiceHost.packageInventory(),
+        )
+        return Promise.all(entries.map(async (entry) => ({ ...entry,
+          directory: (await ctx.session.get({ sessionID: entry.sessionID }).catch(() => null))?.location.directory ?? null,
+        })))
+      },
+      save: async (value, call) => {
+        const input = Schema.decodeUnknownSync(packageActionInput)(value)
+        const session = await packageConversation(input.sessionID)
+        if (!session) return call.error("invalid_session", "The conversation is unavailable in this location", {})
+        return actOnPackage(session, input.path, "save", false)
+      },
+      close: async (value, call) => {
+        const input = Schema.decodeUnknownSync(closePackageInput)(value)
+        const session = await packageConversation(input.sessionID)
+        if (!session) return call.error("invalid_session", "The conversation is unavailable in this location", {})
+        if (input.decision === "cancel") return { status: "cancelled" }
+        return actOnPackage(session, input.path, input.decision, true)
       },
     })
     await ctx.rpc.register(permission, {

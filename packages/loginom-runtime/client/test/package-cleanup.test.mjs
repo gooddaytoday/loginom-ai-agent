@@ -953,6 +953,20 @@ test('D81 diagnostic retains fixed safe control IDs',async()=>{
   assert.equal(r.logout_menu_readback.avatar[0].hit_tid,tid);
 });
 
+test('explicit discard can close a dirty draft after clean close refused, without saving it',async()=>{
+ const f=fixture({path:null,modified:true});
+ const receipt=f.context.__loginomDockPreparationV1.receipts.get('prepare');
+ receipt.request=JSON.stringify({session:options.sessionId,intent:'new_draft'});
+ receipt.phase='verified';receipt.packageInventoryBefore=0;
+ const draft={packagePath:null,unsavedDraft:true};
+ assert.equal((await f.run({...draft,userDecision:'clean'})).reason,'UNSAVED_CHANGES');
+ assert.equal(f.events.includes('close'),false);
+ const result=await f.run({...draft,userDecision:'discard'});
+ assert.equal(result.status,'SUCCEEDED');
+ assert.equal(result.unsaved_changes_discarded,true);
+ assert.deepEqual(f.events.filter(event=>['close','discard','logout'].includes(event)),['close','discard','logout']);
+});
+
 for(const mode of ['clean','navigated','foreign-navigation','dirty','foreign-intent','persisted','foreign-tab','running'])
  test('unsaved prepared draft cleanup retains native guards: '+mode,async()=>{
   const f=fixture({path:mode==='persisted'?options.packagePath:null,modified:mode==='dirty',running:mode==='running'});

@@ -8,7 +8,7 @@ import { DesktopStorage } from "../storage"
 import { getStore } from "../storage/store"
 import { WINDOW_IDS_KEY } from "../storage/keys"
 import { windowDataFile } from "../../shared/ipc-transport"
-import { isQuitting, type State } from "../lifecycle/machine"
+import { isQuitting, needsQuitConfirmation, type State } from "../lifecycle/machine"
 import { windowArguments } from "./bootstrap"
 import {
   getBackgroundColor,
@@ -109,6 +109,7 @@ export function setWindowThemeReady(win: BrowserWindow) {
 export const mainWindows = Effect.fn("Window.make")(function* (input: {
   readonly appState: () => State
   readonly relaunch: () => void
+  readonly requestQuit: () => void
   /** Windows logoff or shutdown. */
   readonly sessionEnding: () => void
 }) {
@@ -208,6 +209,11 @@ export const mainWindows = Effect.fn("Window.make")(function* (input: {
   const register = (win: BrowserWindow, id: string) => {
     registry.register(id, win)
     win.on("focus", () => registry.focused(id))
+    win.on("close", (event) => {
+      if (process.platform === "darwin" || getMainWindows().length !== 1 || !needsQuitConfirmation(input.appState())) return
+      event.preventDefault()
+      input.requestQuit()
+    })
     // Windows emits session-end, but not before-quit, during shutdown and logoff.
     win.on("session-end", input.sessionEnding)
     win.on("closed", () => {

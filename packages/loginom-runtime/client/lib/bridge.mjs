@@ -32,7 +32,7 @@ import { compactActionResult, compactNodeRequestFailure, userResultSchema, compa
 import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory, userActionKeys } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
-import { createPackageStateReader } from './package-state.mjs';
+import { createPackageStateReader, packageTarget, readPackageState as readOwnedPackage } from './package-state.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState,readSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
 import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
@@ -331,6 +331,7 @@ export async function createBridge(config, session, { browserTransport: managedB
     // runtime rereads path and dirty state itself after the model's browser work.
     const saveRecoveries = new Map();
     const readPackageState = createPackageStateReader(session.metadata, config.loginomUrl);
+    let userCloseReceipt;
     const readSavedState = async save => {
       const prepared = session.metadata.workspacePreparation?.state;
       const options = { sessionId: session.metadata.sessionId, documentId: prepared?.document_id,
@@ -971,6 +972,46 @@ export async function createBridge(config, session, { browserTransport: managedB
       packageState(context, busy) {
         return readPackageState(context, lastSavedPackage, busy);
       },
+      packageAction(context, { decision, path, close }) {
+        return browserGate(async () => {
+          const blocked = { status: 'blocked' };
+          if (userCloseReceipt || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork()
+            || recovery.unsettled() || clipboardUncertain || heldLeases.size) return blocked;
+          const metadata = session.metadata;
+          const target = packageTarget(metadata, context, config.loginomUrl && new URL(config.loginomUrl).origin);
+          if (!target) return !metadata.workspacePreparation && close ? { status: 'closed' } : blocked;
+          const observed = await target.page.evaluate(readOwnedPackage, target.owner);
+          if (observed?.open === false && observed.packageCount === 0 && close) {
+            userCloseReceipt = { status: 'ALREADY_CLOSED', package_closed: true, logged_out: false };
+            return { status: 'closed' };
+          }
+          if (observed?.open !== true || observed.path !== path || typeof observed.modified !== 'boolean') return blocked;
+          if (decision === 'clean' && observed.modified) return blocked;
+          let result = { status: 'clean' };
+          if (decision === 'save') {
+            if (path === null && observed.modified) await target.page.bringToFront();
+            result = await target.page.evaluate(readOwnedPackage, { ...target.owner, save: { path } }) ?? blocked;
+            if (result.status === 'blocked') return result;
+            if (result.status === 'saved') {
+              lastSavedPackage = { ...result.lastSave, document_id: target.owner.documentId,
+                operation_id: randomUUID(), sequence: saveSequence++ };
+              reopenedSave = null;
+            }
+          }
+          if (!close) return result;
+          const prepared = metadata.workspacePreparation.state;
+          const packagePath = result.lastSave?.path ?? path;
+          const options = { ...target.owner, loginomUrl: config.loginomUrl, loginomBuild: target.owner.build,
+            packagePath, tabTid: prepared.workflow_ref?.tab_tid, unsavedDraft: packagePath === null,
+            diagnosticReadOnly: prepared.package_ref?.read_only === true, userDecision: decision };
+          const response = await browser.callTool({name:'browser_run_code_unsafe',
+            arguments:{code:makePackageCleanupCode(options)}}, undefined, {timeout:30000});
+          const receipt = parsePackageCleanupResult(response, options);
+          if (receipt.status !== 'SUCCEEDED') return { status: 'blocked', ...(result.lastSave ? { lastSave: result.lastSave } : {}) };
+          userCloseReceipt = receipt;
+          return { status: 'closed', ...(result.lastSave ? { lastSave: result.lastSave } : {}) };
+        });
+      },
       applyWithScanReceipt(args,receipt,extra) {
         return callTool({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);
       },
@@ -1073,8 +1114,8 @@ export async function createBridge(config, session, { browserTransport: managedB
           && cleanupState.package_ref.path === null;
         const packagePath = config.acceptanceCleanupPackage ?? (normalCleanup ? lastSavedPackage?.path ?? openedPackage ?? (failedOpen ? preparationRequest.package_path : null) : userProfile && savedPackages.size === 1 ? savedPackages.keys().next().value : null);
         const saveOperationId = normalCleanup ? lastSavedPackage?.operation_id : savedPackages.get(packagePath);
-        let cleanup;
-        if (packagePath || normalCleanup) {
+        let cleanup = userCloseReceipt;
+        if (!cleanup && (packagePath || normalCleanup)) {
           if (lifecycleCleanupFailed) cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'};
           else if (!prepared?.attempted) cleanup = {status:'SKIPPED_UNPREPARED', session_id:session.metadata.sessionId};
           else {
