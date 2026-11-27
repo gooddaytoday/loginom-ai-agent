@@ -3,17 +3,17 @@ import { usePlugin } from "@opencode/plugin/gui"
 import { TextField } from "@opencode/ui/text-field"
 import { createMemo, createResource, createSignal, onCleanup, Show } from "solid-js"
 import type definition from "./index"
-import { profileClient } from "./profile-client"
+import { profileDirectory, profileService } from "./profile-service"
 
 export default function Instructions() {
   const ctx = usePlugin<typeof definition>()
-  const client = createMemo(() => profileClient(ctx))
+  const service = createMemo(() => profileService(ctx))
 
   return (
     <ctx.ui.SettingsLayout title={ctx.t("instructionsHeading")} description={ctx.t("instructionsDescription")}>
       <ctx.ui.SettingsSection>
         <Show
-          when={client()}
+          when={service()}
           keyed
           fallback={
             <p class="p-4" role="alert">
@@ -21,20 +21,27 @@ export default function Instructions() {
             </p>
           }
         >
-          {(target) => <Editor client={target} />}
+          {(target) => <Editor service={target} />}
         </Show>
       </ctx.ui.SettingsSection>
     </ctx.ui.SettingsLayout>
   )
 }
 
-function Editor(props: { client: NonNullable<ReturnType<typeof profileClient>> }) {
+function Editor(props: { service: NonNullable<ReturnType<typeof profileService>> }) {
   const ctx = usePlugin<typeof definition>()
-  const rpc = props.client.rpc(InstructionsDefinition)
+  const rpc = props.service.client.rpc(InstructionsDefinition)
   const controller = new AbortController()
   onCleanup(() => controller.abort())
-  const options = () => ({ signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]) })
-  const [saved, { mutate }] = createResource(() => rpc.read({}, options()).catch(() => undefined))
+  const options = async () => {
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)])
+    const directory = await profileDirectory(props.service, signal)
+    return directory ? { location: { directory }, signal } : undefined
+  }
+  const [saved, { mutate }] = createResource(async () => {
+    const target = await options()
+    return target && rpc.read({}, target).catch(() => undefined)
+  })
   const [draft, setDraft] = createSignal<string>()
   const [saving, setSaving] = createSignal(false)
   const [failed, setFailed] = createSignal(false)
@@ -47,7 +54,8 @@ function Editor(props: { client: NonNullable<ReturnType<typeof profileClient>> }
     if (!saved() || !dirty() || saving() || tooLong()) return
     setSaving(true)
     setFailed(false)
-    const result = await rpc.save({ text: text() }, options()).catch(() => undefined)
+    const target = await options()
+    const result = target && (await rpc.save({ text: text() }, target).catch(() => undefined))
 
     if (result) {
       mutate(result)

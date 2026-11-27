@@ -23,17 +23,21 @@ test.use({ serviceWorkers: "block" })
 
 test("profile instructions retain an unsaved draft after a failed save and enforce the UTF-8 limit", async ({ page }, testInfo) => {
   const draft = "Новые инструкции"
+  const serviceDirectory = "/service"
   let saved = "Исходные инструкции"
   let reject = true
   await mockWorkspace(page, {
     name: "Profile instructions",
+    directory: serviceDirectory,
     sessions: [],
     seed: { locale: "ru" },
-    rpc: ({ rpcID, method, body }) => {
+    onRpc: ({ rpcID, method, body, directory }) => {
       if (rpcID !== "loginom.instructions") return
+      expect(directory).toBe(serviceDirectory)
       if (method === "read") return { output: { text: saved } }
-      if (method !== "save" || reject) return
+      if (method !== "save") return
       expect(body).toEqual({ input: { text: draft } })
+      if (reject) return { unavailable: true }
       saved = draft
       return { output: { text: saved } }
     },
@@ -108,6 +112,63 @@ const patched = (page: Page) =>
   page.waitForRequest(
     (request) => request.method() === "PATCH" && new URL(request.url()).pathname === `/api/project/${projectID}`,
   )
+
+test("Loginom settings use the service Location and recover an unconfirmed Save", async ({ page }) => {
+  const serviceDirectory = "/service"
+  const loginom = "https://loginom.example/app/"
+  let username = "user"
+  let revision = 0
+  const checks: unknown[] = []
+  await mockWorkspace(page, {
+    name: "Loginom",
+    sessions: [],
+    directory: serviceDirectory,
+    provider: NO_PROVIDER,
+    onRpc: (request) => {
+      if (request.rpcID !== "loginom.connection") return
+      expect(request.directory).toBe(serviceDirectory)
+      switch (request.method) {
+        case "status":
+          return {
+            output: {
+              ok: true,
+              value: {
+                revision,
+                generation: revision,
+                url: loginom,
+                username,
+                folder: `/${username}`,
+                hasPassword: false,
+                failed: false,
+                state: revision ? "ready" : "unconfigured",
+              },
+            },
+          }
+        case "check":
+          checks.push(request.body)
+          return { output: { ok: true, value: { validationId: "checked", expiresAt: 4102444800000 } } }
+        case "save":
+          expect(request.body).toMatchObject({ input: { revision: 0, validationId: "checked" } })
+          username = "analyst"
+          revision = 1
+          return { unavailable: true }
+      }
+    },
+  })
+  await page.goto("/settings?tab=loginom")
+  const settings = page.getByRole("tabpanel", { name: "Loginom", exact: true })
+  const user = settings.getByRole("textbox", { name: "Username" })
+  await expect(user).toHaveValue("user")
+  await user.fill("analyst")
+  await settings.getByRole("button", { name: "Save", exact: true }).click()
+  await expect(settings.getByText("Connected as analyst · folder /analyst")).toBeVisible()
+  await settings.getByRole("button", { name: "Check", exact: true }).click()
+  await expect(settings.getByText("Checked, not yet saved")).toBeVisible()
+  expect(checks).toMatchObject([
+    { input: { revision: 0, url: loginom, username: "analyst" } },
+    { input: { revision: 1, url: loginom, username: "analyst" } },
+  ])
+})
 
 test("settings has its own route and returns through app history", async ({ page }) => {
   const { settings } = await open(page)
