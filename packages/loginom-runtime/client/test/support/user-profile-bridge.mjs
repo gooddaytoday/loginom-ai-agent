@@ -353,7 +353,9 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const afterPrepare=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,
       document_id:reopenedNode.document_id,workflow_ref:{workflow_id:reopenedNode.workflow_id},
       target:{kind:'existing',type:'transform.sorting',ref:reopenedNode}}});
-    assert.equal(JSON.parse(afterPrepare.content[0].text).error.code,'NODE_TYPE_NOT_DESCRIBED');
+    const existingRefusal=JSON.parse(afterPrepare.content[0].text);
+    assert.equal(existingRefusal.error.code,'NODE_TYPE_NOT_DESCRIBED');
+    assert.equal(existingRefusal.effect_possible,false);
     assert.deepEqual(JSON.parse(afterPrepare.content[1].text).node_types,[card]);
     assert.equal(browserCalls.length,beforeExisting);
     const refreshed=JSON.parse((await describe({node_types:['transform.sorting'],modes:['keys']})).content[0].text);

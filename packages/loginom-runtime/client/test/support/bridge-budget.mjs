@@ -125,9 +125,9 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
    assert.equal(prepared.prepared,true);
    const before=browserCalls;
    let requestCount=0;
-   const apply=type=>call('dock_node_apply',{operation_id:'apply-'+ ++requestCount,contract_revision:'1.0.0',
+   const apply=(type,mode=type==='transform.sorting'?'keys':'expression')=>call('dock_node_apply',{operation_id:'apply-'+ ++requestCount,contract_revision:'1.0.0',
     document_id:'fixture-document',workflow_ref:{workflow_id:'fixture-workflow'},target:{kind:'new',type},
-    inputs:[],mode:type==='transform.sorting'?'keys':'expression',parameters:{},finish:'execute'});
+    inputs:[],mode,parameters:{},finish:'execute'});
    await call('dock_action_describe',{node_types:['transform.sorting'],modes:['keys']});
    assert.equal(parse(await apply('transform.sorting')).status,'SUCCEEDED');
    assert.equal(applied.length,1);
@@ -138,11 +138,13 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
    assert.equal(parse(refused).error.code,'USER_RESPONSE_BUDGET');
    const refusedApply=await apply('transform.calculator');
    const refusal=parse(refusedApply);
+   assert.ok(size(refusedApply)<=46000);
    assert.equal(refusal.error.code,'NODE_TYPE_NOT_DESCRIBED');
    assert.equal(refusal.effect_possible,false);
    assert.equal(refusal.cleanup_complete,true);
    assert.equal(applied.length,1,'refused cards must not authorize node application');
    assert.equal(refusal.next_step.tool,'dock_node_apply');
+   assert.equal(Object.hasOwn(refusal.next_step,'original_operation_id'),false);
    const [card]=JSON.parse(refusedApply.content[1].text).node_types;
    assert.equal(card.type,'transform.calculator');
    assert.ok(card.parameter_schema);
@@ -168,6 +170,34 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
    }
    assert.equal(parse(await apply('transform.calculator')).status,'SUCCEEDED');
    assert.equal(applied.length,4);
+
+   const type='research.corr_analysis';
+   const pearson=await apply(type,'pearson');
+   assert.equal(parse(pearson).error.code,'NODE_TYPE_NOT_DESCRIBED');
+   assert.equal(parse(pearson).effect_possible,false);
+   const pearsonCard=JSON.parse(pearson.content[1].text).node_types[0];
+   assert.match(pearsonCard.guidance,/Корреляция Пирсона/);
+   assert.doesNotMatch(pearsonCard.guidance,/Ранговая корреляция Спирмена/);
+   assert.equal(parse(await apply(type,'pearson')).status,'SUCCEEDED');
+   const spearman=await apply(type,'spearman');
+   assert.equal(parse(spearman).error.code,'NODE_TYPE_NOT_DESCRIBED');
+   assert.equal(parse(spearman).effect_possible,false);
+   const spearmanCard=JSON.parse(spearman.content[1].text).node_types[0];
+   assert.match(spearmanCard.guidance,/Ранговая корреляция Спирмена/);
+   assert.doesNotMatch(spearmanCard.guidance,/Корреляция Пирсона/);
+   assert.equal(applied.length,5,'the delivered Pearson card cannot admit Spearman');
+
+   await writeFile(join(resources.directory,'references/nodes',type+'.md'),'tampered');
+   const failedCard=await apply(type,'kendall');
+   const failedRefusal=parse(failedCard);
+   assert.equal(failedRefusal.error.code,'NODE_TYPE_NOT_DESCRIBED');
+   assert.equal(failedRefusal.effect_possible,false);
+   assert.equal(failedRefusal.next_step.tool,'dock_action_describe');
+   assert.equal(failedCard.content.length,1);
+   const events=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(line=>JSON.parse(line));
+   const event=events.find(row=>row.phase==='node_type_not_described'&&row.operation_id===failedRefusal.operation_id);
+   assert.equal(event?.card_error,'LOGINOM_SKILL_HASH_MISMATCH');
+   assert.equal(applied.length,5);
    assert.equal(browserCalls,before);
    return;
   }

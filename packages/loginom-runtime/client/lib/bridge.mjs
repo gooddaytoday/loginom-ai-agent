@@ -632,13 +632,18 @@ export async function createBridge(config, session, { browserTransport: managedB
                 const refusal=userWorkflows.checkNodeDescription(args);
                 if(refusal){
                   const nodeType=args.target.type,modes=[args.mode];
-                  const description=await describeUserResult(actionRuntime.describe({node_types:[nodeType]}),modes).catch(()=>null);
+                  let description,cardError;
+                  try{
+                    description=await describeUserResult(actionRuntime.describe({node_types:[nodeType]}),modes);
+                  }catch(error){
+                    cardError=redactor.text(String(error?.message??error)).slice(0,1000);
+                  }
                   const card=description?.node_types?.[0];
                   let reply={content:[{type:'text',text:JSON.stringify(refusal)}],structuredContent:refusal};
                   let cardDelivered=false;
                   if(card?.parameter_schema&&card.candidate_modes?.includes(args.mode)
-                    &&Buffer.byteLength(JSON.stringify(card),'utf8')<=(nodeType==='imports.text'?13000:12000)){
-                    const result={...refusal,next_step:{tool:'dock_node_apply',original_operation_id:args.operation_id,
+                    &&Buffer.byteLength(JSON.stringify(card),'utf8')<=12000){
+                    const result={...refusal,next_step:{tool:'dock_node_apply',
                       instruction:'Read guidance and parameter_schema in the node card in this reply. Submit the complete request with a NEW operation_id. No node operation started.'}};
                     const withCard=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(result)},
                       {type:'text',text:JSON.stringify({node_types:[card]})}],structuredContent:result},
@@ -648,6 +653,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                   extra.signal.throwIfAborted();
                   await recordExecution({phase:'node_type_not_described',operation_id:args.operation_id,
                     node_type:nodeType,result:reply.structuredContent,
+                    ...(cardError===undefined?{}:{card_error:cardError}),
                     ...(cardDelivered?{card_delivered:{mode:args.mode,cache_key:card.cache_key}}:{})});
                   extra.signal.throwIfAborted();
                   if(cardDelivered)userWorkflows.rememberDescriptions(description,modes);
