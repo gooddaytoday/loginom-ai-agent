@@ -70,6 +70,20 @@ test('text Import delimited guidance keeps every rule in compact English',async 
  assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/imports.text.md')))<=6000);
 });
 
+test('text Import guidance gives the first Apply the entire confirmed CSV profile',async t=>{
+ const source=await createBundledSkillFixture(t);
+ const loader=createSkillLoader({resources:source.resources});
+ const [description]=await loader.describeNodes([{type:'imports.text',modes:NODE_TYPES['imports.text'].modes}],['delimited']);
+ const text=description.guidance.replace(/\s+/g,' ');
+ assert.match(text,/All CSV types\/format confirmed: first Apply with all `settings\.columns` and `settings\.format\.null_marker` \(incl\. `""`\)\. Execute\/read port 0/);
+ assert.match(text,/Else preview and compare ORIGINAL text/);
+ const main=(await readFile(join(source.directory,'SKILL.md'),'utf8')).replace(/\s+/g,' ');
+ assert.match(main,/в первый Apply передай все `settings\.columns` в порядке файла: точный заголовок в `source_name`, техническое ASCII-имя в `name`, подтверждённый `type`/);
+ assert.match(main,/точные `decimal_separator` и `null_marker` \(даже `""`\)/);
+ assert.match(main,/Сверь типы, значения и NULL по порту 0/);
+ assert.match(main,/`settings_complete:true` говорит только о пагинации\. Если тип или формат не подтверждён/);
+});
+
 test('node guidance uses the prepared bundle and selects common plus requested modes',async t=>{
  const source=await createBundledSkillFixture(t);
  const file=join(source.directory,'references/nodes/transform.join_data.md');

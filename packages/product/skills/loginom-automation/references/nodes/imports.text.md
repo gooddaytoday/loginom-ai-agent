@@ -1,27 +1,29 @@
 # Текстовый файл
 
 <!-- mode: delimited -->
-Existing needs confirmed source CSV before Execute/read.
-Reads may add a visualizer. `NOT_APPLIED`/`effect_possible=false`: ask CSV, skip cleanup/Save.
-
+Existing: confirmed source CSV before Execute/read. Reads may add a visualizer.
+`NOT_APPLIED`/`effect_possible=false`: ask CSV; skip cleanup/Save.
 Missing CSV: `next_step`; SAME node, no XML.
 
-Known schema/format: Execute. Else preview and compare ORIGINAL text.
-Server download only by request or contradiction. User bans win.
-`dock_node_apply` `parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
-`finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}`:
-`output.server_profile`: native format/types, no Execute. Reuse `node` as `target.ref` after Close.
-If garbled, fresh `dock_storage_source` and `settings.source.encoding` CP1251.
-`columns_omitted>0`: do NOT ask names. `auto_detect_columns:"new"`, omit `columns`;
-Execute; ALL names/types/N from readback/port. Edits: SAME node.
-Report native types. Leave rare types unchecked. download/sampling: full sample settings.
+All CSV types/format confirmed: first Apply with all `settings.columns` and
+`settings.format.null_marker` (incl. `""`). Execute/read port 0.
+Else preview and compare ORIGINAL text.
 
-Rename/type edits: SAME Import's `settings.columns`, no Reform.
-Keep unchanged `settings.source`/`settings.format`/`mappings` and field order.
+Server download only by request/contradiction; user bans win.
+Server preview: `parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
+`finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}`:
+`output.server_profile`: native format/types. Reuse `node` as `target.ref`.
+If garbled: fresh `dock_storage_source` and CP1251 in `settings.source.encoding`.
+`columns_omitted>0`: skip asking names. `auto_detect_columns:"new"`, omit `columns`;
+Execute; ALL names/types/N from port/readback.
+Report native types; rare types unchecked. download/sampling: full sample settings.
+
+Rename/types: SAME Import's `settings.columns`, no Reform.
+Keep `settings.source`/`settings.format`/`mappings` and field order.
 Attachment `overwrite=reject`. Compare server bytes before reuse. Never bypass
 `UPLOAD_PATH_CONFLICT` via path/policy or saved-node activation.
 
-Use receipt `output.upload_operation_id`. Omit `source_path` for its verified path.
+Use receipt `output.upload_operation_id`; omit `source_path` for its verified path.
 Fallback: UTF-8, header 1, skip 0, comma, decimal point, empty NULL, double quote.
 
 `source_switch`: [switch to full file](../large-files.md#переключение-на-полный-файл); no separate Import Execute.
@@ -57,9 +59,9 @@ Before Export/report read Calculator real/values/NULL; types/date format/seconds
 
 Types: `settings.format.auto_detect_columns` (`none`/`new`/`all`),
 `settings.analysis`: `rows`, `refresh` (`all`=fields/types, `types`=types).
-`new`: omit `columns` unless correcting. Reuse: complete source/format.
+`new`: omit `columns` for auto-detect. Reuse complete source/format.
 `all`: fields/types appear only after Execute; omit `columns`/output `mappings`.
-For manual fields use `new`/`none`. `new`: separate-call types on SAME node survive
+For manual fields use `new`/`none`. `new`: types set later on SAME node survive
 `source_path` changes. `refresh` erases manual types: only on request.
 
 Mixed: `settings.format.variant_as_general_type:true` and
