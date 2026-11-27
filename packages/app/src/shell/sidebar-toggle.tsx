@@ -8,7 +8,7 @@ import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useSettings } from "@/settings/model"
-import { sidebarUnread } from "@/shell/sidebar-peek"
+import { sidebarConversationActivity, sidebarUnread } from "@/shell/sidebar-peek"
 
 // The toggle's dot for sidebar sessions with unread activity, shown while the sidebar is closed.
 function UnreadBadge(props: { show: boolean; ring: "base" | "deep" }) {
@@ -66,6 +66,9 @@ export function SidebarToggle(props: { handoff?: "out" | "in" }) {
   let full: SVGSVGElement | undefined
   let outline: HTMLSpanElement | undefined
   const unread = () => !settings.appearance.sidebarOpen() && sidebarUnread()
+  const conversation = () =>
+    side === "in" && !settings.appearance.sidebarOpen() ? sidebarConversationActivity() : undefined
+  const conversationStatus = () => conversation()?.status
 
   const paints = {
     out: (button: HTMLElement, closed: number) => {
@@ -111,7 +114,9 @@ export function SidebarToggle(props: { handoff?: "out" | "in" }) {
         class="shrink-0"
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => settings.appearance.setSidebarOpen(!settings.appearance.sidebarOpen())}
-        aria-label={language.t(unread() ? "command.sidebar.toggle.unread" : "command.sidebar.toggle")}
+        aria-label={
+          conversation()?.label ?? language.t(unread() ? "command.sidebar.toggle.unread" : "command.sidebar.toggle")
+        }
         aria-expanded={settings.appearance.sidebarOpen()}
         aria-controls="vertical-tabs-sidebar"
         icon={
@@ -119,8 +124,39 @@ export function SidebarToggle(props: { handoff?: "out" | "in" }) {
             <span class="relative flex">
               <Icon ref={full} name="layout-left-full" />
               <span ref={outline} class="absolute inset-0 flex">
-                <Icon name="layout-left" />
-                <UnreadBadge show={unread()} ring="base" />
+                <Show
+                  when={conversationStatus()}
+                  fallback={
+                    <>
+                      <Icon name="layout-left" />
+                      <UnreadBadge show={unread()} ring="base" />
+                    </>
+                  }
+                >
+                  <svg
+                    aria-hidden="true"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                    stroke-linecap="round"
+                  >
+                    <circle cx="10" cy="10" r="7" />
+                    <path d="M10 6v4l2.5 1.5" />
+                  </svg>
+                  <Show when={conversationStatus() !== "idle"}>
+                    <span
+                      aria-hidden="true"
+                      class="absolute -top-0.5 -end-0.5 size-2 rounded-full"
+                      classList={{
+                        "bg-amber-500": conversationStatus() === "input",
+                        "bg-blue-500": conversationStatus() === "running",
+                      }}
+                    />
+                  </Show>
+                </Show>
               </span>
             </span>
           ) : (

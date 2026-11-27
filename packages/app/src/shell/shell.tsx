@@ -12,6 +12,7 @@ import { UploadToastHost } from "@/composer/attachments/uploads"
 import { useSettingsSurface } from "@/settings/surface"
 import { useSettings } from "@/settings/model"
 import { PluginServerCover } from "@/runtime/plugin/server-shell"
+import { useManagedFolders } from "@/runtime/plugin/managed-folders"
 import { PluginSlot } from "@/runtime/plugin/render"
 import { COMMAND_SEARCH_ID, useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -34,6 +35,7 @@ export const sidebarToggleCommand = { id: "sidebar.toggle", keybind: "mod+shift+
 
 export default function Layout(props: ParentProps) {
   const platform = usePlatform()
+  const folders = useManagedFolders()
   const settings = useSettingsSurface()
   const preferences = useSettings()
   const command = useCommand()
@@ -58,7 +60,7 @@ export default function Layout(props: ParentProps) {
     tabsPanel: undefined,
   })
 
-  const verticalTabs = () => preferences.appearance.tabLayout() !== "horizontal" && !mobile()
+  const verticalTabs = () => (!!folders() || preferences.appearance.tabLayout() !== "horizontal") && !mobile()
 
   const organizedSidebar = () =>
     preferences.appearance.tabLayout() === "vertical" && preferences.general.sidebarOrganize() !== "list"
@@ -159,6 +161,7 @@ export default function Layout(props: ParentProps) {
       ? [
           {
             ...sidebarToggleCommand,
+            keybind: folders() ? "mod+b" : sidebarToggleCommand.keybind,
             title: language.t("command.sidebar.toggle"),
             category: language.t("command.category.view"),
             onSelect: toggleSidebar,

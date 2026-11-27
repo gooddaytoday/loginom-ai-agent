@@ -1,12 +1,14 @@
 import { Predicate } from "effect"
 import { base64Encode } from "@opencode/util/encode"
 import { Session } from "@opencode/schema/session"
+import { conversationTitle, isConversationDraft } from "@opencode/gui-plugins/managed-folders"
 import { createMemo, createSignal, onCleanup, startTransition, untrack } from "solid-js"
 import type { ComposerSession, NewSessionComposerAdapter } from "@/composer/adapter"
 import { useComposerState } from "@/composer/persistence"
 import { createComposerControls, createComposerModelSelection } from "@/composer/selection"
 import { createComposerProjectControls } from "./project/controller"
 import { useLanguage } from "@/runtime/i18n/language"
+import { useManagedFolders } from "@/runtime/plugin/managed-folders"
 import { useLocal } from "@/providers/models/selection"
 import { useData, useServer } from "@/runtime/server/current"
 import { useServerSDK } from "@/runtime/server/client"
@@ -92,6 +94,7 @@ export function createNewSessionComposerAdapter(props: {
   const serverSDK = useServerSDK()
   const tabs = useTabs()
   const language = useLanguage()
+  const folders = useManagedFolders()
   const model = createComposerModelSelection({ agent: () => local.agent.current() })
   const controls = createComposerControls({ model })
 
@@ -106,6 +109,8 @@ export function createNewSessionComposerAdapter(props: {
       const projectDirectory = props.root()
       const worktree = props.worktree()
       const directory = worktree === "main" ? projectDirectory : worktree
+      const managed = server.conn.type === "sidecar" && isConversationDraft(projectDirectory) ? folders() : undefined
+      const title = managed ? conversationTitle(message.text, language.t("command.session.new")) : undefined
       const sessionID = Session.ID.create()
       const settled = Promise.withResolvers<Started>()
 
@@ -114,11 +119,11 @@ export function createNewSessionComposerAdapter(props: {
           type: "start",
           sessionID,
           workspace:
-            worktree === "create"
+            worktree === "create" || managed
               ? { type: "new", projectDirectory, branch: props.branch() }
               : { type: "existing", directory },
           mcp: props.mcp.capture(),
-          toggling: worktree !== "create" && props.mcp.toggling(directory),
+          toggling: !managed && worktree !== "create" && props.mcp.toggling(directory),
         },
         (attempt) => {
           const pending = tabs.prepareSession(
@@ -165,13 +170,17 @@ export function createNewSessionComposerAdapter(props: {
             if (effect.type === "worktree.create") {
               if (ended.signal.aborted) return
               props.start.dispatch(
-                await createWorktree({
-                  api: serverSDK.api,
-                  data,
-                  directory: effect.projectDirectory,
-                  project: data.location.info({ directory: effect.projectDirectory })?.project,
-                  branch: effect.branch,
-                }).then(
+                await (
+                  managed && title
+                    ? managed.conversation(title)
+                    : createWorktree({
+                        api: serverSDK.api,
+                        data,
+                        directory: effect.projectDirectory,
+                        project: data.location.info({ directory: effect.projectDirectory })?.project,
+                        branch: effect.branch,
+                      })
+                ).then(
                   (directory) => ({ type: "worktree.created", attempt, directory }) as const,
                   (error) => ({ type: "worktree.failed", attempt, message: errorMessage(language, error) }) as const,
                 ),
@@ -198,6 +207,7 @@ export function createNewSessionComposerAdapter(props: {
                 await data.session
                   .create({
                     id: effect.sessionID,
+                    ...(title ? { title } : {}),
                     agent: selection.agent,
                     model: {
                       id: selection.model.modelID,
@@ -261,7 +271,7 @@ export function createNewSessionComposerAdapter(props: {
               await data.project.sync().catch(() => undefined)
             }
 
-            await pending.rollback(effect.worktree?.directory)
+            await pending.rollback(managed ? undefined : effect.worktree?.directory)
 
             if (effect.worktree) props.mcp.remember(effect.worktree.directory, effect.worktree.mcp)
             settled.resolve(undefined)
