@@ -75,7 +75,7 @@
     },
     {
       "id": "CAT-14",
-      "title": "Built-in GUI tool renderers (C3.0, accepted timeline row exception)",
+      "title": "Built-in GUI tool renderers (C3.0, C3.18)",
       "paths": [
         "packages/app/component-tests/plugin-host.fixture.tsx",
         "packages/app/src/runtime/plugin/host.tsx",
@@ -94,7 +94,15 @@
         "packages/session-ui/src/timeline-next/tools/tool-display.tsx",
         "packages/session-ui/src/timeline/projection.ts",
         "packages/session-ui/src/tools/tool-renderer.tsx",
-        "packages/ui/src/i18n/en.ts"
+        "packages/ui/src/i18n/en.ts",
+        "packages/app/src/session/screen.tsx",
+        "packages/app/src/runtime/plugin/host-apis.tsx",
+        "packages/app/src/session/timeline/tool-renderers.tsx",
+        "packages/app/component-tests/tool-renderer.fixture.tsx",
+        "packages/app/e2e/regression/timeline-stream.spec.ts",
+        "packages/app/test-browser/builtin-plugins.test.ts",
+        "packages/gui-plugins/src/main.ts",
+        "packages/gui-plugins/src/renderer.ts"
       ]
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },

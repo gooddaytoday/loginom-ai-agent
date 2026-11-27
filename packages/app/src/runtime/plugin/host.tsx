@@ -838,7 +838,16 @@ function createHost(input: HostInput) {
           if (name === claimed) return value
 
           if (name !== undefined) {
-            if (nativeToolNames.has(name)) throw new Error(`Cannot register a renderer for native tool "${name}"`)
+            const prefix = name.endsWith("*") ? name.slice(0, -1) : undefined
+
+            if (prefix === "" || (prefix ?? name).includes("*")) throw new Error(`Invalid tool renderer name "${name}"`)
+
+            if (
+              prefix === undefined
+                ? nativeToolNames.has(name)
+                : [...nativeToolNames].some((tool) => tool.startsWith(prefix))
+            )
+              throw new Error(`Cannot register a renderer for native tool "${name}"`)
 
             if (toolRendererNames.has(name)) throw new Error(`A renderer is already registered for tool "${name}"`)
           }

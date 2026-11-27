@@ -6,12 +6,14 @@ import { PackageSchema, readFinding, type Finding } from "./contract"
 import { transition, type Event, type Request, type State } from "./machine"
 import type definition from "./index"
 import styles from "./schema.css?inline"
+import registerSteps from "./step"
 
 const pageID = "package-schema"
 
 const SchemaPage = lazy(() => import("./page"))
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
+  registerSteps(ctx)
   ctx.add(Style, styles)
   const [state, setState] = createSignal<State>({ status: "closed" })
   const dispatch = (event: Event) => setState((current) => transition(current, event))

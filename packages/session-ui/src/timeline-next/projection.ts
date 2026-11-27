@@ -1,3 +1,4 @@
+import type { ToolSeparation } from "../context/data"
 import type {
   ModelRef,
   SessionMessageAssistant,
@@ -68,7 +69,7 @@ type Input = {
   pendingInputIDs?: ReadonlySet<string>
   queuedCompactionIDs: readonly string[]
   turnDiffs: boolean
-  toolSeparate?: ReadonlySet<string>
+  toolSeparate?: ToolSeparation
   /** Whether a part shows. Text and thoughts are read through signals, so a streamed delta does not rebuild the rows. */
   shows: (content: Content) => boolean
 }
@@ -103,7 +104,7 @@ export function createNextTimelineProjection(input: {
   queuedCompactionIDs?: Accessor<readonly string[]>
   /** Summarize each finished turn's changed files after it. */
   turnDiffs?: Accessor<boolean>
-  toolSeparate?: Accessor<ReadonlySet<string> | undefined>
+  toolSeparate?: Accessor<ToolSeparation | undefined>
 }) {
   const sessionMessageByID = createMemo(
     () => new Map(input.sessionMessages().map((message) => [message.id, message] as const)),
@@ -452,7 +453,7 @@ function turnRows(
   detail: TimelineDetail,
   isVisible: (content: Content) => boolean,
   commentary: ReadonlySet<Content>,
-  toolSeparate?: ReadonlySet<string>,
+  toolSeparate?: ToolSeparation,
 ) {
   const rows: TimelineRow.TimelineRow[] = []
   const assistantMessages = turn.entries.flatMap((entry) => (entry.type === "assistant" ? [entry.message] : []))
@@ -869,7 +870,7 @@ function groupContent(
   items: { messageID: string; partID: string; content: Content }[],
   detail: TimelineDetail,
   commentary: ReadonlySet<Content>,
-  toolSeparate?: ReadonlySet<string>,
+  toolSeparate?: ToolSeparation,
 ): PartGroup[] {
   const groups: PartGroup[] = []
   let adjacent: { type: "context" | "file" | "read" | "events"; refs: PartRef[] } | undefined

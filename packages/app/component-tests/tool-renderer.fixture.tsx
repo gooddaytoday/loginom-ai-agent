@@ -1,3 +1,4 @@
+import type { ToolSeparation } from "@opencode/session-ui/context"
 import type { SessionMessageAssistantTool, SessionMessageInfo, SessionStatus } from "@opencode/client/promise"
 import type { Context } from "@opencode/plugin/gui"
 import { ToolRenderer } from "@opencode/plugin/gui/builtin"
@@ -182,7 +183,7 @@ export async function checkToolRendererRegistration() {
 
 function Rows(props: {
   next: boolean
-  toolSeparate: () => ReadonlySet<string> | undefined
+  toolSeparate: () => ToolSeparation | undefined
   messages: () => SessionMessageInfo[]
 }) {
   const [open, setOpen] = createStore<Record<string, boolean | undefined>>({})

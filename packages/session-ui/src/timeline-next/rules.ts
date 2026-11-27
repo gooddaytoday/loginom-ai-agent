@@ -1,3 +1,4 @@
+import type { ToolSeparation } from "../context/data"
 import type { SessionMessageAssistant, SessionMessageAssistantTool, SessionMessageInfo } from "@opencode/client/promise"
 import { currentToolFailed, currentToolGroupedRead, currentToolInput } from "../message/current-tool-state"
 import { timelineNoticeRequired, type TimelineDetail, type TimelinePlacement } from "../timeline/detail"
@@ -131,7 +132,7 @@ export function contentGroup(
   detail: TimelineDetail,
   content: Content,
   commentary: ReadonlySet<Content>,
-  toolSeparate?: ReadonlySet<string>,
+  toolSeparate?: ToolSeparation,
 ) {
   if (content.type === "text") return commentary.has(content) ? ("context" as const) : undefined
 
