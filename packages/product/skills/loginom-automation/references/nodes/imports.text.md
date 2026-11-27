@@ -5,9 +5,9 @@ Existing: confirmed source CSV for Execute/read (may add visualizer).
 `NOT_APPLIED`/`effect_possible=false`: ask CSV; skip cleanup/Save.
 Missing: `next_step`; SAME node, no XML.
 
-Confirmed types/header/encoding/format: first Apply copies full
-`settings.source`/`settings.format` (`null_marker` incl. `""`) and whole
-`settings.columns` incl. `label`. Execute/read port 0.
+Confirmed types/header/encoding/format: first Apply copies
+`settings.source` without the profile's `source_path`, full `settings.format`
+(`null_marker` incl. `""`), whole `settings.columns` incl. `label`. Execute/read port 0.
 Profile: `status:"sampled"` or `scan.status:"exact"`, empty `anomalies`,
 no mismatches. Verify defaults.
 Else preview and compare ORIGINAL text.
@@ -26,7 +26,7 @@ Keep `settings.source`/`settings.format`/`mappings` and field order.
 Attachment `overwrite=reject`; compare server bytes before reuse.
 No path/policy/saved-node activation bypass of `UPLOAD_PATH_CONFLICT`.
 
-Receipt `output.upload_operation_id`; omit `source_path` for verified path.
+Verified delivery: use `output.upload_operation_id`.
 Fallback: UTF-8, header, skip 0, comma, dot, empty NULL, double quote.
 
 `source_switch`: [switch to full file](../large-files.md#переключение-на-полный-файл); no separate Import Execute.

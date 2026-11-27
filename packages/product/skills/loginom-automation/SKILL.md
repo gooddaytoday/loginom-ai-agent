@@ -236,7 +236,7 @@ patch по схеме его типа. Дождись подтверждённо
 | Узел «Python», код `.py` | `programming.python` / script | [читать](references/nodes/programming.python.md) |
 
 Новый CSV/TXT: если подтверждены типы, заголовок, кодировка и формат, передай в первый Apply
-полные `settings.source`/`settings.format` (`delimiter`, `decimal_separator`,
+полные `settings.source` (без `source_path` из профиля) и `settings.format` (`delimiter`, `decimal_separator`,
 `null_marker` даже `""`) и все `settings.columns` целиком, включая `source_name` и `label`.
 Профиль: `status:"sampled"` или `scan.status:"exact"`, `anomalies:[]`, без `first_mismatch`/`first_violation`.
 Сверь возможные дефолты `"."`/`""` по исходнику или заданию. `settings_complete` — пагинация.

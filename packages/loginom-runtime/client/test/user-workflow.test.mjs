@@ -266,23 +266,30 @@ test('first text import Apply dispatches the confirmed CSV settings with its ver
   operation_id:'delivery',upload_operation_id:source.upload_operation_id,
   outcome:{status:'SUCCEEDED',cleanup_complete:true,upload_completion_verified:true,destination}
  },{artifact_id:source.artifact_id});
- const settings={
-  source:{encoding:'Кириллическая (1251)',first_line_as_title:true,rows_to_skip:1},
+ const profileSettings={
+  source:{source_path:'',encoding:'Кириллическая (1251)',first_line_as_title:true,rows_to_skip:1},
   format:{delimiter:';',decimal_separator:',',null_marker:'',text_qualifier:'"',date_format:'dd/mm/yyyy',date_separator:'.'},
   columns:[
    {source_name:'Дата',name:'Column1',label:'Дата',type:'datetime',data_kind:'Непрерывный',used:true},
    {source_name:'Выручка',name:'Column2',label:'Выручка',type:'real',data_kind:'Непрерывный',used:true},
   ],
  };
- const args={...request(),target:{kind:'new',type:'imports.text'},mode:'delimited',parameters:{source,settings}};
- const expected=structuredClone({source,settings:{...settings,source:{...settings.source,source_path:destination}}});
+ const args={...request(),target:{kind:'new',type:'imports.text'},mode:'delimited',parameters:{source,settings:profileSettings}};
+ const expected=structuredClone({
+  source,settings:{...profileSettings,source:{...profileSettings.source,source_path:destination}},
+ });
  const read=structuredClone(args.read);
  const {validateTextImportNodeParameters}=await import('../lib/text-import-node.mjs');
  const runtime={tools:nodeApiTools,startNodeApply:async apply=>{
   validateTextImportNodeParameters(apply.parameters,apply.mode,apply);
   return apply;
  }};
- const dispatched=await dispatchNodeApi(runtime,'dock_node_apply',binding.expandNode(args));
+ await assert.rejects(()=>dispatchNodeApi(runtime,'dock_node_apply',binding.expandNode(args)),
+  /settings\.source\.source_path: string is too short/);
+
+ const settings=structuredClone(profileSettings);
+ delete settings.source.source_path;
+ const dispatched=await dispatchNodeApi(runtime,'dock_node_apply',binding.expandNode({...args,parameters:{source,settings}}));
 
  assert.deepEqual(dispatched.parameters,expected);
  assert.deepEqual(dispatched.read,read);
