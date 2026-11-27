@@ -44,20 +44,11 @@ for (const streaming of [false, true]) {
   })
 }
 
-story("aligns the retry icon with the error label", async ({ mount }) => {
+story("shows the retry countdown and the attempt", async ({ mount }) => {
   const timeline = await mount("current-session-timeline-rows--provider-retry")
-  const card = timeline.locator('[data-kind="session-retry-card"]')
-  const icon = card.locator('[data-slot="icon-svg"]')
-  const label = card.locator('[data-slot="session-turn-retry-message"]')
-  await expect(icon).toBeVisible()
-  await expect(label).toBeVisible()
-
-  const [iconY, labelY] = await Promise.all([
-    icon.evaluate((element) => element.getBoundingClientRect().y),
-    label.evaluate((element) => element.getBoundingClientRect().y),
-  ])
-
-  expect(iconY).toBe(labelY)
+  const retry = timeline.locator('[data-slot="session-turn-retry"]')
+  await expect(retry).toBeVisible()
+  await expect(retry).toContainText(/Attempt \d+ - retrying in \d+s/)
 })
 
 story("centers the error icon on the first line of short and wrapped errors", async ({ mount }) => {

@@ -1,3 +1,4 @@
+import { freeLimitReset } from "../timeline/model-stop"
 import type { SessionUserActions } from "@opencode/session-ui/message"
 import type { ShellOutputInput } from "@opencode/client/promise"
 import { getFilename, sameDirectory } from "@opencode/util/path"
@@ -38,7 +39,6 @@ import { SessionComposerRegion } from "./session-composer-region"
 import { createSessionComposerController, type SessionComposerController } from "./controller"
 import { SessionQueuePanel } from "./queue-panel"
 import { SessionGoLimitTray } from "./go-limit-tray"
-import { SessionFreeLimitPanel, useFreeLimit } from "./free-limit-panel"
 import { SessionActivityChips, type SessionActivityItem } from "./activity-chips"
 import { SessionComposerLane, useComposerLaneAlignment } from "./composer-lane"
 import { SessionTodoPill } from "./todo-pill"
@@ -252,7 +252,7 @@ export function createActiveSessionRegion(input: {
 
   const recalled = new Set<string>()
 
-  // The free allowance or a Go usage limit stops a prompt after it was sent. Hand its text back so switching models and
+  // A Go usage limit stops a prompt after it was sent. Hand its text back so switching models and
   // resending is one step, unless the user has already started typing something else.
   onCleanup(
     location().event.on("session.step.failed", (event) => {
@@ -261,7 +261,7 @@ export function createActiveSessionRegion(input: {
 
       if (!sessionID || event.data.sessionID !== sessionID) return
 
-      if (type !== "provider.free-limit" && type !== "provider.go-limit") return
+      if (type !== "provider.go-limit") return
 
       if (recalled.has(event.data.assistantMessageID)) return
       recalled.add(event.data.assistantMessageID)
@@ -556,7 +556,17 @@ export function ActiveSessionComposerRegion(props: {
     return props.session.data.info()?.outcome
   }
 
-  const freeLimit = useFreeLimit(() => props.model.composer.model.paid)
+  const limitLabel = () => {
+    const key = props.model.composer.model.selection.key()
+
+    const reset =
+      key && freeLimitReset(props.session.history.messages(), { id: key.modelID, providerID: key.providerID })
+
+    if (!reset) return
+    const time = new Intl.DateTimeFormat(language.locale(), { timeStyle: "short" }).format(reset)
+
+    return language.t("session.modelStop.limitLabel", { time })
+  }
 
   return (
     <SessionComposerRegion
@@ -610,24 +620,15 @@ export function ActiveSessionComposerRegion(props: {
             // The container for the composer's `cqw` caps: only the composer re-evaluates as a panel beside it
             // animates the chat's width.
             <div class="@container">
-              <Show
-                when={!freeLimit.active()}
-                fallback={
-                  <SessionFreeLimitPanel
-                    resetAt={freeLimit.resetAt()}
-                    selection={() => props.model.composer.model.selection}
-                  />
-                }
-              >
-                <VoiceComposer session={props.session.data.info()}>
-                  <Composer
-                    model={props.model.composer}
-                    borderUnderlay
-                    readOnly={props.model.queue.undoing()}
-                    suggestionBoundary={props.suggestionBoundary}
-                  />
-                </VoiceComposer>
-              </Show>
+              <VoiceComposer session={props.session.data.info()}>
+                <Composer
+                  model={props.model.composer}
+                  modelStatus={limitLabel()}
+                  borderUnderlay
+                  readOnly={props.model.queue.undoing()}
+                  suggestionBoundary={props.suggestionBoundary}
+                />
+              </VoiceComposer>
             </div>
           }
         >

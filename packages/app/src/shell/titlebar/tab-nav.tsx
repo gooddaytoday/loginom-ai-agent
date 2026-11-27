@@ -1,3 +1,4 @@
+import { modelStopped } from "@/session/timeline/model-stop"
 import { createEffect, createMemo, createSignal, onCleanup, Show, untrack, type JSX, type Ref } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Predicate } from "effect"
@@ -136,11 +137,19 @@ export function TabNavItem(
 
   onCleanup(() => window.clearTimeout(intent))
 
+  const stopped = () => {
+    const session = props.session
+
+    return session && modelStopped(session, serverCtx()?.data.session.message.list(session.id))
+  }
+
   // The project icon stays put; status shows where the close button appears on hover.
   const status = () => {
     if (props.preparing || props.loading) return "busy"
 
     if (!props.session) return
+
+    if (stopped()) return "model-stopped"
 
     if (props.active && !serverCtx()?.notification.session.manuallyUnread(props.session.id)) return
 
@@ -152,7 +161,8 @@ export function TabNavItem(
     return props.session.outcome === "failed" ? "failed" : "unread"
   }
 
-  const dotted = () => status() === "attention" || status() === "unread" || status() === "failed"
+  const dotted = () =>
+    status() === "attention" || status() === "unread" || status() === "failed" || status() === "model-stopped"
 
   const project = createMemo(() => {
     const session = props.session
@@ -442,6 +452,7 @@ export function TabNavItem(
       classList={{ invisible: props.hidden }}
       data-active={props.active}
       data-status={status()}
+      aria-description={stopped() ? language.t("session.modelStop.indicator") : undefined}
       data-dragging={props.dragging}
       data-state={props.active || props.pressed ? "pressed" : undefined}
       onPointerEnter={() => hover(true)}
@@ -577,6 +588,7 @@ export function TabNavItem(
           <span data-mark="attention" data-slot="tab-status-dot" />
           <span data-mark="unread" data-slot="tab-status-dot" />
           <span data-mark="failed" data-slot="tab-status-dot" />
+          <span data-mark="model-stopped" data-slot="tab-status-dot" />
         </span>
         <Show when={actions}>
           <IconButton

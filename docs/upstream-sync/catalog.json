@@ -73,6 +73,26 @@
         "packages/desktop/src/main/service/background-service-machine.test.ts"
       ]
     },
+    {
+      "id": "CAT-14",
+      "title": "C3.4: model stops, continuation, retry and compaction",
+      "paths": [
+        "packages/core/src/session/to-session-error.ts",
+        "packages/core/test/session-error.test.ts",
+        "packages/app/src/composer/composer.tsx",
+        "packages/app/src/runtime/i18n/en.ts",
+        "packages/app/src/runtime/i18n/ru.ts",
+        "packages/app/src/session/composer/region.tsx",
+        "packages/app/src/session/timeline/message-timeline.tsx",
+        "packages/app/src/shell/titlebar/project-session-row.tsx",
+        "packages/app/src/shell/titlebar/tab-nav.*",
+        "packages/session-ui/component-tests/session-timeline.spec.ts",
+        "packages/session-ui/src/components/session-retry.tsx",
+        "packages/session-ui/src/timeline-next/row.tsx",
+        "packages/session-ui/src/timeline/session-timeline-row.tsx",
+        "packages/ui/src/i18n/ru.ts"
+      ]
+    },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
     { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },

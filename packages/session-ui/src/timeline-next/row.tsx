@@ -89,6 +89,9 @@ export function createNextTimelineRowRenderer(input: {
   projection: Projection
   presentation: (message: SessionMessageUser) => SessionUserPresentation | undefined
   actions?: SessionUserActions
+  renderError?: (row: TimelineRow.Error) => JSX.Element
+  renderUserNotice?: (message: SessionMessageUser) => JSX.Element
+  renderAnswerNote?: (userMessageID: string, answer: SessionMessageAssistant) => JSX.Element
   timelineDetail: Accessor<TimelineDetail>
   foldUserMessages?: Accessor<boolean>
   disclosure: {
@@ -555,20 +558,25 @@ export function createNextTimelineRowRenderer(input: {
         {(message) => (
           <Show when={content()}>
             {(content) => (
-              <AssistantContent
-                message={message()}
-                content={content()}
-                contentID={ref()!.partID}
-                showAssistantCopyPartID={copyContentID(row().userMessageID)}
-                turnDurationMs={duration(row().userMessageID)}
-                turnTokensPerSecond={turnTokensPerSecond()}
-                sources={turnSourcesValue()}
-                onOpenSources={() => sourcesHost?.open(row().userMessageID)}
-                defaultOpen={defaultOpen()}
-                toolOpen={input.disclosure.value(disclosureKey()) ?? defaultOpen()}
-                onToolOpenChange={(open) => input.disclosure.set(disclosureKey(), open)}
-                onContentRendered={onSizeChange}
-              />
+              <>
+                <AssistantContent
+                  message={message()}
+                  content={content()}
+                  contentID={ref()!.partID}
+                  showAssistantCopyPartID={copyContentID(row().userMessageID)}
+                  turnDurationMs={duration(row().userMessageID)}
+                  turnTokensPerSecond={turnTokensPerSecond()}
+                  sources={turnSourcesValue()}
+                  onOpenSources={() => sourcesHost?.open(row().userMessageID)}
+                  defaultOpen={defaultOpen()}
+                  toolOpen={input.disclosure.value(disclosureKey()) ?? defaultOpen()}
+                  onToolOpenChange={(open) => input.disclosure.set(disclosureKey(), open)}
+                  onContentRendered={onSizeChange}
+                />
+                <Show when={copyContentID(row().userMessageID) === ref()?.partID}>
+                  {input.renderAnswerNote?.(row().userMessageID, message())}
+                </Show>
+              </>
             )}
           </Show>
         )}
@@ -1063,6 +1071,10 @@ export function createNextTimelineRowRenderer(input: {
         <Frame row={current()} grow={grow}>
           <Show when={message()}>
             {(message) => {
+              const notice = input.renderUserNotice?.(message())
+
+              if (notice) return <div class={`w-full ${padding()}`}>{notice}</div>
+
               const presentation = () => input.presentation(message())
 
               return (
@@ -1391,42 +1403,49 @@ export function createNextTimelineRowRenderer(input: {
     return (
       <Frame row={current()}>
         <div data-slot="session-turn-message-container" class={`w-full ${padding()}`}>
-          <Switch fallback={<SessionError message={current().text} />}>
-            <Match when={budgetLimit()}>
-              {(notice) => (
-                <div
-                  role="status"
-                  class="text-[13px] font-[440] leading-text-compact tracking-[-0.04px] text-v2-text-text-muted"
-                >
-                  {notice().text}
-                  <Show when={input.actions?.chooseModel}>
-                    {(choose) => (
-                      <>
-                        <span aria-hidden="true">{" · "}</span>
-                        <button
-                          type="button"
-                          class="font-[530] text-v2-text-text-base hover:underline focus-visible:underline focus-visible:outline-none"
-                          onClick={() => choose()()}
-                        >
-                          {notice().action}
-                        </button>
-                      </>
-                    )}
-                  </Show>
-                </div>
-              )}
-            </Match>
-            <Match when={usageLimit()}>
-              {(text) => (
-                <div
-                  role="status"
-                  class="text-[13px] font-[440] leading-text-compact tracking-[-0.04px] text-v2-text-text-muted"
-                >
-                  {text()}
-                </div>
-              )}
-            </Match>
-          </Switch>
+          <Show
+            when={input.renderError?.(current())}
+            fallback={
+              <Switch fallback={<SessionError message={current().text} />}>
+                <Match when={budgetLimit()}>
+                  {(notice) => (
+                    <div
+                      role="status"
+                      class="text-[13px] font-[440] leading-text-compact tracking-[-0.04px] text-v2-text-text-muted"
+                    >
+                      {notice().text}
+                      <Show when={input.actions?.chooseModel}>
+                        {(choose) => (
+                          <>
+                            <span aria-hidden="true">{" · "}</span>
+                            <button
+                              type="button"
+                              class="font-[530] text-v2-text-text-base hover:underline focus-visible:underline focus-visible:outline-none"
+                              onClick={() => choose()()}
+                            >
+                              {notice().action}
+                            </button>
+                          </>
+                        )}
+                      </Show>
+                    </div>
+                  )}
+                </Match>
+                <Match when={usageLimit()}>
+                  {(text) => (
+                    <div
+                      role="status"
+                      class="text-[13px] font-[440] leading-text-compact tracking-[-0.04px] text-v2-text-text-muted"
+                    >
+                      {text()}
+                    </div>
+                  )}
+                </Match>
+              </Switch>
+            }
+          >
+            {(content) => content()}
+          </Show>
         </div>
       </Frame>
     )

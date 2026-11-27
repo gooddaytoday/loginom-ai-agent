@@ -229,7 +229,7 @@ describe("toSessionError", () => {
         ),
       ),
     ).toEqual({
-      type: "provider.invalid-request",
+      type: "provider.context-overflow",
       message: "too large",
       status: 413,
       response: { body: '{"error":"context limit"}' },

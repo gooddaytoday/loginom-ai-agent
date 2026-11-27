@@ -15,6 +15,7 @@ import { useSessionTabAvatarState } from "@/shell/layout/project-avatar-state"
 import { errorMessage } from "@/shell/layout/helpers"
 import { showToast } from "@/shell/notifications/toast"
 import { sessionTreeIDs } from "@/session/requests/session-request-tree"
+import { modelStopped } from "@/session/timeline/model-stop"
 import { sessionLabel } from "@/session/title"
 import { createSessionExporter } from "@/session/commands/export-session"
 import { createSessionRenamer } from "@/session/commands/rename-session"
@@ -68,6 +69,8 @@ export function ProjectSessionRow(props: {
     () => true,
     () => props.session,
   )
+
+  const stopped = () => modelStopped(props.session, ctx()?.data.session.message.list(props.session.id))
 
   function DeleteDialog() {
     const confirm = () => {
@@ -132,6 +135,7 @@ export function ProjectSessionRow(props: {
         class="relative flex h-7 w-full shrink-0 items-center gap-2 rounded-[6px] ps-8 pe-2 text-start text-[13px] leading-[var(--line-height-compact)] font-medium focus-visible:outline-none"
         classList={{ "text-v2-text-text-base": props.active, "text-v2-text-text-faint": !props.active }}
         aria-current={props.active ? "page" : undefined}
+        aria-description={stopped() ? language.t("session.modelStop.indicator") : undefined}
         title={sessionLabel(props.session)}
         style={props.depth ? { "padding-inline-start": `calc(2rem + ${props.depth * 14}px)` } : undefined}
         onClick={props.onOpen}
@@ -167,8 +171,15 @@ export function ProjectSessionRow(props: {
           <Show
             when={status.loading()}
             fallback={
-              <Show when={status.unread() && !props.active}>
-                <span class="size-1.5 rounded-full bg-v2-text-text-base" />
+              <Show
+                when={stopped()}
+                fallback={
+                  <Show when={status.unread() && !props.active}>
+                    <span class="size-1.5 rounded-full bg-v2-text-text-base" />
+                  </Show>
+                }
+              >
+                <span class="size-1.5 rounded-full bg-v2-state-fg-warning" />
               </Show>
             }
           >
