@@ -235,12 +235,12 @@ patch по схеме его типа. Дождись подтверждённо
 | Явный JS/подтверждённый пробел | `programming.javascript` / script | [читать](references/nodes/programming.javascript.md) |
 | Узел «Python», код `.py` | `programming.python` / script | [читать](references/nodes/programming.python.md) |
 
-Новый CSV/TXT: если все типы и формат подтверждены заданием или проверенным образцом,
-в первый Apply передай все `settings.columns` в порядке файла: точный заголовок в
-`source_name`, техническое ASCII-имя в `name`, подтверждённый `type`.
-Сохрани `settings.format`, включая точные `decimal_separator` и `null_marker` (даже `""`).
-Сверь типы, значения и NULL по порту 0. `settings_complete:true` говорит только о пагинации.
-Если тип или формат не подтверждён, используй [автоопределение Loginom](references/nodes/imports.text.md).
+Новый CSV/TXT: если подтверждены типы, заголовок, кодировка и формат, передай в первый Apply
+полные `settings.source`/`settings.format` (`delimiter`, `decimal_separator`,
+`null_marker` даже `""`) и все `settings.columns` целиком, включая `source_name` и `label`.
+Профиль: `status:"sampled"` или `scan.status:"exact"`, `anomalies:[]`, без `first_mismatch`/`first_violation`.
+Сверь возможные дефолты `"."`/`""` по исходнику или заданию. `settings_complete` — пагинация.
+Сверь типы, значения и NULL по порту 0. При неполном профиле — [автоопределение Loginom](references/nodes/imports.text.md).
 Import edits on the SAME existing node: resend the exact parameters.source from the verified upload/storage receipt together with settings (including column/type patches). Only unchanged Execute may omit source: `parameters:{settings:{}}`. After preview_only/Close nothing is saved: send complete settings.source (encoding, first_line_as_title, rows_to_skip), settings.format (explicit decimal_separator "." or ",", never "Не задано (…)"), and columns or auto_detect_columns:"new"/"all"; returned node: target:{kind:"existing",ref:node}. Reuse the verified delivery; do not upload again.
 Превью усечено (`columns_omitted>0`): не спрашивай имена; `auto_detect_columns:"new"`
 без `columns`, все имена/типы — из readback/порта после Execute. Правки — того же узла.
