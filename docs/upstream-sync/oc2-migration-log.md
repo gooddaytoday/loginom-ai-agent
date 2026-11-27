@@ -26493,7 +26493,7 @@ $ loop.sh <исходники с правкой>       # после
 `run-check.py start --cold`, запуск от `lrun`. Набор — 25 узлов B6.0, по одному сценарию на узел (последний принятый в реестре); составные s1 (calculator, sorting, grouping) и s3
 (row-filter, join left) засчитаны на все свои узлы. Исполнители — agent3 и agent4 (две линии), независимый проверяющий — agent2 (RUNBOOK п. 7), у каждой линии свой аккаунт —
 одновременной работы одного пользователя в двух сеансах не было. Исполнитель: два раунда, третий — только при одном PASS из двух (2 из 3, В-86). Проверяющий: один прогон
-на сценарий с 2 PASS у исполнителя; при не-PASS — ещё два (s3, rest-get-plain), чтобы ответ был при любом прочтении критерия. 36 стартов (22 исполнителя, 14 проверяющего),
+на сценарий с 2 PASS у исполнителя; при не-PASS — ещё два (s3, rest-get-plain), чтобы по этим двум сценариям ответ был при любом прочтении критерия. 36 стартов (22 исполнителя, 14 проверяющего),
 нагрузка машины 1–7, очереди `--host-load-max` почти не было. Скрипты линий — `<lrun>/b61a/{lane,check-lane,node-lib,node-round}.sh`, прогоны — `<lrun>/b61a/runs/<раунд>`.
 Перед стартом все 20 имён сценариев групп B–I прошли `start --prepare-only`.
 
@@ -26518,8 +26518,8 @@ $ loop.sh <исходники с правкой>       # после
 | datamining-linregression | r3 (база + продолжение) | 2/2 | PASS | **принят** |
 | datamining-logregression | logreg-forward | 2/2 | PASS | **принят** |
 | integration-restrequest | rest-get-plain | 2/2 | 2 из 3: FAIL (сохранение), PASS, PASS | **принят** |
-| exports-excel | exports-excel | 0/2: r1 стенд («Файлы»), r2 модель | — | не принят |
-| preprocessing-datapartition | partition-random | 0/2: r1 модель, r2 стенд («Файлы») | — | не принят |
+| exports-excel | exports-excel | 0/2: r1 возврат из «Файлов» (пробой не воспроизведён, причина открыта), r2 модель | — | не принят |
+| preprocessing-datapartition | partition-random | 0/2: r1 модель, r2 «Файлы» (список хранилища — воспроизведён на `v0.4.2`) | — | не принят |
 | preprocessing-sampling | sampling-random | 0/2: модель | — | не принят |
 | preprocessing-smoothing | smoothing-hp | 1/3: r2, r3 модель | — | не принят |
 | research-autocorrelation | acf-update | 0/2: стенд (UNKNOWN по сроку) | — | не принят |
@@ -26536,10 +26536,13 @@ $ loop.sh <исходники с правкой>       # после
   (b3-1 partition-random → `SAMPLING_CSV_SCHEMA_OR_COUNT`), выгружена таблица до замены источника (b4-2, b4-3 smoothing-hp → `CSV_VALUES_OR_ORDER`);
 - k1 s3: модель заменяла `PaidAmount` одноимённым полем калькулятора с исключением исходного — `node.apply` AMBIGUOUS → FAILED ×5, срок модели (замена поля вне принятого среза калькулятора).
 
-**Стенд, воспроизводится на `v0.4.2` (B6.1-E).** 4 отказа: b2-1 exports-excel (`NODE_APPLY_STOPPED: Export file read did not return to its workflow` — «Файлы» ~25 с под маской busy,
-возврат во вкладку сценария не уложился в 5 с, операция AMBIGUOUS, Save заблокирован), b3-2 partition-random (`STORAGE_SOURCE_REFUSED: Server storage navigation did not complete`,
-затем `FOREIGN_WORKFLOW_CHANGED`, вкладка «Файлы» осталась активной), b5-1, b5-2 acf-update (фаза `target` узла `research.auto_correlation` молчит до срока: цикл
-`readAutoCorrelationRowCount` в `auto-correlation-preflight.mjs` ждёт полей просмотра Loginom).
+**Браузерная часть на стенде (B6.1-E).** 4 отказа; на `v0.4.2` воспроизведена только часть:
+- воспроизведено пробой без модели и на v2, и целиком на `v0.4.2`: b5-1, b5-2 acf-update (фаза `target` узла `research.auto_correlation` молчит до срока: цикл
+  `readAutoCorrelationRowCount` в `auto-correlation-preflight.mjs` ждёт полей просмотра Loginom) и вторая половина b3-2 partition-random (`STORAGE_SOURCE_REFUSED: Server storage
+  navigation did not complete`, затем `FOREIGN_WORKFLOW_CHANGED`, вкладка «Файлы» осталась активной);
+- не воспроизведено, причина открыта: b2-1 exports-excel (`NODE_APPLY_STOPPED: Export file read did not return to its workflow` — «Файлы» ~25 с под маской busy, возврат во вкладку
+  сценария не уложился в 5 с, операция AMBIGUOUS, Save заблокирован; во всех пробах экспорт с чтением выгрузки прошёл) и первая половина b3-2 (`Node procedure readiness timeout:
+  one new node execution group` на экспорте, файл на сервере записан).
 
 **Продукт, не разобран.** b9-k rest-get-plain: `package.save_checkpoint` → `CAPABILITY_ERROR REST_PACKAGE_NORMALIZATION_STILL_MODIFIED` (пакет остаётся изменённым после единственного
 дополнительного Save), модель отчиталась «сохранён» → `SAVE_NOT_CONFIRMED`. Два следующих прогона — PASS; в 0.4 у этого сценария был такой же исключённый и повторённый прогон.
@@ -26554,15 +26557,18 @@ A — Host v2 + ресурсы `cli5`, B — Host v2 + ресурсы релиз
 | `research.auto_correlation` после импорта: фаза `target` > 180 с (`ACF_TARGET_PENDING`) | 1/1 | 1/1 | 2/2 |
 | экспорт text/excel + чтение выгрузки, затем `dock_storage_list`: `STORAGE_SOURCE_REFUSED` | 2/2 (на 1-м и 2-м списке) | 2/2 (на 1-м и 4-м) | 2/2 (на 1-м и 2-м) |
 
-Экспорты с чтением выгрузки во всех пробах — SUCCEEDED (80–110 с). Вывод: оба вида отказов дают и `v0.4.2`, и v2 — это поведение стенда при 7.4.2, паритет с 0.4 сохранён.
+Экспорты с чтением выгрузки во всех пробах — SUCCEEDED (80–110 с). Вывод: два воспроизведённых вида отказов (acf и `dock_storage_list`) дают и `v0.4.2`, и v2 — это не
+регрессия переноса, паритет с 0.4 по ним сохранён. Стенд это или окружение этой машины (headless Chromium под `lrun`) — не разделено.
 Гипотеза о росте числа записей в папке аккаунта (в `/agent3` — 111) не проверялась. Логи — `<evidence>/b61e/`. Первая версия пробы acf отклонялась `REQUEST_REJECTED`:
 без `dock_action_describe` узел не допускается (исправлено в `19b752bdbe`).
 
 ### Вопросы владельцу
 
-1. Критерий проверяющего: один PASS на сценарий или 2 из 3 (RUNBOOK п. 7 число не задаёт). От него зависят row-filter и join.
-2. Узлы, не принятые из-за модели (sampling, smoothing, части exports-excel и partition) и стенда (acf, части exports-excel и partition): повторные серии или зачесть как есть.
-   Повтор узлов «стенда» на сегодняшнем стенде не поможет — их падает и `v0.4.2`.
+1. Критерий проверяющего: один PASS на сценарий или 2 из 3 (RUNBOOK п. 7 число не задаёт). Дополнительные прогоны проверяющего я делал только после не-PASS (s3,
+   rest-get-plain) — это моё правило, не согласованное. При «один PASS» принято 18; при «2 из 3» — без новых прогонов только restrequest (2 из 3), у 15 сценариев (17 узлов) один прогон
+   проверяющего и нужен ещё хотя бы один PASS каждому (15–30 прогонов, 6–12 ч), а s3 (row-filter, join) уже 1 из 3 и нужна новая серия.
+2. Узлы, не принятые из-за модели (sampling, smoothing, части exports-excel и partition) и браузерной части (acf, части exports-excel и partition): повторные серии или зачесть
+   как есть. Повтор acf на сегодняшнем стенде не поможет — его падает и `v0.4.2`; у exports-excel r1 причина не найдена.
 3. Класс «встроенный инструмент на нелокальном пути» — главный источник провалов DeepSeek flash; контракт 0.4.2 не менялся (общий критерий приёмки).
 
 ## B6.2-F Итоговый прогон проверок шлюза B на кандидате
