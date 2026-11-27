@@ -27,9 +27,7 @@ export const layer = Layer.effect(
 
     yield* importLegacyStores(storage.db, userData).pipe(
       Effect.tap((result) =>
-        result.removed.length === 0
-          ? Effect.void
-          : Effect.logInfo("imported legacy store files", { imported: result.imported, files: result.removed }),
+        result.files.length === 0 ? Effect.void : Effect.logInfo("imported legacy store files", result),
       ),
       Effect.catch((error) => Effect.logWarning("failed to import legacy store files", { error })),
     )
