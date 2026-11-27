@@ -33,7 +33,7 @@ import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory, userActionKeys } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState,readSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
-import {compareSavedPackageGraph,makeSavedPackageGraphCode,parseSavedPackageBytes,savedGraphMessage} from './saved-package-graph.mjs';
+import {compareSavedPackageWorkflows,makeSavedPackageGraphCode,readSavedPackageFacts,savedGraphMessage,uncheckedSaveFacts} from './saved-package-graph.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
 import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
 import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
@@ -892,25 +892,31 @@ export async function createBridge(config, session, { browserTransport: managedB
                 if(!admission.savedGraph) {
                   const prepared=session.metadata.workspacePreparation?.state;
                   const identity={save_operation_id:savedOutcome.operation_id,package_path:admission.path};
+                  admission.savedFile=uncheckedSaveFacts(admission.path);
                   try {
                     const before=savedOutcome.trace?.findLast(entry=>entry.event==='save_graph_before_write')?.graph;
-                    if(!before||!savedState||workspaceBindingAdvice||prepared?.document_id!==admission.document_id
+                    if(workspaceBindingAdvice||prepared?.document_id!==admission.document_id
                       ||savedOutcome.cleanup_complete!==true) throw Error('Saved graph binding unavailable');
                     if(config.storageDirectories)requireStorageDestination(admission.path,config.storageDirectories,'packages');
                     const workflow=normalizedWorkspace?.workflow_ref??prepared.workflow_ref;
-                    const intent=actionRuntime.saveNodeIntent(prepared.document_id,workflow.workflow_id);
                     const code=makeSavedPackageGraphCode({origin:new URL(config.loginomUrl).origin,build:session.metadata.targetIdentity.loginom_build,
-                      path:admission.path,tabTid:workflow.tab_tid,documentId:prepared.document_id,sessionId:session.metadata.sessionId,account:savedState.account});
+                      path:admission.path,tabTid:workflow.tab_tid,documentId:prepared.document_id,sessionId:session.metadata.sessionId,account:prepared.loginom_account});
                     const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,{timeout:15000});
-                    const graph=await compareSavedPackageGraph({bytes:parseSavedPackageBytes(response),before,...intent});
+                    const {save,graphs}=await readSavedPackageFacts({path:admission.path,response,before});
+                    admission.savedFile=save;
+                    if(!graphs||!before)throw Error('Saved graph comparison unavailable');
+                    const intent=actionRuntime.saveNodeIntent(prepared.document_id,workflow.workflow_id);
+                    const graph=compareSavedPackageWorkflows({graphs,before,...intent});
                     admission.savedGraph={...identity,status:'compared',...graph,
-                      rename_attribution:savedState.modified?'unconfirmed':'observed_during_save'};
+                      rename_attribution:savedState?.modified===false?'observed_during_save':'unconfirmed'};
                   } catch {
                     admission.savedGraph={...identity,status:'unavailable'};
                   }
                 }
-                reply._meta={...reply._meta,loginom:{saved_package_graph:admission.savedGraph}};
-                reply.content.push({type:'text',text:savedGraphMessage(admission.savedGraph)});
+                reply._meta={...reply._meta,loginom:{...reply._meta?.loginom,save:admission.savedFile,saved_package_graph:admission.savedGraph}};
+                reply.content.push({type:'text',text:admission.savedFile.fileExists===false
+                  ?'Файл по пути сохранения не найден. Сохранение файла не подтверждено; не повторяйте Save без проверки.'
+                  :savedGraphMessage(admission.savedGraph)});
               }
             }
             try {

@@ -88,7 +88,7 @@ class ExternalClient {
     }
     else if(this.f.savedFixture && code.includes('function inSavedFileTab')){
       this.f.events.push('saved-file');
-      value={base64:this.f.savedFixture.toString('base64')};
+      value={fileExists:true,base64:this.f.savedFixture.toString('base64')};
     }
     else if(code.includes('async function closeOwnedPackage')){
       this.f.events.push('package-cleanup');
@@ -530,9 +530,12 @@ for(const action_key of ['package.save_checkpoint','package.save_as'])
    assert.equal(report.save_operation_id,saved.operation_id);
    assert.equal(report.package_path,path);
    assert.deepEqual(report.saved_labels,[{node_id:'770a65bc-5ea0-47f2-80f8-ab900e5e43c2',label:'По убыванию выручки'}]);
+   const facts=response._meta.loginom.save;
+   assert.deepEqual(facts,{path,fileExists:true,fileRead:true,nodeCount:4,workflowGuidMatch:false,runVerified:null,rowCount:null});
    assert.ok(response.content.some(block=>block.text.includes('«Сортировка» → «По убыванию выручки»')));
    const replay=await client.callTool({name:'dock_action_run',arguments:{action_key,parameters:{path,conflict_policy:'replace'},operation_id:saved.operation_id}});
    assert.deepEqual(replay._meta.loginom.saved_package_graph,report);
+   assert.deepEqual(replay._meta.loginom.save,facts);
    assert.equal(f.events.filter(event=>event==='saved-file').length,1);
    assert.equal(f.saves,1);
    assert.equal((await bridge.close()).browser_transport_closed,true);

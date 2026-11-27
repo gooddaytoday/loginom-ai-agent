@@ -102,6 +102,8 @@ Loginom, проверяет frontend build через публичный `bg.app
 | `dock_operation_inspect` | По необязательному `operation_id` читает браузерную квитанцию и сверяет заданную либо текущую pending-операцию |
 | `dock_operation_recover` | Принимает исходный `operation_id`, отдельный `recovery_operation_id` и `strategy` из `complete_link`, `restore_control`, `accept_observed_state`, `abandon_operation`; для последних двух нужен `observation_id`, кроме освобождения остановленной `dock_node_apply` через `abandon_operation`, где доказательство собирает сам Dock; проверяет возможность и результат восстановления |
 
+После подтверждения явного `package.save_checkpoint` / `package.save_as` (в том числе через `dock_operation_inspect`) точный сохранённый `.lgp` читается один раз: проверки файла и графа используют одни байты, не повторяя Save. `metadata.loginom.save` содержит `path`, `fileExists` (`false` — отсутствие подтверждено, `null` — не проверено), `fileRead`, `nodeCount` (весь пакет) и `workflowGuidMatch` (точный состав узлов активного workflow по GUID, либо `null` при недоказанном сопоставлении). `runVerified` и `rowCount` остаются `null`: чтение файла не запускает пакет и не измеряет строки. Имена, связи и порядок полей остаются отдельно в `metadata.loginom.saved_package_graph`.
+
 Агент начинает с discovery, не угадывая action keys. Неизвестное действие и
 ошибочные аргументы возвращаются обычным MCP-content с `FAILED`; существующая
 неопределённая операция сохраняет `AMBIGUOUS`. Эти ошибки запроса не означают

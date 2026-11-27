@@ -67,11 +67,21 @@ async function inSavedFileTab(page, options) {
       verify();
       const name = owner.path.split('/').at(-1), dir = owner.path.slice(0, -name.length);
       if (bg.TBGFileOpenMode.fomRead !== 0) throw Error('Native read-only mode changed');
-      const downloader = new bg.filestorage.FileDownloader(name, dir, files.Controller.FController.FFileStorage);
+      const storage = files.Controller.FController.FFileStorage;
+      const info = await storage.GetFileInfo(owner.path);
+      if (info === null || info === undefined) {
+        const directoryExists = await storage.DirectoryExists(dir.slice(0, -1));
+        verify();
+        if (directoryExists !== true) throw Error('Saved package directory unavailable');
+        return {fileExists:false};
+      }
+      await ReleaseObject(info, true);
+      verify();
+      const downloader = new bg.filestorage.FileDownloader(name, dir, storage);
       try {
         if (downloader.FullFilename !== owner.path) throw Error('Native saved path differs');
         const size = await downloader.GetFileSize();
-        if (!Number.isSafeInteger(size) || size < 1 || size > owner.limit) throw Error('Saved package size outside bound');
+        if (!Number.isSafeInteger(size) || size < 1 || size > owner.limit) return {fileExists:true};
         verify();
         const stream = await downloader.GetFileStream();
         if (downloader.FShareDenyNone) throw Error('Saved package does not have an exclusive read');
@@ -83,7 +93,10 @@ async function inSavedFileTab(page, options) {
           bytes.set(chunk, offset);
         }
         verify();
-        return {base64:bytes.toBase64()};
+        return {fileExists:true, base64:bytes.toBase64()};
+      } catch {
+        verify();
+        return {fileExists:true};
       } finally {
         await downloader.Dispose();
         if (!downloader.IsStreamReleased() || !downloader.IsDisposed) throw Error('Saved package stream did not close');
@@ -108,19 +121,24 @@ export function makeSavedPackageGraphCode(options) {
   return `async page=>(${inSavedFileTab.toString()})(page,${JSON.stringify({...options, limit:maxBytes})})`;
 }
 
-export function parseSavedPackageBytes(response) {
+function parseSavedPackageRead(response) {
   if (!response?.isError) for (const block of response?.content ?? []) {
     if (block.type !== 'text') continue;
     const text = block.text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/)?.[1] ?? block.text;
     if (text.length > Math.ceil(maxBytes / 3) * 4 + 64) continue;
     try {
-      const {base64} = JSON.parse(text);
-      if (typeof base64 !== 'string') continue;
+      const {base64, fileExists} = JSON.parse(text);
+      if (fileExists === false && base64 === undefined) return {fileExists};
+      if (typeof base64 !== 'string') {
+        if (fileExists === true) return {fileExists};
+        continue;
+      }
       const bytes = Buffer.from(base64, 'base64');
-      if (bytes.length && bytes.length <= maxBytes && bytes.toString('base64') === base64) return bytes;
+      if (fileExists !== false && bytes.length && bytes.length <= maxBytes && bytes.toString('base64') === base64)
+        return {fileExists:true, bytes};
     } catch {}
   }
-  throw Error('Saved package read unavailable');
+  return {fileExists:null};
 }
 
 const child = (parent, name) => Array.from(parent?.childNodes ?? []).find(element => element.nodeType === 1 && element.localName === name);
@@ -159,10 +177,36 @@ async function savedGraphs(bytes) {
   } finally { await archive.close(); }
 }
 
-export async function compareSavedPackageGraph({bytes, before, sorting = new Map(), intendedLabels = new Map()}) {
+export function uncheckedSaveFacts(path) {
+  return {path, fileExists:null, fileRead:false, nodeCount:null, workflowGuidMatch:null, runVerified:null, rowCount:null};
+}
+
+export async function readSavedPackageFacts({path, response, before}) {
+  const {bytes, fileExists} = parseSavedPackageRead(response);
+  const facts = {...uncheckedSaveFacts(path), fileExists};
+  if (!bytes) return {save:facts};
+  let graphs;
+  try { graphs = await savedGraphs(bytes); } catch { return {save:facts}; }
+  facts.fileRead = true;
+  facts.nodeCount = graphs.reduce((count, graph) => count + graph.nodes.length, 0);
+  if (!before) return {save:facts, graphs};
+  try {
+    const expected = new Set(before.nodes.map(node => guid(node.id)));
+    const inventories = graphs.map(graph => new Set(graph.nodes.map(node => guid(node.getAttribute('Guid')))));
+    if (expected.size === before.nodes.length && inventories.every((ids, index) => ids.size === graphs[index].nodes.length)) {
+      const matches = inventories.length === 1 ? inventories : inventories.filter(ids => [...expected].some(id => ids.has(id)));
+      if (matches.length === 1) {
+        const [actual] = matches;
+        facts.workflowGuidMatch = expected.size === actual.size && [...expected].every(id => actual.has(id));
+      }
+    }
+  } catch {}
+  return {save:facts, graphs};
+}
+
+export function compareSavedPackageWorkflows({graphs, before, sorting = new Map(), intendedLabels = new Map()}) {
   const expected = new Map(before.nodes.map(node => [guid(node.id), node]));
   if (!expected.size || expected.size !== before.nodes.length) throw Error('Pre-save node identity unavailable');
-  const graphs = await savedGraphs(bytes);
   const matching = graphs.filter(({nodes}) => nodes.some(node => expected.has(guid(node.getAttribute('Guid')))));
   if (matching.length !== 1) throw Error('Saved workflow identity unavailable');
   const {nodes, links} = matching[0];
