@@ -311,3 +311,23 @@ code{font:12px/1.5 ui-monospace,Menlo,monospace;overflow-wrap:anywhere}
 .edit-actions{display:grid;gap:10px}
 .edit-source code{overflow-wrap:anywhere}
 @media(max-width:410px){.edit-diff-title{padding:7px}.edit-diff-title strong{font-size:13px;overflow-wrap:anywhere}.edit-actions .btn{white-space:normal;text-align:left}.chat-package-context>.badge{display:none}}
+
+.step-stalled, .turn-steps .step-stalled {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+.step-stalled[hidden], .turn-steps .step-stalled[hidden] { display: none; }
+.step-stalled .button-row { flex-wrap: wrap; }
+.queue-label { display: block; padding: 8px 12px 0; font-size: 13px; color: var(--muted); }
+.correction-queue { padding: 6px 12px; border-bottom: 1px solid var(--line); }
+.correction-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 4px 0; font-size: 13px; }
+.correction-row > span { flex: 1 0 160px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.correction-row > input { flex: 1 0 160px; min-width: 0; padding: 5px 8px; color: var(--ink); background: var(--soft); border: 1px solid var(--line); border-radius: 6px; }
+.sl-stage-clock { display: block; margin-top: 3px; color: var(--muted); font-weight: normal; }
+.session-link .row-text .session-decision { white-space: normal; font-size: 12px; }

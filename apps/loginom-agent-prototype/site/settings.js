@@ -53,7 +53,8 @@ const permissionKinds = [
 const permissionLabels = { allow: "Разрешено", ask: "Спрашивать", deny: "Запрещено" }
 
 const preferences = [
-  ["notifications", "Сообщать, когда агент закончил или ждёт ответа", "Уведомление системы, если окно приложения не на виду."],
+  ["notifyFinished", "Ход закончен", "Уведомить, когда вы вне разговора."],
+  ["notifyDecision", "Нужен ваш ответ или разрешение", "Уведомить, когда вы вне разговора."],
   ["sounds", "Звук", "Короткий звук вместе с уведомлением."],
   ["agentPicker", "Выбор режима агента", "В поле ввода появится переключатель «Выполнение / Планирование»."],
 ]
@@ -93,7 +94,7 @@ export function ensureSettings(state) {
   s.instructionsDraft ??= s.instructions
   s.theme = state.theme ?? s.theme ?? "system"
   // Iteration 2: the agent mode picker is off for newcomers; it is turned on in «Общие».
-  s.preferences ??= { notifications: true, sounds: false, agentPicker: false }
+  s.preferences ??= { notifyFinished: true, notifyDecision: true, sounds: false, agentPicker: false, ...state.notificationPrefs }
   s.shortcuts ??= "windows"
   if (s.pendingConnection && !running(state)) {
     s.connection = s.pendingConnection.connection
@@ -729,7 +730,11 @@ export function bindSettings(root, state, api) {
       s.terminal = value
       api.render()
     }
-    if (name.startsWith("pref:")) s.preferences[name.split(":")[1]] = value
+    if (name.startsWith("pref:")) {
+      const key = name.split(":")[1]
+      s.preferences[key] = value
+      if (key === "notifyFinished" || key === "notifyDecision") api.saveNotificationPrefs(s.preferences)
+    }
     if (name === "shortcuts") { s.shortcuts = value; api.render() }
     if (name === "closed-mode") {
       const before = s.model?.name ?? ""
