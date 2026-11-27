@@ -11,6 +11,11 @@ describe("desktop last active route", () => {
     expect(acceptedLastActiveUrl("/server/wsl%3ADebian/session/abc?view=review#file")).toBe(
       "/server/wsl%3ADebian/session/abc?view=review#file",
     )
+    const page = "/page/%40acme%2Fplugin/overview?view=summary#details"
+    expect(acceptedLastActiveUrl(page)).toBe(page)
+    expect(acceptedLastActiveUrl("/page/plugin")).toBe("/")
+    expect(acceptedLastActiveUrl("/page//overview")).toBe("/")
+    expect(acceptedLastActiveUrl("/page/plugin/overview/extra")).toBe("/")
     expect(acceptedLastActiveUrl(undefined)).toBe("/")
     expect(acceptedLastActiveUrl("/settings/extra")).toBe("/")
     expect(acceptedLastActiveUrl("/new-session/extra")).toBe("/")
