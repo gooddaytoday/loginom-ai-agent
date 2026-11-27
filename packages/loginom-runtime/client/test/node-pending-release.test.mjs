@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {createActionRuntime} from '../lib/executor.mjs';
+import {nodeResultReply} from '../lib/node-result-reply.mjs';
+import {loginomFeedMetadata} from '../lib/user-results.mjs';
 import {releasePendingNode,verifyRecoveredPendingNode,proveFinishLaunchRefused,NodeReleaseBlocked} from '../lib/node-pending-release.mjs';
 import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
 import {applyNode,releaseNodeApply} from '../lib/node-apply.mjs';
@@ -380,6 +382,21 @@ function fixture({release:releaseDriver,type='imports.text',execute=async()=>{th
 }
 const proved=({wizard_closed=false,read_view_restored=false}={})=>()=>({verified:true,cleanup_complete:true,effect_possible:wizard_closed||read_view_restored,
  node_context:{...node,verified:true,surface:'graph',locked:false},graph:graphOf(),cleanup:{wizard_closed,read_view_restored,views_returned:false}});
+
+test('a settled runtime wait exposes the node observed by the target phase, not the request', async()=>{
+ const {runtime}=fixture();
+ const input=request();
+ input.finish='done';
+ runtime.startNodeApply(input);
+ const job=await runtime.waitNodeApply(input.operation_id,{timeoutMs:1000});
+ assert.equal(job.outcome.status,'SUCCEEDED');
+ const tool='dock_node_wait';
+ const reply=nodeResultReply(job,{userProfile:true,tool});
+ assert.deepEqual(reply.structuredContent.node,node);
+ const projection=loginomFeedMetadata(reply,{tool,facts:runtime.nodeFeedFacts(input.operation_id)});
+ assert.equal(projection.kind,'configure');
+ assert.deepEqual(projection.node,{guid:node.node_id,label:'Source',type:'imports.text'});
+});
 const stop=async(f,phase)=>{
  const key=phase==='read'?'readOutput':'finish',original=f.drivers[key];let first=true;
  f.drivers[key]=async(...args)=>{if(!first)return original(...args);first=false;f.calls.push(phase);throw Error('Local node cancellation requested');};
