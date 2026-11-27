@@ -26502,7 +26502,7 @@ $ loop.sh <исходники с правкой>       # после
 | Узел | Сценарий | Исполнитель | Проверяющий | Итог |
 |---|---|---|---|---|
 | calculator, sorting, grouping | s1 | 2/2 (t1, t2) | PASS (k1) | **принят** |
-| row-filter, join (left) | s3 | 2/2 (t1, t2) | 1 из 3: k1 UNKNOWN (срок модели), k2 FAIL (модель), k3 PASS | **ждёт решения по критерию проверяющего** |
+| row-filter, join (left) | s3 | 2/2 (t1, t2) | 1 из 3: k1 UNKNOWN (срок модели), k2 FAIL (модель), k3 PASS | **принят** (В-112, 27.11: проверяющему — 1 удачный прогон из не более чем 3) |
 | transform-crosstable | s5 | 2/2 | PASS | **принят** |
 | replacement | regex-replace | 2/2 | PASS | **принят** |
 | date-time | date-time-iso | 2/2 | PASS | **принят** |
@@ -26524,7 +26524,7 @@ $ loop.sh <исходники с правкой>       # после
 | preprocessing-smoothing | smoothing-hp | 1/3: r2, r3 модель | — | не принят |
 | research-autocorrelation | acf-update | 0/2: стенд (UNKNOWN по сроку) | — | не принят |
 
-Принято 18 из 25; row-filter и join — по решению владельца; не приняты 5.
+Принято 18 из 25; row-filter и join — по решению владельца; не приняты 5. После решений владельца 27.11 (В-112, В-113) — 21 из 25, см. `## B6.1-R`.
 
 ### Причины отказов
 
@@ -26732,3 +26732,36 @@ SHA-256 `aa3641eafdc26c08bb1c12da13b8b7232cd8725b0a4ca32409d7c7218165c2f5` (= `c
 - Уборка проверена вживую 27.11 около 02:10 PT: `C:\lab\b62c` нет; локальные учётные записи — `DefaultAccount`, `user`, `WDAGUtilityAccount`, администратор, гость; в `C:\Users` — `Public`, `user`.
   `C:\lab\LAB-2109` и задача `LAB-2109-seed` (`C:\lab\LAB-2109\stage.ps1 -Mode seed`) — Windows-смоук тега проекта 0.4 (другая сессия), не наши. Свободное место: до 54,2 ГБ, после 49,5, при проверке 51,6; `LAB-2109` — 0,79 ГБ.
 - Крупные артефакты (установщик, ZIP CLI, части) удалены из `<evidence>/b62w/` — они есть в run `45884410046` до 03.12.
+
+## B6.1-R Новая серия по четырём узлам (В-113) и итог приёмки узлов
+
+27.11.2026, 00:34–02:45 PT. Решения владельца 27.11 («делаем как рекомендуешь», вопросы Б1–Б4 шлюза B): В-112 — независимому проверяющему достаточно одного удачного прогона
+из не более чем трёх; В-113 — для exports-excel, partition-random, sampling-random, smoothing-hp новая серия по тем же правилам, обе серии — в отчёт; research-autocorrelation —
+ограничение, общее с `v0.4.2`. Код, сборка и порядок — как в `## B6.1 Приёмка 25 узлов`: `38757dac11`, `<lrun>/b61a/cli5`, `run-check.py start --cold`, запуск от `lrun`,
+модель `deepseek/deepseek-flash`. Аккаунты — как в первой серии: partition-random — agent3 (линия `c1`), остальные три — agent4 (линия `c2`), проверяющий — agent2.
+Раунды — `<lrun>/b61a/runs/{c1-1,c1-2,c1-3,c2-1,c2-2,c2-3,c2-k}`, выводы линий — `<lrun>/b61a/lane-{c1,c2,ck}.out`.
+
+Правила счёта записаны до первого результата: новая серия считается сама по себе (PASS первой серии не прибавляются); она последняя — третьей без владельца нет;
+FAIL и UNKNOWN — прогоны; недействителен только раунд без `results.json` (таких не было).
+
+| Узел | Сценарий | Исполнитель | Проверяющий | Итог |
+|---|---|---|---|---|
+| preprocessing-smoothing | smoothing-hp | 2/2 (c2-1, c2-2) | PASS (c2-k) | **принят** |
+| preprocessing-sampling | sampling-random | 1/3: c2-1 модель (`SAMPLING_CONFIGURATION_MISSING`), c2-2 PASS, c2-3 холодное чтение | — | не принят |
+| preprocessing-datapartition | partition-random | 1/3: c1-1 модель (`SAMPLING_PORTS_INCOMPLETE`), c1-2 PASS, c1-3 холодное чтение | — | не принят |
+| exports-excel | exports-excel | 0/2: c2-1, c2-2 — отказ стенда, затем встроенный инструмент модели | — | не принят |
+
+10 прогонов исполнителя и 1 проверяющего. Отказов 6:
+- **модель** — 2: c2-1 sampling-random (выборка не настроена — как в b4-1, b4-2), c1-1 partition-random (у результата не все порты);
+- **отказ стенда, затем модель** — 2: в обоих прогонах exports-excel `dock_storage_source`/`dock_storage_list` → `STORAGE_SOURCE_REFUSED` (`navigation_unconfirmed`) — тот же отказ, что в
+  B6.1-E и на `v0.4.2`; после него модель взяла встроенный инструмент: c2-1 — `read` бинарного XLSX (по отчёту модели книга и пакет сохранены; проверки сохранения не запускались — прогон остановился на фазе модели), c2-2 — `glob /agent4`;
+  оба → `CLI_TOOL_FAILED` по контракту 0.4.2. `Export file read did not return` (b2-1) не повторилось;
+- **холодное чтение сохранённого пакета в новом браузере** — 2, в первой серии этой фазы среди отказов не было: c1-3 partition-random (`NodeProcedureStepError: … Observed control
+  geometry changed`, `ui.act`, фаза `preconditions`, `NOT_APPLIED`), c2-3 sampling-random (`NodeReadinessTimeout: native execution control for selected node`). В обоих модель,
+  CSV, Save, port-read и оракул (c2-3: `PASS`, 2 выполнения) прошли. Код — клиент `loginom-runtime` (`node-procedure.mjs`) из `cli5`; нагрузка машины на старте 5,5 (c1-3) и 1,9 (c2-3).
+  Не разобрано: стенд или клиент — не разделено; похожий `Node procedure readiness timeout` был в первой серии в b3-2 (на экспорте).
+
+smoothing-hp: в первой серии 1/3 (две ошибки модели), в новой — 2/2 и проверяющий PASS; обе серии — в отчёте шлюза.
+
+**Итог приёмки узлов (обе серии, В-112, В-113): принят 21 из 25** — 18 первой серии, row-filter и join (В-112), smoothing-hp (новая серия). Не приняты 3: exports-excel,
+preprocessing-datapartition, preprocessing-sampling. research-autocorrelation — ограничение, общее с `v0.4.2` (В-113). Закрытие шлюза с 21 из 25 — решение владельца.
