@@ -254,6 +254,7 @@ async function handle(message) {
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+        knownSecrets: [input.connection.password],
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
         startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {
           state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error,

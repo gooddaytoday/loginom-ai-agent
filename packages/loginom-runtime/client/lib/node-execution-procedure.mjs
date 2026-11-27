@@ -397,7 +397,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       const group=one(s.node_processes.processes.filter(p=>p.process_id===execution.group_id&&p.record_id===execution.group_record_id),'Execution group replaced');
       const failed=group.progress_state?.state==='failed';
       if(failed&&!verifyFailedChild) {
-        const receipt=verifyFailedExecution(execution,s.node_processes);
+        const receipt=verifyFailedExecution(execution,s.node_processes,channel.nativeErrorText);
         await act(s,'ConsoleForm;btnClose','click',fresh=>verifyFailedExecution(execution,fresh.node_processes));
         await observe('failed execution console closed',s=>!consoleVisible(s));
         await returnToExecutedWorkflow(channel,node);
@@ -436,7 +436,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
         &&s.node_outputs.node_selected===true&&s.prepared_node_context.surface==='graph',{readOutputs:true});
       const owner={verified:true,process_id:child.process_id,record_id:child.record_id,
         node_selected:s.node_outputs.node_selected,node:s.prepared_node_context};
-      const receipt=failed?verifyFailedChildExecution(execution,s.node_processes,child,owner)
+      const receipt=failed?verifyFailedChildExecution(execution,s.node_processes,child,owner,channel.nativeErrorText)
         :verifyCompletedExecution(execution,s.node_processes,owner);
       await closeConsole(s);
       await returnToExecutedWorkflow(channel,node);

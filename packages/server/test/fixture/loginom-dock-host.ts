@@ -98,9 +98,13 @@ export function scriptedHost(
     }
     if (request.method === "call") {
       if (input.name === "dock_prepare") run.prepared = true
-      return reply(
-        options.call?.(input) ?? { content: [{ type: "text", text: JSON.stringify({ called: input.name }) }] },
-      )
+      try {
+        return reply(
+          options.call?.(input) ?? { content: [{ type: "text", text: JSON.stringify({ called: input.name }) }] },
+        )
+      } catch (error) {
+        return fail(error instanceof Error ? error.message : String(error))
+      }
     }
     return fail("LOGINOM_HOST_REQUEST_FAILED")
   }

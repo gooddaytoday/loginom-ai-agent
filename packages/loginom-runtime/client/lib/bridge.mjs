@@ -93,7 +93,7 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
   return inherited;
 }
 
-export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, reauthenticateReload } = {}) {
+export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, reauthenticateReload, knownSecrets = [] } = {}) {
   if (config.closeSavedPackageOnShutdown !== undefined && typeof config.closeSavedPackageOnShutdown !== 'boolean'
       || config.closeSavedPackageOnShutdown === true && config.acceptanceCleanupPackage)
     throw Error('Invalid private saved-package cleanup policy');
@@ -278,6 +278,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         },
         getNodeContractPins: () => ({...pinned.pins, skillRevision:session.metadata.skillRevision, loginomProfile:session.metadata.targetIdentity ?? pinned.compatibility}),
         artifactStore:session.artifactStore, allowCandidate: replay, onRecord:recordExecution, redactor,
+        nativeErrorRedactor:createRedactor([config.apiKey,...knownSecrets]),
         browserRecovery: config.browserRecovery === true && userProfile,
         ...(userProfile ? { probePreparedPage } : {}),
         ...(userProfile && config.storageDirectories && reauthenticateReload ? {

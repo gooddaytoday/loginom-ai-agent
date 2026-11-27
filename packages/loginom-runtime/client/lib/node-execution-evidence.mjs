@@ -1,3 +1,5 @@
+import {nativeErrorText} from './node-failure.mjs';
+
 const requireValue=(value,message)=>{if(!value)throw new Error(message);};
 const id=v=>typeof v==='string' && /^[1-9][0-9]*(?:\.[1-9][0-9]*)*$/.test(v);
 const nonempty=v=>typeof v==='string' && v.length>0;
@@ -89,7 +91,7 @@ export function verifyCompletedExecution(execution,snapshot,owner) {
 
 // A dependency can fail before the requested child starts. This proves failure
 // of the uniquely identified launch group, not execution of that child.
-export function verifyFailedExecution(execution,snapshot) {
+export function verifyFailedExecution(execution,snapshot,safeText=nativeErrorText) {
   const ps=inventory(snapshot,execution.node,execution.root_id);
   const group=ps.find(p=>p.parent_id===null&&p.process_id===execution.group_id&&p.record_id===execution.group_record_id);
   requireValue(execution.execution_id===execution.node.document_id+':'+execution.root_id+':'+execution.group_id,
@@ -97,9 +99,11 @@ export function verifyFailedExecution(execution,snapshot) {
   requireValue(group?.error===true&&group.progress_state?.verified===true&&group.progress_state.state==='failed'
     &&group.progress_state.source==='native_progress_record'&&group.progress_state.terminal===true
     &&group.progress_state.can_cancel===false&&nonempty(group.error_details?.trim()),'Same execution group must have a verified terminal failure and reason');
+  const message=safeText(group.error_details);
   return {verified:true,status:'failed',execution_id:execution.execution_id,node:structuredClone(execution.node),
     root_id:execution.root_id,group_id:execution.group_id,group_record_id:execution.group_record_id,
-    failure_verified:true,output_refreshed:false,error:{code:'NODE_EXECUTION_FAILED',message:group.error_details.slice(0,1000)}};
+    failure_verified:true,output_refreshed:false,error:{code:'NODE_EXECUTION_FAILED',message,
+      native:{source:'native_group_error_details',message}}};
 }
 
 // Stronger, opt-in evidence for callers that must attribute a failure to the
@@ -123,7 +127,7 @@ export function selectFailedExecutionChild(execution,snapshot,expected) {
   return structuredClone(child);
 }
 
-export function verifyFailedChildExecution(execution,snapshot,expected,owner) {
+export function verifyFailedChildExecution(execution,snapshot,expected,owner,safeText=nativeErrorText) {
   requireValue(expected,'Pinned failed child is required');
   const child=selectFailedExecutionChild(execution,snapshot,expected);
   requireValue(snapshot.processes.filter(p=>p.selected===true).length===1&&child.selected===true&&child.rendered===true,
@@ -131,9 +135,10 @@ export function verifyFailedChildExecution(execution,snapshot,expected,owner) {
   requireValue(owner?.verified===true&&owner.node_selected===true&&owner.process_id===child.process_id
     &&owner.record_id===child.record_id&&sameNode(owner.node,execution.node)&&owner.node?.verified===true
     &&owner.node.surface==='graph','Failed child Show Node proof differs');
+  const message=safeText(child.error_details);
   return {...verifyFailedExecution(execution,snapshot),process_id:child.process_id,process_record_id:child.record_id,
     owner_verified:true,ownership_source:'native_process_model_identity_and_show_node',error_source:'native_child_error_details',
-    error:{code:'NODE_EXECUTION_FAILED',message:child.error_details.slice(0,1000)}};
+    error:{code:'NODE_EXECUTION_FAILED',message,native:{source:'native_child_error_details',message,node:structuredClone(execution.node)}}};
 }
 
 // Upstream dependencies can add sibling processes to this launch. Their captions

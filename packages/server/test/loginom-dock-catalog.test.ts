@@ -728,6 +728,53 @@ describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () =
   )
 
   it.live(
+    "session messages expose terminal Loginom metadata only for native failures",
+    () =>
+      Effect.gen(function* () {
+        const node = { document_id: "doc", workflow_id: "workflow", node_id: "fc94c88b-6b37-451b-9d57-a9378122d8a3" }
+        const refused = { kind: "node_failed", message: "Не удалось прочитать вход", node }
+        const reported = { kind: "post_launch_message", message: "Ошибка после запуска" }
+        const host = scriptedHost({
+          catalog: () => [tool("dock_node_wait", { operation_id: { type: "string" } })],
+          call: (input) => {
+            const args = Schema.decodeUnknownSync(Schema.Struct({ operation_id: Schema.String }))(input.args)
+            if (args.operation_id === "host") throw Error("LOGINOM_CALL_BUSY")
+            const receipt = { operation_id: args.operation_id, state: "settled", status: "FAILED" }
+            return {
+              content: [{ type: "text", text: JSON.stringify(receipt) }],
+              structuredContent: receipt,
+              _meta: { loginom: args.operation_id === "refused" ? refused : reported },
+            }
+          },
+        })
+        const test = yield* boot(host)
+        const id = yield* test.create("native Loginom errors")
+        yield* test.wizard(
+          id,
+          script(
+            { tool: "loginom_dock_node_wait", input: { operation_id: "refused" } },
+            { tool: "loginom_dock_node_wait", input: { operation_id: "reported" } },
+            { tool: "loginom_dock_node_wait", input: { operation_id: "host" } },
+            { text: "end" },
+          ),
+        )
+        const messages = yield* test.call(`/api/session/${id}/message?order=asc&type=assistant`)
+        expect(messages.status).toBe(200)
+        const calls = yield* test.calls(id)
+        expect(calls.map((part) => part.state.status)).toEqual(["error", "error", "error"])
+        expect(calls.map((part) => (part.state.status === "error" ? part.state.metadata?.loginom : undefined))).toEqual([
+          refused,
+          reported,
+          undefined,
+        ])
+        expect(JSON.stringify(messages.body)).toContain(JSON.stringify(refused))
+        expect(JSON.stringify(messages.body)).toContain(JSON.stringify(reported))
+        expect(JSON.stringify(messages.body)).toContain("LOGINOM_CALL_BUSY")
+      }),
+    timeout,
+  )
+
+  it.live(
     "the full text of an oversized Dock reply is read without the «outside the project» question (B2.6a2)",
     () =>
       Effect.gen(function* () {

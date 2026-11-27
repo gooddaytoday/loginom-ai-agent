@@ -58,6 +58,7 @@ import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode,makePrepare
 import {makeNodeProcessContextCode} from './node-process-context.mjs';
 import {makeNodeOutputContextCode,makeTreeWizardContextCode} from './node-output-context.mjs';
 import {captureExecutionBaseline,identifyNewExecution,selectFailedExecutionChild} from './node-execution-evidence.mjs';
+import {nativeErrorText} from './node-failure.mjs';
 import {makeNodeVariableOutputCode,makeBuiltinVariablesPreviewCode,makeNodePortOutputCode} from './node-port-output.mjs';
 import {makeExcelSourceReadCode} from './imports-excel-procedure.mjs';
 import {makeNodeTableContextCode} from './node-table-context.mjs';
@@ -270,6 +271,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   const channel = {
     // Private cleanup proofs must use the same clock as this procedure's deadline.
     now,
+    nativeErrorText:message=>nativeErrorText(message,operation.nativeErrorRedactor),
     async readExistingProcesses() {
       checkBudget();
       if(!preparedNodeContext)throw Error('Prepared node required for existing execution read');
@@ -1114,10 +1116,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
               ||state.ui.masks.some(m=>!settlingErrorToast.masks.some(old=>m.ref===old.ref
                 &&m.graph_loading_owner_ref===old.graph_loading_owner_ref))))
               throw Error('Owned execution error toast settlement context changed');
+            const toastFailure=owned=>{
+              const message=channel.nativeErrorText(toast.message);
+              return {code:'NODE_EXECUTION_FAILED',message:owned?message:('Loginom сообщил после запуска: '+message).slice(0,1000),
+                native:{source:owned?'loginom_error_toast':'loginom_post_launch_error_toast',message,
+                  node:structuredClone(launchEvidence.baseline.node),launch_operation_id:launchEvidence.operation_id,
+                  ...(owned?{execution_id:execution.execution_id,
+                    process_id:child.process_id,process_record_id:child.record_id}:{attribution:'own_action_wait'})}};
+            };
             if(Object.values(reportChecks).every(Boolean)&&!settleReportedErrorToast) {
-              const failure={code:'NODE_EXECUTION_FAILED',message:('Loginom сообщил после запуска: '+toast.message).slice(0,1000),
-                native:{source:'loginom_post_launch_error_toast',attribution:'own_action_wait',message:toast.message,
-                  node:structuredClone(launchEvidence.baseline.node),launch_operation_id:launchEvidence.operation_id}};
+              const failure=toastFailure(false);
               const saved=await entry('node_execution_error_toast_observed',{step,sample,internal_operation_id:id,
                 launch:structuredClone(launchEvidence),checks:reportChecks,failure,native_processes:native,outcome:structuredClone(detail)});
               if(JSON.stringify(saved?.failure)!==JSON.stringify(failure)||!saved?.outcome?.output)throw Error('Native error toast was not durably acknowledged');
@@ -1132,12 +1140,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
               launch:structuredClone(launchEvidence),native_processes:structuredClone(native),
               execution:structuredClone(execution??null),child:structuredClone(child??null),outcome:structuredClone(detail),initial_outcome:structuredClone(result)});
             if(Object.values(checks).every(Boolean)||settleReportedErrorToast&&Object.values(reportChecks).every(Boolean)) {
-              const failure=Object.values(checks).every(Boolean)?{code:'NODE_EXECUTION_FAILED',message:toast.message,native:{source:'loginom_error_toast',
-                node:structuredClone(launchEvidence.baseline.node),launch_operation_id:launchEvidence.operation_id,
-                execution_id:execution.execution_id,process_id:child.process_id,process_record_id:child.record_id}}
-                :{code:"NODE_EXECUTION_FAILED",message:("Loginom сообщил после запуска: "+toast.message).slice(0,1000),
-                  native:{source:"loginom_post_launch_error_toast",attribution:"own_action_wait",message:toast.message,
-                    node:structuredClone(launchEvidence.baseline.node),launch_operation_id:launchEvidence.operation_id}};
+              const failure=toastFailure(Object.values(checks).every(Boolean));
               const saved=await entry('node_execution_error_toast_observed',{step,sample,internal_operation_id:id,
                 launch:structuredClone(launchEvidence),failure,native_processes:native,outcome:structuredClone(detail)});
               if(JSON.stringify(saved?.failure)!==JSON.stringify(failure)||!saved?.outcome?.output)throw Error('Native error toast was not durably acknowledged');

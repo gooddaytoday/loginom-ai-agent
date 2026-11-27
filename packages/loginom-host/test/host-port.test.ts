@@ -61,6 +61,11 @@ test.each(["finish", "reject", "release", "close", "uncertain", "disconnect", "k
             next_step:{tool:'dock_node_wait',arguments:{operation_id:'original'}}},content:[]};
           process.send({id:m.id,result:{result,recoveryPending:true,activeWork:true}}); return;
         }
+        if (action === 'terminal-error') {
+          const result = {structuredContent:{operation_id:'original',state:'settled',status:'FAILED'},content:[],
+            _meta:{loginom:{kind:'post_launch_message',message:'Сообщение Loginom'}}};
+          process.send({id:m.id,result:{result,recoveryPending:true,activeWork:true}}); return;
+        }
         process.send({id:m.id,result:{result:{action},recoveryPending:action!=='finish',activeWork:action!=='uncertain'&&action!=='finish'}});
       });
     `,
@@ -121,6 +126,11 @@ test.each(["finish", "reject", "release", "close", "uncertain", "disconnect", "k
         const runtime = await host.runtime(1, createHash("sha256").update("chat").digest("hex"))
         expect(await call("reject")).toMatchObject({
           structuredContent: { request_rejected: true, error: { code: "REQUEST_REJECTED" } },
+        })
+        expect(await call("terminal-error")).toEqual({
+          structuredContent: { operation_id: "original", state: "settled", status: "FAILED" },
+          content: [],
+          _meta: { loginom: { kind: "post_launch_message", message: "Сообщение Loginom" } },
         })
         expect(host.journal.pending()).toEqual([])
         expect(await call("wait")).toEqual({ action: "wait" })

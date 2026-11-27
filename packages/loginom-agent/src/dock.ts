@@ -18,7 +18,7 @@ import { Identifier } from "@opencode/schema/identifier"
 import type { Model } from "@opencode/schema/model"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 import { local, type Profile } from "./access"
 import { exactScanReceipt } from "./file-profile-core"
 import type { ServiceHost } from "./host"
@@ -46,6 +46,25 @@ const Reply = Schema.Struct({
 })
 const decodeCatalog = Schema.decodeUnknownSync(Catalog)
 const decodeReply = Schema.decodeUnknownSync(Reply)
+const nodeIdentity = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_.:-]{1,128}$/))
+const guid = "[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}"
+const nativeMessage = Schema.String.check(Schema.isPattern(/^[\s\S]{1,1000}$/))
+const decodeLoginomFailure = Schema.decodeUnknownOption(
+  Schema.Union([
+    Schema.Struct({
+      kind: Schema.Literal("node_failed"),
+      message: nativeMessage,
+      node: Schema.optional(
+        Schema.Struct({
+          document_id: nodeIdentity,
+          workflow_id: nodeIdentity,
+          node_id: Schema.String.check(Schema.isPattern(new RegExp(`^(?:\\{${guid}\\}|${guid})$`, "i"))),
+        }),
+      ),
+    }),
+    Schema.Struct({ kind: Schema.Literal("post_launch_message"), message: nativeMessage }),
+  ]),
+)
 
 // The product's own tools that 0.4 offered only beside a prepared Dock: the catalog then describes Dock actions.
 const prepared = ["loginom_file_admit", "loginom_file_profile", "loginom_file_scan", "loginom_file_sample"]
@@ -306,11 +325,15 @@ export async function dockTools(input: {
       summary && outputPath
         ? `${summary}\n\nTable data and verbose details were omitted by the backend response limit. The complete original result is retained at ${outputPath}. Do not infer unread data or repeat mutations solely to retrieve omitted text.`
         : text
-    if (state === "failed")
+    if (state === "failed") {
+      const loginom = name.startsWith("dock_node_")
+        ? Option.getOrUndefined(decodeLoginomFailure(result._meta?.loginom))
+        : undefined
       throw new Tool.Error({
         message: content || "LOGINOM_TOOL_FAILED",
-        metadata: { generation: lease.generation, isError: true },
+        metadata: { generation: lease.generation, isError: true, ...(loginom ? { loginom } : {}) },
       })
+    }
     const images = result.content.flatMap((block) =>
       block.type === "image" && typeof block.data === "string" && typeof block.mimeType === "string"
         ? [{ type: "file" as const, uri: `data:${block.mimeType};base64,${block.data}`, mime: block.mimeType }]

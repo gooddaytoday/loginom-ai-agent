@@ -2180,7 +2180,7 @@ export function parseCapabilityResult(response,{redactor}={}) {
   throw error;
 }
 
-export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
+export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, nativeErrorRedactor = redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
   nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, getPreparationReceipt = () => null,
   browserRecovery = false, probePreparedPage, reopenNodePackage, cacheDirectory, serverSourceCache = true }) {
@@ -4529,7 +4529,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       running=true;
       try {
         if(!operation){
-          operation={id:operationId,signature,parameters:request,scanReceipt:structuredClone(scanReceipt),
+          operation={id:operationId,signature,parameters:request,scanReceipt:structuredClone(scanReceipt),nativeErrorRedactor,
             action:{action_key:'node.apply',capability:'node.apply',revision:request.contract_revision},
             checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:admissionDeadline};
           if(admissionUncertainty?.child){
