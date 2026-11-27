@@ -717,6 +717,10 @@ export const dict = {
   "settings.general.row.followUpBehavior.description":
     "Выберите, ставить ли последующие сообщения в очередь или направлять ими текущий шаг. Для переключения используйте {{keybind}}.",
   "settings.general.row.followUpBehavior.queue": "Поставить в очередь",
+  "settings.general.row.systemProxy.title": "Системный прокси",
+  "settings.general.row.systemProxy.description": "Использовать прокси операционной системы. Чтобы применить настройку к фоновой службе, перезапустите приложение.",
+  "settings.general.row.systemProxy.unreachable": "Системный прокси недоступен.",
+  "settings.general.row.systemProxy.socksOnly": "Фоновая служба не может использовать системный прокси, доступный только по SOCKS.",
   "settings.general.row.followUpBehavior.steer": "Направить",
   "desktop.onboarding.defaultProject": "Проект по умолчанию",
   "toast.migration.progress.clearingOldEvents": "Удаление старых событий",

@@ -1,12 +1,11 @@
-import { app, session } from "electron"
-import { desktopServiceProxy, MODEL_PROXY_URLS, probeProxyUrl } from "@loginom-ai-agent/loginom-host/system-proxy"
-import { Product } from "@loginom-ai-agent/product"
+import { app } from "electron"
 import type { Endpoint } from "@opencode/client/service"
 import { Context, Effect, FileSystem, Layer, Option, Path, Schema } from "effect"
 import { SidecarChanged } from "../../shared/ipc-rpc/events"
 import { CHANNEL } from "../constants"
 import { emitIpcEvent } from "../ipc-events"
 import { LoginomResources } from "../loginom/resources"
+import { backgroundServiceEnvironment } from "../loginom/system-proxy"
 import { getMainWindows } from "../windows"
 import { BackgroundServiceMachine } from "./background-service-machine"
 import { cleanStages } from "./cli-stages"
@@ -74,27 +73,13 @@ const probe = Effect.fn("BackgroundService.probe")(function* () {
 const ensure = Effect.fn("BackgroundService.ensure")(function* (mode: BackgroundServiceMachine.ConnectMode) {
   const runFork = Effect.runForkWith(yield* Effect.context<FileSystem.FileSystem | Path.Path>())
   const setup = yield* prepare(mode)
-  const catalog = process.env.LOGINOM_AI_AGENT_MODELS_URL || "https://models.opencode.ai"
-  const urls = [...MODEL_PROXY_URLS]
-
-  for (const url of [catalog, Product.updateFeed]) if (url && URL.canParse(url)) urls.push(url)
-
-  const proxy = yield* Effect.promise(() =>
-    desktopServiceProxy({
-      environment: process.env,
-      chromium: (url) => session.defaultSession.resolveProxy(url),
-      urls,
-      probe: (url) => probeProxyUrl(url, 1000),
-    }),
-  )
-
-  yield* Effect.logInfo("background service proxy", { state: proxy.state, notices: proxy.notices })
+  const env = yield* backgroundServiceEnvironment(setup.env)
 
   const run = (version = setup.version) =>
     setup.client.Service.ensure({
       file: setup.file,
       version,
-      env: { ...setup.env, ...proxy.environment },
+      env,
       // A fixed port makes a second contender fail to bind and back off; port 0 never collides, so two
       // services could boot against the same database.
       command: withoutWindowDescriptors([

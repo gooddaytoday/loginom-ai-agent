@@ -1,6 +1,20 @@
+import { readFile } from "node:fs/promises"
+import { join } from "node:path"
 import type { ProxyConfig } from "electron"
 
-export function updateProxy(environment: NodeJS.ProcessEnv) {
+export async function systemProxyPreference(userData: string) {
+  try {
+    const settings: { systemProxyEnabled?: unknown } | null = JSON.parse(
+      await readFile(join(userData, "loginom-ai-agent.settings"), "utf8"),
+    )
+
+    return settings?.systemProxyEnabled !== false
+  } catch {
+    return true
+  }
+}
+
+export function updateProxy(environment: NodeJS.ProcessEnv, systemProxyEnabled = true) {
   const first = (...values: (string | undefined)[]) => values.find((value) => value?.trim())?.trim()
   const all = first(environment.ALL_PROXY, environment.all_proxy)
   const http = first(environment.HTTP_PROXY, environment.http_proxy)
@@ -28,7 +42,9 @@ export function updateProxy(environment: NodeJS.ProcessEnv) {
     }
   })
 
-  const disabled = ["off", "0", "false"].includes(environment.LOGINOM_AI_AGENT_SYSTEM_PROXY?.trim().toLowerCase() ?? "")
+  const disabled =
+    !systemProxyEnabled ||
+    ["off", "0", "false"].includes(environment.LOGINOM_AI_AGENT_SYSTEM_PROXY?.trim().toLowerCase() ?? "")
 
   const config: ProxyConfig = routes.length
     ? {

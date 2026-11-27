@@ -81,10 +81,28 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
   ]
   const runtimeNoProxy = environment[runtimeNoProxyKey]
   const runtimeProxy = () => {
-    if (runtimeNoProxy === undefined) return env
-    for (const key of ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "NODE_USE_ENV_PROXY"]) delete env[key]
-    env.NO_PROXY = runtimeNoProxy
-    if (platform !== "win32") env.no_proxy = runtimeNoProxy
+    if (!runtimeNoProxy) return env
+    let marker: unknown
+    try {
+      marker = JSON.parse(runtimeNoProxy)
+    } catch {
+      return env
+    }
+    if (!Array.isArray(marker) || marker.length !== 4) return env
+    const [http, https, systemBypass, userBypass] = marker
+    if (typeof http !== "string" || typeof https !== "string" || typeof systemBypass !== "string" || typeof userBypass !== "string") return env
+    let removed = false
+    for (const [key, value] of Object.entries(env)) {
+      const name = key.toUpperCase()
+      if ((name === "HTTP_PROXY" && value === http) || (name === "HTTPS_PROXY" && value === https)) {
+        delete env[key]
+        removed = true
+      }
+    }
+    if (!removed) return env
+    for (const key of ["NO_PROXY", "no_proxy"]) if (env[key] === systemBypass) env[key] = userBypass
+    if (env.NODE_USE_ENV_PROXY === "1" && !["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"].some((key) => env[key]))
+      delete env.NODE_USE_ENV_PROXY
     return env
   }
   if (platform === "linux")

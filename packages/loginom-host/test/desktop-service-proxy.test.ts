@@ -1,10 +1,11 @@
 import { expect, test } from "bun:test"
 import { createServer } from "node:http"
 import { runtimeEnvironment } from "../src/supervisor"
-import { desktopServiceProxy } from "../src/system-proxy"
+import { desktopServiceProxy, onceDesktopServiceProxy } from "../src/system-proxy"
 
 const inherited = { NO_PROXY: "private.example", no_proxy: "another.example" }
 const loopback = ["localhost", "127.0.0.1", "::1", "[::1]"]
+const windows = { autoDetect: false, autoConfigUrl: "", proxy: "proxy.example:8080", bypass: "internal.example" }
 
 test("WinINET reaches the Desktop service but not its Loginom runtime", async () => {
   const proxy = await desktopServiceProxy({
@@ -47,6 +48,90 @@ test("explicit HTTPS_PROXY skips system and PAC readers and survives in the runt
     no_proxy: noProxy,
   })
 })
+
+test.each(["win32", "linux"] as const)("a terminal CLI preserves its new explicit proxy on %s", async (platform) => {
+  const proxy = await desktopServiceProxy({
+    platform,
+    environment: inherited,
+    windows,
+  })
+  expect(proxy.state).toBe("applied")
+  const HTTPS_PROXY = "http://explicit.example:8080"
+  const runtime = runtimeEnvironment({ ...proxy.environment, HTTPS_PROXY }, platform)
+  expect(runtime).toMatchObject({
+    HTTPS_PROXY,
+    NODE_USE_ENV_PROXY: "1",
+    NO_PROXY: [...loopback, "private.example", "another.example"].join(","),
+  })
+  expect(runtime.HTTP_PROXY).toBeUndefined()
+  expect(runtime.https_proxy).toBeUndefined()
+})
+
+test("Desktop shares one detection across startup and reconnect and exposes unreachable without going direct", async () => {
+  let probes = 0
+  const detect = onceDesktopServiceProxy(() => ({
+    platform: "win32",
+    windows,
+    probe: async () => {
+      probes++
+      return "closed"
+    },
+  }))
+  const [startup, reconnect] = await Promise.all([detect(), detect()])
+  expect(reconnect).toEqual(startup)
+  expect(await detect()).toEqual(startup)
+  expect(startup.notices).toContain("unreachable")
+  expect(startup.environment.HTTPS_PROXY).toBe("http://proxy.example:8080")
+  expect(probes).toBe(1)
+})
+
+test("Desktop does not resolve system routes when the imported preference is off", async () => {
+  const result = await desktopServiceProxy({
+    enabled: false,
+    windows,
+  })
+  expect(result.state).toBe("off")
+  expect(result.environment.HTTPS_PROXY).toBeUndefined()
+})
+
+test("Desktop exposes SOCKS-only as an unsupported route", async () => {
+  const result = await desktopServiceProxy({
+    platform: "win32",
+    windows: { ...windows, proxy: "socks=proxy.example:1080" },
+    probe: async () => "other",
+  })
+  expect(result.notices).toContain("socks-only")
+  expect(result.environment.HTTPS_PROXY).toBeUndefined()
+})
+
+test.each(["deadline", "quit"] as const)(
+  "Desktop stops waiting for Chromium on %s",
+  async (stop) => {
+    const controller = new AbortController()
+    const pending = Promise.withResolvers<string>()
+    const entered = Promise.withResolvers<void>()
+    const detection = desktopServiceProxy(
+      {
+        platform: "win32",
+        signal: controller.signal,
+        windows,
+        chromium: () => {
+          entered.resolve()
+          return pending.promise
+        },
+      },
+      stop === "deadline" ? 25 : 10_000,
+    )
+    await entered.promise
+    if (stop === "quit") controller.abort()
+    try {
+      expect(await detection).toMatchObject({ state: "failed", notices: ["timeout"] })
+    } finally {
+      pending.resolve("DIRECT")
+    }
+  },
+  2_000,
+)
 
 test("a Bun sidecar connects through PAC's proxy, but reaches loopback directly", async () => {
   const connects: string[] = []

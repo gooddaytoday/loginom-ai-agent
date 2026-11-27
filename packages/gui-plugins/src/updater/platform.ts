@@ -6,7 +6,7 @@ import { Effect } from "effect"
 import { Product } from "@loginom-ai-agent/product"
 import { isProductBuild } from "./feed"
 import type { Platform } from "./machine"
-import { updateProxy } from "./proxy"
+import { systemProxyPreference, updateProxy } from "./proxy"
 
 const updateClient = pkg.autoUpdater
 
@@ -20,9 +20,15 @@ export const make = Effect.fn("Updater.platform")(function* (channel: string, fe
   const userAgent = `${Product.slug}/${channel === "prod" ? "latest" : channel}/${app.getVersion()}/desktop`
   const runFork = Effect.runForkWith(yield* Effect.context())
   let credentials: ReturnType<typeof updateProxy>["credentials"] | undefined
+
   const login = (auth: AuthInfo, callback: (username: string, password: string) => void) => {
     const selected = credentials?.(auth)
-    callback(selected?.username ?? "", selected?.password ?? "")
+
+    if (selected) return callback(selected.username, selected.password)
+
+    // SAFETY: Electron's ClientRequest login callback accepts zero arguments to cancel authentication.
+    const cancel = callback as () => void
+    cancel()
   }
 
   yield* Effect.acquireRelease(
@@ -57,7 +63,7 @@ export const make = Effect.fn("Updater.platform")(function* (channel: string, fe
   return {
     checkForUpdate: Effect.tryPromise({
       try: async () => {
-        const proxy = updateProxy(process.env)
+        const proxy = updateProxy(process.env, await systemProxyPreference(app.getPath("userData")))
         credentials = proxy.credentials
         await updateClient.netSession.setProxy(proxy.config)
         await updateClient.netSession.closeAllConnections()

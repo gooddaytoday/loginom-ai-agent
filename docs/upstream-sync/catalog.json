@@ -25,7 +25,6 @@
       "title": "Upstream endpoints: updates, installer, sharing",
       "paths": [
         "packages/gui-plugins/src/updater/main.ts", "packages/gui-plugins/src/updater/platform.ts",
-        "packages/gui-plugins/src/updater/proxy.ts", "packages/gui-plugins/src/updater/proxy.test.ts",
         "packages/gui-plugins/src/updater/whats-new.tsx", "packages/desktop/src/renderer/platform/notifications.ts",
         "packages/desktop/src/renderer/platform/notifications.test.ts", "packages/cli/src/services/updater.ts",
         "packages/cli/test/updater-install.test.ts"
@@ -58,7 +57,7 @@
     {
       "id": "CAT-13",
       "title": "Product storage root and own background service (U5)",
-      "note": "C5.4: background-service.ts supplies the resolved proxy through the existing service spawn environment; see catalog.md.",
+      "note": "C5.4: background-service.ts calls the fork's proxy environment helper at spawn; see catalog.md.",
       "paths": [
         "packages/util/src/global.ts", "packages/client/src/service-probe.ts", "packages/cli/src/services/service-config.ts",
         "packages/desktop/src/main/service/sidecar-probe.ts", "packages/desktop/src/main/service/background-service.ts",
