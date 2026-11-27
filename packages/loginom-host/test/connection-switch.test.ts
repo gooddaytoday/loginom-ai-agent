@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { cliCredentials } from "../src/connection/cli-credentials"
 import { connectionStore } from "../src/connection/connection-store"
+import { hostError } from "../src/errors"
 import { launchNodeHost } from "../src/node-client"
 import { stageHeldKnowledge } from "./fixtures/knowledge"
 
@@ -172,6 +173,7 @@ test.each([
         username: original.username,
         failure,
       })
+      expect(hostError(failure)).toBe(failure)
       expect(await f.store.read()).toEqual(original)
       expect(await Bun.file(f.fault).exists()).toBe(false)
       if (fault === "before-activate") {
