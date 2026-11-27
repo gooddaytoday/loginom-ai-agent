@@ -54,17 +54,23 @@ function outputChannel(){
  const sources=groupingOutputDefinitions(config).map((f,i)=>({...f,record_id:'s'+i,field_id:String(i),index:i,required:false}));
  const native={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',autosync:true,
   node_context:{node_id:'grouping'},source_fields:sources,target_fields:[1,4,0,2,3].map((i,index)=>({...sources[i],record_id:'t'+i,index,group_index:index,source:sources[i],exclusion_source:null,excluded:false,inherited:false,data_kind:'Дискретный'}))};
- const actions=[];let selected=null,editor=null,draft=null;
- const state=()=>({node_mapping:structuredClone(native),wizard:{status:'observed',stage:'output_mapping',root_ref:'root',root_tid:'W',
+ const actions=[],reads=[];let selected=null,editor=null,draft=null;
+ const state=()=>({node_mapping:structuredClone(native),wizard:{status:'observed',stage:'output_mapping',root_ref:channel.root,root_tid:'W',
   column_parameters:editor?{status:'observed',root_ref:'editor',selected_column:editor,fields:Object.fromEntries(['name','label'].map(k=>[k,{value:draft[k],input_ref:k}]))}:undefined,
   output_columns:{auto_sync:{status:'observed',value:native.autosync,ref:'auto'},
-   page:{status:native.target_fields.some(f=>f.excluded)?'unverified_definition_page':'complete_definition_page',schema_id:'schema-'+native.autosync,offset:0,limit:8,total_columns:5,returned:5,next_offset:null},
-   fields:native.target_fields.map(f=>({...f,status:'observed',name_ref:f.record_id,selected:selected===f.record_id}))}},
+   page:{status:native.target_fields.some(f=>f.excluded)?'unverified_definition_page':'complete_definition_page',schema_id:JSON.stringify(native.target_fields.map(f=>f.record_id)),offset:0,limit:8,total_columns:5,returned:5,next_offset:null},
+   fields:native.target_fields.map(f=>({...f,status:'observed',row_ref:'row-'+f.record_id,name_ref:f.record_id,selected:selected===f.record_id}))}},
   ui:{elements:[...native.target_fields.map(f=>({ref:f.record_id,allowed_actions:['click','double_click']})),
    ...['name','label'].map(k=>({ref:k,wizard_field:{scope:'output_column',name:k},allowed_actions:['set_wizard_field']})),
    {ref:'apply',column_close:{scope:'output'},allowed_actions:['apply_output_column']},
    ...[['auto','btnAutoSyncThroughColumns'],['up','btnMoveMappingColumnUp'],['exclude','btnAddMappingToExcluded']].map(([ref,key])=>({ref,tid:'W;DerivedDataSourceOutputSocketWizard;'+key,allowed_actions:['click']}))]}});
- const channel={async observe(o){const s=state();assert.ok(o.ready(s),o.condition);return s;},async perform(o){
+ const channel={root:'root',async observe(o){
+  const s=state();
+  if(o.readMappings)reads.push(o.condition);
+  assert.ok(o.ready(s),o.condition);
+  channel.afterObserve?.(o,s);
+  return s;
+ },async perform(o){
   const s=state();assert.ok(o.ready(s),o.condition);const a=o.resolve(s);actions.push(a);
   if(a.ref==='auto'){native.autosync=!native.autosync;channel.afterAutosync?.(native);}
   else if(a.verb==='double_click'){editor=structuredClone(native.target_fields.find(f=>f.record_id===a.ref));draft={name:editor.name,label:editor.label};}
@@ -77,7 +83,46 @@ function outputChannel(){
    native.target_fields.push({...source,record_id:'excluded',field_id:'99',index:4,group_index:0,label:source.name,data_kind:'Неопределенное',source:null,exclusion_source:source,excluded:true,inherited:false});
   }else selected=a.ref;
  }};
- return {config,params,native,channel,actions,mapping:{autosync:false,fields:['Segment','Group','OtherTotal','MeanAmount','TextRows'].map(name=>({source:{kind:'configured_field',name},...(name==='Segment'?{excluded:true}:{})}))}};
+ return {config,params,native,channel,actions,reads,mapping:{autosync:false,fields:['Segment','Group','OtherTotal','MeanAmount','TextRows'].map(name=>({source:{kind:'configured_field',name},...(name==='Segment'?{excluded:true}:{})}))}};
+}
+
+function prepareSingleOutputEdit(f,ordered) {
+ if(ordered)f.native.target_fields.sort((a,b)=>a.source.index-b.source.index);
+ for(const [index,field] of f.native.target_fields.entries()) {
+  const measure=f.params.measures[field.source.index-2];
+  Object.assign(field,{index,group_index:index,name:measure?.name??field.name,label:measure?.label??field.label});
+ }
+ f.native.target_fields.find(f=>f.record_id==='t4').label='Старая метка';
+ f.native.autosync=false;
+}
+
+for(const ordered of [true,false])test(`Grouping reuses the full Apply readback ${ordered?'without':'before'} a move`,async()=>{
+ const f=outputChannel();
+ prepareSingleOutputEdit(f,ordered);
+ const result=await configureGroupingOutput(f.channel,f.config,f.params,{});
+ assert.equal(result.native_mapping.target_fields.at(-1).label,'Количество строк');
+ const moves=f.actions.filter(action=>action.ref==='up');
+ assert.equal(moves.length,ordered?0:4);
+ assert.deepEqual(f.reads.slice(f.reads.indexOf('native output field after Apply')), [
+  'native output field after Apply',
+  ...moves.map(()=> 'native output order and selection after one move'),
+  'grouping output names and order applied',
+ ]);
+});
+
+for(const ordered of [true,false])for(const change of ['wizard rebuild','record replacement']){
+ test(`Grouping refuses ${change} after Apply with ${ordered?'no move':'a pending move'}`,async()=>{
+  const f=outputChannel();
+  prepareSingleOutputEdit(f,ordered);
+  f.channel.afterObserve=o=>{
+   if(o.condition!=='native output field after Apply')return;
+   if(change==='wizard rebuild')f.channel.root='replacement-root';
+   else f.native.target_fields.find(field=>field.record_id==='t0').record_id='replacement-record';
+  };
+  await assert.rejects(configureGroupingOutput(f.channel,f.config,f.params,{}),
+   /grouping output names and order applied|select output field to move|(?:Grouping output|Output reorder) binding changed/);
+  assert.equal(f.actions.at(-1).ref,'apply');
+ });
 }
 test('Grouping reconfiguration completes edits and autosync before creating the excluded group',async()=>{
  const f=outputChannel();const result=await configureGroupingOutput(f.channel,f.config,f.params,f.mapping);

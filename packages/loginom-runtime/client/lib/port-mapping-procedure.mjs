@@ -198,7 +198,7 @@ export async function configureOutputField(channel,field) {
   return (await editOutputField(channel,field,initial)).receipt;
 }
 
-async function editOutputField(channel,field,initial) {
+async function editOutputField(channel,field,initial,readbackPage) {
   const baseline=initial.node_mapping;
   const find=n=>n.target_fields.filter(t=>t.record_id===field.current.record_id&&t.source?.record_id===field.source.record_id);
   const targets=find(baseline);
@@ -261,14 +261,23 @@ async function editOutputField(channel,field,initial) {
     identity:s=>({root,original,fields:s.wizard.column_parameters.fields}),resolve:s=>{
       const e=s.ui.elements.find(e=>e.column_close?.scope==='output'&&e.allowed_actions.includes('apply_output_column'));
       if(!e)throw new Error('Output field Apply unavailable');return {verb:'apply_output_column',ref:e.ref};}});
-  const after=await channel.observe({condition:'native output field after Apply',readMappings:true,ready:bound});
+  const after=await channel.observe({condition:'native output field after Apply',readMappings:true,
+    outputColumnPage:readbackPage,ready:bound});
   const expected={...baseline,target_fields:baseline.target_fields.map(t=>t.record_id===original.record_id?{...t,name:field.name,label:field.label,...(baseline.mapping_wizard==='TuneDataSourceMappingWizard'?{origin_type:1}:{})}:t)};
   if(!same(mappingSemantics(after.node_mapping),mappingSemantics(expected)))throw new Error('Output field edit changed unrelated native mapping state');
   return {state:after,receipt:{verified:true,cleanup_complete:true,effect_possible:true,field:find(after.node_mapping)[0],
     source_identity_verified:true,settings_applied:false}};
 }
 
-export async function reorderOutputFields(channel,recordIds,initialObservation) {
+export function reorderOutputFields(channel,recordIds,initialObservation) {
+  return reorderFields(channel,recordIds,initialObservation,false);
+}
+
+export function reorderBoundOutputFields(channel,recordIds,edited) {
+  return reorderFields(channel,recordIds,edited,true);
+}
+
+async function reorderFields(channel,recordIds,initialObservation,bindRows) {
   const ready=s=>['output_mapping','input_mapping'].includes(s.wizard?.stage)&&s.node_mapping?.verified===true
     &&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true;
   let state=initialObservation??await channel.observe({condition:'native mapping before reorder',readMappings:true,ready});
@@ -276,6 +285,8 @@ export async function reorderOutputFields(channel,recordIds,initialObservation) 
   const baseline=state.node_mapping;
   const root=state.wizard.root_ref,stage=state.wizard.stage;
   const bound=s=>ready(s)&&s.wizard.root_ref===root&&s.wizard.stage===stage;
+  const sameWizard=s=>s.wizard?.root_ref===root&&s.wizard.root_tid===initialObservation.wizard.root_tid
+    &&same(s.prepared_node_context,initialObservation.prepared_node_context);
   if(!Array.isArray(recordIds)||recordIds.length!==baseline.target_fields.length||new Set(recordIds).size!==recordIds.length
     ||recordIds.some(id=>!baseline.target_fields.some(f=>f.record_id===id)))throw Error('Reorder requires every native output record exactly once');
   const grouped=['DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard'].includes(baseline.mapping_wizard);
@@ -294,19 +305,39 @@ export async function reorderOutputFields(channel,recordIds,initialObservation) 
       if(grouped&&expected.target_fields[index-1].excluded!==field.excluded)throw Error('Output reorder would cross an exclusion group');
       const offset=Math.floor(index/8)*8;
       const rowOf=s=>s.wizard?.output_columns?.fields?.find(f=>f.index===index&&f.name===field.name&&f.label===field.label);
-      const moveReady=s=>{
+      const pageReady=s=>{
         const page=s.wizard?.output_columns?.page;
         return s.wizard?.root_ref===root&&s.wizard.stage===stage&&page?.status==='complete_definition_page'
-          &&page.offset===offset&&page.total_columns===recordIds.length&&rowOf(s)?.selected===true;
+          &&page.offset===offset&&page.total_columns===recordIds.length&&!!rowOf(s);
       };
+      const selected=s=>pageReady(s)&&rowOf(s).selected===true;
+      const cell=s=>s.ui.elements.find(e=>e.ref===rowOf(s)?.name_ref&&e.allowed_actions.includes('click'));
       // Use the freshly reconciled selection for consecutive moves of this row.
       // Crossing a page or losing selection goes through the normal guarded select.
-      if(!moveReady(state)){
-        state=await observeOutputDefinitionPage(channel,{offset,total:recordIds.length,field,stage,
-          ready:s=>s.wizard?.root_ref===root});
-        await channel.perform({condition:'select output field to move',initialObservation:state,
-          ready:s=>s.wizard.root_ref===root&&!!rowOf(s),identity:()=>field,
-          resolve:s=>{const row=rowOf(s),e=s.ui.elements.find(e=>e.ref===row.name_ref&&e.allowed_actions.includes('click'));
+      let selectionPage=state;
+      const sameRow=s=>{
+        if(!bindRows)return true;
+        const schemaId=selectionPage.wizard.output_columns.page.schema_id,rowRef=rowOf(selectionPage)?.row_ref;
+        return sameWizard(s)&&pageReady(s)&&typeof schemaId==='string'&&s.wizard.output_columns.page.schema_id===schemaId
+          &&typeof rowRef==='string'&&rowOf(s).row_ref===rowRef
+          &&(!s.node_mapping||same(mappingSemantics(s.node_mapping),mappingSemantics(selectionPage.node_mapping)));
+      };
+      const moveReady=s=>selected(s)&&sameRow(s);
+      if(!selected(state)){
+        if(!bindRows||!pageReady(state)||!cell(state)){
+          const before=state.node_mapping;
+          selectionPage=await observeOutputDefinitionPage(channel,{offset,total:recordIds.length,field,stage,
+            ...(bindRows?{readMappings:true}:{}),
+            ready:s=>{
+              if(!bindRows)return s.wizard?.root_ref===root;
+              if(!bound(s)||!sameWizard(s)||!same(mappingSemantics(s.node_mapping),mappingSemantics(before)))
+                throw Error('Output reorder binding changed');
+              return true;
+            }});
+        }
+        await channel.perform({condition:'select output field to move',initialObservation:selectionPage,
+          ready:s=>s.wizard.root_ref===root&&!!rowOf(s)&&sameRow(s),identity:()=>field,
+          resolve:s=>{const e=cell(s);
             if(!e)throw Error('Output reorder selection unavailable');return {verb:'click',ref:e.ref};}});
         state=await channel.observe({condition:'selected output field move up ready',outputColumnPage:{offset,limit:8},ready:moveReady});
       }
@@ -320,7 +351,7 @@ export async function reorderOutputFields(channel,recordIds,initialObservation) 
         return {...f,index:i,...(grouped?{group_index:groupIndex}:{})};
       });moves++;
       state=await channel.observe({condition:'native output order and selection after one move',readMappings:true,
-        outputColumnPage:{offset:Math.floor((index-1)/8)*8,limit:8},ready:bound});
+        outputColumnPage:{offset:Math.floor((index-1)/8)*8,limit:8},ready:s=>bound(s)&&(!bindRows||sameWizard(s))});
       const observed=semantic(state.node_mapping),wanted=semantic(expected),selection=wanted.source_selection;
       // Moving an output row can remove the confirmed empty source selection.
       // No selected source or other mapping property may change with the move.
@@ -370,9 +401,17 @@ export function planOutputFieldEdits(fields) {
 }
 
 export async function configureOutputFields(channel,mapping,configured) {
-  const before=await channel.observe({condition:'complete native mapping before field edits',readMappings:true,ready:nativeMappingReady});
+  return (await editConfiguredOutputFields(channel,mapping,configured,nativeMappingReady,false)).receipt;
+}
+
+export function editBoundOutputFields(channel,mapping,configured,owned) {
+  return editConfiguredOutputFields(channel,mapping,configured,s=>nativeMappingReady(s)&&owned(s),true);
+}
+
+async function editConfiguredOutputFields(channel,mapping,configured,ready,bindRows) {
+  const before=await channel.observe({condition:'complete native mapping before field edits',readMappings:true,ready});
   const resolved=resolveConfiguredOutputMapping(mapping,configured,before.node_mapping);
-  if(resolved.fields===null)return {verified:true,effect_possible:false,cleanup_complete:true,edits:[],settings_applied:false};
+  if(resolved.fields===null)return {state:before,receipt:{verified:true,effect_possible:false,cleanup_complete:true,edits:[],settings_applied:false}};
   // An existing exclusion is preserved as native state; only a new exclusion
   // requires the separately verified exclusion gesture.
   const exclusions=resolved.fields.filter(f=>f.excluded&&f.current.excluded!==true),edits=[];
@@ -391,14 +430,15 @@ export async function configureOutputFields(channel,mapping,configured) {
     state=excluded.state;
     edits.push({source_record_id:field.source.record_id,excluded:true,verified:excluded.receipt.verified,effect_possible:excluded.receipt.effect_possible});
   }
-  for(const step of steps) {
+  for(const [index,step] of steps.entries()) {
     const current=state.node_mapping.target_fields.find(f=>f.record_id===step.record_id);
-    const result=await editOutputField(channel,{current,source:current.source,name:step.name,label:step.label},state);
+    const readbackPage=bindRows&&index===steps.length-1?{offset:0,limit:8}:undefined;
+    const result=await editOutputField(channel,{current,source:current.source,name:step.name,label:step.label},state,readbackPage);
     state=result.state;
     edits.push({...step,verified:result.receipt.verified,effect_possible:result.receipt.effect_possible});
   }
-  return {verified:true,cleanup_complete:true,effect_possible:edits.some(e=>e.effect_possible),edits,
-    source_identity_verified:true,definition:state.node_mapping,settings_applied:false};
+  return {state,receipt:{verified:true,cleanup_complete:true,effect_possible:edits.some(e=>e.effect_possible),edits,
+    source_identity_verified:true,definition:state.node_mapping,settings_applied:false}};
 }
 
 // Exclusion is a source exclusion record, not deletion of the input field.
