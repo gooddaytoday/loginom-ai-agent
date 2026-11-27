@@ -3,7 +3,14 @@ import { readNodeOutput } from "../src/node-output"
 
 test("expanded sample uses only the selected session's recorded tool receipt", async () => {
   const request = { sessionID: "ses_chat", messageID: "msg_response", toolCallID: "selected-call", port: 0 }
-  const metadata = { generation: 2, loginom: { version: 1, operationId: "original", executionId: "execution", ports: [{ port: 0, portGuid: "native" }] } }
+  const metadata = {
+    generation: 2,
+    loginom: {
+      v: 1, operationId: "original", state: "settled", status: "SUCCEEDED",
+      executionId: "execution", executionStatus: "completed", cleanupComplete: true,
+      ports: [{ index: 0, guid: "native", rowCount: 1, columnCount: 1 }],
+    },
+  }
   const message = {
     type: "assistant", id: request.messageID, time: { created: 1 }, agent: "build", model: { providerID: "test", id: "test-model" },
     content: [{
@@ -15,10 +22,10 @@ test("expanded sample uses only the selected session's recorded tool receipt", a
   const read: NonNullable<Parameters<typeof readNodeOutput>[2]> = async (session, receipt) => {
     expect(session).toBe(request.sessionID)
     expect(receipt).toEqual({ generation: 2, operationId: "original", executionId: "execution", portGuid: "native" })
-    return { rows: [[{ value: "on demand" }]], targetRows: 1 }
+    return { rows: [[{ value: "on demand" }]] }
   }
   const history: Parameters<typeof readNodeOutput>[0] = async ({ sessionID }) => sessionID === request.sessionID ? [message] : []
-  expect(await readNodeOutput(history, request, read)).toEqual({ kind: "available", rows: [[{ value: "on demand" }]], targetRows: 1 })
+  expect(await readNodeOutput(history, request, read)).toEqual({ kind: "available", rows: [[{ value: "on demand" }]] })
   expect(await readNodeOutput(history, request, async () => null)).toEqual(unavailable)
   const forbidden = async () => { throw Error("must not contact runtime") }
   let called = false

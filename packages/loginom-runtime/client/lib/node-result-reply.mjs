@@ -1,4 +1,4 @@
-import {compactNodeResult,nodeOutputView} from './user-results.mjs';
+import {compactNodeResult} from './user-results.mjs';
 import {boundedUserToolReply} from './user-response-budget.mjs';
 const nodeReply=(value,omitPorts)=>({content:[{type:'text',text:JSON.stringify(value)}],
  structuredContent:omitPorts&&value.output?.ports!==undefined?{...value,
@@ -7,7 +7,7 @@ const nodeReply=(value,omitPorts)=>({content:[{type:'text',text:JSON.stringify(v
 // Check the actual MCP envelope, including its JSON-escaped text copy. Never
 // truncate exact_table or turn full coverage into an ordinary sample on overflow.
 // The runtime's completed mutation checkpoint is retained for inspection.
-export function nodeResultReply(result,{userProfile=false,tool,outputView=false,inputCount,redactor}={}) {
+export function nodeResultReply(result,{userProfile=false,tool}={}) {
  // The model reads content; structuredContent retains control fields without
  // transporting a second table. Other tools and diagnostic replies stay intact.
  const omitPorts=userProfile&&tool==='dock_node_wait';
@@ -19,10 +19,5 @@ export function nodeResultReply(result,{userProfile=false,tool,outputView=false,
   const error=Error('Exact full result exceeds the 1 MiB serialized MCP limit; no table was delivered. The original node checkpoint is retained.');
   error.code='EXACT_FULL_SERIALIZATION_LIMIT';throw error;
  }
- const bounded=userProfile?boundedUserToolReply(reply):reply;
- if(outputView&&userProfile)try{
-  const view=nodeOutputView(result,bounded===reply?delivered:undefined,inputCount,redactor);
-  if(view)return {...bounded,_meta:{loginomNodeOutput:view}};
- }catch{}
- return bounded;
+ return userProfile?boundedUserToolReply(reply):reply;
 }

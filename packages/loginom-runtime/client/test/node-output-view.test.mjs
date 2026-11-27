@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {nodeResultReply} from '../lib/node-result-reply.mjs';
 import {sampleFromReceipt} from '../lib/node-output-view.mjs';
-import {nodeInputCount} from '../lib/user-results.mjs';
+import {linkedInputReceipt,loginomFeedMetadata} from '../lib/user-results.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 
 const makeCell=value=>({type:'string',value,is_null:value===null,precision:'source_text'});
 const makeReceipt=({values,rowCount=values.length,nodeId='target',executionId='doc:root:3',portGuid='result-port'}={})=>({
- operation_id:nodeId,state:'settled',outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{
+ id:nodeId,operation_id:nodeId,state:'settled',outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{
   node:{document_id:'doc',workflow_id:'flow',node_id:nodeId},execution:{status:'completed',execution_id:executionId},
   configuration:{status:'applied',readback:{kind:'row_filter',conditions:['confirmed']}},
   output:{ports:[{port:0,port_guid:portGuid,fresh:true,execution_id:executionId,freshness_basis:'completed_execution_port_source',
@@ -16,64 +16,68 @@ const makeReceipt=({values,rowCount=values.length,nodeId='target',executionId='d
  }},
 });
 const options={userProfile:true,tool:'dock_node_wait'};
-const project=(receipt,extra={})=>nodeResultReply(receipt,{...options,outputView:true,...extra});
+const project=(receipt,extra={})=>loginomFeedMetadata(nodeResultReply(receipt,options),{tool:options.tool,...extra});
 const readPort=receipt=>receipt.outcome.output.output.ports[0];
 
 test('wait publishes the final model rows and explicit sample limit without changing either MCP result copy',()=>{
  const receipt=makeReceipt({values:['a','b','я'.repeat(30000)],rowCount:120});
- const {_meta,...reply}=project(receipt);
- assert.deepEqual(reply,nodeResultReply(receipt,options));
+ const reply=nodeResultReply(receipt,options),before=structuredClone(reply);
  assert.equal(reply.structuredContent.output.ports,undefined);
  const [delivered]=JSON.parse(reply.content[0].text).output.ports;
- const [view]=_meta.loginomNodeOutput.ports;
- assert.deepEqual(view.summary,{rowCount:120});
- assert.deepEqual(view.detail,{kind:'delivered',sample:[[makeCell('a')],[makeCell('b')]]});
- assert.deepEqual(view.detail.sample,delivered.sample);
- assert.deepEqual(view.expanded.sample,{targetRows:100,availableRows:2,limitation:'more_rows_not_delivered'});
- assert.deepEqual(view.expanded.columns,[{index:0,name:'item',label:'Item',type:'string'}]);
- assert.deepEqual(view.signals,[{kind:'seen_of_total',seen:2,total:120}]);
- assert.deepEqual(_meta.loginomNodeOutput.how.configuration,{kind:'row_filter',conditions:['confirmed']});
+ const node=receipt.outcome.output;
+ const metadata=loginomFeedMetadata(reply,{tool:options.tool,facts:{node:{ref:node.node},configuration:node.configuration}});
+ assert.deepEqual(reply,before);
+ const [port]=metadata.ports;
+ assert.equal(port.rowCount,120);
+ assert.deepEqual(port.details,{delivered:{kind:'preview'},sampleLimitation:'more_rows_not_delivered'});
+ assert.deepEqual(port.preview.sample,delivered.sample);
+ assert.equal(port.preview.schema[0].name,'item');
+ assert.deepEqual(metadata.evidence,[{kind:'tableRead',port:0,portGuid:port.guid,rowsRead:2,rowCount:120,executionId:metadata.executionId}]);
+ assert.equal(metadata.outputConfiguration.kind,'confirmed');
+ assert.deepEqual(metadata.outputConfiguration.readback.conditions,['confirmed']);
 });
 
 test('zero rows and NULL in read rows are distinct; zero and empty strings are not NULL',()=>{
- for(const [values,rowCount,signals] of [
-  [[],0,[{kind:'zero_rows'}]],
-  [[null,null],7,[{kind:'seen_of_total',seen:2,total:7},{kind:'null_in_read_rows',columns:[0]}]],
-  [[null,'0',''],3,[]],
-  [[],4,[{kind:'seen_of_total',seen:0,total:4}]],
+ for(const [values,rowCount,nullColumns] of [
+  [[],0,undefined],
+  [[null,null],7,[0]],
+  [[null,'0',''],3,undefined],
+  [[],4,undefined],
  ]){
-  const view=project(makeReceipt({values,rowCount}))._meta.loginomNodeOutput;
-  const [port]=view.ports;
-  assert.deepEqual(port.signals,signals);
-  assert.deepEqual(view.how.configuration,{kind:'row_filter',conditions:['confirmed']});
+  const [port]=project(makeReceipt({values,rowCount})).ports;
+  assert.equal(port.rowCount,rowCount);
+  assert.deepEqual(port.details.nullColumns,nullColumns);
  }
 });
 
 test('refused model delivery never publishes hidden rows or a claim about their NULLs',()=>{
  const receipt=makeReceipt({values:[null],rowCount:5});
  readPort(receipt).schema[0].label='x'.repeat(50000);
- const reply=project(receipt);
+ const reply=nodeResultReply(receipt,options);
  assert.equal(reply.isError,true);
- const [port]=reply._meta.loginomNodeOutput.ports;
- assert.deepEqual(port.detail,{kind:'unavailable',reason:'rows_not_delivered'});
- assert.equal(port.expanded.columns,null);
- assert.equal(port.expanded.columnsLimitation,'columns_projection_limit');
- assert.deepEqual(port.signals,[{kind:'seen_of_total',seen:0,total:5}]);
+ assert.equal(project(receipt),undefined);
 });
 
 test('expanded columns remain available when only the delivered rows exceed the budget',()=>{
- const receipt=makeReceipt({values:['x'.repeat(50000)],rowCount:1});
- receipt.outcome.output.configuration.readback={kind:'user_variables'};
- const reply=project(receipt);
- assert.equal(reply.isError,true);
- const [port]=reply._meta.loginomNodeOutput.ports;
- assert.deepEqual(port.detail,{kind:'unavailable',reason:'rows_not_delivered'});
- assert.deepEqual(port.expanded.columns,readPort(receipt).schema);
+ const receipt=makeReceipt({values:['x'.repeat(20000)],rowCount:1});
+ const metadata=project(receipt);
+ const [port]=metadata.ports;
+ assert.equal(metadata.outputConfiguration.kind,'confirmed');
+ assert.deepEqual(port.details.delivered,{kind:'unavailable',reason:'projection_limit'});
+ assert.deepEqual(JSON.parse(JSON.stringify(port.details.columns)),readPort(receipt).schema);
+ assert.ok(Buffer.byteLength(JSON.stringify(metadata))<=16384);
 });
 
-test('failure to build optional output metadata does not change the model reply',()=>{
- const receipt=makeReceipt({values:['visible']});
- assert.deepEqual(project(receipt,{inputCount:()=>{throw new Error('unavailable input evidence');}}),nodeResultReply(receipt,options));
+test('detail never substitutes the ten-row preview for all delivered rows or exposes redacted cells',()=>{
+ const values=Array.from({length:13},(_,index)=>'row '+index);
+ const receipt=makeReceipt({values});
+ const [port]=project(receipt).ports;
+ assert.equal(port.preview.sample.length,10);
+ assert.deepEqual(port.details.delivered,{kind:'rows',rows:values.map(value=>[makeCell(value)])});
+ readPort(receipt).schema[0].name='password';
+ const metadata=project(receipt);
+ assert.deepEqual(metadata.ports[0].details.delivered,{kind:'unavailable',reason:'rows_redacted'});
+ assert.ok(!JSON.stringify(metadata).includes('row 0'));
 });
 
 test('before and after uses the confirmed linked input, not a neighbouring receipt',()=>{
@@ -81,9 +85,11 @@ test('before and after uses the confirmed linked input, not a neighbouring recei
  const source=makeReceipt({values:[],rowCount:12,nodeId:'linked',executionId:'doc:root:1',portGuid:'input-source-port'});
  const unrelated=makeReceipt({values:[],rowCount:90,nodeId:'neighbour',executionId:'doc:root:2',portGuid:'neighbour-port'});
  const input={nodeId:'linked',portGuid:'input-source-port',inputPortGuid:'input-port',linkGuid:'link',executionId:'doc:root:1'};
- const resolve=receipts=>()=>receipts.map(receipt=>nodeInputCount(input,receipt,target.outcome.output.node)).find(Boolean);
- const getSignal=receipts=>project(target,{inputCount:resolve(receipts)})._meta.loginomNodeOutput.ports[0].signals.find(signal=>signal.kind==='before_after');
- assert.deepEqual(getSignal([unrelated,source]),{kind:'before_after',input:{...input,rowCount:12},after:3});
+ const resolve=receipts=>()=>receipts.map(receipt=>linkedInputReceipt(input,receipt,target.outcome.output.node)).find(Boolean);
+ const getSignal=receipts=>project(target,{inputReceipt:resolve(receipts)}).ports[0].details.input;
+ assert.deepEqual(getSignal([unrelated,source]),{operationId:'linked',executionId:input.executionId,portGuid:input.portGuid});
+ assert.equal(project(source).ports[0].rowCount,12);
+ assert.equal(project(target).ports[0].rowCount,3);
  readPort(source).port_guid='changed-port';
  assert.equal(getSignal([unrelated,source]),undefined);
 });
@@ -94,7 +100,7 @@ test('expanded read uses only the same execution, port, schema and confirmed cle
  const evidence={verified:true,cleanup_complete:true,output};
  const redactor=createRedactor(['fresh-data']);
  assert.deepEqual(JSON.parse(JSON.stringify(sampleFromReceipt(port,evidence,redactor))),{
-  rows:Array.from({length:100},()=>[makeCell('[redacted]')]),targetRows:100,
+  rows:Array.from({length:100},()=>[makeCell('[redacted]')]),
  });
  assert.equal(sampleFromReceipt(port,{...evidence,cleanup_complete:false},redactor),null);
  for(const changed of [{execution_id:'other'},{port_guid:'other'},{row_count:108},{schema:[{...port.schema[0],name:'other'}]}])

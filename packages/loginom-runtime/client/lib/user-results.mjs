@@ -1,6 +1,9 @@
+import {isDeepStrictEqual} from 'node:util';
 import {nodeOutputPortSchema,replacedLinksSchema} from './node-result-schema.mjs';
 import {budgetUserPreview,previewWireSize,USER_PREVIEW_WIRE_BUDGET} from './user-preview-budget.mjs';
 import {calculatorPrecisionWarnings} from './calculator-precision-warning.mjs';
+import {createRedactor} from './redact.mjs';
+import {confirmedTablePort,redactOutputRows,sensitiveOutputColumn} from './node-output-view.mjs';
 const pick = (value, keys) => Object.fromEntries(keys.filter(key => value?.[key] !== undefined).map(key => [key, value[key]]));
 export const userResultSchema = {
   type: 'object', required: ['result_version', 'operation_id'], additionalProperties: false,
@@ -136,66 +139,13 @@ function deliveredUpload(result,outcome) {
     +`not the delivery operation_id "${result.operation_id}".`};
 }
 
-export function confirmedTablePort(port,executionId) {
-  return port?.fresh===true&&port.freshness_basis==='completed_execution_port_source'
-    &&port.execution_id===executionId&&typeof port.port_guid==='string'&&!!port.port_guid
-    &&Number.isSafeInteger(port.port)&&port.port>=0&&Number.isSafeInteger(port.row_count)&&port.row_count>=0
-    &&Array.isArray(port.schema)&&Array.isArray(port.sample)&&port.sample.length<=Math.min(100,port.row_count);
-}
-
-export function nodeOutputView(result,delivered,inputCount,redactor) {
-  const outcome=result.outcome,node=outcome?.output,executionId=node?.execution?.execution_id;
-  if(result.state!=='settled'||outcome?.status!=='SUCCEEDED'||outcome.cleanup_complete!==true
-    ||node?.execution?.status!=='completed'||!executionId||!node.node)return;
-  const ports=(node.output?.ports??[]).filter(port=>confirmedTablePort(port,executionId)).map(port=>{
-    const visible=delivered?.output?.ports?.find(item=>item.port_guid===port.port_guid);
-    const sample=visible?.sample??[],exact=visible?.exact_table?.rows;
-    const rows=exact??sample,seen=rows.length;
-    const signals=[];
-    if(port.row_count===0)signals.push({kind:'zero_rows'});
-    else if(seen<port.row_count)signals.push({kind:'seen_of_total',seen,total:port.row_count});
-    const columns=visible?.schema??null;
-    const nullColumns=(columns??[]).flatMap((_,index)=>seen>0&&rows.every(row=>row[index]?.is_null===true)?[index]:[]);
-    if(nullColumns.length)signals.push({kind:'null_in_read_rows',columns:nullColumns});
-    const before=inputCount?.(port);
-    if(before)signals.push({kind:'before_after',input:before,after:port.row_count});
-    const targetRows=Math.min(port.row_count,100);
-    return {port:port.port,portGuid:port.port_guid,summary:{rowCount:port.row_count},
-      detail:visible?{kind:'delivered',sample,...(exact?{exactRows:exact}:{})}:{kind:'unavailable',reason:'rows_not_delivered'},
-      expanded:{sample:{targetRows,availableRows:seen,...(seen<targetRows?{limitation:'more_rows_not_delivered'}:{})},columns},signals};
-  });
-  if(!ports.length)return;
-  const view={version:1,operationId:result.operation_id,executionId,node:node.node,ports};
-  const fits=value=>Buffer.byteLength(JSON.stringify(value),'utf8')<=USER_PREVIEW_WIRE_BUDGET;
-  for(const port of ports){
-    if(port.expanded.columns)continue;
-    const schema=node.output.ports.find(output=>output.port_guid===port.portGuid).schema;
-    const columns=redactor?redactor.redact(schema):schema;
-    if(Array.isArray(columns))port.expanded.columns=columns;
-    if(!port.expanded.columns||!fits(view)){
-      port.expanded.columns=null;
-      port.expanded.columnsLimitation='columns_projection_limit';
-    }
-  }
-  const readback=node.configuration?.status==='applied'?node.configuration.readback:null;
-  if(readback){
-    try{
-      const configuration=redactor?redactor.redact(readback):readback;
-      const expanded={...view,how:{configuration}};
-      if(configuration?.type!=='redaction_failure'&&fits(expanded))return expanded;
-    }catch{}
-    return {...view,how:{configuration:null,limitation:'configuration_projection_limit'}};
-  }
-  return {...view,how:{configuration:null,limitation:'configuration_not_confirmed'}};
-}
-
-export function nodeInputCount(port,source,node) {
+export function linkedInputReceipt(port,source,node) {
   const outcome=source?.outcome,receipt=outcome?.output;
   if(outcome?.status!=='SUCCEEDED'||outcome.cleanup_complete!==true||receipt?.execution?.status!=='completed'
     ||receipt.execution.execution_id!==port.executionId||receipt.node?.node_id!==port.nodeId
     ||!['document_id','workflow_id'].every(key=>receipt.node[key]===node[key]))return;
   const output=receipt.output?.ports?.find(output=>output.port_guid===port.portGuid&&confirmedTablePort(output,port.executionId));
-  if(output)return {...port,rowCount:output.row_count};
+  if(output)return {operationId:source.id,executionId:port.executionId,portGuid:port.portGuid};
 }
 
 function previewLimitations(output) {
@@ -251,4 +201,220 @@ export function compactKnowledgeBundle(description) {
     node_types: description.node_types.map(node => pick(node, ['type', 'candidate_node_apply_available',
       'semantics', 'modes', 'limitations', 'knowledge_sha256', 'validated_for'])),
   };
+}
+
+const FEED_MAX_BYTES = 16 * 1024;
+const FEED_PREVIEW_MAX_BYTES = 12 * 1024;
+
+export function loginomSaveMetadata(outcome, {knownSecrets = [], receiptWindow} = {}) {
+  const path = outcome.output?.package_ref?.path;
+  if (outcome.status !== 'SUCCEEDED' || !['package.save_as', 'package.save_checkpoint'].includes(outcome.action_key)
+      || !outcome.operation_id || typeof path !== 'string' || !path || path !== outcome.output.package_ref.active_identity) return;
+  const graph = outcome.trace?.findLast(item => item.event === 'reopened_package_observed'
+    && item.actual_path === path && item.path_matches === true && item.graph_matches === true)?.graph;
+  const evidence = [{kind:'saved', path:[...createRedactor(knownSecrets).text(path).toWellFormed()].slice(0, 1000).join('')}];
+  if (outcome.output.reopened === true && Array.isArray(graph?.nodes))
+    evidence.push({kind:'savedGraphRead', nodeCount:graph.nodes.length, scope:'activeWorkflow'});
+  return {v:1, operationId:outcome.operation_id, state:'settled', status:'SUCCEEDED', kind:'save', evidence,
+    ...(receiptWindow?.documentId && {receiptWindow})};
+}
+
+export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts, inputReceipt}) {
+  const receipt = reply.structuredContent;
+  if (!['dock_node_apply', 'dock_node_wait', 'dock_node_status', 'dock_node_read', 'dock_node_resume', 'dock_node_cancel', 'dock_node_stop'].includes(tool)
+      || receipt?.result_version !== 'user-v1' || !['running', 'settled'].includes(receipt.state)
+      || typeof receipt.operation_id !== 'string' || !receipt.operation_id) return;
+
+  const redactor = createRedactor(knownSecrets);
+  const text = (value, max = 1000) => typeof value === 'string'
+    ? [...redactor.text(value).toWellFormed()].slice(0, max).join('') : undefined;
+  const reference = receipt.node ?? receipt.progress?.node;
+  const matchingFacts = facts && ['document_id','workflow_id','node_id']
+    .every(key => facts.node.ref[key] === (reference?.ref ?? reference)?.[key]) ? facts : undefined;
+  const node = matchingFacts?.node ?? reference;
+  const guid = node?.ref?.node_id ?? node?.node_id;
+  const label = text(node?.label);
+  const type = text(node?.type, 128);
+  const execution = receipt.execution ?? receipt.progress?.execution;
+  const state = receipt.state;
+  const succeeded = state === 'settled' && receipt.status === 'SUCCEEDED' && !reply.isError;
+  const result = {
+    v: 1, operationId: receipt.operation_id, state,
+    attempt: receipt.attempt, status: state === 'settled' ? receipt.status : undefined,
+    phase: text(receipt.phase ?? receipt.progress?.pending_phase, 128),
+    node: typeof guid === 'string' && guid && label !== undefined && type ? {guid, label, type} : undefined,
+    executionId: typeof execution?.execution_id === 'string' ? execution.execution_id : undefined, executionStatus: execution?.status,
+    effectPossible: receipt.effect_possible, cleanupComplete: receipt.cleanup_complete,
+    limitations: receipt.limitations?.slice(0, 8).map(value => text(value)),
+    nextStep: typeof receipt.next_step?.instruction === 'string'
+      ? {tool: text(receipt.next_step.tool, 128), instruction: text(receipt.next_step.instruction)} : undefined,
+  };
+  const error = receipt.error;
+  const native = error?.native;
+  const afterLaunch = native?.source === 'loginom_post_launch_error_toast' && native.attribution === 'own_action_wait';
+  const verified = error?.code === 'NODE_EXECUTION_FAILED'
+    && (native?.source === 'loginom_error_toast' || execution?.failure_verified === true);
+  if (state === 'settled' && error?.code) {
+    const message = text(afterLaunch ? native.message : error.message);
+    if (message) result.error = {code: text(error.code, 128), message,
+      source: afterLaunch || verified ? 'loginom' : 'runtime',
+      attribution: afterLaunch ? 'after_launch' : verified ? 'verified_node' : undefined};
+  }
+
+  const artifacts = succeeded ? receipt.output?.file_artifacts ?? [] : [];
+  const files = artifacts.flatMap(file => {
+    const verifiedFile = outputFiles.find(output => output.artifact_id === file.artifact_id);
+    return verifiedFile ? [{artifactId: file.artifact_id, name: text(verifiedFile.name), bytes: file.bytes}] : [];
+  });
+  if (files.length) result.files = files;
+  if (matchingFacts?.kind) result.kind = matchingFacts.kind;
+  else if (artifacts.length) result.kind = 'export';
+  else if (tool === 'dock_node_read') result.kind = 'read';
+  else if (execution?.execution_id || ['completed', 'failed', 'pending', 'cancelled'].includes(execution?.status)) result.kind = 'execute';
+  else if (receipt.configuration?.status === 'applied') result.kind = 'configure';
+
+  let ports = succeeded ? receipt.output?.ports : undefined;
+  if (succeeded && !ports && tool === 'dock_node_wait' && reply.content[0]?.type === 'text') {
+    try {
+      const delivered = JSON.parse(reply.content[0].text);
+      if (delivered.result_version === 'user-v1' && delivered.operation_id === receipt.operation_id
+        && delivered.attempt === receipt.attempt && delivered.state === state && delivered.status === receipt.status) ports = delivered.output?.ports;
+    } catch {}
+  }
+  const safeCount = value => Number.isSafeInteger(value) && value >= 0;
+  const boundTable = port => port.port_kind !== 'tree' && port.fresh === true && safeCount(port.port) && safeCount(port.row_count)
+    && typeof port.port_guid === 'string' && port.port_guid && Array.isArray(port.schema)
+    && (!execution?.execution_id || port.execution_id === execution.execution_id);
+  const tables = (ports ?? []).flatMap(port => {
+    if (!boundTable(port)) return [];
+    const table = {index: port.port, guid: port.port_guid, rowCount: port.row_count, columnCount: port.schema.length};
+    return [{table, port}];
+  });
+  if (tables.length) result.ports = tables.map(({table}) => table);
+
+  const evidence = [];
+  if (state === 'settled' && execution?.status === 'completed' && result.executionId
+      && matchingFacts?.launchedExecutionId === result.executionId) {
+    evidence.push({kind:'executed', executionId:result.executionId, scope:'workspace'});
+    if (safeCount(matchingFacts.executionWindow?.startedAt) && safeCount(matchingFacts.executionWindow?.confirmedAt))
+      result.receiptWindow = matchingFacts.executionWindow;
+  }
+  if (succeeded) for (const port of matchingFacts?.readPorts ?? ports ?? []) {
+    if (!boundTable(port)) continue;
+    const rowsRead = port.read_coverage?.rows_read ?? port.sample?.length;
+    if (!safeCount(rowsRead) || rowsRead > port.row_count) continue;
+    evidence.push({kind:'tableRead', port:port.port, portGuid:port.port_guid, rowsRead, rowCount:port.row_count,
+      executionId:result.executionId});
+  }
+  if (evidence.length) result.evidence = evidence;
+
+  const bytes = value => Buffer.byteLength(JSON.stringify(value), 'utf8');
+  // Reserve space for the receipt and table summaries before adding rows.
+  let blockRemaining = FEED_MAX_BYTES - bytes(result);
+  while (blockRemaining < 0 && result.limitations?.length) {
+    result.limitations.pop();
+    blockRemaining = FEED_MAX_BYTES - bytes(result);
+  }
+  for (const key of ['ports', 'files']) {
+    if (blockRemaining >= 0) break;
+    delete result[key];
+    blockRemaining = FEED_MAX_BYTES - bytes(result);
+  }
+  while (blockRemaining < 0 && result.evidence?.length) {
+    result.evidence.pop();
+    blockRemaining = FEED_MAX_BYTES - bytes(result);
+  }
+  if (blockRemaining < 0) return;
+  if (!result.ports) return result;
+
+  let previewRemaining = FEED_PREVIEW_MAX_BYTES;
+  const previewKeyBytes = ',"preview":'.length;
+  const columns = port => port.schema.map(column => ({index: column.index, name: text(column.name), label: text(column.label),
+    type: text(column.type, 128), data_kind: text(column.data_kind, 128)}));
+  for (const {table, port} of tables) {
+    const remaining = Math.min(previewRemaining, blockRemaining - previewKeyBytes);
+    if (remaining <= 0) break;
+    const rows = port.sample ?? [];
+    if (!rows.length && (table.rowCount !== 0 || !port.sample_complete)) continue;
+    const sensitive = port.schema.map(sensitiveOutputColumn);
+    const schema = columns(port);
+    const sample = [];
+    const preview = {schema, sample, sampleComplete: false};
+    if (bytes(preview) > remaining) continue;
+    for (const row of rows.slice(0, 10)) {
+      if (row.length !== schema.length) break;
+      sample.push(row.map((cell, index) => {
+        if (sensitive[index] && cell.is_null !== true) return {type: text(cell.type, 128), is_null: cell.is_null, value: '[redacted]'};
+        return Object.fromEntries(Object.entries(pick(cell, ['type', 'value', 'decimal', 'representation', 'display_text',
+          'precision', 'is_null', 'timezone', 'cell_type', 'non_finite'])).flatMap(([key, value]) =>
+          value === null || ['string', 'number', 'boolean'].includes(typeof value)
+            ? [[key, typeof value === 'string' ? redactor.text(value) : value]] : []));
+      }));
+      if (bytes(preview) > remaining) { sample.pop(); break; }
+    }
+    if (rows.length && !sample.length) continue;
+    preview.sampleComplete = port.sample_complete === true && sample.length === rows.length && sample.length === table.rowCount;
+    const previewBytes = bytes(preview);
+    previewRemaining -= previewBytes;
+    blockRemaining -= previewBytes + previewKeyBytes;
+    table.preview = preview;
+  }
+  if (execution?.status !== 'completed' || receipt.cleanup_complete !== true) return result;
+  const confirmed = tables.filter(({port}) => confirmedTablePort(port, result.executionId));
+  if (!confirmed.length) return result;
+  const fits = () => bytes(result) <= FEED_MAX_BYTES;
+  const configuration = matchingFacts?.configuration ?? receipt.configuration;
+  const readback = configuration?.status === 'applied' ? configuration.readback : undefined;
+  result.outputConfiguration = {kind:'unavailable', reason:readback ? 'projection_limit' : 'configuration_not_confirmed'};
+  if (!fits()) delete result.outputConfiguration;
+
+  for (const {table, port} of confirmed) {
+    const rows = port.exact_table?.rows ?? port.sample;
+    const samePreview = isDeepStrictEqual(rows, JSON.parse(JSON.stringify(table.preview?.sample ?? null)));
+    const details = {
+      delivered:{kind:'unavailable',reason:'projection_limit'},
+      ...(rows.length < Math.min(100,port.row_count) && {sampleLimitation:'more_rows_not_delivered'}),
+      ...(!table.preview && {columnsLimitation:'projection_limit'}),
+    };
+    table.details = details;
+    if (!fits()) {
+      delete table.details;
+      continue;
+    }
+    const nullColumns = port.schema.flatMap((_,index) => rows.length && rows.every(row=>row[index]?.is_null===true) ? [index] : []);
+    if (nullColumns.length) {
+      details.nullColumns = nullColumns;
+      if (!fits()) delete details.nullColumns;
+    }
+    let input;
+    try { input = inputReceipt?.(port); } catch {}
+    if (input) {
+      details.input = input;
+      if (!fits()) delete details.input;
+    }
+    if (!table.preview) {
+      details.columns = columns(port);
+      if (fits()) delete details.columnsLimitation;
+      else delete details.columns;
+    }
+    const fallback = details.delivered;
+    if (samePreview) details.delivered = {kind:'preview'};
+    else if (bytes(rows) <= FEED_MAX_BYTES) {
+      const safeRows = JSON.stringify(redactOutputRows(rows,port.schema,redactor)) === JSON.stringify(rows);
+      details.delivered = safeRows ? {kind:'rows',rows} : {kind:'unavailable',reason:'rows_redacted'};
+    }
+    if (!fits()) details.delivered = fallback;
+  }
+  if (readback) {
+    const fallback = result.outputConfiguration;
+    const safe = redactor.redact(readback,{preserveJsonText:true});
+    if (safe?.type !== 'redaction_failure') {
+      result.outputConfiguration = {kind:'confirmed',readback:safe};
+      if (!fits()) {
+        if (fallback) result.outputConfiguration = fallback;
+        else delete result.outputConfiguration;
+      }
+    }
+  }
+  return result;
 }

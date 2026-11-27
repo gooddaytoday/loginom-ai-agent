@@ -26,8 +26,8 @@ import { makeWorkspaceBootstrapCode, packageReadOnlyAdvice } from './workspace.m
 import { createNodeProcedure } from './node-procedure.mjs';
 import {makeNodePortOutputCode} from './node-port-output.mjs';
 import {readQualityPortOutput} from './quality-moda.mjs';
-import {confirmedTablePort,nodeInputCount} from './user-results.mjs';
-import {sampleFromReceipt} from './node-output-view.mjs';
+import {linkedInputReceipt} from './user-results.mjs';
+import {confirmedTablePort,sampleFromReceipt} from './node-output-view.mjs';
 import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow, releaseNodeApply, NodeVariableInputError } from './node-apply.mjs';
 import {reconcileOutputMappingPhase} from './node-output-mapping-recovery.mjs';
 import {reconcileInputMappingPhase} from './node-input-mapping-recovery.mjs';
@@ -3783,8 +3783,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const incoming=operation.targetPhase?.final_graph?.links.filter(link=>link.target===witness.binding.node.node_id);
       if(incoming?.length!==1||incoming[0].source!==witness.input.nodeId)return;
       for(const source of operations.values()){
-        const count=nodeInputCount(witness.input,source,witness.binding.node);
-        if(count)return count;
+        const receipt=linkedInputReceipt(witness.input,source,witness.binding.node);
+        if(receipt)return receipt;
       }
     },
     async readNodeOutput(receipt) {
@@ -4903,6 +4903,20 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return value(...args);
     }]));
   return Object.freeze({...exposed,...browserRecoveryApi,
+    nodeFeedFacts:id=>{
+      const operation=operations.get(id),state=operation?.nodeApply;
+      const observed=state?.phases.find(phase=>phase.phase==='target')?.value?.target?.node;
+      if(!observed||observed.ref?.node_id!==state.node?.node_id)return;
+      const finish=state.phases.find(phase=>phase.phase==='finish')?.value;
+      const label=finish?.node_label??observed.label;
+      const request=state.request;
+      const kind=request.mode===NODE_READ_MODE?'read':request.mode==='add_only'?'add':request.finish==='execute'
+        ?observed.type?.startsWith('exports.')?'export':'execute'
+        :request.finish==='done'?'configure':undefined;
+      return {node:{ref:observed.ref,label,type:observed.type},kind,configuration:operation.outcome?.output?.configuration,
+        launchedExecutionId:finish?.mode==='execute'?finish.execution_id:undefined,readPorts:state.output?.ports,
+        executionWindow:{documentId:observed.ref.document_id, startedAt:state.execution_started_at, confirmedAt:state.execution_completed_at}};
+    },
     // Host lifecycle cleanup must bypass the user mutation facade. A retained
     // node/recovery gate still blocks package cleanup; it cannot block draining
     // the owned worker or removing its private local download cache.

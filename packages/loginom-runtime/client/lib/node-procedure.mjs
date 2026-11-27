@@ -287,7 +287,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(request.requireExactNumbers===true&&['transform.collapse_columns','transform.replace_columns','transform.group_data','transform.sorting','trees.to_table'].includes(readType))
         request={...request,typedVariants:true,...(readType==='transform.replace_columns'?{variantEmptyIsNull:true}:{})};
       if(!preparedNodeContext)throw Error('Prepared node required for direct output read');
-      if(operation.nodeOutputWitnesses&&operation.parameters.finish==='execute')request={...request,captureInput:true};
+      const finish=operation.nodeOutputWitnesses&&operation.nodeApply?.phases.find(phase=>phase.phase==='finish')?.value;
+      if(finish?.mode==='execute'&&finish.execution_id===request.execution.execution_id)request={...request,captureInput:true};
       const code=makeNodePortOutputCode(preparedNodeContext,request,{origin:targetOrigin,build:targetBuild,deadline:operation.deadline});
       snapshot=null;evidenceSnapshot=null;
       // Only an actual dispatch invalidates the previous read's cleanup proof.

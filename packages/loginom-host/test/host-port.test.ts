@@ -47,7 +47,7 @@ test.each(["finish", "reject", "release", "close", "uncertain", "disconnect", "k
         if (m.operation === 'close') { owner.port1.close(); owner.port2.close(); process.send({id:m.id,result:{closed:true}},()=>process.disconnect()); }
         if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
         if (m.operation === 'nodeOutput') process.send({id:m.id,result:m.input.operationId==='confirmed'&&m.input.executionId==='execution'&&m.input.portGuid==='port'
-          ?{rows:[[{value:'live sample'}]],targetRows:1}:null});
+          ?{rows:[[{value:'live sample'}]]}:null});
         if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
         if (m.operation !== 'call') return;
         const action = m.input.arguments.action;
@@ -137,7 +137,7 @@ test.each(["finish", "reject", "release", "close", "uncertain", "disconnect", "k
           const sample = (session: string, generation: number) => client.request("nodeOutput", {
             run: "ui-read", session, receipt: { ...receipt, generation },
           })
-          expect(await sample("chat", 1)).toEqual({ rows: [[{ value: "live sample" }]], targetRows: 1 })
+          expect(await sample("chat", 1)).toEqual({ rows: [[{ value: "live sample" }]] })
           expect(await sample("another-chat", 1)).toBeNull()
           expect(await sample("chat", 2)).toBeNull()
         }

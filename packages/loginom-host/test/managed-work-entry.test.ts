@@ -95,12 +95,15 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
        export const artifactFailure=artifacts.artifactFailure ?? (()=>null);`,
     "runtime/client/lib/bridge.mjs": `
       import { readFileSync } from 'node:fs';
+      import { loginomFeedMetadata } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/user-results.mjs", import.meta.url).href)};
       const work = () => JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8'));
-      export async function createBridge() { return {
+      export async function createBridge(_config, _session, {presentNodeReply}) { return {
         server: { connect: async () => {} }, close: async () => ({
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
+        applyWithScanReceipt: reply => presentNodeReply(reply, options =>
+          loginomFeedMetadata(reply, {...options, tool:'dock_node_apply'})),
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
           return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
@@ -147,7 +150,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     stateDir: join(directory, "state"),
     generation: 1,
     chat: "chat",
-    connection: { url: "http://example.test", username: "user", apiKey: "fixture", password: "" },
+    connection: { url: "http://example.test", username: "test", apiKey: "fixture", password: "private-password" },
     environment: {},
   })
   try {
@@ -175,6 +178,53 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       result: { content: [{ type: "text", text: JSON.stringify({ args, pair: packageArtifact, private: true }) }] },
       recoveryPending: false,
       activeWork: false,
+    })
+    const receipt = {
+      result_version: "user-v1",
+      operation_id: "test-operation",
+      state: "settled",
+      status: "SUCCEEDED",
+      node: { node_id: "node-guid", label: "test node", type: "transform.filter_data" },
+      output: {
+        ports: [
+          {
+            port: 0,
+            port_guid: "port-guid",
+            fresh: true,
+            row_count: 3,
+            sample_complete: true,
+            schema: [{ index: 0, name: "test_name", type: "string" }],
+            sample: ["contest result", "fixture", "private-password"].map((value) => [{ type: "string", value }]),
+          },
+        ],
+      },
+    }
+    const content = [{ type: "text", text: JSON.stringify(receipt) }]
+    expect(
+      await runtime.request("call", {
+        name: "dock_node_apply",
+        arguments: { content, structuredContent: receipt },
+        scanReceipt: {},
+      }),
+    ).toMatchObject({
+      result: {
+        content,
+        _meta: {
+          loginom: {
+            operationId: "test-operation",
+            node: { label: "test node" },
+            evidence: [{ kind: "tableRead", port: 0, portGuid: "port-guid", rowsRead: 3, rowCount: 3 }],
+            ports: [
+              {
+                preview: {
+                  schema: [{ name: "test_name" }],
+                  sample: [[{ value: "contest result" }], [{ value: "[redacted]" }], [{ value: "[redacted]" }]],
+                },
+              },
+            ],
+          },
+        },
+      },
     })
     const call = runtime
       .request("call", { name: "fixture", arguments: { hold: true } })
@@ -315,7 +365,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       expect(error).toMatchObject({ message: code })
       if (name === "oversize")
         expect(error).toMatchObject({ details: { actual: 16 * 1024 * 1024 + 1, limit: 16 * 1024 * 1024 } })
-      const text = error instanceof Error ? error.message + JSON.stringify("details" in error ? error.details : undefined) : String(error)
+      const text =
+        error instanceof Error
+          ? error.message + JSON.stringify("details" in error ? error.details : undefined)
+          : String(error)
       expect(text).toContain(code)
       expect(text).not.toMatch(/secret|sourcePath|\/private|stack|AAAA/)
       expect(host.journal.pending()).toEqual([])

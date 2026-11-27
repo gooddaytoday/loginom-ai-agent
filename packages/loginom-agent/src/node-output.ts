@@ -2,13 +2,8 @@ import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import type { Plugin } from "@opencode/plugin"
 import { Session } from "@opencode/schema/session"
 import { Schema } from "effect"
+import { LoginomMetadata } from "./loginom-metadata"
 
-const View = Schema.Struct({
-  version: Schema.Literal(1),
-  operationId: Schema.NonEmptyString,
-  executionId: Schema.NonEmptyString,
-  ports: Schema.Array(Schema.Struct({ port: Schema.Int, portGuid: Schema.NonEmptyString })),
-})
 const Request = Schema.Struct({
   sessionID: Session.ID,
   messageID: Schema.NonEmptyString,
@@ -35,12 +30,11 @@ export const nodeOutputRpc = {
         anyOf: [
           {
             type: "object",
-            required: ["kind", "rows", "targetRows"],
+            required: ["kind", "rows"],
             additionalProperties: false,
             properties: {
               kind: { const: "available" },
               rows: { type: "array", maxItems: 100, items: { type: "array" } },
-              targetRows: { type: "integer", minimum: 0, maximum: 100 },
               limitation: { const: "preview_limit" },
             },
           },
@@ -57,7 +51,7 @@ export const nodeOutputRpc = {
   events: {},
 } as const
 
-export function isNodeOutputTool(name: string) {
+function isNodeOutputTool(name: string) {
   return /^loginom_dock_node_(apply|wait|status|read|resume|cancel|stop)$/.test(name)
 }
 
@@ -77,14 +71,23 @@ export async function readNodeOutput(
   const metadata = call.state.metadata
   const view = metadata?.loginom
   const generation = metadata?.generation
-  if (typeof generation !== "number" || !Schema.is(View)(view)) return unavailable
-  const port = view.ports.find((item) => item.port === value.port)
+  if (
+    typeof generation !== "number" ||
+    !Schema.is(LoginomMetadata)(view) ||
+    view.state !== "settled" ||
+    view.status !== "SUCCEEDED" ||
+    view.cleanupComplete !== true ||
+    view.executionStatus !== "completed" ||
+    !view.executionId
+  )
+    return unavailable
+  const port = view.ports?.find((item) => item.index === value.port)
   if (!port) return unavailable
   const sample = await read(value.sessionID, {
     generation,
     operationId: view.operationId,
     executionId: view.executionId,
-    portGuid: port.portGuid,
+    portGuid: port.guid,
   }).catch(() => null)
   return sample ? { kind: "available", ...sample } : unavailable
 }
