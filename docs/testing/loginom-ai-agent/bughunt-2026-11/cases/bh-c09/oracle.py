@@ -22,7 +22,10 @@ for row in read(ROOT / "data/orders.csv"):
 months = sorted({month for category, month in cells})
 rows = [{"Category": category, **{month: float(cells[category, month]) for month in months}}
         for category in sorted({category for category, month in cells})]
-columns = [("Category", "string"), *[(month, "real") for month in months]]
+columns = [
+    {"name": "Category", "label": "Category", "type": "string"},
+    *[{"name": month, "label": month, "type": "real", "name_any": True} for month in months],
+]
 nodes = ["imports.text", "transform.join_data", "transform.calculator", "transform.group_data", "transform.cross_table", "exports.text"]
 ordered = True
 
@@ -32,7 +35,8 @@ expected = {
     "outputs": [] if not columns else [{
         "output_node_type": "export_input", "ordered": ordered,
         "export_destination": "/bughunt/" + ROOT.name + ".csv",
-        "columns": [{"name": name, "label": name, "type": kind} for name, kind in columns],
+        "column_order": "exact",
+        "columns": columns,
         "rows": rows,
     }],
 }
