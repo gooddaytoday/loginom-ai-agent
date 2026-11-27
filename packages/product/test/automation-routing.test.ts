@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url"
 const root = new URL("../skills/loginom-automation/", import.meta.url)
 const skill = await Bun.file(new URL("SKILL.md", root)).text()
 
-test("automation entry stays below 40 KB as the node catalog grows", () => {
-  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(40_000)
+test("automation entry stays within 39 KB as the node catalog grows", () => {
+  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(39_000)
   const fileScope = "Файлы задания ищи только в рабочем каталоге и по точным путям из задания."
   expect(skill).toContain(fileScope)
   expect(skill).toContain("В CLI `glob`, `read`, `list` вне рабочего каталога отклоняются и обрывают прогон.")
@@ -63,14 +63,14 @@ test('node selection preserves the standard-node restriction', () => {
   expect(skill).toContain('Для операций ниже используй указанные штатные узлы и режимы, без замены Калькулятором или JavaScript')
 })
 
-test("final message leaves package cleanup to the host and never links server paths", () => {
+test("final message reports the saved path and requires confirmation of cleanup", () => {
   const finish = skill.slice(skill.indexOf("## Завершение"))
-  // The host closes the saved package and logs out after the answer; no tool does it.
-  expect(finish).toContain("закрытие и выход выполнит приложение")
-  expect(finish).toContain("не пиши, что пакет останется открытым")
+  expect(finish).toContain("После подтверждённого Save сообщи")
+  expect(finish).toContain("Пакет сохранён в `<полный серверный путь .lgp>`")
+  expect(finish).toContain("Сообщай о закрытии или выходе только после подтверждения")
+  expect(finish).not.toContain("закрытие и выход выполнит приложение")
   // Export results carry artifact_id/destination, not a download URL.
   expect(finish).toContain("серверный путь пиши в `коде`, не ссылкой")
-  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(40_000)
 })
 
 test("the final report uses results collected before saving", () => {
