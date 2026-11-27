@@ -27,14 +27,18 @@ const setup: Plugin.MainSetup = async (ctx) => {
     from: { settings: "ready", file: "loginom-ai-agent.updater" },
   })
 
-  // electron-updater loads only in packaged builds, after the first window is up.
-  const platform = enabled
-    ? await import("./platform").then((module) => runPromise(module.make(build.channel, feed)))
-    : undefined
-
   if (ctx.signal.aborted) return
   const scope = Scope.makeUnsafe()
   ctx.onCleanup(() => runPromise(Scope.close(scope, Exit.void)))
+
+  // electron-updater loads only in packaged builds, after the first window is up.
+  const platform = enabled
+    ? await import("./platform").then((module) =>
+        runPromise(module.make(build.channel, feed).pipe(Scope.provide(scope))),
+      )
+    : undefined
+
+  if (ctx.signal.aborted) return
   const publish = { changed: () => {} }
 
   const updater = await runPromise(

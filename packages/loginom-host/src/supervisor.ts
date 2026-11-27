@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import { appendFile, mkdir, writeFile } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
 import { hostError, hostException } from "./errors"
+import { runtimeNoProxyKey } from "./system-proxy/environment"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { recordLocalDiagnostics } from "../../loginom-runtime/client/lib/local-diagnostics.mjs"
 
@@ -78,6 +79,14 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
     "NODE_USE_ENV_PROXY",
     "LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT",
   ]
+  const runtimeNoProxy = environment[runtimeNoProxyKey]
+  const runtimeProxy = () => {
+    if (runtimeNoProxy === undefined) return env
+    for (const key of ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "NODE_USE_ENV_PROXY"]) delete env[key]
+    env.NO_PROXY = runtimeNoProxy
+    if (platform !== "win32") env.no_proxy = runtimeNoProxy
+    return env
+  }
   if (platform === "linux")
     keys.push(
       "DISPLAY",
@@ -99,12 +108,12 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
         const name = key.toUpperCase()
         if (allowed.has(name) && environment[key] && !(name in env)) env[name] = environment[key]
       })
-    return env
+    return runtimeProxy()
   }
   keys.forEach((key) => {
     if (environment[key]) env[key] = environment[key]
   })
-  return env
+  return runtimeProxy()
 }
 
 // One browser child per generation/chat; knowledge has one child per generation.

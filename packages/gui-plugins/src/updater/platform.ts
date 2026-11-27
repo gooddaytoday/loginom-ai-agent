@@ -1,11 +1,12 @@
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
-import { app, autoUpdater } from "electron"
+import { app, autoUpdater, type AuthInfo } from "electron"
 import pkg from "electron-updater"
 import { Effect } from "effect"
 import { Product } from "@loginom-ai-agent/product"
 import { isProductBuild } from "./feed"
 import type { Platform } from "./machine"
+import { updateProxy } from "./proxy"
 
 const updateClient = pkg.autoUpdater
 
@@ -18,6 +19,20 @@ const unpackTimeout = 120_000
 export const make = Effect.fn("Updater.platform")(function* (channel: string, feed: string) {
   const userAgent = `${Product.slug}/${channel === "prod" ? "latest" : channel}/${app.getVersion()}/desktop`
   const runFork = Effect.runForkWith(yield* Effect.context())
+  let credentials: ReturnType<typeof updateProxy>["credentials"] | undefined
+  const login = (auth: AuthInfo, callback: (username: string, password: string) => void) => {
+    const selected = credentials?.(auth)
+    callback(selected?.username ?? "", selected?.password ?? "")
+  }
+
+  yield* Effect.acquireRelease(
+    Effect.sync(() => updateClient.on("login", login)),
+    () =>
+      Effect.sync(() => {
+        updateClient.off("login", login)
+      }),
+  )
+
   updateClient.logger = {
     info: (...args) => runFork(Effect.logInfo(...args)),
     warn: (...args) => runFork(Effect.logWarning(...args)),
@@ -42,6 +57,10 @@ export const make = Effect.fn("Updater.platform")(function* (channel: string, fe
   return {
     checkForUpdate: Effect.tryPromise({
       try: async () => {
+        const proxy = updateProxy(process.env)
+        credentials = proxy.credentials
+        await updateClient.netSession.setProxy(proxy.config)
+        await updateClient.netSession.closeAllConnections()
         const result = await updateClient.checkForUpdates()
 
         if (!result?.isUpdateAvailable) return undefined
