@@ -99,8 +99,6 @@
         "packages/app/src/shell/routes/session-ui-provider.tsx",
         "packages/gui-plugins/AGENTS.md",
         "packages/gui-plugins/README.md",
-        "packages/gui-plugins/src/renderer.ts",
-        "packages/gui-plugins/src/main.ts",
         "packages/plugin/src/gui/builtin.ts",
         "packages/session-ui/src/context/data.tsx",
         "packages/session-ui/src/timeline-next/projection.ts",
@@ -117,8 +115,6 @@
       "id": "CAT-21",
       "title": "Built-in plugin top-level pages",
       "paths": [
-        "packages/app/src/runtime/plugin/host-apis.tsx", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/main.ts",
-        "packages/gui-plugins/src/browser/panel.fixture.tsx",
         "packages/app/src/shell/routes/routes.tsx", "packages/app/src/shell/state/layout.tsx",
         "packages/app/src/shell/state/layout.test.ts", "packages/app/vite.config.ts",
         "packages/plugin/src/gui/host-apis.ts",

@@ -15,6 +15,7 @@ for (const width of [1280, 390]) {
     const added = "Проверка пустых значений"
     const removed = "Промежуточная выгрузка"
     const filter = "Фильтр по дате"
+    const importer = "CSV продаж"
 
     await card.getByText("Изменённые узлы", { exact: true }).click()
     await card
@@ -25,6 +26,15 @@ for (const width of [1280, 390]) {
     const fromCard = fact(card.getByRole("table", { name: tableName }), port)
     await expect(fromCard.getByRole("cell")).toHaveText([/← «CSV продаж»/, /← «Проверка пустых значений»/])
     const cardValues = await fromCard.getByRole("cell").allTextContents()
+    const importRow = card
+      .getByRole("listitem")
+      .filter({ has: page.getByText(importer, { exact: true }).and(page.locator("strong")) })
+    await importRow.getByText(tableName, { exact: true }).click()
+    const file = (parent: Locator) => fact(parent.getByRole("table", { name: tableName }), "Имя файла/URL")
+    const safeSource = "https://imports.example.invalid/sales.csv"
+    const hiddenSource = /demo-user|demo-pass|fixture-query|fixture-fragment/
+    await expect(file(importRow).getByRole("cell")).toContainText([safeSource, "Обновлённые продажи.csv"])
+    await expect(card).not.toContainText(hiddenSource)
 
     await card.getByRole("button", { name: "Посмотреть на схеме" }).click()
 
@@ -55,6 +65,9 @@ for (const width of [1280, 390]) {
     await expect(fact(table, "Вход «Источник данных»").getByRole("cell")).toHaveText([/← «Фильтр по дате»/, /—/])
     await node(filter).click()
     await expect(fact(table, "Условие").getByRole("cell")).toHaveText([/Выручка больше 0/, /Выручка больше 100/])
+    await node(importer).click()
+    await expect(file(schema).getByRole("cell")).toContainText([safeSource, "Обновлённые продажи.csv"])
+    await expect(schema).not.toContainText(hiddenSource)
     await node(group).click()
     await expect(node(group)).toHaveAttribute("aria-pressed", "true")
     const inDiagram = fact(table, port)
@@ -81,9 +94,12 @@ for (const width of [1280, 390]) {
     await beforeDiagram.getByRole("button", { name: filter }).click()
     await expect(schema.getByText("Выручка > 0", { exact: true })).toBeVisible()
     await expect(schema.getByText("Выручка > 100", { exact: true })).toHaveCount(0)
+    await beforeDiagram.getByRole("button", { name: importer, exact: true }).click()
+    await expect(schema.getByText(safeSource, { exact: true })).toBeVisible()
+    await expect(schema).not.toContainText(hiddenSource)
 
     await withChanges.click()
-    await expect(node(filter)).toHaveAttribute("aria-pressed", "true")
+    await expect(node(importer)).toHaveAttribute("aria-pressed", "true")
     await schema.getByRole("button", { name: "Сохранить новой версией" }).click()
     await expect(schema.getByRole("status")).toHaveText("Сохранено новой версией: Продажи — v2.lgp")
     await schema.getByRole("button", { name: "Вернуться к разговору" }).click()
@@ -95,5 +111,16 @@ for (const width of [1280, 390]) {
       { method: "save-version", input: { sessionID } },
       { method: "undo-save", input: { sessionID, path: version } },
     ])
+  })
+}
+
+for (const diagram of ["unrelated", "missing-lineage"] as const) {
+  test(`uses recorded edits only when the saved diagrams have ${diagram} provenance`, async ({ page }) => {
+    const { card } = await setupPackageChanges(page, { diagram })
+    await card.getByText("Изменённые узлы", { exact: true }).click()
+    await expect(card.getByText("Ручная правка", { exact: true })).toBeVisible()
+    await expect(card.getByText("Проверка пустых значений", { exact: true })).toHaveCount(0)
+    await expect(card.getByText("Промежуточная выгрузка", { exact: true })).toHaveCount(0)
+    await expect(card.getByRole("button", { name: "Посмотреть на схеме" })).toHaveCount(0)
   })
 }

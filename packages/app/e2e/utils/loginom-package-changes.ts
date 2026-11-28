@@ -88,7 +88,8 @@ function changeFacts() {
   const newInput = { ...oldInput, source: added.guid, output: "missing-out" }
   const toAdded = { ...oldInput, target: added.guid, input: "missing-in" }
 
-  const snapshot = (nodes: JsonValue[], links: (typeof oldInput)[]): JsonValue => ({
+  const snapshot = (packagePath: string, nodes: JsonValue[], links: (typeof oldInput)[]): JsonValue => ({
+    packagePath,
     source: "saved",
     scope: "package",
     complete: true,
@@ -113,8 +114,9 @@ function changeFacts() {
       { kind: "link_added", link: newInput, sourceLabel: added.label, targetLabel: revenue.label },
     ],
     schemas: {
-      before: snapshot([importer, filter, revenue, removed], [toFilter, oldInput]),
+      before: snapshot(original, [importer, filter, revenue, removed], [toFilter, oldInput]),
       after: snapshot(
+        copy,
         [{ ...importer, text_import: { ...importer.text_import, column_separator: "," } }, filter, added, revenue],
         [toFilter, toAdded, newInput],
       ),
@@ -130,7 +132,7 @@ export async function setupPackageChanges(
     stale?: boolean
     schema?: boolean
     facts?: boolean
-    diagram?: boolean
+    diagram?: boolean | "unrelated" | "missing-lineage"
   } = {},
 ) {
   const calls: { method: string; input: unknown }[] = []
@@ -169,10 +171,27 @@ export async function setupPackageChanges(
 
   if (options.facts) Object.assign(changes, changeFacts())
 
-  if (options.diagram) Object.assign(changes, { edits: [], schemas: packageSchemaDiffFixture() })
+  if (options.diagram) {
+    const { before, after } = packageSchemaDiffFixture()
+    Object.assign(changes, {
+      edits:
+        options.diagram === true
+          ? []
+          : [{ kind: "node_renamed", guid: "manual", from: "Вручную", to: "Ручная правка" }],
+      schemas: {
+        before: { ...before, packagePath: options.diagram === "unrelated" ? "/other/Продажи.lgp" : original },
+        after: { ...after, packagePath: copy },
+      },
+    })
+  }
 
   if (options.schema) Object.assign(changes, { schemaUrl })
-  const metadata = { loginom: { packageChanges: changes } }
+  const metadata = {
+    loginom: {
+      ...(options.diagram === "missing-lineage" ? {} : { agentCopy: { originalPath: original, path: copy } }),
+      packageChanges: changes,
+    },
+  }
 
   const messages = [
     userMessage([userText("Внеси улучшения в сценарий продаж.")]),
@@ -203,9 +222,9 @@ export async function setupPackageChanges(
 
       if (method === "replace-original" && options.busy)
         return new MockRpcError({
-          type: "loginom.package-copy.failed",
+          type: "package_busy",
           message: "Package busy",
-          data: { code: "PACKAGE_BUSY" },
+          data: { packagePath: original, kind: "read_only", lockMarker: "unknown" },
         })
 
       if (method === "save-version") return { output: { path: version, name: "Продажи — v2.lgp" } }

@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 import { schemaNodeChanges } from "./compare-schemas"
 import type { SchemaPair } from "./schema-contract"
 import {
@@ -60,8 +60,16 @@ const run = Schema.Struct({
   }),
 })
 
+const packagePath = Schema.String.check(
+  Schema.isMaxLength(1024),
+  Schema.isPattern(/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+\.lgp$/i),
+  Schema.makeFilter((path) => !path.split("/").some((part) => part === "." || part === "..")),
+)
+const AgentCopy = Schema.Struct({ originalPath: packagePath, path: packagePath })
+
 const metadata = Schema.Struct({
   loginom: Schema.Struct({
+    agentCopy: Schema.optionalKey(Schema.Unknown),
     packageChanges: Schema.Struct({
       v: Schema.Literal(1),
       sessionID: Schema.NonEmptyString,
@@ -82,7 +90,28 @@ export type PackageChanges = typeof metadata.Type.loginom.packageChanges
 
 export type ChangesWithSchema = PackageChanges & { schemaDiff: SchemaPair }
 
-export const decodePackageChanges = Schema.decodeUnknownOption(metadata)
+const decodeMetadata = Schema.decodeUnknownOption(metadata)
+
+export function decodePackageChanges(value: unknown): PackageChanges | undefined {
+  const decoded = Option.getOrUndefined(decodeMetadata(value))
+  if (!decoded) return
+
+  const { agentCopy, packageChanges: changes } = decoded.loginom
+  const { schemas } = changes
+
+  // Capture paths identify the exact saved files read by the producer. Names and GUIDs can be shared by copies.
+  if (
+    schemas &&
+    Schema.is(AgentCopy)(agentCopy) &&
+    agentCopy.originalPath !== agentCopy.path &&
+    agentCopy.path === changes.copyPath &&
+    schemas.before.packagePath === agentCopy.originalPath &&
+    schemas.after.packagePath === agentCopy.path
+  )
+    return changes
+
+  return { ...changes, schemas: undefined }
+}
 
 type Reason = { kind: "renamed"; from: string } | { kind: "moved" | "links" | "settings" }
 

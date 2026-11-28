@@ -31,23 +31,18 @@ export const decodeReplaced = Schema.decodeUnknownSync(replaced)
 export const decodeRestored = Schema.decodeUnknownSync(restored)
 export const decodeEmpty = Schema.decodeUnknownSync(empty, { onExcessProperty: "error" })
 
-const error = Schema.decodeUnknownOption(
-  Schema.Struct({
-    type: Schema.String,
-    data: Schema.optionalKey(Schema.Struct({ code: Schema.String })),
-  }),
-)
+const error = Schema.decodeUnknownOption(Schema.Struct({ type: Schema.String }))
 
 export function rpcFailure(value: unknown) {
   const failure = Option.getOrUndefined(error(value))
-  switch (failure?.data?.code ?? failure?.type) {
-    case "PACKAGE_BUSY":
+  switch (failure?.type) {
+    case "package_busy":
       return "busy"
-    case "PATH_EXISTS":
+    case "path_exists":
       return "exists"
-    case "FORBIDDEN":
+    case "access_denied":
       return "forbidden"
-    case "COPY_NOT_FOUND":
+    case "copy_missing":
       return "noCopy"
     default:
       return "unconfirmed"

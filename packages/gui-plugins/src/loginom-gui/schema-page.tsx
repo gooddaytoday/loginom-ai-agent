@@ -10,6 +10,7 @@ import { createPackageChangeActions, PackageChangeActions } from "./package-chan
 import { nodeRows, type ChangesWithSchema } from "./package-changes-data"
 import { FactsTable } from "./facts-table"
 import type en from "./i18n/en"
+import { importSourceLabel } from "./import-source-label"
 import type { Event, Request, State } from "./schema-machine"
 
 type Translate = (key: keyof typeof en, args?: Record<string, string | number>) => string
@@ -108,7 +109,7 @@ function settings(node: Node, translate: Translate) {
     { label: translate("condition"), value: conditions || undefined },
     { label: translate("keys"), value: groups || undefined },
     { label: translate("measures"), value: measures || undefined },
-    { label: translate("file"), value: node.text_import?.file_or_url },
+    { label: translate("file"), value: importSourceLabel(node.text_import?.file_or_url) },
     { label: translate("separator"), value: separator },
   ].filter((setting) => setting.value !== undefined)
 }

@@ -1,7 +1,6 @@
 import { CodeBlock, Slot, Style, type MountedSession, type Plugin } from "@opencode/plugin/gui"
 import { Page, ToolRenderer, builtinContext } from "@opencode/plugin/gui/builtin"
 import { Button } from "@opencode/ui/button"
-import { Option } from "effect"
 import { createMemo, createSignal, lazy, onCleanup, Show, Suspense, untrack } from "solid-js"
 import { decodePackageChanges, packageChangesTool, type ChangesWithSchema } from "./package-changes-data"
 import { PackageSchema, readFinding, type Finding } from "./schema-contract"
@@ -21,6 +20,7 @@ const Card = lazy(async () => {
 
 export const registerSchema: Plugin.Setup<typeof definition> = (ctx) => {
   ctx.add(Style, styles)
+  const router = builtinContext(ctx).router
   const [state, setState] = createSignal<State>({ status: "closed" })
   const dispatch = (event: Event) => setState((current) => transition(current, event))
   let controller: AbortController | undefined
@@ -60,12 +60,12 @@ export const registerSchema: Plugin.Setup<typeof definition> = (ctx) => {
       request: { sessionID: session.id, serverID: session.server.id, directory: session.directory },
       changes,
     })
-    builtinContext(ctx).layout.openPage(pageID)
+    router.openPage(pageID)
   }
 
   const open = (session: MountedSession, finding?: Finding) => {
     load({ sessionID: session.id, serverID: session.server.id, directory: session.directory, finding })
-    builtinContext(ctx).layout.openPage(pageID)
+    router.openPage(pageID)
   }
 
   const back = () => {
@@ -162,9 +162,7 @@ export const registerSchema: Plugin.Setup<typeof definition> = (ctx) => {
     },
     render(props) {
       const changes = createMemo(() =>
-        props.status === "completed"
-          ? Option.getOrUndefined(decodePackageChanges(props.metadata))?.loginom.packageChanges
-          : undefined,
+        props.status === "completed" ? decodePackageChanges(props.metadata) : undefined,
       )
 
       const target = createMemo(() => {

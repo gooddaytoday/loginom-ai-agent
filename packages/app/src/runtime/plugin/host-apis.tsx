@@ -104,7 +104,7 @@ type Attached = {
   scope: (server: string) => ServerScope
   /** Records a session-scoped store so layout pruning drops it with the session. */
   scoped: (name: string) => void
-  layout: Omit<Layout, "narrow" | "settings" | "project" | "draft" | "command" | "openPage" | "stored" | "side"> & {
+  layout: Omit<Layout, "narrow" | "settings" | "project" | "draft" | "command" | "stored" | "side"> & {
     stored(plugin: string, session: SessionRef): readonly string[]
     /** `width` and `resize` take the panel's host key, `${plugin}:${panel id}`. */
     side: Layout["side"]
@@ -113,7 +113,6 @@ type Attached = {
   project: (server: string, title: string) => void
   draft: Layout["draft"]
   command: (id: string) => void
-  openPage: (plugin: string, id: string) => void
   run: (id: string) => boolean
   notify: (plugin: string, options: NotifyOptions) => Promise<NotifyResult>
   font: Accessor<string>
@@ -486,7 +485,6 @@ export function createHostApis() {
       project: (server, title) => write((value) => value.project(server, title)),
       draft: (input) => write((value) => value.draft(input)),
       command: (id) => write((value) => value.command(id)),
-      openPage: (id) => write((value) => value.openPage(plugin, id)),
     }),
     embeds: () => embeds,
     ui: () => ui,
@@ -1191,7 +1189,6 @@ export function createPluginAttachment(apis: HostApis) {
       pickProjectDraft(server, undefined, input.prompt)
     },
     command: (id) => void run(id),
-    openPage: (plugin, id) => navigate(`/page/${encodeURIComponent(plugin)}/${encodeURIComponent(id)}`),
     font: () => terminalFontFamily(settings.appearance.terminalFont()),
     routing: useIsRouting(),
     path: () => `${location.pathname}${location.search}`,

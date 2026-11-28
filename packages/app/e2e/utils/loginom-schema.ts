@@ -170,9 +170,19 @@ export function openLoginomSchemaConversation(page: Page, source: "saved" | "win
 export function packageSchemaDiffFixture() {
   const nodes = root.nodes
     .map((node) => {
-      if (node.guid === id(5)) return { ...node, label: "Выручка по регионам", position: point(530, 45) }
+      if (node.guid === id(3)) {
+        return {
+          ...node,
+          position: point(70, 45),
+          text_import: {
+            file_or_url:
+              "https://demo-user:demo-pass@imports.example.invalid/sales.csv?download=fixture-query#fixture-fragment",
+            column_separator: ";",
+          },
+        }
+      }
 
-      if (node.guid === id(3)) return { ...node, position: point(70, 45) }
+      if (node.guid === id(5)) return { ...node, label: "Выручка по регионам", position: point(530, 45) }
 
       return { ...node, label: "Фильтр по дате", position: point(300, 225) }
     })
@@ -214,12 +224,14 @@ export function packageSchemaDiffFixture() {
           ...root,
           nodes: [
             ...nodes.map((node) =>
-              node.guid === id(4)
-                ? {
-                    ...node,
-                    filter_conditions: [{ field: "Выручка", relation: "frtGreater", value: "100", join: "ctAnd" }],
-                  }
-                : node,
+              node.guid === id(3)
+                ? { ...node, text_import: { file_or_url: "Обновлённые продажи.csv", column_separator: ";" } }
+                : node.guid === id(4)
+                  ? {
+                      ...node,
+                      filter_conditions: [{ field: "Выручка", relation: "frtGreater", value: "100", join: "ctAnd" }],
+                    }
+                  : node,
             ),
             added,
           ],

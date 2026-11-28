@@ -1,6 +1,7 @@
 import { Effect, Option, Schema } from "effect"
 import { SchemaPair } from "./schema-contract"
 import type en from "./i18n/en"
+import { importSourceLabel } from "./import-source-label"
 
 const direction = Schema.Literals(["input", "output"])
 
@@ -53,8 +54,15 @@ const saved = Schema.Struct({
   workflows: Schema.Array(workflow),
 })
 
+const packagePath = { packagePath: Schema.NonEmptyString }
+const capturedSchema = Schema.Struct({ ...SchemaPair.fields.before.fields, ...packagePath })
+const capturedFacts = Schema.Struct({ ...saved.fields, ...packagePath })
+
 export const packageChangeSchemas = Schema.UndefinedOr(
-  Schema.Union([SchemaPair, Schema.Struct({ before: saved, after: saved })]),
+  Schema.Union([
+    Schema.Struct({ before: capturedSchema, after: capturedSchema }),
+    Schema.Struct({ before: capturedFacts, after: capturedFacts }),
+  ]),
 ).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(undefined))))
 
 export function diagramSchemas(schemas: typeof packageChangeSchemas.Type): SchemaPair | undefined {
@@ -141,7 +149,7 @@ function settings(entry: typeof node.Type, t: TranslateFacts): Facts {
     )
   }
 
-  add("facts.file", entry.text_import?.file_or_url?.replace(/(https?:\/\/)[^/|\s@]+@/gi, "$1"))
+  add("facts.file", importSourceLabel(entry.text_import?.file_or_url))
   const separator = entry.text_import?.column_separator
   add("facts.separator", separator === undefined ? undefined : settingValue(separator, t))
 
