@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { Product } from "@loginom-ai-agent/product"
@@ -51,8 +51,8 @@ async function fixture(codec: CredentialCodec) {
     async marker() {
       return readFile(join(directory, "v040-migration.json"), "utf8")
     },
-    async start() {
-      const service = await connectionService(connectionStore(directory, codec), runtime)
+    async start(profileStore = connectionStore(directory, codec)) {
+      const service = await connectionService(profileStore, runtime)
       services.push(service)
       await service.settled()
       return service
@@ -217,30 +217,374 @@ for (const [name, codec] of [
     })
   }
 
-  test(`${name}: explicit pending old-default choice survives failed preparation and restart`, async () => {
+  test(`${name}: explicit old-default choice requires another save after failed preparation and restart`, async () => {
     const f = await fixture(codec)
     try {
       await f.store.stage(original)
       await f.store.activate(1)
       const first = await f.start()
-      const validation = await first.api.check({
+      const input = {
         revision: 1, url: original.url, username: original.username,
-        apiKey: { operation: "preserve" }, password: { operation: "preserve" },
-      })
+        apiKey: { operation: "preserve" as const }, password: { operation: "preserve" as const },
+      }
+      const validation = await first.api.check(input)
       const prepare = f.runtime.prepare
       f.runtime.prepare = async () => { throw Error("unavailable") }
       await first.api.save({ revision: 1, validationId: validation.validationId })
       await first.settled()
-      expect(await f.store.pending()).toMatchObject({ url: original.url, urlSource: "explicit", generation: 2 })
+      expect(await first.api.status()).toMatchObject({ generation: 1, failure: "LOGINOM_RUNTIME_START_FAILED" })
+      expect(await f.store.pending()).toBeUndefined()
       await first.close()
       f.runtime.prepare = prepare
       const restarted = await f.start()
+      expect(await restarted.api.status()).toMatchObject({ url: original.url, generation: 1, state: "ready" })
+      expect(await f.store.read()).toEqual(original)
+      const retry = await restarted.api.check(input)
+      await restarted.api.save({ revision: 1, validationId: retry.validationId })
+      await restarted.settled()
       expect(await restarted.api.status()).toMatchObject({ url: original.url, generation: 2, state: "ready" })
       // The new generation does not carry the saved key forward; Help uses the built-in key.
       expect(await f.store.read()).toMatchObject({ url: original.url, urlSource: "explicit", apiKey: "", password: original.password })
       expect(await f.store.latestGeneration()).toBe(2)
       expect(await f.store.pending()).toBeUndefined()
     } finally { await f.close() }
+  })
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    `${name}: a write failure during activation does not replay the saved request when permissions are restored`,
+    async () => {
+      const f = await fixture(codec)
+      const replacementUrl = "https://replacement.example/app/"
+      try {
+        await f.store.stage(original)
+        await f.store.activate(1)
+        const first = await f.start()
+        const run = first.acquire("draining")!
+        const validation = await first.api.check({
+          revision: 1, url: replacementUrl, username: "replacement-user", password: { operation: "empty" },
+        })
+        expect(await first.api.save({ revision: 1, validationId: validation.validationId })).toMatchObject({
+          generation: 1, state: "pending",
+        })
+
+        // Before activation can write anything, deny both atomic replacement and unlink in the actual store.
+        const generations = join(f.directory, "generations")
+        await chmod(f.directory, 0o500)
+        try {
+          await chmod(generations, 0o500)
+          run.release()
+          await first.settled()
+          const failed = await first.api.status()
+          expect(failed).toMatchObject({
+            generation: 1, state: "ready", failure: "LOGINOM_STORE_WRITE_FAILED",
+            cleanupFailure: "LOGINOM_PENDING_CLEAR_FAILED",
+          })
+          if (!failed.pendingNotice) throw Error("Missing pending notice")
+          await expect(first.api.acknowledgePendingNotice({ id: failed.pendingNotice })).rejects.toThrow("LOGINOM_STORE_WRITE_FAILED")
+          expect(await first.api.status()).toEqual(failed)
+          expect(await f.store.read()).toEqual(original)
+          expect(await f.store.pending()).toMatchObject({ url: replacementUrl })
+          expect(first.acquire("after-failure")?.generation).toBe(1)
+          await first.close()
+        } finally {
+          await chmod(f.directory, 0o700)
+          await chmod(generations, 0o700)
+        }
+
+        const startsBeforeRestart = f.prepared.length
+        const restarted = await f.start()
+        expect(await restarted.api.status()).toMatchObject({
+          generation: 1, state: "ready", url: original.url, failure: "LOGINOM_PENDING_NOT_APPLIED",
+        })
+        expect(f.prepared.slice(startsBeforeRestart)).toEqual([original.url])
+        expect(await f.store.read()).toEqual(original)
+        expect(await f.store.pending()).toBeUndefined()
+      } finally { await f.close() }
+    },
+  )
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    `${name}: restores the active connection when it cannot claim a pending change at startup`,
+    async () => {
+      const f = await fixture(codec)
+      const replacementUrl = "https://replacement.example/app/"
+      try {
+        await f.store.stage(original)
+        await f.store.activate(1)
+        const first = await f.start()
+        expect(first.acquire("draining")?.generation).toBe(1)
+        const validation = await first.api.check({
+          revision: 1, url: replacementUrl, username: "replacement-user", password: { operation: "empty" },
+        })
+        expect(await first.api.save({ revision: 1, validationId: validation.validationId })).toMatchObject({
+          generation: 1, state: "pending",
+        })
+        await first.close()
+
+        await chmod(f.directory, 0o500)
+        try {
+          const readOnly = await f.start()
+          expect(await readOnly.api.status()).toMatchObject({
+            generation: 1, state: "ready", url: original.url, failure: "LOGINOM_PENDING_RESUME_FAILED",
+          })
+          expect(readOnly.acquire("after-restart")?.generation).toBe(1)
+          expect(f.prepared).toEqual([original.url, original.url])
+          await readOnly.close()
+        } finally {
+          await chmod(f.directory, 0o700)
+        }
+
+        const recovered = await f.start()
+        expect(await recovered.api.status()).toMatchObject({ generation: 2, state: "ready", url: replacementUrl })
+        expect(await recovered.api.status()).not.toHaveProperty("failure")
+      } finally { await f.close() }
+    },
+  )
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    `${name}: reports a confirmed change that could not be handed off when permissions were lost`,
+    async () => {
+      const f = await fixture(codec)
+      const replacementUrl = "https://replacement.example/app/"
+      try {
+        await f.store.stage(original)
+        await f.store.activate(1)
+        const first = await f.start()
+        expect(first.acquire("draining")?.generation).toBe(1)
+        const input = {
+          revision: 1, url: replacementUrl, username: "replacement-user", password: { operation: "empty" as const },
+        }
+        const validation = await first.api.check(input)
+        expect(await first.api.save({ revision: 1, validationId: validation.validationId })).toMatchObject({
+          generation: 1, state: "pending",
+        })
+
+        await chmod(f.directory, 0o500)
+        try {
+          await first.close()
+          const readOnly = await f.start()
+          expect(await readOnly.api.status()).toMatchObject({
+            generation: 1, state: "ready", failure: "LOGINOM_PENDING_NOT_APPLIED",
+            cleanupFailure: "LOGINOM_PENDING_CLEAR_FAILED",
+          })
+          expect(await f.store.pending()).toMatchObject({ url: replacementUrl })
+          await readOnly.close()
+        } finally {
+          await chmod(f.directory, 0o700)
+        }
+
+        const reopened = await f.start()
+        const notApplied = { generation: 1, state: "ready", url: original.url, failure: "LOGINOM_PENDING_NOT_APPLIED" }
+        expect(await reopened.api.status()).toMatchObject(notApplied)
+        expect(await f.store.pending()).toBeUndefined()
+        await reopened.close()
+
+        const next = await f.start()
+        expect(await next.api.status()).toMatchObject(notApplied)
+        expect(f.prepared).toEqual([original.url, original.url, original.url, original.url])
+        const retry = await next.api.check(input)
+        await next.api.save({ revision: 1, validationId: retry.validationId })
+        await next.settled()
+        expect(await next.api.status()).toMatchObject({ generation: 2, state: "ready", url: replacementUrl })
+        await next.close()
+
+        const applied = await f.start()
+        expect(await applied.api.status()).not.toHaveProperty("failure")
+      } finally { await f.close() }
+    },
+  )
+
+  test(`${name}: an already committed change does not get a discard notice on restart`, async () => {
+    const f = await fixture(codec)
+    try {
+      const committed = { ...original, generation: 2, revision: 2 }
+      await f.store.savePending(committed)
+      await f.store.stage(committed)
+      await f.store.activate(2)
+      const restarted = await f.start()
+      expect(await restarted.api.status()).toMatchObject({ generation: 2, state: "ready" })
+      expect(await restarted.api.status()).not.toHaveProperty("failure")
+      expect(await f.store.pending()).toBeUndefined()
+    } finally { await f.close() }
+  })
+
+  test(`${name}: a clean restart resumes a change still queued behind a lease`, async () => {
+    const f = await fixture(codec)
+    const replacementUrl = "https://replacement.example/app/"
+    try {
+      await f.store.stage(original)
+      await f.store.activate(1)
+      const first = await f.start()
+      expect(first.acquire("draining")?.generation).toBe(1)
+      const validation = await first.api.check({
+        revision: 1, url: replacementUrl, username: "replacement-user", password: { operation: "empty" },
+      })
+      expect(await first.api.save({ revision: 1, validationId: validation.validationId })).toMatchObject({
+        generation: 1, state: "pending",
+      })
+      await first.close()
+
+      const restarted = await f.start()
+      expect(await restarted.api.status()).toMatchObject({ generation: 2, state: "ready", url: replacementUrl })
+      expect(await f.store.pending()).toBeUndefined()
+    } finally { await f.close() }
+  })
+
+  test(`${name}: a change rejected on startup stays visible after the next restart`, async () => {
+    const f = await fixture(codec)
+    try {
+      await f.store.stage(original)
+      await f.store.activate(1)
+      const input = {
+        revision: 1,
+        url: "https://replacement.example/app/",
+        username: "replacement-user",
+        password: { operation: "empty" as const },
+      }
+      const first = await f.start()
+      expect(first.acquire("draining")?.generation).toBe(1)
+      const validation = await first.api.check(input)
+      expect(await first.api.save({ revision: 1, validationId: validation.validationId })).toMatchObject({
+        generation: 1,
+        state: "pending",
+      })
+      await first.close()
+
+      const prepare = f.runtime.prepare
+      f.runtime.prepare = (candidate) =>
+        candidate.url === input.url ? Promise.reject(Error("LOGINOM_RUNTIME_TIMEOUT")) : prepare(candidate)
+      const rejected = await f.start()
+      const ready = { generation: 1, state: "ready", url: original.url }
+      expect(await rejected.api.status()).toMatchObject({ ...ready, failure: "LOGINOM_RUNTIME_TIMEOUT" })
+      expect(await f.store.pending()).toBeUndefined()
+      await rejected.close()
+
+      f.runtime.prepare = prepare
+      const reopened = await f.start()
+      expect(await reopened.api.status()).toMatchObject({ ...ready, failure: "LOGINOM_PENDING_NOT_APPLIED" })
+      expect(reopened.acquire("draining")?.generation).toBe(1)
+      const retry = await reopened.api.check(input)
+      expect(await reopened.api.save({ revision: 1, validationId: retry.validationId })).not.toHaveProperty("failure")
+      expect(await reopened.api.cancelPending({ revision: 2 })).toMatchObject(ready)
+      await reopened.close()
+
+      const afterCancel = await f.start()
+      expect(await afterCancel.api.status()).toMatchObject(ready)
+      expect(await afterCancel.api.status()).not.toHaveProperty("failure")
+    } finally {
+      await f.close()
+    }
+  })
+
+  test(`${name}: retries deleting rejected pending settings on startup without preparing them again`, async () => {
+    const f = await fixture(codec)
+    const replacementUrl = "https://replacement.example/app/"
+    const prepare = f.runtime.prepare
+    const blockedStore = () => ({
+      ...connectionStore(f.directory, codec),
+      async clearPending() { throw Error("EPERM") },
+    })
+    try {
+      await f.store.stage(original)
+      await f.store.activate(1)
+      const first = await f.start(blockedStore())
+      f.runtime.prepare = async (candidate) => {
+        f.prepared.push(candidate.url)
+        throw Error("LOGINOM_RUNTIME_TIMEOUT")
+      }
+      const input = {
+        revision: 1, url: replacementUrl, username: "replacement-user",
+        password: { operation: "replace" as const, value: "replacement-password" },
+      }
+      const validation = await first.api.check(input)
+      await first.api.save({ revision: 1, validationId: validation.validationId })
+      await first.settled()
+      expect(await first.api.status()).toMatchObject({
+        generation: 1, state: "ready", failure: "LOGINOM_RUNTIME_TIMEOUT",
+        cleanupFailure: "LOGINOM_PENDING_CLEAR_FAILED",
+      })
+      expect(await f.store.pending()).toMatchObject({ url: replacementUrl })
+      expect(first.acquire("on-original")?.generation).toBe(1)
+      await first.close()
+
+      f.runtime.prepare = prepare
+      const retriedWithFailure = await f.start(blockedStore())
+      expect(await retriedWithFailure.api.status()).toMatchObject({
+        generation: 1, state: "ready", failure: "LOGINOM_PENDING_NOT_APPLIED",
+        cleanupFailure: "LOGINOM_PENDING_CLEAR_FAILED",
+      })
+      expect(await f.store.pending()).toMatchObject({ url: replacementUrl })
+      await retriedWithFailure.close()
+
+      const restarted = await f.start()
+      expect(await restarted.api.status()).toMatchObject({
+        generation: 1, state: "ready", url: original.url, failure: "LOGINOM_PENDING_NOT_APPLIED",
+      })
+      expect(f.prepared).toEqual([original.url, replacementUrl, original.url, original.url])
+      expect(await f.store.read()).toEqual(original)
+      expect(await f.store.pending()).toBeUndefined()
+
+      const retry = await restarted.api.check(input)
+      await restarted.api.save({ revision: 1, validationId: retry.validationId })
+      await restarted.settled()
+      expect(await f.store.read()).toMatchObject({ generation: 2, url: replacementUrl })
+    } finally { await f.close() }
+  })
+
+  test(`${name}: acknowledging a rejected change leaves the active generation's startup error visible`, async () => {
+    const f = await fixture(codec)
+    try {
+      await f.store.stage(original)
+      await f.store.activate(1)
+      await f.store.recordPendingDiscard({ activeGeneration: 1, id: "notice" })
+      f.runtime.prepare = async () => { throw Error("LOGINOM_RUNTIME_TIMEOUT") }
+
+      const service = await f.start()
+      const failed = { generation: 1, state: "recoverable-error", runtimeFailure: "LOGINOM_RUNTIME_TIMEOUT" }
+      expect(await service.api.status()).toMatchObject({
+        ...failed, failure: "LOGINOM_PENDING_NOT_APPLIED", pendingNotice: "notice",
+      })
+      expect(await service.api.acknowledgePendingNotice({ id: "notice" })).toMatchObject({
+        ...failed, failure: "LOGINOM_RUNTIME_TIMEOUT",
+      })
+      expect(await service.api.status()).not.toHaveProperty("pendingNotice")
+      expect(service.acquire("failed-generation")).toBeUndefined()
+    } finally { await f.close() }
+  })
+
+  test(`${name}: tasks can enter the ready generation while a notice acknowledgment writes the profile`, async () => {
+    const f = await fixture(codec)
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    try {
+      await f.store.stage(original)
+      await f.store.activate(1)
+      await f.store.recordPendingDiscard({ activeGeneration: 1, id: "notice" })
+      const service = await f.start({
+        ...f.store,
+        async clearPendingDiscard() {
+          entered.resolve()
+          await release.promise
+          await f.store.clearPendingDiscard()
+        },
+      })
+      const acknowledgement = service.api.acknowledgePendingNotice({ id: "notice" })
+      await entered.promise
+      const lease = service.acquire("during-acknowledgment")
+      expect(lease?.generation).toBe(1)
+      lease?.release()
+      const validation = await service.api.check({
+        revision: 1, url: original.url, username: original.username, password: { operation: "preserve" },
+      })
+      const change = { revision: 1, validationId: validation.validationId }
+      await expect(service.api.save(change)).rejects.toThrow("LOGINOM_APPLICATION_PENDING")
+      release.resolve()
+      expect(await acknowledgement).not.toHaveProperty("pendingNotice")
+      expect(await service.api.save(change)).toMatchObject({ revision: 2 })
+    } finally {
+      release.resolve()
+      await f.close()
+    }
   })
 
   test(`${name}: preserves current-version stand URLs and secrets across restarts`, async () => {
@@ -282,6 +626,7 @@ for (const [name, codec] of [
           apiKey: "pending-key",
         }
         await f.store.savePending(pending)
+        await f.store.deferPending(pending)
         await f.start()
         expect(await f.store.read()).toEqual(pending)
         expect(f.prepared).toEqual([original.url, url])

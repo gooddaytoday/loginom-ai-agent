@@ -6,7 +6,7 @@ import { createHash, randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
-import { connectionService } from "./connection/connection-service"
+import { connectionService, type RuntimeHandle } from "./connection/connection-service"
 import { connectionStore, type ActiveConnection } from "./connection/connection-store"
 import type { CredentialCodec } from "./connection/credentials"
 import { recoveryStore } from "./connection/recovery-store"
@@ -217,6 +217,8 @@ export async function createLoginomHost(options: {
   closeSavedPackageOnShutdown?: boolean
   // Private launcher capability baked into packaged release builds; never from env or the model.
   browserRecovery?: boolean
+  // The Node entry may wrap replacement preparation in a CON-08 fixture build.
+  prepareConnectionSwitch?: (prepare: () => Promise<RuntimeHandle>, signal: AbortSignal) => Promise<RuntimeHandle>
   onConnectionApplication?: Loginom.ConnectionApplicationListener
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
@@ -497,6 +499,48 @@ export async function createLoginomHost(options: {
     }
     throw error
   }
+  async function prepareGeneration(connection: ActiveConnection, signal?: AbortSignal): Promise<RuntimeHandle> {
+    const knowledge = await superviseKnowledge(
+      {
+        node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
+        entry: join(resources, "runtime/src/knowledge-entry.mjs"),
+        stateDir: join(root, "knowledge", String(connection.generation)),
+        generation: connection.generation,
+        helpRoot: join(resources, "help"),
+        environment,
+      },
+      signal,
+    ).catch(startupFailure)
+    const catalog = knowledge.request("list")
+    const ready = catalog.then(() => undefined)
+    const generation = { connection, knowledge, catalog, ready, children: new Map<string, Promise<Runtime>>() }
+    generations.set(connection.generation, generation)
+    void ready.catch(() => undefined)
+    return {
+      ready,
+      async reset() {
+        const results = await Promise.allSettled(
+          [...generation.children.entries()].map(async ([chat, child]) => {
+            await (await child).close()
+            generation.children.delete(chat)
+          }),
+        )
+        if (results.some((result) => result.status === "rejected"))
+          throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      },
+      async close() {
+        generations.delete(connection.generation)
+        const results = await Promise.allSettled([
+          knowledge.close(),
+          ...[...generation.children.values()].map(async (child) => (await child).close()),
+        ])
+        if (results.some((result) => result.status === "rejected")) {
+          shutdown.failed = true
+          throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+        }
+      },
+    }
+  }
   const service = await connectionService(
     connectionStore(join(root, "connection"), options.codec),
     {
@@ -554,42 +598,11 @@ export async function createLoginomHost(options: {
           ])
         }
       },
-      async prepare(connection) {
-        const knowledge = await superviseKnowledge({
-          node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
-          entry: join(resources, "runtime/src/knowledge-entry.mjs"),
-          stateDir: join(root, "knowledge", String(connection.generation)),
-          generation: connection.generation,
-          helpRoot: join(resources, "help"),
-          environment,
-        }).catch(startupFailure)
-        const catalog = knowledge.request("list")
-        const ready = catalog.then(() => undefined)
-        const generation = { connection, knowledge, catalog, ready, children: new Map<string, Promise<Runtime>>() }
-        generations.set(connection.generation, generation)
-        void ready.catch(() => undefined)
-        return {
-          ready,
-          async reset() {
-            const results = await Promise.allSettled(
-              [...generation.children.entries()].map(async ([chat, child]) => {
-                await (await child).close()
-                generation.children.delete(chat)
-              }),
-            )
-            if (results.some((result) => result.status === "rejected"))
-              throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
-          },
-          async close() {
-            generations.delete(connection.generation)
-            const results = await Promise.allSettled([
-              knowledge.close(),
-              ...[...generation.children.values()].map(async (child) => (await child).close()),
-            ])
-            if (results.some((result) => result.status === "rejected"))
-              throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
-          },
-        }
+      prepare(connection, switchSignal) {
+        const prepare = () => prepareGeneration(connection, switchSignal)
+        return switchSignal && options.prepareConnectionSwitch
+          ? options.prepareConnectionSwitch(prepare, switchSignal)
+          : prepare()
       },
     },
     journal,

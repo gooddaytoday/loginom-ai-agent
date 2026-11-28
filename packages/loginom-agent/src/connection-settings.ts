@@ -14,9 +14,17 @@ import { ServiceHost } from "./host"
 
 type Request = typeof ServiceHost.connectionSettings.request
 
+const pendingOutcomes = new Map<string, NonNullable<Status["pendingOutcome"]>>([
+  ["LOGINOM_PENDING_RESUME_FAILED", "pendingResumeFailed"],
+  ["LOGINOM_PENDING_NOT_APPLIED", "pendingNotApplied"],
+  ["LOGINOM_STORE_WRITE_FAILED", "pendingWriteFailed"],
+  ["LOGINOM_PENDING_CLEAR_FAILED", "pendingCleanupFailed"],
+])
+
 export function connectionSettings(request: Request = ServiceHost.connectionSettings.request) {
   const readStatus = (reply: unknown): Status => {
     const view = Schema.decodeUnknownSync(Loginom.View)(reply)
+    const pendingOutcome = view.failure && pendingOutcomes.get(view.failure)
     return {
       revision: view.revision,
       generation: view.generation,
@@ -27,14 +35,24 @@ export function connectionSettings(request: Request = ServiceHost.connectionSett
       state: view.state,
       ...(view.application ? { application: view.application } : {}),
       failed: !!view.failure || view.state === "recoverable-error",
+      ...(view.cleanupFailure ? { pendingCleanupFailed: true } : {}),
+      ...(pendingOutcome ? { pendingOutcome } : {}),
+      ...(view.pendingNotice ? { pendingNotice: view.pendingNotice } : {}),
     }
   }
-  const status = async (method: "connection.status" | "connection.settings.save", input: unknown) => {
+  const status = async (
+    method: "connection.status" | "connection.settings.save" | "connection.acknowledge-pending-notice",
+    input: unknown,
+    fallback: Issue,
+  ) => {
     try {
       const value = readStatus(await request(method, input))
       return { ok: true as const, value }
     } catch (error) {
-      return { ok: false as const, issue: issue(error, method === "connection.status" ? "unavailable" : "saveFailed") }
+      return {
+        ok: false as const,
+        issue: issue(error, fallback),
+      }
     }
   }
   return {
@@ -55,7 +73,9 @@ export function connectionSettings(request: Request = ServiceHost.connectionSett
         return { ok: false, issue: issue(error, "checkFailed") }
       }
     },
-    save: (input: typeof Loginom.Save.Type) => status("connection.settings.save", input),
+    save: (input: typeof Loginom.Save.Type) => status("connection.settings.save", input, "saveFailed"),
+    acknowledgePendingNotice: (input: typeof Loginom.AcknowledgePendingNotice.Type) =>
+      status("connection.acknowledge-pending-notice", input, "acknowledgeFailed"),
   } satisfies RpcHandlers<typeof ConnectionSettingsRpc>
 }
 

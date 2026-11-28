@@ -33,7 +33,7 @@ export const BrowserStatus = Schema.Union([
 export type BrowserStatus = typeof BrowserStatus.Type
 export const ConnectionApplication = Schema.Struct({ revision: NonNegativeInt, generation: NonNegativeInt })
 export type ConnectionApplication = typeof ConnectionApplication.Type
-export type ConnectionApplicationListener = (outcome: "applied" | "failed", event: ConnectionApplication) => void
+export type ConnectionApplicationListener = (outcome: "applied" | "failed" | "ready", event: ConnectionApplication) => void
 const Application = Schema.Union([
   Schema.Struct({ state: Schema.Literal("pending"), tasks: NonNegativeInt }),
   Schema.Struct({ state: Schema.Literal("applied") }),
@@ -51,6 +51,9 @@ export const View = Schema.Struct({
   application: Schema.optionalKey(Application),
   browser: optional(BrowserStatus),
   failure: Schema.optionalKey(Schema.String),
+  runtimeFailure: Schema.optionalKey(Schema.Literals(["LOGINOM_RUNTIME_START_FAILED", "LOGINOM_RUNTIME_TIMEOUT"])),
+  cleanupFailure: Schema.optionalKey(Schema.Literal("LOGINOM_PENDING_CLEAR_FAILED")),
+  pendingNotice: Schema.optionalKey(Schema.String),
   recoveries: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 export type View = typeof View.Type
@@ -61,6 +64,7 @@ export const Validation = Schema.Struct({
 })
 export const Save = Schema.Struct({ validationId: Schema.String, revision: NonNegativeInt })
 export const Cancel = Schema.Struct({ revision: NonNegativeInt })
+export const AcknowledgePendingNotice = Schema.Struct({ id: Schema.String })
 export const AcknowledgeRecovery = Schema.Struct({ revision: NonNegativeInt, ids: Schema.Array(Schema.String) })
 
 export type API = {
@@ -69,5 +73,6 @@ export type API = {
   check(candidate: Candidate, settings?: boolean, signal?: AbortSignal): Promise<typeof Validation.Type>
   save(input: typeof Save.Type, settings?: boolean): Promise<View>
   cancelPending(input: typeof Cancel.Type): Promise<View>
+  acknowledgePendingNotice(input: typeof AcknowledgePendingNotice.Type): Promise<View>
   acknowledgeRecovery(input: typeof AcknowledgeRecovery.Type): Promise<View>
 }

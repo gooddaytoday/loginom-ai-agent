@@ -28,7 +28,8 @@ type Event =
   | { type: "target"; available: boolean; now: number }
   | { type: "disposed" }
   | { type: "refresh"; now: number }
-  | { type: "application"; revision: number; generation: number }
+  | { type: "acknowledge" }
+  | { type: "application"; revision: number; generation: number; now: number }
   | { type: "edit"; patch: Partial<Draft> }
   | { type: "submit"; submit: "check" | "save"; now: number }
   | { type: "status"; attempt: number; result: StatusResult | undefined; now: number }
@@ -38,6 +39,7 @@ type Event =
 type Effect =
   | { type: "cancel" }
   | { type: "status"; attempt: number; delay?: number; timeout?: number }
+  | { type: "acknowledge"; attempt: number; id: string }
   | { type: "check"; attempt: number; input: Candidate }
   | { type: "save"; attempt: number; input: { revision: number; validationId: string } }
 
@@ -68,7 +70,7 @@ function preservesPassword({ status, draft }: Form) {
 }
 
 function waiting(status: Status) {
-  return !status.failed && (status.state === "pending" || status.state === "starting")
+  return status.state === "starting" || (status.state === "pending" && !status.failed)
 }
 
 function draftCandidate(current: Form): Candidate | { issue: Issue } {
@@ -119,17 +121,24 @@ export function transition(state: State, event: Event): Transition {
       if (state.type !== "editing") return keep
 
       return refresh(state, attempt)
+    case "acknowledge":
+      if (state.type !== "editing" || !state.status.pendingNotice) return keep
+      return {
+        state: { ...state, type: "refreshing", attempt, edited: false },
+        effects: [{ type: "acknowledge", attempt, id: state.status.pendingNotice }],
+      }
     case "application":
       if (state.type !== "applying" && state.type !== "editing") return keep
 
       if (!waiting(state.status) || event.revision < state.status.revision || event.generation < state.status.generation)
         return keep
 
-      if (state.type === "editing") return refresh(state, attempt)
-
       return {
-        state: { ...state, attempt },
-        effects: [{ type: "cancel" }, { type: "status", attempt }],
+        state: {
+          type: "applying", attempt, status: state.status, draft: state.draft,
+          until: event.now + applicationWait, edited: state.type === "editing" || state.edited,
+        },
+        effects: [{ type: "cancel" }, { type: "status", attempt, timeout: applicationWait }],
       }
     case "edit": {
       if (!("draft" in state) || state.type === "saving") return keep
@@ -237,9 +246,10 @@ export function transition(state: State, event: Event): Transition {
         const pendingDraft =
           state.type === "saving" || (recovered && !edited) ? { ...state.draft, password: "" } : draft
 
-        // Drains can last as long as the tasks. Bound the wait for startup once the tasks finish.
+        // Drains and startup of the retained connection can keep polling while the service responds.
+        const restored = status.state === "starting" && status.failed
         const until =
-          state.type === "applying" && !waitingTasks(state.status) && !waitingTasks(status)
+          state.type === "applying" && !restored && !waitingTasks(state.status) && !waitingTasks(status)
             ? state.until
             : event.now + applicationWait
 
@@ -292,6 +302,7 @@ function message(state: State) {
   if (state.type === "verified") return "verified"
 
   if (!("status" in state)) return
+  if (state.status.pendingOutcome) return state.status.pendingOutcome
 
   if (state.status.failed) return "activationFailed"
 
@@ -311,8 +322,10 @@ export function view(state: State) {
 
   return {
     draft: form?.draft,
-    connected: form?.status.state === "ready" && !form.status.failed ? form.status : undefined,
+    connected: form?.status.state === "ready" ? form.status : undefined,
     message: message(state),
+    pendingCleanupFailed: form?.status.pendingCleanupFailed,
+    canAcknowledge: state.type === "editing" && !!state.status.pendingNotice,
     waitingTasks: state.type === "applying" ? waitingTasks(state.status) : 0,
     fieldErrors: {
       url: issue === "invalidAddress" || issue === "loginUnavailable" ? issue : undefined,
@@ -324,6 +337,7 @@ export function view(state: State) {
       issue === "changed" ||
       issue === "expired" ||
       issue === "saveFailed" ||
+      issue === "acknowledgeFailed" ||
       issue === "knowledgeAuthFailed" ||
       issue === "checkFailed" ||
       issue === "logoutUnconfirmed"

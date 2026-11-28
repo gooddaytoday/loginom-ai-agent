@@ -90,6 +90,38 @@ test("the settings RPC emits only the display status, even for a migrated addres
   })
 })
 
+test.each([
+  ["LOGINOM_PENDING_CLEAR_FAILED", { pendingOutcome: "pendingCleanupFailed" }],
+  ["LOGINOM_PENDING_RESUME_FAILED", { pendingOutcome: "pendingResumeFailed" }],
+  ["LOGINOM_PENDING_NOT_APPLIED", { pendingOutcome: "pendingNotApplied" }],
+])("settings report %s while the original connection is ready", async (failure, outcome) => {
+  const settings = connectionSettings(async () => ({
+    revision: 2,
+    generation: 1,
+    url: "https://loginom.example/app/",
+    username: "analyst",
+    folder: "/analyst",
+    hasPassword: true,
+    state: "ready",
+    failure,
+  }))
+  const result = await settings.status()
+  const validated = await ConnectionSettingsRpc.methods.status.output["~standard"].validate(result)
+  expect(validated).toMatchObject({
+    value: { ok: true, value: { generation: 1, state: "ready", failed: true, ...outcome } },
+  })
+})
+
+test("settings keep the write failure alongside the cleanup warning", async () => {
+  const settings = connectionSettings(async () => ({
+    revision: 2, generation: 1, url: "https://loginom.example/app/", username: "analyst", folder: "/analyst",
+    hasPassword: true, state: "ready", failure: "LOGINOM_STORE_WRITE_FAILED", cleanupFailure: "LOGINOM_PENDING_CLEAR_FAILED",
+  }))
+  expect(await settings.status()).toMatchObject({
+    ok: true, value: { pendingOutcome: "pendingWriteFailed", pendingCleanupFailed: true },
+  })
+})
+
 const input = {
   revision: 0,
   url: "https://loginom.example/",

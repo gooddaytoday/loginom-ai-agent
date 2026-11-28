@@ -94,6 +94,61 @@ test("Save checks first and reports pending activation until the service applies
   expect(view(applied)).toMatchObject({ connected: { username: "user", folder: "/user" }, readOnly: false })
 })
 
+test.each([
+  { outcome: { pendingOutcome: "pendingCleanupFailed" }, message: "pendingCleanupFailed" },
+  { outcome: { pendingOutcome: "pendingResumeFailed" }, message: "pendingResumeFailed" },
+  { outcome: { pendingOutcome: "pendingNotApplied" }, message: "pendingNotApplied" },
+  { outcome: {}, message: "activationFailed" },
+] satisfies { outcome: Partial<Status>; message: string }[])(
+  "settings show the original connection alongside $message",
+  ({ outcome, message }) => {
+    const state = form({ ...fresh, revision: 2, generation: 1, state: "ready", failed: true, ...outcome })
+    expect(view(state)).toMatchObject({
+      message,
+      busy: false,
+      connected: { generation: 1, username: fresh.username, folder: fresh.folder },
+    })
+  },
+)
+
+test("a saved warning stays visible while polling for the original connection and can be acknowledged when ready", () => {
+  const warning = { ...fresh, revision: 2, generation: 1, failed: true, pendingOutcome: "pendingNotApplied", pendingNotice: "notice" } as const
+  const starting = form({ ...warning, state: "starting" })
+  expect(view(starting)).toMatchObject({ message: "pendingNotApplied", busy: true })
+  const stillStarting = transition(starting, {
+    type: "status", attempt: starting.attempt, now: 20_000,
+    result: { ok: true, value: { ...warning, state: "starting" } },
+  })
+  expect(stillStarting.effects).toMatchObject([{ type: "status" }])
+  const failure = { ok: false, issue: "unavailable" } as const
+  const interrupted = transition(stillStarting.state, {
+    type: "status", attempt: stillStarting.state.attempt, now: 21_000,
+    result: failure,
+  })
+  expect(interrupted.effects).toMatchObject([{ type: "status", delay: 1000 }])
+  expect(view(interrupted.state)).toMatchObject({ message: "pendingNotApplied", busy: true })
+  const expired = transition(interrupted.state, {
+    type: "status", attempt: interrupted.state.attempt, now: 35_000,
+    result: failure,
+  })
+  expect(expired.effects).toEqual([])
+  const refreshed = transition(expired.state, { type: "application", revision: 2, generation: 1, now: 36_000 })
+  expect(refreshed.effects).toMatchObject([{ type: "cancel" }, { type: "status" }])
+  const ready = transition(refreshed.state, {
+    type: "status", attempt: refreshed.state.attempt, now: 36_000,
+    result: { ok: true, value: { ...warning, state: "ready" } },
+  }).state
+  expect(view(ready)).toMatchObject({ connected: { generation: 1 }, message: "pendingNotApplied", canAcknowledge: true })
+  expect(transition(ready, { type: "acknowledge" }).effects).toMatchObject([{ type: "acknowledge", id: "notice" }])
+})
+
+test("the form shows primary write and secondary cleanup failures together", () => {
+  expect(view(form({
+    ...fresh, state: "ready", generation: 1, failed: true,
+    pendingOutcome: "pendingWriteFailed", pendingCleanupFailed: true,
+  }))).toMatchObject({ message: "pendingWriteFailed", pendingCleanupFailed: true, connected: { generation: 1 } })
+})
+
 test("unavailable, changed targets and disposal ignore late completions", () => {
   const checking = check().state
   const result = { type: "checked", attempt: checking.attempt, result: validation } as const

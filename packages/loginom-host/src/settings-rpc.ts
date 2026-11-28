@@ -3,8 +3,14 @@ import { Schema, Struct } from "effect"
 import { Loginom } from "./loginom"
 
 export const Status = Loginom.View.mapFields((fields) => ({
-  ...Struct.pick(fields, ["revision", "generation", "url", "username", "folder", "hasPassword", "state", "application"]),
+  ...Struct.pick(fields, [
+    "revision", "generation", "url", "username", "folder", "hasPassword", "state", "application", "pendingNotice",
+  ]),
   failed: Schema.Boolean,
+  pendingCleanupFailed: Schema.optionalKey(Schema.Literal(true)),
+  pendingOutcome: Schema.optionalKey(Schema.Literals([
+    "pendingResumeFailed", "pendingNotApplied", "pendingWriteFailed", "pendingCleanupFailed",
+  ])),
 }))
 export const Address = Schema.String.check(
   Schema.makeFilter((value) => {
@@ -44,6 +50,7 @@ export const Issue = Schema.Literals([
   "changed",
   "expired",
   "saveFailed",
+  "acknowledgeFailed",
 ])
 export type Issue = typeof Issue.Type
 
@@ -69,8 +76,12 @@ export const ConnectionSettingsRpc = Rpc.define({
     },
     check: { input: safeInput, output: Schema.toStandardSchemaV1(result(Validation)) },
     save: { input: Schema.toStandardSchemaV1(Loginom.Save), output: Schema.toStandardSchemaV1(statusResult) },
+    acknowledgePendingNotice: {
+      input: Schema.toStandardSchemaV1(Loginom.AcknowledgePendingNotice),
+      output: result(Status),
+    },
   },
-  events: { applied: applicationEvent, failed: applicationEvent },
+  events: { applied: applicationEvent, failed: applicationEvent, ready: applicationEvent },
 })
 
 export type StatusResult = typeof ConnectionSettingsRpc.methods.status.output.Type

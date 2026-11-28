@@ -72,6 +72,7 @@ test("local connection startup settles before Help readiness and becomes ready o
     await f.catalog.release()
     await f.readiness[0]
     expect(await f.service.api.status()).toMatchObject({ state: "ready", url: f.original.url })
+    expect(f.outcomes).toEqual([["ready", { revision: 1, generation: 1 }]])
     const lease = f.service.acquire("after-ready")
     expect(lease?.generation).toBe(1)
     lease?.release()
@@ -175,30 +176,44 @@ test.each(["applied", "failed"] as const)("settings drain both old-generation ta
         generation: 1,
         application: { state: "pending", tasks: 2 - index },
       })
-      expect(f.outcomes).toEqual([])
+      expect(f.outcomes).toEqual([["ready", { revision: 1, generation: 1 }]])
       f.service.turn(task, task, false)
     }
 
-    await f.service.settled()
-    expect(await f.service.api.status()).toMatchObject({ generation: 2, state: "starting" })
-    expect((await f.service.api.status()).application).toBeUndefined()
-    expect(f.service.acquire("third")).toBeUndefined()
-    expect(f.outcomes).toEqual([])
-
     await nextCatalog.entered()
+    expect(await f.service.api.status()).toMatchObject({
+      generation: 1, state: "starting", application: { state: "pending", tasks: 0 },
+    })
+    expect(await f.store.read()).toEqual(f.original)
+    expect(await f.processes[0].request("list")).toHaveProperty("tools")
+    expect(f.service.acquire("third")).toBeUndefined()
+    expect(f.outcomes).toEqual([["ready", { revision: 1, generation: 1 }]])
+
     await nextCatalog.release(outcome === "failed" ? "fail" : undefined)
-    if (outcome === "failed") {
+    if (outcome === "failed")
       await expect(f.readiness[1]).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
-      expect(f.outcomes).toEqual([["failed", { revision: 2, generation: 2 }]])
+    await f.service.settled()
+
+    if (outcome === "failed") {
+      expect(f.outcomes).toEqual([
+        ["ready", { revision: 1, generation: 1 }],
+        ["failed", { revision: 2, generation: 2 }],
+      ])
       const status = await f.service.api.status()
-      expect(status).toMatchObject({ generation: 2, state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED" })
+      expect(status).toMatchObject({ generation: 1, state: "ready", failure: "LOGINOM_RUNTIME_START_FAILED" })
       expect(status.application).toBeUndefined()
-      expect(f.service.acquire("third")).toBeUndefined()
+      expect(await f.store.read()).toEqual(f.original)
+      expect(await f.processes[0].request("list")).toHaveProperty("tools")
+      const third = f.service.acquire("third")
+      expect(third?.generation).toBe(1)
+      third?.release()
       return
     }
 
-    await f.readiness[1]
-    expect(f.outcomes).toEqual([["applied", { revision: 2, generation: 2 }]])
+    expect(f.outcomes).toEqual([
+      ["ready", { revision: 1, generation: 1 }],
+      ["applied", { revision: 2, generation: 2 }],
+    ])
     expect(await f.service.api.status()).toMatchObject({
       generation: 2,
       url,

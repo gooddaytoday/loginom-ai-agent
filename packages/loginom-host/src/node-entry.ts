@@ -11,6 +11,8 @@ import { DashboardRead } from "./dashboard"
 import { WriteOutcomeInput, WriteOutcomeResult, writeStep } from "./connection/write-outcomes"
 import { StepOperationId } from "./step-state"
 
+declare const LOGINOM_AI_AGENT_CON08_TEST_BUILD: boolean | undefined
+
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
 const events = new EventEmitter()
@@ -127,6 +129,10 @@ async function dispatch(message: unknown) {
         browserRecovery: "browserRecovery" in input && input.browserRecovery === true,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
+        prepareConnectionSwitch:
+          typeof LOGINOM_AI_AGENT_CON08_TEST_BUILD !== "undefined" && LOGINOM_AI_AGENT_CON08_TEST_BUILD
+            ? (await import("./connection/con08-fixture")).connectionSwitchFixture(input.root)
+            : undefined,
         onConnectionApplication: (outcome, data) => reply({ event: `connection.${outcome}`, data }),
       }
       state.starting = createLoginomHost(options).then(async (host) => {
@@ -192,6 +198,11 @@ async function checkWriteOutcome(host: Awaited<ReturnType<typeof createLoginomHo
 
 async function management(method: string, input: unknown, host: Awaited<ReturnType<typeof createLoginomHost>>) {
   if (method === "connection.status" || method === "connection.read") return host.api.status()
+  if (method === "connection.acknowledge-pending-notice") {
+    const notice = Schema.decodeUnknownOption(Loginom.AcknowledgePendingNotice)(input)
+    if (Option.isNone(notice)) throw Error("LOGINOM_INPUT_INVALID")
+    return host.api.acknowledgePendingNotice(notice.value)
+  }
   if (method === "connection.ready") {
     const before = await host.api.status()
     if (!before.generation) throw new Error("LOGINOM_CONFIG_REQUIRED")

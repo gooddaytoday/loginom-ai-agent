@@ -48,7 +48,8 @@
         ".github/**", ".husky/**", "script/**", "nix/**", "patches/**", "turbo.json", ".gitignore", ".gitleaksignore",
         ".gitattributes", ".dockerignore", ".oxlintrc.json", "install", "packages/*/script/**", "packages/*/scripts/**", "packages/desktop/electron*.ts",
         "packages/cli/bin/**", "strobe.json"
-      ]
+      ],
+      "note": "Keep the CON-08 production Host bundle check in packages/desktop/scripts/release/candidate.ts (CLI release candidate) and packages/desktop/scripts/release/manifest.ts (Desktop resources). Both reject a packaged node-host.mjs containing con08-fault with RELEASE_CON08_FIXTURE_PRESENT."
     },
     {
       "id": "CAT-03",
