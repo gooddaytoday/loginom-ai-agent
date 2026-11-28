@@ -5,12 +5,32 @@ import { modelServerFetch } from "../src/model-server-network"
 
 test.each([
   ["an escaped", 'fixture-"private"-key', "[redacted]"],
-  ["a short", "a", "…"],
-])("model server SSE keeps ordinary deltas live and masks %s key", async (_label, key, mask) => {
-  const delta = `data: ${JSON.stringify({ choices: [{ delta: { content: "Считаю" } }] })}`
+  ["a short", "a", "a"],
+])("model server SSE keeps tool calls live with %s key", async (_label, key, expected) => {
+  const delta = `data: ${JSON.stringify({
+    id: "fixture",
+    object: "chat.completion.chunk",
+    created: 0,
+    model: "alpha",
+    choices: [
+      {
+        index: 0,
+        delta: {
+          role: "assistant",
+          content: "Считаю",
+          tool_calls: [
+            { index: 0, id: "call_fixture", type: "function", function: { name: "check", arguments: "{}" } },
+          ],
+        },
+        finish_reason: null,
+      },
+    ],
+  })}\r\n\r\n`
   const error = JSON.stringify({ error: { message: `Rejected ${key}` } })
-  const split = error.indexOf(JSON.stringify(key).slice(1, -1)) + 1
+  const prefix = '{"error":{"message":"Rejected '
+  const split = prefix.length + 1
   const release = Promise.withResolvers<void>()
+  const releaseRest = Promise.withResolvers<void>()
   const encoder = new TextEncoder()
   const server = Bun.serve({
     hostname: "127.0.0.1",
@@ -18,9 +38,10 @@ test.each([
     fetch: () => {
       const body = new ReadableStream<Uint8Array>({
         async start(stream) {
-          stream.enqueue(encoder.encode(delta + "\r\n\r"))
+          stream.enqueue(encoder.encode(delta))
           await release.promise
-          stream.enqueue(encoder.encode(`\ndata: ${error.slice(0, split)}`))
+          stream.enqueue(encoder.encode(`data: ${error.slice(0, split)}`))
+          await releaseRest.promise
           stream.enqueue(encoder.encode(`${error.slice(split)}\r\n\r\ndata: [DONE]\r\n\r\n`))
           stream.close()
         },
@@ -35,14 +56,34 @@ test.each([
     })
     if (!reply.body) throw new Error("Missing fixture response body")
     const reader = reply.body.pipeThrough(new TextDecoderStream()).getReader()
-    expect((await reader.read()).value).toBe(delta + "\n\n")
+    expect((await reader.read()).value).toBe(delta)
     release.resolve()
+
+    const short = key === expected
+    expect((await reader.read()).value).toBe(`data: ${prefix}${short ? key : ""}`)
+    releaseRest.resolve()
 
     let rest = ""
     for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) rest += chunk.value
-    expect(rest).toBe(`data: {"error":{"message":"Rejected ${mask}"}}\n\ndata: [DONE]\n\n`)
+    expect(rest).toBe(`${short ? "" : expected}"}}\r\n\r\ndata: [DONE]\r\n\r\n`)
   } finally {
     release.resolve()
+    releaseRest.resolve()
+    await server.stop(true)
+  }
+})
+
+test("model server masks the key in a number and a field name without reformatting an HTTP error", async () => {
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: () => new Response('{ "12345678": 12345678 }\r\n', { status: 401 }),
+  })
+  try {
+    const reply = await modelServerFetch(server.url, { headers: { Authorization: "Bearer 12345678" } })
+    expect(reply.status).toBe(401)
+    expect(await reply.text()).toBe('{ "[redacted]": [redacted] }\r\n')
+  } finally {
     await server.stop(true)
   }
 })

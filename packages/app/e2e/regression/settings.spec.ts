@@ -2268,15 +2268,19 @@ test("providers: settings and the connect dialog list popular providers in the s
   ).toBeVisible()
 })
 
-test("providers: an open dialog reacts to remote catalog outages and recovery", async ({ page }) => {
-  const { settings, push } = await open(page, {
+test("providers: an open dialog reacts to catalog changes across an event stream reconnect", async ({ page }) => {
+  const transport = await installSseTransport(page, { server: SERVER })
+  let catalogAvailable = false
+
+  const { settings } = await open(page, {
     integrations: [{ id: "openai", name: "OpenAI", methods: [{ type: "key" }], connections: [] }],
     onRpc: ({ rpcID, method }) =>
       rpcID === "loginom.model-server" && method === "catalogAvailable"
-        ? { output: { ok: true, value: false } }
+        ? { output: { ok: true, value: catalogAvailable } }
         : undefined,
   })
 
+  const first = await transport.waitForConnection()
   expect(await page.evaluate(() => navigator.onLine)).toBe(true)
   await settings.getByRole("tab", { name: "Providers", exact: true }).click()
   await settings.getByRole("button", { name: "Show more providers", exact: true }).click()
@@ -2287,18 +2291,81 @@ test("providers: an open dialog reacts to remote catalog outages and recovery", 
 
   await expect(rows).toHaveText([customServer, "OpenAI"])
 
-  for (const available of [true, false]) {
-    await push([
-      {
-        id: `evt_model_catalog_available_${available}`,
-        created: 1,
-        type: "rpc.loginom.model-server.catalogAvailabilityChanged",
-        location: { directory },
-        data: { available },
-      },
-    ])
-    await expect(rows).toHaveText(available ? ["OpenAI", customServer] : [customServer, "OpenAI"])
+  let availabilityEventID = 0
+
+  const publishAvailability = (available: boolean) => {
+    catalogAvailable = available
+
+    return transport.send({
+      id: `evt_model_catalog_available_${++availabilityEventID}`,
+      created: 1,
+      type: "rpc.loginom.model-server.catalogAvailabilityChanged",
+      location: { directory },
+      data: { available },
+    })
   }
+
+  await publishAvailability(true)
+  await expect(rows).toHaveText(["OpenAI", customServer])
+
+  catalogAvailable = false
+  await transport.disconnect()
+  await transport.waitForConnection({ after: first.id })
+  await expect(rows).toHaveText([customServer, "OpenAI"])
+
+  await publishAvailability(true)
+  await expect(rows).toHaveText(["OpenAI", customServer])
+  await publishAvailability(false)
+  await expect(rows).toHaveText([customServer, "OpenAI"])
+})
+
+test("providers: the Russian dialog lists other providers and warns when saving a short key", async ({ page }) => {
+  const address = "http://127.0.0.1:8000/v1"
+  await mockWorkspace(page, {
+    name: "Настройки",
+    directory,
+    seed: { locale: "ru" },
+    onRpc: ({ rpcID, method, body }) => {
+      if (rpcID !== "loginom.model-server") return
+
+      switch (method) {
+        case "catalogAvailable":
+          return { output: { ok: true, value: true } }
+        case "discover":
+          return { output: { ok: true, value: ["alpha"] } }
+        case "save":
+          expect(body).toMatchObject({ input: { address, key: "1234567", models: ["alpha"] } })
+
+          return { output: { ok: true, value: { providerID: `loginom-model-server-${"1".repeat(64)}` } } }
+      }
+    },
+  })
+
+  await page.goto("/settings")
+  const settings = page.getByTestId("settings-screen")
+  const width = page.viewportSize()?.width ?? 1280
+
+  if (width < 800) {
+    await settings.getByRole("button", { name: "Общие", exact: true }).click()
+    await page.getByRole("menuitemradio", { name: "Провайдеры", exact: true }).click()
+  } else {
+    await settings.getByRole("tab", { name: "Провайдеры", exact: true }).click()
+  }
+
+  await settings.getByRole("button", { name: "Показать больше провайдеров", exact: true }).click()
+
+  const title = "Свой сервер (OpenAI-совместимый)"
+  const picker = page.getByRole("dialog", { name: "Подключить провайдера", exact: true })
+
+  await picker.getByRole("region", { name: "Остальные", exact: true }).getByText(title, { exact: true }).click()
+
+  const form = page.getByRole("dialog", { name: title, exact: true })
+  await form.getByLabel("Адрес", { exact: true }).fill(address)
+  await form.getByLabel("Ключ (необязательно)", { exact: true }).fill("1234567")
+  await form.getByRole("button", { name: "Найти модели", exact: true }).click()
+  await expect(form.getByRole("radio", { name: "alpha", exact: true })).toBeChecked()
+  await form.getByRole("button", { name: "Подключить", exact: true }).click()
+  await expect(page.getByText("Короткий ключ не защищается при выводе ошибок", { exact: true })).toBeVisible()
 })
 
 test("providers: a partial custom server removal explains the failure and can be retried", async ({ page }) => {

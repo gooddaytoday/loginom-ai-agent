@@ -1,3 +1,4 @@
+import { modelServerSecretMinLength } from "@loginom-ai-agent/loginom-host/model-server-key"
 import { ModelServerRpc } from "@loginom-ai-agent/loginom-host/model-server-rpc"
 import { usePlugin } from "@opencode/plugin/gui"
 import type { ProviderSetupProps } from "@opencode/plugin/gui/builtin"
@@ -35,6 +36,12 @@ export default function ModelServer(props: ProviderSetupProps) {
 
         if (!result.ok) return void dispatch({ type: "settled", attempt, issue: result.issue })
 
+        if (!lifetime.signal.aborted && input.key && input.key.trimEnd().length < modelServerSecretMinLength)
+          ctx.toast.show({
+            icon: "warning",
+            title: ctx.t("modelServerTitle"),
+            description: ctx.t("modelServerShortKeyWarning"),
+          })
         dispatch({ type: "stored", attempt })
         await props.onConnected(result.value.providerID, request.models, request.selected, lifetime.signal)
         dispatch({ type: "settled", attempt })

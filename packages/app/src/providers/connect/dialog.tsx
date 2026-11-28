@@ -317,9 +317,15 @@ function ProviderPicker(props: {
 
     for (const entry of props.setups) {
       void entry
-        .preferFirst?.(sdk.api, directory, lifetime.signal, (first) => {
-          if (!lifetime.signal.aborted) setPreferred((current) => ({ ...current, [entry.id]: first }))
-        })
+        .preferFirst?.(
+          () => sdk.api,
+          directory,
+          lifetime.signal,
+          (first) => {
+            if (!lifetime.signal.aborted) setPreferred((current) => ({ ...current, [entry.id]: first }))
+          },
+          sdk.event.listen,
+        )
         .catch(() => undefined)
     }
   })

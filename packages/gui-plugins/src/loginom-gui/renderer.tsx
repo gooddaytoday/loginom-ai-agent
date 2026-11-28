@@ -31,32 +31,42 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       return ctx.t("modelServerTitle")
     },
     matchesProvider: isModelServerID,
-    async preferFirst(client, directory, signal, report) {
+    async preferFirst(client, directory, signal, report, listen) {
       const { ModelServerRpc } = await import("@loginom-ai-agent/loginom-host/model-server-rpc")
 
       if (signal.aborted) return
 
-      const rpc = client.rpc(ModelServerRpc)
-      let observedChange = false
+      const isAvailability = Schema.is(ModelServerRpc.events.catalogAvailabilityChanged.schema)
+      let revision = 0
 
-      rpc.events.on(
-        "catalogAvailabilityChanged",
-        ({ data }) => {
-          observedChange = true
-          report(!data.available)
-        },
-        { signal },
-      )
+      const refresh = async () => {
+        const requested = ++revision
 
-      const result = await rpc.catalogAvailable(
-        {},
-        {
-          location: directory ? { directory } : undefined,
-          signal: AbortSignal.any([signal, AbortSignal.timeout(25_000)]),
-        },
-      )
+        const result = await client().rpc(ModelServerRpc).catalogAvailable(
+          {},
+          {
+            location: directory ? { directory } : undefined,
+            signal: AbortSignal.any([signal, AbortSignal.timeout(25_000)]),
+          },
+        )
 
-      if (!observedChange && result.ok) report(!result.value)
+        if (!signal.aborted && requested === revision && result.ok) report(!result.value)
+      }
+
+      const unsubscribe = listen((event) => {
+        if (event.type === "server.connected") return void refresh().catch(() => undefined)
+
+        if (event.type !== `rpc.${ModelServerRpc.id}.catalogAvailabilityChanged`) return
+
+        if (!isAvailability(event.data)) return
+
+        revision++
+        report(!event.data.available)
+      })
+
+      signal.addEventListener("abort", unsubscribe, { once: true })
+
+      await refresh()
     },
     removal: {
       get title() {

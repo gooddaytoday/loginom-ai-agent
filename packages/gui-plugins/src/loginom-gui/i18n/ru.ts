@@ -68,6 +68,7 @@ export default {
   modelServerTitle: "Свой сервер (OpenAI-совместимый)",
   modelServerDescription: "Подключите модели на этом компьютере или в сети организации.",
   modelServerKey: "Ключ (необязательно)",
+  modelServerShortKeyWarning: "Короткий ключ не защищается при выводе ошибок",
   modelServerFind: "Найти модели",
   modelServerFinding: "Ищем модели…",
   modelServerSelect: "Подключатся все найденные модели. С какой начать?",

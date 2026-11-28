@@ -3,7 +3,7 @@
 
 import type { FormAnswer, FormInfo } from "@opencode/client/promise"
 import type { Schema } from "effect"
-import type { OpenCodeClient, RpcCallOptions } from "@opencode/client/promise"
+import type { OpenCodeClient, OpenCodeEvent, RpcCallOptions } from "@opencode/client/promise"
 import type { Context } from "./context.js"
 import { Registry, type Catalog, type Messages, type Persisted, type StoreDeclaration, type StoreFrom } from "./core.js"
 import type { Desktop, Layout, Locale, StorageScope, StoreOptions } from "./host-apis.js"
@@ -34,10 +34,11 @@ export interface ProviderSetup {
   readonly title: string
   /** Reports whether to list this action first, initially and on changes until the dialog aborts the signal. */
   readonly preferFirst?: (
-    client: OpenCodeClient,
+    client: () => OpenCodeClient,
     directory: string | undefined,
     signal: AbortSignal,
     report: (first: boolean) => void,
+    listen: (handler: (event: OpenCodeEvent) => void) => VoidFunction,
   ) => Promise<void>
   /** Identifies configured providers to place alongside the action in Settings. */
   readonly matchesProvider?: (id: string) => boolean

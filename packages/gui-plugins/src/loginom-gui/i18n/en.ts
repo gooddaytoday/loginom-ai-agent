@@ -65,6 +65,7 @@ export default {
   modelServerTitle: "Custom server (OpenAI-compatible)",
   modelServerDescription: "Connect models on this computer or on your organization’s network.",
   modelServerKey: "Key (optional)",
+  modelServerShortKeyWarning: "Short keys are not masked in error messages",
   modelServerFind: "Find models",
   modelServerFinding: "Finding models…",
   modelServerSelect: "All models found will be connected. Which one should we start with?",

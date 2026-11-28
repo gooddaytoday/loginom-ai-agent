@@ -1,10 +1,10 @@
+import { modelServerSecretMinLength } from "@loginom-ai-agent/loginom-host/model-server-key"
+import { Buffer } from "node:buffer"
 import { lookup } from "node:dns/promises"
 import { request as httpRequest } from "node:http"
 import { request as httpsRequest } from "node:https"
 import { BlockList, isIP } from "node:net"
 import { Readable } from "node:stream"
-import { OpenAIChatEvent } from "@opencode/ai/protocols/openai-chat"
-import type { SchemaAST } from "effect"
 import { HttpsProxyAgent } from "https-proxy-agent"
 
 const blocked = new BlockList()
@@ -112,83 +112,48 @@ export async function resolveModelServer(input: string, signal: AbortSignal) {
   } as const
 }
 
-function declaredFields(ast: SchemaAST.AST): string[] {
-  switch (ast._tag) {
-    case "Objects":
-      return ast.propertySignatures.flatMap(({ name, type }) => [String(name), ...declaredFields(type)])
-    case "Arrays":
-      return [...ast.elements, ...ast.rest].flatMap(declaredFields)
-    case "Union":
-      return ast.types.flatMap(declaredFields)
-    default:
-      return []
-  }
-}
+function redactBody(body: ReadableStream<Uint8Array>, key: string) {
+  const needles = Array.from(new Set([JSON.stringify(key).slice(1, -1), key]), (value) => Buffer.from(value))
+  const mask = Buffer.from("[redacted]".includes(key) ? "…" : "[redacted]")
+  let pending = Buffer.alloc(0)
 
-const completionFields = new Set(declaredFields(OpenAIChatEvent.ast))
-const sseFields = new Set(["", "data", "event", "id", "retry"])
+  return body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, stream) {
+        const bytes = pending.length ? Buffer.concat([pending, chunk]) : Buffer.from(chunk)
+        let offset = 0
 
-function redactEventStream(body: ReadableStream<Uint8Array>, key: string, mask: string) {
-  const escapedKey = JSON.stringify(key).slice(1, -1)
-  const redactRaw = (text: string) => text.replaceAll(escapedKey, mask).replaceAll(key, mask)
-  const redact = (frame: string) => {
-    const lines = frame.split("\n")
-    const payload = lines
-      .filter((line) => line.startsWith("data:"))
-      .map((line) => line.slice(5).replace(/^ /u, ""))
-      .join("\n")
-    let data = payload
-    if (payload && payload !== "[DONE]" && payload !== ": keepalive") {
-      try {
-        JSON.parse(payload)
-        data = payload.replace(/("(?:[^"\\]|\\.)*")(\s*:)?/gu, (match, token: string, field?: string) => {
-          const value: unknown = JSON.parse(token)
-          if (typeof value !== "string" || !value.includes(key) || (field && completionFields.has(value))) return match
-          return JSON.stringify(value.replaceAll(key, mask)) + (field ?? "")
-        })
-      } catch {
-        data = redactRaw(payload)
-      }
-    }
-
-    let replaced = false
-    return lines
-      .flatMap((line) => {
-        if (!line.startsWith("data:")) {
-          const colon = line.indexOf(":")
-          const field = colon < 0 ? line : line.slice(0, colon)
-          if (!sseFields.has(field)) return redactRaw(line)
-          return colon < 0 ? line : line.slice(0, colon + 1) + redactRaw(line.slice(colon + 1))
+        while (offset < bytes.length) {
+          let first = bytes.length
+          let length = 0
+          for (const needle of needles) {
+            const found = bytes.indexOf(needle, offset)
+            if (found < 0 || found >= first) continue
+            first = found
+            length = needle.length
+          }
+          if (!length) break
+          if (first > offset) stream.enqueue(bytes.subarray(offset, first))
+          stream.enqueue(mask)
+          offset = first + length
         }
-        if (data === payload) return line
-        if (replaced) return []
-        replaced = true
-        return data.split("\n").map((value) => `data: ${value}`)
-      })
-      .join("\n")
-  }
 
-  let pending = ""
-  let endedWithCR = false
-  return body
-    .pipeThrough(new TextDecoderStream())
-    .pipeThrough(
-      new TransformStream<string, string>({
-        transform(chunk, stream) {
-          if (!chunk) return
-          const text = endedWithCR && chunk.startsWith("\n") ? chunk.slice(1) : chunk
-          endedWithCR = chunk.endsWith("\r")
-          const frames = (pending + text.replace(/\r\n?/gu, "\n")).split("\n\n")
-          pending = frames.pop() ?? ""
-          if (pending.length > 10 * 1024 * 1024) throw new Error("Model server event is too large")
-          for (const frame of frames) stream.enqueue(redact(frame) + "\n\n")
-        },
-        flush(stream) {
-          if (pending) stream.enqueue(redact(pending))
-        },
-      }),
-    )
-    .pipeThrough(new TextEncoderStream())
+        let end = bytes.length
+        for (const needle of needles) {
+          for (let start = Math.max(offset, bytes.length - needle.length + 1); start < end; start++) {
+            if (!bytes.subarray(start).equals(needle.subarray(0, bytes.length - start))) continue
+            end = start
+            break
+          }
+        }
+        if (end > offset) stream.enqueue(bytes.subarray(offset, end))
+        pending = Buffer.from(bytes.subarray(end))
+      },
+      flush(stream) {
+        if (pending.length) stream.enqueue(pending)
+      },
+    }),
+  )
 }
 
 export const modelServerFetch = Object.assign(
@@ -198,26 +163,11 @@ export const modelServerFetch = Object.assign(
     if (!target.ok) throw new Error("Model server address is not allowed")
     const reply = await target.request(request)
     const key = request.headers.get("authorization")?.match(/^Bearer (.+)$/iu)?.[1]
-    if (!key || !reply.body) return reply
+    if (!key || key.length < modelServerSecretMinLength || !reply.body) return reply
 
-    const mask = "[redacted]".includes(key) ? "…" : "[redacted]"
     const headers = new Headers(reply.headers)
     headers.delete("content-length")
-    const response = { status: reply.status, statusText: reply.statusText, headers }
-    if (reply.ok) {
-      const isEventStream =
-        headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() === "text/event-stream" ||
-        new URL(request.url).pathname.endsWith("/chat/completions")
-      return isEventStream ? new Response(redactEventStream(reply.body, key, mask), response) : reply
-    }
-
-    const text = await reply.text()
-    let body = text
-    try {
-      body = JSON.stringify(JSON.parse(text))
-    } catch {}
-    body = body.replaceAll(JSON.stringify(key).slice(1, -1), mask).replaceAll(key, mask)
-    return new Response(body, response)
+    return new Response(redactBody(reply.body, key), { status: reply.status, statusText: reply.statusText, headers })
   },
   { preconnect: fetch.preconnect },
 )

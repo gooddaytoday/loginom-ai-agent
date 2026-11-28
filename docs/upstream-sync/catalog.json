@@ -155,7 +155,10 @@
         "packages/session-ui/src/timeline/projection.ts",
         "packages/session-ui/src/tools/tool-renderer.tsx",
         "packages/ui/src/i18n/en.ts"
-      ]
+      ],
+      "notes": {
+        "packages/plugin/src/gui/builtin.ts": "C2.6: provider setup priority follows the window host's reconnecting server event stream."
+      }
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer and window tests", "paths": ["packages/desktop/**"] },
     {
@@ -197,7 +200,9 @@
         "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**"
       ],
       "notes": {
-        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events."
+        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events. C2.6: own-server ordering after reconnect and short-key warning.",
+        "packages/app/src/providers/connect/dialog.tsx": "C2.6: pass the reconnecting server event stream to built-in provider setup priority.",
+        "packages/app/src/runtime/i18n/ru.ts": "C2.6 (В-90): Russian label for the remaining providers group."
       }
     },
     {

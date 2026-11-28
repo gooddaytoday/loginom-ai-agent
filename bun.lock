@@ -513,7 +513,6 @@
         "@loginom-ai-agent/dashboard": "workspace:*",
         "@loginom-ai-agent/loginom-host": "workspace:*",
         "@loginom-ai-agent/product": "workspace:*",
-        "@opencode/ai": "workspace:*",
         "@opencode/plugin": "workspace:*",
         "@opencode/schema": "workspace:*",
         "@opencode/util": "workspace:*",
