@@ -1,5 +1,7 @@
 # Приёмка Loginom AI Agent на отдельных машинах
 
+Шлюз C, сценарии 1, 2 и 4, запускаются из корня репозитория командой `bun run --cwd packages/app test:e2e:gate`. Нужны Chromium для Playwright, `npm ci --ignore-scripts --prefix packages/loginom-runtime/client` и путь к Node 24.19.0 в `LOGINOM_AI_AGENT_TEST_NODE`. Отчёт со снимками 1280 и 390 px сохраняется в `packages/app/e2e/playwright-report/gate`.
+
 Самостоятельный CLI из ветки `loginom-cli` проверяется по отдельному
 [runbook IND-01…14](standalone-cli.md). Его текущая спецификация —
 [standalone CLI](../../superpowers/specs/2026-09-17-loginom-cli-standalone-design.md);
