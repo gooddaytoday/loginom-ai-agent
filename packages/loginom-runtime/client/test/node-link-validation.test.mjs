@@ -7,6 +7,7 @@ import {join} from 'node:path';
 import {readNodeTargetLinkValidation} from '../lib/executor.mjs';
 import {createExecutionJournal} from '../lib/execution-journal.mjs';
 import {makeRestLinkCode} from '../lib/rest-request.mjs';
+import {runRestStep} from '../lib/rest-step.mjs';
 import {linkPage,linkParameters,run} from './support/executor-fixture.mjs';
 function fixture(value,kind='data'){
  const context={request:{document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'wf'}},dom_epoch:1,nodes:[{id:'s',tid:'Source'},{id:'t',tid:'Target'}]};
@@ -33,10 +34,11 @@ function restServiceLink(mode='ready'){
  f.source.element.contains=f.target.element.contains=()=>false;
  f.source.element.getBoundingClientRect=()=>({x:20,y:20,width:12,height:24});
  f.target.element.getBoundingClientRect=()=>({x:100+shift,y:200,width:12,height:24});
- const blocker={};
+ const blocker={tagName:'DIV',getAttribute:name=>({'data-tid':'wf;DragMask',class:'x-mask rest-mask'})[name]??null};
  f.document.elementFromPoint=(x,y)=>{
   const element=[f.source.element,f.target.element].find(e=>{const b=e.getBoundingClientRect();return x>=b.x&&x<b.x+b.width&&y>=b.y&&y<b.y+b.height;});
-  if(mode==='covered'||clock<1100&&(
+  if(mode==='covered')return element===f.source.element?blocker:null;
+  if(clock<1100&&(
    ['source_cover','cover_owner_changed'].includes(mode)&&element===f.source.element||mode==='target_cover'&&element===f.target.element))return blocker;
   return element;
  };
@@ -67,7 +69,8 @@ function restServiceLink(mode='ready'){
  up:async()=>{upCalls++;if(down&&f.handler.marker.validState?.cell===f.target.port.FCell&&cache['115']['237']===true){drops++;edge={source:f.source.port.FCell,target:f.target.port.FCell};f.source.port.FCell.edges=[edge];}down=false;f.graph.isMouseDown=false;}};
  if(mode==='existing'){edge={source:f.source.port.FCell,target:f.target.port.FCell};f.source.port.FCell.edges=[edge];}
  const task={document_id:'doc',workflow_ref:f.context.request.workflow_ref,node:{node_id:'t'},connection:{reference_node_id:'s'},dom_epoch:1,deadline:['expired','covered'].includes(mode)?1150:30000};
- return {run:()=>vm.runInContext('('+makeRestLinkCode(task)+')',f.browser)(f.page),moves,get down(){return down;},get upCalls(){return upCalls;},get drops(){return drops;}};
+ const execute=code=>vm.runInContext('('+code+')',f.browser)(f.page);
+ return {run:()=>execute(makeRestLinkCode(task)),execute,task,page:f.page,moves,get down(){return down;},get upCalls(){return upCalls;},get drops(){return drops;}};
 }
 
 for(const mode of ['ready','shifted','unready','pending'])test('serialized REST service drag preserves the native marker: '+mode,async()=>{
@@ -90,6 +93,22 @@ for(const mode of ['source_cover','target_cover','covered','cover_owner_changed'
   assert.equal(f.drops,1);
   assert.equal(f.upCalls,1);
  }
+});
+test('REST link refusal preserves the blocked ports and actual DOM hit in its receipt',async()=>{
+ const f=restServiceLink('covered'),completed=[];
+ await assert.rejects(runRestStep({operation:{id:'rest'},execute:f.execute,
+  receiptOptions:(_id,_key,signature)=>({receipt_namespace:'test',receipt_signature:signature}),
+  onRecord:async entry=>{if(entry.phase==='node_step_completed')completed.push(entry.outcome);return entry;}},
+ f.task,'link',makeRestLinkCode,{connection:f.task.connection,dom_epoch:f.task.dom_epoch},{}),/REST link port is covered/);
+ const {state,outcome}=f.page[Symbol.for('loginom-dock.operation-receipts.v1')].get('test/rest:n1');
+ assert.equal(state,'completed');
+ assert.equal(outcome.status,'NOT_APPLIED');
+ assert.equal(outcome.effect_possible,false);
+ assert.equal(outcome.cleanup_complete,true);
+ assert.deepEqual(structuredClone(outcome.output.blocked_ports),{source:{tag:'div',tid:'wf;DragMask',class:'x-mask rest-mask'},target:null});
+ assert.deepEqual(completed,[outcome]);
+ assert.equal(f.moves.length,0);
+ assert.equal(f.upCalls,0);
 });
 for(const [mode,error] of [['marker','native target marker is not ready'],['rejected','native compatibility rejected'],['expired','validation deadline elapsed'],['foreign','Link validation workflow changed']])test('serialized REST service drag retains refusal: '+mode,async()=>{
  const f=restServiceLink(mode),result=await f.run();

@@ -55,7 +55,15 @@ export function readSavedPackageState(o) {
   // Confirm once after polling, while the original native owner can still be checked.
   if(modified&&o.cleanDeadline!==undefined&&Date.now()<o.confirmationDeadline){
    checkOwner();
-   modified=await read();
+   const remaining=o.confirmationDeadline-Date.now();
+   if(remaining>0){
+    let timer;
+    try{
+     const expired=new Promise(resolve=>{timer=setTimeout(()=>resolve(true),remaining);});
+     const confirmed=await Promise.race([read(),expired]);
+     if(Date.now()<o.confirmationDeadline)modified=confirmed;
+    }finally{clearTimeout(timer);}
+   }
   }
   return {version:1,session_id:o.sessionId,document_id:o.documentId,account:o.account,package_path:o.packagePath,
    modified,observation:'after_confirmed_save',read_only:true,persisted_content_verified:false};

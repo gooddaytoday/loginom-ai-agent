@@ -835,12 +835,16 @@ export async function readNodeTargetLinkValidation(page, context, parameters, en
     };
     const source=bind(context.nodes[0],'Output',parameters.source_port),target=bind(context.nodes[1],'Input',parameters.target_port);
     if(endpointsOnly){
-      const point=({element})=>{
+      const blocked_ports={};
+      const point=(role,{element})=>{
         const box=element.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2;
         const hit=document.elementFromPoint(x,y);
-        return box.width>0&&box.height>0&&hit&&(element===hit||element.contains(hit))?{x,y}:null;
+        if(box.width>0&&box.height>0&&hit&&(element===hit||element.contains(hit)))return {x,y};
+        blocked_ports[role]=hit?{tag:hit.tagName.toLowerCase().slice(0,24),tid:hit.getAttribute('data-tid')?.slice(0,96)??null,
+          class:hit.getAttribute('class')?.slice(0,96)??null}:null;
+        return null;
       };
-      return {source:point(source),target:point(target)};
+      return {source:point('source',source),target:point('target',target),blocked_ports};
     }
     const handler=graph.connectionHandler;
     const ownership={graph_mouse_down:!!graph.isMouseDown,connection_first:!!handler.first,source_cell:handler.previous?.cell===source.port.FCell,
@@ -1917,9 +1921,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if(normalizeRest)try {
       const binding = task.storage_binding;
       if (!binding) throw Error('REST package normalization requires its prepared session storage identity');
-      const read = async cleanDeadline => (await page.evaluate(readSavedState, {
+      const read = async (cleanDeadline, confirmationDeadline) => (await page.evaluate(readSavedState, {
         sessionId: binding.session_id, documentId: binding.document_id, account: binding.loginom_account,
-        packagePath: before.path, origin: binding.origin, loginomBuild, cleanDeadline, confirmationDeadline: deadline,
+        packagePath: before.path, origin: binding.origin, loginomBuild, cleanDeadline, confirmationDeadline,
       })).modified;
       modifiedBefore = await read();
       modifiedAfter = modifiedBefore;
@@ -1937,9 +1941,10 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         await waitForNoMask(60000);
         transientDialog = false;
         ensureDeadline();
-        // Bound the transient modified-flag race and keep five seconds for
-        // verified continuation binding after a confirmed Save.
-        modifiedAfter = await read(Math.min(deadline - 5000, Date.now() + 5000));
+        // Poll and confirm within the same budget, leaving five seconds for binding.
+        const bindingReserveStart = deadline - 5000;
+        const cleanDeadline = Math.min(bindingReserveStart, Date.now() + 5000);
+        modifiedAfter = await read(cleanDeadline, Math.min(bindingReserveStart, cleanDeadline + 500));
       }
       if (modifiedAfter !== false) throw Error('REST_PACKAGE_NORMALIZATION_STILL_MODIFIED: package is still modified after the one additional Save; no retry was sent');
       ensureDeadline();

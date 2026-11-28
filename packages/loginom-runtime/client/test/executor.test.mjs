@@ -970,7 +970,11 @@ async function restSavePage(modified, restReference = true) {
  page.context.location={origin:'https://loginom.invalid'};
  page.context.__loginomDockPreparationV1.receipts.get('prepared').request=JSON.stringify({session:'save-session'});
  await page.execute('async page=>{const p=globalThis.__loginomDockPreparationV1;p.receipts=new Map(p.receipts);return true;}');
- page.context.setTimeout=(callback,ms)=>page.waitForTimeout(ms).then(callback);
+ page.context.setTimeout=(callback,ms)=>{
+  const due=page.clock+ms;
+  return setImmediate(()=>page.waitForTimeout(Math.max(0,due-page.clock)).then(callback));
+ };
+ page.context.clearTimeout=clearImmediate;
  page.saveWrites=0;page.modifiedReads=0;
  const save=page.save.bind(page),elements=page.elements.bind(page),click=page.click.bind(page);
  page.save=()=>{page.saveWrites++;save();};
@@ -1240,6 +1244,34 @@ test('REST normalization confirms the same Save at '+cleanAfter+' ms',async()=>{
  else assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
  assert.deepEqual(reads.filter(ms=>ms>=5000),cleanAfter<5000?[]:[5000]);
  assert.equal(outcome.trace.find(e=>e.event==='rest_package_normalization').modified_after,!clean);
+ assert.equal(page.saveWrites,2);
+});
+
+for(const budget of [20000,10600])
+test('REST normalization stops waiting for a late confirmation and keeps the continuation reserve: '+budget,{timeout:5000},async()=>{
+ const page=await restSavePage([true]),deadline=page.clock+budget;
+ const evaluate=page.evaluate.bind(page);
+ const session=page.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.Session;
+ let confirmationStarted,finishRead;
+ page.evaluate=async(fn,arg)=>{
+  if(arg?.cleanDeadline!==undefined)session.IsPackageModified=async()=>{
+   if(page.clock<arg.cleanDeadline)return true;
+   assert.equal(confirmationStarted,undefined,'only one confirmation RPC is allowed');
+   confirmationStarted=page.clock;
+   return new Promise(resolve=>{finishRead=resolve;});
+  };
+  return evaluate(fn,arg);
+ };
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'},{deadline_at:deadline});
+ assert.equal(typeof finishRead,'function',JSON.stringify(outcome.trace.find(e=>e.event==='rest_package_normalization')));
+ finishRead(false);
+ assert.equal(outcome.status,'AMBIGUOUS');
+ assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
+ const confirmationTime=page.clock-confirmationStarted;
+ assert.ok(confirmationTime>0&&confirmationTime<=500);
+ assert.ok(deadline-page.clock>=5000);
+ if(budget===10600)assert.ok(confirmationTime<500,'confirmation must use only the time left before the reserve');
+ assert.equal(outcome.trace.find(e=>e.event==='rest_package_normalization').modified_after,true);
  assert.equal(page.saveWrites,2);
 });
 

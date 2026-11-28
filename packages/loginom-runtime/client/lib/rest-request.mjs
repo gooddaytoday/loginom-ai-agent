@@ -26,13 +26,14 @@ export async function restLinkCapability(page,t,readValidation){
   // Read both owned ports again after a transient blocker before starting the drag.
   const reachabilityDeadline=Math.min(t.deadline,Date.now()+500);
   const readPoints=()=>readValidation(page,context,parameters,true);
-  let {source,target}=await readPoints();
-  while((!source||!target)&&Date.now()<reachabilityDeadline){
+  let points=await readPoints();
+  while((!points.source||!points.target)&&Date.now()<reachabilityDeadline){
    await page.waitForTimeout(Math.min(50,reachabilityDeadline-Date.now()));
    if(Date.now()>=t.deadline)break;
-   ({source,target}=await readPoints());
+   points=await readPoints();
   }
-  if(!source||!target)throw Error('REST link port is covered');
+  const {source,target,blocked_ports}=points;
+  if(!source||!target)return {verified:false,cleanup_complete:true,effect_possible:false,error:'REST link port is covered',blocked_ports};
   need(Date.now()<t.deadline,'deadline elapsed');await page.mouse.move(source.x,source.y);effect=true;held=true;await page.mouse.down();await page.mouse.move(target.x,target.y,{steps:16});
   let validation;
   do{need(Date.now()<t.deadline,'validation deadline elapsed');validation=await readValidation(page,context,parameters);need(validation.state!=='rejected','native compatibility rejected the ports');if(validation.state==='pending')await page.waitForTimeout(Math.min(50,t.deadline-Date.now()));}while(validation.state==='pending');
