@@ -354,7 +354,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         if(changed&&!after.interaction_ready)throw refusal;
         await save('node_target_refusal_observed',{refusal:{effect,receipt:structuredClone(receipt),after_graph:after}});
         (state.refusals??=[]).push({id:effect.id,kind,receipt:structuredClone(receipt)});
-        state.pending = null; state.last_graph=structuredClone(after);state.effect_possible=priorEffect;
+        state.pending = null; state.last_graph=structuredClone(changed?before:after);state.effect_possible=priorEffect;
         await commit();
         if(changed)throw refusal;
         // New receipt ID, same graph identity and original deadline. No retry
@@ -405,6 +405,8 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
   }
   try {
     let graph = await observe();
+    if(state.graph_conflict_reconciled&&!state.pending&&!state.completed&&!sameDomainGraph(state.last_graph,graph))
+      throw graphRefusal(state.last_graph,graph,'Graph changed again after the checked target checkpoint');
     if(state.move_mismatch)return structuredClone(state.result);
     if (state.pending) {
       // Adapter reads the receipt; it is never allowed to reissue the gesture.
@@ -665,14 +667,28 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
   }
 }
 
+// Keep the created GUID and the ports, links and captions the original request
+// depends on. A neighbour's caption can change without invalidating that proof.
+function canKeepCreatedTarget(request,state,checkpoint,graph) {
+  if(request.target.kind!=='new'||!state.targetId||state.completed||state.add_only_unowned_links
+    ||!state.receipts.some(effect=>effect.kind==='create'&&effect.verified===true)
+    ||graph.complete!==true||graph.interaction_ready!==true||graph.nodes.some(node=>node.locked!==false))return false;
+  const bound=new Set([state.targetId,...[...request.inputs,...request.variable_inputs??[]].map(input=>input.source.node_id)]);
+  const captions=new Map(checkpoint.nodes.map(node=>[node.ref.node_id,node.label]));
+  const nodes=graph.nodes.map(node=>bound.has(node.ref.node_id)||!captions.has(node.ref.node_id)
+    ?node:{...node,label:captions.get(node.ref.node_id)});
+  return sameDomainGraph(checkpoint,{...graph,nodes});
+}
+
 // Read-only reconciliation: inspect must never continue the remaining gestures.
-export async function inspectNodeTarget({request,operation,adapter,record,deadline}) {
+export async function inspectNodeTarget({request,operation,adapter,record,deadline,signal,graphConflict=false}) {
   const state=structuredClone(operation.targetPhase);
   if(!state)throw new Error('Node target has no checkpoint');
-  const graph=await adapter.observe(request,deadline);
+  const graph=await adapter.observe(request,deadline,signal);
+  signal?.throwIfAborted();
   if(state.pending){
     const effect=state.pending;
-    const recovery=await reconcileTargetEffect(adapter,effect,graph,deadline);
+    const recovery=await reconcileTargetEffect(adapter,effect,graph,deadline,signal);
     if(recovery.completed===true&&recovery.cleanup_complete===true
       &&await settleMoveMismatch({operation,state,effect,receipt:recovery.receipt,graph,adapter,record})){
       operation.targetPhase=state;return structuredClone(state.result);
@@ -689,7 +705,19 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
     state.receipts.push({id:effect.id,kind:effect.kind,parameters:effect.parameters,verified:true,receipt:recovery,...(keepBefore(effect,request)?{before:effect.before}:{})});
     state.pending=null;state.last_graph=structuredClone(graph);
     }
-  }else if(!same(state.completed?state.final_graph:(state.last_graph??state.baseline),graph))throw new Error('Partial node target graph changed');
+  }else{
+    const checkpoint=state.completed?state.final_graph:(state.last_graph??state.baseline);
+    const matches=checkpoint&&(state.graph_conflict_reconciled?sameDomainGraph(checkpoint,graph):same(checkpoint,graph));
+    if(!matches){
+      if(!graphConflict||!checkpoint||!canKeepCreatedTarget(request,state,checkpoint,graph))
+        throw Error('Partial node target graph changed');
+      const confirmed=await adapter.observe(request,deadline,signal);
+      signal?.throwIfAborted();
+      if(!sameDomainGraph(graph,confirmed))throw Error('Graph changed during target reconciliation');
+      state.last_graph=structuredClone(confirmed);
+      state.graph_conflict_reconciled=true;
+    }
+  }
   if(state.completed && !same(state.final_graph,graph))throw new Error('Completed node target changed');
   const event={operation_id:operation.id,phase:'node_target_checkpoint',internal_provenance:'node_target_v1',target_state:structuredClone(state)};
   const ack=await record(event);if(!same(ack?.target_state,journalCopy(event).target_state))throw new Error('Node target journal acknowledgement differs');

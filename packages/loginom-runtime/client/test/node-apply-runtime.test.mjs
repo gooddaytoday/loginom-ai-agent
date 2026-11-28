@@ -37,6 +37,87 @@ function fixture({execute=async()=>{throw Error('Unexpected public transport')},
  return {runtime,adapter,calls,events,graph,drivers,handler,handlers,failRecord:p=>{failRecord=p}};
 }
 
+for(const variant of ['neighbour','new','during_gesture','changed_again'])test('step check after confirmed creation and manual caption change: '+variant,async()=>{
+ const edited=variant==='new'?'new':'neighbour';
+ let editedOnce=false;
+ const f=fixture({record:async event=>{
+  if(variant!=='during_gesture'&&!editedOnce&&event.phase==='node_target_checkpoint'&&event.target_state.receipts.some(effect=>effect.kind==='create')){
+   editedOnce=true;
+   f.graph.nodes.find(node=>node.ref.node_id===edited).label='Manual caption';
+  }
+  return event;
+ }});
+ f.graph.nodes.push({ref:{document_id:'doc',workflow_id:'wf',node_id:'neighbour'},type:'imports.text',label:'Neighbour',
+  position:{x:160,y:80},inputs:[],outputs:[0],locked:false});
+ const mutate=f.adapter.mutate;
+ f.adapter.mutate=async effect=>{
+  if(variant==='during_gesture'&&!editedOnce&&effect.kind==='rename'){
+   editedOnce=true;
+   f.graph.nodes.find(node=>node.ref.node_id==='neighbour').label='Manual caption';
+   return {status:'NOT_APPLIED',cleanup_complete:true,effect_possible:false,error_code:'NODE_GRAPH_CONFLICT'};
+  }
+  const reply=await mutate(effect);
+  const target=f.graph.nodes.find(node=>node.ref.node_id==='new');
+  target.locked=false;
+  if(effect.kind==='rename')target.label=effect.parameters.label;
+  return reply;
+ };
+ const r=request();r.target.label='Step caption';
+ const stopped=await f.runtime.runNodeApply(r);
+ assert.equal(stopped.error.code,'NODE_GRAPH_CONFLICT');
+ assert.deepEqual(f.calls,['source','create']);
+ if(edited==='new'){
+  await assert.rejects(f.runtime.checkStepContinuation('apply',AbortSignal.timeout(1000)),/graph changed/);
+  assert.deepEqual(f.calls,['source','create']);
+  return;
+ }
+ const checked=await f.runtime.checkStepContinuation('apply',AbortSignal.timeout(1000));
+ assert.equal(checked.error.code,'NODE_PHASE_RECOVERED');
+ assert.deepEqual(f.calls,['source','create']);
+ const caption=variant==='changed_again'?'Second manual caption':'Manual caption';
+ if(variant==='changed_again'){
+  f.graph.nodes.find(node=>node.ref.node_id==='neighbour').label=caption;
+  assert.equal((await f.runtime.checkStepContinuation('apply',AbortSignal.timeout(1000))).error.code,'NODE_PHASE_RECOVERED');
+ }
+ const result=await f.runtime.runNodeApply(r,{resume:true});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ assert.deepEqual(f.graph.nodes.map(node=>[node.ref.node_id,node.label]),[['neighbour',caption],['new','Step caption']]);
+ assert.equal(f.calls.filter(name=>name==='create').length,1);
+});
+
+for(const phase of ['input_mapping','output_mapping'])test('step check accepts only a verified Calculator Done for '+phase,async()=>{
+ let mapped=0,doneVerified=false,probes=0;
+ const direction=phase==='input_mapping'?'Input':'Output';
+ const f=fixture({wrapDrivers:(_context,drivers)=>({...drivers,
+  mapPorts:async()=>{
+   if(++mapped===(phase==='input_mapping'?1:2))throw Error('Lost mapping Done response');
+   return {verified:true,cleanup_complete:true};
+  },
+  [`inspect${direction}Mapping`]:async()=>({available:doneVerified,phase}),
+  [`recover${direction}Mapping`]:async()=>{
+   probes++;
+   return {verified:true,cleanup_complete:true,finish:{settings_applied:true,execution_started:false},recovery:{verified:true}};
+  },
+  finish:async()=>({verified:true,cleanup_complete:true,mode:'done',settings_applied:true,execution_started:false}),
+  finishGraph:drivers.finish,
+ })});
+ f.handlers.set('transform.calculator',{...f.handler,output_wizard:'separate'});
+ const r=request();r.target.type='transform.calculator';
+ const stopped=await f.runtime.runNodeApply(r);
+ assert.equal(stopped.output.pending_phase,phase);
+ assert.equal(await f.runtime.checkStepContinuation('apply',AbortSignal.timeout(1000)),undefined);
+ doneVerified=true;
+ const checked=await f.runtime.checkStepContinuation('apply',AbortSignal.timeout(1000));
+ assert.equal(checked.operation_id,'apply');
+ assert.equal(checked.output.pending_phase,phase);
+ assert.equal(probes,0);
+ const result=await f.runtime.runNodeApply(r,{resume:true});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ assert.equal(probes,1);
+ assert.equal(mapped,2);
+ assert.equal(f.calls.filter(name=>name==='create').length,1);
+});
+
 test('interrupting Wait does not cancel Apply or clear its busy signal',async()=>{
  const tracker=createProtectedOperation({pages:()=>[]},'http://loginom.test');
  const entered=Promise.withResolvers(),release=Promise.withResolvers();

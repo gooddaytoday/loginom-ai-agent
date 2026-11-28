@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, unlink } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, unlink } from "node:fs/promises"
 import { MessageChannel } from "node:worker_threads"
 import { Schema } from "effect"
 import { Agent } from "@opencode/schema/agent"
@@ -102,7 +102,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
        export const admitStartupArtifacts=artifacts.admitStartupArtifacts;
        export const artifactFailure=artifacts.artifactFailure ?? (()=>null);`,
     "runtime/client/lib/bridge.mjs": `
-      import { readFileSync } from 'node:fs';
+      import { readFileSync, writeFileSync } from 'node:fs';
       import { withLoginomMetadata } from './loginom-feed-metadata.mjs';
       import { loginomFeedMetadata } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/user-results.mjs", import.meta.url).href)};
       const work = () => JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8'));
@@ -115,10 +115,22 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
         trackedStep: (_name, _args, dispatch) => dispatch(),
-        checkStepState: async id => id!==work().checkId ? { state: 'unavailable', retryAvailable: false } : {
-          state: 'observed', retryAvailable: true, window: { path: null, modified: true, nodeCount: 1, linkCount: 0 },
-          lastConfirmedStep: null, graphSinceLastConfirmedStep: 'unknown',
-          step: { outcome: 'not_applied', retryAvailable: true, persistence: 'step_unsaved', save: null },
+        checkStepState: async (id, signal) => {
+          if (id !== work().checkId) return { state: 'unavailable', retryAvailable: false };
+          if (work().holdCheck) {
+            writeFileSync(${JSON.stringify(work)} + '.' + id, '');
+            while (work().holdCheck) {
+              signal.throwIfAborted();
+              await new Promise(resolve => setTimeout(resolve, 20));
+            }
+          }
+          const continuation = id === 'checking';
+          return { state: 'observed', retryAvailable: !continuation, ...(continuation ? { resumeAvailable: true } : {}),
+            window: { path: null, modified: true, nodeCount: 1, linkCount: 0 },
+            lastConfirmedStep: null, graphSinceLastConfirmedStep: 'unknown',
+            step: { outcome: continuation ? 'check_required' : 'not_applied', retryAvailable: !continuation,
+              persistence: continuation ? 'unknown' : 'step_unsaved', save: null },
+          };
         },
         applyWithScanReceipt: async reply => {
           const end = await protectOperation(reply.structuredContent.operation_id);
@@ -447,6 +459,47 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       expect(callError).toMatchObject({ message: code })
     }
     fault.name = ""
+    const state = { activeWork: false, unsettledWork: false, prepared: true, checkId: "checking" }
+    const chat = createHash("sha256").update(sessionID).digest("hex")
+    const runtime = await host.runtime(1, chat)
+    const request = runtime.request
+    const begin = host.journal.begin
+    let journalAdmissions = 0
+    host.journal.begin = (...args) => {
+      journalAdmissions++
+      return begin(...args)
+    }
+    for (const expired of [false, true]) {
+      const checkId = expired ? "expired-check" : state.checkId
+      runtime.request = (operation, value, timeout, progress) =>
+        request(operation, value, expired && operation === "checkStepState" ? 1_000 : timeout, progress)
+      await Bun.write(work, JSON.stringify({ ...state, checkId, holdCheck: true }))
+      const checking = checkStepState(sessionID, checkId)
+      try {
+        const deadline = Date.now() + 3_000
+        while (Date.now() < deadline && !(await stat(work + "." + checkId).catch(() => false))) await Bun.sleep(20)
+        expect(await stat(work + "." + checkId)).toBeDefined()
+        if (expired) await expect(checking).resolves.toEqual({ state: "unavailable", retryAvailable: false })
+        await expect(run.call("dock_node_apply", { operation_id: "parallel-apply" }, "msg_original")).rejects.toThrow(
+          "LOGINOM_CALL_BUSY",
+        )
+        expect(journalAdmissions).toBe(0)
+        expect(host.journal.pending()).toEqual([])
+      } finally {
+        await Bun.write(work, JSON.stringify(state))
+        runtime.request = request
+        if (!expired)
+          expect(await checking).toMatchObject({ state: "observed", resumeAvailable: true, retryAvailable: false })
+        else {
+          const deadline = Date.now() + 3_000
+          while (Date.now() < deadline && (await host.workState(1, chat)).dispatching) await Bun.sleep(20)
+        }
+      }
+    }
+    await expect(run.call("dock_node_apply", { operation_id: "parallel-apply" }, "msg_original")).resolves.toEqual({
+      content: [],
+    })
+    expect(journalAdmissions).toBe(1)
     const lostArgs = { operation_id: "lost-write", failAfterDispatch: true }
     await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared: true, checkId: "lost-write" }))
     expect(await checkStepState("foreign-chat", "lost-write"))

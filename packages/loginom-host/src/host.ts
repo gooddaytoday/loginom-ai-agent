@@ -638,6 +638,15 @@ export async function createLoginomHost(options: {
     }
   }
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
+  const browserDispatches = new Set<string>()
+  const timedOutStepChecks = new WeakSet<Runtime>()
+  function reserveBrowserDispatch(chat: string) {
+    if (browserDispatches.has(chat)) return
+    browserDispatches.add(chat)
+    return () => {
+      browserDispatches.delete(chat)
+    }
+  }
   function beginClose() {
     service.beginClose()
     resourceController.abort()
@@ -811,15 +820,34 @@ export async function createLoginomHost(options: {
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true
     },
+    reserveBrowserDispatch,
+    async assertBrowserDispatchIdle(runtime: Runtime) {
+      if (!timedOutStepChecks.has(runtime)) return
+      // The Host timeout does not prove the child released its controller.
+      const work = await runtime.request("work", undefined, 5000).catch(() => undefined)
+      if (!work || typeof work !== "object" || !("dispatching" in work) || work.dispatching !== false)
+        throw new Error("LOGINOM_CALL_BUSY")
+      timedOutStepChecks.delete(runtime)
+    },
     async checkStepState(chat: string, operationId: string) {
-      const unavailable = { state: "unavailable", retryAvailable: false }
-      const status = await service.api.status()
-      const children = generations.get(status.generation)?.children
-      const child = children?.get(chat)
-      if (!child || lost.has(chat) || stale.has(chat)) return unavailable
-      const result = await (await child).request("checkStepState", { operationId }, 25000).catch(() => unavailable)
-      const after = await service.api.status()
-      return children?.get(chat) === child && status.generation === after.generation ? result : unavailable
+      const release = reserveBrowserDispatch(chat)
+      if (!release) return { state: "busy", retryAvailable: false }
+      try {
+        const unavailable = { state: "unavailable", retryAvailable: false }
+        const status = await service.api.status()
+        const children = generations.get(status.generation)?.children
+        const child = children?.get(chat)
+        if (!child || lost.has(chat) || stale.has(chat)) return unavailable
+        const runtime = await child
+        const result = await runtime.request("checkStepState", { operationId }, 25000).catch((error: unknown) => {
+          if (error instanceof Error && error.message === "LOGINOM_RUNTIME_TIMEOUT") timedOutStepChecks.add(runtime)
+          return unavailable
+        })
+        const after = await service.api.status()
+        return children?.get(chat) === child && status.generation === after.generation ? result : unavailable
+      } finally {
+        release()
+      }
     },
     async workState(generation: number, chat: string) {
       // Inspect only the existing owner. Losing it is uncertainty, not evidence of idle work.

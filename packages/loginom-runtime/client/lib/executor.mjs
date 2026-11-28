@@ -2630,7 +2630,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return true;
     }finally{running=false;}
   };
-  const inspectApply=async(operation,signal)=>{
+  const inspectApply=async(operation,signal,{graphConflict=false}={})=>{
     // An inspection never calls configuration, execution or generic action
     // reconciliation. Unknown phases keep the gate until a phase-specific
     // verifier is available. A durable node checkpoint is safe to redeliver.
@@ -2659,13 +2659,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }
     if(operation.nodeApply?.pending?.phase==='input_mapping'&&operation.nodeApplyDrivers?.inspectInputMapping){
       running=true;
-      try{operation.inputMappingRecovery=await operation.nodeApplyDrivers.inspectInputMapping({readReceipt:ref=>readReceipt(operation,ref)});}
+      try{operation.inputMappingRecovery=await operation.nodeApplyDrivers.inspectInputMapping({readReceipt:ref=>readReceipt(operation,ref),signal});}
       catch(error){operation.inputMappingRecovery={available:false,phase:'input_mapping',reason:String(error.message).slice(0,1000)};}
       finally{running=false;}
     }
     if(operation.nodeApply?.pending?.phase==='output_mapping'&&operation.nodeApplyDrivers?.inspectOutputMapping){
       running=true;
-      try{operation.outputMappingRecovery=await operation.nodeApplyDrivers.inspectOutputMapping({readReceipt:ref=>readReceipt(operation,ref)});}
+      try{operation.outputMappingRecovery=await operation.nodeApplyDrivers.inspectOutputMapping({readReceipt:ref=>readReceipt(operation,ref),signal});}
       catch(error){operation.outputMappingRecovery={available:false,phase:'output_mapping',reason:String(error.message).slice(0,1000)};}
       finally{running=false;}
     }
@@ -2690,7 +2690,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const state=operation.nodeApply;
         const {graph}=validateNodeApplyRequest(state.request,nodeApplyHandlers);
         const result=await inspectNodeTarget({request:graph,operation,adapter:operation.nodeTargetAdapter,
-          record:nodeTargetRecord,deadline:now()+15000});
+          record:nodeTargetRecord,deadline:now()+15000,signal,graphConflict});
         if(result.status==='FAILED'&&result.cleanup_complete===true&&operation.targetPhase.move_mismatch&&!operation.targetPhase.pending){
           const outcome={...operation.outcome.output,status:'FAILED',pending_phase:null,cleanup_complete:true,
             error:{code:'NODE_APPLY_STOPPED',message:result.error}};
@@ -4942,6 +4942,29 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // the owned worker or removing its private local download cache.
     closeNodeOperations:()=>nodeJobs.close(),
     stepReceipt:id=>operations.get(id)?.outcome,
+    async checkStepContinuation(id,signal){
+      const operation=pending;
+      if(operation?.id!==id||running||nodeJobs.busy)return;
+      const state=operation.nodeApply,phase=state?.pending?.phase;
+      const graphConflict=phase==='target'&&operation.outcome?.error?.code==='NODE_GRAPH_CONFLICT';
+      const mapping=state?.request.target.type==='transform.calculator'
+        &&(phase==='input_mapping'?'inputMappingRecovery':phase==='output_mapping'?'outputMappingRecovery':null);
+      if(graphConflict||mapping)await inspectApply(operation,signal,{graphConflict});
+      else if(state?.target_reconciled&&!phase&&!state.node&&operation.targetPhase?.graph_conflict_reconciled){
+        running=true;
+        try{
+          const {graph}=validateNodeApplyRequest(state.request,nodeApplyHandlers);
+          await inspectNodeTarget({request:graph,operation,adapter:operation.nodeTargetAdapter,
+            record:nodeTargetRecord,deadline:now()+8000,signal,graphConflict:true});
+        }finally{running=false;}
+      }
+      signal?.throwIfAborted();
+      const current=operation.outcome;
+      // Mapping inspection authenticates the original Done. Resume owns the
+      // separate live probe and may still refuse before performing more work.
+      if(pending===operation&&(current?.error?.code==='NODE_PHASE_RECOVERED'&&current.cleanup_complete===true
+        ||mapping&&operation[mapping]?.available===true))return current;
+    },
     stepCheckBusy:()=>!!(running||nodeJobs.busy||leased||storageNavigating||serverDownloads?.unsettled||delivery.unsettled||sourceReads.unsettled),
     async settleUnappliedStep(id,graph,{signal,deadline}){
       const operation=pending;

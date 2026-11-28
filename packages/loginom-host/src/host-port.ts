@@ -194,10 +194,6 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       try {
         const check = Schema.decodeUnknownSync(StepCheckRequest)(input)
         const chat = createHash("sha256").update(check.sessionID).digest("hex")
-        if ([...runs.values()].some((run) => run.chat === chat && run.dispatching)) {
-          reply({ id: data.id, result: { state: "busy", retryAvailable: false } })
-          return
-        }
         const result = Schema.decodeUnknownSync(StepCheckResult)(
           await service.checkStepState(chat, check.operationId),
         )
@@ -408,6 +404,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       // Refuse competing calls before durable admission. The active call keeps its
       // own journal and lease; a known no-dispatch refusal is not uncertainty.
       if ((data.method === "call" || referenceCall) && run.dispatching) throw new Error("LOGINOM_CALL_BUSY")
+      const releaseBrowser = browserCall ? service.reserveBrowserDispatch(run.chat) : undefined
+      if (browserCall && !releaseBrowser) throw new Error("LOGINOM_CALL_BUSY")
       if (data.method === "call" || referenceCall) run.dispatching = true
       const preparing = data.method === "call" && "name" in input && input.name === prepareTool.name
       if (packageInput || preparing) run.packagePreparation = new AbortController()
@@ -643,6 +641,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             run.admitted.add(admission.userMessage)
           }
           if (packageAborted()) throw new Error("LOGINOM_RUN_ABORTED")
+          await service.assertBrowserDispatchIdle(runtime)
           if (
             preparation?.waited &&
             (state.closed || run.released || preparation.signal.aborted || Date.now() >= preparation.deadline)
@@ -714,6 +713,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           throw new Error("LOGINOM_CALL_UNCERTAIN")
         }
       } finally {
+        releaseBrowser?.()
         if (data.method === "call" || referenceCall) {
           run.dispatching = false
           run.packagePreparation = undefined

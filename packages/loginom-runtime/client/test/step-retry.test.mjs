@@ -12,9 +12,13 @@ function fixture() {
   const window={status:'READY',document_id:'page',workflow_ref:graph.workflow_ref,graph,
     package_ref:{path:'/scenario.lgp'},modified:true};
   const receipts=new Map(),saves=new Map();
-  let canProveNoWrite=false;
+  let canProveNoWrite=false,doneVerified=false;
   const retry=createStepRetry({
     workspace:()=>({document_id:window.document_id,workflow_ref:window.workflow_ref}),observe:async()=>structuredClone(window),receipt:id=>receipts.get(id),
+    checkContinuation:async id=>{
+      const result=receipts.get(id);
+      if(doneVerified||result?.error?.code==='NODE_PHASE_RECOVERED'&&result.cleanup_complete)return result;
+    },
     unsettled:()=>[...receipts.values()].some(item=>item.status==='AMBIGUOUS'),
     busy:()=>false,confirmedSave:id=>saves.get(id),label:(_name,args)=>args.operation_id,
     settleUnapplied:async id=>{
@@ -35,7 +39,7 @@ function fixture() {
     assert.equal(reply._meta.loginom.v,1);
     return reply._meta.loginom.step;
   };
-  return {retry,window,receipts,saves,finish,noWrite:()=>{canProveNoWrite=true;}};
+  return {retry,window,receipts,saves,finish,verifyDone:()=>{doneVerified=true;},noWrite:()=>{canProveNoWrite=true;}};
 }
 
 test('lost write requires a read-only check and positive evidence before a fresh operation is admitted',async()=>{
@@ -113,10 +117,29 @@ test('a completed read opens one continuation only for the reconciled original p
   f.receipts.set('write',{status:'AMBIGUOUS',effect_possible:true,cleanup_complete:true,error:{code:'NODE_PHASE_RECOVERED'}});
   const resume={operation_id:'write'};
   assert.equal(f.retry.admit('dock_node_resume',resume).blocked.operationId,'write');
-  assert.equal((await f.retry.check('write',signal)).retryAvailable,false);
+  const checked=await f.retry.check('write',signal);
+  assert.equal(checked.retryAvailable,false);
+  assert.equal(checked.resumeAvailable,true);
   assert.equal(f.retry.admit(apply,{operation_id:'new'}).blocked.operationId,'write');
   assert.equal(f.retry.admit('dock_node_resume',resume),undefined);
   assert.equal(f.retry.admit('dock_node_resume',resume).blocked.operationId,'write');
+});
+
+test('verified Calculator Done can authorize the original continuation despite an ambiguous outer receipt',async()=>{
+  const f=fixture(),resume={operation_id:'write'};
+  await f.finish(apply,'write',{status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false});
+  assert.equal((await f.retry.check('write',signal)).resumeAvailable,undefined);
+  assert.ok(f.retry.admit('dock_node_resume',resume).blocked);
+  f.verifyDone();
+  const checked=await f.retry.check('write',signal);
+  assert.equal(checked.resumeAvailable,true);
+  assert.equal(checked.retryAvailable,false);
+  assert.strictEqual(f.retry.admit('dock_node_resume',resume),undefined);
+  assert.ok(f.retry.admit('dock_node_resume',resume).blocked);
+  f.receipts.set('write',{status:'SUCCEEDED',effect_possible:true,cleanup_complete:true});
+  const reply=await f.retry.finish('dock_node_resume',resume,{content:[]},undefined,signal);
+  assert.equal(reply._meta.loginom.step.outcome,'completed');
+  assert.ok(f.retry.admit(apply,{operation_id:'next'}).step);
 });
 
 test('a mismatching Save retains the unknown outcome and refuses a new write',async()=>{

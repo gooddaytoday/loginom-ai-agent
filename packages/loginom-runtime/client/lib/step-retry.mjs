@@ -24,7 +24,7 @@ const saveMismatch=receipt=>receipt?.error?.code==='SAVE_RESULT_MISMATCH';
 const noEffect=receipt=>!saveMismatch(receipt)&&['NOT_APPLIED','FAILED'].includes(receipt?.status)
   &&receipt.effect_possible===false&&receipt.cleanup_complete===true;
 
-export function createStepRetry({workspace,observe,receipt,settleUnapplied,busy,unsettled,confirmedSave,label}) {
+export function createStepRetry({workspace,observe,receipt,checkContinuation,settleUnapplied,busy,unsettled,confirmedSave,label}) {
   const steps=new Map();
   let blocked, completed, saved;
   let sequence=0;
@@ -83,6 +83,7 @@ export function createStepRetry({workspace,observe,receipt,settleUnapplied,busy,
       }
       step.scope=save?scope:step.scope;
       step.outcome='completed';
+      if(blocked===step)blocked=undefined;
       delete step.reason;
       if(!completed||step.sequence>completed.sequence){
         completed=step;
@@ -114,6 +115,7 @@ export function createStepRetry({workspace,observe,receipt,settleUnapplied,busy,
     const step=steps.get(id),scope=workspace();
     const unavailable={state:'unavailable',retryAvailable:false};
     if(!step||!sameScope(step.scope,scope))return unavailable;
+    delete step.resumeReceipt;
     if(busy())return {state:'busy',retryAvailable:false};
     const first=await observe(scope,signal).catch(()=>null);
     if(!quiet(first))return unavailable;
@@ -127,13 +129,17 @@ export function createStepRetry({workspace,observe,receipt,settleUnapplied,busy,
         const clean=!saveMismatch(current)&&(!unsettled()&&(step.unapplied||noEffect(current))
           ||await settleUnapplied(id,second.graph,signal).catch(()=>false));
         if(clean)step.outcome='not_applied';
-        else if(current?.error?.code==='NODE_PHASE_RECOVERED'&&current.cleanup_complete===true)
-          step.resumeReceipt=current;
+        else {
+          const confirmed=await checkContinuation(id,signal).catch(()=>null);
+          if(confirmed&&confirmed===receipt(id)&&sameScope(scope,workspace())&&!signal.aborted)
+            step.resumeReceipt=confirmed;
+        }
       }
     }
     if(blocked===step&&step.outcome!=='check_required')blocked=undefined;
     const last=sameScope(scope,completed?.scope)?completed:null;
     return {state:'observed',retryAvailable:!blocked&&!unsettled()&&step.outcome==='not_applied',
+      ...(step.resumeReceipt?{resumeAvailable:true}:{}),
       window:{path:second.package_ref.path,modified:second.modified,nodeCount:second.graph.nodes.length,
         linkCount:second.graph.links.length+(second.graph.variable_links?.length??0)+second.graph.foreign_links.length},
       lastConfirmedStep:last?{operationId:last.id,label:last.label}:null,

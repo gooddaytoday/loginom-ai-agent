@@ -26,6 +26,7 @@ export const StepCheckResult = Schema.Union([
   Schema.Struct({
     state: Schema.Literal("observed"),
     retryAvailable: Schema.Boolean,
+    resumeAvailable: Schema.optional(Schema.Literal(true)),
     window: Schema.Struct({
       path: Schema.NullOr(Schema.String),
       modified: Schema.NullOr(Schema.Boolean),

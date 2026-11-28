@@ -397,6 +397,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       busy:()=>recovery.unsettled()||clipboardUncertain||heldLeases.size>0||actionRuntime.stepCheckBusy(),
       unsettled:()=>actionRuntime.hasUnsettledWork(),
       receipt:id=>actionRuntime.stepReceipt(id),
+      checkContinuation:(id,signal)=>actionRuntime.checkStepContinuation(id,signal),
       settleUnapplied:(id,graph,signal)=>actionRuntime.settleUnappliedStep(id,graph,{signal,deadline:Date.now()+6000}),
       confirmedSave:id=>lastSavedPackage?.operation_id===id?lastSavedPackage:null,
       label:(name,args)=>redactor.text((typeof args?.target?.label==='string'&&args.target.label?args.target.label:undefined)??NODE_TYPES[args?.target?.type]?.title
