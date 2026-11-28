@@ -9,6 +9,7 @@ import {
   createRoot,
   createSignal,
   getOwner,
+  mapArray,
   onCleanup,
   untrack,
 } from "solid-js"
@@ -29,6 +30,12 @@ import { createServerSyncContext } from "./sync"
 import { createData, createSessionRetention } from "@opencode/client/solid"
 import type { ServerScope } from "@/runtime/server/scope"
 import { createPermissionAutoApprover } from "@/session/requests/auto-approve"
+import { createFreeModelLimits } from "@/session/free-limit-reset"
+import {
+  transitionUnresolvedLimit,
+  unresolvedLimitInitial,
+  type UnresolvedLimitState,
+} from "@/session/free-limit-machine"
 import { createSessionMessageHandoffs } from "@/session/handoff"
 import { createServerNotificationState } from "@/shell/notifications/notification"
 import { createNotificationCoordinator } from "@/shell/notifications/coordinator"
@@ -43,7 +50,7 @@ import { showToast } from "@/shell/notifications/toast"
 import { formatServerError } from "./errors"
 import { useSettings } from "@/settings/model"
 import { timelinePreset } from "@opencode/session-ui/timeline/detail"
-import type { SessionInfo } from "@opencode/client/promise"
+import { isSessionNotFoundError, type SessionInfo } from "@opencode/client/promise"
 import { projectForSession } from "@/shell/layout/helpers"
 import { isProjectDirectory } from "@/workspaces/paths"
 import type { Project } from "@/runtime/server/types"
@@ -236,6 +243,70 @@ function createServerController(
     remove: (sessionID) => sdk.api.session.remove({ sessionID }),
   })
 
+  const freeModelLimits = createFreeModelLimits(scope)
+  onCleanup(
+    sdk.event.on("session.step.failed", ({ created, data: { error, sessionID, assistantMessageID } }) => {
+      if (error.type !== "provider.free-limit") return
+      const message = data.session.message.get(sessionID, assistantMessageID)
+
+      if (message?.type === "assistant") {
+        freeModelLimits.remember(message, created, error.retryAfterMs)
+
+        return
+      }
+
+      freeModelLimits.rememberUnresolved({
+        sessionID,
+        messageID: assistantMessageID,
+        failedAt: created,
+        retryAfterMs: error.retryAfterMs,
+      })
+    }),
+  )
+
+  const resolveLimitFailures = mapArray(freeModelLimits.unresolved, (failure) => {
+    const controller = new AbortController()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let delay = 1_000
+    let state: UnresolvedLimitState = unresolvedLimitInitial
+
+    const resolve = async () => {
+      const { sessionID, messageID, failedAt, retryAfterMs } = failure
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)])
+      const message = await sdk.api.session.message.get({ sessionID, messageID }, { signal }).catch(() => undefined)
+
+      if (controller.signal.aborted) return
+
+      if (message?.type === "assistant" && freeModelLimits.remember(message, failedAt, retryAfterMs)) return
+
+      // Only the conversation endpoint can confirm deletion. A missing message can appear on a later read.
+      const conversationMissing =
+        !message &&
+        (await sdk.api.session.get({ sessionID }, { signal }).then(
+          () => false,
+          (error) => isSessionNotFoundError(error) && error.sessionID === sessionID,
+        ))
+
+      if (controller.signal.aborted) return
+
+      state = transitionUnresolvedLimit(state, { type: "lookup", conversationMissing })
+
+      if (state.type === "released") return freeModelLimits.releaseUnresolved(failure)
+
+      timer = setTimeout(() => void resolve(), delay)
+      delay = Math.min(delay * 2, 30_000)
+    }
+
+    onCleanup(() => {
+      controller.abort()
+      clearTimeout(timer)
+    })
+
+    void resolve()
+  })
+
+  createEffect(resolveLimitFailures)
+
   // Transcripts otherwise stay loaded for every session this window ever opened. Open tabs and the three most
   // recently viewed sessions keep theirs; any other session reloads its transcript when it is opened again.
   createSessionRetention({
@@ -351,6 +422,7 @@ function createServerController(
 
   return {
     data,
+    freeModelLimits,
     sdk,
     sync,
     get isLocal() {

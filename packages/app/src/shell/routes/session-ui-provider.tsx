@@ -1,7 +1,7 @@
 import { DataProvider, type TurnDiffInput, type ToolRenderers } from "@opencode/session-ui/context"
 import { MarkdownProvider, type ReadMarkdownImage } from "@opencode/session-ui/context/markdown"
 import { useNavigate, useParams } from "@solidjs/router"
-import { useQuery } from "@tanstack/solid-query"
+import { useSessionConfig } from "@/session/config"
 import { createEffect, createMemo, createSignal, on, onCleanup, untrack, type ParentProps } from "solid-js"
 import { useProviders } from "@/providers/catalog/providers"
 import { LocalProvider } from "@/providers/models/selection"
@@ -181,7 +181,13 @@ export function SessionUIProvider(
       )
   }
 
-  createEffect(on(() => props.server, () => dispatchReferenceLookup({ type: "server.changed" }), { defer: true }))
+  createEffect(
+    on(
+      () => props.server,
+      () => dispatchReferenceLookup({ type: "server.changed" }),
+      { defer: true },
+    ),
+  )
   onCleanup(() => dispatchReferenceLookup({ type: "disposed" }))
 
   const sessionTitle = (id: string) => {
@@ -198,11 +204,7 @@ export function SessionUIProvider(
 
   const providers = useProviders(directory)
 
-  const config = useQuery(() => ({
-    queryKey: [serverSDK.scope, "session-ui-config", directory()],
-    enabled: serverSDK.connection.status() === "connected",
-    queryFn: () => serverSDK.api.config.get({ location: { directory: directory() } }),
-  }))
+  const config = useSessionConfig(directory)
 
   onCleanup(
     serverSDK.event.on("config.updated", (event) => {
@@ -271,6 +273,7 @@ export function SessionUIProvider(
         onNavigateToSession={navigateToSession}
         onSessionHref={href}
         backgroundCompaction={backgroundCompaction()}
+        hideCompletedCompactionStart
       >
         <MarkdownProvider
           readImage={readImage()}

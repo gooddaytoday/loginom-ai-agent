@@ -47,7 +47,7 @@ import {
 } from "../message/message-content"
 import { taskAgentName, ToolRegistry, type ContextGroupPart } from "../tools/tool-renderer"
 import { GenericTool } from "../components/basic-tool"
-import { SessionRetry } from "../components/session-retry"
+import { SessionRetry, type SessionRetryOverride } from "../components/session-retry"
 import { SessionError } from "../components/session-error"
 import { timelineCategory, type TimelineDetail } from "./detail"
 import { currentToolFailed } from "../message/current-tool-state"
@@ -91,12 +91,17 @@ export type SessionUserPresentation = {
   voice?: boolean
 }
 
-export function createSessionTimelineRowRenderer(input: {
+export function createSessionTimelineRowRenderer<ErrorPresentation>(input: {
   sessionID: Accessor<string>
   status: Accessor<SessionStatus>
   projection: Projection
   presentation: (message: SessionMessageUser) => SessionUserPresentation | undefined
   actions?: SessionUserActions
+  errorPresentation?: (row: TimelineRow.Error) => ErrorPresentation | undefined
+  renderError?: (presentation: Accessor<ErrorPresentation>) => JSX.Element
+  renderRetry?: SessionRetryOverride
+  renderUserNotice?: (message: SessionMessageUser) => JSX.Element
+  renderAnswerNote?: (userMessageID: string, answer: SessionMessageAssistant) => JSX.Element
   reasoningMode: Accessor<ReasoningMode>
   shellToolDefaultOpen: Accessor<boolean>
   editToolDefaultOpen: Accessor<boolean>
@@ -571,20 +576,25 @@ export function createSessionTimelineRowRenderer(input: {
         {(message) => (
           <Show when={content()}>
             {(content) => (
-              <SessionAssistantContent
-                message={message()}
-                content={content()}
-                contentID={ref()!.partID}
-                showAssistantCopyPartID={copyContentID(row().userMessageID)}
-                turnDurationMs={duration(row().userMessageID)}
-                turnTokensPerSecond={turnTokensPerSecond()}
-                sources={turnSourcesValue()}
-                onOpenSources={() => sourcesHost?.open(row().userMessageID)}
-                defaultOpen={defaultOpen()}
-                toolOpen={input.disclosure.value(disclosureKey()) ?? defaultOpen()}
-                onToolOpenChange={(open) => input.disclosure.set(disclosureKey(), open)}
-                onContentRendered={onSizeChange}
-              />
+              <>
+                <SessionAssistantContent
+                  message={message()}
+                  content={content()}
+                  contentID={ref()!.partID}
+                  showAssistantCopyPartID={copyContentID(row().userMessageID)}
+                  turnDurationMs={duration(row().userMessageID)}
+                  turnTokensPerSecond={turnTokensPerSecond()}
+                  sources={turnSourcesValue()}
+                  onOpenSources={() => sourcesHost?.open(row().userMessageID)}
+                  defaultOpen={defaultOpen()}
+                  toolOpen={input.disclosure.value(disclosureKey()) ?? defaultOpen()}
+                  onToolOpenChange={(open) => input.disclosure.set(disclosureKey(), open)}
+                  onContentRendered={onSizeChange}
+                />
+                <Show when={copyContentID(row().userMessageID) === ref()?.partID}>
+                  {input.renderAnswerNote?.(row().userMessageID, message())}
+                </Show>
+              </>
             )}
           </Show>
         )}
@@ -1086,6 +1096,10 @@ export function createSessionTimelineRowRenderer(input: {
         <Frame row={current()} grow={grow}>
           <Show when={message()}>
             {(message) => {
+              const notice = input.renderUserNotice?.(message())
+
+              if (notice) return <div class={`w-full ${padding()}`}>{notice}</div>
+
               const presentation = () => input.presentation(message())
 
               return (
@@ -1301,6 +1315,7 @@ export function createSessionTimelineRowRenderer(input: {
         <Frame row={current()}>
           <div data-slot="session-turn-message-container" class={`w-full ${padding()}`}>
             <SessionRetry
+              override={input.renderRetry}
               status={{ type: "retry", attempt: current().attempt, message: current().message, next: current().next }}
               show={input.projection.activeMessageID() === current().userMessageID}
             />
@@ -1379,42 +1394,49 @@ export function createSessionTimelineRowRenderer(input: {
     return (
       <Frame row={current()}>
         <div data-slot="session-turn-message-container" class={`w-full ${padding()}`}>
-          <Switch fallback={<SessionError message={current().text} />}>
-            <Match when={budgetLimit()}>
-              {(notice) => (
-                <div
-                  role="status"
-                  class="text-[13px] font-[440] leading-text-compact tracking-[-0.04px] text-v2-text-text-muted"
-                >
-                  {notice().text}
-                  <Show when={input.actions?.chooseModel}>
-                    {(choose) => (
-                      <>
-                        <span aria-hidden="true">{" · "}</span>
-                        <button
-                          type="button"
-                          class="font-[530] text-v2-text-text-base hover:underline focus-visible:underline focus-visible:outline-none"
-                          onClick={() => choose()()}
-                        >
-                          {notice().action}
-                        </button>
-                      </>
-                    )}
-                  </Show>
-                </div>
-              )}
-            </Match>
-            <Match when={usageLimit()}>
-              {(text) => (
-                <div
-                  role="status"
-                  class="text-[13px] font-[440] leading-text-compact tracking-[-0.04px] text-v2-text-text-muted"
-                >
-                  {text()}
-                </div>
-              )}
-            </Match>
-          </Switch>
+          <Show
+            when={input.errorPresentation?.(current())}
+            fallback={
+              <Switch fallback={<SessionError message={current().text} />}>
+                <Match when={budgetLimit()}>
+                  {(notice) => (
+                    <div
+                      role="status"
+                      class="text-[13px] font-[440] leading-text-compact tracking-[-0.04px] text-v2-text-text-muted"
+                    >
+                      {notice().text}
+                      <Show when={input.actions?.chooseModel}>
+                        {(choose) => (
+                          <>
+                            <span aria-hidden="true">{" · "}</span>
+                            <button
+                              type="button"
+                              class="font-[530] text-v2-text-text-base hover:underline focus-visible:underline focus-visible:outline-none"
+                              onClick={() => choose()()}
+                            >
+                              {notice().action}
+                            </button>
+                          </>
+                        )}
+                      </Show>
+                    </div>
+                  )}
+                </Match>
+                <Match when={usageLimit()}>
+                  {(text) => (
+                    <div
+                      role="status"
+                      class="text-[13px] font-[440] leading-text-compact tracking-[-0.04px] text-v2-text-text-muted"
+                    >
+                      {text()}
+                    </div>
+                  )}
+                </Match>
+              </Switch>
+            }
+          >
+            {(presentation) => input.renderError?.(presentation)}
+          </Show>
         </div>
       </Frame>
     )

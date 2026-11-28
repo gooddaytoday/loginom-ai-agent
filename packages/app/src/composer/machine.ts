@@ -97,6 +97,7 @@ export type SubmitSnapshot = {
   id: SessionMessage.ID
   commands: readonly { name: string }[] | undefined
   clientCommand: (() => void | Promise<void>) | undefined
+  modelLimited?: boolean
   comments: PromptHistoryComment[]
   /** The active Session, whose timeline can show a held prompt; a new-session draft has none yet. */
   session: ComposerSession | undefined
@@ -123,6 +124,7 @@ export type ComposerSubmitEvent =
   | {
       type: "hold.loaded"
       attempt: number
+      modelLimited?: boolean
       selection: ComposerSelection | undefined
       commands: readonly { name: string }[] | undefined
     }
@@ -236,6 +238,8 @@ export function transitionComposerSubmit(
         ],
       }
 
+    if (state.snapshot.mode === "normal" && event.modelLimited) return cancelHold(state, [])
+
     // The composer already cleared, so the send goes on from what was captured at Enter.
     if (!event.selection) return cancelHold(state, [{ type: "notify.missing-selection" }])
 
@@ -335,7 +339,8 @@ function submit(state: ComposerSubmitState, snapshot: SubmitSnapshot, done: Subm
     }
 
   // Like the TUI, a blank Enter never interrupts; only Stop, Escape and Ctrl+G do.
-  if (blank(snapshot)) return { state, effects: [{ type: "done", done, sent: false }] }
+  if (blank(snapshot) || (snapshot.mode === "normal" && snapshot.modelLimited))
+    return { state, effects: [{ type: "done", done, sent: false }] }
 
   if (!snapshot.selection) {
     // A cold Location lists its agents and models only after its plugins activate, so hold the send until then.

@@ -1,4 +1,4 @@
-import { Show, type JSX, type ParentProps } from "solid-js"
+import { Show, useContext, type JSX, type ParentProps } from "solid-js"
 import { createSimpleContext } from "@opencode/ui/context"
 import { ServerConnection } from "./registry"
 import { useGlobal, type ServerCtx } from "./runtime"
@@ -26,6 +26,8 @@ const context = createSimpleContext({
 })
 
 export const useServer = context.use
+
+export const useOptionalServer = () => useContext(context.context)
 
 // Keyed by controller: while the server rejects our credentials the children unmount and `signedOut` shows instead,
 // and they mount again with the controller its new credentials start.

@@ -208,6 +208,40 @@
       "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
     },
     {
+      "id": "CAT-22",
+      "title": "C3.4: model stops, continuation, retry and compaction",
+      "paths": [
+        "packages/app/src/composer/composer.tsx",
+        "packages/app/src/composer/machine.ts",
+        "packages/app/src/composer/model.ts",
+        "packages/app/src/composer/submit.ts",
+        "packages/app/src/providers/models/select-dialog.tsx",
+        "packages/app/src/runtime/server/current.tsx",
+        "packages/app/src/runtime/server/runtime.tsx",
+        "packages/app/src/runtime/i18n/en.ts",
+        "packages/app/src/runtime/i18n/ru.ts",
+        "packages/app/src/session/composer/free-limit-panel.tsx",
+        "packages/app/src/session/composer/region.tsx",
+        "packages/app/src/session/usage-exceeded-dialogs.tsx",
+        "packages/app/src/session/timeline/message-timeline.tsx",
+        "packages/app/src/session/timeline/cache.ts",
+        "packages/app/src/shell/routes/session-ui-provider.tsx",
+        "packages/app/src/shell/layout/project-avatar-state.ts",
+        "packages/app/src/shell/titlebar/project-session-row.tsx",
+        "packages/app/src/shell/titlebar/tab-nav.*",
+        "packages/session-ui/src/components/session-retry.tsx",
+        "packages/session-ui/src/components/timeline-separator.tsx",
+        "packages/session-ui/src/message/message-content.tsx",
+        "packages/session-ui/src/context/data.tsx",
+        "packages/app/e2e/regression/composer.spec.ts",
+        "packages/app/e2e/regression/timeline-stream.spec.ts",
+        "packages/app/e2e/utils/mock-api.ts",
+        "packages/app/e2e/utils/mock-server.ts",
+        "packages/session-ui/src/timeline-next/row.tsx",
+        "packages/session-ui/src/timeline/session-timeline-row.tsx"
+      ]
+    },
+    {
       "id": "CAT-24",
       "title": "Background conversation notifications (C3.10, A3)",
       "paths": [

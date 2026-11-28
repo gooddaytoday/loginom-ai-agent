@@ -1,0 +1,782 @@
+import { expect, test } from "@playwright/test"
+import type { OpenCodeEvent, SessionMessageAssistant, SessionMessageInfo } from "@opencode/client/promise"
+import { holdRoute, provider, seed, sessionHref } from "../utils/app"
+import { openSession } from "../utils/workspace"
+
+test.use({ locale: "ru-RU", timezoneId: "UTC", video: "off" })
+test.beforeEach(async ({ page }) => await seed(page, { locale: "ru" }))
+
+const model = { providerID: "opencode", id: "free-test" }
+
+const sessionID = "ses_model_stop"
+const narrowViewport = { width: 390, height: 844 }
+
+function history(
+  type: string,
+  created: number,
+  details?: Partial<NonNullable<SessionMessageAssistant["error"]>>,
+): SessionMessageInfo[] {
+  const error = { type, message: "Test provider refused the request", status: 429, retryAfterMs: 3_600_000, ...details }
+
+  return [
+    { type: "user", id: "msg_001", time: { created }, text: "Обработай таблицу" },
+    {
+      type: "assistant",
+      id: "msg_002",
+      time: { created, completed: created },
+      model,
+      agent: "build",
+      content: [{ type: "text", text: "Таблица прочитана." }],
+      finish: "stop",
+    },
+    {
+      type: "assistant",
+      id: "msg_003",
+      time: { created, completed: created },
+      model,
+      agent: "build",
+      content: [],
+      finish: "error",
+      error,
+    },
+    { type: "idle", id: "msg_004", time: { created }, outcome: "failed", error },
+  ]
+}
+
+function freeLimitFailure(input: {
+  sessionID: string
+  directory: string
+  messageID: string
+  model: typeof model
+  time: number
+  retryAfterMs?: number
+}) {
+  const error = {
+    type: "provider.free-limit",
+    message: "Test provider refused the request",
+    status: 429,
+    retryAfterMs: input.retryAfterMs,
+  }
+  const message = {
+    type: "assistant",
+    id: input.messageID,
+    time: { created: input.time, completed: input.time },
+    model: input.model,
+    agent: "build",
+    content: [],
+    finish: "error",
+    error,
+  } satisfies SessionMessageAssistant
+  const event = {
+    id: `evt_${input.messageID}`,
+    created: input.time,
+    type: "session.step.failed",
+    location: { directory: input.directory },
+    durable: { aggregateID: input.sessionID, seq: 1, version: 1 },
+    data: { sessionID: input.sessionID, assistantMessageID: message.id, error },
+  } satisfies OpenCodeEvent
+
+  return { message, event }
+}
+
+for (const viewport of [{ width: 1440, height: 900 }, narrowViewport]) {
+  test(`continues after the free limit at ${viewport.width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport)
+    const now = new Date("2026-11-27T02:00:00Z")
+    await page.clock.setFixedTime(now)
+    const messages = history("provider.free-limit", now.getTime())
+    const requests: string[] = []
+    page.on("request", (request) => {
+      const action = new URL(request.url()).pathname.match(`/api/session/${sessionID}/(model|prompt)$`)?.[1]
+
+      if (request.method() === "POST" && action) requests.push(action)
+    })
+    const second = { providerID: "opencode", id: "second-test" }
+    const { push, session } = await openSession(page, {
+      name: "Лимит модели",
+      sessions: [{ id: sessionID, title: "Обработка таблицы", model, outcome: "failed" }],
+      provider: provider(
+        { id: model.id, name: "Бесплатная модель" },
+        { id: second.id, name: "Вторая модель" },
+        { id: "hidden-test", name: "Скрытая модель" },
+      ),
+      seed: {
+        settings: { general: { newTimeline: viewport.width === 1440 } },
+        storage: {
+          "opencode.global.dat:model": {
+            user: [{ providerID: "opencode", modelID: "hidden-test", visibility: "hide" }],
+            recent: [],
+            variant: {},
+          },
+        },
+      },
+      pageMessages: (_id, limit, _before, type) => ({
+        items: messages.filter((message) => !type || message.type === type).slice(-limit),
+      }),
+    })
+
+    const stop = page.locator('[data-component="model-stop"]')
+    await expect(stop).toContainText("Ход остановлен: дневной лимит исчерпан")
+    await expect(stop).toContainText("Лимит обновится в 03:00")
+    await expect(page.getByText("Таблица прочитана.")).toBeVisible()
+    await expect(page.getByText("Лимит на сегодня исчерпан — обновится в 03:00")).toBeVisible()
+    await expect(stop.getByRole("button", { name: "Продолжить с этой же" })).toHaveCount(0)
+    await stop.getByText("Продолжить с другой моделью").click()
+    await expect(stop.getByRole("button", { name: "Бесплатная модель" })).toHaveCount(0)
+    await expect(stop.getByRole("button", { name: "Скрытая модель" })).toHaveCount(0)
+    await page.screenshot({ path: testInfo.outputPath(`model-stop-${viewport.width}.png`) })
+
+    const switched = page.waitForRequest(
+      (request) => request.method() === "POST" && new URL(request.url()).pathname === `/api/session/${sessionID}/model`,
+    )
+
+    const continued = page.waitForRequest(
+      (request) => request.method() === "POST" && new URL(request.url()).pathname.endsWith("/prompt"),
+    )
+
+    await stop.getByRole("button", { name: "Вторая модель" }).click()
+    expect((await switched).postDataJSON()).toMatchObject({ model: second })
+    const prompt = (await continued).postDataJSON()
+    expect(prompt).toMatchObject({ metadata: { modelContinuation: "Вторая модель" } })
+    await expect(page.getByText("Вы продолжили с моделью «Вторая модель»")).toBeVisible()
+
+    const created = now.getTime() + 1000
+    const assistantMessageID = "msg_model_stop_resumed"
+    const answer = "Обработка завершена."
+    const event = (seq: number) => ({
+      id: `evt_model_stop_${seq}`,
+      created: created + seq,
+      durable: { aggregateID: sessionID, seq, version: 1 as const },
+    })
+
+    Object.assign(session, { outcome: "succeeded" })
+    await push([
+      { ...event(1), type: "session.inbox.delivered", data: { sessionID, inboxID: prompt.id } },
+      { ...event(2), type: "session.execution.started", data: { sessionID } },
+      {
+        ...event(3),
+        type: "session.step.started",
+        data: { sessionID, assistantMessageID, agent: "build", model: second, started: created },
+      },
+      { ...event(4), type: "session.text.started", data: { sessionID, assistantMessageID, ordinal: 0 } },
+      { ...event(5), type: "session.text.ended", data: { sessionID, assistantMessageID, ordinal: 0, text: answer } },
+      {
+        ...event(6),
+        type: "session.step.ended",
+        data: {
+          sessionID,
+          assistantMessageID,
+          finish: "stop",
+          cost: 0,
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+      },
+      { ...event(7), type: "session.execution.succeeded", data: { sessionID } },
+    ] satisfies OpenCodeEvent[])
+
+    await expect(page.getByText(answer, { exact: true })).toBeVisible()
+    await expect(stop).toContainText("Ход остановлен: дневной лимит исчерпан")
+    await expect(stop.getByText("Продолжить с другой моделью")).toHaveCount(0)
+    await expect(stop.getByRole("button", { name: "Продолжить с этой же" })).toHaveCount(0)
+    expect(requests).toEqual(["model", "prompt"])
+  })
+}
+
+for (const [type, reason, same] of [
+  ["provider.quota", "закончились средства", false],
+  ["provider.auth", "ключ не подошёл", false],
+  ["provider.no-route", "модель недоступна", true],
+  ["provider.invalid-request", "запрос отклонён", true],
+] as const) {
+  test(`shows the recovery options for ${type}: ${reason}`, async ({ page }) => {
+    await openSession(page, {
+      name: "Сбой модели",
+      sessions: [{ id: sessionID, title: "Обработка таблицы", model, outcome: "failed" }],
+      provider: provider({ id: model.id, name: "Тестовая модель" }),
+      pageMessages: () => ({ items: history(type, Date.now()) }),
+    })
+    const stop = page.locator('[data-component="model-stop"]')
+    await expect(stop).toContainText(`Ход остановлен: ${reason}`)
+    await expect(stop.getByRole("button", { name: "Подключить модель" })).toBeVisible()
+    await expect(stop.getByRole("button", { name: "Скопировать текст ошибки" })).toBeVisible()
+    await expect(stop.getByRole("button", { name: "Продолжить с этой же" })).toHaveCount(same ? 1 : 0)
+  })
+}
+
+test("removes the free-limit countdown at the reset time without reloading", async ({ page }) => {
+  const now = new Date("2026-11-27T02:00:00Z")
+  await page.clock.install({ time: now })
+  const messages = history("provider.free-limit", now.getTime())
+  await openSession(page, {
+    name: "Дневной лимит",
+    sessions: [{ id: sessionID, title: "Обработка таблицы", model, outcome: "failed" }],
+    provider: provider({ id: model.id, name: "Бесплатная модель" }),
+    pageMessages: (_id, limit, _before, type) => ({
+      items: messages.filter((message) => !type || message.type === type).slice(-limit),
+    }),
+  })
+
+  const stop = page.locator('[data-component="model-stop"]')
+  const composerWarning = page.getByRole("status").filter({ hasText: /^Лимит на сегодня исчерпан — обновится в 03:00/ })
+  const reset = stop.getByText("Лимит обновится в 03:00", { exact: true })
+  await expect(composerWarning).toBeVisible()
+  await expect(reset).toBeVisible()
+  await page.clock.fastForward(3_600_000)
+  await expect(composerWarning).toHaveCount(0)
+  await expect(reset).toHaveCount(0)
+  await expect(stop.getByRole("status")).toContainText("Ход остановлен: дневной лимит исчерпан")
+})
+
+test("blocks both sends after a model hits its daily limit in an unopened conversation", async ({ page }, testInfo) => {
+  const now = new Date("2026-11-27T02:00:00Z")
+  await page.clock.install({ time: now })
+  const otherSession = "ses_unopened_limit"
+  const messages = history("provider.free-limit", now.getTime())
+  const prompts: { sessionID: string; text: unknown }[] = []
+
+  const view = await openSession(page, {
+    name: "Общий дневной лимит",
+    sessions: [
+      { id: sessionID, title: "Новый запрос", model },
+      { id: otherSession, title: "Фоновый разговор", model },
+    ],
+    provider: provider({ id: model.id, name: "Бесплатная модель" }, { id: "second-test", name: "Вторая модель" }),
+    pageMessages: (id) => ({ items: id === otherSession ? messages : [] }),
+    onPrompt: ({ sessionID, body }) => void prompts.push({ sessionID, text: body.text }),
+  })
+
+  const failure = messages.find((message) => message.type === "assistant" && message.error)
+
+  if (failure?.type !== "assistant" || !failure.error) throw new Error("Missing failed assistant in test history")
+
+  const warning = page.getByRole("status").filter({ hasText: /Лимит на сегодня исчерпан — обновится в 03:00/ })
+  await expect(warning).toHaveCount(0)
+  await view.push([
+    {
+      id: "evt_unopened_free_limit",
+      created: now.getTime(),
+      type: "session.step.failed",
+      location: { directory: view.directory },
+      durable: { aggregateID: otherSession, seq: 1, version: 1 },
+      data: { sessionID: otherSession, assistantMessageID: failure.id, error: failure.error },
+    },
+  ])
+  await expect(warning).toBeVisible()
+  const draft = "Подготовь отчёт по таблице"
+  await view.editor.fill(draft)
+  await expect(page.locator('[data-action="composer-submit"]')).toBeDisabled()
+  await view.editor.press("Enter")
+  await expect(view.editor).toHaveText(draft)
+  expect(prompts).toEqual([])
+
+  await page.reload()
+  await expect(warning).toBeVisible()
+  await view.editor.fill(draft)
+  await view.editor.press("Enter")
+  await expect(view.editor).toHaveText(draft)
+  expect(prompts).toEqual([])
+
+  const changeModel = warning.getByRole("button", { name: "Сменить модель", exact: true })
+  await changeModel.click()
+  const dialog = page.getByRole("dialog")
+  const limitedModel = dialog.locator('[data-option-key="opencode:free-test"]')
+  await expect(limitedModel.getByText("лимит до 03:00", { exact: true })).toBeVisible()
+  await expect(dialog.locator('[data-option-key="opencode:second-test"]')).not.toContainText("лимит")
+  await page.screenshot({ path: testInfo.outputPath("composer-model-limit-picker-desktop.png") })
+  await page.keyboard.press("Escape")
+  await expect(dialog).toHaveCount(0)
+  await page.setViewportSize(narrowViewport)
+  await expect(changeModel).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath("composer-model-limit-390.png") })
+  await page.locator('[data-action="composer-model"]').click()
+  await expect(limitedModel.getByText("лимит до 03:00", { exact: true })).toBeInViewport({ ratio: 1 })
+  await page.screenshot({ path: testInfo.outputPath("composer-model-limit-picker-390.png"), animations: "disabled" })
+
+  await page.clock.fastForward(3_600_000)
+  await expect(limitedModel.getByText("лимит до 03:00", { exact: true })).toHaveCount(0)
+  await page.keyboard.press("Escape")
+  await expect(dialog).toHaveCount(0)
+  await expect(warning).toHaveCount(0)
+  await expect(page.locator('[data-action="composer-submit"]')).toBeEnabled()
+  await view.editor.press("Enter")
+  await expect.poll(() => prompts).toEqual([{ sessionID, text: draft }])
+  await expect(view.editor).toHaveText("")
+})
+
+test("holds a daily limit without a reset time until an explicit retry", async ({ page }, testInfo) => {
+  await page.setViewportSize(narrowViewport)
+  const messages = history("provider.free-limit", Date.now(), { retryAfterMs: undefined })
+  const prompts: unknown[] = []
+
+  const { editor } = await openSession(page, {
+    name: "Дневной лимит без времени сброса",
+    sessions: [{ id: sessionID, title: "Чтение таблицы", model, outcome: "failed" }],
+    provider: provider({ id: model.id, name: "Бесплатная модель" }, { id: "second-test", name: "Вторая модель" }),
+    pageMessages: (_id, limit, _before, type) => ({
+      items: messages.filter((message) => !type || message.type === type).slice(-limit),
+    }),
+    onPrompt: ({ body }) => void prompts.push(body.text),
+  })
+
+  const warning = page.getByRole("status").filter({
+    has: page.getByText("Дневной лимит исчерпан", { exact: true }),
+  })
+
+  const retry = warning.getByRole("button", { name: "Попробовать снова", exact: true })
+  await expect(retry).toBeVisible()
+  const draft = "Проверь числа в таблице"
+  await editor.fill(draft)
+  await editor.press("Enter")
+  await expect(editor).toHaveText(draft)
+  expect(prompts).toEqual([])
+  await page.screenshot({ path: testInfo.outputPath("composer-model-limit-unknown-390.png") })
+
+  const modelChip = page.locator('[data-action="composer-model"]')
+  await modelChip.click()
+  const dialog = page.getByRole("dialog")
+  const limitedModel = dialog.locator('[data-option-key="opencode:free-test"]')
+  await expect(limitedModel.getByText("лимит исчерпан", { exact: true })).toBeInViewport()
+  await dialog.getByRole("button", { name: /Вторая модель/ }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(modelChip).toContainText("Вторая модель")
+  await expect(warning).toHaveCount(0)
+  await expect(editor).toHaveText(draft)
+
+  await modelChip.click()
+  await expect(limitedModel.getByText("лимит исчерпан", { exact: true })).toBeInViewport()
+  await limitedModel.click()
+  await expect(dialog).toHaveCount(0)
+  await retry.click()
+  await expect.poll(() => prompts).toEqual([draft])
+  await expect(editor).toHaveText("")
+
+  // The backend still returns the old failure in history after the explicit retry.
+  await page.reload()
+  await expect(page.getByText("Ход остановлен: дневной лимит исчерпан", { exact: true })).toBeVisible()
+  await expect(retry).toHaveCount(0)
+  const next = "Подготовь сводку"
+  await editor.fill(next)
+  await editor.press("Enter")
+  await expect.poll(() => prompts).toEqual([draft, next])
+})
+
+test("keeps limits for different models recorded in two tabs", async ({ page, context }) => {
+  const now = new Date("2026-11-27T02:00:00Z")
+  const secondPage = await context.newPage()
+  const prompts: string[] = []
+  await seed(secondPage, { locale: "ru" })
+  await Promise.all([page.clock.setFixedTime(now), secondPage.clock.setFixedTime(now)])
+
+  const open = async (tab: typeof page, selected: typeof model, suffix: string, retryAfterMs?: number) => {
+    const otherSession = `ses_background_${suffix}`
+    const directory = "C:/OpenCode/Two limit tabs"
+    const failure = freeLimitFailure({
+      sessionID: otherSession,
+      directory,
+      messageID: `msg_limit_${suffix}`,
+      model: selected,
+      time: now.getTime(),
+      retryAfterMs,
+    })
+    const view = await openSession(tab, {
+      name: "Две вкладки",
+      directory,
+      sessions: [
+        { id: `ses_draft_${suffix}`, title: `Запрос ${suffix}`, model: selected },
+        { id: otherSession, title: `Фоновый разговор ${suffix}`, model: selected },
+      ],
+      provider: provider({ id: model.id, name: "Бесплатная модель" }, { id: "second-test", name: "Вторая модель" }),
+      pageMessages: (id) => ({ items: id === otherSession ? [failure.message] : [] }),
+      onPrompt: ({ sessionID }) => void prompts.push(sessionID),
+    })
+
+    return { ...view, event: failure.event }
+  }
+
+  const first = await open(page, model, "a", 3_600_000)
+  const second = await open(secondPage, { ...model, id: "second-test" }, "b")
+  await first.push([first.event])
+  await expect(page.getByRole("status").filter({ hasText: "обновится в 03:00" })).toBeVisible()
+  await second.push([second.event])
+  await expect(secondPage.getByRole("status").filter({ hasText: "Дневной лимит исчерпан" })).toBeVisible()
+
+  const showBoth = async (tab: typeof page) => {
+    await tab.getByRole("button", { name: "Сменить модель", exact: true }).click()
+    const dialog = tab.getByRole("dialog")
+    await expect(dialog.locator('[data-option-key="opencode:free-test"]')).toContainText("лимит до 03:00")
+    await expect(dialog.locator('[data-option-key="opencode:second-test"]')).toContainText("лимит исчерпан")
+    await tab.keyboard.press("Escape")
+    await expect(dialog).toHaveCount(0)
+  }
+
+  await showBoth(page)
+  await page.reload()
+  await showBoth(page)
+  await first.editor.fill("Построй график")
+  await first.editor.press("Enter")
+  await expect(first.editor).toHaveText("Построй график")
+  expect(prompts).toEqual([])
+})
+
+test("keeps an unidentified limit through failed lookups and a reload", async ({ page }, testInfo) => {
+  await page.setViewportSize(narrowViewport)
+  const now = new Date("2026-11-27T02:00:00Z")
+  await page.clock.install({ time: now })
+  const directory = "C:/OpenCode/Unknown limit model"
+  const otherSession = "ses_unreadable_limit"
+  const failure = freeLimitFailure({
+    sessionID: otherSession,
+    directory,
+    messageID: "msg_unreadable_limit",
+    model: { ...model, id: "second-test" },
+    time: now.getTime(),
+  })
+  let readable = false
+  const prompts: unknown[] = []
+  const view = await openSession(page, {
+    name: "Модель не определена",
+    directory,
+    sessions: [
+      { id: sessionID, title: "Текущий разговор", model },
+      { id: otherSession, title: "Фоновый разговор", model: failure.message.model },
+    ],
+    provider: provider({ id: model.id, name: "Бесплатная модель" }, { id: "second-test", name: "Вторая модель" }),
+    pageMessages: () => ({ items: [] }),
+    message: () => (readable ? failure.message : undefined),
+    onPrompt: ({ body }) => void prompts.push(body.text),
+  })
+  const messageResponse = (status: number) =>
+    page.waitForResponse((response) => response.url().includes(failure.message.id) && response.status() === status)
+  const missing = messageResponse(404)
+  await view.push([failure.event])
+  await missing
+  const warning = page.getByRole("status").filter({ hasText: "Модель не определена" })
+  await expect(warning).toBeVisible()
+  await expect(warning).not.toContainText("обновится")
+
+  const missingAfterReload = messageResponse(404)
+  await page.reload()
+  await missingAfterReload
+  await expect(warning).toBeVisible()
+  const draft = "Построй график"
+  await view.editor.fill(draft)
+  await expect(page.locator('[data-action="composer-submit"]')).toBeDisabled()
+  await view.editor.press("Enter")
+  await expect(view.editor).toHaveText(draft)
+  expect(prompts).toEqual([])
+  await page.screenshot({ path: testInfo.outputPath("composer-limit-unidentified-390.png") })
+
+  readable = true
+  const found = messageResponse(200)
+  await page.clock.fastForward(10_000)
+  await found
+  await expect(warning).toHaveCount(0)
+  await page.locator('[data-action="composer-model"]').click()
+  const dialog = page.getByRole("dialog")
+  await expect(dialog.locator('[data-option-key="opencode:second-test"]')).toContainText("лимит исчерпан")
+  await expect(dialog.locator('[data-option-key="opencode:free-test"]')).not.toContainText("лимит")
+  await page.keyboard.press("Escape")
+  await expect(dialog).toHaveCount(0)
+  await view.editor.press("Enter")
+  await expect.poll(() => prompts).toEqual([draft])
+})
+
+for (const release of ["reset", "deletion", "retry"] as const) {
+  test(`releases an unidentified daily limit after ${release}`, async ({ page }, testInfo) => {
+    if (release === "retry") await page.setViewportSize(narrowViewport)
+
+    const now = new Date("2026-11-27T02:00:00Z")
+    if (release === "reset") await page.clock.install({ time: now })
+    const directory = "C:/OpenCode/Unidentified limit release"
+    const otherSession = "ses_unidentified_release"
+    const failure = freeLimitFailure({
+      sessionID: otherSession,
+      directory,
+      messageID: "msg_unidentified_release",
+      model,
+      time: now.getTime(),
+      retryAfterMs: release === "reset" ? 3_600_000 : undefined,
+    })
+    const prompts: unknown[] = []
+    const view = await openSession(page, {
+      name: "Неопознанный лимит",
+      directory,
+      sessions: [
+        { id: sessionID, title: "Текущий разговор", model },
+        ...(release === "deletion" ? [] : [{ id: otherSession, title: "Фоновый разговор", model }]),
+      ],
+      provider: provider({ id: model.id, name: "Бесплатная модель" }),
+      pageMessages: () => ({ items: [] }),
+      onPrompt: ({ body }) => void prompts.push(body.text),
+    })
+
+    const warning = page.getByRole("status").filter({ hasText: "Модель не определена" })
+    const send = page.locator('[data-action="composer-submit"]')
+    const retry = warning.getByRole("button", { name: "Попробовать снова", exact: true })
+    const sessionRoute = (url: URL) => url.pathname === `/api/session/${otherSession}`
+    const deletion = release === "deletion" ? await holdRoute(page, sessionRoute, { method: "GET" }) : undefined
+
+    const failed = page.waitForResponse(
+      (response) => response.url().includes(failure.message.id) && response.status() === 404,
+    )
+    await view.push([failure.event])
+    await failed
+    await expect(warning).toBeVisible()
+    const draft = "Построй график"
+    await view.editor.fill(draft)
+    await expect(view.editor).toBeEditable()
+    await expect(send).toBeDisabled()
+    await view.editor.press("Enter")
+    await expect(view.editor).toHaveText(draft)
+    expect(prompts).toEqual([])
+
+    if (release === "reset") {
+      await expect(retry).toHaveCount(0)
+      const remaining = now.getTime() + 3_600_000 - (await page.evaluate(() => Date.now()))
+      await page.clock.fastForward(remaining - 10_000)
+      await expect(send).toBeDisabled()
+      await page.clock.fastForward(10_000)
+    } else if (deletion) {
+      await deletion.arrived
+      await expect(send).toBeDisabled()
+      deletion.release()
+    } else {
+      await expect(retry).toBeVisible()
+      await page.screenshot({ path: testInfo.outputPath("composer-unidentified-retry-390.png") })
+      await retry.click()
+    }
+
+    await expect(warning).toHaveCount(0)
+    if (deletion) expect(deletion.requests).toHaveLength(3)
+    if (release !== "retry") {
+      await expect(send).toBeEnabled()
+      await send.click()
+    }
+
+    await expect.poll(() => prompts).toEqual([draft])
+    await expect(view.editor).toHaveText("")
+  })
+}
+
+for (const action of ["provider.use", "integration.connect"] as const) {
+  test(`directs users to the administrator when ${action} is restricted`, async ({ page }) => {
+    const messages = history("provider.auth", Date.now())
+    await openSession(page, {
+      name: "Управляемые модели",
+      configEntries: [
+        {
+          type: "document",
+          info: { policies: [{ action, resource: "*", effect: "deny" }] },
+        },
+      ],
+      sessions: [{ id: sessionID, title: "Обработка таблицы", model, outcome: "failed" }],
+      provider: provider({ id: model.id, name: "Разрешённая модель" }),
+      pageMessages: (_id, limit, _before, type) => ({
+        items: messages.filter((message) => !type || message.type === type).slice(-limit),
+      }),
+    })
+
+    const stop = page.locator('[data-component="model-stop"]')
+    await expect(stop.getByText("Обратитесь к администратору", { exact: true })).toBeVisible()
+    await expect(stop.getByRole("button", { name: "Подключить модель" })).toHaveCount(0)
+  })
+}
+
+test("can retry copying a model stop error after the clipboard stops responding", async ({ page }) => {
+  await page.clock.install()
+  await page.addInitScript(() => {
+    let writes = 0
+    Object.defineProperty(navigator.clipboard, "writeText", {
+      value: () => (++writes === 1 ? new Promise<void>(() => {}) : Promise.resolve()),
+    })
+  })
+  const messages = history("provider.auth", Date.now())
+  await openSession(page, {
+    name: "Сбой модели",
+    sessions: [{ id: sessionID, title: "Обработка таблицы", model, outcome: "failed" }],
+    provider: provider({ id: model.id, name: "Тестовая модель" }),
+    pageMessages: (_id, limit, _before, type) => ({
+      items: messages.filter((message) => !type || message.type === type).slice(-limit),
+    }),
+  })
+
+  const stop = page.locator('[data-component="model-stop"]')
+  const copy = stop.getByRole("button", { name: "Скопировать текст ошибки" })
+  await copy.click()
+  await expect(copy).toBeDisabled()
+  await page.clock.fastForward(30_000)
+  await expect(stop.getByRole("alert")).toHaveText("Не удалось выполнить действие. Попробуйте ещё раз.")
+  await copy.click()
+  await expect(copy).toBeEnabled()
+  await expect(stop.getByRole("alert")).toHaveCount(0)
+})
+
+test("copies a model stop error when the Clipboard API is unavailable", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", { value: undefined })
+    document.execCommand = (command) => {
+      const selected = document.activeElement
+
+      if (command !== "copy" || !(selected instanceof HTMLTextAreaElement)) return false
+      document.documentElement.dataset.copiedText = selected.value.slice(selected.selectionStart, selected.selectionEnd)
+
+      return true
+    }
+  })
+  await openSession(page, {
+    name: "Копирование по HTTP",
+    sessions: [{ id: sessionID, title: "Обработка таблицы", model, outcome: "failed" }],
+    provider: provider({ id: model.id, name: "Тестовая модель" }),
+    pageMessages: () => ({ items: history("provider.auth", Date.now()) }),
+  })
+
+  const stop = page.locator('[data-component="model-stop"]')
+  await stop.getByRole("button", { name: "Скопировать текст ошибки" }).click()
+  await expect(page.locator("html")).toHaveAttribute("data-copied-text", "Test provider refused the request")
+  await expect(stop.getByRole("alert")).toHaveCount(0)
+})
+
+test("offers another model when the context overflows at 390px", async ({ page }, testInfo) => {
+  await page.setViewportSize(narrowViewport)
+  const messages = history("provider.invalid-request", Date.now(), {
+    status: 400,
+    message: "Please reduce the length of the messages",
+  })
+  await openSession(page, {
+    name: "Длинный разговор",
+    sessions: [{ id: sessionID, title: "Обработка таблицы", model, outcome: "failed" }],
+    provider: provider({ id: model.id, name: "Тестовая модель" }, { id: "large-test", name: "Модель с большим окном" }),
+    pageMessages: (_id, limit, _before, type) => ({
+      items: messages.filter((message) => !type || message.type === type).slice(-limit),
+    }),
+  })
+
+  const stop = page.locator('[data-component="model-stop"]')
+  const warning = "Разговор не помещается в модель — начните новый разговор или выберите модель с большим окном"
+  await expect(stop.getByRole("status")).toContainText(warning)
+  await expect(stop.getByRole("button", { name: "Продолжить с этой же" })).toHaveCount(0)
+  await expect(stop.getByRole("button", { name: "Скопировать текст ошибки" })).toBeVisible()
+  await stop.getByText("Продолжить с другой моделью", { exact: true }).click()
+  await expect(stop.getByRole("button", { name: "Модель с большим окном" })).toBeVisible()
+  await expect(stop.getByRole("button", { name: "Тестовая модель" })).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath("context-overflow-390.png") })
+})
+
+for (const backgroundCompaction of [false, true]) {
+  test(`shows the full ${backgroundCompaction ? "background" : "regular"} compaction notice at 390px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(narrowViewport)
+    const messages: SessionMessageInfo[] = [
+      { type: "user", id: "msg_001", time: { created: Date.now() }, text: "Обработай таблицу" },
+      {
+        type: "compaction",
+        id: "msg_002",
+        time: { created: Date.now() - 5000 },
+        status: "completed",
+        reason: "auto",
+        summary: "Таблица прочитана.",
+      },
+    ]
+
+    await openSession(page, {
+      name: "Сжатие",
+      sessions: [{ id: sessionID, title: "Обработка таблицы", model }],
+      configEntries: [{ type: "document", info: { experimental: { background_compaction: backgroundCompaction } } }],
+      seed: { settings: { general: { newTimeline: backgroundCompaction } } },
+      pageMessages: () => ({ items: messages }),
+    })
+
+    const compaction = page.locator('[data-component="session-compaction-message"]')
+    const text = "История разговора сокращена"
+    if (backgroundCompaction) await compaction.getByRole("button", { name: text }).click()
+    const notice = compaction.getByText(text, { exact: true })
+    await expect(compaction.getByText("Таблица прочитана.", { exact: true })).toBeVisible()
+    await expect(compaction.getByText("Сокращаем историю разговора", { exact: true })).toHaveCount(0)
+    await expect(notice).toHaveCount(1)
+    await expect(notice).toBeInViewport({ ratio: 1 })
+    await expect
+      .poll(() =>
+        notice.evaluate((element) => {
+          const box = element.getBoundingClientRect()
+          const textRange = document.createRange()
+          textRange.selectNodeContents(element)
+          return Array.from(textRange.getClientRects()).every(
+            (line) => line.left >= box.left - 1 && line.right <= box.right + 1,
+          )
+        }),
+      )
+      .toBe(true)
+    await page.screenshot({
+      animations: "disabled",
+      path: testInfo.outputPath(`compaction-${backgroundCompaction ? "background" : "regular"}-390.png`),
+    })
+  })
+}
+
+for (const tabLayout of ["horizontal", "vertical"]) {
+  test(`marks a model stop without opening its history in ${tabLayout} layout`, async ({ page }) => {
+    const failedTitle = "Model failed"
+    const failedID = "ses_model_stop_unopened"
+    const failed = history("provider.quota", Date.now())
+    const reads: { type: string | undefined; limit: number }[] = []
+
+    await openSession(page, {
+      name: "Model stop project",
+      sessions: [
+        { id: sessionID, title: "Open session", model },
+        { id: failedID, title: failedTitle, model, outcome: "failed" },
+      ],
+      seed: { settings: { appearance: { tabLayout, sidebarOpen: true }, general: { sidebarOrganize: "projects" } } },
+      pageMessages: (id, limit, _before, type) => {
+        if (id !== failedID) return { items: [] }
+        reads.push({ type, limit })
+        return { items: failed.filter((message) => !type || message.type === type).slice(-limit) }
+      },
+    })
+
+    if (tabLayout === "horizontal") {
+      const tab = page.locator(`[data-titlebar-tab]:has(a[href="${sessionHref(failedID)}"])`)
+      await expect(tab).toHaveAttribute("data-status", "model-stopped")
+      await expect(tab).toHaveAttribute("aria-description", "Модель не ответила")
+      await expect(tab.locator('[data-mark="model-stopped"]')).toBeVisible()
+    } else {
+      const project = page.getByRole("complementary").getByRole("button", { name: /Model stop project/ })
+      const row = page.locator(`button[data-titlebar-tab-action][title="${failedTitle}"]`)
+
+      if ((await project.getAttribute("aria-expanded")) !== "true") await project.click()
+      await expect(row).toHaveAttribute("aria-description", "Модель не ответила")
+      await expect(row.locator(".bg-v2-state-fg-warning")).toBeVisible()
+    }
+
+    expect(reads.length).toBeGreaterThan(0)
+    expect(reads.every((read) => read.type === "idle" && read.limit === 1)).toBe(true)
+  })
+}
+
+test("shows the product retry countdown in the app timeline", async ({ page }) => {
+  const now = Date.now()
+  await page.clock.setFixedTime(now)
+  await openSession(page, {
+    name: "Model retry",
+    sessions: [{ id: sessionID, title: "Retry session", model, time: { created: now, updated: now, busy: now } }],
+    pageMessages: () => ({
+      items: [
+        { type: "user", id: "msg_retry_user", time: { created: now }, text: "Обработай таблицу" },
+        {
+          type: "assistant",
+          id: "msg_retry_assistant",
+          time: { created: now },
+          model,
+          agent: "build",
+          content: [],
+          retry: { attempt: 2, at: now + 15_000, error: { type: "provider.error", message: "Rate limited" } },
+        },
+      ],
+    }),
+  })
+
+  const retry = page.locator('[data-slot="session-turn-retry"]')
+  await expect(retry).toContainText("Модель занята — повторю через 15 с · попытка 2")
+  await expect(retry.locator('[data-kind="session-retry-card"]')).toHaveCount(0)
+})

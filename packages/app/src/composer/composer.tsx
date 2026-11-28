@@ -62,6 +62,23 @@ export function Composer(props: {
 
   return (
     <div class="flex flex-col gap-3">
+      <Show when={props.model.modelStatus}>
+        {(status) => (
+          <div role="status" class="flex flex-wrap items-center gap-2 text-sm text-v2-state-fg-warning">
+            <span>{status().text}</span>
+            <Show when={status().retry && !props.readOnly}>
+              <Button size="small" variant="neutral" onClick={() => status().retry?.()}>
+                {language.t("session.modelStop.retryLimit")}
+              </Button>
+            </Show>
+            <Show when={status().changeModel}>
+              <Button size="small" variant="neutral" onClick={() => command.trigger("model.choose")}>
+                {language.t("session.modelStop.chooseAlternative")}
+              </Button>
+            </Show>
+          </div>
+        )}
+      </Show>
       <ComposerEditor
         controller={props.model}
         borderUnderlay={props.borderUnderlay}

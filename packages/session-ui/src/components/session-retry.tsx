@@ -1,4 +1,5 @@
-import { createEffect, createMemo, createSignal, on, onCleanup, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, on, onCleanup, Show, type Component } from "solid-js"
+import { Dynamic } from "solid-js/web"
 import type { SessionStatus } from "@opencode/client/promise"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { Card } from "@opencode/ui/card"
@@ -7,7 +8,9 @@ import { TextShimmer } from "@opencode/ui/text-shimmer"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { SessionErrorMessage } from "./session-error"
 
-export function SessionRetry(props: { status: SessionStatus; show?: boolean }) {
+export type SessionRetryOverride = Component<{ attempt: number; seconds: number; message: string }>
+
+export function SessionRetry(props: { status: SessionStatus; show?: boolean; override?: SessionRetryOverride }) {
   const i18n = useI18n()
 
   const retry = createMemo(() => {
@@ -48,11 +51,13 @@ export function SessionRetry(props: { status: SessionStatus; show?: boolean }) {
     return current.message
   })
 
+  const remaining = () => Math.max(0, seconds())
+
   const info = createMemo(() => {
     const current = retry()
 
     if (!current) return ""
-    const count = Math.max(0, seconds())
+    const count = remaining()
 
     if (count > 0) return i18n.plural("ui.sessionTurn.retry.attemptWaiting", count, { attempt: current.attempt })
 
@@ -62,30 +67,44 @@ export function SessionRetry(props: { status: SessionStatus; show?: boolean }) {
   return (
     <Show when={retry() && (props.show ?? true)}>
       <div data-slot="session-turn-retry" class="w-full min-w-0">
-        <Card variant="error" class="error-card" data-kind="session-retry-card">
-          <div class="flex w-full items-start gap-2">
-            <Icon name="outline-hexagonal-warning" class="shrink-0 text-v2-state-fg-danger" />
-            <div class="min-w-0 flex-1">
-              <Tooltip
-                appearance="large"
-                contentClass="max-w-80 break-words"
-                value={retry()?.message ?? ""}
-                placement="top"
-              >
-                <div data-slot="session-turn-retry-message" class="cursor-help truncate">
-                  <SessionErrorMessage message={message()} />
+        <Show
+          when={props.override}
+          fallback={
+            <Card variant="error" class="error-card" data-kind="session-retry-card">
+              <div class="flex w-full items-start gap-2">
+                <Icon name="outline-hexagonal-warning" class="shrink-0 text-v2-state-fg-danger" />
+                <div class="min-w-0 flex-1">
+                  <Tooltip
+                    appearance="large"
+                    contentClass="max-w-80 break-words"
+                    value={retry()?.message ?? ""}
+                    placement="top"
+                  >
+                    <div data-slot="session-turn-retry-message" class="cursor-help truncate">
+                      <SessionErrorMessage message={message()} />
+                    </div>
+                  </Tooltip>
+                  <Show when={info()}>
+                    {(line) => (
+                      <div data-slot="session-turn-retry-info">
+                        <TextShimmer text={line()} active />
+                      </div>
+                    )}
+                  </Show>
                 </div>
-              </Tooltip>
-              <Show when={info()}>
-                {(line) => (
-                  <div data-slot="session-turn-retry-info">
-                    <TextShimmer text={line()} active />
-                  </div>
-                )}
-              </Show>
-            </div>
-          </div>
-        </Card>
+              </div>
+            </Card>
+          }
+        >
+          {(override) => (
+            <Dynamic
+              component={override()}
+              attempt={retry()?.attempt ?? 0}
+              seconds={remaining()}
+              message={retry()?.message ?? ""}
+            />
+          )}
+        </Show>
       </div>
     </Show>
   )

@@ -138,6 +138,9 @@ export function createTimelineCache(
                 get backgroundCompaction() {
                   return backgroundCompaction()
                 },
+                get hideCompletedCompactionStart() {
+                  return data.hideCompletedCompactionStart
+                },
                 navigateToSession: data.navigateToSession,
                 sessionHref: data.sessionHref,
                 readMedia: data.readMedia,

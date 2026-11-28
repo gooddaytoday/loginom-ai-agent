@@ -33,7 +33,7 @@ import { ModelTooltip } from "./tooltip"
 import { ModelDetails } from "./details"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ExternalLink } from "@/runtime/platform/external-link"
-import { useData } from "@/runtime/server/current"
+import { useData, useOptionalServer } from "@/runtime/server/current"
 import { useWorkspaceLocation } from "@/workspaces/location"
 import { createModelUsage, ModelUsageTag } from "@/usage/model"
 import {
@@ -95,6 +95,29 @@ const sortModelGroups = (a: { category: string; items: ModelItem[] }, b: { categ
   if (aPopular && bPopular) return aIndex - bIndex
 
   return a.items[0].provider.name.localeCompare(b.items[0].provider.name)
+}
+
+function ModelLimitTag(props: { model: ModelItem }) {
+  const server = useOptionalServer()
+  const language = useLanguage()
+  const limit = () => server?.ctx.freeModelLimits.limit({ id: props.model.id, providerID: props.model.provider.id })
+
+  return (
+    <Show when={limit()}>
+      {(value) => {
+        const text = () => {
+          const reset = value().resetAt
+
+          if (reset === null) return language.t("session.modelStop.modelLimitUnknown")
+          const time = new Intl.DateTimeFormat(language.locale(), { timeStyle: "short" }).format(reset)
+
+          return language.t("session.modelStop.modelLimitUntil", { time })
+        }
+
+        return <span class="shrink-0 text-xs text-v2-state-fg-warning">{text()}</span>
+      }}
+    </Show>
+  )
 }
 
 const ModelList: Component<{
@@ -217,6 +240,7 @@ const ModelList: Component<{
                   <Show when={item.latest}>
                     <Badge class="shrink-0">{language.t("model.tag.latest")}</Badge>
                   </Show>
+                  <ModelLimitTag model={item} />
                   <Show when={usage(item)}>{(value) => <ModelUsageTag usage={value()} />}</Show>
                 </div>
               </div>
@@ -966,6 +990,7 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
           <Show when={item().latest}>
             <Badge class="shrink-0">{language.t("model.tag.latest")}</Badge>
           </Show>
+          <ModelLimitTag model={item()} />
         </span>
         <Show when={usage(item())}>{(value) => <ModelUsageTag usage={value()} />}</Show>
         <Show when={active()}>

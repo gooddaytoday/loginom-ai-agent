@@ -98,6 +98,8 @@ export const {
     onSessionHref?: SessionHrefFn
     /** Whether `experimental.background_compaction` is on for this location; automatic compactions then show quietly. */
     backgroundCompaction?: boolean
+    /** Hide the start divider once compaction has completed. */
+    hideCompletedCompactionStart?: boolean
   }) => {
     return {
       get store() {
@@ -117,6 +119,9 @@ export const {
       },
       get backgroundCompaction() {
         return props.backgroundCompaction === true
+      },
+      get hideCompletedCompactionStart() {
+        return props.hideCompletedCompactionStart === true
       },
       navigateToSession: props.onNavigateToSession,
       sessionHref: props.onSessionHref,

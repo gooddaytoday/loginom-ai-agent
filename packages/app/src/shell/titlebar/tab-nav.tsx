@@ -7,6 +7,7 @@ import { ActivityRing } from "@opencode/ui/activity-ring"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Icon } from "@opencode/ui/icon"
 import { Menu } from "@opencode/ui/menu"
+import { useSessionModelStopped } from "@/shell/layout/project-avatar-state"
 import { useServerCtx } from "@/runtime/server/runtime"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
@@ -136,11 +137,15 @@ export function TabNavItem(
 
   onCleanup(() => window.clearTimeout(intent))
 
+  const stopped = useSessionModelStopped(serverCtx, () => props.session)
+
   // The project icon stays put; status shows where the close button appears on hover.
   const status = () => {
     if (props.preparing || props.loading) return "busy"
 
     if (!props.session) return
+
+    if (stopped()) return "model-stopped"
 
     if (props.active && !serverCtx()?.notification.session.manuallyUnread(props.session.id)) return
 
@@ -152,7 +157,8 @@ export function TabNavItem(
     return props.session.outcome === "failed" ? "failed" : "unread"
   }
 
-  const dotted = () => status() === "attention" || status() === "unread" || status() === "failed"
+  const dotted = () =>
+    status() === "attention" || status() === "unread" || status() === "failed" || status() === "model-stopped"
 
   const project = createMemo(() => {
     const session = props.session
@@ -442,6 +448,7 @@ export function TabNavItem(
       classList={{ invisible: props.hidden }}
       data-active={props.active}
       data-status={status()}
+      aria-description={stopped() ? language.t("session.modelStop.indicator") : undefined}
       data-dragging={props.dragging}
       data-state={props.active || props.pressed ? "pressed" : undefined}
       onPointerEnter={() => hover(true)}
@@ -577,6 +584,7 @@ export function TabNavItem(
           <span data-mark="attention" data-slot="tab-status-dot" />
           <span data-mark="unread" data-slot="tab-status-dot" />
           <span data-mark="failed" data-slot="tab-status-dot" />
+          <span data-mark="model-stopped" data-slot="tab-status-dot" />
         </span>
         <Show when={actions}>
           <IconButton

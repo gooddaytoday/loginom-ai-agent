@@ -11,7 +11,7 @@ import { TextInput } from "@opencode/ui/text-input"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ServerConnection } from "@/runtime/server/registry"
 import { useGlobal } from "@/runtime/server/runtime"
-import { useSessionTabAvatarState } from "@/shell/layout/project-avatar-state"
+import { useSessionModelStopped, useSessionTabAvatarState } from "@/shell/layout/project-avatar-state"
 import { errorMessage } from "@/shell/layout/helpers"
 import { showToast } from "@/shell/notifications/toast"
 import { sessionTreeIDs } from "@/session/requests/session-request-tree"
@@ -68,6 +68,8 @@ export function ProjectSessionRow(props: {
     () => true,
     () => props.session,
   )
+
+  const stopped = useSessionModelStopped(ctx, () => props.session)
 
   function DeleteDialog() {
     const confirm = () => {
@@ -132,6 +134,7 @@ export function ProjectSessionRow(props: {
         class="relative flex h-7 w-full shrink-0 items-center gap-2 rounded-[6px] ps-8 pe-2 text-start text-[13px] leading-[var(--line-height-compact)] font-medium focus-visible:outline-none"
         classList={{ "text-v2-text-text-base": props.active, "text-v2-text-text-faint": !props.active }}
         aria-current={props.active ? "page" : undefined}
+        aria-description={stopped() ? language.t("session.modelStop.indicator") : undefined}
         title={sessionLabel(props.session)}
         style={props.depth ? { "padding-inline-start": `calc(2rem + ${props.depth * 14}px)` } : undefined}
         onClick={props.onOpen}
@@ -167,8 +170,15 @@ export function ProjectSessionRow(props: {
           <Show
             when={status.loading()}
             fallback={
-              <Show when={status.unread() && !props.active}>
-                <span class="size-1.5 rounded-full bg-v2-text-text-base" />
+              <Show
+                when={stopped()}
+                fallback={
+                  <Show when={status.unread() && !props.active}>
+                    <span class="size-1.5 rounded-full bg-v2-text-text-base" />
+                  </Show>
+                }
+              >
+                <span class="size-1.5 rounded-full bg-v2-state-fg-warning" />
               </Show>
             }
           >

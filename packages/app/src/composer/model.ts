@@ -38,6 +38,7 @@ import { parseClientSlashCommand } from "./client-slash-command"
 
 export type ComposerModel = ComposerEditorModel & {
   readonly model: ComposerControls["model"]
+  readonly modelStatus?: { text: string; changeModel?: true; retry?: () => void }
 }
 
 const sendFailedTitle = {
@@ -293,9 +294,19 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
 
   const variants = createMemo(() => ["default", ...adapter.controls().model.selection.variant.list()])
 
+  const selectedModel = () => {
+    const key = adapter.controls().model.selection.key()
+
+    return key && { id: key.modelID, providerID: key.providerID }
+  }
+
+  const { freeModelLimits } = server.ctx
+  const modelLimited = () => !freeModelLimits.canSend(selectedModel())
+
   const submission = createComposerSubmit({
     adapter,
     mode,
+    modelLimited,
     commands: () => data.location.command.list({ directory: sdk().directory }),
     editor: () => editor,
     queueScroll: () => requestAnimationFrame(() => editor?.scrollIntoView({ block: "nearest" })),
@@ -529,7 +540,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
         stopping,
         held: () => submitView().held,
         busy: () => submitView().busy,
-        canSubmit: () => submitView().canSubmit,
+        canSubmit: () => submitView().canSubmit && (mode() === "shell" || !modelLimited()),
         working: adapter.working,
         queue: options?.queue,
         quote:
@@ -538,6 +549,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
                 available: () =>
                   available() &&
                   !adapter.controls().model.loading &&
+                  !modelLimited() &&
                   submitView().canSubmit &&
                   !options?.queue?.undoing(),
                 delivery: () => (adapter.working() ? (options?.queue?.alternate() ?? "steer") : undefined),
@@ -554,7 +566,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
           // the composer value as a new prompt. Enter keeps it queued in
           // place; the alternate action sends it as a steer.
           if (queue?.editing()) {
-            queue.confirmEdit(submitOptions?.alternate ? "steer" : "queue")
+            if (!modelLimited()) queue.confirmEdit(submitOptions?.alternate ? "steer" : "queue")
 
             return
           }
@@ -562,7 +574,8 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
           // With no draft to send, the explicit alternate shortcut acts on the next queued prompt.
           // Plain Enter, touch's primary send and an empty shell composer still do nothing.
           if (submitOptions?.alternate && mode() === "normal" && blank()) {
-            if (adapter.working() && submitView().canSubmit && prompt.context.items().length === 0) queue?.steerFirst()
+            if (adapter.working() && submitView().canSubmit && !modelLimited() && prompt.context.items().length === 0)
+              queue?.steerFirst()
 
             return
           }
@@ -574,7 +587,41 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     },
   })
 
-  Object.defineProperty(controller, "model", { get: () => adapter.controls().model })
+  Object.defineProperties(controller, {
+    model: { get: () => adapter.controls().model },
+    modelStatus: {
+      get: () => {
+        if (freeModelLimits.unresolved().length)
+          return {
+            text: language.t("session.modelStop.limitUnresolved"),
+            retry: freeModelLimits.canRetryUnresolved()
+              ? () => {
+                  if (mode() === "normal" && freeModelLimits.allowUnresolvedRetry()) controller.submit()
+                }
+              : undefined,
+          }
+
+        const model = selectedModel()
+        const limit = model && freeModelLimits.limit(model)
+
+        if (!limit) return
+
+        if (limit.resetAt === null)
+          return {
+            text: language.t("session.modelStop.limitUnknown"),
+            changeModel: true,
+            retry: () => {
+              const current = selectedModel()
+
+              if (mode() === "normal" && current && freeModelLimits.allowRetry(current)) controller.submit()
+            },
+          }
+        const time = new Intl.DateTimeFormat(language.locale(), { timeStyle: "short" }).format(limit.resetAt)
+
+        return { text: language.t("session.modelStop.limitLabel", { time }), changeModel: true }
+      },
+    },
+  })
 
   command.register("composer-editor", () => [
     {

@@ -1,8 +1,14 @@
+import { useModels } from "@/providers/models/models"
+import { useServerSDK } from "@/runtime/server/client"
+import { ModelRetry, ModelStop, readModelContinuation, stopReason } from "./model-stop"
+import { MODEL_STOP_ACTION_TIMEOUT_MS } from "./model-stop-machine"
+import { sameModel } from "../free-limit-reset"
+import { modelConnectionRestricted, useSessionConfig } from "../config"
 import { createEffect, createMemo, createSignal, onCleanup, Show, type Accessor, type JSX } from "solid-js"
 import { Predicate } from "effect"
 import { abort } from "@opencode/util/abort"
 import { createAnimatedPresence } from "@/runtime/animated-presence"
-import type { SessionMessageUser } from "@opencode/client/promise"
+import type { ModelRef, SessionMessageAssistant, SessionMessageUser } from "@opencode/client/promise"
 import type { SessionUserActions } from "@opencode/session-ui/actions"
 import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
@@ -151,7 +157,7 @@ function MessageTimelineView(
   const command = useCommand()
   const pluginScoped = usePluginScoped()
   const server = useServer()
-  const data = server.ctx.data
+  const { data, freeModelLimits } = server.ctx
   const sdk = useWorkspaceLocation()
   const sessionID = props.data.sessionID
   const sessionStatus = props.data.status
@@ -301,6 +307,45 @@ function MessageTimelineView(
 
   const settings = useSettings()
 
+  const models = useModels()
+  const api = useServerSDK().api
+  const history = props.session.history.messages
+  const config = useSessionConfig(sessionDirectory)
+  const modelsManaged = createMemo(() => config.isSuccess && modelConnectionRestricted(config.data))
+
+  const modelName = (model: ModelRef | undefined) =>
+    model ? (models.find({ modelID: model.id, providerID: model.providerID })?.name ?? model.id) : "—"
+
+  const errorPresentation = (row: { userMessageID: string; text: string; resetAt?: number }) => {
+    const messages = history()
+    const start = messages.findIndex((message) => message.id === row.userMessageID)
+
+    if (start < 0) return
+    const end = messages.findIndex((message, index) => index > start && message.type === "user")
+    const turn = messages.slice(start + 1, end < 0 ? undefined : end)
+
+    const failure = turn.findLast(
+      (message) => (message.type === "assistant" || message.type === "idle") && stopReason(message.error),
+    )
+
+    if (failure?.type !== "assistant" && failure?.type !== "idle") return
+    const reason = stopReason(failure.error)
+
+    if (!reason) return
+
+    const model =
+      turn.findLast((message) => message.type === "assistant")?.model ??
+      (end < 0 ? props.session.data.info()?.model : undefined)
+
+    return {
+      userMessageID: row.userMessageID,
+      reason,
+      error: failure.error?.message ?? row.text,
+      model,
+      resetAt: row.resetAt,
+    }
+  }
+
   const rowInput = {
     foldUserMessages: settings.general.foldUserMessages,
     sessionID: () => sessionID()!,
@@ -319,6 +364,93 @@ function MessageTimelineView(
       }
     },
     actions: props.actions,
+    errorPresentation,
+    renderError: (presentation: Accessor<NonNullable<ReturnType<typeof errorPresentation>>>) => {
+      const canContinue = () =>
+        sessionStatus().type === "idle" &&
+        history().findLast((message) => message.type === "user")?.id === presentation().userMessageID
+
+      const canResumeSame = () => {
+        const model = presentation().model
+
+        return !!model && freeModelLimits.canSend(model)
+      }
+      const candidates = createMemo(() =>
+        !canContinue()
+          ? []
+          : models.list().flatMap((item) => {
+              const model = { id: item.id, providerID: item.provider.id }
+              if (
+                !models.visible({ modelID: model.id, providerID: model.providerID }) ||
+                sameModel(model, presentation().model) ||
+                !freeModelLimits.canSend(model)
+              )
+                return []
+              return [{ model, name: item.name }]
+            }),
+      )
+
+      return (
+        <ModelStop
+          reason={presentation().reason}
+          error={presentation().error}
+          model={presentation().model}
+          modelName={modelName(presentation().model)}
+          resetAt={presentation().resetAt}
+          alternatives={candidates()}
+          canResumeSame={canResumeSame()}
+          canContinue={canContinue() && !!props.actions?.chooseModel}
+          modelsManaged={modelsManaged()}
+          connect={() => command.trigger("provider.connect")}
+          resume={async (model) => {
+            const id = sessionID()
+
+            if (!id || !canContinue() || !freeModelLimits.canSend(model)) return
+            const signal = AbortSignal.timeout(MODEL_STOP_ACTION_TIMEOUT_MS)
+            await data.session.prompt({
+              sessionID: id,
+              prepare: async () => {
+                await api.session.switchModel({ sessionID: id, model }, { signal })
+                signal.throwIfAborted()
+              },
+              text: language.t("session.modelStop.continuePrompt"),
+              metadata: { modelContinuation: modelName(model), previousModel: modelName(presentation().model) },
+            })
+            data.session.acceptSend(id)
+          }}
+        />
+      )
+    },
+    renderRetry: ModelRetry,
+    renderUserNotice: (message: SessionMessageUser) => {
+      const continuation = readModelContinuation(message.metadata)
+
+      if (!continuation) return
+
+      return (
+        <div class="text-sm text-v2-text-text-muted" role="status">
+          {language.t("session.modelStop.continued", { model: continuation.modelContinuation })}
+        </div>
+      )
+    },
+    renderAnswerNote: (userMessageID: string, answer: SessionMessageAssistant) => {
+      const message = projection.messageByID().get(userMessageID)
+
+      if (message?.type !== "user") return
+
+      const continuation = readModelContinuation(message.metadata)
+
+      if (!continuation) return
+
+      const previous = continuation.previousModel
+      const actual = modelName(answer.model)
+
+      return (
+        <div class="text-xs text-v2-text-text-muted">
+          {previous && previous !== actual ? `${previous} → ${actual}` : actual}
+        </div>
+      )
+    },
     timelineDetail: props.data.timelineDetail,
     disclosure: virtualized.disclosure,
     centered: () => props.centered,
