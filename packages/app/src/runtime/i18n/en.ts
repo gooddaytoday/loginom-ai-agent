@@ -54,8 +54,8 @@ export const dict = {
 
   "command.project.open": "Open project",
   "command.project.copyID": "Copy Project ID",
-  "command.provider.connect": "Connect an integration",
-  "command.provider.connect.description": "Sign in to OpenCode Go, OpenCode Console, or another model provider",
+  "command.provider.connect": "Connect model…",
+  "command.provider.connect.description": "Connect a model with a subscription, an API key, or your own server.",
   "command.settings.open": "Open settings",
   "command.config.reload": "Reload configuration",
   "command.config.reload.description": "Reload agents, commands, skills, MCP servers and plugins from your config",
@@ -132,8 +132,8 @@ export const dict = {
   "palette.group.settings": "Settings",
   "palette.session.location": "{{project}} · {{server}}",
 
-  "dialog.provider.title": "Integrations",
-  "dialog.provider.description": "Connect services so OpenCode can use them.",
+  "dialog.provider.title": "Connect provider",
+  "dialog.provider.description": "Connect a provider to use its models in Loginom AI Agent.",
   "dialog.provider.search.placeholder": "Search providers",
   "dialog.provider.empty": "No providers found",
   "dialog.provider.group.popular": "Popular",
@@ -148,7 +148,6 @@ export const dict = {
   "dialog.provider.tag.recommended": "Recommended",
   "dialog.provider.opencode.note": "Curated models including Claude, GPT, Gemini and more",
   "dialog.provider.opencode.tagline": "Reliable optimized models",
-  "dialog.provider.opencodeGo.tagline": "Low cost subscription for everyone",
   "dialog.provider.anthropic.note": "Direct access to Claude models via API key",
   "dialog.provider.claudeAgent.note": "Use your Claude plan or another Claude Code login",
   "dialog.provider.copilot.note": "AI models for coding assistance via GitHub Copilot",
@@ -158,6 +157,7 @@ export const dict = {
   "dialog.provider.vercel.note": "Unified access to AI models with smart routing",
 
   "dialog.model.select.title": "Select model",
+  "dialog.model.connect": "Connect model",
   "dialog.model.search.placeholder": "Search models",
   "dialog.model.empty": "No model results",
   "dialog.model.unavailable": "{{model}} (unavailable)",
@@ -173,8 +173,8 @@ export const dict = {
   "dialog.model.unfavorite": "Unfavorite",
 
   "dialog.model.unpaid.freeModels.title": "Free models provided by OpenCode",
-  "dialog.model.unpaid.addMore.title": "Add more models from popular providers",
-  "dialog.model.unpaid.viewMoreProviders": "See 70+ more providers",
+  "dialog.model.unpaid.connect.title": "Add more models",
+  "dialog.model.unpaid.moreProviders": "More providers",
 
   "dialog.provider.viewAll": "Show more providers",
   "dialog.provider.accounts.add": "Add account",
@@ -492,8 +492,6 @@ export const dict = {
   "dialog.project.edit.worktree.startup": "Worktree startup script",
   "dialog.project.edit.worktree.startup.placeholder": "e.g. bun install",
 
-  "dialog.usageExceeded.dontShowAgain": "Don't show again",
-
   "toast.permissions.autoaccept.on.title": "Auto-accepting permissions",
   "toast.permissions.autoaccept.on.description": "Permission requests will be automatically approved",
   "toast.permissions.autoaccept.project.title": "Auto-accepting permissions for this project",
@@ -592,6 +590,9 @@ export const dict = {
   "notification.session.error.title": "Session error",
   "notification.session.error.fallbackDescription": "An error occurred",
 
+  "plugin.page.unavailable": "Plugin page unavailable",
+  "plugin.page.backHome": "Back to Home",
+  "plugin.page.navigation": "Plugin pages",
   "home.title": "Home",
   "home.projects": "Projects",
   "home.projects.all": "All projects",
@@ -653,11 +654,8 @@ export const dict = {
   "session.background.moveRunning": "Move to background",
   "session.background.moveInline": "Press {{keybind}} to move running work to the background",
   "command.session.background": "Move to background",
-  "session.freeLimit.title": "Free limit reached",
-  "session.freeLimit.reset": "Free usage resets at {{time}}. Connect a provider or subscribe to Go to continue.",
-  "session.freeLimit.noReset": "Connect a provider or subscribe to Go to continue.",
-  "session.freeLimit.connect": "Connect provider",
-  "session.freeLimit.subscribe": "Subscribe to Go · $10/mo",
+  "session.freeLimit.stopped": "Model stopped the turn",
+  "session.freeLimit.resetTime": "Free usage resets at {{time}}.",
   "session.goLimit.title": "Go usage limit reached.",
   "session.goLimit.titleNamed": "Go {{name}} usage limit reached.",
   "session.goLimit.reset": "It resets at {{time}}.",

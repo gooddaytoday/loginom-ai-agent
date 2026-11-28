@@ -7,7 +7,7 @@ import { Menu } from "@opencode/ui/menu"
 import { BuiltinProviderSetup, type ProviderSetup } from "@opencode/plugin/gui/builtin"
 import { OpenCodeLogo } from "@/providers/opencode-logo"
 import { showToast } from "@/shell/notifications/toast"
-import { popularProviders, useProviders } from "@/providers/catalog/providers"
+import { useProviders } from "@/providers/catalog/providers"
 import { consoleProviderGroup } from "@/providers/catalog/console"
 import { useIntegrations } from "@/providers/catalog/integrations"
 import { createEffect, createMemo, createSignal, on, onCleanup, untrack, type Component, For, type JSX, Show } from "solid-js"
@@ -38,9 +38,19 @@ type ProviderSource = "env" | "api" | "account" | "config" | "custom"
 
 type ProviderItem = ReturnType<ReturnType<typeof useProviders>["connected"]>[number]
 
+const POPULAR_SETTINGS_ORDER = [
+  "opencode",
+  "opencode-go",
+  "openai",
+  "github-copilot",
+  "anthropic",
+  "google",
+  "openrouter",
+  "vercel",
+]
+
 const PROVIDER_NOTES = [
   { match: (id: string) => id === "opencode", key: "dialog.provider.opencode.note" },
-  { match: (id: string) => id === "opencode-go", key: "dialog.provider.opencodeGo.tagline" },
   { match: (id: string) => id === "anthropic", key: "dialog.provider.anthropic.note" },
   { match: (id: string) => id === "claude-agent", key: "dialog.provider.claudeAgent.note" },
   { match: (id: string) => id.startsWith("github-copilot"), key: "dialog.provider.copilot.note" },
@@ -263,7 +273,7 @@ export const SettingsProviders: Component<{
       })
       .slice()
 
-    items.sort((a, b) => popularProviders.indexOf(a.id) - popularProviders.indexOf(b.id))
+    items.sort((a, b) => POPULAR_SETTINGS_ORDER.indexOf(a.id) - POPULAR_SETTINGS_ORDER.indexOf(b.id))
 
     return items
   })
@@ -685,7 +695,7 @@ export const SettingsProviders: Component<{
                     <div class="settings-provider-copy">
                       <div class="settings-provider-main">
                         <span class="settings-provider-name">{item.name}</span>
-                        <Show when={item.id === "opencode" || item.id === "opencode-go"}>
+                        <Show when={item.id === "opencode"}>
                           <Badge>{language.t("dialog.provider.tag.recommended")}</Badge>
                         </Show>
                       </div>

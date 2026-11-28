@@ -23,7 +23,13 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import { LifetimeContext, liveAccessor, PluginContext, type Bridge, type Entry } from "@opencode/plugin/gui/host"
-import { BuiltinProviderSetup, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
+import {
+  BuiltinProviderSetup,
+  Page,
+  ToolRenderer,
+  type BuiltinCatalog,
+  type BuiltinContext,
+} from "@opencode/plugin/gui/builtin"
 import { Predicate } from "effect"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { pluralCategory, resolveTemplate } from "@opencode/ui/context/i18n"
@@ -72,6 +78,7 @@ import {
   type PluginHostEffect,
   type PluginHostEvent,
 } from "./instance-machine"
+import { nativeToolNames } from "./native-tool-names"
 import { createStartupGate } from "./startup"
 import { createSessionStore, whenLoaded } from "./stores"
 
@@ -129,8 +136,8 @@ type HostState = {
   contracts: Record<string, number | undefined>
 }
 
-// How long a plugin may load its window entry and global stores before it fails.
-const activationTimeout = 30_000
+// Give Desktop's 30 s port handshake time to finish, with 15 s of headroom for store reads.
+const activationTimeout = 45_000
 
 type Stores = Record<string, Persisted<object> | ((session: SessionRef) => Persisted<object>)>
 
@@ -188,6 +195,7 @@ function createHost(input: HostInput) {
   const owner = getOwner()
   const provided = new Map<string, { live: Live<unknown> & { readonly status: "active" } }>()
   const generations = new Map<string, number>()
+  const toolRendererNames = new Set<string>()
 
   // Entries are indexed by registry and contracts versioned by token, so a change wakes only its own readers.
   const [state, setState] = createStore<HostState>({ entries: {}, contracts: {} })
@@ -814,27 +822,81 @@ function createHost(input: HostInput) {
       add<T>(registry: Registry<T>, item: T | (() => T | undefined)) {
         if (late()) return () => {}
 
+        const toolRenderer = registry.id === ToolRenderer.id
+
+        if (toolRenderer && !input.builtins?.has(plugin))
+          throw new Error("Only built-in plugins can add tool renderers")
+
+        if (registry.id === Page.id && !input.builtins?.has(plugin))
+          throw new Error("Only built-in plugins can add pages")
+
         if (registry.id === BuiltinProviderSetup.id && !input.builtins?.has(plugin))
           throw new Error("Only built-in plugins can add provider setup forms")
 
+        let active = toolRenderer
+        let claimed: string | undefined
+
+        const releaseName = () => {
+          if (claimed === undefined) return
+          toolRendererNames.delete(claimed)
+          claimed = undefined
+        }
+
+        const validate = (value: T | undefined) => {
+          if (!active) return value
+
+          const name = Predicate.hasProperty(value, "tool") && Predicate.isString(value.tool) ? value.tool : undefined
+
+          if (name === claimed) return value
+
+          if (name !== undefined) {
+            if (nativeToolNames.has(name)) throw new Error(`Cannot register a renderer for native tool "${name}"`)
+
+            if (toolRendererNames.has(name)) throw new Error(`A renderer is already registered for tool "${name}"`)
+          }
+
+          releaseName()
+
+          if (name !== undefined) {
+            toolRendererNames.add(name)
+            claimed = name
+          }
+
+          return value
+        }
+
         // Promise callbacks may have no owner; fall back to the plugin root.
-        const read =
-          // SAFETY: a function item is the SDK's reactive form; registries take no function values.
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- see SAFETY above
-          typeof item === "function"
-            ? runWithOwner(getOwner() ?? root, () => createMemo(item as () => T | undefined))
-            : () => item
+        // SAFETY: a function item is the SDK's reactive form; registries take no function values.
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- see SAFETY above
+        const reactive = typeof item === "function"
+
+        const owner = getOwner() ?? root
+
+        const read = reactive
+          ? runWithOwner(owner, () => {
+              // SAFETY: the function branch above is the registry's reactive form.
+              const getValue = item as () => T | undefined
+
+              return createMemo(getValue)
+            })
+          : undefined
+
+        // Validate the initial value in ctx.add, before installing the contribution.
+        const initial = validate(reactive ? untrack(() => read?.()) : item)
+        const value = toolRenderer && read ? runWithOwner(owner, () => createMemo(() => validate(read()))) : read
 
         const key = `${plugin}/${++sequence.value}`
 
         setState("entries", registry.id, (entries = []) => [
           ...entries,
-          { key, registry: registry.id, plugin, value: read ?? (() => undefined) },
+          { key, registry: registry.id, plugin, value: value ?? (() => initial) },
         ])
 
-        return register(() =>
-          setState("entries", registry.id, (entries = []) => entries.filter((entry) => entry.key !== key)),
-        )
+        return register(() => {
+          active = false
+          releaseName()
+          setState("entries", registry.id, (entries = []) => entries.filter((entry) => entry.key !== key))
+        })
       },
       list,
       provide<T>(token: Contract<T> | Ipc, impl: T) {

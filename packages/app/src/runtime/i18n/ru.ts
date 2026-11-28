@@ -85,7 +85,8 @@ export const dict = {
   "theme.scheme.dark": "Тёмная",
 
   "command.project.open": "Открыть проект",
-  "command.provider.connect": "Подключить провайдера",
+  "command.provider.connect": "Подключить модель…",
+  "command.provider.connect.description": "Подключите модель: по подписке, по ключу API или свой сервер.",
   "command.settings.open": "Открыть настройки",
 
   "command.palette": "Палитра команд",
@@ -135,6 +136,8 @@ export const dict = {
   "palette.group.commands": "Команды",
   "palette.group.files": "Файлы",
 
+  "dialog.provider.title": "Подключить провайдера",
+  "dialog.provider.description": "Подключите провайдера, чтобы использовать его модели в Loginom AI Agent.",
   "dialog.provider.search.placeholder": "Поиск провайдеров",
   "dialog.provider.empty": "Провайдеры не найдены",
   "dialog.provider.group.popular": "Популярные",
@@ -143,7 +146,6 @@ export const dict = {
   "dialog.provider.tag.recommended": "Рекомендуемые",
   "dialog.provider.opencode.note": "Отобранные модели, включая Claude, GPT, Gemini и другие",
   "dialog.provider.opencode.tagline": "Надёжные оптимизированные модели",
-  "dialog.provider.opencodeGo.tagline": "Доступная подписка для всех",
   "dialog.provider.copilot.note": "ИИ-модели для помощи в кодировании через GitHub Copilot",
   "dialog.provider.openai.note": "Модели GPT для быстрых и мощных задач общего ИИ",
   "dialog.provider.google.note": "Модели Gemini для быстрых и структурированных ответов",
@@ -151,14 +153,18 @@ export const dict = {
   "dialog.provider.vercel.note": "Единый доступ к ИИ-моделям с умной маршрутизацией",
 
   "dialog.model.select.title": "Выбрать модель",
+  "dialog.model.connect": "Подключить модель",
   "dialog.model.search.placeholder": "Поиск моделей",
   "dialog.model.empty": "Модели не найдены",
   "dialog.model.manage": "Управление моделями",
   "dialog.model.manage.description": "Настройте, какие модели отображаются при выборе модели",
 
-  "dialog.model.unpaid.freeModels.title": "Бесплатные модели от OpenCode",
-  "dialog.model.unpaid.addMore.title": "Добавьте больше моделей от популярных провайдеров",
-  "dialog.model.unpaid.viewMoreProviders": "Посмотреть ещё более 70 провайдеров",
+  "dialog.model.unpaid.freeModels.title": "Бесплатные модели OpenCode",
+  "dialog.model.unpaid.connect.title": "Добавьте больше моделей",
+  "dialog.model.unpaid.moreProviders": "Ещё провайдеры",
+
+  "session.freeLimit.stopped": "Модель остановила ход",
+  "session.freeLimit.resetTime": "Бесплатные запросы снова доступны с {{time}}.",
 
   "dialog.provider.viewAll": "Показать больше провайдеров",
 
@@ -271,7 +277,6 @@ export const dict = {
 
   "dialog.project.edit.worktree.startup": "Скрипт запуска рабочего пространства",
   "dialog.project.edit.worktree.startup.placeholder": "например, bun install",
-  "dialog.usageExceeded.dontShowAgain": "Больше не показывать",
 
   "toast.permissions.autoaccept.on.title": "Разрешения принимаются автоматически",
   "toast.permissions.autoaccept.on.description": "Запросы на разрешения будут одобряться автоматически",

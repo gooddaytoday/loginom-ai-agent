@@ -1,14 +1,14 @@
-# Excel файл (`imports.excel`)
+# Excel файл
 
 <!-- mode: xlsx -->
-## Режим XLSX: импорт из Excel
+## Импорт XLSX
 
 Исходная XLSX: `imports.excel`, `mode:"xlsx"`, проверенные `parameters.source` и
 `excel.source_path`. `sheet_name` — точное имя листа с пробелами/регистром;
 без него первый, при `source_switch` прежний. `header_rows`: 1–1000;
 `columns`: все 1–64 поля в исходном порядке с `name`, `label`, `type`.
 Имя — ASCII identifier; иной исходный заголовок — `source_name`.
-Поля справа доступны прокруткой. Сохраняй NULL.
+Прокрути к правым полям. Сохраняй NULL.
 Не добавляй Калькулятор/JavaScript для диапазона, Boolean, ширины или списка.
 
 Диапазон: `excel.named_range:"SalesRange"` (точное имя, без `sheet_name`).
