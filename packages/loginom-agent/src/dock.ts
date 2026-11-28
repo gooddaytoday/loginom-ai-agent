@@ -276,6 +276,7 @@ export async function dockTools(input: {
     const task = bound.get(lease)?.task ?? (await input.task(call.sessionID))
     const signal = call.signal
     let publishing = Promise.resolve()
+    let progressMetadata = {}
     const result = await lease
       .call(
         name,
@@ -287,9 +288,10 @@ export async function dockTools(input: {
         packageInput,
         scanReceipt,
         (update) => {
+          const metadata = progressMetadata = { ...progressMetadata, ...update }
           publishing = publishing
             .then(async () => {
-              if (!signal.aborted) await call.progress({ loginomStep: update })
+              if (!signal.aborted) await call.progress(metadata)
             })
             .catch(() => undefined)
         },

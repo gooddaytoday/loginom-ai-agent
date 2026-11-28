@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { Busy } from "@loginom-ai-agent/loginom-host/step-progress"
 
 const count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 const maxBytes = 16 * 1024
@@ -22,6 +23,7 @@ export const LoginomMetadata = Schema.Struct({
   attempt: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
   kind: Schema.optional(Schema.Literals(["add", "configure", "execute", "export", "read"])),
   state: Schema.Literals(["running", "settled"]),
+  busy: Schema.optional(Busy),
   status: Schema.optional(Schema.Literals(["SUCCEEDED", "FAILED", "NOT_APPLIED", "AMBIGUOUS"])),
   phase: Schema.optional(Schema.String),
   node: Schema.optional(

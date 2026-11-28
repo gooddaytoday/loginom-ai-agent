@@ -195,9 +195,18 @@ export function compactKnowledgeBundle(description) {
 const FEED_MAX_BYTES = 16 * 1024;
 const FEED_PREVIEW_MAX_BYTES = 12 * 1024;
 
-export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts}) {
+export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts, busy, save}) {
+  const busyFor = operationId => busy?.version === 1 && busy.operationId === operationId
+    && /^[A-Za-z0-9_.:-]{1,128}$/.test(busy.operationId)
+    && typeof busy.active === 'boolean' && typeof busy.windowId === 'string'
+    && /^[0-9a-f-]{36}$/.test(busy.windowId)
+    ? {version:1, windowId:busy.windowId, operationId:busy.operationId, active:busy.active} : undefined;
+  if (tool === 'dock_action_run' && ['package.save_as', 'package.save_checkpoint'].includes(save?.action_key)) {
+    const signal = busyFor(save.operation_id);
+    return signal ? {v:1, operationId:save.operation_id, state:'settled', status:save.status, busy:signal} : undefined;
+  }
   const receipt = reply.structuredContent;
-  if (!['dock_node_apply', 'dock_node_wait', 'dock_node_status', 'dock_node_read', 'dock_node_resume', 'dock_node_cancel', 'dock_node_stop'].includes(tool)
+  if (!['dock_node_apply', 'dock_node_wait', 'dock_node_status', 'dock_node_read', 'dock_node_resume', 'dock_node_cancel', 'dock_node_stop', 'dock_node_delete'].includes(tool)
       || receipt?.result_version !== 'user-v1' || !['running', 'settled'].includes(receipt.state)
       || typeof receipt.operation_id !== 'string' || !receipt.operation_id) return;
 
@@ -215,6 +224,7 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
   const succeeded = state === 'settled' && receipt.status === 'SUCCEEDED' && !reply.isError;
   const result = {
     v: 1, operationId: receipt.operation_id, state,
+    busy: busyFor(receipt.operation_id),
     attempt: receipt.attempt, status: state === 'settled' ? receipt.status : undefined,
     phase: text(receipt.phase ?? receipt.progress?.pending_phase, 128),
     node: typeof guid === 'string' && guid && label !== undefined && type ? {guid, label, type} : undefined,
