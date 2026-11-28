@@ -37,7 +37,18 @@ export function createWebPlatform(version: string) {
         notification.close()
       }
 
-      return true
+      return new Promise<true | void>((resolve) => {
+        const listeners = new AbortController()
+
+        const finish = (shown?: true) => {
+          listeners.abort()
+          resolve(shown)
+        }
+
+        notification.addEventListener("show", () => finish(true), { signal: listeners.signal })
+        notification.addEventListener("error", () => finish(), { signal: listeners.signal })
+        notification.addEventListener("close", () => finish(), { signal: listeners.signal })
+      })
     },
   }
 

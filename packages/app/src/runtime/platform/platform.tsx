@@ -59,7 +59,7 @@ type PlatformBase = {
   /** Restart the app  */
   restart(): Promise<void>
 
-  /** Submit a system notification and return true if it was sent. */
+  /** Return true when the system notification fires show. */
   notify(title: string, description?: string, onClick?: () => void): Promise<true | void>
 
   /** Open a native attachment picker and read selected files sequentially (desktop only) */

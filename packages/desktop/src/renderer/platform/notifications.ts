@@ -28,23 +28,29 @@ export function createDesktopNotify(api: DesktopNotifyAPI): Platform["notify"] {
 
     activeNotifications.add(notification)
 
-    const release = () => {
-      activeNotifications.delete(notification)
-      notification.onclick = null
-      notification.onclose = null
-      notification.onerror = null
-    }
+    return new Promise<true | void>((resolve) => {
+      const release = () => {
+        activeNotifications.delete(notification)
+        notification.onclick = null
+        notification.onclose = null
+        notification.onerror = null
+        notification.onshow = null
+        resolve(undefined)
+      }
 
-    notification.onclose = release
-    notification.onerror = release
+      notification.onclose = release
+      notification.onerror = release
+      notification.onshow = () => {
+        notification.onshow = null
+        resolve(true)
+      }
 
-    notification.onclick = () => {
-      release()
-      void Promise.all([api.showWindow(), api.setWindowFocus()])
-      onClick?.()
-      notification.close()
-    }
-
-    return true
+      notification.onclick = () => {
+        release()
+        void Promise.all([api.showWindow(), api.setWindowFocus()])
+        onClick?.()
+        notification.close()
+      }
+    })
   }
 }
