@@ -89,12 +89,15 @@ function Step(props: ToolRendererProps) {
     onCleanup(() => clearTimeout(timer))
   })
 
-  createKeyed(() => progress()?.startedAt, (since) => {
-    const tick = () => setSeconds(Math.max(0, Math.floor((Date.now() - since) / 1000)))
-    tick()
-    const timer = setInterval(tick, 1000)
-    onCleanup(() => clearInterval(timer))
-  })
+  createKeyed(
+    () => progress()?.startedAt,
+    (since) => {
+      const tick = () => setSeconds(Math.max(0, Math.floor((Date.now() - since) / 1000)))
+      tick()
+      const timer = setInterval(tick, 1000)
+      onCleanup(() => clearInterval(timer))
+    },
+  )
 
   const title = () => {
     if (failed()) {
@@ -112,9 +115,10 @@ function Step(props: ToolRendererProps) {
     if (!step) return ctx.t("step.running")
 
     const elapsed = seconds()
-    const duration = elapsed < 60
-      ? ctx.t("duration.seconds", { seconds: elapsed })
-      : ctx.t("duration.minutes", { minutes: Math.floor(elapsed / 60), seconds: elapsed % 60 })
+    const duration =
+      elapsed < 60
+        ? ctx.t("duration.seconds", { seconds: elapsed })
+        : ctx.t("duration.minutes", { minutes: Math.floor(elapsed / 60), seconds: elapsed % 60 })
 
     if (step.phase === "waiting") return ctx.t("phase.waiting", { duration })
 

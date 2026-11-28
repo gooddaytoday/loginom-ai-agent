@@ -3546,6 +3546,8 @@ for (const width of [1280, 390]) {
 }
 
 test("Loginom updates the current step when live progress arrives", async ({ page }) => {
+  await page.clock.setFixedTime(receipts.configuring.startedAt + 12000)
+
   const timeline = await setupTimeline(page, {
     locale: "ru",
     messages: [userMessage(), assistantMessage([], { completed: false })],
@@ -3563,7 +3565,7 @@ test("Loginom updates the current step when live progress arrives", async ({ pag
   await timeline.send(
     partUpdated(toolPart(id, name, "running", {}, { metadata: { loginomStep: receipts.configuring } })),
   )
-  await expect(progress.getByText(/^Собираю сценарий в Loginom… · Идёт \d+ с$/)).toBeVisible()
+  await expect(progress.getByText("Собираю сценарий в Loginom… · Идёт 12 с", { exact: true })).toBeVisible()
 })
 
 for (const width of [1280, 390]) {
