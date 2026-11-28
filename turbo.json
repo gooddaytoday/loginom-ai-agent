@@ -70,7 +70,8 @@
     },
     "@opencode/desktop#test": {
       "outputs": [],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["LOGINOM_AI_AGENT_TEST_NODE"]
     },
     "@opencode/sdk#verify:package": {
       "outputs": []

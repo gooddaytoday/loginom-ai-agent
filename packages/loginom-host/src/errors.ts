@@ -1,3 +1,5 @@
+import { stepOperationIdPattern } from "./step-operation-id"
+
 const codes = new Set([
   "DASHBOARD_ORIGIN_MISMATCH",
   "DASHBOARD_STORAGE_UNAVAILABLE",
@@ -14,6 +16,8 @@ const codes = new Set([
   "LOGINOM_SCOPE_DENIED",
   "LOGINOM_RECOVERY_REQUIRED",
   "LOGINOM_CALL_UNCERTAIN",
+  "LOGINOM_WRITE_NOT_DISPATCHED",
+  "LOGINOM_WRITE_JOURNAL_INVALID",
   "LOGINOM_CALL_BUSY",
   "LOGINOM_CANDIDATE_INVALID",
   "LOGINOM_SAVE_INVALID",
@@ -47,9 +51,13 @@ const codes = new Set([
   "LOGINOM_LOGIN_UNAVAILABLE",
   "LOGINOM_BROWSER_START_FAILED",
   "LOGINOM_RUNTIME_START_FAILED",
+  "LOGINOM_RUNTIME_TIMEOUT",
   "LOGINOM_RUNTIME_UNAVAILABLE",
   "LOGINOM_STORE_READ_FAILED",
   "LOGINOM_STORE_WRITE_FAILED",
+  "LOGINOM_PENDING_CLEAR_FAILED",
+  "LOGINOM_PENDING_RESUME_FAILED",
+  "LOGINOM_PENDING_NOT_APPLIED",
   "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE",
   "LOGINOM_CREDENTIAL_FORMAT_INVALID",
   "LOGINOM_HOST_CLOSED",
@@ -101,9 +109,19 @@ const reasons: Record<string, string> = {
 // path, cause, stack, file bytes or arbitrary details across the trust boundary.
 export function hostFailure(value: unknown) {
   const error = hostError(value)
+  const source = value && typeof value === "object" && "details" in value ? value.details : undefined
+  if (error === "LOGINOM_CALL_UNCERTAIN" && source && typeof source === "object" &&
+    "checkWriteOutcome" in source && source.checkWriteOutcome === true) {
+    const operationId = "operationId" in source && typeof source.operationId === "string" &&
+      stepOperationIdPattern.test(source.operationId) ? source.operationId : undefined
+    return { error, details: {
+      checkWriteOutcome: true,
+      reason: "Исход записи в целевой пакет неизвестен. Не повторяйте запись. Прочитайте текущее состояние пакета и запросите проверку исхода исходного вызова.",
+      ...(operationId ? { operationId } : {}),
+    } }
+  }
   const reason = reasons[error]
   if (!reason) return { error }
-  const source = value && typeof value === "object" && "details" in value ? value.details : undefined
   const details: { reason: string; actual?: number; limit?: number; hint?: string } = { reason }
   if (error === "LOGINOM_FILE_TOO_LARGE") {
     const fields: { actual?: unknown; limit?: unknown } = source && typeof source === "object" ? source : {}
@@ -119,6 +137,10 @@ export function hostFailure(value: unknown) {
 export function hostException(value: unknown) {
   const failure = hostFailure(value)
   return Object.assign(new Error(failure.error), failure.details ? { details: failure.details } : {})
+}
+
+export function uncertainCall(operationId?: string) {
+  return hostException({ error: "LOGINOM_CALL_UNCERTAIN", details: { checkWriteOutcome: true, operationId } })
 }
 
 export function hostErrorText(value: unknown) {

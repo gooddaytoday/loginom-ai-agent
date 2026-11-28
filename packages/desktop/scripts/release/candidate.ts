@@ -3,6 +3,7 @@ import { cp, mkdir, readdir, rename, rm } from "node:fs/promises"
 import { basename, dirname, join, resolve } from "node:path"
 import { $ } from "bun"
 import { verifyCliManifest } from "@loginom-ai-agent/loginom-host/cli-manifest"
+import { verifyProductionHost } from "../../../loginom-host/script/verify-production-host"
 import { decodeManifest, verifyResourceTree } from "./manifest"
 
 // B5.2b: verifies one platform's candidate artifacts downloaded from a loginom-{linux,windows,macos}.yml run. `prepare`
@@ -143,6 +144,7 @@ async function g5(platform: keyof typeof platforms, work: string, output: string
     const metadata = await verifyCliManifest(cli, { platform: process.platform, arch: process.arch })
     if (!basename(archive).includes(`-cli-${metadata.version}-`)) throw Error("RELEASE_CLI_VERSION_MISMATCH")
     if (metadata.sourceCommit !== manifest.source.commit) throw Error("RELEASE_CLI_COMMIT_MISMATCH")
+    await verifyProductionHost(join(cli, cliProbe))
   }
   const verifyResources = () => verifyResourceTree(resources, manifest.runtime.resourcesSha256, config.target)
   await verifyCli()

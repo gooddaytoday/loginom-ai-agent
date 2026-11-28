@@ -13,6 +13,7 @@ import { supervise } from "../src/supervisor"
 import { createLoginomHost } from "../src/host"
 import { loginomHostPort } from "../src/host-port"
 import { LoginomHost } from "../src/adapter"
+import { transport } from "../src/transport"
 import { HostTaskScope } from "../src/task-scope"
 import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
@@ -106,6 +107,12 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
           while (!busy && !existsSync(${JSON.stringify(snapshotRelease)})) await new Promise(resolve => setTimeout(resolve, 5));
           return { staleForSeconds: busy ? 2 : null };
         },
+        trackedStep: (_name, _args, dispatch) => dispatch(),
+        checkStepState: async id => id!==work().checkId ? { state: 'unavailable', retryAvailable: false } : {
+          state: 'observed', retryAvailable: true, window: { path: null, modified: true, nodeCount: 1, linkCount: 0 },
+          lastConfirmedStep: null, graphSinceLastConfirmedStep: 'unknown',
+          step: { outcome: 'not_applied', retryAvailable: true, persistence: 'step_unsaved', save: null },
+        },
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
           return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
@@ -115,7 +122,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     "runtime/client/node_modules/@modelcontextprotocol/sdk/client/index.js": `
       exports.Client = class {
         async connect() {} async close() {}
-        async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }] }; }
+        async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }, { name: 'dock_node_apply', inputSchema: { type: 'object' } }] }; }
         async callTool(input, _unused, { signal }) {
           if (input.arguments.failAfterDispatch) throw Error('LOGINOM_FILE_CHANGED');
           if (input.arguments.progressFixture) {
@@ -163,7 +170,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared }))
       expect(await runtime.request("list")).toEqual({
         prepared,
-        tools: [{ name: "fixture", inputSchema: { type: "object" } }],
+        tools: [
+          { name: "fixture", inputSchema: { type: "object" } },
+          { name: "dock_node_apply", inputSchema: { type: "object" } },
+        ],
       })
     }
     for (const state of [
@@ -188,6 +198,9 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     try {
       expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: true })
       expect(await runtime.request("packageState", undefined, 1000)).toEqual({ staleForSeconds: 2 })
+      expect(await runtime.request("checkStepState", { operationId: "pending" })).toEqual({
+        state: "busy", retryAvailable: false,
+      })
     } finally {
       await Bun.write(snapshotRelease, "")
       expect(await runtime.request("interrupt")).toEqual({ interrupted: true })
@@ -228,11 +241,14 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     },
     host,
   )
-  LoginomHost.connect({
-    postMessage: (data) => channel.port2.postMessage(data),
-    on: (_event, listener) => channel.port2.on("message", (data) => listener({ data })),
+  const sharedPort = {
+    postMessage: (data: unknown) => channel.port2.postMessage(data),
+    on: (_event: "message", listener: (event: { data: unknown }) => void) =>
+      channel.port2.on("message", (data) => listener({ data })),
     start: () => channel.port2.start(),
-  })
+  }
+  LoginomHost.connect(sharedPort)
+  const privateHost = transport(sharedPort)
   const original = host.inputs
   const fault = { name: "" }
   // Deterministically reproduce a source disappearing/changing after the Host
@@ -280,10 +296,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       files: { ask: async () => undefined, snapshot: async () => { throw Error("Unexpected file snapshot") } },
       profiles: directory,
       ready: () => true,
-      wrap: (tool) => tool,
       lease: async () => run,
       task: async () => messageID,
       failure: () => undefined,
+      wrap: (tool) => tool,
     })
     await dock.refresh(sessionID, "loginom-automation", undefined)
     type Editor = Parameters<NonNullable<typeof captured.transform>>[0]
@@ -294,6 +310,8 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     })
     const tool = tools.get("loginom_fixture")
     if (!tool) throw Error("Fixture tool not registered")
+    const apply = tools.get("loginom_dock_node_apply")
+    if (!apply) throw Error("Apply tool not registered")
     const updates: unknown[] = []
     const result = await tool.execute({ progressFixture: true }, {
       sessionID, messageID, agent: Agent.ID.make("fixture"), id: Tool.CallID.make("fixture"),
@@ -339,6 +357,26 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         .catch((error: unknown) => error)
       expect(callError).toMatchObject({ message: code })
     }
+    fault.name = ""
+    const lostArgs = { operation_id: "lost-write", failAfterDispatch: true }
+    const blocked = { message: "LOGINOM_CALL_UNCERTAIN", details: { operationId: "lost-write" } }
+    expect(await run.call("dock_node_apply", lostArgs, "msg_original").catch((error: unknown) => error)).toMatchObject(blocked)
+    expect(await run.call("dock_node_apply", { operation_id: "premature" }, "msg_original").catch((error: unknown) => error)).toMatchObject(blocked)
+    const modelError = await apply.execute({ operation_id: "premature" }, {
+      sessionID, messageID, agent: Agent.ID.make("fixture"), id: Tool.CallID.make("blocked-write"),
+      signal: new AbortController().signal, progress: async () => {},
+    }).catch((error: unknown) => error)
+    expect(modelError).toBeInstanceOf(Tool.Error)
+    expect(modelError).toMatchObject({ message: expect.stringContaining("LOGINOM_CALL_UNCERTAIN"), metadata: {
+      loginom: { operationId: "lost-write", step: { outcome: "check_required", retryAvailable: false } },
+    } })
+    await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared: true, checkId: "lost-write" }))
+    expect(await privateHost.request("checkStepState", { sessionID: "foreign-chat", operationId: "lost-write" }))
+      .toEqual({ state: "unavailable", retryAvailable: false })
+    expect(await privateHost.request("checkStepState", { sessionID: "file-errors", operationId: "lost-write" }))
+      .toMatchObject({ state: "observed", retryAvailable: true })
+    expect(await run.call("dock_node_apply", { operation_id: "next" }, "msg_original")).toMatchObject({ content: [] })
+
     // Once dispatch has started, a thrown file-shaped error cannot certify
     // no effect and must still become CALL_UNCERTAIN.
     fault.name = ""

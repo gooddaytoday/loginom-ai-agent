@@ -1,13 +1,108 @@
 // The parts of the SDK only the app's built-in plugins use, for workspace imports only: `tsconfig.build.json` leaves it
 // out of `dist`, and `script/pack.ts` exports it as `null`. Public SDK modules never import it.
 
+import type { FormAnswer, FormInfo } from "@opencode/client/promise"
 import type { Schema } from "effect"
+import type { OpenCodeClient, OpenCodeEvent, RpcCallOptions } from "@opencode/client/promise"
 import type { Context } from "./context.js"
 import { Registry, type Catalog, type Messages, type Persisted, type StoreDeclaration, type StoreFrom } from "./core.js"
 import type { Desktop, Layout, Locale, StorageScope, StoreOptions } from "./host-apis.js"
 import type { MainContext } from "./main.js"
 import type { Command, IconName, Panel, PanelTab, SlotMap } from "./registries.js"
 import { type JSX } from "solid-js"
+
+/** Host capabilities for a built-in form in the provider dialog. */
+export interface ProviderSetupProps {
+  /** Client for the server whose provider profile the form edits. */
+  readonly client: OpenCodeClient
+  /** Location where the dialog was opened, or the server's default Location. */
+  readonly location: RpcCallOptions["location"]
+  /** Refreshes the catalog and selects a model after the form saves a provider. */
+  readonly onConnected: (
+    providerID: string,
+    models: readonly string[],
+    selected: string,
+    signal: AbortSignal,
+  ) => Promise<void>
+}
+
+/** A form that connects a provider not yet present in the integration catalog. */
+export interface ProviderSetup {
+  /** Stable identifier for the setup action. */
+  readonly id: string
+  /** Localized label for the action and dialog. */
+  readonly title: string
+  /** Reports whether to list this action first, initially and on changes until the dialog aborts the signal. */
+  readonly preferFirst?: (
+    client: () => OpenCodeClient,
+    directory: string | undefined,
+    signal: AbortSignal,
+    report: (first: boolean) => void,
+    listen: (handler: (event: OpenCodeEvent) => void) => VoidFunction,
+  ) => Promise<void>
+  /** Identifies configured providers to place alongside the action in Settings. */
+  readonly matchesProvider?: (id: string) => boolean
+  /** Removal action for providers that own a profile entry rather than just a credential. */
+  readonly removal?: {
+    /** Localized label for the removal button. */
+    readonly title: string
+    /** Runs confirmation and removal, returning true only when the server confirmed it. */
+    readonly run: (
+      client: OpenCodeClient,
+      provider: {
+        /** ID sent to the server. */
+        readonly id: string
+        /** Name shown in confirmation. */
+        readonly name: string
+      },
+      directory: string | undefined,
+      signal: AbortSignal,
+    ) => Promise<boolean>
+  }
+  /** Renders the form inside the host's provider dialog. */
+  readonly render: (props: ProviderSetupProps) => JSX.Element
+}
+
+/** Setup actions contributed by the app's built-in plugins. */
+export const BuiltinProviderSetup = Registry.define<ProviderSetup>("builtin-provider-setup")
+
+type BuiltinDeepLink = { readonly channel: string; readonly data: typeof Schema.Json.Type }
+
+type DeepLinkListener = (data: BuiltinDeepLink["data"]) => void
+
+const deepLinkListeners = new Map<string, DeepLinkListener>()
+
+const pendingDeepLinks = new Map<string, BuiltinDeepLink["data"][]>()
+
+/**
+ * Delivers opaque data in this Desktop renderer, buffering it until the built-in subscribes.
+ * @param link - The destination channel and its JSON payload.
+ */
+export function deliverBuiltinDeepLink(link: BuiltinDeepLink) {
+  const listener = deepLinkListeners.get(link.channel)
+
+  if (listener) return listener(link.data)
+
+  pendingDeepLinks.set(link.channel, [...(pendingDeepLinks.get(link.channel) ?? []), link.data])
+}
+
+/**
+ * Consumes a built-in channel's buffered and live deep links.
+ * @param channel - The channel the built-in owns.
+ * @param listener - Decodes and handles each payload.
+ * @returns Stops listening; later arrivals are buffered again.
+ */
+export function subscribeBuiltinDeepLinks(channel: string, listener: DeepLinkListener) {
+  deepLinkListeners.set(channel, listener)
+  const pending = pendingDeepLinks.get(channel)
+
+  pendingDeepLinks.delete(channel)
+  pending?.forEach(listener)
+
+  return () => {
+    if (deepLinkListeners.get(channel) === listener) deepLinkListeners.delete(channel)
+  }
+}
 
 /**
  * Runs fn when the main thread is idle (a short timeout where requestIdleCallback is missing, e.g. Safari). Load lazy
@@ -81,6 +176,43 @@ export interface ToolRenderer {
  * ```
  */
 export const ToolRenderer = Registry.define<ToolRenderer>("tool.renderer")
+
+/** Live question data and the host's draft and reply controls. */
+export interface QuestionRendererProps {
+  /** The open question and its server metadata. */
+  readonly request: FormInfo
+  /** Whether the host is settling a submitted reply. */
+  readonly busy: boolean
+  /** Text saved for this question while it remains open, including across dock remounts. */
+  readonly draft: string
+  /**
+   * Updates the saved text.
+   * @param text - The current text in the renderer's input.
+   */
+  setDraft(text: string): void
+  /**
+   * Submits the answer through the host's form controller.
+   * @param answer - The answer keyed by form field.
+   */
+  reply(answer: FormAnswer): void
+}
+
+/** A built-in plugin's renderer for questions it recognizes. */
+export interface QuestionRenderer {
+  /**
+   * Selects questions this plugin renders.
+   * @param request - The open question as published by the server.
+   */
+  matches(request: FormInfo): boolean
+  /**
+   * Draws the question in the composer dock.
+   * @param props - Live question data and the host's draft and reply controls.
+   */
+  render(props: QuestionRendererProps): JSX.Element
+}
+
+/** The registry of question renderers supplied by built-in plugins. */
+export const QuestionRenderer = Registry.define<QuestionRenderer>("question.renderer")
 
 /** A `Command` with the fields only built-ins set. */
 export interface BuiltinCommand extends Command {
@@ -184,6 +316,31 @@ export interface BuiltinSlotMap extends SlotMap {
     readonly label: string
     /** The location icon: monitor for the local repository, worktree for a worktree. */
     readonly icon: IconName
+  }
+  /** Replaces the wordmark above the draft composer. */
+  readonly "session.new.heading": Record<string, never>
+  /** Replaces the empty normal-mode draft hint. */
+  readonly "session.new.composer.placeholder": Record<string, never>
+  /** Replaces the project picker's label and moves the picker into the composer toolbar. */
+  readonly "session.new.composer.project": {
+    /** Display name of the selected project. */
+    readonly project: string
+  }
+  /** Items at the end of the draft composer's Add menu. Render rows with `Ui.MenuItem`. */
+  readonly "session.new.composer.add.menu": Record<string, never>
+  /** Content below the draft composer and its location controls. */
+  readonly "session.new.below": {
+    /**
+     * Prefills the draft and tags its origin without submitting it.
+     * @param text - The replacement text, leaving attachments in place.
+     * @param origin - A plugin-prefixed identifier for the source of the text.
+     */
+    insertPrompt(text: string, origin: string): void
+    /**
+     * Listen for successful promotion of this draft. Returns a function that unregisters the listener.
+     * @param listener - Receives the origin captured at submit time, if any.
+     */
+    onStarted(listener: (origin: string | undefined) => void): () => void
   }
 }
 
@@ -370,6 +527,15 @@ export interface BuiltinContext extends Context {
   readonly locale: BuiltinLocale
   /** The session layout, with `command`. */
   readonly layout: BuiltinLayout
+  /** The app's route, with navigation to a built-in plugin's pages. */
+  readonly router: Context["router"] & {
+    /**
+     * Opens a top-level page contributed by the calling plugin. Waits for the app interface to mount.
+     *
+     * @param id - The page's id within the plugin, as registered with `Page`.
+     */
+    openPage(id: string): void
+  }
   /** Stores whose older homes may be parts of shared app keys. */
   readonly storage: BuiltinStorage
 }

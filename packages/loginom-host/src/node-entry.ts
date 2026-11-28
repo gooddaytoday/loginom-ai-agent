@@ -1,12 +1,17 @@
+import { createHash } from "node:crypto"
 import { EventEmitter } from "node:events"
 import { isAbsolute } from "node:path"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
 import { createLoginomHost } from "./host"
-import { loginomHostPort, type HostPort } from "./host-port"
+import { chatId, loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
 import { DashboardRead } from "./dashboard"
+import { WriteOutcomeInput, WriteOutcomeResult, writeStep } from "./connection/write-outcomes"
+import { StepOperationId } from "./step-state"
+
+declare const LOGINOM_AI_AGENT_CON08_TEST_BUILD: boolean | undefined
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
@@ -31,7 +36,9 @@ const port: HostPort = {
 }
 const candidate = Schema.decodeUnknownOption(Loginom.Candidate)
 const save = Schema.decodeUnknownOption(Loginom.Save)
-const turn = Schema.decodeUnknownOption(Schema.Struct({ id: Schema.String, active: Schema.Boolean }))
+const turn = Schema.decodeUnknownOption(
+  Schema.Struct({ id: Schema.String, session: Schema.NonEmptyString, active: Schema.Boolean }),
+)
 const cancel = Schema.decodeUnknownOption(Loginom.Cancel)
 const recover = Schema.decodeUnknownOption(Loginom.AcknowledgeRecovery)
 
@@ -103,11 +110,12 @@ async function dispatch(message: unknown) {
         typeof input.headless !== "boolean" ||
         ("resourceVersion" in input && typeof input.resourceVersion !== "string") ||
         ("strictRecovery" in input && typeof input.strictRecovery !== "boolean") ||
+        ("desktopWriteOutcomes" in input && typeof input.desktopWriteOutcomes !== "boolean") ||
         ("closeSavedPackageOnShutdown" in input && typeof input.closeSavedPackageOnShutdown !== "boolean") ||
         ("browserRecovery" in input && typeof input.browserRecovery !== "boolean")
       )
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
-      const options = {
+      const options: Parameters<typeof createLoginomHost>[0] = {
         root: input.root,
         resources: input.resources,
         headless: input.headless,
@@ -115,11 +123,17 @@ async function dispatch(message: unknown) {
         resourceVersion:
           "resourceVersion" in input && typeof input.resourceVersion === "string" ? input.resourceVersion : undefined,
         strictRecovery: "strictRecovery" in input && input.strictRecovery === true,
+        desktopWriteOutcomes: "desktopWriteOutcomes" in input && input.desktopWriteOutcomes === true,
         closeSavedPackageOnShutdown:
           "closeSavedPackageOnShutdown" in input && input.closeSavedPackageOnShutdown === true,
         browserRecovery: "browserRecovery" in input && input.browserRecovery === true,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
+        prepareConnectionSwitch:
+          typeof LOGINOM_AI_AGENT_CON08_TEST_BUILD !== "undefined" && LOGINOM_AI_AGENT_CON08_TEST_BUILD
+            ? (await import("./connection/con08-fixture")).connectionSwitchFixture(input.root)
+            : undefined,
+        onConnectionApplication: (outcome, data) => reply({ event: `connection.${outcome}`, data }),
       }
       state.starting = createLoginomHost(options).then(async (host) => {
         state.host = host
@@ -142,6 +156,10 @@ async function dispatch(message: unknown) {
         throw new Error("LOGINOM_INPUT_INVALID")
       const result = await state.host.packageState(input.sessionID)
       reply({ id: message.id, result })
+      return
+    }
+    if (message.method === "loginom.write-outcome.check") {
+      reply({ id: message.id, result: await checkWriteOutcome(state.host, Schema.decodeUnknownSync(WriteOutcomeInput)(input)) })
       return
     }
     if (!message.method.startsWith("connection.")) {
@@ -168,8 +186,30 @@ async function dispatch(message: unknown) {
   }
 }
 
+async function checkWriteOutcome(host: Awaited<ReturnType<typeof createLoginomHost>>, input: typeof WriteOutcomeInput.Type): Promise<typeof WriteOutcomeResult.Type> {
+  const journal = host.writes
+  const entry = journal?.find(createHash("sha256").update(input.sessionID).digest("hex"), input.writeID, input.operationId)
+  if (!journal || !entry) return { status: "unknown" }
+  const operationId = entry.receipt.operationID
+  const ref = { writeID: entry.id, ...(Schema.is(StepOperationId)(operationId) ? { operationId } : {}) }
+  if (journal.active(entry)) return { ...ref, status: "unknown", step: writeStep("unknown") }
+  if (entry.status !== "unknown") return { ...ref, status: entry.status, step: entry.step ?? writeStep(entry.status) }
+  const result = await host.checkRecordedStep(entry)
+  const status = result.status ?? "unknown"
+  const observed = result.observation.state === "observed" ? result.observation.step : undefined
+  const step = observed && (status !== "unknown" || observed.outcome === "check_required") ? observed : writeStep(status)
+  return { ...ref, status, step,
+    ...(result.ownerLost ? { readback: await host.readSavedWriteTarget(entry) } : {}),
+  }
+}
+
 async function management(method: string, input: unknown, host: Awaited<ReturnType<typeof createLoginomHost>>) {
   if (method === "connection.status" || method === "connection.read") return host.api.status()
+  if (method === "connection.acknowledge-pending-notice") {
+    const notice = Schema.decodeUnknownOption(Loginom.AcknowledgePendingNotice)(input)
+    if (Option.isNone(notice)) throw Error("LOGINOM_INPUT_INVALID")
+    return host.api.acknowledgePendingNotice(notice.value)
+  }
   if (method === "connection.ready") {
     const before = await host.api.status()
     if (!before.generation) throw new Error("LOGINOM_CONFIG_REQUIRED")
@@ -198,7 +238,7 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
   if (method === "connection.settings.turn") {
     const value = turn(input)
     if (Option.isNone(value)) throw new Error("LOGINOM_INPUT_INVALID")
-    host.turn(value.value.id, value.value.active)
+    host.turn(value.value.id, chatId(value.value.session), value.value.active)
     return {}
   }
   if (method === "connection.check") {
