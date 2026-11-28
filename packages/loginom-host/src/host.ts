@@ -214,7 +214,7 @@ export async function createLoginomHost(options: {
   closeSavedPackageOnShutdown?: boolean
   // Private launcher capability baked into packaged release builds; never from env or the model.
   browserRecovery?: boolean
-  onConnectionApplied?: (event: Loginom.ConnectionApplied) => void
+  onConnectionApplication?: Loginom.ConnectionApplicationListener
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
@@ -588,7 +588,7 @@ export async function createLoginomHost(options: {
       },
     },
     journal,
-    options.onConnectionApplied,
+    options.onConnectionApplication,
   )
   const dashboardOperations = new Map<AbortController, Promise<unknown>>()
   function dashboardOperation(operation: DashboardStorageOperation, input: DashboardRead | DashboardPublish | DashboardDelete, signal?: AbortSignal) {

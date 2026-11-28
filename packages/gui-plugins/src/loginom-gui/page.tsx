@@ -91,11 +91,10 @@ export default function Page() {
   createKeyed(
     client,
     (target) => {
-      onCleanup(
-        target.rpc(ConnectionSettingsRpc).events.on("applied", ({ data }) => {
-          dispatch({ type: "applied", generation: data.generation })
-        }),
-      )
+      const events = target.rpc(ConnectionSettingsRpc).events
+      for (const outcome of ["applied", "failed"] as const) {
+        onCleanup(events.on(outcome, ({ data }) => dispatch({ type: "application", ...data })))
+      }
       reload()
     },
     { otherwise: reload },

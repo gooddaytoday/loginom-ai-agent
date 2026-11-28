@@ -7,7 +7,7 @@ import { runtimeEnvironment } from "./supervisor"
 import { transport, type Port } from "./transport"
 import { hostError } from "./errors"
 
-const decodeApplied = Schema.decodeUnknownOption(Loginom.ConnectionApplied)
+const decodeApplication = Schema.decodeUnknownOption(Loginom.ConnectionApplication)
 
 export class NodeHostStartupError extends Error {
   constructor(
@@ -38,7 +38,7 @@ export async function launchNodeHost(
     strictRecovery?: boolean
     closeSavedPackageOnShutdown?: boolean
     browserRecovery?: boolean
-    onConnectionApplied?: (event: Loginom.ConnectionApplied) => void
+    onConnectionApplication?: Loginom.ConnectionApplicationListener
   },
   timing: { start?: number; close?: number; terminate?: number; teardown?: number } = {},
 ) {
@@ -86,9 +86,16 @@ export async function launchNodeHost(
   }
   child.on("disconnect", closePort)
   child.on("message", (data: unknown) => {
-    if (data && typeof data === "object" && "event" in data && data.event === "connection.applied" && "data" in data) {
-      const applied = decodeApplied(data.data)
-      if (Option.isSome(applied)) input.onConnectionApplied?.(applied.value)
+    if (
+      data &&
+      typeof data === "object" &&
+      "event" in data &&
+      "data" in data &&
+      (data.event === "connection.applied" || data.event === "connection.failed")
+    ) {
+      const event = decodeApplication(data.data)
+      if (Option.isSome(event))
+        input.onConnectionApplication?.(data.event === "connection.applied" ? "applied" : "failed", event.value)
       return
     }
     events.emit("message", { data })

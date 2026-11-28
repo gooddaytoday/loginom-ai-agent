@@ -31,7 +31,7 @@ type Started = {
 }
 
 const state: { current?: Started } = {}
-const appliedListeners = new Set<(event: Loginom.ConnectionApplied) => void>()
+const applicationListeners = new Set<Loginom.ConnectionApplicationListener>()
 const decodeRecord = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ session: Schema.String, pid: Schema.Number })),
 )
@@ -144,9 +144,9 @@ export const dashboard = {
 
 export const connectionSettings = {
   request,
-  onApplied(listener: (event: Loginom.ConnectionApplied) => void) {
-    appliedListeners.add(listener)
-    return () => appliedListeners.delete(listener)
+  onApplication(listener: Loginom.ConnectionApplicationListener) {
+    applicationListeners.add(listener)
+    return () => applicationListeners.delete(listener)
   },
   holdTurn(session: string) {
     const id = randomUUID()
@@ -228,7 +228,7 @@ function nodeHost(root: string, resources: string) {
       entry: join(resources, "host", "node-host.mjs"),
       root,
       resources,
-      onConnectionApplied: (event) => appliedListeners.forEach((listener) => listener(event)),
+      onConnectionApplication: (outcome, event) => applicationListeners.forEach((listener) => listener(outcome, event)),
       // As the Desktop Host of 0.4, the user sees the browser at work. The product CLI's `run --headless` reaches only the
       // private server of that run (B2.7a4b): the profile's service started its Host before, for every client. Strict
       // recovery holds for a server of a CLI profile started with it, as for each process of 0.4's CLI; never for

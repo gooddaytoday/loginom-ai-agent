@@ -17,7 +17,7 @@ export async function connectionService(
   store: ReturnType<typeof connectionStore>,
   runtime: ConnectionRuntime,
   recovery?: Pick<Awaited<ReturnType<typeof recoveryStore>>, "pending" | "acknowledge">,
-  onApplied?: (event: Loginom.ConnectionApplied) => void,
+  onApplication?: Loginom.ConnectionApplicationListener,
 ) {
   // Both Desktop and CLI cross this boundary before preparing any runtime.
   await store.initialize()
@@ -105,11 +105,18 @@ export async function connectionService(
     if (state.failure === "LOGINOM_STORE_READ_FAILED") throw Error(state.failure)
   }
 
-  function observeReadiness(handle: RuntimeHandle) {
+  function finishApplication(candidate: ActiveConnection, outcome: "applied" | "failed") {
+    if (state.closing || state.revision !== candidate.revision) return
+    if (outcome === "applied") state.applied = true
+    onApplication?.(outcome, { revision: candidate.revision, generation: candidate.generation })
+  }
+
+  function observeReadiness(handle: RuntimeHandle, candidate?: ActiveConnection) {
     const ready = () => {
       state.readiness = "ready"
       state.phase = state.pending ? "pending" : "ready"
       if (!state.failure) state.setupRequired = undefined
+      if (candidate) finishApplication(candidate, "applied")
     }
     if (!handle.ready) return ready()
     state.readiness = "starting"
@@ -122,8 +129,9 @@ export async function connectionService(
       () => {
         if (state.closing || state.handle !== handle) return
         state.readiness = "recoverable-error"
-        state.failure = "LOGINOM_RUNTIME_START_FAILED"
+        if (!state.pending) state.failure = "LOGINOM_RUNTIME_START_FAILED"
         state.phase = state.pending ? "pending" : "recoverable-error"
+        if (candidate) finishApplication(candidate, "failed")
       },
     )
   }
@@ -169,14 +177,13 @@ export async function connectionService(
     const candidate = state.pending
     state.phase = "starting"
     state.applying = (async () => {
-      const prepared = await runtime.prepare(candidate).catch(() => {
-        state.failure = "LOGINOM_RUNTIME_START_FAILED"
-        return undefined
-      })
+      const prepared = await runtime.prepare(candidate).catch(() => undefined)
       if (!prepared) {
         if (state.pending === candidate) {
+          state.failure = "LOGINOM_RUNTIME_START_FAILED"
           state.pending = undefined
           state.phase = state.handle ? state.readiness : "recoverable-error"
+          finishApplication(candidate, "failed")
         }
         return
       }
@@ -186,6 +193,7 @@ export async function connectionService(
         await prepared.close().catch(() => undefined)
         return
       }
+      let durable = true
       const committed = await store
         .staged(candidate.generation)
         .then((previous) => {
@@ -206,7 +214,7 @@ export async function connectionService(
           async () => {
             // A directory fsync can fail after rename has already changed the active pointer.
             // Keep the live runtime aligned with that pointer; report the durability failure.
-            state.failure = "LOGINOM_STORE_WRITE_FAILED"
+            durable = false
             const persisted = await store.read().catch(() => undefined)
             return (
               persisted?.generation === candidate.generation &&
@@ -219,10 +227,11 @@ export async function connectionService(
           },
         )
       if (!committed) {
-        state.failure = "LOGINOM_STORE_WRITE_FAILED"
         await prepared.close().catch(() => undefined)
+        state.failure = "LOGINOM_STORE_WRITE_FAILED"
         state.pending = undefined
         state.phase = state.handle ? state.readiness : "recoverable-error"
+        finishApplication(candidate, "failed")
         return
       }
       const previous = state.handle
@@ -233,13 +242,11 @@ export async function connectionService(
       state.pending = undefined
       // Finish the store writes before a window can observe successful activation.
       await store.clearPending().catch(() => {
-        state.failure = "LOGINOM_STORE_WRITE_FAILED"
+        durable = false
       })
-      observeReadiness(prepared)
-      if (!state.failure && !state.closing) {
-        state.applied = true
-        onApplied?.({ revision: candidate.revision, generation: candidate.generation })
-      }
+      state.failure = durable ? undefined : "LOGINOM_STORE_WRITE_FAILED"
+      observeReadiness(prepared, durable ? candidate : undefined)
+      if (!durable) finishApplication(candidate, "failed")
       await previous?.close().catch(() => undefined)
     })().finally(() => {
       state.applying = undefined

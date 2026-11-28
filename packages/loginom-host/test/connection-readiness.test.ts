@@ -13,19 +13,21 @@ import type { Loginom } from "../src/loginom"
 
 // "held" keeps the first catalog pending in a stub entry; "shipped" and "tampered"
 // run the real entry over a Help fixture.
-async function readinessFixture(help: "held" | "shipped" | "tampered") {
+async function readinessFixture(help: "held" | "shipped" | "tampered", holdNext = false) {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "connection-knowledge-ready-"))
   const helpRoot = await writeHelp(join(directory, "help"), help === "tampered" ? { tamper: "data/README.md" } : {})
   const entry = join(directory, "held-knowledge.mjs")
   const catalog = await stageHeldKnowledge(entry, join(directory, "catalog-gate"))
+  const nextEntry = join(directory, "next-knowledge.mjs")
+  const nextCatalog = holdNext ? await stageHeldKnowledge(nextEntry, join(directory, "next-catalog-gate")) : undefined
   const store = connectionStore(join(directory, "connection"), credentials("linux"))
   const original = { generation: 1, revision: 1, url: "http://unavailable.example/app/?custom=1",
     username: "user", apiKey: "UNIT-NONSECRET", password: "PRIVATE-NONSECRET-PASSWORD" }
   const processes: Awaited<ReturnType<typeof superviseKnowledge>>[] = []
   const readiness: Promise<void>[] = []
-  const applied: Loginom.ConnectionApplied[] = []
+  const outcomes: Parameters<Loginom.ConnectionApplicationListener>[] = []
   await store.stage(original)
   await store.activate(1)
   const service = await connectionService(store, {
@@ -33,9 +35,12 @@ async function readinessFixture(help: "held" | "shipped" | "tampered") {
       return { state: "verified" }
     },
     async prepare(connection) {
+      const knowledgeEntry = help === "held"
+        ? entry
+        : fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url))
       const child = await superviseKnowledge({
         node,
-        entry: help === "held" ? entry : fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)),
+        entry: connection.generation === 2 && holdNext ? nextEntry : knowledgeEntry,
         stateDir: directory, generation: connection.generation, helpRoot, environment: {},
       })
       processes.push(child)
@@ -44,10 +49,11 @@ async function readinessFixture(help: "held" | "shipped" | "tampered") {
       void ready.catch(() => {})
       return { ready, close: () => child.close() }
     },
-  }, undefined, (event) => applied.push(event))
-  return { service, store, original, readiness, processes, catalog, applied,
+  }, undefined, (...event) => outcomes.push(event))
+  return { service, store, original, readiness, processes, catalog, nextCatalog, outcomes,
     async close() {
       await catalog.release()
+      await nextCatalog?.release()
       await service.close()
       for (const child of processes) expect(await child.exited).toEqual({ code: 0, signal: null })
       await rm(directory, { recursive: true, force: true })
@@ -134,9 +140,10 @@ test("a new generation closes pending old readiness and only its own catalog can
   } finally { await f.close() }
 })
 
-test("settings wait for both old-generation tasks and notify once the next generation is applied", async () => {
-  const f = await readinessFixture("held")
+test.each(["applied", "failed"] as const)("settings drain both old-generation tasks and report catalog outcome: %s", async (outcome) => {
+  const f = await readinessFixture("held", true)
   try {
+    const nextCatalog = f.nextCatalog!
     await f.service.settled()
     await f.catalog.release()
     await f.readiness[0]
@@ -168,13 +175,30 @@ test("settings wait for both old-generation tasks and notify once the next gener
         generation: 1,
         application: { state: "pending", tasks: 2 - index },
       })
-      expect(f.applied).toEqual([])
+      expect(f.outcomes).toEqual([])
       f.service.turn(task, task, false)
     }
 
     await f.service.settled()
+    expect(await f.service.api.status()).toMatchObject({ generation: 2, state: "starting" })
+    expect((await f.service.api.status()).application).toBeUndefined()
+    expect(f.service.acquire("third")).toBeUndefined()
+    expect(f.outcomes).toEqual([])
+
+    await nextCatalog.entered()
+    await nextCatalog.release(outcome === "failed" ? "fail" : undefined)
+    if (outcome === "failed") {
+      await expect(f.readiness[1]).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
+      expect(f.outcomes).toEqual([["failed", { revision: 2, generation: 2 }]])
+      const status = await f.service.api.status()
+      expect(status).toMatchObject({ generation: 2, state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED" })
+      expect(status.application).toBeUndefined()
+      expect(f.service.acquire("third")).toBeUndefined()
+      return
+    }
+
     await f.readiness[1]
-    expect(f.applied).toEqual([{ revision: 2, generation: 2 }])
+    expect(f.outcomes).toEqual([["applied", { revision: 2, generation: 2 }]])
     expect(await f.service.api.status()).toMatchObject({
       generation: 2,
       url,
@@ -190,4 +214,4 @@ test("settings wait for both old-generation tasks and notify once the next gener
   } finally {
     await f.close()
   }
-})
+}, 30_000)

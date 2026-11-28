@@ -25,7 +25,7 @@ type Event =
   | { type: "target"; available: boolean }
   | { type: "disposed" }
   | { type: "refresh" }
-  | { type: "applied"; generation: number }
+  | { type: "application"; revision: number; generation: number }
   | { type: "edit"; patch: Partial<Draft> }
   | { type: "submit"; submit: "check" | "save"; now: number }
   | { type: "status" | "saved"; attempt: number; result: StatusResult; now: number }
@@ -99,10 +99,11 @@ export function transition(state: State, event: Event): Transition {
       if (state.type === "unavailable") return transition(state, { type: "target", available: true })
       if (state.type !== "editing") return keep
       return refresh(state, attempt)
-    case "applied":
+    case "application":
       if (state.type !== "applying" && state.type !== "editing") return keep
 
-      if (!waiting(state.status) || event.generation <= state.status.generation) return keep
+      if (!waiting(state.status) || event.revision < state.status.revision || event.generation < state.status.generation)
+        return keep
 
       if (state.type === "editing") return refresh(state, attempt)
 
@@ -219,7 +220,7 @@ function message(state: State) {
   if (!("status" in state)) return
   if (state.status.failed) return "activationFailed"
 
-  if (state.status.application?.state === "applied") return "applied"
+  if (state.status.state === "ready" && state.status.application?.state === "applied") return "applied"
 
   if (state.type === "applying")
     return state.status.state === "pending" && !state.status.application ? "pending" : "starting"

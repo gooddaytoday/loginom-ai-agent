@@ -79,7 +79,7 @@
       "title": "Web app, UI kit, session UI",
       "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"],
       "notes": {
-        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain and applied-event regression."
+        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events."
       }
     },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },

@@ -26,6 +26,7 @@ export function settingsAddress(value: string) {
 
 const Candidate = Loginom.Candidate.mapFields((fields) => Struct.omit(fields, ["apiKey"]))
 const Validation = Loginom.Validation.mapFields((fields) => Struct.pick(fields, ["validationId", "expiresAt"]))
+const applicationEvent = { schema: Schema.toStandardSchemaV1(Loginom.ConnectionApplication) }
 export type Status = typeof Status.Type
 export type Candidate = typeof Candidate.Type
 export type Validation = typeof Validation.Type
@@ -62,7 +63,7 @@ export const ConnectionSettingsRpc = Rpc.define({
     check: { input: safeInput, output: result(Validation) },
     save: { input: Schema.toStandardSchemaV1(Loginom.Save), output: result(Status) },
   },
-  events: { applied: { schema: Schema.toStandardSchemaV1(Loginom.ConnectionApplied) } },
+  events: { applied: applicationEvent, failed: applicationEvent },
 })
 
 export type StatusResult = typeof ConnectionSettingsRpc.methods.status.output.Type

@@ -115,13 +115,20 @@ test("Loginom settings use the service Location and recover an unconfirmed Save"
   ])
 })
 
-test("Loginom settings count draining tasks and show Applied on the RPC event", async ({ page }) => {
+for (const outcome of ["applied", "failed"] as const) {
+  test(`Loginom settings count draining tasks and refresh on ${outcome}`, ({ page }) =>
+    loginomApplication(page, outcome),
+  )
+}
+
+async function loginomApplication(page: Page, outcome: "applied" | "failed") {
   const directory = "/service"
   const oldUrl = "https://old.example/app/"
   const newUrl = "https://new.example/app/"
   let generation = 1
   let revision = 1
   let tasks = 2
+  let state: "ready" | "pending" | "starting" | "recoverable-error" = "ready"
 
   function status() {
     return {
@@ -131,11 +138,10 @@ test("Loginom settings count draining tasks and show Applied on the RPC event", 
       username: "analyst",
       folder: "/analyst",
       hasPassword: false,
-      failed: false,
-      state: revision > generation ? "pending" : "ready",
-      ...(revision === 2 && {
-        application: generation === 1 ? { state: "pending", tasks } : { state: "applied" },
-      }),
+      failed: state === "recoverable-error",
+      state,
+      ...(state === "pending" && { application: { state: "pending", tasks } }),
+      ...(state === "ready" && generation === 2 && { application: { state: "applied" } }),
     }
   }
 
@@ -158,6 +164,7 @@ test("Loginom settings count draining tasks and show Applied on the RPC event", 
         case "save":
           expect(request.body).toMatchObject({ input: { revision: 1, validationId: "checked" } })
           revision = 2
+          state = "pending"
 
           return { output: { ok: true, value: status() } }
       }
@@ -174,7 +181,7 @@ test("Loginom settings count draining tasks and show Applied on the RPC event", 
   await settings.getByRole("button", { name: "Сохранить", exact: true }).click()
   await expect(notice).toHaveText("Новые параметры применятся после завершения 2 задач")
 
-  // Keep the next status timer frozen after observing one more update. Only the event can then refresh it.
+  // Control status polling so the page sees the new generation before its catalog is ready.
   const now = await page.evaluate(() => Date.now())
   await page.clock.pauseAt(now + 1_000)
   tasks = 1
@@ -182,18 +189,30 @@ test("Loginom settings count draining tasks and show Applied on the RPC event", 
   await expect(notice).toHaveText("Новые параметры применятся после завершения 1 задачи")
 
   generation = 2
+  state = "starting"
+  await page.clock.fastForward(1_000)
+  await expect(notice).toHaveText("Применяем подключение…")
+  await expect(notice.getByText("Применено", { exact: true })).toHaveCount(0)
+
+  // Leave the clock frozen. The event must refresh the status for the same generation.
+  state = outcome === "applied" ? "ready" : "recoverable-error"
   await push([
     {
-      id: "evt_loginom_connection_applied",
+      id: `evt_loginom_connection_${outcome}`,
       created: 1,
-      type: "rpc.loginom.connection.applied",
+      type: `rpc.loginom.connection.${outcome}`,
       location: { directory },
       data: { revision, generation },
     },
   ])
-  await expect(notice.getByText("Применено", { exact: true })).toBeVisible()
-  await expect(address).toHaveValue(newUrl)
-})
+  if (outcome === "failed") {
+    await expect(notice).toHaveText("Служба не применила подключение. Проверьте настройки и попробуйте снова.")
+    await expect(notice.getByText("Применено", { exact: true })).toHaveCount(0)
+  } else {
+    await expect(notice.getByText("Применено", { exact: true })).toBeVisible()
+    await expect(address).toHaveValue(newUrl)
+  }
+}
 
 test("settings has its own route and returns through app history", async ({ page }) => {
   const { settings } = await open(page)

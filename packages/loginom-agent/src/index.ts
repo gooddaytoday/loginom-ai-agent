@@ -557,11 +557,11 @@ export default Plugin.define({
       },
     })
 
-    const unsubscribeApplied = ServiceHost.connectionSettings.onApplied((event) => {
-      void settingsRpc.events.emit("applied", event).catch(() => undefined)
+    const unsubscribeApplication = ServiceHost.connectionSettings.onApplication((outcome, event) => {
+      void settingsRpc.events.emit(outcome, event).catch(() => undefined)
     })
     return async () => {
-      unsubscribeApplied()
+      unsubscribeApplication()
       stop.abort()
       await Promise.all([...runs.keys()].map(drop))
       await drafts.close()

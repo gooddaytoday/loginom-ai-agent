@@ -109,7 +109,7 @@ async function dispatch(message: unknown) {
         ("browserRecovery" in input && typeof input.browserRecovery !== "boolean")
       )
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
-      const options = {
+      const options: Parameters<typeof createLoginomHost>[0] = {
         root: input.root,
         resources: input.resources,
         headless: input.headless,
@@ -122,7 +122,7 @@ async function dispatch(message: unknown) {
         browserRecovery: "browserRecovery" in input && input.browserRecovery === true,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
-        onConnectionApplied: (data: Loginom.ConnectionApplied) => reply({ event: "connection.applied", data }),
+        onConnectionApplication: (outcome, data) => reply({ event: `connection.${outcome}`, data }),
       }
       state.starting = createLoginomHost(options).then(async (host) => {
         state.host = host
