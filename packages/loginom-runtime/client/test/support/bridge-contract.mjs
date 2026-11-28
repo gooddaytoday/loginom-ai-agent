@@ -140,11 +140,12 @@ test('MCP application refusals remain typed normal content and the same connecti
     }
     bridge = await starting;
     const odbc='ODBC: PWD={sample-first;sample-second,sample-third}}sample-last};UID=reader';
+    const unbraced='ODBC: pWd=sample phrase, second part;UID=reader\nPWD=sample tail with spaces';
     const profile=`Файл «${win32.join('C:\\','Users','Example Name','input.csv')}» недоступен`;
     await recordExecution({operation_id:'journal-native-error',phase:'node_execution_error_toast_observed',failure:{message:'Safe failure'},
       native_processes:{processes:[{error_details:'Console: '+connectionValue+'; https://example.test/private-path'},
-        {error_details:'Short: '+shortValue},{error_details:odbc}]},
-      outcome:{output:{ui:{dialogs:[{error_toast:{kind:'error',message:`Toast: ${connectionValue}; ${odbc}; ${profile}`}}]}}}});
+        {error_details:'Short: '+shortValue},{error_details:odbc},{error_details:unbraced}]},
+      outcome:{output:{ui:{dialogs:[{error_toast:{kind:'error',message:`Toast: ${connectionValue}; ${odbc}; ${profile}\n${unbraced}`}}]}}}});
     const journal=await readFile(join(directory,'execution-events.jsonl'),'utf8');
     const evidence=journal.trim().split('\n').map(line=>JSON.parse(line)).find(event=>event.operation_id==='journal-native-error');
     assert.ok(evidence,'the native observation must be durable');
@@ -152,9 +153,10 @@ test('MCP application refusals remain typed normal content and the same connecti
     assert.equal(evidence.native_processes.processes[0].error_details,'Console: [redacted]; [URL скрыт]');
     assert.equal(evidence.native_processes.processes[1].error_details,'[сообщение скрыто]');
     assert.equal(evidence.native_processes.processes[2].error_details,'ODBC: [redacted];UID=reader');
+    assert.equal(evidence.native_processes.processes[3].error_details,'ODBC: [redacted];UID=reader\n[redacted]');
     assert.equal(evidence.outcome.output.ui.dialogs[0].error_toast.message,
-      'Toast: [redacted]; ODBC: [redacted];UID=reader; Файл «[путь скрыт]» недоступен');
-    assert.doesNotMatch(journal,/sample-(?:first|second|third|last)|Example Name/);
+      'Toast: [redacted]; ODBC: [redacted];UID=reader; Файл «[путь скрыт]» недоступен\nODBC: [redacted];UID=reader\n[redacted]');
+    assert.doesNotMatch(journal,/sample-(?:first|second|third|last)|sample (?:phrase|tail)|second part|with spaces|Example Name/);
     assert.ok(!journal.includes(connectionValue));
     assert.ok(!journal.includes(shortValue));
     if (fault) { assert.equal(failures, 1); assert.equal(diagnostics.length, 1); assert.equal(diagnostics[0].retry, true); }

@@ -26,7 +26,8 @@ function replay(fault,verb='train',options={}) {
   {process_id:'2',record_id:'new',parent_id:null,state:'pending_or_failed',error:true,error_details:message,children_loaded:true,progress_state:terminal},
   {process_id:'2.1',record_id:'child',parent_id:'2',state:'pending_or_failed',error:true,error_details:message,caption:'Прогноз Y',progress_state:terminal,
    owner:{verified:true,node_id:fault==='owner'?'other':node.node_id,source:'native_process_model_identity'}}]};
- if(options.omitted)processes.processes[2].error_details_omitted=true;
+ if(options.omitGroupDetails)processes.processes[1].error_details_omitted=true;
+ if(options.omitChildDetails)processes.processes[2].error_details_omitted=true;
  if(fault==='stale')processes.processes=processes.processes.slice(0,1);
  // l667diag4:731–840: both old roots remain; Train validation creates no process.
  if(options.preProcess)processes.processes=[
@@ -56,7 +57,10 @@ function replay(fault,verb='train',options={}) {
     const output=state();
     if(launched&&clock>=201)options.changeState?.(output);
     if(code.includes('"node_error_toast_observation":true')&&output.ui.dialogs.length){
-     output.ui.dialogs[0].error_toast={kind:fault==='info'?'info':'error',caption:fault==='caption'?'Other:':'Прогноз Y:',message:fault==='text'?'Other error':options.toastMessage??message};
+     const toastMessage=fault==='text'?'Other error':options.toastMessage??message;
+     if(toastMessage.length<=4096)
+      output.ui.dialogs[0].error_toast={kind:fault==='info'?'info':'error',caption:fault==='caption'?'Other:':'Прогноз Y:',message:toastMessage};
+     else output.ui.dialogs[0].error_toast_diagnostic={failed_conditions:['message_bounded']};
      output.ui.elements.push({ref:'ui-close',tid:'toast;p.h;close',signature:{tag:'div',dialog_ref:'ui-toast'},enabled:true,allowed_actions:['click']});
     }
     return {status:'SUCCEEDED',output};
@@ -120,11 +124,29 @@ test('a new group with unproved child cannot use the report-only fallback even w
  assert.deepEqual(f.actions.map(a=>a.ref),['ui-launch']);
  assert.ok(f.records.some(r=>r.report_failed_conditions?.includes('no_new_execution')));
 });
-test('the console placeholder cannot prove error-toast ownership, even if its text matches',async()=>{
- const f=replay(undefined,'train',{message:'[сообщение слишком длинное]',omitted:true});
+test('the console placeholder confirms failure but cannot prove error-toast ownership, even if its text matches',async()=>{
+ const message='[сообщение слишком длинное]';
+ const f=replay(undefined,'train',{message,omitChildDetails:true,settleReportedErrorToast:true});
+ await assert.rejects(f.run(),error=>error.nodeExecutionFailure?.code==='NODE_EXECUTION_FAILED'
+  &&error.nodeExecutionFailure.native.source==='native_group_error_details'&&error.nodeExecutionFailure.native.message===message);
+ assert.deepEqual(f.actions.map(action=>action.ref),['ui-launch']);
+});
+test('an oversized open toast leaves a confirmed group failure in v1 without claiming a node or closing the toast',async()=>{
+ const message='[сообщение слишком длинное]';
+ const f=replay('owner','execute_graph_node',{message,omitGroupDetails:true,omitChildDetails:true,
+  toastMessage:'Synthetic diagnostic '.repeat(240),loadingRace:true,consoleNotReady:true,autoExpire:true,
+  exclusive:true,settleReportedErrorToast:true});
+ const result=await applyToast(f);
+ assert.equal(result.status,'FAILED');
+ assert.equal(result.cleanup_complete,true);
+ assert.deepEqual(waitReply(result)._meta.loginom.error,
+  {code:'NODE_EXECUTION_FAILED',source:'loginom',attribution:'after_launch',message});
+ assert.deepEqual(f.actions.map(action=>action.ref),['ui-launch']);
+});
+test('oversized details and an open notification do not make a running group a failure',async()=>{
+ const f=replay('running','train',{message:'[сообщение слишком длинное]',omitGroupDetails:true,omitChildDetails:true});
  await assert.rejects(f.run(),error=>!error.nodeExecutionFailure);
  assert.deepEqual(f.actions.map(action=>action.ref),['ui-launch']);
- assert.ok(f.records.some(record=>record.failed_conditions?.includes('toast_message_matches')));
 });
 for(const fault of ['info','caption','text','owner','stale','root','running','no-baseline'])test('unproved toast retains the existing timeout and no dismissal: '+fault,async()=>{
  const f=replay(fault);await assert.rejects(f.run(),e=>!e.nodeExecutionFailure);assert.equal(f.actions.length,1);

@@ -57,7 +57,7 @@ import {makeJavascriptSchemaContextCode} from './javascript-schema-context.mjs';
 import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode,makePreparedInputPortReconcileCode,makeImportVariableInputReleaseCode} from './node-port-open.mjs';
 import {makeNodeProcessContextCode} from './node-process-context.mjs';
 import {makeNodeOutputContextCode,makeTreeWizardContextCode} from './node-output-context.mjs';
-import {captureExecutionBaseline,identifyNewExecution,selectFailedExecutionChild} from './node-execution-evidence.mjs';
+import {captureExecutionBaseline,identifyNewExecution,selectFailedExecutionChild,verifyFailedExecution} from './node-execution-evidence.mjs';
 import {nativeErrorText} from './node-failure.mjs';
 import {makeNodeVariableOutputCode,makeBuiltinVariablesPreviewCode,makeNodePortOutputCode} from './node-port-output.mjs';
 import {makeExcelSourceReadCode} from './imports-excel-procedure.mjs';
@@ -909,7 +909,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           }
           throw error;
         }
-        // Reporting a pre-process error grants no UI action, including dismiss.
+        // Reporting a failure without toast ownership grants no UI action, including dismiss.
         // Ordinary release may only wait for that exact notification to expire.
         if(reportedErrorToast&&result.output.ui.dialogs.length) {
           const portal=result.output.ui.dialogs[0];
@@ -1042,7 +1042,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             assertContext(detail.output,true);
             const state=detail.output,dialog=state.ui.dialogs[0];
             if(state.ui.masks.length) {
-              const checks={toast_error_kind:dialog?.error_toast?.kind==='error',dialog_unique:state.ui.dialogs.length===1,
+              const toastFailures=dialog?.error_toast_diagnostic?.failed_conditions;
+              const checks={toast_error_kind:dialog?.error_toast?.kind==='error'
+                  ||toastFailures?.length===1&&toastFailures[0]==='message_bounded',dialog_unique:state.ui.dialogs.length===1,
                 toast_identity:dialog?.identity?.anchor_tid==='toast',dialog_ref:dialog?.ref===portal.ref,
                 browser_document:state.dom_epoch.document===launchEvidence.browser_document,
                 after_launch:now()>=launchEvidence.started_at,launch_wait_active:now()<operation.deadline,
@@ -1111,6 +1113,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
               toast_absent_before_launch:launchEvidence.toast_absent===true,
               launch_wait_active:now()<operation.deadline,
               exclusive_operation:operation.exclusiveNodeExecution?.()===true};
+            const mayCloseToast=Object.values(checks).every(Boolean),mayReportToast=Object.values(reportChecks).every(Boolean);
+            let nativeFailure;
+            if(!mayCloseToast&&checks.native_context&&execution&&(child?.error_details_omitted===true
+              ||native.processes.some(process=>process.record_id===execution.group_record_id&&process.error_details_omitted===true))) {
+              try {nativeFailure=verifyFailedExecution(execution,native,channel.nativeErrorText).error;}
+              catch(error) {nativeProofError={stage:'verify_failed_execution',condition:String(error.message)};}
+            }
             if(settlingErrorToast&&(dialog?.ref!==settlingErrorToast.ref
               ||JSON.stringify(toast)!==JSON.stringify(settlingErrorToast.error_toast)
               ||state.ui.masks.some(m=>!settlingErrorToast.masks.some(old=>m.ref===old.ref
@@ -1124,23 +1133,23 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
                   ...(owned?{execution_id:execution.execution_id,
                     process_id:child.process_id,process_record_id:child.record_id}:{attribution:'own_action_wait'})}};
             };
-            if(Object.values(reportChecks).every(Boolean)&&!settleReportedErrorToast) {
-              const failure=toastFailure(false);
+            if(nativeFailure||mayReportToast&&!settleReportedErrorToast) {
+              const failure=nativeFailure??toastFailure(false);
               const saved=await entry('node_execution_error_toast_observed',{step,sample,internal_operation_id:id,
-                launch:structuredClone(launchEvidence),checks:reportChecks,failure,native_processes:native,outcome:structuredClone(detail)});
+                launch:structuredClone(launchEvidence),checks:nativeFailure?checks:reportChecks,failure,native_processes:native,outcome:structuredClone(detail)});
               if(JSON.stringify(saved?.failure)!==JSON.stringify(failure)||!saved?.outcome?.output)throw Error('Native error toast was not durably acknowledged');
               reportedErrorToast=structuredClone(dialog);launchEvidence=undefined;snapshot=null;evidenceSnapshot=null;
               if(releaseWizard){satisfied=false;confirmations=0;previousIdentity=undefined;continue;}
               throw Object.assign(Error(failure.message),{nodeExecutionFailure:failure});
             }
-            if(Object.values(checks).some(ok=>!ok))await entry('node_observation_context_refused',{step,sample,internal_operation_id:id,condition,
+            if(!mayCloseToast)await entry('node_observation_context_refused',{step,sample,internal_operation_id:id,condition,
               stage:'error_toast_owner',reason:'Owned execution error toast ownership refused',checks,
               failed_conditions:Object.keys(checks).filter(k=>!checks[k]),report_checks:reportChecks,
               report_failed_conditions:Object.keys(reportChecks).filter(k=>!reportChecks[k]),native_proof_error:nativeProofError??null,
               launch:structuredClone(launchEvidence),native_processes:structuredClone(native),
               execution:structuredClone(execution??null),child:structuredClone(child??null),outcome:structuredClone(detail),initial_outcome:structuredClone(result)});
-            if(Object.values(checks).every(Boolean)||settleReportedErrorToast&&Object.values(reportChecks).every(Boolean)) {
-              const failure=toastFailure(Object.values(checks).every(Boolean));
+            if(mayCloseToast||settleReportedErrorToast&&mayReportToast) {
+              const failure=toastFailure(mayCloseToast);
               const saved=await entry('node_execution_error_toast_observed',{step,sample,internal_operation_id:id,
                 launch:structuredClone(launchEvidence),failure,native_processes:native,outcome:structuredClone(detail)});
               if(JSON.stringify(saved?.failure)!==JSON.stringify(failure)||!saved?.outcome?.output)throw Error('Native error toast was not durably acknowledged');

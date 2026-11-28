@@ -168,6 +168,8 @@ test('node errors retain native attribution and mask credentials without changin
 for (const [message, expected] of [
   ['ODBC: pWd={sample-first;sample-second,sample-third}}sample-last};UID=reader', 'ODBC: [redacted];UID=reader'],
   ['ODBC: PWD={sample-first}};sample-last', 'ODBC: [redacted]'],
+  ['ODBC: pWd=sample phrase, second part;UID=reader\r\nPWD=sample tail with spaces\nNext line',
+    'ODBC: [redacted];UID=reader\r\n[redacted]\nNext line'],
   [`Файлы «${win32.join('C:\\', 'Users', 'Example Name', 'input.csv')}» и “${win32.join('D:\\', 'Users', 'Second Name', 'output.csv')}” недоступны`,
     'Файлы «[путь скрыт]» и “[путь скрыт]” недоступны'],
 ]) test(`v1 metadata sanitizes native diagnostics: ${expected}`, () => {

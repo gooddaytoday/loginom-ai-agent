@@ -10,7 +10,7 @@ export function createRedactor(knownValues = [], { sanitizeNativeErrors = false 
   const shortKnown = knownValues.filter(value => typeof value === 'string' && value.length > 0 && value.length < 4);
   const scalar = value => JSON.isRawJSON(value) ? JSON.parse(value.rawJSON) : value;
   function text(raw) {
-    let value = raw.replace(/\bpwd\b["']?\s*[:=]\s*\{(?:[^}]|}})*(?:}(?!})|$)/gi, marker);
+    let value = raw.replace(/\bpwd\b["']?[^\S\r\n]*[:=][^\S\r\n]*(?:\{(?:[^}]|}})*(?:}(?!})|$)|(?:"[^"\r\n]*"|'[^'\r\n]*')?[^;\r\n]*)/gi, marker);
     for (const secret of [...known].sort((a, b) => b.length - a.length)) {
       for (const variant of new Set([secret, encodeURIComponent(secret), JSON.stringify(secret).slice(1, -1)])) {
         value = value.replaceAll(variant, marker);
@@ -47,7 +47,7 @@ export function createRedactor(knownValues = [], { sanitizeNativeErrors = false 
       .replace(/«(?:[a-z]:[\\/]|\\\\|~?\/)[^\r\n»]*»/gi,'«[путь скрыт]»')
       .replace(/“(?:[a-z]:[\\/]|\\\\|~?\/)[^\r\n”]*”/gi,'“[путь скрыт]”')
       .replace(/(^|[\s'"`«“(=:\[])(?:[a-z]:[\\/]|\\\\|~?\/)[^\r\n<>"`»”|;\]]+/gi,'$1[путь скрыт]')
-      .replace(/\b(?:token|secret|pwd|sessionid|signature)\b["']?\s*[:=]\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;}&]+)/gi,'[секрет скрыт]')
+      .replace(/\b(?:token|secret|sessionid|signature)\b["']?\s*[:=]\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;}&]+)/gi,'[секрет скрыт]')
       .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,'[секрет скрыт]')
       .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,'')
       .trim().slice(0,1000)||'[сообщение скрыто]';
