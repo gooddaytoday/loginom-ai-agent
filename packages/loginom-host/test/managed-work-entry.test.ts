@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, unlink } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink } from "node:fs/promises"
 import { MessageChannel } from "node:worker_threads"
 import { Schema } from "effect"
 import { Agent } from "@opencode/schema/agent"
@@ -109,7 +109,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
         applyWithScanReceipt: reply => presentNodeReply(
           withLoginomMetadata(reply, {operationId:reply.structuredContent.operation_id, state:'settled', verificationStale:true}),
-          options => loginomFeedMetadata(reply, {...options, tool:'dock_node_apply'})),
+          options => {
+            if (reply.structuredContent.projectionError) throw Error('Projection error with password: private-password');
+            return loginomFeedMetadata(reply, {...options, tool:'dock_node_apply'});
+          }),
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
           return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
@@ -122,6 +125,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }] }; }
         async callTool(input, _unused, { signal }) {
           if (input.arguments.failAfterDispatch) throw Error('LOGINOM_FILE_CHANGED');
+          if (input.arguments.packageFacts) return {
+            content: [{ type: 'text', text: 'package prepared' }],
+            _meta: { loginomFields: { agentCopy: { originalPath: '/original.lgp', path: '/copy.lgp' } } },
+          };
           if (input.arguments.progressFixture) {
             const { stepPhase } = await import('../../../../lib/step-progress.mjs');
             stepPhase('configuring', 'transform.group_data', { kind: 'fields', index: 2, total: 3 });
@@ -231,6 +238,20 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
           },
         },
       },
+    })
+    const projectionFailure = await runtime.request("call", {
+      name: "dock_node_apply",
+      arguments: { content, structuredContent: { ...receipt, projectionError: true } },
+      scanReceipt: {},
+    })
+    expect(projectionFailure).toMatchObject({ result: { content } })
+    const attempts = join(directory, "state/generations/1/chats/chat/attempts")
+    const [attempt] = await readdir(attempts)
+    const journal = await readFile(join(attempts, attempt, "execution-events.jsonl"), "utf8")
+    expect(journal).not.toContain("private-password")
+    expect(JSON.parse(journal.trim())).toMatchObject({
+      phase: "feed_projection_failed",
+      error: { message: "Projection error with password: [redacted]" },
     })
     const call = runtime
       .request("call", { name: "fixture", arguments: { hold: true } })
@@ -349,6 +370,17 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       { loginomStep: { version: 1, phase: "configuring", nodeType: "transform.group_data", substep: { kind: "fields", index: 2, total: 3 }, startedAt: expect.any(Number), lastReplyAt: expect.any(Number), stalledSince: null } },
       { loginomStep: { version: 1, phase: "reading", nodeType: "transform.group_data", substep: null, startedAt: expect.any(Number), lastReplyAt: expect.any(Number), stalledSince: null } },
     ])
+    expect(await tool.execute({ packageFacts: true }, {
+      sessionID, messageID, agent: Agent.ID.make("fixture"), id: Tool.CallID.make("package-facts"),
+      signal: new AbortController().signal,
+      progress: async () => undefined,
+    })).toEqual({
+      content: "package prepared",
+      metadata: { generation: 1, loginom: {
+        v: 1, operationId: "package-facts", state: "settled",
+        agentCopy: { originalPath: "/original.lgp", path: "/copy.lgp" },
+      } },
+    })
     await Bun.sleep(1_600)
     expect(updates).toHaveLength(2)
     for (const [name, code] of [
