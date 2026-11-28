@@ -1,6 +1,7 @@
 import { Schema } from "effect"
+import { stepOperationIdPattern } from "./step-operation-id"
 
-export const StepOperationId = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_.:-]{1,128}$/))
+export const StepOperationId = Schema.String.check(Schema.isPattern(stepOperationIdPattern))
 const Label = Schema.String.check(Schema.isMaxLength(240))
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 const StepRef = Schema.Struct({ operationId: StepOperationId, label: Label })

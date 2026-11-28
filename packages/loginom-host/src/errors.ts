@@ -1,5 +1,4 @@
-import { Schema } from "effect"
-import { StepOperationId } from "./step-state"
+import { stepOperationIdPattern } from "./step-operation-id"
 
 const codes = new Set([
   "DASHBOARD_ORIGIN_MISMATCH",
@@ -107,7 +106,8 @@ export function hostFailure(value: unknown) {
   const source = value && typeof value === "object" && "details" in value ? value.details : undefined
   if (error === "LOGINOM_CALL_UNCERTAIN" && source && typeof source === "object" &&
     "checkWriteOutcome" in source && source.checkWriteOutcome === true) {
-    const operationId = "operationId" in source && Schema.is(StepOperationId)(source.operationId) ? source.operationId : undefined
+    const operationId = "operationId" in source && typeof source.operationId === "string" &&
+      stepOperationIdPattern.test(source.operationId) ? source.operationId : undefined
     return { error, details: {
       checkWriteOutcome: true,
       reason: "Исход записи в целевой пакет неизвестен. Не повторяйте запись. Прочитайте текущее состояние пакета и запросите проверку исхода исходного вызова.",
