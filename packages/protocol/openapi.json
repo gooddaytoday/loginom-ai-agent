@@ -23923,6 +23923,9 @@
           },
           "error": {
             "$ref": "#/components/schemas/Session.StructuredError"
+          },
+          "interruption": {
+            "$ref": "#/components/schemas/Session.Message.Interruption"
           }
         },
         "required": ["id", "time", "type", "outcome"],
@@ -23964,6 +23967,32 @@
             "$ref": "#/components/schemas/Session.Message.Idle"
           }
         ]
+      },
+      "Session.Message.Interruption": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": ["user", "shutdown", "superseded", "inactivity", "restart"]
+          },
+          "lastKnown": {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "stepID": {
+                "$ref": "#/components/schemas/Session.Message.ID"
+              }
+            },
+            "required": ["at"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["reason"],
+        "additionalProperties": false
       },
       "Session.Message.LocationSwitched": {
         "type": "object",
@@ -27896,7 +27925,22 @@
               },
               "reason": {
                 "type": "string",
-                "enum": ["user", "shutdown", "superseded", "inactivity"]
+                "enum": ["user", "shutdown", "superseded", "inactivity", "restart"]
+              },
+              "lastKnown": {
+                "type": "object",
+                "properties": {
+                  "at": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "stepID": {
+                    "$ref": "#/components/schemas/Session.Message.ID"
+                  }
+                },
+                "required": ["at"],
+                "additionalProperties": false
               }
             },
             "required": ["sessionID", "reason"],
