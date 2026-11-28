@@ -3,14 +3,11 @@ import { Schema } from "effect"
 import { Button } from "@opencode/ui/button"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { useLanguage } from "@/runtime/i18n/language"
-import { usePlatform } from "@/runtime/platform/platform"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import { useWorkspaceLocation } from "@/workspaces/location"
 import type { ModelSelection } from "@/providers/models/selection"
 import { limitResetAt } from "../usage-exceeded-dialogs"
-
-const GO_URL = "https://opencode.ai/go"
 
 // OpenCode Zen always says when free usage resets; this covers a refusal that doesn't, or a delay out of range.
 const FALLBACK_RESET_MS = 3_600_000
@@ -53,7 +50,6 @@ export function useFreeLimit(paid: () => boolean) {
 // Stands in for the composer while free usage is used up: with no paid provider there is nothing the composer can send.
 export function SessionFreeLimitPanel(props: { resetAt: number | null; selection: () => ModelSelection | undefined }) {
   const language = useLanguage()
-  const platform = usePlatform()
   const dialog = useDialog()
   const location = useWorkspaceLocation()
 
@@ -69,25 +65,12 @@ export function SessionFreeLimitPanel(props: { resetAt: number | null; selection
     ).format(at)
   }
 
-  const connect = (provider?: string) => {
-    void import("@/providers/connect/dialog").then((x) => {
-      const controller = x.useProviderConnectController()
-
-      if (provider) controller.select(provider)
+  const connect = () => {
+    void import("@/providers/connect/dialog").then(({ DialogConnectProvider }) => {
       void dialog.show(() => (
-        <x.DialogConnectProvider
-          controller={controller}
-          directory={location().directory}
-          selection={props.selection()}
-          standalone={!!provider}
-        />
+        <DialogConnectProvider directory={location().directory} selection={props.selection()} />
       ))
     })
-  }
-
-  const subscribe = () => {
-    platform.openExternal(GO_URL)
-    connect("opencode-go")
   }
 
   return (
@@ -98,34 +81,25 @@ export function SessionFreeLimitPanel(props: { resetAt: number | null; selection
     >
       <div class="flex flex-col gap-0.5 ps-1.5 pe-1 pt-1">
         <div class="text-[13px] font-[530] leading-[var(--line-height-base)] text-v2-text-text-base">
-          {language.t("session.freeLimit.title")}
+          {language.t("session.freeLimit.stopped")}
         </div>
         <div class="text-[13px] font-[440] leading-[var(--line-height-base)] text-v2-text-text-muted [font-variant-numeric:tabular-nums]">
-          <Show when={reset()} fallback={language.t("session.freeLimit.noReset")}>
-            {(time) => language.t("session.freeLimit.reset", { time: time() })}
+          {language.t("command.provider.connect.description")}
+          <Show when={reset()}>
+            {(time) => <> {language.t("session.freeLimit.resetTime", { time: time() })}</>}
           </Show>
         </div>
       </div>
       <div class="flex items-center justify-end gap-1.5">
-        <Button
-          data-action="session-free-limit-subscribe"
-          type="button"
-          size="normal"
-          variant="ghost"
-          class="![font-weight:530]"
-          onClick={subscribe}
-        >
-          {language.t("session.freeLimit.subscribe")}
-        </Button>
         <Button
           data-action="session-free-limit-connect"
           type="button"
           size="normal"
           variant="submit"
           class="![font-weight:530]"
-          onClick={() => connect()}
+          onClick={connect}
         >
-          {language.t("session.freeLimit.connect")}
+          {language.t("dialog.model.connect")}
         </Button>
       </div>
     </div>

@@ -1,8 +1,9 @@
 import { desktopServiceProxy, MODEL_PROXY_URLS, probeProxyUrl } from "@loginom-ai-agent/loginom-host/system-proxy"
 import { Product } from "@loginom-ai-agent/product"
-import { SystemProxy, type SystemProxySetting } from "@opencode/gui-plugins/loginom"
+import { SystemProxy, type SystemProxySetting } from "@opencode/gui-plugins/loginom-gui/contract"
 import { systemProxyPreference } from "@opencode/gui-plugins/updater/proxy-preference"
-import type { Plugin } from "@opencode/plugin/gui/main"
+import type { Entry } from "@opencode/plugin/gui/host"
+import type { MainContext } from "@opencode/plugin/gui/main"
 import { session } from "electron"
 import { Effect } from "effect"
 import { isQuitting, type State } from "../lifecycle/machine"
@@ -13,8 +14,8 @@ import { getStore } from "../storage/store"
 
 type Detection = Awaited<ReturnType<typeof desktopServiceProxy>>
 
-export function desktopProxyPreference(state: StateStore, settings = getStore) {
-  return systemProxyPreference(createStorage(state, settings, "updater", true))
+export function desktopProxyPreference(state: StateStore) {
+  return systemProxyPreference(createStorage(state, getStore, "updater", true))
 }
 
 export const startSystemProxy = Effect.fn("Desktop.startSystemProxy")(function* (
@@ -117,11 +118,32 @@ export const startSystemProxy = Effect.fn("Desktop.startSystemProxy")(function* 
   }
 })
 
-export function systemProxyPlugin(proxy: Effect.Success<ReturnType<typeof startSystemProxy>>): Plugin.MainSetup {
-  return (ctx) => {
+export function withSystemProxy(entries: readonly Entry[], proxy: Effect.Success<ReturnType<typeof startSystemProxy>>) {
+  const install = (ctx: MainContext) => {
     const provider = ctx.provide(SystemProxy, { state: proxy.setting, get: proxy.setting, set: proxy.set })
     ctx.onCleanup(proxy.subscribe(() => provider.changed()))
   }
+
+  return entries.map((entry): Entry => {
+    const main = entry.mainEntry
+
+    if (entry.id !== "loginom-gui" || !main) return entry
+
+    return {
+      ...entry,
+      mainEntry: async () => {
+        const { default: setup } = await main()
+
+        return {
+          default(ctx: never) {
+            install(ctx)
+
+            return setup(ctx)
+          },
+        }
+      },
+    }
+  })
 }
 
 function resolveProxy(enabled: boolean, signal: AbortSignal) {

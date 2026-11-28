@@ -6,7 +6,7 @@ import type { PluginEndpoint } from "../../shared/ipc-rpc/plugins"
 import { ApplicationLifecycle } from "../lifecycle"
 import { DesktopInitialization } from "../lifecycle/desktop-initialization"
 import { Shutdown } from "../lifecycle/shutdown"
-import { systemProxyPlugin } from "../loginom/system-proxy"
+import { withSystemProxy } from "../loginom/system-proxy"
 
 const LEVELS = { debug: "Debug", info: "Info", warn: "Warn", error: "Error" } as const
 
@@ -56,7 +56,7 @@ export const layer = Layer.effect(
           module.createHost({
             db: storage.db,
             state: storage.state,
-            builtins: registry.builtins(systemProxyPlugin(systemProxy)),
+            builtins: withSystemProxy(registry.builtins, systemProxy),
             cli: {
               version: cli.version,
               command: cli.command,

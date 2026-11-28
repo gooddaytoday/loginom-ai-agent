@@ -38,7 +38,15 @@ const electron = {
   net: {},
   ImageView: {},
   ipcMain: { on() {} },
-  session: {},
+  session: {
+    fromPartition: () => ({
+      setPermissionRequestHandler() {},
+      setPermissionCheckHandler() {},
+      on() {},
+      off() {},
+    }),
+  },
+  WebContentsView: {},
   clipboard: {},
   webContents: {},
   safeStorage: {},
@@ -46,7 +54,7 @@ const electron = {
 
 mock.module("electron", () => ({ ...electron, default: electron }))
 
-const { startSystemProxy, desktopProxyPreference, systemProxyPlugin } = await import("../src/main/loginom/system-proxy")
+const { startSystemProxy, desktopProxyPreference, withSystemProxy } = await import("../src/main/loginom/system-proxy")
 
 const { createHost } = await import("../src/main/plugin/host")
 
@@ -178,7 +186,7 @@ try {
         const host = createHost({
           db: database.db,
           state,
-          builtins: builtins(systemProxyPlugin(proxy)).filter((entry) => entry.id === "loginom"),
+          builtins: withSystemProxy(builtins.filter((entry) => entry.id === "loginom-gui"), proxy),
           cli: { version: "0.0.0", command: [], development: true },
           subscriptions: new Map(),
           servers: new Map(),
@@ -211,7 +219,7 @@ try {
           try {
             const handoff = await runtime.runPromise(IpcPortHandoff)
             handoff.bind(contents, serverPort(channel.port1))
-            const ipc = "loginom.system-proxy"
+            const ipc = "loginom-gui.system-proxy"
             expect((await call(channel.port2, 1, "PluginCall", { ipc, method: "get" })).exit).toEqual(
               success({ enabled: !legacyOff, status: legacyOff ? "none" : scenario }),
             )

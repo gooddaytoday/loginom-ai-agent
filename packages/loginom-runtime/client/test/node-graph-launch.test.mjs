@@ -39,6 +39,11 @@ for(const selected of [false,true])test('graph launch selects only when needed a
  assert.equal(f.actions.filter(a=>a.verb==='execute_graph_node').length,1);
  await assert.rejects(f.driver.launchGraph());assert.equal(f.actions.filter(a=>a.verb==='execute_graph_node').length,1);
 });
+test('an already selected native Execute control is used from the guarded graph observation',async()=>{
+ const f=fixture({selected:true});await f.driver.prepare();await f.driver.launchGraph();
+ assert.equal(f.observations.at(-1).condition,'configured graph node ready for execution');
+ assert.equal(f.actions.filter(a=>a.verb==='execute_graph_node').length,1);
+});
 test('a lost graph launch reply cannot cause a second launch',async()=>{
  const f=fixture({fail:true});await f.driver.prepare();await assert.rejects(f.driver.launchGraph(),/lost launch/);
  await assert.rejects(f.driver.launchGraph());assert.equal(f.actions.filter(a=>a.verb==='execute_graph_node').length,1);

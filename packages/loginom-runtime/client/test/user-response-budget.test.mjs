@@ -114,30 +114,54 @@ function catalog(types) {
    {...pins,skillRevision:'e'.repeat(64),loginomProfile:pins.compatibilityProfile},new Map(),handlers,'7.4.2'),session_manifest:pins});
 }
 
-test('oversized real node cards supply exact individually deliverable retries with only matching modes',async t=>{
+async function packedDescribeRecovery(t,types,modes){
  const resources=await createBundledSkillFixture(t),skill=createSkillLoader({resources:resources.resources});
- const types=['imports.text','programming.javascript','integration.rest_request','transform.calculator'];
- const modes=['delimited','script','request','expression'];
  const description=catalog(types);
  description.node_types=await skill.describeNodes(description.node_types,modes);
  const original=reply(description),before=JSON.stringify(original);
- t.diagnostic('four-card envelope bytes: '+bytes(original));
+ t.diagnostic(types.length+'-card envelope bytes: '+bytes(original));
  assert.ok(bytes(original)>46000);
  const refused=boundedUserToolReply(original,{tool:'dock_action_describe',modes});
  assert.equal(refused.isError,true);
- const recovery=JSON.parse(refused.content[0].text).next_step;
- assert.deepEqual(recovery.arguments,{node_types:[types[0]],modes:[modes[0]]});
+ const value=JSON.parse(refused.content[0].text),recovery=value.next_step;
+ assert.equal(recovery.undeliverable_requests,undefined);
  const requests=[recovery.arguments,...recovery.remaining_requests];
- assert.deepEqual(requests,types.map((type,index)=>({node_types:[type],modes:[modes[index]]})));
+ t.diagnostic('retry requests: '+JSON.stringify(requests));
+ // Every type is requested exactly once, in its original relative order, with
+ // only the original modes it supports.
+ assert.deepEqual(requests.flatMap(request=>request.node_types).sort(),[...types].sort());
  for(const request of requests){
-  const single=catalog(request.node_types);
-  single.node_types=await skill.describeNodes(single.node_types,request.modes);
-  const delivered=reply(single);
+  assert.deepEqual(request.node_types,types.filter(type=>request.node_types.includes(type)));
+  assert.deepEqual(request.modes,modes.filter(mode=>request.modes.includes(mode)));
+  const batch=catalog(request.node_types);
+  batch.node_types=await skill.describeNodes(batch.node_types,request.modes);
+  const delivered=reply(batch);
   assert.notEqual(boundedUserToolReply(delivered,{tool:'dock_action_describe',modes:request.modes}).isError,true);
   assert.ok(bytes(delivered)<=46000);
-  assert.deepEqual(single.node_types[0],description.node_types.find(card=>card.type===request.node_types[0]));
+  for(const card of batch.node_types)assert.deepEqual(card,description.node_types.find(node=>node.type===card.type));
  }
  assert.equal(JSON.stringify(original),before);
+ return {value,requests};
+}
+
+test('oversized real node cards supply exact deliverable retries with only matching modes',async t=>{
+ const types=['imports.text','programming.javascript','integration.rest_request','transform.calculator'];
+ const modes=['delimited','script','request','expression'];
+ const {requests}=await packedDescribeRecovery(t,types,modes);
+ assert.ok(requests.length>1&&requests.length<types.length,JSON.stringify(requests));
+});
+
+// LAB-2008: six cards were split into six single requests although three fit
+// together (bh-a10, lab2006-1 model.stdout:33, lab2006-3 model.stdout:41).
+test('six-card refusal groups deliverable cards into fewer requests that fit',async t=>{
+ const types=['imports.text','imports.excel','transform.join_data','transform.group_data','transform.sorting','exports.text'];
+ const modes=['delimited','xlsx','inner','aggregate','keys'];
+ const {value,requests}=await packedDescribeRecovery(t,types,modes);
+ assert.ok(requests.length<=3,JSON.stringify(requests));
+ assert.ok(Math.max(...requests.map(request=>request.node_types.length))>=2);
+ assert.match(value.next_step.instruction,new RegExp(`^The 6 deliverable node cards are grouped into ${requests.length} node requests that each fit one reply\\. Run arguments`));
+ assert.match(value.error.message,/next_step groups the cards into requests that fit\./);
+ assert.doesNotMatch(JSON.stringify(value),/fewest|Up to/);
 });
 
 test('an oversized single card is reported without an identical retry or lost modes',()=>{
@@ -148,6 +172,10 @@ test('an oversized single card is reported without an identical retry or lost mo
  const next=JSON.parse(refused.content[0].text).next_step;
  assert.equal(refused.isError,true);assert.equal(next.tool,undefined);assert.equal(next.arguments,undefined);
  assert.deepEqual(next.undeliverable_requests,[{node_types:['imports.text'],modes:['delimited']}]);
+ // With no deliverable request the refusal does not promise a grouped next_step.
+ const message=JSON.parse(refused.content[0].text).error.message;
+ assert.equal(message,'Description exceeds the delivery budget; no cards delivered. Schemas and rules are intact.');
+ assert.match(next.instruction,/No smaller verified request is available/);
  assert.equal(JSON.stringify(original),before);
 });
 
@@ -160,6 +188,8 @@ test('mixed overflow splits saving actions from nodes, omits absent modes and do
  assert.deepEqual(next.arguments,{node_types:['transform.calculator']});
  assert.deepEqual(next.remaining_requests,[{action_keys:['package.save_checkpoint']}]);
  assert.deepEqual(next.undeliverable_requests,[{node_types:['imports.text']}]);
+ // A single deliverable card needs no grouping sentence.
+ assert.match(next.instruction,/^Run arguments/);
  assert.ok(bytes(refused)<2000);
 });
 

@@ -11,7 +11,14 @@ Python 3.13 на сервере, в отдельном процессе (`execut
 
 `dock_node_apply`: `target.type:"programming.python"`, `mode:"script"`,
 таблица — к входу 0 (`inputs`), `finish:"execute"`, `read.ports:[0]`,
-`read.sample_rows` до 100. Параметры:
+`read.sample_rows` до 100. Для прямой связи с источником переменных добавь
+в `variable_inputs` запись с `kind:"variables"`, `input:0`, `source` (ссылка
+на узел-источник) и `output` (номер его выхода переменных). Оставь
+`mappings:[]` для автоматического сопоставления. В коде импортируй
+`InputVariables` из `builtin_data` и читай по имени, например
+`InputVariables.Items["Threshold"].Value`.
+
+В `parameters` передай настройки кода и схемы.
 - `source_text` — весь код дословно, строки LF; файл `.py` передай без
   изменений (до 2048 символов и 128 строк);
 - `schema_mode:"code"` — включает «Разрешить формировать выходные столбцы из
@@ -41,7 +48,7 @@ None/NA/NaT/NaN как пропуск.
 код; замена кода — `source_text` и `expected_source_sha256` из readback.
 
 Не поддержано: установка пакетов, сеть, файлы, подпроцессы, окружения (PY_ENV,
-venv), входные переменные, дополнительные порты, `read.coverage:"full"`.
+venv), дополнительные порты, `read.coverage:"full"`.
 Импорт — только builtin_data, builtin_pandas_utils, pandas, numpy и
 вычислительные модули стандартной библиотеки (math, cmath, datetime, decimal,
 fractions, statistics, re, json, itertools, functools, collections, random).

@@ -141,7 +141,6 @@ export const dict = {
   "dialog.provider.tag.recommended": "Preporučeno",
   "dialog.provider.opencode.note": "Kurirani modeli uključujući Claude, GPT, Gemini i druge",
   "dialog.provider.opencode.tagline": "Pouzdani optimizovani modeli",
-  "dialog.provider.opencodeGo.tagline": "Povoljna pretplata za sve",
   "dialog.provider.copilot.note": "AI modeli za pomoć pri kodiranju putem GitHub Copilot",
   "dialog.provider.openai.note": "GPT modeli za brze, sposobne opšte AI zadatke",
   "dialog.provider.google.note": "Gemini modeli za brze, strukturirane odgovore",
@@ -155,8 +154,6 @@ export const dict = {
   "dialog.model.manage.description": "Prilagodi koji se modeli prikazuju u izborniku modela.",
 
   "dialog.model.unpaid.freeModels.title": "Besplatni modeli koje obezbjeđuje OpenCode",
-  "dialog.model.unpaid.addMore.title": "Dodaj još modela od popularnih provajdera",
-  "dialog.model.unpaid.viewMoreProviders": "Pogledaj još više od 70 provajdera",
 
   "dialog.provider.viewAll": "Prikaži više provajdera",
 
@@ -269,8 +266,6 @@ export const dict = {
   "dialog.project.edit.color.select": "Odaberi boju {{color}}",
   "dialog.project.edit.worktree.startup": "Skripta za pokretanje radnog prostora",
   "dialog.project.edit.worktree.startup.placeholder": "npr. bun install",
-
-  "dialog.usageExceeded.dontShowAgain": "Nemoj više prikazivati",
 
   "toast.permissions.autoaccept.on.title": "Automatsko prihvatanje dozvola",
   "toast.permissions.autoaccept.on.description": "Zahtjevi za dozvole će biti automatski odobreni",

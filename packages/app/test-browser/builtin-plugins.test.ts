@@ -16,7 +16,7 @@ const product = [
   "microsoft-office",
   "sources",
   "goal",
-  "loginom",
+  "loginom-gui",
 ]
 
 const app = await import("@/runtime/plugin/builtins")
@@ -25,7 +25,7 @@ const desktop = await import("@opencode/gui-plugins/main")
 
 test("the product window registers every built-in but pairing, SSH and WSL, which only Desktop main lists", () => {
   expect(app.builtins.map((plugin) => plugin.id)).toEqual(product)
-  expect(desktop.builtins(() => undefined).map((plugin) => plugin.id).toSorted()).toEqual(
+  expect(desktop.builtins.map((plugin) => plugin.id).toSorted()).toEqual(
     [...product, "pairing", "ssh", "wsl"].toSorted(),
   )
 })
