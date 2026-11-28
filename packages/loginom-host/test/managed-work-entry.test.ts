@@ -297,6 +297,8 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     })
     const tool = tools.get("loginom_fixture")
     if (!tool) throw Error("Fixture tool not registered")
+    const apply = tools.get("loginom_dock_node_apply")
+    if (!apply) throw Error("Apply tool not registered")
     const updates: unknown[] = []
     const result = await tool.execute({ progressFixture: true }, {
       sessionID, messageID, agent: Agent.ID.make("fixture"), id: Tool.CallID.make("fixture"),
@@ -344,11 +346,17 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     }
     fault.name = ""
     const lostArgs = { operation_id: "lost-write", failAfterDispatch: true }
-    const blocked = { _meta: { loginomStep: { operationId: "lost-write", step: {
-      outcome: "check_required", retryAvailable: false,
-    } } } }
-    expect(await run.call("dock_node_apply", lostArgs, "msg_original")).toMatchObject(blocked)
-    expect(await run.call("dock_node_apply", { operation_id: "premature" }, "msg_original")).toMatchObject(blocked)
+    const blocked = { message: "LOGINOM_CALL_UNCERTAIN", details: { operationId: "lost-write" } }
+    expect(await run.call("dock_node_apply", lostArgs, "msg_original").catch((error: unknown) => error)).toMatchObject(blocked)
+    expect(await run.call("dock_node_apply", { operation_id: "premature" }, "msg_original").catch((error: unknown) => error)).toMatchObject(blocked)
+    const modelError = await apply.execute({ operation_id: "premature" }, {
+      sessionID, messageID, agent: Agent.ID.make("fixture"), id: Tool.CallID.make("blocked-write"),
+      signal: new AbortController().signal, progress: async () => {},
+    }).catch((error: unknown) => error)
+    expect(modelError).toBeInstanceOf(Tool.Error)
+    expect(modelError).toMatchObject({ message: expect.stringContaining("LOGINOM_CALL_UNCERTAIN"), metadata: {
+      loginom: { operationId: "lost-write", step: { outcome: "check_required", retryAvailable: false } },
+    } })
     await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared: true, checkId: "lost-write" }))
     expect(await privateHost.request("checkStepState", { sessionID: "foreign-chat", operationId: "lost-write" }))
       .toEqual({ state: "unavailable", retryAvailable: false })

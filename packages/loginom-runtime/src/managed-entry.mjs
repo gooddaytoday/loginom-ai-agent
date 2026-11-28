@@ -431,14 +431,14 @@ async function handle(message) {
         return state.client.callTool({ name, arguments: args }, undefined, options)
       }, controller.signal))
       const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
-      const writeSettled = writeReceipt ? (await import("../client/lib/write-outcome.mjs")).writeReplySettled(result, name, args) : undefined
+      const writeVerdict = writeReceipt ? (await import("../client/lib/write-outcome.mjs")).writeReplyVerdict(result, name, args) : undefined
       send({
         id: message.id,
         result: {
           result: outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result,
           recoveryPending: state.bridge.hasUnsettledWork(),
           activeWork: state.bridge.hasActiveWork(),
-          ...(writeReceipt ? { writeSettled } : {}),
+          ...(writeVerdict ? { writeVerdict } : {}),
           ...(observeOnly ? { writeOwner: state.owner.attempt } : {}),
         },
       })

@@ -1,3 +1,6 @@
+import { Schema } from "effect"
+import { StepOperationId } from "./step-state"
+
 const codes = new Set([
   "DASHBOARD_ORIGIN_MISMATCH",
   "DASHBOARD_STORAGE_UNAVAILABLE",
@@ -14,7 +17,6 @@ const codes = new Set([
   "LOGINOM_SCOPE_DENIED",
   "LOGINOM_RECOVERY_REQUIRED",
   "LOGINOM_CALL_UNCERTAIN",
-  "LOGINOM_WRITE_OUTCOME_UNKNOWN",
   "LOGINOM_WRITE_NOT_DISPATCHED",
   "LOGINOM_WRITE_JOURNAL_INVALID",
   "LOGINOM_CALL_BUSY",
@@ -80,7 +82,6 @@ export function hostError(value: unknown) {
 }
 
 const reasons: Record<string, string> = {
-  LOGINOM_WRITE_OUTCOME_UNKNOWN: "Исход предыдущей записи в целевой пакет неизвестен. Не повторяйте запись. Прочитайте текущее состояние пакета и запросите проверку исхода исходного вызова.",
   DASHBOARD_CANCELLED: "Операция dashboard отменена.",
   DASHBOARD_WRITE_UNKNOWN: "Результат публикации неизвестен. Проверьте версию на стенде; повторная запись автоматически не выполняется.",
   DASHBOARD_DELETE_BUSY: "Этот дашборд уже удаляется. Повторите запрос после завершения операции.",
@@ -103,9 +104,18 @@ const reasons: Record<string, string> = {
 // path, cause, stack, file bytes or arbitrary details across the trust boundary.
 export function hostFailure(value: unknown) {
   const error = hostError(value)
+  const source = value && typeof value === "object" && "details" in value ? value.details : undefined
+  if (error === "LOGINOM_CALL_UNCERTAIN" && source && typeof source === "object" &&
+    "checkWriteOutcome" in source && source.checkWriteOutcome === true) {
+    const operationId = "operationId" in source && Schema.is(StepOperationId)(source.operationId) ? source.operationId : undefined
+    return { error, details: {
+      checkWriteOutcome: true,
+      reason: "Исход записи в целевой пакет неизвестен. Не повторяйте запись. Прочитайте текущее состояние пакета и запросите проверку исхода исходного вызова.",
+      ...(operationId ? { operationId } : {}),
+    } }
+  }
   const reason = reasons[error]
   if (!reason) return { error }
-  const source = value && typeof value === "object" && "details" in value ? value.details : undefined
   const details: { reason: string; actual?: number; limit?: number; hint?: string } = { reason }
   if (error === "LOGINOM_FILE_TOO_LARGE") {
     const fields: { actual?: unknown; limit?: unknown } = source && typeof source === "object" ? source : {}
@@ -121,6 +131,10 @@ export function hostFailure(value: unknown) {
 export function hostException(value: unknown) {
   const failure = hostFailure(value)
   return Object.assign(new Error(failure.error), failure.details ? { details: failure.details } : {})
+}
+
+export function uncertainCall(operationId?: string) {
+  return hostException({ error: "LOGINOM_CALL_UNCERTAIN", details: { checkWriteOutcome: true, operationId } })
 }
 
 export function hostErrorText(value: unknown) {

@@ -3,6 +3,7 @@ import { constants, type Stats } from "node:fs"
 import { lstat, mkdir, open, readdir, rename, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { Schema } from "effect"
+import { uncertainCall } from "../errors"
 import { Step, StepOperationId, unknownWriteStep } from "../step-state"
 
 export const WriteOutcomeInput = Schema.Struct({
@@ -35,7 +36,11 @@ const Write = Schema.Struct({
   receipt,
   baseline,
 })
-export const WriteIntent = Schema.Union([Schema.Struct({ effect: Schema.Literal("read") }), Write])
+export const WriteIntent = Schema.Union([
+  Schema.Struct({ effect: Schema.Literal("read") }),
+  Schema.Struct({ effect: Schema.Literal("control"), owner: id, operationId: StepOperationId }),
+  Write,
+])
 const Record = Schema.Struct({
   ...Write.fields,
   id, chat: digest, turn: identity, call: identity,
@@ -44,12 +49,14 @@ const Record = Schema.Struct({
   status: WriteVerdict,
   step: Schema.optional(Step),
   createdAt: Schema.Number,
+  settledAt: Schema.optional(Schema.Number),
 })
 export type WriteRecord = typeof Record.Type
+const retentionMs = 24 * 60 * 60 * 1000
 
 export function writeStep(status: typeof WriteVerdict.Type): typeof Step.Type {
   if (status === "unknown") return unknownWriteStep
-  if (status === "not_applied") return { outcome: "not_applied", retryAvailable: true, persistence: "step_unsaved", save: null }
+  if (status === "not_applied") return { outcome: "not_applied", retryAvailable: true, persistence: "unknown", save: null }
   return { outcome: "completed", retryAvailable: false, persistence: "unknown", save: null }
 }
 
@@ -90,15 +97,28 @@ export async function writeOutcomes(directory: string) {
     await sync()
     entries.set(entry.id, entry)
   }
+  function retained(entry: WriteRecord, now = Date.now()) {
+    return active.has(entry.id) || entry.status === "unknown" || now - (entry.settledAt ?? entry.createdAt) < retentionMs
+  }
+  async function prune(now: number) {
+    const expired = [...entries.values()].filter((entry) => !retained(entry, now))
+    for (const entry of expired) {
+      await rm(join(directory, `${entry.id}.json`), { force: true })
+      entries.delete(entry.id)
+    }
+    if (expired.length) await sync()
+  }
+  await prune(Date.now())
   return {
-    async begin(input: Omit<WriteRecord, "id" | "status" | "step" | "createdAt">) {
+    async begin(input: Omit<WriteRecord, "id" | "status" | "step" | "createdAt" | "settledAt">) {
+      await prune(Date.now())
       const paths = input.paths.map((value) => value.normalize("NFC").toLowerCase())
-      if ([...entries.values()].some((entry) => entry.server === input.server &&
+      const conflict = [...entries.values()].find((entry) => entry.server === input.server &&
         (active.has(entry.id) || entry.status === "unknown") &&
         (entry.paths.some((value) => paths.includes(value.normalize("NFC").toLowerCase())) ||
           (!paths.length && !input.baseline.draft) || (!entry.paths.length && !entry.baseline.draft) ||
-          (entry.chat === input.chat && (entry.baseline.draft || input.baseline.draft)))))
-        throw Error("LOGINOM_WRITE_OUTCOME_UNKNOWN")
+          (entry.chat === input.chat && (entry.baseline.draft || input.baseline.draft))))
+      if (conflict) throw uncertainCall(conflict.chat === input.chat ? conflict.receipt.operationID ?? undefined : undefined)
       const entry = { ...input, id: randomUUID(), status: "not_applied", createdAt: Date.now() } satisfies WriteRecord
       active.add(entry.id)
       entries.set(entry.id, entry)
@@ -110,10 +130,10 @@ export async function writeOutcomes(directory: string) {
     find(chat: string, writeID?: string, operationId?: string) {
       if (writeID !== undefined) {
         const entry = entries.get(writeID)
-        return entry?.chat === chat && (operationId === undefined || entry.receipt.operationID === operationId) ? entry : undefined
+        return entry?.chat === chat && retained(entry) && (operationId === undefined || entry.receipt.operationID === operationId) ? entry : undefined
       }
       const recent = [...entries.values()]
-        .filter((entry) => entry.chat === chat && (operationId === undefined || entry.receipt.operationID === operationId))
+        .filter((entry) => entry.chat === chat && retained(entry) && (operationId === undefined || entry.receipt.operationID === operationId))
         .sort((left, right) => right.createdAt - left.createdAt)
       return recent.find((entry) => entry.status === "unknown" || active.has(entry.id)) ?? recent[0]
     },
@@ -125,11 +145,8 @@ export async function writeOutcomes(directory: string) {
     },
     dispatch: (entry: WriteRecord) => put({ ...entry, status: "unknown" }),
     release: (entry: WriteRecord) => { active.delete(entry.id) },
-    async finish(entry: WriteRecord, verdict: "applied" | "not_applied" | "complete", step?: typeof Step.Type) {
-      if (verdict !== "complete") return put({ ...entry, status: verdict, ...(step ? { step } : {}) })
-      await rm(join(directory, `${entry.id}.json`), { force: true })
-      await sync()
-      entries.delete(entry.id)
+    finish(entry: WriteRecord, verdict: "applied" | "not_applied", step?: typeof Step.Type) {
+      return put({ ...entry, status: verdict, settledAt: Date.now(), ...(step ? { step } : {}) })
     },
   }
 }

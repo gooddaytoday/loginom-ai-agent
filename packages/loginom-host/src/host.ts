@@ -652,8 +652,9 @@ export async function createLoginomHost(options: {
     if (originalGeneration !== undefined && status.generation !== originalGeneration) return unavailableOwner
     const children = generations.get(status.generation)?.children
     const child = children?.get(chat)
-    if (!child || lost.has(chat) || stale.has(chat)) return unavailableOwner
-    const result = await child.then((runtime) => runtime.request("checkStepState", { operationId, owner }, 25000)).catch(() => unavailable)
+    if (!child || lost.has(chat) || (originalGeneration === undefined && stale.has(chat))) return unavailableOwner
+    const result = await child.then((runtime) => runtime.request("checkStepState", { operationId, owner }, 25000))
+      .catch((error: unknown) => error instanceof Error && error.message === "LOGINOM_RUNTIME_DISCONNECTED" ? unavailableOwner : unavailable)
     const after = await service.api.status()
     if (children?.get(chat) !== child || status.generation !== after.generation) return unavailableOwner
     if (owner !== undefined && result === "owner_lost") return result

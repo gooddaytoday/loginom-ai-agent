@@ -9,8 +9,8 @@
 import { randomUUID } from "node:crypto"
 import { mkdir, writeFile } from "node:fs/promises"
 import { extname, join, resolve } from "node:path"
-import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
-import { StepMetadata } from "@loginom-ai-agent/loginom-host/step-state"
+import { hostErrorText, hostFailure } from "@loginom-ai-agent/loginom-host/errors"
+import { StepMetadata, uncertainStep } from "@loginom-ai-agent/loginom-host/step-state"
 import { SessionV1 } from "@loginom-ai-agent/loginom-host/session-v1"
 import type { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
@@ -295,7 +295,12 @@ export async function dockTools(input: {
       .finally(() => publishing)
       .then(decodeReply)
       .catch((error) => {
-        throw Error(hostErrorText(error))
+        const message = hostErrorText(error)
+        const { details } = hostFailure(error)
+        if (details && "operationId" in details && details.operationId) throw new Tool.Error({
+          message, metadata: { generation: lease.generation, isError: true, loginom: uncertainStep(details.operationId) },
+        })
+        throw Error(message)
       })
     const text = result.content
       .flatMap((block) => (block.type === "text" && typeof block.text === "string" ? [block.text] : []))

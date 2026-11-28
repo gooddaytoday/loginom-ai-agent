@@ -13,6 +13,8 @@ export function savedPackagePath(value) {
 export function writeIntent(input, workspace, { owner, uploadPath, knownOperation }) {
   const { name, arguments: args } = input;
   const prepare = name === 'dock_prepare';
+  if (name === 'dock_node_stop' || name === 'dock_node_cancel')
+    return { effect: 'control', owner, operationId: args?.operation_id };
   if (reads.has(name) || name === 'dock_node_read' && (args?.execution ?? 'existing') === 'existing'
     || name === 'dock_browser_recovery' && args?.action === 'status'
     || prepare && !input.packageArtifact && ['open_package', 'existing_workflow'].includes(args?.intent))
@@ -37,17 +39,17 @@ export function writeIntent(input, workspace, { owner, uploadPath, knownOperatio
   };
 }
 
-export function writeReplySettled(reply, name, args) {
-  if (stepWriteTool(name, args)) return false;
+export function writeReplyVerdict(reply, name, args) {
+  if (stepWriteTool(name, args)) return;
   let result = reply.structuredContent;
   if (!result && reply.content?.[0]?.type === 'text') {
-    try { result = JSON.parse(reply.content[0].text); } catch { return name?.startsWith('browser_') && !reply.isError; }
+    try { result = JSON.parse(reply.content[0].text); } catch { return name?.startsWith('browser_') && !reply.isError ? 'applied' : undefined; }
   }
   const outcome = result?.outcome ?? result?.output?.outcome ?? result;
-  if (['AMBIGUOUS', 'unresolved', 'pending'].includes(outcome?.status)) return false;
+  if (['AMBIGUOUS', 'unresolved', 'pending'].includes(outcome?.status)) return;
   if (outcome?.status === 'FAILED' || outcome?.status === 'NOT_APPLIED')
-    return outcome.effect_possible === false && outcome.cleanup_complete === true;
-  if (result?.state && result.state !== 'settled') return false;
-  if (result?.prepared === false || outcome?.cleanup_complete === false || outcome?.pending_phase) return false;
-  return !reply.isError;
+    return outcome.effect_possible === false && outcome.cleanup_complete === true ? 'not_applied' : undefined;
+  if (result?.state && result.state !== 'settled') return;
+  if (result?.prepared === false || outcome?.cleanup_complete === false || outcome?.pending_phase) return;
+  return reply.isError ? undefined : 'applied';
 }

@@ -54,21 +54,5 @@ export const unknownWriteStep = {
 } as const satisfies typeof Step.Type
 
 export function uncertainStep(operationId: string) {
-  return {
-    isError: true,
-    content: [
-      {
-        type: "text",
-        text: `Check the state of the original Loginom operation before another mutation: ${operationId}`,
-      },
-    ],
-    _meta: {
-      loginomStep: StepMetadata.make({
-        v: 1,
-        operationId,
-        state: "settled",
-        step: unknownWriteStep,
-      }),
-    },
-  }
+  return StepMetadata.make({ v: 1, operationId, state: "settled", step: unknownWriteStep })
 }

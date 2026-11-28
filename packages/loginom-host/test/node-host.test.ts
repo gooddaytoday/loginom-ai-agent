@@ -3,6 +3,7 @@ import { access, copyFile, mkdir, mkdtemp, readFile, realpath, rm, symlink, writ
 import { createHash } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { pathToFileURL } from "node:url"
 import { buildKeychain } from "../script/build-keychain"
 import { launchNodeHost, NodeHostStartupError } from "../src/node-client"
 import { verifyInstallationResources } from "../src/host"
@@ -35,13 +36,25 @@ afterAll(async () => {
   if (fixture.directory) await rm(fixture.directory, { recursive: true, force: true })
 })
 
-test("Desktop checks the original write, allows reads, and never unlocks an unknown write on reconnect or restart", async () => {
+test("Desktop keeps write evidence through lost replies, runtime replacement and restart, and allows only matching Stop and Cancel", async () => {
   const directory = await mkdtemp(join(fixture.directory, "desktop-writes-"))
   const root = join(directory, "profile")
   const resources = join(directory, "resources")
   const effects = join(directory, "effects.jsonl")
   const reconnect = join(directory, "reconnected")
+  const droppedReply = join(directory, "dropped-reply")
+  const entry = join(directory, "drop-reply.mjs")
   const target = "/fixture/packages/original.lgp"
+  await writeFile(entry, `
+    import {writeFileSync} from 'node:fs';
+    const send = process.send.bind(process);
+    process.send = (message, ...args) => {
+      if (message.result?._meta?.loginomStep?.operationId !== 'undelivered') return send(message, ...args);
+      writeFileSync(${JSON.stringify(droppedReply)}, 'reply dropped after dispatch');
+      return true;
+    };
+    await import(${JSON.stringify(pathToFileURL(fixture.entry).href)});
+  `)
   await mkdir(join(resources, "runtime/src"), { recursive: true })
   await mkdir(join(resources, "bin"))
   await symlink(fixture.node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
@@ -50,6 +63,7 @@ test("Desktop checks the original write, allows reads, and never unlocks an unkn
   await writeFile(join(resources, "runtime/src/managed-entry.mjs"), `
     import { randomUUID } from 'node:crypto';
     import { appendFileSync, existsSync } from 'node:fs';
+    import { writeIntent } from ${JSON.stringify(pathToFileURL(join(import.meta.dir, "../../loginom-runtime/client/lib/write-outcome.mjs")).href)};
     const owner = randomUUID(), receipts = new Map();
     let path, validation;
     const step = (operationId, outcome, reason) => ({outcome, ...(reason ? {reason} : {}),
@@ -64,12 +78,12 @@ test("Desktop checks the original write, allows reads, and never unlocks an unkn
       }
       if (operation === 'close') process.send({id,result:{closed:true}},()=>process.disconnect());
       if (operation === 'interrupt') reply({interrupted:true});
-      if (operation === 'list') reply({prepared:true,tools:['dock_action_run','dock_workspace_observe'].map(name=>({name,inputSchema:{type:'object'}}))});
+      if (operation === 'list') reply({prepared:true,tools:['dock_action_run','dock_workspace_observe','dock_node_apply','dock_node_stop','dock_node_cancel'].map(name=>({name,inputSchema:{type:'object'}}))});
       if (operation === 'write-outcome.prepare') {
-        const args=input.arguments;
-        if (input.name !== 'dock_action_run') return reply({effect:'read'});
-        reply({effect:'save',operation:args.action_key,paths:[path], receipt:{owner,operationID:args.operation_id,fresh:true},
-          baseline:{document:'doc',workflow:'workflow',packagePath:path,savedDigest:'a'.repeat(64),draft:false}});
+        const intent = writeIntent(input, {document_id:'doc',workflow_ref:{workflow_id:'workflow'},package_ref:{path}},
+          {owner,knownOperation:operationId=>receipts.has(operationId)});
+        if (intent.effect === 'save') intent.baseline.savedDigest = 'a'.repeat(64);
+        reply(intent);
       }
       if (operation === 'checkStepState') {
         if (input.owner !== undefined && input.owner !== owner) return reply('owner_lost');
@@ -81,10 +95,13 @@ test("Desktop checks the original write, allows reads, and never unlocks an unkn
       if (operation === 'write-outcome.readback') reply(input.packagePath === ${JSON.stringify(target)} ? 'changed' : 'unavailable');
       if (operation !== 'call') return;
       if (input.name === 'dock_prepare') path=input.arguments.package_path;
-      const answer = result => reply({result,recoveryPending:false,writeSettled:true});
+      const answer = result => reply({result,recoveryPending:false,writeVerdict:'applied'});
+      if (input.name === 'dock_node_apply') return reply({result:{state:'running'},recoveryPending:true,activeWork:true});
+      if (['dock_node_stop','dock_node_cancel'].includes(input.name)) return answer({control:input.name,id:input.arguments.operation_id});
       if (input.name !== 'dock_action_run') return answer({path,reconnected:existsSync(${JSON.stringify(reconnect)})});
       const operationID=input.arguments.operation_id;
       if (operationID !== 'rejected') appendFileSync(${JSON.stringify(effects)}, JSON.stringify({path,operationID})+'\\n');
+      if (operationID === 'dead') return process.exit(0);
       if (['partial', 'committed', 'rejected'].includes(operationID)) {
         receipts.set(operationID, operationID === 'committed' ? step(operationID,'completed')
           : operationID === 'rejected' ? step(operationID,'not_applied') : step(operationID,'check_required','partial_effect'));
@@ -97,12 +114,12 @@ test("Desktop checks the original write, allows reads, and never unlocks an unkn
   const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
   await store.stage({ generation: 1, revision: 1, url: "http://127.0.0.1:1/app/", username: "fixture", apiKey: "fixture", password: "" })
   await store.activate(1)
-  const launch = () => launchNodeHost({ node: fixture.node, entry: fixture.entry, root, resources, headless: true, desktopWriteOutcomes: true })
+  const launch = () => launchNodeHost({ node: fixture.node, entry, root, resources, headless: true, desktopWriteOutcomes: true })
   let host = await launch()
   const check = (sessionID = "chat", operationId?: string) => host.request("loginom.write-outcome.check", { sessionID, operationId })
-  const call = (run: string, name: string, args: object = {}) => host.request("call", { run, name, args,
-    userMessage: "msg_original", invocation: { turn: "msg_current", call: "tool-call" } })
-  const write = (operationID: string, run = "one") => call(run, "dock_action_run", { action_key: "package.save_checkpoint", operation_id: operationID })
+  const call = (run: string, name: string, args: object = {}, timeout?: number) => host.request("call", { run, name, args,
+    userMessage: "msg_original", invocation: { turn: "msg_current", call: "tool-call" } }, timeout)
+  const write = (operationID: string, run = "one", timeout?: number) => call(run, "dock_action_run", { action_key: "package.save_checkpoint", operation_id: operationID }, timeout)
   async function prepare(run: string, session: string, path = target) {
     await host.request("acquire", { run, session })
     await host.request("scope", { run, mode: "bind", scope: { taskMessageID: "msg_original", profile: "loginom-automation" } })
@@ -112,17 +129,16 @@ test("Desktop checks the original write, allows reads, and never unlocks an unkn
   try {
     await host.request("connection.ready", {})
     await prepare("one", "chat")
-    expect(await write("committed")).toMatchObject({ isError: true, _meta: { loginomStep: { operationId: "committed",
-      step: { outcome: "check_required", reason: "unknown_write", retryAvailable: false } } } })
-    await expect(write("blocked-first")).rejects.toThrow("LOGINOM_WRITE_OUTCOME_UNKNOWN")
+    await expect(write("committed")).rejects.toMatchObject({ message: "LOGINOM_CALL_UNCERTAIN", details: { operationId: "committed" } })
+    await expect(write("blocked-first")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
     expect(await check("chat", "committed")).toMatchObject({ status: "applied", writeID: expect.any(String), operationId: "committed",
       step: { outcome: "completed", retryAvailable: false, persistence: "saved_through", save: { path: target } } })
-    expect(await write("rejected")).toMatchObject({ isError: true })
+    await expect(write("rejected")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
     expect(await host.request("checkStepState", { sessionID: "chat", operationId: "rejected" })).toMatchObject({
       state: "observed", retryAvailable: true, step: { outcome: "not_applied" },
     })
     expect(await check("chat", "rejected")).toMatchObject({ status: "not_applied", step: { retryAvailable: true } })
-    expect(await write("partial")).toMatchObject({ isError: true })
+    await expect(write("partial")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
     const unknown = await check()
     expect(unknown).toMatchObject({ status: "unknown", writeID: expect.any(String), step: { outcome: "check_required", reason: "partial_effect", retryAvailable: false } })
     await writeFile(reconnect, "online")
@@ -132,22 +148,43 @@ test("Desktop checks the original write, allows reads, and never unlocks an unkn
     expect(await host.request("checkStepState", { sessionID: "chat", operationId: "partial" })).toMatchObject({
       state: "observed", retryAvailable: false, step: { outcome: "check_required", reason: "partial_effect" },
     })
-    await expect(write("partial")).rejects.toMatchObject({ message: "LOGINOM_WRITE_OUTCOME_UNKNOWN", details: { reason: expect.stringContaining("Прочитайте") } })
+    await expect(write("partial")).rejects.toMatchObject({ message: "LOGINOM_CALL_UNCERTAIN", details: { reason: expect.stringContaining("Прочитайте") } })
     await prepare("peer", "another-chat")
-    await expect(write("blocked-other-chat", "peer")).rejects.toThrow("LOGINOM_WRITE_OUTCOME_UNKNOWN")
+    const foreign = await write("blocked-other-chat", "peer").catch((error: unknown) => error)
+    expect(foreign).toMatchObject({ message: "LOGINOM_CALL_UNCERTAIN" })
+    expect(foreign).not.toHaveProperty("details.operationId")
     expect(await check("another-chat")).toEqual({ status: "unknown" })
     await prepare("other", "third-chat", "/fixture/packages/different.lgp")
     expect(await write("unrelated", "other")).toMatchObject({ saved: true })
+    await expect(write("undelivered", "other", 2_000)).rejects.toThrow("LOGINOM_HOST_TIMEOUT")
+    expect(await readFile(droppedReply, "utf8")).toBe("reply dropped after dispatch")
+
+    const controlPath = "/fixture/packages/control.lgp"
+    await prepare("control", "control-chat", controlPath)
+    expect(await call("control", "dock_node_apply", { operation_id: "apply" })).toMatchObject({ state: "running" })
+    for (const name of ["dock_node_stop", "dock_node_cancel"]) {
+      await expect(call("control", name, { operation_id: "unrelated" })).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+      expect(await call("control", name, { operation_id: "apply" })).toMatchObject({ control: name, id: "apply" })
+    }
+    await expect(write("blocked-after-control", "control")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+
+    await expect(write("dead", "other")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+    expect(await check("third-chat", "dead")).toMatchObject({ status: "unknown", readback: "unavailable" })
+    await host.request("release", { run: "other" })
+    await prepare("replacement", "third-chat", "/fixture/packages/different.lgp")
+    await expect(call("replacement", "dock_node_cancel", { operation_id: "dead" })).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+    await expect(write("blocked-replacement", "replacement")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
     await host.close()
     host = await launch()
     await host.request("connection.ready", {})
     expect(await check()).toMatchObject({ status: "unknown", writeID: expect.any(String), readback: "changed" })
     expect(await check("chat", "committed")).toMatchObject({ status: "applied", step: { outcome: "completed", save: { path: target } } })
+    expect(await check("third-chat", "undelivered")).toMatchObject({ status: "applied", step: { outcome: "completed", persistence: "saved_through" } })
     await prepare("one", "chat")
     expect(await call("one", "dock_workspace_observe")).toEqual({ path: target, reconnected: true })
-    await expect(write("blocked-restart")).rejects.toThrow("LOGINOM_WRITE_OUTCOME_UNKNOWN")
+    await expect(write("blocked-restart")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
     expect((await readFile(effects, "utf8")).trim().split("\n").map((line) => JSON.parse(line).operationID))
-      .toEqual(["committed", "partial", "unrelated"])
+      .toEqual(["committed", "partial", "unrelated", "undelivered", "dead"])
   } finally {
     await host.close()
   }
