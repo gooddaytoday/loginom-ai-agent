@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { Schema } from "effect"
 import { Loginom } from "../src/loginom"
 import { once } from "node:events"
-import { access, lstat, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
@@ -671,7 +671,7 @@ test.skipIf(!hasConnectionFixture)(
 )
 
 test.skipIf(!hasConnectionFixture)(
-  "CON-05: saving a different user closes the old browser and opens a fresh profile with the new file root",
+  "CON-05: saving a different user closes the old browser and isolates cookie, storage and file root",
   async () => {
     const f = await loginomConnectionFixture()
     try {
@@ -693,21 +693,11 @@ test.skipIf(!hasConnectionFixture)(
             },
             true,
           )
-        const profileLock = async (generation: number) => {
-          const attempts = join(f.root, "runtime", "generations", String(generation), "chats", chat, "attempts")
-          const entries = await readdir(attempts)
-          const [attempt] = entries
-          if (entries.length !== 1 || !attempt) throw Error("Expected exactly one browser attempt")
-          const lock = join(attempts, attempt, "browser-profile", "SingletonLock")
-          expect((await lstat(lock)).isSymbolicLink()).toBe(true)
-          return lock
-        }
         const first = await check(0, "first-user")
         await host.api.save({ revision: 0, validationId: first.validationId }, true)
         await waitForKnowledge(host)
         expect(await host.api.status()).toMatchObject({ generation: 1, username: "first-user", folder: "/first-user" })
         const oldRuntime = await host.runtime(1, chat)
-        const oldLock = await profileLock(1)
         const oldSession = f.logins.at(-1)
         if (!oldSession) throw Error("The first browser did not authenticate")
         const oldStream = f.sessions.get(oldSession.cookie)
@@ -723,7 +713,6 @@ test.skipIf(!hasConnectionFixture)(
         })()
         const [exit] = await Promise.all([oldRuntime.exited, closed, activation])
         expect(exit).toEqual({ code: 0, signal: null })
-        await expect(lstat(oldLock)).rejects.toMatchObject({ code: "ENOENT" })
         expect(await host.api.status()).toMatchObject({
           generation: 2,
           username: "second-user",
@@ -731,7 +720,6 @@ test.skipIf(!hasConnectionFixture)(
         })
         const afterSave = f.requests.length
         const newRuntime = await host.runtime(2, chat)
-        expect(await profileLock(2)).not.toBe(oldLock)
         expect(f.logins.map((login) => login.username)).toEqual([
           "first-user",
           "first-user",
@@ -741,6 +729,7 @@ test.skipIf(!hasConnectionFixture)(
         const newSession = f.logins.at(-1)
         if (!newSession) throw Error("The second browser did not authenticate")
         expect(newSession.cookie).not.toBe(oldSession.cookie)
+        expect(newSession).toMatchObject({ previousLocalOwner: "", previousSessionOwner: "" })
         expect(f.requests.slice(afterSave)).toEqual([
           { method: "GET", path: "/app/", cookie: "" },
           { method: "POST", path: "/login", cookie: "" },

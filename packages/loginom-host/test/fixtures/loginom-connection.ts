@@ -21,10 +21,15 @@ export async function loginomConnectionFixture() {
   const resources = join(directory, "resources")
   const browserFile = join("browsers", basename(browser))
   const requests: { method: string | undefined; path: string; cookie: string }[] = []
-  const logins: { username: string; cookie: string }[] = []
+  const logins: {
+    username: string
+    cookie: string
+    previousLocalOwner: string | null
+    previousSessionOwner: string | null
+  }[] = []
   const sessions = new Map<string, ServerResponse>()
   const server = createServer((request, response) => {
-    const path = new URL(request.url ?? "/", "http://localhost").pathname
+    const { pathname: path, searchParams } = new URL(request.url ?? "/", "http://localhost")
     const cookie = request.headers.cookie ?? ""
     response.setHeader("Cache-Control", "no-store")
     if (path === "/favicon.ico") return response.writeHead(204).end()
@@ -42,14 +47,22 @@ export async function loginomConnectionFixture() {
             fields.get("password") !== "fixture-password"
           )
             return response.writeHead(403).end()
-          logins.push({ username, cookie: `fixture-auth=${logins.length + 1}` })
+          logins.push({
+            username,
+            cookie: `fixture-auth=${logins.length + 1}`,
+            previousLocalOwner: fields.get("localOwner"),
+            previousSessionOwner: fields.get("sessionOwner"),
+          })
           return response.writeHead(204, { "Set-Cookie": `fixture-auth=${logins.length}; Path=/; Max-Age=3600` }).end()
         },
         () => response.writeHead(400).end(),
       )
       return
     }
-    if (request.method === "GET" && path === "/live" && logins.some((login) => login.cookie === cookie)) {
+    if (request.method === "GET" && path === "/live") {
+      const owner = logins.find((login) => login.cookie === cookie)?.username
+      if (!owner || searchParams.get("localOwner") !== owner || searchParams.get("sessionOwner") !== owner)
+        return response.writeHead(403).end()
       // This stream is held by the authenticated page for its entire lifetime.
       sessions.set(cookie, response)
       response.writeHead(200, { "Content-Type": "text/event-stream" })
@@ -125,16 +138,26 @@ const loginPage = `<!doctype html>
   <button id="logoutButton" data-tid="MF;AppMenuForm;btnLogOut" hidden>Log out</button>
 </div>
 <script>
+  const ownerKey = "fixture-owner";
   let live;
   login.onsubmit = async (event) => {
     event.preventDefault();
     const fields = new FormData(login);
+    fields.set("localOwner", localStorage.getItem(ownerKey) ?? "");
+    fields.set("sessionOwner", sessionStorage.getItem(ownerKey) ?? "");
     const response = await fetch("/login", { method: "POST", body: new URLSearchParams(fields) });
     if (!response.ok) return;
-    live = new EventSource("/live");
+    const username = fields.get("username");
+    localStorage.setItem(ownerKey, username);
+    sessionStorage.setItem(ownerKey, username);
+    const stored = new URLSearchParams({
+      localOwner: localStorage.getItem(ownerKey),
+      sessionOwner: sessionStorage.getItem(ownerKey),
+    });
+    live = new EventSource("/live?" + stored);
     live.onopen = () => {
       window.bg = { app: { Application: { FInstance: { FMainForm: { FMapTree: {
-        FServerConnection: { UserName: fields.get("username") }
+        FServerConnection: { UserName: username }
       } } } } } };
       login.hidden = true;
       workspace.hidden = false;
