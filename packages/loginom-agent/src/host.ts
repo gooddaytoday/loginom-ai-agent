@@ -144,6 +144,10 @@ export const dashboard = {
 
 export const connectionSettings = {
   request,
+  starting() {
+    const current = state.current
+    return current !== undefined && !current.closing && current.connected === undefined
+  },
   onApplication(listener: Loginom.ConnectionApplicationListener) {
     applicationListeners.add(listener)
     return () => applicationListeners.delete(listener)

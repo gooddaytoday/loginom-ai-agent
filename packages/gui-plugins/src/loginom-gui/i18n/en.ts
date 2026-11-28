@@ -51,6 +51,7 @@ export default {
   starting: "Applying connection…",
   unavailable: "The Loginom service could not be reached. Try again.",
   serviceUnavailable: "Loginom service unavailable",
+  serviceStarting: "Starting the Loginom service…",
   activationFailed: "The service could not apply the connection. Check the settings and try again.",
   invalidAddress: "Enter a Loginom address starting with http:// or https://, without credentials or URL parameters.",
   invalidUsername: "Check the Loginom username.",

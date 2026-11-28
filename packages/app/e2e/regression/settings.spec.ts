@@ -10,6 +10,7 @@ import { installSseTransport } from "../utils/sse-transport"
 import {
   loginomAddress,
   loginomDiagnosticKey,
+  loginomProductPlugin,
   loginomSettingsFixture,
   openLoginomSettings,
 } from "../utils/loginom-settings"
@@ -54,6 +55,71 @@ function open(page: Page, input: Partial<WorkspaceInput> = {}) {
 
 const loginomPassword = "fixture-wrong-password"
 
+test("Loginom settings recover automatically from a cold Location and a slow Host", async ({ page }) => {
+  let registered = false
+  let host: "handshake" | "catalog" | "ready" = "handshake"
+  let earlyStatusCalls = 0
+  const fixture = loginomSettingsFixture()
+
+  await mockWorkspace(page, {
+    name: "Loginom first start",
+    directory,
+    sessions: [],
+    provider: NO_PROVIDER,
+    seed: { locale: "ru" },
+    plugins: () => (registered ? [loginomProductPlugin] : []),
+    onRpc(request) {
+      if (request.rpcID !== "loginom.connection" || request.method !== "status") return
+
+      if (!registered) {
+        earlyStatusCalls++
+
+        return { unavailable: true }
+      }
+
+      if (host === "handshake") return { output: { ok: true, state: "starting" } }
+
+      if (host === "catalog")
+        return { output: { ok: true, value: { ...fixture.status, state: "starting" } } }
+
+      return fixture.onRpc?.(request)
+    },
+  })
+
+  await page.clock.install()
+  await page.goto("/settings?tab=loginom")
+  const settings = page.getByRole("tabpanel").filter({ has: page.getByRole("heading", { name: "Loginom", exact: true }) })
+  const notice = settings.getByRole("status")
+  await expect(notice).toHaveText("Запускаем службу…")
+  expect(earlyStatusCalls).toBe(0)
+
+  const now = await page.evaluate(() => Date.now())
+  await page.clock.pauseAt(now + 1_000)
+  await page.clock.fastForward(36_000)
+  await page.clock.resume()
+
+  const nextStatus = () =>
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === "/api/rpc/loginom.connection/status",
+    )
+
+  const handshakeStatus = nextStatus()
+  registered = true
+  expect((await handshakeStatus).status()).toBe(200)
+  await expect(notice).toHaveText("Запускаем службу…")
+
+  const catalogStatus = nextStatus()
+  host = "catalog"
+  expect((await catalogStatus).status()).toBe(200)
+  await expect(notice).toHaveText("Запускаем службу…")
+
+  host = "ready"
+  await expect(notice).toHaveText("Подключён как analyst · папка /analyst")
+  await expect(settings.getByRole("textbox", { name: "Адрес" })).toHaveValue(loginomAddress)
+})
+
 for (const [issue, text, address] of [
   ["knowledgeAuthFailed", "The knowledge service rejected its access key.", loginomAddress],
   [
@@ -87,6 +153,7 @@ for (const [issue, text, address] of [
       },
     ])
     expect(fixture.saves).toEqual([])
+
     for (const secret of [loginomPassword, loginomDiagnosticKey]) {
       await expect(form).not.toContainText(secret)
       expect(journal.join("\n")).not.toContain(secret)
@@ -112,9 +179,11 @@ test("Loginom sends preserve, replace and passwordless operations through the se
   await expect(password).toBeDisabled()
   await check.click()
   await expect(checked).toBeVisible()
+
   const saved = page.waitForResponse(
     (response) => new URL(response.url()).pathname === "/api/rpc/loginom.connection/save",
   )
+
   await form.getByRole("button", { name: "Save", exact: true }).click()
   expect((await saved).ok()).toBe(true)
   await expect(checked).toBeHidden()
@@ -150,9 +219,11 @@ test("Loginom settings use the service Location and recover an unconfirmed Save"
     sessions: [],
     directory: serviceDirectory,
     provider: NO_PROVIDER,
+    plugins: [loginomProductPlugin],
     onRpc: (request) => {
       if (request.rpcID !== "loginom.connection") return
       expect(request.directory).toBe(serviceDirectory)
+
       switch (request.method) {
         case "status":
           return {
@@ -172,11 +243,13 @@ test("Loginom settings use the service Location and recover an unconfirmed Save"
           }
         case "check":
           checks.push(request.body)
+
           return { output: { ok: true, value: { validationId: "checked", expiresAt: 4102444800000 } } }
         case "save":
           expect(request.body).toMatchObject({ input: { revision: 0, validationId: "checked" } })
           username = "analyst"
           revision = 1
+
           return { unavailable: true }
       }
     },
@@ -231,6 +304,7 @@ async function loginomApplication(page: Page, outcome: "applied" | "failed") {
     sessions: [],
     directory,
     provider: NO_PROVIDER,
+    plugins: [loginomProductPlugin],
     seed: { locale: "ru" },
     onRpc: (request) => {
       if (request.rpcID !== "loginom.connection") return
@@ -271,6 +345,7 @@ async function loginomApplication(page: Page, outcome: "applied" | "failed") {
       page.waitForResponse((response) => new URL(response.url()).pathname === "/api/rpc/loginom.connection/status"),
       page.clock.fastForward(duration),
     ])
+
     expect(response.ok()).toBe(true)
   }
 
@@ -295,6 +370,7 @@ async function loginomApplication(page: Page, outcome: "applied" | "failed") {
       data: { revision, generation },
     },
   ])
+
   if (outcome === "failed") {
     await expect(notice).toHaveText("Служба не применила подключение. Проверьте настройки и попробуйте снова.")
     await expect(notice.getByText("Применено", { exact: true })).toHaveCount(0)
@@ -2227,15 +2303,19 @@ test("providers: settings and the connect dialog list popular providers in the s
     { id: "anthropic", name: "Anthropic" },
     { id: "google", name: "Google" },
   ]
+
   const { settings } = await open(page, {
     integrations: popular.toReversed().map((item) => ({ ...item, methods: [{ type: "key" }], connections: [] })),
   })
+
   const names = popular.map((item) => item.name)
 
   await settings.getByRole("tab", { name: "Providers", exact: true }).click()
+
   const section = settings.locator(".settings-section").filter({
     has: page.getByRole("heading", { name: "Popular providers", exact: true }),
   })
+
   await expect(section.locator(".settings-provider-name")).toHaveText(names)
 
   await settings.getByRole("button", { name: "Show more providers", exact: true }).click()

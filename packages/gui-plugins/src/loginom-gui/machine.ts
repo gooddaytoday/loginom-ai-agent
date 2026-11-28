@@ -10,9 +10,12 @@ import {
 import { Schema } from "effect"
 
 type Draft = { url: string; username: string; password: string; noPassword: boolean }
+
 type Form = { status: Status; draft: Draft }
+
 type State = { attempt: number } & (
-  | { type: "unavailable" | "loading" | "disposed" }
+  | { type: "unavailable" | "disposed" }
+  | { type: "loading"; until?: number }
   | (Form & { type: "editing"; issue?: Issue })
   | (Form & { type: "checking"; submit: "check" | "save" })
   | (Form & { type: "verified"; validation: Validation })
@@ -40,7 +43,10 @@ type Effect =
 type Transition = { state: State; effects: Effect[] }
 
 const applicationWait = 15_000
-const applicationPollDelay = 1_000
+
+const startupWait = 180_000
+
+const statusPollDelay = 1_000
 
 export const initial: State = { type: "unavailable", attempt: 0 }
 
@@ -68,18 +74,25 @@ function draftCandidate(current: Form): Candidate | { issue: Issue } {
   const { status, draft } = current
   const url = draft.url.trim()
   const username = draft.username.trim()
+
   if (!Schema.is(Address)(url)) return { issue: "invalidAddress" }
+
   if (!username) return { issue: "invalidUsername" }
   const identity = { revision: status.revision, url, username }
+
   if (draft.noPassword) return { ...identity, password: { operation: "empty" } }
+
   if (draft.password) return { ...identity, password: { operation: "replace", value: draft.password } }
+
   if (preservesPassword(current)) return { ...identity, password: { operation: "preserve" } }
+
   return { issue: "passwordRequired" }
 }
 
 export function transition(state: State, event: Event): Transition {
   const attempt = state.attempt + 1
   const keep = { state, effects: [] }
+
   if (state.type === "disposed") return keep
 
   function save(current: Form, validationId: string) {
@@ -98,7 +111,9 @@ export function transition(state: State, event: Event): Transition {
         : { state: { type: "unavailable", attempt }, effects: [{ type: "cancel" }] }
     case "refresh":
       if (state.type === "unavailable") return transition(state, { type: "target", available: true })
+
       if (state.type !== "editing") return keep
+
       return refresh(state, attempt)
     case "application":
       if (state.type !== "applying" && state.type !== "editing") return keep
@@ -115,40 +130,55 @@ export function transition(state: State, event: Event): Transition {
     case "edit": {
       if (!("draft" in state) || state.type === "saving") return keep
       const draft = { ...state.draft, ...event.patch }
+
       if (draft.noPassword) draft.password = ""
+
       if (state.type === "applying") return { state: { ...state, draft, edited: true }, effects: [] }
+
       if (state.type === "refreshing") return { state: { ...state, draft, edited: true }, effects: [] }
+
       return {
         state: { type: "editing", attempt, draft, status: state.status },
         effects: state.type === "checking" ? [{ type: "cancel" }] : [],
       }
     }
+
     case "submit": {
       if (state.type !== "editing" && state.type !== "verified") return keep
+
       if (event.submit === "save" && state.type === "verified" && event.now < state.validation.expiresAt)
         return save(state, state.validation.validationId)
       const candidate = draftCandidate(state)
+
       if ("issue" in candidate) return failed(state, candidate.issue)
+
       return {
         state: { type: "checking", attempt, draft: state.draft, status: state.status, submit: event.submit },
         effects: [{ type: "check", attempt, input: candidate }],
       }
     }
+
     case "checked":
       if (state.type !== "checking" || event.attempt !== state.attempt) return keep
+
       if (event.result.ok) {
         const validation = event.result.value
+
         if (state.submit === "save") return save(state, validation.validationId)
+
         return {
           state: { type: "verified", attempt, draft: state.draft, status: state.status, validation },
           effects: [],
         }
       }
+
       return failed(state, event.result.issue)
     case "saved":
     case "status": {
       if (event.attempt !== state.attempt) return keep
+
       if (event.type === "saved" && state.type !== "saving") return keep
+
       if (
         event.type === "status" &&
         state.type !== "loading" &&
@@ -156,21 +186,49 @@ export function transition(state: State, event: Event): Transition {
         state.type !== "refreshing"
       )
         return keep
-      if (!event.result.ok) {
-        if (state.type === "saving" && event.result.issue === "saveFailed") return refresh(state, attempt, "saveFailed")
+      const reply = event.result
+      const hostStarting = "state" in reply
+      const result = hostStarting ? ({ ok: false, issue: "unavailable" } as const) : reply
+
+      if (
+        state.type === "loading" &&
+        (hostStarting || (result.ok && result.value.state === "starting" && !result.value.failed))
+      ) {
+        const until = state.until ?? event.now + startupWait
+        const timeout = until - event.now - statusPollDelay
+
+        if (timeout <= 0) return { state: { type: "unavailable", attempt }, effects: [] }
+
+        return {
+          state: { type: "loading", attempt, until },
+          effects: [{ type: "status", attempt, delay: statusPollDelay, timeout }],
+        }
+      }
+
+      if (!result.ok) {
+        if (state.type === "saving" && result.issue === "saveFailed") return refresh(state, attempt, "saveFailed")
+
         if (state.type === "loading") return { state: { type: "unavailable", attempt }, effects: [] }
+
         if (state.type === "applying")
-          return pollApplication({ ...state, attempt }, event.now, event.result.issue)
+          return pollApplication({ ...state, attempt }, event.now, result.issue)
+
         if ("draft" in state)
-          return failed(state, state.type === "refreshing" ? (state.issue ?? event.result.issue) : event.result.issue)
+          return failed(state, state.type === "refreshing" ? (state.issue ?? result.issue) : result.issue)
+
         return keep
       }
-      const status = event.result.value
+
+      const status = result.value
+
       const recovered =
         state.type === "refreshing" && state.issue === "saveFailed" && state.status.revision !== status.revision
+
       const edited =
         (state.type === "applying" && state.edited) || (state.type === "refreshing" && (state.edited || !recovered))
+
       const draft = "draft" in state && edited ? state.draft : form(status).draft
+
       if (waiting(status)) {
         const pendingDraft =
           state.type === "saving" || (recovered && !edited) ? { ...state.draft, password: "" } : draft
@@ -180,9 +238,12 @@ export function transition(state: State, event: Event): Transition {
           state.type === "applying" && !waitingTasks(state.status) && !waitingTasks(status)
             ? state.until
             : event.now + applicationWait
+
         return pollApplication({ type: "applying", attempt, status, draft: pendingDraft, until, edited }, event.now)
       }
+
       const issue = state.type === "refreshing" && !recovered ? state.issue : undefined
+
       return { state: { type: "editing", attempt, status, draft, issue }, effects: [] }
     }
   }
@@ -190,9 +251,11 @@ export function transition(state: State, event: Event): Transition {
 
 function pollApplication(state: Extract<State, { type: "applying" }>, now: number, issue?: Issue): Transition {
   const { attempt, status, draft, until } = state
-  const timeout = until - now - applicationPollDelay
+  const timeout = until - now - statusPollDelay
+
   if (timeout <= 0) return { state: { type: "editing", attempt, status, draft, issue }, effects: [] }
-  return { state, effects: [{ type: "status", attempt, delay: applicationPollDelay, timeout }] }
+
+  return { state, effects: [{ type: "status", attempt, delay: statusPollDelay, timeout }] }
 }
 
 function waitingTasks(status: Status) {
@@ -215,10 +278,17 @@ function failed(state: Form & { attempt: number }, issue: Issue): Transition {
 
 function message(state: State) {
   if (state.type === "disposed") return
-  if (state.type === "loading" || state.type === "refreshing") return "loading"
+
+  if (state.type === "loading") return state.until === undefined ? "loading" : "serviceStarting"
+
+  if (state.type === "refreshing") return "loading"
+
   if (state.type === "unavailable") return "serviceUnavailable"
+
   if (state.type === "verified") return "verified"
+
   if (!("status" in state)) return
+
   if (state.status.failed) return "activationFailed"
 
   if (state.status.state === "ready" && state.status.application?.state === "applied") return "applied"
@@ -227,12 +297,14 @@ function message(state: State) {
     return state.status.state === "pending" && !state.status.application ? "pending" : "starting"
 
   if (waiting(state.status)) return "applicationPaused"
+
   if (state.status.state !== "ready") return "disconnected"
 }
 
 export function view(state: State) {
   const form = "draft" in state ? state : undefined
   const issue = state.type === "editing" ? state.issue : undefined
+
   return {
     draft: form?.draft,
     connected: form?.status.state === "ready" && !form.status.failed ? form.status : undefined,

@@ -1,6 +1,42 @@
 import { expect, test } from "bun:test"
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { ConnectionSettingsRpc, type Candidate, type Issue } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { connectionSettings } from "../src/connection-settings"
+import { ServiceHost, type Connection } from "../src/host"
+
+test("the settings RPC answers while the Host handshake is pending", async () => {
+  const data = await mkdtemp(join(tmpdir(), "settings-handshake-"))
+  const handshake = Promise.withResolvers<Connection>()
+  const connection: Connection = {
+    port: { postMessage() {}, on() {}, start() {} },
+    close: async () => {},
+    request: async () => ({
+      revision: 1,
+      generation: 1,
+      url: "https://loginom.example/app/",
+      username: "analyst",
+      folder: "/analyst",
+      hasPassword: true,
+      state: "ready",
+    }),
+  }
+  await ServiceHost.start({ data, connect: () => handshake.promise })
+  try {
+    const settings = connectionSettings()
+    const status = await Promise.race([settings.status(), Bun.sleep(300).then(() => "waiting for handshake")])
+    expect(status).toEqual({ ok: true, state: "starting" })
+
+    handshake.resolve(connection)
+    await handshake.promise
+    expect(await settings.status()).toMatchObject({ ok: true, value: { state: "ready", username: "analyst" } })
+  } finally {
+    handshake.resolve(connection)
+    await ServiceHost.close()
+    await rm(data, { recursive: true, force: true })
+  }
+})
 
 test("the settings RPC emits only the display status, even for a migrated address", async () => {
   const settings = connectionSettings(async () => ({
