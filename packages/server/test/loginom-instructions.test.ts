@@ -104,8 +104,11 @@ it.live(
           expect(system).toContain(projectText)
           expect(instructions).toContain(projectText)
           if (expected) {
-            expect(system).toContain(expected)
-            expect(instructions).toContain(expected)
+            expect(system?.includes(expected), `${kind}: profile text in the model system prompt`).toBe(true)
+            expect(
+              typeof instructions === "string" && instructions.includes(expected),
+              `${kind}: profile text in Claude Code instructions`,
+            ).toBe(true)
           } else {
             expect(system).not.toContain(profileText)
             expect(instructions).not.toContain(profileText)
@@ -123,10 +126,14 @@ it.live(
       expect(yield* rpc(profile, "save", { text: profileText })).toEqual({ output: { text: profileText } })
       expect(yield* rpc(project, "read")).toEqual({ output: { text: profileText } })
       const original = yield* create("Saved instructions")
-      expect(yield* entries(original.id)).toEqual({ data: [{ key: "loginom-profile", value: profileText }] })
       yield* sessions.prompt({ sessionID: original.id, text: "Test conversation" })
       yield* sessions.wait(original.id)
       yield* checkRequest(original.id, "primary", profileText)
+      expect(yield* entries(original.id)).toEqual({ data: [{ key: "loginom-profile", value: profileText }] })
+
+      const unprompted = yield* create("Generate before any prompt")
+      yield* sessions.generate({ sessionID: unprompted.id, prompt: "First request" })
+      yield* checkRequest(unprompted.id, "generate", profileText)
 
       yield* rpc(profile, "save", { text: "New defaults" })
       const newer = yield* create("New instructions")

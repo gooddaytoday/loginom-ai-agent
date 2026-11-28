@@ -31,6 +31,7 @@ test("profile instructions retain an unsaved draft after a failed save and enfor
   const draft = "Новые инструкции"
   const serviceDirectory = "/service"
   let saved = "Исходные инструкции"
+  let rejectRead = true
   let reject = true
   await mockWorkspace(page, {
     name: "Profile instructions",
@@ -40,7 +41,7 @@ test("profile instructions retain an unsaved draft after a failed save and enfor
     onRpc: ({ rpcID, method, body, directory }) => {
       if (rpcID !== "loginom.instructions") return
       expect(directory).toBe(serviceDirectory)
-      if (method === "read") return { output: { text: saved } }
+      if (method === "read") return rejectRead ? { unavailable: true } : { output: { text: saved } }
       if (method !== "save") return
       expect(body).toEqual({ input: { text: draft } })
       if (reject) return { unavailable: true }
@@ -48,9 +49,18 @@ test("profile instructions retain an unsaved draft after a failed save and enfor
       return { output: { text: saved } }
     },
   })
+  const loading = await holdRoute(page, (url) => url.pathname === "/api/rpc/loginom.instructions/read", { method: "POST" })
   await page.goto("/settings")
   const settings = page.getByTestId("settings-screen")
   await settings.getByRole("tab", { name: "Инструкции", exact: true }).click()
+  try {
+    await expect(settings.getByRole("status", { name: "", exact: true }).filter({ hasText: "Загружаем инструкции…" })).toBeVisible()
+  } finally {
+    loading.release()
+  }
+  await expect(settings.getByRole("alert").filter({ hasText: "Не удалось загрузить инструкции." })).toBeVisible()
+  rejectRead = false
+  await settings.getByRole("button", { name: "Повторить", exact: true }).click()
   const text = settings.getByRole("textbox", { name: "Инструкции", exact: true })
   const save = settings.getByRole("button", { name: "Сохранить", exact: true })
   const unsaved = settings.getByText("Не сохранено", { exact: true })
