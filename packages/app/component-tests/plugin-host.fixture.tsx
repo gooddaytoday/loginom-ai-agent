@@ -22,7 +22,12 @@ import {
   type StoreOptions,
   type Workspaces,
 } from "@opencode/plugin/gui"
-import { deliverBuiltinDeepLink, type BuiltinLayout, type BuiltinLocale } from "@opencode/plugin/gui/builtin"
+import {
+  BuiltinProviderSetup,
+  deliverBuiltinDeepLink,
+  type BuiltinLayout,
+  type BuiltinLocale,
+} from "@opencode/plugin/gui/builtin"
 import {
   createComponent,
   createMemo,
@@ -78,6 +83,7 @@ export {
 } from "@opencode/plugin/gui"
 
 export { Schema }
+
 export { BuiltinSlot } from "@opencode/plugin/gui/builtin"
 
 type PluginHost = ReturnType<typeof usePluginHost>
@@ -239,6 +245,26 @@ export function mountPluginHost(input?: {
     status: (id = "fixture") => hosts[0]?.status(id),
     /** Contributions the host holds for a registry; readable after the host unmounts. */
     entries: (registry: string) => hosts[0]?.state.entries[registry]?.length ?? 0,
+  }
+}
+
+export async function canAddProviderSetup(builtin: boolean) {
+  const host = mountPluginHost(builtin ? { builtins: new Set(["fixture"]) } : undefined)
+  const registered = Promise.withResolvers<void>()
+
+  try {
+    host.load((ctx) => {
+      try {
+        ctx.add({ ...BuiltinProviderSetup }, { id: "fixture-setup", title: "Fixture setup", render: () => null })
+      } finally {
+        registered.resolve()
+      }
+    })
+    await registered.promise
+
+    return host.entries(BuiltinProviderSetup.id)
+  } finally {
+    host.unmount()
   }
 }
 
