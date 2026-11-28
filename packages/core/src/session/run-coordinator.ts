@@ -122,8 +122,8 @@ export const make = <Key, E, Reason = never>(options: {
     // A late wake starts a fresh execution for the remaining work. A queue-only wake
     // waits for success, including when it arrives during terminal settlement.
     const settle = (key: Key, execution: Execution<E, Reason>, exit: Exit.Exit<void, E>) => {
-      const pending = execution.pendingQueueWake && Exit.isSuccess(exit) ? "input" : execution.pendingWake
-      if (pending) start(key, false, pending)
+      const next = execution.pendingQueueWake && Exit.isSuccess(exit) ? "input" : execution.pendingWake
+      if (next) start(key, false, next)
       else executions.delete(key)
       Deferred.doneUnsafe(execution.done, exit)
     }

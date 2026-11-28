@@ -311,6 +311,20 @@ export type SessionInboxCancelOperation<E = never> = (
   input: SessionInboxCancelInput,
 ) => Effect.Effect<SessionInboxCancelOutput, E>
 
+export type SessionInboxEditInput = {
+  readonly sessionID: Session.ID
+  readonly inboxID: SessionMessage.ID
+  readonly text: string
+  readonly files?: ReadonlyArray<PromptInput.FileAttachment> | undefined
+  readonly agents?: ReadonlyArray<AgentAttachment> | undefined
+  readonly skills?: ReadonlyArray<PromptInput.SkillAttachment> | undefined
+  readonly metadata?: { readonly [x: string]: unknown } | undefined
+}
+export type SessionInboxEditOutput = void
+export type SessionInboxEditOperation<E = never> = (
+  input: SessionInboxEditInput,
+) => Effect.Effect<SessionInboxEditOutput, E>
+
 export type SessionInboxUpdateInput = {
   readonly sessionID: Session.ID
   readonly inboxID: SessionMessage.ID
@@ -435,6 +449,7 @@ export interface SessionApi<E = never> {
   readonly inbox: {
     readonly list: SessionInboxListOperation<E>
     readonly cancel: SessionInboxCancelOperation<E>
+    readonly edit: SessionInboxEditOperation<E>
     readonly update: SessionInboxUpdateOperation<E>
   }
   readonly generate: SessionGenerateOperation<E>

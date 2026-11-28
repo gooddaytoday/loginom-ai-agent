@@ -8,6 +8,7 @@ import { AIError, InvalidRequestError, LanguageModel, LLMClient } from "@opencod
 import { OpenAIChat } from "@opencode/ai/protocols/openai-chat"
 import { TestLLM } from "@opencode/ai/testing"
 import { Agent } from "@opencode/core/agent"
+import { Bus } from "@opencode/core/bus"
 import { Database } from "@opencode/core/database/database"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNodePlatform } from "@opencode/core/effect/app-node-platform"
@@ -21,6 +22,7 @@ import { Plugin } from "@opencode/core/plugin"
 import { Provider } from "@opencode/core/provider"
 import { AbsolutePath } from "@opencode/core/schema"
 import { Session } from "@opencode/core/session"
+import { SessionEvent } from "@opencode/core/session/event"
 import { SessionRestart } from "@opencode/core/session/execution/restart"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { Shell } from "@opencode/core/shell"
@@ -79,6 +81,7 @@ const world = Effect.gen(function* () {
     Layer.buildWithScope(
       AppNodeBuilder.build(
         LayerNode.group([
+          Bus.node,
           PersistentPty.node,
           Shell.daemonNode,
           Session.node,
@@ -120,6 +123,46 @@ const until = (check: () => boolean) =>
   Effect.gen(function* () {
     while (!check()) yield* Effect.sleep(5)
   })
+
+it.live("signals completion once after a prompt queued during an active turn", () =>
+  Effect.gen(function* () {
+    const { llm, project, server } = yield* world
+    const context = yield* server(yield* Scope.fork(yield* Effect.scope))
+    const sessions = Context.get(context, Session.Service)
+    const bus = Context.get(context, Bus.Service)
+    const { id: sessionID } = yield* sessions.create({
+      location: { directory: AbsolutePath.make(project) },
+      title: "Queued prompt completion",
+      agent: Agent.ID.make("build"),
+      model: Model.Ref.make({ id: Model.ID.make("restart"), providerID: Provider.ID.make("test") }),
+    })
+    const completions: string[] = []
+    yield* Effect.acquireRelease(
+      bus.listen((event) =>
+        event.type === SessionEvent.Execution.Succeeded.type && event.durable?.aggregateID === sessionID
+          ? Effect.sync(() => void completions.push(event.id))
+          : Effect.void,
+      ),
+      (unsubscribe) => unsubscribe,
+    )
+
+    const active = yield* llm.gate()
+    yield* sessions.prompt({ sessionID, text: "Active prompt" })
+    yield* active.started
+    yield* sessions.prompt({ sessionID, text: "Queued prompt", delivery: "queue" })
+    const queued = yield* llm.gate()
+    yield* active.release
+    yield* queued.started
+
+    expect(JSON.stringify((yield* llm.requests())[1]?.messages)).toContain("Queued prompt")
+    expect(completions).toEqual([])
+    yield* queued.release
+    yield* sessions.wait(sessionID)
+
+    expect(yield* llm.requests()).toHaveLength(2)
+    expect(completions).toHaveLength(1)
+  }),
+)
 
 describe("queued prompts across a graceful restart", () => {
   for (const recovery of ["manual", "fails", "succeeds"] as const)
