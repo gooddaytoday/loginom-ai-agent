@@ -10,6 +10,7 @@ import type definition from "./index"
 import { LoginomRepeatDock } from "./repeat-dock"
 import registerSchema from "./schema-renderer"
 import { registerStartScreen } from "./start-screen"
+import { registerSystemProxy } from "./system-proxy"
 
 const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
@@ -52,6 +53,8 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
   })
 
   if (!ctx.desktop) return
+
+  registerSystemProxy(ctx)
 
   const Dashboard = lazy(() => import("./dashboard"))
   const router = builtinContext(ctx).router

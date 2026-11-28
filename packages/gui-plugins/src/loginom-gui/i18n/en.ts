@@ -1,4 +1,12 @@
 export const dict = {
+  "proxy.title": "System proxy",
+  "proxy.description": "Use the operating system’s proxy. Restart the app to apply this to the background service.",
+  "proxy.timeout": "Detecting the system proxy timed out.",
+  "proxy.failed": "Could not detect the system proxy.",
+  "proxy.unreachable": "The system proxy is unreachable.",
+  "proxy.socks-only": "The background service cannot use a SOCKS-only system proxy.",
+  "proxy.unavailable": "The system proxy setting is unavailable.",
+  "proxy.writeFailed": "Could not save the system proxy setting.",
   startExamples: "Example tasks",
   startDismiss: "Hide example tasks",
   startProject: "Project: {{name}}",
