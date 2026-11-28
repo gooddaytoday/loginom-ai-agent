@@ -60,7 +60,7 @@ export function connectionSettings(request: Request = ServiceHost.connectionSett
       const startup = ServiceHost.connectionSettings.startup()
       if (startup === "starting") return { ok: true, state: "starting" }
       if (typeof startup === "object") return { ok: false, issue: "unavailable", reason: startup.reason }
-      return status("connection.status", {})
+      return status("connection.status", {}, "unavailable")
     },
     async check(candidate: Candidate, context: { signal: AbortSignal }) {
       try {

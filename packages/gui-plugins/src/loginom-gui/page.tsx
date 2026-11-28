@@ -78,11 +78,13 @@ export default function Page() {
       const options = directory ? { location: { directory }, signal } : undefined
 
       switch (effect.type) {
-        case "status":
         case "acknowledge": {
-          const response = options && (effect.type === "status"
-            ? rpc?.status({}, options)
-            : rpc?.acknowledgePendingNotice({ id: effect.id }, options))
+          const result = options && (await rpc?.acknowledgePendingNotice({ id: effect.id }, options).catch(() => undefined))
+          dispatch({ type: "status", attempt: effect.attempt, now: Date.now(), result })
+          break
+        }
+
+        case "status": {
           // A cold Location can answer the inventory before the product RPC is callable.
           const plugin =
             startup && options

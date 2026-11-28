@@ -78,7 +78,7 @@ export const ConnectionSettingsRpc = Rpc.define({
     save: { input: Schema.toStandardSchemaV1(Loginom.Save), output: Schema.toStandardSchemaV1(statusResult) },
     acknowledgePendingNotice: {
       input: Schema.toStandardSchemaV1(Loginom.AcknowledgePendingNotice),
-      output: result(Status),
+      output: Schema.toStandardSchemaV1(result(Status)),
     },
   },
   events: { applied: applicationEvent, failed: applicationEvent, ready: applicationEvent },

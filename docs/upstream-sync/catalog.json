@@ -214,7 +214,7 @@
         "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**"
       ],
       "notes": {
-        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events. C2.6: own-server ordering after reconnect and short-key warning. LAB-2308: automatic startup across plugin registration, Host handshake, one dropped status request, and catalog readiness.",
+        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events. C2.6: own-server ordering after reconnect and short-key warning. LAB-2308: automatic startup across plugin registration, Host handshake, one dropped status request, and catalog readiness. C5 (CON-08): Retry unavailable status RPCs, refresh on the restored connection's ready event, and acknowledge the failure notice from the form.",
         "packages/app/src/providers/connect/dialog.tsx": "C2.6: pass the reconnecting server event stream to built-in provider setup priority.",
         "packages/app/src/runtime/i18n/ru.ts": "C2.6 (В-90): Russian label for the remaining providers group."
       }

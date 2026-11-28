@@ -409,6 +409,7 @@ for (const width of [1280, 390]) {
     }
     const { push } = await mockWorkspace(page, {
       directory, name: "Loginom demo", provider: NO_PROVIDER,
+      plugins: [loginomProductPlugin],
       onRpc: ({ rpcID, method, body }) => {
         if (rpcID !== "loginom.connection") return
         if (method === "acknowledgePendingNotice") {
