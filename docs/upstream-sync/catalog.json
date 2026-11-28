@@ -204,6 +204,8 @@
         "packages/app/src/composer/machine.ts",
         "packages/app/src/composer/model.ts",
         "packages/app/src/composer/submit.ts",
+        "packages/app/src/providers/models/select-dialog.tsx",
+        "packages/app/src/runtime/server/current.tsx",
         "packages/app/src/runtime/server/runtime.tsx",
         "packages/app/src/runtime/i18n/en.ts",
         "packages/app/src/runtime/i18n/ru.ts",

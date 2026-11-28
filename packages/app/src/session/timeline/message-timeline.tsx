@@ -373,7 +373,7 @@ function MessageTimelineView(
       const canResumeSame = () => {
         const model = presentation().model
 
-        return !!model && freeModelLimits.resetAt(model) === undefined
+        return !!model && freeModelLimits.canSend(model)
       }
       const candidates = createMemo(() =>
         !canContinue()
@@ -383,7 +383,7 @@ function MessageTimelineView(
               if (
                 !models.visible({ modelID: model.id, providerID: model.providerID }) ||
                 sameModel(model, presentation().model) ||
-                freeModelLimits.resetAt(model) !== undefined
+                !freeModelLimits.canSend(model)
               )
                 return []
               return [{ model, name: item.name }]
@@ -405,7 +405,7 @@ function MessageTimelineView(
           resume={async (model) => {
             const id = sessionID()
 
-            if (!id || !canContinue() || freeModelLimits.resetAt(model) !== undefined) return
+            if (!id || !canContinue() || !freeModelLimits.canSend(model)) return
             const signal = AbortSignal.timeout(MODEL_STOP_ACTION_TIMEOUT_MS)
             await data.session.prompt({
               sessionID: id,

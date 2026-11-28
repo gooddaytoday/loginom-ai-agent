@@ -65,7 +65,12 @@ export function Composer(props: {
       <Show when={props.model.modelStatus}>
         {(status) => (
           <div role="status" class="flex flex-wrap items-center gap-2 text-sm text-v2-state-fg-warning">
-            {status()}
+            <span>{status().text}</span>
+            <Show when={status().retry && !props.readOnly}>
+              <Button size="small" variant="neutral" onClick={() => status().retry?.()}>
+                {language.t("session.modelStop.retryLimit")}
+              </Button>
+            </Show>
             <Button size="small" variant="neutral" onClick={() => command.trigger("model.choose")}>
               {language.t("session.modelStop.chooseAlternative")}
             </Button>

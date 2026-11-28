@@ -38,7 +38,7 @@ import { parseClientSlashCommand } from "./client-slash-command"
 
 export type ComposerModel = ComposerEditorModel & {
   readonly model: ComposerControls["model"]
-  readonly modelStatus?: string
+  readonly modelStatus?: { text: string; retry?: () => void }
 }
 
 const sendFailedTitle = {
@@ -294,16 +294,22 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
 
   const variants = createMemo(() => ["default", ...adapter.controls().model.selection.variant.list()])
 
-  const modelResetAt = () => {
+  const selectedModel = () => {
     const key = adapter.controls().model.selection.key()
 
-    return key && server.ctx.freeModelLimits.resetAt({ id: key.modelID, providerID: key.providerID })
+    return key && { id: key.modelID, providerID: key.providerID }
   }
+
+  const { freeModelLimits } = server.ctx
 
   const submission = createComposerSubmit({
     adapter,
     mode,
-    modelLimited: () => modelResetAt() !== undefined,
+    modelLimited: () => {
+      const model = selectedModel()
+
+      return !!model && !freeModelLimits.canSend(model)
+    },
     commands: () => data.location.command.list({ directory: sdk().directory }),
     editor: () => editor,
     queueScroll: () => requestAnimationFrame(() => editor?.scrollIntoView({ block: "nearest" })),
@@ -586,12 +592,23 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     model: { get: () => adapter.controls().model },
     modelStatus: {
       get: () => {
-        const reset = modelResetAt()
+        const model = selectedModel()
+        const limit = model && freeModelLimits.limit(model)
 
-        if (reset === undefined) return
-        const time = new Intl.DateTimeFormat(language.locale(), { timeStyle: "short" }).format(reset)
+        if (!limit) return
 
-        return language.t("session.modelStop.limitLabel", { time })
+        if (limit.resetAt === null)
+          return {
+            text: language.t("session.modelStop.limitUnknown"),
+            retry: () => {
+              const current = selectedModel()
+
+              if (mode() === "normal" && current && freeModelLimits.allowRetry(current)) controller.submit()
+            },
+          }
+        const time = new Intl.DateTimeFormat(language.locale(), { timeStyle: "short" }).format(limit.resetAt)
+
+        return { text: language.t("session.modelStop.limitLabel", { time }) }
       },
     },
   })

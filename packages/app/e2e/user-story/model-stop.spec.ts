@@ -234,21 +234,94 @@ test("blocks both sends after a model hits its daily limit in an unopened conver
   await expect(view.editor).toHaveText(draft)
   expect(prompts).toEqual([])
 
+  await page.reload()
+  await expect(warning).toBeVisible()
+  await view.editor.fill(draft)
+  await view.editor.press("Enter")
+  await expect(view.editor).toHaveText(draft)
+  expect(prompts).toEqual([])
+
   const changeModel = warning.getByRole("button", { name: "Сменить модель", exact: true })
   await changeModel.click()
-  await expect(page.getByRole("dialog")).toBeVisible()
+  const dialog = page.getByRole("dialog")
+  const limitedModel = dialog.locator('[data-option-key="opencode:free-test"]')
+  await expect(limitedModel.getByText("лимит до 03:00", { exact: true })).toBeVisible()
+  await expect(dialog.locator('[data-option-key="opencode:second-test"]')).not.toContainText("лимит")
+  await page.screenshot({ path: testInfo.outputPath("composer-model-limit-picker-desktop.png") })
   await page.keyboard.press("Escape")
-  await expect(page.getByRole("dialog")).toHaveCount(0)
-  await page.screenshot({ path: testInfo.outputPath("composer-model-limit-desktop.png") })
+  await expect(dialog).toHaveCount(0)
   await page.setViewportSize(narrowViewport)
   await expect(changeModel).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath("composer-model-limit-390.png") })
+  await page.locator('[data-action="composer-model"]').click()
+  await expect(limitedModel.getByText("лимит до 03:00", { exact: true })).toBeInViewport({ ratio: 1 })
+  await page.screenshot({ path: testInfo.outputPath("composer-model-limit-picker-390.png"), animations: "disabled" })
 
   await page.clock.fastForward(3_600_000)
+  await expect(limitedModel.getByText("лимит до 03:00", { exact: true })).toHaveCount(0)
+  await page.keyboard.press("Escape")
+  await expect(dialog).toHaveCount(0)
   await expect(warning).toHaveCount(0)
   await view.editor.press("Enter")
   await expect.poll(() => prompts).toEqual([{ sessionID, text: draft }])
   await expect(view.editor).toHaveText("")
+})
+
+test("holds a daily limit without a reset time until an explicit retry", async ({ page }, testInfo) => {
+  await page.setViewportSize(narrowViewport)
+  const messages = history("provider.free-limit", Date.now(), { retryAfterMs: undefined })
+  const prompts: unknown[] = []
+
+  const { editor } = await openSession(page, {
+    name: "Дневной лимит без времени сброса",
+    sessions: [{ id: sessionID, title: "Чтение таблицы", model, outcome: "failed" }],
+    provider: provider({ id: model.id, name: "Бесплатная модель" }, { id: "second-test", name: "Вторая модель" }),
+    pageMessages: (_id, limit, _before, type) => ({
+      items: messages.filter((message) => !type || message.type === type).slice(-limit),
+    }),
+    onPrompt: ({ body }) => void prompts.push(body.text),
+  })
+
+  const warning = page.getByRole("status").filter({
+    has: page.getByText("Дневной лимит исчерпан", { exact: true }),
+  })
+
+  const retry = warning.getByRole("button", { name: "Попробовать снова", exact: true })
+  await expect(retry).toBeVisible()
+  const draft = "Проверь числа в таблице"
+  await editor.fill(draft)
+  await editor.press("Enter")
+  await expect(editor).toHaveText(draft)
+  expect(prompts).toEqual([])
+  await page.screenshot({ path: testInfo.outputPath("composer-model-limit-unknown-390.png") })
+
+  const modelChip = page.locator('[data-action="composer-model"]')
+  await modelChip.click()
+  const dialog = page.getByRole("dialog")
+  const limitedModel = dialog.locator('[data-option-key="opencode:free-test"]')
+  await expect(limitedModel.getByText("лимит исчерпан", { exact: true })).toBeInViewport()
+  await dialog.getByRole("button", { name: /Вторая модель/ }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(modelChip).toContainText("Вторая модель")
+  await expect(warning).toHaveCount(0)
+  await expect(editor).toHaveText(draft)
+
+  await modelChip.click()
+  await expect(limitedModel.getByText("лимит исчерпан", { exact: true })).toBeInViewport()
+  await limitedModel.click()
+  await expect(dialog).toHaveCount(0)
+  await retry.click()
+  await expect.poll(() => prompts).toEqual([draft])
+  await expect(editor).toHaveText("")
+
+  // The backend still returns the old failure in history after the explicit retry.
+  await page.reload()
+  await expect(page.getByText("Ход остановлен: дневной лимит исчерпан", { exact: true })).toBeVisible()
+  await expect(retry).toHaveCount(0)
+  const next = "Подготовь сводку"
+  await editor.fill(next)
+  await editor.press("Enter")
+  await expect.poll(() => prompts).toEqual([draft, next])
 })
 
 for (const action of ["provider.use", "integration.connect"] as const) {

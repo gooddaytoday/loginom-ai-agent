@@ -237,14 +237,14 @@ function createServerController(
     remove: (sessionID) => sdk.api.session.remove({ sessionID }),
   })
 
-  const freeModelLimits = createFreeModelLimits()
+  const freeModelLimits = createFreeModelLimits(scope)
   onCleanup(
     sdk.event.on("session.step.failed", ({ created, data: { error, sessionID, assistantMessageID } }) => {
       if (error.type !== "provider.free-limit") return
       const message = data.session.message.get(sessionID, assistantMessageID)
 
       if (message?.type === "assistant") {
-        freeModelLimits.remember(message.model, created, error.retryAfterMs)
+        freeModelLimits.remember(message, created, error.retryAfterMs)
 
         return
       }
@@ -253,7 +253,7 @@ function createServerController(
       void sdk.api.session.message
         .get({ sessionID, messageID: assistantMessageID }, { signal: AbortSignal.timeout(10_000) })
         .then((message) => {
-          if (message.type === "assistant") freeModelLimits.remember(message.model, created, error.retryAfterMs)
+          if (message.type === "assistant") freeModelLimits.remember(message, created, error.retryAfterMs)
         })
         .catch(() => undefined)
     }),
