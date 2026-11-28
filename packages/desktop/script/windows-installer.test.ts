@@ -55,8 +55,8 @@ LangString appRunning \${LANG_ENGLISH} "running"
 LangString appClosing \${LANG_ENGLISH} "closing"
 LangString appCannotBeClosed \${LANG_ENGLISH} "cannot close"
 !define APP_EXECUTABLE_FILENAME "OpenCode.exe"
-!define APP_ID "ai.opencode.desktop"
-!define APP_FILENAME "@opencodedesktop"
+!define APP_ID "com.loginom.aiagent"
+!define APP_FILENAME "@loginom-ai-agentdesktop"
 !define UNINSTALL_FILENAME "Uninstall OpenCode.exe"
 !define UNINSTALL_REGISTRY_KEY "${uninstallKey}"
 !define SHORTCUT_NAME "OpenCode Installer Test"
@@ -216,15 +216,23 @@ windows(
 const directoryCases = [
   {
     name: "a first install uses the app ID",
-    from: "@opencodedesktop",
+    from: "@loginom-ai-agentdesktop",
     shared: [],
-    expected: "ai.opencode.desktop",
+    expected: "com.loginom.aiagent",
     left: undefined,
     uninstallKept: true,
   },
   {
+    name: "a first install leaves a different channel in the 0.4 directory alone",
+    from: "@loginom-ai-agentdesktop",
+    shared: ["OpenCode Beta.exe", "Uninstall OpenCode Beta.exe", "resources/app.asar"],
+    expected: "com.loginom.aiagent",
+    left: ["OpenCode Beta.exe", "Uninstall OpenCode Beta.exe", "resources/app.asar"],
+    uninstallKept: true,
+  },
+  {
     name: "leaving the shared directory keeps the other channels",
-    from: "@opencodedesktop",
+    from: "@loginom-ai-agentdesktop",
     shared: [
       "OpenCode.exe",
       "Uninstall OpenCode.exe",
@@ -232,15 +240,15 @@ const directoryCases = [
       "Uninstall OpenCode Beta.exe",
       "resources/app.asar",
     ],
-    expected: "ai.opencode.desktop",
+    expected: "com.loginom.aiagent",
     left: ["OpenCode Beta.exe", "Uninstall OpenCode Beta.exe", "resources/app.asar"],
     uninstallKept: false,
   },
   {
     name: "the last channel removes the shared directory",
-    from: "@opencodedesktop",
+    from: "@loginom-ai-agentdesktop",
     shared: ["OpenCode.exe", "Uninstall OpenCode.exe", "resources/app.asar"],
-    expected: "ai.opencode.desktop",
+    expected: "com.loginom.aiagent",
     left: undefined,
     uninstallKept: false,
   },
