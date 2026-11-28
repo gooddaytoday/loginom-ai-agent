@@ -1,7 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join,win32} from 'node:path';
 import {createNodeProcedure} from '../lib/node-procedure.mjs';
 import {applyNode} from '../lib/node-apply.mjs';
+import {createExecutionJournal} from '../lib/execution-journal.mjs';
+import {nodeResultReply} from '../lib/node-result-reply.mjs';
+import {loginomFeedMetadata} from '../lib/user-results.mjs';
+import {withLoginomMetadata} from '../lib/loginom-feed-metadata.mjs';
+import {createRedactor} from '../lib/redact.mjs';
 
 // l667lin-diag:661–737: successful native Train, then a toast outside
 // the toolbar root for every sample. DOM template: manual train-toast.json.
@@ -9,7 +17,7 @@ const defaultMessage='Количество строк (2) в обучающем 
 function replay(fault,verb='train',options={}) {
  const message=options.message??defaultMessage;
  let clock=1,launched=false,closed=false;const records=[],actions=[],nativeReads=[];
- const node={document_id:'doc',workflow_id:'wf',node_id:'node'};
+ const node={document_id:'doc',workflow_id:'wf',node_id:options.nodeId??'node'};
  const workflow={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
  const context={...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;Прогноз_Y',locked:false};
  const terminal={verified:true,state:'failed',source:'native_progress_record',terminal:true,can_cancel:false};
@@ -17,7 +25,8 @@ function replay(fault,verb='train',options={}) {
   {process_id:'1',record_id:'old',parent_id:null,state:'completed',error:false},
   {process_id:'2',record_id:'new',parent_id:null,state:'pending_or_failed',error:true,error_details:message,children_loaded:true,progress_state:terminal},
   {process_id:'2.1',record_id:'child',parent_id:'2',state:'pending_or_failed',error:true,error_details:message,caption:'Прогноз Y',progress_state:terminal,
-   owner:{verified:true,node_id:fault==='owner'?'other':'node',source:'native_process_model_identity'}}]};
+   owner:{verified:true,node_id:fault==='owner'?'other':node.node_id,source:'native_process_model_identity'}}]};
+ if(options.omitted)processes.processes[2].error_details_omitted=true;
  if(fault==='stale')processes.processes=processes.processes.slice(0,1);
  // l667diag4:731–840: both old roots remain; Train validation creates no process.
  if(options.preProcess)processes.processes=[
@@ -31,10 +40,10 @@ function replay(fault,verb='train',options={}) {
   prepared_node_context:context,wizard:{status:'absent'},ui:{masks:options.loadingRace&&launched&&clock<(options.loadingUntil??401)?[{ref:'graph-mask',kind:clock<(options.toastAt??0)?'busy':'modal_background',target_tid:'MF;TF-1;ModelForm',dialog_ref:null,graph_loading_owner_ref:'graph'}]:[],dialogs:launched&&clock>=(options.toastAt??0)&&!closed&&!(options.autoExpire&&clock>=(options.toastUntil??(options.loadingRace?601:201)))?[{ref:'ui-toast',identity:{anchor_tid:'toast',path:[]},title:'Ошибка',text:'[outside selected root]'}]:[],
    truncated:{dialogs:false,masks:false},elements:[{ref:'ui-launch',tid:'mn;mniTeachNode',label:'Обучить узел',allowed_actions:[verb==='train'?'click':verb]},
     {ref:'ui-progress',tid:'MF;cntMain;tlbMainToolbar;btnProgress',signature:{tag:'a'},enabled:true,allowed_actions:['click']} ]}});
- const operation={id:'own',deadline:30000,action:{action_key:'node.apply',revision:'1'}};
+ const operation={id:'own',deadline:30000,action:{action_key:'node.apply',revision:'1'},nativeErrorRedactor:options.redactor};
  if(options.preProcess||options.exclusive!==undefined)operation.exclusiveNodeExecution=()=>options.exclusive!==false;
  const channel=createNodeProcedure({operation,settleReportedErrorToast:options.settleReportedErrorToast,preparedNodeContext:{document_id:'doc',workflow_ref:workflow,node},targetOrigin:'http://example.test',targetBuild:'7.4.2',
-  now:()=>clock,monotonicNow:()=>clock,wait:async ms=>{clock+=ms},record:async r=>{records.push(structuredClone(r));return structuredClone(r)},
+  now:()=>clock,monotonicNow:()=>clock,wait:async ms=>{clock+=ms},record:async r=>{records.push(structuredClone(r));return options.record?options.record(r):structuredClone(r)},
   wrapMutation:(code,reference)=>({code,reference}),execute:async code=>{
    if(typeof code==='string') {
     if(code.includes('async function readNodeProcesses(')){
@@ -57,7 +66,7 @@ function replay(fault,verb='train',options={}) {
    else {assert.equal(action.ref,'ui-close');closed=true;}
    return {status:'SUCCEEDED',action_key:'ui.act',operation_id:code.reference.id,cleanup_complete:true,effect_possible:true,output:state()};
   }});
- return {channel,actions,records,nativeReads,operation,get clock(){return clock},advance:ms=>{clock+=ms},async run(){
+ return {channel,actions,records,nativeReads,operation,node,get clock(){return clock},advance:ms=>{clock+=ms},async run(){
   await channel.observe({condition:'native launch available',readTraining:verb==='train',ready:()=>true});
   if(fault!=='no-baseline')await channel.bindExecutionBaseline?.({root_id:'root',node,roots:options.preProcess
    ?[{process_id:'1',record_id:'2858',completed:true},{process_id:'2',record_id:'3150',completed:true}]
@@ -110,6 +119,12 @@ test('a new group with unproved child cannot use the report-only fallback even w
  await assert.rejects(f.run(),e=>!e.nodeExecutionFailure);
  assert.deepEqual(f.actions.map(a=>a.ref),['ui-launch']);
  assert.ok(f.records.some(r=>r.report_failed_conditions?.includes('no_new_execution')));
+});
+test('the console placeholder cannot prove error-toast ownership, even if its text matches',async()=>{
+ const f=replay(undefined,'train',{message:'[сообщение слишком длинное]',omitted:true});
+ await assert.rejects(f.run(),error=>!error.nodeExecutionFailure);
+ assert.deepEqual(f.actions.map(action=>action.ref),['ui-launch']);
+ assert.ok(f.records.some(record=>record.failed_conditions?.includes('toast_message_matches')));
 });
 for(const fault of ['info','caption','text','owner','stale','root','running','no-baseline'])test('unproved toast retains the existing timeout and no dismissal: '+fault,async()=>{
  const f=replay(fault);await assert.rejects(f.run(),e=>!e.nodeExecutionFailure);assert.equal(f.actions.length,1);
@@ -216,16 +231,52 @@ for(const delayed of [false,true])test('JavaScript reported error closes its sti
  assert.equal(state.ui.dialogs.length,0);assert.equal(f.actions.filter(a=>a.ref==='ui-launch').length,1);
 });
 
-test('apply runtime releases a recorded JavaScript failure with a persistently visible toast',async()=>{
- const f=replay(undefined,'execute_graph_node',{preProcess:true,settleReportedErrorToast:true});
- const node={document_id:'doc',workflow_id:'wf',node_id:'node'},ok=async()=>({verified:true,cleanup_complete:true});
+async function applyToast(fixture,record=async entry=>entry,{unconfirmedCleanup=false}={}){
+ const {node}=fixture,ok=async()=>({verified:true,cleanup_complete:true});
  const request={operation_id:'own',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]},
   target:{kind:'new',type:'programming.javascript',position:{x:100,y:100}},inputs:[],mode:'script',parameters:{},mappings:[],finish:'execute',
   read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:1000,execute_ms:1000,total_ms:10000}};
- const drivers={verifySource:ok,prepareTarget:async()=>({...await ok(),node}),mapPorts:ok,openWizard:ok,finish:()=>f.run(),
-  releasePending:async()=>{await f.channel.observe({condition:'release recorded error',releaseWizard:true,settleWizard:{graph_only:true,node,deadline:10000},ready:s=>!s.ui.dialogs.length});
+ const drivers={verifySource:ok,prepareTarget:async()=>({...await ok(),node}),mapPorts:ok,openWizard:ok,finish:()=>fixture.run(),
+  releasePending:async()=>{if(unconfirmedCleanup)throw Error('Unknown cleanup');
+   await fixture.channel.observe({condition:'release recorded error',releaseWizard:true,settleWizard:{graph_only:true,node,deadline:10000},ready:state=>!state.ui.dialogs.length});
    return {verified:true,cleanup_complete:true,node_context:node,cleanup:{wizard_closed:false}};}};
- const result=await applyNode({request,operation:f.operation,drivers,handlers:new Map([['programming.javascript',{revision:'1',modes:['script'],validate:()=>{},configure:ok}]]),record:async e=>e,now:()=>1});
+ return applyNode({request,operation:fixture.operation,drivers,handlers:new Map([['programming.javascript',{revision:'1',modes:['script'],validate:()=>{},configure:ok}]]),record,now:()=>1});
+}
+
+function waitReply(result){
+ const tool='dock_node_wait';
+ const reply=nodeResultReply({operation_id:result.operation_id,state:'settled',outcome:{status:result.status,error:result.error,output:result}},
+  {userProfile:true,tool});
+ return withLoginomMetadata(reply,{receipt:loginomFeedMetadata(reply,{tool})});
+}
+
+test('apply runtime releases a recorded JavaScript failure with a persistently visible toast',async()=>{
+ const f=replay(undefined,'execute_graph_node',{preProcess:true,settleReportedErrorToast:true});
+ const result=await applyToast(f);
  assert.equal(result.status,'FAILED');assert.equal(result.error.code,'NODE_EXECUTION_FAILED');assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);assert.ok(result.next_step);
  assert.deepEqual(f.actions.map(a=>a.ref),['ui-launch','ui-close']);
+ assert.deepEqual(waitReply(result)._meta.loginom.error,
+  {code:'NODE_EXECUTION_FAILED',source:'loginom',attribution:'after_launch',message:defaultMessage});
+});
+
+test('an owned failed child yields a redacted native error and exact node identity even if cleanup is unconfirmed',async context=>{
+ const directory=await mkdtemp(join(tmpdir(),'loginom-toast-'));
+ context.after(()=>rm(directory,{recursive:true,force:true}));
+ const redactor=createRedactor(['fixture-known-value']),record=createExecutionJournal({directory,metadata:{},redactor});
+ const profile=join(directory,'Profile One','session.json'),windowsProfile=win32.join('C:\\','Users',"Fixture's Profile",'AppData','cache');
+ const fixture=replay(undefined,'execute_graph_node',{nodeId:'fc94c88b-6b37-451b-9d57-a9378122d8a3',redactor,record,
+  message:`Сбой: fixture-known-value; "${profile}"; "${windowsProfile}"; https://user:fixture-url-value@example.test/f/path-value?token=query-value; token=bare-value`});
+ const result=await applyToast(fixture,record,{unconfirmedCleanup:true});
+ assert.equal(result.status,'AMBIGUOUS');assert.equal(result.cleanup_complete,false);
+ const reply=waitReply(result),native=reply._meta?.loginom?.error;
+ assert.equal(reply._meta.loginom.v,1);
+ assert.equal(native?.attribution,'verified_node');assert.deepEqual(native.node,fixture.node);
+ assert.match(native.message,/^Сбой:.*\[путь скрыт\].*\[URL скрыт\]/);
+ assert.doesNotMatch(JSON.stringify(reply),/fixture-known-value|Profile One|Fixture's Profile|fixture-url-value|path-value|query-value|bare-value/);
+});
+
+test('an unowned native notification does not turn a routine runtime error into a Loginom failure',async()=>{
+ const fixture=replay('owner','execute_graph_node',{nodeId:'fc94c88b-6b37-451b-9d57-a9378122d8a3'});
+ const error=waitReply(await applyToast(fixture))._meta?.loginom?.error;
+ assert.equal(error?.source,'runtime');assert.equal(error.attribution,undefined);assert.equal(error.node,undefined);
 });

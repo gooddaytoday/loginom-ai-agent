@@ -1,13 +1,13 @@
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {javascriptContextReceiptSchema,javascriptContextReply} from '../../lib/javascript-context-read.mjs';
 import {createRedactor} from '../../lib/redact.mjs';
 import { createArtifactStore } from '../../lib/artifacts.mjs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, win32 } from 'node:path';
 import { Client as ProtocolClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import * as workspace from '../../lib/workspace.mjs';
@@ -37,7 +37,7 @@ test('MCP application refusals remain typed normal content and the same connecti
   const resources = await createBundledSkillFixture(t);
   const page = new Page(); let browserCalls = 0, preparationPath=[];
   const sourceCalls=[];
-  let browserPause, nodePause, actionRuntime, nodeHandlers;
+  let browserPause, nodePause, actionRuntime, nodeHandlers, recordExecution;
   const catalog = await createActionCatalogFixture();
   const compatibility = catalog.compatibility;
   const fault = process.env.LOGINOM_TEST_CATALOG_FAULT;
@@ -91,28 +91,31 @@ test('MCP application refusals remain typed normal content and the same connecti
   mock.module(new URL('../../lib/executor.mjs', import.meta.url).href, { namedExports: {
     executorTools,makeArtifactUploadCode,makeNativeOutputDownloadCode,makeArtifactDownloadCode,
     rebindNodeTargetLinkEpochs,readNodeTargetLinkValidation,makeCapabilityCode,withBrowserReceipt,parseCapabilityResult,
-    createActionRuntime: options => actionRuntime=createActionRuntime({...options,
-      nodeApplyHandlers:nodeHandlers=new Map(options.nodeApplyHandlers),
-      nodeApplyDriverFactory:input=>input.operation.id==='bridge-background'
-        ?Object.fromEntries(['verifySource','mapPorts','openWizard','finish','waitExecution','readOutput','verifyContinuation']
-          .map(name=>[name,()=>{throw Error('Unexpected background browser driver: '+name);}])):options.nodeApplyDriverFactory(input),
-      onRecord:async event=>{
-        const recorded=await options.onRecord(event);
-        if(nodePause&&event.operation_id==='bridge-background'&&event.phase==='prepared'){
-          const pause=nodePause;nodePause=null;pause.enter();await pause.wait;
-        }
-        return recorded;
-      },
-      nodeTargetAdapterFactory:()=>({observe:async request=>{
-        assert.equal(request.target.kind,'existing');assert.equal(request.target.type,'programming.javascript');
-        sourceCalls.push('graph');return {nodes:[{ref:request.target.ref,type:'programming.javascript'}],links:[]};
-      }}),
-      javascriptSourceAdapterFactory: () => ({active:false,uncertain:false,
-      async open({owner}) {sourceCalls.push('open');return {owner};},
-      async read(handle,{owner}) {assert.deepEqual(handle.owner,owner);sourceCalls.push('read');
-        return {owner,source:'const sample = "Привет 😀";\n',settings:{generation:true}};},
-      async discard(handle,{owner}) {assert.deepEqual(handle.owner,owner);sourceCalls.push('discard');
-        return {closed:true,owner};}})}),
+    createActionRuntime: options => {
+      recordExecution=options.onRecord;
+      return actionRuntime=createActionRuntime({...options,
+        nodeApplyHandlers:nodeHandlers=new Map(options.nodeApplyHandlers),
+        nodeApplyDriverFactory:input=>input.operation.id==='bridge-background'
+          ?Object.fromEntries(['verifySource','mapPorts','openWizard','finish','waitExecution','readOutput','verifyContinuation']
+            .map(name=>[name,()=>{throw Error('Unexpected background browser driver: '+name);}])):options.nodeApplyDriverFactory(input),
+        onRecord:async event=>{
+          const recorded=await options.onRecord(event);
+          if(nodePause&&event.operation_id==='bridge-background'&&event.phase==='prepared'){
+            const pause=nodePause;nodePause=null;pause.enter();await pause.wait;
+          }
+          return recorded;
+        },
+        nodeTargetAdapterFactory:()=>({observe:async request=>{
+          assert.equal(request.target.kind,'existing');assert.equal(request.target.type,'programming.javascript');
+          sourceCalls.push('graph');return {nodes:[{ref:request.target.ref,type:'programming.javascript'}],links:[]};
+        }}),
+        javascriptSourceAdapterFactory: () => ({active:false,uncertain:false,
+        async open({owner}) {sourceCalls.push('open');return {owner};},
+        async read(handle,{owner}) {assert.deepEqual(handle.owner,owner);sourceCalls.push('read');
+          return {owner,source:'const sample = "Привет 😀";\n',settings:{generation:true}};},
+        async discard(handle,{owner}) {assert.deepEqual(handle.owner,owner);sourceCalls.push('discard');
+          return {closed:true,owner};}})});
+    },
   } });
   const { createBridge } = await import('../../lib/bridge.mjs');
   const session = { directory, browserCli: '/unit/browser.mjs', browserConfig: '/unit/browser.json', browserRoot: '/unit/browser',
@@ -125,7 +128,9 @@ test('MCP application refusals remain typed normal content and the same connecti
     const sourcePath=join(directory,'private-source.csv');await writeFile(sourcePath,'abc');
     const admitted=await session.artifactStore.admit({sourcePath,name:'sales.csv',bytes:3,
       sha256:createHash('sha256').update('abc').digest('hex')});
-    const starting = createBridge(config, session, { startup: { onFailure: (error, detail) => diagnostics.push({ error, ...detail }) } });
+    const connectionValue='fixture-journal-connection-value',shortValue='~z';
+    const starting = createBridge(config, session, {knownSecrets:[connectionValue,shortValue],
+      startup: { onFailure: (error, detail) => diagnostics.push({ error, ...detail }) } });
     if (fault?.endsWith('-two') || fault?.includes('semantic')) {
       await assert.rejects(starting, /TLS EOF|invalid catalog/);
       assert.equal(failures, fault.endsWith('-two') ? 2 : 1);
@@ -134,6 +139,24 @@ test('MCP application refusals remain typed normal content and the same connecti
       return;
     }
     bridge = await starting;
+    const odbc='ODBC: PWD={sample-first;sample-second,sample-third}}sample-last};UID=reader';
+    const profile=`Файл «${win32.join('C:\\','Users','Example Name','input.csv')}» недоступен`;
+    await recordExecution({operation_id:'journal-native-error',phase:'node_execution_error_toast_observed',failure:{message:'Safe failure'},
+      native_processes:{processes:[{error_details:'Console: '+connectionValue+'; https://example.test/private-path'},
+        {error_details:'Short: '+shortValue},{error_details:odbc}]},
+      outcome:{output:{ui:{dialogs:[{error_toast:{kind:'error',message:`Toast: ${connectionValue}; ${odbc}; ${profile}`}}]}}}});
+    const journal=await readFile(join(directory,'execution-events.jsonl'),'utf8');
+    const evidence=journal.trim().split('\n').map(line=>JSON.parse(line)).find(event=>event.operation_id==='journal-native-error');
+    assert.ok(evidence,'the native observation must be durable');
+    assert.equal(evidence.failure.message,'Safe failure');
+    assert.equal(evidence.native_processes.processes[0].error_details,'Console: [redacted]; [URL скрыт]');
+    assert.equal(evidence.native_processes.processes[1].error_details,'[сообщение скрыто]');
+    assert.equal(evidence.native_processes.processes[2].error_details,'ODBC: [redacted];UID=reader');
+    assert.equal(evidence.outcome.output.ui.dialogs[0].error_toast.message,
+      'Toast: [redacted]; ODBC: [redacted];UID=reader; Файл «[путь скрыт]» недоступен');
+    assert.doesNotMatch(journal,/sample-(?:first|second|third|last)|Example Name/);
+    assert.ok(!journal.includes(connectionValue));
+    assert.ok(!journal.includes(shortValue));
     if (fault) { assert.equal(failures, 1); assert.equal(diagnostics.length, 1); assert.equal(diagnostics[0].retry, true); }
     for (const key of ['DISPLAY', 'XAUTHORITY', 'XDG_RUNTIME_DIR', 'WAYLAND_DISPLAY', 'XDG_SESSION_TYPE', 'XDG_CURRENT_DESKTOP']) {
       if (process.platform === 'linux' && process.env[key] && !process.env[key].startsWith('()'))

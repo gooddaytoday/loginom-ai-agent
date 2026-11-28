@@ -32,7 +32,7 @@ export function scriptedHost(
   const log: Request[] = []
   const send = (data: unknown) => listeners.forEach((listener) => listener({ data }))
 
-  const handle = (request: Request & { id: string }) => {
+  const handle = async (request: Request & { id: string }) => {
     log.push({ method: request.method, input: request.input })
     const reply = (result: unknown) => send({ id: request.id, result, generation: state.generation })
     const fail = (error: string) => send({ id: request.id, error })
@@ -104,9 +104,13 @@ export function scriptedHost(
     }
     if (request.method === "call") {
       if (input.name === "dock_prepare") run.prepared = true
-      return void Promise.resolve(
-        options.call?.(input) ?? { content: [{ type: "text", text: JSON.stringify({ called: input.name }) }] },
-      ).then(reply, (error: unknown) => fail(error instanceof Error ? error.message : String(error)))
+      try {
+        return reply(
+          (await options.call?.(input)) ?? { content: [{ type: "text", text: JSON.stringify({ called: input.name }) }] },
+        )
+      } catch (error) {
+        return fail(error instanceof Error ? error.message : String(error))
+      }
     }
     return fail("LOGINOM_HOST_REQUEST_FAILED")
   }

@@ -61,7 +61,9 @@ export async function readNodeProcesses(page,binding,readNode=readPreparedNodeCo
           }
         }
         const state=d.Status===3?'completed':'pending_or_failed';
-        const error=typeof d.ErrorDetails==='string'?d.ErrorDetails.trim().length>0:true;
+        const details=typeof d.ErrorDetails==='string'?d.ErrorDetails:null;
+        const error=details===null||details.trim().length>0;
+        const omitted=details!==null&&details.length>4096;
         // ProgressForm's cached ProgressBarCls is the source of the rendered
         // progress cell class. Do not guess other numeric enum ordinals.
         const states={ptpsNotStarted:'not_started',ptpsProcessing:'running',ptpsNotResponding:'not_responding',
@@ -76,7 +78,8 @@ export async function readNodeProcesses(page,binding,readNode=readPreparedNodeCo
         const progress_state=statusValid?{verified:true,state:detailed,terminal,can_cancel:d.CanCancelProcess,
           source:'native_progress_record'}:{verified:false};
         processes.push({process_id:id,record_id:record,parent_id:parent,state,error,
-          ...(error&&typeof d.ErrorDetails==='string'?{error_details:d.ErrorDetails.trim().slice(0,1000)}:{}),rendered,selected,process_tid:path,
+          ...(error&&details!==null?(omitted?{error_details:'[сообщение слишком длинное]',error_details_omitted:true}
+            :{error_details:details}):{}),rendered,selected,process_tid:path,
           expander_tid,expanded,children_loaded:d.loaded===true,caption:typeof d.text==='string'?d.text.slice(0,240):null,progress_state,
           ...(owner&&d.ModelNode===owner.data?{owner:{verified:true,node_id:nodeId,source:'native_process_model_identity'}}:{})});
         if(Array.isArray(n.childNodes)&&n.childNodes.length)walk(n.childNodes,id);
