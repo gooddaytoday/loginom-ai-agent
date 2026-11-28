@@ -1,19 +1,46 @@
-import { CodeBlock, Slot, Style, type MountedSession, type Plugin } from "@opencode/plugin/gui"
+import { CodeBlock, SettingsPage, Slot, Style, type MountedSession, type Plugin } from "@opencode/plugin/gui"
 import { Page, builtinContext } from "@opencode/plugin/gui/builtin"
 import { Button } from "@opencode/ui/button"
 import { createResource, createSignal, lazy, onCleanup, Show, Suspense, untrack } from "solid-js"
 import { PackageSchema, readFinding } from "./contract"
 import { copyText, readPackageCopy } from "./copy"
-import { transition, type Event, type Request, type State } from "./machine"
+import { transition, type Event, type Request, type State } from "./schema-machine"
 import type definition from "./index"
 import styles from "./schema.css?inline"
 import registerSteps from "./step"
 
 const pageID = "package-schema"
 
-const SchemaPage = lazy(() => import("./page"))
+const SchemaPage = lazy(() => import("./schema-page"))
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
+  const Catalog = lazy(() => import("./catalog-page"))
+  ctx.add(Page, {
+    id: "catalog",
+    nav: {},
+    get title() {
+      return ctx.t("catalog.title")
+    },
+    render: () => (
+      <Suspense>
+        <Catalog />
+      </Suspense>
+    ),
+  })
+  const ConnectionPage = lazy(() => import("./page"))
+  ctx.add(SettingsPage, {
+    id: "loginom",
+    icon: "arrow-up-right",
+    get title() {
+      return ctx.t("title")
+    },
+    render: () => (
+      <Suspense>
+        <ConnectionPage />
+      </Suspense>
+    ),
+  })
+
   ctx.add(Style, styles)
   const [state, setState] = createSignal<State>({ status: "closed" })
   const dispatch = (event: Event) => setState((current) => transition(current, event))

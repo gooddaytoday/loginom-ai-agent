@@ -70,7 +70,6 @@ export interface MockServerConfig {
   // Without it, writes answer 501 MockUnsupported.
   onFileWrite?: (input: { path: string; directory: string; body: string }) => void
   configEntries?: unknown[]
-  rpc?: (params: { rpcID: string; method: string }, payload: Schema.JsonValue) => Schema.JsonValue | undefined
   directory: string
   project: unknown
   // Replaces the `/api/project` inventory, which defaults to `[project]`. A location inside a listed project
@@ -102,6 +101,12 @@ export interface MockServerConfig {
   onMessage?: (input: { sessionID: string; messageID: string }) => void
   onRevertStage?: (input: { sessionID: string; messageID: string }) => void
   onSession?: (sessionID: string) => void
+  onRpc?: (request: {
+    rpcID: string
+    method: string
+    directory: string | null
+    body: unknown
+  }) => { output: unknown } | { unavailable: true } | undefined
   events?: () => OpenCodeEvent[]
   eventRetry?: number
   // Idle event streams send a comment every 15 s like the real server. Set false only to test the client's stall watchdog.
@@ -1223,15 +1228,20 @@ function mockHandlers(
         },
         // The goal plugin's pill reads each routed session's goal; no scenario sets one.
         rpcCall: (ctx) => {
-          const response = config.rpc?.(ctx.params, ctx.payload)
-
-          if (response !== undefined) return Effect.succeed(response)
-
-          if (ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get") return Effect.succeed({ output: null })
-
-          return Effect.fail(new MockUnsupported({
-            message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC`,
-          }))
+          const url = new URL(ctx.request.url, config.server ?? SERVER)
+          const response = config.onRpc?.({
+            ...ctx.params,
+            directory: url.searchParams.get("location[directory]"),
+            body: ctx.payload,
+          })
+          if (response && "unavailable" in response)
+            return Effect.fail(new MockServiceUnavailable({ message: "RPC unavailable" }))
+          if (response) return Effect.succeed(response)
+          if (ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get")
+            return Effect.succeed({ output: null })
+          return Effect.fail(
+            new MockUnsupported({ message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC` }),
+          )
         },
         sessionActive: () => {
           const status = resolve(config.sessionStatus ?? {})

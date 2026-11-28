@@ -151,9 +151,9 @@ export function openLoginomSchemaConversation(page: Page, source: "saved" | "win
     sessions: [{ id: sessionID, title: "Продажи" }],
     seed: { locale: "ru" },
     pageMessages: pageMessagesFrom({ [sessionID]: source === "saved" ? messages : messages.slice(0, 1) }),
-    rpc: (params, payload) => {
-      if (params.rpcID !== "loginom.package" || params.method !== "schema") return
-      const requested = JSON.stringify(payload)
+    onRpc: ({ rpcID, method, body }) => {
+      if (rpcID !== "loginom.package" || method !== "schema") return
+      const requested = JSON.stringify(body)
 
       if (requested === JSON.stringify({ input: { sessionID, source: "saved" } }))
         return { output: { snapshot: saved } }
@@ -234,12 +234,12 @@ export async function openLoginomNodeConversation(page: Page, options: NodeLinks
     sessions: [{ id: sessionID, title: "Продажи" }],
     seed: { locale: "ru", settings: { newTimeline: options.newTimeline ?? true } },
     pageMessages: pageMessagesFrom({ [sessionID]: messages }),
-    rpc: (params, payload) => {
-      if (JSON.stringify(payload) !== JSON.stringify({ input: { sessionID } })) return
+    onRpc: ({ rpcID, method, body }) => {
+      if (JSON.stringify(body) !== JSON.stringify({ input: { sessionID } })) return
 
-      if (params.rpcID === "loginom.package" && params.method === "schema") return { output: { snapshot } }
+      if (rpcID === "loginom.package" && method === "schema") return { output: { snapshot } }
 
-      if (params.rpcID === "loginom.package-state" && params.method === "snapshot") {
+      if (rpcID === "loginom.package-state" && method === "snapshot") {
         const dirty = packageState === "dirty"
         const draft = packageState === "draft"
         const path = draft ? null : `/analyst/Пакеты/${packageName()}`

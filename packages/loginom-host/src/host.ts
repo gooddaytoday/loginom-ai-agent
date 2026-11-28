@@ -374,6 +374,7 @@ export async function createLoginomHost(options: {
     signal?: AbortSignal,
     deadline?: number,
     validationHttpCache = false,
+    validationLogout = false,
   ) {
     const validation = purpose === "validation"
     const startupDeadline = deadline ?? Date.now() + (validation ? 210_000 : 120_000)
@@ -471,6 +472,7 @@ export async function createLoginomHost(options: {
         connection,
         validation,
         validationHttpCache: httpCache,
+        validationLogout,
         // CLI supplies its explicit browser policy for background launches too.
         headless: purpose === "chat" ? options.headless === true : (options.preflightHeadless ?? true),
         closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
@@ -497,7 +499,7 @@ export async function createLoginomHost(options: {
   const service = await connectionService(
     connectionStore(join(root, "connection"), options.codec),
     {
-      async check(connection, signal) {
+      async check(connection, signal, settings) {
         signal?.throwIfAborted()
         const chat = randomUUID()
         // An overlapping check keeps its independent fresh cache; no queue or new deadline.
@@ -529,7 +531,7 @@ export async function createLoginomHost(options: {
             await knowledge.close()
           }
           signal?.throwIfAborted()
-          const child = await launch(connection, chat, "validation", signal, undefined, httpCache).catch((error: unknown) => {
+          const child = await launch(connection, chat, "validation", signal, undefined, httpCache, settings).catch((error: unknown) => {
             if (error instanceof Error && Schema.is(Loginom.BrowserFailure)(error.message))
               return { state: "failed" as const, failure: error.message }
             throw error

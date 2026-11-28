@@ -979,6 +979,20 @@ export function createPluginAttachment(apis: HostApis) {
 
   const listedServer = (id: string) => servers.list.find((conn) => ServerConnection.key(conn) === id)
 
+  const pickProjectDraft = (server: ServerConnection.Any, title?: string, prompt?: string) =>
+    picker({
+      server,
+      title,
+      onSelect: (value) => {
+        const directory = Array.isArray(value) ? value[0] : value
+
+        if (!directory) return
+        const key = ServerConnection.key(server)
+        void global.serverCtx(key)?.projects.add(directory)
+        void tabs.newDraft({ server: key, directory }, prompt)
+      },
+    })
+
   const dispatchProject = (event: ProjectRequestEvent) => {
     const next = transitionProjectRequest(untrack(projectState), event)
 
@@ -994,20 +1008,7 @@ export function createPluginAttachment(apis: HostApis) {
       const server = untrack(() => listedServer(effect.server))
 
       if (!server) return
-      untrack(() =>
-        picker({
-          server,
-          title: effect.title,
-          onSelect: (value) => {
-            const directory = Array.isArray(value) ? value[0] : value
-
-            if (!directory) return
-            const key = ServerConnection.key(server)
-            void global.serverCtx(key)?.projects.add(directory)
-            void tabs.newDraft({ server: key, directory })
-          },
-        }),
-      )
+      untrack(() => pickProjectDraft(server, effect.title))
     })
   }
 
@@ -1179,9 +1180,24 @@ export function createPluginAttachment(apis: HostApis) {
     project: (server, title) =>
       dispatchProject({ type: "request", server, title, listed: !!untrack(() => listedServer(server)) }),
     draft: (input) => {
-      const server = servers.list.find((conn) => ServerConnection.key(conn) === input.server)
+      const selection = layout.home.selection()
 
-      if (server) void tabs.newDraft({ server: ServerConnection.key(server), directory: input.directory }, input.prompt)
+      const server = input.server
+        ? listedServer(input.server)
+        : ((selection.server && listedServer(selection.server)) || servers.visible[0])
+
+      if (!server) return
+      const key = ServerConnection.key(server)
+
+      const selected =
+        key === selection.server
+          ? global.serverCtx(key)?.projects.used().find((project) => project.worktree === selection.directory)
+          : undefined
+
+      const directory = input.directory ?? selected?.worktree
+
+      if (directory) return void tabs.newDraft({ server: key, directory }, input.prompt)
+      pickProjectDraft(server, undefined, input.prompt)
     },
     command: (id) => void run(id),
     openPage: (plugin, id) => navigate(`/page/${encodeURIComponent(plugin)}/${encodeURIComponent(id)}`),
