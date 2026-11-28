@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, untrack, type JSX } from "solid-js"
 import { useNavigate } from "@solidjs/router"
 import { ComposerAddItem } from "@opencode/plugin/gui/builtin"
 import { Contribution } from "@/runtime/plugin/render"
@@ -32,6 +32,10 @@ export function Composer(props: {
   borderUnderlay?: boolean
   readOnly?: boolean
   suggestionBoundary?: () => HTMLElement | undefined
+  suggestionViewport?: () => HTMLElement | undefined
+  addMenu?: { render: () => JSX.Element }
+  placeholder?: { render: () => JSX.Element }
+  toolbar?: JSX.Element
 }) {
   const dialog = useDialog()
   const command = useCommand()
@@ -109,6 +113,10 @@ export function Composer(props: {
         queueFirstLabel={language.t("session.queue.first")}
         exitShellKeybind={[formatKeybind("esc", language.t)]}
         suggestionBoundary={props.suggestionBoundary}
+        suggestionViewport={props.suggestionViewport}
+        addMenu={props.addMenu}
+        placeholder={props.placeholder}
+        toolbar={props.toolbar}
         modelControl={
           <ComposerModelControl
             loading={props.model.model.loading}

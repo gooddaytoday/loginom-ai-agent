@@ -1,15 +1,23 @@
 import { SettingsPage, type Plugin } from "@opencode/plugin/gui"
-import { ComposerAddItem, Page, type ComposerAddInput } from "@opencode/plugin/gui/builtin"
-import { createSignal, lazy, Show, Suspense, type Accessor, type Setter } from "solid-js"
-import { PackagePicker, type PackageAction, type PackageInput, type PackageSelection } from "./contract"
+import { builtinContext, ComposerAddItem, Page, subscribeBuiltinDeepLinks, type ComposerAddInput } from "@opencode/plugin/gui/builtin"
+import { dashboardLinkChannel } from "@loginom-ai-agent/product/dashboard-link"
+import { Option, Schema } from "effect"
+import { createSignal, lazy, onCleanup, Show, Suspense, type Accessor, type Setter } from "solid-js"
+import { unwrap } from "solid-js/store"
+import { DashboardLink, PackagePicker, type PackageAction, type PackageInput, type PackageSelection } from "./contract"
+import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
 import type definition from "./index"
 import { remember } from "./package-model"
+import { registerStartScreen } from "./start-screen"
+
+const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
 function packageInput(selection: PackageSelection): PackageInput {
   return selection.kind === "loginom" ? { kind: "loginom", package: selection.package } : selection
 }
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
+  registerStartScreen(ctx)
   const Settings = lazy(() => import("./page"))
   const Catalog = lazy(() => import("./catalog-page"))
   const Picker = lazy(() => import("./package-picker"))
@@ -180,6 +188,81 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       </Suspense>
     ),
   })
+
+  if (!ctx.desktop) return
+
+  const Dashboard = lazy(() => import("./dashboard"))
+  const router = builtinContext(ctx).router
+
+  const [store, setStore] = ctx.storage.memory<{ dashboard: DashboardState }>("dashboard", {
+    initial: { dashboard: { nextAttempt: 1 } },
+  })
+
+  const dashboard: DashboardStore = {
+    state: () => store.dashboard,
+    dispatch(event) {
+      const previous = unwrap(store.dashboard)
+      const next = transitionDashboard(previous, event)
+
+      if (next === previous) return
+
+      setStore((draft) => {
+        draft.dashboard = next
+      })
+
+      return next
+    },
+  }
+
+  ctx.add(Page, {
+    id: "dashboard",
+    get title() {
+      return ctx.t("dashboard")
+    },
+    render: () => (
+      <Suspense>
+        <Show
+          when={dashboard.state().current?.link}
+          keyed
+          fallback={
+            <p class="p-4" role="status">
+              {ctx.t("dashboardOpenStudio")}
+            </p>
+          }
+        >
+          {(link) => <Dashboard link={link} dashboard={dashboard} />}
+        </Show>
+      </Suspense>
+    ),
+  })
+
+  onCleanup(subscribeBuiltinDeepLinks(dashboardLinkChannel, (data) => {
+    const decoded = decodeLink(data)
+
+    if (Option.isNone(decoded)) return
+
+    const link = decoded.value
+
+    if ("code" in link) {
+      const issue =
+        link.code === "DASHBOARD_SNAPSHOT_UNAVAILABLE" || link.code === "DASHBOARD_SNAPSHOT_INVALID"
+          ? "dashboardSnapshotGone"
+          : link.code === "LOGINOM_CONFIG_REQUIRED"
+            ? "dashboardConnect"
+            : "dashboardOpenFailed"
+
+      if (router.path().split("?")[0] === `/page/${ctx.id}/dashboard`) {
+        if (dashboard.dispatch({ type: "link.failed", id: link.id, issue })) return
+      }
+
+      ctx.toast.show({ variant: "error", title: ctx.t(issue) })
+
+      return
+    }
+
+    dashboard.dispatch({ type: "link.opened", link })
+    router.openPage("dashboard")
+  }))
 }
 
 export default setup

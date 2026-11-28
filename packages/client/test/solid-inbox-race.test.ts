@@ -47,6 +47,60 @@ const enqueued: OpenCodeEvent = {
   },
 }
 
+const edited: OpenCodeEvent = {
+  id: "evt_edited",
+  type: "session.inbox.edited",
+  created: 2,
+  durable: { aggregateID: item.sessionID, seq: 2, version: 1 },
+  data: { sessionID: item.sessionID, inboxID: item.id, payload: { text: "Edited from another client" } },
+}
+
+const queued = { ...item, delivery: "queue" as const }
+const later = { ...queued, id: "msg_later", payload: { text: "Later prompt" } }
+
+test("an inbox edit updates the open queue and transcript in place", async () => {
+  const setup = fixture(async () => Response.json({ data: [queued, later] }))
+  try {
+    await setup.data.session.pending.sync(item.sessionID)
+    setup.emit(edited)
+
+    expect(setup.data.session.pending.list(item.sessionID)).toEqual([
+      { ...queued, payload: edited.data.payload },
+      later,
+    ])
+    expect(setup.data.session.message.get(item.sessionID, item.id)).toMatchObject({
+      text: edited.data.payload.text,
+      time: item.time,
+    })
+  } finally {
+    setup.dispose()
+  }
+})
+
+test("inbox hydration applies an edit and a delivery change to a row it has not seen", async () => {
+  const response = Promise.withResolvers<Response>()
+  const setup = fixture(() => response.promise)
+  try {
+    const reading = setup.data.session.pending.sync(item.sessionID)
+    setup.emit(edited)
+    setup.emit({
+      id: "evt_delivery_after_edit",
+      type: "session.inbox.delivery.changed",
+      created: 3,
+      durable: { aggregateID: item.sessionID, seq: 3, version: 1 },
+      data: { sessionID: item.sessionID, inboxID: item.id, delivery: "steer" },
+    })
+    response.resolve(Response.json({ data: [queued, later] }))
+    await reading
+
+    expect(setup.data.session.pending.list(item.sessionID)).toEqual([{ ...item, payload: edited.data.payload }, later])
+    expect(setup.data.session.message.get(item.sessionID, item.id)).toMatchObject({ text: edited.data.payload.text })
+  } finally {
+    response.resolve(Response.json({ data: [] }))
+    setup.dispose()
+  }
+})
+
 test.each(["delivered", "cancelled"] as const)(
   "a delayed inbox snapshot cannot resurrect a %s prompt",
   async (action) => {

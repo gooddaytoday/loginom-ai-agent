@@ -65,6 +65,8 @@ function issue(error: unknown, fallback: Issue): Issue {
       return "invalidUsername"
     case "LOGINOM_PASSWORD_REQUIRED":
       return "passwordRequired"
+    case "LOGINOM_KNOWLEDGE_AUTH_FAILED":
+      return "knowledgeAuthFailed"
     case "LOGINOM_LOGIN_REJECTED":
       return "credentialsRejected"
     case "LOGINOM_LOGOUT_UNCONFIRMED":

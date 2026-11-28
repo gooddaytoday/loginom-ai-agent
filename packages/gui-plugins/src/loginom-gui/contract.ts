@@ -1,4 +1,5 @@
-import { Contract } from "@opencode/plugin/gui"
+import { Contract, Ipc } from "@opencode/plugin/gui"
+import { Schema } from "effect"
 import type { Package } from "./package-model"
 
 export type PackageInput = { kind: "loginom"; package: Package } | { kind: "file"; file: File }
@@ -23,3 +24,27 @@ export const PackagePicker = Contract.define<
   },
   "loginom-gui.package-picker"
 >("loginom-gui.package-picker")
+
+export const DashboardTarget = Schema.Struct({
+  id: Schema.String,
+  directory: Schema.String,
+  nodeName: Schema.String,
+  action: Schema.Literals(["create", "edit"]),
+  notice: Schema.optional(Schema.Struct({ kind: Schema.String })),
+})
+
+export const DashboardLink = Schema.Union([Schema.Struct({ id: Schema.String, code: Schema.String }), DashboardTarget])
+
+export const DashboardPreview = Ipc.define({
+  id: "loginom-gui.dashboard",
+  methods: {
+    open: {
+      input: Schema.Struct({ url: Schema.String }),
+      output: Schema.Struct({ id: Schema.String }),
+    },
+    close: {
+      input: Schema.Struct({ id: Schema.String }),
+      output: Schema.Void,
+    },
+  },
+})
