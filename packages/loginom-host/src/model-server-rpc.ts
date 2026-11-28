@@ -52,5 +52,5 @@ export const ModelServerRpc = Rpc.define({
       output: output(Schema.Boolean),
     },
   },
-  events: {},
+  events: { catalogAvailabilityChanged: { schema: input(Schema.Struct({ available: Schema.Boolean })) } },
 })

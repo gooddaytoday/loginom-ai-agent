@@ -1,4 +1,18 @@
-import { Cause, Context, Deferred, Duration, Effect, Layer, Option, Result, Schedule, Schema, Semaphore } from "effect"
+import {
+  Cause,
+  Clock,
+  Context,
+  Duration,
+  Effect,
+  Layer,
+  Option,
+  PubSub,
+  Result,
+  Schedule,
+  Schema,
+  Semaphore,
+  Stream,
+} from "effect"
 import { HttpClient, HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/http"
 import { ConfigProvider } from "@opencode/schema/config/provider"
 import { MaxTokensField, MediaInput } from "@opencode/schema/model-compatibility"
@@ -477,6 +491,7 @@ export interface Interface {
   readonly get: () => Effect.Effect<readonly Snapshot[]>
   readonly refresh: (force?: boolean) => Effect.Effect<void>
   readonly remoteAvailable?: Effect.Effect<boolean>
+  readonly remoteAvailabilityChanges?: Stream.Stream<boolean>
 }
 
 export const Options = Schema.Struct({
@@ -562,12 +577,14 @@ export const layer = (options?: Options) =>
       const key = cacheKey(source)
       const metaKey = `${key}:meta`
       const ttl = Duration.minutes(5)
+      const availabilityTTL = Duration.toMillis(Duration.minutes(1))
       const lock = Semaphore.makeUnsafe(1)
-      const firstCheck = yield* Deferred.make<boolean>()
-      let available: boolean | undefined
+      const availabilityChanges = yield* PubSub.sliding<boolean>(1)
+      let checked: { available: boolean; at: number } | undefined
       const markAvailability = Effect.fnUntraced(function* (result: boolean) {
-        available = result
-        yield* Deferred.succeed(firstCheck, result)
+        const previous = checked?.available
+        checked = { available: result, at: yield* Clock.currentTimeMillis }
+        if (result !== previous) yield* PubSub.publish(availabilityChanges, result)
       })
       // The v1 catalog was cached under unversioned keys; free that multi-MB row.
       yield* kv.remove(key.replace("models-dev:v2:", "models-dev:"))
@@ -676,16 +693,19 @@ export const layer = (options?: Options) =>
 
       const get = (): Effect.Effect<readonly Snapshot[]> => cachedGet
 
-      const refresh = Effect.fn("ModelsDev.refresh")(function* (force = false) {
+      const refresh = Effect.fn("ModelsDev.refresh")(function* (force = false, checkAvailability = false) {
         yield* lock
           .withPermit(
             Effect.gen(function* () {
+              if (checkAvailability && checked && (yield* Clock.currentTimeMillis) - checked.at <= availabilityTTL)
+                return
               const stored = Option.getOrUndefined(
                 Schema.decodeUnknownOption(CacheMeta)((yield* kv.get(metaKey)) ?? (yield* kv.get(key))),
               )
               if (
                 !force &&
-                (!refreshEnabled || available !== undefined) &&
+                !checkAvailability &&
+                (!refreshEnabled || checked !== undefined) &&
                 stored &&
                 Date.now() - stored.updatedAt < Duration.toMillis(ttl)
               )
@@ -727,8 +747,9 @@ export const layer = (options?: Options) =>
         get,
         refresh,
         remoteAvailable: refreshEnabled
-          ? Effect.suspend(() => (available === undefined ? Deferred.await(firstCheck) : Effect.succeed(available)))
+          ? refresh(false, true).pipe(Effect.map(() => checked?.available ?? false))
           : undefined,
+        remoteAvailabilityChanges: refreshEnabled ? Stream.fromPubSub(availabilityChanges) : undefined,
       })
     }),
   )

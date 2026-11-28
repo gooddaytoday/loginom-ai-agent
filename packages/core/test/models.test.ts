@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Money } from "@opencode/schema/money"
 import { Effect, Exit, Fiber, Layer, Ref, Scope, Stream, Tracer } from "effect"
+import { TestClock } from "effect/testing"
 import { HttpClient, HttpClientResponse } from "effect/http"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNodePlatform } from "@opencode/util/effect/app-node-platform"
@@ -887,20 +888,33 @@ describe("ModelsDev Service", () => {
     }),
   )
 
-  it.live("reports remote catalog failure and recovery separately from the cached catalog", () =>
+  it.effect("reports catalog recovery after rechecking a result older than a minute", () =>
     Effect.gen(function* () {
       const cache = makeCache()
       writeCache(cache, fixture, Date.now())
       const state = yield* Ref.make({ ...initialState, body: "<html>Not a provider catalog</html>" })
       yield* Effect.gen(function* () {
         const svc = yield* ModelsDev.Service
-        if (!svc.remoteAvailable) throw new Error("Remote refresh is disabled")
+        if (!svc.remoteAvailable || !svc.remoteAvailabilityChanges) throw new Error("Remote refresh is disabled")
         expect(yield* svc.get()).toEqual(fixtureSnapshot)
         expect(yield* svc.remoteAvailable).toBe(false)
-        yield* Ref.update(state, (previous) => ({ ...previous, body: JSON.stringify(fixture2) }))
-        yield* svc.refresh(true)
-        expect(yield* svc.remoteAvailable).toBe(true)
-        expect(yield* svc.get()).toEqual(fixture2Snapshot)
+        yield* Ref.update(state, (previous) => ({ ...previous, body: JSON.stringify(fixture) }))
+        const changes = yield* svc.remoteAvailabilityChanges.pipe(
+          Stream.take(1),
+          Stream.runCollect,
+          Effect.forkScoped({ startImmediately: true }),
+        )
+        yield* TestClock.adjust("1 minute")
+        expect(yield* svc.remoteAvailable).toBe(false)
+        expect((yield* Ref.get(state)).calls).toHaveLength(1)
+        yield* TestClock.adjust(1)
+        expect(yield* Effect.all([svc.remoteAvailable, svc.remoteAvailable], { concurrency: "unbounded" })).toEqual([
+          true,
+          true,
+        ])
+        expect((yield* Ref.get(state)).calls).toHaveLength(2)
+        expect(Array.from(yield* Fiber.join(changes))).toEqual([true])
+        expect(yield* svc.get()).toEqual(fixtureSnapshot)
       }).pipe(Effect.provide(buildLayer(state, cache, { fetch: true })))
     }),
   )

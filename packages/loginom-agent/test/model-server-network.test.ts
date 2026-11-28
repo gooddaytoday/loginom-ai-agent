@@ -3,9 +3,13 @@ import { createServer } from "node:http"
 import { connect } from "node:net"
 import { modelServerFetch } from "../src/model-server-network"
 
-test("model server SSE keeps ordinary deltas live and masks a key split between chunks", async () => {
-  const key = 'fixture-"private"-key'
+test.each([
+  ["an escaped", 'fixture-"private"-key', "[redacted]"],
+  ["a short", "a", "…"],
+])("model server SSE keeps ordinary deltas live and masks %s key", async (_label, key, mask) => {
   const delta = `data: ${JSON.stringify({ choices: [{ delta: { content: "Считаю" } }] })}`
+  const error = JSON.stringify({ error: { message: `Rejected ${key}` } })
+  const split = error.indexOf(JSON.stringify(key).slice(1, -1)) + 1
   const release = Promise.withResolvers<void>()
   const encoder = new TextEncoder()
   const server = Bun.serve({
@@ -16,8 +20,8 @@ test("model server SSE keeps ordinary deltas live and masks a key split between 
         async start(stream) {
           stream.enqueue(encoder.encode(delta + "\r\n\r"))
           await release.promise
-          stream.enqueue(encoder.encode('\ndata: {"error":{"message":"Invalid fixture-'))
-          stream.enqueue(encoder.encode('\\\"private\\\"-key"}}\r\n\r\ndata: [DONE]\r\n\r\n'))
+          stream.enqueue(encoder.encode(`\ndata: ${error.slice(0, split)}`))
+          stream.enqueue(encoder.encode(`${error.slice(split)}\r\n\r\ndata: [DONE]\r\n\r\n`))
           stream.close()
         },
       })
@@ -36,7 +40,7 @@ test("model server SSE keeps ordinary deltas live and masks a key split between 
 
     let rest = ""
     for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) rest += chunk.value
-    expect(rest).toBe('data: {"error":{"message":"Invalid [redacted]"}}\n\ndata: [DONE]\n\n')
+    expect(rest).toBe(`data: {"error":{"message":"Rejected ${mask}"}}\n\ndata: [DONE]\n\n`)
   } finally {
     release.resolve()
     await server.stop(true)

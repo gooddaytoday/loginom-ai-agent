@@ -305,27 +305,23 @@ function ProviderPicker(props: {
   const integrations = useIntegrations(() => props.directory)
   const language = useLanguage()
   const sdk = useServerSDK()
-  const [preferred, setPreferred] = createSignal<string[]>([])
+  const [preferred, setPreferred] = createSignal<Record<string, boolean>>({})
 
   createEffect(() => {
     const lifetime = new AbortController()
     const directory = props.directory
 
-    const checks = props.setups.flatMap((entry) =>
-      entry.preferFirst
-        ? [
-            entry.preferFirst(sdk.api, directory, lifetime.signal).then(
-              (first) => (first ? [entry.id] : []),
-              () => [],
-            ),
-          ]
-        : [],
-    )
+    setPreferred({})
 
     onCleanup(() => lifetime.abort())
-    void Promise.all(checks).then((ids) => {
-      if (!lifetime.signal.aborted) setPreferred(ids.flat())
-    })
+
+    for (const entry of props.setups) {
+      void entry
+        .preferFirst?.(sdk.api, directory, lifetime.signal, (first) => {
+          if (!lifetime.signal.aborted) setPreferred((current) => ({ ...current, [entry.id]: first }))
+        })
+        .catch(() => undefined)
+    }
   })
 
   const [store, setStore] = createStore<{
@@ -374,12 +370,12 @@ function ProviderPicker(props: {
   })
 
   const groups = () => [
-    { title: "", items: () => actions().filter((row) => preferred().includes(row.id)) },
+    { title: "", items: () => actions().filter((row) => preferred()[row.id] === true) },
     { title: language.t("dialog.provider.connected"), items: connected },
     { title: language.t("dialog.provider.group.popular"), items: popular },
     {
       title: language.t("dialog.provider.group.services"),
-      items: () => [...actions().filter((row) => !preferred().includes(row.id)), ...services()],
+      items: () => [...actions().filter((row) => preferred()[row.id] !== true), ...services()],
     },
   ]
 

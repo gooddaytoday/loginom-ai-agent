@@ -32,8 +32,13 @@ export interface ProviderSetup {
   readonly id: string
   /** Localized label for the action and dialog. */
   readonly title: string
-  /** Whether to list this action before the provider groups for the current service and Location. */
-  readonly preferFirst?: (client: OpenCodeClient, directory: string | undefined, signal: AbortSignal) => Promise<boolean>
+  /** Reports whether to list this action first, initially and on changes until the dialog aborts the signal. */
+  readonly preferFirst?: (
+    client: OpenCodeClient,
+    directory: string | undefined,
+    signal: AbortSignal,
+    report: (first: boolean) => void,
+  ) => Promise<void>
   /** Identifies configured providers to place alongside the action in Settings. */
   readonly matchesProvider?: (id: string) => boolean
   /** Removal action for providers that own a profile entry rather than just a credential. */

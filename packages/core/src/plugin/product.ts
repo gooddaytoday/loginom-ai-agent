@@ -11,7 +11,7 @@ import LoginomAgent, {
 } from "@loginom-ai-agent/loginom-agent"
 import { Integration } from "@opencode/schema/integration"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
-import { Context, Effect, Layer, Semaphore } from "effect"
+import { Context, Effect, Layer, Semaphore, Stream } from "effect"
 import { Config } from "../config.js"
 import { Credential } from "../credential.js"
 import { Formatter } from "../formatter.js"
@@ -61,7 +61,7 @@ export const plugins: readonly InternalPlugin[] = [
             )
         const mutate = <A, E>(effect: Effect.Effect<A, E>) =>
           modelServerWrites.withPermit(Effect.uninterruptible(effect))
-        yield* ctx.rpc
+        const modelServer = yield* ctx.rpc
           .register(
             ModelServerRpc,
             modelServerHandlers({
@@ -124,6 +124,13 @@ export const plugins: readonly InternalPlugin[] = [
             }),
           )
           .pipe(Effect.orDie)
+        if (models.remoteAvailabilityChanges)
+          yield* models.remoteAvailabilityChanges.pipe(
+            Stream.runForEach((available) =>
+              modelServer.events.emit("catalogAvailabilityChanged", { available }).pipe(Effect.ignore),
+            ),
+            Effect.forkScoped({ startImmediately: true }),
+          )
       }),
   },
 ]

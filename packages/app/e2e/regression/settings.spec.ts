@@ -2268,8 +2268,8 @@ test("providers: settings and the connect dialog list popular providers in the s
   ).toBeVisible()
 })
 
-test("providers: the custom server comes first when the remote catalog is unavailable", async ({ page }) => {
-  const { settings } = await open(page, {
+test("providers: an open dialog reacts to remote catalog outages and recovery", async ({ page }) => {
+  const { settings, push } = await open(page, {
     integrations: [{ id: "openai", name: "OpenAI", methods: [{ type: "key" }], connections: [] }],
     onRpc: ({ rpcID, method }) =>
       rpcID === "loginom.model-server" && method === "catalogAvailable"
@@ -2280,8 +2280,25 @@ test("providers: the custom server comes first when the remote catalog is unavai
   expect(await page.evaluate(() => navigator.onLine)).toBe(true)
   await settings.getByRole("tab", { name: "Providers", exact: true }).click()
   await settings.getByRole("button", { name: "Show more providers", exact: true }).click()
+
   const dialog = page.getByRole("dialog", { name: "Connect provider", exact: true })
-  await expect(dialog.locator("[data-provider-id]")).toHaveText(["Custom server (OpenAI-compatible)", "OpenAI"])
+  const rows = dialog.locator("[data-provider-id]")
+  const customServer = "Custom server (OpenAI-compatible)"
+
+  await expect(rows).toHaveText([customServer, "OpenAI"])
+
+  for (const available of [true, false]) {
+    await push([
+      {
+        id: `evt_model_catalog_available_${available}`,
+        created: 1,
+        type: "rpc.loginom.model-server.catalogAvailabilityChanged",
+        location: { directory },
+        data: { available },
+      },
+    ])
+    await expect(rows).toHaveText(available ? ["OpenAI", customServer] : [customServer, "OpenAI"])
+  }
 })
 
 test("providers: a partial custom server removal explains the failure and can be retried", async ({ page }) => {

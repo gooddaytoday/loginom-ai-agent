@@ -3,6 +3,8 @@ import { request as httpRequest } from "node:http"
 import { request as httpsRequest } from "node:https"
 import { BlockList, isIP } from "node:net"
 import { Readable } from "node:stream"
+import { OpenAIChatEvent } from "@opencode/ai/protocols/openai-chat"
+import type { SchemaAST } from "effect"
 import { HttpsProxyAgent } from "https-proxy-agent"
 
 const blocked = new BlockList()
@@ -110,34 +112,60 @@ export async function resolveModelServer(input: string, signal: AbortSignal) {
   } as const
 }
 
+function declaredFields(ast: SchemaAST.AST): string[] {
+  switch (ast._tag) {
+    case "Objects":
+      return ast.propertySignatures.flatMap(({ name, type }) => [String(name), ...declaredFields(type)])
+    case "Arrays":
+      return [...ast.elements, ...ast.rest].flatMap(declaredFields)
+    case "Union":
+      return ast.types.flatMap(declaredFields)
+    default:
+      return []
+  }
+}
+
+const completionFields = new Set(declaredFields(OpenAIChatEvent.ast))
+const sseFields = new Set(["", "data", "event", "id", "retry"])
+
 function redactEventStream(body: ReadableStream<Uint8Array>, key: string, mask: string) {
+  const escapedKey = JSON.stringify(key).slice(1, -1)
+  const redactRaw = (text: string) => text.replaceAll(escapedKey, mask).replaceAll(key, mask)
   const redact = (frame: string) => {
-    const data = frame
-      .split("\n")
+    const lines = frame.split("\n")
+    const payload = lines
       .filter((line) => line.startsWith("data:"))
       .map((line) => line.slice(5).replace(/^ /u, ""))
       .join("\n")
-    if (!data || data === "[DONE]" || data === ": keepalive") return frame
-
-    try {
-      const event: unknown = JSON.parse(data)
-      if (typeof event !== "object" || event === null || !("error" in event) || !event.error) return frame
-      const error = event.error
-      if (typeof error === "object" && "message" in error && typeof error.message === "string") {
-        const code = "code" in error ? error.code : undefined
-        return `data: ${JSON.stringify({
-          error: {
-            message: error.message.replaceAll(key, mask),
-            code: typeof code === "string" ? code.replaceAll(key, mask) : typeof code === "number" ? code : undefined,
-          },
-        })}`
+    let data = payload
+    if (payload && payload !== "[DONE]" && payload !== ": keepalive") {
+      try {
+        JSON.parse(payload)
+        data = payload.replace(/("(?:[^"\\]|\\.)*")(\s*:)?/gu, (match, token: string, field?: string) => {
+          const value: unknown = JSON.parse(token)
+          if (typeof value !== "string" || !value.includes(key) || (field && completionFields.has(value))) return match
+          return JSON.stringify(value.replaceAll(key, mask)) + (field ?? "")
+        })
+      } catch {
+        data = redactRaw(payload)
       }
-    } catch {}
+    }
 
-    return `data: ${data
-      .replaceAll(JSON.stringify(key).slice(1, -1), mask)
-      .replaceAll(key, mask)
-      .replaceAll("\n", "\ndata: ")}`
+    let replaced = false
+    return lines
+      .flatMap((line) => {
+        if (!line.startsWith("data:")) {
+          const colon = line.indexOf(":")
+          const field = colon < 0 ? line : line.slice(0, colon)
+          if (!sseFields.has(field)) return redactRaw(line)
+          return colon < 0 ? line : line.slice(0, colon + 1) + redactRaw(line.slice(colon + 1))
+        }
+        if (data === payload) return line
+        if (replaced) return []
+        replaced = true
+        return data.split("\n").map((value) => `data: ${value}`)
+      })
+      .join("\n")
   }
 
   let pending = ""

@@ -31,10 +31,24 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       return ctx.t("modelServerTitle")
     },
     matchesProvider: isModelServerID,
-    async preferFirst(client, directory, signal) {
+    async preferFirst(client, directory, signal, report) {
       const { ModelServerRpc } = await import("@loginom-ai-agent/loginom-host/model-server-rpc")
 
-      const result = await client.rpc(ModelServerRpc).catalogAvailable(
+      if (signal.aborted) return
+
+      const rpc = client.rpc(ModelServerRpc)
+      let observedChange = false
+
+      rpc.events.on(
+        "catalogAvailabilityChanged",
+        ({ data }) => {
+          observedChange = true
+          report(!data.available)
+        },
+        { signal },
+      )
+
+      const result = await rpc.catalogAvailable(
         {},
         {
           location: directory ? { directory } : undefined,
@@ -42,7 +56,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
         },
       )
 
-      return result.ok && !result.value
+      if (!observedChange && result.ok) report(!result.value)
     },
     removal: {
       get title() {

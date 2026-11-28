@@ -35,6 +35,11 @@ const fixture = (ids: readonly string[]) =>
                 return new Response(`data: ${JSON.stringify({ error: { message } })}\r\n\r\n`, {
                   headers: { "content-type": "text/event-stream" },
                 })
+              if (messages.includes("(sse-invalid)"))
+                return new Response(
+                  `data: ${JSON.stringify({ choices: message, [key ?? "unknown"]: "fixture diagnostic" })}\r\n\r\n`,
+                  { headers: { "content-type": "text/event-stream" } },
+                )
 
               return messages.includes("(plain)")
                 ? new Response(message, { status: 401 })
@@ -217,6 +222,29 @@ it.live(
         expect(error).toContain("Fixture rejected credential [redacted]")
         expect(error).not.toContain("fixture-replacement-")
       }
+
+      const failed = yield* Effect.promise(async (signal) => {
+        const options = { signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]) }
+        const session = await client.session.create({ location, model: { providerID: firstID, id: "alpha" } }, options)
+        const events = client.event.subscribe(options)[Symbol.asyncIterator]()
+        try {
+          await events.next()
+          await client.session.prompt({ sessionID: session.id, text: "Fixture only: rejected (sse-invalid)" }, options)
+          for (;;) {
+            const event = await events.next()
+            if (event.done) throw new Error("Missing session error")
+            if (event.value.type === "session.step.failed" && event.value.data.sessionID === session.id)
+              return event.value.data.error
+          }
+        } finally {
+          await events.return?.()
+        }
+      })
+      expect(failed).toMatchObject({
+        type: "provider.invalid-output",
+        response: { body: '{"choices":"Fixture rejected credential [redacted]","[redacted]":"fixture diagnostic"}' },
+      })
+      expect(JSON.stringify(failed)).not.toContain("fixture-replacement-")
 
       for (const key of ["a", "1"]) {
         expect(yield* Effect.promise(() => rpc.discover({ address: first.address, key }, options))).toEqual({
