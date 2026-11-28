@@ -518,6 +518,7 @@ export function fromPromise(plugin: Plugin) {
             scan: (options) => run(host.storage.scan(options)),
           },
           tool: {
+            ask: (form, context, signal) => Effect.runPromiseWith(runtime)(host.tool.ask(form, context), { signal }),
             reload: () => run(host.tool.reload()),
             list: () =>
               run(host.tool.list()).then((tools) =>

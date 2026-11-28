@@ -27,6 +27,7 @@ type Event =
   | { type: "target"; available: boolean }
   | { type: "disposed" }
   | { type: "refresh" }
+  | { type: "application"; revision: number; generation: number }
   | { type: "edit"; patch: Partial<Draft> }
   | { type: "submit"; submit: "check" | "save"; now: number }
   | { type: "status" | "saved"; attempt: number; result: StatusResult; now: number }
@@ -41,6 +42,7 @@ type Effect =
 type Transition = { state: State; effects: Effect[] }
 
 const applicationWait = 15_000
+const applicationPollDelay = 1_000
 
 export const initial: State = { type: "unavailable", attempt: 0 }
 
@@ -109,6 +111,18 @@ export function transition(state: State, event: Event): Transition {
       if (state.type !== "editing") return keep
 
       return refresh(state, attempt)
+    case "application":
+      if (state.type !== "applying" && state.type !== "editing") return keep
+
+      if (!waiting(state.status) || event.revision < state.status.revision || event.generation < state.status.generation)
+        return keep
+
+      if (state.type === "editing") return refresh(state, attempt)
+
+      return {
+        state: { ...state, attempt },
+        effects: [{ type: "cancel" }, { type: "status", attempt }],
+      }
     case "edit": {
       if (!("draft" in state) || state.type === "saving") return keep
       const draft = { ...state.draft, ...event.patch }
@@ -173,10 +187,8 @@ export function transition(state: State, event: Event): Transition {
         if (state.type === "saving" && event.result.issue === "saveFailed") return refresh(state, attempt, "saveFailed")
 
         if (state.type === "loading") return { state: { type: "unavailable", attempt }, effects: [] }
-
-        if (state.type === "applying" && event.now >= state.until)
-          return { state: { type: "editing", attempt, status: state.status, draft: state.draft }, effects: [] }
-
+        if (state.type === "applying")
+          return pollApplication({ ...state, attempt }, event.now, event.result.issue)
         if ("draft" in state)
           return failed(state, state.type === "refreshing" ? (state.issue ?? event.result.issue) : event.result.issue)
 
@@ -197,17 +209,12 @@ export function transition(state: State, event: Event): Transition {
         const pendingDraft =
           state.type === "saving" || (recovered && !edited) ? { ...state.draft, password: "" } : draft
 
-        const until = state.type === "applying" ? state.until : event.now + applicationWait
-        const remaining = until - event.now
-
-        if (remaining > 1000) {
-          return {
-            state: { type: "applying", attempt, status, draft: pendingDraft, until, edited },
-            effects: [{ type: "status", attempt, delay: 1000, timeout: remaining - 1000 }],
-          }
-        }
-
-        return { state: { type: "editing", attempt, status, draft: pendingDraft }, effects: [] }
+        // Drains can last as long as the tasks. Bound the wait for startup once the tasks finish.
+        const until =
+          state.type === "applying" && !waitingTasks(state.status) && !waitingTasks(status)
+            ? state.until
+            : event.now + applicationWait
+        return pollApplication({ type: "applying", attempt, status, draft: pendingDraft, until, edited }, event.now)
       }
 
       const issue = state.type === "refreshing" && !recovered ? state.issue : undefined
@@ -215,6 +222,17 @@ export function transition(state: State, event: Event): Transition {
       return { state: { type: "editing", attempt, status, draft, issue }, effects: [] }
     }
   }
+}
+
+function pollApplication(state: Extract<State, { type: "applying" }>, now: number, issue?: Issue): Transition {
+  const { attempt, status, draft, until } = state
+  const timeout = until - now - applicationPollDelay
+  if (timeout <= 0) return { state: { type: "editing", attempt, status, draft, issue }, effects: [] }
+  return { state, effects: [{ type: "status", attempt, delay: applicationPollDelay, timeout }] }
+}
+
+function waitingTasks(status: Status) {
+  return status.application?.state === "pending" ? status.application.tasks : 0
 }
 
 function refresh(state: Form, attempt: number, issue?: Issue): Transition {
@@ -237,14 +255,16 @@ function message(state: State) {
   if (state.type === "loading" || state.type === "refreshing") return "loading"
 
   if (state.type === "unavailable") return "serviceUnavailable"
-
-  if (state.type === "applying") return state.status.state === "pending" ? "pending" : "starting"
-
   if (state.type === "verified") return "verified"
 
   if (!("status" in state)) return
 
   if (state.status.failed) return "activationFailed"
+
+  if (state.status.state === "ready" && state.status.application?.state === "applied") return "applied"
+
+  if (state.type === "applying")
+    return state.status.state === "pending" && !state.status.application ? "pending" : "starting"
 
   if (waiting(state.status)) return "applicationPaused"
 
@@ -259,6 +279,7 @@ export function view(state: State) {
     draft: form?.draft,
     connected: form?.status.state === "ready" && !form.status.failed ? form.status : undefined,
     message: message(state),
+    waitingTasks: state.type === "applying" ? waitingTasks(state.status) : 0,
     fieldErrors: {
       url: issue === "invalidAddress" || issue === "loginUnavailable" ? issue : undefined,
       username: issue === "invalidUsername" ? issue : undefined,
@@ -269,6 +290,7 @@ export function view(state: State) {
       issue === "changed" ||
       issue === "expired" ||
       issue === "saveFailed" ||
+      issue === "knowledgeAuthFailed" ||
       issue === "checkFailed" ||
       issue === "logoutUnconfirmed"
         ? issue

@@ -64,6 +64,17 @@ export type DataSessionStatus = "idle" | "running"
  */
 export type DataPendingStatus = "starting" | "steering" | "stranded" | "queued"
 type OpenCodeEventMap = { [Type in OpenCodeEvent["type"]]: Extract<OpenCodeEvent, { type: Type }> }
+type PendingPatch = {
+  delivery?: SessionInbox.Delivery
+  payload?: OpenCodeEventMap["session.inbox.edited"]["data"]["payload"]
+}
+type PendingUpdate = SessionInboxInfo | PendingPatch | undefined
+
+function patchPending(item: SessionInboxInfo, patch: PendingPatch): SessionInboxInfo {
+  const delivery = patch.delivery ?? item.delivery
+  if (item.type === "user" && patch.payload) return { ...item, delivery, payload: patch.payload }
+  return delivery === item.delivery ? item : { ...item, delivery }
+}
 
 export type CreateDataInput = {
   readonly api: () => OpenCodeClient
@@ -359,7 +370,7 @@ export function createData(config: CreateDataInput) {
   const stored = (message: SessionMessageInfo) => (omitFiles() ? omitMessageFileData(message) : message)
   const sync = createSync()
   let activeUpdates: Map<string, DataSessionStatus | undefined> | undefined
-  const pendingUpdates = new Map<string, Map<string, SessionInboxInfo | SessionInbox.Delivery | undefined>>()
+  const pendingUpdates = new Map<string, Map<string, PendingUpdate>>()
 
   function setSessionActive(sessionID: string, status: DataSessionStatus) {
     activeUpdates?.set(sessionID, status)
@@ -415,12 +426,22 @@ export function createData(config: CreateDataInput) {
       })
   }
 
-  function updatePending(sessionID: string, inboxID: string, delivery: SessionInbox.Delivery) {
+  function updatePending(sessionID: string, inboxID: string, patch: PendingPatch) {
+    const updates = pendingUpdates.get(sessionID)
+    if (updates) {
+      const previous = updates.get(inboxID)
+      if (previous) updates.set(inboxID, "id" in previous ? patchPending(previous, patch) : { ...previous, ...patch })
+      else if (!updates.has(inboxID)) updates.set(inboxID, patch)
+    }
     const index = store.session.pending[sessionID]?.findIndex((item) => item.id === inboxID) ?? -1
     const item = store.session.pending[sessionID]?.[index]
-    pendingUpdates.get(sessionID)?.set(inboxID, item ? { ...item, delivery } : delivery)
-    if (index < 0 || !item || item.delivery === delivery) return
-    setStore("session", "pending", sessionID, index, { ...item, delivery })
+    if (!item) return
+    const next = patchPending(item, patch)
+    if (next === item) return
+    batch(() => {
+      setStore("session", "pending", sessionID, index, next)
+      if (patch.payload) materializeInboxMessage(next)
+    })
   }
 
   // Inbox IDs of optimistic admissions awaiting acknowledgement, so rejection
@@ -932,8 +953,11 @@ export function createData(config: CreateDataInput) {
         compacting.get(event.data.sessionID)?.observed.add(event.data.inboxID)
         return
       }
+      case "session.inbox.edited":
+        updatePending(event.data.sessionID, event.data.inboxID, { payload: event.data.payload })
+        return
       case "session.inbox.delivery.changed":
-        updatePending(event.data.sessionID, event.data.inboxID, event.data.delivery)
+        updatePending(event.data.sessionID, event.data.inboxID, { delivery: event.data.delivery })
         return
       case "session.inbox.cancelled": {
         retractLocal(event.data.sessionID, event.data.inboxID)
@@ -1643,7 +1667,7 @@ export function createData(config: CreateDataInput) {
         sync(sessionID: string) {
           return sync.run(`session.pending:${sessionID}`, async () => {
             const started = deletionEpoch
-            const updates = new Map<string, SessionInboxInfo | SessionInbox.Delivery | undefined>()
+            const updates = new Map<string, PendingUpdate>()
             pendingUpdates.set(sessionID, updates)
             try {
               const snapshot = await api().session.inbox.list({ sessionID }).catch(evictMissing)
@@ -1653,10 +1677,11 @@ export function createData(config: CreateDataInput) {
               const current = new Map(snapshot.map((item) => [item.id, item]))
               updates.forEach((item, id) => {
                 if (item === undefined) current.delete(id)
-                else if (typeof item === "string") {
+                else if ("id" in item) current.set(id, item)
+                else {
                   const existing = current.get(id)
-                  if (existing) current.set(id, { ...existing, delivery: item })
-                } else current.set(id, item)
+                  if (existing) current.set(id, patchPending(existing, item))
+                }
               })
               const pending = [...current.values()]
               // A positive read acknowledges admission even when its SSE echo is delayed.

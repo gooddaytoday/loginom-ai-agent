@@ -160,23 +160,27 @@ story("a restored plugin page shows a loader while waiting for settings and whil
   await host.evaluate((host) => host.unmount())
 })
 
-story("a third-party plugin cannot register a page with a public registry token", async ({ page }) => {
-  const result = await page.evaluate(async (fixture) => {
-    const { mountPluginHost, Registry, until } = await import(fixture)
-    const host = mountPluginHost()
+for (const registry of ["page", "question.renderer"]) {
+  story(`a third-party plugin cannot register ${registry} with a public registry token`, async ({ page }) => {
+    const result = await page.evaluate(async ({ fixture, registry }) => {
+      const { mountPluginHost, Registry, until } = await import(fixture)
+      const host = mountPluginHost()
+      const contribution =
+        registry === "page" ? { id: "overview", title: "Third-party page" } : { matches: () => true, render: () => null }
 
-    try {
-      host.load((ctx: Context) => ctx.add(Registry.define("page"), { id: "overview", title: "Third-party page" }))
-      await until(() => host.status() === "failed" || host.status() === "active")
+      try {
+        host.load((ctx: Context) => ctx.add(Registry.define(registry), contribution))
+        await until(() => host.status() === "failed" || host.status() === "active")
 
-      return { status: host.status(), pages: host.entries("page") }
-    } finally {
-      host.unmount()
-    }
-  }, fixture)
+        return { status: host.status(), entries: host.entries(registry) }
+      } finally {
+        host.unmount()
+      }
+    }, { fixture, registry })
 
-  expect(result).toEqual({ status: "failed", pages: 0 })
-})
+    expect(result).toEqual({ status: "failed", entries: 0 })
+  })
+}
 
 story("a plugin that finishes loading after the host unmounts is never set up", async ({ page }) => {
   const setups = await page.evaluate(async (fixture) => {

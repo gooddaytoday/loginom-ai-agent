@@ -3,7 +3,7 @@ import { Schema, Struct } from "effect"
 import { Loginom } from "./loginom"
 
 export const Status = Loginom.View.mapFields((fields) => ({
-  ...Struct.pick(fields, ["revision", "generation", "url", "username", "folder", "hasPassword", "state"]),
+  ...Struct.pick(fields, ["revision", "generation", "url", "username", "folder", "hasPassword", "state", "application"]),
   failed: Schema.Boolean,
 }))
 export const Address = Schema.String.check(
@@ -26,6 +26,7 @@ export function settingsAddress(value: string) {
 
 const Candidate = Loginom.Candidate.mapFields((fields) => Struct.omit(fields, ["apiKey"]))
 const Validation = Loginom.Validation.mapFields((fields) => Struct.pick(fields, ["validationId", "expiresAt"]))
+const applicationEvent = { schema: Schema.toStandardSchemaV1(Loginom.ConnectionApplication) }
 export type Status = typeof Status.Type
 export type Candidate = typeof Candidate.Type
 export type Validation = typeof Validation.Type
@@ -35,6 +36,7 @@ export const Issue = Schema.Literals([
   "invalidAddress",
   "invalidUsername",
   "passwordRequired",
+  "knowledgeAuthFailed",
   "credentialsRejected",
   "loginUnavailable",
   "logoutUnconfirmed",
@@ -62,7 +64,7 @@ export const ConnectionSettingsRpc = Rpc.define({
     check: { input: safeInput, output: result(Validation) },
     save: { input: Schema.toStandardSchemaV1(Loginom.Save), output: result(Status) },
   },
-  events: {},
+  events: { applied: applicationEvent, failed: applicationEvent },
 })
 
 export type StatusResult = typeof ConnectionSettingsRpc.methods.status.output.Type

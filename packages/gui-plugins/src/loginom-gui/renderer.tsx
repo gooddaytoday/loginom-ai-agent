@@ -1,5 +1,11 @@
 import { SettingsPage, type Plugin } from "@opencode/plugin/gui"
-import { builtinContext, Page, PermissionDock, subscribeBuiltinDeepLinks } from "@opencode/plugin/gui/builtin"
+import {
+  builtinContext,
+  Page,
+  PermissionDock,
+  QuestionRenderer,
+  subscribeBuiltinDeepLinks,
+} from "@opencode/plugin/gui/builtin"
 import { dashboardLinkChannel } from "@loginom-ai-agent/product/dashboard-link"
 import { Option, Schema } from "effect"
 import { lazy, onCleanup, Show, Suspense } from "solid-js"
@@ -9,6 +15,7 @@ import { transitionDashboard, type DashboardState, type DashboardStore } from ".
 import type definition from "./index"
 import PermissionPrompt from "./permission-dock"
 import { permissionDescription } from "./permission-model"
+import { LoginomRepeatDock } from "./repeat-dock"
 import { registerStartScreen } from "./start-screen"
 
 const decodeLink = Schema.decodeUnknownOption(DashboardLink)
@@ -52,6 +59,11 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
         <Settings />
       </Suspense>
     ),
+  })
+
+  ctx.add(QuestionRenderer, {
+    matches: (request) => request.metadata?.loginomRepeat === true,
+    render: (props) => <LoginomRepeatDock {...props} />,
   })
 
   if (!ctx.desktop) return
