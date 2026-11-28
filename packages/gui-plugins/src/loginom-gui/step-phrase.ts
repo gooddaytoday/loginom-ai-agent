@@ -11,7 +11,7 @@ const positive = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
 const text = Schema.NonEmptyString
 
 const displayField = <S extends Schema.Constraint>(schema: S) =>
-  Schema.optional(schema).pipe(Schema.catchDecoding(() => Effect.succeed(Option.none())))
+  Schema.catchDecoding<Schema.optional<S>>(() => Effect.succeed(Option.none()))(Schema.optional(schema))
 
 // The timeline reads only the display fields of the Loginom metadata v1 receipt.
 const Receipt = Schema.Struct({

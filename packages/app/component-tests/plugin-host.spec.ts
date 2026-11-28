@@ -135,7 +135,7 @@ story("the narrow session header and timeline preferences are restricted to buil
       let hasTimeline = false
 
       try {
-        host.load((ctx) => {
+        host.load((ctx: Context) => {
           hasTimeline = "timeline" in ctx
           ctx.add(Registry.define("slot"), () => ({
             at: "session.header.mobile",
