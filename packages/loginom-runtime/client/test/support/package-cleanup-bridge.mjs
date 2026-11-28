@@ -123,7 +123,15 @@ mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExport
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:options=>{
   const f=current;
-  if(f.artifactBrowser)return executor.createActionRuntime({...options,execute:f.artifactBrowser});
+  if(f.artifactBrowser){
+    f.artifactRuntime=executor.createActionRuntime({...options,execute:f.artifactBrowser,now:f.artifactNow,
+      onRecord:async event=>{
+        const saved=await options.onRecord(event);
+        f.afterArtifactRecord?.(event);
+        return saved;
+      }});
+    return f.artifactRuntime;
+  }
   if(f.stoppedImport){
     const node={document_id:'own-doc',workflow_id:'own-workflow',node_id:'source'};
     const graph={complete:true,document_id:'own-doc',nodes:[],links:[],foreign_links:[]};
@@ -435,7 +443,7 @@ for(const scenario of ['opened-clean','opened-read-only','opened-dirty','opened-
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
 
-for(const fault of ['cancelled','unknown','wrong-bytes'])test('CLI shutdown after pending upload verification: '+fault,async t=>{
+for(const fault of ['cancelled','unknown','wrong-bytes','changed-mtime','late-hash','late-ack'])test('CLI shutdown after pending upload verification: '+fault,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-upload-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
   const f=current={scenario:'opened-clean',events:[],saves:0,path,catalog};
@@ -447,7 +455,21 @@ for(const fault of ['cancelled','unknown','wrong-bytes'])test('CLI shutdown afte
   const page=new Page(),prefix=page.prefix,nav=prefix+';NavigationBar;NavigationPanel';
   const fileTid=prefix+';FileStorageForm;colName_input.csv';
   const addedControls=[nav,prefix+';FileStorageForm;pnlFileStorage;tbl'].map(tid=>({tid,ref:page.uiReference(tid),kind:'region'}));
-  let downloads=0,uploads=0,cancelledReceipt;
+  let downloads=0,uploads=0,cancelledReceipt,shutdownDeadline,clock=Date.now();
+  const initialVersion={bytes:artifact.bytes,mtime:'2026-11-28T00:00:00.000Z'};
+  f.artifactNow=()=>clock;
+  f.afterArtifactRecord=event=>{
+    if(fault==='late-ack'&&event.phase==='artifact_delivery_completed')clock=shutdownDeadline+1;
+  };
+  const stageDownload=store.stageDownload;
+  store.stageDownload=async id=>{
+    const lease=await stageDownload(id);
+    return {...lease,verify:async name=>{
+      const proof=await lease.verify(name);
+      if(fault==='late-hash')clock=shutdownDeadline+1;
+      return proof;
+    }};
+  };
   const receipt=(action_key,operation_id,fields)=>({action_key,operation_id,action_revision:'1',phase:'observed',
     status:'SUCCEEDED',effect_possible:false,cleanup_complete:true,output:{},trace:[],error:null,...fields});
   f.artifactBrowser=async code=>{
@@ -468,6 +490,7 @@ for(const fault of ['cancelled','unknown','wrong-bytes'])test('CLI shutdown afte
         if(fault==='cancelled')throw Error('Original download reply lost');
         return cancelledReceipt;
       }
+      shutdownDeadline=Number(code.match(/"deadline_at":(\d+)/)[1]);
       const downloadPath=JSON.parse(code.match(/"download_path":("(?:[^"\\]|\\.)*")/)[1]);
       const observationId=JSON.parse(code.match(/"observation_id":("[^"]+")/)[1]);
       const fileRef=page.uiReference(fileTid);
@@ -477,7 +500,9 @@ for(const fault of ['cancelled','unknown','wrong-bytes'])test('CLI shutdown afte
           destination:artifact.upload.destination,suggested_name:'input.csv',download_completed:true,
           bytes_verification_required:true,file_ref:fileRef,observation_id:observationId},
         trace:[{event:'artifact_file_discovered',file_ref:fileRef,file_tid:fileTid,directory:artifact.upload.directory,
-          document:'fixture-document',active_tab_ref:'storage-tab',workflow_ref:page.uiSnapshot().workflow_ref}]});
+          document:'fixture-document',active_tab_ref:'storage-tab',workflow_ref:page.uiSnapshot().workflow_ref},
+          {event:'artifact_file_version_verified',before:initialVersion,
+            after:fault==='changed-mtime'?{...initialVersion,mtime:'2026-11-28T00:00:01.000Z'}:initialVersion}]});
     }
     const output={...page.uiSnapshot(),active_tab_ref:'storage-tab',file_storage:{status:'observed',directory:artifact.upload.directory},
       observation_root:{ref:page.uiReference(nav)}};
@@ -506,6 +531,8 @@ for(const fault of ['cancelled','unknown','wrong-bytes'])test('CLI shutdown afte
   assert.equal(cleanup.reason,fault==='cancelled'?null:'CLEANUP_OR_OPERATION_UNCONFIRMED');
   assert.equal(cleanup.package_closed===true,fault==='cancelled');
   assert.equal(cleanup.logged_out===true,fault==='cancelled');
+  const final=await f.artifactRuntime.inspect({operationId:'delivery:upload'});
+  assert.equal(final.output.state,fault==='cancelled'?'resolved':'pending');
   assert.equal(uploads,1);
   assert.equal(downloads,fault==='unknown'?1:2);
 });

@@ -20,14 +20,18 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
  };
  const snapshot=job=>structuredClone({operation_id:job.id,state:job.state,phase:job.phase,
   upload_operation_id:job.uploadId,outcome:job.outcome??null,error:job.error??null,...(job.largeUpload?{status:job.status,bytes:job.bytes??0,total_bytes:job.artifact.bytes,percent:job.artifact.bytes?Math.min(100,(job.bytes??0)/job.artifact.bytes*100):job.status==='ready'?100:0,elapsed_ms:now()-job.started,deadline_at:job.deadline,poll_after_ms:5000}: {})});
- const finish=async(job,artifact,final)=>{
-  const outcome=final.output?.outcome,proof=outcome?.output?.server_copy_verification;
-  requireValue(final.output?.state==='resolved'&&final.output?.cleanup_confirmed===true&&outcome.status==='SUCCEEDED'
-    &&proof?.bytes_verified===true&&proof.upload_completion_verified===true&&proof.destination===artifact.upload.destination
+ const recordCompletion=async(job,artifact,proof)=>{
+  requireValue(proof?.bytes_verified===true&&proof.upload_completion_verified===true&&proof.destination===artifact.upload.destination
     &&proof.bytes===artifact.bytes&&proof.sha256===artifact.sha256,'Final transfer proof mismatch');
   const result={status:'SUCCEEDED',upload_operation_id:job.uploadId,destination:proof.destination,bytes:proof.bytes,sha256:proof.sha256,
     verification_id:proof.verification_id,cleanup_complete:true,upload_completion_verified:true};
-  await acknowledge(job,'artifact_delivery_completed',{result});job.outcome=result;job.phase='completed';job.error=null;
+  await acknowledge(job,'artifact_delivery_completed',{result});
+  return result;
+ };
+ const finish=async(job,artifact,final)=>{
+  const outcome=final.output?.outcome;
+  requireValue(final.output?.state==='resolved'&&final.output?.cleanup_confirmed===true&&outcome.status==='SUCCEEDED','Final transfer proof mismatch');
+  job.outcome=await recordCompletion(job,artifact,outcome.output?.server_copy_verification);job.phase='completed';job.error=null;
  };
  async function run(job,artifact,signal,resumeId=null,shutdownDeadline) {
   let submitted=job.uploadStarted===true,effectPossible=submitted;
@@ -307,11 +311,18 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
      &&JSON.stringify(destination.workflow_ref)===JSON.stringify(job.binding.workflow_ref)
      &&destination.active_tab_ref===job.binding.active_tab_ref,'Delivery browser context changed; no verification dispatched');
    check();job.verificationState='preflight';
+   let shutdownResult;
    const verification=await runtime.verifyDeliveredArtifact({operationId:job.uploadId,verificationId:job.id+(duringShutdown?':shutdown-verify':':verify'),
-    observationId:destination.observation_id,signal,shutdownDeadline,onDispatched:()=>{job.verificationStarted=true;job.verificationState='dispatched';}});
+    observationId:destination.observation_id,signal,onDispatched:()=>{job.verificationStarted=true;job.verificationState='dispatched';},
+    ...(duringShutdown?{shutdownDeadline,acknowledgeShutdown:async proof=>{shutdownResult=await recordCompletion(job,artifact,proof);}}:{})});
    if(job.conflictRejected&&verification.status!=='SUCCEEDED'&&verification.cleanup_complete===true)job.verificationState='settled';
    const lostVerification=!duringShutdown&&verification.error?.code==='BROWSER_CALL_UNCERTAIN';
    requireValue(lostVerification||verification.status==='SUCCEEDED'&&verification.cleanup_complete===true&&verification.output?.bytes_verified===true,'Destination bytes require inspection');
+   if(duringShutdown){
+    requireValue(shutdownResult,'Shutdown delivery evidence is missing');
+    job.outcome=shutdownResult;job.phase='completed';job.error=null;
+    return snapshot(job);
+   }
    // Verification owns its dispatched work through cleanup. Cancellation or
    // deadline expiry cannot discard its committed proof; only inspect it here.
    const final=await runtime.inspect({operationId:job.uploadId});

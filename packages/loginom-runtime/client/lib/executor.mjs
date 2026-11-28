@@ -2486,15 +2486,22 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if(raw.action_key!=='artifact.download' || raw.action_revision!=='1' || raw.operation_id!==attempt.id)
       throw new Error('Downloaded artifact receipt identity mismatch');
     attempt.raw=structuredClone(raw);
+    // Shutdown uses one absolute cutoff through readback, hashing, cleanup and
+    // durable delivery acknowledgement. Receipt recovery uses it as well.
+    const checkDeadline=()=>{
+      if(attempt.acknowledgeShutdown&&now()>=attempt.deadline)throw Error('Artifact verification deadline elapsed');
+    };
+    checkDeadline();
     if(!attempt.rawRecorded) {
       await remember(attempt,'download_completed',raw);attempt.rawRecorded=true;
+      checkDeadline();
     }
     const artifact=operation.checkpoint.artifact;
     let outcome=attempt.byteOutcome ?? {...structuredClone(raw),action_key:'artifact.verify'};
     if(!attempt.byteOutcome && raw.status==='SUCCEEDED') {
       const expected={artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,
         upload_operation_id:operation.id,destination:artifact.upload.destination,suggested_name:artifact.name,
-        download_completed:true,bytes_verification_required:true,file_ref:attempt.checkpoint.discovery?verifiedDiscoveryReference(artifact,attempt.checkpoint.discovery,raw):attempt.parameters.file_ref,
+        download_completed:true,bytes_verification_required:true,file_ref:attempt.checkpoint.discovery?verifiedDiscoveryReference(artifact,attempt.checkpoint.discovery,raw,!!attempt.acknowledgeShutdown):attempt.parameters.file_ref,
         observation_id:attempt.parameters.observation_id};
       if(fingerprint('download.output',raw.output)!==fingerprint('download.output',expected) || raw.cleanup_complete!==true
         || raw.phase!=='downloaded' || raw.effect_possible!==true || raw.error!==null)
@@ -2509,8 +2516,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           error:{code:'DOWNLOADED_ARTIFACT_MISMATCH',message:'Downloaded bytes do not match the admitted artifact'}};
       }
     }
+    checkDeadline();
     attempt.byteOutcome=structuredClone(outcome);
-    if(!attempt.byteRecorded) {await remember(attempt,'download_verified',outcome);attempt.byteRecorded=true;}
+    if(!attempt.byteRecorded) {await remember(attempt,'download_verified',outcome);attempt.byteRecorded=true;checkDeadline();}
     if(outcome.output.bytes_verified===true && (operation.outcome.output.upload_submitted===true||attempt.checkpoint.existing_file_check===true)
       && operation.outcome.cleanup_complete===true && raw.cleanup_complete===true) {
       // The transfer contract's postcondition is exact destination bytes/size/
@@ -2524,6 +2532,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         operation.cleanupConfirmed=false;
         return attempt.outcome;
       }
+      checkDeadline();
       const summary={verification_id:attempt.id,status:'SUCCEEDED',bytes_verified:true,upload_completion_verified:true,
         destination:artifact.upload.destination,bytes:artifact.bytes,sha256:artifact.sha256};
       const completedUpload={...structuredClone(operation.outcome),status:'SUCCEEDED',phase:'verified',error:null,
@@ -2531,8 +2540,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           ...(attempt.checkpoint.existing_file_check?{existing_file_reused:true,artifact_id:artifact.artifact_id,bytes:artifact.bytes,sha256:artifact.sha256}:{}),
           transfer_postcondition:'destination_bytes_digest_and_size',server_copy_verification:summary}};
       const completedVerification={...structuredClone(outcome),output:{...outcome.output,upload_completion_verified:true}};
-      if(!attempt.transferRecorded) {await remember(operation,'transfer_completed',completedUpload);attempt.transferRecorded=true;}
+      if(!attempt.transferRecorded) {await remember(operation,'transfer_completed',completedUpload);attempt.transferRecorded=true;checkDeadline();}
       await remember(attempt,'verification_completed',completedVerification);
+      checkDeadline();
+      if(attempt.acknowledgeShutdown){
+        await attempt.acknowledgeShutdown(summary);
+        checkDeadline();
+      }
       operation.outcome=completedUpload;operation.transportUncertain=false;operation.cleanupConfirmed=true;
       attempt.outcome=completedVerification;attempt.settled=true;
       auxiliary.set(attempt.id,{signature:attempt.signature,outcome:structuredClone(completedVerification)});
@@ -4315,7 +4329,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       pending=null;observations.clear();return result;
     },
     canVerifyCancelledDelivery,
-    async verifyArtifact({operationId,verificationId,observationId,fileRef,signal,discover=false,compareExisting=false,onDispatched,shutdownDeadline}={}) {
+    async verifyArtifact({operationId,verificationId,observationId,fileRef,signal,discover=false,compareExisting=false,onDispatched,shutdownDeadline,acknowledgeShutdown}={}) {
       signal?.throwIfAborted();checkId(operationId);checkId(verificationId);
       if(!allowCandidate || !artifactStore)throw new Error('Artifact verification is available only in a candidate session');
       const signature=fingerprint(discover?'artifact.verify.discovery':'artifact.verify',[operationId,observationId,fileRef,compareExisting]);
@@ -4341,7 +4355,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         || operation.transportUncertain || !operation.cleanupConfirmed || (operation.verification && !operation.verification.settled))
         throw new Error('Inspect and confirm the pending upload browser receipt before verifying its file');
       const duringShutdown=shutdownDeadline!==undefined;
-      if(duringShutdown && (!discover || !canVerifyCancelledDelivery(operationId,operation.deliveryOperationId)
+      if(duringShutdown && (!discover || typeof acknowledgeShutdown!=='function' || !canVerifyCancelledDelivery(operationId,operation.deliveryOperationId)
         || !Number.isSafeInteger(shutdownDeadline) || now()>=shutdownDeadline))
         throw Error('Cancelled delivery verification is unavailable');
       const snapshot=observations.get(observationId);
@@ -4363,7 +4377,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       try {
         if(duringShutdown)await operation.verification.lease.release();
         const lease=await artifactStore.stageDownload(operation.parameters.artifact_id);
-        const attempt={id:verificationId,signature,lease,action:{action_key:'artifact.verify',revision:'1',capability:'artifact.verify'},
+        const attempt={id:verificationId,signature,lease,...(duringShutdown?{acknowledgeShutdown}:{}),action:{action_key:'artifact.verify',revision:'1',capability:'artifact.verify'},
           parameters:{upload_operation_id:operationId,observation_id:observationId,file_ref:fileRef},checkpoint:{artifact:options.artifact,
             ...(existingFile?{existing_file_check:true}:{}),
             ...(discover?{discovery:{workflow_ref:snapshot.workflow_ref,document:snapshot.dom_epoch.document,active_tab_ref:snapshot.active_tab_ref}}:{})},deadline:shutdownDeadline??now()+60000};
