@@ -704,10 +704,13 @@ A partial receipt requires a verified read from the same saved node. After
 CLI shutdown, package close, logout and runtime ACK, the runner checks the
 turn's v1 savedFileRead version against the segment's last Save receipt. The
 cold reader verifies modification time, size and SHA-256 for the reopened file
-before executing or reading any port. A missing or changed version gives
-UNKNOWN. Without a shutdown ACK, affected turns are UNKNOWN and the cleanup
-error is reported separately. The runner removes the temporary login
-configuration and closes the reader before any manual edit or continuation.
+before executing or reading any port. A direct cold-reader call with
+`case_port_node_ids` also requires a Save version. A missing or changed version
+reports `UNKNOWN`. After a cold reader fails, queued reads that did not run
+report `UNKNOWN` as well. Unconfirmed shutdown makes affected turns `UNKNOWN`.
+`results.json` records all observed closure failure codes in `live_cleanup_errors`.
+The runner removes the temporary login configuration and closes the reader
+before any manual edit or continuation.
 
 The model and any explicit variant are recorded per run in `results.json`.
 

@@ -56,29 +56,6 @@ if (!args.config || !args.resources || !args.saved || !args.expected || !args.ou
   throw Error("Required: --config --resources --saved --expected --output")
 
 const treeAuditPath=new URL('./run-check.py',import.meta.url).pathname
-const root = resolve(args.resources)
-const load = (name) => import(pathToFileURL(join(root, "runtime", name)).href)
-const { verifyResources } = await load("src/resources.mjs")
-const resources = await verifyResources(root)
-const compatibilityPlatform = resources.manifest.target?.startsWith("win32-")
-  ? "windows"
-  : resources.manifest.target?.startsWith("darwin-")
-    ? "macos"
-    : "linux"
-const { loginBrowser } = await load("src/connection-check.mjs")
-const { makeWorkspacePrepareCode } = await load("client/lib/workspace.mjs")
-const { createNodeTargetBrowserAdapter } = await load("client/lib/node-target-browser.mjs")
-const { createNodeProcedure } = await load("client/lib/node-procedure.mjs")
-const { createNodeExecutionProcedure,trainConfiguredNode } = await load("client/lib/node-execution-procedure.mjs")
-const { createExecutionJournal } = await load("client/lib/execution-journal.mjs")
-const { makeSavedPackageStateCode } = await load("client/lib/package-persistence.mjs")
-const { withBrowserReceipt } = await load("client/lib/executor.mjs")
-const { makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode } = await load("client/lib/package-cleanup.mjs")
-const { openNewOutputTable, configureTablePrecision, prepareTableRead, returnFromOutputTable } =
-  await load("client/lib/node-output-procedure.mjs")
-const { readTableOutputPages } = await load("client/lib/table-output-pages.mjs")
-const { decodeTableOutput } = await load("client/lib/table-output-values.mjs")
-
 const config = JSON.parse(await readFile(args.config, "utf8"))
 const loginPassword = config.workflow_profile?.password ?? ""
 if (config.workflow_profile?.passwordless_login === true && loginPassword !== "") throw Error("TEST_PASSWORD_UNAVAILABLE")
@@ -120,6 +97,40 @@ const saved = await loadSaved(args.saved)
 if (saved.path !== expected.package_path) throw Error("PACKAGE_PATH_MISMATCH")
 
 await mkdir(args.output, { recursive: true, mode: 0o700 })
+if(nodeIds!==undefined){
+  const file=saved.file_version;
+  if(typeof file?.mtime!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(file.mtime)
+   ||!Number.isSafeInteger(file.size)||file.size<1||typeof file.hash!=='string'||!/^[a-f0-9]{64}$/.test(file.hash)){
+    const result={status:'UNKNOWN',phase:'independent_cold_reopen_readback',path:saved.path,settingsReapplied:false,
+      error:'CASE_PORT_SAVE_VERSION_UNKNOWN',cleanup:{status:'NOT_RUN',package_closed:false,logged_out:false}};
+    await writeFile(join(args.output,'result.json'),JSON.stringify(result,null,2)+'\n');
+    process.exit(0);
+  }
+}
+
+const root = resolve(args.resources)
+const load = (name) => import(pathToFileURL(join(root, "runtime", name)).href)
+const { verifyResources } = await load("src/resources.mjs")
+const resources = await verifyResources(root)
+const compatibilityPlatform = resources.manifest.target?.startsWith("win32-")
+  ? "windows"
+  : resources.manifest.target?.startsWith("darwin-")
+    ? "macos"
+    : "linux"
+const { loginBrowser } = await load("src/connection-check.mjs")
+const { makeWorkspacePrepareCode } = await load("client/lib/workspace.mjs")
+const { createNodeTargetBrowserAdapter } = await load("client/lib/node-target-browser.mjs")
+const { createNodeProcedure } = await load("client/lib/node-procedure.mjs")
+const { createNodeExecutionProcedure,trainConfiguredNode } = await load("client/lib/node-execution-procedure.mjs")
+const { createExecutionJournal } = await load("client/lib/execution-journal.mjs")
+const { makeSavedPackageStateCode } = await load("client/lib/package-persistence.mjs")
+const { withBrowserReceipt } = await load("client/lib/executor.mjs")
+const { makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode } = await load("client/lib/package-cleanup.mjs")
+const { openNewOutputTable, configureTablePrecision, prepareTableRead, returnFromOutputTable } =
+  await load("client/lib/node-output-procedure.mjs")
+const { readTableOutputPages } = await load("client/lib/table-output-pages.mjs")
+const { decodeTableOutput } = await load("client/lib/table-output-values.mjs")
+
 const session = randomUUID()
 const metadata = {
   sessionId: session,

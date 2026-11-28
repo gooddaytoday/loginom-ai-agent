@@ -4042,6 +4042,7 @@ class Runner:
         cancellation_pending = getattr(self, 'cancel_requested', False)
         self.closing_live = True
         cleanup = 'FAIL'
+        cleanup_errors = []
         try:
             close_error = None
             try:
@@ -4096,16 +4097,19 @@ class Runner:
             with live.turn_log.open('a') as log:
                 print(json.dumps(dict(event='cleanup_verified', at=time.time(), **proof)), file=log)
             if not chromium_exited:
-                raise PackageCloseUnconfirmed('LIVE_CHAIN_CHROMIUM_EXIT_UNCONFIRMED')
+                cleanup_errors.append('LIVE_CHAIN_CHROMIUM_EXIT_UNCONFIRMED')
             if package_closed is False or logged_out is False:
-                raise PackageCloseUnconfirmed('LIVE_CHAIN_PACKAGE_CLEANUP_UNCONFIRMED')
+                cleanup_errors.append('LIVE_CHAIN_PACKAGE_CLEANUP_UNCONFIRMED')
             if not ack:
-                raise PackageCloseUnconfirmed('LIVE_CHAIN_RUNTIME_ACK_MISSING')
+                cleanup_errors.append('LIVE_CHAIN_RUNTIME_ACK_MISSING')
             if close_error:
-                raise PackageCloseUnconfirmed(close_error)
+                cleanup_errors.append(close_error)
+            if cleanup_errors:
+                raise PackageCloseUnconfirmed(cleanup_errors[0])
             cleanup = 'main PASS' if attempts else 'no workspace started'
         except PackageCloseUnconfirmed as error:
             self.current['live_cleanup_error'] = str(error)
+            self.current['live_cleanup_errors'] = cleanup_errors or [str(error)]
             raise
         finally:
             self.current['cleanup'] = cleanup
@@ -4116,37 +4120,58 @@ class Runner:
                     turn['cleanup'] = cleanup
                     if cleanup == 'FAIL' and turn['status'] == 'PASS':
                         turn.update(status='UNKNOWN', failure_class='LIVE_CHAIN_SHUTDOWN_UNCONFIRMED')
-                        if turn.get('csv') == 'pending native port readback':
-                            turn.update(csv='UNKNOWN', readback_reason='CASE_PORT_READBACK_CLOSE_UNCONFIRMED')
             self.closing_live = False
-            if not cancellation_pending and getattr(self, 'cancel_requested', False):
+            cancelled = not cancellation_pending and getattr(self, 'cancel_requested', False)
+            if cleanup == 'FAIL' or cancelled:
+                self.complete_live_port_readbacks(live, skip_reason='CASE_PORT_READBACK_CLOSE_UNCONFIRMED'
+                                                 if cleanup == 'FAIL' else 'CASE_PORT_READBACK_SKIPPED')
+            if cancelled:
                 raise InterruptedError('LIVE_CHAIN_CANCELLED')
 
-        readbacks, live.port_readbacks = live.port_readbacks, []
-        final_version = saved_file_version(live.saved)
-        for stage, package, login, build, version in readbacks:
-            turn = next(turn for turn in self.current['turns'] if turn['case'] == stage.name)
-            reason = None
-            if not verify_ports:
-                reason = 'CASE_PORT_READBACK_SKIPPED'
-            elif version is None or final_version is None:
-                reason = 'CASE_PORT_SAVE_VERSION_UNKNOWN'
-            elif version != final_version:
-                reason = 'CASE_PORT_SAVE_VERSION_CHANGED'
-            if reason is None:
-                try:
-                    reason = self.case_port_readback(stage, package, login, build, version=version)
-                except Exception as error:
-                    turn.update(status='UNKNOWN' if isinstance(error, TimeoutError) else 'FAIL', csv='FAIL',
-                                failure_class=str(error).split(':')[0] or type(error).__name__)
-                    raise
+        self.complete_live_port_readbacks(live, skip_reason=None if verify_ports else 'CASE_PORT_READBACK_SKIPPED')
+
+    def complete_live_port_readbacks(self, live, *, skip_reason):
+        if not live.port_readbacks:
+            return
+        turns = self.current['turns']
+        turns_by_case = {turn['case']: turn for turn in turns}
+        readbacks = iter(live.port_readbacks)
+
+        def finish(turn, reason):
             turn['csv'] = 'UNKNOWN' if reason else '— (native outputs PASS)'
             if reason:
                 turn['readback_reason'] = reason
                 if turn['status'] == 'PASS':
                     turn.update(status='UNKNOWN', failure_class=reason)
-            if turn is self.current['turns'][-1]:
-                self.current['csv'] = turn['csv']
+
+        try:
+            final_version = saved_file_version(live.saved)
+            for stage, package, login, build, version in readbacks:
+                turn = turns_by_case[stage.name]
+                reason = skip_reason
+                if not reason:
+                    if version is None or final_version is None:
+                        reason = 'CASE_PORT_SAVE_VERSION_UNKNOWN'
+                    elif version != final_version:
+                        reason = 'CASE_PORT_SAVE_VERSION_CHANGED'
+                    else:
+                        try:
+                            reason = self.case_port_readback(stage, package, login, build, version=version)
+                        except InterruptedError:
+                            finish(turn, 'CASE_PORT_READBACK_INTERRUPTED')
+                            raise
+                        except Exception as error:
+                            turn.update(status='UNKNOWN' if isinstance(error, TimeoutError) else 'FAIL', csv='FAIL',
+                                        failure_class=str(error).split(':')[0] or type(error).__name__)
+                            raise
+                finish(turn, reason)
+        finally:
+            # A failed cold reader may have left a lock on the package.
+            for stage, *_ in readbacks:
+                finish(turns_by_case[stage.name], 'CASE_PORT_READBACK_SKIPPED')
+            if live.port_readbacks[-1][0].name == turns[-1]['case']:
+                self.current['csv'] = turns[-1]['csv']
+            live.port_readbacks.clear()
 
     def preserve_live_evidence(self, profile, folder):
         runtime = profile / 'loginom/runtime'

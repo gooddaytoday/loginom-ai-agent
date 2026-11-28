@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {makeSavedPackageStateCode} from '../../../packages/loginom-runtime/client/lib/package-persistence.mjs';
 import {verifyColdPackageFile} from '../cold-reader-policy.mjs';
 const source=await readFile(new URL('../cold-check.mjs',import.meta.url),'utf8');
@@ -68,4 +72,30 @@ test('deferred ports require the version of the file read under the reopened wor
   assert.equal(proof.reason,reason,mode);
   assert.deepEqual(proof.file,['absent','release','missing reader'].includes(mode)?undefined:observed,mode);
  }
+});
+
+test('direct cold port readback without a usable Save version reports UNKNOWN before opening',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'cold-ports-'));
+ t.after(()=>rm(root,{recursive:true,force:true}));
+ const config=join(root,'config.json'), expected=join(root,'expected.json');
+ const script=fileURLToPath(new URL('../cold-check.mjs',import.meta.url));
+ const packagePath='/own/saved.lgp';
+ await writeFile(config,JSON.stringify({workflow_profile:{passwordless_login:true}}));
+ await writeFile(expected,JSON.stringify({package_path:packagePath,nodes:[],case_port_node_ids:['node'],
+  outputs:[{output_node_type:'imports.text',columns:[{name:'id',type:'integer'}],rows:[{id:1}]}]}));
+ const version={mtime:'2026-11-28T00:00:00.000Z',size:100,hash:'a'.repeat(64)};
+ for(const [name,saved] of [
+  ['path-only',packagePath],['no version',{path:packagePath}],['null',{path:packagePath,file_version:null}],
+  ...Object.entries({mtime:'invalid',size:0,hash:'invalid'}).map(([key,value])=>
+   [key,{path:packagePath,file_version:{...version,[key]:value}}]),
+ ]) await t.test(name,async()=>{
+  const savedFile=join(root,'saved.json'), output=join(root,name);
+  await writeFile(savedFile,JSON.stringify(saved));
+  execFileSync(process.execPath,[script,'--config',config,'--resources',join(root,'missing-runtime'),
+   '--saved',typeof saved==='string'?saved:savedFile,'--expected',expected,'--output',output]);
+  const result=JSON.parse(await readFile(join(output,'result.json'),'utf8'));
+  assert.equal(result.status,'UNKNOWN');
+  assert.equal(result.error,'CASE_PORT_SAVE_VERSION_UNKNOWN');
+  assert.deepEqual(result.cleanup,{status:'NOT_RUN',package_closed:false,logged_out:false});
+ });
 });

@@ -371,9 +371,10 @@ class LiveChainTest(unittest.TestCase):
         edit = dict(kind='rename', node=dict(label='Before'), label='After')
         persisted = dict(complete=True, links=[], nodes=[
             dict(ref=dict(node_id='node'), label='After', type='imports.text', position=dict(x=64, y=64))])
-        for acknowledged, version_known, evidence_unmoved in (
-                (True, True, False), (True, False, False), (False, True, False), (True, True, True)):
-            with self.subTest(acknowledged=acknowledged, version_known=version_known,
+        for acknowledged, native_cleanup, version_known, evidence_unmoved in (
+                (True, True, True, False), (True, True, False, False), (False, True, True, False),
+                (False, False, True, False), (True, True, True, True)):
+            with self.subTest(acknowledged=acknowledged, native_cleanup=native_cleanup, version_known=version_known,
                               evidence_unmoved=evidence_unmoved), TemporaryDirectory() as directory:
                 root = Path(directory)
                 pair, cases = root / 'pair', root / 'cases'
@@ -465,8 +466,9 @@ class LiveChainTest(unittest.TestCase):
                     (live.browser[2] / 'execution-events.jsonl').write_text('{}\n')
                     live.child.returncode = 0
                     write(live.browser[2] / 'saved-package-cleanup.json',
-                          dict(status='SUCCEEDED', package_closed=True, logged_out=True, unsaved_changes_discarded=False,
-                               account=live.account, package_path=live.package, document_id='document'))
+                          dict(status='SUCCEEDED' if native_cleanup else 'BLOCKED', package_closed=native_cleanup,
+                               logged_out=native_cleanup, unsaved_changes_discarded=False, account=live.account,
+                               package_path=live.package, document_id='document'))
                     if acknowledged:
                         ack = live.profile / 'loginom/runtime' / f'runtime-close-{live.child.pid}.json'
                         write(ack, dict(closed_ack=True, exit_code=0, exit_signal=None))
@@ -508,7 +510,10 @@ class LiveChainTest(unittest.TestCase):
                     self.assertEqual(calls, ['setup', 'first', 'exit'])
                     self.assertEqual(result['turns'][0]['status'], 'UNKNOWN')
                     self.assertEqual(result['turns'][0]['csv'], 'UNKNOWN')
-                    self.assertEqual(result['live_cleanup_error'], 'LIVE_CHAIN_RUNTIME_ACK_MISSING')
+                    failures = ([] if native_cleanup else ['LIVE_CHAIN_PACKAGE_CLEANUP_UNCONFIRMED']) + [
+                        'LIVE_CHAIN_RUNTIME_ACK_MISSING']
+                    self.assertEqual(result['live_cleanup_errors'], failures)
+                    self.assertEqual(result['live_cleanup_error'], failures[0])
                     self.assertEqual(result['turns'][0]['manual_edit']['failure_category'], 'product')
                     self.assertEqual(result['turns'][1]['status'], 'NOT_RUN')
 
@@ -536,6 +541,39 @@ class LiveChainTest(unittest.TestCase):
             self.assertEqual((first['status'], first['failure_class']), ('UNKNOWN', 'CASE_PORT_SAVE_VERSION_CHANGED'))
             self.assertEqual((unknown['status'], unknown['failure_class']), ('UNKNOWN', 'CASE_PORT_SAVE_VERSION_UNKNOWN'))
             self.assertEqual((last['status'], last['csv']), ('PASS', '— (native outputs PASS)'))
+
+    def test_failed_cold_read_finalizes_every_remaining_turn_in_results(self):
+        module = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'run-check.py'))
+        with TemporaryDirectory() as directory:
+            folder = Path(directory)
+            runner = module['Runner'].__new__(module['Runner'])
+            names = ('first', 'second', 'third')
+            runner.out = folder
+            runner.current = dict(scenario='third', status='PENDING', csv='pending native port readback',
+                                  turns=[dict(case=name, status='PASS', csv='pending native port readback') for name in names])
+            runner.report = dict(head='fixture', tree='fixture', runs=[runner.current], phase='case-port-readback')
+            version = dict(mtime='2026-11-28T00:00:00.000Z', size=100, hash='a' * 64)
+            arguments = ('/worker/sample.lgp', dict(username='worker'), folder / 'build')
+            live = Mock(profile=folder, previous_acks=set(), saved=dict(file_version=version),
+                        turn_log=folder / 'turns.jsonl', port_readbacks=[(folder / name, *arguments, version) for name in names])
+            live.segment_attempts.return_value = []
+            live.remaining_browsers.return_value = set()
+            with patch.object(runner, 'case_port_readback', side_effect=OSError('COLD_READ_FAILED')) as reader:
+                try:
+                    runner.close_live(live)
+                except OSError as error:
+                    runner.failure(runner.current, error, folder)
+                else:
+                    self.fail('the attempted readback failure did not reach the run report')
+            runner.save()
+            reader.assert_called_once_with(folder / 'first', *arguments, version=version)
+            result = json.loads((folder / 'results.json').read_text())['runs'][0]
+            self.assertEqual((result['status'], result['csv']), ('FAIL', 'UNKNOWN'))
+            first, *remaining = result['turns']
+            self.assertEqual((first['status'], first['csv'], first['failure_class']), ('FAIL', 'FAIL', 'COLD_READ_FAILED'))
+            for turn in remaining:
+                self.assertEqual((turn['status'], turn['csv'], turn['readback_reason']),
+                                 ('UNKNOWN', 'UNKNOWN', 'CASE_PORT_READBACK_SKIPPED'))
 
     def test_save_version_requires_a_successful_receipt_for_this_operation_and_path(self):
         version = dict(mtime='2026-11-28T00:00:00.000Z', size=100, hash='a' * 64)
