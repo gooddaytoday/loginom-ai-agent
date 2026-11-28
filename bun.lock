@@ -533,6 +533,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@loginom-ai-agent/product": "workspace:*",
+        "@loginom-ai-agent/runtime": "workspace:*",
         "@opencode/schema": "workspace:*",
         "@xmldom/xmldom": "0.8.15",
         "@zip.js/zip.js": "2.7.62",
@@ -555,8 +556,6 @@
       "version": "0.1.0",
       "dependencies": {
         "acorn": "8.15.0",
-      },
-      "devDependencies": {
         "yaml": "2.9.1",
       },
     },
