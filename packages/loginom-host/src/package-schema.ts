@@ -61,7 +61,7 @@ function normalizedLink(value: typeof link.Type) {
 
 type Workflow = Pick<PackageStructure["modules"][number], "workflow_nodes" | "links" | "submodels">
 type SavedNode = typeof node.Type &
-  Pick<Workflow["workflow_nodes"][number], "filter_conditions" | "grouping_fields" | "text_import">
+  Pick<Workflow["workflow_nodes"][number], "filter_conditions" | "grouping_fields">
 type SavedWorkflow = {
   key: string[]
   label: string
@@ -90,7 +90,6 @@ function savedWorkflow(workflow: Workflow, key: string[], label: string): SavedW
         ],
         ...(entry.filter_conditions ? { filter_conditions: entry.filter_conditions } : {}),
         ...(entry.grouping_fields ? { grouping_fields: entry.grouping_fields } : {}),
-        ...(entry.text_import ? { text_import: entry.text_import } : {}),
       }
     }),
     links: workflow.links.map((link) =>
@@ -108,7 +107,7 @@ function savedWorkflow(workflow: Workflow, key: string[], label: string): SavedW
 export async function savedPackageSchema(name: string, bytes: Uint8Array) {
   if (bytes.byteLength > maxPackageBytes) throw Error("PACKAGE_SCHEMA_TOO_LARGE")
   const { extractPackageBytes } = await import("./package-docs/extract")
-  const structure = await extractPackageBytes(name, bytes, { xmlBudget: maxPackageBytes, includeTextImport: true })
+  const structure = await extractPackageBytes(name, bytes, { xmlBudget: maxPackageBytes })
   const snapshot = {
     source: "saved" as const,
     observed_at: new Date().toISOString(),

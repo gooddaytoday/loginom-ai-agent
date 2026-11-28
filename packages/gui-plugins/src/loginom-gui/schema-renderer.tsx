@@ -3,7 +3,7 @@ import { Page, builtinContext } from "@opencode/plugin/gui/builtin"
 import { Button } from "@opencode/ui/button"
 import { createResource, createSignal, lazy, onCleanup, Show, Suspense, untrack } from "solid-js"
 import { PackageSchema, readFinding } from "./contract"
-import { copyText, readPackageCopy } from "./copy"
+import { copyText, readPackageCopy, samePackage } from "./copy"
 import { transition, type Event, type Request, type State } from "./schema-machine"
 import type definition from "./index"
 import styles from "./schema.css?inline"
@@ -44,7 +44,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
 
       return server.client.rpc(PackageSchema).schema(input, { location: { directory: request.directory }, signal })
     }).then(
-      ({ snapshot }) => dispatch({ type: "loaded", request, snapshot }),
+      ({ snapshot, reason }) => dispatch({ type: "loaded", request, snapshot, reason }),
       () => dispatch({ type: "failed", request }),
     )
   }
@@ -101,7 +101,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
         if (current.status === "ready" && current.snapshot.source === "window") {
           const workflow = current.snapshot.workflow
 
-          return path?.document_id === workflow.document_id && path.workflow_id === workflow.workflow_id ? path : null
+          return path && samePackage(path, workflow) ? path : null
         }
       }
 

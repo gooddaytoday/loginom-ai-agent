@@ -27,7 +27,7 @@ function fixture() {
     Items: { Workspace: { getActiveTab: () => ({ Controller: { Node: { data: { node: other } } } }) } },
   };
   const receipt = {
-    phase: 'verified', request: JSON.stringify({ session: 'chat' }), packageNode: owned,
+    phase: 'verified', workflowId: 'workflow', request: JSON.stringify({ session: 'chat' }), packageNode: owned,
     openConnection: connection, openServerSession: session,
   };
   const globals = {
@@ -44,8 +44,8 @@ function fixture() {
   };
   const page = { url: () => origin, evaluate: (read, input) => runInNewContext(`(${read})(input)`, { ...globals, input, setTimeout, clearTimeout }) };
   const read = createPackageStateReader(metadata, origin, () => data.time);
-  const snapshot = (save, opened) => read({ pages: () => [page] }, save && { ...save, document_id: 'doc' }, false, opened);
-  return { snapshot, data, owned, packages, connection, receipt, metadata };
+  const snapshot = (save, opened) => read({ pages: () => [page] }, save && { workflow_id: 'workflow', ...save, document_id: 'doc' }, false, opened);
+  return { snapshot, data, owned, packages, connection, receipt, metadata, page, receipts: globals.__loginomDockPreparationV1.receipts };
 }
 
 test('reads the conversation draft even when another package is active', async () => {
@@ -70,7 +70,7 @@ test('reports confirmed Save independently of current dirty state and package cl
   const { snapshot, data, owned, packages } = fixture();
   owned.PackageFileName = 'user\\result.lgp';
   const lastSave = { path: '/user/result.lgp', confirmedAt: 90 };
-  const copy = { document_id: 'doc', workflow_id: 'workflow', path: lastSave.path, lastSave: false };
+  const copy = { document_id: 'doc', workflow_id: 'workflow', workflow_ids: ['workflow'], path: lastSave.path, lastSave: false };
   assert.deepEqual(await snapshot(lastSave), {
     open: true, path: '/user/result.lgp', modified: false, modifiedDetectedAt: null, lastSave, copy,
   });
@@ -101,17 +101,17 @@ test('copy uses an opened file or a confirmed Save, ignoring a draft filename', 
   const { snapshot, data, owned } = fixture();
   owned.PackageFileName = 'user/temporary.lgp';
   assert.equal((await snapshot()).copy, undefined);
-  const opened = { documentID: 'doc', path: '/user/original.lgp' };
+  const opened = { documentID: 'doc', workflowID: 'workflow', path: '/user/original.lgp' };
   owned.PackageFileName = 'user/original.lgp';
   assert.deepEqual((await snapshot(undefined, opened)).copy, {
-    document_id: 'doc', workflow_id: 'workflow', path: '/user/original.lgp', lastSave: false,
+    document_id: 'doc', workflow_id: 'workflow', workflow_ids: ['workflow'], path: '/user/original.lgp', lastSave: false,
   });
   data.modified = true;
   assert.equal((await snapshot(undefined, opened)).copy.lastSave, true);
   owned.PackageFileName = 'user/revised.lgp';
   data.modified = false;
   assert.deepEqual((await snapshot({ path: '/user/revised.lgp', confirmedAt: 200 })).copy, {
-    document_id: 'doc', workflow_id: 'workflow', path: '/user/revised.lgp', lastSave: false,
+    document_id: 'doc', workflow_id: 'workflow', workflow_ids: ['workflow'], path: '/user/revised.lgp', lastSave: false,
   });
 });
 
@@ -124,14 +124,16 @@ test('copies the current owned filename after manual Save As with an older agent
   receipt.stepSession = { connection, nativeSession: connection.Session };
   const lastSave = { path: '/analyst/Sales.lgp', confirmedAt: 90 };
   owned.PackageFileName = 'analyst/Sales-v2.lgp';
-  const copy = { document_id: 'doc', workflow_id: 'workflow', path: '/analyst/Sales-v2.lgp', lastSave: false };
+  const copy = { document_id: 'doc', workflow_id: 'workflow', workflow_ids: ['workflow'], path: '/analyst/Sales-v2.lgp', lastSave: false };
   assert.deepEqual(await snapshot(lastSave), {
     open: true, path: copy.path, modified: false, modifiedDetectedAt: null, lastSave, copy,
   });
   data.modified = true;
   assert.deepEqual((await snapshot(lastSave)).copy, { ...copy, lastSave: true });
   packages.shift();
-  assert.deepEqual((await snapshot(lastSave)).copy, { ...copy, path: lastSave.path, lastSave: true });
+  assert.deepEqual((await snapshot(lastSave)).copy, { ...copy, lastSave: true });
+  const newer = { path: '/analyst/Sales-v3.lgp', confirmedAt: 110 };
+  assert.deepEqual((await snapshot(newer)).copy, { ...copy, path: newer.path, lastSave: true });
 });
 
 test('recognizes the first manual save of an owned draft', async () => {
@@ -140,6 +142,54 @@ test('recognizes the first manual save of an owned draft', async () => {
   assert.equal((await snapshot()).copy, undefined);
   owned.PackageFileName = 'analyst/Sales.lgp';
   assert.deepEqual((await snapshot()).copy, {
-    document_id: 'doc', workflow_id: 'workflow', path: '/analyst/Sales.lgp', lastSave: false,
+    document_id: 'doc', workflow_id: 'workflow', workflow_ids: ['workflow'], path: '/analyst/Sales.lgp', lastSave: false,
   });
+});
+
+test('branches share the verified package, and another package in the same document does not inherit its copy path', async () => {
+  const { snapshot, metadata, owned, receipt, receipts, packages } = fixture();
+  const preparation = metadata.workspacePreparation;
+  const lastSave = { path: '/analyst/Sales.lgp', confirmedAt: 90 };
+  owned.PackageFileName = 'analyst/Sales-v2.lgp';
+  assert.equal((await snapshot(lastSave)).copy.path, '/analyst/Sales-v2.lgp');
+
+  receipt.phase = 'superseded';
+  receipts.set('parent', { ...receipt, phase: 'verified', workflowId: 'parent' });
+  metadata.workspacePreparation = { operation_id: 'parent', state: {
+    ...preparation.state, workflow_ref: { ...preparation.state.workflow_ref, workflow_id: 'parent' },
+  }};
+  packages.shift();
+  assert.deepEqual((await snapshot(lastSave)).copy, {
+    document_id: 'doc', workflow_id: 'parent', workflow_ids: ['workflow', 'parent'],
+    path: '/analyst/Sales-v2.lgp', lastSave: true,
+  });
+
+  receipts.set('different', { ...receipt, phase: 'verified', workflowId: 'different', packageNode: packages[0] });
+  metadata.workspacePreparation = { operation_id: 'different', state: {
+    ...preparation.state, workflow_ref: { ...preparation.state.workflow_ref, workflow_id: 'different' },
+  }};
+  assert.equal((await snapshot(lastSave)).copy, undefined);
+});
+
+test('bounds a stalled page evaluation, skips overlapping polls and resumes when it settles', async t => {
+  const { snapshot, page } = fixture();
+  const evaluate = page.evaluate;
+  const stalled = Promise.withResolvers();
+  let evaluations = 0;
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  page.evaluate = () => {
+    evaluations++;
+    return stalled.promise;
+  };
+  const unavailable = { open: null, path: null, modified: null, modifiedDetectedAt: null, lastSave: null };
+  const pending = snapshot();
+  t.mock.timers.tick(4000);
+  assert.deepEqual(await pending, unavailable);
+  assert.deepEqual(await snapshot(), unavailable);
+  assert.equal(evaluations, 1);
+
+  stalled.resolve(null);
+  await stalled.promise;
+  page.evaluate = evaluate;
+  assert.equal((await snapshot()).open, true);
 });

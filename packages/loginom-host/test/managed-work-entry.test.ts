@@ -330,6 +330,9 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     expect(await host.packageSchema("file-errors", target)).toMatchObject({
       source: "saved", target, workflows: [{ submodels: [{ submodels: [expect.anything()] }] }],
     })
+    await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared: true,
+      schema: { ...snapshot, name: "Fixture", navigation_path: [] }, savedSchema: { source: "save_required" } }))
+    expect(await host.packageSchema("file-errors", target)).toEqual({ source: "save_required" })
     await run.tools()
     const sessionID = Session.ID.make("ses_file_errors")
     const messageID = SessionMessage.ID.make("msg_original")

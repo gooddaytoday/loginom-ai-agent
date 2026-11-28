@@ -28,7 +28,10 @@ const rpc = {
       },
       output: {
         type: "object",
-        properties: { snapshot: { anyOf: [{ type: "object" }, { type: "null" }] } },
+        properties: {
+          snapshot: { anyOf: [{ type: "object" }, { type: "null" }] },
+          reason: { type: "string", const: "saveRequired" },
+        },
         required: ["snapshot"],
         additionalProperties: false,
       },
@@ -59,17 +62,14 @@ export async function rememberSavedPackage(
 }
 
 export async function registerPackageSchema(
-  ctx: Pick<Plugin.Context, "location" | "rpc" | "session" | "storage">,
+  ctx: Pick<Plugin.Context, "rpc" | "storage">,
   files: Pick<Awaited<ReturnType<typeof localFiles>>, "attachedPackage">,
+  ownsSession: (sessionID: string) => Promise<boolean>,
 ) {
   await ctx.rpc.register(rpc, {
     async schema(value, { signal }) {
       const input = Schema.decodeUnknownSync(Request)(value)
-      const owns = async () => {
-        const session = await ctx.session.get({ sessionID: input.sessionID }).catch(() => undefined)
-        return session?.location.directory === ctx.location.directory && session.projectID === ctx.location.project.id
-      }
-      if (!(await owns())) return { snapshot: null }
+      if (!(await ownsSession(input.sessionID))) return { snapshot: null }
       signal.throwIfAborted()
 
       const window =
@@ -91,7 +91,11 @@ export async function registerPackageSchema(
               return attached && savedPackageSchema(attached.name, attached.bytes)
             })().catch(() => null))
       signal.throwIfAborted()
-      return { snapshot: (await owns()) ? snapshot : null }
+      if (!(await ownsSession(input.sessionID))) return { snapshot: null }
+
+      if (snapshot && typeof snapshot === "object" && "source" in snapshot && snapshot.source === "save_required")
+        return { snapshot: null, reason: "saveRequired" }
+      return { snapshot }
     },
   })
 }

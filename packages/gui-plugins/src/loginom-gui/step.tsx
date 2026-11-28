@@ -7,7 +7,7 @@ import { createMemo, createResource, createSignal, createUniqueId, For, onCleanu
 import { createKeyed, Slot, usePlugin, type MountedSession, type Plugin } from "@opencode/plugin/gui"
 import { builtinContext, BuiltinSlot, ToolRenderer, type ToolRendererProps } from "@opencode/plugin/gui/builtin"
 import { readStepNode, type StepNode } from "./contract"
-import { copyText, readPackageCopy } from "./copy"
+import { copyText, readPackageCopy, samePackage } from "./copy"
 import type definition from "./index"
 import { decodeFacts, decodeProgress, failureTitle, loginomStepPhrase, stepDetails } from "./step-phrase"
 
@@ -63,7 +63,7 @@ function StepActions(props: { node: StepNode; openNode: OpenNode }) {
     if (path.loading) return
     const current = path()
 
-    if (current?.document_id === props.node.document_id && current.workflow_id === props.node.workflow_id)
+    if (current && samePackage(current, props.node))
       return current
   }
 

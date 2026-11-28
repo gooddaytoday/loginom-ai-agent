@@ -841,6 +841,8 @@ export async function createLoginomHost(options: {
         before.generation !== after.generation || generation?.children.get(chat) !== child ||
         stale.has(chat) || journal.pending().length || recoveries.has(chat)
       ) return null
+      if (target && result && typeof result === "object" && "source" in result && result.source === "save_required")
+        return { source: "save_required" as const }
       if (target && result && typeof result === "object" && "source" in result && result.source === "saved" &&
         "name" in result && typeof result.name === "string" && "base64" in result && typeof result.base64 === "string" &&
         result.base64.length <= Math.ceil(maxPackageBytes / 3) * 4) {

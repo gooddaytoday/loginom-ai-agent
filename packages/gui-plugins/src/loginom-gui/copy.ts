@@ -8,11 +8,17 @@ type Context = Parameters<Plugin.Setup<typeof definition>>[0]
 const CopyPath = Schema.Struct({
   document_id: Schema.NonEmptyString,
   workflow_id: Schema.NonEmptyString,
+  workflow_ids: Schema.optionalKey(Schema.Array(Schema.NonEmptyString)),
   path: Schema.String.check(Schema.isPattern(/^\/[^\r\n]+\.lgp$/i)),
   lastSave: Schema.Boolean,
 })
 
 export type CopyPath = typeof CopyPath.Type
+
+export function samePackage(path: CopyPath, workflow: Pick<CopyPath, "document_id" | "workflow_id">) {
+  return path.document_id === workflow.document_id
+    && (path.workflow_id === workflow.workflow_id || path.workflow_ids?.includes(workflow.workflow_id) === true)
+}
 
 const PackageState = Rpc.define({
   id: "loginom.package-state",

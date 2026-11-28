@@ -36,12 +36,6 @@ const node = Schema.Struct({
       }),
     ),
   ),
-  text_import: Schema.optionalKey(
-    Schema.Struct({
-      file_or_url: Schema.optionalKey(Schema.String),
-      column_separator: Schema.optionalKey(Schema.String),
-    }),
-  ),
 })
 
 const endpoint = Schema.Struct({
@@ -128,7 +122,9 @@ export const PackageSchema = Rpc.define({
           source: Schema.optionalKey(Schema.Literals(["saved", "window"])),
         }),
       ),
-      output: Schema.toStandardSchemaV1(Schema.Struct({ snapshot: Schema.NullOr(snapshot) })),
+      output: Schema.toStandardSchemaV1(
+        Schema.Struct({ snapshot: Schema.NullOr(snapshot), reason: Schema.optionalKey(Schema.Literal("saveRequired")) }),
+      ),
     },
   },
   events: {},

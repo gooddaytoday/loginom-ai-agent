@@ -47,12 +47,33 @@ async function inSavedFileTab(page, options) {
         throw Error('Saved package owner changed');
     };
     const session = connection?.Session;
+    const readModified = async () => {
+      verify();
+      const proxy = pack.Package;
+      if (!proxy) return null;
+      let timer;
+      try {
+        const modified = await Promise.race([
+          session.IsPackageModified(proxy),
+          new Promise(resolve => { timer = setTimeout(resolve, 3000, null); }),
+        ]);
+        verify();
+        return pack.Package === proxy ? modified : null;
+      } finally {
+        clearTimeout(timer);
+      }
+    };
     verify();
-    return {verify, workspace, card, path: options.path, limit: options.limit};
+    return {verify, readModified, workspace, card, path: options.path, limit: options.limit};
   }, options);
   const tab = page.locator('[data-tid='+JSON.stringify(options.tabTid)+']');
   let files, entered = false;
   try {
+    if (options.target) {
+      const modified = await owner.evaluate(owner => owner.readModified());
+      if (modified === true) return {saveRequired:true};
+      if (modified !== false) throw Error('Saved package modified state unavailable');
+    }
     if (options.target && await page.locator('[role="dialog"]:visible,.x-window:visible,.bg-dialog:visible').count())
       throw Error('Saved package window is blocked');
     if (await tab.count() !== 1 || !await tab.evaluate(element => element.classList.contains('x-tab-active')))
@@ -64,7 +85,7 @@ async function inSavedFileTab(page, options) {
       const card = owner.workspace.getActiveTab(), controller = card?.Controller?.FController;
       return controller?.constructor?.name === 'FileStorageForm' && controller.FFileStorage ? card : null;
     }, owner, {timeout: 2500});
-    return await page.evaluate(async ({owner, files}) => {
+    return await page.evaluate(async ({owner, files, target}) => {
       const verify = () => {
         owner.verify();
         if (owner.workspace.getActiveTab() !== files) throw Error('Saved package Files tab changed');
@@ -88,12 +109,18 @@ async function inSavedFileTab(page, options) {
           bytes.set(chunk, offset);
         }
         verify();
+        if (target) {
+          const modified = await owner.readModified();
+          verify();
+          if (modified === true) return {saveRequired:true};
+          if (modified !== false) throw Error('Saved package modified state unavailable');
+        }
         return {base64:bytes.toBase64()};
       } finally {
         await downloader.Dispose();
         if (!downloader.IsStreamReleased() || !downloader.IsDisposed) throw Error('Saved package stream did not close');
       }
-    }, {owner, files});
+    }, {owner, files, target: !!options.target});
   } finally {
     try {
       if (entered && await owner.evaluate((owner, files) => files
@@ -118,12 +145,13 @@ export function parseSavedPackageBytes(response) {
     if (block.type !== 'text') continue;
     const text = block.text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/)?.[1] ?? block.text;
     if (text.length > Math.ceil(maxBytes / 3) * 4 + 64) continue;
-    try {
-      const {base64} = JSON.parse(text);
-      if (typeof base64 !== 'string') continue;
-      const bytes = Buffer.from(base64, 'base64');
-      if (bytes.length && bytes.length <= maxBytes && bytes.toString('base64') === base64) return bytes;
-    } catch {}
+    let result;
+    try { result = JSON.parse(text); }
+    catch { continue; }
+    if (result?.saveRequired === true) throw Object.assign(Error('Save the package first'), {code:'PACKAGE_SCHEMA_SAVE_REQUIRED'});
+    if (typeof result?.base64 !== 'string') continue;
+    const bytes = Buffer.from(result.base64, 'base64');
+    if (bytes.length && bytes.length <= maxBytes && bytes.toString('base64') === result.base64) return bytes;
   }
   throw Error('Saved package read unavailable');
 }

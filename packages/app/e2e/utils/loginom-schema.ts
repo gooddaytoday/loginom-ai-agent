@@ -47,7 +47,6 @@ const root = {
         { ...port(33, "input", 1, "Управляющие переменные"), guid: "455b65c3-0587-3a9c-b47e-9b0d285bff3c" },
         port(30, "output", 0, "Набор данных"),
       ],
-      text_import: { file_or_url: "sales.csv", column_separator: ";" },
     },
     {
       guid: id(4),
@@ -243,6 +242,8 @@ export async function openLoginomNodeConversation(page: Page, options: NodeLinks
         const step = JSON.stringify(body) === JSON.stringify({ input: { sessionID, target: binding } })
 
         if (step && parent) {
+          if (packageState === "dirty") return { output: { snapshot: null, reason: "saveRequired" } }
+
           const workflow = { ...root, nodes: [...root.nodes, sameName] }
 
           return { output: { snapshot: { ...saved, workflows: [workflow], target: binding } } }
@@ -267,6 +268,7 @@ export async function openLoginomNodeConversation(page: Page, options: NodeLinks
               ? {
                   document_id: target.document_id,
                   workflow_id: snapshot.workflow.workflow_id,
+                  workflow_ids: parent ? [target.workflow_id, snapshot.workflow.workflow_id] : [snapshot.workflow.workflow_id],
                   path,
                   lastSave: dirty,
                 }

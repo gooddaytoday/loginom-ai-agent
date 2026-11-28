@@ -9,12 +9,12 @@ export type Request = { sessionID: string; serverID: string; directory: string }
 export type State =
   | { status: "closed" }
   | { status: "loading" | "empty" | "failed"; request: Request }
-  | { status: "missing"; request: Request; reason: "unavailable" | "otherSnapshot" | "removed" }
+  | { status: "missing"; request: Request; reason: "unavailable" | "otherSnapshot" | "saveRequired" | "removed" }
   | { status: "ready"; request: Request; snapshot: Snapshot; path: readonly Workflow[]; selected?: number }
 
 export type Event =
   | { type: "open"; request: Request }
-  | { type: "loaded"; request: Request; snapshot: Snapshot | null }
+  | { type: "loaded"; request: Request; snapshot: Snapshot | null; reason?: "saveRequired" }
   | { type: "failed"; request: Request }
   | { type: "close" }
   | { type: "module"; workflow: Workflow }
@@ -53,7 +53,7 @@ export function transition(state: State, event: Event): State {
       const { finding, node } = request
 
       if (node) {
-        if (!snapshot) return { status: "missing", request, reason: "unavailable" }
+        if (!snapshot) return { status: "missing", request, reason: event.reason ?? "unavailable" }
 
         if (snapshot.source === "saved") {
           if (snapshot.target?.document_id !== node.document_id || snapshot.target.workflow_id !== node.workflow_id)

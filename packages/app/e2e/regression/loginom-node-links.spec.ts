@@ -50,11 +50,22 @@ test("opens the saved submodel from a step after returning to the parent workflo
   await expect(node).toHaveAttribute("aria-pressed", "false")
   await page.getByRole("button", { name: "Вернуться к разговору" }).click()
 
+  await page.getByRole("button", { name: "Действия шага" }).click()
+  await page.getByRole("menuitem", { name: "Скопировать путь", exact: true }).click()
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe("/analyst/Пакеты/Продажи.lgp")
+
   await page.getByRole("button", { name: "Показать на схеме" }).click()
   await expect(page.getByText("Сохранённый файл", { exact: true })).toBeVisible()
   await expect(page.getByText("Продажи.lgp › Контроль качества", { exact: true })).toBeVisible()
   await expect(node).toHaveAttribute("aria-pressed", "true")
   await expect(node).toBeFocused()
+})
+
+test("requires saving before opening a departed submodel after an unsaved edit", async ({ page }) => {
+  await openLoginomNodeConversation(page, { packageState: "dirty", graph: "parent" })
+  await page.getByRole("button", { name: "Показать на схеме" }).click()
+  await expect(page.getByRole("status").filter({ hasText: "Сохраните пакет и попробуйте снова." })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Внутренняя проверка", exact: true })).toHaveCount(0)
 })
 
 test("offers no path for an unsaved draft", async ({ page }) => {
@@ -110,6 +121,13 @@ for (const [graph, message] of [
 ] as const) {
   test(`reports a node reference with graph state ${graph} without selecting a namesake`, async ({ page }) => {
     await openLoginomNodeConversation(page, { packageState: "saved", graph })
+
+    if (graph === "other") {
+      await page.getByRole("button", { name: "Действия шага" }).click()
+      await expect(page.getByRole("menuitem", { name: "Скопировать путь", exact: true })).toBeDisabled()
+      await page.keyboard.press("Escape")
+    }
+
     await page.getByRole("button", { name: "Показать на схеме" }).click()
     await expect(page.getByRole("status").filter({ hasText: message })).toBeVisible()
     await expect(page.getByRole("button", { name: "Внутренняя проверка", exact: true })).toHaveCount(0)

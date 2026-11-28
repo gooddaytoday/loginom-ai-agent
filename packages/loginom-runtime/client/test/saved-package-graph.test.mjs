@@ -77,9 +77,10 @@ test('reads a saved package for a departed workflow and restores the current par
   const bytes = await readFile(new URL('../../../loginom-host/test/fixtures/package-docs/deep.lgp', import.meta.url));
   const origin = 'https://loginom.test', tabTid = 'package-tab', document = {};
   const path = '/analyst/Package.lgp';
-  let downloads = 0;
+  let downloads = 0, modified = false, editWhileReading = false;
   class PackageTreeNode {
     PackageFileName = path;
+    Package = {};
     HasRunningNodes() { return false; }
   }
   class FileStorageForm { FFileStorage = {}; }
@@ -89,7 +90,10 @@ test('reads a saved package for a departed workflow and restores the current par
     async GetFileSize() { downloads++; return bytes.length; }
     async GetFileStream() {
       let offset = 0;
-      return { async ReadBuffer(buffer) { buffer.set(bytes.subarray(offset, offset += buffer.length)); } };
+      return { async ReadBuffer(buffer) {
+        buffer.set(bytes.subarray(offset, offset += buffer.length));
+        if (editWhileReading) modified = true;
+      } };
     }
     async Dispose() { this.IsDisposed = true; }
     IsStreamReleased() { return this.IsDisposed; }
@@ -99,7 +103,7 @@ test('reads a saved package for a departed workflow and restores the current par
   const files = { Controller: { FController: new FileStorageForm() } };
   let active = parent;
   const tab = { getAttribute: () => tabTid, classList: { contains: () => active === parent } };
-  const nativeSession = {};
+  const nativeSession = { IsPackageModified: async () => modified };
   const connection = { Connected: true, UserName: 'analyst', Session: nativeSession };
   const form = { Items: { Workspace: { getActiveTab: () => active } }, FMapTree: {
     FServerConnection: connection, PackageNodes: { Count: 1, Items: () => pack },
@@ -114,7 +118,7 @@ test('reads a saved package for a departed workflow and restores the current par
     bg: { app: { Version:'7.4.2', PackageTreeNode, Application:{FInstance:{FMainForm:form}} },
       TBGFileOpenMode: {fomRead:0}, filestorage: {FileDownloader} },
   };
-  const evaluate = (fn, ...args) => runInNewContext(`(${fn})(...args)`, {...globals, args});
+  const evaluate = (fn, ...args) => runInNewContext(`(${fn})(...args)`, {...globals, args, setTimeout, clearTimeout});
   const handle = value => ({ value, evaluate: (fn, other) => evaluate(fn, value, other?.value), async dispose() {} });
   const page = {
     evaluateHandle: (fn, input) => handle(evaluate(fn, input)),
@@ -124,14 +128,29 @@ test('reads a saved package for a departed workflow and restores the current par
       click: async () => { active = selector.includes('btnFilestorage') ? files : parent; },
     }),
     waitForFunction: (fn, owner) => handle(evaluate(fn, owner.value)),
-    evaluate: (fn, {owner, files}) => evaluate(fn, {owner:owner.value, files:files.value}),
+    evaluate: (fn, {owner, files, target}) => evaluate(fn, {owner:owner.value, files:files.value,target}),
   };
   const read = runInNewContext(makeSavedPackageGraphCode({ origin, build:'7.4.2', documentId:'doc',
     sessionId:'chat', account:'analyst', path, tabTid, target:{preparationId:'current', workflowId:'submodel'} }));
+  modified = true;
+  assert.equal((await read(page)).saveRequired, true);
+  assert.equal(downloads, 0);
+  assert.equal(active, parent);
+
+  modified = false;
   const result = await read(page);
   assert.equal(result.base64, bytes.toString('base64'));
   assert.equal(active, parent);
+  editWhileReading = true;
+  const changed = await read(page);
+  assert.equal(changed.saveRequired, true);
+  assert.equal(changed.base64, undefined);
+  assert.throws(() => parseSavedPackageBytes({ content: [{ type: 'text', text: JSON.stringify(changed) }] }), {
+    code: 'PACKAGE_SCHEMA_SAVE_REQUIRED',
+  });
+  assert.equal(active, parent);
+
   departed.packageNode = new PackageTreeNode();
   await assert.rejects(read(page), /Saved package owner changed/);
-  assert.equal(downloads, 1);
+  assert.equal(downloads, 2);
 });

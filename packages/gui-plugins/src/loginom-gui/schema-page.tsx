@@ -94,17 +94,10 @@ function settings(node: Node, translate: Translate) {
     })
     .join("; ")
 
-  let separator = node.text_import?.column_separator
-
-  if (separator === "\t") separator = translate("tab")
-  else if (separator === " ") separator = translate("space")
-
   return [
     { label: translate("condition"), value: conditions || undefined },
     { label: translate("keys"), value: groups || undefined },
     { label: translate("measures"), value: measures || undefined },
-    { label: translate("file"), value: node.text_import?.file_or_url },
-    { label: translate("separator"), value: separator },
   ].filter((setting) => setting.value !== undefined)
 }
 

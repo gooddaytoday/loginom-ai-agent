@@ -248,7 +248,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         throw error;
       }
       lastSavedPackage=null;
-      openedPackage={documentID:opened.document_id,path};
+      openedPackage={documentID:opened.document_id,workflowID:opened.workflow_ref.workflow_id,path};
       reopenedSave=null;
       ownedUnsavedDraft=null;
       nativeStepDocument=reopenedNativeStepDocument;
@@ -545,7 +545,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                 packageSaveFloor = saveSequence;
                 const path = preparationRequest.package_path;
                 openedPackage = preparationRequest.intent === 'open_package' && state.package_ref?.persisted === true
-                  && path && state.package_ref.path === path ? { documentID: state.document_id, path } : null;
+                  && path && state.package_ref.path === path ? { documentID: state.document_id, workflowID: state.workflow_ref.workflow_id, path } : null;
               }
               if(state.status==='READY'&&preparationRequest.intent==='new_draft'&&state.created_draft===true
                 &&state.package_ref?.persisted===false&&state.package_ref.path===null)
@@ -783,7 +783,8 @@ export async function createBridge(config, session, { browserTransport: managedB
             const newSave=saveRequest&&!saveAdmissions.has(operationId);
             const saveAdmission=newSave?{
               sequence:saveSequence++,action_key:args.action_key,path:args.parameters?.path,
-              document_id:session.metadata.workspacePreparation?.state?.document_id}:null;
+              document_id:session.metadata.workspacePreparation?.state?.document_id,
+              workflow_id:session.metadata.workspacePreparation?.state?.workflow_ref?.workflow_id}:null;
             const outcome = request.params.name === 'dock_workspace_observe' ? await actionRuntime.observe({ signal: extra.signal, scope: args.scope, cursor: args.cursor, rootRef: args.root_ref, observationId: args.observation_id, storageName: args.storage_name })
               : request.params.name === 'dock_operation_inspect' ? await actionRuntime.inspect({ operationId: args.operation_id, signal: extra.signal })
                 : request.params.name === 'dock_operation_recover' ? await actionRuntime.recover(args.operation_id,
@@ -821,7 +822,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               &&(!lastSavedPackage||admission.sequence>lastSavedPackage.sequence)) {
               savedPackages.set(admission.path,confirmedSave.operation_id);
               lastSavedPackage={path:admission.path,operation_id:confirmedSave.operation_id,
-                document_id:admission.document_id,sequence:admission.sequence,confirmedAt:Date.now()};
+                document_id:admission.document_id,workflow_id:admission.workflow_id,sequence:admission.sequence,confirmedAt:Date.now()};
               admission.confirmed=true;
               if(confirmedSave.output?.reopened===true||confirmedSave.trace?.some(e=>e.event==='save_continuations_observed'
                 &&e.recovered_reopen===true&&e.native_identity_verified===true))
@@ -1038,6 +1039,9 @@ export async function createBridge(config, session, { browserTransport: managedB
           const path = current.copy?.path;
           if (!path || current.open !== true || current.path !== path || session.metadata.workspacePreparation !== preparation)
             return window;
+          if (!current.copy.workflow_ids?.includes(target.workflow_id)) return window;
+          if (current.modified === true) return { source: 'save_required' };
+          if (current.modified !== false) return window;
           signal.throwIfAborted();
           requireStorageDestination(path, config.storageDirectories, 'packages');
           const code = makeSavedPackageGraphCode({
@@ -1052,7 +1056,8 @@ export async function createBridge(config, session, { browserTransport: managedB
           return session.metadata.workspacePreparation === preparation
             ? {source:'saved', name:path.split('/').at(-1), base64:bytes.toString('base64')}
             : null;
-        } catch {
+        } catch (error) {
+          if (error?.code === 'PACKAGE_SCHEMA_SAVE_REQUIRED') return { source: 'save_required' };
           return window;
         }
       },

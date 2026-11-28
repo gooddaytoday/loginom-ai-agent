@@ -26,6 +26,7 @@ export const packageStateRpc = {
             properties: {
               document_id: { type: "string" },
               workflow_id: { type: "string" },
+              workflow_ids: { type: "array", items: { type: "string" } },
               path: { type: "string" },
               lastSave: { type: "boolean" },
             },

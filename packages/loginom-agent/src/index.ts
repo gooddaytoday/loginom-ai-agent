@@ -110,8 +110,10 @@ const permission = {
   events: {},
 } as const
 
-export default Plugin.define({
-  id: "loginom.product",
+export const pluginID = "loginom.product"
+
+export default (ownsSession: (sessionID: string) => Promise<boolean>) => Plugin.define({
+  id: pluginID,
   setup: async (ctx) => {
     // Access grants (G1), keyed by the exact session ID: a subsession, a fork and a scheduled wake run in another
     // session or arrive as a new prompt, so none of them inherits a grant. A grant lives for one task, as in 0.4: from the
@@ -508,7 +510,7 @@ export default Plugin.define({
       await binding.fork(event.sessionID)
     })
 
-    await registerPackageSchema(ctx, files)
+    await registerPackageSchema(ctx, files, ownsSession)
     await ctx.rpc.register(runner, {
       start: async (value) => {
         // The RPC host validates the call against the JSON Schema above before the handler runs.
@@ -542,10 +544,14 @@ export default Plugin.define({
       snapshot: async (value, call) => {
         if (!value || typeof value !== "object" || !("sessionID" in value) || typeof value.sessionID !== "string")
           return call.error("invalid_session", "A conversation ID is required", {})
-        const session = await ctx.session.get({ sessionID: value.sessionID }).catch(() => undefined)
-        if (session?.location.directory !== ctx.location.directory)
+        if (!(await ownsSession(value.sessionID)))
           return call.error("invalid_session", "The conversation is unavailable in this location", {})
-        return ServiceHost.packageState(value.sessionID)
+        const state = await ServiceHost.packageState(value.sessionID)
+        call.signal.throwIfAborted()
+
+        if (!(await ownsSession(value.sessionID)))
+          return call.error("invalid_session", "The conversation is unavailable in this location", {})
+        return state
       },
     })
     await ctx.rpc.register(permission, {

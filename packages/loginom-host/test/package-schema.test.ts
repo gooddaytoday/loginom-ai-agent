@@ -30,18 +30,8 @@ test("saved schema reads positions, endpoints and filter conditions from evaluat
   ).toContainEqual({ field: "current_ratio", relation: "frtLess", join: "ctAnd", value: "1" })
 })
 
-test("saved schema reports text-import settings without attributing them to other nodes", async () => {
-  const schema = await saved("tasks/filter-active-rows/reference.lgp")
-  const nodes = schema.workflows[0].nodes
-  expect(nodes.find((node) => node.type === "TBGImportTextFile")?.text_import).toEqual({
-    file_or_url: "data/orders.csv",
-    column_separator: ",",
-  })
-  expect(nodes.find((node) => node.type === "TBGExportTextFile")).not.toHaveProperty("text_import")
-})
-
-test("saved schema keeps the file URL and explicit separator without inferring missing settings", async () => {
-  const url = "https://example.invalid/" + "a".repeat(500)
+test("saved schema omits settings even when a text-import URL contains user credentials and query data", async () => {
+  const url = "https://reader:demo-pass@example.invalid/orders.csv?token=demo-query"
   const zip = new ZipWriter(new Uint8ArrayWriter())
   await zip.add("PackageInfo.xml", new TextReader('<PackageInfo Name="Fixture"/>'), { useWebWorkers: false })
   await zip.add(
@@ -65,9 +55,14 @@ test("saved schema keeps the file URL and explicit separator without inferring m
   )
   const schema = await savedPackageSchema("import.lgp", await zip.close())
   const nodes = schema.workflows[0].nodes
-  expect(nodes[0].text_import).toEqual({ file_or_url: url, column_separator: "\t" })
-  expect(nodes[1].text_import).toEqual({ column_separator: "" })
-  expect(nodes[2]).not.toHaveProperty("text_import")
+  expect(nodes).toHaveLength(3)
+
+  for (const node of nodes) {
+    expect(node.type).toBe("TBGImportTextFile")
+    expect(node).not.toHaveProperty("text_import")
+  }
+  expect(JSON.stringify(schema)).not.toContain("demo-pass")
+  expect(JSON.stringify(schema)).not.toContain("demo-query")
 })
 
 test("saved schema reports grouping keys and measures and keeps the nested workflow keys", async () => {
