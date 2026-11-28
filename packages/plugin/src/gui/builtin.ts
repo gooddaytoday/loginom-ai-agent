@@ -85,19 +85,39 @@ export const ToolRenderer = Registry.define<ToolRenderer>("tool.renderer")
 
 /** Live question data and the host's draft and reply controls. */
 export interface QuestionRendererProps {
+  /** The open question and its server metadata. */
   readonly request: FormInfo
+  /** Whether the host is settling a submitted reply. */
   readonly busy: boolean
+  /** Text saved for this question while it remains open, including across dock remounts. */
   readonly draft: string
+  /**
+   * Updates the saved text.
+   * @param text - The current text in the renderer's input.
+   */
   setDraft(text: string): void
+  /**
+   * Submits the answer through the host's form controller.
+   * @param answer - The answer keyed by form field.
+   */
   reply(answer: FormAnswer): void
 }
 
 /** A built-in plugin's renderer for questions it recognizes. */
 export interface QuestionRenderer {
+  /**
+   * Selects questions this plugin renders.
+   * @param request - The open question as published by the server.
+   */
   matches(request: FormInfo): boolean
+  /**
+   * Draws the question in the composer dock.
+   * @param props - Live question data and the host's draft and reply controls.
+   */
   render(props: QuestionRendererProps): JSX.Element
 }
 
+/** The registry of question renderers supplied by built-in plugins. */
 export const QuestionRenderer = Registry.define<QuestionRenderer>("question.renderer")
 
 /** A `Command` with the fields only built-ins set. */
