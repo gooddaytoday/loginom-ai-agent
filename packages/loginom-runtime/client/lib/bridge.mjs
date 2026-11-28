@@ -903,6 +903,8 @@ export async function createBridge(config, session, { browserTransport: managedB
               // Knowledge/journal failure cannot erase a completed browser receipt.
               reply.content.push({ type: 'text', text: 'Recovery context unavailable; keep the operation receipt and inspect the actual state.' });
             }
+            if(userProfile&&presentNodeReply&&saveRequest&&outcome.operation_id===operationId)
+              return presentNodeReply(reply,options=>loginomFeedMetadata(reply,{...options,tool:request.params.name,save:outcome}));
             return reply;
           });
         }
@@ -989,7 +991,6 @@ export async function createBridge(config, session, { browserTransport: managedB
       },
       hasActiveWork: () => !clipboardUncertain && (!!actionRuntime?.hasActiveWork() || recovery.unsettled()),
       cancelArtifactDeliveries: () => actionRuntime?.cancelArtifactDeliveries(),
-      cancelNodeOperations: () => actionRuntime?.cancelNodeOperations(),
       hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0, close() {
       shutdownStarted = true;
       closing ??= (async () => {

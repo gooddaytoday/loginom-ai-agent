@@ -369,7 +369,6 @@ async function handle(message) {
     }
     if (message.operation === "interrupt") {
       state.bridge?.cancelArtifactDeliveries?.()
-      state.bridge?.cancelNodeOperations?.()
       state.controller?.abort()
       send({ id: message.id, result: { interrupted: true } })
       return

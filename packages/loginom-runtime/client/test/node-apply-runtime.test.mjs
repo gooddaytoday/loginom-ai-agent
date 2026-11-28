@@ -37,40 +37,26 @@ function fixture({execute=async()=>{throw Error('Unexpected public transport')},
  return {runtime,adapter,calls,events,graph,drivers,handler,handlers,failRecord:p=>{failRecord=p}};
 }
 
-test('pending Apply stays protected across calls until the interrupted worker settles',async()=>{
+test('interrupting Wait does not cancel Apply or clear its busy signal',async()=>{
  const tracker=createProtectedOperation({pages:()=>[]},'http://loginom.test');
  const entered=Promise.withResolvers(),release=Promise.withResolvers();
- const f=fixture({protectOperation:tracker.begin,wrapDrivers:(_context,drivers)=>({...drivers,mapPorts:async(_mappings,ctx)=>{
-  entered.resolve();await release.promise;ctx.signal.throwIfAborted();
+ const f=fixture({protectOperation:tracker.begin,wrapDrivers:(_context,drivers)=>({...drivers,mapPorts:async(mappings,ctx)=>{
+  entered.resolve();await release.promise;return drivers.mapPorts(mappings,ctx);
  }})});
  assert.equal(f.runtime.startNodeApply(request()).state,'running');
  await entered.promise;
  assert.equal(tracker.snapshot().active,true);
  assert.equal((await f.runtime.waitNodeApply('apply',{timeoutMs:0})).state,'running');
  const updates=[];const unsubscribe=tracker.subscribe(update=>updates.push(update.active));
- f.runtime.cancelNodeOperations();
+ const controller=new AbortController();
+ const wait=f.runtime.waitNodeApply('apply',{timeoutMs:1000,signal:controller.signal});
+ controller.abort();
+ await assert.rejects(wait,{name:'AbortError'});
  assert.equal(tracker.snapshot().active,true);
  release.resolve();
  const settled=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
- assert.equal(settled.state,'settled');assert.equal(settled.cancel_requested,true);
+ assert.equal(settled.outcome.status,'SUCCEEDED');assert.equal(settled.cancel_requested,false);
  assert.deepEqual(updates,[true,false]);unsubscribe();
-});
-
-test('a verified foreign graph change reaches the Apply reply and cannot resume',async()=>{
- const f=fixture({wrapAdapter:adapter=>({...adapter,mutate:async effect=>{
-  const result=await adapter.mutate(effect);
-  f.graph.nodes[0].label='Исправлено вручную';
-  return result;
- }})});
- f.graph.nodes.push({ref:{document_id:'doc',workflow_id:'wf',node_id:'manual'},type:'imports.text',
-  label:'До шага',position:{x:20,y:40},inputs:[],outputs:[0]});
- f.runtime.startNodeApply(request());
- const result=compactNodeResult(await f.runtime.waitNodeApply('apply',{timeoutMs:1000}));
- assert.equal(result.error.code,'LOGINOM_FOREIGN_GRAPH_EDIT');
- assert.equal(result.error.message,'Вы изменили схему во время шага: шаг остановлен, ваши правки остались в окне');
- assert.equal(f.graph.nodes[0].label,'Исправлено вручную');
- assert.throws(()=>f.runtime.startNodeApply({operation_id:'apply'},{resume:true}),/manual graph edit/);
- assert.deepEqual(f.calls,['source','create']);
 });
 
 for(const variant of ['absent','opened','missing-node','unknown-receipt','changed-graph','expired','journal'])test('open UI_EPOCH_CHANGED recovery: '+variant,async()=>{

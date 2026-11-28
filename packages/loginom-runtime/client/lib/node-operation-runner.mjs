@@ -104,9 +104,6 @@ export function createNodeOperationRunner({run,validate,progress,admitResume}) {
    if(job.state==='running')job.controller.abort(new Error('Local node cancellation requested'));
    return snapshot(job);
   },
-  interrupt() {
-   for(const job of jobs.values())if(job.state==='running')job.controller.abort(new Error('Local node cancellation requested'));
-  },
   async close() {
    closing=true;
    const active=[...jobs.values()].filter(job=>job.state==='running');

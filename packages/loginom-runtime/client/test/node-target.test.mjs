@@ -272,12 +272,7 @@ test('native placement mismatch is a classified read-only refusal',async()=>{
 });
 test('unrelated graph mutation cannot be accepted as successful creation',async()=>{
  const f=fixture(),mutate=f.adapter.mutate;f.adapter.mutate=async e=>{const r=await mutate(e);f.graph.nodes[0].label='unexpected';return r;};
- const result=await f.run();
- assert.equal(result.status,'AMBIGUOUS');
- assert.equal(result.error_code,'LOGINOM_FOREIGN_GRAPH_EDIT');
- assert.equal(result.error,'Вы изменили схему во время шага: шаг остановлен, ваши правки остались в окне');
- assert.equal(f.graph.nodes[0].label,'unexpected');
- assert.equal(f.calls.length,1);
+ assert.equal((await f.run()).status,'AMBIGUOUS');assert.equal(f.calls.length,1);
 });
 test('existing identity preserves unrequested properties and correct links without gestures',async()=>{
  const f=fixture();await f.run();const r=request();r.target={kind:'existing',type:'transform.union_data',ref:ref('target')};

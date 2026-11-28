@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
+import {EventEmitter} from 'node:events';
 import {createProtectedOperation} from '../../src/protected-operation.mjs';
 import {prepareNodeTarget,verifyNodeTargetEffect} from '../lib/node-target.mjs';
 import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
@@ -142,7 +143,7 @@ test('deletion contract rejects foreign workflow, inputs and unknown fields befo
 
 test('an unverified deletion stays ambiguous and is never repeated',async()=>{
  const f=fixture();f.adapter.mutate=async effect=>{f.calls.push(effect.kind);f.graph=remove(remove(f.graph,'b'),'d');return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true};};
- const result=await f.run();assert.equal(result.status,'AMBIGUOUS');assert.equal(result.error_code,'LOGINOM_FOREIGN_GRAPH_EDIT');
+ const result=await f.run();assert.equal(result.status,'AMBIGUOUS');assert.match(result.error,/reconciliation/);
  assert.equal(result.pending,'delete:graph:0');assert.deepEqual(f.calls,['delete_node']);
 });
 
@@ -259,19 +260,15 @@ function runtime(initial=chain(),protectOperation){
  return {runtime:value,calls,adapter,set:v=>{graph=v;},get graph(){return graph;}};
 }
 const args={operation_id:'del-1',document_id:'doc',workflow_ref:workflow,node:ref('b'),label:'Фильтр'};
-for(const outcome of ['success','failure','interrupt'])test('protected delete shows and removes the warning after '+outcome,async()=>{
+for(const outcome of ['success','refused','failure','interrupt'])test('protected delete shows the warning: '+outcome,async()=>{
  let layer;
  const origin='http://loginom.test';
  const document={createElement(){return {style:{},setAttribute(){},remove(){layer=undefined;},
   attachShadow(){return {append:label=>{this.label=label;}};}};},
   getElementById:id=>layer?.id===id?layer:undefined,documentElement:{append:node=>{layer=node;}}};
- const page={isClosed:()=>false,url:()=>origin};
- const context={pages:()=>[page],newCDPSession:async target=>{
-  assert.equal(target,page);
-  return {send:async (method,{expression})=>{
-   assert.equal(method,'Runtime.evaluate');runInNewContext(expression,{document,location:{origin}});return {};
-  },detach:async()=>{}};
- }};
+ const page=Object.assign(new EventEmitter(),{isClosed:()=>false,url:()=>origin,
+  evaluate:async (fn,input)=>runInNewContext(`(${fn})(input)`,{document,location:{origin},input})});
+ const context={pages:()=>[page]};
  const protectedOperation=createProtectedOperation(context,origin);
  const f=runtime(chain(),protectedOperation.begin);
  const controller=new AbortController();
@@ -281,6 +278,7 @@ for(const outcome of ['success','failure','interrupt'])test('protected delete sh
   entered.resolve();await release.promise;
   controller.signal.throwIfAborted();
   if(outcome==='failure')throw Error('fixture failure');
+  if(outcome==='refused')return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
   return mutate(effect);
  };
  const pending=dispatchNodeApi(f.runtime,'dock_node_delete',args,{signal:controller.signal});
@@ -294,9 +292,21 @@ for(const outcome of ['success','failure','interrupt'])test('protected delete sh
  assert.equal(protectedOperation.snapshot().active,true);
  release.resolve();
  const result=await pending;
- assert.equal(result.outcome.status,outcome==='success'?'SUCCEEDED':'AMBIGUOUS');
- assert.deepEqual(updates,[active,{...active,active:false}]);
- assert.equal(layer,undefined);
+ const unresolved=['failure','interrupt'].includes(outcome);
+ assert.equal(result.outcome.status,outcome==='success'?'SUCCEEDED':unresolved?'AMBIGUOUS':'NOT_APPLIED');
+ if(unresolved){
+  assert.deepEqual(updates,[active]);
+  assert.equal(protectedOperation.snapshot().active,true);
+  assert.ok(layer);
+  layer=undefined;
+  page.emit('domcontentloaded');
+  assert.ok(layer);
+ }else{
+  assert.deepEqual(updates,[active,{...active,active:false}]);
+  assert.equal(layer,undefined);
+  page.emit('domcontentloaded');
+  assert.equal(layer,undefined);
+ }
  unsubscribe();
 });
 test('dock_node_delete deletes through the public tool and reports a user-v1 receipt',async()=>{

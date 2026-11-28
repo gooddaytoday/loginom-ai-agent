@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 const warning = 'Агент работает в окне Loginom — не меняйте схему до конца шага';
 
-function showWarning(id, origin, text) {
-  if (location.origin !== origin || !document.documentElement) return;
+function showWarning({ id, origin, text }) {
+  if (location.origin !== origin || !document.documentElement || document.getElementById(id)) return;
   const layer = document.createElement('div');
   layer.id = id;
   layer.inert = true;
@@ -36,33 +36,24 @@ export function createProtectedOperation(context, origin) {
       const started = { version: 1, windowId, operationId, active: true };
       const id = 'loginom-agent-busy-' + randomUUID();
       publish(started);
-      let page, cdp;
-      try {
-        const pages = context.pages().filter(page => !page.isClosed() && URL.parse(page.url())?.origin === origin);
-        if (pages.length === 1) {
-          page = pages[0];
-          cdp = await context.newCDPSession(page);
-          await cdp.send('Runtime.evaluate', {
-            expression: `(${showWarning})(${JSON.stringify(id)},${JSON.stringify(origin)},${JSON.stringify(warning)})`,
-            timeout: 1000,
-          });
-        }
-      } catch {}
-      return async () => {
-        try {
-          if (cdp) {
-            const expression = `document.getElementById(${JSON.stringify(id)})?.remove()`;
-            try {
-              const result = await cdp.send('Runtime.evaluate', { expression, timeout: 1000 });
-              if (result.exceptionDetails) throw Error('Busy overlay removal failed');
-            }
-            catch { await page.evaluate(expression).catch(() => undefined); }
-            finally { await cdp.detach().catch(() => undefined); }
-          }
-        } finally {
-          publish({ ...started, active: false });
-        }
+      const pages = context.pages().filter(page => !page.isClosed() && URL.parse(page.url())?.origin === origin);
+      const page = pages.length === 1 ? pages[0] : undefined;
+      let painting, ending;
+      const paint = () => {
+        if (!page) return;
+        painting = page.evaluate(showWarning, { id, origin, text: warning }).catch(() => undefined);
       };
+      page?.on('domcontentloaded', paint);
+      paint();
+      await painting;
+      return () => ending ??= (async () => {
+        page?.off('domcontentloaded', paint);
+        await painting;
+        await page?.evaluate(({ id, origin }) => {
+          if (location.origin === origin) document.getElementById(id)?.remove();
+        }, { id, origin }).catch(() => undefined);
+        publish({ ...started, active: false });
+      })();
     },
   };
 }

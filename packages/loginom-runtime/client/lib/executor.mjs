@@ -2213,6 +2213,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     return result;
   };
   let pending = null;
+  const settlePending = async operation => {
+    if(pending!==operation)return;
+    if(operation.endProtection)await operation.endProtection();
+    if(pending===operation)pending=null;
+  };
   let running = false;
   const operations = new Map();
   const auxiliary = new Map();
@@ -2541,7 +2546,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   };
   const nodeTargetOutcome=(operation,result)=>({status:result.status,action_key:operation.action.action_key,action_revision:'1',operation_id:operation.id,
     phase:result.phase,effect_possible:operation.targetPhase?.effect_possible===true,cleanup_complete:result.cleanup_complete===true,
-    output:result,error:result.error?{code:result.error_code??'NODE_TARGET_INCOMPLETE',message:result.error}:null,trace:[]});
+    output:result,error:result.error?{code:'NODE_TARGET_INCOMPLETE',message:result.error}:null,trace:[]});
   const nodeTargetRecord=event=>onRecord({...event,action_key:'node.target.internal',action_revision:'1'});
   const targetAdapter=operation=>nodeTargetAdapterFactory({execute:async(code,options)=>{
     const wrapped='async page => {const base={action_key:"node.target.transport",action_revision:"1",operation_id:'+JSON.stringify(operation.id)+',phase:"observed",effect_possible:false,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('+code+')(page)}};}catch(error){return {...base,status:"FAILED",output:{},error:{code:"NODE_TARGET_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
@@ -2689,7 +2694,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const outcome=nodeApplyOutcome(operation,operation.nodeApply.result);
       await remember(operation,'completed',outcome);
       operation.outcome=outcome;operation.cleanupConfirmed=true;
-      if(pending===operation)pending=null;
+      await settlePending(operation);
       // A release whose delivery journal failed is redelivered here; its job
       // must not keep the earlier AMBIGUOUS outcome as unsettled work.
       if(nodeJobs.has(operation.id)&&nodeJobs.status(operation.id).state==='settled')nodeJobs.settle(operation.id,outcome);
@@ -2702,7 +2707,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const result=await inspectNodeTarget({request:operation.parameters,operation,adapter:operation.nodeTargetAdapter,record:nodeTargetRecord,deadline:now()+15000});
     const outcome=nodeTargetOutcome(operation,result);await remember(operation,'reconciled',outcome);
     operation.outcome=outcome;operation.cleanupConfirmed=outcome.cleanup_complete;
-    if(result.status!=='AMBIGUOUS'&&result.cleanup_complete===true)pending=null;
+    if(result.status!=='AMBIGUOUS'&&result.cleanup_complete===true)await settlePending(operation);
     return outcome;
   };
   const reconcilePending = async signal => {
@@ -2735,7 +2740,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if (state.receipt.action_key === operation.action.action_key) operation.outcome = state.receipt;
         if (operation.cleanupConfirmed && operation.outcome.status !== 'AMBIGUOUS' && !operation.storageDownloadNavigation) {
           if(operation.action.capability==='artifact.upload' && (operation.outcome.status==='NOT_APPLIED'||operation.outcome.status==='FAILED'&&operation.outcome.output?.conflict_rejected===true))await operation.uploadLease?.release();
-          pending = null; return operation.outcome;
+          await settlePending(operation); return operation.outcome;
         }
       }
       if(operation.cleanupConfirmed===false && operation.verification?.byteOutcome?.output?.bytes_verified===true)
@@ -2765,8 +2770,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       await remember(operation, 'reconciled', outcome);
       operation.outcome = outcome;
       operation.cleanupConfirmed = outcome.cleanup_complete === true;
-      if (outcome.status === 'SUCCEEDED' || outcome.status === 'NOT_APPLIED') {
-        pending = null;
+      if ((outcome.status === 'SUCCEEDED' || outcome.status === 'NOT_APPLIED') &&
+          (!operation.endProtection || operation.cleanupConfirmed)) {
+        await settlePending(operation);
         operation.outcome = outcome;
       }
       return outcome;
@@ -2890,7 +2896,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           operation.transportUncertain=false;
         }else await remember(operation,'operation_abandoned',outcome);
         operation.outcome=outcome;operation.cleanupConfirmed=true;
-        pending=null;nodeJobs.settle(operation.id,operation.outcome);
+        await settlePending(operation);nodeJobs.settle(operation.id,operation.outcome);
         returned={status:'SUCCEEDED',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'resolved',
           effect_possible:false,error:null,trace:[],recovery_operation_id:recoveryOperationId,
           output:{resolution:'released_after_proof',goal_verified:false,original_outcome:structuredClone(operation.outcome)}};
@@ -2979,9 +2985,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if(operation.action.capability==='node.apply'){
       const release=nodeReleaseStep(operation);
       return {recovery_options:release?['abandon_operation']:[],next_steps:release?[release,...base]:base,
-        internal_resume_available:!operation.foreignGraphEdit&&operation.cleanupConfirmed===true&&!operation.nodeApply?.pending};
+        internal_resume_available:operation.cleanupConfirmed===true&&!operation.nodeApply?.pending};
     }
-    if(operation.action.capability==='node.target.internal')return {recovery_options:[],next_steps:base,internal_resume_available:!operation.foreignGraphEdit&&operation.cleanupConfirmed===true&&!operation.targetPhase?.pending};
+    if(operation.action.capability==='node.target.internal')return {recovery_options:[],next_steps:base,internal_resume_available:operation.cleanupConfirmed===true&&!operation.targetPhase?.pending};
     if(operation.action.capability==='artifact.upload') {
       if(operation.deliveryOperationId){
         if(operation.cleanupConfirmed && !operation.verification)base.push({tool:'dock_artifact_delivery_resume',
@@ -3207,7 +3213,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       // Redelivery of the original request reports its own failure and the linked recovery.
       operation.outcome.output.browser_recovery = { receipt_id: receipt.id, status: receipt.status, facts: receipt.facts };
       await remember(operation, 'operation_abandoned', operation.outcome);
-      pending = null; nodeJobs.settle(operation.id, operation.outcome);
+      await settlePending(operation); nodeJobs.settle(operation.id, operation.outcome);
       recoveryReceipts.set(receipt.id, receipt);
       recoveredSteps.set(step.key, { operation_id: operation.id, code, receipt_id: receipt.id });
       leased = null;
@@ -3303,7 +3309,6 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const nodeJobs=createNodeOperationRunner({run:(request,options)=>runtime.runNodeApply(request,options),
     admitResume:id=>{
       const operation=operations.get(id),phase=operation?.nodeApply?.pending?.phase,drivers=operation?.nodeApplyDrivers;
-      if(operation?.foreignGraphEdit)throw Error('A step stopped by a manual graph edit cannot be resumed');
       if(operation?.nodeApply?.result?.checkpoint_kind==='local_node_released')
         throw new Error('The original node operation was released; follow its next_step with a NEW operation_id');
       // Эти фазы сначала сверяют собственные квитанции; итоговую проверку делает runNodeApply.
@@ -3873,7 +3878,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const resolved = { ...structuredClone(operation.outcome), resolution, goal_verified: false,
             recovery_operation_id: recoveryOperationId, observation_id: observationId };
           await remember(operation, strategy === 'abandon_operation' ? 'operation_abandoned' : 'observed_state_accepted', resolved);
-          operation.outcome = resolved; pending = null; observations.clear();
+          operation.outcome = resolved; await settlePending(operation); observations.clear();
           const result = { status: 'SUCCEEDED', action_key: 'operation.recover', action_revision: '1', operation_id: operationId,
             phase: 'resolved', effect_possible: false, error: null, trace: [], output: { resolution,
               goal_verified: false, original_outcome: resolved }, recovery_operation_id: recoveryOperationId };
@@ -3912,7 +3917,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         await remember(record, 'recovery_completed', outcome);
         const returned = { ...outcome, recovery_operation_id: recoveryOperationId };
         auxiliary.set(recoveryOperationId, { signature, outcome: structuredClone(returned) });
-        if (!operation.transportUncertain && operation.cleanupConfirmed && ['SUCCEEDED', 'NOT_APPLIED'].includes(outcome.status)) pending = null;
+        if (!operation.transportUncertain && operation.cleanupConfirmed && ['SUCCEEDED', 'NOT_APPLIED'].includes(outcome.status)) await settlePending(operation);
         return returned;
       } finally { running = false; }
     },
@@ -4362,7 +4367,6 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(pending&&pending!==operation)throw new Error('Another Dock operation remains pending');
       if(operation&&!resume){await inspectTarget(operation);return {...structuredClone(operation.outcome),output:{...structuredClone(operation.outcome.output),replayed:operation.outcome.status==='SUCCEEDED'}};}
       if(resume){
-        if(operation?.foreignGraphEdit)throw Error('A step stopped by a manual graph edit cannot be resumed');
         if(!operation||pending!==operation)throw new Error('Resume requires the original pending node target');
         await inspectTarget(operation);
         if(!pending)return structuredClone(operation.outcome);
@@ -4371,7 +4375,6 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         operation.resumeAttempts=(operation.resumeAttempts??0)+1;
       }
       running=true;
-      let endProtection;
       try{
         if(!operation){operation={id:operationId,signature,parameters:structuredClone(request),action:{action_key:actionKey,capability:'node.target.internal',revision:'1'}};
           operation.nodeTargetAdapter=targetAdapter(operation);
@@ -4380,16 +4383,16 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         operation.deadline=now()+60000;
         await remember(operation,resume?'node_target_resume_prepared':'prepared');signal?.throwIfAborted();
         operations.set(operation.id,operation);pending=operation;observations.clear();
-        if(protectOperation)endProtection=await protectOperation(operationId);
+        if(protectOperation)operation.endProtection??=await protectOperation(operationId);
         const result=await prepareNodeTarget({request:operation.parameters,operation,adapter:operation.nodeTargetAdapter,record:nodeTargetRecord,signal,now});
         // A settled child receipt is needed even after cancellation. Never infer
         // cleanup from a model summary or release the gate on transport timeout.
         result.cleanup_complete=!operation.targetPhase?.pending || operation.targetPhase.pending.receipt?.cleanup_complete===true;
         const outcome=nodeTargetOutcome(operation,result);operation.outcome=outcome;operation.cleanupConfirmed=outcome.cleanup_complete;
         try{await remember(operation,'completed',outcome);}catch(error){operation.outcome=failed(operation,'EVIDENCE_WRITE_FAILED',String(error.message));return operation.outcome;}
-        if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)pending=null;
+        if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)await settlePending(operation);
         return structuredClone(outcome);
-      }finally{try{if(endProtection)await endProtection();}finally{running=false;}}
+      }finally{running=false;}
     },
     // Public deletion of one node of the prepared workflow. It reuses the
     // journaled node target phase; a busy session refuses before any gesture.
@@ -4412,7 +4415,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             instruction:'Do not retry deletion while the operation runs. Report the refusal; delete later only if the user still asks after it settles, with a NEW operation_id.'});
       let outcome=await runtime.runNodeTarget(request,{operationId:id,signal,actionKey:'node.delete'});
       const operation=operations.get(id);
-      if(known&&outcome.status==='AMBIGUOUS'&&operation&&!operation.foreignGraphEdit&&pending===operation&&!operation.targetPhase?.pending&&operation.cleanupConfirmed)
+      if(known&&outcome.status==='AMBIGUOUS'&&operation&&pending===operation&&!operation.targetPhase?.pending&&operation.cleanupConfirmed)
         outcome=await runtime.runNodeTarget(request,{operationId:id,signal,resume:true,actionKey:'node.delete'});
       const result=outcome.output??{};
       const deleted=result.deleted_node;
@@ -4531,9 +4534,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         admissionSources=proofs;
       }
       running=true;
-      let endProtection;
       try {
-        if(protectOperation)endProtection=await protectOperation(operationId);
         if(!operation){
           operation={id:operationId,signature,parameters:request,scanReceipt:structuredClone(scanReceipt),
             action:{action_key:'node.apply',capability:'node.apply',revision:request.contract_revision},
@@ -4690,7 +4691,6 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             }finally{operation.deadline=overallDeadline;}
             if(result.status!=='SUCCEEDED'){
               const error=new Error(result.error??'Node target is not verified');
-              if(result.error_code)error.code=result.error_code;
               if(result.status==='FAILED'&&result.cleanup_complete===true&&operation.targetPhase?.move_mismatch&&!operation.targetPhase.pending)
                 error.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:true,cleanup_complete:true,
                   settings_unchanged:true,verification:'node_move_position_mismatch'};
@@ -4719,6 +4719,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         await remember(operation,resume?'node_apply_resume_prepared':'prepared');
         if(!admissionUncertainty)signal?.throwIfAborted();
         operations.set(operation.id,operation);pending=operation;observations.clear();
+        if(protectOperation)operation.endProtection??=await protectOperation(operationId);
         let result;
         try{result=await applyNode({request,operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,
           record:onRecord,signal,stopSignal,now,resume,deadlineAt:admissionDeadline,admissionUncertainty});}
@@ -4745,14 +4746,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             error:{code:'EVIDENCE_WRITE_FAILED',message:String(error.message).slice(0,1000)}});
           return structuredClone(operation.outcome);
         }
-        if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)pending=null;
+        if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)await settlePending(operation);
         // T4: an unconfirmed export download is offered to browser recovery first;
         // the plain save-and-report continuation stays available as the alternative.
         const exported=exportRecoveryTrigger(operation);
         if(exported&&operation.outcome.output)operation.outcome.output.next_step={...browserRecoveryNext(operation,exported),
           alternative_next_step:operation.outcome.output.next_step??null};
         return structuredClone(operation.outcome);
-      }finally{try{if(endProtection)await endProtection();}finally{running=false;}}
+      }finally{running=false;}
     },
     async run(actionKey, parameters, { signal, operationId, deadlineAt } = {}) {
       signal?.throwIfAborted();
@@ -4804,6 +4805,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         await remember(operation, 'prepared');
         signal?.throwIfAborted();
         if (deadlineAt !== undefined && now() >= operation.deadline) throw new Error('Action parent deadline expired before mutation');
+        if(protectOperation&&['package.save_as','package.save_checkpoint'].includes(actionKey)){
+          operation.endProtection=await protectOperation(operation.id);
+          if(signal?.aborted||now()>=operation.deadline){
+            await operation.endProtection();
+            signal?.throwIfAborted();
+            throw Error('Save deadline expired before mutation');
+          }
+        }
         operations.set(operation.id, operation);
         pending = operation;
         observations.clear();
@@ -4823,7 +4832,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           operation.outcome = failed(operation, 'EVIDENCE_WRITE_FAILED', String(error?.message ?? error).slice(0, 1000));
           return operation.outcome;
         }
-        if (outcome.status !== 'AMBIGUOUS' && operation.cleanupConfirmed) pending = null;
+        if (outcome.status !== 'AMBIGUOUS' && operation.cleanupConfirmed) await settlePending(operation);
         return outcome;
       } finally { running = false; }
     },
@@ -4885,7 +4894,6 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // node/recovery gate still blocks package cleanup; it cannot block draining
     // the owned worker or removing its private local download cache.
     closeNodeOperations:()=>nodeJobs.close(),
-    cancelNodeOperations:()=>nodeJobs.interrupt(),
     cleanupServerCache:runtime.cleanupServerCache,
     // Retained ambiguous jobs are active recovery work even while no worker is
     // running. Keep the same host lease so the next model turn can use the
