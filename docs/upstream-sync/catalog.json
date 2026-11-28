@@ -134,8 +134,13 @@
       ]
     },
     {
+      "id": "CAT-17",
+      "title": "Built-in plugin page navigation for dashboard links",
+      "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
+    },
+    {
       "id": "CAT-14",
-      "title": "Built-in GUI tool renderers (C3.0, accepted timeline row exception)",
+      "title": "Built-in GUI tool renderers and timeline controls (C3.0, C3.18)",
       "paths": [
         "packages/app/component-tests/plugin-host.fixture.tsx",
         "packages/app/src/runtime/plugin/host.tsx",
@@ -154,7 +159,19 @@
         "packages/session-ui/src/timeline-next/tools/tool-display.tsx",
         "packages/session-ui/src/timeline/projection.ts",
         "packages/session-ui/src/tools/tool-renderer.tsx",
-        "packages/ui/src/i18n/en.ts"
+        "packages/ui/src/i18n/en.ts",
+        "packages/app/src/session/screen.tsx",
+        "packages/app/src/session/timeline/tool-renderers.tsx",
+        "packages/app/component-tests/tool-renderer.fixture.tsx",
+        "packages/app/component-tests/plugin-host.spec.ts",
+        "packages/app/e2e/fixtures/loginom-feed-receipts.json",
+        "packages/app/e2e/regression/timeline-stream.spec.ts",
+        "packages/app/e2e/regression/loginom-node-links.spec.ts",
+        "packages/app/e2e/tsconfig.json",
+        "packages/app/e2e/utils/loginom-schema.ts",
+        "packages/app/test-browser/builtin-plugins.test.ts",
+        "packages/gui-plugins/src/main.ts",
+        "packages/gui-plugins/src/renderer.ts"
       ]
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer and window tests", "paths": ["packages/desktop/**"] },
@@ -162,6 +179,8 @@
       "id": "CAT-21",
       "title": "Built-in plugin top-level pages",
       "paths": [
+        "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/main.ts",
+        "packages/gui-plugins/src/browser/panel.fixture.tsx",
         "packages/app/src/shell/routes/routes.tsx", "packages/app/src/shell/state/layout.tsx",
         "packages/app/src/shell/state/layout.test.ts", "packages/app/vite.config.ts",
         "packages/plugin/src/gui/host-apis.ts",
@@ -183,11 +202,6 @@
         "packages/app/e2e/utils/app-direction.html", "packages/app/e2e/utils/app-direction.fixture.tsx",
         "packages/app/e2e/utils/direction.ts"
       ]
-    },
-    {
-      "id": "CAT-17",
-      "title": "Built-in plugin page navigation for dashboard links",
-      "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
     },
     {
       "id": "CAT-10",

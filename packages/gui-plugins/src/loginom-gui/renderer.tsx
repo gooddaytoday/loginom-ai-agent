@@ -8,6 +8,7 @@ import { DashboardLink } from "./contract"
 import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
 import type definition from "./index"
 import { LoginomRepeatDock } from "./repeat-dock"
+import registerSchema from "./schema-renderer"
 import { registerStartScreen } from "./start-screen"
 import { registerSystemProxy } from "./system-proxy"
 
@@ -15,6 +16,7 @@ const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   registerStartScreen(ctx)
+  registerSchema(ctx)
   const Catalog = lazy(() => import("./catalog-page"))
 
   ctx.add(Page, {

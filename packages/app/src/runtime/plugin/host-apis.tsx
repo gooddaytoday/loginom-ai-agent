@@ -36,7 +36,13 @@ import {
   type StorageScope,
   type Tabs,
 } from "@opencode/plugin/gui"
-import { BuiltinPanel, type BuiltinStoreFrom, type BuiltinStoreOptions } from "@opencode/plugin/gui/builtin"
+import {
+  BuiltinPanel,
+  type BuiltinStoreFrom,
+  type BuiltinStoreOptions,
+  type BuiltinTimeline,
+} from "@opencode/plugin/gui/builtin"
+import { timelinePreset, timelinePresets } from "@opencode/session-ui/timeline/detail"
 import { usePlatform } from "@/runtime/platform/platform"
 import { same } from "@/runtime/persistence/equality"
 import { Persist, persisted, removePersisted } from "@/runtime/persistence/storage"
@@ -104,15 +110,17 @@ type Attached = {
   scope: (server: string) => ServerScope
   /** Records a session-scoped store so layout pruning drops it with the session. */
   scoped: (name: string) => void
-  layout: Omit<Layout, "narrow" | "settings" | "project" | "draft" | "command" | "stored" | "side"> & {
+  layout: Omit<Layout, "narrow" | "settings" | "project" | "draft" | "command" | "openPage" | "stored" | "side"> & {
     stored(plugin: string, session: SessionRef): readonly string[]
     /** `width` and `resize` take the panel's host key, `${plugin}:${panel id}`. */
     side: Layout["side"]
   }
   settings: (page?: string) => void
+  timeline: BuiltinTimeline
   project: (server: string, title: string) => void
   draft: Layout["draft"]
   command: (id: string) => void
+  openPage: (plugin: string, id: string) => void
   run: (id: string) => boolean
   notify: (plugin: string, options: NotifyOptions) => Promise<NotifyResult>
   font: Accessor<string>
@@ -485,6 +493,11 @@ export function createHostApis() {
       project: (server, title) => write((value) => value.project(server, title)),
       draft: (input) => write((value) => value.draft(input)),
       command: (id) => write((value) => value.command(id)),
+      openPage: (id) => write((value) => value.openPage(plugin, id)),
+    }),
+    timeline: () => ({
+      detail: () => current()?.timeline.detail() ?? "compact",
+      setDetail: (mode) => write((value) => value.timeline.setDetail(mode)),
     }),
     embeds: () => embeds,
     ui: () => ui,
@@ -1189,6 +1202,7 @@ export function createPluginAttachment(apis: HostApis) {
       pickProjectDraft(server, undefined, input.prompt)
     },
     command: (id) => void run(id),
+    openPage: (plugin, id) => navigate(`/page/${encodeURIComponent(plugin)}/${encodeURIComponent(id)}`),
     font: () => terminalFontFamily(settings.appearance.terminalFont()),
     routing: useIsRouting(),
     path: () => `${location.pathname}${location.search}`,
@@ -1199,6 +1213,18 @@ export function createPluginAttachment(apis: HostApis) {
     server,
     // SAFETY: a plugin names a page it contributed through `SettingsPage`, which settings lists as a plugin tab.
     settings: (page) => surface.open(page as Parameters<typeof surface.open>[0]),
+    timeline: {
+      detail: () => {
+        const preset = timelinePreset(settings.general.timelineDetail())?.id
+
+        return preset === "detailed" || preset === "everything" ? "detailed" : "compact"
+      },
+      setDetail: (mode) => {
+        const preset = timelinePresets.find(({ id }) => id === mode)
+
+        if (preset) settings.general.setTimelineDetail(preset.value)
+      },
+    },
     layout: {
       ready: layout.ready,
       open,

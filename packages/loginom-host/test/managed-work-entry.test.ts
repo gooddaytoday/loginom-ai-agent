@@ -24,6 +24,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "managed-work-entry-"))
   const work = join(directory, "work.json")
+  const snapshot = { document: "fixture-doc", workflow: "fixture-workflow", nodes: [], links: [] }
   const src = join(directory, "runtime/src")
   const files = {
     "runtime/src/managed-entry.mjs": await readFile(
@@ -68,6 +69,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       new URL("../../loginom-runtime/client/lib/redact.mjs", import.meta.url),
       "utf8",
     ),
+    "runtime/client/lib/saved-package-reader.mjs": await readFile(
+      new URL("../../loginom-runtime/client/lib/saved-package-reader.mjs", import.meta.url),
+      "utf8",
+    ),
     "runtime/client/lib/browser-downloads.mjs": await readFile(
       new URL("../../loginom-runtime/client/lib/browser-downloads.mjs", import.meta.url),
       "utf8",
@@ -101,6 +106,14 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
+        graphSnapshot: async () => work().graph ?? null,
+        packageSchema: async (_context, target, signal) => {
+          if (work().holdSchema) await new Promise((resolve, reject) =>
+            signal.addEventListener('abort', () => reject(Error('aborted')), { once: true }));
+          if (target?.workflow_id === 'saved-workflow' && target.document_id === work().schema?.document)
+            return work().savedSchema;
+          return work().schema;
+        },
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
           return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
@@ -110,9 +123,18 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     "runtime/client/node_modules/@modelcontextprotocol/sdk/client/index.js": `
       exports.Client = class {
         async connect() {} async close() {}
-        async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }] }; }
+        async listTools() {
+          return { tools: ['fixture', 'dock_node_apply'].map(name => ({ name, inputSchema: { type: 'object' } })) };
+        }
         async callTool(input, _unused, { signal }) {
           if (input.arguments.failAfterDispatch) throw Error('LOGINOM_FILE_CHANGED');
+          if (input.name === 'dock_node_apply' && input.arguments.nodeFixture) {
+            return { content: [{ type: 'text', text: 'original node result' }], structuredContent: {
+              result_version: 'user-v1', state: 'settled', status: 'SUCCEEDED', operation_id: 'node-step',
+              node: { document_id: 'fixture-doc', workflow_id: 'fixture-workflow',
+                node_id: '{FCA4EE21-7521-4B4B-B99F-000000000008}' },
+            } };
+          }
           if (input.arguments.progressFixture) {
             const { stepPhase } = await import('../../../../lib/step-progress.mjs');
             stepPhase('configuring', 'transform.group_data', { kind: 'fields', index: 2, total: 3 });
@@ -158,7 +180,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared }))
       expect(await runtime.request("list")).toEqual({
         prepared,
-        tools: [{ name: "fixture", inputSchema: { type: "object" } }],
+        tools: ["fixture", "dock_node_apply"].map((name) => ({ name, inputSchema: { type: "object" } })),
       })
     }
     for (const state of [
@@ -169,6 +191,8 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       await Bun.write(work, JSON.stringify(state))
       expect(await runtime.request("work")).toEqual({ ...state, dispatching: false })
     }
+    await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, schema: snapshot }))
+    expect(await runtime.request("packageSchema")).toEqual(snapshot)
     const args = { intent: "open_package", operation_id: "local-package" }
     const packageArtifact = { artifactID: "artifact", uploadGrantID: "grant" }
     expect(await runtime.request("call", { name: "dock_prepare", arguments: args, packageArtifact })).toEqual({
@@ -180,9 +204,15 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       .request("call", { name: "fixture", arguments: { hold: true } })
       .catch((error: unknown) => error)
     expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: true })
+    expect(await runtime.request("packageSchema")).toBeNull()
     expect(await runtime.request("interrupt")).toEqual({ interrupted: true })
     expect(await call).toMatchObject({ message: "LOGINOM_RUNTIME_FAILED" })
     expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: false })
+    await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, holdSchema: true }))
+    const reading = runtime.request("packageSchema")
+    expect(await runtime.request("work")).toMatchObject({ dispatching: true })
+    expect(await runtime.request("call", { name: "fixture", arguments: {} })).toMatchObject({ result: { content: [] } })
+    expect(await reading).toBeNull()
   } finally {
     await runtime.close()
     expect(await runtime.exited).toEqual({ code: 0, signal: null })
@@ -240,6 +270,46 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
   }
   try {
     await waitForKnowledge(host)
+    expect(await host.packageSchema("file-errors")).toBeNull()
+    for (const [task, label] of [
+      ["msg_step_one", "Импорт"],
+      ["msg_step_two", "Продажи"],
+    ] as const) {
+      const turn = await LoginomHost.acquire("manual-edits")
+      if (!turn) throw Error("Adapter unavailable")
+      await turn.scope(
+        "bind",
+        Schema.decodeUnknownSync(HostTaskScope.Info)({
+          taskMessageID: task,
+          profile: "loginom-automation",
+        }),
+      )
+      await Bun.write(
+        work,
+        JSON.stringify({
+          activeWork: false,
+          unsettledWork: false,
+          prepared: true,
+          graph: {
+            document: "doc",
+            workflow: "wf",
+            nodes: [{ guid: "import", label, type: "import", position: { x: 0, y: 0 } }],
+            links: [],
+          },
+        }),
+      )
+      expect(await turn.call("dock_prepare", {}, task)).toEqual(
+        task === "msg_step_one"
+          ? { content: [] }
+          : {
+              content: [],
+              _meta: { loginomManualEdits: [{ kind: "node_renamed", guid: "import", from: "Импорт", to: "Продажи" }] },
+            },
+      )
+      await turn.tools()
+      expect(await turn.call("fixture", {}, task)).toEqual({ content: [] })
+      await turn.release()
+    }
     const run = await LoginomHost.acquire("file-errors")
     if (!run) throw Error("Adapter unavailable")
     await run.scope(
@@ -247,6 +317,22 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       Schema.decodeUnknownSync(HostTaskScope.Info)({ taskMessageID: "msg_original", profile: "loginom-automation" }),
     )
     await run.call("dock_prepare", {}, "msg_original")
+    const archive = await readFile(join(import.meta.dir, "fixtures/package-docs/deep.lgp"))
+    await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared: true,
+      schema: { ...snapshot, name: "Fixture", navigation_path: [] },
+      savedSchema: { source: "saved", name: "deep.lgp", base64: archive.toString("base64") } }))
+    expect(await host.packageSchema("other-conversation")).toBeNull()
+    expect(await host.packageSchema("file-errors")).toMatchObject({
+      source: "window", generation: 1, workflow: { document_id: snapshot.document, workflow_id: snapshot.workflow },
+    })
+    const target = { document_id: snapshot.document, workflow_id: "saved-workflow" }
+    expect(await host.packageSchema("other-conversation", target)).toBeNull()
+    expect(await host.packageSchema("file-errors", target)).toMatchObject({
+      source: "saved", target, workflows: [{ submodels: [{ submodels: [expect.anything()] }] }],
+    })
+    await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared: true,
+      schema: { ...snapshot, name: "Fixture", navigation_path: [] }, savedSchema: { source: "save_required" } }))
+    expect(await host.packageSchema("file-errors", target)).toEqual({ source: "save_required" })
     await run.tools()
     const sessionID = Session.ID.make("ses_file_errors")
     const messageID = SessionMessage.ID.make("msg_original")
@@ -264,6 +350,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         },
         model: { list: async () => { throw Error("No model access in fixture") } },
         session: { context: async () => [] },
+        storage: { set: async () => undefined },
       },
       files: { ask: async () => undefined, snapshot: async () => { throw Error("Unexpected file snapshot") } },
       profiles: directory,
@@ -295,6 +382,46 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     ])
     await Bun.sleep(1_600)
     expect(updates).toHaveLength(2)
+    const nodeID = "fca4ee21-7521-4b4b-b99f-000000000008"
+    const nodeTool = tools.get("loginom_dock_node_apply")
+    if (!nodeTool) throw Error("Node tool not registered")
+    await Bun.write(
+      work,
+      JSON.stringify({
+        activeWork: false,
+        unsettledWork: false,
+        prepared: true,
+        graph: {
+          ...snapshot,
+          name: "Продажи.lgp",
+          navigation_path: ["Подготовка"],
+          nodes: [{ guid: nodeID, label: "Фильтр по дате", type: "transform.filter_rows", position: { x: 70, y: 70 } }],
+        },
+      }),
+    )
+    const nodeResult = await nodeTool.execute(
+      { nodeFixture: true },
+      {
+        sessionID,
+        messageID,
+        agent: Agent.ID.make("fixture"),
+        id: Tool.CallID.make("node-fixture"),
+        signal: new AbortController().signal,
+        progress: async () => undefined,
+      },
+    )
+    expect(nodeResult).toEqual({
+      content: "original node result",
+      metadata: {
+        generation: 1,
+        loginomNode: {
+          document_id: "fixture-doc",
+          workflow_id: "fixture-workflow",
+          node_id: nodeID,
+          label: "Продажи.lgp › Подготовка › Фильтр по дате",
+        },
+      },
+    })
     for (const [name, code] of [
       ["missing", "LOGINOM_FILE_NOT_FOUND"],
       ["directory", "LOGINOM_FILE_NOT_REGULAR"],

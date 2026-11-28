@@ -32,7 +32,9 @@ import { compactActionResult, compactNodeRequestFailure, userResultSchema, compa
 import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory, userActionKeys } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
+import { createPackageStateReader } from './package-state.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState,readSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
+import {compareSavedPackageGraph,makeSavedPackageGraphCode,parseSavedPackageBytes,savedGraphMessage} from './saved-package-graph.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
 import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
 import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
@@ -152,6 +154,9 @@ export async function createBridge(config, session, { browserTransport: managedB
   const savedPackages = new Map();
   const saveAdmissions = new Map();
   let saveSequence=0;
+  // A newly prepared package must never inherit confirmations from the previous one.
+  let packageSaveFloor=0;
+  let openedPackage=null;
   let lastSavedPackage = null;
   let ownedUnsavedDraft = null;
   // Save As closes the package and reopens it in a new tab. Until a new
@@ -243,6 +248,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         throw error;
       }
       lastSavedPackage=null;
+      openedPackage={documentID:opened.document_id,workflowID:opened.workflow_ref.workflow_id,path};
       reopenedSave=null;
       ownedUnsavedDraft=null;
       nativeStepDocument=reopenedNativeStepDocument;
@@ -329,6 +335,7 @@ export async function createBridge(config, session, { browserTransport: managedB
     // T4 for saves: a confirmed Save whose package state could not be read. The
     // runtime rereads path and dirty state itself after the model's browser work.
     const saveRecoveries = new Map();
+    const readPackageState = createPackageStateReader(session.metadata, config.loginomUrl);
     const readSavedState = async save => {
       const prepared = session.metadata.workspacePreparation?.state;
       const options = { sessionId: session.metadata.sessionId, documentId: prepared?.document_id,
@@ -471,6 +478,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           let workspace = null;
           if (actionRuntime) {
             workspace = await dockGate(request.params.name, async () => {
+              const previous = session.metadata.workspacePreparation;
               const state = await prepareWorkspaceSession({ metadata: session.metadata,
               request: preparationRequest, signal: extra.signal,
               assertAllowed() {
@@ -532,6 +540,13 @@ export async function createBridge(config, session, { browserTransport: managedB
               assertTarget: target => assertCatalogTarget(pinnedActions, target), record: recordExecution,
               save: () => session.save(catalog),
               });
+              if (state.status === 'READY' && preparationRequest.intent !== 'existing_workflow'
+                  && (state.operation_id !== previous?.operation_id || state.document_id !== previous?.state?.document_id)) {
+                packageSaveFloor = saveSequence;
+                const path = preparationRequest.package_path;
+                openedPackage = preparationRequest.intent === 'open_package' && state.package_ref?.persisted === true
+                  && path && state.package_ref.path === path ? { documentID: state.document_id, workflowID: state.workflow_ref.workflow_id, path } : null;
+              }
               if(state.status==='READY'&&preparationRequest.intent==='new_draft'&&state.created_draft===true
                 &&state.package_ref?.persisted===false&&state.package_ref.path===null)
                 ownedUnsavedDraft={document_id:state.document_id,tab_tid:state.workflow_ref?.tab_tid,account:state.loginom_account};
@@ -768,7 +783,8 @@ export async function createBridge(config, session, { browserTransport: managedB
             const newSave=saveRequest&&!saveAdmissions.has(operationId);
             const saveAdmission=newSave?{
               sequence:saveSequence++,action_key:args.action_key,path:args.parameters?.path,
-              document_id:session.metadata.workspacePreparation?.state?.document_id}:null;
+              document_id:session.metadata.workspacePreparation?.state?.document_id,
+              workflow_id:session.metadata.workspacePreparation?.state?.workflow_ref?.workflow_id}:null;
             const outcome = request.params.name === 'dock_workspace_observe' ? await actionRuntime.observe({ signal: extra.signal, scope: args.scope, cursor: args.cursor, rootRef: args.root_ref, observationId: args.observation_id, storageName: args.storage_name })
               : request.params.name === 'dock_operation_inspect' ? await actionRuntime.inspect({ operationId: args.operation_id, signal: extra.signal })
                 : request.params.name === 'dock_operation_recover' ? await actionRuntime.recover(args.operation_id,
@@ -802,10 +818,12 @@ export async function createBridge(config, session, { browserTransport: managedB
             if(admission&&confirmedSave.status==='SUCCEEDED'&&confirmedSave.action_key===admission.action_key
               &&confirmedSave.output?.package_ref?.path===admission.path
               &&admission.document_id===session.metadata.workspacePreparation?.state?.document_id
+              &&admission.sequence>=packageSaveFloor
               &&(!lastSavedPackage||admission.sequence>lastSavedPackage.sequence)) {
               savedPackages.set(admission.path,confirmedSave.operation_id);
               lastSavedPackage={path:admission.path,operation_id:confirmedSave.operation_id,
-                document_id:admission.document_id,sequence:admission.sequence};
+                document_id:admission.document_id,workflow_id:admission.workflow_id,sequence:admission.sequence,confirmedAt:Date.now()};
+              admission.confirmed=true;
               if(confirmedSave.output?.reopened===true||confirmedSave.trace?.some(e=>e.event==='save_continuations_observed'
                 &&e.recovered_reopen===true&&e.native_identity_verified===true))
                 reopenedSave={path:admission.path,preparation:session.metadata.workspacePreparation};
@@ -861,6 +879,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               instruction:'Save rebound the saved package. Issued document/workflow/node identities remain valid; this is their current tab and navigation.'})});
             if(workspaceBindingAdvice)reply.content.push({type:'text',text:JSON.stringify(workspaceBindingAdvice)});
             if(savedOutcome.status==='SUCCEEDED'&&['package.save_as','package.save_checkpoint'].includes(savedOutcome.action_key)&&savedOutcome.output?.package_ref?.path){
+              let savedState;
               // Save As can reopen a package that Loginom immediately marks
               // modified. Report this while the model can still checkpoint it,
               // rather than discovering it only during isolated shutdown.
@@ -871,6 +890,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                   loginomUrl:config.loginomUrl,loginomBuild:session.metadata.targetIdentity.loginom_build};
                 const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code:makeSavedPackageStateCode(options)}},undefined,{timeout:15000});
                 const state=parseSavedPackageState(response,options),advice=savedPackageStateAdvice(state,savedOutcome);
+                savedState=state;
                 await recordExecution({phase:'saved_package_state_observed',operation_id:savedOutcome.operation_id,state,advice});
                 reply.content.push({type:'text',text:JSON.stringify(advice)});
               }catch{
@@ -883,6 +903,30 @@ export async function createBridge(config, session, { browserTransport: managedB
                   instruction:'The save receipt remains valid, but the current open package dirty state could not be verified. Do not claim that session cleanup is confirmed.',
                   ...(recovery.enabled?{next_step:{tool:'dock_browser_recovery',arguments:{action:'start',operation_id:savedOutcome.operation_id},
                     reason:'SAVE_STATE_UNCONFIRMED',instruction:'Start browser recovery for this save yourself; do not ask the user to act in the interface.'}}:{})})});
+              }
+              if(admission?.confirmed && savedOutcome.operation_id===lastSavedPackage?.operation_id) {
+                if(!admission.savedGraph) {
+                  const prepared=session.metadata.workspacePreparation?.state;
+                  const identity={save_operation_id:savedOutcome.operation_id,package_path:admission.path};
+                  try {
+                    const before=savedOutcome.trace?.findLast(entry=>entry.event==='save_graph_before_write')?.graph;
+                    if(!before||!savedState||workspaceBindingAdvice||prepared?.document_id!==admission.document_id
+                      ||savedOutcome.cleanup_complete!==true) throw Error('Saved graph binding unavailable');
+                    if(config.storageDirectories)requireStorageDestination(admission.path,config.storageDirectories,'packages');
+                    const workflow=normalizedWorkspace?.workflow_ref??prepared.workflow_ref;
+                    const intent=actionRuntime.saveNodeIntent(prepared.document_id,workflow.workflow_id);
+                    const code=makeSavedPackageGraphCode({origin:new URL(config.loginomUrl).origin,build:session.metadata.targetIdentity.loginom_build,
+                      path:admission.path,tabTid:workflow.tab_tid,documentId:prepared.document_id,sessionId:session.metadata.sessionId,account:savedState.account});
+                    const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,{timeout:15000});
+                    const graph=await compareSavedPackageGraph({bytes:parseSavedPackageBytes(response),before,...intent});
+                    admission.savedGraph={...identity,status:'compared',...graph,
+                      rename_attribution:savedState.modified?'unconfirmed':'observed_during_save'};
+                  } catch {
+                    admission.savedGraph={...identity,status:'unavailable'};
+                  }
+                }
+                reply._meta={...reply._meta,loginom:{saved_package_graph:admission.savedGraph}};
+                reply.content.push({type:'text',text:savedGraphMessage(admission.savedGraph)});
               }
             }
             try {
@@ -966,6 +1010,61 @@ export async function createBridge(config, session, { browserTransport: managedB
         ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
     });
     return { server, catalog,
+      async graphSnapshot(signal,{details=false}={}) {
+        const prepared=session.metadata.workspacePreparation?.state;
+        if(!userProfile||!session.metadata.workspaceReady||prepared?.status!=='READY'
+          ||nativeStepDocument!==prepared.document_id||actionRuntime?.hasUnsettledWork()||actionRuntime?.hasActiveWork()
+          ||recovery.unsettled()||clipboardUncertain||heldLeases.size>0)
+          return null;
+        const code=makeWorkspaceStepCode({loginomUrl:config.loginomUrl,build:session.metadata.targetIdentity.loginom_build,
+          sessionId:session.metadata.sessionId,workflowRef:{...prepared.workflow_ref,document_id:prepared.document_id},
+          readGraph,types:NODE_TYPES,snapshotOnly:true,snapshotDetails:details});
+        const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{
+          code:config.storageDirectories?withStorageIdentity(code,session.metadata.storageBinding):code,
+        }},undefined,{timeout:3000,signal});
+        const snapshot=parseCapabilityResult(response,{redactor}).output?.snapshot;
+        return snapshot?redactor.redact(snapshot):null;
+      },
+      async packageSchema(context, target, signal) {
+        const window = await this.graphSnapshot(signal, {details:true}).catch(() => null);
+        if (!target || window?.document === target.document_id && window.workflow === target.workflow_id) return window;
+        const preparation = session.metadata.workspacePreparation;
+        const prepared = preparation?.state;
+        if (!userProfile || !config.storageDirectories || !session.metadata.workspaceReady || prepared?.status !== 'READY'
+          || prepared.document_id !== target.document_id || nativeStepDocument !== prepared.document_id
+          || actionRuntime?.hasUnsettledWork() || actionRuntime?.hasActiveWork() || recovery.unsettled()
+          || clipboardUncertain || heldLeases.size > 0) return window;
+        try {
+          const current = await this.packageState(context, false);
+          const path = current.copy?.path;
+          if (!path || current.open !== true || current.path !== path || session.metadata.workspacePreparation !== preparation)
+            return window;
+          if (!current.copy.workflow_ids?.includes(target.workflow_id)) return window;
+          if (current.modified === true) return { source: 'save_required' };
+          if (current.modified !== false) return window;
+          signal.throwIfAborted();
+          requireStorageDestination(path, config.storageDirectories, 'packages');
+          const code = makeSavedPackageGraphCode({
+            origin: new URL(config.loginomUrl).origin, build: session.metadata.targetIdentity.loginom_build,
+            path, tabTid: prepared.workflow_ref.tab_tid, documentId: prepared.document_id,
+            sessionId: session.metadata.sessionId, account: prepared.loginom_account,
+            target: {preparationId: preparation.operation_id, workflowId: target.workflow_id},
+          });
+          const response = await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,{timeout:10000});
+          signal.throwIfAborted();
+          const bytes = parseSavedPackageBytes(response);
+          return session.metadata.workspacePreparation === preparation
+            ? {source:'saved', name:path.split('/').at(-1), base64:bytes.toString('base64')}
+            : null;
+        } catch (error) {
+          if (error?.code === 'PACKAGE_SCHEMA_SAVE_REQUIRED') return { source: 'save_required' };
+          return window;
+        }
+      },
+      packageState(context, busy) {
+        const save = lastSavedPackage?.sequence >= packageSaveFloor ? lastSavedPackage : null;
+        return readPackageState(context, save, busy, openedPackage);
+      },
       applyWithScanReceipt(args,receipt,extra) {
         return callTool({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);
       },

@@ -2,11 +2,12 @@ import { EventEmitter } from "node:events"
 import { isAbsolute } from "node:path"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
-import { createLoginomHost } from "./host"
-import { chatId, loginomHostPort, type HostPort } from "./host-port"
+import { chatId, createLoginomHost } from "./host"
+import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
 import { DashboardRead } from "./dashboard"
+import { PackageSchemaSession } from "./package-schema"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
@@ -137,6 +138,18 @@ async function dispatch(message: unknown) {
     if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
     if (message.method === "dashboard.read") {
       const result = await state.host.readDashboard(Schema.decodeUnknownSync(DashboardRead)(input))
+      reply({ id: message.id, result })
+      return
+    }
+    if (message.method === "package.schema") {
+      const { sessionID, target } = Schema.decodeUnknownSync(PackageSchemaSession)(input)
+      reply({ id: message.id, result: await state.host.packageSchema(sessionID, target) })
+      return
+    }
+    if (message.method === "package.state") {
+      if (!input || typeof input !== "object" || !("sessionID" in input) || typeof input.sessionID !== "string")
+        throw new Error("LOGINOM_INPUT_INVALID")
+      const result = await state.host.packageState(input.sessionID)
       reply({ id: message.id, result })
       return
     }

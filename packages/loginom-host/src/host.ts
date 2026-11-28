@@ -2,7 +2,7 @@ import { inputStore, type InputFile } from "./inputs"
 import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { tmpdir } from "node:os"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
@@ -17,6 +17,11 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
+import { maxPackageBytes, PackageWorkflow, savedPackageSchema, windowPackageSchema } from "./package-schema"
+
+export function chatId(sessionID: string) {
+  return createHash("sha256").update(sessionID).digest("hex")
+}
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
 export async function verifyInstallationResources(options: {
@@ -809,8 +814,47 @@ export async function createLoginomHost(options: {
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
       return inputs.admit(`${generation}:${chat}`, userMessage, files, `/${current.connection.username}`)
     },
+    async packageState(sessionID: string) {
+      const chat = chatId(sessionID)
+      const { generation } = await service.api.status()
+      const child = generations.get(generation)?.children.get(chat)
+      if (!child) {
+        if (lost.has(chat) || stale.has(chat) || [...generations.values()].some((entry) => entry.children.has(chat)))
+          return null
+        return { open: false, path: null, modified: null, modifiedDetectedAt: null, lastSave: null }
+      }
+      const result = await (await child).request("packageState", undefined, 5000)
+      if ((await service.api.status()).generation !== generation || generations.get(generation)?.children.get(chat) !== child)
+        return null
+      return result
+    },
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true
+    },
+    async packageSchema(sessionID: string, target?: typeof PackageWorkflow.Type) {
+      const chat = chatId(sessionID)
+      const before = await service.api.status()
+      const generation = generations.get(before.generation)
+      const child = generation?.children.get(chat)
+      if (!child || stale.has(chat) || journal.pending().length || recoveries.has(chat)) return null
+      const result = await (await child).request("packageSchema", target, target ? 19_000 : 12_000)
+      const after = await service.api.status()
+      if (
+        before.generation !== after.generation || generation?.children.get(chat) !== child ||
+        stale.has(chat) || journal.pending().length || recoveries.has(chat)
+      ) return null
+      if (target && result && typeof result === "object" && "source" in result && result.source === "save_required")
+        return { source: "save_required" as const }
+      if (target && result && typeof result === "object" && "source" in result && result.source === "saved" &&
+        "name" in result && typeof result.name === "string" && "base64" in result && typeof result.base64 === "string" &&
+        result.base64.length <= Math.ceil(maxPackageBytes / 3) * 4) {
+        const snapshot = await savedPackageSchema(result.name, Buffer.from(result.base64, "base64"))
+        if ((await service.api.status()).generation !== before.generation || generation?.children.get(chat) !== child ||
+          stale.has(chat) || journal.pending().length || recoveries.has(chat)) return null
+        return { ...snapshot, target }
+      }
+      const snapshot = windowPackageSchema(result)
+      return snapshot ? { ...snapshot, generation: before.generation } : null
     },
     async workState(generation: number, chat: string) {
       // Inspect only the existing owner. Losing it is uncertainty, not evidence of idle work.

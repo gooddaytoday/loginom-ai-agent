@@ -24,6 +24,7 @@ import {
 import { createStore } from "solid-js/store"
 import { LifetimeContext, liveAccessor, PluginContext, type Bridge, type Entry } from "@opencode/plugin/gui/host"
 import {
+  BuiltinSlot,
   Page,
   QuestionRenderer,
   ToolRenderer,
@@ -87,8 +88,7 @@ type Contribution = { key: string; registry: string; plugin: string; value: Acce
 export type Item<T> = { readonly key: string; readonly plugin: string; readonly value: T }
 
 /**
- * The context the host builds: every `Setup<D>` of the definition receives it, and contributions read it as `Context`.
- * It has the members only built-ins use, which `builtinContext` reads.
+ * The context for `Setup<D>` and contributions. `builtinContext` can read additional members on built-in instances.
  */
 type InstanceContext = SetupContext<Entry> & BuiltinContext
 
@@ -815,6 +815,7 @@ function createHost(input: HostInput) {
     const stores: Stores = {}
 
     const gui = input.plugin?.(plugin)
+    const builtin = input.builtins?.has(plugin) === true
 
     const context = {
       id: plugin,
@@ -828,15 +829,16 @@ function createHost(input: HostInput) {
 
         const toolRenderer = registry.id === ToolRenderer.id
 
-        if (toolRenderer && !input.builtins?.has(plugin))
+        if (toolRenderer && !builtin)
           throw new Error("Only built-in plugins can add tool renderers")
 
-        if (registry.id === QuestionRenderer.id && !input.builtins?.has(plugin))
+        if (registry.id === QuestionRenderer.id && !builtin)
           throw new Error("Only built-in plugins can add question renderers")
 
-        if (registry.id === Page.id && !input.builtins?.has(plugin))
+        if (registry.id === Page.id && !builtin)
           throw new Error("Only built-in plugins can add pages")
 
+        const checkMobileSlot = registry.id === BuiltinSlot.id && !builtin
         let active = toolRenderer
         let claimed: string | undefined
 
@@ -847,6 +849,9 @@ function createHost(input: HostInput) {
         }
 
         const validate = (value: T | undefined) => {
+          if (checkMobileSlot && Predicate.hasProperty(value, "at") && value.at === "session.header.mobile")
+            throw new Error("Only built-in plugins can add mobile header slots")
+
           if (!active) return value
 
           const name = Predicate.hasProperty(value, "tool") && Predicate.isString(value.tool) ? value.tool : undefined
@@ -854,7 +859,16 @@ function createHost(input: HostInput) {
           if (name === claimed) return value
 
           if (name !== undefined) {
-            if (nativeToolNames.has(name)) throw new Error(`Cannot register a renderer for native tool "${name}"`)
+            const prefix = name.endsWith("*") ? name.slice(0, -1) : undefined
+
+            if (prefix === "" || (prefix ?? name).includes("*")) throw new Error(`Invalid tool renderer name "${name}"`)
+
+            if (
+              prefix === undefined
+                ? nativeToolNames.has(name)
+                : [...nativeToolNames].some((tool) => tool.startsWith(prefix))
+            )
+              throw new Error(`Cannot register a renderer for native tool "${name}"`)
 
             if (toolRendererNames.has(name)) throw new Error(`A renderer is already registered for tool "${name}"`)
           }
@@ -887,7 +901,9 @@ function createHost(input: HostInput) {
 
         // Validate the initial value in ctx.add, before installing the contribution.
         const initial = validate(reactive ? untrack(() => read?.()) : item)
-        const value = toolRenderer && read ? runWithOwner(owner, () => createMemo(() => validate(read()))) : read
+
+        const value =
+          (toolRenderer || checkMobileSlot) && read ? runWithOwner(owner, () => createMemo(() => validate(read()))) : read
 
         const key = `${plugin}/${++sequence.value}`
 
@@ -949,22 +965,31 @@ function createHost(input: HostInput) {
     }
 
     // Each HostApi is created on the instance's first read of it.
-    const created = new Map<string, HostApis[keyof HostApis]>()
+    const created = new Map<string, HostApis[keyof HostApis] | Context["layout"]>()
 
     Object.defineProperties(
       context,
       Object.fromEntries(
-        Object.entries(factories).map(([name, create]) => [
-          name,
-          {
-            enumerable: true,
-            get() {
-              if (!created.has(name)) created.set(name, create(plugin, root, typed, register, !gui))
+        Object.entries(factories)
+          .filter(([name]) => builtin || name !== "timeline")
+          .map(([name, create]) => [
+            name,
+            {
+              enumerable: true,
+              get() {
+                if (!created.has(name)) {
+                  if (!builtin && name === "layout") {
+                    const { openPage: _, ...layout } = factories.layout(plugin, root, typed, register, !gui)
+                    created.set(name, layout)
+                  } else {
+                    created.set(name, create(plugin, root, typed, register, !gui))
+                  }
+                }
 
-              return created.get(name)
+                return created.get(name)
+              },
             },
-          },
-        ]),
+          ]),
       ),
     )
 

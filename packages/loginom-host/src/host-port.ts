@@ -1,5 +1,5 @@
-import { createHash, randomUUID } from "node:crypto"
-import type { createLoginomHost } from "./host"
+import { randomUUID } from "node:crypto"
+import { chatId, type createLoginomHost } from "./host"
 import type { InputFile } from "./inputs"
 import type { FileReference } from "./file-reference"
 import { hostException, hostFailure } from "./errors"
@@ -9,6 +9,7 @@ import { DashboardDelete, DashboardRead, DashboardPublish } from "./dashboard"
 import { Schema } from "effect"
 import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
 import { browserRecoveryToolName, isBrowserRecoveryTool } from "../../loginom-runtime/client/lib/browser-recovery.mjs"
+import { graphSteps } from "./manual-edits"
 
 const knowledgeTools = new Set(["find", "search", "read", "grep", "glob", "list", "tree"])
 const Admissions = Schema.Array(
@@ -63,12 +64,9 @@ export type HostPort = {
   start(): void
 }
 
-export function chatId(session: string) {
-  return createHash("sha256").update(session).digest("hex")
-}
-
 export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<typeof createLoginomHost>>) {
   const owner = randomUUID()
+  const graphStep = graphSteps()
   const runs = new Map<
     string,
     {
@@ -648,11 +646,13 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           }
           const requestID = data.id
           const stepProgress = "stepProgress" in input && input.stepProgress === true
+          const step = graphStep(run.chat, run.scope!.taskMessageID, lease.generation)
           const result = await runtime.request(
             "call",
             {
               name: input.name,
               arguments: remaining === undefined ? args : { ...(args as object), timeout_ms: remaining },
+              ...(step.readBefore ? { graphBefore: true } : {}),
               ...(packageArtifact ? { packageArtifact } : {}),
               ...(input.name === "dock_node_apply" && "scanReceipt" in input ? { scanReceipt: input.scanReceipt } : {}),
               ...(stepProgress ? { stepProgress: true } : {}),
@@ -683,7 +683,25 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             }
           }
           if (isBrowserRecoveryTool(input.name)) run.recovery = recoveryPhase(result.result, run.recovery)
-          reply({ id: data.id, result: result.result }, lease.generation)
+          const manualEdits = step.settle(
+            "graphBefore" in result ? result.graphBefore : undefined,
+            !result.recoveryPending && "graphAfter" in result ? result.graphAfter : undefined,
+          )
+          const body = result.result
+          const meta = body && typeof body === "object" && "_meta" in body ? body._meta : undefined
+          reply(
+            {
+              id: data.id,
+              result:
+                manualEdits.length && body && typeof body === "object"
+                  ? {
+                      ...body,
+                      _meta: { ...(meta && typeof meta === "object" ? meta : {}), loginomManualEdits: manualEdits },
+                    }
+                  : body,
+            },
+            lease.generation,
+          )
         } catch (error) {
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE") throw error
           // A journal write failure precedes runtime dispatch and cannot establish

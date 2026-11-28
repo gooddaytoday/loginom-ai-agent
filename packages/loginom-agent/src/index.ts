@@ -20,6 +20,8 @@ import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
 import { packageDocs } from "./package-docs"
+import { registerPackageSchema } from "./package-schema"
+import { packageStateRpc } from "./package-state-contract"
 import {
   classify,
   declinedText,
@@ -108,8 +110,10 @@ const permission = {
   events: {},
 } as const
 
-export default Plugin.define({
-  id: "loginom.product",
+export const pluginID = "loginom.product"
+
+export default (ownsSession: (sessionID: string) => Promise<boolean>) => Plugin.define({
+  id: pluginID,
   setup: async (ctx) => {
     // Access grants (G1), keyed by the exact session ID: a subsession, a fork and a scheduled wake run in another
     // session or arrive as a new prompt, so none of them inherits a grant. A grant lives for one task, as in 0.4: from the
@@ -509,6 +513,7 @@ export default Plugin.define({
       await binding.fork(event.sessionID)
     })
 
+    await registerPackageSchema(ctx, files, ownsSession)
     await ctx.rpc.register(runner, {
       start: async (value) => {
         // The RPC host validates the call against the JSON Schema above before the handler runs.
@@ -536,6 +541,20 @@ export default Plugin.define({
         if (!Dashboard.isWork(ctx.location.directory)) return {}
         const url = await drafts.preview((value as { id: string }).id, call.signal)
         return url ? { url } : {}
+      },
+    })
+    await ctx.rpc.register(packageStateRpc, {
+      snapshot: async (value, call) => {
+        if (!value || typeof value !== "object" || !("sessionID" in value) || typeof value.sessionID !== "string")
+          return call.error("invalid_session", "A conversation ID is required", {})
+        if (!(await ownsSession(value.sessionID)))
+          return call.error("invalid_session", "The conversation is unavailable in this location", {})
+        const state = await ServiceHost.packageState(value.sessionID)
+        call.signal.throwIfAborted()
+
+        if (!(await ownsSession(value.sessionID)))
+          return call.error("invalid_session", "The conversation is unavailable in this location", {})
+        return state
       },
     })
     await ctx.rpc.register(permission, {

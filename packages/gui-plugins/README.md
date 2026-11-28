@@ -206,7 +206,14 @@ Built-in window plugins can import `ToolRenderer` from `@opencode/plugin/gui/bui
 `ctx.add(ToolRenderer, { tool, title, separate, render })` in setup for a tool they own. The host rejects native or
 already registered tool names and withdraws the renderer when the plugin unloads. `separate: true` gives visible calls
 their own row in grouped timelines. The renderer receives live data, including partial input. The timeline shows a tool
-error card if rendering throws and retries rendering at the next call status.
+error card if rendering throws and retries rendering at the next call status. An exact tool name takes priority over
+namespace prefixes ending in `*`, and the longest matching prefix wins. A renderer can provide
+`handlesFailure(metadata)` to render failures with the facts it understands. The host keeps the standard error card for other failures.
+
+`builtinContext(ctx).timeline` reads and sets the app's saved Compact and Detailed presets. A built-in can use
+`BuiltinSlot` at `session.header.mobile` to put a control beside the session location on narrow screens.
+The host restricts the narrow-screen slot, timeline preset access and `ToolRenderer` to built-in plugins.
+`builtinContext(ctx).layout.openPage(id)` opens a page registered by that same built-in.
 
 [Lifetimes](#lifetimes) shows `createKeyed` in files.
 
@@ -352,7 +359,7 @@ to the displayed repository or worktree instead of adding a second menu item.
 | `builtinMainContext(ctx)`, `MainStoreFrom`, `Lifecycle` | Main stores imported from settings files or other namespaces, and `lifecycle.restart(handoff)` |
 | `builtinCatalog(catalog)`, `BuiltinCatalog`             | Locales other than English as loaders, loaded when the user picks the locale                   |
 
-Registry tokens that extend a public registry share its id, so the host reads every item through it. The host accepts `Page` and `QuestionRenderer` registrations only from built-in plugins. A question renderer matches form metadata in its owning plugin. The underlying form remains usable in clients without the custom renderer. The host builds every context with the built-in members; `builtinContext` and `builtinMainContext` only type them. A plugin bundle's catalog holds every locale inline, and the host rejects a bundle whose catalog has a loader.
+Registry tokens that extend a public registry share its id, so the host reads every item through it. The window host reserves `Page`, `QuestionRenderer`, `ToolRenderer` and the `session.header.mobile` slot for built-in plugins. It exposes the timeline presets and `layout.openPage` on built-in window contexts. A question renderer matches form metadata in its owning plugin. The underlying form remains usable in clients without the custom renderer. A plugin bundle's catalog holds every locale inline, and the host rejects a bundle whose catalog has a loader.
 
 ```ts
 i18n: builtinCatalog({ en, de: () => import("./i18n/de") }),

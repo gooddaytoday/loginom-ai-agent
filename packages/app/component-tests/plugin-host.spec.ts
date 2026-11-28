@@ -7,6 +7,7 @@ import type {
   DialogHandle,
   Dialogs,
   Live,
+  Registry as RegistryToken,
   SessionRef,
   SessionScreen,
 } from "@opencode/plugin/gui"
@@ -123,6 +124,34 @@ story(
   },
 )
 
+story("the host reserves mobile header contributions and timeline navigation APIs for built-ins", async ({ page }) => {
+  const results = await page.evaluate(async (fixture) => {
+    const { mountPluginHost, Registry, Slot, until } = await import(fixture)
+    const mobile: RegistryToken<{ at: string; render: () => null }> = Registry.define(Slot.id)
+    const checks: { api?: { openPage: boolean; timeline: boolean }; slots: number }[] = []
+
+    for (const builtin of [false, true]) {
+      const host = mountPluginHost({ builtins: new Set(builtin ? ["fixture"] : []) })
+      await until(() => host.count() === 1)
+      let api: { openPage: boolean; timeline: boolean } | undefined
+      host.load((ctx: Context) => {
+        api = { openPage: "openPage" in ctx.layout, timeline: "timeline" in ctx }
+        ctx.add(mobile, { at: "session.header.mobile", render: () => null })
+      })
+      await until(() => host.status() === "active" || host.status() === "failed")
+      checks.push({ api, slots: host.entries(Slot.id) })
+      host.unmount()
+    }
+
+    return checks
+  }, fixture)
+
+  expect(results).toEqual([
+    { api: { openPage: false, timeline: false }, slots: 0 },
+    { api: { openPage: true, timeline: true }, slots: 1 },
+  ])
+})
+
 story("a plugin page that fails to render shows a way back to Home", async ({ page }) => {
   const host = await page.evaluateHandle(async (fixture) => {
     const { mountPluginPages } = await import(fixture)
@@ -165,6 +194,7 @@ for (const registry of ["page", "question.renderer"]) {
     const result = await page.evaluate(async ({ fixture, registry }) => {
       const { mountPluginHost, Registry, until } = await import(fixture)
       const host = mountPluginHost()
+
       const contribution =
         registry === "page" ? { id: "overview", title: "Third-party page" } : { matches: () => true, render: () => null }
 
@@ -181,6 +211,46 @@ for (const registry of ["page", "question.renderer"]) {
     expect(result).toEqual({ status: "failed", entries: 0 })
   })
 }
+
+story("the narrow session header and timeline preferences are restricted to built-in plugins", async ({ page }) => {
+  const results = await page.evaluate(async (fixture) => {
+    const { mountPluginHost, Registry, until } = await import(fixture)
+    const result = []
+
+    for (const builtin of [false, true]) {
+      const host = mountPluginHost({
+        builtins: new Set(builtin ? ["fixture"] : []),
+      })
+
+      let hasTimeline = false
+
+      try {
+        host.load((ctx: Context) => {
+          hasTimeline = "timeline" in ctx
+          ctx.add(Registry.define("slot"), () => ({
+            at: "session.header.mobile",
+            render: () => "Header action",
+          }))
+        })
+        await until(() => host.status() === "failed" || host.status() === "active")
+        result.push({
+          status: host.status(),
+          slots: host.entries("slot"),
+          hasTimeline,
+        })
+      } finally {
+        host.unmount()
+      }
+    }
+
+    return result
+  }, fixture)
+
+  expect(results).toEqual([
+    { status: "failed", slots: 0, hasTimeline: false },
+    { status: "active", slots: 1, hasTimeline: true },
+  ])
+})
 
 story("a plugin that finishes loading after the host unmounts is never set up", async ({ page }) => {
   const setups = await page.evaluate(async (fixture) => {
@@ -1078,6 +1148,7 @@ story(
 story("the new-session slot renders nothing without a plugin", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {
     const { mountPlugins, BuiltinSlot, until } = await import(fixture)
+
     const host = mountPlugins({
       definitions: [
         {
@@ -1088,16 +1159,19 @@ story("the new-session slot renders nothing without a plugin", async ({ page }) 
         },
       ],
     })
+
     try {
       const heading = () => host.container.querySelector('[data-testid="draft-heading"]')
       await until(() => heading()?.textContent === "Draft heading")
       host.define([])
       await until(() => heading()?.textContent === "")
+
       return { elements: heading()?.childElementCount, errors: host.escaped() }
     } finally {
       host.unmount()
     }
   }, fixture)
+
   expect(result).toEqual({ elements: 0, errors: [] })
 })
 
