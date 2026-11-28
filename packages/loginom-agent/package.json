@@ -7,7 +7,8 @@
   "license": "MIT",
   "exports": {
     ".": "./src/index.ts",
-    "./host": "./src/host.ts"
+    "./host": "./src/host.ts",
+    "./loginom-metadata": "./src/loginom-metadata.ts"
   },
   "scripts": {
     "typecheck": "bun check --no-script",
@@ -23,7 +24,8 @@
     "@opencode/util": "workspace:*",
     "@zip.js/zip.js": "2.7.62",
     "effect": "catalog:",
-    "htmlparser2": "8.0.2"
+    "htmlparser2": "8.0.2",
+    "https-proxy-agent": "7.0.6"
   },
   "devDependencies": {
     "@tsconfig/bun": "catalog:",

@@ -2,7 +2,6 @@ import { expect } from "bun:test"
 import fs from "node:fs/promises"
 import { createServer } from "node:http"
 import path from "node:path"
-import { Agent } from "@opencode/schema/agent"
 import { Integration } from "@opencode/schema/integration"
 import { ServerInfo } from "@opencode/protocol/groups/server"
 import { Effect, Schedule, Schema } from "effect"
@@ -527,20 +526,13 @@ it.live("serves the session view operation and missing-session error", () =>
 it.live("routes pending requests through the Session's instance", () =>
   Effect.gen(function* () {
     const config = yield* Effect.acquireDisposable(Effect.promise(() => tmpdir("opencode-pending-read-")))
-    const handler = yield* ServerFetch.make({
-      ...options,
-      config: {
-        directory: config.path,
-        project: false,
-        content: JSON.stringify({ permissions: [{ action: "shell", resource: "*", effect: "ask" }] }),
-      },
-    })
+    const handler = yield* ServerFetch.make({ ...options, config: { ...options.config, directory: config.path } })
     const created = (yield* Effect.promise(() =>
       handler(
         new Request("http://opencode.local/api/session", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: "{}",
+          body: JSON.stringify({ permissions: [{ action: "edit", resource: "notes.md", effect: "ask" }] }),
         }),
       ).then((response) => response.json()),
     )) as { data: { id: string } }
@@ -622,35 +614,18 @@ it.live("routes pending requests through the Session's instance", () =>
     expect(globalForms.status).toBe(200)
     expect(yield* Effect.promise(() => globalForms.json())).toMatchObject({ data: [{ title: "Global form" }] })
 
-    // Agent permission policy is installed by plugin activation.
-    yield* Effect.gen(function* () {
-      const response = yield* Effect.promise(() => handler(new Request("http://opencode.local/api/agent")))
-      expect(response.status).toBe(200)
-      const body = Schema.decodeUnknownSync(Schema.Struct({ data: Schema.Array(Agent.Info) }))(
-        yield* Effect.promise(() => response.json()),
-      )
-      return body.data.some(
-        (agent) =>
-          agent.id === "build" &&
-          agent.permissions.some((rule) => rule.action === "shell" && rule.resource === "*" && rule.effect === "ask"),
-      )
-    }).pipe(
-      Effect.filterOrFail((ready) => ready),
-      Effect.retry(Schedule.spaced("10 millis")),
-      Effect.timeout("2 seconds"),
-    )
     const createdPermission = yield* Effect.promise(() =>
       handler(
         new Request(`http://opencode.local/api/session/${created.data.id}/permission`, {
           method: "POST",
           headers: { "content-type": "application/json", ...headers },
-          body: JSON.stringify({ id: "per_pending_read", action: "shell", resources: ["pwd"] }),
+          body: JSON.stringify({ id: "per_pending_edit", action: "edit", resources: ["notes.md"] }),
         }),
       ),
     )
     expect(createdPermission.status).toBe(200)
     expect(yield* Effect.promise(() => createdPermission.json())).toEqual({
-      data: { id: "per_pending_read", effect: "ask" },
+      data: { id: "per_pending_edit", effect: "ask" },
     })
 
     const permissions = yield* Effect.promise(() =>
@@ -658,7 +633,7 @@ it.live("routes pending requests through the Session's instance", () =>
     )
     expect(permissions.status).toBe(200)
     expect(yield* Effect.promise(() => permissions.json())).toMatchObject({
-      data: [{ id: "per_pending_read", sessionID: created.data.id, action: "shell", resources: ["pwd"] }],
+      data: [{ id: "per_pending_edit", sessionID: created.data.id, action: "edit", resources: ["notes.md"] }],
     })
     expect(yield* loaded()).toHaveLength(1)
   }),

@@ -302,7 +302,7 @@ test.each([
   expect(await runtime.exited).toEqual({ code: 0, signal: null })
 }, 10_000)
 
-test.each(["success", "slow-6s", "slow-8s", "missing-ack-6s", "refused", "private-error", "bad-ack", "bad-exit", "timeout"])(
+test.each(["success", "slow-6s", "slow-8s", "missing-ack-6s", "refused", "audit-error", "private-error", "bad-ack", "bad-exit", "timeout"])(
   "private shutdown evidence distinguishes IPC and exit without weakening cleanup: %s",
   async (mode) => {
     const directory = await mkdtemp(join(fixture.directory, "diagnostic-"))
@@ -311,11 +311,13 @@ test.each(["success", "slow-6s", "slow-8s", "missing-ack-6s", "refused", "privat
       if(m.operation==='start')process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
       if(m.operation!=='close')return;
       const mode=${JSON.stringify(mode)};
+      if(mode==='audit-error'&&(!Number.isSafeInteger(m.input?.deadline)||m.input.deadline<=Date.now()))process.exit(2);
       if(mode.startsWith('slow-')){setTimeout(()=>process.send({id:m.id,result:{closed:true}},()=>process.disconnect()),mode==='slow-6s'?6000:8000);return;}
       if(mode==='missing-ack-6s'){setTimeout(()=>process.disconnect(),6000);return;}
       if(mode==='timeout'){setTimeout(()=>process.disconnect(),15250);return;}
       if(mode==='bad-exit')process.exitCode=1;
       const value=mode==='refused'?{error:'LOGINOM_RUNTIME_CLEANUP_FAILED'}:
+        mode==='audit-error'?{error:'LOGINOM_RUNTIME_CLEANUP_FAILED',audit_error:{code:'ARTIFACT_DELIVERY_AUDIT_WRITE_FAILED',phase:'verification_completed',message:'private-secret-must-not-escape'}}:
         mode==='private-error'?{error:'private-secret-must-not-escape'}:{result:{closed:mode!=='bad-ack',extra:'private-secret-must-not-escape'}};
       process.send({id:m.id,...value},()=>process.disconnect());
     });`)
@@ -330,6 +332,7 @@ test.each(["success", "slow-6s", "slow-8s", "missing-ack-6s", "refused", "privat
       const closing = runtime.close();
       assert.equal(runtime.close(), closing);
       if (${JSON.stringify(["success", "slow-6s", "slow-8s"].includes(mode))}) await closing;
+      else if (${JSON.stringify(mode === "audit-error")}) await assert.rejects(closing, {code:'LOGINOM_RUNTIME_CLEANUP_FAILED',audit_error:{code:'ARTIFACT_DELIVERY_AUDIT_WRITE_FAILED',phase:'verification_completed'}});
       else await assert.rejects(closing, /LOGINOM_RUNTIME_CLEANUP_FAILED/);
     `], { stdout: "pipe", stderr: "pipe" })
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
@@ -342,7 +345,8 @@ test.each(["success", "slow-6s", "slow-8s", "missing-ack-6s", "refused", "privat
     const result = JSON.parse(text)
     expect(result.request_error).toBe(mode === "timeout" ? "LOGINOM_RUNTIME_TIMEOUT"
       : mode === "missing-ack-6s" ? "LOGINOM_RUNTIME_DISCONNECTED"
-      : mode === "refused" ? "LOGINOM_RUNTIME_CLEANUP_FAILED" : mode === "private-error" ? "LOGINOM_RUNTIME_FAILED" : null)
+      : ["refused", "audit-error"].includes(mode) ? "LOGINOM_RUNTIME_CLEANUP_FAILED" : mode === "private-error" ? "LOGINOM_RUNTIME_FAILED" : null)
+    expect(result.audit_error).toEqual(mode === "audit-error" ? { code: "ARTIFACT_DELIVERY_AUDIT_WRITE_FAILED", phase: "verification_completed" } : undefined)
     expect(result.closed_ack).toBe(["success", "slow-6s", "slow-8s", "bad-exit"].includes(mode))
     expect(result.exit_code).toBe(mode === "bad-exit" ? 1 : 0)
     expect(result.exit_signal).toBeNull()

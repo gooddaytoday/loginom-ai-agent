@@ -655,6 +655,31 @@ test('repeat dock_prepare accepts a manually saved draft with the same native ow
   assert.equal(fixture.events.filter(e=>e==='create_draft').length,1);
 });
 
+test('state check reads the native dirty flag and requests a graph without rebinding ports',async()=>{
+  const fixture=pageFixture({authenticated:true,nativeWorkflow:true});
+  const first=await execute(fixture);
+  const main=fixture.context.bg.app.Application.FInstance.FMainForm,card=main.Items.Workspace.getActiveTab();
+  main.Items.Workspace.getActiveTab=()=>card;
+  const pkg=fixture.tabs[0].workflowNode.ParentNode;
+  pkg.Package={};pkg.HasRunningNodes=()=>false;pkg.PackageFileName='user/scenario.lgp';
+  let dirtyReads=0, graphReads=0;
+  main.FMapTree.FServerConnection.Session.IsPackageModified=async proxy=>{
+    assert.equal(proxy,pkg.Package);dirtyReads++;return true;
+  };
+  const readStep=runInNewContext(makeWorkspaceStepCode({loginomUrl:'http://loginom.example/app',build,
+    sessionId:'standalone',workflowRef:{...first.workflow_ref,document_id:first.document_id},types:{},inspectState:true,
+    readGraph:async(_page,options)=>{
+      check(options);return {complete:true};
+    }}),{check:options=>{assert.equal(options.read_only,true);graphReads++;}});
+  const result=await readStep(fixture.page);
+  assert.equal(result.effect_possible,false);
+  assert.equal(result.output.modified,true);
+  assert.equal(result.output.package_ref.path,'/user/scenario.lgp');
+  assert.equal(result.output.graph.complete,true);
+  assert.equal(dirtyReads,1);assert.equal(graphReads,1);
+  assert.equal(fixture.events.filter(event=>event==='create_draft').length,1);
+});
+
 test('new Apply preflight reads manual Save navigation without replacing the issued preparation', async()=>{
   const fixture=pageFixture({authenticated:true,nativeWorkflow:true});
   const first=await execute(fixture);

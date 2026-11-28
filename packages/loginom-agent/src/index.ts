@@ -4,11 +4,14 @@
 import { join } from "node:path"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
+import { StepCheckRequest, StepCheckResult } from "@loginom-ai-agent/loginom-host/step-state"
+import { WriteOutcomeInput, WriteOutcomeResult } from "@loginom-ai-agent/loginom-host/write-outcomes"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
+import { Schema } from "effect"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
 import { connectionSettings } from "./connection-settings"
@@ -41,6 +44,10 @@ import { repeatGuard } from "./repeat-guard"
 import { apply, bundled, hub } from "./skills"
 
 export { Dashboard }
+export { modelServerHandlers } from "./model-server"
+export { modelServerFetch } from "./model-server-network"
+export { isModelServerID } from "@loginom-ai-agent/loginom-host/model-server-id"
+export { ModelServerRpc } from "@loginom-ai-agent/loginom-host/model-server-rpc"
 
 // The wizard's RPC: grant a profile to one prompt and admit it. The UI is stage C.
 const runner = {
@@ -76,6 +83,28 @@ const preflight = {
         additionalProperties: false,
       },
       output: { type: "object", properties: { code: { type: "string" } }, additionalProperties: false },
+    },
+  },
+  events: {},
+} as const
+
+const writeOutcome = {
+  id: "loginom.write-outcome",
+  methods: {
+    check: {
+      input: Schema.toStandardSchemaV1(WriteOutcomeInput),
+      output: Schema.toStandardSchemaV1(WriteOutcomeResult),
+    },
+  },
+  events: {},
+} as const
+
+const loginomStep = {
+  id: "loginom.step",
+  methods: {
+    checkState: {
+      input: Schema.toStandardSchemaV1(StepCheckRequest),
+      output: Schema.toStandardSchemaV1(StepCheckResult),
     },
   },
   events: {},
@@ -181,7 +210,7 @@ export default Plugin.define({
     const hold = (sessionID: string) => {
       const current = runs.get(sessionID)
       if (current) return current.lease
-      const endTurn = ServiceHost.connectionSettings.holdTurn()
+      const endTurn = ServiceHost.connectionSettings.holdTurn(sessionID)
       const lease = dashboard()
         ? Promise.resolve(undefined)
         : ServiceHost.acquire(sessionID).then(
@@ -340,7 +369,10 @@ export default Plugin.define({
     // `package-docs` grant.
     const profiles = join(Global.Path.data, "file-profiles")
     const files = await localFiles(ctx, profiles)
-    const repeats = repeatGuard(async () => (await ctx.tool.list()).find((tool) => tool.id === "question"))
+    const repeats = repeatGuard({
+      ask: ctx.tool.ask,
+      interrupt: (sessionID) => ctx.session.interrupt({ sessionID }),
+    })
     await ctx.tool.transform((editor) => {
       editor.add(
         repeats.wrap(
@@ -425,7 +457,7 @@ export default Plugin.define({
       hide(event)
     })
     await ctx.tool.hook("execute.before", async (event) => {
-      if (!repeats.tracks(event.tool)) repeats.reset(event.sessionID)
+      repeats.before(event.sessionID, event.tool)
       await bound(event.sessionID)
       if (!permits(profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
@@ -518,7 +550,15 @@ export default Plugin.define({
         return { granted: true }
       },
     })
-    await ctx.rpc.register(ConnectionSettingsRpc, connectionSettings())
+    await ctx.rpc.register(loginomStep, {
+      checkState: async (input, call) => {
+        await bound(input.sessionID)
+        await ctx.session.get({ sessionID: input.sessionID })
+        call.signal.throwIfAborted()
+        return ServiceHost.checkStepState(input)
+      },
+    })
+    const settingsRpc = await ctx.rpc.register(ConnectionSettingsRpc, connectionSettings())
     await ctx.rpc.register(preflight, {
       check: async (value) => {
         const code = await ServiceHost.preflight((value as { automation: boolean }).automation)
@@ -529,6 +569,19 @@ export default Plugin.define({
     await ctx.rpc.register(DashboardTarget.rpc, {
       prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),
       find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),
+      preview: async (value, call) => {
+        if (!Dashboard.isWork(ctx.location.directory)) return {}
+        const url = await drafts.preview((value as { id: string }).id, call.signal)
+        return url ? { url } : {}
+      },
+    })
+    await ctx.rpc.register(writeOutcome, {
+      check: async (input, call) => {
+        await bound(input.sessionID)
+        await ctx.session.get({ sessionID: input.sessionID })
+        call.signal.throwIfAborted()
+        return ServiceHost.checkWriteOutcome(input)
+      },
     })
     await ctx.rpc.register(permission, {
       conversation: async (value, call) => {
@@ -567,7 +620,11 @@ export default Plugin.define({
       },
     })
 
+    const unsubscribeApplication = ServiceHost.connectionSettings.onApplication((outcome, event) => {
+      void settingsRpc.events.emit(outcome, event).catch(() => undefined)
+    })
     return async () => {
+      unsubscribeApplication()
       stop.abort()
       await Promise.all([...runs.keys()].map(drop))
       await drafts.close()

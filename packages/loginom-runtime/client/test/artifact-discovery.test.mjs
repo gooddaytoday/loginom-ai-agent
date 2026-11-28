@@ -8,6 +8,8 @@ function fixture(fault) {
  const snapshot={authenticated:true,origin:'https://test',loginom_build:'7.4.2',workflow_ref:{prefix},dom_epoch:{document:'doc',revision:1},
   active_tab_ref:'tab',package_identity:null,file_storage:{status:'observed',directory:'/user/dock-p3'},observation_root:{ref:'nav'},ui:{elements:[],masks:[],dialogs:[]}};
  const task={snapshot,artifact:{name,bytes:42,upload:{directory:'/user/dock-p3'}},expected_origin:'https://test',expected_build:'7.4.2',operation_id:'verify'};
+ const versionCase=fault?.startsWith('version-');
+ if(versionCase){task.shutdown_verification=true;task.artifact.upload.destination='/user/dock-p3/'+name;}
  const staticListing=fault==='late_row'||fault==='missing_row';
  const owner={isConnected:true,scrollHeight:staticListing?500:2500,clientHeight:500,contains:e=>e===owner,
   getBoundingClientRect:()=>({x:0,y:100,width:800,height:500}),get scrollTop(){return top;},set scrollTop(v){moves.push(v);top=v;}};
@@ -30,8 +32,15 @@ function fixture(fault) {
   if(fault==='refresh_busy_owner'&&directoryReads>=3)s.active_tab_ref='foreign';
   if(fault==='refresh_context'&&directoryReads>1||fault==='refresh_native_context'&&nativeChecks>0)s.active_tab_ref='foreign';
   if(fault==='directory'&&moves.length)s.file_storage.directory='/foreign';
-  if(options.discover_roots&&(top>=1400||(fault==='empty'||fault==='late_row'||fault?.startsWith('refresh_busy')||fault?.startsWith('refresh_native'))&&refreshes>0)&&fault!=='absent')s.ui.elements=[{tid:fileTid,ref:'file'}];
-  if(options.root_ref==='file')s.ui.elements=[{tid:fileTid,ref:'file',label:name,storage_entry:{bytes:fault==='pending_size'&&refreshes===0?0:42}}];
+  if(options.discover_roots&&(versionCase||top>=1400||(fault==='empty'||fault==='late_row'||fault?.startsWith('refresh_busy')||fault?.startsWith('refresh_native'))&&refreshes>0)&&fault!=='absent')s.ui.elements=[{tid:fileTid,ref:'file'}];
+  if(options.root_ref==='file'){
+   const refreshed=downloads>0&&refreshes>0;
+   s.ui.elements=[{tid:fileTid,ref:'file',label:name,storage_entry:{
+    bytes:fault==='pending_size'&&refreshes===0?0:refreshed&&fault==='version-size'?41:42,
+    kind:'file',bytes_source:'native_file_store',path:task.artifact.upload.destination,
+    mtime:refreshed&&fault==='version-mtime'?'2026-11-28T00:00:01.000Z':'2026-11-28T00:00:00.000Z',
+   }}];
+  }
   return {status:'SUCCEEDED',output:s};
  };
  const download=async(p,t,read)=>{downloads++;
@@ -115,6 +124,13 @@ test('readiness timeout before any gesture is no-effect; timeout after refresh r
 test('discovered download preserves the private toast observation when delegating the file read',async()=>{
  const f=fixture('download_toast'),r=await f.run();
  assert.equal(r.status,'SUCCEEDED');assert.equal(f.downloads,1);
+});
+for(const version of ['stable','mtime','size'])test('shutdown download confirms the refreshed file version: '+version,async()=>{
+ const f=fixture('version-'+version),result=await f.run();
+ assert.equal(result.status,version==='stable'?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result));
+ assert.equal(f.downloads,1);
+ assert.equal(f.refreshes,1,'the cached row cannot verify the server version after the download');
+ if(version!=='stable')assert.equal(result.error.code,'DISCOVERY_FILE_VERSION_CHANGED');
 });
 test('private discovery reveals a buffered authorized row and delegates exactly one download',async()=>{
  const f=fixture(),r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.deepEqual(f.moves,[700,1400]);assert.equal(f.downloads,1);

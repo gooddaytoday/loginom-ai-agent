@@ -1,15 +1,17 @@
 import type { OpenCodeEvent } from "@opencode/client/promise"
-import { expect, test } from "@playwright/test"
+import { expect, test, type Page } from "@playwright/test"
 import {
   captureConsoleWarnings,
   openCommandPalette,
   openPaletteWorkspace,
   paletteSession,
 } from "../utils/command-palette"
-import { REMOTE_SERVER, SERVER } from "../utils/app"
+import { expectPath, REMOTE_SERVER, seed, SERVER, sessionHref } from "../utils/app"
 import { mockRemoteServer, mockWorkspace } from "../utils/workspace"
 
 test.use({ serviceWorkers: "block", permissions: ["clipboard-read", "clipboard-write"] })
+
+const searchButton = (page: Page) => page.getByRole("button", { name: "Search", exact: true })
 
 test("copies the session ID while file and session searches are still pending", async ({ page }) => {
   const warnings = captureConsoleWarnings(page)
@@ -42,16 +44,14 @@ test("home commands do not wait for session search", async ({ page }) => {
   await expect(dialog.getByRole("option", { name: /^Open settings/ })).toHaveAttribute("aria-selected", "true")
   await input.press("Enter")
   await expect(page).toHaveURL("/settings")
-  await expect(page.getByTestId("settings-screen").getByRole("tab", { name: "Preferences", exact: true })).toBeVisible()
+  await expect(
+    page.getByTestId("settings-screen").getByRole("heading", { name: "Preferences", exact: true }),
+  ).toBeVisible()
   release.resolve()
 })
 
 test("finds a setting and opens Settings with its row in view and highlighted", async ({ page }) => {
-  await openPaletteWorkspace(page)
-  await page.keyboard.press("Control+K")
-  const dialog = page.getByRole("dialog")
-  const input = dialog.getByRole("combobox")
-  await expect(input).toBeFocused()
+  const { dialog, input } = await openCommandPalette(page)
   await input.fill("theme")
   await expect(dialog.getByRole("option", { name: /^Theme/ })).toHaveAttribute("aria-selected", "true")
 
@@ -87,9 +87,9 @@ test("opens from the Settings page and finds another setting", async ({ page }) 
   await page.keyboard.press("ControlOrMeta+,")
   await expect(page).toHaveURL("/settings")
   const screen = page.getByTestId("settings-screen")
-  await expect(screen.getByRole("tab", { name: "Preferences", exact: true })).toBeVisible()
+  await expect(screen.getByRole("heading", { name: "Preferences", exact: true })).toBeVisible()
 
-  await page.keyboard.press("ControlOrMeta+K")
+  await page.keyboard.press("ControlOrMeta+Shift+P")
   const dialog = page.getByRole("dialog")
   const input = dialog.getByRole("combobox")
   await expect(input).toBeFocused()
@@ -110,29 +110,32 @@ test("lists recent sessions before a query is entered", async ({ page }) => {
   await expect(session).toHaveAttribute("aria-selected", "false")
   await session.click()
   await expect(dialog).toHaveCount(0)
-  await expect(page.getByRole("heading", { name: paletteSession.title, exact: true })).toBeVisible()
+  await expectPath(page, sessionHref(paletteSession.id))
 })
 
-test("titlebar search lists recent sessions and opens the typed match", async ({ page }) => {
-  await openPaletteWorkspace(page, true)
-  await page.getByRole("banner").getByRole("button", { name: "Search sessions", exact: true }).click()
+test("sidebar search lists recent conversations and opens the typed match", async ({ page }) => {
+  const sessions = [paletteSession]
+  await seed(page, { settings: { appearance: { tabLayout: "vertical" } } })
+  await openPaletteWorkspace(page, true, sessions)
+  await searchButton(page).click()
   const dialog = page.getByRole("dialog")
   const input = dialog.getByRole("combobox")
   await expect(input).toBeFocused()
-  await expect(input).toHaveAttribute("placeholder", "Search sessions")
-  await expect(dialog.getByText("Recent sessions", { exact: true })).toBeVisible()
+  await expect(input).toHaveAttribute("placeholder", "Title, project, or words from your prompt")
+  await expect(dialog.getByText("Recent conversations", { exact: true })).toBeVisible()
   await expect(dialog.getByRole("option", { name: /Palette fixture session/ })).toHaveAttribute("aria-selected", "true")
-  // Session search lists sessions only, never commands.
   await input.fill("settings")
   await expect(dialog.getByText("No results found", { exact: true })).toBeVisible()
-  await input.fill("Palette fixture")
-  await expect(dialog.getByRole("option")).toHaveCount(1)
+  const match = { ...paletteSession, id: "ses_palette_typed_match", title: "Quarterly revenue" }
+  sessions.push(match)
+  await input.fill("quarterly")
+  await expect(dialog.getByRole("option")).toHaveText([/Quarterly revenue/])
   await input.press("Enter")
   await expect(dialog).toHaveCount(0)
-  await expect(page.getByRole("heading", { name: paletteSession.title, exact: true })).toBeVisible()
+  await expectPath(page, sessionHref(match.id))
 })
 
-test("titlebar search asks for one bounded result set after a pause in typing", async ({ page }) => {
+test("sidebar search requests each field once with bounded results after a pause in typing", async ({ page }) => {
   await openPaletteWorkspace(page, true)
   const searches: URL[] = []
   page.on("request", (request) => {
@@ -144,43 +147,51 @@ test("titlebar search asks for one bounded result set after a pause in typing", 
 
     searches.push(url)
   })
-  await page.getByRole("banner").getByRole("button", { name: "Search sessions", exact: true }).click()
+  await searchButton(page).click()
   const dialog = page.getByRole("dialog")
   const input = dialog.getByRole("combobox")
   await expect(dialog.getByRole("option", { name: /Palette fixture session/ })).toHaveAttribute("aria-selected", "true")
 
-  const searched = page.waitForRequest((request) => {
-    const url = new URL(request.url())
+  const fields = ["project", "prompt", "title"]
+  const searched = Promise.all(
+    fields.map((field) =>
+      page.waitForResponse((response) => {
+        const url = new URL(response.url())
 
-    return (
-      request.method() === "GET" &&
-      url.pathname === "/api/session" &&
-      url.searchParams.get("search") === "Palette fixture"
-    )
-  })
+        return (
+          response.request().method() === "GET" &&
+          url.pathname === "/api/session" &&
+          url.searchParams.get("search") === "Palette fixture" &&
+          url.searchParams.get("searchField") === field
+        )
+      }),
+    ),
+  )
 
   // A burst of input in one task is one pause: every keystroke must supersede the last, and only the pause searches.
   await input.evaluate((element) => {
-    // SAFETY: the dialog's combobox is SearchList's own text input, which is an HTMLInputElement.
-    const field = element as HTMLInputElement
+    if (!(element instanceof HTMLInputElement)) throw new Error("Expected a search input")
     const value = "Palette fixture"
 
     for (let index = 1; index <= value.length; index++) {
-      field.value = value.slice(0, index)
-      field.dispatchEvent(new InputEvent("input", { bubbles: true }))
+      element.value = value.slice(0, index)
+      element.dispatchEvent(new InputEvent("input", { bubbles: true }))
     }
   })
 
-  const request = new URL((await searched).url())
+  await searched
   await expect(dialog.getByRole("option", { name: /Palette fixture session/ })).toBeVisible()
-  expect(searches).toHaveLength(1)
-  expect(request.searchParams.get("limit")).toBe("50")
-  expect(request.searchParams.get("parentID")).toBe("null")
-  expect(request.searchParams.get("archived")).toBe("false")
-  expect(request.searchParams.get("cursor")).toBeNull()
+  expect(searches.map((url) => url.searchParams.get("searchField")).sort()).toEqual(fields)
+  for (const { searchParams } of searches) {
+    expect(searchParams.get("search")).toBe("Palette fixture")
+    expect(searchParams.get("limit")).toBe("50")
+    expect(searchParams.get("parentID")).toBe("null")
+    expect(searchParams.get("archived")).toBe("false")
+    expect(searchParams.get("cursor")).toBeNull()
+  }
 })
 
-test("titlebar search shows one server's matches while another server's search fails", async ({ page }) => {
+test("sidebar search shows one server's matches while another server's search fails", async ({ page }) => {
   await mockRemoteServer(page, { name: "Remote" })
   const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   // Only typed searches fail, so the remote server still lists its recent sessions.
@@ -196,28 +207,31 @@ test("titlebar search shows one server's matches while another server's search f
   await openPaletteWorkspace(page, true)
   // The server matches more than titles, so only its answer can list this session. Registered after the local mock so
   // this route answers first.
-  await page.route(new RegExp(`^${escape(SERVER)}/api/session\\?.*search=[^&]`), (route) =>
-    route.fulfill({
-      json: {
-        data: [
-          {
-            ...paletteSession,
-            id: "ses_palette_found",
-            location: { directory: paletteSession.directory },
-            title: "Matched on the server",
-          },
-        ],
-      },
-    }),
+  await page.route(
+    (url) =>
+      url.origin === SERVER && url.pathname === "/api/session" && url.searchParams.get("searchField") === "prompt",
+    (route) =>
+      route.fulfill({
+        json: {
+          data: [
+            {
+              ...paletteSession,
+              id: "ses_palette_found",
+              location: { directory: paletteSession.directory },
+              title: "Matched on the server",
+            },
+          ],
+        },
+      }),
   )
-  await page.getByRole("banner").getByRole("button", { name: "Search sessions", exact: true }).click()
+  await searchButton(page).click()
   const dialog = page.getByRole("dialog")
   await dialog.getByRole("combobox").fill("needle")
   await expect(dialog.getByRole("option")).toHaveText([/Matched on the server/])
-  await expect(dialog.getByText("Request failed", { exact: true })).toHaveCount(0)
+  await expect(dialog.getByRole("status")).toHaveText("Prompt text search is currently unavailable.")
 })
 
-test("a working session keeps its project avatar in Search sessions and shows its activity ring in place of its age", async ({
+test("a working conversation keeps its project avatar in search and shows its activity ring in place of its age", async ({
   page,
 }) => {
   const working = { id: "ses_palette_working", title: "Working session" }
@@ -228,7 +242,7 @@ test("a working session keeps its project avatar in Search sessions and shows it
     sessionStatus: { [working.id]: { type: "running" } },
   })
   await page.goto("/")
-  await page.getByRole("banner").getByRole("button", { name: "Search sessions", exact: true }).click()
+  await searchButton(page).click()
   const dialog = page.getByRole("dialog")
   const workingRow = dialog.getByRole("option", { name: /Working session/ })
   const idleRow = dialog.getByRole("option", { name: /Idle session/ })
@@ -297,7 +311,7 @@ declare global {
   }
 }
 
-test("titlebar search keeps recent order stable across agent steps", async ({ page }) => {
+test("sidebar search keeps recent order stable across agent steps", async ({ page }) => {
   const busy = { ...paletteSession, time: { ...paletteSession.time } }
 
   const fresh = {
@@ -345,17 +359,17 @@ test("titlebar search keeps recent order stable across agent steps", async ({ pa
 
   const dialog = page.getByRole("dialog")
 
-  const openAndClose = async () => {
+  const openAndClose = async (open: () => Promise<void>) => {
     const listed = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/session")
-    await page.getByRole("banner").getByRole("button", { name: "Search sessions", exact: true }).click()
+    await open()
     await listed
     await expect(dialog.getByRole("option")).toHaveText([/Fresh fixture session/, /Palette fixture session/])
     await dialog.getByRole("combobox").press("Escape")
     await expect(dialog).toHaveCount(0)
   }
 
-  await openAndClose()
-  await openAndClose()
+  await openAndClose(() => searchButton(page).click())
+  await openAndClose(() => searchButton(page).press("ControlOrMeta+K"))
 
   expect(await page.evaluate(() => window.__paletteOrders)).toEqual([[fresh.title, paletteSession.title]])
 })
@@ -367,9 +381,9 @@ const olderSession = {
   time: { created: 1699999999000, updated: 1699999999000 },
 }
 
-test("titlebar search drops a recent session deleted while it is open", async ({ page }) => {
+test("sidebar search drops a recent session deleted while it is open", async ({ page }) => {
   const mock = await openPaletteWorkspace(page, true, [paletteSession, olderSession])
-  await page.getByRole("banner").getByRole("button", { name: "Search sessions", exact: true }).click()
+  await searchButton(page).click()
   const options = page.getByRole("dialog").getByRole("option")
   await expect(options).toHaveText([/Palette fixture session/, /Older fixture session/])
   await mock.push([
@@ -502,7 +516,7 @@ test("selects the first session when it arrives above automatically selected fil
   await expect(first).toHaveAttribute("aria-selected", "true")
   await input.press("Enter")
   await expect(dialog).toHaveCount(0)
-  await expect(page.getByRole("heading", { name: paletteSession.title, exact: true })).toBeVisible()
+  await expectPath(page, sessionHref(paletteSession.id))
 })
 
 test("keeps a keyboard-selected file when session results arrive later", async ({ page }) => {
@@ -540,15 +554,20 @@ test("keeps a keyboard-selected file when session results arrive later", async (
   await expect(file).toHaveAttribute("aria-selected", "true")
   await input.press("Enter")
   await expect(dialog).toHaveCount(0)
-  const tab = page.getByRole("tab", { name: "README.md", exact: true })
+  const mobile = (page.viewportSize()?.width ?? 1280) < 800
+  if (mobile) {
+    await page.getByRole("tab", { name: "More...", exact: true }).click()
+    await dialog.getByRole("button", { name: "Files", exact: true }).click()
+  }
+  const files = mobile
+    ? page.locator('[data-slot="session-mobile-files"]')
+    : page.getByRole("complementary", { name: "Review and files" })
+  const tab = files.getByRole("tab", { name: "README.md", exact: true })
   await expect(tab).toBeVisible()
-  await expect(page.getByRole("heading", { name: paletteSession.title, exact: true })).toBeVisible()
-  await page
-    .getByRole("complementary", { name: "Review and files" })
-    .getByRole("button", { name: "Close tab", exact: true })
-    .click()
+  await expectPath(page, sessionHref(paletteSession.id))
+  await files.getByRole("button", { name: "Close tab", exact: true }).click()
   await expect(tab).toHaveCount(0)
-  await expect(page.getByRole("heading", { name: paletteSession.title, exact: true })).toBeVisible()
+  await expectPath(page, sessionHref(paletteSession.id))
   // The duplicate command ID warning is DEV-only, so only dev-server runs can catch duplicate tab commands here.
   expect(warnings).toEqual([])
 })
@@ -578,6 +597,7 @@ test("navigation replaces commands without retaining disposed owners", async ({ 
   await expect(dialog.getByRole("option", { name: "Copy Session ID", exact: true })).toHaveCount(0)
   await dialog.getByRole("combobox").press("Escape")
   await expect(dialog).toHaveCount(0)
+  await page.setViewportSize({ width: 1280, height: 800 })
   const tabs = page.locator("[data-titlebar-tab-link]")
   await tabs.filter({ hasText: paletteSession.title }).click()
   await expect(page.getByRole("heading", { name: paletteSession.title, exact: true })).toBeVisible()
@@ -588,7 +608,7 @@ test("navigation replaces commands without retaining disposed owners", async ({ 
     await expect(editor).toBeEditable()
   }
 
-  await page.setViewportSize({ width: 600, height: 800 })
+  await page.setViewportSize({ width: 390, height: 800 })
   await page.locator('[data-slot="mobile-tabs-trigger"]').click()
   await expect(page.locator('[data-slot="mobile-tabs-drawer"] [data-titlebar-tab-link]')).toHaveCount(4)
   await page.setViewportSize({ width: 1280, height: 800 })
@@ -730,9 +750,7 @@ test("keeps matching session and file results steady across keystrokes while sea
   })
 })
 
-test("titlebar session search shrinks with results while its field stays anchored through scrolling", async ({
-  page,
-}) => {
+test("sidebar search shrinks with results while its field stays anchored through scrolling", async ({ page }) => {
   await openPaletteWorkspace(page, true, [
     { ...paletteSession, time: { ...paletteSession.time } },
     ...Array.from({ length: 23 }, (_, index) => ({
@@ -742,7 +760,7 @@ test("titlebar session search shrinks with results while its field stays anchore
       time: { created: 1700000000000 - index - 1, updated: 1700000000000 - index - 1 },
     })),
   ])
-  await page.getByRole("banner").getByRole("button", { name: "Search sessions", exact: true }).click()
+  await searchButton(page).click()
   const dialog = page.getByRole("dialog")
   const input = dialog.getByRole("combobox")
   const options = dialog.getByRole("option")
