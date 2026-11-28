@@ -23,7 +23,7 @@ export default {
   "onboarding.wslNotInstalled.description":
     "WSL (Windows Subsystem for Linux) is required before Loginom AI Agent can add a WSL server",
   "onboarding.wslUnavailable.title": "WSL unavailable",
-  "onboarding.wslUnavailable.description": "OpenCode could not verify WSL on this machine.",
+  "onboarding.wslUnavailable.description": "Loginom AI Agent could not verify WSL on this machine.",
   "onboarding.installWsl": "Install WSL",
   "onboarding.windowsRestartRequired": "Restart Windows to finish installing WSL, then reopen Loginom AI Agent.",
   "onboarding.allDistrosAdded": "All installed distros are already added.",

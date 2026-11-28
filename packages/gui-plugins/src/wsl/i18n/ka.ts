@@ -21,12 +21,12 @@ export default {
   "onboarding.needAnotherDistroHint": "დააინსტალირეთ Linux დისტრიბუცია WSL კატალოგიდან",
   "onboarding.wslNotInstalled.title": "WSL არ არის დაინსტალირებული",
   "onboarding.wslNotInstalled.description":
-    "WSL (Windows ქვესისტემა Linux-ისთვის) საჭიროა, სანამ OpenCode შეძლებს WSL სერვერის დამატებას",
+    "WSL (Windows ქვესისტემა Linux-ისთვის) საჭიროა, სანამ Loginom AI Agent შეძლებს WSL სერვერის დამატებას",
   "onboarding.wslUnavailable.title": "WSL მიუწვდომელია",
-  "onboarding.wslUnavailable.description": "OpenCode ვერ დაადასტურა WSL ამ მოწყობილობაზე.",
+  "onboarding.wslUnavailable.description": "Loginom AI Agent ვერ დაადასტურა WSL ამ მოწყობილობაზე.",
   "onboarding.installWsl": "დააინსტალირეთ WSL",
   "onboarding.windowsRestartRequired":
-    "გადატვირთეთ Windows WSL-ის ინსტალაციის დასასრულებლად, შემდეგ ხელახლა გახსენით OpenCode.",
+    "გადატვირთეთ Windows WSL-ის ინსტალაციის დასასრულებლად, შემდეგ ხელახლა გახსენით Loginom AI Agent.",
   "onboarding.allDistrosAdded": "ყველა დაინსტალირებული დისტრო უკვე დამატებულია.",
   "onboarding.noDistros": "გავრცელება ჯერ არ არის გამოვლენილი.",
   "onboarding.installDistro": "Install Distro",

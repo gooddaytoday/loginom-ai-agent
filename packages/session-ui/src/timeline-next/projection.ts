@@ -1,4 +1,6 @@
 import type { ToolSeparation } from "../context/data"
+import { currentToolMetadata } from "../message/current-tool-state"
+import { collapseToolGroups, toolGroupSummary } from "../message/tool-group"
 import type {
   ModelRef,
   SessionMessageAssistant,
@@ -484,7 +486,8 @@ function turnRows(
     const before = interruptedAt < 0 ? refs : refs.filter((ref) => ref.messageIndex <= interruptedAt)
     const after = interruptedAt < 0 ? [] : refs.filter((ref) => ref.messageIndex > interruptedAt)
 
-    const appendGroups = (items: typeof refs) => {
+    const appendGroups = (refsToGroup: typeof refs) => {
+      const items = collapseToolGroups(refsToGroup)
       let offset = 0
       groupContent(items, detail, commentary, toolSeparate).forEach((group) => {
         const tool = group.type !== "part" || items[offset]?.content.type !== "text"
@@ -893,7 +896,9 @@ function groupContent(
   }
 
   items.forEach((item) => {
-    const type = contentGroup(detail, item.content, commentary, toolSeparate)
+    const summary = item.content.type === "tool" && toolGroupSummary(currentToolMetadata(item.content))
+
+    const type = summary ? undefined : contentGroup(detail, item.content, commentary, toolSeparate)
 
     if (type) {
       if (adjacent?.type !== type) flush()

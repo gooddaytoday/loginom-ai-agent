@@ -351,13 +351,14 @@ to the displayed repository or worktree instead of adding a second menu item.
 | `onIdle(fn)`                                            | Runs work while the main thread is idle, e.g. a lazy chunk's preload                           |
 | `BuiltinPanel`, `BuiltinPanelTab`                       | `legacy` stored keys of a panel; `first` and stable `dom` ids of a tab                         |
 | `Page`                                                  | Top-level plugin pages with optional navigation entries                                        |
+| `QuestionRenderer`                                      | Renders matching forms through the window host’s form reply and draft controls                |
 | `BuiltinCommand`                                        | `follows`: share another command's shortcut inside `scope`                                     |
 | `BuiltinStore`, `BuiltinStoreFrom`                      | Window stores imported from parts of the app's own keys                                        |
 | `builtinContext(ctx)`                                   | `ctx.desktop.forceFocus`, `ctx.locale.setDirection`                                            |
 | `builtinMainContext(ctx)`, `MainStoreFrom`, `Lifecycle` | Main stores imported from settings files or other namespaces, and `lifecycle.restart(handoff)` |
 | `builtinCatalog(catalog)`, `BuiltinCatalog`             | Locales other than English as loaders, loaded when the user picks the locale                   |
 
-Registry tokens that extend a public registry share its id, so the host reads every item through it. The window host reserves `Page`, `ToolRenderer` and the `session.header.mobile` slot for built-in plugins. It exposes the timeline presets and `layout.openPage` on built-in window contexts. A plugin bundle's catalog holds every locale inline, and the host rejects a bundle whose catalog has a loader.
+Registry tokens that extend a public registry share its id, so the host reads every item through it. The window host reserves `Page`, `QuestionRenderer`, `ToolRenderer` and the `session.header.mobile` slot for built-in plugins. It exposes the timeline presets and `layout.openPage` on built-in window contexts. A question renderer matches form metadata in its owning plugin. The underlying form remains usable in clients without the custom renderer. A plugin bundle's catalog holds every locale inline, and the host rejects a bundle whose catalog has a loader.
 
 ```ts
 i18n: builtinCatalog({ en, de: () => import("./i18n/de") }),

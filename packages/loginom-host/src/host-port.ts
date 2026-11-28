@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { runtimeChat, type createLoginomHost } from "./host"
+import { chatId, type createLoginomHost } from "./host"
 import type { InputFile } from "./inputs"
 import type { FileReference } from "./file-reference"
 import { hostException, hostFailure } from "./errors"
@@ -173,7 +173,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       )
         throw new Error("LOGINOM_CONNECTION_NOT_READY")
     }
-    const lease = service.acquire(`${owner}:${id}`)
+    const lease = service.acquire(`${owner}:${id}`, run.chat)
     if (!lease) throw new Error("LOGINOM_CONNECTION_NOT_READY")
     run.lease = lease
     return lease
@@ -223,7 +223,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           acquiring.has(input.run)
         )
           throw new Error("LOGINOM_RUN_INVALID")
-        const chat = runtimeChat(input.session)
+        const chat = chatId(input.session)
         if (service.recoveries.has(chat) || service.journal.pending().length)
           throw new Error("LOGINOM_RECOVERY_REQUIRED")
         if ([...runs.values()].some((run) => run.chat === chat) || [...acquiring.values()].includes(chat))

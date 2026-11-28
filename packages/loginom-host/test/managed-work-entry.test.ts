@@ -355,10 +355,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       files: { ask: async () => undefined, snapshot: async () => { throw Error("Unexpected file snapshot") } },
       profiles: directory,
       ready: () => true,
-      wrap: (tool) => tool,
       lease: async () => run,
       task: async () => messageID,
       failure: () => undefined,
+      wrap: (tool) => tool,
     })
     await dock.refresh(sessionID, "loginom-automation", undefined)
     type Editor = Parameters<NonNullable<typeof captured.transform>>[0]

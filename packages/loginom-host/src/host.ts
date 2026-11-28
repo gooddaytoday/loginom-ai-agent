@@ -19,7 +19,7 @@ import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
 import { maxPackageBytes, PackageWorkflow, savedPackageSchema, windowPackageSchema } from "./package-schema"
 
-export function runtimeChat(sessionID: string) {
+export function chatId(sessionID: string) {
   return createHash("sha256").update(sessionID).digest("hex")
 }
 
@@ -219,6 +219,7 @@ export async function createLoginomHost(options: {
   closeSavedPackageOnShutdown?: boolean
   // Private launcher capability baked into packaged release builds; never from env or the model.
   browserRecovery?: boolean
+  onConnectionApplication?: Loginom.ConnectionApplicationListener
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
@@ -592,6 +593,7 @@ export async function createLoginomHost(options: {
       },
     },
     journal,
+    options.onConnectionApplication,
   )
   const dashboardOperations = new Map<AbortController, Promise<unknown>>()
   function dashboardOperation(operation: DashboardStorageOperation, input: DashboardRead | DashboardPublish | DashboardDelete, signal?: AbortSignal) {
@@ -813,7 +815,7 @@ export async function createLoginomHost(options: {
       return inputs.admit(`${generation}:${chat}`, userMessage, files, `/${current.connection.username}`)
     },
     async packageState(sessionID: string) {
-      const chat = createHash("sha256").update(sessionID).digest("hex")
+      const chat = chatId(sessionID)
       const { generation } = await service.api.status()
       const child = generations.get(generation)?.children.get(chat)
       if (!child) {
@@ -830,7 +832,7 @@ export async function createLoginomHost(options: {
       return generations.get(generation)?.children.has(chat) === true
     },
     async packageSchema(sessionID: string, target?: typeof PackageWorkflow.Type) {
-      const chat = runtimeChat(sessionID)
+      const chat = chatId(sessionID)
       const before = await service.api.status()
       const generation = generations.get(before.generation)
       const child = generation?.children.get(chat)

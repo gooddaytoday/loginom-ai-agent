@@ -185,7 +185,7 @@ export default (ownsSession: (sessionID: string) => Promise<boolean>) => Plugin.
     const hold = (sessionID: string) => {
       const current = runs.get(sessionID)
       if (current) return current.lease
-      const endTurn = ServiceHost.connectionSettings.holdTurn()
+      const endTurn = ServiceHost.connectionSettings.holdTurn(sessionID)
       const lease = dashboard()
         ? Promise.resolve(undefined)
         : ServiceHost.acquire(sessionID).then(
@@ -344,7 +344,10 @@ export default (ownsSession: (sessionID: string) => Promise<boolean>) => Plugin.
     // `package-docs` grant.
     const profiles = join(Global.Path.data, "file-profiles")
     const files = await localFiles(ctx, profiles)
-    const repeats = repeatGuard(async () => (await ctx.tool.list()).find((tool) => tool.id === "question"))
+    const repeats = repeatGuard({
+      ask: ctx.tool.ask,
+      interrupt: (sessionID) => ctx.session.interrupt({ sessionID }),
+    })
     await ctx.tool.transform((editor) => {
       editor.add(
         repeats.wrap(
@@ -429,7 +432,7 @@ export default (ownsSession: (sessionID: string) => Promise<boolean>) => Plugin.
       hide(event)
     })
     await ctx.tool.hook("execute.before", async (event) => {
-      if (!repeats.tracks(event.tool)) repeats.reset(event.sessionID)
+      repeats.before(event.sessionID, event.tool)
       await bound(event.sessionID)
       if (!permits(profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
@@ -523,7 +526,7 @@ export default (ownsSession: (sessionID: string) => Promise<boolean>) => Plugin.
         return { granted: true }
       },
     })
-    await ctx.rpc.register(ConnectionSettingsRpc, connectionSettings())
+    const settingsRpc = await ctx.rpc.register(ConnectionSettingsRpc, connectionSettings())
     await ctx.rpc.register(preflight, {
       check: async (value) => {
         const code = await ServiceHost.preflight((value as { automation: boolean }).automation)
@@ -591,7 +594,11 @@ export default (ownsSession: (sessionID: string) => Promise<boolean>) => Plugin.
       },
     })
 
+    const unsubscribeApplication = ServiceHost.connectionSettings.onApplication((outcome, event) => {
+      void settingsRpc.events.emit(outcome, event).catch(() => undefined)
+    })
     return async () => {
+      unsubscribeApplication()
       stop.abort()
       await Promise.all([...runs.keys()].map(drop))
       await drafts.close()

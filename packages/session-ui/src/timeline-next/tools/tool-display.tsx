@@ -1,3 +1,5 @@
+import { ToolGroupRow } from "../../components/tool-group-row"
+import { toolGroupSummary } from "../../message/tool-group"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { createMemo, Match, Show, Switch, type Component } from "solid-js"
 import { Dynamic } from "solid-js/web"
@@ -76,6 +78,9 @@ export function ToolDisplay(props: ToolProps & { id: string; error?: string; sto
     <Show when={!hideQuestion()}>
       <div data-component="tool-part-wrapper" data-timeline-part-id={props.id}>
         <Switch>
+          <Match when={toolGroupSummary(props.metadata)}>
+            {(summary) => <ToolGroupRow summary={summary()} detail={error() ?? props.output} />}
+          </Match>
           <Match when={stopped()}>
             {(stopped) => <Dynamic component={renderer.render()} {...props} output={stopped().output} />}
           </Match>
