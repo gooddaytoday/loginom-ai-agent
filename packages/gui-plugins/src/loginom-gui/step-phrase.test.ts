@@ -24,7 +24,7 @@ const saved = {
   kind: "save",
   evidence: [
     { kind: "saved", path: "/user/ABC-анализ.lgp" },
-    { kind: "savedGraphRead", nodeCount: 4, scope: "activeWorkflow" },
+    { kind: "reopenedGraphRead", nodeCount: 4, scope: "activeWorkflow" },
   ],
 }
 

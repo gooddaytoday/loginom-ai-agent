@@ -2,7 +2,7 @@
   "sources": {
     "node, failure": "#1471 32f1f5fbe451c71425473cb01087937c686a4a2d: nodeResultReply, loginomFeedMetadata, withLoginomMetadata",
     "output": "#1504 d4c352d4fed848b23ea69177aab99258444dab6d: nodeResultReply, loginomFeedMetadata",
-    "save": "#1484 e743ae4ec038199a57ac877b13de93e116b1c446: loginomSaveMetadata",
+    "save": "#1484 e92119e1c737828de6858e1452b6deac02adeb95: loginomSaveMetadata",
     "waiting, configuring, reading": "#1471 32f1f5fbe451c71425473cb01087937c686a4a2d: withStepProgress",
     "nativeNodeFailure, nativeFailureWithoutNode, nativeLaunchMessage": "#1514 2a41d8090ce97099f45775cd8f741d58ccc52f0b: nodeFailureMetadata",
     "graphConflict": "#1471 32f1f5fbe451c71425473cb01087937c686a4a2d: loginomFeedMetadata with the NODE_GRAPH_CONFLICT code from #1481",
@@ -168,7 +168,7 @@
         "path": "/user/ABC-анализ.lgp"
       },
       {
-        "kind": "savedGraphRead",
+        "kind": "reopenedGraphRead",
         "nodeCount": 2,
         "scope": "activeWorkflow"
       }
