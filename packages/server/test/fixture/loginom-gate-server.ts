@@ -18,6 +18,7 @@ import { productSkills } from "../../../loginom-host/src/bundled-skills"
 import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
 import { reservedSkillNames } from "../../../product/src/skills"
 import { dockTool, scriptedHost } from "./loginom-dock-host"
+import { gateGraph } from "./loginom-gate-graph"
 import { gateScenarios, modelCalls, salesCsv, salesFile } from "./loginom-gate-scenarios"
 import { serveRoutes } from "./routes"
 
@@ -31,6 +32,7 @@ assert.equal(new URL(browserOrigin).hostname, "127.0.0.1")
 const modelName = scenario === "9" ? "Модель организации" : "Gate model"
 const title = `Шлюз C · ${scenario}`
 const turns = gateScenarios[scenario]
+const graph = scenario === "10" ? gateGraph() : undefined
 const expectedCalls = turns.flatMap((turn) => turn.calls)
 const activeRead = Promise.withResolvers<void>()
 let waitingRead = false
@@ -70,7 +72,8 @@ const host = scriptedHost({
       await activeRead.promise
       waitingRead = false
     }
-    return { content: [{ type: "text", text: JSON.stringify(expected.receipt) }] }
+    const receipt = graph && expected.name === "dock_node_apply" ? await graph.apply(expected.input) : expected.receipt
+    return { content: [{ type: "text", text: JSON.stringify(receipt) }] }
   },
 })
 
@@ -170,6 +173,12 @@ await Effect.runPromise(
         const results = answer.flatMap((message) =>
           message.role === "tool" ? message.content.filter((part) => part.name.startsWith("loginom_dock_")) : [],
         )
+        if (turn.automaticReadRetry) {
+          // The model never sends a second read. The browser test checks how many times the real app reached the Host.
+          assert.equal(results.length, 1)
+          assert.equal(results[0]?.result.type, "error")
+          return TestLLM.text(turn.reply, crypto.randomUUID())
+        }
         const repeatStop = turn.repeatStop ?? false
         assert.equal(results.length, turn.calls.length + Number(repeatStop))
         for (const [index, call] of turn.calls.entries()) {
@@ -182,7 +191,8 @@ await Effect.runPromise(
             assert.equal(result.type, "error", `${name} must report the failed receipt`)
             assert(JSON.stringify(result.value).includes(JSON.stringify(receipt).slice(1, -1)))
           } else {
-            assert.deepEqual(result, { type: "text", value: receipt })
+            assert(result.type === "text" && typeof result.value === "string", JSON.stringify(result))
+            assert.deepEqual(JSON.parse(result.value), call.receipt)
           }
         }
         if (repeatStop) {
@@ -248,7 +258,11 @@ await Effect.runPromise(
         async fetch(request) {
           const url = new URL(request.url)
           if (url.pathname === "/__gate" && request.method === "GET")
-            return Response.json({ waitingRead, calls: host.requests("call").map((call) => call.name) })
+            return Response.json({
+              waitingRead,
+              calls: host.requests("call").map((call) => call.name),
+              graph: graph?.snapshot(),
+            })
           if (url.pathname === "/__gate/release" && request.method === "POST") {
             activeRead.resolve()
             return new Response(null, { status: 204 })

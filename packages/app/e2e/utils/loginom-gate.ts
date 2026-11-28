@@ -28,7 +28,11 @@ const readReady = Schema.decodeUnknownSync(
 )
 
 const readStatus = Schema.decodeUnknownSync(
-  Schema.Struct({ waitingRead: Schema.Boolean, calls: Schema.Array(Schema.String) }),
+  Schema.Struct({
+    waitingRead: Schema.Boolean,
+    calls: Schema.Array(Schema.String),
+    graph: Schema.optional(Schema.Struct({ links: Schema.Array(Schema.String), resultRows: Schema.Number })),
+  }),
 )
 
 export async function withLoginomGate(
@@ -105,7 +109,7 @@ export async function withLoginomGate(
       ])
 
       clearTimeout(timer)
-      await run(await openGate(page, service, appOrigin))
+      await run(await openGate(page, service, appOrigin, scenario))
     } catch (error) {
       await info.attach("gate-service.log", { body: logs.join(""), contentType: "text/plain" })
 
@@ -122,10 +126,11 @@ export async function withLoginomGate(
   }
 }
 
-async function openGate(page: Page, ready: ReturnType<typeof readReady>, appOrigin: string) {
+async function openGate(page: Page, ready: ReturnType<typeof readReady>, appOrigin: string, scenario: GateScenario) {
   const local = [appOrigin, ready.origin].map((origin) => RegExp.escape(origin)).join("|")
   await page.route(new RegExp(`^(?!(?:${local})/)https?://`), (route) => route.abort("blockedbyclient"))
   await seed(page, {
+    locale: scenario === "7" ? "ru" : "en",
     servers: [ready.origin],
     tabs: [{ session: ready.session, server: ready.origin }],
     settings: { general: { followUpBehavior: "queue" } },

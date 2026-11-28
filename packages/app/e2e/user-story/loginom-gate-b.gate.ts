@@ -1,22 +1,49 @@
-import { expect, test } from "@playwright/test"
+import { expect, test, type Page } from "@playwright/test"
 import { gatePrompts, salesCsv, salesFile } from "../../../server/test/fixture/loginom-gate-scenarios"
 import { gateScreenshot, withLoginomGate } from "../utils/loginom-gate"
 
-test.fixme("7 · Каталог и своё (LAB-2181)", async ({ page, baseURL }, info) => {
+async function openCatalog(page: Page, title: string) {
+  const tabs = page.locator('[data-slot="mobile-tabs-trigger"]')
+
+  if (await tabs.isVisible()) await tabs.click()
+  await page.getByRole("navigation").getByRole("button", { name: title, exact: true }).click()
+  await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible()
+}
+
+test("7 · Каталог и своё", async ({ page, baseURL }, info) => {
   if (!baseURL) throw new Error("Missing Playwright app URL")
   await withLoginomGate({ page, baseURL, scenario: "7", info }, async () => {
-    await test.step("Открыть каталог, выбрать «Сообщество» и проверить разрешения", async () => {
-      await page.getByText("Каталог", { exact: true }).click()
-      await page.getByRole("button", { name: "Сообщество", exact: true }).click()
-      await expect(page.getByText("Что будет разрешено", { exact: true })).toBeVisible()
+    await test.step("Открыть каталог и карточку комплектного действия", async () => {
+      await openCatalog(page, "Каталог")
+      const cards = page.getByRole("article")
+      await expect(cards.getByRole("heading")).toHaveText([
+        "Построить сценарий Loginom",
+        "Документировать",
+        "Создать дашборд",
+        "Проверить",
+      ])
+      await expect(page.getByRole("button", { name: "Создать своё", exact: true })).toBeDisabled()
       await gateScreenshot(page, info, "07-catalog")
+
+      const tier = page.getByRole("group", { name: "Кто подготовил" })
+      await tier.getByRole("button", { name: "Сообщество", exact: true }).click()
+      await expect(cards).toHaveCount(0)
+      await expect(page.getByText("Ничего не нашлось", { exact: true })).toBeVisible()
+      await tier.getByRole("button", { name: "Loginom", exact: true }).click()
+
+      const card = cards.filter({ has: page.getByRole("heading", { name: "Документировать", exact: true }) })
+      await card.getByRole("button", { name: "Запустить", exact: true }).click()
+      const detail = page.getByRole("dialog", { name: "Документировать", exact: true })
+      await expect(detail.getByRole("heading", { name: "Что будет разрешено" })).toBeVisible()
+      await expect(detail.getByText("Подготовлено и поддерживается Loginom.", { exact: true })).toBeVisible()
+      await expect(
+        detail.getByText("Прочитать локальный пакет и создать документ встроенным генератором.", { exact: true }),
+      ).toBeVisible()
+      await gateScreenshot(page, info, "07-catalog-permissions")
     })
+    await test.step.skip("В-49, этап E (контекст LAB-2181) · подтвердить установку элемента сообщества", async () => {})
     await test.step.skip(
-      "LAB-2181 · установить навык только после согласия и увидеть его в «Установленных»",
-      async () => {},
-    )
-    await test.step.skip(
-      "LAB-2181 · открыть «Создать своё». Создание, проба, включение и публикация требуют отдельной реализации",
+      "В-34, В-42 (контекст LAB-2181) · «Создать своё»: авторинг, проба, включение и публикация",
       async () => {},
     )
   })
@@ -29,20 +56,20 @@ test("8 · Сбои", async ({ page, baseURL }, info) => {
       await gate.editor.fill(gatePrompts.read)
       await gate.submit.click()
       await expect.poll(gate.status).toMatchObject({ waitingRead: true, calls: ["dock_prepare", "dock_inspect"] })
-      await gate.editor.fill(gatePrompts.reread)
+      await gate.editor.fill(gatePrompts.queue)
       await gate.editor.press("Alt+Enter")
       const queued = page.locator('[data-component="session-queue-row"]')
-      await expect(queued.getByRole("button", { name: gatePrompts.reread, exact: true })).toBeVisible()
+      const correction = queued.getByRole("button", { name: gatePrompts.queue, exact: true })
+      await expect(correction).toBeInViewport({ ratio: 1 })
+      await expect(page.locator("[data-moving]").filter({ has: correction })).toHaveCount(0)
       await gateScreenshot(page, info, "08-queued-during-read")
     })
-    await test.step("Увидеть сбой чтения и результат поправки после возврата Loginom", async () => {
+    await test.step("Дождаться успешного чтения и отправки поправки из очереди", async () => {
       await gate.releaseRead()
-      await expect(page.getByText("Шаг чтения не выполнен: Loginom недоступен.", { exact: true })).toBeVisible()
-      await expect(
-        page.getByText("Loginom снова доступен. Прочитана версия v1 пакета Продажи.lgp.", { exact: true }),
-      ).toBeVisible()
+      await expect(page.getByText("Прочитана версия v1 пакета Продажи.lgp.", { exact: true })).toBeVisible()
+      await expect(page.getByText("Поправка учтена.", { exact: true })).toBeVisible()
       await expect(page.locator('[data-component="session-queue-row"]')).toHaveCount(0)
-      await gateScreenshot(page, info, "08-read-recovered")
+      expect(await gate.status()).toMatchObject({ calls: ["dock_prepare", "dock_inspect"] })
     })
     await test.step("После обрыва записи запросить проверку и увидеть подтверждённую версию", async () => {
       await gate.editor.fill(gatePrompts.write)
@@ -52,13 +79,13 @@ test("8 · Сбои", async ({ page, baseURL }, info) => {
       ).toBeVisible()
       await gateScreenshot(page, info, "08-write-unconfirmed")
       expect(await gate.status()).toMatchObject({
-        calls: ["dock_prepare", "dock_inspect", "dock_inspect", "dock_action_run"],
+        calls: ["dock_prepare", "dock_inspect", "dock_action_run"],
       })
       await gate.editor.fill(gatePrompts.check)
       await gate.submit.click()
       await expect(page.getByText("Проверка пакета подтвердила версию v1.", { exact: true })).toBeVisible()
       expect(await gate.status()).toMatchObject({
-        calls: ["dock_prepare", "dock_inspect", "dock_inspect", "dock_action_run", "dock_inspect"],
+        calls: ["dock_prepare", "dock_inspect", "dock_action_run", "dock_inspect"],
       })
     })
     await test.step("Остановить третий одинаковый вызов до обращения в Loginom", async () => {
@@ -68,13 +95,14 @@ test("8 · Сбои", async ({ page, baseURL }, info) => {
       await expect(
         question.getByText("Агент снова делает одно и то же: применяет настройки узла Loginom", { exact: true }),
       ).toBeVisible()
-      const applies = async () => (await gate.status()).calls.filter((call) => call === "dock_node_apply")
-      expect(await applies()).toHaveLength(2)
+      const before = ["dock_prepare", "dock_inspect", "dock_action_run", "dock_inspect"]
+      const stoppedCalls = [...before, "dock_node_apply", "dock_node_apply"]
+      expect((await gate.status()).calls).toEqual(stoppedCalls)
       await gateScreenshot(page, info, "08-repeat-question")
       await question.getByRole("radio", { name: /^Остановить/ }).click()
       await question.getByRole("button", { name: "Submit", exact: true }).click()
       await expect(page.getByText("Третий вызов остановлен по вашему выбору.", { exact: true })).toBeVisible()
-      expect(await applies()).toHaveLength(2)
+      expect((await gate.status()).calls).toEqual(stoppedCalls)
     })
     await test.step.skip(
       "LAB-2216, LAB-2234, LAB-2225 · таймеры долгого шага, подсказка задержки и «После хода»",
@@ -84,7 +112,30 @@ test("8 · Сбои", async ({ page, baseURL }, info) => {
       "LAB-2199, LAB-2228 · кнопки проверки, блокировка повтора записи и повтор чтения",
       async () => {},
     )
-    await test.step.skip("LAB-2208 · прерванный при закрытии ход и продолжение с подтверждённого шага", async () => {})
+    await test.step.skip("Б4 · UI «Ход прерван» и «Продолжить» (ядро LAB-2208 уже в базе)", async () => {})
+    await test.step.skip(
+      "LAB-2216, LAB-2228 · один автоповтор чтения, затем остановка после второго отказа",
+      async () => {
+        await gate.editor.fill(gatePrompts.outage)
+        await gate.submit.click()
+
+        const trace = [
+          "dock_prepare",
+          "dock_inspect",
+          "dock_action_run",
+          "dock_inspect",
+          "dock_node_apply",
+          "dock_node_apply",
+          "dock_inspect",
+          "dock_inspect",
+        ]
+
+        await expect.poll(async () => (await gate.status()).calls).toEqual(trace)
+        await expect(page.getByText("Шаг не выполнен", { exact: true })).toBeVisible()
+        await expect(page.getByRole("button", { name: "Повторить шаг", exact: true })).toBeDisabled()
+        expect((await gate.status()).calls).toEqual(trace)
+      },
+    )
     await test.step.skip("LAB-2196 · пакет в другом разговоре, Studio или осиротевшей сессии", async () => {})
     await test.step.skip(
       "LAB-2235 · свернуть одинаковые вызовы в одну строку ленты и связать её с вопросом",
@@ -123,8 +174,12 @@ test("9 · Закрытый контур", async ({ page, baseURL }, info) => {
       "LAB-2207 · режим сети и пометка «Задано администратором» (политика закрытого контура — этап F)",
       async () => {},
     )
+    await test.step("Открыть каталог из приложения", async () => {
+      await openCatalog(page, "Catalog")
+    })
+    await test.step.skip("В-51 · импортировать файл «Контроль полноты загрузок» из каталога", async () => {})
     await test.step.skip(
-      "LAB-2181 · получить файл «Контроль полноты загрузок» и импортировать через каталог (доставка Hub — этап E)",
+      "Этап E, В-51 · скачать дополнение с сайта Hub и передать файл в закрытый контур",
       async () => {},
     )
   })
@@ -144,7 +199,10 @@ test("10 · Собрать вместе с Loginom", async ({ page, baseURL }, i
       ).toBeVisible()
       await gate.editor.fill(gatePrompts.import)
       await gate.submit.click()
-      await expect(page.getByText("Узел «Импорт текста» выполнен. Прочитано 12 строк.", { exact: true })).toBeVisible()
+      await expect(
+        page.getByText("Узел «Импорт» подключён к узлу «Результат». В узле «Результат» 12 строк.", { exact: true }),
+      ).toBeVisible()
+      expect(await gate.status()).toMatchObject({ graph: { links: ["import→result"], resultRows: 12 } })
       await gateScreenshot(page, info, "10-import-12-rows")
     })
     await test.step.skip(
@@ -152,16 +210,22 @@ test("10 · Собрать вместе с Loginom", async ({ page, baseURL }, i
       async () => {},
     )
     await test.step.skip("LAB-2189, LAB-2226 · ручная правка графа, конфликт и повтор с текущей схемой", async () => {})
-    await test.step("Попросить фильтр за 2026 год и получить 8 строк", async () => {
+    await test.step("Вставить фильтр перед «Результат» и проверить 8 строк у «Результат»", async () => {
       await gate.editor.fill(gatePrompts.filter)
       await gate.submit.click()
       await expect(
-        page.getByText("Узел «Фильтр строк» подключён к импорту и выполнен. За 2026 год осталось 8 строк.", {
-          exact: true,
-        }),
+        page.getByText(
+          "Связь «Импорт → Результат» заменена на «Импорт → Фильтр → Результат». В узле «Результат» 8 строк за 2026 год.",
+          {
+            exact: true,
+          },
+        ),
       ).toBeVisible()
       expect(await gate.status()).toMatchObject({
-        calls: ["dock_prepare", "dock_artifact_deliver", "dock_node_apply", "dock_node_apply"],
+        graph: {
+          links: ["import→filter", "filter→result"],
+          resultRows: 8,
+        },
       })
       await gateScreenshot(page, info, "10-filter-8-rows")
     })
@@ -170,7 +234,15 @@ test("10 · Собрать вместе с Loginom", async ({ page, baseURL }, i
       await gate.submit.click()
       await expect(page.getByText("Пакет сохранён в Loginom по пути /gate/Продажи.lgp.", { exact: true })).toBeVisible()
       expect(await gate.status()).toMatchObject({
-        calls: ["dock_prepare", "dock_artifact_deliver", "dock_node_apply", "dock_node_apply", "dock_action_run"],
+        calls: [
+          "dock_prepare",
+          "dock_artifact_deliver",
+          "dock_node_apply",
+          "dock_node_apply",
+          "dock_node_apply",
+          "dock_node_apply",
+          "dock_action_run",
+        ],
       })
       await gateScreenshot(page, info, "10-save")
     })

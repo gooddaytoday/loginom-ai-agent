@@ -19,19 +19,20 @@ export const salesCsv =
 
 export const gatePrompts = {
   read: "Прочитай пакет Продажи.lgp.",
-  reread: "Проверь ещё раз, доступен ли пакет Продажи.lgp.",
+  queue: "Укажи версию пакета.",
+  outage: "Прочитай настройки узлов пакета «Продажи.lgp».",
   write: "Сохрани новую версию пакета Продажи.lgp.",
   check: "Проверь, какая версия Продажи.lgp сохранилась.",
   repeat: "Примени настройку фильтра в пакете Продажи.lgp.",
   closed: "Ответь, доступна ли модель организации.",
-  import: "Импортируй учебную таблицу sales-demo.csv и запусти узел импорта.",
-  filter: "Добавь фильтр за 2026 год и запусти его.",
+  import: "Импортируй учебную таблицу sales-demo.csv, подключи «Импорт» к узлу «Результат» и запусти «Результат».",
+  filter: "Вставь фильтр перед «Результат»: только 2026 год.",
   save: "Сохрани учебный пакет продаж в Loginom.",
 }
 
 const packagePath = "/gate/Продажи.lgp"
-const workflow = { workflow_id: "gate-workflow" }
-const doc = "gate-document"
+export const workflow = { workflow_id: "gate-workflow" }
+export const doc = "gate-document"
 const skill = { tool: "skill", input: { id: "loginom-automation" } }
 const prepare = { prepared: true, document_id: doc, workflow_ref: workflow }
 const read = { package_path: packagePath }
@@ -50,6 +51,7 @@ type Turn = {
   automation?: boolean
   admitUpload?: boolean
   repeatStop?: boolean
+  automaticReadRetry?: boolean
   calls: DockCall[]
 }
 
@@ -75,7 +77,7 @@ const node = (type: string, operation_id: string, parameters: Record<string, unk
   finish: "execute",
 })
 
-const output = (operation_id: string, node_id: string, row_count: number) => ({
+export const output = (operation_id: string, node_id: string, row_count: number) => ({
   operation_id,
   state: "settled",
   status: "SUCCEEDED",
@@ -89,6 +91,23 @@ const repeatedApply: DockCall = {
   receipt: output("gate-repeat", "filter", 8),
 }
 
+export const nodeRef = (node_id: string) => ({ document_id: doc, ...workflow, node_id })
+const fromImport = { source: nodeRef("import"), output: 0, input: 0 }
+const fromFilter = { source: nodeRef("filter"), output: 0, input: 0 }
+export const originalEdge = { source: "import", output: 0, target: "result", input: 0 }
+export const replacementEdge = { source: "filter", output: 0, target: "result", input: 0 }
+const resultNode = "transform.sorting"
+const outageCall = (attempt: number): DockCall => ({
+  name: "dock_inspect",
+  input: { ...read, operation_id: "gate-outage" },
+  receipt: {
+    operation_id: "gate-outage",
+    state: "settled",
+    status: "FAILED",
+    error: `Loginom недоступен. Попытка ${attempt}.`,
+  },
+})
+
 export type GateScenario = "7" | "8" | "9" | "10"
 
 export const gateScenarios: Record<GateScenario, readonly Turn[]> = {
@@ -99,23 +118,14 @@ export const gateScenarios: Record<GateScenario, readonly Turn[]> = {
       automation: true,
       calls: [
         { name: "dock_prepare", input: { intent: "open_package", ...read }, receipt: prepare },
-        inspect(
-          {
-            operation_id: "gate-read",
-            state: "settled",
-            status: "FAILED",
-            error: "Связь с Loginom прервалась при чтении.",
-          },
-          true,
-        ),
+        inspect({ state: "settled", status: "SUCCEEDED", package_ref: { path: packagePath }, revision: "v1" }, true),
       ],
-      reply: "Шаг чтения не выполнен: Loginom недоступен.",
+      reply: "Прочитана версия v1 пакета Продажи.lgp.",
     },
     {
-      prompt: gatePrompts.reread,
-      automation: true,
-      calls: [inspect({ state: "settled", status: "SUCCEEDED", package_ref: { path: packagePath }, revision: "v1" })],
-      reply: "Loginom снова доступен. Прочитана версия v1 пакета Продажи.lgp.",
+      prompt: gatePrompts.queue,
+      calls: [],
+      reply: "Поправка учтена.",
     },
     {
       prompt: gatePrompts.write,
@@ -143,6 +153,13 @@ export const gateScenarios: Record<GateScenario, readonly Turn[]> = {
       repeatStop: true,
       calls: [repeatedApply, repeatedApply],
       reply: "Третий вызов остановлен по вашему выбору.",
+    },
+    {
+      prompt: gatePrompts.outage,
+      automation: true,
+      automaticReadRetry: true,
+      calls: [outageCall(1), outageCall(2)],
+      reply: "Чтение завершилось ошибкой.",
     },
   ],
   "9": [
@@ -173,8 +190,22 @@ export const gateScenarios: Record<GateScenario, readonly Turn[]> = {
           input: node("imports.text", "gate-import", { source: { upload_operation_id: "gate-upload" } }, []),
           receipt: output("gate-import", "import", 12),
         },
+        {
+          name: "dock_node_apply",
+          input: {
+            ...node(
+              resultNode,
+              "gate-result-initial",
+              { keys: [{ field: { kind: "input_field", name: "amount" }, direction: "ASC" }] },
+              [fromImport],
+            ),
+            target: { kind: "new", type: resultNode, label: "Результат" },
+            mode: "keys",
+          },
+          receipt: output("gate-result-initial", "result", 12),
+        },
       ],
-      reply: "Узел «Импорт текста» выполнен. Прочитано 12 строк.",
+      reply: "Узел «Импорт» подключён к узлу «Результат». В узле «Результат» 12 строк.",
     },
     {
       prompt: gatePrompts.filter,
@@ -182,13 +213,36 @@ export const gateScenarios: Record<GateScenario, readonly Turn[]> = {
       calls: [
         {
           name: "dock_node_apply",
-          input: node("transform.filter_data", "gate-filter", { year: 2026 }, [
-            { node_id: "import", port_id: "import-out" },
-          ]),
+          input: {
+            ...node(
+              "transform.filter_data",
+              "gate-filter",
+              {
+                groups: [
+                  [{ field: { kind: "input_field", name: "year" }, type: "integer", operator: "=", value: 2026 }],
+                ],
+              },
+              [fromImport],
+            ),
+            mode: "conditions",
+          },
           receipt: output("gate-filter", "filter", 8),
         },
+        {
+          name: "dock_node_apply",
+          input: {
+            ...node(resultNode, "gate-result-relinked", {}, [{ ...fromFilter, replace_existing: true }]),
+            target: { kind: "existing", type: resultNode, ref: nodeRef("result") },
+            mode: "keys",
+          },
+          receipt: {
+            ...output("gate-result-relinked", "result", 8),
+            replaced_links: [{ removed: originalEdge, created: replacementEdge }],
+          },
+        },
       ],
-      reply: "Узел «Фильтр строк» подключён к импорту и выполнен. За 2026 год осталось 8 строк.",
+      reply:
+        "Связь «Импорт → Результат» заменена на «Импорт → Фильтр → Результат». В узле «Результат» 8 строк за 2026 год.",
     },
     {
       prompt: gatePrompts.save,
@@ -208,7 +262,9 @@ export const gateScenarios: Record<GateScenario, readonly Turn[]> = {
 }
 
 export function modelCalls(turn: Turn, uploadedPath: string | undefined) {
-  const dock = turn.calls.map((call) => ({ tool: `loginom_${call.name}`, input: call.input }))
+  // Recovery belongs to the app/host. The recorded model asks for this read only once.
+  const requested = turn.automaticReadRetry ? turn.calls.slice(0, 1) : turn.calls
+  const dock = requested.map((call) => ({ tool: `loginom_${call.name}`, input: call.input }))
   if (turn.repeatStop) dock.push({ tool: "loginom_dock_node_apply", input: repeatedApply.input })
   if (turn.admitUpload) dock.splice(1, 0, { tool: "loginom_file_admit", input: { path: uploadedPath } })
   return turn.automation ? [skill, ...dock] : dock
