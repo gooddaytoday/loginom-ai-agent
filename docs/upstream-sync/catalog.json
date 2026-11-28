@@ -41,7 +41,7 @@
       "id": "CAT-20",
       "title": "Profile permission settings",
       "paths": [
-        "packages/core/src/config.ts", "packages/core/src/plugin/plan.ts", "packages/schema/src/config.ts",
+        "packages/core/src/config.ts", "packages/core/src/plugin/plan.ts", "packages/core/test/plugin/plan.test.ts", "packages/schema/src/config.ts",
         "packages/plugin/src/gui/registries.ts", "packages/app/src/settings/shell.tsx",
         "packages/app/src/runtime/plugin/settings-page-view.tsx", "packages/app/e2e/regression/settings.spec.ts",
         "packages/app/e2e/utils/mock-api.ts", "packages/app/e2e/utils/mock-server.ts"

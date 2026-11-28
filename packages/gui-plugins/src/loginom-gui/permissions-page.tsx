@@ -1,6 +1,6 @@
 import { permissionDefaults, permissionKinds, type Kind } from "@loginom-ai-agent/product/permissions"
 import { createKeyed, usePlugin, type SettingsPage } from "@opencode/plugin/gui"
-import { createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js"
+import { createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack } from "solid-js"
 import type definition from "./index"
 import { initialPermissions, permissionPatch, permissionView, transitionPermissions } from "./permissions-machine"
 import { profileService } from "./profile-service"
@@ -71,6 +71,14 @@ export default function PermissionsPage(props: Pick<Parameters<SettingsPage["ren
   const current = (kind: Kind) => permissionView(state(), kind).value
   const label = (effect: ReturnType<typeof current>) => ctx.t(`permission_${effect}`)
   const disabled = () => state().type !== "ready"
+  const descriptionPrefix = createUniqueId()
+
+  const description = (kind: Kind) =>
+    current(kind) === permissionDefaults[kind]
+      ? ctx.t("permissionsDefault")
+      : ctx.t("permissionsChanged", {
+          effect: kind === "terminal" ? ctx.t("permissionTerminalOff") : label(permissionDefaults[kind]),
+        })
 
   const issue = () => {
     const current = state()
@@ -138,6 +146,7 @@ export default function PermissionsPage(props: Pick<Parameters<SettingsPage["ren
                   <select
                     class="max-w-full cursor-pointer rounded-md border border-border-base bg-surface-raised-base px-2 py-1 text-text-strong"
                     aria-label={ctx.t(`permission_${kind}`)}
+                    aria-describedby={`${descriptionPrefix}-${kind}`}
                     disabled={disabled()}
                     onChange={(event) => {
                       const effect = effects.find((value) => value === event.currentTarget.value)
@@ -158,6 +167,9 @@ export default function PermissionsPage(props: Pick<Parameters<SettingsPage["ren
                       )}
                     </For>
                   </select>
+                  <span id={`${descriptionPrefix}-${kind}`} class="text-12-regular text-text-base">
+                    {description(kind)}
+                  </span>
                   <Override kind={kind} />
                 </div>
               </ui.SettingsRow>
@@ -166,9 +178,10 @@ export default function PermissionsPage(props: Pick<Parameters<SettingsPage["ren
         </ui.SettingsSection>
         <ui.SettingsSection title={ctx.t("permission_terminal")}>
           <ui.SettingsRow title={ctx.t("permissionTerminalToggle")} description={ctx.t("permission_terminal_hint")}>
-            <div class="flex min-w-0 flex-col items-start gap-1">
+            <div class="flex min-w-0 flex-col items-start gap-1 [&>[data-component=switch]]:flex-col-reverse [&>[data-component=switch]]:items-start">
               <ui.Switch
                 label={ctx.t("permissionTerminalToggle")}
+                description={description("terminal")}
                 hideLabel
                 disabled={disabled()}
                 checked={current("terminal") === "ask"}

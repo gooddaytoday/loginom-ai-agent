@@ -473,25 +473,20 @@ export const layer = (options?: Options) =>
           if (patch.shell === undefined && !patch.permissions?.length && !patch.removePermissions?.length) return
           const directory = initial.global ?? AbsolutePath.make(globalService.config)
           const candidates = ConfigDiscovery.names.map((name) => path.join(directory, name))
-          const filepath =
-            (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "loginom-ai-agent.jsonc")
-          const files = patch.removePermissions?.length
-            ? [...new Set([...(yield* Effect.filter(candidates, fs.isFile)), filepath])]
-            : [filepath]
-          const edits = yield* Effect.forEach(files, (file) =>
-            Effect.gen(function* () {
-              const text = (yield* fs.readFileStringSafe(file)) ?? "{}\n"
-              const updated = yield* Effect.try({
-                try: () =>
-                  patchDocument(text, file === filepath ? patch : { removePermissions: patch.removePermissions }),
-                catch: (cause) => new FSUtil.FileSystemError({ method: "config.update", cause }),
-              })
-              return { file, text, updated }
-            }),
+          const existing = yield* Effect.filter(candidates, fs.isFile)
+          const fallback = existing.at(-1) ?? path.join(directory, "loginom-ai-agent.jsonc")
+          const permissions = Boolean(patch.permissions?.length || patch.removePermissions?.length)
+          const files = permissions && existing.length ? existing : [fallback]
+          const documents = yield* Effect.forEach(files, (file) =>
+            fs.readFileStringSafe(file).pipe(Effect.map((text) => ({ file, text: text ?? "{}\n" }))),
           )
+          const edits = yield* Effect.try({
+            try: () => patchDocuments(documents, patch, permissions),
+            catch: (cause) => new FSUtil.FileSystemError({ method: "config.update", cause }),
+          })
           for (const { file, text, updated } of edits)
             if (text !== updated) yield* fs.writeWithDirs(file, updated.endsWith("\n") ? updated : `${updated}\n`)
-          if (patch.permissions?.length || patch.removePermissions?.length) yield* reload().pipe(Effect.provide(context))
+          if (permissions) yield* reload().pipe(Effect.provide(context))
           else yield* requestReload
         },
         (effect) => updateLock.withPermit(effect),
@@ -538,8 +533,9 @@ export function configured(options?: Options) {
   })
 }
 
-function patchDocument(text: string, patch: Patch) {
-  const options = { formattingOptions: { tabSize: 2, insertSpaces: true } }
+const isPermissionPair = Schema.is(Schema.Struct({ action: Schema.String, resource: Schema.String }))
+
+function parseDocument(text: string) {
   const errors: ParseError[] = []
   const document: unknown = parse(text, errors, { allowTrailingComma: true, allowEmptyContent: true })
   if (
@@ -547,39 +543,60 @@ function patchDocument(text: string, patch: Patch) {
     (document !== undefined && (!document || typeof document !== "object" || Array.isArray(document)))
   )
     throw new Error("Invalid configuration document")
-  const shell =
-    patch.shell === undefined ? text : applyEdits(text, modify(text, ["shell"], patch.shell ?? undefined, options))
-  if (!patch.permissions?.length && !patch.removePermissions?.length) return shell
-  const permissions = document && "permissions" in document ? document.permissions : undefined
-  if (permissions !== undefined && !Array.isArray(permissions)) throw new Error("Invalid configuration permissions")
-  const key = (rule: { action?: unknown; resource?: unknown }) => JSON.stringify([rule.action, rule.resource])
-  const incoming = new Map(patch.permissions?.map((rule) => [key(rule), rule]))
-  const removed = new Set(patch.removePermissions?.map(key))
-  const existing = permissions ?? []
-  const updated = existing.flatMap((rule) => {
-    if (!rule) return [rule]
-    const pair = key(rule)
-    if (removed.has(pair)) return []
-    const replacement = incoming.get(pair)
-    return [replacement ?? rule]
+  return document
+}
+
+function patchDocuments(files: readonly { file: string; text: string }[], patch: Patch, permissions: boolean) {
+  const options = { formattingOptions: { tabSize: 2, insertSpaces: true } }
+  const documents = files.map((file) => {
+    const value = parseDocument(file.text)
+    const rules = permissions && value && "permissions" in value ? value.permissions : undefined
+    if (rules !== undefined && !Array.isArray(rules)) throw new Error("Invalid configuration permissions")
+    const entries: unknown[] = rules ?? []
+    return { ...file, updated: file.text, rules: entries }
   })
-  const present = new Set(existing.filter(Boolean).map(key))
-  for (const [pair, rule] of incoming) {
-    if (present.has(pair) && !removed.has(pair)) continue
-    const narrower =
-      rule.resource === "*"
-        ? updated.findIndex(
-            (entry) =>
-              typeof entry?.action === "string" &&
-              Wildcard.match(rule.action, entry.action) &&
-              typeof entry.resource === "string" &&
-              entry.resource !== "*",
-          )
-        : -1
-    updated.splice(narrower === -1 ? updated.length : narrower, 0, rule)
+  const fallback = documents.at(-1)
+  if (!fallback) return documents
+  if (patch.shell !== undefined)
+    fallback.updated = applyEdits(fallback.updated, modify(fallback.updated, ["shell"], patch.shell ?? undefined, options))
+
+  const key = (rule: { action: string; resource: string }) => JSON.stringify([rule.action, rule.resource])
+  const removed = new Set(patch.removePermissions?.map(key))
+  for (const document of documents) {
+    for (const [index, rule] of Array.from(document.rules.entries()).reverse()) {
+      if (!isPermissionPair(rule) || !removed.has(key(rule))) continue
+      document.updated = applyEdits(document.updated, modify(document.updated, ["permissions", index], undefined, options))
+      document.rules.splice(index, 1)
+    }
   }
-  if (isDeepStrictEqual(existing, updated)) return shell
-  return applyEdits(shell, modify(shell, ["permissions"], updated, options))
+
+  const incoming = new Map(patch.permissions?.map((rule) => [key(rule), rule]))
+  for (const [pair, rule] of incoming) {
+    const matches = (entry: unknown) => isPermissionPair(entry) && key(entry) === pair
+    const existing = documents.findLast((document) => document.rules.some(matches))
+    if (existing) {
+      const index = existing.rules.findLastIndex(matches)
+      if (isDeepStrictEqual(existing.rules[index], rule)) continue
+      existing.updated = applyEdits(existing.updated, modify(existing.updated, ["permissions", index], rule, options))
+      existing.rules[index] = rule
+      continue
+    }
+
+    const narrower = (entry: unknown) =>
+      isPermissionPair(entry) &&
+      Wildcard.match(rule.action, entry.action) &&
+      entry.resource !== rule.resource &&
+      Wildcard.match(entry.resource, rule.resource)
+    const target = documents.find((document) => document.rules.some(narrower)) ?? fallback
+    const before = target.rules.findIndex(narrower)
+    const index = before < 0 ? target.rules.length : before
+    target.updated = applyEdits(
+      target.updated,
+      modify(target.updated, ["permissions", index], rule, { ...options, isArrayInsertion: true }),
+    )
+    target.rules.splice(index, 0, rule)
+  }
+  return documents
 }
 
 export const node = configured()

@@ -443,6 +443,55 @@ describe("loginom.product permissions (B2.6a)", () => {
   )
 
   it.live(
+    "PATCH keeps narrower profile rules effective across files and for a non-universal resource glob",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const profile = path.join(test.dir, "global", "config", "loginom-ai-agent")
+        const at = `location[directory]=${encodeURIComponent(test.dir)}`
+        const secret = { action: "*", resource: "*.secret", effect: "deny" }
+        const excel = { action: "loginom_dock_node_apply", resource: "exports.excel", effect: "deny" }
+        yield* Effect.promise(async () => {
+          await Bun.write(`${profile}.json`, JSON.stringify({ permissions: [secret] }))
+          await Bun.write(
+            `${profile}.jsonc`,
+            `{ "permissions": [\n  // Keep Excel exports blocked.\n  ${JSON.stringify(excel)}\n] }\n`,
+          )
+        })
+        const patch = (kind: "read" | "export", effect: "ask" | "allow") =>
+          test.call(`/api/experimental/config?${at}`, { permissions: settingRules(kind, effect) }, "PATCH")
+        expect((yield* patch("read", "ask")).status).toBe(204)
+        const session = yield* test.create("narrower profile rules")
+        yield* until(() =>
+          test.call(`/api/agent?${at}`).pipe(
+            Effect.map((result) => {
+              const build = result.body.data.find((agent: { id: string }) => agent.id === "build")
+              return build && settingEffect("read", build.permissions) === "ask" ? true : undefined
+            }),
+          ),
+        )
+        expect((yield* test.ask(session, { action: "read", resources: ["data.secret"], source })).effect).toBe("deny")
+        expect((yield* test.ask(session, { action: "read", resources: ["inside.txt"], source })).effect).toBe("ask")
+
+        expect((yield* patch("export", "allow")).status).toBe(204)
+        yield* until(() =>
+          test.call(`/api/agent?${at}`).pipe(
+            Effect.map((result) => {
+              const build = result.body.data.find((agent: { id: string }) => agent.id === "build")
+              return build && settingEffect("export", build.permissions) === "allow" ? true : undefined
+            }),
+          ),
+        )
+        const exportTo = (resource: string) =>
+          test.ask(session, { action: "loginom_dock_node_apply", resources: [resource], source })
+        expect((yield* exportTo("exports.excel")).effect).toBe("deny")
+        expect((yield* exportTo("exports.text")).effect).toBe("allow")
+        expect(yield* Effect.promise(() => Bun.file(`${profile}.jsonc`).text())).toContain("// Keep Excel exports blocked.")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
     "defaults: project files without a question, the other kinds ask, reading outside the project asks, the terminal is off",
     () =>
       Effect.gen(function* () {

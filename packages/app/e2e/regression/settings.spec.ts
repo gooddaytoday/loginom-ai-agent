@@ -214,6 +214,13 @@ for (const width of [1280, 390]) {
     const writeRow = settings.locator('[data-component="settings-row"]').filter({ has: page.getByRole("combobox", writeControl) })
     const overridden = writeRow.getByText("Other profile rules override your choice: Ask.", { exact: true })
     await expect(write).toHaveValue("ask")
+    await expect(write).toHaveAccessibleDescription("Default")
+    await expect(settings.getByRole("combobox", { name: "Read project files", exact: true })).toHaveAccessibleDescription(
+      "You changed this · default: “Allowed”",
+    )
+    await expect(
+      settings.getByRole("switch", { name: "Allow the agent to use the terminal", exact: true }),
+    ).toHaveAccessibleDescription("You changed this · default: “Off”")
     await expect(settings.getByText("In this workspace: Denied", { exact: true })).toBeVisible()
     await write.selectOption("deny")
     await expect(overridden).toBeVisible()
@@ -222,6 +229,7 @@ for (const width of [1280, 390]) {
     await expect(write).toBeEnabled()
     await expect(overridden).toHaveCount(0)
     await expect(write).toHaveValue("ask")
+    await expect(write).toHaveAccessibleDescription("Default")
     expect(profile).toEqual([exception, fallback])
   })
 }

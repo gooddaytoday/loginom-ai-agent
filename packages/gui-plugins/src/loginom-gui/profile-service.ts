@@ -11,10 +11,3 @@ export function profileService(ctx: Context) {
 
   return local.length === 1 ? local.at(0) : undefined
 }
-
-export async function profileDirectory(server: ReturnType<typeof profileService>, signal: AbortSignal) {
-  return (
-    server?.data.location.default().directory ||
-    (await server?.client.location.get({}, { signal }).catch(() => undefined))?.directory
-  )
-}

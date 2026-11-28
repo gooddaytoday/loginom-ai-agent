@@ -80,6 +80,13 @@ const run = Effect.fnUntraced(function* (events: ReadonlyArray<SessionEvent.Agen
       event: {
         subscribe: () => Stream.fromIterable(events),
       },
+      permission: {
+        hook: () => Effect.succeed({ dispose: Effect.void }),
+        list: () => Effect.die("unused permission.list"),
+        get: () => Effect.die("unused permission.get"),
+        reply: () => Effect.die("unused permission.reply"),
+        assert: () => Effect.die("unused permission.assert"),
+      },
       session: {
         hook: (name, callback) => {
           if (name === "context") contextHook = callback as (input: SessionContext) => Effect.Effect<void>
