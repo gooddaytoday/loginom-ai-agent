@@ -177,3 +177,27 @@ test('Save publishes only the matching bounded busy snapshot, without changing i
   assert.equal(loginomFeedMetadata(reply,{tool,save,busy:{...busy,operationId:'old-save'}}),undefined);
   assert.deepEqual(reply.content,[{type:'text',text:'original Save receipt'}]);
 });
+
+test('saved package graph shares v1 with busy, redacts labels and fits its own budget', () => {
+  const reply={content:[{type:'text',text:'Save succeeded'}]};
+  const packagePath='/account/result.lgp', operationId='save-id';
+  const save={action_key:'package.save_checkpoint',operation_id:operationId,status:'SUCCEEDED', output:{package_ref:{path:packagePath}}};
+  const busy={version:1,windowId:'09a4db75-00cf-4ee0-912d-c252afbaba0f',operationId,active:false};
+  const saved_labels=Array.from({length:200},(_,index)=>({node_id:'node-'+index,label:index===199?'Левое':'credential-example'+'Ж'.repeat(200)}));
+  const savedPackageGraph={status:'compared',package_path:packagePath,save_operation_id:operationId,rename_attribution:'observed_during_save',
+    unchecked_sorting:[],saved_labels,changes:[{kind:'node_renamed',node_id:'node-199',before:'Слияние',saved:'Левое',
+      observed_before_save:'Слияние',repair:{label:'Попросить исправить',prompt:'Проверить узел node-199'}}]};
+  const metadata=loginomFeedMetadata(reply,{tool:'dock_action_run',save,busy,savedPackageGraph,knownSecrets:['credential-example']});
+  assert.equal(metadata.v,1);
+  assert.deepEqual(metadata.busy,busy);
+  const graph=metadata.savedPackageGraph;
+  assert.equal(graph.truncated,true);
+  assert.ok(graph.savedLabels.length<=32);
+  assert.deepEqual(graph.savedLabels[0],{nodeId:'node-199',label:'Левое'});
+  assert.equal(graph.changes[0].repair.label,'Попросить исправить');
+  assert.doesNotMatch(JSON.stringify(graph),/credential-example/);
+  assert.ok(Buffer.byteLength(JSON.stringify(graph))<=8*1024);
+  assert.ok(Buffer.byteLength(JSON.stringify(metadata))<=16*1024);
+  assert.equal(loginomFeedMetadata(reply,{tool:'dock_action_run',save,busy,
+    savedPackageGraph:{...savedPackageGraph,save_operation_id:'other'}}).savedPackageGraph,undefined);
+});

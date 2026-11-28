@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {TextReader, Uint8ArrayWriter, ZipWriter} from '@zip.js/zip.js';
-import {compareSavedPackageGraph, parseSavedPackageBytes, savedGraphMessage} from '../lib/saved-package-graph.mjs';
+import {chromium} from 'playwright';
+import {compareSavedPackageGraph, makeSavedPackageGraphCode, parseSavedPackageBytes, savedGraphMessage} from '../lib/saved-package-graph.mjs';
 
 const join = '4527f5b0-c77f-4fcc-91be-fccae0406581';
 const sortingNode = '4abeb776-ab7c-48ba-ba43-0858d760c9e1';
@@ -68,4 +69,52 @@ test('the same labels, links and field order produce no discrepancy', async () =
 test('an unverified archive cannot be reported as an unchanged graph', async () => {
   await assert.rejects(compareSavedPackageGraph({bytes:Buffer.from('not a package'),before}));
   assert.match(savedGraphMessage({status:'unavailable'}), /Пакет сохранён, но/);
+});
+
+test('saved-file read closes only its own Files tab, even if read or workflow return fails', async () => {
+  const origin='https://loginom.invalid', path='/account/saved.lgp', tabTid='fixture-workflow';
+  const browser=await chromium.launch({chromiumSandbox:true, executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER, args:['--no-proxy-server']});
+  try {
+    const page=await browser.newPage();
+    await page.route('**/*',route=>route.fulfill({contentType:'text/html',body:
+      '<div data-tid="fixture-workflow" class="x-tab-active">Workflow</div><button data-tid="MF;cntMain;tlbMainToolbar;btnFilestorage">Files</button>'}));
+    const execute=Function('return '+makeSavedPackageGraphCode({origin,path,tabTid,build:'7.4.2',documentId:'doc',sessionId:'session',account:'account'}))();
+    for (const scenario of ['success','read failed','return failed','existing']) {
+      await page.goto(origin);
+      await page.evaluate(({scenario,path,tabTid})=>{
+        const workflow=document.querySelector('[data-tid="'+tabTid+'"]');
+        class PackageTreeNode { PackageFileName=path; HasRunningNodes(){return false;} }
+        class FileStorageForm { FFileStorage={}; }
+        const pack=new PackageTreeNode(), card={Controller:{Node:{data:{node:pack}}},tab:{el:{dom:workflow}}};
+        const filesTab=document.createElement('div');
+        filesTab.dataset.tid='fixture-files';
+        filesTab.innerHTML='Files <button data-ref="closeEl">Close</button>';
+        const files={Controller:{FController:new FileStorageForm()},tab:{el:{dom:filesTab}}};
+        let active=card, disposed=0;
+        const cards=[card];
+        const mount=()=>{if(!cards.includes(files)){cards.push(files);document.body.append(filesTab);}};
+        if(scenario==='existing')mount();
+        filesTab.querySelector('button').onclick=()=>{cards.splice(cards.indexOf(files),1);filesTab.remove();active=card;};
+        workflow.onclick=()=>{if(scenario!=='return failed')active=card;};
+        document.querySelector('[data-tid$="btnFilestorage"]').onclick=()=>{mount();active=files;};
+        class FileDownloader {
+          constructor(name,dir){this.FullFilename=dir+name;}
+          GetFileSize(){return 1;}
+          GetFileStream(){return {ReadBuffer(chunk){if(scenario==='read failed')throw Error('Read refused');chunk[0]=42;}};}
+          Dispose(){disposed++;this.IsDisposed=true;}
+          IsStreamReleased(){return this.IsDisposed;}
+        }
+        const FMapTree={FServerConnection:{Connected:true,UserName:'account',Session:{}},PackageNodes:{Count:1,Items:()=>pack}};
+        const Workspace={getActiveTab:()=>active,items:{items:cards}};
+        globalThis.bg={app:{Version:'7.4.2',PackageTreeNode,Application:{FInstance:{FMainForm:{Items:{Workspace},FMapTree}}}},
+          TBGFileOpenMode:{fomRead:0},filestorage:{FileDownloader}};
+        globalThis.__loginomDockPreparationV1={document,id:'doc',receipts:new Map([['save',
+          {phase:'verified',packageNode:pack,request:'{"session":"session"}'}]])};
+        globalThis.observedTabs=()=>({active:active===card?'workflow':'files', files:cards.includes(files), disposed});
+      },{scenario,path,tabTid});
+      if (scenario.endsWith('failed')) await assert.rejects(execute(page), /Read refused|Timeout/);
+      else assert.deepEqual(await execute(page), {base64:'Kg=='});
+      assert.deepEqual(await page.evaluate(()=>globalThis.observedTabs()),{active:'workflow',files:scenario==='existing',disposed:1},scenario);
+    }
+  } finally { await browser.close(); }
 });

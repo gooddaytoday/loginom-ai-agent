@@ -10,6 +10,33 @@ const reply = (value: typeof receipt, loginom?: unknown) => ({
   _meta: { loginom },
 })
 
+test("Dock forwards the saved graph in v1 alongside the busy signal", async () => {
+  const savedPackageGraph = {
+    status: "compared",
+    packagePath: "/account/saved.lgp",
+    scope: "active_workflow",
+    renameAttribution: "observed_during_save",
+    changes: [{
+      kind: "node_renamed",
+      nodeId: "node-guid",
+      before: "Слияние",
+      saved: "Левое",
+      observedBeforeSave: "Слияние",
+      repair: { label: "Попросить исправить", prompt: "Проверить узел node-guid" },
+    }],
+    savedLabels: [{ nodeId: "node-guid", label: "Левое" }],
+    uncheckedSorting: 0,
+    truncated: false,
+  }
+  const busy = { version: 1, operationId: "operation", windowId: "09a4db75-00cf-4ee0-912d-c252afbaba0f", active: false }
+  const { node: _node, ...save } = feed
+  const loginom = { ...save, busy, savedPackageGraph }
+  const input = reply(receipt, loginom)
+  const result = await dockToolResult(input, 1)
+  expect(result.metadata.loginom).toEqual(loginom)
+  expect(result.content).toEqual(input.content[0].text)
+})
+
 test.each([
   { kind: "configure" },
   {

@@ -814,6 +814,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                 reopenedSave={path:admission.path,preparation:session.metadata.workspacePreparation};
             }
             const savedOutcome = confirmedSave ?? outcome;
+            let savedPackageGraph;
             let normalizedWorkspace = null;
             let workspaceBindingAdvice = null;
             const saveContinuations = savedOutcome.output?.workflow_continuations
@@ -894,7 +895,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                   const prepared=session.metadata.workspacePreparation?.state;
                   const identity={save_operation_id:savedOutcome.operation_id,package_path:admission.path};
                   try {
-                    const before=savedOutcome.trace?.findLast(entry=>entry.event==='save_graph_before_write')?.graph;
+                    const before=actionRuntime.savedGraphBefore(savedOutcome.operation_id);
                     if(!before||!savedState||workspaceBindingAdvice||prepared?.document_id!==admission.document_id
                       ||savedOutcome.cleanup_complete!==true) throw Error('Saved graph binding unavailable');
                     if(config.storageDirectories)requireStorageDestination(admission.path,config.storageDirectories,'packages');
@@ -910,8 +911,8 @@ export async function createBridge(config, session, { browserTransport: managedB
                     admission.savedGraph={...identity,status:'unavailable'};
                   }
                 }
-                reply._meta={...reply._meta,loginom:{saved_package_graph:admission.savedGraph}};
-                reply.content.push({type:'text',text:savedGraphMessage(admission.savedGraph)});
+                savedPackageGraph=admission.savedGraph;
+                reply.content.push({type:'text',text:redactor.text(savedGraphMessage(savedPackageGraph))});
               }
             }
             try {
@@ -931,8 +932,8 @@ export async function createBridge(config, session, { browserTransport: managedB
               // Knowledge/journal failure cannot erase a completed browser receipt.
               reply.content.push({ type: 'text', text: 'Recovery context unavailable; keep the operation receipt and inspect the actual state.' });
             }
-            if(userProfile&&presentNodeReply&&saveRequest&&outcome.operation_id===operationId)
-              return presentNodeReply(reply,options=>loginomFeedMetadata(reply,{...options,tool:request.params.name,save:outcome}));
+            if(userProfile&&presentNodeReply&&(savedPackageGraph||saveRequest&&outcome.operation_id===operationId))
+              return presentNodeReply(reply,options=>loginomFeedMetadata(reply,{...options,tool:request.params.name,save:savedOutcome,savedPackageGraph}));
             return reply;
           });
         }

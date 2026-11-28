@@ -161,6 +161,14 @@ export function compactActionResult(result,{wireSize=previewWireSize}={}) {
   // force another observation, or tempt clients to reuse stale references.
   const copy = structuredClone(result);
   delete copy.trace;
+  const inspected = copy.action_key === 'operation.inspect' ? copy.output?.outcome : undefined;
+  if (['package.save_as', 'package.save_checkpoint'].includes(inspected?.action_key)) {
+    inspected.trace = inspected.trace?.map(({graph, expected_graph, actual_graph, ...event}) => event);
+    if (inspected.output) {
+      delete inspected.output.expected_graph;
+      delete inspected.output.actual_graph;
+    }
+  }
   // Inspection must reconcile the same retained operation even when its table
   // could not be delivered. Preserve every effect/phase/configuration receipt.
   const node=copy.action_key==='operation.inspect'&&copy.output?.outcome?.action_key==='node.apply'
@@ -194,16 +202,48 @@ export function compactKnowledgeBundle(description) {
 
 const FEED_MAX_BYTES = 16 * 1024;
 const FEED_PREVIEW_MAX_BYTES = 12 * 1024;
+const SAVED_GRAPH_MAX_BYTES = 8 * 1024;
+const SAVE_ACTIONS = ['package.save_as', 'package.save_checkpoint'];
 
-export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts, busy, save}) {
+function projectSavedPackageGraph(graph, knownSecrets) {
+  const {text} = createRedactor(knownSecrets);
+  const packagePath = text(graph.package_path).toWellFormed();
+  if (graph.status === 'unavailable') return {status:'unavailable', packagePath};
+  const result = {status:'compared', packagePath, scope:'active_workflow', renameAttribution:graph.rename_attribution,
+    changes:[], savedLabels:[], uncheckedSorting:graph.unchecked_sorting.length, truncated:true};
+  const safe = value => Array.isArray(value) ? value.map(safe) : text(value).toWellFormed();
+  const append = (target, value) => {
+    target.push(value);
+    if (Buffer.byteLength(JSON.stringify(result)) > SAVED_GRAPH_MAX_BYTES) target.pop();
+  };
+  const labelsWithChanges = new Set(graph.changes.map(change => change.node_id));
+  const labels = graph.saved_labels.toSorted((left, right) =>
+    Number(labelsWithChanges.has(right.node_id)) - Number(labelsWithChanges.has(left.node_id)));
+  for (const change of graph.changes.slice(0, 16)) {
+    const {kind, node_id:nodeId, endpoints, label, before, saved, observed_before_save:observedBeforeSave, repair} = change;
+    append(result.changes, endpoints ? {kind, endpoints} : {kind, nodeId, label:label && safe(label), before:safe(before),
+      ...(saved === undefined ? {} : {saved:safe(saved)}),
+      ...(repair ? {observedBeforeSave:safe(observedBeforeSave), repair:{label:repair.label, prompt:safe(repair.prompt)}} : {})});
+  }
+  for (const item of labels.slice(0, 32)) append(result.savedLabels, {nodeId:item.node_id, label:safe(item.label)});
+  result.truncated = result.changes.length !== graph.changes.length || result.savedLabels.length !== labels.length;
+  return result;
+}
+
+export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts, busy, save, savedPackageGraph}) {
   const busyFor = operationId => busy?.version === 1 && busy.operationId === operationId
     && /^[A-Za-z0-9_.:-]{1,128}$/.test(busy.operationId)
     && typeof busy.active === 'boolean' && typeof busy.windowId === 'string'
     && /^[0-9a-f-]{36}$/.test(busy.windowId)
     ? {version:1, windowId:busy.windowId, operationId:busy.operationId, active:busy.active} : undefined;
-  if (tool === 'dock_action_run' && ['package.save_as', 'package.save_checkpoint'].includes(save?.action_key)) {
-    const signal = busyFor(save.operation_id);
-    return signal ? {v:1, operationId:save.operation_id, state:'settled', status:save.status, busy:signal} : undefined;
+  if (['dock_action_run', 'dock_operation_inspect'].includes(tool) && SAVE_ACTIONS.includes(save?.action_key)) {
+    const signal = tool === 'dock_action_run' ? busyFor(save.operation_id) : undefined;
+    const graph = save.status === 'SUCCEEDED' && savedPackageGraph?.save_operation_id === save.operation_id
+      && savedPackageGraph.package_path === save.output?.package_ref?.path
+      ? projectSavedPackageGraph(savedPackageGraph, knownSecrets) : undefined;
+    const bounded = graph && Buffer.byteLength(JSON.stringify(graph)) <= SAVED_GRAPH_MAX_BYTES ? graph : undefined;
+    return signal || bounded ? {v:1, operationId:save.operation_id, state:'settled', status:save.status,
+      ...(signal ? {busy:signal} : {}), ...(bounded ? {savedPackageGraph:bounded} : {})} : undefined;
   }
   const receipt = reply.structuredContent;
   if (!['dock_node_apply', 'dock_node_wait', 'dock_node_status', 'dock_node_read', 'dock_node_resume', 'dock_node_cancel', 'dock_node_stop', 'dock_node_delete'].includes(tool)

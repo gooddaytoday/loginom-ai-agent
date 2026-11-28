@@ -14,6 +14,38 @@ import {readUserVariablesSnapshot} from '../lib/crosstable-variables.mjs';
 import {makePackageCleanupCode} from '../lib/package-cleanup.mjs';
 import {createProtectedOperation} from '../../src/protected-operation.mjs';
 
+test('a lost Save response still reconciles within the inspect wire budget at 200 nodes', async()=>{
+ const page=linkPage(), path='/user/data/packages/large.lgp', marker='private snapshot';
+ const nodes=Array.from({length:200},(_,index)=>({
+  id:'47d76e4d-ec5c-49c9-b31a-'+String(index).padStart(12,'0'),label:marker+' ж'.repeat(130),sorting:false,
+ }));
+ const links=Array.from({length:499},(_,index)=>Array.from({length:4},(_,offset)=>nodes[(index+offset)%nodes.length].id));
+ const graph={nodes,links};
+ let writes=0;
+ const save=page.save.bind(page);
+ page.save=()=>{writes++;save();};
+ const evaluate=page.evaluate.bind(page);
+ page.evaluate=(fn,arg)=>fn.name==='readSaveGraph'?Promise.resolve(graph):evaluate(fn,arg);
+ const runtimeWithLostReply=runtime(page,{execute:async code=>{
+  const result=await page.execute(code);
+  if(result.action_key==='package.save_checkpoint'&&result.status==='SUCCEEDED'&&page.storage.has(path))
+   throw Error('Lost Save response');
+  return result;
+ }});
+ const stopped=await runtimeWithLostReply.run('package.save_checkpoint',{path,conflict_policy:'fail'},{operationId:'large-save'});
+ assert.equal(stopped.status,'AMBIGUOUS');
+ const inspected=await runtimeWithLostReply.inspect({operationId:'large-save'});
+ assert.equal(inspected.output.state,'resolved');
+ assert.equal(inspected.output.outcome.status,'SUCCEEDED');
+ assert.equal(inspected.output.outcome.output.package_ref.path,path);
+ const modelText=JSON.stringify(compactActionResult(inspected));
+ assert.ok(Buffer.byteLength(JSON.stringify(graph))>46000);
+ assert.ok(Buffer.byteLength(modelText)<46000);
+ assert.doesNotMatch(JSON.stringify(inspected), new RegExp(marker));
+ assert.equal(runtimeWithLostReply.savedGraphBefore('large-save')?.nodes.length,200);
+ assert.equal(writes,1);
+});
+
 test('a retained preparation cannot mask a settled node worker using the same ID',async()=>{
  const page=new Page(),receipt={status:'READY',operation_id:'shared'};
  const engine=runtime(page,{getPreparationReceipt:id=>id==='shared'?receipt:null,

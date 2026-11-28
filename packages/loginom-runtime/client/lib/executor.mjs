@@ -870,6 +870,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
   let restoreViewport = null;
   let workflow = task.checkpoint?.workflow_ref ?? null;
   let loginomBuild = null;
+  let saveGraph;
   let graphBinding=task.checkpoint?.graph_binding??null;
   const record = (event, detail = {}) => trace.push({ at_ms: Date.now() - started, event, ...detail });
   const remaining = () => Math.max(0, deadline - Date.now());
@@ -1771,11 +1772,11 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if (staged.package_identity.running)
       throw new Error('Cannot save the package while a process is running or its nodes are locked. No save request was sent.');
     if (!same(staged, before)) throw Error('Package changed after save preflight');
-    const recordSaveGraph = async () => {
-      try { record('save_graph_before_write', {graph:await page.evaluate(readSaveGraph)}); }
-      catch { record('save_graph_before_write', {graph:null}); }
+    const captureSaveGraph = async () => {
+      try { saveGraph = await page.evaluate(readSaveGraph); }
+      catch { saveGraph = null; }
     };
-    await recordSaveGraph();
+    await captureSaveGraph();
     await click('file_dialog.confirm', true);
     record('save_requested', { path: before.path });
     const expectedConflict = '"' + before.path + '" уже существует. Вы хотите заменить его?';
@@ -1801,7 +1802,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       if ((await yes.innerText()).trim() !== 'Да' || (await noButton.innerText()).trim() !== 'Нет')
         throw new Error('Save confirmation answer labels differ');
       if (task.parameters.conflict_policy === 'replace') {
-        await recordSaveGraph();
+        await captureSaveGraph();
         await click('message.yes', true);
         record('overwrite_confirmed');
       } else {
@@ -2006,8 +2007,6 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       continuations = await bindSavedContinuations(before, before.continuations, 'reconcile');
     }
     record('save_continuations_observed', { continuations, reopened, native_identity_verified: true });
-    const savedGraph = receipt.trace.findLast(entry => entry.event === 'save_graph_before_write');
-    if (savedGraph) record('save_graph_before_write', {graph:savedGraph.graph});
     phase = 'verified'; effectPossible = true;
     record('postcondition_verified', { proof: 'save_receipt_and_unmodified_native_package', package_path: before.path, reopened });
     const output = { package_ref: { kind: 'package', path: before.path, active_identity: before.path }, reopened };
@@ -2105,6 +2104,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       if (restoreViewport) await cleanup('viewport', restoreViewport);
     }
     outcome.cleanup_complete = !trace.some(entry => ['cleanup_failed', 'cleanup_deferred'].includes(entry.event));
+    if (saveGraph !== undefined && task.receipt_namespace) outcome.private_save_graph = saveGraph;
     return outcome;
   })();
 }
@@ -2451,7 +2451,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }
     if (outcome.operation_id !== operation.id) throw new Error('Dock capability operation identity does not match');
     if (mode !== 'prepare' && outcome.status === 'SUCCEEDED') validateActionParameters(operation.action.output_schema, outcome.output, 'output');
+    retainSaveGraph(operation, outcome);
     return outcome;
+  };
+  const retainSaveGraph = (operation, outcome) => {
+    if (!Object.hasOwn(outcome, 'private_save_graph')) return;
+    if (['package.save_as', 'package.save_checkpoint'].includes(outcome.action_key))
+      operation.saveGraph = outcome.private_save_graph;
+    delete outcome.private_save_graph;
   };
   const remember = async (operation, phase, outcome) => {
     await onRecord({ operation_id: operation.id, action_key: operation.action.action_key, action_revision: operation.action.revision,
@@ -2473,6 +2480,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (receipt.action_key === operation.action.action_key && receipt.status === 'SUCCEEDED' && operation.action.output_schema) {
         validateActionParameters(operation.action.output_schema, receipt.output, 'output');
       }
+      retainSaveGraph(operation, receipt);
     }
     return state;
   };
@@ -3788,6 +3796,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     },
     nodeApplyStatus:id=>sourceReads.has(id)?sourceReads.status(id):nodeJobs.status(id),
     nodeApplyWorkflow:id=>nodeJobs.workflow(id),
+    savedGraphBefore: id => operations.get(id)?.saveGraph,
     saveNodeIntent(documentId, workflowId) {
       const sorting=new Map(), intendedLabels=new Map();
       for(const operation of operations.values()) {
@@ -4883,7 +4892,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }});
   // Internal delivery calls retain the original runtime methods. The returned
   // facade prevents a second caller from changing UI between transfer stages.
-  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','nodeApplyWorkflow','saveNodeIntent','waitNodeApply']);
+  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','nodeApplyWorkflow','savedGraphBefore','saveNodeIntent','waitNodeApply']);
   const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply','deleteNode']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{

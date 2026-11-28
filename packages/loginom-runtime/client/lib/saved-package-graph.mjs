@@ -45,15 +45,30 @@ async function inSavedFileTab(page, options) {
     };
     const session = connection?.Session;
     verify();
-    return {verify, workspace, card, path: options.path, limit: options.limit};
+    const cards = workspace.items?.items;
+    if (!Array.isArray(cards) || cards.length > 32 || !cards.includes(card)) throw Error('Workspace tab inventory unavailable');
+    const initial = new Set(cards);
+    const isFiles = candidate => candidate?.Controller?.FController?.constructor?.name === 'FileStorageForm';
+    const inventory = () => {
+      const current = app.Application.FInstance.FMainForm.Items.Workspace;
+      if (current !== workspace || prep.document !== document) throw Error('Workspace changed during saved package read');
+      return current.items.items;
+    };
+    const openedFiles = () => {
+      const added = inventory().filter(candidate => !initial.has(candidate) && isFiles(candidate));
+      if (added.length > 1) throw Error('Ambiguous new Files tabs');
+      return added[0];
+    };
+    return {verify, workspace, card, isFiles, inventory, openedFiles, path: options.path, limit: options.limit};
   }, options);
   const tab = page.locator('[data-tid='+JSON.stringify(options.tabTid)+']');
-  let files, entered = false;
+  let files, attempted = false;
   try {
-    if (await tab.count() !== 1 || !await tab.evaluate(element => element.classList.contains('x-tab-active')))
+    if (await tab.count() !== 1 || !await tab.evaluate((element, owner) =>
+      owner.card.tab?.el?.dom === element && element.classList.contains('x-tab-active'), owner))
       throw Error('Save workflow tab is not active');
+    attempted = true;
     await page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnFilestorage"]').click({timeout: 1500});
-    entered = true;
     files = await page.waitForFunction(owner => {
       owner.verify();
       const card = owner.workspace.getActiveTab(), controller = card?.Controller?.FController;
@@ -91,11 +106,38 @@ async function inSavedFileTab(page, options) {
     }, {owner, files});
   } finally {
     try {
-      if (entered && await owner.evaluate((owner, files) => files
-        ? owner.workspace.getActiveTab() === files
-        : owner.workspace.getActiveTab()?.Controller?.FController?.constructor?.name === 'FileStorageForm', files)) {
-        await tab.click({timeout: 1500});
-        await page.waitForFunction(owner => owner.workspace.getActiveTab() === owner.card, owner, {timeout: 1500});
+      if (attempted) {
+        const opened = await owner.evaluateHandle((owner, files) => {
+          if (files) return owner.openedFiles() === files ? files : null;
+          return owner.openedFiles() ?? null;
+        }, files);
+        try {
+          try {
+            if (await owner.evaluate((owner, files) => {
+              const active = owner.workspace.getActiveTab();
+              return (files ? active === files : owner.isFiles(active)) && owner.inventory().includes(owner.card);
+            }, files)) {
+              const original = await owner.evaluateHandle(owner => owner.card.tab?.el?.dom);
+              try {
+                await original.asElement()?.click({timeout: 1500});
+                await page.waitForFunction(owner => owner.workspace.getActiveTab() === owner.card, owner, {timeout: 1500});
+              } finally { await original.dispose(); }
+            }
+          } finally {
+            if (await opened.evaluate((card, owner) => card !== null && owner.inventory().includes(card), owner)) {
+              const close = await opened.evaluateHandle((card, owner) => {
+                const buttons = card === owner.openedFiles() && card.tab?.el?.dom?.querySelectorAll('[data-ref="closeEl"]');
+                return buttons?.length === 1 ? buttons[0] : null;
+              }, owner);
+              try {
+                const button = close.asElement();
+                if (!button) throw Error('Owned Files close control unavailable');
+                await button.click({timeout: 1500});
+                await page.waitForFunction(({owner, opened}) => !owner.inventory().includes(opened), {owner, opened}, {timeout: 1500});
+              } finally { await close.dispose(); }
+            }
+          }
+        } finally { await opened.dispose(); }
       }
     } finally {
       await files?.dispose();
