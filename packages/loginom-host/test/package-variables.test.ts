@@ -57,10 +57,10 @@ test("uses the local workflow's package port links and keeps local control bindi
       { name: "INPUT", value: "" }, { name: "limit", value: "0" }, { name: "enabled", value: "false" },
     ],
     usages: [
-      { kind: "template", scope: "package", name: "INPUT", module: "Unit_0", branch: [], nodeID: "import", nodeLabel: "Импорт", parameter: "FileName" },
-      { kind: "binding", scope: "control", name: "limit", module: "Unit_0", branch: [], nodeID: "import", nodeLabel: "Импорт", parameter: "Limit.Engine.Root." },
-      { kind: "template", scope: "control", name: "INPUT", module: "Unit_0", branch: [], nodeID: "other", nodeLabel: "Другой", parameter: "TableName" },
-      { kind: "template", scope: "control", name: "limit", module: "Unit_0", branch: ["Ветка"], nodeID: "export", nodeLabel: "Экспорт", parameter: "TableName" },
+      { kind: "template", scope: "package", name: "INPUT", module: "Unit_0", branch: [], nodeId: "import", nodeLabel: "Импорт", parameter: "FileName" },
+      { kind: "binding", scope: "control", name: "limit", module: "Unit_0", branch: [], nodeId: "import", nodeLabel: "Импорт", parameter: "Limit.Engine.Root." },
+      { kind: "template", scope: "control", name: "INPUT", module: "Unit_0", branch: [], nodeId: "other", nodeLabel: "Другой", parameter: "TableName" },
+      { kind: "template", scope: "control", name: "limit", module: "Unit_0", branch: ["Ветка"], nodeId: "export", nodeLabel: "Экспорт", parameter: "TableName" },
     ],
   })
 })

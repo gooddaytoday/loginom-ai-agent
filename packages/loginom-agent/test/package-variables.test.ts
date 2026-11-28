@@ -3,6 +3,7 @@ import { copyFile, mkdir, mkdtemp, realpath, rename, rm, symlink, truncate, writ
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { decodeLoginomMetadata } from "../src/loginom-metadata"
 import { packageVariablesHandler, packageVariablesRpc } from "../src/package-variables"
 
 const fixture = new URL("../../../evals/tasks/node-evals/crosstable-local-variable-bindings/reference.lgp", import.meta.url)
@@ -37,13 +38,17 @@ test("variables RPC reads a saved file only in the conversation's location and h
     const input = await packageVariablesRpc.methods.variables.input["~standard"].validate({ sessionID: "local", localPath: "package.lgp" })
     if (input.issues) throw Error("fixture input rejected")
     const output = await variables(input.value, call)
-    expect(await packageVariablesRpc.methods.variables.output["~standard"].validate(output)).toMatchObject({
-      value: { snapshot: { source: "saved", definitionsCoverage: "complete", definitions: [], defaults: [], usages: [
+    const validated = await packageVariablesRpc.methods.variables.output["~standard"].validate(output)
+    if (validated.issues || !validated.value.snapshot) throw Error("fixture snapshot rejected")
+    const packageVariables = validated.value.snapshot
+    expect(packageVariables).toMatchObject({ source: "saved", definitionsCoverage: "complete", definitions: [], defaults: [],
+      truncated: false, usages: [
         { name: "CaptionSeparator", scope: "control", kind: "binding", parameter: "DisplayNameSeparator.Engine.Root." },
         { name: "GroupLimit", scope: "control", kind: "binding", parameter: "SlidingUniqueValuesLimit.Engine.Root." },
         { name: "CategoryNames", scope: "control", kind: "binding", parameter: "UniqueValueNames.Engine.Root." },
-      ] } },
-    })
+      ] })
+    expect(decodeLoginomMetadata({ v: 1, operationId: "read", state: "settled", packageVariables })?.packageVariables)
+      .toEqual(packageVariables)
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

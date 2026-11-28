@@ -482,10 +482,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const local=await bridge.prepareLocalPackage({intent:'open_package',operation_id:expectedOperation},
       {artifactID:artifact.artifact_id,uploadGrantID:artifact.upload.grant_id},{signal:new AbortController().signal});
     assert.notEqual(local.isError,true,JSON.stringify(local));
-    assert.deepEqual(local._meta?.loginom,{
-      v:1,operationId:expectedOperation,state:'settled',
-      packageVariables:{source:'saved',state:'deferred'},
-    });
+    assert.equal(Object.hasOwn(local._meta?.loginom ?? {}, 'packageVariables'),false);
     const opened=JSON.parse(local.content[0].text);
     assert.equal(packageDeliveries.length,1);assert.equal(packageDeliveries[0].artifact_id,artifact.artifact_id);
     assert.equal(packageDeliveries[0].upload_grant_id,artifact.upload.grant_id);

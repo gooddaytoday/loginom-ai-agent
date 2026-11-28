@@ -148,7 +148,7 @@ export async function extractPackageVariables(bytes: Uint8Array) {
 
     const modules = unitPaths(await xml("PackageIndex.xml"), entries)
     const usages: { name: string; kind: "template" | "binding"; scope: "package" | "control" | "unknown"; module: string; branch: string[];
-      nodeID: string; nodeLabel: string; parameter: string }[] = []
+      nodeId: string; nodeLabel: string; parameter: string }[] = []
     let usagesTruncated = false
     for (const module of modules) {
       const unit = await xml(module + "/Unit.xml")
@@ -162,18 +162,18 @@ export async function extractPackageVariables(bytes: Uint8Array) {
         for (const node of items(child(flow.root, "Nodes"))) {
           const component = child(node, "Component")
           const engine = child(component, "Engine")
-          const { guid: nodeID, label: nodeLabel } = nodeIdentity(node, engine)
-          if (!nodeID) continue
+          const { guid: nodeId, label: nodeLabel } = nodeIdentity(node, engine)
+          if (!nodeId) continue
           const controlPort = namedPort(child(component, "InputSockets"), "ControlVariables")
           const controlPortID = controlPort?.getAttribute("Guid")
-          const linkedToPackage = controlPortID && packageTargets.get(nodeID)?.has(controlPortID)
+          const linkedToPackage = controlPortID && packageTargets.get(nodeId)?.has(controlPortID)
           const localNames = new Set(items(child(child(child(controlPort, "Socket"), "Variables"), "Elements"))
             .filter((entry) => entry.getAttribute("OriginType") === "iotCustom")
             .map((entry) => entry.getAttribute("Name")))
           const scope = (name: string) => localNames.has(name) ? "control"
             : packageNames.has(name) && linkedToPackage
               ? "package" : controlPort ? "control" : "unknown"
-          const location = { module, branch: flow.branch, nodeID, nodeLabel }
+          const location = { module, branch: flow.branch, nodeId, nodeLabel }
           for (const parameter of ["FileName", "TableName"]) {
             const setting = engine?.getAttribute(parameter) ?? ""
             const names = new Set<string>()

@@ -6,25 +6,11 @@ import { FSUtil } from "@opencode/util/fs-util"
 import { Schema } from "effect"
 import { MAX_BYTE_ADMISSION } from "./file-profile-core"
 import { fileSnapshot } from "./file-snapshot"
+import { LoginomPackageVariables } from "./loginom-metadata"
 
 const snapshot = Schema.Struct({
-  source: Schema.Literal("saved"),
-  definitionsCoverage: Schema.Literals(["complete", "partial", "unavailable"]),
-  defaultsCoverage: Schema.Literals(["complete", "partial", "unavailable"]),
-  usagesCoverage: Schema.Literal("partial"),
+  ...LoginomPackageVariables.fields,
   truncated: Schema.Boolean,
-  definitions: Schema.NullOr(Schema.Array(Schema.Struct({ name: Schema.String, type: Schema.String }))),
-  defaults: Schema.NullOr(Schema.Array(Schema.Struct({ name: Schema.String, value: Schema.String }))),
-  usages: Schema.Array(Schema.Struct({
-    name: Schema.String,
-    kind: Schema.Literals(["template", "binding"]),
-    scope: Schema.Literals(["package", "control", "unknown"]),
-    module: Schema.String,
-    branch: Schema.Array(Schema.String),
-    nodeID: Schema.String,
-    nodeLabel: Schema.String,
-    parameter: Schema.String,
-  })),
 })
 
 const empty = Schema.toStandardSchemaV1(Schema.Struct({}))

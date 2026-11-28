@@ -48,7 +48,7 @@ it.live("routes the real variables RPC after plugin activation", Effect.gen(func
   })
   expect(yield* call("loginom.package-variables/variables", { localPath: "reference.lgp" })).toMatchObject({
     snapshot: { definitions: [], truncated: false, usages: [
-      { name: "CaptionSeparator", scope: "control" },
+      { name: "CaptionSeparator", scope: "control", nodeId: "43c6846e-3081-4be7-8bac-3092f35fbecb" },
       { name: "GroupLimit", scope: "control" },
       { name: "CategoryNames", scope: "control" },
     ] },
