@@ -2,14 +2,24 @@ export * as PluginProduct from "./product.js"
 
 // Fork seam U1 (catalog CAT-07): the Loginom AI Agent product plugin is built in, runs last in `post`, and its ID is
 // guarded against config removals and reserved against packages that claim it.
-import LoginomAgent, { Dashboard } from "@loginom-ai-agent/loginom-agent"
+import LoginomAgent, { checkNodeDraftDelivery, Dashboard } from "@loginom-ai-agent/loginom-agent"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
-import { Context, Effect, Layer } from "effect"
+import { Context, Effect, Layer, Option } from "effect"
 import { Formatter } from "../formatter.js"
 import type { InternalPlugin } from "./internal.js"
 import { PluginPromise } from "./promise.js"
+import type { Rpc } from "../rpc.js"
 
 const product = PluginPromise.fromPromise(LoginomAgent)
+
+export const checkPromptDelivery = (rpc: Rpc.Interface, sessionID: string, metadata: unknown) =>
+  checkNodeDraftDelivery(sessionID, metadata, () =>
+    rpc.call("loginom.package-state", "snapshot", { sessionID }).pipe(
+      Effect.timeoutOption("8 seconds"),
+      Effect.map(Option.getOrUndefined),
+      Effect.orElseSucceed(() => undefined),
+    ),
+  )
 
 // No formatter runs in a dashboard's work folder, whatever the config says (B2.9d, guarantee G1): a formatter loads
 // its own config from the folder of the file it formats (Prettier runs `src/.prettierrc.cjs`), and there the model

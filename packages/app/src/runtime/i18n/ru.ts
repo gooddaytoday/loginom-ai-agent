@@ -393,6 +393,7 @@ export const dict = {
   "prompt.toast.shellSendFailed.title": "Не удалось отправить команду оболочки",
   "prompt.toast.commandSendFailed.title": "Не удалось отправить команду",
   "prompt.toast.promptSendFailed.title": "Не удалось отправить запрос",
+  "prompt.toast.loginomPackageChanged": "Пакет Loginom сменился, закрылся или его не удалось проверить перед отправкой.",
 
   "dialog.mcp.title": "Подключения",
   "dialog.mcp.empty": "Нет подключений к внешним сервисам",

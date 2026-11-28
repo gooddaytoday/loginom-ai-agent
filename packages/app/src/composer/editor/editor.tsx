@@ -22,6 +22,9 @@ import { Key } from "@solid-primitives/keyed"
 import { FileIcon } from "@opencode/ui/file-icon"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
+import { ComposerNoteHandler } from "@opencode/plugin/gui/builtin"
+import { usePluginHost } from "@/runtime/plugin/host"
+import { Contribution } from "@/runtime/plugin/render"
 import { Loader } from "@opencode/ui/loader"
 import { ProviderModelIcon } from "@/providers/models/provider-group"
 import { useI18n } from "@opencode/ui/context/i18n"
@@ -753,6 +756,21 @@ function parseComposerEditor(editor: HTMLDivElement) {
   return [{ type: "text" as const, content: "", start: 0, end: 0 }]
 }
 
+function PluginNoteChip(props: { origin: string; data: string; remove: () => void; fallback: () => JSX.Element }) {
+  const host = usePluginHost()
+  const handler = () => host.items(ComposerNoteHandler).find((item) => item.plugin === props.origin)
+
+  return (
+    <Show when={handler()} keyed fallback={props.fallback()}>
+      {(item) => (
+        <Contribution plugin={item.plugin} fallback={props.fallback}>
+          {() => item.value.render(props)}
+        </Contribution>
+      )}
+    </Show>
+  )
+}
+
 function ComposerAttachments(props: {
   attachments: ComposerAttachment[]
   uploads?: Upload[]
@@ -808,43 +826,56 @@ function ComposerAttachments(props: {
           class="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar px-2 pt-2 pb-1"
         >
           <For each={props.comments ?? []}>
-            {(comment) => (
-              <div
-                ref={(element) => {
-                  setAnchors(comment.key, element)
-                  onCleanup(() => setAnchors(comment.key, undefined))
-                }}
-                class="relative group shrink-0"
-              >
-                <Tooltip
-                  value={comment.comment}
-                  placement="top"
-                  openDelay={800}
-                  disabled={comment.type === "quote" || (comment.type === "note" && !comment.comment.trim())}
-                  contentClass="max-w-[300px] break-words"
+            {(comment) => {
+              const card = () => (
+                <div
+                  ref={(element) => {
+                    setAnchors(comment.key, element)
+                    onCleanup(() => setAnchors(comment.key, undefined))
+                  }}
+                  class="relative group shrink-0"
                 >
-                  <CommentCard
-                    comment={comment.comment ?? ""}
-                    target={commentCardTarget(comment)}
-                    title={quoteTitle(comment)}
-                    tooltip={quoteHint(comment) || (comment.type === "note" && !comment.comment.trim())}
-                    active={commentActive(comment)}
-                    onClick={() => {
-                      if (comment.type !== "quote") return props.onCommentClick?.(comment)
-                      props.quoteComment.set(props.quoteComment.key() === comment.key ? undefined : comment.key)
-                    }}
-                  />
-                </Tooltip>
-                <button
-                  type="button"
-                  onClick={() => props.onCommentRemove?.(comment)}
-                  class="absolute -top-1 -end-1 size-4 rounded-full bg-v2-icon-icon-muted outline-solid outline-1 outline-v2-icon-icon-contrast flex items-center justify-center hover-reveal group-hover:opacity-100"
-                  aria-label={props.removeLabel}
-                >
-                  <Icon name="outline-xmark" class="text-v2-icon-icon-contrast" />
-                </button>
-              </div>
-            )}
+                  <Tooltip
+                    value={comment.comment}
+                    placement="top"
+                    openDelay={800}
+                    disabled={comment.type === "quote" || (comment.type === "note" && !comment.comment.trim())}
+                    contentClass="max-w-[300px] break-words"
+                  >
+                    <CommentCard
+                      comment={comment.comment ?? ""}
+                      target={commentCardTarget(comment)}
+                      title={quoteTitle(comment)}
+                      tooltip={quoteHint(comment) || (comment.type === "note" && !comment.comment.trim())}
+                      active={commentActive(comment)}
+                      onClick={() => {
+                        if (comment.type !== "quote") return props.onCommentClick?.(comment)
+                        props.quoteComment.set(props.quoteComment.key() === comment.key ? undefined : comment.key)
+                      }}
+                    />
+                  </Tooltip>
+                  <button
+                    type="button"
+                    onClick={() => props.onCommentRemove?.(comment)}
+                    class="absolute -top-1 -end-1 size-4 rounded-full bg-v2-icon-icon-muted outline-solid outline-1 outline-v2-icon-icon-contrast flex items-center justify-center hover-reveal group-hover:opacity-100"
+                    aria-label={props.removeLabel}
+                  >
+                    <Icon name="outline-xmark" class="text-v2-icon-icon-contrast" />
+                  </button>
+                </div>
+              )
+
+              if (comment.type !== "note" || comment.data === undefined) return card()
+
+              return (
+                <PluginNoteChip
+                  origin={comment.origin}
+                  data={comment.data}
+                  remove={() => props.onCommentRemove?.(comment)}
+                  fallback={card}
+                />
+              )
+            }}
           </For>
           <For each={props.files ?? []}>
             {(file) => (

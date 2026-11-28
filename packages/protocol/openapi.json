@@ -28309,6 +28309,9 @@
               },
               "inboxID": {
                 "$ref": "#/components/schemas/Session.Message.ID"
+              },
+              "reason": {
+                "type": "string"
               }
             },
             "required": ["sessionID", "inboxID"],

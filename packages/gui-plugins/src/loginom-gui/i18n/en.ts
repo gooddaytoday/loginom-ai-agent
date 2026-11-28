@@ -1,4 +1,10 @@
 export default {
+  "node.remove": "Remove node",
+  "node.differentPackage": "This conversation is linked to a different Loginom package. Remove the node to send.",
+  "node.missingPackage": "Could not verify the Loginom package linked to this conversation.",
+  "node.stalePackage": "The package state is out of date. Try again when the open package can be verified.",
+  "node.differentConversation": "This Loginom node belongs to another conversation. Remove the node to send.",
+  "node.sourceUnavailable": "Could not open the original conversation.",
   "proxy.title": "System proxy",
   "proxy.description": "Use the operating system’s proxy. Restart the app to apply this to the background service.",
   "proxy.timeout": "Detecting the system proxy timed out.",

@@ -3,7 +3,7 @@ import { Option, Schema } from "effect"
 import { Persistence } from "@/runtime/persistence/schema"
 import { uuid } from "@opencode/util/uuid"
 import { FileSelection } from "@/workspaces/files/types"
-import { durableNote, LegacyBrowserNote, NoteComment, QuoteComment, type ContextItem } from "./schema"
+import { durableNote, LegacyBrowserNote, NoteComment, QuoteComment, type ContextItem, type NoteContextItem } from "./schema"
 
 const PromptFileComment = Persistence.struct({
   type: Schema.optional(Schema.Literal("file")),
@@ -74,7 +74,18 @@ export function formatQuoteComment(input: QuoteComment) {
   return `${quote}\n\nThe user made the following comment regarding this quote: ${input.comment}`
 }
 
+/** The model-visible text of a comment stored in prompt metadata. */
+export function formatPromptComment(comment: PromptComment) {
+  if (comment.type === "note") return formatNoteComment(comment)
+
+  if (comment.type === "quote") return formatQuoteComment(comment)
+
+  return formatCommentNote(comment)
+}
+
 /** Restores a sent comment to the composer, for example after a revert or fork. */
+export function commentContextItem(comment: NoteComment): NoteContextItem
+export function commentContextItem(comment: PromptComment): ContextItem
 export function commentContextItem(comment: PromptComment): ContextItem {
   // The message may predate this app process, so a note's live references can no longer be trusted.
   if (comment.type === "note") return { ...durableNote(comment), commentID: uuid() }

@@ -197,6 +197,30 @@
       "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
     },
     {
+      "id": "CAT-29",
+      "title": "Structured composer notes and return to the originating message (C3 Г4)",
+      "paths": [
+        "packages/plugin/src/gui/builtin.ts",
+        "packages/app/src/runtime/plugin/host.tsx", "packages/app/src/runtime/plugin/host-apis.tsx",
+        "packages/app/src/runtime/plugin/mounted-session.ts",
+        "packages/app/src/composer/editor/editor.tsx", "packages/app/src/composer/machine.ts",
+        "packages/app/src/composer/model.ts", "packages/app/src/composer/request.ts",
+        "packages/app/src/composer/schema.ts", "packages/app/src/composer/submit.ts",
+        "packages/app/src/composer/comment-note.ts", "packages/app/src/session/composer/queue-machine.ts",
+        "packages/app/src/session/composer/queue.ts",
+        "packages/app/src/runtime/i18n/en.ts", "packages/app/src/runtime/i18n/ru.ts",
+        "packages/app/src/shell/notifications/notification.tsx", "packages/app/src/shell/tabs/tabs.tsx",
+        "packages/app/src/session/route.tsx", "packages/app/src/session/timeline/cursor.ts",
+        "packages/core/src/plugin/product.ts", "packages/core/src/session/inbox.ts",
+        "packages/core/src/session/runner/llm.ts", "packages/core/test/session-runner.test.ts",
+        "packages/schema/src/session-event.ts", "packages/protocol/openapi.json",
+        "packages/client/src/effect/api/api.ts", "packages/client/src/promise/generated/types.ts",
+        "packages/gui-plugins/README.md", "packages/gui-plugins/AGENTS.md",
+        "packages/app/component-tests/plugin-host.spec.ts", "packages/app/component-tests/plugin-host.fixture.tsx",
+        "packages/app/e2e/regression/composer.spec.ts", "packages/app/e2e/regression/session-queue.spec.ts", "packages/app/e2e/utils/windows-menu.fixture.tsx"
+      ]
+    },
+    {
       "id": "CAT-10",
       "title": "Web app, UI kit, session UI and Loginom localization",
       "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"],

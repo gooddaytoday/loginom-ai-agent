@@ -5,7 +5,17 @@ import type { FormAnswer, FormInfo } from "@opencode/client/promise"
 import type { Schema } from "effect"
 import type { Context } from "./context.js"
 import { Registry, type Catalog, type Messages, type Persisted, type StoreDeclaration, type StoreFrom } from "./core.js"
-import type { Desktop, Layout, Locale, StorageScope, StoreOptions } from "./host-apis.js"
+import type {
+  ComposerNote,
+  Desktop,
+  Layout,
+  Locale,
+  MountedSession,
+  Screen,
+  StorageScope,
+  StoreOptions,
+  Tabs,
+} from "./host-apis.js"
 import type { MainContext } from "./main.js"
 import type { Command, IconName, Panel, PanelTab, SlotMap } from "./registries.js"
 import { type JSX } from "solid-js"
@@ -120,6 +130,33 @@ export interface ToolRenderer {
  * ```
  */
 export const ToolRenderer = Registry.define<ToolRenderer>("tool.renderer")
+
+/**
+ * Presentation and send check for a built-in plugin's structured composer notes, matched by the note's origin.
+ * @example
+ * ```ts
+ * ctx.add(ComposerNoteHandler, { render: renderNote, check: verifyNote })
+ * ```
+ */
+export const ComposerNoteHandler = Registry.define<{
+  /**
+   * Renders the draft chip. The fallback is the standard note card.
+   * @param input - The note data and its removal action.
+   */
+  render(input: {
+    /** The data stored with the note. */
+    readonly data: string
+    /** Removes the note from its draft. */
+    readonly remove: () => void
+  }): JSX.Element
+  /**
+   * Returns a message to block sending, or undefined to accept the note.
+   * @param data - The data stored with the note.
+   * @param session - The receiving conversation, if it already exists and is mounted.
+   * @param signal - Aborts the check when its composer closes.
+   */
+  check(data: string, session: MountedSession | undefined, signal: AbortSignal): Promise<string | undefined>
+}>("composer.note")
 
 /** Live question data and the host's draft and reply controls. */
 export interface QuestionRendererProps {
@@ -463,6 +500,33 @@ export interface BuiltinLocale extends Locale {
   setDirection(direction: "ltr" | "rtl"): void
 }
 
+/** A note with durable data that its built-in handler checks before sending. */
+export type BuiltinComposerNote = ComposerNote & {
+  /** The serialized data for the note's renderer and send check. */
+  data: string
+}
+
+/** Tabs with navigation to an existing message in the session timeline. */
+export interface BuiltinTabs extends Tabs {
+  /**
+   * Opens a session tab and can reveal a message in its timeline.
+   *
+   * @param session - The session's server and id.
+   * @param options - How to open the tab.
+   */
+  open(
+    session: Parameters<Tabs["open"]>[0],
+    options?: {
+      /** Also shows the tab and the session in it. */
+      readonly focus?: boolean
+      /** With focus, reveals this message in the session timeline. */
+      readonly messageID?: string
+      /** With focus, reports that the requested session could not be opened. */
+      readonly onUnavailable?: () => void
+    },
+  ): void
+}
+
 /** The window context as the app's host builds it for every plugin, with the members only built-ins use. */
 export interface BuiltinContext extends Context {
   /** Desktop-only abilities, `forceFocus` included; undefined on the web. */
@@ -480,6 +544,17 @@ export interface BuiltinContext extends Context {
      */
     openPage(id: string): void
   }
+  /** The routed session's screen, with structured note attachment for built-ins. */
+  readonly screen: Screen & {
+    /**
+     * Attaches a structured note to the current composer, when a session screen is mounted.
+     *
+     * @param note - The note to attach. The host assigns its origin to the caller's plugin id.
+     */
+    attachNote(note: BuiltinComposerNote): void
+  }
+  /** The app's tabs, with navigation to an existing message. */
+  readonly tabs: BuiltinTabs
   /** Stores whose older homes may be parts of shared app keys. */
   readonly storage: BuiltinStorage
 }

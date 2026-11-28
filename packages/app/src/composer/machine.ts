@@ -406,7 +406,12 @@ function prepare(
 }
 
 function showsWhileHeld(snapshot: SubmitSnapshot) {
-  return snapshot.mode === "normal" && snapshot.delivery === "steer" && !parseSlashCommand(snapshot.text)
+  return (
+    snapshot.mode === "normal" &&
+    snapshot.delivery === "steer" &&
+    !parseSlashCommand(snapshot.text) &&
+    !snapshot.draft.context.some((item) => item.type === "note" && item.data !== undefined)
+  )
 }
 
 // A shown hold returns its prompt to the composer it left and removes it from the timeline.

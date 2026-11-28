@@ -4,7 +4,8 @@ import type { ComposerDelivery } from "@/composer/adapter"
 import type { ComposerStateTarget } from "@/composer/submission-state"
 import type { ContextItem, ImageAttachmentPart, PathAttachmentPart, Prompt } from "@/composer/state"
 import { appendPrompt, clonePrompt, isAttachment, promptLength } from "@/composer/prompt-parts"
-import { readPromptPresentation } from "@/composer/comment-note"
+import type { NoteComment, NoteContextItem } from "@/composer/schema"
+import { formatNoteComment, readPromptPresentation, type PromptComment } from "@/composer/comment-note"
 import { type BlobReference, createLegacyBlobReference } from "@/runtime/persistence/drafts"
 
 export type QueuedPrompt = Extract<SessionInboxInfo, { type: "user" }>
@@ -14,6 +15,7 @@ export type EditStash = {
   readonly cursor: number
   readonly mode: "normal" | "shell"
   readonly retry: ReturnType<ComposerStateTarget["retry"]["current"]>
+  readonly notes?: readonly NoteContextItem[]
 }
 
 // The queued prompt loaded in the composer. `stash` is the draft the composer held before the first row opened; every
@@ -40,6 +42,7 @@ export type EditOperation = {
   readonly delivery: ComposerDelivery
   readonly item: QueuedPrompt
   readonly prompt: Prompt
+  readonly notes: readonly NoteContextItem[]
   readonly raw: string
   readonly text: string
   readonly attachments: number
@@ -105,7 +108,7 @@ export type QueueMutationStage = "running" | "committed" | "settled"
 // After unmount, an operation still in flight can owe the composer's saved draft a prompt: an edit the server never
 // admitted, or an undo whose cancel the server may still apply.
 type DisposedReturn =
-  | { readonly type: "edit"; readonly attempt: number; readonly prompt: Prompt }
+  | { readonly type: "edit"; readonly attempt: number; readonly prompt: Prompt; readonly notes: readonly NoteContextItem[] }
   | { readonly type: "undo"; readonly attempt: number }
 
 // Operations run one at a time in the order they were requested: `active` is in flight and `pending` waits for it.
@@ -137,6 +140,7 @@ export type QueueEvent =
       readonly delivery: ComposerDelivery
       readonly reverted: boolean
       readonly prompt: Prompt
+      readonly notes?: readonly NoteContextItem[]
       // Fresh inbox IDs, one per queued prompt, for the replacements an edit admits.
       readonly ids: readonly string[]
     }
@@ -170,7 +174,7 @@ export type QueueEvent =
 export type QueueToastKey = "common.requestFailed" | "session.queue.reverted" | "session.queue.undoShell"
 
 export type QueueEffect =
-  | { readonly type: "draft.load"; readonly prompt: Prompt; readonly cursor: number }
+  | { readonly type: "draft.load"; readonly prompt: Prompt; readonly cursor: number; readonly item: QueuedPrompt }
   // `keep` is the prompt the edit was loaded from: changes made to it join the restored draft.
   | { readonly type: "draft.restore"; readonly stash: EditStash; readonly focus: boolean; readonly keep?: QueuedPrompt }
   | { readonly type: "draft.pinned"; readonly blobs: ReadonlyMap<string, BlobReference> }
@@ -271,7 +275,7 @@ export function transitionQueue(state: QueueState, event: QueueEvent): QueueTran
 
     const returning: DisposedReturn | undefined =
       active?.type === "edit" && active.phase === "admitting"
-        ? { type: "edit", attempt: active.attempt, prompt: active.prompt }
+        ? { type: "edit", attempt: active.attempt, prompt: active.prompt, notes: active.notes }
         : active?.type === "undo"
           ? { type: "undo", attempt: active.attempt }
           : undefined
@@ -306,7 +310,7 @@ function settleDisposed(state: Extract<QueueState, { status: "disposed" }>, even
 
   return changed(
     { status: "disposed" },
-    returning.type === "edit" ? [{ type: "draft.merge", prompt: returning.prompt, context: [], focus: false }] : [],
+    returning.type === "edit" ? [{ type: "draft.merge", prompt: returning.prompt, context: returning.notes, focus: false }] : [],
   )
 }
 
@@ -458,6 +462,7 @@ function startEdit(state: LiveQueueState, event: Extract<QueueEvent, { type: "ed
   const effects: QueueEffect[] = [
     {
       type: "draft.load",
+      item,
       prompt: [{ type: "text", content: text, start: 0, end: text.length }, ...attachments],
       cursor: text.length,
     },
@@ -487,11 +492,12 @@ function confirmEdit(state: LiveQueueState, event: Extract<QueueEvent, { type: "
   const restored = restore(state.edit, true)
   const raw = promptText(event.prompt)
   const attachments = event.prompt.filter(isAttachment)
+  const notes = event.notes ?? []
 
-  if (!raw.trim() && !attachments.length) return changed(closed, [restored])
+  if (!raw.trim() && !attachments.length && !notes.length) return changed(closed, [restored])
   const position = state.items.findIndex((entry) => entry.id === state.edit.id)
   const item = state.items[position] ?? state.edit.item
-  const pristine = isPristine(item, event.prompt)
+  const pristine = isPristine(item, event.prompt, notes)
 
   if (pristine && event.delivery === "queue") return changed(closed, [restored])
 
@@ -508,9 +514,10 @@ function confirmEdit(state: LiveQueueState, event: Extract<QueueEvent, { type: "
       delivery: event.delivery,
       item,
       prompt: event.prompt,
+      notes,
       raw,
       text: raw.trim(),
-      attachments: attachments.length,
+      attachments: attachments.length + notes.length,
       moved: Object.fromEntries([item, ...after].map((entry, index) => [entry.id, event.ids[index]])),
     },
     [restored],
@@ -644,7 +651,11 @@ function settle(
           ...hidden.state,
           edit: {
             ...hidden.state.edit,
-            stash: { ...hidden.state.edit.stash, prompt: mergePrompt(hidden.state.edit.stash.prompt, active.prompt) },
+            stash: {
+              ...hidden.state.edit.stash,
+              prompt: mergePrompt(hidden.state.edit.stash.prompt, active.prompt),
+              notes: [...(hidden.state.edit.stash.notes ?? []), ...active.notes],
+            },
           },
         }
       : hidden.state
@@ -654,7 +665,7 @@ function settle(
   return changed(next.state, [
     { type: "toast", key: "common.requestFailed" },
     ...(returned && restored.status === "mutating"
-      ? [{ type: "draft.merge" as const, prompt: active.prompt, context: [] }]
+      ? [{ type: "draft.merge" as const, prompt: active.prompt, context: active.notes }]
       : []),
     ...hidden.effects,
     ...next.effects,
@@ -845,8 +856,14 @@ export function queuedPromptRows(
     if (sent.some((entry) => entry.original === item.id && entry.admitted && entry.delivery === "steer")) return []
 
     const presentation = readPromptPresentation(item.payload.metadata)
-    // Text-only edits preserve the original context suffix. A context-only edit currently loads that suffix as text.
-    const comments = !edit || presentation?.displayText.trim() ? (presentation?.comments ?? []) : []
+    const originalComments = presentation?.comments ?? []
+    // Pending counts already include the edited chips. Other comments survive only when context stays out of the text.
+
+    const comments = edit
+      ? (presentation?.displayText.trim() || originalComments.some(isStructuredNote)
+          ? originalComments.filter((comment) => !isStructuredNote(comment))
+          : [])
+      : originalComments
 
     return [
       {
@@ -863,11 +880,18 @@ export function queuedPromptRows(
 }
 
 // Whether the composer still holds the queued prompt exactly as it was loaded.
-export function isPristine(item: QueuedPrompt, prompt: Prompt) {
+export function isPristine(item: QueuedPrompt, prompt: Prompt, notes: readonly NoteContextItem[]) {
   const attachments = prompt.filter(isAttachment)
   const original = queuedPromptAttachments(item)
+  const originalNotes = queuedPromptNotes(item)
 
   return (
+    notes.length === originalNotes.length &&
+    notes.every((note, index) => {
+      const before = originalNotes[index]
+
+      return note.origin === before.origin && note.data === before.data && formatNoteComment(note) === formatNoteComment(before)
+    }) &&
     promptText(prompt).trim() === queuedPromptText(item) &&
     attachments.length === original.length &&
     attachments.every((attachment, index) => attachment.id === original[index].id)
@@ -885,7 +909,19 @@ export function mergePrompt(draft: Prompt, prompt: Prompt) {
 
 const decodeDisplayText = Schema.decodeUnknownOption(Schema.Struct({ displayText: Schema.NonEmptyString }))
 
+function isStructuredNote(comment: PromptComment): comment is NoteComment {
+  return comment.type === "note" && comment.data !== undefined
+}
+
+export function queuedPromptNotes(item: QueuedPrompt | undefined) {
+  return readPromptPresentation(item?.payload.metadata)?.comments.filter(isStructuredNote) ?? []
+}
+
 export function queuedPromptText(item: QueuedPrompt) {
+  const presentation = readPromptPresentation(item.payload.metadata)
+
+  if (presentation?.comments.some(isStructuredNote)) return presentation.displayText
+
   return Option.match(decodeDisplayText(item.payload.metadata), {
     onNone: () => item.payload.text,
     onSome: (metadata) => metadata.displayText,

@@ -3,6 +3,7 @@ import { Schema } from "effect"
 import { isSessionNotFoundError, type SessionInfo } from "@opencode/client/promise"
 import type { ServerSDK } from "@/runtime/server/client"
 import type { Data } from "@opencode/client/solid"
+import { showToast } from "@/shell/notifications/toast"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useLanguage } from "@/runtime/i18n/language"
 import { projectSettingsKey, useSettings } from "@/settings/model"
@@ -36,12 +37,17 @@ const requestTitles = {
   "websearch.provider": "notification.permission.title",
 } as const
 
-export function openNotificationSession(tabs: NotificationTabs, server: ServerConnection.Key, sessionID: string) {
+export function openNotificationSession(
+  tabs: NotificationTabs,
+  server: ServerConnection.Key,
+  sessionID: string,
+  options?: { messageID?: string },
+) {
   const tab = tabs.addSessionTab({ server, sessionId: sessionID })
 
   if (tab.type !== "session") return
   tabs.rememberSessionRoute(tab, sessionID)
-  tabs.select(tab)
+  tabs.select(tab, options)
 }
 
 // Only direct children: a grandchild reports to its own parent, so waiting on it could mean no sound at all. Running
@@ -403,6 +409,17 @@ export function createServerNotificationState(input: {
   }
 
   const unsub = input.sdk.event.listen((event) => {
+    if (event.type === "session.inbox.cancelled" && event.data.reason) {
+      showToast({
+        variant: "error",
+        title: language.t("prompt.toast.promptSendFailed.title"),
+        description:
+          event.data.reason === "loginom.package-changed" ? language.t("prompt.toast.loginomPackageChanged") : undefined,
+      })
+
+      return
+    }
+
     if (event.type === "session.deleted") {
       updateManual(event.data.sessionID, false)
 

@@ -269,7 +269,13 @@ export function createMountedSession(session: SessionModel) {
 
       return true
     },
-    attach: (part) => write((draft) => draft.context.add(part)),
+    attach: (part) =>
+      write((draft) => {
+        const item = { ...part }
+
+        if (item.type === "note" && "data" in item) return
+        draft.context.add(item)
+      }),
     quotable: () => !!prompt()?.quotable(),
     focus(commentID, options) {
       if (commentID === undefined) return prompt()?.focus()
@@ -383,7 +389,7 @@ export function createMountedSession(session: SessionModel) {
   // only global observers need this attachment. One batch prevents exposing a view on another screen.
   createEffect(() =>
     batch(() => {
-      onCleanup(attachment.screen(screen))
+      onCleanup(attachment.screen(screen, (note) => write((draft) => draft.context.add(note))))
       onCleanup(attachment.mount(mounted))
     }),
   )

@@ -2,6 +2,7 @@ import { ImagePreview } from "@opencode/ui/image-preview"
 import { useDialog } from "@opencode/ui/context/dialog"
 import type { ReferenceInfo } from "@opencode/client/promise"
 import type { Links, MountedSession } from "@opencode/plugin/gui"
+import { ComposerNoteHandler } from "@opencode/plugin/gui/builtin"
 import { createComponent, createEffect, createMemo, on, onCleanup } from "solid-js"
 import { Predicate } from "effect"
 import type { ComposerSuggestion } from "./types"
@@ -55,7 +56,8 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     server.conn.type !== "plugin" || !server.conn.managed || server.ctx.sdk.connection.status() === "connected"
 
   const files = useFile()
-  const links = usePluginHost().links
+  const host = usePluginHost()
+  const links = host.links
   const plugins = usePluginAttachment()
   const comments = useComments()
   const dialog = useDialog()
@@ -294,6 +296,18 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
   const variants = createMemo(() => ["default", ...adapter.controls().model.selection.variant.list()])
 
   const submission = createComposerSubmit({
+    async checkNote(note, target, signal) {
+      const mounted = plugins.current()
+
+      const session =
+        mounted && mounted.id === target?.id && mounted.directory === target.directory ? mounted : undefined
+
+      const handler = host.items(ComposerNoteHandler).find((item) => item.plugin === note.origin)?.value
+
+      if (!handler || note.data === undefined) return language.t("common.requestFailed")
+
+      return handler.check(note.data, session, signal).catch(() => language.t("common.requestFailed"))
+    },
     adapter,
     mode,
     commands: () => data.location.command.list({ directory: sdk().directory }),

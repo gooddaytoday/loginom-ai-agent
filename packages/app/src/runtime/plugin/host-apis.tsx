@@ -34,9 +34,14 @@ import {
   type ShellTab,
   type Storage,
   type StorageScope,
-  type Tabs,
 } from "@opencode/plugin/gui"
-import { BuiltinPanel, type BuiltinStoreFrom, type BuiltinStoreOptions } from "@opencode/plugin/gui/builtin"
+import {
+  BuiltinPanel,
+  type BuiltinComposerNote,
+  type BuiltinStoreFrom,
+  type BuiltinStoreOptions,
+  type BuiltinTabs,
+} from "@opencode/plugin/gui/builtin"
 import { usePlatform } from "@/runtime/platform/platform"
 import { same } from "@/runtime/persistence/equality"
 import { Persist, persisted, removePersisted } from "@/runtime/persistence/storage"
@@ -47,6 +52,7 @@ import { useDirectoryPicker } from "@/workspaces/selection/picker"
 import { SessionRouteKey, SessionStateKey, type ServerScope } from "@/runtime/server/scope"
 import { findSessionTab, tabKey, useTabs, type Tab } from "@/shell/tabs/tabs"
 import { openNotificationSession } from "@/shell/notifications/notification"
+import { SESSION_RESOLUTION_TIMEOUT_MS } from "@/session/resolution-machine"
 import { playSoundById } from "@/shell/notifications/sound"
 import { showToast } from "@/shell/notifications/toast"
 import { useCurrentRoute, useLayout } from "@/shell/state/layout"
@@ -99,8 +105,9 @@ import { ui } from "./ui"
 type Attached = {
   sessions: Accessor<readonly SessionRef[]>
   current: Accessor<MountedSession | undefined>
-  tabs: Tabs
+  tabs: BuiltinTabs
   screen: Accessor<SessionScreen | undefined>
+  attachNote: (note: BuiltinComposerNote) => void
   scope: (server: string) => ServerScope
   /** Records a session-scoped store so layout pruning drops it with the session. */
   scoped: (name: string) => void
@@ -395,9 +402,13 @@ export function createHostApis() {
       current: () => current()?.current(),
     }),
     // Before the interface mounts, no tabs are listed and writes wait for it.
-    tabs: () => ({
+    tabs: (_plugin, _owner, _context, _register, builtin) => ({
       list: () => current()?.tabs.list() ?? [],
-      open: (session, options) => write((value) => value.tabs.open(session, options)),
+      open: (session, options) => {
+        const allowed = builtin || !options ? options : { focus: options.focus }
+
+        write((value) => value.tabs.open(session, allowed), builtin ? options?.onUnavailable : undefined)
+      },
       focus: (key) => write((value) => value.tabs.focus(key)),
       move: (key, index) => write((value) => value.tabs.move(key, index)),
       close: (key) => write((value) => value.tabs.close(key)),
@@ -452,11 +463,16 @@ export function createHostApis() {
     }),
     // No command is registered before the interface mounts.
     commands: () => ({ run: (id) => untrack(attached)?.run(id) ?? false }),
-    screen: () => ({
+    screen: (plugin, _owner, _context, _register, builtin) => ({
       current: () => {
         const attached = current()
 
         return attached?.current() ? attached.screen() : undefined
+      },
+      attachNote: (note) => {
+        const attached = current()
+
+        if (builtin && attached?.current()) attached.attachNote({ ...note, origin: plugin })
       },
     }),
     // Before the interface mounts, reads return what an empty layout holds and writes wait for it.
@@ -533,7 +549,8 @@ export function createPluginAttachment(apis: HostApis) {
   const narrow = () => !desktop()
   // The mounted session screen, from its first render, and its object for the session it routes once it has mounted;
   // one screen is mounted at a time.
-  const [screen, setScreen] = createSignal<SessionScreen>()
+  const [mountedScreen, setMountedScreen] = createSignal<Pick<Attached, "attachNote"> & { screen: SessionScreen }>()
+  const screen = () => mountedScreen()?.screen
   const [routedView, setRoutedView] = createSignal<Accessor<MountedSession>>()
   const refs = new Map<string, SessionRef>()
 
@@ -1055,26 +1072,71 @@ export function createPluginAttachment(apis: HostApis) {
 
   const findTab = (key: string) => tabs.store.find((tab) => tabKey(tab) === key)
 
-  // Opens a session as the session list and the app's notifications do; an unlisted server opens nothing.
-  const openSession: Tabs["open"] = (session, options) => {
+  const [failedRoute, setFailedRoute] = createSignal<Accessor<string | undefined>>()
+  const pendingOpens = new Set<{ key: string; finish: (available: boolean) => void }>()
+
+  const settleOpens = (key: string | undefined, available: boolean) => {
+    if (!key) return
+
+    for (const pending of pendingOpens) {
+      if (pending.key === key) pending.finish(available)
+    }
+  }
+
+  createEffect(() => {
+    const failed = failedRoute()?.()
+    const mounted = current()?.key
+
+    untrack(() => {
+      settleOpens(failed, false)
+      settleOpens(mounted, true)
+    })
+  })
+  onCleanup(() => pendingOpens.forEach((pending) => pending.finish(false)))
+
+  const watchOpen = (key: string, unavailable: () => void) => {
+    const pending = { key, finish }
+    const timer = setTimeout(() => finish(false), SESSION_RESOLUTION_TIMEOUT_MS)
+
+    function finish(available: boolean) {
+      if (!pendingOpens.delete(pending)) return
+      clearTimeout(timer)
+
+      if (!available) unavailable()
+    }
+
+    pendingOpens.add(pending)
+  }
+
+  // Opens a session as the session list and the app's notifications do.
+  const openSession: BuiltinTabs["open"] = (session, options) => {
     const conn = servers.list.find((item) => ServerConnection.key(item) === session.server)
 
-    if (!conn) return
+    if (!conn) return options?.onUnavailable?.()
     const key = ServerConnection.key(conn)
     const shown = findSessionTab(tabs.store, key, session.id)
 
-    // A tab that already routes the session, e.g. a subagent opened from its parent's tab, keeps its route.
-    if (shown?.type === "session" && shown.routeSessionId === session.id) {
-      if (options?.focus) tabs.select(shown)
+    const routesSession = shown?.type === "session" && shown.routeSessionId === session.id
+
+    if (!options?.focus) {
+      if (!routesSession) tabs.addSessionTab({ server: key, sessionId: session.id })
 
       return
     }
 
-    if (!options?.focus) return void tabs.addSessionTab({ server: key, sessionId: session.id })
-    openNotificationSession(tabs, key, session.id)
+    if (options.onUnavailable) watchOpen(`${key}\n${session.id}`, options.onUnavailable)
+
+    // A tab that already routes the session, e.g. a subagent opened from its parent's tab, keeps its route.
+    if (routesSession) tabs.select(shown, options)
+    else openNotificationSession(tabs, key, session.id, options)
+
+    untrack(() => {
+      settleOpens(failedRoute()?.(), false)
+      settleOpens(current()?.key, true)
+    })
   }
 
-  const shell: Tabs = {
+  const shell: BuiltinTabs = {
     list: shellTabs,
     open: openSession,
     focus(key) {
@@ -1164,6 +1226,7 @@ export function createPluginAttachment(apis: HostApis) {
     notify,
     mode: theme.mode,
     screen,
+    attachNote: (note) => mountedScreen()?.attachNote(note),
     scope,
     scoped: layout.sessionState.track,
     project: (server, title) =>
@@ -1276,11 +1339,21 @@ export function createPluginAttachment(apis: HostApis) {
       },
     },
     /** A screen started rendering: `Screen.current` returns it only while its session matches the route. */
-    screen(value: SessionScreen) {
-      setScreen(() => value)
+    screen(screen: SessionScreen, attachNote: Attached["attachNote"]) {
+      const value = { screen, attachNote }
+
+      setMountedScreen(value)
 
       return () => {
-        if (screen() === value) setScreen(undefined)
+        if (mountedScreen() === value) setMountedScreen(undefined)
+      }
+    },
+    /** Reports terminal route failures that never mount a session screen. */
+    routeFailure(failure: Accessor<string | undefined>) {
+      setFailedRoute(() => failure)
+
+      return () => {
+        if (failedRoute() === failure) setFailedRoute(undefined)
       }
     },
     /** A session screen mounted: `Sessions.current` reads its object for the routed session. */

@@ -57,6 +57,11 @@ type ComposerSubmitInput = {
   delivery?: (alternate: boolean) => ComposerDelivery
   queueFirst?: (inboxID: string) => void
   clientCommand?: (text: string) => (() => void | Promise<void>) | undefined
+  checkNote?: (
+    note: Extract<ContextItem, { type: "note" }>,
+    session: ComposerSession | undefined,
+    signal: AbortSignal,
+  ) => Promise<string | undefined>
   notify: {
     missingSelection: () => void
     unqueueable: () => void
@@ -73,6 +78,7 @@ type ComposerSubmitInput = {
 // The submit lifecycle is `transitionComposerSubmit`; this runs its effects and turns their results into events.
 export function createComposerSubmit(input: ComposerSubmitInput) {
   const [state, setState] = createSignal(createComposerSubmitState())
+  const noteChecks = new AbortController()
 
   const dispatch = (event: ComposerSubmitEvent) => {
     const result = transitionComposerSubmit(state(), event)
@@ -167,8 +173,7 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
     }
 
     if (effect.type === "session.start") {
-      input.adapter.beforeSubmit?.()
-      void startSession(input, effect.value, {
+      void startSession(input, effect.value, noteChecks.signal, {
         target: () => composerSubmitTarget(state(), effect.attempt) ?? effect.target,
         retarget: (target, options) =>
           dispatch({
@@ -254,7 +259,10 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
       )
   })
 
-  onCleanup(() => dispatch({ type: "unmounted" }))
+  onCleanup(() => {
+    noteChecks.abort()
+    dispatch({ type: "unmounted" })
+  })
 
   return {
     state,
@@ -363,8 +371,40 @@ async function runClientCommand(input: ComposerSubmitInput, prompt: Prompt, run:
 async function startSession(
   input: ComposerSubmitInput,
   submission: ComposerSubmission,
+  signal: AbortSignal,
   handle: ComposerSubmissionHandle,
 ) {
+  const active = input.adapter.kind === "active-session" ? input.adapter.session() : undefined
+
+  const notes =
+    submission.mode === "normal"
+      ? submission.context.filter((item) => item.type === "note").filter((item) => item.data !== undefined)
+      : []
+
+  if (notes.length) {
+    const target = handle.target()
+    const draft = () => JSON.stringify([target.current(), target.context.items(), target.mode.current()])
+    const original = draft()
+
+    if (!input.checkNote) return
+
+    for (const note of notes) {
+      const message = await input.checkNote(note, active, signal)
+
+      if (signal.aborted || draft() !== original) return
+
+      if (message) {
+        input.notify.failed("prompt", new Error(message))
+
+        return
+      }
+    }
+
+    if (input.adapter.kind === "active-session" && active?.directory !== input.adapter.session().directory) return
+  }
+
+  input.adapter.beforeSubmit?.()
+
   // Images restored from a draft or history carry ids only; the optimistic message shows their URLs.
   const images = await Promise.all(
     submission.images.map(async (image) => ({
@@ -373,8 +413,14 @@ async function startSession(
     })),
   )
 
-  if (input.adapter.kind === "active-session")
-    return { images, session: input.adapter.session(), cleanupReady: Promise.resolve(), complete: undefined }
+  if (notes.length && signal.aborted) return
+
+  if (input.adapter.kind === "active-session") {
+    const session = notes.length ? active : input.adapter.session()
+
+    return session && { images, session, cleanupReady: Promise.resolve(), complete: undefined }
+  }
+
   const started = await input.adapter.start(submission.selection, handle, handoffMessage({ ...submission, images }))
 
   return started && { ...started, images }
@@ -664,6 +710,7 @@ function restoreDraft(
           subtitle: item.subtitle,
           icon: item.icon,
           subject: item.subject,
+          data: item.data,
           href: item.href,
           live: item.live,
           comment: item.comment,

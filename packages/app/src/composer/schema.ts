@@ -172,6 +172,7 @@ const NoteFields = {
   subtitle: Persistence.optional(Schema.String),
   icon: Schema.String,
   subject: Schema.String,
+  data: Persistence.optional(Schema.String),
   href: Persistence.optional(Schema.String),
   live: Persistence.optional(Persistence.struct({ subject: Schema.String, href: Persistence.optional(Schema.String) })),
   comment: Schema.String,

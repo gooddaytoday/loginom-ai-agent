@@ -379,6 +379,7 @@ export const dict = {
   "prompt.toast.shellSendFailed.title": "Failed to send shell command",
   "prompt.toast.commandSendFailed.title": "Failed to send command",
   "prompt.toast.promptSendFailed.title": "Failed to send prompt",
+  "prompt.toast.loginomPackageChanged": "The Loginom package changed, closed, or could not be verified before delivery.",
 
   "dialog.mcp.title": "MCPs",
   "dialog.mcp.empty": "No MCPs configured",

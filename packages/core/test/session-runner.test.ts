@@ -23,6 +23,7 @@ import { TestLLM, compileRequest } from "@opencode/ai/testing"
 import { RequestExecutor } from "@opencode/ai/route"
 import type { SessionHooks } from "@opencode/plugin/effect/session"
 import { Database } from "@opencode/core/database/database"
+import { Rpc } from "@opencode/core/rpc"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNodePlatform } from "@opencode/core/effect/app-node-platform"
@@ -516,6 +517,7 @@ const layer = Layer.unwrap(
         Model.node,
         Tool.node,
         PluginHooks.node,
+        Rpc.node,
         Job.node,
         echoNode,
         SessionRunnerModel.node,
@@ -4849,6 +4851,82 @@ describe("SessionRunnerLLM", () => {
     ])
     expect(yield* s.inbox).toEqual([])
   })
+
+  for (const [name, binding, delivered] of [
+    ["unchanged", { open: true, path: "/sales.lgp", staleForSeconds: null }, true],
+    ["changed", { open: true, path: "/other.lgp", staleForSeconds: null }, false],
+    ["closed", { open: false, path: "/sales.lgp", staleForSeconds: null }, false],
+    ["stale", { open: true, path: "/sales.lgp", staleForSeconds: 12 }, false],
+  ] as const) {
+    scenario(`checks a ${name} Loginom package at queue delivery`, function* (s) {
+      const rpc = yield* Rpc.Service
+      const snapshots: string[] = []
+      let current: typeof binding | { open: true; path: string; staleForSeconds: null } = {
+        open: true,
+        path: "/sales.lgp",
+        staleForSeconds: null,
+      }
+      yield* rpc.register(
+        Rpc.define({
+          id: "loginom.package-state",
+          events: {},
+          methods: { snapshot: { input: Schema.Struct({ sessionID: Schema.String }), output: Schema.Unknown } },
+        }),
+        {
+          snapshot: (input) =>
+            Effect.sync(() => {
+              snapshots.push(input.sessionID)
+              return current
+            }),
+        },
+      )
+      yield* s.admit("Start working")
+      yield* s.llm.push(TestLLM.stop(), TestLLM.stop(), TestLLM.stop())
+      const first = yield* s.resumePaused
+      const guarded = yield* s.session.prompt({
+        sessionID,
+        text: "Inspect the sales node",
+        delivery: "queue",
+        metadata: {
+          comments: [
+            {
+              type: "note",
+              origin: "loginom-gui",
+              data: JSON.stringify({ source: { sessionID }, node: { path: "/sales.lgp" } }),
+            },
+          ],
+        },
+      })
+      yield* s.session.prompt({ sessionID, text: "Next plain prompt", delivery: "queue" })
+      expect(yield* s.inbox).toHaveLength(2)
+      expect(snapshots).toEqual([])
+      current = binding
+      yield* first.finish
+
+      expect(snapshots).toEqual([sessionID])
+      expect(s.requests.map(userTexts)).toEqual(
+        delivered
+          ? [
+              ["Start working"],
+              ["Start working", "Inspect the sales node"],
+              ["Start working", "Inspect the sales node", "Next plain prompt"],
+            ]
+          : [["Start working"], ["Start working", "Next plain prompt"]],
+      )
+      expect(yield* s.inbox).toEqual([])
+      const cancelled = yield* s.db
+        .select({ data: EventTable.data })
+        .from(EventTable)
+        .where(and(eq(EventTable.aggregate_id, sessionID), eq(EventTable.type, "session.inbox.cancelled.1")))
+        .all()
+        .pipe(Effect.orDie)
+      if (delivered) expect(cancelled).toEqual([])
+      else
+        expect(cancelled).toMatchObject([
+          { data: { inboxID: guarded.id, reason: "loginom.package-changed" } },
+        ])
+    })
+  }
 
   scenario("edits and removes queued prompts while the next turn is preparing", function* (s) {
     yield* s.admit("Start working")
