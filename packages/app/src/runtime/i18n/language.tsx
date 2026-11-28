@@ -1,6 +1,7 @@
 import { batch, createEffect, createMemo, createSignal, on, onCleanup, untrack, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Option, Schema, SchemaGetter } from "effect"
+import { Product } from "@loginom-ai-agent/product"
 import { createSimpleContext } from "@opencode/ui/context"
 import { showToast } from "@opencode/ui/toast"
 import {
@@ -18,7 +19,6 @@ import en from "@/runtime/i18n/en"
 import { dict } from "@opencode/ui/i18n/en"
 import {
   createDesktopNativeBundle,
-  detectDesktopNativeLocale,
   DESKTOP_NATIVE_ENGLISH,
   DESKTOP_NATIVE_LABELS,
   DESKTOP_NATIVE_LOCALES,
@@ -197,13 +197,6 @@ export function loadLocaleDict(locale: Locale) {
   return loadDict(locale).then(() => undefined)
 }
 
-function detectLocale(): Locale {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- probing for a browser global
-  if (typeof navigator !== "object") return "en"
-
-  return detectDesktopNativeLocale(navigator.languages?.length ? navigator.languages : [navigator.language])
-}
-
 export function normalizeLocale(value: string): Locale {
   return Option.getOrElse(Schema.decodeUnknownOption(LocaleSchema)(value), () => "en")
 }
@@ -230,7 +223,9 @@ function readStoredLocale() {
   }
 }
 
-const warm = readStoredLocale() ?? detectLocale()
+const defaultLocale = Product.defaultLocale
+
+const warm = readStoredLocale() ?? defaultLocale
 
 const initialLocale =
   warm === "en"
@@ -248,7 +243,7 @@ export const { use: useLanguage, provider: LanguageProvider } = createSimpleCont
   name: "Language",
   gate: false,
   init: (props: { locale?: Locale; onNativeTranslations?: (bundle: DesktopNativeBundle) => void }) => {
-    const initial = props.locale ?? readStoredLocale() ?? detectLocale()
+    const initial = props.locale ?? readStoredLocale() ?? defaultLocale
     const [store, setStore, _, ready] = persisted(Persist.global("language"), languageSchema, { locale: initial })
 
     const stored = untrack(() => store.locale)
