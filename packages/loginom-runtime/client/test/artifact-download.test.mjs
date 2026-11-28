@@ -96,7 +96,7 @@ test('server event and RPC consume the original operation deadline instead of th
   execute:async(code,options)=>{
    if(code.includes('"download_path":')){
     rpc=options;rpcStarted=f.page.clock;f.page.clock+=5000;
-    const page=new Proxy(f.page,{get:(target,key)=>key==='context'?context:target[key]});
+    const page=new Proxy(f.page,{get:(target,key)=>key==='context'?context:Reflect.get(target,key)});
     return structuredClone(await vm.runInContext(`(${code})`,f.page.context)(page));
    }
    return f.page.execute(code);
@@ -164,7 +164,7 @@ for(const fault of ['restored','midstream','session','mtime','bytes','partial','
    // Playwright page, connection and Chromium byte events are deterministic.
    try{
     if(!f.page.context)await f.page.execute('async page=>null');
-    const page=new Proxy(f.page,{get:(target,key)=>key==='context'?context:target[key]});
+    const page=new Proxy(f.page,{get:(target,key)=>key==='context'?context:Reflect.get(target,key)});
     const result=structuredClone(await vm.runInContext('('+withStorageIdentity(code,binding,options?.storageSession)+')',f.page.context)(page));
     if(code.includes('"mode":"status"')){
      if(fault==='midstream'&&!connection.Connected)f.page.clock+=30000;
@@ -216,6 +216,22 @@ test('download binds the checked file gesture to its page event and exact privat
   assert.equal(result.output.bytes_verification_required,true);
   assert.ok(!JSON.stringify(result).includes('/private/'));
   assert.ok(!JSON.stringify(result).includes('not-for-output'));
+});
+
+// LAB-2054: a 77-byte server-copy verification emitted its download event
+// ~30 s after the gesture, after a fixed 15 s window had already expired.
+test('upload verification waits for its download event within its own deadline, keeping a reserve',async()=>{
+  const f=fixture(),wait=f.page.waitForEvent;let timeout;
+  f.options.deadline_at=f.page.clock+60000;
+  f.page.waitForEvent=(type,options)=>{timeout=options.timeout;return wait(type,options);};
+  const result=await f.run();
+  assert.equal(result.status,'SUCCEEDED');
+  assert.ok(timeout>30000,'the event window must cover a slow native download: '+timeout);
+  assert.ok(timeout<=60000-15000,'post-download settlement keeps its reserve: '+timeout);
+  const short=fixture(),shortWait=short.page.waitForEvent;let shortTimeout;
+  short.options.deadline_at=short.page.clock+20000;
+  short.page.waitForEvent=(type,options)=>{shortTimeout=options.timeout;return shortWait(type,options);};
+  assert.equal((await short.run()).status,'SUCCEEDED');assert.equal(shortTimeout,15000);
 });
 
 test('download preserves bounded stale-reference reason/checks without replaying the denied gesture',async()=>{
@@ -703,6 +719,32 @@ test('native export download requires its fresh output binding without an input 
  const result=await f.page.execute(makeNativeOutputDownloadCode(options));assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.upload_operation_id,undefined);assert.equal(result.output.output_binding.execution_id,'execution');
  for(const patch of [{expected_bytes:4},{output_binding:{...options.output_binding,execution_id:''}},{artifact:{name:'other.csv'}}])assert.throws(()=>makeNativeOutputDownloadCode({...options,...patch}));
 });
+// LAB-2054 review: only upload verification gets the deadline-based window.
+test('native export download keeps the 15 s event window despite a long deadline',async()=>{
+ const {makeNativeOutputDownloadCode}=await import('../lib/executor.mjs');
+ const f=fixture('native.csv');f.page.directory='/test-2';
+ const original=f.page.uiSnapshot.bind(f.page);
+ f.page.uiSnapshot=()=>{const s=original();for(const e of s.ui.elements)if(e.label==='native.csv')e.storage_entry={bytes:3,kind:'file'};return s;};
+ const snapshot=f.page.uiSnapshot(),file=snapshot.ui.elements.find(e=>e.label==='native.csv'),wait=f.page.waitForEvent;let timeout;
+ f.page.waitForEvent=(type,options)=>{timeout=options.timeout;return wait(type,options);};
+ const options={...f.options,artifact:{artifact_id:'output',name:'native.csv'},snapshot,file_ref:file.ref,expected_bytes:3,deadline_at:f.page.clock+120000,
+  output_binding:{session_id:'session',document_id:'doc',workflow_id:'flow',node_id:'node',execution_id:'execution',directory:'/test-2',destination:'/test-2/native.csv'}};
+ assert.equal((await f.page.execute(makeNativeOutputDownloadCode(options))).status,'SUCCEEDED');assert.equal(timeout,15000);
+});
+
+// LAB-2054 review: a verification gesture refused before any click cannot emit
+// a download; it must not hold the call for the long verification window.
+test('verification refused before its click does not wait the long event window',async()=>{
+ const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page);
+ f.page.uiSnapshot=()=>{const s=snapshot();s.ui.elements=s.ui.elements.map(e=>e.ref===f.options.file_ref?{...e,allowed_actions:[]}:e);return s;};
+ f.options.deadline_at=f.page.clock+60000;
+ let timeout;f.page.waitForEvent=(type,options)=>{timeout=options.timeout;f.calls.push('listen');return new Promise(()=>{});};
+ const started=f.page.clock,result=await f.run();
+ assert.ok(timeout>15000);
+ assert.equal(result.status,'NOT_APPLIED');assert.equal(result.error.code,'DOWNLOAD_GESTURE_NOT_CONFIRMED');
+ assert.ok(f.page.clock-started<=15000,'waited '+(f.page.clock-started)+' ms');assert.deepEqual(f.calls,['listen']);
+});
+
 test('changed native output size refuses download before the gesture',async()=>{
  const {makeNativeOutputDownloadCode}=await import('../lib/executor.mjs');const f=fixture('native.csv');f.page.directory='/test-2';
  const original=f.page.uiSnapshot.bind(f.page);let bytes=3;

@@ -2,7 +2,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {treeLabelSeparators,treeToTableParametersSchema,validateTreeJsonScope,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths} from '../lib/tree-parameters.mjs';
+import {treeLabelSeparators,treeToTableParametersSchema,validateTreeJsonScope,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths,treeColumnNames} from '../lib/tree-parameters.mjs';
 import {createTreeNodeSupport,treeConfigurationReadback} from '../lib/tree-node.mjs';
 import {NODE_TYPES,validateNodeTargetRequest} from '../lib/node-contracts.mjs';
 test('tree stage 1 admits the independent acceptance JSON with exact original integer lexemes',async()=>{
@@ -10,7 +10,7 @@ test('tree stage 1 admits the independent acceptance JSON with exact original in
  assert.equal(validateTreeJsonScope(text).verified,true);
 });
 for(const value of ['[]','null','1','{"items":[]}','{"items":[1,2]}',
- '{"items":[{"v":1,"v":2}]}','{"id":1,"items":[{"id":2}]}','{"items":[{"v":9223372036854775808}]}'])test('tree scope refuses '+value,()=>{
+ '{"items":[{"v":1,"v":2}]}','{"items":[{"v":9223372036854775808}]}'])test('tree scope refuses '+value,()=>{
  assert.throws(()=>validateTreeJsonScope(value));
 });
 test('JSON tree and tree-to-table admit the native-confirmed dates fixture and datetime schema',async()=>{
@@ -139,7 +139,7 @@ function tableImplementation(json=false){
  const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
  const factory=vm.runInNewContext('('+createTreeNodeSupport.toString()+')',{
   createTabularTransformNodeSupport:(_config,implementation)=>implementation,
-  jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},treeLabelSeparators,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths,treeConfigurationReadback,
+  jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},treeLabelSeparators,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths,treeColumnNames,treeConfigurationReadback,
   need,owned,ready:s=>owned(s)&&s.node_tree?.verified,same:(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b)),
   one:(s,p,m)=>{const found=s.ui.elements.filter(p);need(found.length===1,m);return found[0];},structuredClone,JSON,
  });
@@ -186,17 +186,17 @@ test('JSON column options use only the verified display label, never a technical
  const f=restJsonColumn({option:'Response'});await assert.rejects(f.run());assert.deepEqual(f.actions.map(a=>a.ref),['picker']);
 });
 
-test('JSON output admits nested object arrays while tree-to-table retains its one-array scope',async()=>{
+test('JSON output and table selection admit a nested object array',async()=>{
  const schema=[{path:'',name:'Root',type:'object',is_container:true,is_array:false},
   {path:'/items',name:'items',type:'object',is_container:true,is_array:true},
   {path:'/items/id',name:'id',type:'integer',is_container:false,is_array:false},
   {path:'/items/parts',name:'parts',type:'object',is_container:true,is_array:true},
   {path:'/items/parts/sku',name:'sku',type:'string',is_container:false,is_array:false}];
- const output={port_kind:'tree',tree:{complete:true,schema}};
+ const output={port_kind:'tree',sample_complete:true,tree:{complete:true,schema}};
  const result=await tableImplementation(true).readOutputs({readOutputPort:async()=>({output})},
   {ports:[0],sample_rows:100},{execution:{execution_id:'exec'}},{});
  assert.equal(result.verified,true);
- assert.throws(()=>validateSelectedTreePaths(schema),/one object and one repeated branch/);
+ assert.equal(validateSelectedTreePaths(schema,['/items/id','/items/parts/sku']),true);
  for(const fault of ['scalar-array']){
   const bad=structuredClone(schema);
   if(fault==='scalar-array')bad[3].is_container=false;
@@ -223,7 +223,6 @@ test('nested JSON keeps scalar/container changes and limits outside scope',async
  for(const value of [
   {items:[{parts:[1,'x']}]}, {items:[{parts:[]}]},
   {items:[{details:{code:'A'}},{details:'A'}]},
-  {items:Array.from({length:257},()=>({id:1}))},
   {items:[{text:'x'.repeat(1024*1024)}]},
  ])assert.throws(()=>validateTreeJsonScope(JSON.stringify(value)));
  let deep={code:'A'};for(let i=0;i<17;i++)deep={details:deep};
@@ -241,7 +240,7 @@ test('JSON scalar arrays admit homogeneous siblings and empty records with a typ
   {path:'/items/id',name:'id',type:'integer',is_container:false,is_array:false},
   ...['tags','scores'].map((name,i)=>({path:'/items/'+name,name,type:i?'real':'string',is_container:false,is_array:true}))];
  assert.equal(validateJsonTreeSchema(schema),true);
- assert.throws(()=>validateSelectedTreePaths(schema,['/items/tags']),/one object and one repeated branch/);
+ assert.throws(()=>validateSelectedTreePaths(schema,['/items/tags']),/scalar arrays/);
  for(const items of [
   [{tags:['a',1]}],[{tags:['a']},{tags:[true]}],[{tags:['a']},{tags:[{v:'a'}]}],
   [{tags:[['a']]}],[{tags:[]}],[{tags:[null]}],
@@ -250,7 +249,7 @@ test('JSON scalar arrays admit homogeneous siblings and empty records with a typ
   assert.equal(validateTreeJsonScope(JSON.stringify({items:[{tags:[]},{tags}]})).verified,true);
  assert.throws(()=>validateJsonTreeSchema([...schema,{path:'/items/mixed',name:'mixed',type:'variant',is_container:false,is_array:true}]),/supported types/);
 });
-test('LAB-1807 tree-siblings-native: JSON admits sibling object arrays; tree-to-table selects across them, nested and scalar arrays stay refused',async()=>{
+test('LAB-1807 tree-siblings-native: JSON and tree-to-table admit sibling and nested object arrays',async()=>{
  const csv=await readFile(new URL('../../../../docs/node-development/nodes/trees-treetodata/fixtures/siblings/documents.csv',import.meta.url),'utf8');
  const text=csv.split(/\r?\n/)[1].match(/^1,"((?:""|[^"])*)"$/)[1].replaceAll('""','"');
  assert.deepEqual(Object.keys(JSON.parse(text)),['batch','items','tags']);
@@ -258,18 +257,20 @@ test('LAB-1807 tree-siblings-native: JSON admits sibling object arrays; tree-to-
  for(const value of ['{"a":[{}],"b":[{}]}','{"items":[{"parts":[{"sku":"a"}],"other":[{"name":"b"}]}]}','{"items":[{"x":1}],"more":[{"t":"a"}],"x":{"tags":[{"u":"b"}]}}'])
   assert.equal(validateTreeJsonScope(value).verified,true,value);
  assert.throws(()=>validateTreeJsonScope('{"items":[{"code":"x"}],"tags":[]}'),/witness/);
- assert.throws(()=>validateTreeJsonScope(JSON.stringify({items:[{code:'x'}],tags:Array.from({length:128},()=>({tag:'a'}))})),/256 nodes/);
+ assert.equal(validateTreeJsonScope(JSON.stringify({items:[{code:'x'}],tags:Array.from({length:128},()=>({tag:'a'}))})).verified,true);
  const node=(path,type,is_array=false)=>({path,name:path.split('/').at(-1)||'Root',type,is_container:type==='object',is_array});
  const schema=[node('','object'),node('/batch','string'),node('/items','object',true),node('/items/code','string'),node('/items/qty','integer'),
   node('/tags','object',true),node('/tags/tag','string')];
  assert.equal(validateJsonTreeSchema(schema),true);
- const output={port_kind:'tree',tree:{complete:true,schema}};
+ const output={port_kind:'tree',sample_complete:true,tree:{complete:true,schema}};
  assert.equal((await tableImplementation(true).readOutputs({readOutputPort:async()=>({output})},{ports:[0],sample_rows:100},{execution:{execution_id:'exec'}},{})).verified,true);
  assert.equal(validateSelectedTreePaths(schema,['/batch','/items/code','/items/qty','/tags/tag']),true);
  assert.equal(validateSelectedTreePaths(schema,['/tags/tag'],['/tags']),true);
  assert.throws(()=>validateSelectedTreePaths(schema,['/tags/tag','/items/code']),/native schema order/);
- assert.throws(()=>validateSelectedTreePaths([...schema,node('/tags/parts','object',true),node('/tags/parts/sku','string')]),/one object and one repeated branch/);
- assert.throws(()=>validateSelectedTreePaths([...schema,{...node('/tags/codes','string',true),is_container:false}]),/one object and one repeated branch/);
+ assert.equal(validateSelectedTreePaths([...schema,node('/tags/parts','object',true),node('/tags/parts/sku','string')],['/tags/parts/sku']),true);
+ const scalarArray=[...schema,{...node('/tags/codes','string',true),is_container:false}];
+ assert.equal(validateSelectedTreePaths(scalarArray,['/items/code']),true);
+ assert.throws(()=>validateSelectedTreePaths(scalarArray,['/tags/codes']),/scalar arrays/);
  assert.throws(()=>validateSelectedTreePaths(schema.filter(n=>!n.is_array&&!n.path.match(/^\/(items|tags)\//))),/one object and one repeated branch/);
 });
 function tableState(indexed=false){
@@ -522,7 +523,118 @@ test('a single JSON string containing a root object array reaches native tree in
  assert.equal(validateJsonTreeSchema(schema),true);
  assert.equal(validateSelectedTreePaths(schema,['/Region','/Amount']),true);
  assert.throws(()=>validateSelectedTreePaths(schema,['/0/Region']));
- assert.throws(()=>validateSelectedTreePaths([...schema,{path:'/items',name:'items',is_container:true,is_array:true}]));
+ const nested=[...schema,{path:'/items',name:'items',is_container:true,is_array:true},
+  {path:'/items/id',name:'id',type:'integer',is_container:false}];
+ assert.equal(validateSelectedTreePaths(nested,['/Region','/items/id']),true);
  for(const unsupported of ['[]','[1,2]','[null,{"Region":"A"}]','[{"v":1},2]','[[{"v":1}]]','[{"v":9223372036854775808}]'])
   assert.throws(()=>validateTreeJsonScope(unsupported),unsupported);
+});
+
+test('JSON scope counts schema paths independently of the records in a flat array',()=>{
+ const document=JSON.stringify(Array.from({length:257},(_,id)=>({id})));
+ assert.equal(validateTreeJsonScope(document).verified,true);
+ const wide=Object.fromEntries(Array.from({length:255},(_,i)=>['c'+i,i]));
+ assert.throws(()=>validateTreeJsonScope(JSON.stringify({items:[wide]})),/256 schema/);
+});
+
+test('nested JSON IDs bind separately; table selection requires unambiguous names',()=>{
+ const document='{"carts":[{"id":1,"products":[{"id":162,"quantity":4},{"id":113,"quantity":3}]}],"total":1,"skip":0,"limit":1}';
+ const schema=[
+  {path:'',name:'Root',is_container:true},
+  {path:'/carts',name:'carts',is_container:true,is_array:true},
+  {path:'/carts/id',name:'id',type:'integer'},
+  {path:'/carts/products',name:'products',is_container:true,is_array:true},
+  {path:'/carts/products/id',name:'id',type:'integer'},
+  {path:'/carts/products/quantity',name:'quantity',type:'integer'},
+ ];
+ const paths=['/carts/id','/carts/products/id','/carts/products/quantity'];
+ assert.equal(validateTreeJsonScope(document).verified,true);
+ assert.equal(validateJsonTreeSchema(schema),true);
+ assert.equal(validateSelectedTreePaths(schema,paths,[],true),true);
+ assert.throws(()=>validateSelectedTreePaths(schema,paths,[],false),/colliding.*names/i);
+ const collision=[...schema,{path:'/carts_products_id',name:'carts_products_id',type:'integer'}];
+ assert.throws(()=>validateSelectedTreePaths(collision,[paths[1],'/carts_products_id'],[],true),/colliding.*names/i);
+});
+
+test('an exact bounded table sample reports partial coverage and preserves the total row count',async()=>{
+ const configuration=tableState().node_tree;
+ const output={port_kind:'table',sample_complete:false,row_count:800,sample_rows:1,
+  schema:['batch','code','qty'].map(name=>({name,type:'integer'}))};
+ const result=await tableImplementation().readOutputs({readOutputPort:async()=>({output})},
+  {ports:[0],sample_rows:1},{portExecution:{},execution:{execution_id:'exec'},receipt_id:'read'},{configuration});
+ assert.equal(result.status,'partial');
+ assert.equal(result.ports[0].row_count,800);
+});
+
+test('tree-to-table can prove the native schema from a JSON execution that requested no preview',async()=>{
+ const source={document_id:'doc',workflow_id:'wf',node_id:'source'};
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',
+  tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'new',type:'trees.to_table'},inputs:[{source,output:0,input:0}],
+  parameters:{selected_paths:['/items/id'],composite_names:false}};
+ const execution_id='doc:root:7',node_context={...source,verified:true,surface:'graph'};
+ const schema=[{path:'',name:'Root',is_container:true},{path:'/items',name:'items',is_container:true,is_array:true},
+  {path:'/items/id',name:'id',type:'integer'}];
+ const history=[{request:{target:{type:'trees.from_json'},read:{ports:[]}},cleanup_confirmed:true,
+  outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node:source,cleanup_complete:true,
+   execution:{status:'completed',execution_id},output:{ports:[]}}}}];
+ const inventory={verified:true,ports:[{index:0,kind:'tree',active:true,port_guid:'port'}]};
+ const process={verified:true,show_completed:true,inventory_complete:true,root_id:'root',node_context,
+  native_state:{active:true,running:false,locked:false},processes:[
+   {process_id:'7',record_id:'group',parent_id:null,children_loaded:true,error:false,
+    progress_state:{verified:true,source:'native_progress_record',state:'completed'}},
+   {process_id:'7.1',record_id:'child',parent_id:'7',error:false,owner:{verified:true,node_id:'source',source:'native_process_model_identity'},
+    progress_state:{verified:true,source:'native_progress_record',state:'completed'}},
+  ]};
+ const port={port:0,port_kind:'tree',port_guid:'port',fresh:true,execution_id,
+  freshness_basis:'completed_execution_port_source',sample_complete:false,tree:{schema}};
+ const response={verified:true,cleanup_complete:true,output:port,node_context:{...node_context}};
+ let events=[],calls=[];
+ const options={operation:{id:'op',parameters:request,nodeTargetAdapter:{observe:async()=>({nodes:[],links:[]})}},
+  nodeHistory:()=>history,now:Date.now,onRecord:async event=>{events.push(event);return event;},
+  execute:async code=>{calls.push(code);return [inventory,process,response][calls.length-1];}};
+ const support=createTreeNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'},{json:false});
+ const check=async()=>{events=[];calls=[];return support.nodeApplyDriverFactory(options).beforeTarget({deadline:Date.now()+10000});};
+ assert.equal((await check()).verified,true);
+ assert.equal(calls.length,3);
+ assert.equal(events[0].source_execution_id,execution_id);
+ for(const [record,key,foreign] of [[port,'port_guid','foreign'],[port,'fresh',false],[response,'cleanup_complete',false],
+  [response.node_context,'surface','wizard'],[response.node_context,'document_id','foreign-doc'],
+  [response.node_context,'workflow_id','foreign-wf'],[response.node_context,'node_id','foreign'],[port,'port',1],
+  [port,'execution_id','doc:root:9'],[port,'freshness_basis','unknown'],[port,'sample_complete',true],
+  [history[0].outcome.output.execution,'execution_id','doc:root:6'],[history[0].request.target,'type','trees.from_table']]){
+  const original=record[key];record[key]=foreign;
+  await assert.rejects(check());assert.deepEqual(events,[]);
+  record[key]=original;
+ }
+ assert.equal(options.operation.transportUncertain,true);
+ schema.push({path:'/ignored',name:'ignored',type:'variant',is_array:true,is_container:false});
+ await assert.rejects(check(),/JSON tree requires supported types/);
+ assert.equal(calls.length,3);
+ assert.deepEqual(events,[]);
+ schema.pop();
+ const sample={...port,tree:{schema,complete:false,instances:[{index:0,parent:null,path:''}],node_count:1}};
+ history[0].request.read.ports=[0];
+ history[0].outcome.output.output.ports=[sample];
+ assert.equal((await check()).verified,true);
+ assert.equal(events[0].source_schema_only,true);
+ sample.port_guid='foreign';
+ await assert.rejects(check(),/inactive or changed/);
+ assert.equal(calls.length,1);
+});
+
+test('a completed JSON execution exposes its incomplete tree preview to the agent',async()=>{
+ const schema=[{path:'',name:'Root',is_container:true,is_array:true},{path:'/id',name:'id',type:'integer'}];
+ const output={port_kind:'tree',sample_complete:false,tree:{complete:false,schema,instances:[{index:0,parent:null,path:''}],node_count:1}};
+ const result=await tableImplementation(true).readOutputs({readOutputPort:async()=>({output})},
+  {ports:[0],sample_rows:100},{execution:{execution_id:'exec'},receipt_id:'read'},{});
+ assert.equal(result.status,'partial');
+ assert.equal(result.execution_id,'exec');
+ assert.equal(result.ports[0],output);
+});
+
+test('JSON admission uses the tabular reader budget including encoded escapes',()=>{
+ const document=n=>JSON.stringify({items:[{name:'"'.repeat(n)}]});
+ assert.equal(validateTreeJsonScope(document(100000)).verified,true);
+ assert.throws(()=>validateTreeJsonScope(document(140000)),/512 KiB/);
 });
