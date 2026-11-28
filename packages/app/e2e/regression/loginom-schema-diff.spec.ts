@@ -67,7 +67,7 @@ for (const width of [1280, 390]) {
     await expect(fact(table, "Условие").getByRole("cell")).toHaveText([/Выручка больше 0/, /Выручка больше 100/])
     await node(importer).click()
     await expect(file(schema).getByRole("cell")).toContainText([safeSource, "Обновлённые продажи.csv"])
-    await expect(schema).not.toContainText(hiddenSource)
+    await expect(schema.getByText(hiddenSource)).toHaveCount(0)
     await node(group).click()
     await expect(node(group)).toHaveAttribute("aria-pressed", "true")
     const inDiagram = fact(table, port)
@@ -96,7 +96,7 @@ for (const width of [1280, 390]) {
     await expect(schema.getByText("Выручка > 100", { exact: true })).toHaveCount(0)
     await beforeDiagram.getByRole("button", { name: importer, exact: true }).click()
     await expect(schema.getByText(safeSource, { exact: true })).toBeVisible()
-    await expect(schema).not.toContainText(hiddenSource)
+    await expect(schema.getByText(hiddenSource)).toHaveCount(0)
 
     await withChanges.click()
     await expect(node(importer)).toHaveAttribute("aria-pressed", "true")
