@@ -75,8 +75,6 @@ def main():
 
     entries = [(e["id"], [glob_regex(p) for p in e["paths"]]) for e in spec["entries"]]
     pending = {e["id"]: e["pending"] for e in spec["entries"] if "pending" in e}
-    references = {e["id"]: e["references"] for e in spec["entries"] if "references" in e}
-    ids = {entry_id for entry_id, _ in entries}
     hits = collections.defaultdict(list)
     unmatched = []
     for path in sorted(set(divergent)):
@@ -90,13 +88,9 @@ def main():
     problems = []
     if unmatched:
         problems.append(f"{len(unmatched)} divergent files match no catalog entry, e.g.: " + ", ".join(unmatched[:8]))
-    stale = [entry_id for entry_id, _ in entries if not hits[entry_id] and entry_id not in pending and entry_id not in references]
+    stale = [entry_id for entry_id, _ in entries if not hits[entry_id] and entry_id not in pending]
     if stale:
         problems.append("entries without divergent files: " + ", ".join(stale))
-    invalid_refs = [entry_id for entry_id, refs in references.items()
-                    if not refs or not set(refs) <= ids - references.keys() or hits[entry_id]]
-    if invalid_refs:
-        problems.append("cross-references must point to primary entries and own no files: " + ", ".join(invalid_refs))
     unnamed = [entry_id for entry_id, task in pending.items() if not (isinstance(task, str) and task.strip())]
     if unnamed:
         problems.append("pending must name a task or stage: " + ", ".join(unnamed))
@@ -104,6 +98,7 @@ def main():
     if arrived:
         problems.append("pending entries with divergent files (describe the change, drop pending): " + ", ".join(arrived))
     doc = open(os.path.join(repo, os.path.dirname(a.catalog), "catalog.md"), encoding="utf-8").read()
+    ids = {entry_id for entry_id, _ in entries}
     documented = set(re.findall(r"^##+ (CAT-\d+)\b", doc, re.M))
     if ids - documented:
         problems.append("ids missing from catalog.md: " + ", ".join(sorted(ids - documented)))

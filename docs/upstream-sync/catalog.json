@@ -51,7 +51,7 @@
       "title": "Providers, plugins, proxy",
       "paths": [
         "packages/core/src/plugin/internal.ts", "packages/core/src/plugin/supervisor.ts", "packages/server/src/options.ts",
-        "packages/server/src/routes.ts", "packages/cli/src/server-process.ts", "packages/core/test/location-layer.test.ts",
+        "packages/server/src/routes.ts", "packages/core/test/location-layer.test.ts",
         "packages/core/test/shell-restart.test.ts", "packages/server/test/schedule.test.ts",
         "packages/sdk/test/embedded.test.ts", "packages/core/src/schedule/check.ts",
         "packages/core/src/tool/plugin/shell.ts", "packages/core/src/tool.ts", "packages/core/src/formatter.ts",
@@ -115,7 +115,7 @@
       "paths": [
         "packages/app/src/shell/routes/routes.tsx", "packages/app/src/shell/state/layout.tsx",
         "packages/app/src/shell/state/layout.test.ts", "packages/app/vite.config.ts",
-        "packages/app/src/runtime/plugin/host-apis.tsx", "packages/plugin/src/gui/host-apis.ts",
+        "packages/plugin/src/gui/host-apis.ts",
         "packages/ui/src/context/dialog.tsx",
         "packages/app/src/runtime/platform/pwa.ts", "packages/app/test-browser/pwa-route.test.ts",
         "packages/app/src/runtime/plugin/pages.tsx",
@@ -123,20 +123,24 @@
       ]
     },
     {
-      "id": "CAT-10",
-      "title": "Web app, UI kit, session UI",
-      "paths": [
-        "packages/app/**", "packages/ui/**", "packages/session-ui/**",
-        "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**"
-      ]
+      "id": "CAT-17",
+      "title": "Built-in plugin page navigation for dashboard links",
+      "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
     },
-    { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
-    { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] },
     {
       "id": "CAT-26",
       "title": "Loginom network settings (C2.8)",
-      "paths": [],
-      "references": ["CAT-07", "CAT-10", "CAT-13", "CAT-21"]
-    }
+      "paths": [
+        "packages/cli/src/server-process.ts", "packages/cli/src/services/network-settings.ts",
+        "packages/cli/test/network-mode.test.ts", "packages/cli/test/fixture/network-fallback.ts",
+        "packages/gui-plugins/src/loginom-gui/network.tsx", "packages/gui-plugins/src/loginom-gui/network.css",
+        "packages/gui-plugins/src/loginom-gui/network/**", "packages/loginom-host/src/network-settings-rpc.ts",
+        "packages/loginom-host/src/system-proxy/service-status.ts", "packages/app/e2e/regression/settings-network.spec.ts",
+        "packages/app/e2e/utils/settings-network.fixture.tsx", "packages/app/e2e/utils/settings-network.html"
+      ]
+    },
+    { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
+    { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
+    { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }
   ]
 }

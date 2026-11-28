@@ -198,7 +198,7 @@ function RootSettings() {
 
   const addServer = () => void dialog.push(() => <DialogServer mode="add" onSave={selectServer} />)
 
-  const pluginTabs = (group?: "about" | "work") =>
+  const pluginTabs = (group?: "about") =>
     surface.plugins
       .pages()
       .filter((item) => item.value.group === group)
@@ -206,15 +206,11 @@ function RootSettings() {
 
   const groups = createMemo<SettingsNavGroup[]>(() => [
     {
-      label: language.t("settings.group.work"),
-      items: [
-        ...serverTabs.map((item) => ({
-          ...item,
-          label: language.t(item.label),
-          onPrefetch: item.value === "workspaces" ? prefetchWorkspaces : undefined,
-        })),
-        ...pluginTabs("work"),
-      ],
+      items: serverTabs.map((item) => ({
+        ...item,
+        label: language.t(item.label),
+        onPrefetch: item.value === "workspaces" ? prefetchWorkspaces : undefined,
+      })),
     },
     {
       items: [

@@ -870,7 +870,6 @@ export const dict = {
   "settings.search.empty": "No results for {{query}}",
   "settings.search.empty.query": '"{{query}}"',
   "settings.search.refine": "Narrow your search to see more specific results.",
-  "settings.group.work": "Work",
   "settings.tab.preferences": "Preferences",
   "settings.tab.shortcuts": "Shortcuts",
   "settings.tab.notifications": "Notifications",
@@ -1149,10 +1148,6 @@ export const dict = {
   "settings.general.row.pinchZoom.description": "Allow trackpad pinch and Ctrl-scroll gestures to zoom",
   "settings.general.row.spellcheck.title": "Spellcheck",
   "settings.general.row.spellcheck.description": "Underline misspelled words while typing",
-  "settings.general.row.systemProxy.title": "System proxy",
-  "settings.general.row.systemProxy.description": "Use the operating system’s proxy. Restart the app to apply this to the background service.",
-  "settings.general.row.systemProxy.unreachable": "The system proxy is unreachable.",
-  "settings.general.row.systemProxy.socksOnly": "The background service cannot use a SOCKS-only system proxy.",
 
   "sound.option.none": "None",
   "sound.option.alert01": "Alert 01",

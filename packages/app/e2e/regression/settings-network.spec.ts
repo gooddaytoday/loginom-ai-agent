@@ -83,8 +83,7 @@ async function settings(
 test("shows sanitized proxy details and saves only an available port", async ({ page }, info) => {
   await page.setViewportSize({ width: 1280, height: 1040 })
   const screen = await settings(page, "explicit")
-  const work = screen.locator(".settings-nav-group").filter({ has: page.getByText("Работа", { exact: true }) })
-  await work.getByRole("tab", { name: "Сеть", exact: true }).press("Enter")
+  await screen.getByRole("tab", { name: "Сеть", exact: true }).press("Enter")
   const panel = screen.getByRole("tabpanel")
   await expect(panel.getByRole("radio")).toHaveCount(0)
   await expect(panel.getByText(/^(Обновления|Каталог)$/)).toHaveCount(0)

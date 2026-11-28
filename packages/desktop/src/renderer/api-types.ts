@@ -2,6 +2,7 @@ import type { DesktopMenuAction, DesktopZoomLevel } from "@opencode/app/desktop-
 import type { DesktopNativeBundle } from "@opencode/app/i18n/desktop-native"
 import type { StorageSnapshot } from "../shared/ipc-transport"
 import type { WindowBootstrap } from "../shared/window-bootstrap"
+import type { DeepLinkPayload } from "../shared/ipc-rpc/events"
 import type {
   ClipboardImage,
   DirectoryPickerOptions,
@@ -40,7 +41,7 @@ export type ElectronAPI = {
   getWindowBootstrap(): WindowBootstrap
   themeReady(): Promise<void>
   onMenuCommand(cb: (id: string) => void): () => void
-  onDeepLink(cb: (delivery: { attempt: number; urls: string[] }) => void): () => void
+  onDeepLink(cb: (delivery: { attempt: number; urls: DeepLinkPayload[] }) => void): () => void
   openDirectoryPicker(opts?: DirectoryPickerOptions): Promise<string | string[] | null>
   openFilePicker(opts?: FilePickerOptions): Promise<PickedFiles | null>
   readPickedFile(token: string, path: string): Promise<ArrayBuffer>
