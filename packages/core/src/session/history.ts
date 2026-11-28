@@ -384,6 +384,47 @@ export const incompleteAssistants = Effect.fn("SessionHistory.incompleteAssistan
   return yield* decodeMessageRows(db, rows)
 })
 
+/** Whether the unfinished claim crossed its first input or model boundary before recovery. */
+export const hasExecutionProgress = Effect.fnUntraced(function* (db: DatabaseService, sessionID: SessionSchema.ID) {
+  const claim = yield* db
+    .select({ started: SessionTable.time_suspended })
+    .from(SessionTable)
+    .where(eq(SessionTable.id, sessionID))
+    .get()
+    .pipe(Effect.orDie)
+  if (claim?.started == null) return false
+
+  const previousIdle = db
+    .select({ seq: SessionMessageTable.seq })
+    .from(SessionMessageTable)
+    .where(and(eq(SessionMessageTable.session_id, sessionID), eq(SessionMessageTable.type, "idle")))
+    .orderBy(desc(SessionMessageTable.seq))
+    .limit(1)
+  // Use the projection because embedded servers may have durable event logging disabled.
+  // A restart notice is visible in history before the runner resumes, but is not a delivery.
+  const progress = yield* db
+    .select({ id: SessionMessageTable.id })
+    .from(SessionMessageTable)
+    .where(
+      and(
+        eq(SessionMessageTable.session_id, sessionID),
+        gte(SessionMessageTable.time_created, claim.started),
+        gt(SessionMessageTable.seq, sql<number>`coalesce((${previousIdle}), -1)`),
+        or(
+          inArray(SessionMessageTable.type, ["user", "assistant"]),
+          and(
+            eq(SessionMessageTable.type, "synthetic"),
+            sql`json_extract(${SessionMessageTable.data}, '$.metadata.notice') is not 'restart'`,
+          ),
+        ),
+      ),
+    )
+    .limit(1)
+    .get()
+    .pipe(Effect.orDie)
+  return progress !== undefined
+})
+
 export const lastKnownActivity = Effect.fnUntraced(function* (db: DatabaseService, sessionID: SessionSchema.ID) {
   const claim = yield* db
     .select({ started: SessionTable.time_suspended, busy: SessionTable.time_busy })

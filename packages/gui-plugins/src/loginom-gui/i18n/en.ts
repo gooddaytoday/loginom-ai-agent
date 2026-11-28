@@ -59,6 +59,7 @@ export default {
   invalidAddress: "Enter a Loginom address starting with http:// or https://, without credentials or URL parameters.",
   invalidUsername: "Check the Loginom username.",
   passwordRequired: "Enter a password or select “No password required”.",
+  knowledgeAuthFailed: "The knowledge service rejected its access key.",
   credentialsRejected: "Loginom rejected the sign-in. Check the username and password.",
   loginUnavailable: "The Loginom sign-in page is unavailable. Check the address and network.",
   logoutUnconfirmed: "Loginom sign-out could not be confirmed. Check the connection again.",
