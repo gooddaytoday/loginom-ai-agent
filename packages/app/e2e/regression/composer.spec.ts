@@ -52,9 +52,9 @@ test("Loginom composer offers the package menu and shows an .lgp above the edito
   await (await chooser).setFiles(packageFixture)
   const remove = page.getByRole("button", { name: `Убрать пакет ${packageFixture.name}` })
   await expect(remove).toBeVisible()
-  await expect(page.getByRole("button", { name: "Схема", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Схема", exact: true })).toHaveCount(0)
   await expect(actions.getByRole("button")).toHaveText(["Документировать", "Проверить", "Улучшить", "Сравнить", "Ещё"])
-  await expect(actions.getByRole("button", { name: "Проверить" })).toHaveAttribute("title", "Добавить из каталога")
+  await expect(actions.getByRole("button", { name: "Улучшить" })).toHaveAttribute("title", "Добавить из каталога")
   await expect(page.locator('[data-component="composer-attachments"]')).toHaveCount(0)
   const actionsBounds = await actions.boundingBox()
   const editorBounds = await view.editor.boundingBox()
@@ -67,12 +67,7 @@ test("Loginom composer offers the package menu and shows an .lgp above the edito
   await expect(actions).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath("composer-390x844.png"), animations: "disabled" })
 
-  await page.getByRole("button", { name: "Схема", exact: true }).click()
-  await expect(page).toHaveURL(/\/page\/loginom-gui\/packages\?source=file&path=/)
-  await page.goBack()
-  await expect(remove).toBeVisible()
-
-  await actions.getByRole("button", { name: "Проверить" }).click()
+  await actions.getByRole("button", { name: "Улучшить" }).click()
   await expect(page).toHaveURL(/\/page\/loginom-gui\/catalog$/)
   await page.goBack()
   await expect(remove).toBeVisible()
@@ -80,6 +75,39 @@ test("Loginom composer offers the package menu and shows an .lgp above the edito
   await expect(actions).toHaveCount(0)
   await expect(view.editor).toHaveText("Inspect package")
 })
+
+for (const action of [
+  { label: "Document", skill: "package-docs", text: "Document the Loginom package" },
+  { label: "Check", skill: "package-linter", text: "Check the Loginom package" },
+]) {
+  test(`Loginom ${action.label} prepares and sends the built-in skill with the package`, async ({ page }) => {
+    const prompts: Parameters<NonNullable<MockServerConfig["onPrompt"]>>[0]["body"][] = []
+
+    const view = await openDraft(page, {
+      name: "LoginomPackageAction",
+      provider: loginomModel,
+      onFileWrite: () => {},
+      onPrompt: ({ body }) => void prompts.push(body),
+    })
+
+    await page.locator('input[type="file"]').setInputFiles(packageFixture)
+    await view.editor.fill("Keep my notes")
+    await page.getByRole("button", { name: action.label, exact: true }).click()
+    await expect(view.editor).toContainText("Keep my notes")
+    await expect(view.editor).toContainText(`@${action.skill} ${action.text} ${packageFixture.name}`)
+    await expect(page.getByRole("button", { name: `Remove package ${packageFixture.name}` })).toBeVisible()
+    expect(prompts).toHaveLength(0)
+
+    await view.editor.press("Enter")
+    await expect.poll(() => prompts).toMatchObject([
+      {
+        skills: [{ id: action.skill }],
+        text: expect.stringContaining("Attached file: `"),
+        metadata: { attachments: [{ name: packageFixture.name, mime: "application/vnd.loginom.package" }] },
+      },
+    ])
+  })
+}
 
 test("without Loginom the composer keeps the native menu and .lgp attachment", async ({ page }) => {
   await openDraft(page, {

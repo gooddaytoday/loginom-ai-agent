@@ -270,10 +270,17 @@ SDK icon fields take an `IconName` from `@opencode/plugin/gui`: the names of the
 | [`ComposerPill`](../plugin/src/gui/registries.ts)    | window  | A pill in the row above a session's composer, optionally opening a menu of rows or a popover of your own content                                                                                                                     |
 | [`CodeBlock`](../plugin/src/gui/registries.ts)       | window  | Your UI in place of the highlighted code of complete fenced code blocks of the languages you list, such as a diagram or a table                                                                                                      |
 | [`CodeBlockAction`](../plugin/src/gui/registries.ts) | window  | A button beside the Copy button of complete fenced code blocks of the languages you list, such as "Run in terminal"                                                                                                                  |
-| [`Slot`](../plugin/src/gui/registries.ts)            | window  | Content for `window.bottom`, `session.header`, `session.location.menu`, `session.panel.end`; built-ins also fill `session.location.workspace`, `session.location.branch.menu` and `session.location.path.menu` through `BuiltinSlot` |
+| [`Slot`](../plugin/src/gui/registries.ts)            | window  | Content for `window.bottom`, `session.header`, `session.location.menu`, `session.panel.end`; built-ins also fill the [built-in slots](../plugin/src/gui/builtin.ts) |
 | [`Style`](../plugin/src/gui/registries.ts)           | window  | CSS imported with `?inline`                                                                                                                                                                                                          |
 | [`Theme`](../plugin/src/gui/registries.ts)           | window  | A color theme in the app's theme file format, listed in Settings › Appearance › Theme                                                                                                                                                |
 | [`MenubarItem`](../plugin/src/gui/main.ts)           | main    | An item of the native app menu                                                                                                                                                                                                       |
+
+`BuiltinSlot` has separate draft-screen slots: `session.new.heading`, `session.new.composer.placeholder`,
+`session.new.composer.project` and `session.new.below`. Render Add-menu rows with `ctx.ui.MenuItem` in the shared
+`composer.add-menu` slot; check `input.isNewSession` for draft-only rows. In `session.new.below`,
+`insertPrompt(text, origin)` replaces the draft text without submitting it;
+`onStarted` reports the captured origin once the draft becomes a session. Use a plugin-prefixed origin and dispose
+the listener with the contribution.
 
 `session.location.menu` contributes items after the project menu's location details. It receives the owning `screen`,
 the live `session`, and `shown`; keep data subscriptions active only while `shown` is true. Loading headers without an

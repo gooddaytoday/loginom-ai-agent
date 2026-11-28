@@ -1,4 +1,4 @@
-import { Show, createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js"
+import { Show, createEffect, createMemo, createSignal, onCleanup, untrack, type JSX } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Button } from "@opencode/ui/button"
@@ -28,6 +28,9 @@ export function Composer(props: {
   borderUnderlay?: boolean
   readOnly?: boolean
   suggestionBoundary?: () => HTMLElement | undefined
+  suggestionViewport?: () => HTMLElement | undefined
+  placeholder?: { render: () => JSX.Element }
+  toolbar?: JSX.Element
 }) {
   const dialog = useDialog()
   const command = useCommand()
@@ -85,6 +88,9 @@ export function Composer(props: {
         queueFirstLabel={language.t("session.queue.first")}
         exitShellKeybind={[formatKeybind("esc", language.t)]}
         suggestionBoundary={props.suggestionBoundary}
+        suggestionViewport={props.suggestionViewport}
+        placeholder={props.placeholder}
+        toolbar={props.toolbar}
         modelControl={
           <ComposerModelControl
             loading={props.model.model.loading}

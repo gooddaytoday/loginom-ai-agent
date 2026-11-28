@@ -99,22 +99,40 @@
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
     {
-      "id": "CAT-15",
+      "id": "CAT-23",
       "title": "Built-in composer contributions (C4.5)",
       "paths": [
+        "packages/app/src/composer/adapter.ts",
         "packages/app/src/composer/attachments/attachments.ts",
         "packages/app/src/composer/composer.tsx",
         "packages/app/src/composer/editor/editor.tsx",
         "packages/app/src/composer/model.ts",
+        "packages/app/src/composer/submit.test.ts",
+        "packages/app/src/runtime/plugin/pages.tsx",
         "packages/app/e2e/regression/composer.spec.ts"
       ]
     },
     {
-      "id": "CAT-14",
+      "id": "CAT-21",
       "title": "Built-in plugin top-level pages",
       "paths": [
         "packages/app/src/shell/routes/routes.tsx", "packages/app/src/shell/state/layout.tsx",
         "packages/app/src/shell/state/layout.test.ts", "packages/app/vite.config.ts",
+        "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
+      ]
+    },
+    {
+      "id": "CAT-16",
+      "title": "New-session GUI slot (C1.3)",
+      "paths": [
+        "packages/plugin/src/gui/builtin.ts",
+        "packages/app/src/new-session/composer-adapter.ts", "packages/app/src/new-session/screen.tsx",
+        "packages/app/src/new-session/view.tsx", "packages/app/src/composer/composer.tsx",
+        "packages/app/src/composer/editor/editor.tsx",
+        "packages/app/src/shell/tabs/schema.ts", "packages/app/src/shell/tabs/tabs.test.ts",
+        "packages/app/e2e/regression/new-session.spec.ts",
+        "packages/app/e2e/utils/app-direction.html", "packages/app/e2e/utils/app-direction.fixture.tsx",
+        "packages/app/e2e/utils/direction.ts",
         "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
       ]
     },

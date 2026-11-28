@@ -76,6 +76,8 @@ export {
 
 export { Schema }
 
+export { BuiltinSlot } from "@opencode/plugin/gui/builtin"
+
 type PluginHost = ReturnType<typeof usePluginHost>
 
 /** What the app interface hands the real host APIs when it mounts. */
@@ -310,6 +312,9 @@ export function mountPlugins(input: {
         </Show>
         <PluginSlot at="window.bottom" input={{}} />
         {input.surface?.()}
+        <div data-testid="draft-heading">
+          <PluginSlot at="session.new.heading" input={{}} />
+        </div>
       </Show>
     )
   }

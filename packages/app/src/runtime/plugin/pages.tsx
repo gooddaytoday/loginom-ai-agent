@@ -7,6 +7,20 @@ import { useCurrentRoute } from "../../shell/state/layout"
 import { usePluginHost } from "./host"
 import { Contribution } from "./render"
 
+export function usePluginPageNavigation() {
+  const host = usePluginHost()
+  const navigate = useNavigate()
+
+  return {
+    hasPage: (plugin: string, page: string) =>
+      host.items(Page).some((entry) => entry.plugin === plugin && entry.value.id === page),
+    openPage(plugin: string, page: string, query?: URLSearchParams) {
+      const path = `/page/${encodeURIComponent(plugin)}/${encodeURIComponent(page)}`
+      navigate(query?.size ? `${path}?${query}` : path)
+    },
+  }
+}
+
 export function useActivePluginPage() {
   const route = useCurrentRoute()
   const host = usePluginHost()
@@ -58,7 +72,7 @@ function PageUnavailable() {
 /** Navigation entries for plugin pages that ask for nav, by `order`. */
 export function PluginPageNav(props: { horizontal?: boolean; onNavigate?: () => void }) {
   const host = usePluginHost()
-  const navigate = useNavigate()
+  const { openPage } = usePluginPageNavigation()
   const language = useLanguage()
   const active = useActivePluginPage()
 
@@ -83,7 +97,7 @@ export function PluginPageNav(props: { horizontal?: boolean; onNavigate?: () => 
               class="h-7 rounded-[6px] px-2 text-start text-[13px] leading-4 text-v2-text-text-base hover:bg-v2-background-bg-layer-02 focus-visible:bg-v2-background-bg-layer-02 aria-[current=page]:bg-v2-background-bg-layer-02"
               aria-current={active() === entry ? "page" : undefined}
               onClick={() => {
-                navigate(`/page/${encodeURIComponent(entry.plugin)}/${encodeURIComponent(entry.value.id)}`)
+                openPage(entry.plugin, entry.value.id)
                 props.onNavigate?.()
               }}
             >

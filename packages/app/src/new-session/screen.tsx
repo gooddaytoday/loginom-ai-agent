@@ -34,6 +34,7 @@ export default function NewSessionPage(props: { draftId: string }) {
   })
 
   const start = tabs.state(tabs.draft(props.draftId), "new-session-start", createNewSessionStartStore)
+  const started = new Set<(origin: string | undefined) => void>()
 
   const mcp = createDraftMcpControls({
     draftID: props.draftId,
@@ -47,12 +48,26 @@ export default function NewSessionPage(props: { draftId: string }) {
     root: workspace.project.root,
     branch: workspace.bar.branch,
     submitted: workspace.selection.remember,
+    captureStarted: () => {
+      const origin = draftTab()?.promptOrigin
+      const listeners = [...started]
+
+      return () => listeners.forEach((listener) => listener(origin))
+    },
     mcp,
     start,
   })
 
   const model = createComposerModel(composer.adapter)
   useComposerCommands({ model: composer.model })
+  createEffect(
+    on(
+      () => composer.ready() && !model.value().trim(),
+      (blank) => {
+        if (blank && draftTab()?.promptOrigin) tabs.updateDraft(props.draftId, { promptOrigin: undefined })
+      },
+    ),
+  )
 
   const project = createPromptProjectController({ controls: composer.project })
   const location = useNewSessionLocationDialog({ project, workspace, onDone: model.restoreFocus })
@@ -85,6 +100,7 @@ export default function NewSessionPage(props: { draftId: string }) {
       const text = search.prompt
 
       if (!text) return
+      tabs.updateDraft(props.draftId, { promptOrigin: undefined })
       composer.adapter.state.set([{ type: "text", content: text, start: 0, end: text.length }], text.length)
       setSearch({ ...search, prompt: undefined })
     })
@@ -100,7 +116,26 @@ export default function NewSessionPage(props: { draftId: string }) {
     <div class="relative size-full overflow-hidden flex flex-col">
       {suspendUntilPromptReady()}
       <div class="flex-1 min-h-0 flex flex-col gap-2 px-[var(--shell-inline-inset,8px)] pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]">
-        <NewSessionView composer={model} project={project} workspace={workspace} location={location} />
+        <NewSessionView
+          composer={model}
+          project={project}
+          workspace={workspace}
+          location={location}
+          insertPrompt={(text, origin) => {
+            tabs.updateDraft(props.draftId, { promptOrigin: origin })
+            model.onInput(
+              text,
+              [{ type: "text", content: text, start: 0, end: text.length }, ...model.attachments()],
+              text.length,
+            )
+            model.restoreFocus()
+          }}
+          onStarted={(listener) => {
+            started.add(listener)
+
+            return () => started.delete(listener)
+          }}
+        />
       </div>
     </div>
   )

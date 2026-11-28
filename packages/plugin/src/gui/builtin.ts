@@ -185,8 +185,10 @@ export const ComposerFileType = Registry.define<ComposerFileType>("composer-file
 
 /** The current draft and its file actions. Read draft and files reactively. */
 export interface ComposerSlotInput {
-  /** Identity of the current draft store, for state kept in a WeakMap. */
-  readonly draft: object
+  /** Stable key for storing selections with this composer, scoped to its server and draft or session. */
+  readonly draftKey: string
+  /** Whether the composer is starting a new session rather than continuing an existing one. */
+  readonly isNewSession: boolean
   /** Path attachments already available to this draft; excludes pending uploads and inline media. */
   readonly files: readonly {
     /** The attachment's identity in the draft. */
@@ -205,6 +207,18 @@ export interface ComposerSlotInput {
    * @param id - The attachment's identity in the draft.
    */
   removeFile(id: string): void
+  /**
+   * Adds a request with a skill mention to the current draft without submitting it.
+   * @param skill - The skill's stable id.
+   * @param text - The request to add after the mention.
+   */
+  appendSkillPrompt(skill: string, text: string): void
+  /**
+   * Checks whether a built-in plugin page is registered in this window.
+   * @param plugin - The id of the built-in plugin that owns the page.
+   * @param page - The id of the plugin page.
+   */
+  hasPage(plugin: string, page: string): boolean
   /**
    * Opens a built-in plugin page without submitting the draft.
    * @param plugin - The id of the built-in plugin that owns the page.
@@ -233,6 +247,29 @@ export interface BuiltinSlotMap extends SlotMap {
     readonly label: string
     /** The location icon: monitor for the local repository, worktree for a worktree. */
     readonly icon: IconName
+  }
+  /** Replaces the wordmark above the draft composer. */
+  readonly "session.new.heading": Record<string, never>
+  /** Replaces the empty normal-mode draft hint. */
+  readonly "session.new.composer.placeholder": Record<string, never>
+  /** Replaces the project picker's label and moves the picker into the composer toolbar. */
+  readonly "session.new.composer.project": {
+    /** Display name of the selected project. */
+    readonly project: string
+  }
+  /** Content below the draft composer and its location controls. */
+  readonly "session.new.below": {
+    /**
+     * Prefills the draft and tags its origin without submitting it.
+     * @param text - The replacement text, leaving attachments in place.
+     * @param origin - A plugin-prefixed identifier for the source of the text.
+     */
+    insertPrompt(text: string, origin: string): void
+    /**
+     * Listen for successful promotion of this draft. Returns a function that unregisters the listener.
+     * @param listener - Receives the origin captured at submit time, if any.
+     */
+    onStarted(listener: (origin: string | undefined) => void): () => void
   }
 }
 

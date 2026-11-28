@@ -71,7 +71,16 @@ function active(state: ComposerStateTarget, target: ComposerSession, ctl = contr
 }
 
 function fresh(state: ComposerStateTarget, start: NewSessionComposerAdapter["start"]): NewSessionComposerAdapter {
-  return { kind: "new-session", state, ready: () => true, controls, working: () => false, submitted() {}, start }
+  return {
+    kind: "new-session",
+    draftID: "draft",
+    state,
+    ready: () => true,
+    controls,
+    working: () => false,
+    submitted() {},
+    start,
+  }
 }
 
 function submitInput(

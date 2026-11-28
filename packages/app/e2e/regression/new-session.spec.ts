@@ -2,8 +2,10 @@ import { expect, test, type Locator, type Page } from "@playwright/test"
 import type { OpenCodeEvent, SessionMessageInfo, WorktreeDirectory } from "@opencode/client/promise"
 import { timelinePresets } from "@opencode/session-ui/timeline/detail"
 import { draftHref, expectPath, holdRoute, NO_PROVIDER, project, provider, seed, sessionHref, T0 } from "../utils/app"
+import { openWithDirection } from "../utils/direction"
 import { mockOpenCodeServer } from "../utils/mock-server"
 import {
+  mockWorkspace,
   newSessionBranch,
   newSessionLocation,
   openDraft,
@@ -57,6 +59,143 @@ test.use({
 test("the new session screen does not show session details", async ({ page }) => {
   await openDraft(page, { name: "Summary" })
   await expect(page.getByRole("button", { name: "Session details", exact: true })).toHaveCount(0)
+})
+
+for (const product of [true, false]) {
+  test(`draft suggestions stay visible with the ${product ? "Loginom" : "stock"} start screen`, async ({ page }) => {
+    const name = "DraftSuggestions"
+    const files = Array.from({ length: 12 }, (_, index) => `file-${String(index + 1).padStart(2, "0")}.lgp`)
+
+    const input = {
+      name,
+      findFiles: () => files,
+      commands: [{ name: "review", description: "Review a draft" }],
+    }
+
+    if (product) {
+      await openDraft(page, input)
+      await expect(page.getByRole("img", { name: "Loginom | AI Agent" })).toBeVisible()
+    } else {
+      const stockDraft = "draft_stock_suggestions"
+      const directory = "C:/OpenCode/DraftSuggestions"
+      await mockWorkspace(page, { ...input, directory, sessions: [], seed: { tabs: [{ draft: stockDraft, directory }] } })
+      await openWithDirection(page, draftHref(stockDraft), "ltr", "loginom-gui")
+      await expect(page.locator('[data-component="new-session-wordmark"]')).toBeVisible()
+      await expect(page.getByText("Ask anything, / for commands, @ for context…")).toBeVisible()
+      await expect(page.getByRole("region", { name: "Example tasks" })).toHaveCount(0)
+    }
+
+    const prompt = editor(page)
+    const suggestions = page.locator('[data-component="composer-suggestions"]')
+
+    await prompt.fill("@file")
+    await expect(suggestions.getByRole("button")).toHaveCount(files.length)
+    await expect(suggestions.getByRole("button", { name: files[0], exact: true })).toBeInViewport({ ratio: 1 })
+    await expect(suggestions).toBeInViewport({ ratio: 0.98 })
+    await suggestions.hover()
+    await page.mouse.wheel(0, 400)
+    await expect(suggestions.getByRole("button", { name: files.at(-1), exact: true })).toBeInViewport({ ratio: 1 })
+
+    await prompt.fill("/")
+    await expect(suggestions.getByRole("button", { name: /\/review/ })).toBeInViewport({ ratio: 1 })
+    await expect(suggestions).toBeInViewport({ ratio: 0.98 })
+  })
+}
+
+test.describe("touch draft", () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } })
+
+  test("restores dismissed Loginom examples through the Add menu", async ({ page }) => {
+    const errors: Error[] = []
+    page.on("pageerror", (error) => errors.push(error))
+    await openDraft(page, { name: "LoginomTouchExamples" })
+    expect(await page.evaluate(() => matchMedia("(hover: none) and (pointer: coarse)").matches)).toBe(true)
+    const examples = page.getByRole("region", { name: "Example tasks" })
+
+    await examples.getByRole("button", { name: "Hide example tasks" }).tap()
+    await expect(examples).toHaveCount(0)
+    await expect(page.locator('[data-action="composer-attach"]')).toHaveCount(0)
+    await page.locator('[data-action="composer-attach-file"]').tap()
+    await expect(page.getByRole("menuitem", { name: "Package from Loginom…", exact: true })).toBeVisible()
+    await page.getByRole("menuitem", { name: "Example tasks" }).tap()
+    await expect(examples).toBeVisible()
+    expect(errors).toEqual([])
+  })
+})
+
+test("Loginom examples fill the draft without starting a conversation and can be dismissed and restored", async ({
+  page,
+}) => {
+  const creates: unknown[] = []
+
+  const draft = await openDraft(page, {
+    name: "LoginomExamples",
+    seed: { locale: "ru" },
+    onSessionCreate: (body) => void creates.push(body),
+  })
+
+  const examples = page.getByRole("region", { name: "Примеры задач" })
+
+  await expect(page.getByText("Опишите задачу: собрать сценарий, разобрать пакет, проверить данные")).toBeVisible()
+  await expect(draft.editor).toBeFocused()
+  await expect(newSessionLocation(page)).toHaveCount(1)
+  await page.getByRole("button", { name: "Проект: LoginomExamples" }).click()
+  await expect(page.getByRole("combobox", { name: "Поиск проектов" })).toBeFocused()
+  await page.keyboard.press("Escape")
+  await expect(examples.getByRole("button")).toHaveCount(5)
+  await examples.getByRole("button", { name: /Задокументировать пакет/ }).click()
+  await expect(draft.editor).toHaveText("Опиши пакет Loginom: что он делает и откуда берёт данные.")
+  await expect(draft.editor).toBeFocused()
+  await expectPath(page, draftHref(draft.draftID))
+  expect(creates).toEqual([])
+
+  await examples.getByRole("button", { name: "Скрыть примеры задач" }).click()
+  await expect(examples).toHaveCount(0)
+  await page.reload()
+  await page.locator('[data-action="composer-attach"]').click()
+  await page.getByRole("menuitem", { name: "Примеры задач" }).click()
+  await expect(examples).toBeVisible()
+})
+
+test("Loginom examples stay until the third conversation started without a template", async ({ page }) => {
+  const creates: string[] = []
+
+  const draft = await openDraft(page, {
+    name: "LoginomExampleProgress",
+    onSessionCreate: (body) => void creates.push(String(body.id)),
+    createdSessionTitle: "Started conversation",
+  })
+
+  const examples = page.getByRole("region", { name: "Example tasks" })
+
+  const nextDraft = async (count: number) => {
+    await submit(page).click()
+    await expect.poll(() => creates).toHaveLength(count)
+    await expectPath(page, sessionHref(creates.at(-1)!))
+    await expect(tabLink(page, creates.at(-1)!)).toContainText("Started conversation")
+    await page.getByRole("button", { name: "New session", exact: true }).click()
+    await expect(draft.editor).toBeEditable()
+  }
+
+  await examples.getByRole("button", { name: /ABC analysis of products/ }).click()
+  await expect(draft.editor).toContainText("Build an ABC analysis")
+  await nextDraft(1)
+  await examples.getByRole("button", { name: /ABC analysis of products/ }).click()
+  await expect(draft.editor).toContainText("Build an ABC analysis")
+  await draft.editor.press("ControlOrMeta+a")
+  await draft.editor.press("Backspace")
+  await expect(page.getByText(/Describe the task:/)).toBeVisible()
+
+  for (const count of [2, 3, 4]) {
+    await expect(examples).toBeVisible()
+    await draft.editor.fill(`My own task ${count - 1}`)
+    await nextDraft(count)
+  }
+
+  await expect(examples).toHaveCount(0)
+  await page.locator('[data-action="composer-attach"]').click()
+  await page.getByRole("menuitem", { name: "Example tasks" }).click()
+  await expect(examples).toBeVisible()
 })
 
 test("the location shortcuts choose worktrees from every state and keep cycling", async ({ page }) => {
@@ -312,12 +451,12 @@ test("picker scrollbars overlay full-width rows and support dragging", async ({ 
 for (const row of [
   {
     name: "POSIX",
-    directory: "/Users/alice/.local/share/opencode/worktree/123456/my-project",
-    pattern: /^\/Users\/.*…\/123456\/my-project$/,
+    directory: "/opt/opencode/shared/fixtures/generated-draft-worktrees/archive-2026-11-27/worktree/123456/my-project",
+    pattern: /^\/opt\/.*…\/123456\/my-project$/,
   },
   {
     name: "Windows",
-    directory: "C:\\Users\\alice\\Documents\\opencode\\worktree\\123456\\my-project",
+    directory: "C:\\OpenCode\\Fixtures\\shared\\generated-draft-worktrees\\archive\\worktree\\123456\\my-project",
     pattern: /^C:\\.*…\\123456\\my-project$/,
   },
 ]) {

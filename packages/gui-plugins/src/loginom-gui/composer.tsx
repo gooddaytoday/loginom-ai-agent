@@ -3,7 +3,7 @@ import type { Plugin } from "@opencode/plugin/gui"
 import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
-import { createSignal, For, Show, type Accessor, type Setter } from "solid-js"
+import { For, Show } from "solid-js"
 import type definition from "./index"
 
 const packageFile = {
@@ -17,18 +17,7 @@ type PackagePicker = () => Promise<LoginomPackage | undefined>
 
 export const registerComposer: Plugin.Setup<typeof definition> = (ctx) => {
   const ui = ctx.ui
-  const selections = new WeakMap<object, [Accessor<LoginomPackage | undefined>, Setter<LoginomPackage | undefined>]>()
-
-  const selection = (input: ComposerSlotInput) => {
-    const existing = selections.get(input.draft)
-
-    if (existing) return existing
-
-    const next = createSignal<LoginomPackage>()
-    selections.set(input.draft, next)
-
-    return next
-  }
+  const selections = ctx.stores.composerPackages
 
   const pick: PackagePicker = async () => {
     await ctx.dialogs.alert({ title: ctx.t("composerLoginom"), description: ctx.t("composerPickerUnavailable") })
@@ -38,7 +27,12 @@ export const registerComposer: Plugin.Setup<typeof definition> = (ctx) => {
 
   const catalog = (input: ComposerSlotInput) => input.openPage("loginom-gui", "catalog")
 
-  const packageActions = ["composerDocument", "composerCheck", "composerImprove", "composerCompare"] as const
+  const builtInActions = [
+    { label: "composerDocument", skill: "package-docs", prompt: "composerDocumentPrompt" },
+    { label: "composerCheck", skill: "package-linter", prompt: "composerCheckPrompt" },
+  ] as const
+
+  const catalogActions = ["composerImprove", "composerCompare"] as const
 
   function PackageCard(props: {
     input: ComposerSlotInput
@@ -59,20 +53,22 @@ export const registerComposer: Plugin.Setup<typeof definition> = (ctx) => {
               {ctx.t(props.source === "file" ? "composerFile" : "title")}
             </div>
           </div>
-          <Button
-            type="button"
-            variant="ghost-muted"
-            size="small"
-            onClick={() =>
-              props.input.openPage(
-                "loginom-gui",
-                "packages",
-                new URLSearchParams({ source: props.source, path: props.path }),
-              )
-            }
-          >
-            {ctx.t("composerScheme")}
-          </Button>
+          <Show when={props.input.hasPage("loginom-gui", "packages")}>
+            <Button
+              type="button"
+              variant="ghost-muted"
+              size="small"
+              onClick={() =>
+                props.input.openPage(
+                  "loginom-gui",
+                  "packages",
+                  new URLSearchParams({ source: props.source, path: props.path }),
+                )
+              }
+            >
+              {ctx.t("composerScheme")}
+            </Button>
+          </Show>
           <IconButton
             type="button"
             variant="ghost-muted"
@@ -83,7 +79,19 @@ export const registerComposer: Plugin.Setup<typeof definition> = (ctx) => {
         </div>
         <div role="group" aria-label={ctx.t("composerActions")} class="flex flex-wrap items-center gap-1">
           <span class="text-xs text-v2-text-text-muted">{ctx.t("composerActions")}:</span>
-          <For each={packageActions}>
+          <For each={builtInActions}>
+            {(action) => (
+              <Button
+                type="button"
+                variant="ghost-muted"
+                size="small"
+                onClick={() => props.input.appendSkillPrompt(action.skill, ctx.t(action.prompt, { name: props.name }))}
+              >
+                {ctx.t(action.label)}
+              </Button>
+            )}
+          </For>
+          <For each={catalogActions}>
             {(action) => (
               <Button
                 type="button"
@@ -114,9 +122,12 @@ export const registerComposer: Plugin.Setup<typeof definition> = (ctx) => {
           label={ctx.t("composerLoginom")}
           icon="folder"
           onSelect={() => {
-            const [, setSelected] = selection(input)
+            const key = input.draftKey
             void pick().then((selected) => {
-              if (selected) setSelected(selected)
+              if (!selected) return
+              selections.update((draft) => {
+                draft[key] = selected
+              })
             })
           }}
         />
@@ -134,14 +145,18 @@ export const registerComposer: Plugin.Setup<typeof definition> = (ctx) => {
     at: "composer.above",
     render: (input) => (
       <>
-        <Show when={selection(input)[0]()}>
+        <Show when={selections.value[input.draftKey]}>
           {(item) => (
             <PackageCard
               input={input}
               name={item().name}
               path={item().path}
               source="loginom"
-              remove={() => selection(input)[1](undefined)}
+              remove={() =>
+                selections.update((draft) => {
+                  delete draft[input.draftKey]
+                })
+              }
             />
           )}
         </Show>

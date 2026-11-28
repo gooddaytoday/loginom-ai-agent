@@ -3,8 +3,6 @@ import { useDialog } from "@opencode/ui/context/dialog"
 import type { ReferenceInfo } from "@opencode/client/promise"
 import type { Links, MountedSession } from "@opencode/plugin/gui"
 import { BuiltinSlot, ComposerFileType, type ComposerSlotInput } from "@opencode/plugin/gui/builtin"
-import { useNavigate } from "@solidjs/router"
-import { unwrap } from "solid-js/store"
 import { createComponent, createEffect, createMemo, on, onCleanup } from "solid-js"
 import { Predicate } from "effect"
 import type { ComposerSuggestion } from "./types"
@@ -15,6 +13,7 @@ import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePluginHost } from "@/runtime/plugin/host"
 import { usePluginAttachment } from "@/runtime/plugin/host-apis"
+import { usePluginPageNavigation } from "@/runtime/plugin/pages"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useWorkspaceLocation } from "@/workspaces/location"
 import { useData, useServer } from "@/runtime/server/current"
@@ -30,8 +29,8 @@ import { createKnownServerSessions, createServerSessionEntries } from "@/shell/c
 import { rankSessionTitle } from "./session-match"
 import { useTabs } from "@/shell/tabs/tabs"
 import type { ComposerAdapter, ComposerControls, ComposerQueue } from "./adapter"
-import { isAttachment } from "./prompt-parts"
-import { isCommentItem } from "./state"
+import { appendPrompt, isAttachment, promptLength } from "./prompt-parts"
+import { isCommentItem, type Prompt } from "./state"
 import type { PromptHistoryComment } from "./history/entry"
 import { createComposerHistory } from "./history/store"
 import { createComposerSubmit } from "./submit"
@@ -65,7 +64,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
   const files = useFile()
   const host = usePluginHost()
   const links = host.links
-  const navigate = useNavigate()
+  const pages = usePluginPageNavigation()
 
   const referenceMime = (filename: string) =>
     host.items(ComposerFileType).find(({ value }) => value.matches(filename))?.value.mime
@@ -595,17 +594,40 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     hasMenu: () => host.items(BuiltinSlot).some(({ value }) => value.at === "composer.add-menu"),
     customFile: (file) => referenceMime(file.filename) === file.mime,
     input: {
-      get draft() {
-        return unwrap(prompt.store[0]())
+      get draftKey() {
+        return JSON.stringify([
+          server.key,
+          adapter.kind,
+          adapter.kind === "new-session" ? adapter.draftID : adapter.session().id,
+        ])
       },
+      isNewSession: adapter.kind === "new-session",
       get files() {
         return controller.attachments().filter((part) => part.type === "path")
       },
       attach: controller.attach,
       removeFile: controller.removeAttachment,
-      openPage: (plugin, page, query) => {
-        const path = `/page/${encodeURIComponent(plugin)}/${encodeURIComponent(page)}`
-        navigate(query?.size ? `${path}?${query}` : path)
+      ...pages,
+      appendSkillPrompt(skill, text) {
+        const current = prompt.current()
+        const content = `@${skill}`
+        const name = skills().find((entry) => entry.id === skill)?.name ?? skill
+
+        const request: Prompt = [
+          {
+            type: "skill",
+            id: Skill.ID.make(skill),
+            name: Skill.Name.make(name),
+            content,
+            start: 0,
+            end: content.length,
+          },
+          { type: "text", content: ` ${text}`, start: content.length, end: content.length + 1 + text.length },
+        ]
+
+        const next = promptLength(current) ? appendPrompt(current, request) : [...request, ...current.filter(isAttachment)]
+        prompt.set(next, promptLength(next))
+        controller.restoreFocus()
       },
     },
   }
