@@ -237,6 +237,7 @@
       ],
       "notes": {
         "packages/app/src/shell/commands/session-search.tsx": "Keeps successful search results when a field fails. The palette displays an inline prompt search status (CAT-10).",
+        "packages/app/e2e/regression/command-palette.spec.ts": "Covers the sidebar Search entry and shortcut, with bounded title, project, and prompt searches and partial server failure (CAT-10).",
         "packages/app/e2e/regression/home.spec.ts": "Covers title and project matches during a prompt search failure and clears the status after recovery."
       }
     },
