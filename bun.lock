@@ -409,7 +409,7 @@
     },
     "packages/desktop": {
       "name": "@opencode-ai/desktop",
-      "version": "0.4.4",
+      "version": "0.4.5",
       "dependencies": {
         "@loginom-ai-agent/dashboard": "workspace:*",
         "@zip.js/zip.js": "2.7.62",
