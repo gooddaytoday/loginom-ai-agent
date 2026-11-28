@@ -206,7 +206,14 @@ Built-in window plugins can import `ToolRenderer` from `@opencode/plugin/gui/bui
 `ctx.add(ToolRenderer, { tool, title, separate, render })` in setup for a tool they own. The host rejects native or
 already registered tool names and withdraws the renderer when the plugin unloads. `separate: true` gives visible calls
 their own row in grouped timelines. The renderer receives live data, including partial input. The timeline shows a tool
-error card if rendering throws and retries rendering at the next call status.
+error card if rendering throws and retries rendering at the next call status. An exact tool name takes priority over
+namespace prefixes ending in `*`. A renderer can provide `handlesFailure(metadata)` to render failures with the facts it
+understands. The host keeps the standard error card for other failures.
+
+Built-in plugins can add conversation header actions to the public `session.header` slot and to the narrow-screen
+`session.header.mobile` slot via `BuiltinSlot`. Use `builtinContext(ctx).timeline` to read and set the app's persisted
+compact or detailed preset. The host restricts the narrow-screen slot, timeline preset access and `ToolRenderer` to
+built-in plugins.
 
 [Lifetimes](#lifetimes) shows `createKeyed` in files.
 

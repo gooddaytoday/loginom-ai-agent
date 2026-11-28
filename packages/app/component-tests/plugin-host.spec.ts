@@ -194,6 +194,46 @@ for (const registry of ["page", "question.renderer"]) {
   })
 }
 
+story("the narrow session header and timeline preferences are restricted to built-in plugins", async ({ page }) => {
+  const results = await page.evaluate(async (fixture) => {
+    const { mountPluginHost, Registry, until } = await import(fixture)
+    const result = []
+
+    for (const builtin of [false, true]) {
+      const host = mountPluginHost({
+        builtins: new Set(builtin ? ["fixture"] : []),
+      })
+
+      let hasTimeline = false
+
+      try {
+        host.load((ctx: Context) => {
+          hasTimeline = "timeline" in ctx
+          ctx.add(Registry.define("slot"), () => ({
+            at: "session.header.mobile",
+            render: () => "Header action",
+          }))
+        })
+        await until(() => host.status() === "failed" || host.status() === "active")
+        result.push({
+          status: host.status(),
+          slots: host.entries("slot"),
+          hasTimeline,
+        })
+      } finally {
+        host.unmount()
+      }
+    }
+
+    return result
+  }, fixture)
+
+  expect(results).toEqual([
+    { status: "failed", slots: 0, hasTimeline: false },
+    { status: "active", slots: 1, hasTimeline: true },
+  ])
+})
+
 story("a plugin that finishes loading after the host unmounts is never set up", async ({ page }) => {
   const setups = await page.evaluate(async (fixture) => {
     const { mountPluginHost } = await import(fixture)

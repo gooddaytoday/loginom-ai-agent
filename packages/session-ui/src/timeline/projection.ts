@@ -1,3 +1,4 @@
+import type { ToolSeparation } from "../context/data"
 import { currentToolMetadata } from "../message/current-tool-state"
 import { collapseToolGroups, toolGroupSummary } from "../message/tool-group"
 import type {
@@ -94,7 +95,7 @@ export type TimelineProjectionInput = {
   pendingInputIDs?: ReadonlySet<string>
   queuedCompactionIDs?: readonly string[]
   turnDiffs?: boolean
-  toolSeparate?: ReadonlySet<string>
+  toolSeparate?: ToolSeparation
   previousRows?: TimelineRow.TimelineRow[]
 }
 
@@ -154,7 +155,7 @@ export function createReactiveTimelineProjection(input: {
   queuedCompactionIDs?: Accessor<readonly string[]>
   /** Summarize each finished turn's changed files after it. */
   turnDiffs?: Accessor<boolean>
-  toolSeparate?: Accessor<ReadonlySet<string> | undefined>
+  toolSeparate?: Accessor<ToolSeparation | undefined>
 }) {
   const sessionMessageByID = createMemo(
     () => new Map(input.sessionMessages().map((message) => [message.id, message] as const)),
@@ -277,7 +278,7 @@ export namespace Timeline {
     detail?: TimelineDetail,
     queuedCompactionIDs: readonly string[] = [],
     turnDiffs = false,
-    toolSeparate?: ReadonlySet<string>,
+    toolSeparate?: ToolSeparation,
   ) {
     type Turn = {
       id: string
@@ -529,7 +530,7 @@ export namespace Timeline {
     isRenderable = renderable,
     detail?: TimelineDetail,
     commentary: ReadonlySet<Content> = new Set(),
-    toolSeparate?: ReadonlySet<string>,
+    toolSeparate?: ToolSeparation,
   ) {
     const rows: TimelineRow.TimelineRow[] = []
     const assistantMessages = entries.flatMap((entry) => (entry.type === "assistant" ? [entry.message] : []))
@@ -1007,7 +1008,7 @@ function groupContent(
   editToolDefaultOpen: boolean,
   commentary: ReadonlySet<Content>,
   detail?: TimelineDetail,
-  toolSeparate?: ReadonlySet<string>,
+  toolSeparate?: ToolSeparation,
 ): PartGroup[] {
   const groups: PartGroup[] = []
   let adjacent: { type: "context" | "file" | "read"; refs: PartRef[]; tools: boolean } | undefined
@@ -1081,7 +1082,7 @@ function contentGroupType(
   hasContextGroup: boolean,
   commentary: ReadonlySet<Content>,
   detail?: TimelineDetail,
-  toolSeparate?: ReadonlySet<string>,
+  toolSeparate?: ToolSeparation,
 ) {
   if (content.type === "tool") {
     if (toolSeparate?.has(content.name)) return undefined

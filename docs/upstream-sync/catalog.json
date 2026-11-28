@@ -144,7 +144,7 @@
     },
     {
       "id": "CAT-14",
-      "title": "Built-in GUI tool renderers (C3.0, accepted timeline row exception) and provider setup (C2.6)",
+      "title": "Built-in GUI tool renderers and timeline controls (C3.0, C3.18) and provider setup (C2.6)",
       "paths": [
         "packages/app/component-tests/plugin-host.fixture.tsx",
         "packages/app/src/runtime/plugin/host.tsx",
@@ -163,7 +163,16 @@
         "packages/session-ui/src/timeline-next/tools/tool-display.tsx",
         "packages/session-ui/src/timeline/projection.ts",
         "packages/session-ui/src/tools/tool-renderer.tsx",
-        "packages/ui/src/i18n/en.ts"
+        "packages/ui/src/i18n/en.ts",
+        "packages/app/src/session/screen.tsx",
+        "packages/app/src/session/timeline/tool-renderers.tsx",
+        "packages/app/component-tests/tool-renderer.fixture.tsx",
+        "packages/app/component-tests/plugin-host.spec.ts",
+        "packages/app/e2e/fixtures/loginom-feed-receipts.json",
+        "packages/app/e2e/regression/timeline-stream.spec.ts",
+        "packages/app/test-browser/builtin-plugins.test.ts",
+        "packages/gui-plugins/src/main.ts",
+        "packages/gui-plugins/src/renderer.ts"
       ],
       "notes": {
         "packages/plugin/src/gui/builtin.ts": "C2.6: provider setup priority follows the window host's reconnecting server event stream."
@@ -204,7 +213,10 @@
     {
       "id": "CAT-17",
       "title": "Built-in plugin page navigation for dashboard links",
-      "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
+      "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"],
+      "notes": {
+        "packages/app/src/runtime/plugin/host-apis.tsx": "C3.18 (CAT-14): attach the built-in timeline preset to the window host."
+      }
     },
     {
       "id": "CAT-10",

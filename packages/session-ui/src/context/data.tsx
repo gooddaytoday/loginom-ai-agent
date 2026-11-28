@@ -65,13 +65,16 @@ export type PeekMediaUrlFn = (uri: string, mime: string) => string | undefined
 /** A host-rendered tool card with its display title and a fallback supplied by the timeline. */
 export type ToolRenderContribution = {
   readonly title: string
+  handlesFailure?(metadata: NonNullable<ToolProps["metadata"]>): boolean
   render(props: ToolProps, fallback: () => JSX.Element): JSX.Element
 }
+
+export type ToolSeparation = Pick<ReadonlySet<string>, "has">
 
 /** Lookups scoped to the host that owns the session's contributed tools. */
 export type ToolRenderers = {
   find(tool: string): ToolRenderContribution | undefined
-  separate(): ReadonlySet<string> | undefined
+  separate(): ToolSeparation | undefined
 }
 
 export const {

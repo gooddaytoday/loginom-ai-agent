@@ -131,7 +131,7 @@ export function onIdle(fn: () => void) {
 
 /** The live state and display options of a tool call in the timeline. */
 export interface ToolRendererProps {
-  /** The tool's name in the transcript. */
+  /** The exact tool name in the transcript, even when the renderer registered a prefix. */
   readonly tool: string
   /** The registered display title, which can follow the window's locale. */
   readonly title: string
@@ -155,12 +155,20 @@ export interface ToolRendererProps {
 
 /** A built-in plugin's renderer for one tool it owns. */
 export interface ToolRenderer {
-  /** The exact tool name in the transcript. OpenCode's own names are reserved. */
+  /**
+   * The exact tool name, or a namespace prefix ending in `*`. Native names are reserved.
+   * The timeline picks an exact renderer first, then the longest matching prefix.
+   */
   readonly tool: string
   /** A display title. Use a getter for a localized title. */
   readonly title: string
   /** Keep visible calls on their own rows, even when tool activity is grouped. */
   readonly separate?: boolean
+  /**
+   * Return true when the call metadata can explain a failure. The timeline otherwise uses its standard error card.
+   * @param metadata - The metadata recorded on the failed tool call.
+   */
+  handlesFailure?(metadata: ToolRendererProps["metadata"]): boolean
   /**
    * Draws a call under the plugin context. The host shows its tool error card if this throws.
    * @param props - Live call data and the timeline's display options.
@@ -303,6 +311,8 @@ export const Page = Registry.define<Page>("page")
 
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
+  /** Actions beside the session location on narrow screens, while the conversation is visible. */
+  readonly "session.header.mobile": Pick<SlotMap["session.header"], "session" | "screen">
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */
   readonly "session.location.branch.menu": SlotMap["session.location.menu"]
   /** Items after the host's copy and reveal actions in the session directory's path submenu. Requires an owning screen. */
@@ -519,6 +529,20 @@ export interface BuiltinLocale extends Locale {
   setDirection(direction: "ltr" | "rtl"): void
 }
 
+/** Shortcuts to the app's persisted timeline detail presets. */
+export interface BuiltinTimeline {
+  /**
+   * The effective two-mode display preference. Detailed and Everything expand details
+   * and other presets and custom settings use compact renderer details.
+   */
+  detail(): "compact" | "detailed"
+  /**
+   * Sets the app's shared timeline preset for all sessions, persisted by the app.
+   * @param mode - Compact or Detailed, as offered by the app's settings.
+   */
+  setDetail(mode: "compact" | "detailed"): void
+}
+
 /** The window context as the app's host builds it for every plugin, with the members only built-ins use. */
 export interface BuiltinContext extends Context {
   /** Desktop-only abilities, `forceFocus` included; undefined on the web. */
@@ -538,6 +562,15 @@ export interface BuiltinContext extends Context {
   }
   /** Stores whose older homes may be parts of shared app keys. */
   readonly storage: BuiltinStorage
+  /**
+   * The current timeline detail preset. Use the app's saved setting for plugin tool details.
+   * @example
+   * ```ts
+   * const timeline = builtinContext(ctx).timeline
+   * timeline.setDetail(timeline.detail() === "compact" ? "detailed" : "compact")
+   * ```
+   */
+  readonly timeline: BuiltinTimeline
 }
 
 /**
@@ -553,8 +586,7 @@ export interface BuiltinContext extends Context {
  * ```
  */
 export function builtinContext(ctx: Context): BuiltinContext {
-  // SAFETY: the app's window host builds every context as a `BuiltinContext` (its HostApi factories are typed by it),
-  // and built-ins run only in that host.
+  // SAFETY: the app's window host attaches the built-in APIs to the built-in plugins that call this helper.
   return ctx as BuiltinContext
 }
 

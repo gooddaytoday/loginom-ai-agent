@@ -17,11 +17,13 @@ import { transitionDashboard, type DashboardState, type DashboardStore } from ".
 import type definition from "./index"
 import { LoginomRepeatDock } from "./repeat-dock"
 import { registerStartScreen } from "./start-screen"
+import setupSteps from "./step-renderer"
 import { registerSystemProxy } from "./system-proxy"
 
 const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
+  setupSteps(ctx)
   registerStartScreen(ctx)
 
   const ModelServer = lazy(() => import("./model-server"))

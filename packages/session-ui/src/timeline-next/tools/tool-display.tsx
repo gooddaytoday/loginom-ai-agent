@@ -92,7 +92,7 @@ export function ToolDisplay(props: ToolProps & { id: string; error?: string; sto
               metadata={props.tool === "shell" ? { ...props.metadata, interrupted: true } : props.metadata}
             />
           </Match>
-          <Match when={error()}>
+          <Match when={renderer.standardError(props.metadata, error())}>
             {(error) => {
               if (props.tool === "question" && error().replace("Error: ", "").includes("dismissed this question")) {
                 return (
