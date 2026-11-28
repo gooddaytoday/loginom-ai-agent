@@ -38,6 +38,7 @@ import {
   withDefaults,
   type Kind,
 } from "./permissions"
+import { repeatGuard } from "./repeat-guard"
 import { apply, bundled, hub } from "./skills"
 
 export { Dashboard }
@@ -325,12 +326,15 @@ export default Plugin.define({
     // `package-docs` grant.
     const profiles = join(Global.Path.data, "file-profiles")
     const files = await localFiles(ctx, profiles)
+    const repeats = repeatGuard(async () => (await ctx.tool.list()).find((tool) => tool.id === "question"))
     await ctx.tool.transform((editor) => {
       editor.add(
-        files.admitTool(async (sessionID) => {
-          const host = await hold(sessionID)
-          return host && { host, userMessage: await task(sessionID) }
-        }),
+        repeats.wrap(
+          files.admitTool(async (sessionID) => {
+            const host = await hold(sessionID)
+            return host && { host, userMessage: await task(sessionID) }
+          }),
+        ),
       )
       fileTools(files, profiles).forEach((tool) => editor.add(tool))
       editor.add(packageDocs(files, ctx.location.directory, resources))
@@ -348,6 +352,7 @@ export default Plugin.define({
       ready: () => ServiceHost.connected(),
       failure: (sessionID) => refused.get(sessionID),
       task,
+      wrap: repeats.wrap,
     })
 
     // The lease events start once the catalog that `drop` clears exists.
@@ -365,7 +370,10 @@ export default Plugin.define({
           const prefix = conversationPrefix(event.data.sessionID)
           await Promise.allSettled(Object.keys(kinds).map((kind) => ctx.storage.remove(prefix + kind)))
         } else if (event.type === "session.execution.started") void hold(event.data.sessionID)
-        else await drop(event.data.sessionID)
+        else {
+          repeats.reset(event.data.sessionID)
+          await drop(event.data.sessionID)
+        }
       }
     })().catch(() => undefined)
 
@@ -407,6 +415,7 @@ export default Plugin.define({
       hide(event)
     })
     await ctx.tool.hook("execute.before", async (event) => {
+      if (!repeats.tracks(event.tool)) repeats.reset(event.sessionID)
       await bound(event.sessionID)
       if (!permits(profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
@@ -470,6 +479,7 @@ export default Plugin.define({
       if (event.prompt.agents?.length && dashboard())
         throw new Error("LOGINOM_SCOPE_DENIED: a dashboard session does not run subagents")
       tasks.set(event.sessionID, event.messageID)
+      repeats.reset(event.sessionID)
       const value = event.metadata?.[token]
       if (event.metadata) delete event.metadata[token]
       const wizard = typeof value === "string" ? pending.get(value) : undefined
