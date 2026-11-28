@@ -7,11 +7,13 @@ import { MenubarItem, type Plugin } from "@opencode/plugin/gui/main"
 import { Updater } from "@opencode/plugin/gui/updater"
 import { logContext } from "./log"
 import { make } from "./machine"
+import { systemProxyPreference } from "./proxy-preference"
 
 const setup: Plugin.MainSetup = async (ctx) => {
   const builtin = builtinMainContext(ctx)
   const build = ctx.app
   const lifecycle = builtin.lifecycle
+  const proxy = systemProxyPreference(builtin.storage)
   // Holds no resources, so it needs no cleanup.
   const context = logContext(ctx.log.write)
   const runPromise = Effect.runPromiseWith(context)
@@ -32,7 +34,9 @@ const setup: Plugin.MainSetup = async (ctx) => {
             initial: null,
             from: { settings: "channel", file: Product.stores.updater },
           })
+
           const { readUpdateSettings, updatePolicyPath } = await import("./signed-feed")
+
           try {
             return readUpdateSettings({
               policyPath: updatePolicyPath(process.platform, process.env.ProgramData),
@@ -48,13 +52,16 @@ const setup: Plugin.MainSetup = async (ctx) => {
       : undefined
 
   if (ctx.signal.aborted) return
+  const scope = Scope.makeUnsafe()
+  ctx.onCleanup(() => runPromise(Scope.close(scope, Exit.void)))
+
   const platform = settings?.enabled
-    ? await import("./platform").then((module) => runPromise(module.make(settings.sources)))
+    ? await import("./platform").then((module) =>
+        runPromise(module.make(settings.sources, () => proxy.value).pipe(Scope.provide(scope))),
+      )
     : undefined
 
   if (ctx.signal.aborted) return
-  const scope = Scope.makeUnsafe()
-  ctx.onCleanup(() => runPromise(Scope.close(scope, Exit.void)))
   const publish = { changed: () => {} }
 
   const updater = await runPromise(
