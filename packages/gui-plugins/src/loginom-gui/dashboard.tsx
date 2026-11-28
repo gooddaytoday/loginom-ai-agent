@@ -81,10 +81,17 @@ function Preview(props: Props & { server: ServerRef }) {
 
     const attempt = view.attempt
 
-    const opening = loadPreview(server, link, signal).then((url) => {
+    const opening = loadPreview(server, link, signal).then(async (url) => {
       signal.throwIfAborted()
 
-      return ipc.open({ url })
+      const deadline = new AbortController()
+      const timer = setTimeout(() => deadline.abort(), 15_000)
+
+      try {
+        return await ipc.open({ url }, { signal: AbortSignal.any([signal, deadline.signal]) })
+      } finally {
+        clearTimeout(timer)
+      }
     })
 
     void opening.then(

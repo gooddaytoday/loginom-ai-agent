@@ -15,10 +15,10 @@ type DeepLinkListener = (data: BuiltinDeepLink["data"]) => void
 
 const deepLinkListeners = new Map<string, DeepLinkListener>()
 
-const pendingDeepLinks = new Map<string, BuiltinDeepLink["data"][]>()
+const pendingDeepLinks = new Map<string, BuiltinDeepLink["data"]>()
 
 /**
- * Delivers opaque data in this Desktop renderer, buffering it until the built-in subscribes.
+ * Delivers opaque data in this Desktop renderer, retaining only the latest payload on an unsubscribed channel.
  * @param link - The destination channel and its JSON payload.
  */
 export function deliverBuiltinDeepLink(link: BuiltinDeepLink) {
@@ -26,11 +26,11 @@ export function deliverBuiltinDeepLink(link: BuiltinDeepLink) {
 
   if (listener) return listener(link.data)
 
-  pendingDeepLinks.set(link.channel, [...(pendingDeepLinks.get(link.channel) ?? []), link.data])
+  pendingDeepLinks.set(link.channel, link.data)
 }
 
 /**
- * Consumes a built-in channel's buffered and live deep links.
+ * Consumes a built-in channel's latest buffered link, then every live link.
  * @param channel - The channel the built-in owns.
  * @param listener - Decodes and handles each payload.
  * @returns Stops listening; later arrivals are buffered again.
@@ -40,7 +40,8 @@ export function subscribeBuiltinDeepLinks(channel: string, listener: DeepLinkLis
   const pending = pendingDeepLinks.get(channel)
 
   pendingDeepLinks.delete(channel)
-  pending?.forEach(listener)
+
+  if (pending !== undefined) listener(pending)
 
   return () => {
     if (deepLinkListeners.get(channel) === listener) deepLinkListeners.delete(channel)

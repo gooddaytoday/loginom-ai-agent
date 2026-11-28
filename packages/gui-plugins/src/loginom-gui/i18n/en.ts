@@ -23,7 +23,7 @@ export default {
   dashboardConnect: "Connect to Loginom in Settings, then open a new dashboard link from Studio.",
   dashboardOpenFailed: "Could not open the dashboard. Check the Loginom connection and try a new link from Studio.",
   dashboardLoading: "Preparing the dashboard preview…",
-  dashboardPreviewFailed: "The preview is unavailable. You can still open the dashboard in chat.",
+  dashboardPreviewFailed: "Could not open the preview. You can still open the dashboard in chat.",
   dashboardPublicationNotice: "The published version may differ from the local draft shown here.",
   dashboardEdit: "Edit in chat",
   dashboardCreatePrompt: "Help me create a dashboard for the node “{{node}}”.",

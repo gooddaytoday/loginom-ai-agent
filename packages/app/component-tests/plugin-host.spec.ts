@@ -97,6 +97,33 @@ for (const viewport of [
   })
 }
 
+story("a stalled dashboard preview stops loading and leaves editing available", async ({ page }) => {
+  await page.clock.install()
+
+  const host = await page.evaluateHandle(async (fixture) => {
+    const { mountDashboard } = await import(fixture)
+
+    return mountDashboard(
+      {
+        id: "665afd45-1298-4c90-9086-1dd73ca94902",
+        directory: "/data/dashboards/orders/work",
+        nodeName: "Заказы",
+        action: "edit",
+      },
+      "stalled",
+    )
+  }, fixture)
+
+  await expect.poll(() => host.evaluate((dashboard) => dashboard.opens())).toBe(1)
+  await page.clock.fastForward(15_000)
+
+  const panel = page.getByRole("region", { name: "Дашборд", exact: true })
+  await expect(panel.getByText("Не удалось открыть предпросмотр. Дашборд всё ещё можно открыть в чате.")).toBeVisible()
+  await panel.getByRole("button", { name: "Изменить в чате" }).click()
+  await expect.poll(() => host.evaluate((dashboard) => dashboard.drafts.length)).toBe(1)
+  await host.evaluate((dashboard) => dashboard.unmount())
+})
+
 story(
   "a plugin page uses its contribution context and becomes unavailable when its plugin is disabled",
   async ({ page }) => {
@@ -1074,6 +1101,7 @@ story(
 story("the new-session slot renders nothing without a plugin", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {
     const { mountPlugins, BuiltinSlot, until } = await import(fixture)
+
     const host = mountPlugins({
       definitions: [
         {
@@ -1084,16 +1112,19 @@ story("the new-session slot renders nothing without a plugin", async ({ page }) 
         },
       ],
     })
+
     try {
       const heading = () => host.container.querySelector('[data-testid="draft-heading"]')
       await until(() => heading()?.textContent === "Draft heading")
       host.define([])
       await until(() => heading()?.textContent === "")
+
       return { elements: heading()?.childElementCount, errors: host.escaped() }
     } finally {
       host.unmount()
     }
   }, fixture)
+
   expect(result).toEqual({ elements: 0, errors: [] })
 })
 
