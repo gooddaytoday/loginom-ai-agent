@@ -291,6 +291,8 @@ test('saveAs failure captures download and native receipt before cancellation',a
  assert.equal(failure.private_download.native_receipt.received_bytes,34);
  assert.match(failure.private_download.message,/download.saveAs: canceled/);
  assert.ok(cancelled);
+ assert.equal(result.cleanup_complete,true);
+ assert.ok(result.trace.some(entry=>entry.event==='download_cancelled_confirmed'));
 });
 
 test('download refuses a different file label, formatted-name collision or package before the browser',()=>{

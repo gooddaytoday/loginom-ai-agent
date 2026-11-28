@@ -984,8 +984,11 @@ export async function createBridge(config, session, { browserTransport: managedB
       hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0, close() {
       shutdownStarted = true;
       closing ??= (async () => {
+        const normalCleanup = config.closeSavedPackageOnShutdown === true;
         let lifecycleCleanupFailed=false;
-        for(const cleanup of [()=>actionRuntime?.closeArtifactDeliveries(),()=>actionRuntime?.closeNodeOperations?.(),
+        for(const cleanup of [()=>actionRuntime?.closeArtifactDeliveries({
+          verifyCancelled:normalCleanup&&!recovery.unsettled()&&!clipboardUncertain&&heldLeases.size===0,
+        }),()=>actionRuntime?.closeNodeOperations?.(),
           ()=>actionRuntime?.cleanupServerCache(),()=>recovery.close()]){
           try{await cleanup();}catch{lifecycleCleanupFailed=true;}
         }
@@ -1012,7 +1015,6 @@ export async function createBridge(config, session, { browserTransport: managedB
             if(timeline)await recordExecution({phase:'native_connection_timeline',timeline});
           }catch{ /* Diagnostic availability cannot change shutdown. */ }
         }
-        const normalCleanup = config.closeSavedPackageOnShutdown === true;
         // MCP cancellation settles the caller before the admitted browser task.
         // Read its final receipt only after that task has left the shared gate.
         if (normalCleanup && session.metadata.workspaceReady !== true

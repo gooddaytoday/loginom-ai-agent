@@ -29,11 +29,13 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     verification_id:proof.verification_id,cleanup_complete:true,upload_completion_verified:true};
   await acknowledge(job,'artifact_delivery_completed',{result});job.outcome=result;job.phase='completed';job.error=null;
  };
- async function run(job,artifact,signal,resumeId=null) {
+ async function run(job,artifact,signal,resumeId=null,shutdownDeadline) {
   let submitted=job.uploadStarted===true,effectPossible=submitted;
+  const duringShutdown=shutdownDeadline!==undefined;
+  const deadline=shutdownDeadline??job.deadline;
   const preUploadResume=!!resumeId&&job.preUploadResume===true;
-  const check=()=>{signal?.throwIfAborted();requireValue(now()<job.deadline,'Artifact delivery deadline elapsed');};
-  const privateDeadline=job.packageUpload||job.largeUpload?{signal,deadlineAt:job.deadline}:{};
+  const check=()=>{signal?.throwIfAborted();requireValue(now()<deadline,'Artifact delivery deadline elapsed');};
+  const privateDeadline=job.packageUpload||job.largeUpload||duringShutdown?{signal,deadlineAt:deadline}:{};
   // The executor's settled refusal for an upload whose own cleanup is
   // unconfirmed. After verification started, an unreleased temporary file of
   // the comparison can still settle, so that state is never terminal here.
@@ -104,8 +106,8 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    }
   };
   const ready=async(condition,read,predicate)=>{
-   const deadline=Math.min(job.deadline,now()+15000);
-   for(let sample=0;sample<80&&now()<deadline;sample++) {
+   const readyDeadline=Math.min(deadline,now()+15000);
+   for(let sample=0;sample<80&&now()<readyDeadline;sample++) {
     const s=await read();
     if(s&&!(s.ui.masks??[]).length&&!(s.ui.dialogs??[]).length&&predicate(s))return s;
     await new Promise(resolve=>setTimeout(resolve,100));
@@ -141,7 +143,11 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    if(!resumeId||preUploadResume)check();job.phase='preflight';
    if(job.packageUpload)requireValue(/\.lgp$/i.test(artifact.name)&&artifact.upload.overwrite==='reject','Private package upload requires an admitted .lgp with reject policy');
    else runtime.preflightDeliveredArtifact(artifact);
-   if(resumeId&&!preUploadResume) {
+   if(duringShutdown) {
+    await acknowledge(job,'artifact_delivery_shutdown_verification',{upload_operation_id:job.uploadId,deadline_at:deadline});
+    inspected=await runtime.inspect({operationId:job.uploadId});
+    upload=inspected.output?.outcome;
+   } else if(resumeId&&!preUploadResume) {
     await acknowledge(job,'artifact_delivery_resume_started',{resume_id:resumeId,upload_operation_id:job.uploadId,
       verification_started:job.verificationStarted===true,deadline_at:job.deadline});
     inspected=await runtime.inspect({operationId:job.uploadId});
@@ -296,15 +302,15 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    job.phase='verify';
    const destination=await directory();
    requireValue(destination.file_storage.directory===artifact.upload.directory,'Verification directory changed');
-   if(resumeId)requireValue(typeof job.binding?.document==='string'&&job.binding.document.length>0
+   if(resumeId||duringShutdown)requireValue(typeof job.binding?.document==='string'&&job.binding.document.length>0
      &&destination.dom_epoch?.document===job.binding.document
      &&JSON.stringify(destination.workflow_ref)===JSON.stringify(job.binding.workflow_ref)
      &&destination.active_tab_ref===job.binding.active_tab_ref,'Delivery browser context changed; no verification dispatched');
    check();job.verificationState='preflight';
-   const verification=await runtime.verifyDeliveredArtifact({operationId:job.uploadId,verificationId:job.id+':verify',
-    observationId:destination.observation_id,signal,onDispatched:()=>{job.verificationStarted=true;job.verificationState='dispatched';}});
+   const verification=await runtime.verifyDeliveredArtifact({operationId:job.uploadId,verificationId:job.id+(duringShutdown?':shutdown-verify':':verify'),
+    observationId:destination.observation_id,signal,shutdownDeadline,onDispatched:()=>{job.verificationStarted=true;job.verificationState='dispatched';}});
    if(job.conflictRejected&&verification.status!=='SUCCEEDED'&&verification.cleanup_complete===true)job.verificationState='settled';
-   const lostVerification=verification.error?.code==='BROWSER_CALL_UNCERTAIN';
+   const lostVerification=!duringShutdown&&verification.error?.code==='BROWSER_CALL_UNCERTAIN';
    requireValue(lostVerification||verification.status==='SUCCEEDED'&&verification.cleanup_complete===true&&verification.output?.bytes_verified===true,'Destination bytes require inspection');
    // Verification owns its dispatched work through cleanup. Cancellation or
    // deadline expiry cannot discard its committed proof; only inspect it here.
@@ -429,6 +435,22 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
   cancel(id){const job=jobs.get(id);requireValue(job?.largeUpload,'Unknown asynchronous upload');if(job.state==='running'){job.status='cancelling';job.controller.abort();}return snapshot(job);},
   interrupt(){for(const job of jobs.values())if(job.largeUpload&&job.state==='running'){job.status='cancelling';job.controller.abort();}},
   async drain(){await Promise.all([...jobs.values()].map(job=>job.promise));},
-  async close(){for(const job of jobs.values())if(job.largeUpload&&job.state==='running'){job.status='cancelling';job.controller.abort();}await Promise.all([...jobs.values()].map(job=>job.promise));requireValue(![...jobs.values()].some(job=>job.largeUpload&&job.status==='uncertain'),'LOGINOM_UPLOAD_UNCERTAIN');},
+  async close({verifyCancelled=false}={}) {
+   for(const job of jobs.values())if(job.largeUpload&&job.state==='running'){job.status='cancelling';job.controller.abort();}
+   await Promise.all([...jobs.values()].map(job=>job.promise));
+   requireValue(![...jobs.values()].some(job=>job.largeUpload&&job.status==='uncertain'),'LOGINOM_UPLOAD_UNCERTAIN');
+   if(!verifyCancelled)return;
+   const job=[...jobs.values()].find(job=>job.verificationStarted
+     &&runtime.canVerifyCancelledDelivery(job.uploadId,job.id));
+   if(!job)return;
+   // Reserve the native package cleanup's 30 s within the host close budget.
+   const deadline=Math.min(job.deadline,now()+8000);
+   if(now()>=deadline)return;
+   const artifact=artifactStore.getUploadGrant(job.artifact.artifact_id,job.artifact.upload.grant_id);
+   if(JSON.stringify(artifact)!==JSON.stringify(job.artifact))return;
+   active=job;job.state='running';
+   job.promise=run(job,artifact,undefined,null,deadline);
+   await job.promise;
+  },
  });
 }

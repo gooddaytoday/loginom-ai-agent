@@ -2,7 +2,7 @@ import vm from 'node:vm';
 import {makePackageCleanupCode} from '../../lib/package-cleanup.mjs';
 import test, {mock} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,readFile,rm,mkdir} from 'node:fs/promises';
+import {mkdtemp,readFile,writeFile,rm,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {Client as AgentClient} from '@modelcontextprotocol/sdk/client/index.js';
@@ -13,6 +13,8 @@ import {serverDownloadTools} from '../../lib/storage-policy.mjs';
 import {createBundledSkillFixture} from './bundled-skill-fixture.mjs';
 import {createActionCatalogFixture} from './action-catalog-fixture.mjs';
 import {Page,runtime} from './executor-fixture.mjs';
+import {createHash} from 'node:crypto';
+import {createArtifactStore} from '../../lib/artifacts.mjs';
 import {closeManagedResources} from '../../../src/managed-resources-close.mjs';
 import {createServer} from 'node:http';
 import {chromium} from 'playwright-core';
@@ -121,6 +123,7 @@ mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExport
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:options=>{
   const f=current;
+  if(f.artifactBrowser)return executor.createActionRuntime({...options,execute:f.artifactBrowser});
   if(f.stoppedImport){
     const node={document_id:'own-doc',workflow_id:'own-workflow',node_id:'source'};
     const graph={complete:true,document_id:'own-doc',nodes:[],links:[],foreign_links:[]};
@@ -431,6 +434,81 @@ for(const scenario of ['opened-clean','opened-read-only','opened-dirty','opened-
     }
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
+
+for(const fault of ['cancelled','unknown','wrong-bytes'])test('CLI shutdown after pending upload verification: '+fault,async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'cleanup-upload-'));
+  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+  const f=current={scenario:'opened-clean',events:[],saves:0,path,catalog};
+  const store=await createArtifactStore({directory:join(directory,'input')});
+  const sourcePath=join(directory,'input.csv'),contents='value\n42\n';
+  await writeFile(sourcePath,contents);
+  const artifact=await store.admit({sourcePath,name:'input.csv',bytes:Buffer.byteLength(contents),
+    sha256:createHash('sha256').update(contents).digest('hex'),upload:{directory:'/test-2',overwrite:'replace'}});
+  const page=new Page(),prefix=page.prefix,nav=prefix+';NavigationBar;NavigationPanel';
+  const fileTid=prefix+';FileStorageForm;colName_input.csv';
+  const addedControls=[nav,prefix+';FileStorageForm;pnlFileStorage;tbl'].map(tid=>({tid,ref:page.uiReference(tid),kind:'region'}));
+  let downloads=0,uploads=0,cancelledReceipt;
+  const receipt=(action_key,operation_id,fields)=>({action_key,operation_id,action_revision:'1',phase:'observed',
+    status:'SUCCEEDED',effect_possible:false,cleanup_complete:true,output:{},trace:[],error:null,...fields});
+  f.artifactBrowser=async code=>{
+    if(code.includes('"receipt_read":true'))return receipt('operation.inspect','delivery:upload',
+      {output:{state:'completed',receipt:cancelledReceipt}});
+    if(code.includes('function browserArtifactUpload')){
+      uploads++;
+      return receipt('artifact.upload','delivery:upload',{phase:'submitted',status:'AMBIGUOUS',effect_possible:true,
+        error:{code:'UPLOAD_SERVER_VERIFICATION_REQUIRED',message:'Pending verification'},output:{upload_submitted:true}});
+    }
+    if(code.includes('function discoverArtifactAndDownload')){
+      downloads++;
+      const id=downloads===1?'delivery:verify':'delivery:shutdown-verify';
+      if(downloads===1){
+        cancelledReceipt=receipt('artifact.download',id,{status:'AMBIGUOUS',phase:'downloading',
+          effect_possible:true,cleanup_complete:fault!=='unknown',error:{code:'DOWNLOAD_BROWSER_CALL_FAILED',message:'Download unavailable'},
+          trace:fault==='unknown'?[]:[{event:'download_cancelled_confirmed'}]});
+        if(fault==='cancelled')throw Error('Original download reply lost');
+        return cancelledReceipt;
+      }
+      const downloadPath=JSON.parse(code.match(/"download_path":("(?:[^"\\]|\\.)*")/)[1]);
+      const observationId=JSON.parse(code.match(/"observation_id":("[^"]+")/)[1]);
+      const fileRef=page.uiReference(fileTid);
+      await writeFile(downloadPath,fault==='wrong-bytes'?'value\n43\n':contents);
+      return receipt('artifact.download',id,{phase:'downloaded',effect_possible:true,
+        output:{artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,upload_operation_id:'delivery:upload',
+          destination:artifact.upload.destination,suggested_name:'input.csv',download_completed:true,
+          bytes_verification_required:true,file_ref:fileRef,observation_id:observationId},
+        trace:[{event:'artifact_file_discovered',file_ref:fileRef,file_tid:fileTid,directory:artifact.upload.directory,
+          document:'fixture-document',active_tab_ref:'storage-tab',workflow_ref:page.uiSnapshot().workflow_ref}]});
+    }
+    const output={...page.uiSnapshot(),active_tab_ref:'storage-tab',file_storage:{status:'observed',directory:artifact.upload.directory},
+      observation_root:{ref:page.uiReference(nav)}};
+    output.ui.elements=addedControls;
+    return receipt('workspace.ui','observe',{output});
+  };
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:store};
+  const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+    mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+    loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+  const client=new AgentClient({name:'upload-cleanup',version:'1'});
+  t.after(async()=>{try{await client.close();await bridge.close();}finally{await rm(directory,{recursive:true,force:true});}});
+  const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+  const prepared=await client.callTool({name:'dock_prepare',arguments:{intent:'open_package',package_path:path}});
+  assert.notEqual(prepared.isError,true,JSON.stringify(prepared));
+  const delivery=await client.callTool({name:'dock_artifact_deliver',arguments:{operation_id:'delivery',
+    artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,budget_ms:120000}});
+  assert.equal(delivery.structuredContent?.status,'AMBIGUOUS',JSON.stringify(delivery));
+  const inspected=await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:'delivery:upload'}});
+  assert.equal(JSON.parse(inspected.content[0].text).output.state,'pending');
+  if(fault==='cancelled')await closeManagedResources({bridge,client},[]);
+  else await assert.rejects(closeManagedResources({bridge,client},[]),/LOGINOM_RUNTIME_CLEANUP_FAILED/);
+  const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
+  assert.equal(cleanup.status,fault==='cancelled'?'SUCCEEDED':'BLOCKED');
+  assert.equal(cleanup.reason,fault==='cancelled'?null:'CLEANUP_OR_OPERATION_UNCONFIRMED');
+  assert.equal(cleanup.package_closed===true,fault==='cancelled');
+  assert.equal(cleanup.logged_out===true,fault==='cancelled');
+  assert.equal(uploads,1);
+  assert.equal(downloads,fault==='unknown'?1:2);
+});
 
 test('unknown prepared workflow advises only the last confirmed Save of its own bridge',async t=>{
   const directory=await mkdtemp(join(tmpdir(),'prepared-workflow-hint-'));

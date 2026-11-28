@@ -447,6 +447,7 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
     // ~30 s after the gesture (LAB-2054). Use its own deadline minus a reserve
     // for save and post-download settlement; never less than the old window.
     const eventTimeout=task.server_source_binding?task.deadline_at-Date.now()
+      :task.shutdown_verification?Math.min(5000,task.deadline_at-Date.now())
       :!task.output_binding&&Number.isFinite(task.deadline_at)?Math.max(15000,task.deadline_at-Date.now()-15000):15000;
     if(eventTimeout<=0)return result(gesture?'AMBIGUOUS':'NOT_APPLIED','LOGINOM_DOWNLOAD_DEADLINE');
     event=page.waitForEvent('download',{timeout:eventTimeout}).then(value=>{
@@ -704,7 +705,12 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
     // Drain the bounded listener and cancel any captured transfer before exit.
     if(event && !download)try{download=await event;}catch{}
     evidence.private_download=await captureFailure(error);trace.push(evidence);
-    if(download && !completed)try{await download.cancel();completed=true;}catch(error){
+    const cancelled=browserStep==='download.saveAs'&&evidence.private_download.failure_state==='read'
+      &&evidence.private_download.download_failure==='canceled';
+    if(download && !completed)try{
+      await download.cancel();completed=true;
+      if(cancelled)trace.push({event:'download_cancelled_confirmed'});
+    }catch(error){
       browserStep='download.cancel';trace.push({event:'download_cleanup_failure',...failureEvidence(error)});
     }
     return result(gesture || event?'AMBIGUOUS':'NOT_APPLIED','DOWNLOAD_BROWSER_CALL_FAILED');
@@ -2552,6 +2558,22 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if(!attempt.checkpoint.existing_file_check&&raw.status==='NOT_APPLIED' && raw.cleanup_complete===true)await attempt.lease.release();
     return outcome;
   };
+  const canVerifyCancelledDelivery = (operationId, deliveryId) => {
+    const attempt = pending?.verification;
+    const raw = attempt?.raw;
+    // This is the original, identity-checked browser receipt. Playwright
+    // reported cancellation before our cleanup ran and the cleanup finished.
+    return !running && !leased && !storageNavigating && !serverDownloads?.unsettled
+      && !nodeJobs.unsettled && !sourceReads.unsettled
+      && pending?.id === operationId && pending.deliveryOperationId === deliveryId
+      && pending.action.capability === 'artifact.upload' && pending.cleanupConfirmed === true && !pending.transportUncertain
+      && pending.outcome?.status === 'AMBIGUOUS' && pending.outcome.error?.code === 'UPLOAD_SERVER_VERIFICATION_REQUIRED'
+      && pending.outcome.output?.upload_submitted === true
+      && attempt?.id === deliveryId+':verify' && attempt.settled === true && attempt.checkpoint.discovery
+      && raw?.status === 'AMBIGUOUS' && raw.phase === 'downloading' && raw.effect_possible === true && raw.cleanup_complete === true
+      && raw.error?.code === 'DOWNLOAD_BROWSER_CALL_FAILED'
+      && raw.trace.some(entry => entry.event === 'download_cancelled_confirmed');
+  };
   const nodeTargetOutcome=(operation,result)=>({status:result.status,action_key:operation.action.action_key,action_revision:'1',operation_id:operation.id,
     phase:result.phase,effect_possible:operation.targetPhase?.effect_possible===true,cleanup_complete:result.cleanup_complete===true,
     output:result,error:result.error?{code:'NODE_TARGET_INCOMPLETE',message:result.error}:null,trace:[]});
@@ -4292,7 +4314,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(recorded?.phase!=='package_upload_completed'||recorded.operation_id!==operationId)throw Error('Package completion was not durably acknowledged');
       pending=null;observations.clear();return result;
     },
-    async verifyArtifact({operationId,verificationId,observationId,fileRef,signal,discover=false,compareExisting=false,onDispatched}={}) {
+    canVerifyCancelledDelivery,
+    async verifyArtifact({operationId,verificationId,observationId,fileRef,signal,discover=false,compareExisting=false,onDispatched,shutdownDeadline}={}) {
       signal?.throwIfAborted();checkId(operationId);checkId(verificationId);
       if(!allowCandidate || !artifactStore)throw new Error('Artifact verification is available only in a candidate session');
       const signature=fingerprint(discover?'artifact.verify.discovery':'artifact.verify',[operationId,observationId,fileRef,compareExisting]);
@@ -4317,23 +4340,35 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(running || !operation || (pending!==operation&&!(existingFile&&!pending)) || operation.action.capability!=='artifact.upload'
         || operation.transportUncertain || !operation.cleanupConfirmed || (operation.verification && !operation.verification.settled))
         throw new Error('Inspect and confirm the pending upload browser receipt before verifying its file');
+      const duringShutdown=shutdownDeadline!==undefined;
+      if(duringShutdown && (!discover || !canVerifyCancelledDelivery(operationId,operation.deliveryOperationId)
+        || !Number.isSafeInteger(shutdownDeadline) || now()>=shutdownDeadline))
+        throw Error('Cancelled delivery verification is unavailable');
       const snapshot=observations.get(observationId);
       if(!snapshot)throw new Error('Observe the authorized file row before verifying');
+      if(duringShutdown){
+        const original=operation.verification.checkpoint.discovery;
+        if(snapshot.dom_epoch.document!==original.document || snapshot.active_tab_ref!==original.active_tab_ref
+          || fingerprint('workflow',snapshot.workflow_ref)!==fingerprint('workflow',original.workflow_ref))
+          throw Error('Original verification browser context changed');
+      }
       if(!discover)observations.assertIssued(observationId,{ref:fileRef});
       const options={operation_id:verificationId,upload_operation_id:operationId,observation_id:observationId,file_ref:fileRef,
         snapshot,artifact:operation.checkpoint.artifact,storage_root_ref:operation.checkpoint.storage_root_ref,
-        expected_build:targetBuild,expected_origin:targetOrigin};
+        expected_build:targetBuild,expected_origin:targetOrigin,...(duringShutdown?{shutdown_verification:true}:{})};
       // Validate exact file identity before allocating any download lease.
       const buildDownload=discover?o=>makeArtifactDiscoveryDownloadCode(o,{download:browserArtifactDownload,reveal:browserArtifactReveal}):makeArtifactDownloadCode;
       buildDownload(options);
       running=true;
       try {
+        if(duringShutdown)await operation.verification.lease.release();
         const lease=await artifactStore.stageDownload(operation.parameters.artifact_id);
         const attempt={id:verificationId,signature,lease,action:{action_key:'artifact.verify',revision:'1',capability:'artifact.verify'},
           parameters:{upload_operation_id:operationId,observation_id:observationId,file_ref:fileRef},checkpoint:{artifact:options.artifact,
             ...(existingFile?{existing_file_check:true}:{}),
-            ...(discover?{discovery:{workflow_ref:snapshot.workflow_ref,document:snapshot.dom_epoch.document,active_tab_ref:snapshot.active_tab_ref}}:{})},deadline:now()+60000};
-        try {signal?.throwIfAborted();await remember(attempt,'download_prepared');signal?.throwIfAborted();}
+            ...(discover?{discovery:{workflow_ref:snapshot.workflow_ref,document:snapshot.dom_epoch.document,active_tab_ref:snapshot.active_tab_ref}}:{})},deadline:shutdownDeadline??now()+60000};
+        try {signal?.throwIfAborted();await remember(attempt,'download_prepared');signal?.throwIfAborted();
+          if(duringShutdown&&now()>=attempt.deadline)throw Error('Artifact verification deadline elapsed');}
         catch(error){await lease.release();throw error;}
         let code;
         try {signal?.throwIfAborted();code=buildDownload({...options,download_path:lease.path,deadline_at:attempt.deadline});}
@@ -4344,7 +4379,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         try {
           const dispatched=withBrowserReceipt(`(${code})(page)`,receipt);
           onDispatched?.();
-          raw=await execute(dispatched,{timeout:65000});
+          raw=await execute(dispatched,{timeout:duringShutdown?Math.max(1,shutdownDeadline-now()):65000});
         } catch(error) {
           try{await onRecord({phase:'artifact_download_transport_failed',operation_id:verificationId,
             cause:operationFailureDiagnostic(error,{downloadCause:true,redactor})});}catch{}
@@ -4893,5 +4928,5 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     artifactDeliveryStatus:id=>delivery.status(id),
     cancelArtifactDelivery:id=>delivery.cancel(id),
     cancelArtifactDeliveries:()=>delivery.interrupt(),
-    closeArtifactDeliveries:()=>delivery.close()});
+    closeArtifactDeliveries:options=>delivery.close(options)});
 }
