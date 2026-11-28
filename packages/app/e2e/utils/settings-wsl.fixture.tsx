@@ -276,7 +276,9 @@ export function mount(input: {
       platform: "desktop",
       os: "windows",
       windowID: "settings-wsl-test",
-      openExternal: () => undefined,
+      openExternal: (url) => {
+        window.open(url, "_blank", "noopener,noreferrer")
+      },
       openDirectoryPickerDialog: async () => null,
       notify: async () => undefined,
       restart: unused,

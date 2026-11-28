@@ -16,6 +16,7 @@ export function transport(port: Port) {
       reject(error: Error): void
       timer: ReturnType<typeof setTimeout>
       observe?(value: unknown): void
+      progress?(value: unknown): void
     }
   >()
   function close() {
@@ -31,6 +32,10 @@ export function transport(port: Port) {
     if (!data || typeof data !== "object" || !("id" in data) || typeof data.id !== "string") return
     const request = pending.get(data.id)
     if (!request) return
+    if ("progress" in data) {
+      request.progress?.(data.progress)
+      return
+    }
     pending.delete(data.id)
     clearTimeout(request.timer)
     request.observe?.(data)
@@ -42,7 +47,7 @@ export function transport(port: Port) {
   })
   port.start()
   return {
-    request(method: string, input: unknown, timeout = 180_000, observe?: (value: unknown) => void) {
+    request(method: string, input: unknown, timeout = 180_000, observe?: (value: unknown) => void, progress?: (value: unknown) => void) {
       if (state.closed) return Promise.reject(new Error("LOGINOM_HOST_CLOSED"))
       const id = randomUUID()
       return new Promise<unknown>((resolve, reject) => {
@@ -50,7 +55,7 @@ export function transport(port: Port) {
           pending.delete(id)
           reject(new Error("LOGINOM_HOST_TIMEOUT"))
         }, timeout)
-        pending.set(id, { resolve, reject, timer, observe })
+        pending.set(id, { resolve, reject, timer, observe, progress })
         try {
           port.postMessage({ id, method, input })
         } catch {
