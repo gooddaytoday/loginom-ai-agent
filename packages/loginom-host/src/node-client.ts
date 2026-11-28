@@ -200,7 +200,8 @@ export async function launchNodeHost(
   return {
     port,
     exited,
-    request: client.request,
+    request: (method: string, input: unknown, timeout?: number, signal?: AbortSignal) =>
+      client.request(method, input, timeout, undefined, undefined, signal),
     get alive() {
       return !state.closed
     },
