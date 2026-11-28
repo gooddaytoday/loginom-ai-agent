@@ -6,10 +6,11 @@
 // a tool the registry does not have. So the plugin keeps the tools of the current connection generation in its registry
 // (`registry`), reloads it when the catalog changes, and each session sees only what its own Host run offers
 // (`catalogs`); the access gate (B2.2) still decides by the task's profile.
-import { randomUUID } from "node:crypto"
+import { createHash } from "node:crypto"
 import { mkdir, writeFile } from "node:fs/promises"
 import { extname, join, resolve } from "node:path"
 import { hostErrorText, hostFailure } from "@loginom-ai-agent/loginom-host/errors"
+import { stepOperationIdPattern } from "@loginom-ai-agent/loginom-host/step-operation-id"
 import { StepMetadata, uncertainStep } from "@loginom-ai-agent/loginom-host/step-state"
 import { SessionV1 } from "@loginom-ai-agent/loginom-host/session-v1"
 import type { Plugin } from "@opencode/plugin"
@@ -24,6 +25,7 @@ import { local, type Profile } from "./access"
 import { exactScanReceipt } from "./file-profile-core"
 import type { ServiceHost } from "./host"
 import { permissionFailure, type localFiles } from "./local-file"
+import { decodeLoginomMetadata, type LoginomMetadataInput } from "./loginom-metadata"
 import { loginomResultState, loginomResultSummary } from "./loginom-result"
 
 type Lease = ServiceHost.Lease
@@ -262,7 +264,7 @@ export async function dockTools(input: {
           if (extname(source.file.name).toLowerCase() !== ".lgp")
             throw Error("local_package_path requires a .lgp file. Путь: " + source.sourcePath)
           delete forwarded.local_package_path
-          if (forwarded.operation_id === undefined) forwarded.operation_id = randomUUID()
+          if (forwarded.operation_id === undefined) forwarded.operation_id = prepareOperationId(call.id)
           return { admissionID: JSON.stringify(["local-file", call.messageID, call.id]), file: source.file }
         })()
       : undefined
@@ -301,44 +303,14 @@ export async function dockTools(input: {
         const message = hostErrorText(error)
         const { details } = hostFailure(error)
         if (details && "operationId" in details && details.operationId) throw new Tool.Error({
-          message, metadata: { generation: lease.generation, isError: true, loginom: uncertainStep(details.operationId) },
+          message, metadata: { generation: lease.generation, isError: true, loginom: decodeLoginomMetadata(uncertainStep(details.operationId)) },
         })
         throw Error(message)
       })
-    const text = result.content
-      .flatMap((block) => (block.type === "text" && typeof block.text === "string" ? [block.text] : []))
-      .join("\n\n")
-    const state = loginomResultState(result as Parameters<typeof loginomResultState>[0])
-    const summary = oversized(text)
-      ? loginomResultSummary(result as Parameters<typeof loginomResultSummary>[0])
-      : undefined
-    const outputPath = summary ? await retain(text) : undefined
-    const content =
-      summary && outputPath
-        ? `${summary}\n\nTable data and verbose details were omitted by the backend response limit. The complete original result is retained at ${outputPath}. Do not infer unread data or repeat mutations solely to retrieve omitted text.`
-        : text
-    const loginom = Option.getOrUndefined(decodeStep(result._meta?.loginomStep))
-    const metadata = { generation: lease.generation, ...(loginom ? { loginom } : {}) }
-    if (state === "failed")
-      throw new Tool.Error({
-        message: content || "LOGINOM_TOOL_FAILED",
-        metadata: { ...metadata, isError: true },
-      })
-    const images = result.content.flatMap((block) =>
-      block.type === "image" && typeof block.data === "string" && typeof block.mimeType === "string"
-        ? [{ type: "file" as const, uri: `data:${block.mimeType};base64,${block.data}`, mime: block.mimeType }]
-        : [],
-    )
-    return {
-      content: images.length ? [{ type: "text", text: content }, ...images] : content,
-      metadata: {
-        ...metadata,
-        ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
-        // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
-        ...(outputPath ? { truncated: true, outputPath } : {}),
-        ...(state === "pending" ? { loginomPending: true } : {}),
-      },
-    }
+    return dockToolResult(result, lease.generation, {
+      toolCallId: call.id,
+      host: result._meta?.loginomFields,
+    })
   }
 
   // Inline attachments of the session's user messages reach a Dock call as eager admissions, as 0.4 admitted `data:`
@@ -357,6 +329,48 @@ export async function dockTools(input: {
       )
       return files.length ? [{ userMessage: message.id, files }] : []
     })
+  }
+}
+
+export function prepareOperationId(callId: string) {
+  return stepOperationIdPattern.test(callId) ? callId : "call:" + createHash("sha256").update(callId, "utf16le").digest("hex")
+}
+
+export async function dockToolResult(
+  result: typeof Reply.Type,
+  generation: Lease["generation"],
+  feed?: LoginomMetadataInput,
+): Promise<Tool.Result> {
+  const text = result.content
+    .flatMap((block) => (block.type === "text" && typeof block.text === "string" ? [block.text] : []))
+    .join("\n\n")
+  const state = loginomResultState(result as Parameters<typeof loginomResultState>[0])
+  const summary = oversized(text)
+    ? loginomResultSummary(result as Parameters<typeof loginomResultSummary>[0])
+    : undefined
+  const outputPath = summary ? await retain(text) : undefined
+  const content =
+    summary && outputPath
+      ? `${summary}\n\nTable data and verbose details were omitted by the backend response limit. The complete original result is retained at ${outputPath}. Do not infer unread data or repeat mutations solely to retrieve omitted text.`
+      : text
+  const loginom = decodeLoginomMetadata(result._meta?.loginom, feed, Option.getOrUndefined(decodeStep(result._meta?.loginomStep)))
+  const metadata = { generation, ...(loginom ? { loginom } : {}) }
+  if (state === "failed")
+    throw new Tool.Error({ message: content || "LOGINOM_TOOL_FAILED", metadata: { ...metadata, isError: true } })
+  const images = result.content.flatMap((block) =>
+    block.type === "image" && typeof block.data === "string" && typeof block.mimeType === "string"
+      ? [{ type: "file" as const, uri: `data:${block.mimeType};base64,${block.data}`, mime: block.mimeType }]
+      : [],
+  )
+  return {
+    content: images.length ? [{ type: "text", text: content }, ...images] : content,
+    metadata: {
+      ...metadata,
+      ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
+      // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
+      ...(outputPath ? { truncated: true, outputPath } : {}),
+      ...(state === "pending" ? { loginomPending: true } : {}),
+    },
   }
 }
 
