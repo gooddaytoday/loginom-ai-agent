@@ -68,15 +68,25 @@ test('expanded columns remain available when only the delivered rows exceed the 
  assert.ok(Buffer.byteLength(JSON.stringify(metadata))<=16384);
 });
 
-test('detail never substitutes the ten-row preview for all delivered rows or exposes redacted cells',()=>{
- const values=Array.from({length:13},(_,index)=>'row '+index);
+test('detail stores one copy of all delivered rows when they fit without the ten-row preview',()=>{
+ const values=Array.from({length:11},(_,index)=>'row '+index+'я'.repeat(464));
  const receipt=makeReceipt({values});
- const [port]=project(receipt).ports;
- assert.equal(port.preview.sample.length,10);
- assert.deepEqual(port.details.delivered,{kind:'rows',rows:values.map(value=>[makeCell(value)])});
+ const [delivered]=JSON.parse(nodeResultReply(receipt,options).content[0].text).output.ports;
+ assert.equal(delivered.sample.length,11);
+ const metadata=project(receipt);
+ const [port]=metadata.ports;
+ assert.ok(!port.preview);
+ assert.deepEqual(port.details.delivered,{kind:'rows',rows:delivered.sample});
+ assert.equal(port.details.columns[0].name,'item');
+ assert.ok(Buffer.byteLength(JSON.stringify(metadata))<=16384);
+});
+
+test('detail does not expose redacted cells',()=>{
+ const receipt=makeReceipt({values:['row 0']});
  readPort(receipt).schema[0].name='password';
  const metadata=project(receipt);
  assert.deepEqual(metadata.ports[0].details.delivered,{kind:'unavailable',reason:'rows_redacted'});
+ assert.equal(metadata.ports[0].preview.sample[0][0].value,'[redacted]');
  assert.ok(!JSON.stringify(metadata).includes('row 0'));
 });
 

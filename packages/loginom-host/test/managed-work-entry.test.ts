@@ -24,6 +24,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "managed-work-entry-"))
   const work = join(directory, "work.json")
+  const finishSample = join(directory, "finish-sample")
   const src = join(directory, "runtime/src")
   const files = {
     "runtime/src/managed-entry.mjs": await readFile(
@@ -94,7 +95,8 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
        export const admitStartupArtifacts=artifacts.admitStartupArtifacts;
        export const artifactFailure=artifacts.artifactFailure ?? (()=>null);`,
     "runtime/client/lib/bridge.mjs": `
-      import { readFileSync } from 'node:fs';
+      import { existsSync, readFileSync } from 'node:fs';
+      import { setTimeout } from 'node:timers/promises';
       import { loginomFeedMetadata } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/user-results.mjs", import.meta.url).href)};
       const work = () => JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8'));
       export async function createBridge(_config, _session, {presentNodeReply}) { return {
@@ -104,6 +106,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
         applyWithScanReceipt: reply => presentNodeReply(reply, options =>
           loginomFeedMetadata(reply, {...options, tool:'dock_node_apply'})),
+        readNodeOutput: async () => {
+          while (!existsSync(${JSON.stringify(finishSample)})) await setTimeout(5);
+          return { rows: [[{ value: 'sample' }]] };
+        },
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
           return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
@@ -116,6 +122,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }] }; }
         async callTool(input, _unused, { signal }) {
           if (input.arguments.failAfterDispatch) throw Error('LOGINOM_FILE_CHANGED');
+          if (input.arguments.afterSample) {
+            if (!require('node:fs').existsSync(${JSON.stringify(finishSample)})) throw Error('sample still running');
+            return { content: [{ type: 'text', text: 'new turn ran' }] };
+          }
           if (input.arguments.progressFixture) {
             const { stepPhase } = await import('../../../../lib/step-progress.mjs');
             stepPhase('configuring', 'transform.group_data', { kind: 'fields', index: 2, total: 3 });
@@ -226,6 +236,24 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         },
       },
     })
+    const nodeOutputRequest = {
+      generation: 1,
+      operationId: "test-operation",
+      executionId: "execution",
+      portGuid: "port-guid",
+    }
+    const sample = runtime.request("nodeOutput", nodeOutputRequest)
+    const nextCall = runtime
+      .request("call", { name: "fixture", arguments: { afterSample: true } })
+      .catch((error: unknown) => error)
+    try {
+      expect(await runtime.request("nodeOutput", nodeOutputRequest)).toBeNull()
+    } finally {
+      await Bun.write(finishSample, "")
+    }
+    expect(await nextCall).toMatchObject({ result: { content: [{ type: "text", text: "new turn ran" }] } })
+    expect(await sample).toBeNull()
+    expect(await runtime.request("nodeOutput", nodeOutputRequest)).toEqual({ rows: [[{ value: "sample" }]] })
     const call = runtime
       .request("call", { name: "fixture", arguments: { hold: true } })
       .catch((error: unknown) => error)

@@ -3798,9 +3798,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const {captureInput,rowOffset,...original}=witness.request;
       const request={...original,sampleRows:100,expectedPortGuid:port.port_guid};
       const options={origin:targetOrigin,build:targetBuild,deadline:now()+12000};
-      const read=async code=>{
+      const read=async(code,{timeout=15000}={})=>{
+        const remaining=options.deadline-now();
+        if(remaining<=0)return;
         const response=await execute('async page=>({status:"SUCCEEDED",action_key:"node.output.read",action_revision:"1",operation_id:'
-          +JSON.stringify(operation.id)+',phase:"read",effect_possible:false,cleanup_complete:true,trace:[],error:null,output:{value:await ('+code+')(page)}})',{timeout:15000});
+          +JSON.stringify(operation.id)+',phase:"read",effect_possible:false,cleanup_complete:true,trace:[],error:null,output:{value:await ('+code+')(page)}})',{timeout:Math.min(timeout,remaining+3000)});
         return response.output?.value;
       };
       running=true;

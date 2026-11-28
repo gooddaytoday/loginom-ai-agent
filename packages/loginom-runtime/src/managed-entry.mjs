@@ -31,6 +31,7 @@ const state = {
   bridge: undefined,
   client: undefined,
   controller: undefined,
+  nodeOutput: undefined,
   session: undefined,
   browser: undefined,
   browserProfile: undefined,
@@ -298,7 +299,7 @@ async function handle(message) {
         if (message.input?.generation !== state.owner.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
         if (message.input.origin !== state.owner.origin) throw Error("DASHBOARD_ORIGIN_MISMATCH")
       }
-      if (state.controller) throw Error("LOGINOM_REQUEST_INVALID")
+      if (state.controller || state.nodeOutput) throw Error("LOGINOM_REQUEST_INVALID")
       const controller = new AbortController()
       state.controller = controller
       const cancellation = { close: undefined }
@@ -363,15 +364,17 @@ async function handle(message) {
       return
     }
     if (message.operation === "nodeOutput") {
-      if (state.controller || message.input?.generation !== state.owner.generation) {
+      if (state.controller || state.nodeOutput || message.input?.generation !== state.owner.generation) {
         send({ id: message.id, result: null })
         return
       }
-      state.controller = new AbortController()
+      const pending = Promise.resolve(state.bridge.readNodeOutput(message.input))
+      state.nodeOutput = pending
       try {
-        send({ id: message.id, result: await state.bridge.readNodeOutput(message.input) })
+        const result = await pending
+        send({ id: message.id, result: state.controller || state.closing ? null : result })
       } finally {
-        state.controller = undefined
+        state.nodeOutput = undefined
       }
       return
     }
@@ -387,6 +390,10 @@ async function handle(message) {
     const controller = new AbortController()
     state.controller = controller
     try {
+      if (state.nodeOutput) {
+        await state.nodeOutput.catch(() => undefined)
+        controller.signal.throwIfAborted()
+      }
       // Allow the bounded owned read and cleanup to return before the outer IPC
       // deadlines. Other tools retain room for a 60-second dock_node_wait.
       const options = {

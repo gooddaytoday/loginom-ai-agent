@@ -401,7 +401,17 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
     if (samePreview) details.delivered = {kind:'preview'};
     else if (bytes(rows) <= FEED_MAX_BYTES) {
       const safeRows = JSON.stringify(redactOutputRows(rows,port.schema,redactor)) === JSON.stringify(rows);
-      details.delivered = safeRows ? {kind:'rows',rows} : {kind:'unavailable',reason:'rows_redacted'};
+      if (!safeRows) details.delivered = {kind:'unavailable',reason:'rows_redacted'};
+      else {
+        const {preview} = table;
+        delete table.preview;
+        if (preview) details.columns = preview.schema;
+        details.delivered = {kind:'rows',rows};
+        if (!fits() && preview) {
+          table.preview = preview;
+          delete details.columns;
+        }
+      }
     }
     if (!fits()) details.delivered = fallback;
   }
