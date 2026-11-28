@@ -17,6 +17,7 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
+import { decodeBusy } from "./step-progress"
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
 export async function verifyInstallationResources(options: {
@@ -829,7 +830,12 @@ export async function createLoginomHost(options: {
         typeof result.dispatching !== "boolean"
       )
         throw new Error("LOGINOM_REPLY_INVALID")
-      return { activeWork: result.activeWork, unsettledWork: result.unsettledWork, dispatching: result.dispatching }
+      const busy = "busy" in result && result.busy !== null ? decodeBusy(result.busy) : undefined
+      if ("busy" in result && result.busy !== null && !busy) throw new Error("LOGINOM_REPLY_INVALID")
+      return {
+        activeWork: result.activeWork, unsettledWork: result.unsettledWork, dispatching: result.dispatching,
+        ...(busy ? { busy } : {}),
+      }
     },
     async runtime(generation: number, chat: string, startup?: { deadline: number; signal: AbortSignal }) {
       const current = generations.get(generation)

@@ -1,4 +1,5 @@
 import vm from 'node:vm';
+import {withLoginomMetadata} from '../../lib/loginom-feed-metadata.mjs';
 import {makePackageCleanupCode} from '../../lib/package-cleanup.mjs';
 import test, {mock} from 'node:test';
 import assert from 'node:assert/strict';
@@ -86,6 +87,18 @@ class ExternalClient {
       value={version:1,session_id:'own-session',document_id:'own-doc',account:'test-2',package_path:this.f.path,
         modified:this.f.scenario==='dirty-after-save'&&this.f.saves===1,observation:'after_confirmed_save',read_only:true,persisted_content_verified:false};
     }
+    else if(this.f.savedFixture && code.includes('function inSavedFileTab')){
+      this.f.events.push('saved-file');
+      if(this.f.refuseSavedRead){
+        this.f.refuseSavedRead=false;
+        return {isError:true,content:[{type:'text',text:'### Error\nTool "browser_run_code_unsafe" not found'}]};
+      }
+      if(this.f.savedReadLost)throw Error('Read timed out with native stream cleanup pending');
+      value=this.f.fileMissing?{fileExists:false}:{fileExists:true,mtime:'2026-11-27T15:00:00.000Z',
+        size:this.f.savedFixture.length,base64:this.f.savedFixture.toString('base64')};
+    } else if(this.f.savedFixture && code.includes('__loginomDockSavedFileReadV1')){
+      value={released:this.f.savedReadReleased===true};
+    }
     else if(code.includes('async function closeOwnedPackage')){
       this.f.events.push('package-cleanup');
       if(this.f.page){
@@ -152,11 +165,15 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
     return f.runtime;
   }
   return {tools:f.storageReturn?[...executor.executorTools,...serverDownloadTools]:executor.executorTools,
+    saveNodeLabels:()=>new Map(),
+    savedGraphBefore:()=>f.savedFixture ? {
+      nodes:[{id:'770a65bc-5ea0-47f2-80f8-ab900e5e43c2',label:f.previousLabel??'Сортировка',sorting:true}],links:[],
+    } : undefined,
     serverDownload:async(_args,_name,{onWorkflowReturn})=>{onWorkflowReturn?.(f.storageReturn);return f.storageReceipt;},
     describe:()=>({available_node_types:[],actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},hasUnsettledWork:()=>f.unsettled || (f.scenario==='product-gate-unsettled' && ++f.workChecks>1),async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
     requestFailure:error=>{
       f.failureMessages??=[];f.failureMessages.push(error.message);
-      return {status:'NOT_APPLIED',operation_id:'refused-save',effect_possible:false,cleanup_complete:true};
+      return {status:'NOT_APPLIED',operation_id:'refused-save',effect_possible:false,cleanup_complete:true,output:{}};
     },
     run:async(key,parameters,{operationId})=>{
       // Keep the real executor's explicit-null validation authoritative.
@@ -168,7 +185,8 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
       if(f.receipts.has(operationId))return f.receipts.get(operationId);
       if(f.scenario==='failed-new-save'&&operationId==='failed-save')return {status:'NOT_APPLIED',action_key:key,operation_id:operationId,effect_possible:false,output:{}};
       f.saves++;f.path=parameters.path;
-      const result={status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};
+      const result={status:'SUCCEEDED',action_key:key,operation_id:operationId,
+        output:{package_ref:{path:parameters.path,active_identity:parameters.path}}};
       if((f.reopen&&key==='package.save_as')||f.normalized||f.verifiedReopen||f.recovered){result.output.reopened=true;f.activeTab='MF;cntMain;cntWorkspace;Workspace;t.br;tb-5';}
       if(f.normalized||f.verifiedReopen||f.recovered&&f.saves>1){
         const continuations=[{document_id:'own-doc',workflow_ref:{workflow_id:'own-workflow',tab_tid:f.activeTab,prefix:'MF;TF-5',
@@ -179,6 +197,7 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
         if(key==='package.save_checkpoint')result.output.workflow_continuations=continuations;
       }
       if(f.recovered){result.output.reopened=false;if(f.saves===1){result.status='AMBIGUOUS';result.output={};}}
+      if(f.savedFixture){result.cleanup_complete=true;result.output.package_ref.active_identity=parameters.path;}
       f.receipts.set(operationId,result);return f.loseId===operationId?{...result,status:'AMBIGUOUS'}:result;
     },
     inspect:async({operationId})=>f.inspection??{status:'SUCCEEDED',action_key:'operation.inspect',operation_id:operationId,
@@ -442,7 +461,14 @@ test('unknown prepared workflow advises only the last confirmed Save of its own 
   const config={resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
     mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
     loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2'};
-  const bridge=await createBridge(config,makeSession());
+  const bridge=await createBridge(config,makeSession(),{
+    presentNodeReply:(reply,project)=>{
+      const receipt=project({});
+      if(!receipt)return reply;
+      const pending=withLoginomMetadata(reply,{operationId:receipt.operationId,state:'running',verificationStale:true});
+      return withLoginomMetadata(pending,{receipt});
+    },
+  });
   const client=new AgentClient({name:'prepared-workflow-hint',version:'1'});
   const stale={intent:'existing_workflow',workflow_ref:{document_id:'old-doc',workflow_id:'old-workflow',
     tab_tid:'old-tab',prefix:'old',navigation_path:[{tid:'not-a-package-path',label:'guessed.lgp'}]}};
@@ -463,17 +489,25 @@ test('unknown prepared workflow advises only the last confirmed Save of its own 
     const unknown=await refusal();
     assert.deepEqual(unknown.arguments,{intent:'open_package'});assert.match(unknown.instruction,/does not know/);
     await client.callTool({name:'dock_prepare',arguments:{}});
-    await save('first-save','package.save_checkpoint',path);
+    const first=(await save('first-save','package.save_checkpoint',path))._meta.loginom;
+    assert.deepEqual(first.evidence,[{kind:'saved',path}]);
+    assert.equal(first.verificationStale,true);
+    assert.equal(first.state,'settled');
+    assert.ok(first.receiptWindow.startSequence<first.receiptWindow.confirmedSequence);
     assert.deepEqual((await refusal()).arguments,{intent:'open_package',package_path:path});
-    await save('newer-save','package.save_as',secondPath);
+    const newer=(await save('newer-save','package.save_as',secondPath))._meta.loginom;
+    assert.equal(newer.receiptWindow.runtimeId,first.receiptWindow.runtimeId);
+    assert.ok(newer.receiptWindow.startSequence>first.receiptWindow.confirmedSequence);
     assert.equal((await refusal()).arguments.package_path,secondPath);
-    await save('first-save','package.save_checkpoint',path);
+    assert.deepEqual((await save('first-save','package.save_checkpoint',path))._meta.loginom.receiptWindow,first.receiptWindow);
     assert.equal((await refusal()).arguments.package_path,secondPath);
     f.refuseOnce='failed-save';await save('failed-save','package.save_checkpoint',path);
     assert.equal((await refusal()).arguments.package_path,secondPath);
-    f.loseId='ambiguous-save';await save('ambiguous-save','package.save_checkpoint',path);
+    f.loseId='ambiguous-save';assert.equal((await save('ambiguous-save','package.save_checkpoint',path))._meta?.loginom,undefined);
     assert.equal((await refusal()).arguments.package_path,secondPath);
-    await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:'ambiguous-save'}});
+    const reconciled=await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:'ambiguous-save'}});
+    assert.deepEqual(reconciled._meta.loginom.evidence,[{kind:'saved',path}]);
+    assert.equal(reconciled._meta.loginom.operationId,'ambiguous-save');
     assert.equal((await refusal()).arguments.package_path,path);
     f.unsettled=true;
     const pending=await client.callTool({name:'dock_prepare',arguments:stale});
@@ -488,17 +522,28 @@ test('unknown prepared workflow advises only the last confirmed Save of its own 
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
 });
 
-for(const action_key of ['package.save_checkpoint','package.save_as'])
- test('Save rejects explicit null but permits an omitted ID: '+action_key,async t=>{
+for(const {action_key,fileMissing,refuseSavedRead} of [{action_key:'package.save_checkpoint'},{action_key:'package.save_as'},
+  {action_key:'package.save_checkpoint',fileMissing:true},{action_key:'package.save_checkpoint',refuseSavedRead:true}])
+ test('Save retains its receipt '+(refuseSavedRead?'after a browser refusal before the read: '
+   :fileMissing?'when listing confirms the file is absent: ':'and reads file evidence: ')+action_key,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-null-save-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
-  const f=current={scenario:'success',events:[],busy:false,saves:0,path,receipts:new Map(),catalog};
+  const savedFixture=await readFile(new URL('../../../../../evals/fixtures/calibration/sales-by-category/reference.lgp',import.meta.url));
+  const f=current={scenario:'success',events:[],busy:false,saves:0,path,receipts:new Map(),catalog,savedFixture,fileMissing,refuseSavedRead};
+  const password='loginom-fixture-password';
+  if(action_key==='package.save_as') f.previousLabel='Я'.repeat(94)+password;
   const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
    artifactStore:{list:()=>[],async releaseUploads(){}}};
   const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
-   mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
-   loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+   mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+   loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session,{
+   browserSecrets:[password],
+   presentNodeReply:(reply, project) => {
+     const projection=project({});
+     return projection?withLoginomMetadata(reply,{receipt:projection}):reply;
+   },
+  });
   const client=new AgentClient({name:'null-save',version:'1'});
   try{
    const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
@@ -513,10 +558,79 @@ for(const action_key of ['package.save_checkpoint','package.save_as'])
    const response=await client.callTool({name:'dock_action_run',arguments:{action_key,parameters:{path,conflict_policy:'replace'}}});
    const saved=JSON.parse(response.content[0].text);
    assert.equal(saved.status,'SUCCEEDED');assert.match(saved.operation_id,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+   const {v,operationId,savedPackageGraph:report,evidence,receiptWindow}=response._meta.loginom;
+   assert.equal(v,1);
+   assert.equal(report.status,fileMissing||refuseSavedRead?'unavailable':'compared');
+   assert.equal(operationId,saved.operation_id);
+   assert.deepEqual(evidence,fileMissing||refuseSavedRead?[{kind:'saved',path}]:[{kind:'saved',path},
+     {kind:'savedFileRead',scope:'package',nodeCount:4,workflowGuidMatch:false,file:{mtime:'2026-11-27T15:00:00.000Z',size:10157,
+       hash:'ad9e8e3b8e63597d724a26fc88f1fa17dc0c9b396ada0624a2756d13238b3790'}}]);
+   assert.equal(receiptWindow.documentId,'own-doc');
+   assert.ok(receiptWindow.startSequence<receiptWindow.confirmedSequence);
+   assert.equal(report.saveOperationId,saved.operation_id);
+   assert.equal(report.packagePath,path);
+   if(fileMissing)assert.ok(response.content.some(block=>block.text.includes('Квитанция Save остаётся')));
+   else if(refuseSavedRead){
+     assert.ok(response.content.some(block=>block.text.includes('Пакет сохранён, но')));
+     assert.ok(response.content.every(block=>!block.text.includes('SAVED_PACKAGE_READ_CLEANUP_PENDING')));
+     assert.equal(bridge.hasUnsettledWork(),false);
+   }
+   else {
+     assert.equal(report.renameAttribution,'unconfirmed');
+     assert.equal(report.scope,'activeWorkflow');
+     assert.deepEqual(report.savedLabels,[{nodeId:'770a65bc-5ea0-47f2-80f8-ab900e5e43c2',label:'По убыванию выручки'}]);
+     assert.ok(report.changes.some(change=>change.kind==='node_added'));
+     const message=response.content.find(block=>block.text.startsWith('В сохранённом пакете имя узла отличается:'));
+     assert.ok(message.text.includes('» → «По убыванию выручки»'));
+     if(f.previousLabel){
+       assert.ok(!JSON.stringify(response).includes(password));
+       assert.ok(!message.text.includes(password.slice(0,6)));
+       assert.ok(report.changes.some(change=>change.before?.endsWith('[redacted]')));
+     }
+   }
+   const replay=await client.callTool({name:'dock_action_run',arguments:{action_key,parameters:{path,conflict_policy:'replace'},operation_id:saved.operation_id}});
+   assert.deepEqual(replay._meta.loginom.savedPackageGraph,report);
+   assert.deepEqual(replay._meta.loginom.evidence,evidence);
+   assert.deepEqual(replay._meta.loginom.receiptWindow,receiptWindow);
+   const inspected=await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:saved.operation_id}});
+   assert.deepEqual(inspected._meta.loginom.savedPackageGraph,report);
+   assert.deepEqual(inspected._meta.loginom.evidence,evidence);
+   assert.deepEqual(inspected._meta.loginom.receiptWindow,receiptWindow);
+   assert.equal(f.events.filter(event=>event==='saved-file').length,1);
    assert.equal(f.saves,1);
+   let lastSave=saved;
+   if(refuseSavedRead){
+    const next=await client.callTool({name:'dock_action_run',arguments:{action_key,parameters:{path,conflict_policy:'replace'},operation_id:'after-refusal'}});
+    lastSave=JSON.parse(next.content[0].text);
+    assert.equal(lastSave.status,'SUCCEEDED');
+    assert.equal(next._meta.loginom.savedPackageGraph.status,'compared');
+    assert.equal(f.saves,2);
+    assert.equal(f.events.filter(event=>event==='saved-file').length,2);
+   }
+   if(action_key==='package.save_as'){
+    const save=operation_id=>client.callTool({name:'dock_action_run',arguments:{action_key,parameters:{path,conflict_policy:'replace'},operation_id}});
+    f.savedReadLost=true;
+    const pending=await save('second-save');
+    assert.equal(JSON.parse(pending.content[0].text).status,'SUCCEEDED');
+    assert.ok(pending.content.some(block=>block.text.includes('SAVED_PACKAGE_READ_CLEANUP_PENDING')));
+    assert.equal(bridge.hasUnsettledWork(),true);
+     const repeated=await save('second-save');
+     assert.equal(JSON.parse(repeated.content[0].text).status,'SUCCEEDED');
+     assert.equal(f.events.filter(event=>event==='saved-file').length,2);
+    const blocked=JSON.parse((await save('third-save')).content[0].text);
+    assert.equal(blocked.status,'NOT_APPLIED');
+    assert.equal(blocked.effect_possible,false);
+    assert.equal(blocked.error.code,'SAVED_PACKAGE_READ_CLEANUP_PENDING');
+    assert.equal(f.saves,2);
+    f.savedReadReleased=true;
+    f.savedReadLost=false;
+    lastSave=JSON.parse((await save('third-save')).content[0].text);
+    assert.equal(lastSave.status,'SUCCEEDED');
+    assert.equal(f.saves,3);
+   }
    assert.equal((await bridge.close()).browser_transport_closed,true);
    const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
-   assert.equal(cleanup.status,'SUCCEEDED');assert.equal(cleanup.save_operation_id,saved.operation_id);
+   assert.equal(cleanup.status,'SUCCEEDED');assert.equal(cleanup.save_operation_id,lastSave.operation_id);
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
 
@@ -574,7 +688,7 @@ for(const mode of ['isolated','product','normal'])for(const scenario of mode==='
       if(!scenario.endsWith('no-save')){
         const saved=await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'own-save'}});
         const values=saved.content.filter(c=>c.type==='text').map(c=>{try{return JSON.parse(c.text);}catch{return {};}});
-        assert.equal(values[0].status,'SUCCEEDED');if(!scenario.startsWith('product-'))assert.deepEqual(values[0].output,{package_ref:{path}});
+        assert.equal(values[0].status,'SUCCEEDED');if(!scenario.startsWith('product-'))assert.deepEqual(values[0].output,{package_ref:{path,active_identity:path}});
         const advice=values.find(v=>v.kind==='dock_saved_package_state');assert.ok(advice);
         assert.equal(advice.modified,scenario==='state-unavailable'?null:scenario==='dirty-after-save');
         if(scenario==='dirty-after-save'){

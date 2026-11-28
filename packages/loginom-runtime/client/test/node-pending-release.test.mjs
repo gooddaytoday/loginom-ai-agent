@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {createActionRuntime,parseCapabilityResult,withBrowserReceipt} from '../lib/executor.mjs';
+import {nodeResultReply} from '../lib/node-result-reply.mjs';
+import {loginomFeedMetadata} from '../lib/user-results.mjs';
 import {createStorageBinding,withStorageIdentity} from '../lib/storage-policy.mjs';
 import {releasePendingNode,verifyRecoveredPendingNode,proveFinishLaunchRefused,NodeReleaseBlocked} from '../lib/node-pending-release.mjs';
 import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
@@ -382,7 +384,7 @@ test('browser recovery refuses a graph that changes after manual cleanup',async(
 const request=()=>({operation_id:'apply',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
  target:{kind:'new',type:'imports.text',label:'Source',position:{x:320,y:280}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'execute',
  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
-function fixture({release:releaseDriver,type='imports.text',browserRecovery=false,execute=async()=>{throw Error('Unexpected public transport');}}={}) {
+function fixture({release:releaseDriver,type='imports.text',browserRecovery=false,receiptSequence,execute=async()=>{throw Error('Unexpected public transport');}}={}) {
  const calls=[],events=[],graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[],links:[],foreign_links:[]};
  const adapter={observe:async()=>structuredClone(graph),preflight:async()=>{},positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),
   reconcile:async()=>({verified:true,cleanup_complete:true}),mutate:async e=>{calls.push(e.kind);if(e.kind==='create')graph.nodes.push({ref:node,
@@ -396,13 +398,47 @@ function fixture({release:releaseDriver,type='imports.text',browserRecovery=fals
   ...(releaseDriver?{releasePending:async state=>{calls.push('release:'+state.pending.phase);return releaseDriver(state);}}:{})};
  const handler={revision:'1',modes:['delimited'],validate:()=>{},configure:ok('configure')};
  let context;
- const runtime=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,execute,browserRecovery,
+ const runtime=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,execute,browserRecovery,receiptSequence,
   nodeTargetAdapterFactory:()=>adapter,nodeApplyHandlers:new Map([[type,handler]]),nodeApplyDriverFactory:value=>{context=value;return drivers;},
   onRecord:async e=>{events.push(e);return e;}});
  return {runtime,calls,events,drivers,handler,context:()=>context};
 }
 const proved=({wizard_closed=false,read_view_restored=false}={})=>()=>({verified:true,cleanup_complete:true,effect_possible:wizard_closed||read_view_restored,
  node_context:{...node,verified:true,surface:'graph',locked:false},graph:graphOf(),cleanup:{wizard_closed,read_view_restored,views_returned:false}});
+
+test('a settled runtime wait exposes the node observed by the target phase, not the request', async()=>{
+ const {runtime}=fixture();
+ const input=request();
+ input.finish='done';
+ runtime.startNodeApply(input);
+ const job=await runtime.waitNodeApply(input.operation_id,{timeoutMs:1000});
+ assert.equal(job.outcome.status,'SUCCEEDED');
+ const tool='dock_node_wait';
+ const reply=nodeResultReply(job,{userProfile:true,tool});
+ assert.deepEqual(reply.structuredContent.node,node);
+ const projection=loginomFeedMetadata(reply,{tool,facts:runtime.nodeFeedFacts(input.operation_id)});
+ assert.equal(projection.kind,'configure');
+ assert.deepEqual(projection.node,{guid:node.node_id,label:'Source',type:'imports.text'});
+});
+
+test('execution evidence retains the same runtime ordinal range when polled again', async()=>{
+ let ordinal=40;
+ const runtimeId='32ef40ff-08d2-476a-ad73-1ef3feb17ce8';
+ const {runtime}=fixture({receiptSequence:{id:runtimeId,next:()=>++ordinal}});
+ const input=request();
+ runtime.startNodeApply(input);
+ const tool='dock_node_wait';
+ const project=async()=>{
+  const job=await runtime.waitNodeApply(input.operation_id,{timeoutMs:1000});
+  const reply=nodeResultReply(job,{userProfile:true,tool});
+  return loginomFeedMetadata(reply,{tool,facts:runtime.nodeFeedFacts(input.operation_id)});
+ };
+ const first=await project();
+ assert.deepEqual(first.evidence,[{kind:'executed',executionId:'exec',scope:'activeWorkflow'}]);
+ assert.deepEqual(first.receiptWindow,{runtimeId,documentId:'doc',startSequence:41,confirmedSequence:42});
+ assert.equal(++ordinal,43);
+ assert.deepEqual((await project()).receiptWindow,first.receiptWindow);
+});
 const stop=async(f,phase)=>{
  const key=phase==='read'?'readOutput':'finish',original=f.drivers[key];let first=true;
  f.drivers[key]=async(...args)=>{if(!first)return original(...args);first=false;f.calls.push(phase);throw Error('Local node cancellation requested');};

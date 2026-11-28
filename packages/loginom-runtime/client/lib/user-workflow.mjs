@@ -3,6 +3,12 @@
 import {NODE_ADD_ONLY_MODE} from './node-contracts.mjs';
 
 export const userActionKeys=['package.save_checkpoint','package.save_as'];
+export function defaultUserNodeReadPorts(finish,type) {
+  if(finish!=='execute'||['variables.from_table','exports.text','exports.excel','exports.lgd'].includes(type))return [];
+  if(type==='research.quality')return [0,1,2,3,4];
+  if(type==='preprocessing.coarse_classes')return [0,1,2];
+  return ['datamining.assn_rules','transform.filter_data','integration.rest_request','datamining.clustering'].includes(type)?[0,1]:[0];
+}
 const exportCreationDefaults=Object.freeze({encoding:'UTF-8',delimiter:',',header:'names',bom:false,line_ending:'LF',decimal_separator:'.',null_marker:'',text_qualifier:'"'});
 export function userActionTool(tool) {
   if(!['dock_action_run','dock_action_describe'].includes(tool.name))return tool;
@@ -165,8 +171,7 @@ export function createUserWorkflowBindings() {
     expandNode(request) {
       const ref = references.get(key(request.document_id, request.workflow_ref?.workflow_id));
       if (!ref) throw Error('UNKNOWN_PREPARED_WORKFLOW: use document_id and workflow_id issued together by successful dock_prepare. No node operation started.');
-      const ports=request.finish!=='execute'||['variables.from_table','exports.text','exports.excel','exports.lgd'].includes(request.target.type)?[]:
-        request.target.type==='research.quality'?[0,1,2,3,4]:request.target.type==='preprocessing.coarse_classes'?[0,1,2]:['datamining.assn_rules','transform.filter_data','integration.rest_request','datamining.clustering'].includes(request.target.type)?[0,1]:[0];
+      const ports=defaultUserNodeReadPorts(request.finish,request.target.type);
       let parameters=request.parameters;
       const firstConfiguration=request.mode!==NODE_ADD_ONLY_MODE&&request.target.kind==='new';
       if(firstConfiguration&&request.target.type==='exports.text'&&parameters&&typeof parameters==='object'&&!Array.isArray(parameters))

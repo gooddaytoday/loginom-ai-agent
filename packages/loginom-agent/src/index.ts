@@ -10,6 +10,7 @@ import type { Permission } from "@opencode/schema/permission"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
+import { appVerifiedHandler, appVerifiedRpc } from "./app-verified"
 import { BrowserRecovery } from "./browser-recovery"
 import { connectionSettings } from "./connection-settings"
 import { Dashboard } from "./dashboard"
@@ -509,6 +510,9 @@ export default Plugin.define({
       await binding.fork(event.sessionID)
     })
 
+    await ctx.rpc.register(appVerifiedRpc, {
+      summary: appVerifiedHandler(ctx.session, ctx.location),
+    })
     await ctx.rpc.register(runner, {
       start: async (value) => {
         // The RPC host validates the call against the JSON Schema above before the handler runs.

@@ -16,6 +16,8 @@ import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
 import { observeLoginomReplies, withStepProgress } from "../client/lib/step-progress.mjs"
+import { createProtectedOperation } from "./protected-operation.mjs"
+import { withLoginomMetadata } from "../client/lib/loginom-feed-metadata.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -36,6 +38,7 @@ const state = {
   browserProfile: undefined,
   browserServer: undefined,
   lastLoginomReplyAt: null,
+  protectedOperation: undefined,
   inputs: new Map(),
   owner: undefined,
   uploadDirectory: undefined,
@@ -182,6 +185,7 @@ async function handle(message) {
         process.platform === "win32" ? await mkdtemp(join(tmpdir(), "lb")) : join(directory, "browser-profile")
       state.browserProfile = process.platform === "win32" ? browserProfile : undefined
       await startupPhase({ phase: "runtime.profile", status: "ready", duration_ms: Math.round(performance.now() - profileStarted) })
+      const knownSecrets = [input.connection.apiKey, input.connection.password]
       const login = {
         browserPath: resources.browserPath,
         profile: browserProfile,
@@ -192,7 +196,7 @@ async function handle(message) {
         signal: state.startupController.signal,
         deadline,
         onPhase: startupPhase,
-        onRetry: createExecutionJournal({ directory, metadata: { sessionId: input.chat,
+        onRetry: createExecutionJournal({ directory, knownSecrets, metadata: { sessionId: input.chat,
           clientRevision: resources.manifestHash, actionManifestDigest: resources.manifest.actionManifestSha256 } }),
       }
       if (input.validation === true) {
@@ -253,8 +257,23 @@ async function handle(message) {
       )
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
+      state.protectedOperation = createProtectedOperation(authenticated.context, new URL(input.connection.url).origin)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+        browserSecrets: knownSecrets,
+        protectOperation: state.protectedOperation.begin,
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
+        presentNodeReply: async (reply, project) => {
+          const outputFiles = await session.artifactStore.outputFiles(reply.structuredContent)
+          let result = reply
+          try {
+            const receipt = project({ outputFiles, knownSecrets, busy: state.protectedOperation.snapshot() })
+            if (receipt) result = withLoginomMetadata(reply, { receipt })
+          } catch (error) {
+            await login.onRetry({ phase: "feed_projection_failed", error: startupDiagnostic(error, knownSecrets) })
+              .catch(() => { session.metadata.localDiagnosticsIncomplete = true })
+          }
+          return outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result
+        },
         startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {
           state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error,
             [input.connection.apiKey, input.connection.password, input.connection.username]) })
@@ -319,6 +338,7 @@ async function handle(message) {
           activeWork: state.bridge.hasActiveWork(),
           unsettledWork: state.bridge.hasUnsettledWork(),
           dispatching: state.controller !== undefined,
+          busy: state.protectedOperation.snapshot() ?? null,
         },
       })
       return
@@ -365,6 +385,9 @@ async function handle(message) {
       throw Error("LOGINOM_REQUEST_INVALID")
     const controller = new AbortController()
     state.controller = controller
+    const unsubscribeBusy = message.input.stepProgress === true
+      ? state.protectedOperation.subscribe(busy => send({ id: message.id, progress: { busy } }))
+      : undefined
     try {
       // Allow the bounded owned read and cleanup to return before the outer IPC
       // deadlines. Other tools retain room for a 60-second dock_node_wait.
@@ -384,7 +407,8 @@ async function handle(message) {
         : message.input.scanReceipt !== undefined
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
           : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options))
-      const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
+      const outputFiles = result._meta?.loginom && Array.isArray(result._meta.outputFiles)
+        ? result._meta.outputFiles : await state.session.artifactStore.outputFiles(result.structuredContent)
       send({
         id: message.id,
         result: {
@@ -394,6 +418,7 @@ async function handle(message) {
         },
       })
     } finally {
+      unsubscribeBusy?.()
       state.controller = undefined
     }
   } catch (error) {

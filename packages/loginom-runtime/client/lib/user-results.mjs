@@ -1,6 +1,8 @@
 import {nodeOutputPortSchema,replacedLinksSchema} from './node-result-schema.mjs';
 import {budgetUserPreview,previewWireSize,USER_PREVIEW_WIRE_BUDGET} from './user-preview-budget.mjs';
 import {calculatorPrecisionWarnings} from './calculator-precision-warning.mjs';
+import {createRedactor} from './redact.mjs';
+import {LOGINOM_METADATA_FIELD_MAX_BYTES, LOGINOM_METADATA_MAX_BYTES, loginomMetadataBytes} from './loginom-feed-metadata.mjs';
 const pick = (value, keys) => Object.fromEntries(keys.filter(key => value?.[key] !== undefined).map(key => [key, value[key]]));
 export const userResultSchema = {
   type: 'object', required: ['result_version', 'operation_id'], additionalProperties: false,
@@ -160,6 +162,14 @@ export function compactActionResult(result,{wireSize=previewWireSize}={}) {
   // force another observation, or tempt clients to reuse stale references.
   const copy = structuredClone(result);
   delete copy.trace;
+  const inspected = copy.action_key === 'operation.inspect' ? copy.output?.outcome : undefined;
+  if (['package.save_as', 'package.save_checkpoint'].includes(inspected?.action_key)) {
+    inspected.trace = inspected.trace?.map(({graph, expected_graph, actual_graph, ...event}) => event);
+    if (inspected.output) {
+      delete inspected.output.expected_graph;
+      delete inspected.output.actual_graph;
+    }
+  }
   // Inspection must reconcile the same retained operation even when its table
   // could not be delivered. Preserve every effect/phase/configuration receipt.
   const node=copy.action_key==='operation.inspect'&&copy.output?.outcome?.action_key==='node.apply'
@@ -189,4 +199,210 @@ export function compactKnowledgeBundle(description) {
     node_types: description.node_types.map(node => pick(node, ['type', 'candidate_node_apply_available',
       'semantics', 'modes', 'limitations', 'knowledge_sha256', 'validated_for'])),
   };
+}
+
+const FEED_PREVIEW_MAX_BYTES = 12 * 1024;
+const SAVED_GRAPH_MAX_BYTES = LOGINOM_METADATA_FIELD_MAX_BYTES.savedPackageGraph;
+
+function projectSavedPackageGraph(graph, text) {
+  const packagePath = text(graph.package_path).toWellFormed();
+  const identity = {saveOperationId:graph.save_operation_id, packagePath};
+  if (graph.status === 'unavailable') return {status:'unavailable', ...identity};
+  const result = {status:'compared', ...identity, scope:'activeWorkflow', renameAttribution:'unconfirmed',
+    changes:[], savedLabels:[], uncheckedSorting:[], truncated:true};
+  const safe = value => Array.isArray(value) ? value.map(safe) : text(value).toWellFormed();
+  const append = (target, value) => {
+    target.push(value);
+    if (loginomMetadataBytes(result) > SAVED_GRAPH_MAX_BYTES) target.pop();
+  };
+  const labelsWithChanges = new Set(graph.changes.map(change => change.node_id));
+  const labels = graph.saved_labels.toSorted((left, right) =>
+    Number(labelsWithChanges.has(right.node_id)) - Number(labelsWithChanges.has(left.node_id)));
+  for (const change of graph.changes.slice(0, 16)) {
+    const {kind, node_id:nodeId, endpoints, label, before, saved, observed_before_save:observedBeforeSave, repair} = change;
+    append(result.changes, endpoints ? {kind, endpoints} : kind === 'node_added' ? {kind, nodeId} : {kind, nodeId, label:label && safe(label), before:safe(before),
+      ...(saved === undefined ? {} : {saved:safe(saved)}),
+      ...(repair ? {observedBeforeSave:safe(observedBeforeSave), repair:{label:repair.label, prompt:safe(repair.prompt)}} : {})});
+  }
+  for (const item of labels.slice(0, 32)) append(result.savedLabels, {nodeId:item.node_id, label:safe(item.label)});
+  for (const id of graph.unchecked_sorting.slice(0, 32)) append(result.uncheckedSorting, id);
+  result.truncated = result.changes.length !== graph.changes.length || result.savedLabels.length !== labels.length
+    || result.uncheckedSorting.length !== graph.unchecked_sorting.length;
+  return result;
+}
+
+const validReceiptWindow = window => typeof window?.documentId === 'string' && window.documentId
+  && typeof window.runtimeId === 'string' && window.runtimeId
+  && Number.isSafeInteger(window.startSequence) && window.startSequence > 0
+  && Number.isSafeInteger(window.confirmedSequence) && window.confirmedSequence > window.startSequence;
+
+function busyFor(busy, operationId) {
+  return busy?.version === 1 && busy.operationId === operationId
+    && /^[A-Za-z0-9_.:-]{1,128}$/.test(busy.operationId)
+    && typeof busy.active === 'boolean' && typeof busy.windowId === 'string'
+    && /^[0-9a-f-]{36}$/.test(busy.windowId)
+    ? {version:1, windowId:busy.windowId, operationId:busy.operationId, active:busy.active} : undefined;
+}
+
+export function loginomSaveMetadata(outcome, {knownSecrets = [], receiptWindow, savedPackageGraph, savedFileRead, busy,
+  maskSavedGraph = createRedactor(knownSecrets, {minimumLength:1}).text} = {}) {
+  if (!['package.save_as', 'package.save_checkpoint'].includes(outcome.action_key) || !outcome.operation_id) return;
+  const signal = busyFor(busy, outcome.operation_id);
+  const receipt = {v:1, operationId:outcome.operation_id, state:'settled', status:outcome.status,
+    ...(signal && {busy:signal})};
+  const path = outcome.output?.package_ref?.path;
+  if (outcome.status !== 'SUCCEEDED' || typeof path !== 'string' || !path || path !== outcome.output.package_ref.active_identity)
+    return signal ? receipt : undefined;
+  const graph = outcome.trace?.findLast(item => item.event === 'reopened_package_observed'
+    && item.actual_path === path && item.path_matches === true && item.graph_matches === true)?.graph;
+  const evidence = [{kind:'saved', path:[...maskSavedGraph(path).toWellFormed()].slice(0, 1000).join('')}];
+  if (outcome.output.reopened === true && Array.isArray(graph?.nodes))
+    evidence.push({kind:'reopenedGraphRead', nodeCount:graph.nodes.length, scope:'activeWorkflow'});
+  const matchesSave = savedPackageGraph?.save_operation_id === outcome.operation_id && savedPackageGraph.package_path === path;
+  if (matchesSave && savedFileRead) evidence.push(savedFileRead);
+  return {...receipt, kind:'save', evidence,
+    ...(matchesSave && {savedPackageGraph:projectSavedPackageGraph(savedPackageGraph, maskSavedGraph)}),
+    ...(validReceiptWindow(receiptWindow) && {receiptWindow})};
+}
+
+export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts, busy}) {
+  const receipt = reply.structuredContent;
+  if (!['dock_node_apply', 'dock_node_wait', 'dock_node_status', 'dock_node_read', 'dock_node_resume', 'dock_node_cancel', 'dock_node_stop', 'dock_node_delete'].includes(tool)
+      || receipt?.result_version !== 'user-v1' || !['running', 'settled'].includes(receipt.state)
+      || typeof receipt.operation_id !== 'string' || !receipt.operation_id) return;
+
+  const redactor = createRedactor(knownSecrets);
+  const text = (value, max = 1000) => typeof value === 'string'
+    ? [...redactor.text(value).toWellFormed()].slice(0, max).join('') : undefined;
+  const reference = receipt.node ?? receipt.progress?.node;
+  const matchingFacts = facts && ['document_id','workflow_id','node_id']
+    .every(key => facts.node.ref[key] === (reference?.ref ?? reference)?.[key]) ? facts : undefined;
+  const node = matchingFacts?.node ?? reference;
+  const guid = node?.ref?.node_id ?? node?.node_id;
+  const label = text(node?.label);
+  const type = text(node?.type, 128);
+  const execution = receipt.execution ?? receipt.progress?.execution;
+  const state = receipt.state;
+  const succeeded = state === 'settled' && receipt.status === 'SUCCEEDED' && !reply.isError;
+  const signal = busyFor(busy, receipt.operation_id);
+  const result = {
+    v: 1, operationId: receipt.operation_id, state,
+    ...(signal && {busy:signal}),
+    attempt: receipt.attempt, status: state === 'settled' ? receipt.status : undefined,
+    phase: text(receipt.phase ?? receipt.progress?.pending_phase, 128),
+    node: typeof guid === 'string' && guid && label !== undefined && type ? {guid, label, type} : undefined,
+    executionId: typeof execution?.execution_id === 'string' ? execution.execution_id : undefined, executionStatus: execution?.status,
+    effectPossible: receipt.effect_possible, cleanupComplete: receipt.cleanup_complete,
+    limitations: receipt.limitations?.slice(0, 8).map(value => text(value)),
+    nextStep: typeof receipt.next_step?.instruction === 'string'
+      ? {tool: text(receipt.next_step.tool, 128), instruction: text(receipt.next_step.instruction)} : undefined,
+  };
+  const error = receipt.error;
+  const native = error?.native;
+  const afterLaunch = native?.source === 'loginom_post_launch_error_toast' && native.attribution === 'own_action_wait';
+  const verified = error?.code === 'NODE_EXECUTION_FAILED'
+    && (native?.source === 'loginom_error_toast' || execution?.failure_verified === true);
+  if (state === 'settled' && error?.code) {
+    const message = text(afterLaunch ? native.message : error.message);
+    if (message) result.error = {code: text(error.code, 128), message,
+      source: afterLaunch || verified ? 'loginom' : 'runtime',
+      attribution: afterLaunch ? 'after_launch' : verified ? 'verified_node' : undefined};
+  }
+
+  const artifacts = succeeded ? receipt.output?.file_artifacts ?? [] : [];
+  const files = artifacts.flatMap(file => {
+    const verifiedFile = outputFiles.find(output => output.artifact_id === file.artifact_id);
+    return verifiedFile ? [{artifactId: file.artifact_id, name: text(verifiedFile.name), bytes: file.bytes}] : [];
+  });
+  if (files.length) result.files = files;
+  if (matchingFacts?.kind) result.kind = matchingFacts.kind;
+  else if (artifacts.length) result.kind = 'export';
+  else if (tool === 'dock_node_read') result.kind = 'read';
+  else if (execution?.execution_id || ['completed', 'failed', 'pending', 'cancelled'].includes(execution?.status)) result.kind = 'execute';
+  else if (receipt.configuration?.status === 'applied') result.kind = 'configure';
+
+  let ports = succeeded ? receipt.output?.ports : undefined;
+  if (succeeded && !ports && tool === 'dock_node_wait' && reply.content[0]?.type === 'text') {
+    try {
+      const delivered = JSON.parse(reply.content[0].text);
+      if (delivered.result_version === 'user-v1' && delivered.operation_id === receipt.operation_id
+        && delivered.attempt === receipt.attempt && delivered.state === state && delivered.status === receipt.status) ports = delivered.output?.ports;
+    } catch {}
+  }
+  const safeCount = value => Number.isSafeInteger(value) && value >= 0;
+  const boundTable = port => port.port_kind !== 'tree' && port.fresh === true && safeCount(port.port) && safeCount(port.row_count)
+    && typeof port.port_guid === 'string' && port.port_guid && Array.isArray(port.schema)
+    && (!execution?.execution_id || port.execution_id === execution.execution_id);
+  const tables = (ports ?? []).flatMap(port => {
+    if (!boundTable(port)) return [];
+    const table = {index: port.port, guid: port.port_guid, rowCount: port.row_count, columnCount: port.schema.length};
+    return [{table, port}];
+  });
+  if (tables.length) result.ports = tables.map(({table}) => table);
+
+  const evidence = [];
+  if (state === 'settled' && execution?.status === 'completed' && result.executionId
+      && matchingFacts?.launchedExecutionId === result.executionId) {
+    evidence.push({kind:'executed', executionId:result.executionId, scope:'activeWorkflow'});
+  }
+  for (const {port} of tables) {
+    const rowsRead = port.sample?.length;
+    if (!safeCount(rowsRead) || rowsRead > port.row_count) continue;
+    evidence.push({kind:'tableRead', port:port.port, portGuid:port.port_guid, rowsRead, rowCount:port.row_count,
+      executionId:result.executionId});
+  }
+  const receiptWindow = evidence.some(fact => fact.kind === 'executed')
+    && safeCount(matchingFacts?.executionWindow?.confirmedSequence) ? matchingFacts.executionWindow : undefined;
+  const withEvidence = () => evidence.length ? {...result, evidence, ...(receiptWindow && {receiptWindow})} : result;
+
+  // Reserve space for the receipt and table summaries before adding rows.
+  let blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
+  while (blockRemaining < 0 && result.limitations?.length) {
+    result.limitations.pop();
+    blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
+  }
+  for (const key of ['ports', 'files']) {
+    if (blockRemaining >= 0) break;
+    delete result[key];
+    blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
+  }
+  if (blockRemaining < 0) return;
+  if (!result.ports) return withEvidence();
+
+  let previewRemaining = FEED_PREVIEW_MAX_BYTES;
+  const previewKeyBytes = ',"preview":'.length;
+  for (const {table, port} of tables) {
+    const remaining = Math.min(previewRemaining, blockRemaining - previewKeyBytes);
+    if (remaining <= 0) break;
+    const rows = port.sample ?? [];
+    if (!rows.length && (table.rowCount !== 0 || !port.sample_complete)) continue;
+    const sensitive = port.schema.map(column => [column.name, column.label].some(name => {
+      if (typeof name !== 'string') return false;
+      const words = name.replace(/(\p{Ll})(\p{Lu})/gu, '$1 $2');
+      return /(?:^|[^\p{L}\p{N}])(?:api[\s_-]?key|secret|token|password|pwd|pass|пароль|ключ[\s_-]+(?:api|доступа)|credential)(?=$|[^\p{L}\p{N}])/iu.test(words);
+    }));
+    const schema = port.schema.map(column => ({index: column.index, name: text(column.name), label: text(column.label),
+      type: text(column.type, 128), data_kind: text(column.data_kind, 128)}));
+    const sample = [];
+    const preview = {schema, sample, sampleComplete: false};
+    if (loginomMetadataBytes(preview) > remaining) continue;
+    for (const row of rows.slice(0, 10)) {
+      if (row.length !== schema.length) break;
+      sample.push(row.map((cell, index) => {
+        if (sensitive[index] && cell.is_null !== true) return {type: text(cell.type, 128), is_null: cell.is_null, value: '[redacted]'};
+        return Object.fromEntries(Object.entries(pick(cell, ['type', 'value', 'decimal', 'representation', 'display_text',
+          'precision', 'is_null', 'timezone', 'cell_type', 'non_finite'])).flatMap(([key, value]) =>
+          value === null || ['string', 'number', 'boolean'].includes(typeof value)
+            ? [[key, typeof value === 'string' ? redactor.text(value) : value]] : []));
+      }));
+      if (loginomMetadataBytes(preview) > remaining) { sample.pop(); break; }
+    }
+    if (rows.length && !sample.length) continue;
+    preview.sampleComplete = port.sample_complete === true && sample.length === rows.length && sample.length === table.rowCount;
+    const previewBytes = loginomMetadataBytes(preview);
+    previewRemaining -= previewBytes;
+    blockRemaining -= previewBytes + previewKeyBytes;
+    table.preview = preview;
+  }
+  return withEvidence();
 }
