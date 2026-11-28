@@ -63,7 +63,7 @@
         "packages/app/src/runtime/server/data.test.ts"
       ]
     },
-    { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7" },
+    { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": ["packages/cli/src/update-notifier.ts"], "pending": "B2.7" },
     {
       "id": "CAT-25",
       "title": "Durable next-turn queue and atomic queued prompt edits (C3.15)",
@@ -155,7 +155,14 @@
       "title": "Built-in plugin page navigation for dashboard links",
       "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
     },
-    { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
+    {
+      "id": "CAT-10",
+      "title": "Web app, UI kit, session UI",
+      "paths": [
+        "packages/app/**", "packages/ui/**", "packages/session-ui/**",
+        "packages/gui-plugins/README.md", "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**"
+      ]
+    },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
     { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }
   ]

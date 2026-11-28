@@ -1,8 +1,20 @@
-import { session, WebContentsView } from "electron"
+import { writeFile } from "node:fs/promises"
+import { dialog, session, WebContentsView } from "electron"
 import type { Embed, Plugin } from "@opencode/plugin/gui/main"
-import { DashboardPreview } from "./contract"
+import { DashboardPreview, reportName, ReportSave } from "./contract"
 
 const setup: Plugin.MainSetup = (ctx) => {
+  ctx.provide(ReportSave, {
+    async write({ title, content }, { signal }) {
+      const result = await dialog.showSaveDialog({ title, defaultPath: reportName })
+
+      if (result.canceled || !result.filePath || signal.aborted) return null
+      await writeFile(result.filePath, content, { mode: 0o600 })
+
+      return result.filePath
+    },
+  })
+
   const views = new Map<number, Embed>()
   const partition = "loginom-dashboard-preview"
   const previewSession = session.fromPartition(partition)

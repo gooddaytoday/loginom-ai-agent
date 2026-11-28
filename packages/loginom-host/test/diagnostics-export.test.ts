@@ -4,9 +4,10 @@ import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync, wr
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { TextWriter, Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from "@zip.js/zip.js"
+import { policyStatus } from "../src/admin-policy"
 import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
-import { DIAGNOSTICS_LIMITS, buildDiagnosticsArchive, profileSecrets } from "../src/diagnostics-export"
+import { DIAGNOSTICS_LIMITS, administratorReport, buildDiagnosticsArchive, profileSecrets } from "../src/diagnostics-export"
 
 const roots: string[] = []
 afterEach(() => {
@@ -21,6 +22,50 @@ function put(path: string, text: string) {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
   writeFileSync(path, text, { mode: 0o600 })
 }
+
+test("administrator report allows only four fields and excludes profile credentials and conversations", async () => {
+  const { data, loginom } = profile()
+  const password = "fixture-password!/"
+  const key = "fixture-provider-key"
+  const codec = credentials("linux")
+  const store = connectionStore(join(loginom, "connection"), codec)
+  const origin = "https://loginom.example.org:8443"
+  const address = `${origin}/app`
+  await store.stage({ url: address, username: "analyst", password, apiKey: "", revision: 1, generation: 1 })
+  await store.activate(1)
+  put(join(data, "auth.json"), JSON.stringify({ test: { key, chat: "private conversation" } }))
+  const known = await profileSecrets({ data, loginom, codec })
+  expect(known.status).toBe("ok")
+  const input = { network: "online", policy: "present", knownSecrets: known.secrets } as const
+  const clean = administratorReport({ ...input, address: `${address}?password=${password}#private`, model: "test/model" })
+  expect(JSON.parse(clean)).toEqual({ network: "online", policy: "present", loginom: origin, model: "test/model" })
+  const pathTokens = ["Zq81cqcfB6UvEr", "E5Nmr0QG7G30"]
+  const contaminated = administratorReport({
+    ...input,
+    address: `${address}/s/${pathTokens[0]}/${encodeURIComponent(password)};jsessionid=${pathTokens[1]}`,
+    model: `test/${key}`,
+  })
+  expect(JSON.parse(contaminated)).toMatchObject({ loginom: origin, model: "[redacted]" })
+  for (const secret of [password, encodeURIComponent(password), key, "private conversation", ...pathTokens]) {
+    expect(clean).not.toContain(secret)
+    expect(contaminated).not.toContain(secret)
+  }
+})
+
+test("diagnostics distinguishes missing, readable and invalid administrator policy files", async () => {
+  const file = join(profile().root, "policy.json")
+  expect(await policyStatus(file)).toBe("absent")
+  put(file, '{"updates":"off","channel":"stable","network":"device"}')
+  expect(await policyStatus(file)).toBe("present")
+  put(file, '{"updates":"disabled"}')
+  expect(await policyStatus(file)).toBe("invalid")
+  put(file, '{"feedUrl":"http://updates.example.test/"}')
+  expect(await policyStatus(file)).toBe("invalid")
+  put(file, '{"channel":"invalid"}')
+  expect(await policyStatus(file)).toBe("invalid")
+  put(file, '{"network":')
+  expect(await policyStatus(file)).toBe("invalid")
+})
 const sha = (value: string | Uint8Array) => createHash("sha256").update(value).digest("hex")
 function attemptDir(runtime: string, sessionID: string, attempt: string) {
   return join(runtime, "generations", "1", "chats", sha(sessionID), "attempts", attempt)

@@ -2,6 +2,7 @@
 // reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host itself belongs to the server process
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
+import { DiagnosticsRpc } from "@loginom-ai-agent/loginom-host/diagnostics-rpc"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Plugin } from "@opencode/plugin"
@@ -15,6 +16,7 @@ import { connectionSettings } from "./connection-settings"
 import { Dashboard } from "./dashboard"
 import { DashboardTarget } from "./dashboard-target"
 import { dashboardTools } from "./dashboard-tools"
+import { diagnostics } from "./diagnostics"
 import { dockTools } from "./dock"
 import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
@@ -518,7 +520,9 @@ export default Plugin.define({
         return { granted: true }
       },
     })
-    await ctx.rpc.register(ConnectionSettingsRpc, connectionSettings())
+    const connection = connectionSettings()
+    await ctx.rpc.register(ConnectionSettingsRpc, connection)
+    await ctx.rpc.register(DiagnosticsRpc, await diagnostics(ctx.model, connection))
     await ctx.rpc.register(preflight, {
       check: async (value) => {
         const code = await ServiceHost.preflight((value as { automation: boolean }).automation)

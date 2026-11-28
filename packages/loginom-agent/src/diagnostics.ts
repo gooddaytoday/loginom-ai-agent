@@ -1,0 +1,93 @@
+import { access, constants } from "node:fs/promises"
+import { join } from "node:path"
+import { policyPath, policyStatus } from "@loginom-ai-agent/loginom-host/admin-policy"
+import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
+import { administratorReport, profileSecrets } from "@loginom-ai-agent/loginom-host/diagnostics-export"
+import { DiagnosticsRpc, type DiagnosticsStatus } from "@loginom-ai-agent/loginom-host/diagnostics-rpc"
+import type { ModelEditor } from "@opencode/plugin/promise/model"
+import type { Context } from "@opencode/plugin/promise/plugin"
+import type { RpcHandlers } from "@opencode/plugin/promise/rpc"
+import { Global } from "@opencode/util/global"
+import { connectionSettings } from "./connection-settings"
+import { ServiceHost } from "./host"
+
+export async function diagnostics(
+  models: Pick<Context["model"], "list" | "transform">,
+  connection = connectionSettings(),
+) {
+  let selected: ReturnType<ModelEditor["default"]["get"]>
+  await models.transform((editor) => {
+    selected = editor.default.get()
+  })
+
+  async function modelStatus() {
+    const response = await models.list().catch(() => undefined)
+    if (!selected) return null
+    const { providerID, modelID } = selected
+    return {
+      id: `${providerID}/${modelID}`,
+      available: response?.data?.some((model) => model.providerID === providerID && model.id === modelID) ?? false,
+    }
+  }
+
+  async function snapshot(check: boolean, signal: AbortSignal): Promise<DiagnosticsStatus> {
+    const profile = ServiceHost.diagnosticsProfile()
+    const policyFile = policyPath()
+    const [saved, model, help, policy] = await Promise.all([
+      connection.status(),
+      modelStatus(),
+      profile?.resources
+        ? access(join(profile.resources, "help", "loginom-help", "data", "README.md"), constants.R_OK).then(
+            () => true,
+            () => false,
+          )
+        : false,
+      policyStatus(policyFile),
+    ])
+    const status = saved.ok ? saved.value : undefined
+    async function loginom() {
+      if (!status?.url || !status.username || status.state === "unconfigured") return "failed"
+      if (!check) return status.failed ? "failed" : status.state === "ready" ? "ready" : "unchecked"
+      const result = await connection.check(
+        {
+          revision: status.revision,
+          url: status.url,
+          username: status.username,
+          password: { operation: status.hasPassword ? "preserve" : "empty" },
+        },
+        { signal },
+      )
+      return result.ok ? "ready" : "failed"
+    }
+    return {
+      loginom: await loginom(),
+      address: status?.url ?? "",
+      model,
+      help,
+      catalog: "unchecked",
+      policy,
+      policyFile,
+      network: profile?.network ?? null,
+    }
+  }
+  return {
+    status: ({ check }, { signal }) => snapshot(check, signal),
+    async report(_input, { signal }) {
+      const status = await snapshot(false, signal)
+      const profile = ServiceHost.diagnosticsProfile()
+      const secrets = await profileSecrets({
+        loginom: profile?.root,
+        data: Global.Path.data,
+        codec: profile?.resources
+          ? cliCredentials(process.platform, { root: profile.root, resources: profile.resources })
+          : undefined,
+      })
+      return administratorReport({
+        ...status,
+        address: secrets.status === "ok" ? status.address : "",
+        model: secrets.status === "ok" ? (status.model?.id ?? null) : null,
+        knownSecrets: secrets.secrets,
+      })
+    },
+  } satisfies RpcHandlers<typeof DiagnosticsRpc>
+}

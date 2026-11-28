@@ -747,7 +747,7 @@ export const dict = {
   "titlebar.tabs": "Вкладки",
   "settings.tab.experimental": "Экспериментальный",
   "settings.experimental.description": "Попробуйте экспериментальные функции",
-  "settings.tab.about": "О нас",
+  "settings.tab.about": "О программе",
   "settings.about.version": "Версия {{version}}",
   "settings.about.devVersion": "разработка",
   "settings.about.license": "Выпущен под лицензией MIT AND AGPL-3.0-only",

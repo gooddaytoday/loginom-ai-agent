@@ -57,9 +57,14 @@ describe("product defaults of the server", () => {
     try {
       const result = await serve(root, async (call) => {
         await active(call, project)
-        const models = (await call("GET", `/api/model?location[directory]=${encodeURIComponent(project)}`)).data as {
+        const query = `location[directory]=${encodeURIComponent(project)}`
+        const models = (await call("GET", `/api/model?${query}`)).data as {
           providerID: string
         }[]
+        const diagnostics = await call("POST", `/api/rpc/loginom.diagnostics/status?${query}`, {
+          input: { check: false },
+        })
+        expect(diagnostics.output).toMatchObject({ model: { id: "stub/stub-model", available: true } })
         const session = (await call("POST", "/api/session", { location: { directory: project } })).data.id as string
         await call("POST", `/api/session/${session}/prompt`, { text: "Make a todo list" })
         await call("POST", `/api/experimental/session/${session}/wait`, {})
@@ -86,7 +91,7 @@ describe("product defaults of the server", () => {
     await fs.mkdir(project)
     await Bun.write(
       path.join(saved, "loginom-ai-agent.json"),
-      JSON.stringify({ network: "device", providers: stub("http://127.0.0.1:9/v1") }),
+      JSON.stringify({ network: "device", model: "stub/missing", providers: stub("http://127.0.0.1:9/v1") }),
     )
     const free = net.createServer()
     await new Promise<void>((resolve) => free.listen(0, "127.0.0.1", resolve))
@@ -100,18 +105,34 @@ describe("product defaults of the server", () => {
       root,
       async (call) => {
         await active(call, project)
-        const models = (await call("GET", `/api/model?location[directory]=${encodeURIComponent(project)}`)).data as {
+        const query = `location[directory]=${encodeURIComponent(project)}`
+        const models = (await call("GET", `/api/model?${query}`)).data as {
           providerID: string
         }[]
-        return models.map((item) => item.providerID)
+        const diagnostics = await call("POST", `/api/rpc/loginom.diagnostics/status?${query}`, { input: { check: false } })
+        const fallback = await call("GET", `/api/model/default?${query}`)
+        const report = await call("POST", `/api/rpc/loginom.diagnostics/report?${query}`, { input: {} })
+        return {
+          models: models.map((item) => item.providerID),
+          status: diagnostics.output,
+          fallback: fallback.data,
+          report: JSON.parse(report.output),
+        }
       },
       {},
       ["--service"],
     )
     expect(result.requests).toEqual([])
     // The server read the moved config (its provider is listed) and offers no free model.
-    expect(result.value).toContain("stub")
-    expect(result.value).not.toContain("opencode")
+    expect(result.value.models).toContain("stub")
+    expect(result.value.models).not.toContain("opencode")
+    expect(result.value.fallback).toMatchObject({ providerID: "stub", id: "stub-model" })
+    expect(result.value.status).toMatchObject({
+      network: "device",
+      model: { id: "stub/missing", available: false },
+      catalog: "unchecked",
+    })
+    expect(result.value.report).toMatchObject({ model: "stub/missing" })
   }, 60_000)
 
   test("«Интернет» by default asks the model catalog and answers with OpenCode's free model", async () => {

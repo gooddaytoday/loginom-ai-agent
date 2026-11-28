@@ -23,6 +23,7 @@ export type Connection = {
 
 type Started = {
   readonly directory: string
+  readonly diagnostics: { root: string; resources?: string; network?: "online" | "device" }
   ready: Promise<Connection | undefined>
   connected?: boolean
   held: Map<Lease, string>
@@ -50,6 +51,7 @@ const decodePublication = Schema.decodeUnknownOption(Schema.NullOr(PublicationSo
 export async function start(input: {
   data: string
   resources?: string
+  network?: "online" | "device"
   connect?: () => Promise<Connection>
 }) {
   if (state.current && !state.current.closing) throw Error("LOGINOM_HOST_ALREADY_STARTED")
@@ -74,6 +76,7 @@ export async function start(input: {
   const connect = input.connect ?? (input.resources ? nodeHost(root, input.resources) : undefined)
   const current: Started = {
     directory,
+    diagnostics: { root, resources: input.resources, network: input.network },
     ready: Promise.resolve(undefined),
     held: new Map(),
   }
@@ -93,6 +96,12 @@ export async function start(input: {
 /** Whether the Host finished its handshake: before that, `acquire` waits for it (up to the handshake's 180 s). */
 export function connected() {
   return !!state.current?.connected && !state.current.closing
+}
+
+export function diagnosticsProfile() {
+  const current = state.current
+  if (!current || current.closing) return undefined
+  return current.diagnostics
 }
 
 /**
