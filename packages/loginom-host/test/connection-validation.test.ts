@@ -744,6 +744,46 @@ test("aborting a settings check stops its browser without closing the node Host"
   }
 }, 15_000)
 
+test.skipIf(!hasConnectionFixture)("settings cancellation drains a 23-second login, logs out and permits a clean Host close", async () => {
+  const submitted = Promise.withResolvers<void>()
+  const f = await loginomConnectionFixture({
+    async beforeLoginReply(username) {
+      if (username !== "first-user") return
+      submitted.resolve()
+      await Bun.sleep(23_000)
+    },
+  })
+  try {
+    const host = await launchNodeHost({
+      node: f.node, entry: await buildNodeHost(f.directory), root: f.root, resources: f.resources, headless: true,
+    })
+    const candidate = {
+      revision: 0, url: f.url, username: "first-user",
+      password: { operation: "replace", value: "fixture-password" },
+    }
+    const controller = new AbortController()
+    const checking = host.request("connection.settings.check", candidate, 60_000, controller.signal)
+    try {
+      await Promise.race([submitted.promise, checking.then(() => { throw Error("Expected the pending login request") })])
+      controller.abort()
+      await expect(checking).rejects.toMatchObject({ name: "AbortError" })
+      expect(f.logins.some((login) => login.username === "first-user")).toBe(false)
+      await expect(host.request("connection.settings.check", { ...candidate, username: "second-user" }))
+        .resolves.toMatchObject({ browser: { state: "verified" } })
+    } finally {
+      controller.abort()
+      await host.close()
+      await checking.catch(() => undefined)
+    }
+    const first = f.logins.find((login) => login.username === "first-user")
+    expect(first).toBeDefined()
+    expect(f.requests).toContainEqual({ method: "POST", path: "/logout", cookie: first?.cookie })
+    expect(await host.exited).toEqual({ code: 0, signal: null })
+  } finally {
+    await f.close()
+  }
+}, 75_000)
+
 function runtimeAlive(pid: number) {
   try {
     process.kill(pid, 0)

@@ -151,7 +151,7 @@ describe("plugin host driver", () => {
     expect(plugins.calls.start).toBe(0)
   })
 
-  test("a boot load that times out still activates main plugins when the CLI lookup finishes late", async () => {
+  test("a boot load that times out still activates main plugins when the host module finishes loading", async () => {
     const plugins = fixture()
     const boot = plugins.driver.start()
     await flush()
@@ -189,7 +189,6 @@ describe("plugin host driver", () => {
     const list = plugins.driver.host()
     await flush()
 
-    // On dev the stop waited for the CLI copy, then built a host against closing storage only to stop it.
     await plugins.driver.stop()
     await expect(list).rejects.toBeInstanceOf(PluginError)
     await expect(list).rejects.toMatchObject({ code: "unavailable" })

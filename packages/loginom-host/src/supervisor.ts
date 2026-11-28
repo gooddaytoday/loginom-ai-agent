@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { hostError, hostException } from "./errors"
 import { runtimeNoProxyKey } from "./system-proxy/environment"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
+import { runtimeExitTimeout, shortLoginShutdownTimeout } from "../../loginom-runtime/src/short-login-timeouts.mjs"
 import { recordLocalDiagnostics } from "../../loginom-runtime/client/lib/local-diagnostics.mjs"
 
 export type Launch = {
@@ -156,8 +157,8 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
     { ...input, packageBrowserProfile, environment: undefined, protocol: 1 },
     Math.max(1, Math.min(input.validation ? 210_000 : 120_000, (input.startupDeadline ?? Infinity) - Date.now())),
     signal,
-    // Picker cancellation may need to drain an in-flight login before native logout.
-    picker ? 50_000
+    // Both short sessions may have already submitted a login when cancelled.
+    picker || input.validationLogout ? shortLoginShutdownTimeout - runtimeExitTimeout
       : input.closeSavedPackageOnShutdown === true || input.acceptanceCleanupPackage ? 45_000 : 15_000,
     pickerProfiles,
   )
@@ -311,7 +312,7 @@ async function superviseProcess(
           error: error instanceof Error && ["LOGINOM_RUNTIME_TIMEOUT", "LOGINOM_RUNTIME_DISCONNECTED",
             "LOGINOM_RUNTIME_CLEANUP_FAILED"].includes(error.message) ? error.message : "LOGINOM_RUNTIME_FAILED" }))
       const reply = response.result
-      const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
+      const timer = setTimeout(() => child.kill("SIGKILL"), runtimeExitTimeout)
       try {
         const outcome = await exited
         // Private transport evidence, not a cleanup receipt. Never include the

@@ -92,8 +92,13 @@
         "packages/core/src/session/history.ts", "packages/protocol/openapi.json",
         "packages/core/src/session/message-updater.ts", "packages/schema/src/session-event.ts",
         "packages/schema/src/session-message.ts", "packages/client/src/effect/api/api.ts",
-        "packages/app/src/runtime/server/data.test.ts"
-      ]
+        "packages/app/src/runtime/server/data.test.ts", "packages/core/src/config.ts",
+        "packages/core/src/model-resolver.ts", "packages/core/src/models-dev.ts", "packages/core/test/models.test.ts",
+        "packages/server/test/loginom-model-server.test.ts"
+      ],
+      "notes": {
+        "packages/server/test/loginom-model-server.test.ts": "C2.6: verifies that model discovery and direct saves omit identifiers containing an echoed server secret."
+      }
     },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7" },
     {
@@ -115,7 +120,7 @@
     {
       "id": "CAT-13",
       "title": "Product storage root and own background service (U5)",
-      "note": "C5.4: Desktop initialization starts the fork's proxy detection; background-service.ts consumes its environment at spawn.",
+      "note": "C5.4: Desktop initialization starts the fork's proxy detection; background-service.ts consumes its environment at spawn. LAB-2276: Service discovery and stop distinguish an unreaped Linux process from a live service. Registration publication and conditional removal serialize through the same per-registration filesystem lock.",
       "paths": [
         "packages/util/src/global.ts", "packages/client/src/service-probe.ts", "packages/cli/src/services/service-config.ts",
         "packages/desktop/src/main/service/sidecar-probe.ts", "packages/desktop/src/main/service/background-service.ts",
@@ -123,7 +128,9 @@
         "packages/desktop/src/main/native/logging.ts", "packages/core/src/config/discovery.ts",
         "packages/process-daemon/src/daemon.rs", "packages/process-daemon/src/daemon/unix.rs", "packages/process-daemon/src/client.rs",
         "packages/server/src/process.ts", "packages/client/src/service-timing.ts", "packages/client/src/promise/service.ts",
-        "packages/client/src/effect/service.ts", "packages/cli/src/shutdown-deadline.ts",
+        "packages/client/src/effect/service.ts", "packages/client/src/service-registration-lock.ts",
+        "packages/client/package.json", "bun.lock", "packages/cli/src/services/service-registration.ts",
+        "packages/cli/src/shutdown-deadline.ts",
         "packages/server/test/process.test.ts", "packages/client/test/fixture/service.ts",
         "packages/client/test/fixture/service-timing.ts", "packages/client/test/promise-service.test.ts",
         "packages/client/test/service.test.ts", "packages/cli/test/service.test.ts",
@@ -135,7 +142,7 @@
     },
     {
       "id": "CAT-14",
-      "title": "Built-in GUI tool renderers (C3.0, accepted timeline row exception)",
+      "title": "Built-in GUI tool renderers (C3.0, accepted timeline row exception) and provider setup (C2.6)",
       "paths": [
         "packages/app/component-tests/plugin-host.fixture.tsx",
         "packages/app/src/runtime/plugin/host.tsx",
@@ -155,9 +162,17 @@
         "packages/session-ui/src/timeline/projection.ts",
         "packages/session-ui/src/tools/tool-renderer.tsx",
         "packages/ui/src/i18n/en.ts"
-      ]
+      ],
+      "notes": {
+        "packages/plugin/src/gui/builtin.ts": "C2.6: provider setup priority follows the window host's reconnecting server event stream."
+      }
     },
-    { "id": "CAT-09", "title": "Desktop main process, preload, renderer and window tests", "paths": ["packages/desktop/**"] },
+    {
+      "id": "CAT-09",
+      "title": "Desktop main process, preload, renderer and window tests",
+      "note": "Plugin inventory is ready without waiting for the bundled CLI; setup still resolves the CLI before starting a main plugin (LAB-2276).",
+      "paths": ["packages/desktop/**"]
+    },
     {
       "id": "CAT-21",
       "title": "Built-in plugin top-level pages",
@@ -192,9 +207,14 @@
     {
       "id": "CAT-10",
       "title": "Web app, UI kit, session UI and Loginom localization",
-      "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"],
+      "paths": [
+        "packages/app/**", "packages/ui/**", "packages/session-ui/**",
+        "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**"
+      ],
       "notes": {
-        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events."
+        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events. C2.6: own-server ordering after reconnect and short-key warning.",
+        "packages/app/src/providers/connect/dialog.tsx": "C2.6: pass the reconnecting server event stream to built-in provider setup priority.",
+        "packages/app/src/runtime/i18n/ru.ts": "C2.6 (В-90): Russian label for the remaining providers group."
       }
     },
     {
@@ -206,6 +226,7 @@
       ],
       "notes": {
         "packages/app/src/shell/commands/session-search.tsx": "Keeps successful search results when a field fails. The palette displays an inline prompt search status (CAT-10).",
+        "packages/app/e2e/regression/command-palette.spec.ts": "Covers the sidebar Search entry and shortcut, with bounded title, project, and prompt searches and partial server failure (CAT-10).",
         "packages/app/e2e/regression/home.spec.ts": "Covers title and project matches during a prompt search failure and clears the status after recovery."
       }
     },

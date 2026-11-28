@@ -13,7 +13,9 @@ import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom
 import type { Loginom } from "@loginom-ai-agent/loginom-host/loginom"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import { decodeFolderListings, packageConnectionError, type ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
+import { StepCheckRequest, StepCheckResult } from "@loginom-ai-agent/loginom-host/step-state"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
+import { WriteOutcomeInput, WriteOutcomeResult } from "@loginom-ai-agent/loginom-host/write-outcomes"
 import { Option, Schema } from "effect"
 
 export type Lease = NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>
@@ -144,6 +146,12 @@ export const dashboard = {
   },
 }
 
+export async function checkStepState(input: typeof StepCheckRequest.Type): Promise<typeof StepCheckResult.Type> {
+  return request("checkStepState", input)
+    .then(Schema.decodeUnknownSync(StepCheckResult))
+    .catch(() => ({ state: "unavailable", retryAvailable: false }))
+}
+
 export const connectionSettings = {
   request,
   onApplication(listener: Loginom.ConnectionApplicationListener) {
@@ -186,6 +194,11 @@ async function request(method: string, input: unknown, timeout?: number, signal?
   const connection = await current?.ready
   if (!connection?.request || current?.closing) throw new Error("LOGINOM_HOST_NOT_READY")
   return connection.request(method, input, timeout, signal)
+}
+
+export async function checkWriteOutcome(input: typeof WriteOutcomeInput.Type): Promise<typeof WriteOutcomeResult.Type> {
+  const reply = await request("loginom.write-outcome.check", input)
+  return Schema.decodeUnknownSync(WriteOutcomeResult)(reply)
 }
 
 /** Releases every lease still held, disconnects and closes the Host. Idempotent: soft stop (B2.3b) may call it first. */
@@ -265,6 +278,7 @@ function nodeHost(root: string, resources: string) {
           : undefined,
       strictRecovery:
         process.env.LOGINOM_AI_AGENT_CLI_ROOT !== undefined && process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
+      desktopWriteOutcomes: process.env.LOGINOM_AI_AGENT_CLI_ROOT === undefined,
       // 0.4.2 enabled it for the CLI's `run` only (`standalone-run.ts`): `forward` marks the private server of a run, so a
       // service, Desktop's server and `serve` never close a package. The runtime then writes `saved-package-cleanup.json`.
       closeSavedPackageOnShutdown:

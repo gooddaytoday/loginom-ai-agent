@@ -340,6 +340,8 @@ to the displayed repository or worktree instead of adding a second menu item.
 
 `@opencode/plugin/gui/builtin` holds what only the built-ins use. It is never published and is not in the modules a plugin bundle may require; a public SDK module never imports it.
 
+`BuiltinProviderSetup` contributes a form to the Connect Provider dialog. The host checks the contributing plugin's built-in identity at registration and rejects third-party bundles even if they recreate the registry token. The form receives the Location fixed when the dialog opens. `preferFirst` can use the host's event subscription, which survives server-stream reconnects; unsubscribe when the dialog's signal aborts.
+
 | Export                                                  | What it adds                                                                                   |
 | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `onIdle(fn)`                                            | Runs work while the main thread is idle, e.g. a lazy chunk's preload                           |

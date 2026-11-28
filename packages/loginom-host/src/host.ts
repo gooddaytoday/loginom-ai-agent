@@ -2,7 +2,7 @@ import { inputStore, type InputFile } from "./inputs"
 import { appendFile, mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { tmpdir } from "node:os"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
@@ -10,6 +10,8 @@ import { connectionService } from "./connection/connection-service"
 import { connectionStore, type ActiveConnection } from "./connection/connection-store"
 import type { CredentialCodec } from "./connection/credentials"
 import { recoveryStore } from "./connection/recovery-store"
+import { SavedCopyReadback, type WriteVerdict, writeOutcomes, type WriteRecord } from "./connection/write-outcomes"
+import { StepCheckResult, StepOperationId } from "./step-state"
 import { fileReferences } from "./file-reference"
 import { dashboardRequest, type DashboardStorageOperation } from "../../loginom-runtime/src/dashboard-storage.mjs"
 import { DashboardRead, DashboardDelete, DashboardDeleteResult, DashboardPublish, PublicationRef, PublicationSet, PublicationSource, PublicationWrite, decodeDashboardDeleteResult } from "./dashboard"
@@ -212,6 +214,7 @@ export async function createLoginomHost(options: {
   headless?: boolean
   preflightHeadless?: boolean
   strictRecovery?: boolean
+  desktopWriteOutcomes?: boolean
   closeSavedPackageOnShutdown?: boolean
   // Private launcher capability baked into packaged release builds; never from env or the model.
   browserRecovery?: boolean
@@ -225,6 +228,8 @@ export async function createLoginomHost(options: {
   const references = fileReferences(join(root, "file-references"))
   await references.cleanup()
   const journal = await recoveryStore(join(root, "recovery"), { strict: options.strictRecovery === true })
+  const writes = options.desktopWriteOutcomes && !options.strictRecovery
+    ? await writeOutcomes(join(root, "write-outcomes")) : undefined
   const generations = new Map<
     number,
     {
@@ -392,6 +397,8 @@ export async function createLoginomHost(options: {
       )
     const waitStarted = performance.now()
     const stateDir = join(root, validation ? "validation" : packageFolder !== undefined ? "package-list" : "runtime")
+    const phaseLog = join(packageFolder === undefined ? root : stateDir, "startup-phases.jsonl")
+    if (packageFolder !== undefined) await mkdir(stateDir, { recursive: true, mode: 0o700 })
     const waitFailure = async (error: unknown): Promise<never> => {
       await mkdir(stateDir, { recursive: true, mode: 0o700 })
         .then(() =>
@@ -413,7 +420,7 @@ export async function createLoginomHost(options: {
       throw error
     }
     await appendFile(
-      join(root, "startup-phases.jsonl"),
+      phaseLog,
       JSON.stringify({
         version: 1,
         recorded_at: new Date().toISOString(),
@@ -435,7 +442,7 @@ export async function createLoginomHost(options: {
       .catch(waitFailure)
       .finally(() => waiting.removeEventListener("abort", cancel))
     await appendFile(
-      join(root, "startup-phases.jsonl"),
+      phaseLog,
       JSON.stringify({
         version: 1,
         recorded_at: new Date().toISOString(),
@@ -644,7 +651,7 @@ export async function createLoginomHost(options: {
   }
   const packageState = join(root, "package-list")
   let packageRead: { controller: AbortController; pending: Promise<FolderReadResult> } | undefined
-  async function retainPackageFailures() {
+  async function retainPackageDiagnostics() {
     const recent = 10
     const files = await readdir(packageState)
     for (const pattern of [/^login-failure-[0-9a-f-]+\.json$/, /^runtime-close-\d+-[0-9a-f-]+\.json$/]) {
@@ -655,10 +662,11 @@ export async function createLoginomHost(options: {
       snapshots.sort((a, b) => b.time - a.time)
       await Promise.all(snapshots.slice(recent).map(({ path }) => rm(path, { force: true })))
     }
-    const log = join(packageState, "startup-failures.jsonl")
-    if (!files.includes("startup-failures.jsonl")) return
-    const lines = (await readFile(log, "utf8")).trimEnd().split("\n")
-    if (lines.length > recent) {
+    for (const name of ["startup-failures.jsonl", "startup-phases.jsonl"]) {
+      if (!files.includes(name)) continue
+      const log = join(packageState, name)
+      const lines = (await readFile(log, "utf8")).trimEnd().split("\n")
+      if (lines.length <= recent) continue
       const temporary = log + ".tmp"
       await writeFile(temporary, lines.slice(-recent).join("\n") + "\n", { mode: 0o600 })
       await rename(temporary, log)
@@ -684,7 +692,7 @@ export async function createLoginomHost(options: {
       }, input)
     } finally {
       lease.release()
-      await retainPackageFailures().catch(() => undefined)
+      await retainPackageDiagnostics().catch(() => undefined)
     }
   }
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
@@ -694,6 +702,22 @@ export async function createLoginomHost(options: {
     for (const controller of dashboardOperations.keys()) controller.abort(new Error("DASHBOARD_CANCELLED"))
     packageRead?.controller.abort(Error("LOGINOM_PACKAGE_FOLDER_CANCELLED"))
   }
+  async function checkStepState(chat: string, operationId: string, originalGeneration?: number, owner?: string): Promise<typeof StepCheckResult.Type | "owner_lost"> {
+    const unavailable = { state: "unavailable", retryAvailable: false } as const
+    const unavailableOwner = owner === undefined ? unavailable : "owner_lost"
+    const status = await service.api.status()
+    if (originalGeneration !== undefined && status.generation !== originalGeneration) return unavailableOwner
+    const children = generations.get(status.generation)?.children
+    const child = children?.get(chat)
+    if (!child || lost.has(chat) || (originalGeneration === undefined && stale.has(chat))) return unavailableOwner
+    const result = await child.then((runtime) => runtime.request("checkStepState", { operationId, owner }, 25000))
+      .catch((error: unknown) => error instanceof Error && error.message === "LOGINOM_RUNTIME_DISCONNECTED" ? unavailableOwner : unavailable)
+    const after = await service.api.status()
+    if (children?.get(chat) !== child || status.generation !== after.generation) return unavailableOwner
+    if (owner !== undefined && result === "owner_lost") return result
+    return Schema.is(StepCheckResult)(result) ? result : unavailable
+  }
+
   return {
     ...service,
     beginClose,
@@ -826,6 +850,56 @@ export async function createLoginomHost(options: {
     },
     journal,
     recoveries,
+    writes,
+    writeServer(generation: number) {
+      const current = generations.get(generation)
+      if (!current) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
+      return writeServer(current.connection.url)
+    },
+    async checkRecordedStep(entry: WriteRecord) {
+      const unavailable = { state: "unavailable", retryAvailable: false } as const
+      const operationId = entry.receipt.operationID
+      if (!writes || !writes.reserveCheck(entry)) return { observation: unavailable }
+      try {
+        if (!generations.get(entry.generation)?.children.has(entry.chat)) return { observation: unavailable, ownerLost: true }
+        if (!entry.receipt.fresh || !Schema.is(StepOperationId)(operationId)) return { observation: unavailable }
+        const result = await checkStepState(entry.chat, operationId, entry.generation, entry.receipt.owner)
+        if (result === "owner_lost") return { observation: unavailable, ownerLost: true }
+        if (result.state !== "observed") return { observation: result }
+        const step = result.step
+        const status: typeof WriteVerdict.Type = step.outcome === "completed" ? "applied"
+          : step.outcome === "not_applied" && result.retryAvailable ? "not_applied" : "unknown"
+        if (status !== "unknown") await writes.finish(entry, status, step)
+        return { observation: result, status }
+      } finally {
+        writes.release(entry)
+      }
+    },
+    async readSavedWriteTarget(entry: WriteRecord): Promise<typeof SavedCopyReadback.Type> {
+      const path = entry.baseline.packagePath
+      if (!path) return "unavailable"
+      const lease = service.acquire(randomUUID())
+      if (!lease) return "unavailable"
+      const chat = createHash("sha256").update(randomUUID()).digest("hex")
+      try {
+        const current = generations.get(lease.generation)
+        if (!current || lease.generation !== entry.generation || writeServer(current.connection.url) !== entry.server)
+          return "unavailable"
+        const child = await retain(current, chat, launch(current.connection, chat, "dashboard"))
+        try {
+          const result = await child.request("write-outcome.readback", entry.baseline, 7_000)
+          return Schema.is(SavedCopyReadback)(result) ? result : "unavailable"
+        } finally {
+          await child.close().catch(() => { shutdown.failed = true })
+          current.children.delete(chat)
+          lost.delete(chat)
+        }
+      } catch {
+        return "unavailable"
+      } finally {
+        lease.release()
+      }
+    },
     knowledge(generation: number) {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
@@ -883,6 +957,7 @@ export async function createLoginomHost(options: {
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true
     },
+    checkStepState,
     async workState(generation: number, chat: string) {
       // Inspect only the existing owner. Losing it is uncertainty, not evidence of idle work.
       if (lost.has(chat) || stale.has(chat)) throw new Error("LOGINOM_RUNTIME_UNAVAILABLE")
@@ -930,4 +1005,9 @@ export async function createLoginomHost(options: {
       )
     },
   }
+}
+
+function writeServer(url: string) {
+  const target = new URL(url)
+  return createHash("sha256").update(target.origin).digest("hex")
 }

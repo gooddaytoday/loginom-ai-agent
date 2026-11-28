@@ -31,6 +31,8 @@ for (const failure of ["none", "starting", "ready", "logout"]) test(
       }
     }
     await Bun.write(join(state, "startup-failures.jsonl"), diagnostics.join("\n") + "\n")
+    await Bun.write(join(state, "startup-phases.jsonl"),
+      diagnostics.map((_, index) => JSON.stringify({ phase: "old-phase", index })).join("\n") + "\n")
     await mkdir(join(resources, "bin"))
     await symlink(node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
     await Bun.write(join(resources, "resource-manifest.json"), "{}")
@@ -53,6 +55,8 @@ for (const failure of ["none", "starting", "ready", "logout"]) test(
           if (!packageFolder) return reply({ ...started, ready: true, chat });
           folder = packageFolder;
           appendFileSync(join(stateDir, "reads"), "start " + folder + "\\n");
+          appendFileSync(join(stateDir, "startup-phases.jsonl"),
+            JSON.stringify({ phase: "fixture.read", folder, chat }) + "\\n");
           if (folder === "/user" && failure !== "ready") { startMessage = message; return }
           return reply({ ...started, listings: [{ folder, entries: [], slow: false }], skippedFolders: [], truncated: false });
         }
@@ -122,6 +126,13 @@ for (const failure of ["none", "starting", "ready", "logout"]) test(
       expect(retained).toHaveLength(10)
       expect(retained).toContain(diagnostics[11])
       expect(retained).not.toContain(diagnostics[0])
+      const phases = (await readFile(join(state, "startup-phases.jsonl"), "utf8")).trimEnd().split("\n").map(line => JSON.parse(line))
+      expect(phases).toHaveLength(10)
+      expect(phases.filter(row => row.phase === "old-phase").map(row => row.index)).toEqual([8, 9, 10, 11])
+      expect(phases.at(-1)).toMatchObject({ phase: "fixture.read", folder: "/common" })
+      const pickerChats = phases.filter(row => row.phase === "fixture.read").map(row => row.chat)
+      const rootPhases = await readFile(join(root, "startup-phases.jsonl"), "utf8")
+      for (const chat of pickerChats) expect(rootPhases).not.toContain(chat)
       expect(await readdir(chats)).toEqual([])
       expect(await readdir(join(root, "runtime", "generations", "1", "chats"))).toEqual(["conversation"])
       expect(await conversation.request("inspect")).toEqual({ protocol: 1, generation: 1 })

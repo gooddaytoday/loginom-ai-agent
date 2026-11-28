@@ -133,6 +133,7 @@ export async function acquire(session: string) {
       packageInput?: { admissionID: string; file: InputFile },
       scanReceipt?: { profile_id: string; records: number; sha256: string; bytes: number; identity: unknown; basis: "backend_exact_scan" },
       progress?: (value: StepProgress) => void,
+      invocation?: { turn: string; call: string },
     ) {
       // Serialize before transport admission so waiting does not consume the IPC timeout
       // or create durable recovery records for calls that have not started.
@@ -145,7 +146,7 @@ export async function acquire(session: string) {
           signal?.addEventListener("abort", abort, { once: true })
           return await connection.request(
             "call",
-            { run, name, args, userMessage, admissions, ...(packageInput ? { packageInput } : {}), ...(scanReceipt ? { scanReceipt } : {}), ...(progress ? { stepProgress: true } : {}) },
+            { run, name, args, userMessage, admissions, ...(packageInput ? { packageInput } : {}), ...(scanReceipt ? { scanReceipt } : {}), ...(progress ? { stepProgress: true } : {}), ...(invocation ? { invocation } : {}) },
             Math.max(180_000, runtimeCallTimeout(name, args) + 30_000),
             observe,
             progress && ((value) => {

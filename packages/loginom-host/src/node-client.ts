@@ -3,6 +3,7 @@ import { isAbsolute } from "node:path"
 import { EventEmitter } from "node:events"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
+import { shortLoginShutdownTimeout } from "../../loginom-runtime/src/short-login-timeouts.mjs"
 import { runtimeEnvironment } from "./supervisor"
 import { transport, type Port } from "./transport"
 import { hostError } from "./errors"
@@ -36,6 +37,7 @@ export async function launchNodeHost(
     // The version that keys the resource verification cache; without it the Host reads the CLI artifact's manifest.
     resourceVersion?: string
     strictRecovery?: boolean
+    desktopWriteOutcomes?: boolean
     closeSavedPackageOnShutdown?: boolean
     browserRecovery?: boolean
     onConnectionApplication?: Loginom.ConnectionApplicationListener
@@ -120,9 +122,9 @@ export async function launchNodeHost(
     start() {},
   }
   const client = transport(port)
-  let pickerUsed = false
+  let guardedLoginUsed = false
   function request(method: string, input: unknown, timeout?: number, signal?: AbortSignal) {
-    if (method === "packages.list") pickerUsed = true
+    if (method === "packages.list" || method === "connection.settings.check") guardedLoginUsed = true
     return client.request(method, input, timeout, undefined, undefined, signal)
   }
   function waitForExit(timeout: number) {
@@ -137,13 +139,12 @@ export async function launchNodeHost(
   function close() {
     if (state.closing) return state.closing
     state.closing = (async () => {
-      // A cancelled picker request can settle before its worker finishes logout.
-      const longerCleanup = input.closeSavedPackageOnShutdown === true || pickerUsed
-      const deadline = Date.now() + (timing.teardown ?? (longerCleanup ? 90_000 : 60_000))
-      const gracefulDeadline = Math.min(
-        deadline,
-        Date.now() + (timing.close ?? (longerCleanup ? 60_000 : 30_000)),
-      )
+      // Cancelling transport can settle the caller before the worker finishes logout and exits.
+      const gracefulTimeout = guardedLoginUsed ? shortLoginShutdownTimeout + 5000
+        : input.closeSavedPackageOnShutdown === true ? 60_000 : 30_000
+      const now = Date.now()
+      const deadline = now + (timing.teardown ?? (gracefulTimeout + 30_000))
+      const gracefulDeadline = Math.min(deadline, now + (timing.close ?? gracefulTimeout))
       try {
         const result = await client
           .request("close", {}, Math.max(0, gracefulDeadline - Date.now()))
@@ -191,6 +192,7 @@ export async function launchNodeHost(
         headless: input.headless,
         ...(input.resourceVersion !== undefined ? { resourceVersion: input.resourceVersion } : {}),
         ...(input.strictRecovery !== undefined ? { strictRecovery: input.strictRecovery } : {}),
+        ...(input.desktopWriteOutcomes !== undefined ? { desktopWriteOutcomes: input.desktopWriteOutcomes } : {}),
         ...(input.closeSavedPackageOnShutdown !== undefined
           ? { closeSavedPackageOnShutdown: input.closeSavedPackageOnShutdown }
           : {}),

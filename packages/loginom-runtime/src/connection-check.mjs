@@ -6,6 +6,7 @@ import { browserLaunch, prepareBrowserProfile } from "../client/lib/browser-laun
 import { createRedactor } from "../client/lib/redact.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
 import { connectionTimelineScript } from "../client/lib/connection-recovery.mjs"
+import { loginSubmitTimeout, loginResponseTimeout, loginLogoutTimeout } from "./short-login-timeouts.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 
@@ -276,7 +277,7 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
           onSubmit()
           submitted = true
         }
-        return field("btnLogin").click({ timeout: remaining(onSubmit ? 5000 : 30_000) })
+        return field("btnLogin").click({ timeout: remaining(onSubmit ? loginSubmitTimeout : 30_000) })
       }).catch(error => {
         // A failed click can already have delivered the credential submission.
         if (!submitted) throw error
@@ -296,7 +297,7 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
             return "session_limit"
           return errors.length ? "rejected" : false
         } catch { return false }
-      }, null, { timeout: remaining(30_000) })).catch(error => {
+      }, null, { timeout: remaining(loginResponseTimeout) })).catch(error => {
         original = error
         throw Error("LOGINOM_LOGIN_UNAVAILABLE")
       })
@@ -503,7 +504,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
   const closing = { promise: undefined }
   const close = () => closing.promise ??= context.close()
   let submitted = false
-  const loginDeadline = readAuthenticated ? deadline - 10_000 : deadline
+  const loginDeadline = validationLogout ? deadline - loginLogoutTimeout : deadline
   // After submission the browser owns a possibly admitted server session.
   // Drain the login response and let the guarded logout run before closing it.
   const cancel = () => { if (!submitted) void close().catch(() => undefined) }
@@ -573,7 +574,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
 async function logoutValidation(page, candidate, deadline, onPhase) {
   const started = performance.now()
   const at = tid => page.locator(`[data-tid="${tid}"]`)
-  const logoutDeadline = Math.min(Date.now() + 10_000, deadline)
+  const logoutDeadline = Math.min(Date.now() + loginLogoutTimeout, deadline)
   const timeout = () => {
     const left = logoutDeadline - Date.now()
     if (left <= 0) throw Error("LOGINOM_LOGOUT_UNCONFIRMED")
