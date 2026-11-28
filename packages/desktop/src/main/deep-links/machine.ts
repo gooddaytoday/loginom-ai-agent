@@ -1,10 +1,12 @@
+import type { DeepLinkPayload } from "../../shared/ipc-rpc/events"
+
 export type DeepLinkWindow = { readonly status: "loading" } | { readonly status: "ready"; readonly clientID: number }
 
 export type DeepLink =
-  | { readonly status: "queued"; readonly url: string }
+  | { readonly status: "queued"; readonly url: DeepLinkPayload }
   | {
       readonly status: "delivered"
-      readonly url: string
+      readonly url: DeepLinkPayload
       readonly clientID: number
       readonly attempt: number
     }
@@ -17,7 +19,7 @@ export type DeepLinkState = {
 }
 
 export type DeepLinkEvent =
-  | { readonly type: "links.received"; readonly urls: readonly string[] }
+  | { readonly type: "links.received"; readonly urls: readonly DeepLinkPayload[] }
   | { readonly type: "window.opened"; readonly windowID: string }
   | { readonly type: "window.focused"; readonly windowID: string }
   | { readonly type: "window.ready"; readonly windowID: string; readonly clientID: number }
@@ -31,7 +33,7 @@ export type DeepLinkCommand =
       readonly windowID: string
       readonly clientID: number
       readonly attempt: number
-      readonly urls: readonly string[]
+      readonly urls: readonly DeepLinkPayload[]
     }
   | { readonly type: "window.focus"; readonly windowID: string }
 
@@ -48,6 +50,7 @@ export function transitionDeepLinks(state: DeepLinkState, event: DeepLinkEvent):
   switch (event.type) {
     case "links.received": {
       if (event.urls.length === 0) return unchanged(state)
+
       const links = event.urls.map((url): DeepLink => ({ status: "queued", url }))
       const focus = preferredWindowID(state)
       const next = drain({ ...state, links: [...state.links, ...links] })
@@ -135,9 +138,11 @@ function drain(state: DeepLinkState): DeepLinkTransition {
   const window = windowID ? state.windows[windowID] : undefined
 
   if (!windowID || window?.status !== "ready") return unchanged(state)
+
   const urls = state.links.flatMap((link) => (link.status === "queued" ? [link.url] : []))
 
   if (urls.length === 0) return unchanged(state)
+
   const attempt = state.nextAttempt
   const clientID = window.clientID
 
