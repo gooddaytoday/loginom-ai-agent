@@ -21,7 +21,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
   })
   ctx.add(Command, (): Command => ({
     id: "show-window",
-    title: ctx.t("show"),
+    title: ctx.t("window.show"),
     section: "session",
     enabled: !!ipc() && session()?.pending === false,
     async run() {
@@ -29,7 +29,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       if (!current || current.pending) return
       const result = await ipc()?.show(current.id).catch(() => "manual" as const)
       if (session()?.id !== current.id || !result || result === "focused") return
-      showToast({ title: ctx.t("show"), description: ctx.t(result) })
+      showToast({ title: ctx.t("window.show"), description: ctx.t(`window.${result}`) })
     },
   }))
 }

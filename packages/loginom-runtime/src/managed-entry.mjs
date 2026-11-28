@@ -15,7 +15,7 @@ import { loginBrowser, loginomAddress, reauthenticateReloadedPage } from "./conn
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
-import { placeBrowserWindow, readWindowBounds, showBrowserWindow } from "./browser-window.mjs"
+import { placeBrowserWindow, prepareBrowserWindow, showBrowserWindow } from "./browser-window.mjs"
 import { observeLoginomReplies, withStepProgress } from "../client/lib/step-progress.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
@@ -152,7 +152,7 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
+      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache, validationLogout } = validateStartInput(input)
       state.owner = { chat: input.chat, generation: input.generation }
       state.startupStateDir = input.stateDir
       state.startupStarted = performance.now()
@@ -203,7 +203,7 @@ async function handle(message) {
           clientRevision: resources.manifestHash, actionManifestDigest: resources.manifest.actionManifestSha256 } }),
       }
       if (input.validation === true) {
-        await loginBrowser(login)
+        await loginBrowser({ ...login, validationLogout })
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
@@ -213,8 +213,7 @@ async function handle(message) {
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:browserDownloadsPath(directory),
         onWindowPage: input.desktopWindow ? async (page) => {
           state.windowPage = page
-          if (login.windowBounds) await placeBrowserWindow(page, login.windowBounds)
-          state.windowBaseline = await readWindowBounds(page)
+          state.windowBaseline = await prepareBrowserWindow(page, login.windowBounds)
         } : undefined,
         onContextCreated: context => {
           state.browser = context

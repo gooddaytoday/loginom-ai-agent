@@ -46,6 +46,14 @@ export function readWindowBounds(page) {
   return withWindow(page, undefined, (_cdp, _id, bounds) => bounds).then(bounds => bounds === 'no-window' ? undefined : bounds);
 }
 
+export async function prepareBrowserWindow(page, rect) {
+  const initial = await readWindowBounds(page);
+  if (!rect || (initial?.windowState === 'normal' && initial.width > rect.width &&
+      initial.left + initial.width === rect.x + rect.width && initial.top === rect.y && initial.height === rect.height)) return initial;
+  await placeBrowserWindow(page, rect);
+  return readWindowBounds(page);
+}
+
 export function placeBrowserWindow(page, rect, baseline) {
   if (!validWindowBounds(rect)) return 'layout-unavailable';
   return withWindow(page, 'layout-unavailable', async (cdp, windowId, bounds) => {

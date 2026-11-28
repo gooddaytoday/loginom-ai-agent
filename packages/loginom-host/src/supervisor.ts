@@ -20,6 +20,7 @@ export type Launch = {
   validation?: boolean
   // Host-owned HTTP cache only; browser profiles and authentication remain fresh.
   validationHttpCache?: boolean
+  validationLogout?: boolean
   headless?: boolean
   desktopWindow?: boolean
   windowBounds?: WindowBounds

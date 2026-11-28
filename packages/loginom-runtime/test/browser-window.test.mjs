@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { placeBrowserWindow, readWindowBounds, showBrowserWindow } from "../src/browser-window.mjs"
+import { placeBrowserWindow, prepareBrowserWindow, readWindowBounds, showBrowserWindow } from "../src/browser-window.mjs"
 
 test("show restores and raises the owning target and reports only confirmed focus", async () => {
   for (const outcome of ["focused", "manual", "no-window"]) {
@@ -70,4 +70,20 @@ test("explicit placement checks real CDP readback and Show does not reset a maxi
   bounds = { ...bounds, left: -400 }
   assert.equal(await placeBrowserWindow(page, next, baseline), "unchanged")
   assert.equal(bounds.left, -400)
+})
+
+test("startup preserves right alignment if Chromium enforces a wider minimum than requested", async () => {
+  const bounds = { windowState: "normal", left: 516, top: 0, width: 508, height: 900 }
+  const writes = []
+  const cdp = {
+    async send(method, payload) {
+      if (method === "Browser.getWindowForTarget") return { windowId: 25, bounds }
+      if (method === "Browser.getWindowBounds") return { bounds }
+      writes.push(payload)
+    },
+    async detach() {},
+  }
+  const page = { isClosed: () => false, context: () => ({ async newCDPSession() { return cdp } }) }
+  assert.deepEqual(await prepareBrowserWindow(page, { x: 563, y: 0, width: 461, height: 900 }), bounds)
+  assert.deepEqual(writes, [])
 })
