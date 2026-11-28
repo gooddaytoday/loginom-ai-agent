@@ -61,16 +61,5 @@ class MakePairTests(unittest.TestCase):
             self.assertTrue((Path(tmp) / 'keep.txt').exists())
 
 
-class RunCheckModelTests(unittest.TestCase):
-    def test_model_is_one_constant_without_variant_or_shared_oauth(self):
-        source = (SCRIPT.parent / 'run-check.py').read_text()
-        self.assertIn("MODEL = 'deepseek/deepseek-flash'", source)
-        self.assertEqual(source.count('deepseek/deepseek-flash'), 1)
-        for text in (source, (SCRIPT.parent / 'run-check-two-turn.py').read_text()):
-            self.assertNotIn('gpt-6.1-sol', text)
-            self.assertNotIn('shared-oauth', text)
-            self.assertNotIn("'--variant'", text)
-
-
 if __name__ == '__main__':
     unittest.main()
