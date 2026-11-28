@@ -109,7 +109,7 @@ test.each([
   }
   const client = OpenCode.make({
     baseUrl: "http://opencode.local",
-    fetch: async () => Response.json({ data: requests }),
+    fetch: Object.assign(async () => Response.json({ data: requests }), { preconnect() {} }),
   })
   const [request] = await client.session.form.list({ sessionID })
   if (!request) throw new Error("The third Loginom call did not open a question")
