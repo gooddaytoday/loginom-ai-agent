@@ -102,6 +102,7 @@ export interface MockServerConfig {
   onMessage?: (input: { sessionID: string; messageID: string }) => void
   onRevertStage?: (input: { sessionID: string; messageID: string }) => void
   onSession?: (sessionID: string) => void
+  promptSearchFailures?: () => boolean
   onRpc?: (request: {
     rpcID: string
     method: string
@@ -1191,6 +1192,9 @@ function mockHandlers(
             })),
           ),
         sessionList: (ctx) => {
+          if (ctx.query.searchField === "prompt" && config.promptSearchFailures?.())
+            return Effect.fail(new MockInternal({ message: "Prompt search failed" }))
+
           const sessions = config.sessions
             .filter(
               (session) =>
