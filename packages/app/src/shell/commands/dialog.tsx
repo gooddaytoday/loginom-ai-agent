@@ -114,7 +114,9 @@ export function CommandPaletteView(props: {
                 : language.t("palette.empty")
           }
           onActive={props.highlight}
-          onSelect={props.select}
+          onSelect={(entry) => {
+            if (!search.waitingForResults()) props.select(entry)
+          }}
           onClose={props.close}
         >
           {(item, row) => {

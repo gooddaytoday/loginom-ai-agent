@@ -129,9 +129,15 @@ test("conversation search keeps its results while waiting and searches prompts f
   await page.clock.install()
   await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
   await search.fill("fi")
+  await search.press("Enter")
+  await expect(search).toBeFocused()
+  await expect(page).toHaveURL("/")
   await page.clock.runFor(300)
   await shortTitle.arrived
   await expect(results).toHaveText([new RegExp(title)])
+  await search.press("Enter")
+  await expect(search).toBeFocused()
+  await expect(page).toHaveURL("/")
   shortTitle.release()
   await expect(dialog.getByText("No results found")).toBeVisible()
   expect(prompt.requests).toHaveLength(0)
@@ -144,6 +150,8 @@ test("conversation search keeps its results while waiting and searches prompts f
   expect(new URL(request.url()).searchParams.get("search")).toBe("fin")
   prompt.release()
   await expect(results).toHaveText([new RegExp(title)])
+  await search.press("Enter")
+  await expectPath(page, sessionHref(sessionID))
 })
 
 test("Home keeps the session list in every interface mode", async ({ page }) => {

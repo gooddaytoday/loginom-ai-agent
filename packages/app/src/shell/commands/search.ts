@@ -103,22 +103,23 @@ export function createCommandPaletteSearch(props: {
 
   onCleanup(() => dispatch({ type: "disposed" }))
 
+  const sources = createMemo(() => selectPaletteSearchSources(searchState()))
+  const waitingForResults = createMemo(() => {
+    const current = query()
+    if (!current || !props.keepPreviousWhileLoading) return false
+
+    const remote = sources()
+    return remote.length > 0 && remote.every((source) => source.settled.query !== current)
+  })
+
   const items = createMemo<CommandPaletteEntry[]>((previous) => {
     const current = query()
-    const sources = selectPaletteSearchSources(searchState())
 
-    if (
-      current &&
-      props.keepPreviousWhileLoading &&
-      previous?.length &&
-      sources.length > 0 &&
-      sources.every((source) => source.settled.query !== current)
-    )
-      return previous
+    if (waitingForResults() && previous?.length) return previous
 
     const entries = uniqueCommandPaletteEntries([
       ...local(),
-      ...sources.flatMap((source) => {
+      ...sources().flatMap((source) => {
         const result = source.settled
 
         if (result.query === current) return result.items
@@ -142,6 +143,7 @@ export function createCommandPaletteSearch(props: {
 
   return {
     items,
+    waitingForResults,
     loading: () => selectPaletteSearchLoading(searchState()),
     failed: () => selectPaletteSearchFailed(searchState()),
   }
