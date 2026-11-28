@@ -1,6 +1,10 @@
 import type { PendingDeepLinks } from "../preload/types"
 
-export const protocolUrls = (argv: string[]) => argv.filter((arg) => arg.startsWith("loginom-ai-agent://"))
+// Windows passes loginom-ai-agent://dashboard?… to the app as loginom-ai-agent://dashboard/?…
+export const protocolUrls = (argv: string[]) =>
+  argv
+    .filter((arg) => arg.startsWith("loginom-ai-agent://"))
+    .map((url) => url.replace(/^loginom-ai-agent:\/\/dashboard\/\?/, "loginom-ai-agent://dashboard?"))
 
 export function createDeepLinkQueue(argv: string[]) {
   const urls = protocolUrls(argv)
@@ -14,6 +18,8 @@ export function createDeepLinkQueue(argv: string[]) {
       const links = window ? (pending.get(window) ?? { urls: [] }) : startup
       links.urls.push(...urls)
       if (window) pending.set(window, links)
+      // The window restored for queued links is a new renderer, as on a cold start.
+      if (!window) links.coldDashboard ??= urls.find((url) => url.startsWith("loginom-ai-agent://dashboard?"))
     },
     restore(window: object) {
       pending.set(window, startup)
