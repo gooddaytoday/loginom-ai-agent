@@ -18,12 +18,11 @@ export type Lease = NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>
 export type Connection = {
   port: Port
   close(): Promise<void>
-  request?: (method: string, input: unknown, timeout?: number) => Promise<unknown>
+  request?: (method: string, input: unknown, timeout?: number, signal?: AbortSignal) => Promise<unknown>
 }
 
 type Started = {
   readonly directory: string
-  readonly deviceOnly: boolean
   ready: Promise<Connection | undefined>
   connected?: boolean
   held: Map<Lease, string>
@@ -51,7 +50,6 @@ const decodePublication = Schema.decodeUnknownOption(Schema.NullOr(PublicationSo
 export async function start(input: {
   data: string
   resources?: string
-  deviceOnly?: boolean
   connect?: () => Promise<Connection>
 }) {
   if (state.current && !state.current.closing) throw Error("LOGINOM_HOST_ALREADY_STARTED")
@@ -76,7 +74,6 @@ export async function start(input: {
   const connect = input.connect ?? (input.resources ? nodeHost(root, input.resources) : undefined)
   const current: Started = {
     directory,
-    deviceOnly: input.deviceOnly ?? false,
     ready: Promise.resolve(undefined),
     held: new Map(),
   }
@@ -145,7 +142,6 @@ export const dashboard = {
 
 export const connectionSettings = {
   request,
-  deviceOnly: () => state.current?.deviceOnly ?? false,
   holdTurn() {
     const id = randomUUID()
     const held = request("connection.settings.turn", { id, active: true }).catch(() => undefined)
@@ -156,11 +152,11 @@ export const connectionSettings = {
   },
 }
 
-async function request(method: string, input: unknown, timeout?: number) {
+async function request(method: string, input: unknown, timeout?: number, signal?: AbortSignal) {
   const current = state.current
   const connection = await current?.ready
   if (!connection?.request || current?.closing) throw new Error("LOGINOM_HOST_NOT_READY")
-  return connection.request(method, input, timeout)
+  return connection.request(method, input, timeout, signal)
 }
 
 export async function windowRequest(method: "window.place" | "window.show", input: unknown) {

@@ -36,7 +36,7 @@ const state = {
   browser: undefined,
   windowPage: undefined,
   windowBaseline: undefined,
-  windowPlaced: false,
+  windowPlacement: undefined,
   placingWindow: undefined,
   browserProfile: undefined,
   browserServer: undefined,
@@ -213,7 +213,7 @@ async function handle(message) {
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:browserDownloadsPath(directory),
         onWindowPage: input.desktopWindow ? async (page) => {
           state.windowPage = page
-          state.windowBaseline = await prepareBrowserWindow(page, login.windowBounds)
+          state.windowBaseline = await prepareBrowserWindow(page, login.windowBounds, state.startupController.signal)
         } : undefined,
         onContextCreated: context => {
           state.browser = context
@@ -298,11 +298,11 @@ async function handle(message) {
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
     if (message.operation === "showWindow") {
-      send({ id: message.id, result: await showBrowserWindow(state.windowPage) })
+      send({ id: message.id, result: await showBrowserWindow(state.windowPage, process.platform, state.startupController.signal) })
       return
     }
     if (message.operation === "placeWindow") {
-      if (state.controller || state.bridge.hasActiveWork() || state.windowPlaced || state.placingWindow) {
+      if (state.controller || state.bridge.hasActiveWork() || state.windowPlacement === null || state.placingWindow) {
         send({ id: message.id, result: "unchanged" })
         return
       }
@@ -310,12 +310,17 @@ async function handle(message) {
         send({ id: message.id, result: state.windowPage ? "layout-unavailable" : "no-window" })
         return
       }
-      const placing = placeBrowserWindow(state.windowPage, message.input, state.windowBaseline)
+      const placing = placeBrowserWindow(state.windowPage, message.input, {
+        baseline: state.windowBaseline,
+        confirmed: state.windowPlacement,
+        shutdown: state.startupController.signal,
+      })
       state.placingWindow = placing
       try {
         const result = await placing
-        if (result === "placed" || result === "unchanged") state.windowPlaced = true
-        send({ id: message.id, result })
+        if (result === "moved") state.windowPlacement = null
+        else if (typeof result !== "string") state.windowPlacement = result
+        send({ id: message.id, result: result === "moved" ? "unchanged" : typeof result === "string" ? result : "placed" })
       } finally {
         state.placingWindow = undefined
       }

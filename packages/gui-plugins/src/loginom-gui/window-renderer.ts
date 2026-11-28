@@ -1,6 +1,6 @@
 import { Command, createKeyed, type Plugin } from "@opencode/plugin/gui"
 import { showToast } from "@opencode/ui/toast"
-import { LoginomWindow } from "./contract"
+import { LoginomWindow, type WindowFeedback } from "./contract"
 import type definition from "./index"
 
 const PendingSession = Symbol("pending session")
@@ -32,9 +32,13 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     async run() {
       const current = session()
       if (!current || current.pending) return
-      const result = await ipc()?.show(current.id, { signal: ctx.signal }).catch(() => "manual" as const)
-      if (ctx.signal.aborted || session()?.id !== current.id || !result || result === "focused") return
-      showToast({ title: ctx.t("window.show"), description: ctx.t(`window.${result}`) })
+      const result = await ipc()?.show(current.id, { signal: ctx.signal })
+        .catch((): typeof WindowFeedback.Type => ({ focus: "manual" }))
+      if (ctx.signal.aborted || session()?.id !== current.id || !result) return
+      const messages = []
+      if (result.layout) messages.push(ctx.t(`window.${result.layout}`))
+      if (result.focus !== "focused") messages.push(ctx.t(`window.${result.focus}`))
+      if (messages.length) showToast({ title: ctx.t("window.show"), description: messages.join(" ") })
     },
   }))
 }

@@ -60,12 +60,17 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         const context = Object.assign(new EventEmitter(), { pages: () => [], close: async () => {} });
         onContextCreated?.(context);
         let bounds = { left: 800, top: 0, width: 800, height: 900, windowState: 'normal' };
+        let stall = true;
         let refusal = true;
         const cdp = {
           async send(method, input) {
             if (method === 'Browser.getWindowForTarget') return { windowId: 8, bounds };
             if (method === 'Browser.getWindowBounds') return { bounds };
             if (method === 'Browser.setWindowBounds') {
+              if (stall) {
+                stall = false;
+                await new Promise(() => {});
+              }
               if (!refusal) bounds = { ...bounds, ...input.bounds };
               refusal = false;
             }
@@ -207,7 +212,14 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     expect(await runtime.request("interrupt")).toEqual({ interrupted: true })
     expect(await call).toMatchObject({ message: "LOGINOM_RUNTIME_FAILED" })
     expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: false })
+    const stalled = runtime.request("placeWindow", windowBounds, 2500)
+    const tool = runtime.request("call", { name: "fixture", arguments: {} }, 2500)
+    expect(await Promise.all([stalled, tool])).toEqual([
+      "layout-unavailable",
+      { result: { content: [] }, recoveryPending: false, activeWork: false },
+    ])
     expect(await runtime.request("placeWindow", windowBounds)).toBe("layout-unavailable")
+    expect(await runtime.request("placeWindow", windowBounds)).toBe("placed")
     expect(await runtime.request("placeWindow", windowBounds)).toBe("placed")
     expect(await runtime.request("placeWindow", { ...windowBounds, x: 800 })).toBe("unchanged")
   } finally {

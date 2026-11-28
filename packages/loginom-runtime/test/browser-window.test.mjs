@@ -57,19 +57,43 @@ test("explicit placement checks real CDP readback and Show does not reset a maxi
   const requested = { x: 800, y: -40, width: 800, height: 860 }
   assert.equal(await showBrowserWindow(page, "linux"), "focused")
   assert.deepEqual(bounds, original)
-  assert.equal(await placeBrowserWindow(page, requested), "placed")
-  assert.deepEqual(bounds, { windowState: "normal", left: 800, top: -40, width: 800, height: 860 })
+  const placed = { windowState: "normal", left: 800, top: -40, width: 800, height: 860 }
+  assert.deepEqual(await placeBrowserWindow(page, requested), placed)
+  assert.deepEqual(bounds, placed)
   allowPlacement = false
   const baseline = await readWindowBounds(page)
   const next = { ...requested, x: -500 }
-  assert.equal(await placeBrowserWindow(page, next, baseline), "layout-unavailable")
+  assert.equal(await placeBrowserWindow(page, next, { baseline }), "layout-unavailable")
   assert.equal(bounds.left, 800)
   allowPlacement = true
-  assert.equal(await placeBrowserWindow(page, next, baseline), "placed")
+  const confirmed = { ...placed, left: -500 }
+  assert.deepEqual(await placeBrowserWindow(page, next, { baseline }), confirmed)
   assert.equal(bounds.left, -500)
+  assert.deepEqual(await placeBrowserWindow(page, next, { baseline, confirmed }), confirmed)
   bounds = { ...bounds, left: -400 }
-  assert.equal(await placeBrowserWindow(page, next, baseline), "unchanged")
+  assert.equal(await placeBrowserWindow(page, next, { baseline, confirmed }), "moved")
   assert.equal(bounds.left, -400)
+})
+
+test("cancelling a hung CDP placement requests detach without waiting for its reply", async () => {
+  const shutdown = new AbortController()
+  const commands = []
+  const pending = new Promise(() => {})
+  const cdp = {
+    async send(method) {
+      commands.push(method)
+      if (method === "Browser.getWindowForTarget") {
+        return { windowId: 8, bounds: { windowState: "normal", left: 0, top: 0, width: 900, height: 900 } }
+      }
+      queueMicrotask(() => shutdown.abort())
+      return pending
+    },
+    async detach() { commands.push("detached"); return pending },
+  }
+  const page = { isClosed: () => false, context: () => ({ async newCDPSession() { return cdp } }) }
+  const result = await placeBrowserWindow(page, { x: 800, y: 0, width: 800, height: 900 }, { shutdown: shutdown.signal })
+  assert.equal(result, "layout-unavailable")
+  assert.deepEqual(commands, ["Browser.getWindowForTarget", "Browser.setWindowBounds", "detached"])
 })
 
 test("startup preserves right alignment if Chromium enforces a wider minimum than requested", async () => {

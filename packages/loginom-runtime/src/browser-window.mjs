@@ -1,39 +1,78 @@
+import { addAbortListener } from 'node:events';
 import { setTimeout } from 'node:timers/promises';
 
-async function withWindow(page, unavailable, action) {
-  if (!page || page.isClosed()) return 'no-window';
-  let cdp;
+function deadline(shutdown) {
+  const timeout = AbortSignal.timeout(1800);
+  return shutdown ? AbortSignal.any([shutdown, timeout]) : timeout;
+}
+
+async function within(signal, start) {
+  signal.throwIfAborted();
+  let listener;
   try {
-    cdp = await page.context().newCDPSession(page);
-    const {windowId, bounds} = await cdp.send('Browser.getWindowForTarget');
-    return await action(cdp, windowId, bounds);
-  } catch {
-    return page.isClosed() ? 'no-window' : unavailable;
+    return await Promise.race([start(), new Promise((_resolve, reject) => {
+      listener = addAbortListener(signal, () => reject(signal.reason));
+    })]);
   } finally {
-    await cdp?.detach().catch(() => undefined);
+    listener?.[Symbol.dispose]();
   }
 }
 
-export async function showBrowserWindow(page, platform = process.platform) {
-  return withWindow(page, 'manual', async (cdp, windowId, bounds) => {
+async function detach(session) {
+  try { await session.detach(); } catch {}
+}
+
+async function withCDP(signal, attach, action) {
+  let session;
+  try {
+    await within(signal, async () => {
+      const acquired = await attach();
+      if (signal.aborted) void detach(acquired);
+      else session = acquired;
+    });
+    const send = (...args) => within(signal, () => session.send(...args));
+    return await action(send);
+  } finally {
+    if (session) {
+      const detached = detach(session);
+      await within(signal, () => detached).catch(() => undefined);
+    }
+  }
+}
+
+async function withWindow(page, unavailable, action, signal) {
+  if (!page || page.isClosed()) return 'no-window';
+  try {
+    return await withCDP(signal, () => page.context().newCDPSession(page), async send => {
+      const {windowId, bounds} = await send('Browser.getWindowForTarget');
+      return action(send, windowId, bounds);
+    });
+  } catch {
+    return page.isClosed() ? 'no-window' : unavailable;
+  }
+}
+
+export async function showBrowserWindow(page, platform = process.platform, shutdown) {
+  const signal = deadline(shutdown);
+  return withWindow(page, 'manual', async (send, windowId, bounds) => {
     if (bounds.windowState === 'minimized')
-      await cdp.send('Browser.setWindowBounds', {windowId, bounds:{windowState:'normal'}});
-    await cdp.send('Page.bringToFront');
-    const focused = await page.waitForFunction(() => document.hasFocus(), undefined, {timeout:500});
-    await focused.dispose();
+      await send('Browser.setWindowBounds', {windowId, bounds:{windowState:'normal'}});
+    await send('Page.bringToFront');
+    await within(signal, async () => {
+      const focused = await page.waitForFunction(() => document.hasFocus(), undefined, {timeout:500});
+      await focused.dispose();
+    });
     if (platform === 'win32') {
-      const browser = await page.context().browser()?.newBrowserCDPSession();
+      const browser = page.context().browser();
       if (!browser) return 'manual';
-      try {
-        const {processInfo} = await browser.send('SystemInfo.getProcessInfo');
+      return withCDP(signal, () => browser.newBrowserCDPSession(), async send => {
+        const {processInfo} = await send('SystemInfo.getProcessInfo');
         const pid = processInfo.find(process => process.type === 'browser')?.id;
         return Number.isSafeInteger(pid) && pid > 0 ? {pid} : 'manual';
-      } finally {
-        await browser.detach().catch(() => undefined);
-      }
+      });
     }
     return 'focused';
-  });
+  }, signal);
 }
 
 const geometry = ['left', 'top', 'width', 'height'];
@@ -42,39 +81,41 @@ const matches = (observed, expected, tolerance = 1) => observed.windowState === 
 export const validWindowBounds = rect => rect && [rect.x, rect.y, rect.width, rect.height].every(Number.isSafeInteger) &&
   rect.width > 0 && rect.height > 0;
 
-export function readWindowBounds(page) {
-  return withWindow(page, undefined, (_cdp, _id, bounds) => bounds).then(bounds => bounds === 'no-window' ? undefined : bounds);
+export function readWindowBounds(page, signal = deadline()) {
+  return withWindow(page, undefined, (_send, _id, bounds) => bounds, signal).then(bounds => bounds === 'no-window' ? undefined : bounds);
 }
 
-export async function prepareBrowserWindow(page, rect) {
-  const initial = await readWindowBounds(page);
+export async function prepareBrowserWindow(page, rect, shutdown) {
+  const signal = deadline(shutdown);
+  const initial = await readWindowBounds(page, signal);
   if (!rect || (initial?.windowState === 'normal' && initial.width > rect.width &&
       initial.left + initial.width === rect.x + rect.width && initial.top === rect.y && initial.height === rect.height)) return initial;
-  await placeBrowserWindow(page, rect);
-  return readWindowBounds(page);
+  await placeBrowserWindow(page, rect, { shutdown: signal });
+  return readWindowBounds(page, signal);
 }
 
-export function placeBrowserWindow(page, rect, baseline) {
+export function placeBrowserWindow(page, rect, { baseline, confirmed, shutdown } = {}) {
   if (!validWindowBounds(rect)) return 'layout-unavailable';
-  return withWindow(page, 'layout-unavailable', async (cdp, windowId, bounds) => {
-    if (baseline && !matches(bounds, baseline, 0)) return 'unchanged';
+  const signal = deadline(shutdown);
+  return withWindow(page, 'layout-unavailable', async (send, windowId, bounds) => {
     const requested = {left:rect.x, top:rect.y, width:rect.width, height:rect.height};
     const expected = {...requested, windowState:'normal'};
-    if (matches(bounds, expected)) return 'placed';
+    const previous = confirmed ?? baseline;
+    if (previous && !matches(bounds, previous, 0)) return 'moved';
+    if (matches(bounds, expected)) return bounds;
+    if (confirmed) return 'unchanged';
     const waitForBounds = async (matches) => {
       for (let attempt = 0; attempt < 10; attempt++) {
-        const reply = await cdp.send('Browser.getWindowBounds', {windowId});
-        if (matches(reply.bounds)) return true;
-        await setTimeout(35);
+        const reply = await send('Browser.getWindowBounds', {windowId});
+        if (matches(reply.bounds)) return reply.bounds;
+        await setTimeout(35, undefined, {signal});
       }
-      return false;
     };
     if (bounds.windowState !== 'normal') {
-      await cdp.send('Browser.setWindowBounds', {windowId, bounds:{windowState:'normal'}});
+      await send('Browser.setWindowBounds', {windowId, bounds:{windowState:'normal'}});
       if (!await waitForBounds(bounds => bounds.windowState === 'normal')) return 'layout-unavailable';
     }
-    await cdp.send('Browser.setWindowBounds', {windowId, bounds:requested});
-    const placed = await waitForBounds(observed => matches(observed, expected));
-    return placed ? 'placed' : 'layout-unavailable';
-  });
+    await send('Browser.setWindowBounds', {windowId, bounds:requested});
+    return await waitForBounds(observed => matches(observed, expected)) ?? 'layout-unavailable';
+  }, signal);
 }
