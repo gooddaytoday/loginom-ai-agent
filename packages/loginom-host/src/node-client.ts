@@ -37,6 +37,7 @@ export async function launchNodeHost(
     // The version that keys the resource verification cache; without it the Host reads the CLI artifact's manifest.
     resourceVersion?: string
     strictRecovery?: boolean
+    desktopWriteOutcomes?: boolean
     closeSavedPackageOnShutdown?: boolean
     browserRecovery?: boolean
     onConnectionApplication?: Loginom.ConnectionApplicationListener
@@ -189,6 +190,7 @@ export async function launchNodeHost(
         ...(input.desktopWindow !== undefined ? { desktopWindow: input.desktopWindow } : {}),
         ...(input.resourceVersion !== undefined ? { resourceVersion: input.resourceVersion } : {}),
         ...(input.strictRecovery !== undefined ? { strictRecovery: input.strictRecovery } : {}),
+        ...(input.desktopWriteOutcomes !== undefined ? { desktopWriteOutcomes: input.desktopWriteOutcomes } : {}),
         ...(input.closeSavedPackageOnShutdown !== undefined
           ? { closeSavedPackageOnShutdown: input.closeSavedPackageOnShutdown }
           : {}),

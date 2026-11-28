@@ -7,6 +7,9 @@ import { WorkspaceID } from "@opencode/schema/workspace-id"
 import { Context, Effect } from "effect"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
+import { Focus } from "../../gui-plugins/src/loginom-gui/contract"
+import { windowFeedback } from "../../gui-plugins/src/loginom-gui/window-placement"
+import { Placement, requestWindow, windowTarget } from "../../gui-plugins/src/loginom-gui/window-request"
 import { ServiceHost } from "../../loginom-agent/src/host"
 import { scriptedHost } from "./fixture/loginom-dock-host"
 import { serveRoutes } from "./fixture/routes"
@@ -68,17 +71,43 @@ it.live("shows and places only conversations in the requested Location", () =>
       expect((yield* call(method, "ses_missing", location)).body).toMatchObject({ type: "invalid_session" })
       expect((yield* call(method, outside.id, location)).body).toMatchObject({ type: "invalid_session" })
       expect((yield* call(method, outside.id, foreign)).body).toMatchObject({ type: "invalid_session" })
-      expect((yield* call(method, scoped.id, location)).body).toMatchObject({ type: "invalid_session" })
       expect((yield* call(method, scoped.id, otherWorkspace)).body).toMatchObject({ type: "invalid_session" })
+      expect((yield* call(method, own.id, workspace)).body).toMatchObject({ type: "invalid_session" })
+      expect(yield* call(method, scoped.id, workspace)).toEqual({
+        status: 200,
+        body: { output: "workspace-unavailable" },
+      })
     }
+
+    const server = yield* Effect.acquireRelease(
+      Effect.sync(() => Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => routes.handler(request) })),
+      (server) => Effect.promise(() => server.stop(true)),
+    )
+    yield* Effect.promise(async () => {
+      const url = new URL(`/api/session/${scoped.id}`, server.url)
+      url.searchParams.set("location[directory]", directory)
+      const response = await fetch(url)
+      expect(response.status).toBe(200)
+      const { data } = await response.json()
+      expect(data).toMatchObject({ id: scoped.id, location })
+      expect(data.location.workspaceID).toBeUndefined()
+      const target = windowTarget({ ...data, pending: false })
+      if (!target) throw new Error("Desktop could not build a target for the loaded conversation")
+      const endpoint = { id: "sidecar", url: server.url.href, headers: {}, sameMachine: true }
+      const { signal } = new AbortController()
+      expect(await requestWindow(endpoint, "place", { ...target, bounds }, Placement, signal)).toBe(
+        "workspace-unavailable",
+      )
+      const focus = await requestWindow(endpoint, "show", target, Focus, signal)
+      expect(windowFeedback(focus ?? "manual", "layout-unavailable")).toEqual({ focus: "workspace-unavailable" })
+    })
+
     expect(calls).toEqual([])
     expect(yield* call("place", own.id, location)).toEqual({ status: 200, body: { output: "moved" } })
-    expect(yield* call("show", scoped.id, workspace)).toEqual({ status: 200, body: { output: "starting" } })
-    expect(yield* call("place", scoped.id, workspace)).toEqual({ status: 200, body: { output: "moved" } })
+    expect(yield* call("show", own.id, location)).toEqual({ status: 200, body: { output: "starting" } })
     expect(calls).toEqual([
       { method: "window.place", input: { sessionID: own.id, bounds } },
-      { method: "window.show", input: { sessionID: scoped.id } },
-      { method: "window.place", input: { sessionID: scoped.id, bounds } },
+      { method: "window.show", input: { sessionID: own.id } },
     ])
     yield* Effect.promise(() => ServiceHost.close())
     expect(yield* call("show", own.id, location)).toEqual({ status: 200, body: { output: "no-window" } })

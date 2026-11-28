@@ -2,15 +2,14 @@ import type { Rectangle } from "electron"
 import type { Focus, WindowFeedback } from "./contract"
 import { layout } from "./layout"
 import { initial, pending, same, transition, type Plan, type State, type WindowSnapshot } from "./window/machine"
+import type { Placement } from "./window-request"
 
 type LayoutFeedback = typeof WindowFeedback.Type.layout
-
-export type PlacementStatus = "placed" | "unchanged" | "moved" | "layout-unavailable" | "starting" | "no-window"
 
 type ShowOptions = {
   sessionID: string
   current: () => WindowSnapshot | undefined
-  place: (plan: Plan) => Promise<PlacementStatus | undefined>
+  place: (plan: Plan) => Promise<typeof Placement.Type | undefined>
   resize: (bounds: Rectangle, restoreStarted: () => void) => Promise<boolean>
 }
 
@@ -48,6 +47,8 @@ export function windowPlacement() {
         return
       }
 
+      if (placed === "workspace-unavailable") return
+
       if (placed !== "placed" || plan.kind !== "split") {
         if (pending(state)) return "split-incomplete"
 
@@ -78,6 +79,8 @@ export function windowPlacement() {
 }
 
 export function windowFeedback(focus: typeof Focus.Type, layout: LayoutFeedback): typeof WindowFeedback.Type {
+  if (focus === "workspace-unavailable") return { focus }
+
   if (layout === "split-incomplete" || (layout && (focus === "focused" || focus === "manual"))) return { focus, layout }
 
   return { focus }

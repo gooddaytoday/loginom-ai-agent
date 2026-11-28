@@ -46,23 +46,18 @@ export const layer = Layer.effect(
 
     const driver = createDriver({
       load: async () => {
-        const [module, registry, cli] = await Promise.all([
-          import("./host"),
-          import("@opencode/gui-plugins/main"),
-          runPromise(desktopCli.resolve),
-        ])
+        const [module, registry] = await Promise.all([import("./host"), import("@opencode/gui-plugins/main")])
 
         return () =>
           module.createHost({
             db: storage.db,
             state: storage.state,
             builtins: withSystemProxy(registry.builtins, systemProxy),
-            cli: {
-              version: cli.version,
-              command: cli.command,
-              binary: cli.binary,
-              development: !app.isPackaged && !cli.binary,
-            },
+            cli: () =>
+              runPromise(desktopCli.resolve).then((cli) => ({
+                ...cli,
+                development: !app.isPackaged && !cli.binary,
+              })),
             subscriptions,
             servers,
             appState: lifecycle.state,

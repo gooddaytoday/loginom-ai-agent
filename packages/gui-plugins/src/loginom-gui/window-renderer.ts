@@ -1,8 +1,8 @@
 import { Command, createKeyed, type Plugin } from "@opencode/plugin/gui"
 import { showToast } from "@opencode/ui/toast"
-import { Schema } from "effect"
-import { LoginomWindow, WindowTarget, type WindowFeedback } from "./contract"
+import { LoginomWindow, type WindowFeedback } from "./contract"
 import type definition from "./index"
+import { windowTarget } from "./window-request"
 
 const PendingSession = Symbol("pending session")
 
@@ -28,15 +28,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     return current?.pending ? PendingSession : current?.id
   }
 
-  const target = () => {
-    const current = session()
-
-    if (!current || current.pending) return
-
-    const input = { sessionID: current.id, location: current.location }
-
-    if (Schema.is(WindowTarget)(input)) return input
-  }
+  const target = () => windowTarget(session())
 
   createKeyed(live, (window) => {
     const track = (id: string | false | null) => void window.track(id, { signal: ctx.signal }).catch(() => undefined)

@@ -12,12 +12,13 @@ import { ServiceHost } from "./host"
 const Target = Schema.Struct({ sessionID: SessionID.check(Schema.isMaxLength(256)), location: Location.Ref })
 const Placement = Schema.Struct({ ...Target.fields, bounds: WindowBounds })
 const errors = { invalid_session: Schema.Struct({}) }
+const WorkspaceUnavailable = Schema.Literal("workspace-unavailable")
 
 const windowRpc = Rpc.define({
   id: "loginom.window",
   methods: {
-    place: { input: Placement, output: PlacementStatus, errors },
-    show: { input: Target, output: WindowStatus, errors },
+    place: { input: Placement, output: Schema.Union([PlacementStatus, WorkspaceUnavailable]), errors },
+    show: { input: Target, output: Schema.Union([WindowStatus, WorkspaceUnavailable]), errors },
   },
   events: {},
 })
@@ -35,21 +36,23 @@ async function showWindow(sessionID: string): Promise<typeof WindowStatus.Type> 
 }
 
 export function registerWindowRpc(ctx: Pick<Plugin.Context, "location" | "session" | "rpc">) {
-  const owns = Effect.fnUntraced(function* ({ sessionID, location }: typeof Target.Type) {
-    if (ctx.location.directory !== location.directory) return false
-    if (ctx.location.workspaceID !== undefined && ctx.location.workspaceID !== location.workspaceID) return false
+  const access = Effect.fnUntraced(function* ({ sessionID, location }: typeof Target.Type) {
+    if (ctx.location.directory !== location.directory) return "invalid"
     const session = yield* ctx.session.get({ sessionID }).pipe(Effect.orElseSucceed(() => undefined))
-    return (
-      Schema.is(Location.Ref)(session?.location) &&
-      session.location.directory === location.directory &&
-      session.location.workspaceID === location.workspaceID
-    )
+    if (!Schema.is(Location.Ref)(session?.location) || session.location.directory !== location.directory)
+      return "invalid"
+    const workspace = session.location.workspaceID
+    if (ctx.location.workspaceID !== undefined && ctx.location.workspaceID !== workspace) return "invalid"
+    if (location.workspaceID !== undefined && location.workspaceID !== workspace) return "invalid"
+    return workspace === undefined ? "allowed" : "workspace-unavailable"
   })
 
   return ctx.rpc.register(windowRpc, {
     place: (input, call) =>
       Effect.gen(function* () {
-        if (!(yield* owns(input)))
+        const status = yield* access(input)
+        if (status === "workspace-unavailable") return status
+        if (status === "invalid")
           return yield* Effect.fail(
             call.error("invalid_session", "The conversation is unavailable in this location", {}),
           )
@@ -60,7 +63,9 @@ export function registerWindowRpc(ctx: Pick<Plugin.Context, "location" | "sessio
       }),
     show: (input, call) =>
       Effect.gen(function* () {
-        if (!(yield* owns(input)))
+        const status = yield* access(input)
+        if (status === "workspace-unavailable") return status
+        if (status === "invalid")
           return yield* Effect.fail(
             call.error("invalid_session", "The conversation is unavailable in this location", {}),
           )

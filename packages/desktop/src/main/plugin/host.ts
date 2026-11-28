@@ -186,7 +186,7 @@ export function createHost(input: {
   readonly builtins: readonly Entry[]
   readonly db: Database
   readonly state: StateStore
-  readonly cli: Cli
+  readonly cli: () => Promise<Cli>
   /** Windows per Ipc that asked for state; shared with the IPC layer, which records them first. */
   readonly subscriptions: Map<string, Set<number>>
   /** The server endpoints each window last pushed. */
@@ -366,11 +366,12 @@ export function createHost(input: {
 
       if (!main) return undefined
 
-      return () =>
-        main().then((module) =>
-          // SAFETY: a built-in's main entry exports a `Plugin.MainSetup`, whose context this host builds.
-          prepare(id, { setup: module.default as Plugin.MainSetup, i18n: builtin.i18n }),
-        )
+      return async () => {
+        const [module, cli] = await Promise.all([main(), input.cli()])
+
+        // SAFETY: a built-in's main entry exports a `Plugin.MainSetup`, whose context this host builds.
+        return prepare(id, { setup: module.default as Plugin.MainSetup, i18n: builtin.i18n }, cli)
+      }
     }
 
     const plugin = plugins.get(id)
@@ -380,7 +381,9 @@ export function createHost(input: {
     return async () => {
       if (!plugin.loaded.ok) throw plugin.loaded.cause
 
-      return prepare(id, { ...plugin.loaded.value, options: plugin.bundle.options, client: sidecarClient })
+      const cli = await input.cli()
+
+      return prepare(id, { ...plugin.loaded.value, options: plugin.bundle.options, client: sidecarClient }, cli)
     }
   }
 
@@ -446,9 +449,11 @@ export function createHost(input: {
   const perform = (command: HostCommand<Listing, Instance>) => {
     switch (command.type) {
       case "subscribe-credentials":
-        resources.unfollow = SidecarCredentials.onChange(() =>
-          dispatch({ type: "endpoint.changed", endpoint: sidecarEndpoint(), quitting: quitting() }),
-        )
+        resources.unfollow = SidecarCredentials.onChange(() => {
+          dispatch({ type: "endpoint.changed", endpoint: sidecarEndpoint(), quitting: quitting() })
+
+          if (!quitting()) void activateAll()
+        })
 
         return
       case "unsubscribe-credentials":
@@ -694,11 +699,11 @@ export function createHost(input: {
 
   /** A loaded revision of the plugin's main code; each instance of it gets its own setup context. */
   const prepare =
-    (id: string, loaded: Loaded): Revision =>
+    (id: string, loaded: Loaded, cli: Cli): Revision =>
     (instance) =>
-      createContext(id, loaded, instance)
+      createContext(id, loaded, cli, instance)
 
-  const createContext = (id: string, loaded: Loaded, instance: Instance): ReturnType<Revision> => {
+  const createContext = (id: string, loaded: Loaded, cli: Cli, instance: Instance): ReturnType<Revision> => {
     const signal = instance.scope.signal
     const contribute = instance.contribute
     // Registered first, so it runs last: the instance's embeds go after everything else it contributed. They are
@@ -868,9 +873,7 @@ export function createHost(input: {
           },
         } satisfies Embeds)
       },
-      get cli() {
-        return input.cli
-      },
+      cli,
       add,
       list,
       provide,

@@ -1,6 +1,7 @@
 export default {
   "window.show": "Show Loginom Window",
   "window.no-window": "There is no Loginom window for this conversation yet.",
+  "window.workspace-unavailable": "Unavailable in this workspace.",
   "window.starting": "Loginom is starting. Try again in a moment.",
   "window.taskbar": "Windows did not bring Loginom forward. Select it from the taskbar.",
   "window.manual": "Loginom could not be brought forward. Switch to it using your window manager.",

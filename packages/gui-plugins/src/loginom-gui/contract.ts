@@ -6,7 +6,7 @@ const Session = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(25
 
 export const WindowTarget = Schema.Struct({ sessionID: Session, location: Location.Ref })
 
-export const Focus = Schema.Literals(["focused", "no-window", "starting", "taskbar", "manual"])
+export const Focus = Schema.Literals(["focused", "no-window", "starting", "taskbar", "manual", "workspace-unavailable"])
 
 export const WindowFeedback = Schema.Struct({
   focus: Focus,

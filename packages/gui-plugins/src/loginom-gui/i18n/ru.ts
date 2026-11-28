@@ -1,6 +1,7 @@
 export default {
   "window.show": "Показать окно Loginom",
   "window.no-window": "Для этого разговора пока нет окна Loginom.",
+  "window.workspace-unavailable": "Недоступно в этом рабочем пространстве",
   "window.starting": "Loginom запускается. Попробуйте ещё раз через несколько секунд.",
   "window.taskbar": "Windows не вывела Loginom на передний план. Выберите его на панели задач.",
   "window.manual": "Не удалось вывести Loginom на передний план. Переключитесь на него вручную.",

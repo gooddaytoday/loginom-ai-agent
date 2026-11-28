@@ -5,46 +5,17 @@ import { createServer } from "node:http"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { productChannel, productSlug } from "@loginom-ai-agent/product"
-import type { Embed, Plugin, ServerEndpoint } from "@opencode/plugin/gui/main"
+import type { Embed, Plugin } from "@opencode/plugin/gui/main"
 import { Schema } from "effect"
 import { app, screen, session, WebContentsView, type BrowserWindow, type Rectangle } from "electron"
-import { DashboardPreview, Focus, LoginomWindow, type WindowFeedback, type WindowTarget } from "./contract"
+import { DashboardPreview, Focus, LoginomWindow, type WindowFeedback } from "./contract"
 import { chromiumBounds, equal } from "./layout"
 import { windowFeedback, windowPlacement } from "./window-placement"
-
-const Placement = Schema.Literals(["placed", "unchanged", "moved", "layout-unavailable", "starting", "no-window"])
+import { Placement, requestWindow } from "./window-request"
 
 const ListenerAddress = Schema.Struct({ port: Schema.Number })
 
-const output = Schema.decodeUnknownSync(Schema.Struct({ output: Schema.Unknown }))
-
 const chatKey = (id: string) => createHash("sha256").update(id).digest("hex")
-
-type WindowRequest = typeof WindowTarget.Type & { bounds?: Rectangle }
-
-async function request<S extends typeof Placement | typeof Focus>(
-  endpoint: ServerEndpoint,
-  method: "place" | "show",
-  input: WindowRequest,
-  schema: S,
-  signal: AbortSignal,
-): Promise<S["Type"] | undefined> {
-  try {
-    const url = new URL(`/api/rpc/loginom.window/${method}`, endpoint.url)
-    url.searchParams.set("location[directory]", input.location.directory)
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { ...endpoint.headers, "content-type": "application/json" },
-      body: JSON.stringify({ input }),
-      redirect: "error",
-      signal: AbortSignal.any([signal, AbortSignal.timeout(3500)]),
-    })
-
-    if (response.ok) return Schema.decodeUnknownSync(schema)(output(await response.json()).output)
-    await response.body?.cancel()
-  } catch {}
-}
 
 const supported = () =>
   process.platform !== "linux" ||
@@ -221,7 +192,7 @@ const setupWindow: Plugin.MainSetup = (ctx) => {
                   ? snapshot(window)
                   : undefined,
               place: (plan) =>
-                request(
+                requestWindow(
                   endpoint,
                   "place",
                   { ...input, bounds: toChromium(plan.browser, plan.target) },
@@ -232,7 +203,7 @@ const setupWindow: Plugin.MainSetup = (ctx) => {
             })
           : "layout-unavailable"
 
-        const focus = (await request(endpoint, "show", input, Focus, caller.signal)) ?? "manual"
+        const focus = (await requestWindow(endpoint, "show", input, Focus, caller.signal)) ?? "manual"
 
         return windowFeedback(focus, layout)
       })().finally(() => showing.delete(window))
