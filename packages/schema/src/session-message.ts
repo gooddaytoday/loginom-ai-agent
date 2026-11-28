@@ -7,7 +7,7 @@ import { Location } from "./location.js"
 import { Model } from "./model.js"
 import { Project } from "./project.js"
 import { Attachment, Prompt } from "./prompt.js"
-import { DateTimeUtcFromMillis, PositiveInt, RelativePath, statics } from "./schema.js"
+import { DateTimeUtcFromMillis, NonNegativeInt, PositiveInt, RelativePath, statics } from "./schema.js"
 import { ascending } from "./identifier.js"
 import { Shell as ShellSchema } from "./shell.js"
 import { FinishReason } from "./llm.js"
@@ -290,6 +290,13 @@ export const Compaction = Schema.Union([CompactionRunning, CompactionCompleted, 
 )
 export type Compaction = CompactionRunning | CompactionCompleted | CompactionFailed
 
+export const Interruption = Schema.Struct({
+  reason: Schema.Literals(["user", "shutdown", "superseded", "inactivity", "restart"]),
+  /** Unix milliseconds of the last persisted activity before recovery. */
+  lastKnown: Schema.Struct({ at: NonNegativeInt, stepID: ID.pipe(optional) }).pipe(optional),
+}).annotate({ identifier: "Session.Message.Interruption" })
+export type Interruption = typeof Interruption.Type
+
 /**
  * Marks the Session going idle: every step since the previous marker belongs to
  * one turn, including prompts steered in while it was busy. A shutdown does not
@@ -301,6 +308,7 @@ export const Idle = Schema.Struct({
   type: Schema.tag("idle"),
   outcome: Schema.Literals(["succeeded", "failed", "interrupted"]),
   error: SessionError.Error.pipe(optional),
+  interruption: Interruption.pipe(optional),
 }).annotate({ identifier: "Session.Message.Idle" })
 
 export const Info = Schema.Union([

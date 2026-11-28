@@ -21,6 +21,7 @@ export type Launch = {
   packageScan?: boolean
   // Host-owned HTTP cache only; browser profiles and authentication remain fresh.
   validationHttpCache?: boolean
+  validationLogout?: boolean
   headless?: boolean
   environment?: NodeJS.ProcessEnv
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
