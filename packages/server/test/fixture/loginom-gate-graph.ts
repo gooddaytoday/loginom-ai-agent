@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { Schema } from "effect"
 import { validateFilterConditions } from "../../../loginom-runtime/client/lib/filter-parameters.mjs"
 import { prepareNodeTarget } from "../../../loginom-runtime/client/lib/node-target.mjs"
-import { doc, nodeRef, originalEdge, output, salesCsv, workflow } from "./loginom-gate-scenarios"
+import { doc, nodeRef, originalEdge, salesCsv, workflowRef } from "./loginom-gate-scenarios"
 
 type Edge = typeof originalEdge
 const inputLink = Schema.decodeUnknownSync(
@@ -10,12 +10,34 @@ const inputLink = Schema.decodeUnknownSync(
     Schema.Struct({ source: Schema.Struct({ node_id: Schema.String }), output: Schema.Number, input: Schema.Number }),
   ]),
 )
-const workflowRef = {
-  ...workflow,
-  tab_tid: "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
-  prefix: "MF;TF-1",
-  navigation_path: [{ tid: "scenario", label: "Сценарий" }],
-}
+export const output = (operation_id: string, node_id: string, row_count: number, replaced_links?: unknown) => ({
+  status: "SUCCEEDED",
+  action_key: "node.apply",
+  action_revision: "1",
+  phase: "verified",
+  operation_id,
+  cleanup_complete: true,
+  effect_possible: true,
+  error: null,
+  trace: [],
+  output: {
+    node: nodeRef(node_id),
+    replaced_links,
+    output: {
+      ports: [
+        {
+          port: 0,
+          port_guid: `${node_id}-out`,
+          row_count,
+          fresh: true,
+          schema: [],
+          sample: [],
+          sample_complete: false,
+        },
+      ],
+    },
+  },
+})
 
 export function gateGraph() {
   const links: Edge[] = []
@@ -80,7 +102,7 @@ export function gateGraph() {
           const target = await prepareNodeTarget({
             request: {
               document_id: request.document_id,
-              workflow_ref: workflowRef,
+              workflow_ref: request.workflow_ref,
               target: request.target,
               inputs: request.inputs,
             },
@@ -111,7 +133,7 @@ export function gateGraph() {
             record: async (event: unknown) => event,
           })
           assert.equal(target.status, "SUCCEEDED", target.error)
-          return { ...output(request.operation_id, "result", resultRows()), replaced_links: target.replaced_links }
+          return output(request.operation_id, "result", resultRows(), target.replaced_links)
         }
         default:
           throw Error("Unexpected graph request")

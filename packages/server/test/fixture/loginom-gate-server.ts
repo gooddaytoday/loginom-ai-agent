@@ -9,7 +9,7 @@ import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { Location } from "@opencode/schema/location"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Global } from "@opencode/util/global"
-import { Context, Effect, Layer } from "effect"
+import { Context, Effect, Layer, Schema } from "effect"
 import { LanguageModel, LLMClient } from "../../../ai/src/effect"
 import { OpenAIChat } from "../../../ai/src/protocols/openai-chat"
 import { TestLLM } from "../../../ai/src/testing"
@@ -17,10 +17,17 @@ import { ServiceHost } from "../../../loginom-agent/src/host"
 import { productSkills } from "../../../loginom-host/src/bundled-skills"
 import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
 import { reservedSkillNames } from "../../../product/src/skills"
-import { dockTool, scriptedHost } from "./loginom-dock-host"
+import { scriptedHost } from "./loginom-dock-host"
 import { gateGraph } from "./loginom-gate-graph"
-import { gateScenarios, modelCalls, salesCsv, salesFile } from "./loginom-gate-scenarios"
+import { gateRuntime } from "./loginom-gate-runtime"
+import { gateScenarios, modelCalls, salesFile } from "./loginom-gate-scenarios"
 import { serveRoutes } from "./routes"
+
+const toolFailure = Schema.decodeUnknownSync(
+  Schema.Struct({
+    error: Schema.Struct({ message: Schema.String }),
+  }),
+)
 
 const [scenario, root, appOrigin, modelRef] = Bun.argv.slice(2)
 assert(scenario === "7" || scenario === "8" || scenario === "9" || scenario === "10")
@@ -33,47 +40,33 @@ const modelName = scenario === "9" ? "Модель организации" : "Ga
 const title = `Шлюз C · ${scenario}`
 const turns = gateScenarios[scenario]
 const graph = scenario === "10" ? gateGraph() : undefined
+const resources = path.join(root, "resources")
+const runtime = gateRuntime(resources, graph)
 const expectedCalls = turns.flatMap((turn) => turn.calls)
 const activeRead = Promise.withResolvers<void>()
 let waitingRead = false
 let received = 0
 const host = scriptedHost({
-  catalog: () =>
-    [...new Set([...expectedCalls.map((call) => call.name), "dock_action_describe"])].map((name) => {
-      const tool = dockTool(name)
-      const inputs = expectedCalls.filter((call) => call.name === name).flatMap((call) => Object.keys(call.input))
-      return {
-        ...tool,
-        inputSchema: {
-          type: "object",
-          properties: { host_context_token: { type: "string" }, ...Object.fromEntries(inputs.map((key) => [key, {}])) },
-        },
-      }
-    }),
+  catalog: runtime.catalog,
+  admit: runtime.admit,
   call: async (request) => {
     const expected = expectedCalls[received]
     try {
       assert(expected, `Unexpected Loginom call: ${request.name}`)
       assert.equal(request.name, expected.name)
       assert.deepEqual(request.args, expected.input)
-      if (expected.name === "dock_artifact_deliver") {
-        assert.deepEqual(
-          host.requests("admit").map((call) => call.files),
-          [[{ name: salesFile, data: Buffer.from(salesCsv).toString("base64") }]],
-        )
+      received++
+      if (expected.hold) {
+        waitingRead = true
+        await activeRead.promise
+        waitingRead = false
       }
+      assert(typeof request.name === "string" && request.args && typeof request.args === "object")
+      return await runtime.call(request.name, request.args as Record<string, unknown>)
     } catch (error) {
       console.error("Unexpected scripted Loginom request", error)
       throw error
     }
-    received++
-    if (expected.hold) {
-      waitingRead = true
-      await activeRead.promise
-      waitingRead = false
-    }
-    const receipt = graph && expected.name === "dock_node_apply" ? await graph.apply(expected.input) : expected.receipt
-    return { content: [{ type: "text", text: JSON.stringify(receipt) }] }
   },
 })
 
@@ -110,8 +103,6 @@ const config = {
 const system = path.join(root, "policy")
 const configOptions = { project: false, claude: false, content: JSON.stringify(config), system }
 const directory = path.join(root, "workspace")
-const resources = path.join(root, "resources")
-
 await Promise.all([directory, system].map((dir) => fs.mkdir(dir, { recursive: true })))
 if (scenario === "9") {
   await Bun.write(
@@ -124,7 +115,13 @@ if (scenario === "9") {
     }),
   )
 }
-for (const skill of reservedSkillNames) {
+const automationSkill = "loginom-automation"
+await fs.cp(
+  new URL(`../../../product/skills/${automationSkill}/`, import.meta.url),
+  path.join(resources, "skills", automationSkill),
+  { recursive: true },
+)
+for (const skill of reservedSkillNames.filter((name) => name !== automationSkill)) {
   await Bun.write(
     path.join(resources, "skills", skill, "SKILL.md"),
     `---\nname: ${skill}\ndescription: Bundled ${skill}.\n---\n\nFixture for ${skill}.\n`,
@@ -186,14 +183,11 @@ await Effect.runPromise(
           const part = results[index]
           assert(part?.name === name, `Missing result for ${name}`)
           const result = part.result
-          const receipt = JSON.stringify(call.receipt)
-          if (call.receipt.status === "FAILED" || call.receipt.status === "AMBIGUOUS") {
-            assert.equal(result.type, "error", `${name} must report the failed receipt`)
-            assert(JSON.stringify(result.value).includes(JSON.stringify(receipt).slice(1, -1)))
-          } else {
-            assert(result.type === "text" && typeof result.value === "string", JSON.stringify(result))
-            assert.deepEqual(JSON.parse(result.value), call.receipt)
-          }
+          const failed = call.expected.status === "FAILED" || call.expected.status === "AMBIGUOUS"
+          assert.equal(result.type, failed ? "error" : "text", JSON.stringify(result))
+          const receipt = result.type === "error" ? toolFailure(result.value).error.message : result.value
+          assert(typeof receipt === "string", JSON.stringify(result))
+          assert.partialDeepStrictEqual(JSON.parse(receipt.split("\n\n")[0]), call.expected)
         }
         if (repeatStop) {
           const stopped = results.at(-1)?.result

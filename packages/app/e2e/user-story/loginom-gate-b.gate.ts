@@ -55,7 +55,9 @@ test("8 · Сбои", async ({ page, baseURL }, info) => {
     await test.step("Поставить поправку в очередь, пока Loginom читает пакет", async () => {
       await gate.editor.fill(gatePrompts.read)
       await gate.submit.click()
-      await expect.poll(gate.status).toMatchObject({ waitingRead: true, calls: ["dock_prepare", "dock_inspect"] })
+      await expect
+        .poll(gate.status)
+        .toMatchObject({ waitingRead: true, calls: ["dock_prepare", "dock_workspace_observe"] })
       await gate.editor.fill(gatePrompts.queue)
       await gate.editor.press("Alt+Enter")
       const queued = page.locator('[data-component="session-queue-row"]')
@@ -66,12 +68,12 @@ test("8 · Сбои", async ({ page, baseURL }, info) => {
     })
     await test.step("Дождаться успешного чтения и отправки поправки из очереди", async () => {
       await gate.releaseRead()
-      await expect(page.getByText("Прочитана версия v1 пакета Продажи.lgp.", { exact: true })).toBeVisible()
-      await expect(page.getByText("Поправка учтена.", { exact: true })).toBeVisible()
+      await expect(page.getByText("В пакете Продажи.lgp найден узел «Фильтр».", { exact: true })).toBeVisible()
+      await expect(page.getByText("Путь пакета — /gate/Продажи.lgp.", { exact: true })).toBeVisible()
       await expect(page.locator('[data-component="session-queue-row"]')).toHaveCount(0)
-      expect(await gate.status()).toMatchObject({ calls: ["dock_prepare", "dock_inspect"] })
+      expect(await gate.status()).toMatchObject({ calls: ["dock_prepare", "dock_workspace_observe"] })
     })
-    await test.step("После обрыва записи запросить проверку и увидеть подтверждённую версию", async () => {
+    await test.step("После обрыва записи запросить проверку и увидеть подтверждение сохранения", async () => {
       await gate.editor.fill(gatePrompts.write)
       await gate.submit.click()
       await expect(
@@ -79,13 +81,13 @@ test("8 · Сбои", async ({ page, baseURL }, info) => {
       ).toBeVisible()
       await gateScreenshot(page, info, "08-write-unconfirmed")
       expect(await gate.status()).toMatchObject({
-        calls: ["dock_prepare", "dock_inspect", "dock_action_run"],
+        calls: ["dock_prepare", "dock_workspace_observe", "dock_action_run"],
       })
       await gate.editor.fill(gatePrompts.check)
       await gate.submit.click()
-      await expect(page.getByText("Проверка пакета подтвердила версию v1.", { exact: true })).toBeVisible()
+      await expect(page.getByText("Проверка подтвердила сохранение пакета Продажи.lgp.", { exact: true })).toBeVisible()
       expect(await gate.status()).toMatchObject({
-        calls: ["dock_prepare", "dock_inspect", "dock_action_run", "dock_inspect"],
+        calls: ["dock_prepare", "dock_workspace_observe", "dock_action_run", "dock_operation_inspect"],
       })
     })
     await test.step("Остановить третий одинаковый вызов до обращения в Loginom", async () => {
@@ -95,8 +97,8 @@ test("8 · Сбои", async ({ page, baseURL }, info) => {
       await expect(
         question.getByText("Агент снова делает одно и то же: применяет настройки узла Loginom", { exact: true }),
       ).toBeVisible()
-      const before = ["dock_prepare", "dock_inspect", "dock_action_run", "dock_inspect"]
-      const stoppedCalls = [...before, "dock_node_apply", "dock_node_apply"]
+      const before = ["dock_prepare", "dock_workspace_observe", "dock_action_run", "dock_operation_inspect"]
+      const stoppedCalls = [...before, "dock_action_describe", "dock_node_apply", "dock_node_apply"]
       expect((await gate.status()).calls).toEqual(stoppedCalls)
       await gateScreenshot(page, info, "08-repeat-question")
       await question.getByRole("radio", { name: /^Остановить/ }).click()
@@ -121,13 +123,14 @@ test("8 · Сбои", async ({ page, baseURL }, info) => {
 
         const trace = [
           "dock_prepare",
-          "dock_inspect",
+          "dock_workspace_observe",
           "dock_action_run",
-          "dock_inspect",
+          "dock_operation_inspect",
+          "dock_action_describe",
           "dock_node_apply",
           "dock_node_apply",
-          "dock_inspect",
-          "dock_inspect",
+          "dock_workspace_observe",
+          "dock_workspace_observe",
         ]
 
         await expect.poll(async () => (await gate.status()).calls).toEqual(trace)
@@ -237,10 +240,17 @@ test("10 · Собрать вместе с Loginom", async ({ page, baseURL }, i
         calls: [
           "dock_prepare",
           "dock_artifact_deliver",
+          "dock_action_describe",
           "dock_node_apply",
+          "dock_node_wait",
+          "dock_action_describe",
           "dock_node_apply",
+          "dock_node_wait",
+          "dock_action_describe",
           "dock_node_apply",
+          "dock_node_wait",
           "dock_node_apply",
+          "dock_node_wait",
           "dock_action_run",
         ],
       })
