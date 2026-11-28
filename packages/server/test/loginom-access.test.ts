@@ -532,6 +532,28 @@ describe("loginom.product access and tool gate (G1)", () => {
   )
 
   it.live(
+    "denying the repeat question blocks later identical calls before dispatch",
+    () =>
+      Effect.gen(function* () {
+        const host = scriptedHost({ catalog: () => [dockTool("dock_node_apply")] })
+        const test = yield* boot(undefined, { catalog: "missing", host })
+        const sessionID = yield* test.create("denied repeat question")
+        yield* test.sessions.setPermissions({
+          sessionID,
+          permissions: [{ action: "question", resource: "*", effect: "deny" }],
+        })
+        const apply = { tool: "loginom_dock_node_apply", input: { path: "same" } }
+
+        yield* test.wizard(sessionID, "loginom-automation", script(apply, apply, apply, apply, { text: "done" }))
+
+        expect(host.requests("call").map((input) => input.name)).toEqual(["dock_node_apply", "dock_node_apply"])
+        expect(yield* test.forms(sessionID)).toEqual([])
+        expect(JSON.stringify((yield* test.requests(sessionID)).at(-1)?.messages)).toContain("Остановлено")
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
     "S1: without a grant a Loginom tool is hidden and rejected, directly, from CodeMode and with permissive session rules",
     () =>
       Effect.gen(function* () {

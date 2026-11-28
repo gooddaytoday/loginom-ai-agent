@@ -139,6 +139,22 @@ test("parallel calls in one model step do not become a serial streak", async () 
   expect(forms).toEqual([])
 })
 
+test("a failed form request keeps identical retries blocked", async () => {
+  const { tool, call, executed, forms } = setup({
+    ask: async () => {
+      throw new Tool.Error({ message: "Question unavailable" })
+    },
+  })
+  const apply = tool()
+
+  await apply.execute({}, call())
+  await apply.execute({}, call())
+  await expect(apply.execute({}, call())).rejects.toThrow("Question unavailable")
+  await expect(apply.execute({}, call())).rejects.toThrow("Остановлено")
+  expect(executed).toHaveLength(2)
+  expect(forms).toHaveLength(1)
+})
+
 test("while the third call is paused, a concurrent call cannot dispatch or ask again", async () => {
   const opened = Promise.withResolvers<void>()
   const answer = Promise.withResolvers<Awaited<ReturnType<ToolDomain["ask"]>>>()

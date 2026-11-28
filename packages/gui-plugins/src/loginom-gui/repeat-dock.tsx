@@ -1,16 +1,13 @@
+import { Option, Schema } from "effect"
+import type { QuestionRendererProps } from "@opencode/plugin/gui/builtin"
 import { DockPrompt } from "@opencode/session-ui/dock-prompt"
 import { Button } from "@opencode/ui/button"
 import { TextInput } from "@opencode/ui/text-input"
 import { createUniqueId } from "solid-js"
 
-export function LoginomRepeatDock(props: {
-  title: string
-  message: string
-  busy: boolean
-  hint: string
-  onHint: (text: string) => void
-  onDecide: (decision: "continue" | "stop" | "hint") => void
-}) {
+const decodeMessage = Schema.decodeUnknownOption(Schema.String)
+
+export function LoginomRepeatDock(props: QuestionRendererProps) {
   const hintID = createUniqueId()
 
   return (
@@ -19,10 +16,12 @@ export function LoginomRepeatDock(props: {
       header={
         <>
           <div data-slot="question-header-top">
-            <div data-slot="question-header-title">{props.title}</div>
+            <div data-slot="question-header-title">{props.request.title}</div>
           </div>
           <div data-slot="question-details">
-            <div data-slot="question-text">{props.message}</div>
+            <div data-slot="question-text">
+              {Option.getOrElse(decodeMessage(props.request.metadata?.message), () => "")}
+            </div>
           </div>
         </>
       }
@@ -30,10 +29,20 @@ export function LoginomRepeatDock(props: {
     >
       <div class="flex flex-col gap-3 px-3 pb-3">
         <div class="flex flex-wrap gap-2">
-          <Button variant="submit" size="large" disabled={props.busy} onClick={() => props.onDecide("continue")}>
+          <Button
+            variant="submit"
+            size="large"
+            disabled={props.busy}
+            onClick={() => props.reply({ decision: "continue" })}
+          >
             Продолжить
           </Button>
-          <Button variant="neutral" size="large" disabled={props.busy} onClick={() => props.onDecide("stop")}>
+          <Button
+            variant="neutral"
+            size="large"
+            disabled={props.busy}
+            onClick={() => props.reply({ decision: "stop" })}
+          >
             Остановить
           </Button>
         </div>
@@ -42,7 +51,9 @@ export function LoginomRepeatDock(props: {
           onSubmit={(event) => {
             event.preventDefault()
 
-            if (!props.busy && props.hint.trim()) props.onDecide("hint")
+            const hint = props.draft.trim()
+
+            if (!props.busy && hint) props.reply({ decision: "hint", hint })
           }}
         >
           <label class="text-12-medium" for={hintID}>
@@ -52,11 +63,11 @@ export function LoginomRepeatDock(props: {
             <TextInput
               id={hintID}
               class="min-w-0 flex-1"
-              value={props.hint}
+              value={props.draft}
               disabled={props.busy}
-              onInput={(event) => props.onHint(event.currentTarget.value)}
+              onInput={(event) => props.setDraft(event.currentTarget.value)}
             />
-            <Button type="submit" variant="neutral" size="large" disabled={props.busy || !props.hint.trim()}>
+            <Button type="submit" variant="neutral" size="large" disabled={props.busy || !props.draft.trim()}>
               Отправить
             </Button>
           </div>

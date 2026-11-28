@@ -1,6 +1,7 @@
 // The parts of the SDK only the app's built-in plugins use, for workspace imports only: `tsconfig.build.json` leaves it
 // out of `dist`, and `script/pack.ts` exports it as `null`. Public SDK modules never import it.
 
+import type { FormAnswer, FormInfo } from "@opencode/client/promise"
 import type { Schema } from "effect"
 import type { Context } from "./context.js"
 import { Registry, type Catalog, type Messages, type Persisted, type StoreDeclaration, type StoreFrom } from "./core.js"
@@ -81,6 +82,23 @@ export interface ToolRenderer {
  * ```
  */
 export const ToolRenderer = Registry.define<ToolRenderer>("tool.renderer")
+
+/** Live question data and the host's draft and reply controls. */
+export interface QuestionRendererProps {
+  readonly request: FormInfo
+  readonly busy: boolean
+  readonly draft: string
+  setDraft(text: string): void
+  reply(answer: FormAnswer): void
+}
+
+/** A built-in plugin's renderer for questions it recognizes. */
+export interface QuestionRenderer {
+  matches(request: FormInfo): boolean
+  render(props: QuestionRendererProps): JSX.Element
+}
+
+export const QuestionRenderer = Registry.define<QuestionRenderer>("question.renderer")
 
 /** A `Command` with the fields only built-ins set. */
 export interface BuiltinCommand extends Command {

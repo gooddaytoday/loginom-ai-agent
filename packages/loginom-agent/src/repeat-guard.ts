@@ -72,7 +72,7 @@ interface Streak {
   count: number
   inFlight: boolean
   parallel: boolean
-  declined?: Form.ID
+  blockedBy?: Form.ID
 }
 
 export function repeatGuard(options: {
@@ -113,9 +113,9 @@ export function repeatGuard(options: {
           }
 
           const previous = recent.get(session)
-          if (previous?.declined && matches(previous)) {
+          if (previous?.blockedBy && matches(previous)) {
             previous.count++
-            throw new Tool.Error({ message: stopped, metadata: member(previous, previous.declined) })
+            throw new Tool.Error({ message: stopped, metadata: member(previous, previous.blockedBy) })
           }
 
           const parallel = !!previous && (previous.inFlight || previous.messageID === call.messageID)
@@ -139,9 +139,11 @@ export function repeatGuard(options: {
           let metadata: Tool.Metadata = member(streak)
           try {
             if (streak.count === 3) {
+              const formID = Form.ID.create()
+              // Only an explicit Continue releases this streak, including when opening the form fails.
+              streak.blockedBy = formID
               const signal = call.signal
               signal.throwIfAborted()
-              const formID = Form.ID.create()
               const group = {
                 ...member(streak, formID).timelineGroup,
                 summary: `Агент дважды вызвал ${action} с теми же параметрами`,
@@ -186,7 +188,6 @@ export function repeatGuard(options: {
               signal.throwIfAborted()
 
               if (reply.status === "cancelled") {
-                streak.declined = formID
                 if (reply.message === undefined) await options.interrupt(session)
                 throw new Tool.Error({ message: stopped })
               }
@@ -195,7 +196,6 @@ export function repeatGuard(options: {
                 throw new Tool.Error({ message: stopped })
               }
               if (reply.answer.decision !== "continue") {
-                streak.declined = formID
                 const hint = reply.answer.hint
                 throw new Tool.Error({
                   message: typeof hint === "string" ? `${stopped}\nПодсказка пользователя: ${hint}` : stopped,
