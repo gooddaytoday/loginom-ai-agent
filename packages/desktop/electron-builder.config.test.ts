@@ -393,6 +393,7 @@ test("shared packaging defaults", async () => {
   expect(config.extraResources).toEqual([
     { from: "resources/", to: "", filter: [bundledCli, `${bundledCli}.exe`, `${bundledCli}.version`] },
     { from: "resources/loginom", to: "loginom" },
+    { from: "resources", to: ".", filter: ["updates-s3.json"] },
     { from: "resources/icons", to: "icons", filter: ["**/*", "!dock.png"] },
   ])
 
