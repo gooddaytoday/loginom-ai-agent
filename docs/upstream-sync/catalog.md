@@ -163,6 +163,8 @@
 
 ## CAT-10 Веб-приложение, UI-кит, UI сессии
 
+- **C2.12 (CON-06).** В `packages/app/e2e/regression/settings.spec.ts` сценарий настроек Loginom проверяет счётчик завершающихся задач, запуск каталога и отдельные события RPC успеха и отказа.
+
 - **Вход OpenCode Console из Desktop (C5.6, В-97 п. 1).** `packages/app/src/providers/connect/controller.ts` передаёт браузеру адрес устройства от сервера без подмены `client_id` и добавления `return_window`. Вход завершается опросом сервера, без ссылки возврата. При обновлении не возвращать переписывание адреса для Desktop; сценарий проверяют `packages/app/e2e/regression/settings.spec.ts` и Desktop-фикстура `packages/app/e2e/utils/settings-wsl.fixture.tsx`. Регистрация только `loginom-ai-agent://` не менялась; в `packages/desktop/README.md` (CAT-09) указана фактическая схема.
 - **Модели и провайдеры (C2.5а, В-82, В-91).** В `app/src/runtime/i18n/{en,ru}.ts` исходные ключи OpenCode задают подписи «Подключить модель…» и «Подключить провайдера». В `app/src/providers/models/unpaid.tsx` Go остаётся обычным провайдером, порядок карточек сохранён из OpenCode 2, ссылка под ними — «Ещё провайдеры». В `app/src/settings/providers/providers.tsx` Go без рекламного текста и знака рекомендации; общие популярные провайдеры идут в том же порядке, что в окне подключения. Удалены `app/src/providers/connect/{go-upsell-hero*,usage-exceeded.tsx}` и вызов рекламного окна из `app/src/session/{screen,usage-exceeded-dialogs}.tsx`. Переписан `app/src/session/composer/free-limit-panel.tsx`: вместо кнопки подписки — обычный вход в выбор провайдера, новые заголовок и подсказка. Уведомление ChatGPT и учёт лимитов сохранены. Неиспользуемые рекламные ключи удалены в `app/src/runtime/i18n` и `ui/src/i18n`: `am`, `ar`, `az`, `bg`, `bn`, `br`, `bs`, `ca`, `cs`, `da`, `de`, `dv`, `dz`, `el`, `en`, `es`, `et`, `fa`, `fi`, `fo`, `fr`, `he`, `hi`, `hr`, `hu`, `hy`, `id`, `is`, `it`, `ja`, `ka`, `km`, `ko`, `lo`, `lt`, `lv`, `mk`, `mn`, `ms`, `my`, `ne`, `nl`, `no`, `pa`, `pl`, `ro`, `ru`, `si`, `sk`, `sl`, `sq`, `sr`, `sv`, `tg`, `th`, `tk`, `tr`, `uk`, `ur`, `uz`, `vi`, `zh`, `zht`.
 
@@ -216,7 +218,7 @@
 `incomplete` и `remaining` остаются. Из файлов upstream изменён только `.gitleaksignore`: +51 отпечаток для архивов
 комплекта, правку покрывает CAT-02. `catalog.json` не менялся.
 
-## CAT-15 Формы решений инструментов и группировка в ленте (C3 Б6)
+## CAT-28 Формы решений инструментов и группировка в ленте (C3 Б6)
 
 - `ToolDomain.ask` в SDK открывает штатную форму из вызова инструмента, проверяет право `question`, связывает форму с вызовом и передаёт сигнал отмены. Точка подключения в `core/src/plugin/host.ts`, контракты в `plugin/src/{effect,promise}/tool.ts`, адаптер в `plugin/src/promise/adapter.ts`.
 - Обе ленты сворачивают введённую сервером группу при появлении строки с итоговым заголовком. В `app` док вопроса выбирает отрисовщик из встроенного реестра `QuestionRenderer` и передаёт ему штатные контроллер ответа и черновик. Плагин `loginom-gui` распознаёт метаданные повтора и отправляет решения Б6 из `repeat-dock.tsx`. Правило повторов, текст и переходы остаются в `loginom-agent/src/repeat-guard.ts`. `QuestionRenderer` доступен только встроенным плагинам. Mini использует ту же форму с необязательной подсказкой, без условных полей и шаблонов.
