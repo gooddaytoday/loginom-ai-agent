@@ -24,6 +24,7 @@ export const BrowserFailure = Schema.Literals([
   "LOGINOM_ACCOUNT_MISMATCH",
   "LOGINOM_LOGIN_UNAVAILABLE",
   "LOGINOM_BROWSER_START_FAILED",
+  "LOGINOM_LOGOUT_UNCONFIRMED",
 ])
 export const BrowserStatus = Schema.Union([
   Schema.Struct({ state: Schema.Literals(["unknown", "verified"]) }),
@@ -57,8 +58,8 @@ export const AcknowledgeRecovery = Schema.Struct({ revision: NonNegativeInt, ids
 export type API = {
   read(): Promise<View>
   status(): Promise<View>
-  check(candidate: Candidate): Promise<typeof Validation.Type>
-  save(input: typeof Save.Type): Promise<View>
+  check(candidate: Candidate, settings?: boolean): Promise<typeof Validation.Type>
+  save(input: typeof Save.Type, settings?: boolean): Promise<View>
   cancelPending(input: typeof Cancel.Type): Promise<View>
   acknowledgeRecovery(input: typeof AcknowledgeRecovery.Type): Promise<View>
 }

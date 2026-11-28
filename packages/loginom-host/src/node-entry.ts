@@ -32,6 +32,7 @@ const port: HostPort = {
 }
 const candidate = Schema.decodeUnknownOption(Loginom.Candidate)
 const save = Schema.decodeUnknownOption(Loginom.Save)
+const turn = Schema.decodeUnknownOption(Schema.Struct({ id: Schema.String, active: Schema.Boolean }))
 const cancel = Schema.decodeUnknownOption(Loginom.Cancel)
 const recover = Schema.decodeUnknownOption(Loginom.AcknowledgeRecovery)
 
@@ -175,19 +176,27 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
     state.setupVerified = true
     return { verified: true }
   }
-  if (method === "connection.check") {
+  if (method === "connection.settings.turn") {
+    const value = turn(input)
+    if (Option.isNone(value)) throw new Error("LOGINOM_INPUT_INVALID")
+    host.turn(value.value.id, value.value.active)
+    return {}
+  }
+  if (method === "connection.check" || method === "connection.settings.check") {
     const value = candidate(input)
     if (Option.isNone(value)) throw new Error("LOGINOM_CANDIDATE_INVALID")
-    return host.api.check(value.value)
+    return host.api.check(value.value, method === "connection.settings.check")
   }
-  if (method === "connection.save") {
+  if (method === "connection.save" || method === "connection.settings.save") {
     const value = save(input)
     if (Option.isNone(value)) throw new Error("LOGINOM_SAVE_INVALID")
-    // Setup prepares resources before check mints its five-minute token.
-    // No hashing may consume that validation lifetime between check and save.
-    if (!state.setupVerified) throw new Error("LOGINOM_RUNTIME_START_FAILED")
-    state.setupVerified = false
-    await host.api.save(value.value)
+    const settings = method === "connection.settings.save"
+    if (!settings) {
+      // CLI setup verifies resources explicitly before check mints its token.
+      if (!state.setupVerified) throw new Error("LOGINOM_RUNTIME_START_FAILED")
+      state.setupVerified = false
+    }
+    await host.api.save(value.value, settings)
     await host.settled()
     return host.api.status()
   }
