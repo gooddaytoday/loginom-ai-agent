@@ -1,6 +1,7 @@
 // Loginom AI Agent product plugin. Core runs it as a built-in server plugin: last in `post`, with a guarded and
 // reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host itself belongs to the server process
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
+import { createHash } from "node:crypto"
 import { join } from "node:path"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
@@ -16,6 +17,7 @@ import { Dashboard } from "./dashboard"
 import { DashboardTarget } from "./dashboard-target"
 import { dashboardTools } from "./dashboard-tools"
 import { dockTools } from "./dock"
+import { exportReceipts, exportReceiptsRpc } from "./export-receipts"
 import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
@@ -212,6 +214,10 @@ export default Plugin.define({
     // The task's user message, which a Host input belongs to: the latest admitted prompt, as for grants. A session this
     // process has not seen a prompt for (resumed after a restart) uses its latest user message.
     const tasks = new Map<string, string>()
+    const receiptScope = createHash("sha256")
+      .update(JSON.stringify([ctx.location.directory, ctx.location.workspaceID]))
+      .digest("hex")
+    const receipts = exportReceipts(join(Global.Path.data, "loginom", "export-receipts", receiptScope))
     const task = async (sessionID: string) =>
       tasks.get(sessionID) ??
       (await ctx.session.context({ sessionID })).findLast((message) => message.type === "user")?.id ??
@@ -369,6 +375,7 @@ export default Plugin.define({
       ready: () => ServiceHost.connected(),
       failure: (sessionID) => refused.get(sessionID),
       task,
+      recordExport: receipts.record,
       wrap: repeats.wrap,
     })
 
@@ -380,10 +387,15 @@ export default Plugin.define({
         "session.execution.succeeded",
         "session.execution.failed",
         "session.execution.interrupted",
+        "session.deleted",
       ] as const
       for await (const event of ctx.event.subscribe({ types: [...types], signal: stop.signal })) {
         if (event.type === "session.execution.started") void hold(event.data.sessionID)
         else {
+          if (event.type === "session.deleted") {
+            receipts.remove(event.data.sessionID)
+            tasks.delete(event.data.sessionID)
+          }
           repeats.reset(event.data.sessionID)
           await drop(event.data.sessionID)
         }
@@ -492,6 +504,7 @@ export default Plugin.define({
       if (event.prompt.agents?.length && dashboard())
         throw new Error("LOGINOM_SCOPE_DENIED: a dashboard session does not run subagents")
       tasks.set(event.sessionID, event.messageID)
+      receipts.start(event.sessionID, event.messageID)
       repeats.reset(event.sessionID)
       const value = event.metadata?.[token]
       if (event.metadata) delete event.metadata[token]
@@ -509,6 +522,14 @@ export default Plugin.define({
       await binding.fork(event.sessionID)
     })
 
+    await ctx.rpc.register(exportReceiptsRpc, {
+      turn: async (input, call) => {
+        const session = await ctx.session.get({ sessionID: input.sessionID }).catch(() => undefined)
+        if (session?.location.directory !== ctx.location.directory)
+          return call.error("not_found", "Turn not found")
+        return receipts.turn(input) ?? call.error("not_found", "Turn not found")
+      },
+    })
     await ctx.rpc.register(runner, {
       start: async (value) => {
         // The RPC host validates the call against the JSON Schema above before the handler runs.
