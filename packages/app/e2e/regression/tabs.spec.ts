@@ -85,6 +85,13 @@ for (const viewport of [
       name: "Packages",
       directory,
       seed: { locale: "ru" },
+      skills: ["package-docs", "package-linter"].map((id) => ({
+        id,
+        name: id,
+        path: `skill://${id}/SKILL.md`,
+        content: "fixture",
+      })),
+      onFileWrite: () => {},
       provider: {
         all: [
           {
@@ -198,7 +205,21 @@ for (const viewport of [
     await result.click()
     await expect(page).toHaveURL(draftUrl)
     await expect(page.getByText("Архив.lgp", { exact: true })).toBeVisible()
+    const actions = page.getByRole("group", { name: "Что сделать с пакетом" })
+    await expect(actions.getByText(/Скачайте пакет из Loginom/)).toBeVisible()
+    await expect(actions.getByRole("button", { name: "Документировать", exact: true })).toHaveCount(0)
+    await expect(actions.getByRole("button", { name: "Проверить", exact: true })).toHaveCount(0)
+    await expect(workspace.editor).toHaveText("")
     await page.screenshot({ path: testInfo.outputPath("composer-card.png") })
+    const chooser = page.waitForEvent("filechooser")
+    await actions.getByRole("button", { name: "Выбрать файл с компьютера" }).click()
+    const localName = "Архив с компьютера.lgp"
+    await (await chooser).setFiles({ name: localName, mimeType: "application/octet-stream", buffer: Buffer.from("demo") })
+    const removeLocal = page.getByRole("button", { name: `Убрать пакет ${localName}`, exact: true })
+    await expect(removeLocal).toBeVisible()
+    await expect(page.getByRole("button", { name: "Документировать", exact: true })).toBeEnabled()
+    await expect(page.getByRole("button", { name: "Проверить", exact: true })).toBeEnabled()
+    await removeLocal.click()
     await page.getByRole("button", { name: "Схема пакета" }).click()
     await expect(page).toHaveURL(/\/page\/loginom-gui\/packages$/)
     await expect(page.getByRole("heading", { name: "Архив.lgp" })).toBeVisible()

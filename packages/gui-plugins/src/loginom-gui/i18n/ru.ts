@@ -3,6 +3,9 @@ export default {
   composerFile: "Файл с компьютера",
   composerCatalog: "Каталог…",
   composerSkillUnavailable: "Навык {{skill}} недоступен в этой рабочей папке.",
+  composerLocalPackageRequired:
+    "Скачайте пакет из Loginom и прикрепите локальный файл .lgp, чтобы документировать или проверить пакет.",
+  composerChooseLocalPackage: "Выбрать файл с компьютера",
   composerRemove: "Убрать пакет {{name}}",
   composerActions: "Что сделать с пакетом",
   composerDocument: "Документировать",

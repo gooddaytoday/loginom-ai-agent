@@ -70,7 +70,7 @@ export function registerComposer(
         </div>
         <div role="group" aria-label={ctx.t("composerActions")} class="flex flex-wrap items-center gap-1">
           <span class="text-xs text-v2-text-text-muted">{ctx.t("composerActions")}:</span>
-          <For each={builtInActions}>
+          <For each={props.source === "file" ? builtInActions : undefined}>
             {(action) => {
               const available = () => props.input.hasSkill(action.skill)
               const hint = () => ctx.t("composerSkillUnavailable", { skill: action.skill })
@@ -108,6 +108,14 @@ export function registerComposer(
           <Button type="button" variant="ghost-muted" size="small" onClick={() => catalog(props.input)}>
             {ctx.t("composerMore")}
           </Button>
+          <Show when={props.source === "loginom"}>
+            <div class="flex w-full flex-wrap items-center gap-1">
+              <span class="text-xs text-v2-text-text-muted">{ctx.t("composerLocalPackageRequired")}</span>
+              <Button type="button" variant="ghost-muted" size="small" onClick={() => props.input.attach()}>
+                {ctx.t("composerChooseLocalPackage")}
+              </Button>
+            </div>
+          </Show>
         </div>
       </div>
     )

@@ -3,6 +3,8 @@ export default {
   composerFile: "File from computer",
   composerCatalog: "Catalog…",
   composerSkillUnavailable: "The {{skill}} skill is not available in this workspace.",
+  composerLocalPackageRequired: "Download the package from Loginom and attach the local .lgp file to document or check it.",
+  composerChooseLocalPackage: "Choose a file from your computer",
   composerRemove: "Remove package {{name}}",
   composerActions: "What to do with the package",
   composerDocument: "Document",
