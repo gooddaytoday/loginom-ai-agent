@@ -203,6 +203,12 @@ for (const viewport of [
     await expect(page).toHaveURL(/\/page\/loginom-gui\/packages$/)
     await expect(page.getByRole("heading", { name: "Архив.lgp" })).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath("packages.png") })
+    const packageActions = page.getByRole("heading", { name: "Что сделать с пакетом" })
+
+    await packageActions.locator("..").getByRole("link", { name: "Ещё действия в каталоге" }).click()
+    await expect(page).toHaveURL(/\/page\/loginom-gui\/catalog$/)
+    await page.goBack()
+    await expect(page.getByRole("heading", { name: "Архив.lgp" })).toBeVisible()
     await page.goBack()
     await expect(page).toHaveURL(draftUrl)
     await expect(page.getByText("Архив.lgp", { exact: true })).toBeVisible()
@@ -228,29 +234,53 @@ for (const viewport of [
       .setInputFiles({ name: "Копия.lgp", mimeType: "application/octet-stream", buffer: Buffer.from("demo") })
     const uploadRoute = /\/api\/rpc\/loginom\.package-upload\/upload(?:\?|$)/
     const uploadButton = upload.getByRole("button", { name: "Загрузить копию и открыть" })
+    const uncertainUpload = "Не удалось подтвердить загрузку или удаление временного файла."
 
     for (const [type, message] of [
       ["name_taken", "В «Моей папке» уже есть пакет с таким именем."],
       ["session_limit", "Сейчас заняты все сессии Loginom вашей организации."],
+      ["uncertain", uncertainUpload],
     ]) {
       await page.route(uploadRoute, (route) => route.fulfill({ status: 400, json: RpcError.make({ type, message }) }), { times: 1 })
       await uploadButton.click()
       await expect(upload.getByRole("alert")).toContainText(message)
     }
 
+    const pendingUpload = await holdRoute(page, uploadRoute)
+
+    await uploadButton.click()
+    await pendingUpload.arrived
+    await upload.getByRole("button", { name: "Отмена" }).click()
+    await expect(upload).toBeHidden()
+    await expect(page.getByText(uncertainUpload, { exact: false })).toBeVisible()
+    pendingUpload.release()
+    await page.getByRole("button", { name: "С компьютера" }).click()
+    await upload
+      .locator('input[type="file"]')
+      .setInputFiles({ name: "Копия.lgp", mimeType: "application/octet-stream", buffer: Buffer.from("demo") })
     await uploadButton.click()
     await expect(page.getByRole("heading", { name: "Копия.lgp" })).toBeVisible()
     expect(calls).toContainEqual({ content: "ZGVtbw==", name: "Копия.lgp", generation: 1 })
-    const statusResponse = Promise.withResolvers<void>()
-    holdStatus = statusResponse.promise
+    const statusRoute = /\/api\/rpc\/loginom\.connection\/status(?:\?|$)/
+    const statusResponse = await holdRoute(page, statusRoute)
+    const folderResponse = await holdRoute(page, /\/api\/rpc\/loginom\.packages\/list(?:\?|$)/)
+
     await page.reload()
     await page.getByRole("button", { name: "Из Loginom" }).click()
     const recents = picker.getByRole("region", { name: "Недавние" })
     const recentCopy = recents.getByRole("button", { name: /Копия\.lgp/ })
+
+    await statusResponse.arrived
+    await expect(recents).toHaveCount(0)
+    statusResponse.release()
+    await folderResponse.arrived
     await expect(recents.getByRole("button")).toHaveText([/Копия\.lgp/, /Архив\.lgp/])
-    await expect(recentCopy).toBeDisabled()
-    statusResponse.resolve()
-    await expect(recentCopy).toBeEnabled()
+    const searchBox = await search.boundingBox()
+    const recentBox = await recents.boundingBox()
+
+    expect(searchBox?.y ?? Infinity).toBeLessThan(recentBox?.y ?? -Infinity)
+    await page.screenshot({ path: testInfo.outputPath("picker-recents.png") })
+    folderResponse.release()
     await recentCopy.click()
     const oldPackage = page.getByRole("heading", { name: "Копия.lgp" })
 
@@ -261,7 +291,12 @@ for (const viewport of [
     await picker.getByRole("button", { name: "Общие папки" }).click()
     await expect(picker.getByRole("alert")).toHaveText("Подключение изменилось. Обновите его перед новой попыткой.")
     await expect(recents).toHaveCount(0)
+    const newAccountStatus = await holdRoute(page, statusRoute)
+
     await picker.getByRole("button", { name: "Повторить" }).click()
+    await newAccountStatus.arrived
+    await expect(recents).toHaveCount(0)
+    newAccountStatus.release()
     await expect(rows).toHaveText([/Другой аккаунт\.lgp/])
     await expect(recents).toHaveCount(0)
     await picker.getByRole("button", { name: "Закрыть" }).click()

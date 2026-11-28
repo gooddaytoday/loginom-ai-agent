@@ -552,6 +552,8 @@ export default Plugin.define({
             return call.error("name_taken", "Package name is already in use")
           if (error instanceof Error && error.message === "LOGINOM_SESSION_LIMIT")
             return call.error("session_limit", "All Loginom sessions are in use")
+          if (error instanceof Error && error.message === "LOGINOM_RUNTIME_CLEANUP_FAILED")
+            return call.error("uncertain", "Package upload cleanup not confirmed")
         }
         return call.error("unavailable", "Package upload not confirmed")
       },

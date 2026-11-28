@@ -68,6 +68,8 @@ function fixture() {
   }
   const scope = createContext({
     Date, atob, location: new URL(origin),
+    setTimeout: (...args) => setTimeout(...args),
+    clearTimeout: (...args) => clearTimeout(...args),
     ReleaseObject: (value, awaited) => { assert.equal(awaited, true); released.push(value) },
     bg: {
       app: { Application: { FInstance: app } },
@@ -167,7 +169,7 @@ test("uploads exact bytes as a copy and never overwrites an existing package", a
       GetFileInfo(name) {
         return files.has(name) ? { Size: Buffer.concat(files.get(name)).length, Time: date } : null
       },
-      DeleteFile(name) { files.delete(name) },
+      DeleteFile(name) { return files.delete(name) },
     })
     const copy = (content) => withPackageUploadSession({
       login: f.login, origin, username, temporary: "fixture", upload: { name: "Продажи.lgp", content },
@@ -194,7 +196,7 @@ test("cancelling an active package write removes its temporary file and never mo
       return { async WriteBuffer() { writing.resolve(); await release.promise } }
     },
     MoveFile() { assert.fail("cancelled upload moved its staged file") },
-    DeleteFile(name) { staged.delete(name) },
+    DeleteFile(name) { return staged.delete(name) },
   })
   const pending = withPackageUploadSession({
     login: f.login, origin, username, temporary: "abort", signal: abort.signal,
@@ -219,7 +221,7 @@ test("a timed-out WriteBuffer removes its staged file before logout even if the 
       return { WriteBuffer() { writing.resolve(); return new Promise(() => {}) } }
     },
     MoveFile() { assert.fail("timed-out upload moved its staged file") },
-    DeleteFile(name) { assert.equal(staged.delete(name), true); f.events.push(["delete staged file"]) },
+    DeleteFile(name) { assert.equal(staged.delete(name), true); f.events.push(["delete staged file"]); return true },
   })
   const pending = withPackageUploadSession({
     login: f.login, origin, username, temporary: "timeout",
@@ -247,7 +249,7 @@ for (const stop of ["cancel", "timeout"]) {
         return new Promise(() => {})
       },
       MoveFile() { assert.fail("unconfirmed upload moved its staged file") },
-      DeleteFile(name) { assert.equal(staged.delete(name), true); f.events.push(["delete staged file", name]) },
+      DeleteFile(name) { assert.equal(staged.delete(name), true); f.events.push(["delete staged file", name]); return true },
     })
     const pending = assert.rejects(withPackageUploadSession({
       login: f.login, origin, username, temporary: "no-handle", signal: abort.signal,
@@ -257,9 +259,50 @@ for (const stop of ["cancel", "timeout"]) {
     if (stop === "cancel") abort.abort(Error("cancelled"))
     else t.mock.timers.tick(60_000)
     await new Promise(resolve => setImmediate(resolve))
-    t.mock.timers.tick(6_000)
+    t.mock.timers.tick(4_000)
     await pending
     assert.deepEqual([...staged], [])
     assert.deepEqual(f.events, [["delete staged file", "/user/.loginom-agent-no-handle.part"], ["logout"], ["close browser"]])
+  })
+}
+
+for (const result of ["late reply", "late file without reply", "no reply or file", "rejected request without a file"]) {
+  test(`cancelling CreateFile handles ${result} before closing the session`, async t => {
+    t.mock.timers.enable({ apis: ["setTimeout"] })
+    const f = fixture()
+    const abort = new AbortController()
+    const requested = Promise.withResolvers()
+    const response = Promise.withResolvers()
+    const staged = new Set()
+    const stream = { WriteBuffer() { assert.fail("cancelled upload wrote to the file") } }
+    Object.assign(f.storage, {
+      CreateFile(name) { requested.resolve(name); return response.promise },
+      MoveFile() { assert.fail("cancelled upload moved its staged file") },
+      DeleteFile(name) {
+        if (!staged.delete(name)) return false
+        f.events.push(["delete staged file", name])
+        return true
+      },
+      GetFileInfo(name) { return staged.has(name) ? {} : null },
+    })
+    const uncertain = result === "no reply or file" || result === "rejected request without a file"
+    const pending = assert.rejects(withPackageUploadSession({
+      login: f.login, origin, username, temporary: "late-create", signal: abort.signal,
+      upload: { name: "Copy.lgp", content: Buffer.from("sample").toString("base64") },
+    }), { message: uncertain ? "LOGINOM_RUNTIME_CLEANUP_FAILED" : "cancelled" })
+    const path = await requested.promise
+    abort.abort(Error("cancelled"))
+    await new Promise(resolve => setImmediate(resolve))
+    if (result === "rejected request without a file") response.reject(Error("connection interrupted"))
+    if (!uncertain) staged.add(path)
+    if (result === "late reply") response.resolve(stream)
+    else t.mock.timers.tick(4_000)
+    await pending
+    assert.equal(staged.size, 0)
+    assert.deepEqual(f.events, [
+      ...(uncertain ? [] : [["delete staged file", "/user/.loginom-agent-late-create.part"]]),
+      ["logout"], ["close browser"],
+    ])
+    if (result === "late reply") assert.deepEqual(f.released, [stream])
   })
 }

@@ -10,7 +10,7 @@ import {
 import { Schema } from "effect"
 import type { Package } from "./package-model"
 
-export type UploadFailure = "invalidFile" | "fileTooLarge" | "nameTaken" | "sessionLimit" | "uploadFailed"
+export type UploadFailure = "invalidFile" | "fileTooLarge" | "nameTaken" | "sessionLimit" | "uploadFailed" | "uploadUncertain"
 
 export type UploadState =
   | { kind: "idle"; file?: File; failure?: UploadFailure }

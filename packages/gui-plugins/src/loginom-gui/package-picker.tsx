@@ -18,6 +18,8 @@ const SessionLimit = Schema.is(Schema.Struct({ type: Schema.Literal("session_lim
 
 const NameTaken = Schema.is(Schema.Struct({ type: Schema.Literal("name_taken") }))
 
+const UploadUncertain = Schema.is(Schema.Struct({ type: Schema.Literal("uncertain") }))
+
 const ConnectionChanged = Schema.is(Schema.Struct({ type: Schema.Literal("connection_changed") }))
 
 const isPackageName = Schema.is(PackageName)
@@ -63,7 +65,9 @@ export default function Picker(props: {
     selectionLifetime.abort()
     const state = uploadState()
 
-    if (state.kind === "uploading") state.attempt.abort()
+    if (state.kind !== "uploading") return
+    state.attempt.abort()
+    ctx.toast.show({ variant: "error", title: ctx.t("packages.uploadUncertain") })
   })
 
   const server = createMemo(() => loginomServer(ctx))
@@ -161,7 +165,7 @@ export default function Picker(props: {
   const recent = createMemo(() => {
     const saved = props.recent()
 
-    if (!saved || (!connection.loading && connected()?.identity.key !== saved.connection)) return []
+    if (!saved || connected()?.identity.key !== saved.connection) return []
 
     return saved.items.filter((item) => matches(item.package.name, query()))
   })
@@ -252,10 +256,11 @@ export default function Picker(props: {
     }
 
     const attempt = new AbortController()
+    const signal = AbortSignal.any([attempt.signal, AbortSignal.timeout(150_000)])
     setUpload((state) => transitionUpload(state, { type: "start", attempt }))
 
     try {
-      const entry = await current.upload(candidate, AbortSignal.any([attempt.signal, AbortSignal.timeout(150_000)]))
+      const entry = await current.upload(candidate, signal)
 
       if (attempt.signal.aborted) return
       const state = setUpload((previous) => transitionUpload(previous, { type: "saved", attempt, entry }))
@@ -263,7 +268,11 @@ export default function Picker(props: {
       if (state.kind === "uploaded") props.select({ kind: "loginom", package: state.entry, connection: current.identity })
     } catch (error) {
       if (attempt.signal.aborted) return
-      const failure = NameTaken(error) ? "nameTaken" : SessionLimit(error) ? "sessionLimit" : "uploadFailed"
+
+      const failure = signal.aborted || UploadUncertain(error)
+        ? "uploadUncertain"
+        : NameTaken(error) ? "nameTaken" : SessionLimit(error) ? "sessionLimit" : "uploadFailed"
+
       setUpload((state) => transitionUpload(state, { type: "failed", attempt, failure }))
     }
   }
@@ -311,6 +320,18 @@ export default function Picker(props: {
   return (
     <ui.Dialog title={props.title} size="large">
       <div class="flex min-w-0 flex-col gap-3">
+        <Show when={!props.upload && connected()}>
+          <TextField
+            label={ctx.t("packages.search")}
+            hideLabel
+            placeholder={ctx.t("packages.search")}
+            value={query()}
+            onChange={(value) => {
+              setDeep(undefined)
+              setQuery(value)
+            }}
+          />
+        </Show>
         <Show when={!props.upload && recent().length}>
           <section aria-label={ctx.t("packages.recent")}>
             <h3 class="mb-1 text-13-medium">{ctx.t("packages.recent")}</h3>
@@ -343,16 +364,6 @@ export default function Picker(props: {
             </div>
           </Match>
           <Match when={connected()}>
-            <TextField
-              label={ctx.t("packages.search")}
-              hideLabel
-              placeholder={ctx.t("packages.search")}
-              value={query()}
-              onChange={(value) => {
-                setDeep(undefined)
-                setQuery(value)
-              }}
-            />
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div class="flex flex-wrap gap-1" role="group" aria-label={ctx.t("packages.roots")}>
                 <For each={[PERSONAL, SHARED]}>

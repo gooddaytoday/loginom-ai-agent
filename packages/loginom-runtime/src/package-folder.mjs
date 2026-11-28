@@ -175,12 +175,13 @@ export async function withPackageUploadSession({ login, origin, username, signal
       const path = `/user/${name}`
       const staged = `/user/.loginom-agent-${temporary}.part`
       let moved = false
+      let createAnswered = false
+      const creating = Promise.resolve().then(() => storage.CreateFile(staged)).then(async stream => {
+        if (cancelled && stream && ownsSession()) await ReleaseObject(stream, true)
+        createAnswered = true
+        return cancelled ? null : stream
+      })
       try {
-        const creating = Promise.resolve(storage.CreateFile(staged)).then(async stream => {
-          if (!cancelled) return stream
-          if (stream && ownsSession()) await ReleaseObject(stream, true)
-          return null
-        })
         const stream = await Promise.race([creating, stopped])
         if (!stream) return null
         try {
@@ -211,11 +212,22 @@ export async function withPackageUploadSession({ login, origin, username, signal
         } finally {
           await ReleaseObject(info, true)
         }
+      } catch {
+        return null
       } finally {
         if (!moved) {
           try {
+            if (!createAnswered) {
+              let deadline
+              await new Promise(resolve => {
+                deadline = setTimeout(resolve, 3_000)
+                void creating.then(resolve, () => undefined)
+              }).finally(() => clearTimeout(deadline))
+            }
             if (!ownsSession()) return "cleanup_failed"
-            if (await storage.DeleteFile(staged) === false) {
+            const answered = createAnswered
+            if (await storage.DeleteFile(staged) !== true) {
+              if (!answered) return "cleanup_failed"
               const remaining = await storage.GetFileInfo(staged)
               if (remaining) {
                 await ReleaseObject(remaining, true)
@@ -227,13 +239,15 @@ export async function withPackageUploadSession({ login, origin, username, signal
           }
         }
       }
-    }, { origin, username, name: upload.name, content: upload.content, temporary }).finally(() => { settled = true })
+    }, { origin, username, name: upload.name, content: upload.content, temporary })
+      .catch(() => "cleanup_failed")
+      .finally(() => { settled = true })
     let saved
     try {
       saved = await bounded(() => pending, 60_000, signal)
     } catch (error) {
       const cleaned = settled
-        ? await pending.catch(() => undefined) !== "cleanup_failed"
+        ? await pending !== "cleanup_failed"
         : await bounded(async () => {
           await page.evaluate(token => {
             const current = globalThis.loginomPackageUpload

@@ -31,6 +31,7 @@ export const UploadRpc = Rpc.define({
       errors: {
         name_taken: Schema.toStandardSchemaV1(Schema.Undefined),
         session_limit: Schema.toStandardSchemaV1(Schema.Undefined),
+        uncertain: Schema.toStandardSchemaV1(Schema.Undefined),
         unavailable: Schema.toStandardSchemaV1(Schema.Undefined),
       },
     },

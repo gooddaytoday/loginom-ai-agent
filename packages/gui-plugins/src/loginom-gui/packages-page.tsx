@@ -75,6 +75,9 @@ export default function Packages(props: {
               </div>
             )}
           </Show>
+          <a class="w-fit text-13-medium underline" href={`/page/${encodeURIComponent(ctx.id)}/catalog`}>
+            {ctx.t("packages.moreActions")}
+          </a>
         </section>
       </div>
     </main>
