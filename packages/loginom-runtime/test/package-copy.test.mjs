@@ -4,7 +4,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
-import { createPackageCopy } from '../client/lib/package-copy.mjs';
+import { createHash } from 'node:crypto';
+import { createPackageCopy, PackageCopyError } from '../client/lib/package-copy.mjs';
 import { packageCopyStorage } from '../src/package-copy-storage.mjs';
 
 const original = '/user/Продажи.lgp';
@@ -61,7 +62,7 @@ async function fixture(t) {
   function evaluate(callback, argument, extra) {
     const body = extra === undefined ? '(callback)(argument)' : '(callback)(argument, extra)';
     return runInNewContext(body.replace('(callback)', '(' + callback.toString() + ')'), {
-      argument, extra, location:browser,
+      argument, extra, location:browser, btoa,
       ReleaseObject: () => {},
       bg:{
         app:{Version:'7.4.2', Application:{FInstance:{FMainForm:form}}},
@@ -72,31 +73,38 @@ async function fixture(t) {
       },
     });
   }
-  const storage = packageCopyStorage({pages:() => [{
+  const storage = packageCopyStorage({
     evaluate,
     async evaluateHandle(callback, argument) {
       const value = await evaluate(callback, argument);
       return {evaluate:(fn, extra) => evaluate(fn, value, extra), dispose:async () => {}};
     },
-  }]}, {url:'http://localhost/', account:'user'});
+  }, {url:'http://localhost/', account:'user'});
+  const save = {
+    checkpoint: async () => {},
+    prepareSave: async (source, sourceHash, path, previous) => {
+      assert.equal(await storage.digest(source), sourceHash);
+      assert.equal(await storage.digest(path), previous);
+      return async () => {
+        assert.ok(files.has(backupPath));
+        files.set(path.slice(0,-4) + '.~lgp', files.get(path));
+        files.set(path, files.get(source));
+        return storage.digest(path);
+      };
+    },
+  };
   const runtime = () => createPackageCopy({
     file:join(directory, 'receipts.json'), root:'/user', storage,
     record: async event => events.push(event),
-    flush:async () => {},
-    async saveFrom(source, sourceHash, path, previous) {
-      assert.equal(await storage.digest(source), sourceHash);
-      assert.equal(await storage.digest(path), previous);
-      assert.ok(files.has(backupPath));
-      files.set(path, files.get(source));
-      return storage.digest(path);
-    },
+    checkpoint: (...args) => save.checkpoint(...args),
+    prepareSave: (...args) => save.prepareSave(...args),
   });
   const server = runtime();
   const {path:copy} = await server.execute('begin', {originalPath:original});
   assert.equal(copy, '/user/Копии агента/Продажи — правка агента.lgp');
   assert.equal(files.get(copy), files.get(original));
   files.set(copy, edited);
-  return {files, native, events, runtime, server, copy};
+  return {files, native, events, runtime, server, copy, storage, save};
 }
 
 test('save-version chooses v3, deduplicates calls and can undo only the owned version', async t => {
@@ -167,18 +175,18 @@ test('collision during publish preserves the competitor and allows another free 
   assert.equal((await server.execute('save-version')).path, '/user/Продажи — v3.lgp');
 });
 
-test('lost storage response is retained across runtime restart and never dispatches twice', async t => {
+test('lost response after publish is reconciled from storage and never dispatches twice', async t => {
   const {files, native, runtime, server, events} = await fixture(t);
   const move = native.MoveFile.bind(native);
   native.MoveFile = (...args) => {
     move(...args);
     throw Error('lost reply');
   };
-  await assert.rejects(server.execute('save-version'), {code:'state_check_required'});
+  assert.equal((await server.execute('save-version')).path, firstVersion);
   assert.equal(files.get(firstVersion), edited);
-  await assert.rejects(runtime().execute('save-version'), {code:'state_check_required'});
+  assert.equal((await runtime().execute('save-version')).path, firstVersion);
   assert.equal(files.size, 3);
-  assert.equal(events.filter(event => event.action === 'save-version').length, 1);
+  assert.equal(events.filter(event => event.action === 'save-version' && event.phase === 'package_copy_admitted').length, 1);
 });
 
 test('a known storage denial has no effect and a later authorized save can proceed', async t => {
@@ -195,7 +203,7 @@ test('restore refuses to overwrite a later external save', async t => {
   const {files, server} = await fixture(t);
   await server.execute('replace-original', {confirmed:true});
   files.set(original, 'later manual changes');
-  await assert.rejects(server.execute('restore-previous', {backupPath}), {code:'state_check_required'});
+  await assert.rejects(server.execute('restore-previous', {backupPath}), {code:'not_applied'});
   assert.equal(files.get(original), 'later manual changes');
   assert.equal(files.get(backupPath), 'original package');
 });
@@ -211,4 +219,98 @@ test('undo preserves a competing update made just before the server moves the ve
   await assert.rejects(server.execute('undo-save', version), {code:'state_check_required'});
   assert.equal(files.get(version.path), 'another operator saved here');
   assert.equal([...files.keys()].some(path => path.endsWith('.part')), false);
+});
+
+
+test('a refused checkpoint or close keeps the draft usable without retrying a write', async t => {
+  const {copy, files, server, storage, save} = await fixture(t);
+  save.checkpoint = async () => { throw new PackageCopyError('not_applied'); };
+  await assert.rejects(server.execute('save-version'), {code:'not_applied'});
+  assert.equal(await server.guard(copy), copy);
+  assert.equal(files.has(firstVersion), false);
+  const close = storage.close;
+  storage.close = async () => { throw new PackageCopyError('not_applied'); };
+  await assert.rejects(server.execute('discard'), {code:'not_applied'});
+  assert.equal(await server.guard(copy), copy);
+  storage.close = close;
+  await server.execute('discard');
+  assert.equal(files.has(copy), false);
+});
+
+test('a lock acquired during discard preflight leaves the copy usable once released', async t => {
+  const {copy, files, server, storage} = await fixture(t);
+  const busy = storage.busy;
+  storage.busy = async path => path === copy;
+  await assert.rejects(server.execute('discard'), {code:'package_busy'});
+  assert.equal(await server.guard(copy), copy);
+  assert.equal(files.get(copy), edited);
+  storage.busy = busy;
+  await server.execute('discard');
+  assert.equal(files.has(copy), false);
+});
+
+test('saving again after edits creates a new version and replacement uses the newest revision', async t => {
+  const {copy, files, server, save} = await fixture(t);
+  assert.equal((await server.execute('save-version')).path, firstVersion);
+  assert.equal(await server.guard(copy), copy);
+  save.checkpoint = async path => files.set(path, 'second edit');
+  const second = await server.execute('save-version');
+  assert.equal(second.path, '/user/Продажи — v3.lgp');
+  assert.equal(files.get(firstVersion), edited);
+  assert.equal(files.get(second.path), 'second edit');
+  save.checkpoint = async path => files.set(path, 'third edit');
+  await server.execute('replace-original', {confirmed:true});
+  assert.equal(files.get(original), 'third edit');
+  assert.equal(files.get(second.path), 'second edit');
+});
+
+test('a second replacement closes the clean local original and creates a numbered backup', async t => {
+  const {files, runtime, server, storage} = await fixture(t);
+  await server.execute('replace-original', {confirmed:true});
+  let open = true;
+  const busy = storage.busy;
+  storage.busy = async path => path === original && open || busy(path);
+  storage.close = async (path, discard) => {
+    assert.equal(path, original);
+    assert.equal(discard, false);
+    open = false;
+  };
+  const reopened = runtime();
+  const fresh = await reopened.execute('begin', {originalPath:original});
+  files.set(fresh.path, 'next round');
+  const second = await reopened.execute('replace-original', {confirmed:true});
+  assert.equal(second.backupPath, '/user/Продажи — до правки 2.lgp');
+  assert.equal(files.get(second.backupPath), edited);
+  assert.equal(files.get(backupPath), 'original package');
+  assert.equal(files.get(original), 'next round');
+});
+
+test('reconciliation after restart only reads Loginom before allowing edits', async t => {
+  const {copy, files, native, runtime, server} = await fixture(t);
+  const exists = native.FileExists;
+  const move = native.MoveFile.bind(native);
+  native.MoveFile = (...args) => {
+    move(...args);
+    native.FileExists = () => { throw Error('browser disconnected during observation'); };
+    throw Error('reply lost');
+  };
+  await assert.rejects(server.execute('save-version'), {code:'state_check_required'});
+  native.FileExists = exists;
+  native.MoveFile = () => assert.fail('reconciliation triggered a file write');
+  const restored = runtime();
+  assert.equal(await restored.guard(copy), copy);
+  assert.equal((await restored.execute('save-version')).path, firstVersion);
+  assert.equal(files.get(firstVersion), edited);
+});
+
+test('binary hashes are exact across chunks and oversized packages fail before publication', async t => {
+  const {copy, files, native, server, storage} = await fixture(t);
+  const payload = Buffer.alloc(2 * 1024 * 1024 + 37);
+  for (let i = 0; i < payload.length; i++) payload[i] = i % 251;
+  files.set(copy, payload);
+  assert.equal(await storage.digest(copy), createHash('sha256').update(payload).digest('hex'));
+  native.GetFileInfo = () => ({Size:32 * 1024 * 1024 + 1});
+  await assert.rejects(server.execute('save-version'), {code:'package_too_large'});
+  assert.equal(files.has(firstVersion), false);
+  assert.equal(await server.guard(copy), copy);
 });

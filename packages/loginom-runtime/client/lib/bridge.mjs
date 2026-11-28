@@ -152,6 +152,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   const heldLeases = new Set();
   const savedPackages = new Map();
   const saveAdmissions = new Map();
+  const saveRuntimeId = randomUUID();
   let saveSequence=0;
   let lastSavedPackage = null;
   let ownedUnsavedDraft = null;
@@ -396,49 +397,60 @@ export async function createBridge(config, session, { browserTransport: managedB
     });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [...structuredClone(catalog.tools), ...recovery.listTools(browserTools)] }));
     const stateCheck = () => new PackageCopyError('state_check_required');
+    const notApplied = () => new PackageCopyError('not_applied');
     const invokeCopyTool = (name, args, signal) =>
       callTool({params:{name,arguments:args}}, {signal}, null, undefined, true);
-    const saveCopy = async (kind, path, operationId, signal) => {
+    const executePackageSave = async (kind, path, operationId, signal) => {
       const response = await invokeCopyTool('dock_action_run', {
         operation_id:operationId, action_key:kind, parameters:{path, conflict_policy:'replace'},
       }, signal);
       const outcome = JSON.parse(response.content[0].text);
+      if (outcome.effect_possible === false && outcome.cleanup_complete === true && outcome.status !== 'SUCCEEDED')
+        throw notApplied();
       if (outcome.operation_id !== operationId || outcome.output?.package_ref?.path !== path
           || outcomeVerification(outcome, pinnedActions.actions.get(kind)).domain_effect.state !== 'verified')
         throw stateCheck();
+      await recordExecution({phase:'package_copy_save_receipt', operation_id:operationId, path,
+        runtime_instance_id:saveRuntimeId, sequence:saveAdmissions.get(operationId).sequence});
     };
+    const copyStorage = packageCopy?.storage;
     const copies = packageCopy && createPackageCopy({
       ...packageCopy,
       record: recordExecution,
-      async flush(path, id, signal) {
-        const state = await packageCopy.storage.workspace(path);
+      async checkpoint(path, signal) {
+        const state = await copyStorage.workspace(path);
         if (!state?.modified) return;
         if (state.running || state.readOnly || session.metadata.workspaceReady !== true
-            || session.metadata.workspacePreparation?.state?.package_ref?.path !== path) throw stateCheck();
-        await saveCopy('package.save_checkpoint', path, id + '-checkpoint', signal);
-        if ((await packageCopy.storage.workspace(path))?.modified !== false) throw stateCheck();
+            || session.metadata.workspacePreparation?.state?.package_ref?.path !== path) throw notApplied();
+        await executePackageSave('package.save_checkpoint', path, 'package-copy-checkpoint-' + randomUUID(), signal);
+        if ((await copyStorage.workspace(path))?.modified !== false) throw stateCheck();
       },
-      async saveFrom(source, sourceHash, path, previous, id, signal) {
-        if (await packageCopy.storage.digest(source) !== sourceHash) throw stateCheck();
+      async prepareSave(source, sourceHash, path, previous, signal) {
         const prepared = session.metadata.workspacePreparation?.state;
-        if (session.metadata.workspaceReady !== true || prepared?.package_ref?.path !== source) {
+        if (session.metadata.workspaceReady !== true || prepared?.package_ref?.path !== source
+            || !await copyStorage.workspace(source)) {
           const response = await invokeCopyTool('dock_prepare', {
-            operation_id:id + '-open', intent:'open_package', package_path:source,
+            operation_id:'package-copy-open-' + randomUUID(), intent:'open_package', package_path:source,
           }, signal);
           const result = JSON.parse(response.content[0].text);
-          if (result.prepared !== true || result.workspace?.package_ref?.path !== source) throw stateCheck();
+          if (result.prepared !== true || result.workspace?.package_ref?.path !== source) throw notApplied();
         }
-        if ((await packageCopy.storage.workspace(source))?.modified !== false
-            || await packageCopy.storage.digest(source) !== sourceHash
-            || await packageCopy.storage.busy(path) || await packageCopy.storage.digest(path) !== previous) throw stateCheck();
-        await saveCopy('package.save_as', path, id + '-save', signal);
-        session.metadata.workspaceReady = false;
-        // Native Save keeps its own previous revision. Compare it independently
-        // so a racing Save in a different Loginom window cannot certify our backup.
-        if (await packageCopy.storage.digest(path.slice(0,-4) + '.~lgp') !== previous) throw stateCheck();
-        const hash = await packageCopy.storage.digest(path);
-        if (!hash) throw stateCheck();
-        return hash;
+        async function verify() {
+          if ((await copyStorage.workspace(source))?.modified !== false
+              || await copyStorage.digest(source) !== sourceHash || await copyStorage.digest(path) !== previous) throw notApplied();
+          if (await copyStorage.busy(path)) throw new PackageCopyError('package_busy', {packagePath:path, kind:'other_loginom_session'});
+        }
+        await verify();
+        return async id => {
+          await verify();
+          await executePackageSave('package.save_as', path, id + '-save', signal);
+          // Save As may replace the graph in the conversation window.
+          session.metadata.workspaceReady = false;
+          if (await copyStorage.digest(path.slice(0,-4) + '.~lgp') !== previous) throw stateCheck();
+          const hash = await copyStorage.digest(path);
+          if (!hash) throw stateCheck();
+          return hash;
+        };
       },
     });
     const callTool = async (request, extra, privatePackage=null, scanReceipt=undefined, copyAction=false) => {
@@ -1051,7 +1063,7 @@ export async function createBridge(config, session, { browserTransport: managedB
     return { server, catalog,
       async packageCopy(action, input, signal) {
         if (!copies || !actionRuntime || shutdownStarted || recovery.unsettled() || actionRuntime.hasUnsettledWork())
-          throw stateCheck();
+          throw notApplied();
         const active = session.metadata.workspacePreparation?.state?.package_ref?.path;
         const discarding = action === 'discard' && await copies.originalFor(active);
         const result = await copies.execute(action, input, signal);

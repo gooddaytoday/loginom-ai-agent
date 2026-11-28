@@ -1,7 +1,7 @@
 import { packageCopyStorage } from './package-copy-storage.mjs'
 import { PackageCopyError } from '../client/lib/package-copy.mjs'
 import { createRequire } from "node:module"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { appendFile, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
@@ -35,6 +35,7 @@ const state = {
   controller: undefined,
   session: undefined,
   browser: undefined,
+  windowPage: undefined,
   browserProfile: undefined,
   browserServer: undefined,
   lastLoginomReplyAt: null,
@@ -213,11 +214,13 @@ async function handle(message) {
           })
         } })
       state.browser = authenticated.context
+      state.windowPage = authenticated.page
       const loginomUrl = loginomAddress(input.connection.url)
       const address = new URL(loginomUrl)
       state.owner.origin = address.origin
       state.owner.pathname = address.pathname
       state.owner.account = input.connection.username
+      const copyScope = createHash("sha256").update(JSON.stringify([loginomUrl, state.owner.account])).digest("hex")
       const config = {
         resources: input.resources,
         // Preparation must bind to the same canonical path used by private login.
@@ -261,9 +264,9 @@ async function handle(message) {
       await state.browserServer.connect(browserServerTransport)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
         packageCopy: {
-          file: join(directory, '..', '..', 'package-copy.json'),
+          file: join(input.stateDir, "package-copies", copyScope, input.chat, "package-copy.json"),
           root: state.uploadDirectory,
-          storage: packageCopyStorage(authenticated.context, {url:config.loginomUrl, account:input.connection.username}),
+          storage: packageCopyStorage(state.windowPage, {url:config.loginomUrl, account:input.connection.username}),
         },
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
         startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {
@@ -316,7 +319,7 @@ async function handle(message) {
     }
     if (message.operation === "packageAccess") {
       const { observePackages } = await import("./package-access.mjs")
-      const page = state.browser.pages()[0]
+      const page = state.windowPage
       const binding = { origin: state.owner.origin, pathname: state.owner.pathname, account: state.owner.account }
       const result = page ? await observePackages(page, binding, message.input?.packagePath) : null
       send({ id: message.id, result })

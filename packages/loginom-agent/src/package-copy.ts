@@ -18,6 +18,8 @@ const errors = {
   path_exists: standard(CopyExists),
   access_denied: empty,
   copy_missing: empty,
+  not_applied: empty,
+  package_too_large: empty,
   state_check_required: empty,
 }
 const rpc = {
@@ -54,9 +56,9 @@ export function registerPackageCopy(
   ) {
     await ctx.session.get({ sessionID })
     if (!await permitted(sessionID)) return call.error("access_denied", "Нет прав для изменения пакета.", {})
-    if (call.signal.aborted) return call.error("state_check_required", unknownState, {})
+    if (call.signal.aborted) return call.error("not_applied", "Операция отменена до запуска.", {})
     const lease = await ServiceHost.acquire(sessionID).catch(() => undefined)
-    if (!lease) return call.error("state_check_required", unknownState, {})
+    if (!lease) return call.error("not_applied", "Окно Loginom недоступно. Операция не запущена.", {})
     const result = await lease.packageCopy(request).then(Schema.decodeUnknownOption(CopyReply))
       .catch(() => Option.none())
       .finally(() => ServiceHost.release(lease))
@@ -79,6 +81,8 @@ export function registerPackageCopy(
       case "path_exists": return call.error(code, "Пакет с таким именем уже существует.", data)
       case "access_denied": return call.error(code, "Нет прав для изменения пакета.", {})
       case "copy_missing": return call.error(code, "Копия пакета не найдена.", {})
+      case "not_applied": return call.error(code, "Операция не применена. Проверьте доступность пакета и его текущую версию.", {})
+      case "package_too_large": return call.error(code, "Копирование поддерживает пакеты размером до 32 МиБ.", {})
       case "state_check_required": return call.error(code, unknownState, {})
     }
   }

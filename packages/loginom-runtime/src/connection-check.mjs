@@ -506,7 +506,8 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
     if (onContextCreated) await onContextCreated(context)
     const loginStarted = performance.now()
     await phase({ phase: "login", status: "starting", attempt: attempt + 1 })
-    const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate, { deadline, themeState, onThemeReload: record, onPhase: phase })
+    const page = context.pages()[0] ?? await context.newPage()
+    const result = await loginPage(page, candidate, { deadline, themeState, onThemeReload: record, onPhase: phase })
       .then(async result => {
         await phase({ phase: "login", status: "ready", attempt: attempt + 1, duration_ms: Math.round(performance.now() - loginStarted) })
         return result
@@ -520,7 +521,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
       return result
     }
     // MCP receives this same live context through its public contextGetter API.
-    return { ...result, context }
+    return { ...result, context, page }
   } catch (error) {
     await close().catch(() => { throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED", error?.cause?.login ? { cause: error.cause } : undefined) })
     signal?.throwIfAborted()

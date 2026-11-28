@@ -176,6 +176,8 @@ test("package recheck distinguishes a live app conversation, an external marker 
           return send({result:{content:[],_meta:{existing:true}}, recoveryPending:false,
             ...(!writer && {packagePath})});
         case 'packageCopy': {
+          if (m.input.action === 'discard') return send({ failure: { code:'not_applied', data:{} } });
+          if (m.input.action === 'save-version') return send({ failure: { code:'state_check_required', data:{} } });
           if (m.input.action !== 'replace-original' || m.input.confirmed !== true)
             return send({ failure: { code:'copy_missing', data:{} } });
           return send({ failure: { code:'package_busy', data:{packagePath,kind:'other_loginom_session'} } });
@@ -221,6 +223,10 @@ test("package recheck distinguishes a live app conversation, an external marker 
     const owned = { packagePath, kind: "other_conversation", sessionID: writer }
     await host.request("acquire", { run: reader, session: reader })
     try {
+      expect(await host.request("packageCopy", { run: reader, action: "discard" }))
+        .toEqual({ failure: { code: "not_applied", data: {} } })
+      expect(await host.request("packageCopy", { run: reader, action: "save-version" }))
+        .toEqual({ failure: { code: "state_check_required", data: {} } })
       expect(await host.request("packageCopy", {run:reader, action:"replace-original", confirmed:true}))
         .toEqual({failure:{code:"package_busy", data:owned}})
     } finally {

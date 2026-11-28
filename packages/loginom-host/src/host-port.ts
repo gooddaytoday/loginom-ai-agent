@@ -380,15 +380,17 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           run.active.add(id)
           const result = await runtime.request("packageCopy", request, 360_000)
             .then(Schema.decodeUnknownSync(CopyReply))
-            .catch(() => ({ failure: { code: "state_check_required", data: {} } }) as const)
-          const certain = !("failure" in result && result.failure.code === "state_check_required")
-          if (certain) {
-            await service.journal.settle(id, true)
-            run.active.delete(id)
-          } else {
+            .catch(() => undefined)
+          if (!result) {
             await abandon(run)
             service.markRuntimeStale(run.chat)
+            reply({ id: data.id, result: { failure: { code: "state_check_required", data: {} } } }, lease.generation)
+            return
           }
+          // A reply acknowledges the command. The runtime's copy journal owns
+          // reconciliation and can read the original intent on the next call.
+          await service.journal.settle(id, true)
+          run.active.delete(id)
           if ("failure" in result && result.failure.code === "package_busy") {
             const candidate = { sessionID: run.sessionID, packagePath: result.failure.data.packagePath }
             const access = Schema.is(PackageRecheck)(candidate)

@@ -25,7 +25,7 @@ export const CopyEmpty = Schema.Struct({})
 const CopyFailures = Schema.Union([
   Schema.Struct({ code: Schema.Literal("package_busy"), data: CopyBusy }),
   Schema.Struct({ code: Schema.Literal("path_exists"), data: CopyExists }),
-  Schema.Struct({ code: Schema.Literals(["access_denied", "copy_missing", "state_check_required"]), data: CopyEmpty }),
+  Schema.Struct({ code: Schema.Literals(["access_denied", "copy_missing", "not_applied", "package_too_large", "state_check_required"]), data: CopyEmpty }),
 ])
 export const CopyReply = Schema.Union([
   Schema.Struct({ output: Schema.Unknown }),

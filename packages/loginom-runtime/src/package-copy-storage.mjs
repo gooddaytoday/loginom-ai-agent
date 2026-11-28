@@ -1,16 +1,15 @@
-import { createHash, randomUUID } from 'node:crypto';
-import { posix } from 'node:path';
+import { createHash } from 'node:crypto';
 import { PackageCopyError } from '../client/lib/package-copy.mjs';
 
 const uncertain = () => new PackageCopyError('state_check_required');
+const MAX_PACKAGE_SIZE = 32 * 1024 * 1024;
 
 // This private driver uses the managed browser that already owns the Loginom session.
-export function packageCopyStorage(context, {url, account}) {
+export function packageCopyStorage(page, {url, account}) {
   const address = new URL(url);
-  const page = () => context.pages()[0];
   const input = {origin:address.origin, pathname:address.pathname, account};
   async function evaluate(mode, path, extra) {
-    const result = await page().evaluate(native, {...input, mode, path, ...extra});
+    const result = await page.evaluate(native, {...input, mode, path, ...extra});
     if (result?.error) {
       const data = result.error === 'package_busy' ? {packagePath:path, kind:'other_loginom_session'}
         : result.error === 'path_exists' ? {path:extra?.target ?? path} : {};
@@ -22,21 +21,25 @@ export function packageCopyStorage(context, {url, account}) {
   }
   async function digest(path) {
     if (!await evaluate('exists', path)) return null;
-    const handle = await page().evaluateHandle(native, {...input, mode:'stream', path});
+    const handle = await page.evaluateHandle(native, {...input, mode:'stream', path});
     try {
       const size = await handle.evaluate(value => value?.size);
       if (!Number.isSafeInteger(size) || size <= 0) throw uncertain();
+      if (size > MAX_PACKAGE_SIZE) throw new PackageCopyError('package_too_large');
       const hash = createHash('sha256');
       for (let remaining = size; remaining > 0;) {
-        const count = Math.min(128 * 1024, remaining);
+        const count = Math.min(1024 * 1024, remaining);
         const bytes = await handle.evaluate(async (value, length) => {
           if (!value.bound()) throw Error('Loginom file reader changed');
           const buffer = new Uint8Array(length);
           await value.stream.ReadBuffer(buffer);
           if (!value.bound()) throw Error('Loginom file reader changed');
-          return Array.from(buffer);
+          let binary = '';
+          for (let offset = 0; offset < length; offset += 16 * 1024)
+            binary += String.fromCharCode(...buffer.subarray(offset, offset + 16 * 1024));
+          return btoa(binary);
         }, count);
-        hash.update(Buffer.from(bytes));
+        hash.update(Buffer.from(bytes, 'base64'));
         remaining -= count;
       }
       return hash.digest('hex');
@@ -52,8 +55,7 @@ export function packageCopyStorage(context, {url, account}) {
     busy: path => evaluate('busy', path),
     ensureDirectory: path => evaluate('directory', path),
     workspace: path => evaluate('workspace', path),
-    async copy(source, target, expected) {
-      const part = posix.join(posix.dirname(target), '.agent-copy-' + randomUUID() + '.part');
+    async copy(source, target, expected, part) {
       try {
         await evaluate('copy', source, {target:part});
       } catch (error) {
@@ -79,9 +81,12 @@ export function packageCopyStorage(context, {url, account}) {
       }
       if (await digest(target) !== expected || await evaluate('exists', part)) throw uncertain();
     },
-    async remove(path, expected) {
-      if (await digest(path) !== expected) throw uncertain();
-      const part = posix.join(posix.dirname(path), '.agent-copy-' + randomUUID() + '.part');
+    async remove(path, expected, part) {
+      if (await digest(path) !== expected) {
+        const error = new PackageCopyError('not_applied');
+        error.noEffect = true;
+        throw error;
+      }
       await evaluate('move', path, {target:part, guard:true});
       try {
         // Verify the file we actually moved before deleting anything. A
@@ -99,13 +104,14 @@ export function packageCopyStorage(context, {url, account}) {
       if (!state) return;
       if (state.running || state.modified && !discard)
         throw new PackageCopyError('package_busy', {packagePath:path, kind:'read_only', lockMarker:'unknown'});
-      const handle = await page().evaluateHandle(native, {...input, mode:'close', path, discard});
+      const handle = await page.evaluateHandle(native, {...input, mode:'close', path, discard});
       try {
-        const reply = handle.evaluate(async value => value?.closed && await value.closed === true && value.bound()).catch(() => false);
+        if (!await handle.evaluate(value => !!value?.closed)) throw new PackageCopyError('not_applied');
+        const reply = handle.evaluate(async value => await value.closed === true && value.bound()).catch(() => false);
         // Close may ask about the one owned draft. All other prompts remain in Loginom.
         if (state.modified) {
-          const no = page().locator('[data-tid^="msgbox"][data-tid$="tlb;no"]:visible');
-          const message = page().locator('[data-tid^="msgbox"][data-tid$="cnt;cnt;cmp"]:visible');
+          const no = page.locator('[data-tid^="msgbox"][data-tid$="tlb;no"]:visible');
+          const message = page.locator('[data-tid^="msgbox"][data-tid$="cnt;cnt;cmp"]:visible');
           const text = await message.innerText({timeout:5_000});
           if (!/сохранить изменения в пакете/i.test(text) || !text.includes(state.name)
             || /заблокирован|отменить активные процессы/i.test(text)
@@ -155,7 +161,7 @@ async function native({origin, pathname, account, mode, path, target, discard, g
       if (mode === 'workspace') return {modified, running, name:node.DisplayName, readOnly:node.ReadOnly};
       const dialog = [...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')]
         .some(element => !!element.getBoundingClientRect().width && getComputedStyle(element).visibility !== 'hidden');
-      if (running || modified && !discard || dialog) throw Error('Package cannot close');
+      if (running || modified && !discard || dialog) return {error:'not_applied', noEffect:true};
       return {bound, closed:Promise.resolve(map.ClosePackage(node, false, true)).catch(() => false)};
     }
     const storage = await session.get_FileStorage();
