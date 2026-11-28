@@ -10,7 +10,7 @@ export { extractPackage } from "./extract"
 export { renderSkeleton } from "./skeleton"
 export { renderReport } from "./emit"
 
-export async function runPackageDocs(input: { operation: "extract" | "skeleton" | "emit"; lgp: string; directory: string; format?: string; output?: string }) {
+export async function runPackageDocs(input: { operation: "extract" | "skeleton" | "emit"; lgp: string; directory: string; format?: string; output?: string; custom?: boolean }) {
   if (!isAbsolute(input.lgp) || !isAbsolute(input.directory)) throw Error("PACKAGE_DOCS_ABSOLUTE_PATH_REQUIRED")
   if (extname(input.lgp).toLowerCase() !== ".lgp") throw Error("PACKAGE_DOCS_LGP_REQUIRED")
   const lgp = await realpath(input.lgp)
@@ -40,7 +40,9 @@ export async function runPackageDocs(input: { operation: "extract" | "skeleton" 
   const markdown = await readDraft(report)
   const requested = (input.format ?? "").trim().toLowerCase().replace(/^\./, "")
   const format = requested === "docx" || requested === "word" ? "docx" : requested === "md" || requested === "markdown" ? "md" : "pdf"
-  validateReport(markdown, structure)
+  if (input.custom) {
+    if (!markdown.trim()) throw Error("PACKAGE_DOCS_REQUIRED_SECTION")
+  } else validateReport(markdown, structure)
   const payload = await renderReport(markdown, format)
   let output = input.output ?? join(directory, `${stem}.lgp_report.${format}`)
   if (input.output) {
@@ -49,8 +51,8 @@ export async function runPackageDocs(input: { operation: "extract" | "skeleton" 
     output = join(directory, basename(input.output))
     const name = relative(directory, output), prefix = stem + ".lgp_report", suffix = "." + format
     const number = name.slice(prefix.length, -suffix.length)
-    if (!isAbsolute(output) || !name.startsWith(prefix) || !name.endsWith(suffix) ||
-        (number !== "" && !/^-(?:[2-9]|[1-9]\d+)$/.test(number))) throw Error("PACKAGE_DOCS_OUTPUT_ESCAPE")
+    if (name !== `${stem} — описание${suffix}` && (!name.startsWith(prefix) || !name.endsWith(suffix) ||
+        (number !== "" && !/^-(?:[2-9]|[1-9]\d+)$/.test(number)))) throw Error("PACKAGE_DOCS_OUTPUT_ESCAPE")
   }
   const temporaryReport = join(directory, ".package-docs-" + randomUUID() + ".tmp")
   try {
@@ -83,13 +85,13 @@ async function main(argv: string[]) {
   const options = new Map<string, string>()
   for (let index = 1; index < argv.length; index += 2) {
     const key = argv[index], value = argv[index + 1]
-    if (!["--lgp", "--directory", ...(operation === "emit" ? ["--format", "--output"] : [])].includes(key) || options.has(key) || !value || value.startsWith("--"))
+    if (!["--lgp", "--directory", ...(operation === "emit" ? ["--format", "--output", "--custom"] : [])].includes(key) || options.has(key) || !value || value.startsWith("--"))
       throw Error("PACKAGE_DOCS_ARGUMENTS_INVALID")
     options.set(key, value)
   }
   const lgp = options.get("--lgp"), directory = options.get("--directory")
   if (!lgp || !directory) throw Error("PACKAGE_DOCS_ARGUMENTS_INVALID")
-  process.stdout.write(JSON.stringify(await runPackageDocs({ operation, lgp, directory, format: options.get("--format"), output: options.get("--output") })) + "\n")
+  process.stdout.write(JSON.stringify(await runPackageDocs({ operation, lgp, directory, format: options.get("--format"), output: options.get("--output"), custom: options.get("--custom") === "true" })) + "\n")
 }
 
 function isErrno(error: unknown, code: string) {

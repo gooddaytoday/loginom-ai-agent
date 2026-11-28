@@ -5,7 +5,7 @@ import { next, permits, type Profile } from "../src/access"
 // with OpenCode 2 tool names. The dashboard profile (B2.9b) adds 0.4's two `loginom-dashboard` cases there and the two of
 // `test/session/task-scope.test.ts` about its base, whose transitions are `next` here; the base itself is the Location's
 // folder (`server/test/loginom-access.test.ts`).
-const docs = ["read", "glob", "grep", "edit", "write", "patch", "todowrite", "question", "skill", "package_docs_run"]
+const docs = ["read", "glob", "grep", "edit", "write", "patch", "todowrite", "skill", "package_docs_run"]
 const local = ["find", "search", "read", "grep", "glob", "list", "tree", "dock_diagnostics"].map(
   (name) => `loginom_${name}`,
 )
@@ -23,6 +23,7 @@ describe("tool policy", () => {
       "webfetch",
       "websearch",
       "execute",
+      "question",
       "opencode_schedule_create",
       ...mutating,
     ])

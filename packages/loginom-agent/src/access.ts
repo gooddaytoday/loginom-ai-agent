@@ -24,7 +24,6 @@ const docs = new Set([
   "write",
   "patch",
   "todowrite",
-  "question",
   "skill",
   "package_docs_run",
 ])

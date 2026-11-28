@@ -6,6 +6,7 @@ import { createHash } from "node:crypto"
 import { readdir, readFile, realpath, stat } from "node:fs/promises"
 import { basename, dirname, extname, isAbsolute, join, relative, sep } from "node:path"
 import type { Info } from "@opencode/plugin/promise/tool"
+import { documentName } from "@loginom-ai-agent/loginom-host/runner-rpc"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { AppProcess } from "@opencode/util/process"
 import { Effect, Option, Schema } from "effect"
@@ -34,6 +35,7 @@ export function packageDocs(
   files: Pick<Awaited<ReturnType<typeof localFiles>>, "ask" | "authorize">,
   location: string,
   resources: string | undefined,
+  wizard?: (sessionID: string) => { custom: boolean } | undefined,
 ): Info<typeof Parameters> {
   return {
     name: "package_docs_run",
@@ -45,6 +47,7 @@ export function packageDocs(
       if (call.signal.aborted) throw AppProcess.abortError(call.signal)
       const { canonicalPath: lgp } = await files.authorize(params.lgp, call)
       const directory = await realpath(location)
+      const action = wizard?.(call.sessionID)
       if (extname(lgp).toLowerCase() !== ".lgp") throw Error("PACKAGE_DOCS_LGP_REQUIRED")
       const stem = basename(lgp, extname(lgp))
       const work = join(
@@ -57,7 +60,9 @@ export function packageDocs(
         params.operation === "emit"
           ? {
               format: params.format ?? "pdf",
-              output: await availableReport(directory, stem, params.format ?? "pdf"),
+              output: action
+                ? join(directory, documentName(basename(lgp), params.format ?? "pdf"))
+                : await availableReport(directory, stem, params.format ?? "pdf"),
             }
           : undefined
       // Permission resources as OpenCode's own file tools name them inside the Location: relative to its directory
@@ -94,6 +99,7 @@ export function packageDocs(
                 "--directory",
                 directory,
                 ...(emission ? ["--format", emission.format, "--output", emission.output] : []),
+                ...(emission && action?.custom ? ["--custom", "true"] : []),
               ],
               { cwd: directory, env: { LANG: "C.UTF-8" }, extendEnv: false },
             ),
