@@ -55,7 +55,7 @@ after(async () => {
   if (build) await rm(build, { recursive: true, force: true })
 })
 
-async function launch(t, failStartup = false) {
+async function launch(t, { failStartup = false, missingCli = false } = {}) {
   const profile = await mkdtemp(join(build, "p-"))
   const home = join(profile, "home")
   // Chromium places a Unix-domain socket below TMPDIR, so keep the path short.
@@ -88,7 +88,7 @@ async function launch(t, failStartup = false) {
       LOGINOM_AI_AGENT_DESKTOP_TEST_ROOT: profile,
       LOGINOM_AI_AGENT_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: "1",
       LOGINOM_AI_AGENT_DESKTOP_REMOTE_DEBUGGING_PORT: "0",
-      LOGINOM_AI_AGENT_DESKTOP_CLI_DEV: join(build, "cli"),
+      ...(missingCli ? {} : { LOGINOM_AI_AGENT_DESKTOP_CLI_DEV: join(build, "cli") }),
       LOGINOM_AI_AGENT_VERSION: version,
       LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "1",
       LOGINOM_AI_AGENT_DISABLE_FREE_MODELS: "1",
@@ -207,9 +207,39 @@ test("recovery-ui: the same window reconnects after the service crashes", async 
 })
 
 test("startup-failure: the window explains why the local service did not start", async (t) => {
-  const { page } = await launch(t, true)
+  const { page } = await launch(t, { failStartup: true })
   await expectWindow(
     page.getByText("An error occurred while starting the local server.", { exact: true }),
   ).toBeVisible()
   await expectWindow(page.getByRole("textbox", { name: "Error Details" })).toHaveValue(new RegExp(startupFailure))
+})
+
+test("plugin inventory is available even when the local CLI cannot start", async (t) => {
+  const { page } = await launch(t, { missingCli: true })
+  await page.addInitScript(() => {
+    window.pluginListReply = new Promise((resolve) => {
+      window.addEventListener("message", ({ source, data, ports }) => {
+        if (source !== window || data !== "desktop-rpc-port" || !ports[0]) return
+        const port = ports[0]
+        const id = "2147483647"
+        port.addEventListener("message", ({ data: reply }) => {
+          if (reply._tag === "Exit" && String(reply.requestId) === id) resolve(reply.exit)
+        })
+        port.start()
+        port.postMessage({ _tag: "Request", id, tag: "PluginList", payload: null, headers: [] })
+      })
+    })
+  })
+  await page.reload()
+
+  const reply = await page.evaluate(() =>
+    Promise.race([
+      window.pluginListReply,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("No PluginList reply")), 10_000)),
+    ]),
+  )
+  expect(reply).toEqual({
+    _tag: "Success",
+    value: expect.arrayContaining([expect.objectContaining({ builtin: true, enabled: true })]),
+  })
 })

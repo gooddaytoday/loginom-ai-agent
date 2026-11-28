@@ -264,23 +264,24 @@ test("stop escalates when the registration disappears before the process exits",
   await run(stop({ file: registration }))
 
   expect(await fixture.signal()).toBe(stopSignal)
-  expect(() => process.kill(original.pid, 0)).toThrow()
   await expectNotListening(original.url)
   expect(await Bun.file(registration).exists()).toBe(false)
   await existing.exited
 }, 15_000)
 
-test.skipIf(process.platform === "win32")(
-  "stop fails when the process survives SIGKILL",
+test.skipIf(process.platform !== "linux")(
+  "stop removes the registration when the service has exited but its parent has not reaped it",
   async () => {
     await using fixture = await serviceFixture()
     const registration = fixture.registration
-    fixture.spawnUnreaped("lingering", "60000")
+    fixture.spawnUnreaped("graceful")
     await fixture.waitForFile()
     const original = await Bun.file(registration).json()
 
-    await expect(run(stop({ file: registration }))).rejects.toThrow(`Server process ${original.pid} is still running`)
+    await run(stop({ file: registration }))
     expect(await Bun.file(registration + ".signal").text()).toBe("SIGTERM")
+    await expectNotListening(original.url)
+    expect(await Bun.file(registration).exists()).toBe(false)
   },
   15_000,
 )
@@ -307,7 +308,6 @@ test.skipIf(!catchesSigterm)(
 
       await stopping
 
-      expect(() => process.kill(original.pid, 0)).toThrow()
       await expectNotListening(original.url)
       expect(await Bun.file(registration).json()).toEqual(replacement)
       expect(await status(replacement.url)).toMatchObject({ pid: successor.pid })

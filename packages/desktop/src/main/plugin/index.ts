@@ -43,18 +43,17 @@ export const layer = Layer.effect(
 
     const driver = createDriver({
       load: async () => {
-        const [module, cli] = await Promise.all([import("./host"), runPromise(desktopCli.resolve)])
+        const module = await import("./host")
 
         return () =>
           module.createHost({
             db: storage.db,
             state: storage.state,
-            cli: {
-              version: cli.version,
-              command: cli.command,
-              binary: cli.binary,
-              development: !app.isPackaged && !cli.binary,
-            },
+            cli: () =>
+              runPromise(desktopCli.resolve).then((cli) => ({
+                ...cli,
+                development: !app.isPackaged && !cli.binary,
+              })),
             subscriptions,
             servers,
             appState: lifecycle.state,

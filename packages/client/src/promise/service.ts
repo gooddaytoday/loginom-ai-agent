@@ -4,7 +4,7 @@ import { contenderPool, spawnServiceContender } from "../service-contender.js"
 import { defaultEnsureTiming, ensureTiming, type EnsureTiming } from "../service-timing.js"
 import { matchesVersion } from "../service-version.js"
 import { PtyHandoff } from "../pty-handoff.js"
-import { decide, fallback, headers, probeResult, requestStop, same } from "../service-probe.js"
+import { decide, fallback, headers, isServiceProcessAlive, probeResult, requestStop, same } from "../service-probe.js"
 
 export * from "../service.js"
 export { fallback, headers }
@@ -123,7 +123,8 @@ async function read(file?: string) {
 
 async function registered(file?: string, timeout?: number) {
   const info = await read(file)
-  if (info === undefined) return { info: undefined, service: undefined, timedOut: false }
+  if (info === undefined || !(await isServiceProcessAlive(info.pid)))
+    return { info: undefined, service: undefined, timedOut: false }
   return { info, ...(await probeResult(info, timeout)) }
 }
 
@@ -133,18 +134,9 @@ function signal(pid: number, name: NodeJS.Signals) {
   } catch {}
 }
 
-function stopped(pid: number) {
-  try {
-    process.kill(pid, 0)
-    return false
-  } catch {
-    return true
-  }
-}
-
 async function waitUntilStopped(pid: number, timing: EnsureTiming, attempts = timing.stopPollAttempts) {
   for (let attempt = 0; attempt <= attempts; attempt++) {
-    if (stopped(pid)) return true
+    if (!(await isServiceProcessAlive(pid))) return true
     if (attempt < attempts) await delay(timing.stopPollInterval)
   }
   return false
@@ -155,15 +147,17 @@ async function terminate(info: Info, options: { readonly file?: string }, timing
   if (current === undefined || !same(current, info)) return
   // Loginom AI Agent (B2.3b): ask the service to close its plugins and exit; signals are the fallback. On Windows
   // SIGTERM ends the process at once, so only the request lets plugins clean up there.
-  const exited =
-    (await requestStop(info, timing.requestTimeout)) &&
-    (await waitUntilStopped(info.pid, timing, Math.ceil(timing.softStopTimeout / timing.stopPollInterval)))
-  if (!exited) signal(info.pid, "SIGTERM")
-  // The registration can disappear or change hands before this process exits. Only the PID we
-  // signalled can tell us whether it has stopped, so escalate based on that process.
-  if (!exited && !(await waitUntilStopped(info.pid, timing))) {
-    signal(info.pid, "SIGKILL")
-    if (!(await waitUntilStopped(info.pid, timing))) throw new Error(`Server process ${info.pid} is still running`)
+  if (await isServiceProcessAlive(info.pid)) {
+    const exited =
+      (await requestStop(info, timing.requestTimeout)) &&
+      (await waitUntilStopped(info.pid, timing, Math.ceil(timing.softStopTimeout / timing.stopPollInterval)))
+    if (!exited) signal(info.pid, "SIGTERM")
+    // The registration can disappear or change hands before this process exits. Only the PID we
+    // signalled can tell us whether it has stopped, so escalate based on that process.
+    if (!exited && !(await waitUntilStopped(info.pid, timing))) {
+      signal(info.pid, "SIGKILL")
+      if (!(await waitUntilStopped(info.pid, timing))) throw new Error(`Server process ${info.pid} is still running`)
+    }
   }
   const latest = await read(options.file)
   if (latest === undefined || !same(latest, info)) return

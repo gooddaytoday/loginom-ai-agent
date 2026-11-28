@@ -4,7 +4,7 @@ import { contenderPool, spawnServiceContender } from "../service-contender.js"
 import { defaultEnsureTiming, ensureTiming, type EnsureTiming } from "../service-timing.js"
 import { matchesVersion } from "../service-version.js"
 import { PtyHandoff } from "../pty-handoff.js"
-import { decide, fallback, headers, probeResult, requestStop, same } from "../service-probe.js"
+import { decide, fallback, headers, isServiceProcessAlive, probeResult, requestStop, same } from "../service-probe.js"
 
 export * from "../service.js"
 export { headers }
@@ -35,7 +35,7 @@ export const incumbent = Effect.fn("service.incumbent")(function* (
   options: DiscoverOptions & { readonly url: string },
 ) {
   const info = yield* read(options.file)
-  if (info === undefined) return undefined
+  if (info === undefined || !(yield* Effect.promise(() => isServiceProcessAlive(info.pid)))) return undefined
   const found = (yield* Effect.promise(() => probeResult({ ...info, url: options.url }))).service
   if (!found?.compatible) return undefined
   if (!matchesVersion(found.version, options)) return undefined
@@ -159,7 +159,8 @@ const read = Effect.fnUntraced(function* (file?: string) {
 
 const registered = Effect.fnUntraced(function* (file?: string, timeout?: number) {
   const info = yield* read(file)
-  if (info === undefined) return { info: undefined, service: undefined, timedOut: false }
+  if (info === undefined || !(yield* Effect.promise(() => isServiceProcessAlive(info.pid))))
+    return { info: undefined, service: undefined, timedOut: false }
   return { info, ...(yield* Effect.promise(() => probeResult(info, timeout))) }
 })
 
@@ -172,9 +173,7 @@ const signal = (pid: number, name: NodeJS.Signals) =>
   Effect.try({ try: () => process.kill(pid, name), catch: (cause) => cause }).pipe(Effect.ignore)
 
 const stopped = Effect.fnUntraced(function* (pid: number) {
-  const running = yield* Effect.try({ try: () => process.kill(pid, 0), catch: () => false }).pipe(
-    Effect.orElseSucceed(() => false),
-  )
+  const running = yield* Effect.promise(() => isServiceProcessAlive(pid))
   if (!running) return true
   return yield* Effect.fail(new Error(`Server process ${pid} is still running`))
 })
@@ -184,19 +183,21 @@ const terminate = Effect.fnUntraced(function* (info: Info, options: { readonly f
   if (current === undefined || !same(current, info)) return
   // Loginom AI Agent (B2.3b): ask the service to close its plugins and exit; signals are the fallback. On Windows
   // SIGTERM ends the process at once, so only the request lets plugins clean up there.
-  const exited = (yield* Effect.promise(() => requestStop(info, timing.requestTimeout)))
-    ? yield* stopped(info.pid).pipe(
-        Effect.retry(poll(timing, Math.ceil(timing.softStopTimeout / timing.stopPollInterval))),
-        Effect.option,
-      )
-    : Option.none()
-  if (Option.isNone(exited)) yield* signal(info.pid, "SIGTERM")
-  const done = Option.isSome(exited) ? exited : yield* stopped(info.pid).pipe(Effect.retry(poll(timing)), Effect.option)
-  // The registration can disappear or change hands before this process exits. Only the PID we
-  // signalled can tell us whether it has stopped, so escalate based on that process.
-  if (Option.isNone(done)) {
-    yield* signal(info.pid, "SIGKILL")
-    yield* stopped(info.pid).pipe(Effect.retry(poll(timing)))
+  if (yield* Effect.promise(() => isServiceProcessAlive(info.pid))) {
+    const exited = (yield* Effect.promise(() => requestStop(info, timing.requestTimeout)))
+      ? yield* stopped(info.pid).pipe(
+          Effect.retry(poll(timing, Math.ceil(timing.softStopTimeout / timing.stopPollInterval))),
+          Effect.option,
+        )
+      : Option.none()
+    if (Option.isNone(exited)) yield* signal(info.pid, "SIGTERM")
+    const done = Option.isSome(exited) ? exited : yield* stopped(info.pid).pipe(Effect.retry(poll(timing)), Effect.option)
+    // The registration can disappear or change hands before this process exits. Only the PID we
+    // signalled can tell us whether it has stopped, so escalate based on that process.
+    if (Option.isNone(done)) {
+      yield* signal(info.pid, "SIGKILL")
+      yield* stopped(info.pid).pipe(Effect.retry(poll(timing)))
+    }
   }
   const latest = yield* read(options.file)
   if (latest === undefined || !same(latest, info)) return

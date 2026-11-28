@@ -16,7 +16,7 @@ const cli = path.resolve(import.meta.dir, "../../../../cli")
 // `<file>.signal`, and exits on either.
 const fixture = path.resolve(import.meta.dir, "../../../../client/test/fixture/service.ts")
 
-const cleanup: Array<() => Promise<unknown>> = []
+const cleanup: Array<() => Promise<void>> = []
 
 afterEach(async () => {
   await Promise.all(cleanup.splice(0).map((run) => run()))
@@ -82,7 +82,7 @@ describe("service-identity", () => {
     ]
 
     const own = directories.map((directory) => path.join(directory, "service-desktop.json"))
-    const services = new Map([...foreign, ...own].map((file, index) => [file, fakeService(1000 + index)]))
+    const services = new Map([...foreign, ...own].map((file, index) => [file, fakeService(index)]))
     await Promise.all(
       [...services].map(async ([file, service]) => {
         await fs.mkdir(path.join(root, path.dirname(file)), { recursive: true })
@@ -441,7 +441,9 @@ async function liveService(file: string, mode = "soft") {
   return service
 }
 
-function fakeService(pid: number) {
+function fakeService(index: number) {
+  const pid = process.pid
+
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
@@ -453,5 +455,5 @@ function fakeService(pid: number) {
 
   cleanup.push(() => server.stop(true))
 
-  return { id: `service-${pid}`, version, url: server.url.origin, pid, password: `secret-${pid}` }
+  return { id: `service-${index}`, version, url: server.url.origin, pid, password: `secret-${index}` }
 }

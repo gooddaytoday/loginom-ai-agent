@@ -67,6 +67,7 @@
     {
       "id": "CAT-13",
       "title": "Product storage root and own background service (U5)",
+      "note": "Service discovery and stop distinguish an unreaped Linux process from a live service (LAB-2276).",
       "paths": [
         "packages/util/src/global.ts", "packages/client/src/service-probe.ts", "packages/cli/src/services/service-config.ts",
         "packages/desktop/src/main/service/sidecar-probe.ts", "packages/desktop/src/main/service/background-service.ts",
@@ -107,7 +108,12 @@
         "packages/ui/src/i18n/en.ts"
       ]
     },
-    { "id": "CAT-09", "title": "Desktop main process, preload, renderer and window tests", "paths": ["packages/desktop/**"] },
+    {
+      "id": "CAT-09",
+      "title": "Desktop main process, preload, renderer and window tests",
+      "note": "Plugin inventory is ready without waiting for the bundled CLI; setup still resolves the CLI before starting a main plugin (LAB-2276).",
+      "paths": ["packages/desktop/**"]
+    },
     {
       "id": "CAT-21",
       "title": "Built-in plugin top-level pages",
