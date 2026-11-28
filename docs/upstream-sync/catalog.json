@@ -189,11 +189,19 @@
     },
     {
       "id": "CAT-10",
-      "title": "Web app, UI kit, session UI",
+      "title": "Web app, UI kit, session UI and Loginom localization",
       "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"],
       "notes": {
         "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events."
       }
+    },
+    {
+      "id": "CAT-15",
+      "title": "Conversation search fields and sidebar shortcut (C1.5)",
+      "paths": [
+        "packages/schema/src/session.ts", "packages/core/src/session/store.ts", "packages/core/test/session-list.test.ts",
+        "packages/protocol/openapi.json", "packages/client/src/effect/api/api.ts", "packages/client/src/effect/generated/client.ts"
+      ]
     },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
     { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }
