@@ -573,7 +573,7 @@ test("the original managed service contender binds when the occupied port is rel
       id: "stale",
       version: LOGINOM_AI_AGENT_VERSION,
       url: "http://127.0.0.1:1",
-      pid: 2_147_483_647,
+      pid: process.pid,
       password: "stale",
     }),
   )
@@ -706,9 +706,9 @@ test("port contender recognizes an incumbent registered during the bind race", a
     registration,
     JSON.stringify({
       id: "stale",
-      version: LOGINOM_AI_AGENT_VERSION,
+      version: "old",
       url: "http://127.0.0.1:1",
-      pid: 2_147_483_647,
+      pid: process.pid,
       password: "stale",
     }),
   )
@@ -766,6 +766,50 @@ test("service registration replaces a stale owner with the bound address", async
     })
     await Effect.runPromise(cleanup.pipe(Effect.provide(NodeFileSystem.layer)))
     expect(await Bun.file(registration).exists()).toBe(false)
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test("a successor publishing during the old service's cleanup stays registered", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-service-overlap-"))
+  const file = path.join(root, "service.json")
+  const run = <A, E>(effect: Effect.Effect<A, E, FileSystem.FileSystem>) =>
+    Effect.runPromise(effect.pipe(Effect.provide(NodeFileSystem.layer)))
+  const register = (id: string) =>
+    ServiceRegistration.register({
+      address: NetAddress.inetAddressFromIpStringUnsafe("127.0.0.1", 4321),
+      password: "secret",
+      id,
+      file,
+      shutdown: Effect.never,
+    }).pipe(Effect.scoped)
+  try {
+    const fileSystem = await run(FileSystem.FileSystem)
+    const removing = Promise.withResolvers<void>()
+    const successor = Promise.withResolvers<void>()
+    const cleanup = await run(
+      register("old").pipe(
+        Effect.provideService(FileSystem.FileSystem, {
+          ...fileSystem,
+          remove: (name, options) =>
+            name === file
+              ? Effect.promise(() => {
+                  removing.resolve()
+                  return Promise.race([successor.promise, Bun.sleep(300)])
+                }).pipe(Effect.andThen(fileSystem.remove(name, options)))
+              : fileSystem.remove(name, options),
+        }),
+      ),
+    )
+    const finishing = run(cleanup)
+
+    await Promise.race([removing.promise, finishing])
+    const replacement = run(register("successor"))
+    void replacement.then(() => successor.resolve(), successor.reject)
+    await Promise.all([finishing, replacement])
+
+    expect(await Bun.file(file).json()).toMatchObject({ id: "successor" })
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }

@@ -1,7 +1,7 @@
 import { Global } from "@opencode/util/global"
 import { LOGINOM_AI_AGENT_CHANNEL, LOGINOM_AI_AGENT_VERSION } from "../version"
 import { Hash } from "@opencode/util/hash"
-import { Service } from "@opencode/client/effect/service"
+import { Service, withRegistrationLock } from "@opencode/client/effect/service"
 import { Effect, FileSystem, Option, Schedule, Schema } from "effect"
 import { randomBytes } from "crypto"
 import path from "path"
@@ -101,7 +101,7 @@ export const migrateRegistration = Effect.fnUntraced(function* (
   const registration = yield* decodeRegistration(text.value).pipe(Effect.option)
   if (Option.isNone(registration)) return
   if (!versionBelongsToChannel(registration.value.version, channel, installedVersion)) return
-  yield* fs.writeFileString(file, text.value, { flag: "wx", mode: 0o600 }).pipe(Effect.ignore)
+  yield* withRegistrationLock(file, fs.writeFileString(file, text.value, { flag: "wx", mode: 0o600 })).pipe(Effect.ignore)
 })
 
 export const migrateConfig = Effect.fnUntraced(function* (legacy: string, file: string) {

@@ -37,7 +37,8 @@
   },
   "dependencies": {
     "@opencode/schema": "workspace:*",
-    "@opencode/protocol": "workspace:*"
+    "@opencode/protocol": "workspace:*",
+    "@opencode/util": "workspace:*"
   },
   "peerDependencies": {
     "effect": "catalog:",
