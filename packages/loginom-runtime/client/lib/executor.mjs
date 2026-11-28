@@ -2459,7 +2459,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     return outcome;
   };
   const remember = async (operation, phase, outcome) => {
-    await onRecord({ operation_id: operation.id, action_key: operation.action.action_key, action_revision: operation.action.revision,
+    return onRecord({ operation_id: operation.id, action_key: operation.action.action_key, action_revision: operation.action.revision,
       phase, parameters: structuredClone(operation.parameters), checkpoint: structuredClone(operation.checkpoint ?? null),
       deadline_at: operation.deadline ?? null, ...(outcome ? { outcome: structuredClone(outcome) } : {}) });
   };
@@ -2555,12 +2555,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       auxiliary.set(attempt.id,{signature:attempt.signature,outcome:structuredClone(completedVerification)});
       if(pending===operation)pending=null;
       if(publishShutdown){
-        // The proof was durably acknowledged before settlement. These records
-        // report the committed verdict and are followed by the bridge audit.
-        void Promise.allSettled([
-          remember(operation,'transfer_completed',completedUpload),
-          remember(attempt,'verification_completed',completedVerification),
-          publishShutdown(),
+        // Settlement rests on the durable proof. Close still has to confirm
+        // the terminal audit within the remaining shutdown budget.
+        const terminalRecord=async (operation,phase,outcome)=>{
+          const saved=await remember(operation,phase,outcome);
+          if(saved?.phase!==phase||saved.operation_id!==operation.id)throw Error('Terminal artifact evidence was not durably acknowledged');
+        };
+        await publishShutdown([
+          ['transfer_completed',()=>terminalRecord(operation,'transfer_completed',completedUpload)],
+          ['verification_completed',()=>terminalRecord(attempt,'verification_completed',completedVerification)],
         ]);
       }
       return completedVerification;

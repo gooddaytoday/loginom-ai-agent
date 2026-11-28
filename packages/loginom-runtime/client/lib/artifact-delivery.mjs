@@ -311,31 +311,34 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
      &&JSON.stringify(destination.workflow_ref)===JSON.stringify(job.binding.workflow_ref)
      &&destination.active_tab_ref===job.binding.active_tab_ref,'Delivery browser context changed; no verification dispatched');
    check();job.verificationState='preflight';
-   let shutdownResult;
    const verification=await runtime.verifyDeliveredArtifact({operationId:job.uploadId,verificationId:job.id+(duringShutdown?':shutdown-verify':':verify'),
     observationId:destination.observation_id,signal,onDispatched:()=>{job.verificationStarted=true;job.verificationState='dispatched';},
     ...(duringShutdown?{shutdownDeadline,acknowledgeShutdown:async proof=>{
      const evidence=completionProof(job,artifact,proof);
      await acknowledge(job,'artifact_delivery_verification_proof',{proof:evidence,deadline_at:deadline});
-     return ()=>{
-      shutdownResult={status:'SUCCEEDED',...evidence,upload_completion_verified:true};
-      return acknowledge(job,'artifact_delivery_completed',{result:shutdownResult});
+     return async terminalRecords=>{
+      const result={status:'SUCCEEDED',...evidence,upload_completion_verified:true};
+      job.outcome=result;job.phase='completed';job.error=null;
+      job.shutdownAuditPending=true;
+      await Promise.all([...terminalRecords,['artifact_delivery_completed',()=>acknowledge(job,'artifact_delivery_completed',{result})]]
+       .map(async ([phase,write])=>{
+        try{await write();}
+        catch(error){job.shutdownAuditError??={code:'ARTIFACT_DELIVERY_AUDIT_WRITE_FAILED',phase};throw error;}
+       }));
+      check();job.shutdownAuditPending=false;
      };
     }}:{})});
    if(job.conflictRejected&&verification.status!=='SUCCEEDED'&&verification.cleanup_complete===true)job.verificationState='settled';
    const lostVerification=!duringShutdown&&verification.error?.code==='BROWSER_CALL_UNCERTAIN';
    requireValue(lostVerification||verification.status==='SUCCEEDED'&&verification.cleanup_complete===true&&verification.output?.bytes_verified===true,'Destination bytes require inspection');
-   if(duringShutdown){
-    requireValue(shutdownResult,'Shutdown delivery evidence is missing');
-    job.outcome=shutdownResult;job.phase='completed';job.error=null;
-    return snapshot(job);
-   }
+   if(duringShutdown)return snapshot(job);
    // Verification owns its dispatched work through cleanup. Cancellation or
    // deadline expiry cannot discard its committed proof; only inspect it here.
    const final=await runtime.inspect({operationId:job.uploadId});
    if(lostVerification)await acknowledge(job,'artifact_delivery_verification_reconciled',{inspection:final});
    await finish(job,artifact,final);
   } catch(error) {
+   if(duringShutdown&&job.shutdownAuditPending)return snapshot(job);
    if(!(error instanceof Error))error=Object.assign(Error(String(error?.message??error?.code
      ??(typeof error==='string'&&error?error:'Artifact delivery failed without an error message'))),{code:error?.code});
    if(job.largeUpload){
@@ -453,7 +456,7 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
   cancel(id){const job=jobs.get(id);requireValue(job?.largeUpload,'Unknown asynchronous upload');if(job.state==='running'){job.status='cancelling';job.controller.abort();}return snapshot(job);},
   interrupt(){for(const job of jobs.values())if(job.largeUpload&&job.state==='running'){job.status='cancelling';job.controller.abort();}},
   async drain(){await Promise.all([...jobs.values()].map(job=>job.promise));},
-  async close({verifyCancelled=false}={}) {
+  async close({verifyCancelled=false,closeDeadline=Infinity}={}) {
    for(const job of jobs.values())if(job.largeUpload&&job.state==='running'){job.status='cancelling';job.controller.abort();}
    await Promise.all([...jobs.values()].map(job=>job.promise));
    requireValue(![...jobs.values()].some(job=>job.largeUpload&&job.status==='uncertain'),'LOGINOM_UPLOAD_UNCERTAIN');
@@ -462,23 +465,25 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
      &&runtime.canVerifyCancelledDelivery(job.uploadId,job.id));
    if(!job)return;
    // Reserve the native package cleanup's 30 s within the host close budget.
-   const deadline=Math.min(job.deadline,now()+8000);
+   const deadline=Math.min(job.deadline,now()+Math.min(8000,Math.floor(closeDeadline-performance.now())));
    if(now()>=deadline)return;
    const artifact=artifactStore.getUploadGrant(job.artifact.artifact_id,job.artifact.upload.grant_id);
    if(JSON.stringify(artifact)!==JSON.stringify(job.artifact))return;
    const controller=new AbortController();
+   const remaining=Math.max(0,deadline-now()),auditDeadline=performance.now()+remaining;
    let timer;
    const expired=new Promise(resolve=>{
     timer=setTimeout(()=>{
      controller.abort(Error('Artifact verification deadline elapsed'));
      resolve(true);
-    },Math.max(0,deadline-now()));
+    },remaining);
    });
    active=job;job.state='running';
    try {
     job.promise=run(job,artifact,controller.signal,null,deadline);
-    const verificationDeadlineElapsed=await Promise.race([job.promise.then(()=>job.phase!=='completed'&&now()>=deadline),expired]);
-    return {verificationDeadlineElapsed};
+    const deadlineElapsed=await Promise.race([job.promise.then(()=>now()>=deadline),expired]);
+    const auditError=job.shutdownAuditError??(deadlineElapsed&&job.shutdownAuditPending?{code:'ARTIFACT_DELIVERY_AUDIT_DEADLINE'}:null);
+    return {verificationDeadlineElapsed:deadlineElapsed&&job.phase!=='completed',auditError,auditDeadline};
    } finally {clearTimeout(timer);}
   },
  });

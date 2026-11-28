@@ -128,6 +128,7 @@ mock.module(new URL('../../lib/execution-journal.mjs',import.meta.url).href,{nam
   let pending=Promise.resolve();
   return event=>{
     const next=pending.then(async()=>{
+      f.beforeArtifactRecord?.(event);
       const saved=await record(event);
       await f.afterArtifactRecord(event);
       return saved;
@@ -453,7 +454,7 @@ for(const scenario of ['opened-clean','opened-read-only','opened-dirty','opened-
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
 
-for(const fault of ['cancelled','unknown','wrong-bytes','changed-mtime','late-hash','late-ack','stalled-ack'])test('CLI shutdown after pending upload verification: '+fault,async t=>{
+for(const fault of ['cancelled','unknown','wrong-bytes','changed-mtime','late-hash','late-ack','stalled-ack','stalled-terminal','terminal-error','stalled-close-audit'])test('CLI shutdown after pending upload verification: '+fault,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-upload-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
   const f=current={scenario:'opened-clean',events:[],saves:0,path,catalog};
@@ -469,12 +470,22 @@ for(const fault of ['cancelled','unknown','wrong-bytes','changed-mtime','late-ha
   const initialVersion={bytes:artifact.bytes,mtime:'2026-11-28T00:00:00.000Z'};
   const ack=Promise.withResolvers();
   let reachedAck=false;
-  f.artifactNow=fault==='stalled-ack'?Date.now:()=>clock;
+  const stalledCloseAudit=fault==='stalled-close-audit';
+  const stalled=['stalled-ack','stalled-terminal','stalled-close-audit'].includes(fault);
+  const auditError=fault==='stalled-terminal'?{code:'ARTIFACT_DELIVERY_AUDIT_DEADLINE'}:
+    fault==='terminal-error'?{code:'ARTIFACT_DELIVERY_AUDIT_WRITE_FAILED',phase:'verification_completed'}:
+    stalledCloseAudit?{code:'CLEANUP_AUDIT_DEADLINE'}:null;
+  f.artifactNow=stalled?Date.now:()=>clock;
+  f.beforeArtifactRecord=event=>{
+    if(fault==='terminal-error'&&event.phase==='verification_completed')throw Object.assign(Error('Private journal write failed'),{code:'EIO'});
+  };
   f.afterArtifactRecord=async event=>{
-    if(!['artifact_delivery_verification_proof','artifact_delivery_completed'].includes(event.phase))return;
+    const heldPhase=fault==='stalled-terminal'?'artifact_delivery_completed':'artifact_delivery_verification_proof';
+    if(stalledCloseAudit?event.event!=='managed_saved_package_cleanup':
+      event.phase!==heldPhase&&!(fault==='late-ack'&&event.phase==='artifact_delivery_completed'))return;
     reachedAck=true;
     if(fault==='late-ack')clock=shutdownDeadline+1;
-    if(fault==='stalled-ack')await ack.promise;
+    if(stalled)await ack.promise;
   };
   const stageDownload=store.stageDownload;
   store.stageDownload=async id=>{
@@ -530,7 +541,7 @@ for(const fault of ['cancelled','unknown','wrong-bytes','changed-mtime','late-ha
     mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
     loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
   const client=new AgentClient({name:'upload-cleanup',version:'1'});
-  t.after(async()=>{try{await client.close();await bridge.close();}finally{await rm(directory,{recursive:true,force:true});}});
+  t.after(async()=>{ack.resolve();try{await client.close();await bridge.close();}finally{await rm(directory,{recursive:true,force:true});}});
   const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
   const prepared=await client.callTool({name:'dock_prepare',arguments:{intent:'open_package',package_path:path}});
   assert.notEqual(prepared.isError,true,JSON.stringify(prepared));
@@ -539,18 +550,24 @@ for(const fault of ['cancelled','unknown','wrong-bytes','changed-mtime','late-ha
   assert.equal(delivery.structuredContent?.status,'AMBIGUOUS',JSON.stringify(delivery));
   const inspected=await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:'delivery:upload'}});
   assert.equal(JSON.parse(inspected.content[0].text).output.state,'pending');
-  if(fault==='cancelled')await closeManagedResources({bridge,client},[]);
-  else if(fault==='stalled-ack'){
+  const managed={bridge,client,session};
+  const expectAuditFailure=error=>{
+    assert.equal(error.code,'LOGINOM_RUNTIME_CLEANUP_FAILED');
+    assert.deepEqual(error.audit_error,auditError);
+    return true;
+  };
+  if(fault==='cancelled')await closeManagedResources(managed,[]);
+  else if(stalled){
     const started=performance.now();
-    const closing=closeManagedResources({bridge,client},[]);
+    const closing=closeManagedResources(managed,[],stalledCloseAudit?{deadline:Date.now()+2000}:undefined);
     let timer;
     try{
       await assert.rejects(Promise.race([closing,new Promise((_,reject)=>{
-        timer=setTimeout(()=>reject(Error('Close still waits for the journal after the 8 s budget')),9000);
-      })]),/LOGINOM_RUNTIME_CLEANUP_FAILED/);
+        timer=setTimeout(()=>reject(Error('Close still waits for the journal after its budget')),stalledCloseAudit?3000:9000);
+      })]),auditError?expectAuditFailure:/LOGINOM_RUNTIME_CLEANUP_FAILED/);
       assert.equal(reachedAck,true);
       t.diagnostic(`Close refused after ${Math.round(performance.now()-started)} ms with journal acknowledgement still blocked`);
-      assert.equal(bridge.hasUnsettledWork(),true);
+      if(!stalledCloseAudit)assert.equal(bridge.hasUnsettledWork(),true);
     }finally{
       clearTimeout(timer);
       ack.resolve();
@@ -558,18 +575,32 @@ for(const fault of ['cancelled','unknown','wrong-bytes','changed-mtime','late-ha
       await f.artifactRuntime.closeArtifactDeliveries();
     }
   }
-  else await assert.rejects(closeManagedResources({bridge,client},[]),/LOGINOM_RUNTIME_CLEANUP_FAILED/);
+  else await assert.rejects(closeManagedResources(managed,[]),auditError?expectAuditFailure:/LOGINOM_RUNTIME_CLEANUP_FAILED/);
   const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
   assert.equal(cleanup.status,fault==='cancelled'?'SUCCEEDED':'BLOCKED');
-  assert.equal(cleanup.reason,fault==='cancelled'?null:'CLEANUP_OR_OPERATION_UNCONFIRMED');
-  assert.equal(cleanup.package_closed===true,fault==='cancelled');
-  assert.equal(cleanup.logged_out===true,fault==='cancelled');
-  if(['cancelled','late-ack','stalled-ack'].includes(fault)){
+  assert.equal(cleanup.reason,fault==='cancelled'?null:auditError?'CLEANUP_EVIDENCE_UNCONFIRMED':'CLEANUP_OR_OPERATION_UNCONFIRMED');
+  assert.equal(cleanup.package_closed===true,fault==='cancelled'||stalledCloseAudit);
+  assert.equal(cleanup.logged_out===true,fault==='cancelled'||stalledCloseAudit);
+  if(auditError){
+    assert.deepEqual(cleanup.audit_error,auditError);
+    const resourceRecords=(await readFile(join(directory,'resource-close.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
+    const completion=resourceRecords.find(event=>event.stage==='complete');
+    assert.equal(completion?.status,'rejected');
+    assert.equal(completion?.code,'LOGINOM_RUNTIME_CLEANUP_FAILED');
+    assert.deepEqual(completion?.audit_error,auditError);
+  }
+  if(auditError||['cancelled','late-ack','stalled-ack'].includes(fault)){
     const records=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
     const terminal=records.filter(event=>['transfer_completed','verification_completed','artifact_delivery_completed'].includes(event.phase)
       &&['delivery','delivery:upload','delivery:shutdown-verify'].includes(event.operation_id));
-    assert.deepEqual(terminal.map(event=>[event.phase,(event.outcome??event.result)?.status]),fault==='cancelled'?
-      [['transfer_completed','SUCCEEDED'],['verification_completed','SUCCEEDED'],['artifact_delivery_completed','SUCCEEDED']]:[]);
+    const completed=['transfer_completed','verification_completed','artifact_delivery_completed'];
+    const expected=fault==='cancelled'||fault==='stalled-terminal'||stalledCloseAudit?completed:fault==='terminal-error'?completed.filter(phase=>phase!=='verification_completed'):[];
+    assert.deepEqual(terminal.map(event=>[event.phase,(event.outcome??event.result)?.status]),expected.map(phase=>[phase,'SUCCEEDED']));
+    if(fault==='terminal-error'){
+      const closeAudit=records.find(event=>event.event==='managed_saved_package_cleanup');
+      assert.deepEqual(closeAudit?.cleanup?.audit_error,auditError);
+      assert.equal(closeAudit?.cleanup?.status,'BLOCKED');
+    }
     const proof=records.find(event=>event.phase==='artifact_delivery_verification_proof'&&event.operation_id==='delivery');
     assert.equal(proof?.proof?.verification_id,'delivery:shutdown-verify');
     assert.equal(proof.deadline_at,shutdownDeadline);
@@ -577,7 +608,7 @@ for(const fault of ['cancelled','unknown','wrong-bytes','changed-mtime','late-ha
     assert.ok(terminal.every(event=>records.indexOf(event)>records.indexOf(proof)));
   }
   const final=await f.artifactRuntime.inspect({operationId:'delivery:upload'});
-  assert.equal(final.output.state,fault==='cancelled'?'resolved':'pending');
+  assert.equal(final.output.state,fault==='cancelled'||auditError?'resolved':'pending');
   assert.equal(uploads,1);
   assert.equal(downloads,fault==='unknown'?1:2);
 });
