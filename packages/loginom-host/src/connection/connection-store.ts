@@ -32,6 +32,7 @@ const decodeMigration = Schema.decodeUnknownOption(
 // Only the owning host accesses this directory; it is outside renderer stores.
 export function connectionStore(directory: string, codec: CredentialCodec = credentials(process.platform)) {
   const pendingPath = join(directory, "pending.json")
+  const discardPath = join(directory, "pending-discarded.json")
   let initialized: Promise<void> | undefined
   async function protectDirectory() {
     await mkdir(directory, { recursive: true, mode: 0o700 })
@@ -47,7 +48,11 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
         throw new Error("LOGINOM_STORE_PERMISSIONS_INVALID")
     }
   }
-  async function write(file: string, record: ConnectionRecord | { state: "resetting" | "complete" }, replace: boolean) {
+  async function write(
+    file: string,
+    record: ConnectionRecord | { state: "resetting" | "complete" } | { activeGeneration: number },
+    replace: boolean,
+  ) {
     await protectDirectory()
     const temporary = `${file}.${randomUUID()}.tmp`
     try {
@@ -180,12 +185,18 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
     },
     async pendingForStartup(activeGeneration: number) {
       const record = await read(pendingPath)
-      if (record?.activationStarted) return "interrupted" as const
+      if (record?.activationStarted) return { interruptedGeneration: record.generation }
       if (!record || record.generation <= activeGeneration) return
       // Claim older records and clean-shutdown handoffs before returning a candidate to activate.
       const candidate = await decodeRecord(record)
       await write(pendingPath, { ...record, activationStarted: true }, true)
       return candidate
+    },
+    async recordPendingDiscard(activeGeneration: number) {
+      await write(discardPath, { activeGeneration }, true)
+    },
+    async pendingDiscarded(activeGeneration: number) {
+      return (await readText(discardPath)) === JSON.stringify({ activeGeneration })
     },
     async deferPending(candidate: Pick<ActiveConnection, "generation" | "revision">) {
       const record = await read(pendingPath)

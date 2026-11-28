@@ -88,14 +88,21 @@ test("Save checks first and reports pending activation until the service applies
 })
 
 test.each([
-  { pendingCleanupFailed: true as const, message: "pendingCleanupFailed" },
-  { message: "activationFailed" },
-])("settings show the original connection alongside $message", ({ pendingCleanupFailed, message }) => {
-  const state = form({ ...fresh, revision: 2, generation: 1, state: "ready", failed: true, pendingCleanupFailed })
-  expect(view(state)).toMatchObject({
-    message, busy: false, connected: { generation: 1, username: fresh.username, folder: fresh.folder },
-  })
-})
+  { outcome: { pendingCleanupFailed: true }, message: "pendingCleanupFailed" },
+  { outcome: { pendingOutcome: "pendingResumeFailed" }, message: "pendingResumeFailed" },
+  { outcome: { pendingOutcome: "pendingNotApplied" }, message: "pendingNotApplied" },
+  { outcome: {}, message: "activationFailed" },
+] satisfies { outcome: Partial<Status>; message: string }[])(
+  "settings show the original connection alongside $message",
+  ({ outcome, message }) => {
+    const state = form({ ...fresh, revision: 2, generation: 1, state: "ready", failed: true, ...outcome })
+    expect(view(state)).toMatchObject({
+      message,
+      busy: false,
+      connected: { generation: 1, username: fresh.username, folder: fresh.folder },
+    })
+  },
+)
 
 test("unavailable, changed targets and disposal ignore late completions", () => {
   const checking = check().state

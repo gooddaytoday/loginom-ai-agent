@@ -32,7 +32,11 @@ test("the settings RPC emits only the display status, even for a migrated addres
   })
 })
 
-test("settings distinguish failed cleanup of pending changes while the original connection is ready", async () => {
+test.each([
+  ["LOGINOM_PENDING_CLEAR_FAILED", { pendingCleanupFailed: true }],
+  ["LOGINOM_PENDING_RESUME_FAILED", { pendingOutcome: "pendingResumeFailed" }],
+  ["LOGINOM_PENDING_NOT_APPLIED", { pendingOutcome: "pendingNotApplied" }],
+])("settings report %s while the original connection is ready", async (failure, outcome) => {
   const settings = connectionSettings(async () => ({
     revision: 2,
     generation: 1,
@@ -41,12 +45,12 @@ test("settings distinguish failed cleanup of pending changes while the original 
     folder: "/analyst",
     hasPassword: true,
     state: "ready",
-    failure: "LOGINOM_PENDING_CLEAR_FAILED",
+    failure,
   }))
   const result = await settings.status()
   const validated = await ConnectionSettingsRpc.methods.status.output["~standard"].validate(result)
   expect(validated).toMatchObject({
-    value: { ok: true, value: { generation: 1, failed: true, pendingCleanupFailed: true } },
+    value: { ok: true, value: { generation: 1, state: "ready", failed: true, ...outcome } },
   })
 })
 

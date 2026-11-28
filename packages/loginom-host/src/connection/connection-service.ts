@@ -67,9 +67,20 @@ export async function connectionService(
     state.loading = (async () => {
       const active = await store.read()
       const latest = await store.latestGeneration()
-      const saved = await store.pendingForStartup(active?.generation ?? 0)
-      if (saved === "interrupted") return { active, latest, failure: await discardPending() }
-      return { active, latest, pending: saved }
+      const activeGeneration = active?.generation ?? 0
+      const saved = await store.pendingForStartup(activeGeneration).catch(() => "unavailable" as const)
+      if (saved === "unavailable") return { active, latest, failure: "LOGINOM_PENDING_RESUME_FAILED" }
+      if (saved && "interruptedGeneration" in saved) {
+        const notApplied = saved.interruptedGeneration > activeGeneration
+        const failure = await discardPending(notApplied ? activeGeneration : undefined)
+        return { active, latest, failure: failure ?? (notApplied ? "LOGINOM_PENDING_NOT_APPLIED" : undefined) }
+      }
+      if (saved) return { active, latest, pending: saved }
+      const failure = await store.pendingDiscarded(activeGeneration).then(
+        (discarded) => (discarded ? "LOGINOM_PENDING_NOT_APPLIED" : undefined),
+        () => "LOGINOM_PENDING_RESUME_FAILED",
+      )
+      return { active, latest, failure }
     })()
       .then(
         ({ active, pending, latest, failure }) => {
@@ -179,11 +190,14 @@ export async function connectionService(
       ...(state.failure ? { failure: state.failure } : {}),
     }
   }
-  function discardPending() {
-    return store.clearPending().then(
-      () => undefined,
-      () => "LOGINOM_PENDING_CLEAR_FAILED" as const,
-    )
+  async function discardPending(rememberFor?: number) {
+    try {
+      // Leave the guarded request on disk until its outcome survives another restart.
+      if (rememberFor !== undefined) await store.recordPendingDiscard(rememberFor)
+      await store.clearPending()
+    } catch {
+      return "LOGINOM_PENDING_CLEAR_FAILED" as const
+    }
   }
   async function failPending(candidate: ActiveConnection, failure: string) {
     state.failure = (await discardPending()) ?? failure

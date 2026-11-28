@@ -53,6 +53,8 @@ export default {
   serviceUnavailable: "Loginom service unavailable",
   activationFailed: "The service could not apply the connection. Check the settings and try again.",
   pendingCleanupFailed: "Pending settings could not be deleted. The service will retry deletion on the next start.",
+  pendingResumeFailed: "Pending settings could not be applied on startup. Check profile write permissions and restart the service.",
+  pendingNotApplied: "The new settings were not applied. Save them again.",
   invalidAddress: "Enter a Loginom address starting with http:// or https://, without credentials or URL parameters.",
   invalidUsername: "Check the Loginom username.",
   passwordRequired: "Enter a password or select “No password required”.",

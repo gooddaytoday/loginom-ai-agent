@@ -288,13 +288,119 @@ for (const [name, codec] of [
 
         const startsBeforeRestart = f.prepared.length
         const restarted = await f.start()
-        expect(await restarted.api.status()).toMatchObject({ generation: 1, state: "ready", url: original.url })
+        expect(await restarted.api.status()).toMatchObject({
+          generation: 1, state: "ready", url: original.url, failure: "LOGINOM_PENDING_NOT_APPLIED",
+        })
         expect(f.prepared.slice(startsBeforeRestart)).toEqual([original.url])
         expect(await f.store.read()).toEqual(original)
         expect(await f.store.pending()).toBeUndefined()
       } finally { await f.close() }
     },
   )
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    `${name}: restores the active connection when it cannot claim a pending change at startup`,
+    async () => {
+      const f = await fixture(codec)
+      const replacementUrl = "https://replacement.example/app/"
+      try {
+        await f.store.stage(original)
+        await f.store.activate(1)
+        const first = await f.start()
+        expect(first.acquire("draining")?.generation).toBe(1)
+        const validation = await first.api.check({
+          revision: 1, url: replacementUrl, username: "replacement-user", password: { operation: "empty" },
+        })
+        expect(await first.api.save({ revision: 1, validationId: validation.validationId })).toMatchObject({
+          generation: 1, state: "pending",
+        })
+        await first.close()
+
+        await chmod(f.directory, 0o500)
+        try {
+          const readOnly = await f.start()
+          expect(await readOnly.api.status()).toMatchObject({
+            generation: 1, state: "ready", url: original.url, failure: "LOGINOM_PENDING_RESUME_FAILED",
+          })
+          expect(readOnly.acquire("after-restart")?.generation).toBe(1)
+          expect(f.prepared).toEqual([original.url, original.url])
+          await readOnly.close()
+        } finally {
+          await chmod(f.directory, 0o700)
+        }
+
+        const recovered = await f.start()
+        expect(await recovered.api.status()).toMatchObject({ generation: 2, state: "ready", url: replacementUrl })
+        expect(await recovered.api.status()).not.toHaveProperty("failure")
+      } finally { await f.close() }
+    },
+  )
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    `${name}: reports a confirmed change that could not be handed off when permissions were lost`,
+    async () => {
+      const f = await fixture(codec)
+      const replacementUrl = "https://replacement.example/app/"
+      try {
+        await f.store.stage(original)
+        await f.store.activate(1)
+        const first = await f.start()
+        expect(first.acquire("draining")?.generation).toBe(1)
+        const input = {
+          revision: 1, url: replacementUrl, username: "replacement-user", password: { operation: "empty" as const },
+        }
+        const validation = await first.api.check(input)
+        expect(await first.api.save({ revision: 1, validationId: validation.validationId })).toMatchObject({
+          generation: 1, state: "pending",
+        })
+
+        await chmod(f.directory, 0o500)
+        try {
+          await first.close()
+          const readOnly = await f.start()
+          expect(await readOnly.api.status()).toMatchObject({
+            generation: 1, state: "ready", failure: "LOGINOM_PENDING_CLEAR_FAILED",
+          })
+          expect(await f.store.pending()).toMatchObject({ url: replacementUrl })
+          await readOnly.close()
+        } finally {
+          await chmod(f.directory, 0o700)
+        }
+
+        const reopened = await f.start()
+        const notApplied = { generation: 1, state: "ready", url: original.url, failure: "LOGINOM_PENDING_NOT_APPLIED" }
+        expect(await reopened.api.status()).toMatchObject(notApplied)
+        expect(await f.store.pending()).toBeUndefined()
+        await reopened.close()
+
+        const next = await f.start()
+        expect(await next.api.status()).toMatchObject(notApplied)
+        expect(f.prepared).toEqual([original.url, original.url, original.url, original.url])
+        const retry = await next.api.check(input)
+        await next.api.save({ revision: 1, validationId: retry.validationId })
+        await next.settled()
+        expect(await next.api.status()).toMatchObject({ generation: 2, state: "ready", url: replacementUrl })
+        await next.close()
+
+        const applied = await f.start()
+        expect(await applied.api.status()).not.toHaveProperty("failure")
+      } finally { await f.close() }
+    },
+  )
+
+  test(`${name}: an already committed change does not get a discard notice on restart`, async () => {
+    const f = await fixture(codec)
+    try {
+      const committed = { ...original, generation: 2, revision: 2 }
+      await f.store.savePending(committed)
+      await f.store.stage(committed)
+      await f.store.activate(2)
+      const restarted = await f.start()
+      expect(await restarted.api.status()).toMatchObject({ generation: 2, state: "ready" })
+      expect(await restarted.api.status()).not.toHaveProperty("failure")
+      expect(await f.store.pending()).toBeUndefined()
+    } finally { await f.close() }
+  })
 
   test(`${name}: a clean restart resumes a change still queued behind a lease`, async () => {
     const f = await fixture(codec)
@@ -357,8 +463,9 @@ for (const [name, codec] of [
       await retriedWithFailure.close()
 
       const restarted = await f.start()
-      expect(await restarted.api.status()).toMatchObject({ generation: 1, state: "ready", url: original.url })
-      expect(await restarted.api.status()).not.toHaveProperty("failure")
+      expect(await restarted.api.status()).toMatchObject({
+        generation: 1, state: "ready", url: original.url, failure: "LOGINOM_PENDING_NOT_APPLIED",
+      })
       expect(f.prepared).toEqual([original.url, replacementUrl, original.url, original.url])
       expect(await f.store.read()).toEqual(original)
       expect(await f.store.pending()).toBeUndefined()

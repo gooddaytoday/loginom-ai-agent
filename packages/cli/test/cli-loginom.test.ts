@@ -141,6 +141,15 @@ test("status prints the saved connection and recovery work instead of a new Host
     "Незавершённых операций нет. Проверить соединение — `loginom check`."
   expect(statusText(statusView(starting))).toBe(configured)
   expect(statusText(statusView({ ...base, state: "ready" }))).toBe(configured)
+  expect(statusText(statusView({ ...starting, failure: "LOGINOM_PENDING_NOT_APPLIED" }))).toBe(
+    configured + "\nНовые параметры не применены. Сохраните их снова через `loginom setup`.",
+  )
+  expect(statusText(statusView({ ...starting, failure: "LOGINOM_PENDING_RESUME_FAILED" }))).toBe(
+    configured + "\nНе удалось применить отложенные настройки при запуске. Проверьте права на запись профиля.",
+  )
+  expect(statusText(statusView({ ...starting, failure: "LOGINOM_PENDING_CLEAR_FAILED" }))).toBe(
+    configured + "\nНе удалось удалить отложенные настройки. Служба повторит очистку при следующем запуске.",
+  )
   const pending = statusView({ ...base, revision: 2, state: "pending" })
   expect(pending.state).toBe("pending")
   expect(statusText(pending)).toBe(

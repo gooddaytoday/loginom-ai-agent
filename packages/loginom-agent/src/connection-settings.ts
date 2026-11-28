@@ -17,6 +17,12 @@ type Request = typeof ServiceHost.connectionSettings.request
 export function connectionSettings(request: Request = ServiceHost.connectionSettings.request) {
   const readStatus = (reply: unknown): Status => {
     const view = Schema.decodeUnknownSync(Loginom.View)(reply)
+    const pendingOutcome =
+      view.failure === "LOGINOM_PENDING_RESUME_FAILED"
+        ? "pendingResumeFailed"
+        : view.failure === "LOGINOM_PENDING_NOT_APPLIED"
+          ? "pendingNotApplied"
+          : undefined
     return {
       revision: view.revision,
       generation: view.generation,
@@ -28,6 +34,7 @@ export function connectionSettings(request: Request = ServiceHost.connectionSett
       ...(view.application ? { application: view.application } : {}),
       failed: !!view.failure || view.state === "recoverable-error",
       ...(view.failure === "LOGINOM_PENDING_CLEAR_FAILED" ? { pendingCleanupFailed: true } : {}),
+      ...(pendingOutcome ? { pendingOutcome } : {}),
     }
   }
   const status = async (method: "connection.status" | "connection.settings.save", input: unknown) => {

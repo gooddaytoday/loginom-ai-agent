@@ -223,6 +223,18 @@ export function statusView(current: Loginom.View) {
   return { ...current, state: current.generation ? ("configured" as const) : ("unconfigured" as const) }
 }
 
+const pendingFailureMessages = new Map([
+  [
+    "LOGINOM_PENDING_RESUME_FAILED",
+    "Не удалось применить отложенные настройки при запуске. Проверьте права на запись профиля.",
+  ],
+  ["LOGINOM_PENDING_NOT_APPLIED", "Новые параметры не применены. Сохраните их снова через `loginom setup`."],
+  [
+    "LOGINOM_PENDING_CLEAR_FAILED",
+    "Не удалось удалить отложенные настройки. Служба повторит очистку при следующем запуске.",
+  ],
+])
+
 export function statusText(current: ReturnType<typeof statusView>) {
   const count = current.recoveries?.length ?? 0
   const clean = current.state !== "recoverable-error" && !count
@@ -234,6 +246,8 @@ export function statusText(current: ReturnType<typeof statusView>) {
   ]
   if (current.state === "pending")
     lines.push("Сохранённое изменение подключения ещё не применено; отменить его — `loginom cancel-pending`.")
+  const pendingFailure = current.failure && pendingFailureMessages.get(current.failure)
+  if (pendingFailure) lines.push(pendingFailure)
   if (count) {
     const word =
       count % 10 === 1 && count % 100 !== 11
@@ -244,7 +258,7 @@ export function statusText(current: ReturnType<typeof statusView>) {
     lines.push(
       `Требуется восстановление: ${count} ${word} — проверьте сценарий в Loginom и выполните \`loginom recover\`.`,
     )
-  } else if (current.state === "recoverable-error")
+  } else if (current.state === "recoverable-error" && !pendingFailure)
     lines.push(
       `Ошибка подключения${current.failure ? `: ${current.failure}` : ""}. ` +
         "Проверить соединение — `loginom check`, настроить заново — `loginom setup`.",

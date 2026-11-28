@@ -6,6 +6,7 @@ export const Status = Loginom.View.mapFields((fields) => ({
   ...Struct.pick(fields, ["revision", "generation", "url", "username", "folder", "hasPassword", "state", "application"]),
   failed: Schema.Boolean,
   pendingCleanupFailed: Schema.optionalKey(Schema.Literal(true)),
+  pendingOutcome: Schema.optionalKey(Schema.Literals(["pendingResumeFailed", "pendingNotApplied"])),
 }))
 export const Address = Schema.String.check(
   Schema.makeFilter((value) => {

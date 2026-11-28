@@ -220,6 +220,7 @@ function message(state: State) {
   if (state.type === "verified") return "verified"
   if (!("status" in state)) return
   if (state.status.pendingCleanupFailed) return "pendingCleanupFailed"
+  if (state.status.pendingOutcome) return state.status.pendingOutcome
   if (state.status.failed) return "activationFailed"
 
   if (state.status.state === "ready" && state.status.application?.state === "applied") return "applied"
