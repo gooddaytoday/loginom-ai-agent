@@ -1,4 +1,5 @@
 import { dialog } from "electron"
+import { join } from "node:path"
 import { Effect, Exit, Schema, Scope } from "effect"
 import { Product } from "@loginom-ai-agent/product"
 import { builtinMainContext } from "@opencode/plugin/gui/builtin"
@@ -11,10 +12,6 @@ const setup: Plugin.MainSetup = async (ctx) => {
   const builtin = builtinMainContext(ctx)
   const build = ctx.app
   const lifecycle = builtin.lifecycle
-  // Loginom AI Agent (B4.12): updates come only from the product feed the build sets; without it the updater is off
-  // and requests nothing, as in 0.4.
-  const feed = build.packaged ? Product.updateFeed : null
-  const enabled = feed !== null
   // Holds no resources, so it needs no cleanup.
   const context = logContext(ctx.log.write)
   const runPromise = Effect.runPromiseWith(context)
@@ -24,18 +21,39 @@ const setup: Plugin.MainSetup = async (ctx) => {
   const ready = builtin.storage.store("ready", {
     schema: Schema.NullOr(Schema.Struct({ version: Schema.String })),
     initial: null,
-    from: { settings: "ready", file: "loginom-ai-agent.updater" },
+    from: { settings: "ready", file: Product.stores.updater },
   })
+
+  const settings =
+    build.packaged && build.channel !== "dev"
+      ? await (async () => {
+          const preference = builtin.storage.store("channel", {
+            schema: Schema.NullOr(Schema.Literals(["stable", "unstable"])),
+            initial: null,
+            from: { settings: "channel", file: Product.stores.updater },
+          })
+          const { readUpdateSettings, updatePolicyPath } = await import("./signed-feed")
+          try {
+            return readUpdateSettings({
+              policyPath: updatePolicyPath(process.platform, process.env.ProgramData),
+              s3Path: join(process.resourcesPath, "updates-s3.json"),
+              preference: preference.value,
+              feed: Product.updateFeed,
+              github: Product.updateGithub,
+            })
+          } catch {
+            ctx.log.write("error", "updater administrator policy or product feed rejected")
+          }
+        })()
+      : undefined
 
   if (ctx.signal.aborted) return
   const scope = Scope.makeUnsafe()
   ctx.onCleanup(() => runPromise(Scope.close(scope, Exit.void)))
 
   // electron-updater loads only in packaged builds, after the first window is up.
-  const platform = enabled
-    ? await import("./platform").then((module) =>
-        runPromise(module.make(build.channel, feed).pipe(Scope.provide(scope))),
-      )
+  const platform = settings?.enabled
+    ? await import("./platform").then((module) => runPromise(module.make(settings.sources).pipe(Scope.provide(scope))))
     : undefined
 
   if (ctx.signal.aborted) return
@@ -122,10 +140,10 @@ const setup: Plugin.MainSetup = async (ctx) => {
       id: "check",
       label: ctx.t("menu.check"),
       after: "about",
-      enabled: () => enabled,
+      enabled: () => !!platform,
       run(window) {
-        // Beta builds check in the focused window, which reports the result in-app.
-        if (build.channel !== "beta") return void runFork(show)
+        // Beta builds and external downloads report the result in the focused window.
+        if (build.channel !== "beta" && !platform?.externalInstall) return void runFork(show)
 
         if (window) provider.emit("check", null, window.id)
       },

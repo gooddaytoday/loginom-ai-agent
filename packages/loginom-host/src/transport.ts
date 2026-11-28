@@ -52,8 +52,8 @@ export function transport(port: Port) {
       input: unknown,
       timeout = 180_000,
       observe?: (value: unknown) => void,
-      signal?: AbortSignal,
       progress?: (value: unknown) => void,
+      signal?: AbortSignal,
     ) {
       if (state.closed) return Promise.reject(new Error("LOGINOM_HOST_CLOSED"))
       if (signal?.aborted) return Promise.reject(signal.reason)

@@ -25,6 +25,7 @@
       "title": "Upstream endpoints: updates, installer, sharing",
       "paths": [
         "packages/gui-plugins/src/updater/main.ts", "packages/gui-plugins/src/updater/platform.ts",
+        "packages/gui-plugins/src/updater/signed-feed*.ts", "packages/desktop/src/main/plugin/storage.test.ts",
         "packages/gui-plugins/src/updater/whats-new.tsx", "packages/desktop/src/renderer/platform/notifications.ts",
         "packages/desktop/src/renderer/platform/notifications.test.ts", "packages/cli/src/services/updater.ts",
         "packages/cli/test/updater-install.test.ts"
@@ -50,7 +51,11 @@
         "packages/sdk/test/embedded.test.ts", "packages/core/src/schedule/check.ts",
         "packages/core/src/tool/plugin/shell.ts", "packages/core/src/tool.ts", "packages/core/src/formatter.ts",
         "packages/core/src/session/execution/restart.ts", "packages/core/test/session-execution.test.ts",
-        "packages/core/test/subagent-idle-e2e.test.ts"
+        "packages/core/test/subagent-idle-e2e.test.ts", "packages/core/src/plugin/product.ts",
+        "packages/core/src/session/history.ts", "packages/protocol/openapi.json",
+        "packages/core/src/session/message-updater.ts", "packages/schema/src/session-event.ts",
+        "packages/schema/src/session-message.ts", "packages/client/src/effect/api/api.ts",
+        "packages/app/src/runtime/server/data.test.ts"
       ]
     },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7" },
@@ -98,13 +103,17 @@
         "packages/ui/src/i18n/en.ts"
       ]
     },
-    { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
+    { "id": "CAT-09", "title": "Desktop main process, preload, renderer and window tests", "paths": ["packages/desktop/**"] },
     {
-      "id": "CAT-14",
+      "id": "CAT-21",
       "title": "Built-in plugin top-level pages",
       "paths": [
         "packages/app/src/shell/routes/routes.tsx", "packages/app/src/shell/state/layout.tsx",
         "packages/app/src/shell/state/layout.test.ts", "packages/app/vite.config.ts",
+        "packages/app/src/runtime/plugin/host-apis.tsx", "packages/plugin/src/gui/host-apis.ts",
+        "packages/ui/src/context/dialog.tsx",
+        "packages/app/src/runtime/platform/pwa.ts", "packages/app/test-browser/pwa-route.test.ts",
+        "packages/app/src/runtime/plugin/pages.tsx",
         "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
       ]
     },
@@ -122,7 +131,7 @@
       "id": "CAT-26",
       "title": "Loginom network settings (C2.8)",
       "paths": [],
-      "references": ["CAT-07", "CAT-10", "CAT-13", "CAT-14"]
+      "references": ["CAT-07", "CAT-10", "CAT-13", "CAT-21"]
     }
   ]
 }

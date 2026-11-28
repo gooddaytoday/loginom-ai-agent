@@ -1,10 +1,22 @@
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
-import { app, autoUpdater, type AuthInfo } from "electron"
+import { app, autoUpdater, net, shell, type AuthInfo } from "electron"
 import pkg from "electron-updater"
 import { Effect } from "effect"
 import { Product } from "@loginom-ai-agent/product"
-import { isProductBuild } from "./feed"
+import { redactUpdateMessage } from "@loginom-ai-agent/product/update-signature"
+import {
+  checkAutomaticUpdate,
+  compareUpdateVersions,
+  downloadSignedUpdate,
+  downloadTarget,
+  loadSignedUpdate,
+  matchUpdateManifest,
+  readUpdateBytes,
+  updateMode,
+  updateNotificationLink,
+  type UpdateSource,
+} from "./signed-feed"
 import type { Platform } from "./machine"
 import { systemProxyPreference, updateProxy } from "./proxy"
 
@@ -16,8 +28,12 @@ const restartTimeout = 10_000
 
 const unpackTimeout = 120_000
 
-export const make = Effect.fn("Updater.platform")(function* (channel: string, feed: string) {
-  const userAgent = `${Product.slug}/${channel === "prod" ? "latest" : channel}/${app.getVersion()}/desktop`
+export const make = Effect.fn("Updater.platform")(function* (sources: readonly UpdateSource[]) {
+  const currentVersion = app.getVersion()
+  const mode = updateMode(process.platform, process.env.APPIMAGE)
+  const preferArm64 = process.platform === "win32" && app.runningUnderARM64Translation
+  const file =
+    process.platform === "darwin" ? "latest-mac.yml" : process.platform === "linux" ? "latest-linux.yml" : "latest.yml"
   const runFork = Effect.runForkWith(yield* Effect.context())
   let credentials: ReturnType<typeof updateProxy>["credentials"] | undefined
 
@@ -39,101 +55,114 @@ export const make = Effect.fn("Updater.platform")(function* (channel: string, fe
       }),
   )
 
+  const safe = (values: unknown[]) => values.map((value) => redactUpdateMessage(String(value)))
   updateClient.logger = {
-    info: (...args) => runFork(Effect.logInfo(...args)),
-    warn: (...args) => runFork(Effect.logWarning(...args)),
-    error: (...args) => runFork(Effect.logError(...args)),
-    debug: (...args) => runFork(Effect.logDebug(...args)),
+    info: (...args) => runFork(Effect.logInfo(...safe(args))),
+    warn: (...args) => runFork(Effect.logWarning(...safe(args))),
+    error: (...args) => runFork(Effect.logError(...safe(args))),
+    debug: (...args) => runFork(Effect.logDebug(...safe(args))),
   }
-  // Loginom AI Agent (B4.12): the product feed the build set, whatever app-update.yml names.
-  updateClient.setFeedURL({ provider: "generic", url: feed, channel: "latest" })
-  updateClient.channel = "latest"
-  updateClient.requestHeaders = { "User-Agent": userAgent }
+  updateClient.requestHeaders = { "User-Agent": `${Product.slug}/${currentVersion}/desktop` }
   updateClient.allowPrerelease = false
-  updateClient.allowDowngrade = true
+  updateClient.allowDowngrade = false
   updateClient.autoDownload = false
-  updateClient.autoInstallOnAppQuit = process.platform === "darwin"
-  yield* Effect.logInfo("auto updater configured", {
-    channel: updateClient.channel,
-    allowPrerelease: updateClient.allowPrerelease,
-    allowDowngrade: updateClient.allowDowngrade,
-    currentVersion: app.getVersion(),
-  })
+  updateClient.autoInstallOnAppQuit = false
+  updateClient.disableWebInstaller = true
+  updateClient.disableDifferentialDownload = true
+  const read = (url: string, timeout?: number) =>
+    readUpdateBytes(
+      url,
+      (url) => {
+        const request = net.request({ url, session: updateClient.netSession, redirect: "manual" })
+        request.on("login", login)
+        let redirects = 0
+        request.on("redirect", (_status, _method, location) => {
+          if (++redirects > 5 || !URL.canParse(location) || new URL(location).protocol !== "https:") {
+            request.emit("error", Error("LOGINOM_UPDATE_REDIRECT_INVALID"))
+            return
+          }
+          request.followRedirect()
+        })
+        return request
+      },
+      timeout,
+    )
+  const failure = (error: unknown) => Error(redactUpdateMessage(error instanceof Error ? error.message : String(error)))
+  let approved: Awaited<ReturnType<typeof checkAutomaticUpdate>>
+  let notification: ReturnType<typeof updateNotificationLink> | undefined
 
   return {
     checkForUpdate: Effect.tryPromise({
-      try: async () => {
+      try: async (signal) => {
+        approved = undefined
+        notification = undefined
         const proxy = updateProxy(process.env, await systemProxyPreference(app.getPath("userData")))
         credentials = proxy.credentials
         await updateClient.netSession.setProxy(proxy.config)
         await updateClient.netSession.closeAllConnections()
-        const result = await updateClient.checkForUpdates()
+        signal.throwIfAborted()
+        const selected = await loadSignedUpdate({ sources, file, currentVersion, read })
+        signal.throwIfAborted()
+        if (
+          !selected ||
+          compareUpdateVersions(selected.signed.version, currentVersion) <= 0 ||
+          selected.signed.stagingPercentage === 0
+        )
+          return undefined
 
-        if (!result?.isUpdateAvailable) return undefined
-        const files = result.updateInfo.files
-
-        // Loginom AI Agent (UPDATE-01): the product never installs an OpenCode build, as in 0.4.
-        if (!isProductBuild(files, feed)) throw new Error("LOGINOM_UPDATE_TARGET_INVALID")
-
-        // electron-updater picks the installer whose name contains process.arch, which emulation on Windows ARM64
-        // reports as x64. downloadUpdate() reads this same list, so keeping only the ARM64 installer moves the install
-        // to the native build. macOS needs nothing here: electron-updater already prefers arm64 under Rosetta.
-        const native = files.filter((file) => file.url.includes("arm64"))
-
-        if (process.platform === "win32" && app.runningUnderARM64Translation && native.length > 0) {
-          files.splice(0, files.length, ...native)
-          runFork(
-            Effect.logInfo("updating emulated x64 install to native ARM64", { urls: native.map((file) => file.url) }),
-          )
+        if (mode === "notify") {
+          const extension = process.platform === "darwin" ? /\.(dmg|zip)$/i : /\.deb$/i
+          const installer = selected.signed.files.find((candidate) => extension.test(candidate.url))
+          if (!installer) throw Error("LOGINOM_UPDATE_TARGET_INVALID")
+          if (!(await updateClient.isUserWithinRollout(selected.signed))) return undefined
+          signal.throwIfAborted()
+          notification = updateNotificationLink(selected, installer.url)
+          return { mode: "external", version: selected.signed.version, url: notification.url } as const
         }
 
-        return { mode: "restart", version: result.updateInfo.version } as const
+        const candidate = await checkAutomaticUpdate(updateClient, selected, preferArm64)
+        signal.throwIfAborted()
+        approved = candidate
+        if (approved) return { mode: "restart", version: approved.info.version } as const
       },
-      catch: (error) => error,
+      catch: failure,
     }),
-    stageUpdate,
+    stageUpdate: () =>
+      Effect.tryPromise({
+        try: () => {
+          if (!approved || downloadTarget(updateClient) !== approved.info)
+            throw Error("LOGINOM_UPDATE_MANIFEST_MISMATCH")
+          const { selected, info } = approved
+          matchUpdateManifest(selected.signed, info)
+          return downloadSignedUpdate(
+            updateClient,
+            selected,
+            () =>
+              loadSignedUpdate({
+                sources: sources.filter((source) => source.kind !== "github"),
+                file,
+                currentVersion: selected.signed.version,
+                read,
+              }),
+            preferArm64,
+          )
+        },
+        catch: failure,
+      }).pipe(Effect.flatMap(unpackInstaller)),
+    externalInstall:
+      mode === "notify"
+        ? (url: string) =>
+            Effect.tryPromise({
+              try: () => {
+                if (!notification) throw Error("LOGINOM_UPDATE_TARGET_INVALID")
+                return shell.openExternal(notification.resolve(url))
+              },
+              catch: failure,
+            })
+        : undefined,
     installAndRestart,
   } satisfies Platform
 })
-
-function stageUpdate(options: { readonly differential: boolean }) {
-  if (process.platform !== "darwin")
-    return Effect.tryPromise({
-      try: () => {
-        // Only the NSIS cache goes stale: macOS refreshes its cached zip with every download and AppImage reads the
-        // blockmap embedded in the running file. An emulated x64 install updates to the ARM64 installer, which cannot
-        // be patched from the cached x64 one.
-        updateClient.disableDifferentialDownload =
-          process.platform === "win32" && (!options.differential || app.runningUnderARM64Translation)
-
-        return updateClient.downloadUpdate()
-      },
-      catch: (error) => error,
-    }).pipe(Effect.flatMap(unpackInstaller))
-
-  return Effect.callback<void, Error>((resume) => {
-    const cleanup = () => {
-      autoUpdater.removeListener("update-downloaded", complete)
-      updateClient.removeListener("error", fail)
-    }
-
-    const complete = () => {
-      cleanup()
-      resume(Effect.void)
-    }
-
-    const fail = (error: Error) => {
-      cleanup()
-      resume(Effect.fail(error))
-    }
-
-    autoUpdater.once("update-downloaded", complete)
-    updateClient.once("error", fail)
-    void updateClient.downloadUpdate().catch(fail)
-
-    return Effect.sync(cleanup)
-  })
-}
 
 // The NSIS installer unpacks the update beside the install directory while the app keeps running, so the
 // install after the restart moves one directory into place instead of decompressing the whole app. When this

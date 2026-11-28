@@ -148,7 +148,6 @@ export async function acquire(session: string) {
             { run, name, args, userMessage, admissions, ...(packageInput ? { packageInput } : {}), ...(scanReceipt ? { scanReceipt } : {}), ...(progress ? { stepProgress: true } : {}) },
             Math.max(180_000, runtimeCallTimeout(name, args) + 30_000),
             observe,
-            undefined,
             progress && ((value) => {
               if (signal?.aborted || queue.released) return
               const update = decodeStepProgress(value)
