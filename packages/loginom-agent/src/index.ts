@@ -20,6 +20,7 @@ import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
 import { packageDocs } from "./package-docs"
+import { packageVariablesHandler, packageVariablesRpc } from "./package-variables"
 import {
   classify,
   declinedText,
@@ -537,6 +538,16 @@ export default Plugin.define({
         const url = await drafts.preview((value as { id: string }).id, call.signal)
         return url ? { url } : {}
       },
+    })
+    await ctx.rpc.register(packageVariablesRpc, {
+      variables: packageVariablesHandler({
+        directory: ctx.location.directory,
+        sessionDirectory: (sessionID) => ctx.session.get({ sessionID }).then(
+          (session) => session.location.directory,
+          () => undefined,
+        ),
+        canRead: async (sessionID, resources) => (await rules({ sessionID }, "read", resources)) === undefined,
+      }),
     })
     await ctx.rpc.register(permission, {
       conversation: async (value, call) => {

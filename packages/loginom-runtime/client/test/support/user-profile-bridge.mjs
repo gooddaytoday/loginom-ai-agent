@@ -482,6 +482,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const local=await bridge.prepareLocalPackage({intent:'open_package',operation_id:expectedOperation},
       {artifactID:artifact.artifact_id,uploadGrantID:artifact.upload.grant_id},{signal:new AbortController().signal});
     assert.notEqual(local.isError,true,JSON.stringify(local));
+    assert.equal(Object.hasOwn(local._meta?.loginom ?? {}, 'packageVariables'),false);
     const opened=JSON.parse(local.content[0].text);
     assert.equal(packageDeliveries.length,1);assert.equal(packageDeliveries[0].artifact_id,artifact.artifact_id);
     assert.equal(packageDeliveries[0].upload_grant_id,artifact.upload.grant_id);
@@ -493,6 +494,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const failed=await bridge.prepareLocalPackage({intent:'open_package',operation_id:expectedOperation},
       {artifactID:artifact.artifact_id,uploadGrantID:artifact.upload.grant_id},{signal:new AbortController().signal});
     assert.equal(failed.isError,true,JSON.stringify(failed));
+    assert.equal(failed._meta?.loginom,undefined);
     const openRefusal=JSON.parse(failed.content[0].text);
     assert.deepEqual(openRefusal.next_step.arguments,{intent:'open_package',operation_id:expectedOperation,package_path:expectedPackage});
     assert.equal(session.metadata.workspaceReady,false);
@@ -501,6 +503,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const resumed=await client.callTool({name:openRefusal.next_step.tool,arguments:openRefusal.next_step.arguments});
     assert.notEqual(resumed.isError,true,JSON.stringify(resumed));
     assert.equal(JSON.parse(resumed.content[0].text).prepared,true);
+    assert.equal(resumed._meta?.loginom?.packageVariables,undefined);
     assert.equal(packageDeliveries.length,deliveriesBefore,'server-path continuation must not upload again');
     const opening=browserCalls.filter(call=>call.arguments.code.includes('async function prepareWorkspace(')).at(-1);
     assert.match(opening.arguments.code,/"recoverOnly":false/);
