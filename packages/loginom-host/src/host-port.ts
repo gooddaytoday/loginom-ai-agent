@@ -4,8 +4,7 @@ import type { InputFile } from "./inputs"
 import type { FileReference } from "./file-reference"
 import { hostException, hostFailure } from "./errors"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
-import { StepCheckRequest, StepCheckResult, uncertainStep } from "./step-state"
-import { stepWriteTool } from "../../loginom-runtime/client/lib/step-retry.mjs"
+import { StepCheckRequest, StepCheckResult } from "./step-state"
 import { HostTaskScope } from "./task-scope"
 import { DashboardDelete, DashboardRead, DashboardPublish } from "./dashboard"
 import { Schema } from "effect"
@@ -92,7 +91,6 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
   const acquiring = new Map<string, string>()
   const state = { closed: false, stopping: undefined as Promise<void> | undefined }
   const pending = new Set<Promise<void>>()
-  const lostStepReplies = new Map<string, { operationId: string; generation: number; journalIds: string[] }>()
   async function abandon(run: NonNullable<ReturnType<typeof runs.get>>) {
     for (const id of run.active) await service.journal.settle(id, false)
     const retained = [...run.active].filter((id) => service.journal.pending().includes(id))
@@ -128,7 +126,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     run.lease?.release()
     runs.delete(id)
   }
-  function reply(value: { id: string; result?: unknown; error?: string }, generation?: number) {
+  function reply(value: { id: string; result?: unknown; error?: string; progress?: unknown }, generation?: number) {
     if (state.closed) return
     port.postMessage(generation === undefined ? value : { ...value, generation })
   }
@@ -200,22 +198,9 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           reply({ id: data.id, result: { state: "busy", retryAvailable: false } })
           return
         }
-        const lost = lostStepReplies.get(chat)
-        if (lost && lost.operationId !== check.operationId) {
-          reply({ id: data.id, result: { state: "unavailable", retryAvailable: false } })
-          return
-        }
         const result = Schema.decodeUnknownSync(StepCheckResult)(
-          await service.checkStepState(chat, check.operationId, lost?.generation),
+          await service.checkStepState(chat, check.operationId),
         )
-        if (lost && result.state === "observed" && (result.retryAvailable || result.step.outcome === "completed")) {
-          for (const id of lost.journalIds) await service.journal.settle(id, true)
-          lostStepReplies.delete(chat)
-          if (!service.journal.pending().length) {
-            service.recoveries.get(chat)?.reconciled()
-            service.recoveries.delete(chat)
-          }
-        }
         reply({ id: data.id, result })
       } catch (error) {
         reply({ id: data.id, ...hostFailure(error) })
@@ -621,21 +606,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         const lease = await connectionLease(input.run, run, preparation)
         if (input.name !== prepareTool.name && !service.hasRuntime(lease.generation, run.chat))
           throw new Error("LOGINOM_SCOPE_DENIED")
-        const stepWrite = stepWriteTool(input.name, args)
-        const lost = lostStepReplies.get(run.chat)
-        if (stepWrite && lost) {
-          reply({ id: data.id, result: uncertainStep(lost.operationId) }, lease.generation)
-          return
-        }
-        const callArgs = stepWrite && input.name === "dock_action_run" && args && typeof args === "object"
-          && (!("operation_id" in args) || args.operation_id === undefined)
-          ? { ...args, operation_id: randomUUID() }
-          : args
-        const stepId = stepWrite && callArgs && typeof callArgs === "object" && "operation_id" in callArgs
-          && typeof callArgs.operation_id === "string" && /^[A-Za-z0-9_.:-]{1,128}$/.test(callArgs.operation_id)
-          ? callArgs.operation_id : undefined
         const recovery = { id: undefined as string | undefined }
-        let dispatched = false
         try {
           const packageAdmission = packageInput
             ? {
@@ -689,16 +660,19 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             recovery.id = undefined
             throw new Error("LOGINOM_CONNECTION_NOT_READY")
           }
-          dispatched = true
+          const requestID = data.id
+          const stepProgress = "stepProgress" in input && input.stepProgress === true
           const result = await runtime.request(
             "call",
             {
               name: input.name,
-              arguments: remaining === undefined ? callArgs : { ...(args as object), timeout_ms: remaining },
+              arguments: remaining === undefined ? args : { ...(args as object), timeout_ms: remaining },
               ...(packageArtifact ? { packageArtifact } : {}),
               ...(input.name === "dock_node_apply" && "scanReceipt" in input ? { scanReceipt: input.scanReceipt } : {}),
+              ...(stepProgress ? { stepProgress: true } : {}),
             },
             runtimeCallTimeout(input.name, "args" in input ? input.args : undefined) + 15_000,
+            stepProgress ? (progress) => reply({ id: requestID, progress }) : undefined,
           )
           if (
             !result ||
@@ -729,14 +703,6 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           // A journal write failure precedes runtime dispatch and cannot establish
           // an uncertain external operation without an admitted journal identity.
           if (!recovery.id) throw hostException(error)
-          if (stepId && dispatched) {
-            lostStepReplies.set(run.chat, {
-              operationId: stepId, generation: lease.generation, journalIds: [...run.active],
-            })
-            await abandon(run)
-            reply({ id: data.id, result: uncertainStep(stepId) }, lease.generation)
-            return
-          }
           await abandon(run)
           service.markRuntimeStale(run.chat)
           throw new Error("LOGINOM_CALL_UNCERTAIN")
