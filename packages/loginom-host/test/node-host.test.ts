@@ -173,7 +173,7 @@ test("package recheck distinguishes a live app conversation, an external marker 
           return;
         }
         case 'call':
-          return send({result:{content:[],_meta:{existing:true}}, recoveryPending:false,
+          return send({result:{content:[],_meta:{existing:true,loginomFields:{verificationStale:true}}}, recoveryPending:false,
             ...(!writer && {packagePath})});
         case 'packageAccess': {
           const state = JSON.parse(readFileSync(${JSON.stringify(stateFile)}, 'utf8'));
@@ -213,8 +213,11 @@ test("package recheck distinguishes a live app conversation, an external marker 
     expect(await recheck()).toEqual({ packagePath, kind: "unavailable" })
     await setPackages(packagePath, "present")
     await prepare(writer)
-    const owned = { packagePath, kind: "other_conversation", sessionID: writer }
-    expect(await prepare(reader)).toEqual({ content: [], _meta: { existing: true, packageAccess: owned } })
+    const owned = { packagePath, kind: "other_conversation", sessionId: writer }
+    expect(await prepare(reader)).toEqual({
+      content: [],
+      _meta: { existing: true, loginomFields: { verificationStale: true, packageAccess: owned } },
+    })
     const pending = prepare(starting)
     try {
       const signal = AbortSignal.timeout(2_000)

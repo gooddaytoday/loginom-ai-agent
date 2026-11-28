@@ -28,7 +28,7 @@ import {javascriptContextReceiptSchema} from './javascript-context-read.mjs';
 import { createRecoveryContext } from './recovery-context.mjs';
 import { outcomeVerification } from './outcome-verification.mjs';
 import { createHostArtifactAdmission, codexInputIdentity } from './host-artifacts.mjs';
-import { compactActionResult, compactNodeRequestFailure, userResultSchema, compactKnowledgeBundle } from './user-results.mjs';
+import { compactActionResult, compactNodeRequestFailure, userResultSchema, compactKnowledgeBundle, loginomFeedMetadata } from './user-results.mjs';
 import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory, userActionKeys } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
@@ -93,7 +93,7 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
   return inherited;
 }
 
-export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, reauthenticateReload } = {}) {
+export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, reauthenticateReload, presentNodeReply } = {}) {
   if (config.closeSavedPackageOnShutdown !== undefined && typeof config.closeSavedPackageOnShutdown !== 'boolean'
       || config.closeSavedPackageOnShutdown === true && config.acceptanceCleanupPackage)
     throw Error('Invalid private saved-package cleanup policy');
@@ -960,14 +960,21 @@ export async function createBridge(config, session, { browserTransport: managedB
         return { isError: true, content: [{ type: 'text', text: message }] };
       }
     };
+    const presentDeliveredNode = (reply, tool) => {
+      if(!presentNodeReply||!userProfile||!isNodeApiTool(tool)||reply.structuredContent?.result_version!=='user-v1')return reply;
+      const facts=actionRuntime?.nodeFeedFacts(reply.structuredContent.operation_id);
+      return presentNodeReply(reply,options=>loginomFeedMetadata(reply,{...options,tool,facts}));
+    };
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       const reply=await callTool(request,extra);
-      return userProfile && ['local','action'].includes(catalog.routes.get(request.params.name))
+      const delivered=userProfile && ['local','action'].includes(catalog.routes.get(request.params.name))
         ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
+      return presentDeliveredNode(delivered,request.params.name);
     });
     return { server, catalog,
-      applyWithScanReceipt(args,receipt,extra) {
-        return callTool({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);
+      async applyWithScanReceipt(args,receipt,extra) {
+        const tool='dock_node_apply';
+        return presentDeliveredNode(await callTool({params:{name:tool,arguments:args}},extra,null,receipt),tool);
       },
       async prepareLocalPackage(args,pair,extra) {
         if(!userProfile||!actionRuntime||!config.storageDirectories||args?.intent!=='open_package'

@@ -691,7 +691,12 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           const body = result.result
           if (packageAccess && body && typeof body === "object") {
             const meta = "_meta" in body && body._meta && typeof body._meta === "object" ? body._meta : {}
-            reply({ id: data.id, result: { ...body, _meta: { ...meta, packageAccess } } }, lease.generation)
+            const fields =
+              "loginomFields" in meta && meta.loginomFields && typeof meta.loginomFields === "object"
+                ? meta.loginomFields
+                : {}
+            const enriched = { ...body, _meta: { ...meta, loginomFields: { ...fields, packageAccess } } }
+            reply({ id: data.id, result: enriched }, lease.generation)
           } else {
             reply({ id: data.id, result: body }, lease.generation)
           }

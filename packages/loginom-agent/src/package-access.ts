@@ -15,14 +15,9 @@ export const packageAccessRpc = {
 
 const decode = Schema.decodeUnknownOption(PackageAccess)
 
-export async function visiblePackageAccess(value: unknown, hasSession: (id: SessionID) => Promise<unknown>) {
+export async function visiblePackageAccess(value: unknown, hasSession?: (id: SessionID) => Promise<unknown>) {
   const access = Option.getOrUndefined(decode(value))
   if (access?.kind !== "other_conversation") return access
-  if (await hasSession(access.sessionID).catch(() => undefined)) return access
+  if (await hasSession?.(access.sessionId).catch(() => undefined)) return access
   return { packagePath: access.packagePath, kind: "read_only", lockMarker: "unknown" } as const
-}
-
-export async function packageAccessMetadata(value: unknown, hasSession: (id: SessionID) => Promise<unknown>) {
-  const packageAccess = await visiblePackageAccess(value, hasSession)
-  return packageAccess ? { loginom: { packageAccess } } : {}
 }
