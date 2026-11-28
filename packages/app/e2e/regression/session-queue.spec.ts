@@ -214,13 +214,14 @@ async function openQueue(
   }
 
   if (followUpBehavior) options.seed = { ...options.seed, settings: { general: { followUpBehavior } } }
-  await openSession(page, options)
+  const { push } = await openSession(page, options)
   const composer = page.locator('[data-component="composer"]')
 
   return {
     composer,
     input: composer.locator('[data-component="composer-editor"]'),
     rows: page.locator('[data-component="session-queue-row"]'),
+    push,
   }
 }
 
@@ -868,6 +869,39 @@ test("editing restores the existing draft and replaces only the original queue p
     ])
   expect(mock.prompts).toEqual([])
   expect(mock.changes).toEqual([])
+})
+
+test("an open queue updates in place when another client edits a queued prompt", async ({ page, browser, baseURL }) => {
+  const mock = createQueueMock(["First prompt", "Check the logs", "Last prompt"])
+  const clients = { ...mock, events: () => [] }
+  const other = await browser.newContext({ baseURL })
+
+  try {
+    const observer = await openQueue(await other.newPage(), clients)
+    const editor = await openQueue(page, clients)
+    const rows = observer.rows.locator('[data-action="session-queue-edit"]')
+    await expect(rows).toHaveText(["First prompt", "Check the logs", "Last prompt"])
+
+    await editor.rows.getByText("Check the logs", { exact: true }).click()
+    await expect(editor.input).toBeFocused()
+    await editor.input.press("End")
+    await editor.input.pressSequentially(" before retrying")
+
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === "PUT" &&
+        new URL(response.url()).pathname === `/api/session/${sessionID}/inbox/inb_seed_2`,
+    )
+
+    await editor.input.press("Enter")
+    expect((await saved).status()).toBe(204)
+    await expect(rows).toHaveText(["First prompt", "Check the logs", "Last prompt"])
+
+    await observer.push(mock.events())
+    await expect(rows).toHaveText(["First prompt", "Check the logs before retrying", "Last prompt"])
+  } finally {
+    await other.close()
+  }
 })
 
 test("a queued prompt the server delivers mid-edit returns the draft typed before the edit", async ({ page }) => {
