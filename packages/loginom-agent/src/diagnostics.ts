@@ -4,26 +4,38 @@ import { policyPath, policyStatus } from "@loginom-ai-agent/loginom-host/admin-p
 import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
 import { administratorReport, profileSecrets } from "@loginom-ai-agent/loginom-host/diagnostics-export"
 import { DiagnosticsRpc, type DiagnosticsStatus } from "@loginom-ai-agent/loginom-host/diagnostics-rpc"
+import type { ModelEditor } from "@opencode/plugin/promise/model"
 import type { Context } from "@opencode/plugin/promise/plugin"
 import type { RpcHandlers } from "@opencode/plugin/promise/rpc"
 import { Global } from "@opencode/util/global"
 import { connectionSettings } from "./connection-settings"
 import { ServiceHost } from "./host"
 
-export function diagnostics(
-  models: Pick<Context["model"], "default">,
-  bundledCatalog: boolean,
+export async function diagnostics(
+  models: Pick<Context["model"], "list" | "transform">,
   connection = connectionSettings(),
 ) {
+  let selected: ReturnType<ModelEditor["default"]["get"]>
+  await models.transform((editor) => {
+    selected = editor.default.get()
+  })
+
+  async function modelStatus() {
+    const response = await models.list().catch(() => undefined)
+    if (!selected) return null
+    const { providerID, modelID } = selected
+    return {
+      id: `${providerID}/${modelID}`,
+      available: response?.data?.some((model) => model.providerID === providerID && model.id === modelID) ?? false,
+    }
+  }
+
   async function snapshot(check: boolean, signal: AbortSignal): Promise<DiagnosticsStatus> {
     const profile = ServiceHost.diagnosticsProfile()
     const policyFile = policyPath()
     const [saved, model, help, policy] = await Promise.all([
       connection.status(),
-      models.default().then(
-        ({ data }) => (data?.enabled ? `${data.providerID}/${data.id}` : null),
-        () => null,
-      ),
+      modelStatus(),
       profile?.resources
         ? access(join(profile.resources, "help", "loginom-help", "data", "README.md"), constants.R_OK).then(
             () => true,
@@ -52,7 +64,7 @@ export function diagnostics(
       address: status?.url ?? "",
       model,
       help,
-      catalog: bundledCatalog,
+      catalog: "unchecked",
       policy,
       policyFile,
       network: profile?.network ?? null,
@@ -73,7 +85,7 @@ export function diagnostics(
       return administratorReport({
         ...status,
         address: secrets.status === "ok" ? status.address : "",
-        model: secrets.status === "ok" ? status.model : null,
+        model: secrets.status === "ok" ? (status.model?.id ?? null) : null,
         knownSecrets: secrets.secrets,
       })
     },

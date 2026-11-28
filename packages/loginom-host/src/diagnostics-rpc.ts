@@ -4,9 +4,9 @@ import { Schema } from "effect"
 const Status = Schema.Struct({
   loginom: Schema.Literals(["ready", "failed", "unchecked"]),
   address: Schema.String,
-  model: Schema.NullOr(Schema.String),
+  model: Schema.NullOr(Schema.Struct({ id: Schema.String, available: Schema.Boolean })),
   help: Schema.Boolean,
-  catalog: Schema.Boolean,
+  catalog: Schema.Literal("unchecked"),
   policy: Schema.Literals(["absent", "present", "invalid"]),
   policyFile: Schema.String,
   network: Schema.NullOr(Schema.Literals(["online", "device"])),

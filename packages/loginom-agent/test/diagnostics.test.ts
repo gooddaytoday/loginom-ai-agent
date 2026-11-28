@@ -25,13 +25,13 @@ test("cancelling a diagnostics RPC cancels its saved Loginom check", async () =>
       signal.addEventListener("abort", () => reject(signal.reason), { once: true })
     })
   })
-  const rpc = diagnostics(
+  const rpc = await diagnostics(
     {
-      default: async () => {
+      transform: async () => ({ dispose: async () => {} }),
+      list: async () => {
         throw new Error("No fixture model")
       },
     },
-    false,
     connection,
   )
   const result = rpc.status(

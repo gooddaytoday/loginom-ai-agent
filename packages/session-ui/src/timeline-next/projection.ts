@@ -68,6 +68,7 @@ type Input = {
   pendingInputIDs?: ReadonlySet<string>
   queuedCompactionIDs: readonly string[]
   turnDiffs: boolean
+  toolSeparate?: ReadonlySet<string>
   /** Whether a part shows. Text and thoughts are read through signals, so a streamed delta does not rebuild the rows. */
   shows: (content: Content) => boolean
 }
@@ -102,6 +103,7 @@ export function createNextTimelineProjection(input: {
   queuedCompactionIDs?: Accessor<readonly string[]>
   /** Summarize each finished turn's changed files after it. */
   turnDiffs?: Accessor<boolean>
+  toolSeparate?: Accessor<ReadonlySet<string> | undefined>
 }) {
   const sessionMessageByID = createMemo(
     () => new Map(input.sessionMessages().map((message) => [message.id, message] as const)),
@@ -142,6 +144,7 @@ export function createNextTimelineProjection(input: {
       pendingInputIDs: input.pendingInputIDs?.(),
       queuedCompactionIDs: input.queuedCompactionIDs?.() ?? [],
       turnDiffs: input.turnDiffs?.() ?? false,
+      toolSeparate: input.toolSeparate?.(),
       shows: (content) =>
         content.type === "tool"
           ? contentShows(detail, content)
@@ -310,7 +313,7 @@ function constructRows(input: Input) {
           ),
         ]
 
-      return turnRows(turn, index > 0, phaseOf(turn), input.detail, visible, commentary)
+      return turnRows(turn, index > 0, phaseOf(turn), input.detail, visible, commentary, input.toolSeparate)
     }),
   ]
 
@@ -449,6 +452,7 @@ function turnRows(
   detail: TimelineDetail,
   isVisible: (content: Content) => boolean,
   commentary: ReadonlySet<Content>,
+  toolSeparate?: ReadonlySet<string>,
 ) {
   const rows: TimelineRow.TimelineRow[] = []
   const assistantMessages = turn.entries.flatMap((entry) => (entry.type === "assistant" ? [entry.message] : []))
@@ -481,7 +485,7 @@ function turnRows(
 
     const appendGroups = (items: typeof refs) => {
       let offset = 0
-      groupContent(items, detail, commentary).forEach((group) => {
+      groupContent(items, detail, commentary, toolSeparate).forEach((group) => {
         const tool = group.type !== "part" || items[offset]?.content.type !== "text"
         offset += group.type === "part" ? 1 : group.refs.length
         rows.push(
@@ -865,6 +869,7 @@ function groupContent(
   items: { messageID: string; partID: string; content: Content }[],
   detail: TimelineDetail,
   commentary: ReadonlySet<Content>,
+  toolSeparate?: ReadonlySet<string>,
 ): PartGroup[] {
   const groups: PartGroup[] = []
   let adjacent: { type: "context" | "file" | "read" | "events"; refs: PartRef[] } | undefined
@@ -887,7 +892,7 @@ function groupContent(
   }
 
   items.forEach((item) => {
-    const type = contentGroup(detail, item.content, commentary)
+    const type = contentGroup(detail, item.content, commentary, toolSeparate)
 
     if (type) {
       if (adjacent?.type !== type) flush()

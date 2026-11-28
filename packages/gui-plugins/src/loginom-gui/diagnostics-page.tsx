@@ -104,11 +104,15 @@ export default function DiagnosticsPage() {
       case "loginom":
         return item?.address || ctx.t("diagnostics.loginomHint")
       case "model":
-        return item?.model ?? ctx.t("diagnostics.modelHint")
+        if (!item?.model) return ctx.t("diagnostics.modelHint")
+
+        return item.model.available
+          ? item.model.id
+          : ctx.t("diagnostics.modelUnavailable", { model: item.model.id })
       case "help":
         return ctx.t(item?.help ? "diagnostics.helpReady" : "diagnostics.helpHint")
       case "catalog":
-        return ctx.t(item?.catalog ? "diagnostics.catalogReady" : "diagnostics.catalogHint")
+        return ctx.t(item ? "diagnostics.catalogHint" : "diagnostics.unknown")
       case "policy": {
         if (!item) return ctx.t("diagnostics.unknown")
 
@@ -142,7 +146,11 @@ export default function DiagnosticsPage() {
               <div class="flex max-w-40 shrink-0 flex-col items-end gap-1 text-right">
                 <Show
                   when={row.ok !== null}
-                  fallback={<span class="text-text-weak">{ctx.t("diagnostics.neutral")}</span>}
+                  fallback={
+                    <span class="text-text-weak">
+                      {ctx.t(row.id === "catalog" ? "diagnostics.unchecked" : "diagnostics.neutral")}
+                    </span>
+                  }
                 >
                   <span class={row.ok ? "text-text-success-base" : "text-text-warning-base"}>
                     {ctx.t(row.ok ? "diagnostics.ok" : page().loading ? "loading" : "diagnostics.attention")}

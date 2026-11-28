@@ -37,6 +37,7 @@ import {
 import { createTimelineProjection } from "./projection"
 import { createNextTimelineProjection } from "@opencode/session-ui/timeline-next"
 import { useServer } from "@/runtime/server/current"
+import { useData } from "@opencode/session-ui/context"
 import type { ReasoningMode } from "@opencode/session-ui/timeline/projection"
 
 const emptyMessages: SessionMessageInfo[] = []
@@ -81,6 +82,7 @@ export function createTimelineController(input: {
   const serverSDK = useServerSDK()
   const server = useServer()
   const data = server.ctx.data
+  const toolRenderers = useData().toolRenderers
   const settings = useSettings()
   const tabs = useTabs()
   const dialog = useDialog()
@@ -213,6 +215,7 @@ export function createTimelineController(input: {
     pendingInputIDs,
     queuedCompactionIDs,
     turnDiffs: settings.general.showTurnDiffs,
+    toolSeparate: toolRenderers?.separate,
   }
 
   const projection = input.next

@@ -1,3 +1,4 @@
+import { parseUpdateAdminPolicy } from "@loginom-ai-agent/product/update-policy"
 import { readFile } from "node:fs/promises"
 import { win32 } from "node:path"
 
@@ -9,10 +10,7 @@ export function policyPath(platform = process.platform, env = process.env) {
 
 export async function policyStatus(file: string) {
   try {
-    const policy: unknown = JSON.parse(await readFile(file, "utf8"))
-    if (typeof policy !== "object" || policy === null || Array.isArray(policy)) return "invalid"
-    if ("channel" in policy && policy.channel !== "stable" && policy.channel !== "unstable") return "invalid"
-    if ("network" in policy && policy.network !== "online" && policy.network !== "device") return "invalid"
+    parseUpdateAdminPolicy(JSON.parse(await readFile(file, "utf8")))
     return "present"
   } catch (error) {
     return error instanceof Error && "code" in error && error.code === "ENOENT" ? "absent" : "invalid"

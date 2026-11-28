@@ -55,8 +55,12 @@ test("administrator report allows only four fields and excludes profile credenti
 test("diagnostics distinguishes missing, readable and invalid administrator policy files", async () => {
   const file = join(profile().root, "policy.json")
   expect(await policyStatus(file)).toBe("absent")
-  put(file, '{"channel":"stable","network":"device"}')
+  put(file, '{"updates":"off","channel":"stable","network":"device"}')
   expect(await policyStatus(file)).toBe("present")
+  put(file, '{"updates":"disabled"}')
+  expect(await policyStatus(file)).toBe("invalid")
+  put(file, '{"feedUrl":"http://updates.example.test/"}')
+  expect(await policyStatus(file)).toBe("invalid")
   put(file, '{"channel":"invalid"}')
   expect(await policyStatus(file)).toBe("invalid")
   put(file, '{"network":')

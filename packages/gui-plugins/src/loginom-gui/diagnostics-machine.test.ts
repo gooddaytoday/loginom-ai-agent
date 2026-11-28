@@ -6,9 +6,9 @@ import { diagnosticsRows } from "./diagnostics-rows"
 const operational: DiagnosticsStatus = {
   loginom: "ready",
   address: "http://127.0.0.1:8080/",
-  model: "test/model",
+  model: { id: "test/model", available: true },
   help: true,
-  catalog: true,
+  catalog: "unchecked",
   policy: "absent",
   policyFile: "policy.json",
   network: "device",
@@ -19,7 +19,7 @@ test("diagnostics reports all eight rows and points to settings or administrator
     { id: "loginom", ok: true, tab: "loginom" },
     { id: "model", ok: true, tab: "models" },
     { id: "help", ok: true, tab: "about" },
-    { id: "catalog", ok: true, tab: "extensions" },
+    { id: "catalog", ok: null, tab: "extensions" },
     { id: "policy", ok: true, tab: undefined },
     { id: "network", ok: true, tab: "general" },
     { id: "service", ok: true, tab: "servers" },
@@ -29,9 +29,8 @@ test("diagnostics reports all eight rows and points to settings or administrator
   const issues = diagnosticsRows({
     ...operational,
     loginom: "failed",
-    model: null,
+    model: { id: "test/disabled", available: false },
     help: false,
-    catalog: false,
     policy: "invalid",
   })
 
@@ -39,7 +38,6 @@ test("diagnostics reports all eight rows and points to settings or administrator
     "loginom",
     "model",
     "help",
-    "catalog",
     "policy",
     "network",
   ])
@@ -63,7 +61,7 @@ function open() {
   return transition(loading, { type: "status", attempt: loading.attempt, status: operational }).state
 }
 
-test("a successful check shows all clear even though the journal is separate", () => {
+test("a successful check finds no issues in the rows it checked", () => {
   const checking = transition(open(), { type: "check" }).state
   expect(view(checking, true)).toMatchObject({ problems: undefined, canCheck: false, canSave: false })
 
