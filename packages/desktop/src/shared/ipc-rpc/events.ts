@@ -3,19 +3,8 @@ import { Schema } from "effect"
 import { Rpc, RpcGroup } from "effect/rpc"
 import { PluginInstalled, PluginMenubarItem, PluginPayload, PluginGuis } from "./plugins"
 
-const DashboardLink = Schema.Struct({
-  id: Schema.String,
-  result: Schema.Union([
-    Schema.Struct({ code: Schema.String }),
-    Schema.Struct({
-      directory: Schema.String,
-      nodeName: Schema.String,
-      action: Schema.Literals(["create", "edit"]),
-      notice: Schema.optional(Schema.Struct({ kind: Schema.String })),
-    }),
-  ]),
-})
-const DeepLinkPayload = Schema.Union([Schema.String, DashboardLink])
+const DeepLinkPayload = Schema.Union([Schema.String, Schema.Struct({ channel: Schema.String, data: Schema.Json })])
+
 export type DeepLinkPayload = typeof DeepLinkPayload.Type
 
 export class DeepLinksOpened extends Schema.TaggedClass<DeepLinksOpened>()("DeepLinksOpened", {

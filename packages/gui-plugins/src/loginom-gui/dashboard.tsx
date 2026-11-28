@@ -1,16 +1,50 @@
-import type { DashboardLinkResult } from "@loginom-ai-agent/product/dashboard-link"
 import { isRpcError } from "@opencode/client/promise"
 import { usePlugin, type ServerRef } from "@opencode/plugin/gui"
 import { AbsolutePath } from "@opencode/schema"
-import { createSignal, onCleanup, onMount, Show } from "solid-js"
+import { Schema } from "effect"
+import { onCleanup, onMount, Show } from "solid-js"
 import { DashboardPreview } from "./contract"
+import { dashboardView, type DashboardStore, type Target } from "./dashboard-machine"
 import type definition from "./index"
 
-type Target = Exclude<DashboardLinkResult, { code: string }>
-export type DashboardIssue = "dashboardSnapshotGone" | "dashboardConnect" | "dashboardOpenFailed"
+type Props = { link: Target; dashboard: DashboardStore }
 
-export default function Dashboard(props: { link: Target; issue?: DashboardIssue }) {
+const locationOf = (link: Target) => ({ directory: AbsolutePath.make(link.directory) })
+
+const previewUrl = Schema.decodeUnknownSync(Schema.Struct({ url: Schema.String }))
+
+const foundSnapshot = Schema.is(Schema.Struct({ found: Schema.Literal(true) }))
+
+async function loadPreview(server: ServerRef, link: Target, lifetime: AbortSignal) {
+  const deadline = Date.now() + 60_000
+  const signal = AbortSignal.any([lifetime, AbortSignal.timeout(60_000)])
+  const location = locationOf(link)
+  let delay = 100
+
+  while (true) {
+    signal.throwIfAborted()
+
+    try {
+      const { output } = await server.client.rpc.call(
+        { rpcID: "loginom.dashboard", method: "preview", input: { id: link.id }, location },
+        { signal },
+      )
+
+      return previewUrl(output).url
+    } catch (error) {
+      const remaining = deadline - Date.now()
+
+      if (signal.aborted || remaining <= 0 || !isRpcError(error) || error.type !== "rpc.unavailable") throw error
+
+      await new Promise((resolve) => setTimeout(resolve, Math.min(delay, remaining)))
+      delay = Math.min(delay * 2, 2_000)
+    }
+  }
+}
+
+export default function Dashboard(props: Props) {
   const ctx = usePlugin<typeof definition>()
+
   const sidecar = () =>
     ctx.servers
       .list()
@@ -27,95 +61,80 @@ export default function Dashboard(props: { link: Target; issue?: DashboardIssue 
         </p>
       }
     >
-      {(server) => <Preview link={props.link} server={server} issue={props.issue} />}
+      {(server) => <Preview link={props.link} server={server} dashboard={props.dashboard} />}
     </Show>
   )
 }
 
-function Preview(props: { link: Target; server: ServerRef; issue?: DashboardIssue }) {
+function Preview(props: Props & { server: ServerRef }) {
   const ctx = usePlugin<typeof definition>()
   const ipc = ctx.main(DashboardPreview)
   const controller = new AbortController()
   const signal = controller.signal
-  const [preview, setPreview] = createSignal<{ kind: "loading" } | { kind: "failed" } | { kind: "ready"; id: string }>({
-    kind: "loading",
-  })
-  const [editing, setEditing] = createSignal(false)
-  const [editIssue, setEditIssue] = createSignal<"dashboardSnapshotGone" | "dashboardOpenFailed">()
-  const link = props.link
-  const location = { directory: AbsolutePath.make(link.directory) }
+  const { link, server, dashboard } = props
+  const display = () => dashboardView(dashboard.state(), link.id)
 
   onMount(() => {
-    void (async () => {
-      const deadline = Date.now() + 60_000
-      const request = (): ReturnType<ServerRef["client"]["rpc"]["call"]> =>
-        props.server.client.rpc
-          .call(
-            {
-              rpcID: "loginom.dashboard",
-              method: "preview",
-              input: { id: link.id },
-              location,
-            },
-            { signal },
-          )
-          .catch(async (error: unknown) => {
-            if (!isRpcError(error) || error.type !== "rpc.unavailable" || Date.now() >= deadline) throw error
-            await new Promise((resolve) => setTimeout(resolve, 100))
-            signal.throwIfAborted()
-            return request()
-          })
-      const { output } = await request()
-      if (!output || typeof output !== "object" || !("url" in output) || typeof output.url !== "string")
-        throw Error("Dashboard preview unavailable")
-      const embed = await ipc.open({ url: output.url }, { signal })
-      if (signal.aborted) return void ipc.close(embed).catch(() => undefined)
-      setPreview({ kind: "ready", id: embed.id })
-    })().catch(() => {
-      if (!signal.aborted) setPreview({ kind: "failed" })
+    const view = dashboard.dispatch({ type: "view.opened", id: link.id })?.current?.view
+
+    if (view?.status !== "open") return
+
+    const attempt = view.attempt
+
+    const opening = loadPreview(server, link, signal).then((url) => {
+      signal.throwIfAborted()
+
+      return ipc.open({ url })
     })
-  })
-  onCleanup(() => {
-    controller.abort()
-    const current = preview()
-    if (current.kind === "ready") void ipc.close({ id: current.id }).catch(() => undefined)
+
+    void opening.then(
+      (embed) => dashboard.dispatch({ type: "preview.ready", attempt, embed: embed.id }),
+      () => dashboard.dispatch({ type: "preview.failed", attempt }),
+    )
+    onCleanup(() => {
+      controller.abort()
+      dashboard.dispatch({ type: "view.closed", attempt })
+      void opening.then((embed) => ipc.close(embed)).catch(() => undefined)
+    })
   })
 
   async function edit() {
-    setEditIssue(undefined)
-    setEditing(true)
+    const viewAttempt = display().attempt
+
+    if (viewAttempt === undefined) return
+
+    const view = dashboard.dispatch({ type: "edit.requested", view: viewAttempt })?.current?.view
+
+    if (view?.status !== "open" || view.edit.status !== "checking") return
+
+    const attempt = view.edit.attempt
+
     try {
-      const { output } = await props.server.client.rpc.call(
-        {
-          rpcID: "loginom.dashboard",
-          method: "find",
-          input: { id: link.id },
-        },
-        { signal },
+      const { output } = await server.client.rpc.call(
+        { rpcID: "loginom.dashboard", method: "find", input: { id: link.id }, location: locationOf(link) },
+        { signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]) },
       )
-      if (signal.aborted) return
-      if (!output || typeof output !== "object" || !("found" in output) || output.found !== true) {
-        setEditIssue("dashboardSnapshotGone")
+
+      if (!foundSnapshot(output)) {
+        dashboard.dispatch({ type: "edit.finished", attempt, issue: "dashboardSnapshotGone" })
+
         return
       }
+
+      if (!dashboard.dispatch({ type: "edit.finished", attempt })) return
+
       ctx.layout.draft({
-        server: props.server.id,
+        server: server.id,
         directory: link.directory,
         prompt: ctx.t(link.action === "create" ? "dashboardCreatePrompt" : "dashboardEditPrompt", {
           node: link.nodeName,
         }),
       })
     } catch {
-      if (!signal.aborted) setEditIssue("dashboardOpenFailed")
-    } finally {
-      if (!signal.aborted) setEditing(false)
+      dashboard.dispatch({ type: "edit.finished", attempt, issue: "dashboardOpenFailed" })
     }
   }
 
-  const embed = () => {
-    const current = preview()
-    return current.kind === "ready" ? current.id : undefined
-  }
   return (
     <section class="flex min-w-0 min-h-0 flex-1 flex-col gap-3 p-4" aria-label={ctx.t("dashboard")}>
       <header class="flex min-w-0 flex-wrap items-center justify-between gap-2">
@@ -123,20 +142,25 @@ function Preview(props: { link: Target; server: ServerRef; issue?: DashboardIssu
           <p class="text-12-regular text-v2-text-text-weak">{ctx.t("dashboard")}</p>
           <h1 class="text-16-medium [overflow-wrap:anywhere]">{link.nodeName}</h1>
         </div>
-        <ctx.ui.Button busy={editing()} onClick={() => void edit()}>
+        <ctx.ui.Button busy={display().editing} onClick={() => void edit()}>
           {ctx.t("dashboardEdit")}
         </ctx.ui.Button>
       </header>
-      <Show when={editIssue() ?? props.issue}>
+      <Show when={display().issue}>
         {(key) => <p role="alert">{ctx.t(key())}</p>}
       </Show>
       <Show when={link.notice}>
         <p role="status">{ctx.t("dashboardPublicationNotice")}</p>
       </Show>
-      <ctx.embeds.View id={embed()} visible={!!embed()} class="relative flex min-h-0 flex-1 flex-col" radius={10}>
-        <Show when={!embed()}>
+      <ctx.embeds.View
+        id={display().embed}
+        visible={!!display().embed}
+        class="relative flex min-h-0 flex-1 flex-col"
+        radius={10}
+      >
+        <Show when={!display().embed}>
           <p role="status" class="p-3">
-            {ctx.t(preview().kind === "failed" ? "dashboardPreviewFailed" : "dashboardLoading")}
+            {ctx.t(display().previewFailed ? "dashboardPreviewFailed" : "dashboardLoading")}
           </p>
         </Show>
       </ctx.embeds.View>

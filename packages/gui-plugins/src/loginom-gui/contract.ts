@@ -1,6 +1,16 @@
 import { Ipc } from "@opencode/plugin/gui"
 import { Schema } from "effect"
 
+export const DashboardTarget = Schema.Struct({
+  id: Schema.String,
+  directory: Schema.String,
+  nodeName: Schema.String,
+  action: Schema.Literals(["create", "edit"]),
+  notice: Schema.optional(Schema.Struct({ kind: Schema.String })),
+})
+
+export const DashboardLink = Schema.Union([Schema.Struct({ id: Schema.String, code: Schema.String }), DashboardTarget])
+
 export const DashboardPreview = Ipc.define({
   id: "loginom-gui.dashboard",
   methods: {

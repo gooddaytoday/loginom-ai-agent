@@ -5,7 +5,9 @@
 export * as DashboardLinks from "./dashboard-links"
 
 import { Product } from "@loginom-ai-agent/product"
+import { dashboardLinkChannel } from "@loginom-ai-agent/product/dashboard-link"
 import { Option, Schema } from "effect"
+import type { DeepLinkPayload } from "../../shared/ipc-rpc/events"
 import { SidecarCredentials } from "../service/sidecar-credentials"
 
 export type Link = { readonly id: string; readonly action: "create" | "edit" }
@@ -32,6 +34,17 @@ const Reply = Schema.Union([
 ])
 
 export type Reply = typeof Reply.Type
+
+export function delivery(link: Link, result: PromiseSettledResult<Reply>): Exclude<DeepLinkPayload, string> {
+  const channel = dashboardLinkChannel
+  const reply = result.status === "fulfilled" ? result.value : { code: "DASHBOARD_SERVICE_UNAVAILABLE" }
+
+  if ("code" in reply) return { channel, data: { id: link.id, code: reply.code } }
+
+  const data = { id: link.id, directory: reply.directory, nodeName: reply.nodeName, action: reply.action }
+
+  return { channel, data: reply.notice ? { ...data, notice: { kind: reply.notice.kind } } : data }
+}
 
 const decodeReply = Schema.decodeUnknownOption(Reply)
 

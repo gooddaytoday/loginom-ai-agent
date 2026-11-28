@@ -47,18 +47,19 @@ for (const viewport of [
 ]) {
   story(`a Studio link opens a dashboard and its edit draft at ${viewport.width}px`, async ({ page }, info) => {
     await page.setViewportSize(viewport)
+
     const target = {
       id: "665afd45-1298-4c90-9086-1dd73ca94902",
       directory: "/data/dashboards/orders/work",
       nodeName: "Заказы",
       action: "edit" as const,
     }
+
     const host = await page.evaluateHandle(
       async ({ fixture, target }) => {
         const { mountDashboard } = await import(fixture)
-        const dashboard = mountDashboard()
-        dashboard.deliver(target)
-        return dashboard
+
+        return mountDashboard(target)
       },
       { fixture, target },
     )
@@ -68,8 +69,13 @@ for (const viewport of [
     await expect(panel.getByText("Строк в результате: 2")).toBeVisible()
     await page.screenshot({ path: info.outputPath(`dashboard-${viewport.width}x${viewport.height}.png`) })
 
+    const expired = /Ссылка из Studio уже использована.*получите новую ссылку/
+
+    await host.evaluate((dashboard) => dashboard.deliver({ id: "other", code: "DASHBOARD_SNAPSHOT_UNAVAILABLE" }))
+    await expect(page.getByRole("alert")).toHaveText(expired)
+    await expect(panel.getByRole("alert")).toHaveCount(0)
     await host.evaluate((dashboard, id) => dashboard.deliver({ id, code: "DASHBOARD_SNAPSHOT_UNAVAILABLE" }), target.id)
-    await expect(page.getByRole("alert")).toHaveText(/Ссылка из Studio уже использована.*получите новую ссылку/)
+    await expect(panel.getByRole("alert")).toHaveText(expired)
     await expect(panel.getByRole("heading", { name: "Заказы" })).toBeVisible()
     await panel.getByRole("button", { name: "Изменить в чате" }).click()
     await expect
@@ -81,7 +87,12 @@ for (const viewport of [
           prompt: "Помоги изменить дашборд для узла «Заказы».",
         },
       ])
-    expect(await host.evaluate((dashboard) => dashboard.previews.length)).toBe(1)
+
+    const locations = await host.evaluate((dashboard) =>
+      [...dashboard.previews, ...dashboard.finds].map((url) => new URL(url).searchParams.get("location[directory]")),
+    )
+
+    expect(locations).toEqual([target.directory, target.directory, target.directory])
     await host.evaluate((dashboard) => dashboard.unmount())
   })
 }
@@ -94,6 +105,7 @@ story(
 
       return mountPluginPages()
     }, fixture)
+
     const nav = page.getByRole("navigation", { name: "Plugin pages" })
     const entry = nav.getByRole("button", { name: "Example plugin page", exact: true })
 

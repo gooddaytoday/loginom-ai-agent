@@ -1,9 +1,14 @@
 import { SettingsPage, type Plugin } from "@opencode/plugin/gui"
-import { builtinContext, Page } from "@opencode/plugin/gui/builtin"
-import { dashboardLinkEvent, type DashboardLinkResult } from "@loginom-ai-agent/product/dashboard-link"
-import { createSignal, lazy, onCleanup, Show, Suspense } from "solid-js"
-import type { DashboardIssue } from "./dashboard"
+import { builtinContext, Page, subscribeBuiltinDeepLinks } from "@opencode/plugin/gui/builtin"
+import { dashboardLinkChannel } from "@loginom-ai-agent/product/dashboard-link"
+import { Option, Schema } from "effect"
+import { lazy, onCleanup, Show, Suspense } from "solid-js"
+import { unwrap } from "solid-js/store"
+import { DashboardLink } from "./contract"
+import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
 import type definition from "./index"
+
+const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   const Settings = lazy(() => import("./page"))
@@ -21,10 +26,30 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
   })
 
   if (!ctx.desktop) return
+
   const Dashboard = lazy(() => import("./dashboard"))
   const router = builtinContext(ctx).router
-  const [target, setTarget] = createSignal<Exclude<DashboardLinkResult, { code: string }>>()
-  const [issue, setIssue] = createSignal<DashboardIssue>()
+
+  const [store, setStore] = ctx.storage.memory<{ dashboard: DashboardState }>("dashboard", {
+    initial: { dashboard: { nextAttempt: 1 } },
+  })
+
+  const dashboard: DashboardStore = {
+    state: () => store.dashboard,
+    dispatch(event) {
+      const previous = unwrap(store.dashboard)
+      const next = transitionDashboard(previous, event)
+
+      if (next === previous) return
+
+      setStore((draft) => {
+        draft.dashboard = next
+      })
+
+      return next
+    },
+  }
+
   ctx.add(Page, {
     id: "dashboard",
     get title() {
@@ -33,7 +58,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     render: () => (
       <Suspense>
         <Show
-          when={target()}
+          when={dashboard.state().current?.link}
           keyed
           fallback={
             <p class="p-4" role="status">
@@ -41,36 +66,39 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
             </p>
           }
         >
-          {(link) => <Dashboard link={link} issue={issue()} />}
+          {(link) => <Dashboard link={link} dashboard={dashboard} />}
         </Show>
       </Suspense>
     ),
   })
 
-  const receive = () => {
-    const pending = window.loginomDashboardLinks ?? []
-    delete window.loginomDashboardLinks
-    for (const link of pending) {
-      if ("code" in link) {
-        const code = link.code
-        const message =
-          code === "DASHBOARD_SNAPSHOT_UNAVAILABLE" || code === "DASHBOARD_SNAPSHOT_INVALID"
-            ? "dashboardSnapshotGone"
-            : code === "LOGINOM_CONFIG_REQUIRED"
-              ? "dashboardConnect"
-              : "dashboardOpenFailed"
-        if (target() && router.path().split("?")[0] === `/page/${ctx.id}/dashboard`) setIssue(message)
-        else ctx.toast.show({ variant: "error", title: ctx.t(message) })
-        continue
+  onCleanup(subscribeBuiltinDeepLinks(dashboardLinkChannel, (data) => {
+    const decoded = decodeLink(data)
+
+    if (Option.isNone(decoded)) return
+
+    const link = decoded.value
+
+    if ("code" in link) {
+      const issue =
+        link.code === "DASHBOARD_SNAPSHOT_UNAVAILABLE" || link.code === "DASHBOARD_SNAPSHOT_INVALID"
+          ? "dashboardSnapshotGone"
+          : link.code === "LOGINOM_CONFIG_REQUIRED"
+            ? "dashboardConnect"
+            : "dashboardOpenFailed"
+
+      if (router.path().split("?")[0] === `/page/${ctx.id}/dashboard`) {
+        if (dashboard.dispatch({ type: "link.failed", id: link.id, issue })) return
       }
-      setIssue(undefined)
-      setTarget(link)
-      router.openPage("dashboard")
+
+      ctx.toast.show({ variant: "error", title: ctx.t(issue) })
+
+      return
     }
-  }
-  window.addEventListener(dashboardLinkEvent, receive)
-  onCleanup(() => window.removeEventListener(dashboardLinkEvent, receive))
-  receive()
+
+    dashboard.dispatch({ type: "link.opened", link })
+    router.openPage("dashboard")
+  }))
 }
 
 export default setup

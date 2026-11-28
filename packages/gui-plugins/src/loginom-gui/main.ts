@@ -15,28 +15,35 @@ const setup: Plugin.MainSetup = (ctx) => {
     async open({ url }, caller) {
       const target = URL.parse(url)
       const window = ctx.windows.get(caller.window)
+
       if (!window || !target || !/^http:\/\/localhost:[1-9]\d{0,4}\/[a-f0-9]{64}\/$/.test(url))
         throw Error("Invalid dashboard preview")
       caller.signal.throwIfAborted()
       views.get(caller.window)?.dispose()
+
       const view = new WebContentsView({
         webPreferences: { partition, sandbox: true, contextIsolation: true, nodeIntegration: false },
       })
+
       const contents = view.webContents
       contents.setWindowOpenHandler(() => ({ action: "deny" }))
       contents.on("will-navigate", (event) => event.preventDefault())
       contents.on("will-redirect", (event) => event.preventDefault())
       const embed = ctx.embeds.create(view, window)
       views.set(caller.window, embed)
+
       const stop = () => {
         if (views.get(caller.window) === embed) views.delete(caller.window)
         embed.dispose()
       }
+
       caller.signal.addEventListener("abort", stop, { once: true })
+
       try {
         await contents.loadURL(target.href)
         caller.signal.throwIfAborted()
         embed.show(true)
+
         return { id: embed.id }
       } catch (error) {
         stop()
@@ -47,6 +54,7 @@ const setup: Plugin.MainSetup = (ctx) => {
     },
     close({ id }, caller) {
       const embed = views.get(caller.window)
+
       if (embed?.id !== id) return
       views.delete(caller.window)
       embed.dispose()

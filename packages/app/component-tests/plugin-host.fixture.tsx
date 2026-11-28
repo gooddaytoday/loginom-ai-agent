@@ -1,6 +1,6 @@
 import { createMemoryHistory, MemoryRouter, useLocation } from "@solidjs/router"
 import { OpenCode, type PluginInfo, type SessionMessageInfo } from "@opencode/client/promise"
-import { dashboardLinkEvent, type DashboardLinkResult } from "@loginom-ai-agent/product/dashboard-link"
+import { dashboardLinkChannel } from "@loginom-ai-agent/product/dashboard-link"
 import { builtins } from "@opencode/gui-plugins/renderer"
 import { DialogProvider, useDialog } from "@opencode/ui/context/dialog"
 import { Menu } from "@opencode/ui/menu"
@@ -22,7 +22,7 @@ import {
   type StoreOptions,
   type Workspaces,
 } from "@opencode/plugin/gui"
-import type { BuiltinLayout, BuiltinLocale } from "@opencode/plugin/gui/builtin"
+import { deliverBuiltinDeepLink, type BuiltinLayout, type BuiltinLocale } from "@opencode/plugin/gui/builtin"
 import {
   createComponent,
   createMemo,
@@ -408,13 +408,19 @@ export function mountPluginPages(options?: Parameters<typeof pagePlugin>[0]) {
   return { disable: () => host.disable([plugin.id]), unmount: host.unmount }
 }
 
-export function mountDashboard() {
+export function mountDashboard(initialLink: typeof Schema.Json.Type) {
   const definition = builtins.find((entry) => entry.id === "loginom-gui")
+
   if (!definition) throw new Error("Loginom GUI not installed")
   const history = createMemoryHistory()
   const [toast, setToast] = createSignal<string>()
   const drafts: Parameters<BuiltinLayout["draft"]>[0][] = []
   const previews: string[] = []
+  const finds: string[] = []
+  const deliver = (data: typeof Schema.Json.Type) => deliverBuiltinDeepLink({ channel: dashboardLinkChannel, data })
+
+  deliver(initialLink)
+
   const server: ServerRef = {
     id: "sidecar",
     name: "Desktop",
@@ -431,29 +437,45 @@ export function mountDashboard() {
       fetch: Object.assign(
         async (input: RequestInfo | URL) => {
           const url = new URL(input instanceof Request ? input.url : input)
+
           if (url.pathname.endsWith("/preview")) {
             previews.push(url.href)
+
+            if (previews.length === 1) {
+              return new Response('{"_tag":"RpcError","type":"rpc.unavailable","message":"RPC is unavailable"}', {
+                status: 400,
+                headers: { "content-type": "application/json" },
+              })
+            }
+
             return Response.json({ output: { url: `http://localhost:3000/${"0".repeat(64)}/` } })
           }
-          if (url.pathname.endsWith("/find")) return Response.json({ output: { found: true } })
+
+          if (url.pathname.endsWith("/find")) {
+            finds.push(url.href)
+
+            return Response.json({ output: { found: true } })
+          }
+
           throw new Error(`Unexpected request: ${url.pathname}`)
         },
         { preconnect() {} },
       ),
     }),
   }
+
   const host = mountPlugins({
     definitions: [definition],
     builtinIDs: new Set([definition.id]),
     locale: "ru",
     ipc: () =>
       Object.assign(
-        Object.fromEntries([
+        Object.fromEntries<() => Promise<{ id: string } | undefined>>([
           ["open", async () => ({ id: "preview" })],
           ["close", async () => undefined],
         ]),
         { state: () => undefined, on: () => () => undefined },
-      ) as IpcClient<IpcSpec>,
+      ),
     apiOverrides: {
       desktop: () => ({
         os: "linux",
@@ -474,6 +496,7 @@ export function mountDashboard() {
       toast: () => ({
         show: (input) => {
           setToast(input.title)
+
           return { dismiss() {} }
         },
       }),
@@ -505,14 +528,13 @@ export function mountDashboard() {
       </MemoryRouter>
     ),
   })
+
   return {
     drafts,
     previews,
+    finds,
     unmount: host.unmount,
-    deliver(link: DashboardLinkResult) {
-      window.loginomDashboardLinks = [link]
-      window.dispatchEvent(new Event(dashboardLinkEvent))
-    },
+    deliver,
   }
 }
 

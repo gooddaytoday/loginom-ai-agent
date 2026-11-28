@@ -110,8 +110,12 @@ const runtime = Layer.effect(
     const deepLinks = yield* DeepLinks.make(focusWindow)
 
     const dashboards = DashboardLinks.make((link, result) => {
-      const reply = result.status === "fulfilled" ? result.value : { code: "DASHBOARD_SERVICE_UNAVAILABLE" }
-      deepLinks.receive([{ id: link.id, result: reply }])
+      runFork(
+        result.status === "fulfilled"
+          ? Effect.logInfo("dashboard link prepared", { ...link, reply: result.value })
+          : Effect.logError("dashboard link failed", { ...link, error: result.reason }),
+      )
+      deepLinks.receive([DashboardLinks.delivery(link, result)])
     })
 
     // Loginom AI Agent (B4.15): every product link goes to the windows, and a dashboard's link to the service too.

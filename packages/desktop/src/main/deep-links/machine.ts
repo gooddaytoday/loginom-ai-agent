@@ -1,3 +1,4 @@
+import { Predicate } from "effect"
 import { consoleReturnWindow } from "../lifecycle/deep-link"
 import type { DeepLinkPayload } from "../../shared/ipc-rpc/events"
 
@@ -54,11 +55,13 @@ export function transitionDeepLinks(state: DeepLinkState, event: DeepLinkEvent):
   switch (event.type) {
     case "links.received": {
       if (event.urls.length === 0) return unchanged(state)
+
       const links = event.urls.map((url): DeepLink => ({
         status: "queued",
         url,
-        target: typeof url === "string" ? consoleReturnWindow(url) : undefined,
+        target: Predicate.isString(url) ? consoleReturnWindow(url) : undefined,
       }))
+
       const focus = links.find((link) => link.target && state.windows[link.target])?.target ?? preferredWindowID(state)
       const next = drain({ ...state, links: [...state.links, ...links] })
 
