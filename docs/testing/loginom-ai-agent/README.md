@@ -1,5 +1,35 @@
 # Приёмка Loginom AI Agent на отдельных машинах
 
+**Шлюз C, сценарии 1, 2 и 4**
+
+Нужны Linux x64 (например, Ubuntu 24.04), Bun 1.4.4, Node.js 24.19.0 с npm в `PATH` и рабочий Chromium sandbox для обычного пользователя. Host запускает копию закреплённого Chromium 1246 из временного каталога. Политика хоста должна разрешать этому процессу создание пользовательского пространства имён или предоставлять рабочий setuid sandbox.
+
+Выполните из корня репозитория. Если на поддерживаемом Playwright дистрибутиве ещё нет системных библиотек Chromium, после `bun install` установите их командой `bun run --cwd packages/app playwright install-deps chromium`. Для неё могут понадобиться права администратора. На Ubuntu 26.04 с установленными библиотеками сначала выполните `export PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64`, чтобы Playwright 1.60 загрузил совместимую сборку.
+
+```bash
+(
+  set -e
+  export LOGINOM_AI_AGENT_TEST_NODE="$(node -p 'process.execPath')"
+  gate_root="$(mktemp -d)"
+  export HOME="$gate_root" TMPDIR="$gate_root/tmp"
+  export XDG_CONFIG_HOME="$gate_root/config" XDG_CACHE_HOME="$gate_root/cache"
+  export XDG_DATA_HOME="$gate_root/data" XDG_STATE_HOME="$gate_root/state" XDG_RUNTIME_DIR="$gate_root/runtime"
+  mkdir -m 700 "$TMPDIR" "$XDG_RUNTIME_DIR"
+  export PLAYWRIGHT_BROWSERS_PATH="$gate_root/browsers"
+
+  bun install --frozen-lockfile
+  npm ci --ignore-scripts --prefix packages/loginom-runtime/client
+  bun run --cwd packages/app playwright install --only-shell chromium
+  node packages/loginom-runtime/client/node_modules/playwright/cli.js install --no-shell chromium
+  export LOGINOM_DOCK_TEST_BROWSER="$PLAYWRIGHT_BROWSERS_PATH/chromium-1246/chrome-linux64/chrome"
+
+  test -x "$LOGINOM_DOCK_TEST_BROWSER"
+  bun run --cwd packages/app test:e2e:gate
+)
+```
+
+Отчёт со снимками 1280 и 390 px сохраняется в `packages/app/e2e/playwright-report/gate`.
+
 Самостоятельный CLI из ветки `loginom-cli` проверяется по отдельному
 [runbook IND-01…14](standalone-cli.md). Его текущая спецификация —
 [standalone CLI](../../superpowers/specs/2026-09-17-loginom-cli-standalone-design.md);
