@@ -30,6 +30,7 @@ test("uses the same phrase inline and preserves the filename's case", () => {
     kind: "export",
     files: [{ artifactId: "sales", name: "Sales.csv", bytes: 1024 }],
   })
+
   expect(loginomStepPhrase(copy, facts, { lowercase: true })).toBe("выгрузил «Sales.csv»")
 })
 

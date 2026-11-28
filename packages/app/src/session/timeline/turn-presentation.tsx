@@ -20,11 +20,13 @@ export function createTurnPresentation(
   detail: Accessor<TimelineDetail>,
 ) {
   const host = usePluginHost()
+
   const forcedOpen = createMemo(() => {
     const preset = timelinePreset(detail())?.id
 
     return preset === "detailed" || preset === "everything"
   })
+
   const open = (id: string) => forcedOpen() || disclosure.open(id)
 
   const descriptions = createMemo(() => {

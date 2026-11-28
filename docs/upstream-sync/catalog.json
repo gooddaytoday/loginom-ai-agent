@@ -2,7 +2,12 @@
   "comment": "Source of truth for which fork changes inside upstream files are described in catalog.md. First matching entry wins. An entry with `pending` names the stage B task or stage that brings its 0.4 change to OpenCode 2; until then it has no divergent files. Checked by scripts/upstream-sync/catalog-check.py.",
   "against": "a6b15d33daf6ab7d35569f6d711fdb630b9f04e7",
   "entries": [
-    { "id": "CAT-01", "title": "Manifests and lockfile", "paths": ["bun.lock", "**/package.json"] },
+    {
+      "id": "CAT-01",
+      "title": "Manifests and lockfile",
+      "paths": ["bun.lock", "**/package.json"],
+      "note": "Keep @types/mime-types in packages/util/package.json for filtered installs that typecheck util source."
+    },
     {
       "id": "CAT-02",
       "title": "CI, build, release and repository hygiene",
@@ -135,14 +140,7 @@
         "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
       ]
     },
-    {
-      "id": "CAT-10",
-      "title": "Web app, UI kit, session UI",
-      "paths": [
-        "packages/app/**", "packages/ui/**", "packages/session-ui/**",
-        "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**"
-      ]
-    },
+    { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
     { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }
   ]

@@ -89,6 +89,7 @@ function completedTitle(copy: Copy, input: ReturnType<typeof decodeFacts>, pendi
 
       return saved?.name ? copy.t("step.save", saved) : copy.t("step.save.unnamed")
     }
+
     case "add":
     case "configure":
     case "execute":

@@ -35,6 +35,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
           (part): part is SessionMessageAssistantTool => part.type === "tool" && part.name.startsWith("loginom_"),
         ),
       )
+
       const locale = ctx.locale.locale()
 
       const actions = [
