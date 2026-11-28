@@ -9,9 +9,15 @@ import { draftHref, seed } from "./app"
 import { gatePassword, type GateScenario } from "./gate-scenarios"
 import { APP_READY_TIMEOUT } from "./waits"
 
-type Gate = { directory: string; requests: unknown[]; calls: unknown[] }
+type Gate = { url: string; directory: string; requests: unknown[]; calls: unknown[] }
 
-export async function withGate(page: Page, scenario: GateScenario, run: (gate: Gate) => Promise<void>) {
+export async function withGate(
+  page: Page,
+  renderer: string | undefined,
+  scenario: GateScenario,
+  run: (gate: Gate) => Promise<void>,
+) {
+  if (!renderer) throw Error("Expected the gate renderer URL")
   const root = await mkdtemp(path.join(os.tmpdir(), "loginom-gate-"))
   const directory = path.join(root, "work")
   try {
@@ -48,6 +54,15 @@ export async function withGate(page: Page, scenario: GateScenario, run: (gate: G
         }),
       ])
       await page.context().route(/^https?:\/\/(?!127\.0\.0\.1:\d+\/)/, (route) => route.abort())
+      // Loginom settings use the serving origin. Put the built renderer on the isolated API server's origin.
+      await page.context().route(
+        (target) => target.origin === url && !target.pathname.startsWith("/api/"),
+        async (route) => {
+          const target = new URL(route.request().url())
+          const response = await route.fetch({ url: new URL(target.pathname + target.search, renderer).href })
+          await route.fulfill({ response })
+        },
+      )
       await seed(page, {
         locale: "ru",
         storage: {
@@ -55,8 +70,8 @@ export async function withGate(page: Page, scenario: GateScenario, run: (gate: G
         },
         tabs: [{ draft: "gate", directory, server: url }],
       })
-      await page.goto(draftHref("gate"))
-      await run({ directory, requests, calls })
+      await page.goto(new URL(draftHref("gate"), url).href)
+      await run({ url, directory, requests, calls })
     } finally {
       if (child.connected) child.disconnect()
       await exited

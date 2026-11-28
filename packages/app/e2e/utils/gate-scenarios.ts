@@ -2,6 +2,7 @@ import type { Step } from "../../../cli/test/fixture/product-run"
 
 export const gatePassword = "gate-fixture"
 export const gateModelID = "test/test-model"
+export const gateLoginom = { url: "https://loginom.example/app/", username: "analyst", folder: "/analyst" }
 
 export const gateScenarios = {
   first: {
@@ -39,10 +40,21 @@ export const gateScenarios = {
 
 export type GateScenario = keyof typeof gateScenarios
 
-export function gateToolReplies(request: unknown) {
+export function gateMessageContents(request: unknown, role: "system" | "tool") {
   if (!request || typeof request !== "object" || !("messages" in request) || !Array.isArray(request.messages)) return []
   return request.messages.flatMap((message: unknown) => {
-    if (!message || typeof message !== "object" || !("role" in message) || message.role !== "tool") return []
+    if (!message || typeof message !== "object" || !("role" in message) || message.role !== role) return []
     return "content" in message && typeof message.content === "string" ? [message.content] : []
+  })
+}
+
+export function gateToolReceipts(request: unknown) {
+  return gateMessageContents(request, "tool").flatMap((content) => {
+    try {
+      const receipt: unknown = JSON.parse(content)
+      return [receipt]
+    } catch {
+      return []
+    }
   })
 }

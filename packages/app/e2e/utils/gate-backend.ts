@@ -1,13 +1,14 @@
 import { copyFile, cp, mkdir, readFile } from "node:fs/promises"
 import path from "node:path"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import { scriptedModel, type Step } from "../../../cli/test/fixture/product-run"
 import { buildPackageDocs } from "../../../loginom-host/script/build-package-docs"
 import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
 import { ServiceHost } from "../../../loginom-agent/src/host"
+import { Loginom } from "../../../loginom-host/src/loginom"
 import { ServerProcess } from "../../../server/src/process"
 import { dockTool, scriptedHost } from "../../../server/test/fixture/loginom-dock-host"
-import { gateScenarios, gateModelID, gatePassword, gateToolReplies } from "./gate-scenarios"
+import { gateLoginom, gateModelID, gatePassword, gateScenarios, gateToolReceipts } from "./gate-scenarios"
 
 const [root, id] = process.argv.slice(2)
 if (!root || !process.send || (id !== "first" && id !== "documentation" && id !== "instructions")) {
@@ -83,6 +84,59 @@ const host = scriptedHost({
   },
 })
 if (id === "instructions") await ServiceHost.start({ data: path.join(root, "data", "loginom"), connect: host.connect })
+if (id === "first") {
+  await ServiceHost.start({
+    data: path.join(root, "data", "loginom"),
+    connect: async () => {
+      const connection = await host.connect()
+      const validationId = "gate-loginom-validation"
+      let expiresAt = 0
+      let status: typeof Loginom.View.Type = {
+        revision: 0,
+        generation: 0,
+        url: "https://loginom.example/",
+        username: "",
+        folder: "",
+        hasPassword: false,
+        state: "unconfigured",
+      }
+      return {
+        ...connection,
+        async request(method, input) {
+          switch (method) {
+            case "connection.status":
+              return status
+            case "connection.settings.check":
+              if (
+                !Schema.is(Loginom.Candidate)(input) ||
+                input.revision !== status.revision ||
+                input.url !== gateLoginom.url ||
+                input.username !== gateLoginom.username ||
+                input.password.operation !== "empty"
+              )
+                throw Error("Unexpected gate Loginom candidate")
+              expiresAt = Date.now() + 60_000
+              return { validationId, expiresAt }
+            case "connection.settings.save":
+              if (
+                !Schema.is(Loginom.Save)(input) ||
+                input.revision !== status.revision ||
+                input.validationId !== validationId ||
+                Date.now() >= expiresAt
+              )
+                throw Error("Unexpected gate Loginom validation")
+              status = { ...status, ...gateLoginom, revision: 1, generation: 1, state: "ready" }
+              return status
+            case "connection.settings.turn":
+              return true
+            default:
+              throw Error(`Unexpected gate Host request: ${method}`)
+          }
+        },
+      }
+    },
+  })
+}
 try {
   await Effect.runPromise(
     Effect.scoped(
@@ -100,14 +154,20 @@ try {
             if (new URL(request.url).origin !== model.server.url.origin)
               throw Error(`Unexpected upstream: ${request.url}`)
             const body: unknown = await request.clone().json()
-            const receipt = steps[0] === fillDraft && gateToolReplies(body).at(-1)
-            if (receipt) {
-              const result: unknown = JSON.parse(receipt)
-              if (!result || typeof result !== "object" || !("report" in result) || typeof result.report !== "string")
-                throw Error("Expected a documentation draft receipt")
-              writeDraft.input.path = path.relative(directory, result.report).split(path.sep).join("/")
-              if (!/^\.work\/package-docs\/Качество данных-[\da-f]{8}\/report\.md$/.test(writeDraft.input.path))
-                throw Error("Unexpected documentation draft path")
+            const report =
+              steps[0] === fillDraft &&
+              gateToolReceipts(body).find(
+                (receipt): receipt is { report: string } =>
+                  !!receipt &&
+                  typeof receipt === "object" &&
+                  "report" in receipt &&
+                  typeof receipt.report === "string" &&
+                  /^\.work\/package-docs\/Качество данных-[\da-f]{8}\/report\.md$/.test(
+                    path.relative(directory, receipt.report).split(path.sep).join("/"),
+                  ),
+              )
+            if (report) {
+              writeDraft.input.path = path.relative(directory, report.report).split(path.sep).join("/")
               const draft = await readFile(path.join(directory, writeDraft.input.path), "utf8")
               writeDraft.input.content = draft
                 .replace("PLACEHOLDER_PACKAGE_DESCRIPTION", "Пакет содержит один демонстрационный модуль.")
