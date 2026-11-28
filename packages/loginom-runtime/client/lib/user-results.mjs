@@ -2,6 +2,7 @@ import {nodeOutputPortSchema,replacedLinksSchema} from './node-result-schema.mjs
 import {budgetUserPreview,previewWireSize,USER_PREVIEW_WIRE_BUDGET} from './user-preview-budget.mjs';
 import {calculatorPrecisionWarnings} from './calculator-precision-warning.mjs';
 import {createRedactor} from './redact.mjs';
+import {LOGINOM_METADATA_MAX_BYTES, loginomMetadataBytes} from './loginom-feed-metadata.mjs';
 const pick = (value, keys) => Object.fromEntries(keys.filter(key => value?.[key] !== undefined).map(key => [key, value[key]]));
 export const userResultSchema = {
   type: 'object', required: ['result_version', 'operation_id'], additionalProperties: false,
@@ -192,7 +193,6 @@ export function compactKnowledgeBundle(description) {
   };
 }
 
-const FEED_MAX_BYTES = 16 * 1024;
 const FEED_PREVIEW_MAX_BYTES = 12 * 1024;
 
 export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts}) {
@@ -266,17 +266,16 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
   });
   if (tables.length) result.ports = tables.map(({table}) => table);
 
-  const bytes = value => Buffer.byteLength(JSON.stringify(value), 'utf8');
   // Reserve space for the receipt and table summaries before adding rows.
-  let blockRemaining = FEED_MAX_BYTES - bytes(result);
+  let blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
   while (blockRemaining < 0 && result.limitations?.length) {
     result.limitations.pop();
-    blockRemaining = FEED_MAX_BYTES - bytes(result);
+    blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
   }
   for (const key of ['ports', 'files']) {
     if (blockRemaining >= 0) break;
     delete result[key];
-    blockRemaining = FEED_MAX_BYTES - bytes(result);
+    blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
   }
   if (blockRemaining < 0) return;
   if (!result.ports) return result;
@@ -297,7 +296,7 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
       type: text(column.type, 128), data_kind: text(column.data_kind, 128)}));
     const sample = [];
     const preview = {schema, sample, sampleComplete: false};
-    if (bytes(preview) > remaining) continue;
+    if (loginomMetadataBytes(preview) > remaining) continue;
     for (const row of rows.slice(0, 10)) {
       if (row.length !== schema.length) break;
       sample.push(row.map((cell, index) => {
@@ -307,11 +306,11 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
           value === null || ['string', 'number', 'boolean'].includes(typeof value)
             ? [[key, typeof value === 'string' ? redactor.text(value) : value]] : []));
       }));
-      if (bytes(preview) > remaining) { sample.pop(); break; }
+      if (loginomMetadataBytes(preview) > remaining) { sample.pop(); break; }
     }
     if (rows.length && !sample.length) continue;
     preview.sampleComplete = port.sample_complete === true && sample.length === rows.length && sample.length === table.rowCount;
-    const previewBytes = bytes(preview);
+    const previewBytes = loginomMetadataBytes(preview);
     previewRemaining -= previewBytes;
     blockRemaining -= previewBytes + previewKeyBytes;
     table.preview = preview;
