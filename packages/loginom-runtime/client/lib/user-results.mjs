@@ -195,7 +195,7 @@ export function compactKnowledgeBundle(description) {
 
 const FEED_PREVIEW_MAX_BYTES = 12 * 1024;
 
-export function loginomSaveMetadata(outcome, {knownSecrets = [], receiptOrder} = {}) {
+export function loginomSaveMetadata(outcome, {knownSecrets = [], receiptWindow} = {}) {
   const path = outcome.output?.package_ref?.path;
   if (outcome.status !== 'SUCCEEDED' || !['package.save_as', 'package.save_checkpoint'].includes(outcome.action_key)
       || !outcome.operation_id || typeof path !== 'string' || !path || path !== outcome.output.package_ref.active_identity) return;
@@ -205,7 +205,7 @@ export function loginomSaveMetadata(outcome, {knownSecrets = [], receiptOrder} =
   if (outcome.output.reopened === true && Array.isArray(graph?.nodes))
     evidence.push({kind:'reopenedGraphRead', nodeCount:graph.nodes.length, scope:'activeWorkflow'});
   return {v:1, operationId:outcome.operation_id, state:'settled', status:'SUCCEEDED', kind:'save', evidence,
-    ...(receiptOrder?.documentId && {receiptOrder})};
+    ...(receiptWindow?.documentId && {receiptWindow})};
 }
 
 export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts}) {
@@ -284,9 +284,7 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
   const evidence = [];
   if (state === 'settled' && execution?.status === 'completed' && result.executionId
       && matchingFacts?.launchedExecutionId === result.executionId) {
-    evidence.push({kind:'executed', executionId:result.executionId, scope:'workspace'});
-    if (safeCount(matchingFacts.executionOrder?.started) && safeCount(matchingFacts.executionOrder?.confirmed))
-      result.receiptOrder = matchingFacts.executionOrder;
+    evidence.push({kind:'executed', executionId:result.executionId, scope:'activeWorkflow'});
   }
   for (const {port} of tables) {
     const rowsRead = port.sample?.length;
@@ -294,7 +292,9 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
     evidence.push({kind:'tableRead', port:port.port, portGuid:port.port_guid, rowsRead, rowCount:port.row_count,
       executionId:result.executionId});
   }
-  if (evidence.length) result.evidence = evidence;
+  const receiptWindow = evidence.some(fact => fact.kind === 'executed')
+    && safeCount(matchingFacts?.executionWindow?.confirmedSequence) ? matchingFacts.executionWindow : undefined;
+  const withEvidence = () => evidence.length ? {...result, evidence, ...(receiptWindow && {receiptWindow})} : result;
 
   // Reserve space for the receipt and table summaries before adding rows.
   let blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
@@ -307,12 +307,8 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
     delete result[key];
     blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
   }
-  while (blockRemaining < 0 && result.evidence?.length) {
-    result.evidence.pop();
-    blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
-  }
   if (blockRemaining < 0) return;
-  if (!result.ports) return result;
+  if (!result.ports) return withEvidence();
 
   let previewRemaining = FEED_PREVIEW_MAX_BYTES;
   const previewKeyBytes = ',"preview":'.length;
@@ -349,5 +345,5 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
     blockRemaining -= previewBytes + previewKeyBytes;
     table.preview = preview;
   }
-  return result;
+  return withEvidence();
 }

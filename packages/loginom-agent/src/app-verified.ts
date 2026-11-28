@@ -1,7 +1,10 @@
 import { Option, Schema } from "effect"
-import { LoginomEvidence, LoginomMetadata } from "./loginom-metadata"
+import { Session } from "@opencode/schema/session"
+import { SessionMessage } from "@opencode/schema/session-message"
+import { defaultUserNodeReadPorts } from "../../loginom-runtime/client/lib/user-workflow.mjs"
+import { decodeLoginomMetadata, LoginomEvidence, type LoginomMetadata } from "./loginom-metadata"
 
-const request = Schema.Struct({ sessionID: Schema.NonEmptyString, promptID: Schema.NonEmptyString })
+const request = Schema.Struct({ sessionID: Session.ID, promptID: SessionMessage.ID })
 const source = Schema.Struct({
   operationId: Schema.NonEmptyString,
   attempt: Schema.optional(Schema.Int),
@@ -28,7 +31,12 @@ const reason = Schema.Literals([
   "noReopenedGraphReadReceipt",
   "noSavedVersionExecutionReceipt",
 ])
-const gap = Schema.Struct({ reason, status: Schema.Literals(["notRequested", "unconfirmed"]) })
+const call = Schema.Struct({ messageID: Schema.String, toolCallID: Schema.String })
+const gap = Schema.Struct({
+  reason,
+  status: Schema.Literals(["notRequested", "unconfirmed"]),
+  call: Schema.optional(call),
+})
 const report = Schema.Struct({ facts: Schema.Array(summaryFact), notVerified: Schema.Array(gap) })
 const schema = (value: typeof request | typeof report) =>
   Schema.toJsonSchemaDocument(value, { referencePolicy: () => undefined }).schema
@@ -40,7 +48,49 @@ export const appVerifiedRpc = {
 } as const
 
 const decodeRequest = Schema.decodeUnknownSync(request)
-const decodeReceipt = Schema.decodeUnknownOption(Schema.Struct({ generation: Schema.Int, loginom: LoginomMetadata }))
+const decodeReceipt = Schema.decodeUnknownOption(Schema.Struct({ generation: Schema.Int, loginom: Schema.Unknown }))
+const decodeInput = Schema.decodeUnknownOption(
+  Schema.Struct({
+    finish: Schema.optional(Schema.String),
+    target: Schema.optional(Schema.Struct({ type: Schema.String })),
+    read: Schema.optional(Schema.Struct({ ports: Schema.optional(Schema.Array(Schema.Number)) })),
+    kind: Schema.optional(Schema.String),
+    execution: Schema.optional(Schema.String),
+    action_key: Schema.optional(Schema.String),
+  }),
+)
+
+const checks = {
+  tableRead: "noTableReadReceipt",
+  executed: "noExecutionReceipt",
+  saved: "noSaveReceipt",
+  reopenedGraphRead: "noReopenedGraphReadReceipt",
+} as const
+type Check = keyof typeof checks
+type EvidenceKind = (typeof LoginomEvidence.Type)["kind"]
+
+function requestedChecks(tool: string, value: unknown): Check[] {
+  const input = Option.getOrUndefined(decodeInput(value))
+  if (!input) return []
+  const ports = input.read?.ports
+  switch (tool) {
+    case "loginom_dock_node_apply":
+      return [
+        ...(input.finish === "execute" ? ["executed" as const] : []),
+        ...((ports ?? defaultUserNodeReadPorts(input.finish, input.target?.type)).length ? ["tableRead" as const] : []),
+      ]
+    case "loginom_dock_node_read":
+      if (input.kind === "source" || input.kind === "context") return []
+      return [
+        ...(ports?.length !== 0 ? ["tableRead" as const] : []),
+        ...(input.execution === "execute" ? ["executed" as const] : []),
+      ]
+    case "loginom_dock_action_run":
+      if (input.action_key === "package.save_as") return ["saved", "reopenedGraphRead"]
+      if (input.action_key === "package.save_checkpoint") return ["saved"]
+  }
+  return []
+}
 
 type Message = {
   type: string
@@ -59,7 +109,7 @@ type Message = {
 type Location = { directory: string; workspaceID?: string }
 type SummarySessions = {
   get(input: { sessionID: string }): Promise<{ id: string; location: Location }>
-  context(input: { sessionID: string }): Promise<readonly Message[]>
+  turnMessages(input: typeof request.Type): Promise<readonly Message[]>
 }
 
 const unavailable = (): typeof report.Type => ({
@@ -77,7 +127,7 @@ export function appVerifiedHandler(sessions: SummarySessions, location: Location
       session.location.workspaceID !== location.workspaceID
     )
       return unavailable()
-    return appVerifiedSummary(await sessions.context({ sessionID }), promptID)
+    return appVerifiedSummary(await sessions.turnMessages({ sessionID, promptID }), promptID)
   }
 }
 
@@ -85,12 +135,13 @@ export function appVerifiedSummary(messages: readonly Message[], promptID: strin
   const start = messages.findIndex((message) => message.type === "user" && message.id === promptID)
   if (start === -1) return unavailable()
 
-  const requested = new Set<typeof reason.Type>()
+  const attempts: { checks: Check[]; call: typeof call.Type; observed: Set<EvidenceKind> }[] = []
+  const pending = new Map<string, (typeof attempts)[number]["observed"]>()
   const facts = new Map<
     string,
     {
       fact: typeof summaryFact.Type
-      order?: LoginomMetadata["receiptOrder"]
+      order?: LoginomMetadata["receiptWindow"]
     }
   >()
   for (const message of messages.slice(start + 1)) {
@@ -98,37 +149,29 @@ export function appVerifiedSummary(messages: readonly Message[], promptID: strin
     if (message.type !== "assistant") continue
     for (const part of message.content ?? []) {
       if (part.type !== "tool" || !part.name.startsWith("loginom_dock_") || part.state.status === "streaming") continue
-      const input = part.state.input
-      if (typeof input === "object" && input !== null) {
-        if (part.name === "loginom_dock_node_apply") {
-          if ("finish" in input && input.finish === "execute") requested.add("noExecutionReceipt")
-          if (
-            "read" in input &&
-            typeof input.read === "object" &&
-            input.read !== null &&
-            "ports" in input.read &&
-            Array.isArray(input.read.ports) &&
-            input.read.ports.length
-          )
-            requested.add("noTableReadReceipt")
-        } else if (part.name === "loginom_dock_node_read") {
-          if (!("kind" in input) || (input.kind !== "source" && input.kind !== "context"))
-            requested.add("noTableReadReceipt")
-          if ("execution" in input && input.execution === "execute") requested.add("noExecutionReceipt")
-        } else if (part.name === "loginom_dock_action_run" && "action_key" in input) {
-          if (input.action_key === "package.save_as" || input.action_key === "package.save_checkpoint")
-            requested.add("noSaveReceipt")
-          if (input.action_key === "package.save_as") requested.add("noReopenedGraphReadReceipt")
-        }
-      }
-      if (part.state.status !== "completed" && part.state.status !== "error") continue
       const receipt = Option.getOrUndefined(decodeReceipt(part.state.metadata))
-      if (receipt?.loginom.state !== "settled") continue
-      const { operationId, attempt, node, status } = receipt.loginom
-      for (const evidence of receipt.loginom.evidence ?? []) {
+      const loginom = decodeLoginomMetadata(receipt?.loginom)
+      const operation = loginom && receipt && JSON.stringify([receipt.generation, loginom.operationId, loginom.attempt])
+      const wanted = requestedChecks(part.name, part.state.input)
+      const reference = { messageID: message.id, toolCallID: part.id }
+      const observed = new Set<EvidenceKind>()
+      if (wanted.length) {
+        attempts.push({ checks: wanted, call: reference, observed })
+        if (operation && loginom?.state === "running") pending.set(operation, observed)
+      }
+      if (
+        !loginom ||
+        loginom.state !== "settled" ||
+        (part.state.status !== "completed" && part.state.status !== "error")
+      )
+        continue
+      const { operationId, attempt, node, status, receiptWindow } = loginom
+      for (const evidence of loginom.evidence ?? []) {
         if (evidence.kind !== "executed" && status !== "SUCCEEDED") continue
+        observed.add(evidence.kind)
+        if (operation && !wanted.length) pending.get(operation)?.add(evidence.kind)
         const key = JSON.stringify([
-          receipt.loginom.receiptOrder?.runtimeId ?? receipt.generation,
+          receiptWindow?.runtimeId ?? receipt?.generation,
           evidence.kind,
           ...(evidence.kind === "executed"
             ? [evidence.executionId]
@@ -136,10 +179,10 @@ export function appVerifiedSummary(messages: readonly Message[], promptID: strin
         ])
         if (!facts.has(key))
           facts.set(key, {
-            order: receipt.loginom.receiptOrder,
+            order: receiptWindow,
             fact: {
               evidence,
-              source: { operationId, attempt, messageID: message.id, toolCallID: part.id, nodeGuid: node?.guid },
+              source: { operationId, attempt, ...reference, nodeGuid: node?.guid },
             },
           })
       }
@@ -149,28 +192,40 @@ export function appVerifiedSummary(messages: readonly Message[], promptID: strin
   const entries = [...facts.values()]
   const saves = entries
     .filter(({ fact, order }) => fact.evidence.kind === "saved" && order !== undefined)
-    .sort((left, right) => (right.order?.confirmed ?? 0) - (left.order?.confirmed ?? 0))
+    .sort((left, right) => (right.order?.confirmedSequence ?? 0) - (left.order?.confirmedSequence ?? 0))
   const linked = entries.map((entry): typeof summaryFact.Type => {
     const { fact, order } = entry
     if (fact.evidence.kind !== "executed" || !order) return fact
     for (const save of saves) {
       if (save.order?.runtimeId !== order.runtimeId || save.order.documentId !== order.documentId) continue
       const timing =
-        order.confirmed < save.order.started ? "before" : order.started > save.order.confirmed ? "after" : undefined
+        order.confirmedSequence < save.order.startSequence
+          ? "before"
+          : order.startSequence > save.order.confirmedSequence
+            ? "after"
+            : undefined
       if (timing) return { ...fact, relativeToSave: { timing, source: save.fact.source } }
     }
     return fact
   })
-  const observed = new Set(linked.map(({ evidence }) => evidence.kind))
   const notVerified: (typeof gap.Type)[] = []
-  const missing = (reason: typeof gap.Type.reason) =>
-    notVerified.push({ reason, status: requested.has(reason) ? "unconfirmed" : "notRequested" })
-  if (!observed.has("tableRead")) missing("noTableReadReceipt")
-  if (linked.some(({ evidence }) => evidence.kind === "tableRead" && evidence.rowsRead < evidence.rowCount))
-    notVerified.push({ reason: "unreadTableRows", status: "unconfirmed" })
-  if (!observed.has("executed")) missing("noExecutionReceipt")
-  if (!observed.has("saved")) missing("noSaveReceipt")
-  if (!observed.has("reopenedGraphRead")) missing("noReopenedGraphReadReceipt")
-  missing("noSavedVersionExecutionReceipt")
+  for (const attempt of attempts)
+    for (const check of attempt.checks)
+      if (!attempt.observed.has(check))
+        notVerified.push({ reason: checks[check], status: "unconfirmed", call: attempt.call })
+  for (const { evidence, source } of linked) {
+    if (evidence.kind === "tableRead" && evidence.rowsRead < evidence.rowCount)
+      notVerified.push({
+        reason: "unreadTableRows",
+        status: "unconfirmed",
+        call: { messageID: source.messageID, toolCallID: source.toolCallID },
+      })
+  }
+  for (const [check, reason] of Object.entries(checks)) {
+    if (linked.some(({ evidence }) => evidence.kind === check)) continue
+    if (attempts.some((attempt) => attempt.checks.some((wanted) => wanted === check))) continue
+    notVerified.push({ reason, status: "notRequested" })
+  }
+  notVerified.push({ reason: "noSavedVersionExecutionReceipt", status: "notRequested" })
   return { facts: linked, notVerified }
 }

@@ -5,7 +5,7 @@ import type { LoginomEvidence } from "../src/loginom-metadata"
 type Evidence = typeof LoginomEvidence.Type
 
 const user = (id: string) => ({ type: "user", id })
-const step = (id: string, operationId: string, evidence: Evidence, receiptOrder?: unknown) => ({
+const step = (id: string, operationId: string, evidence: Evidence, receiptWindow?: unknown) => ({
   type: "assistant",
   id,
   content: [
@@ -17,17 +17,18 @@ const step = (id: string, operationId: string, evidence: Evidence, receiptOrder?
         status: "completed",
         metadata: {
           generation: 4,
-          loginom: { v: 1, operationId, state: "settled", status: "SUCCEEDED", evidence: [evidence], receiptOrder },
+          loginom: { v: 1, operationId, state: "settled", status: "SUCCEEDED", evidence: [evidence], receiptWindow },
         },
       },
     },
   ],
 })
-const executed = { kind: "executed", executionId: "execution", scope: "workspace" } satisfies Evidence
+const executed = { kind: "executed", executionId: "execution", scope: "activeWorkflow" } satisfies Evidence
 const saved = { kind: "saved", path: "/analyst/result.lgp" } satisfies Evidence
 type Gap = ReturnType<typeof appVerifiedSummary>["notVerified"][number]
 const notRequested = (reason: Gap["reason"]): Gap => ({ reason, status: "notRequested" })
-const unconfirmed = (reason: Gap["reason"]): Gap => ({ reason, status: "unconfirmed" })
+const unconfirmed = (reason: Gap["reason"], call?: Gap["call"]): Gap => ({ reason, status: "unconfirmed", call })
+const ref = (messageID: string, toolCallID: string) => ({ messageID, toolCallID })
 
 test("turn summary cites the read step and does not inherit launches or saves from other turns", () => {
   const read = {
@@ -54,7 +55,7 @@ test("turn summary cites the read step and does not inherit launches or saves fr
   ).toEqual({
     facts: [{ evidence: read, source: { operationId: "read-op", messageID: "read", toolCallID: "read-tool" } }],
     notVerified: [
-      unconfirmed("unreadTableRows"),
+      unconfirmed("unreadTableRows", ref("read", "read-tool")),
       notRequested("noExecutionReceipt"),
       notRequested("noSaveReceipt"),
       notRequested("noReopenedGraphReadReceipt"),
@@ -82,16 +83,16 @@ test("save and workspace execution are separate and do not prove the saved versi
 })
 
 test("only disjoint receipt ranges in the same runtime and document prove order relative to Save", () => {
-  const order = { runtimeId: "runtime-one", documentId: "doc" }
-  const launch = (id: string, started: number, confirmed: number, identity = order) =>
-    step(id, id, { ...executed, executionId: id }, { ...identity, started, confirmed })
-  const save = step("save", "save-op", saved, { ...order, started: 20, confirmed: 30 })
+  const order = { runtimeId: "32ef40ff-08d2-476a-ad73-1ef3feb17ce8", documentId: "doc" }
+  const launch = (id: string, startSequence: number, confirmedSequence: number, identity = order) =>
+    step(id, id, { ...executed, executionId: id }, { ...identity, startSequence, confirmedSequence })
+  const save = step("save", "save-op", saved, { ...order, startSequence: 20, confirmedSequence: 30 })
   const history = [
     user("prompt"),
     save,
     launch("old-poll", 10, 19),
     launch("foreign-doc", 31, 35, { ...order, documentId: "other" }),
-    launch("new-runtime", 31, 35, { ...order, runtimeId: "runtime-two" }),
+    launch("new-runtime", 31, 35, { ...order, runtimeId: "c58fbbe2-0983-44dc-ba70-abfcd876c880" }),
     launch("overlap", 19, 25),
     launch("new", 31, 35),
   ]
@@ -128,24 +129,79 @@ test("an attempted check without a receipt is unconfirmed, not unrequested", () 
     },
   ]
   expect(appVerifiedSummary(history, "prompt").notVerified).toEqual([
+    unconfirmed("noExecutionReceipt", ref("failed", "apply")),
+    unconfirmed("noSaveReceipt", ref("failed", "save")),
+    unconfirmed("noReopenedGraphReadReceipt", ref("failed", "save")),
     notRequested("noTableReadReceipt"),
-    unconfirmed("noExecutionReceipt"),
-    unconfirmed("noSaveReceipt"),
-    unconfirmed("noReopenedGraphReadReceipt"),
     notRequested("noSavedVersionExecutionReceipt"),
+  ])
+})
+
+test("a successful wait settles only its operation; another failed node keeps both gaps including its default read", () => {
+  const launch = (id: string, operationId: string, state: "running" | "settled") => ({
+    type: "assistant",
+    id,
+    content: [
+      {
+        type: "tool" as const,
+        id: id + "-tool",
+        name: "loginom_dock_node_apply",
+        state: {
+          status: state === "running" ? "completed" : "error",
+          input: { finish: "execute", target: { type: "transform.calculator" } },
+          metadata: { generation: 4, loginom: { v: 1, operationId, attempt: 1, state } },
+        },
+      },
+    ],
+  })
+  const read = { kind: "tableRead", port: 0, portGuid: "port", rowsRead: 2, rowCount: 2 } satisfies Evidence
+  const wait = {
+    type: "assistant",
+    id: "wait",
+    content: [
+      {
+        type: "tool" as const,
+        id: "wait-tool",
+        name: "loginom_dock_node_wait",
+        state: {
+          status: "completed",
+          metadata: {
+            generation: 4,
+            loginom: {
+              v: 1,
+              operationId: "ok",
+              attempt: 1,
+              state: "settled",
+              status: "SUCCEEDED",
+              evidence: [executed, read],
+            },
+          },
+        },
+      },
+    ],
+  }
+  const result = appVerifiedSummary(
+    [user("prompt"), launch("started", "ok", "running"), wait, launch("bad", "failed", "settled")],
+    "prompt",
+  )
+  expect(result.facts.map(({ evidence }) => evidence)).toEqual([executed, read])
+  expect(result.notVerified.filter(({ status }) => status === "unconfirmed")).toEqual([
+    unconfirmed("noExecutionReceipt", ref("bad", "bad-tool")),
+    unconfirmed("noTableReadReceipt", ref("bad", "bad-tool")),
   ])
 })
 
 test("summary RPC reads only the exact session in its Location", async () => {
   const location = { directory: "/project", workspaceID: "one" }
-  const input = { sessionID: "session", promptID: "prompt" }
+  const input = { sessionID: "ses_session", promptID: "msg_old_prompt" }
   const run = (session: { id: string; location: typeof location }) =>
     appVerifiedHandler(
       {
         get: async () => session,
-        context: async ({ sessionID }) => {
-          expect(sessionID).toBe(input.sessionID)
-          return [user("prompt"), step("save", "save-op", saved)]
+        turnMessages: async ({ sessionID, promptID }) => {
+          expect(String(sessionID)).toBe(input.sessionID)
+          expect(String(promptID)).toBe(input.promptID)
+          return [user(input.promptID), step("save", "save-op", saved)]
         },
       },
       location,

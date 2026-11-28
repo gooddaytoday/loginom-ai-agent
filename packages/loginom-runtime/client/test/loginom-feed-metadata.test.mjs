@@ -43,7 +43,7 @@ test('completed launch proves execution even when no output was requested', () =
   const tool = 'dock_node_wait';
   const reply = nodeResultReply(receipt(), {userProfile:true, tool});
   assert.deepEqual(loginomFeedMetadata(reply, {tool, facts:{...facts, launchedExecutionId:'exec'}}).evidence, [
-    {kind:'executed', executionId:'exec', scope:'workspace'},
+    {kind:'executed', executionId:'exec', scope:'activeWorkflow'},
   ]);
   assert.equal(loginomFeedMetadata(reply, {tool, facts:{...facts, launchedExecutionId:'another-exec'}}).evidence, undefined);
 });

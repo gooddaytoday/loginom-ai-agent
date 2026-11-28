@@ -261,7 +261,8 @@ async function handle(message) {
           const outputFiles = await session.artifactStore.outputFiles(reply.structuredContent)
           let result = reply
           try {
-            result = withLoginomMetadata(reply, { receipt: project({ outputFiles, knownSecrets }) })
+            const receipt = project({ outputFiles, knownSecrets })
+            result = withLoginomMetadata(reply, { receipt, evidence: receipt?.evidence, receiptWindow: receipt?.receiptWindow })
           } catch (error) {
             await login.onRetry({ phase: "feed_projection_failed", error: startupDiagnostic(error, knownSecrets) })
               .catch(() => { session.metadata.localDiagnosticsIncomplete = true })

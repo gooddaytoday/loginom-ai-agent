@@ -476,13 +476,13 @@ test('unknown prepared workflow advises only the last confirmed Save of its own 
     assert.deepEqual(first.evidence,[{kind:'saved',path}]);
     assert.equal(first.verificationStale,true);
     assert.equal(first.state,'settled');
-    assert.ok(first.receiptOrder.started<first.receiptOrder.confirmed);
+    assert.ok(first.receiptWindow.startSequence<first.receiptWindow.confirmedSequence);
     assert.deepEqual((await refusal()).arguments,{intent:'open_package',package_path:path});
     const newer=(await save('newer-save','package.save_as',secondPath))._meta.loginom;
-    assert.equal(newer.receiptOrder.runtimeId,first.receiptOrder.runtimeId);
-    assert.ok(newer.receiptOrder.started>first.receiptOrder.confirmed);
+    assert.equal(newer.receiptWindow.runtimeId,first.receiptWindow.runtimeId);
+    assert.ok(newer.receiptWindow.startSequence>first.receiptWindow.confirmedSequence);
     assert.equal((await refusal()).arguments.package_path,secondPath);
-    assert.deepEqual((await save('first-save','package.save_checkpoint',path))._meta.loginom.receiptOrder,first.receiptOrder);
+    assert.deepEqual((await save('first-save','package.save_checkpoint',path))._meta.loginom.receiptWindow,first.receiptWindow);
     assert.equal((await refusal()).arguments.package_path,secondPath);
     f.refuseOnce='failed-save';await save('failed-save','package.save_checkpoint',path);
     assert.equal((await refusal()).arguments.package_path,secondPath);

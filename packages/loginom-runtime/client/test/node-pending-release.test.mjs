@@ -423,7 +423,8 @@ test('a settled runtime wait exposes the node observed by the target phase, not 
 
 test('execution evidence retains the same runtime ordinal range when polled again', async()=>{
  let ordinal=40;
- const {runtime}=fixture({receiptSequence:{id:'fixture-runtime',next:()=>++ordinal}});
+ const runtimeId='32ef40ff-08d2-476a-ad73-1ef3feb17ce8';
+ const {runtime}=fixture({receiptSequence:{id:runtimeId,next:()=>++ordinal}});
  const input=request();
  runtime.startNodeApply(input);
  const tool='dock_node_wait';
@@ -433,10 +434,10 @@ test('execution evidence retains the same runtime ordinal range when polled agai
   return loginomFeedMetadata(reply,{tool,facts:runtime.nodeFeedFacts(input.operation_id)});
  };
  const first=await project();
- assert.deepEqual(first.evidence,[{kind:'executed',executionId:'exec',scope:'workspace'}]);
- assert.deepEqual(first.receiptOrder,{runtimeId:'fixture-runtime',documentId:'doc',started:41,confirmed:42});
+ assert.deepEqual(first.evidence,[{kind:'executed',executionId:'exec',scope:'activeWorkflow'}]);
+ assert.deepEqual(first.receiptWindow,{runtimeId,documentId:'doc',startSequence:41,confirmedSequence:42});
  assert.equal(++ordinal,43);
- assert.deepEqual((await project()).receiptOrder,first.receiptOrder);
+ assert.deepEqual((await project()).receiptWindow,first.receiptWindow);
 });
 const stop=async(f,phase)=>{
  const key=phase==='read'?'readOutput':'finish',original=f.drivers[key];let first=true;

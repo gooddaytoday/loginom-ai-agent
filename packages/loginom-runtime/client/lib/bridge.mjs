@@ -905,8 +905,8 @@ export async function createBridge(config, session, { browserTransport: managedB
               reply.content.push({ type: 'text', text: 'Recovery context unavailable; keep the operation receipt and inspect the actual state.' });
             }
             if(userProfile && confirmedSave)projectSave?.(options=>loginomSaveMetadata(confirmedSave,{...options,
-              receiptOrder:admission&&{runtimeId:receiptSequence.id,documentId:admission.document_id,
-                started:admission.sequence,confirmed:admission.confirmed}}));
+              receiptWindow:admission&&{runtimeId:receiptSequence.id,documentId:admission.document_id,
+                startSequence:admission.sequence,confirmedSequence:admission.confirmed}}));
             return reply;
           });
         }

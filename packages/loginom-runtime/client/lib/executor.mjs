@@ -4889,8 +4889,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         :request.finish==='done'?'configure':undefined;
       return {node:{ref:observed.ref,label,type:observed.type},kind,
         launchedExecutionId:finish?.mode==='execute'?finish.execution_id:undefined,
-        executionOrder:receiptSequence&&{runtimeId:receiptSequence.id,documentId:observed.ref.document_id,
-          started:state.execution_started,confirmed:state.execution_confirmed}};
+        executionWindow:receiptSequence&&{runtimeId:receiptSequence.id,documentId:observed.ref.document_id,
+          startSequence:state.execution_started,confirmedSequence:state.execution_confirmed}};
     },
     // Host lifecycle cleanup must bypass the user mutation facade. A retained
     // node/recovery gate still blocks package cleanup; it cannot block draining
