@@ -20,12 +20,11 @@ export type Lease = NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>
 export type Connection = {
   port: Port
   close(): Promise<void>
-  request?: (method: string, input: unknown, timeout?: number) => Promise<unknown>
+  request?: (method: string, input: unknown, timeout?: number, signal?: AbortSignal) => Promise<unknown>
 }
 
 type Started = {
   readonly directory: string
-  readonly deviceOnly: boolean
   readonly networkSettings?: RpcHandlers<typeof NetworkSettingsRpc>
   ready: Promise<Connection | undefined>
   connected?: boolean
@@ -54,7 +53,6 @@ const decodePublication = Schema.decodeUnknownOption(Schema.NullOr(PublicationSo
 export async function start(input: {
   data: string
   resources?: string
-  deviceOnly?: boolean
   networkSettings?: RpcHandlers<typeof NetworkSettingsRpc>
   connect?: () => Promise<Connection>
 }) {
@@ -80,7 +78,6 @@ export async function start(input: {
   const connect = input.connect ?? (input.resources ? nodeHost(root, input.resources) : undefined)
   const current: Started = {
     directory,
-    deviceOnly: input.deviceOnly ?? false,
     networkSettings: input.networkSettings,
     ready: Promise.resolve(undefined),
     held: new Map(),
@@ -152,7 +149,6 @@ export const networkSettings = () => state.current?.networkSettings
 
 export const connectionSettings = {
   request,
-  deviceOnly: () => state.current?.deviceOnly ?? false,
   holdTurn() {
     const id = randomUUID()
     const held = request("connection.settings.turn", { id, active: true }).catch(() => undefined)
@@ -163,11 +159,11 @@ export const connectionSettings = {
   },
 }
 
-async function request(method: string, input: unknown, timeout?: number) {
+async function request(method: string, input: unknown, timeout?: number, signal?: AbortSignal) {
   const current = state.current
   const connection = await current?.ready
   if (!connection?.request || current?.closing) throw new Error("LOGINOM_HOST_NOT_READY")
-  return connection.request(method, input, timeout)
+  return connection.request(method, input, timeout, signal)
 }
 
 /** Releases every lease still held, disconnects and closes the Host. Idempotent: soft stop (B2.3b) may call it first. */
