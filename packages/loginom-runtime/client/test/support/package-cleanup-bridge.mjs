@@ -1,5 +1,6 @@
 import vm from 'node:vm';
 import {makePackageCleanupCode} from '../../lib/package-cleanup.mjs';
+import {withLoginomMetadata} from '../../lib/loginom-feed-metadata.mjs';
 import test, {mock} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,readFile,rm,mkdir} from 'node:fs/promises';
@@ -168,7 +169,8 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
       if(f.receipts.has(operationId))return f.receipts.get(operationId);
       if(f.scenario==='failed-new-save'&&operationId==='failed-save')return {status:'NOT_APPLIED',action_key:key,operation_id:operationId,effect_possible:false,output:{}};
       f.saves++;f.path=parameters.path;
-      const result={status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};
+      const result={status:'SUCCEEDED',action_key:key,operation_id:operationId,
+        output:{package_ref:{path:parameters.path,active_identity:parameters.path}}};
       if((f.reopen&&key==='package.save_as')||f.normalized||f.verifiedReopen||f.recovered){result.output.reopened=true;f.activeTab='MF;cntMain;cntWorkspace;Workspace;t.br;tb-5';}
       if(f.normalized||f.verifiedReopen||f.recovered&&f.saves>1){
         const continuations=[{document_id:'own-doc',workflow_ref:{workflow_id:'own-workflow',tab_tid:f.activeTab,prefix:'MF;TF-5',
@@ -442,7 +444,14 @@ test('unknown prepared workflow advises only the last confirmed Save of its own 
   const config={resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
     mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
     loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2'};
-  const bridge=await createBridge(config,makeSession());
+  const bridge=await createBridge(config,makeSession(),{
+    presentNodeReply:(reply,project)=>{
+      const receipt=project({});
+      if(!receipt)return reply;
+      const pending=withLoginomMetadata(reply,{operationId:receipt.operationId,state:'running',verificationStale:true});
+      return withLoginomMetadata(pending,{receipt});
+    },
+  });
   const client=new AgentClient({name:'prepared-workflow-hint',version:'1'});
   const stale={intent:'existing_workflow',workflow_ref:{document_id:'old-doc',workflow_id:'old-workflow',
     tab_tid:'old-tab',prefix:'old',navigation_path:[{tid:'not-a-package-path',label:'guessed.lgp'}]}};
@@ -463,17 +472,25 @@ test('unknown prepared workflow advises only the last confirmed Save of its own 
     const unknown=await refusal();
     assert.deepEqual(unknown.arguments,{intent:'open_package'});assert.match(unknown.instruction,/does not know/);
     await client.callTool({name:'dock_prepare',arguments:{}});
-    await save('first-save','package.save_checkpoint',path);
+    const first=(await save('first-save','package.save_checkpoint',path))._meta.loginom;
+    assert.deepEqual(first.evidence,[{kind:'saved',path}]);
+    assert.equal(first.verificationStale,true);
+    assert.equal(first.state,'settled');
+    assert.ok(first.receiptOrder.started<first.receiptOrder.confirmed);
     assert.deepEqual((await refusal()).arguments,{intent:'open_package',package_path:path});
-    await save('newer-save','package.save_as',secondPath);
+    const newer=(await save('newer-save','package.save_as',secondPath))._meta.loginom;
+    assert.equal(newer.receiptOrder.runtimeId,first.receiptOrder.runtimeId);
+    assert.ok(newer.receiptOrder.started>first.receiptOrder.confirmed);
     assert.equal((await refusal()).arguments.package_path,secondPath);
-    await save('first-save','package.save_checkpoint',path);
+    assert.deepEqual((await save('first-save','package.save_checkpoint',path))._meta.loginom.receiptOrder,first.receiptOrder);
     assert.equal((await refusal()).arguments.package_path,secondPath);
     f.refuseOnce='failed-save';await save('failed-save','package.save_checkpoint',path);
     assert.equal((await refusal()).arguments.package_path,secondPath);
-    f.loseId='ambiguous-save';await save('ambiguous-save','package.save_checkpoint',path);
+    f.loseId='ambiguous-save';assert.equal((await save('ambiguous-save','package.save_checkpoint',path))._meta?.loginom,undefined);
     assert.equal((await refusal()).arguments.package_path,secondPath);
-    await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:'ambiguous-save'}});
+    const reconciled=await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:'ambiguous-save'}});
+    assert.deepEqual(reconciled._meta.loginom.evidence,[{kind:'saved',path}]);
+    assert.equal(reconciled._meta.loginom.operationId,'ambiguous-save');
     assert.equal((await refusal()).arguments.package_path,path);
     f.unsettled=true;
     const pending=await client.callTool({name:'dock_prepare',arguments:stale});
@@ -574,7 +591,7 @@ for(const mode of ['isolated','product','normal'])for(const scenario of mode==='
       if(!scenario.endsWith('no-save')){
         const saved=await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'own-save'}});
         const values=saved.content.filter(c=>c.type==='text').map(c=>{try{return JSON.parse(c.text);}catch{return {};}});
-        assert.equal(values[0].status,'SUCCEEDED');if(!scenario.startsWith('product-'))assert.deepEqual(values[0].output,{package_ref:{path}});
+        assert.equal(values[0].status,'SUCCEEDED');if(!scenario.startsWith('product-'))assert.deepEqual(values[0].output,{package_ref:{path,active_identity:path}});
         const advice=values.find(v=>v.kind==='dock_saved_package_state');assert.ok(advice);
         assert.equal(advice.modified,scenario==='state-unavailable'?null:scenario==='dirty-after-save');
         if(scenario==='dirty-after-save'){

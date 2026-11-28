@@ -2,6 +2,11 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readFile, rm, symlink, unlink } from "node:fs/promises"
 import { MessageChannel } from "node:worker_threads"
 import { Schema } from "effect"
+import { Agent } from "@opencode/schema/agent"
+import { AbsolutePath } from "@opencode/schema/schema"
+import { Session } from "@opencode/schema/session"
+import { SessionMessage } from "@opencode/schema/session-message"
+import { Tool } from "@opencode/schema/tool"
 import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
 import { supervise } from "../src/supervisor"
@@ -12,8 +17,9 @@ import { HostTaskScope } from "../src/task-scope"
 import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
 import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
+import { dockTools } from "../../loginom-agent/src/dock"
 
-test("actual managed entry reads live bridge work and dispatching over private IPC", async () => {
+test("actual managed entry relays work, dispatch and Dock tool progress over private IPC", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "managed-work-entry-"))
@@ -44,8 +50,14 @@ test("actual managed entry reads live bridge work and dispatching over private I
       return { manifestHash: 'fixture', manifest: { actionManifestSha256: 'fixture' } };
     }`,
     "runtime/src/connection-check.mjs": `
+      import { EventEmitter } from 'node:events';
       export const loginomAddress = value => value;
-      export const loginBrowser = async () => ({ context: { close: async () => {} } });
+      export const loginBrowser = async ({ onContextCreated }) => {
+        const context = Object.assign(new EventEmitter(), { pages: () => [], close: async () => {} });
+        onContextCreated?.(context);
+        context.emit('response', { url: () => 'http://example.test/app/', fromServiceWorker: () => false });
+        return { context };
+      };
       export const reauthenticateReloadedPage = async () => { throw Error('work state fixture does not log in again'); };`,
     "runtime/client/package.json": JSON.stringify({ type: "module" }),
     "runtime/client/lib/execution-journal.mjs": await readFile(
@@ -58,6 +70,14 @@ test("actual managed entry reads live bridge work and dispatching over private I
     ),
     "runtime/client/lib/browser-downloads.mjs": await readFile(
       new URL("../../loginom-runtime/client/lib/browser-downloads.mjs", import.meta.url),
+      "utf8",
+    ),
+    "runtime/client/lib/step-progress.mjs": await readFile(
+      new URL("../../loginom-runtime/client/lib/step-progress.mjs", import.meta.url),
+      "utf8",
+    ),
+    "runtime/client/lib/loginom-feed-metadata.mjs": await readFile(
+      new URL("../../loginom-runtime/client/lib/loginom-feed-metadata.mjs", import.meta.url),
       "utf8",
     ),
     "runtime/client/lib/catalog.mjs": await readFile(
@@ -79,6 +99,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
        export const artifactFailure=artifacts.artifactFailure ?? (()=>null);`,
     "runtime/client/lib/bridge.mjs": `
       import { readFileSync } from 'node:fs';
+      import { withLoginomMetadata } from './loginom-feed-metadata.mjs';
       import { loginomFeedMetadata } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/user-results.mjs", import.meta.url).href)};
       const work = () => JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8'));
       export async function createBridge(_config, _session, {presentNodeReply}) { return {
@@ -86,8 +107,9 @@ test("actual managed entry reads live bridge work and dispatching over private I
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
-        applyWithScanReceipt: reply => presentNodeReply(reply, options =>
-          loginomFeedMetadata(reply, {...options, tool:'dock_node_apply'})),
+        applyWithScanReceipt: reply => presentNodeReply(
+          withLoginomMetadata(reply, {operationId:reply.structuredContent.operation_id, state:'settled', verificationStale:true}),
+          options => loginomFeedMetadata(reply, {...options, tool:'dock_node_apply'})),
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
           return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
@@ -100,6 +122,15 @@ test("actual managed entry reads live bridge work and dispatching over private I
         async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }] }; }
         async callTool(input, _unused, { signal }) {
           if (input.arguments.failAfterDispatch) throw Error('LOGINOM_FILE_CHANGED');
+          if (input.arguments.progressFixture) {
+            const { stepPhase } = await import('../../../../lib/step-progress.mjs');
+            stepPhase('configuring', 'transform.group_data', { kind: 'fields', index: 2, total: 3 });
+            await new Promise(resolve => setTimeout(resolve, 1700));
+            stepPhase('reading', 'transform.group_data');
+            await new Promise(resolve => setTimeout(resolve, 1550));
+            setTimeout(() => stepPhase('executing'), 50);
+            return { content: [{ type: 'text', text: 'original model result' }] };
+          }
           if (!input.arguments.hold) return { content: [] };
           await new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(Error('aborted')), { once: true }));
         }
@@ -189,6 +220,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
             operationId: "test-operation",
             node: { label: "test node" },
             evidence: [{ kind: "tableRead", port: 0, portGuid: "port-guid", rowsRead: 3, rowCount: 3 }],
+            verificationStale: true,
             ports: [
               {
                 preview: {
@@ -273,6 +305,53 @@ test("actual managed entry reads live bridge work and dispatching over private I
     )
     await run.call("dock_prepare", {}, "msg_original")
     await run.tools()
+    const sessionID = Session.ID.make("ses_file_errors")
+    const messageID = SessionMessage.ID.make("msg_original")
+    type DockPlugin = Parameters<typeof dockTools>[0]["plugin"]
+    const captured: { transform?: Parameters<DockPlugin["tool"]["transform"]>[0] } = {}
+    const dock = await dockTools({
+      plugin: {
+        location: { directory: AbsolutePath.make(directory) },
+        tool: {
+          transform: async (transform) => {
+            captured.transform = transform
+            return { dispose: async () => undefined }
+          },
+          reload: async () => undefined,
+        },
+        model: { list: async () => { throw Error("No model access in fixture") } },
+        session: { context: async () => [] },
+      },
+      files: { ask: async () => undefined, snapshot: async () => { throw Error("Unexpected file snapshot") } },
+      profiles: directory,
+      ready: () => true,
+      lease: async () => run,
+      task: async () => messageID,
+      failure: () => undefined,
+      wrap: (tool) => tool,
+    })
+    await dock.refresh(sessionID, "loginom-automation", undefined)
+    type Editor = Parameters<NonNullable<typeof captured.transform>>[0]
+    const tools = new Map<string, Parameters<Editor["add"]>[0]>()
+    captured.transform?.({
+      add: (tool) => tools.set(tool.name, tool),
+      list: () => [], get: () => undefined, namespace: () => undefined, update: () => undefined, remove: () => undefined,
+    })
+    const tool = tools.get("loginom_fixture")
+    if (!tool) throw Error("Fixture tool not registered")
+    const updates: unknown[] = []
+    const result = await tool.execute({ progressFixture: true }, {
+      sessionID, messageID, agent: Agent.ID.make("fixture"), id: Tool.CallID.make("fixture"),
+      signal: new AbortController().signal,
+      progress: async (update) => { updates.push(update) },
+    })
+    expect(result).toEqual({ content: "original model result", metadata: { generation: 1 } })
+    expect(updates).toEqual([
+      { loginomStep: { version: 1, phase: "configuring", nodeType: "transform.group_data", substep: { kind: "fields", index: 2, total: 3 }, startedAt: expect.any(Number), lastReplyAt: expect.any(Number), stalledSince: null } },
+      { loginomStep: { version: 1, phase: "reading", nodeType: "transform.group_data", substep: null, startedAt: expect.any(Number), lastReplyAt: expect.any(Number), stalledSince: null } },
+    ])
+    await Bun.sleep(1_600)
+    expect(updates).toHaveLength(2)
     for (const [name, code] of [
       ["missing", "LOGINOM_FILE_NOT_FOUND"],
       ["directory", "LOGINOM_FILE_NOT_REGULAR"],

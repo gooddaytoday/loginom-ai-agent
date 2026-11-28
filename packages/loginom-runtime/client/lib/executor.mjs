@@ -2183,7 +2183,7 @@ export function parseCapabilityResult(response,{redactor}={}) {
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
   nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, getPreparationReceipt = () => null,
-  browserRecovery = false, probePreparedPage, reopenNodePackage, cacheDirectory, serverSourceCache = true }) {
+  browserRecovery = false, probePreparedPage, reopenNodePackage, cacheDirectory, serverSourceCache = true, receiptSequence }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   const executeBrowser=execute;
   execute=async(...args)=>{
@@ -4714,7 +4714,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         operations.set(operation.id,operation);pending=operation;observations.clear();
         let result;
         try{result=await applyNode({request,operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,
-          record:onRecord,signal,stopSignal,now,resume,deadlineAt:admissionDeadline,admissionUncertainty});}
+          record:onRecord,signal,stopSignal,now,resume,deadlineAt:admissionDeadline,admissionUncertainty,
+          nextReceiptSequence:receiptSequence?.next});}
         catch(error){
           // Keep the claimed ID even if the first phase could not be started.
           // A reused ID must never silently acquire a different request.
@@ -4874,8 +4875,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         ?observed.type?.startsWith('exports.')?'export':'execute'
         :request.finish==='done'?'configure':undefined;
       return {node:{ref:observed.ref,label,type:observed.type},kind,
-        launchedExecutionId:finish?.mode==='execute'?finish.execution_id:undefined,readPorts:state.output?.ports,
-        executionWindow:{documentId:observed.ref.document_id, startedAt:state.execution_started_at, confirmedAt:state.execution_completed_at}};
+        launchedExecutionId:finish?.mode==='execute'?finish.execution_id:undefined,
+        executionOrder:receiptSequence&&{runtimeId:receiptSequence.id,documentId:observed.ref.document_id,
+          started:state.execution_started,confirmed:state.execution_confirmed}};
     },
     // Host lifecycle cleanup must bypass the user mutation facade. A retained
     // node/recovery gate still blocks package cleanup; it cannot block draining

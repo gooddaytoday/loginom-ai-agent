@@ -1,4 +1,5 @@
 import {validateVariableBindings} from './variable-binding-parameters.mjs';
+import {stepPhase} from './step-progress.mjs';
 import {validateVariablePortMapping} from './variable-port-mapping.mjs';
 import {calculatorVariableMappingRefusal,restVariableMappingNoEffectRefusal,unionWizardOpeningRefusal,variablesCalculatorDeactivationRefusal} from './node-pending-release.mjs';
 import {createHash} from 'node:crypto';
@@ -201,7 +202,7 @@ export async function reconcileNodeWorkflow({operation,adapter,record,now=Date.n
 }
 
 export async function applyNode({request, operation, handlers, drivers, record,
-  signal, stopSignal, now=Date.now, resume=false, deadlineAt=Infinity, admissionUncertainty}) {
+  signal, stopSignal, now=Date.now, resume=false, deadlineAt=Infinity, admissionUncertainty, nextReceiptSequence}) {
   request=structuredClone(request);
   const {graph,handler}=validateNodeApplyRequest(request,handlers);
   requireValue(operation.id===request.operation_id, 'node.apply operation identity differs');
@@ -279,6 +280,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
     const deadline=Math.min(state.deadline,now()+budget,configuration?state.configure_deadline:Infinity,
       executionPhase&&state.execution_wait?.phase===name?state.execution_wait.deadline:Infinity);
     requireValue(now()<deadline,'node.apply configuration deadline elapsed');
+    stepPhase(name==='read'?'reading':executionPhase||name==='materialization_start'
+      ||name==='finish'&&request.finish==='execute'?'executing':configuration?'configuring':'waiting',request.target.type);
     const oldConfigure=continuingConfigure&&name==='configure',oldOpen=continuingOpen&&name==='open',oldFinish=continuingFinish&&name==='finish';
     const pending=oldConfigure||oldOpen||oldFinish?state.pending:{phase:name,receipt_id:operation.id+':'+name,deadline,
       effect_possible:mutation,before_node:structuredClone(state.node)};
@@ -291,7 +294,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // Preserve uncertainty until the driver and journal both confirm completion.
     const previousEffect=state.effect_possible;
     state.effect_possible ||= mutation;
-    if(name==='finish'&&request.finish==='execute')state.execution_started_at=Math.floor(performance.now());
+    if(name==='finish'&&request.finish==='execute')state.execution_started=nextReceiptSequence?.();
     let value;
     try{value=await call({...context(),receipt_id:pending.receipt_id,deadline:pending.deadline});}
     catch(error){
@@ -518,7 +521,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         return result;
       }
       state.execution={status:'completed',execution_id:execution.execution_id};
-      if(name==='execute')state.execution_completed_at=Math.floor(performance.now());
+      if(name==='execute')state.execution_confirmed=nextReceiptSequence?.();
       return null;
   };
   try {
