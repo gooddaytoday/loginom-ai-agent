@@ -2,12 +2,15 @@
 // reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host itself belongs to the server process
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
+import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
+import { Session } from "@opencode/schema/session"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
+import { Schema } from "effect"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
 import { Dashboard } from "./dashboard"
@@ -73,6 +76,44 @@ const preflight = {
         additionalProperties: false,
       },
       output: { type: "object", properties: { code: { type: "string" } }, additionalProperties: false },
+    },
+  },
+  events: {},
+} as const
+
+const work = {
+  id: "loginom.work",
+  methods: {
+    busy: {
+      input: {
+        type: "object",
+        properties: { sessionID: { type: "string" } },
+        required: ["sessionID"],
+        additionalProperties: false,
+      },
+      output: {
+        type: "object",
+        properties: {
+          busy: {
+            anyOf: [
+              { type: "null" },
+              {
+                type: "object",
+                properties: {
+                  version: { const: 1 },
+                  windowId: { type: "string" },
+                  operationId: { type: "string" },
+                  active: { type: "boolean" },
+                },
+                required: ["version", "windowId", "operationId", "active"],
+                additionalProperties: false,
+              },
+            ],
+          },
+        },
+        required: ["busy"],
+        additionalProperties: false,
+      },
     },
   },
   events: {},
@@ -507,6 +548,14 @@ export default Plugin.define({
       check: async (value) => {
         const code = await ServiceHost.preflight((value as { automation: boolean }).automation)
         return code ? { code } : {}
+      },
+    })
+    await ctx.rpc.register(work, {
+      busy: async (value) => {
+        const { sessionID } = Schema.decodeUnknownSync(Schema.Struct({ sessionID: Session.ID }))(value)
+        const { location } = await ctx.session.get({ sessionID })
+        if (location.directory !== ctx.location.directory) throw Error("LOGINOM_SCOPE_DENIED")
+        return { busy: await LoginomHost.busy(sessionID) }
       },
     })
     // A dashboard's folder before its chat (B2.9h): Desktop and the CLI ask on the Location of their own working directory.

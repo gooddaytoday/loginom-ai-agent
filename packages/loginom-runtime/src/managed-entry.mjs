@@ -38,6 +38,7 @@ const state = {
   browserServer: undefined,
   lastLoginomReplyAt: null,
   protectedOperation: undefined,
+  windowPage: undefined,
   inputs: new Map(),
   owner: undefined,
   uploadDirectory: undefined,
@@ -256,7 +257,8 @@ async function handle(message) {
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
       const knownSecrets = [input.connection.apiKey, input.connection.password]
-      state.protectedOperation = createProtectedOperation(authenticated.context, new URL(input.connection.url).origin)
+      state.windowPage = authenticated.page
+      state.protectedOperation = createProtectedOperation(state.windowPage, state.owner.origin)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
         protectOperation: state.protectedOperation.begin,
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),

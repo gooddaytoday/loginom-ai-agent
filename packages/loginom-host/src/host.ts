@@ -809,6 +809,17 @@ export async function createLoginomHost(options: {
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true
     },
+    async busySnapshot(generation: number, chat: string) {
+      const child = generations.get(generation)?.children.get(chat)
+      if (!child) return null
+      const result = await (await child).request("work", undefined, 5_000)
+      if (result && typeof result === "object" && "busy" in result) {
+        if (result.busy === null) return null
+        const busy = decodeBusy(result.busy)
+        if (busy) return busy
+      }
+      throw new Error("LOGINOM_REPLY_INVALID")
+    },
     async workState(generation: number, chat: string) {
       // Inspect only the existing owner. Losing it is uncertainty, not evidence of idle work.
       if (lost.has(chat) || stale.has(chat)) throw new Error("LOGINOM_RUNTIME_UNAVAILABLE")
@@ -826,12 +837,7 @@ export async function createLoginomHost(options: {
         typeof result.dispatching !== "boolean"
       )
         throw new Error("LOGINOM_REPLY_INVALID")
-      const busy = "busy" in result && result.busy !== null ? decodeBusy(result.busy) : undefined
-      if ("busy" in result && result.busy !== null && !busy) throw new Error("LOGINOM_REPLY_INVALID")
-      return {
-        activeWork: result.activeWork, unsettledWork: result.unsettledWork, dispatching: result.dispatching,
-        ...(busy ? { busy } : {}),
-      }
+      return { activeWork: result.activeWork, unsettledWork: result.unsettledWork, dispatching: result.dispatching }
     },
     async runtime(generation: number, chat: string, startup?: { deadline: number; signal: AbortSignal }) {
       const current = generations.get(generation)

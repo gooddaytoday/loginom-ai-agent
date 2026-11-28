@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 const warning = 'Агент работает в окне Loginom — не меняйте схему до конца шага';
+const paintTimeoutMs = 250;
 
 function showWarning({ id, origin, text }) {
   if (location.origin !== origin || !document.documentElement || document.getElementById(id)) return;
@@ -16,7 +17,11 @@ function showWarning({ id, origin, text }) {
   document.documentElement.append(layer);
 }
 
-export function createProtectedOperation(context, origin) {
+function removeWarning({ id, origin }) {
+  if (location.origin === origin) document.getElementById(id)?.remove();
+}
+
+export function createProtectedOperation(page, origin) {
   const windowId = randomUUID();
   const listeners = new Set();
   let current;
@@ -36,24 +41,27 @@ export function createProtectedOperation(context, origin) {
       const started = { version: 1, windowId, operationId, active: true };
       const id = 'loginom-agent-busy-' + randomUUID();
       publish(started);
-      const pages = context.pages().filter(page => !page.isClosed() && URL.parse(page.url())?.origin === origin);
-      const page = pages.length === 1 ? pages[0] : undefined;
-      let painting, ending;
-      const paint = () => {
-        if (!page) return;
-        painting = page.evaluate(showWarning, { id, origin, text: warning }).catch(() => undefined);
+      let ended = false;
+      const remove = async () => page?.evaluate(removeWarning, { id, origin });
+      const paint = async () => {
+        await page?.evaluate(showWarning, { id, origin, text: warning }).catch(() => undefined);
+        if (ended) void remove().catch(() => undefined);
       };
-      page?.on('domcontentloaded', paint);
-      paint();
-      await painting;
-      return () => ending ??= (async () => {
-        page?.off('domcontentloaded', paint);
-        await painting;
-        await page?.evaluate(({ id, origin }) => {
-          if (location.origin === origin) document.getElementById(id)?.remove();
-        }, { id, origin }).catch(() => undefined);
+      const repaint = () => { void paint().catch(() => undefined); };
+      if (page) {
+        page.on('domcontentloaded', repaint);
+        let timer;
+        try {
+          await Promise.race([paint(), new Promise(resolve => { timer = setTimeout(resolve, paintTimeoutMs); })]);
+        } finally { clearTimeout(timer); }
+      }
+      return () => {
+        if (ended) return;
+        ended = true;
+        page?.off('domcontentloaded', repaint);
         publish({ ...started, active: false });
-      })();
+        void remove().catch(() => undefined);
+      };
     },
   };
 }

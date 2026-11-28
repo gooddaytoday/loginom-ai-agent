@@ -2215,8 +2215,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   let pending = null;
   const settlePending = async operation => {
     if(pending!==operation)return;
-    if(operation.endProtection)await operation.endProtection();
-    if(pending===operation)pending=null;
+    pending=null;
+    operation.endProtection?.();
   };
   let running = false;
   const operations = new Map();
@@ -4808,7 +4808,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if(protectOperation&&['package.save_as','package.save_checkpoint'].includes(actionKey)){
           operation.endProtection=await protectOperation(operation.id);
           if(signal?.aborted||now()>=operation.deadline){
-            await operation.endProtection();
+            operation.endProtection();
             signal?.throwIfAborted();
             throw Error('Save deadline expired before mutation');
           }

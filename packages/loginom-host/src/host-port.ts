@@ -189,6 +189,18 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     )
       return
     const input = "input" in data ? data.input : undefined
+    if (data.method === "busy") {
+      try {
+        const { session } = Schema.decodeUnknownSync(Schema.Struct({ session: Schema.NonEmptyString }))(input)
+        const chat = createHash("sha256").update(session).digest("hex")
+        const generation = [...runs.values()].find((run) => run.chat === chat)?.lease?.generation
+          ?? service.recoveries.get(chat)?.generation ?? (await service.api.status()).generation
+        reply({ id: data.id, result: await service.busySnapshot(generation, chat) })
+      } catch (error) {
+        reply({ id: data.id, ...hostFailure(error) })
+      }
+      return
+    }
     if (!input || typeof input !== "object" || !("run" in input) || typeof input.run !== "string") {
       reply({ id: data.id, error: "LOGINOM_HOST_REQUEST_FAILED" })
       return
@@ -362,12 +374,6 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         return
       }
       if (run.scope?.profile === "loginom-dashboard" && data.method === "call") throw new Error("LOGINOM_SCOPE_DENIED")
-      if (data.method === "busy") {
-        const generation = run.lease?.generation ?? (await service.api.status()).generation
-        const state = await service.workState(generation, run.chat)
-        reply({ id: data.id, result: state.busy ?? null }, generation)
-        return
-      }
       const browserCall =
         data.method === "call" &&
         "name" in input &&

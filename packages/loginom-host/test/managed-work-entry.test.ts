@@ -125,6 +125,12 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }] }; }
         async callTool(input, _unused, { signal }) {
           if (input.arguments.failAfterDispatch) throw Error('LOGINOM_FILE_CHANGED');
+          if (input.arguments.pendingFixture) {
+            const { protect } = await import('../../../../lib/bridge.mjs');
+            this.endPending = await protect('pending-operation');
+            return { content: [], structuredContent: { state: 'pending' } };
+          }
+          if (input.arguments.settleFixture) this.endPending();
           if (input.arguments.progressFixture) {
             const { stepPhase } = await import('../../../../lib/step-progress.mjs');
             const { protect } = await import('../../../../lib/bridge.mjs');
@@ -356,12 +362,12 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       progress: async (update) => { updates.push(update); entered.resolve() },
     })
     await Promise.race([entered.promise, running])
-    const active = await run.busy()
+    const active = await LoginomHost.busy("file-errors")
     if (!active) throw Error("Protected operation did not publish a live snapshot")
     expect(active).toMatchObject({ version: 1, windowId: expect.any(String), operationId: "progress-operation", active: true })
     const result = await running
     const settled = { ...active, active: false }
-    expect(await run.busy()).toEqual(settled)
+    expect(await LoginomHost.busy("file-errors")).toEqual(settled)
     expect(result).toEqual({ content: "original model result", metadata: { generation: 1 } })
     expect(updates).toEqual([
       { loginom: { busy: active } },
@@ -406,6 +412,18 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         .catch((error: unknown) => error)
       expect(callError).toMatchObject({ message: code })
     }
+    fault.name = ""
+    await Bun.write(work, JSON.stringify({ activeWork: true, unsettledWork: true, prepared: true }))
+    expect(await run.call("fixture", { pendingFixture: true }, "msg_original")).toMatchObject({
+      structuredContent: { state: "pending" },
+    })
+    const background = await LoginomHost.busy("file-errors")
+    if (!background) throw Error("Protected operation did not retain its snapshot")
+    expect(background).toMatchObject({ operationId: "pending-operation", active: true })
+    expect(await LoginomHost.busy("different-chat")).toBeNull()
+    await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared: true }))
+    await run.call("fixture", { settleFixture: true }, "msg_original")
+    expect(await LoginomHost.busy("file-errors")).toEqual({ ...background, active: false })
     // Once dispatch has started, a thrown file-shaped error cannot certify
     // no effect and must still become CALL_UNCERTAIN.
     fault.name = ""
@@ -414,6 +432,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       .catch((error: unknown) => error)
     expect(uncertain).toMatchObject({ message: "LOGINOM_CALL_UNCERTAIN" })
     await run.release()
+    expect(await LoginomHost.busy("file-errors")).toEqual({ ...background, active: false })
   } finally {
     LoginomHost.disconnect()
     await port.close()

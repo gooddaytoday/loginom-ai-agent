@@ -38,7 +38,7 @@ function fixture({execute=async()=>{throw Error('Unexpected public transport')},
 }
 
 test('interrupting Wait does not cancel Apply or clear its busy signal',async()=>{
- const tracker=createProtectedOperation({pages:()=>[]},'http://loginom.test');
+ const tracker=createProtectedOperation(undefined,'http://loginom.test');
  const entered=Promise.withResolvers(),release=Promise.withResolvers();
  const f=fixture({protectOperation:tracker.begin,wrapDrivers:(_context,drivers)=>({...drivers,mapPorts:async(mappings,ctx)=>{
   entered.resolve();await release.promise;return drivers.mapPorts(mappings,ctx);

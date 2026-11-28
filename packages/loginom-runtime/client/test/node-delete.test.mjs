@@ -268,8 +268,7 @@ for(const outcome of ['success','refused','failure','interrupt'])test('protected
   getElementById:id=>layer?.id===id?layer:undefined,documentElement:{append:node=>{layer=node;}}};
  const page=Object.assign(new EventEmitter(),{isClosed:()=>false,url:()=>origin,
   evaluate:async (fn,input)=>runInNewContext(`(${fn})(input)`,{document,location:{origin},input})});
- const context={pages:()=>[page]};
- const protectedOperation=createProtectedOperation(context,origin);
+ const protectedOperation=createProtectedOperation(page,origin);
  const f=runtime(chain(),protectedOperation.begin);
  const controller=new AbortController();
  const updates=[];
@@ -308,6 +307,22 @@ for(const outcome of ['success','refused','failure','interrupt'])test('protected
   assert.equal(layer,undefined);
  }
  unsubscribe();
+});
+test('a stalled browser renderer does not block the protected gesture or its cleanup', {timeout:3000}, async()=>{
+ const evaluations=[];
+ const page=Object.assign(new EventEmitter(),{evaluate:(_fn,input)=>{
+  evaluations.push(input);
+  return new Promise(()=>{});
+ }});
+ const protectedOperation=createProtectedOperation(page,'https://loginom.test');
+ const f=runtime(chain(),protectedOperation.begin);
+ const result=await dispatchNodeApi(f.runtime,'dock_node_delete',args);
+ assert.equal(result.outcome.status,'SUCCEEDED');
+ assert.equal(protectedOperation.snapshot()?.active,false);
+ assert.equal(evaluations.length,2);
+ assert.equal(evaluations[0].id,evaluations[1].id);
+ const next=await dispatchNodeApi(f.runtime,'dock_node_delete',{...args,operation_id:'next-delete'});
+ assert.equal(next.outcome.status,'NOT_APPLIED');
 });
 test('dock_node_delete deletes through the public tool and reports a user-v1 receipt',async()=>{
  const f=runtime();assert.ok(f.runtime.tools.some(t=>t.name==='dock_node_delete'));

@@ -20,6 +20,11 @@ export function disconnect() {
   state.connection?.close()
   state.connection = undefined
 }
+export async function busy(session: string) {
+  const connection = state.connection
+  if (!connection) return null
+  return Schema.decodeUnknownSync(Schema.NullOr(Busy))(await connection.request("busy", { session }, 6_000))
+}
 export async function acquire(session: string) {
   const connection = state.connection
   if (!connection) return
@@ -123,11 +128,6 @@ export async function acquire(session: string) {
     },
     async tools() {
       return connection.request("tools", { run }, undefined, observe)
-    },
-    async busy() {
-      return Schema.decodeUnknownSync(Schema.NullOr(Busy))(
-        await connection.request("busy", { run }, undefined, observe),
-      )
     },
     async call(
       name: string,

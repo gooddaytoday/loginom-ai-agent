@@ -26,6 +26,7 @@ import { BrowserRecovery } from "../../loginom-agent/src/browser-recovery"
 import { ServiceHost } from "../../loginom-agent/src/host"
 import { launchNodeHost } from "../../loginom-host/src/node-client"
 import { createEmbeddedRoutes } from "../src/routes"
+import { pluginsLoaded } from "./fixture/routes"
 
 // Host lease of the built-in product plugin `loginom.product` (guarantee G3, stage B2.3), the cases of spike S2 on a real
 // server with a scripted model and the real private Node host. The Host starts as the server process starts it
@@ -261,6 +262,15 @@ const boot = (options: { sent?: unknown[]; handshake?: Promise<void> } = {}) =>
       create,
       prompt,
       wizard,
+      pluginsLoaded: pluginsLoaded(context, dir),
+      busy: (sessionID: Session.ID) =>
+        Effect.promise(async () => {
+          const response = await handler(new Request(
+            `http://opencode.local/api/rpc/loginom.work/busy?location[directory]=${encodeURIComponent(dir)}`,
+            { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: { sessionID } }) },
+          ))
+          return { status: response.status, body: await response.json() }
+        }),
       history,
       ended,
       unload,
@@ -273,6 +283,19 @@ const boot = (options: { sent?: unknown[]; handshake?: Promise<void> } = {}) =>
   })
 
 describe("loginom.product Host lease (G3, spike S2)", () => {
+  it.live(
+    "reads busy for a chat without leasing it or starting a runtime",
+    () => Effect.gen(function* () {
+      const sent: unknown[] = []
+      const fixture = yield* boot({ sent })
+      const sessionID = yield* fixture.create("idle chat")
+      yield* fixture.pluginsLoaded
+      expect(yield* fixture.busy(sessionID)).toEqual({ status: 200, body: { output: { busy: null } } })
+      expect(yield* fixture.leased).toEqual([])
+      expect(sent).toEqual([expect.objectContaining({ method: "busy", input: { session: sessionID } })])
+    }),
+    timeout,
+  )
   it.live(
     "S2 success: an execution holds one Host lease until it succeeds, and the session's next execution leases again",
     () =>

@@ -40,7 +40,7 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
  const form=page.app.Application.FInstance.FMainForm,connection=form.FMapTree.FServerConnection;
  connection.FSession={};connection.FRemoteSession={};form.FReconnecting=false;
  if(fault==='retry-restore')page.context.Ext.Msg={cfg:{}};
- const tracker=createProtectedOperation({pages:()=>[]},'https://loginom.invalid');
+ const tracker=createProtectedOperation(undefined,'https://loginom.invalid');
  const updates=[];
  tracker.subscribe(update=>updates.push(update.active));
  const engine=runtime(page,{getStorageBinding:()=>binding,

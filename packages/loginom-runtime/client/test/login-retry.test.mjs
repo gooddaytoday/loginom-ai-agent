@@ -4,10 +4,43 @@ import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loginBrowser } from '../../src/connection-check.mjs';
+import { createProtectedOperation } from '../../src/protected-operation.mjs';
 
 const browserPath=process.env.LOGINOM_DOCK_TEST_BROWSER;
 const html=identity=>`<div data-tid="MF;cntMain;tlbMainToolbar;btnAvatar">User</div>
 <script>window.bg={app:{Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:{UserName:${JSON.stringify(identity)}}}}}}}};</script>`;
+
+test('only the authenticated conversation page warns while a protected operation runs',
+  {skip:!browserPath,timeout:30000},async()=>{
+  const profile=await mkdtemp(join(tmpdir(),'login-busy-'));
+  const url='http://login-busy.invalid/app/';
+  let context;
+  try {
+    const {page,context:browser}=await loginBrowser({browserPath,profile,headless:true,keepOpen:true,
+      candidate:{url,username:'worker',password:''},
+      onContextCreated:async value=>{
+        await value.route('**/*',route=>route.fulfill({contentType:'text/html',body:html('worker')}));
+      }});
+    context=browser;
+    const other=await context.newPage();
+    await other.goto(url);
+    await other.bringToFront();
+    const tracker=createProtectedOperation(page,new URL(url).origin);
+    const layer='[id^="loginom-agent-busy-"]';
+    const end=await tracker.begin('pending-operation');
+    await page.locator(layer).waitFor({state:'attached',timeout:5000});
+    assert.equal(await other.locator(layer).count(),0);
+    await page.reload();
+    await page.locator(layer).waitFor({state:'attached',timeout:5000});
+    end();
+    await page.locator(layer).waitFor({state:'detached',timeout:5000});
+    await page.reload();
+    assert.equal(await page.locator(layer).count(),0);
+  } finally {
+    await context?.close();
+    await rm(profile,{recursive:true,force:true});
+  }
+});
 
 for(const keepOpen of [false,true])
 for(const mode of ['normal','success','form','retry-deadline','twice','mismatch','rejected','cancel','deadline','cleanup','journal'])
