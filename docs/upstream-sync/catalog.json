@@ -61,7 +61,8 @@
         "packages/core/src/session/message-updater.ts", "packages/schema/src/session-event.ts",
         "packages/schema/src/session-message.ts", "packages/client/src/effect/api/api.ts",
         "packages/app/src/runtime/server/data.test.ts"
-      ]
+      ],
+      "note": "The built-in Loginom package references RPC checks session directory, workspace and project at the product seam before calling Host; the public session representation omits workspaceID."
     },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7" },
     {

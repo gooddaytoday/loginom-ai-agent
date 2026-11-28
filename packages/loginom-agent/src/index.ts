@@ -112,8 +112,10 @@ const permission = {
   events: {},
 } as const
 
-export default Plugin.define({
-  id: "loginom.product",
+export const pluginID = "loginom.product"
+
+export default (ownsSession: (sessionID: string) => Promise<boolean>) => Plugin.define({
+  id: pluginID,
   setup: async (ctx) => {
     // Access grants (G1), keyed by the exact session ID: a subsession, a fork and a scheduled wake run in another
     // session or arrive as a new prompt, so none of them inherits a grant. A grant lives for one task, as in 0.4: from the
@@ -540,8 +542,7 @@ export default Plugin.define({
       },
     })
     await ctx.rpc.register(Packages, packageListHandlers())
-    await ctx.rpc.register(PackageReferences, packageReferencesHandlers((sessionID) =>
-      ctx.session.get({ sessionID }).then(() => true, () => false)))
+    await ctx.rpc.register(PackageReferences, packageReferencesHandlers(ownsSession))
     await ctx.rpc.register(permission, {
       conversation: async (value, call) => {
         const input = value as { sessionID: string; requestID: string }

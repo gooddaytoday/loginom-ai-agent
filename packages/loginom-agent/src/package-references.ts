@@ -12,7 +12,8 @@ export function packageReferencesHandlers(
     async references({ sessionID }, { signal }) {
       signal.throwIfAborted()
       try {
-        if (!await ownsSession(sessionID)) return referencesNotChecked("no_copy")
+        if (!(await ownsSession(sessionID))) return referencesNotChecked("no_copy")
+        signal.throwIfAborted()
         const generation = await host.generation()
         signal.throwIfAborted()
         if (!generation) return referencesNotChecked("not_connected")
