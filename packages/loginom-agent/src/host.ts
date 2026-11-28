@@ -10,8 +10,9 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
+import { hostError } from "@loginom-ai-agent/loginom-host/errors"
 import type { Loginom } from "@loginom-ai-agent/loginom-host/loginom"
-import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
+import { launchNodeHost, NodeHostStartupError } from "@loginom-ai-agent/loginom-host/node-client"
 import { StepCheckRequest, StepCheckResult } from "@loginom-ai-agent/loginom-host/step-state"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { WriteOutcomeInput, WriteOutcomeResult } from "@loginom-ai-agent/loginom-host/write-outcomes"
@@ -27,7 +28,7 @@ export type Connection = {
 type Started = {
   readonly directory: string
   ready: Promise<Connection | undefined>
-  connected?: boolean
+  startup?: "starting" | "ready" | { reason: string }
   held: Map<Lease, string>
   closing?: Promise<void>
 }
@@ -79,16 +80,20 @@ export async function start(input: {
   const current: Started = {
     directory,
     ready: Promise.resolve(undefined),
+    startup: connect ? "starting" : undefined,
     held: new Map(),
   }
   current.ready = (connect?.() ?? Promise.resolve(undefined)).then(
     (connection) => {
       if (connection && current.closing) return connection.close().then(() => undefined)
       if (connection) LoginomHost.connect(connection.port)
-      current.connected = !!connection
+      current.startup = connection ? "ready" : undefined
       return connection
     },
-    () => undefined,
+    (error: unknown) => {
+      current.startup = { reason: error instanceof NodeHostStartupError ? error.message : hostError(error) }
+      return undefined
+    },
   )
   state.current = current
   return { recovered, close }
@@ -96,7 +101,7 @@ export async function start(input: {
 
 /** Whether the Host finished its handshake: before that, `acquire` waits for it (up to the handshake's 180 s). */
 export function connected() {
-  return !!state.current?.connected && !state.current.closing
+  return state.current?.startup === "ready" && !state.current.closing
 }
 
 /**
@@ -152,6 +157,10 @@ export async function checkStepState(input: typeof StepCheckRequest.Type): Promi
 
 export const connectionSettings = {
   request,
+  startup() {
+    const current = state.current
+    if (!current?.closing) return current?.startup
+  },
   onApplication(listener: Loginom.ConnectionApplicationListener) {
     applicationListeners.add(listener)
     return () => applicationListeners.delete(listener)

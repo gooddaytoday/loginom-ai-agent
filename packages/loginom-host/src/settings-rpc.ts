@@ -49,7 +49,10 @@ export type Issue = typeof Issue.Type
 
 const failure = Schema.Struct({ ok: Schema.Literal(false), issue: Issue })
 const result = <S extends Schema.ConstraintDecoder<unknown>>(value: S) =>
-  Schema.toStandardSchemaV1(Schema.Union([Schema.Struct({ ok: Schema.Literal(true), value }), failure]))
+  Schema.Union([Schema.Struct({ ok: Schema.Literal(true), value }), failure])
+const statusResult = result(Status)
+const hostStarting = Schema.Struct({ ok: Schema.Literal(true), state: Schema.Literal("starting") })
+const hostUnavailable = Schema.Struct({ ok: Schema.Literal(false), issue: Schema.Literal("unavailable"), reason: Schema.String })
 const safeInput = {
   "~standard": Schema.toStandardSchemaV1(Candidate, {
     leafHook: () => "Invalid Loginom connection fields",
@@ -60,9 +63,12 @@ const safeInput = {
 export const ConnectionSettingsRpc = Rpc.define({
   id: "loginom.connection",
   methods: {
-    status: { input: Schema.toStandardSchemaV1(Schema.Struct({})), output: result(Status) },
-    check: { input: safeInput, output: result(Validation) },
-    save: { input: Schema.toStandardSchemaV1(Loginom.Save), output: result(Status) },
+    status: {
+      input: Schema.toStandardSchemaV1(Schema.Struct({})),
+      output: Schema.toStandardSchemaV1(Schema.Union([hostUnavailable, statusResult, hostStarting])),
+    },
+    check: { input: safeInput, output: Schema.toStandardSchemaV1(result(Validation)) },
+    save: { input: Schema.toStandardSchemaV1(Loginom.Save), output: Schema.toStandardSchemaV1(statusResult) },
   },
   events: { applied: applicationEvent, failed: applicationEvent },
 })
