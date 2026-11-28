@@ -1113,6 +1113,43 @@ test('ambiguous REST reopen then overwrite and native cleanup: '+fault,async()=>
  assert.equal(closed,accepted?1:0);assert.equal(loggedOut,accepted);
 });
 
+test('Save recovery refuses a link added after the saved graph snapshot',async()=>{
+ const page=await restSavePage([true,true]);
+ const prep=page.context.__loginomDockPreparationV1,receipt=prep.receipts.get('prepared');
+ const oldTab=receipt.tab,oldPackage=receipt.packageNode,oldWorkflow=receipt.nodeTargetWorkflowNode;
+ const oldCrumbs=[{tid:'old-crumb',label:'Draft'}];
+ receipt.crumbs=oldCrumbs;
+ page.model.FDiagram.FNodes.FCollection[0].FIconCls='bg-vendor-icon-modelgeneric';
+ oldPackage.FSubNodes={FItems:[{FCustomForm:{FDiagram:{FNodes:{FCollection:[{FIconCls:'bg-vendor-icon-restclientconnection'}]}}}}]};
+ const path='/user/data/packages/recovery-graph-race.lgp';
+ const first=await run(page,'package.save_checkpoint',{path,conflict_policy:'fail'});
+ assert.equal(first.status,'AMBIGUOUS',JSON.stringify(first));
+ const pending=prep.savedPackageReopen;
+ assert.ok(pending);
+ const writesBefore=page.saveWrites,getCmp=page.context.Ext.getCmp;
+ page.context.Ext.getCmp=id=>{
+  const component=getCmp(id);
+  if(page.saveWrites>writesBefore&&id==='save-crumb-4'&&page.edges.length===0){
+   page.edges.push('Источник|Output_Data-0|Приёмник|Input_Data-0');
+   const graph=page.model.FDiagram.FmxGraph.container;
+   graph.children=page.elements().find(element=>element.symbol==='workflow.graph').children;
+   for(const child of graph.children)child.parentElement=graph;
+  }
+  return component;
+ };
+ const second=await run(page,'package.save_checkpoint',{path,conflict_policy:'replace'});
+ assert.equal(page.storage.get(path).edges.length,0);
+ assert.equal(page.edges.length,1);
+ assert.equal(second.status,'AMBIGUOUS',JSON.stringify(second));
+ assert.equal(second.effect_possible,true);
+ assert.deepEqual(second.output?.workflow_continuations??[],[]);
+ assert.equal(receipt.tab,oldTab);
+ assert.equal(receipt.packageNode,oldPackage);
+ assert.equal(receipt.nodeTargetWorkflowNode,oldWorkflow);
+ assert.deepEqual(receipt.crumbs,oldCrumbs);
+ assert.equal(prep.savedPackageReopen,pending);
+});
+
 for(const missing of [['packages.close'],['packages.open'],['packages.close','packages.open']])
 test('REST checkpoint retains the legacy path without catalog selectors: '+missing,async()=>{
  const page=await restSavePage([true,true]);
