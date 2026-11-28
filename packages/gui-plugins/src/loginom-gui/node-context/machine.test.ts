@@ -18,6 +18,7 @@ test("attaches only to the originating visit, even after an intermediate visit w
     serverListed: true,
     tabs: [],
   })
+
   expect(request.effects).toEqual([{ type: "open", attempt: "first", context }])
 
   const transferred = transitionNodeDraft(request.state, { type: "mounted", sessionKey: "other-server\nses_original" })
@@ -36,6 +37,7 @@ test("closing the original tab cancels a pending attachment, even when it opened
     serverListed: true,
     tabs: [],
   })
+
   const opening = transitionNodeDraft(request.state, { type: "tabs.changed", tabs: ["server\nses_other"] })
   const opened = transitionNodeDraft(opening.state, { type: "tabs.changed", tabs: [origin] })
   const closed = transitionNodeDraft(opened.state, { type: "tabs.changed", tabs: [] })
@@ -55,7 +57,9 @@ test("a new node action replaces the pending one even when the earlier origin mo
     serverListed: true,
     tabs: [origin],
   })
+
   const next: NodeContext = { ...context, source: { ...context.source, sessionID: "ses_other" }, intent: "edit" }
+
   const replacement = transitionNodeDraft(previous.state, {
     type: "requested",
     attempt: "next",
@@ -63,6 +67,7 @@ test("a new node action replaces the pending one even when the earlier origin mo
     serverListed: true,
     tabs: [origin],
   })
+
   expect(replacement.effects).toEqual([{ type: "open", attempt: "next", context: next }])
 
   const enteredPrevious = transitionNodeDraft(replacement.state, { type: "mounted", sessionKey: origin })
@@ -80,6 +85,7 @@ test("an unavailable source reports failure, replaces the old request, and never
     serverListed: true,
     tabs: [],
   })
+
   const unavailable = { ...context, source: { ...context.source, serverID: "unlisted" } }
 
   const request = transitionNodeDraft(earlier.state, {
@@ -104,6 +110,7 @@ test("terminal refusal clears only its own attachment request", () => {
     serverListed: true,
     tabs: [],
   })
+
   const next = transitionNodeDraft(first.state, {
     type: "requested",
     attempt: "next",
@@ -111,6 +118,7 @@ test("terminal refusal clears only its own attachment request", () => {
     serverListed: true,
     tabs: [],
   })
+
   const past = transitionNodeDraft(next.state, { type: "open.failed", attempt: "first" })
   expect(past.effects).toEqual([])
   expect(transitionNodeDraft(past.state, { type: "mounted", sessionKey: origin }).effects).toEqual([

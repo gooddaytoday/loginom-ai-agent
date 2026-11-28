@@ -1077,6 +1077,7 @@ export function createPluginAttachment(apis: HostApis) {
 
   const settleOpens = (key: string | undefined, available: boolean) => {
     if (!key) return
+
     for (const pending of pendingOpens) {
       if (pending.key === key) pending.finish(available)
     }
@@ -1100,6 +1101,7 @@ export function createPluginAttachment(apis: HostApis) {
     function finish(available: boolean) {
       if (!pendingOpens.delete(pending)) return
       clearTimeout(timer)
+
       if (!available) unavailable()
     }
 
@@ -1121,6 +1123,7 @@ export function createPluginAttachment(apis: HostApis) {
 
       return
     }
+
     if (options.onUnavailable) watchOpen(`${key}\n${session.id}`, options.onUnavailable)
 
     // A tab that already routes the session, e.g. a subagent opened from its parent's tab, keeps its route.

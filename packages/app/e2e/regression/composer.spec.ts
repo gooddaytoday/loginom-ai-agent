@@ -176,11 +176,13 @@ for (const width of [1280, 390]) {
 test("a refused Loginom conversation does not attach the old node on a later visit", async ({ page }) => {
   const other = { id: "ses_node_other", title: "Другой разговор" }
   const source = nodeFixture.source
+
   const view = await openSession(page, {
     name: "LoginomNodeRefusal",
     sessions: [other],
     seed: { locale: "ru", storage: { "opencode.e2e.loginom-node": "1" } },
   })
+
   const tabs = page.locator('[data-slot="titlebar-v2"]')
   await tabs.getByRole("button", { name: "Тестовый пакет", exact: true }).click()
   await page.getByRole("button", { name: "Спросить агента", exact: true }).click()
