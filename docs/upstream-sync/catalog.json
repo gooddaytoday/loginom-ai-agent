@@ -28,7 +28,12 @@
         "packages/session-ui/src/tools/tool-renderer.tsx"
       ]
     },
-    { "id": "CAT-01", "title": "Manifests and lockfile", "paths": ["bun.lock", "**/package.json"] },
+    {
+      "id": "CAT-01",
+      "title": "Manifests and lockfile",
+      "paths": ["bun.lock", "**/package.json"],
+      "note": "Keep @types/mime-types in packages/util/package.json for filtered installs that typecheck util source."
+    },
     {
       "id": "CAT-02",
       "title": "CI, build, release and repository hygiene",
