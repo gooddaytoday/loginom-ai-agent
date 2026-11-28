@@ -26,6 +26,7 @@ story(
     await projects.getByRole("button", { name: "showMoreConversations" }).click()
     const latest = projects.getByRole("button", { name: /^Отчёт 8/ })
     await expect(projects.getByText("Отчёт 2")).toBeVisible()
+    await expect(projects.getByRole("button", { name: "showMoreConversations" })).toHaveCount(0)
     await expect(latest.getByRole("img")).toHaveCount(0)
     await latest.click()
     await expect(page.locator("[data-opened]")).toHaveAttribute("data-opened", "report-7")

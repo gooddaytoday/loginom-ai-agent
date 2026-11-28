@@ -207,14 +207,14 @@ export function PluginNavigation(props: { connection: ServerConnection.Sidecar; 
                 if (!current) return false
 
                 const page = await current.sdk.api.session.list(
-                  { project, limit, parentID: null, archived: false, order: "desc" },
+                  { project, limit: limit + 1, parentID: null, archived: false, order: "desc" },
                   { signal },
                 )
 
                 signal.throwIfAborted()
-                setProjectSessions((previous) => new Map(previous).set(project, page.data))
+                setProjectSessions((previous) => new Map(previous).set(project, page.data.slice(0, limit)))
 
-                return !!page.cursor.next
+                return page.data.length > limit
               },
               async projectNames(signal) {
                 const projects = await ctx()?.sdk.api.project.list(undefined, { signal })
