@@ -68,10 +68,6 @@ export const dict = {
   "ui.sessionTurn.retry.geminiHot": "gemini este prea solicitat acum",
   "ui.sessionTurn.error.freeUsageExceeded": "Ai depășit utilizarea gratuită",
   "ui.sessionTurn.error.addCredits": "Adaugă credit",
-  "dialog.usageExceeded.freeTier.title": "Limită gratuită atinsă",
-  "dialog.usageExceeded.freeTier.description":
-    "Abonează-te la OpenCode Go pentru 10$/lună și obține acces fiabil la cele mai bune modele open-source.",
-  "dialog.usageExceeded.freeTier.actionLabel": "Abonează-te",
   "ui.sessionTurn.status.delegating": "Se deleagă sarcina",
   "ui.sessionTurn.status.planning": "Se planifică următorii pași",
   "ui.sessionTurn.status.gatheringContext": "Se explorează",

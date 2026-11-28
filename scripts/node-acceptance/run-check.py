@@ -33,8 +33,7 @@ CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential', 'logreg-partitio
 # LAB-1869: native Enrich autosync reorders RowID/Key on cold Execute.
 COLD_COLUMNS_BY_NAME_SCENARIOS = ('enrich-data-left',)
 D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week', 'tree-to-table-typed')
-# Acceptance model (B-106). No variant: models.json gives deepseek-flash none. Key comes from DEEPSEEK_API_KEY in the environment.
-MODEL = 'deepseek/deepseek-flash'  # the only place that names the model; `--variant` is never passed
+MODEL = 'deepseek/deepseek-flash'
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
@@ -73,7 +72,19 @@ def write(path, value):
 
 
 def daemon_pid():
-    return json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))['pid']
+    return json.loads(subprocess.check_output([os.environ.get('MULTICA_CLI_PATH', 'multica'), 'daemon', 'status', '--output', 'json']))['pid']
+
+
+def stop_phase(child):
+    assert child.pid != daemon_pid(), 'Cannot terminate daemon'
+    child.send_signal(signal.SIGINT)
+    try: child.wait(timeout=100)
+    except subprocess.TimeoutExpired:
+        os.killpg(child.pid, signal.SIGINT)
+        try: child.wait(timeout=40)
+        except subprocess.TimeoutExpired:
+            os.killpg(child.pid, signal.SIGKILL)
+            child.wait()
 
 
 def git(*args, cwd=REPO):
@@ -2203,14 +2214,15 @@ def downloaded_csv(profile, destination):
 
 
 class Runner:
-    def __init__(self, directory):
+    def __init__(self, directory, *, auth_source=None):
         self.out = directory
         self.report = read(directory / 'results.json')
         self.options = read(directory / 'request.json')
         self.deadline = self.report['started'] + 85 * 60
         self.last_start = 0
         self.current = None
-        self.env = {k: v for k, v in os.environ.items() if not k.startswith(('MULTICA_', 'CODEX_'))}
+        self.auth_source = auth_source
+        self.env = {k: v for k, v in os.environ.items() if k != 'RUN_CHECK_AUTH' and not k.startswith(('MULTICA_', 'CODEX_'))}
         self.env['LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT'] = self.options.get('viewport', '1280x800')
         self.env.update(LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS='false', HTTP_PROXY='http://127.0.0.1:2080', HTTPS_PROXY='http://127.0.0.1:2080', NO_PROXY='localhost,127.0.0.1,::1,app.loginom.ai,mcp.loginom.ai,mas.kartamyshev.dev')
 
@@ -2252,6 +2264,7 @@ class Runner:
         self.report['phase'] = 'gate:' + name
         self.report['phase_folder'] = str(folder)
         self.save()
+        child = None
         try:
             while True:
                 if time.time() >= self.deadline: raise TimeoutError('load/spacing budget')
@@ -2275,23 +2288,16 @@ class Runner:
                     loads.write(json.dumps({'at': time.time(), 'phase': name, 'load': os.getloadavg(), 'rss_bytes': self.memory(child.pid)}) + '\n')
                     loads.flush()
                     if time.time() >= end:
-                        daemon = json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))
-                        assert child.pid != daemon['pid'], 'Cannot terminate daemon'
                         # The CLI owns runtime close/ACK. Let it close children
                         # before interrupting the whole process group.
-                        child.send_signal(signal.SIGINT)
-                        # Host teardown already allows up to 90 seconds.
-                        try: child.wait(timeout=100)
-                        except subprocess.TimeoutExpired:
-                            os.killpg(child.pid, signal.SIGINT)
-                            try: child.wait(timeout=40)
-                            except subprocess.TimeoutExpired:
-                                os.killpg(child.pid, signal.SIGKILL)
-                                child.wait()
+                        stop_phase(child)
                         raise TimeoutError(name + ' deadline')
                     try: child.wait(timeout=1)
                     except subprocess.TimeoutExpired: pass
                 assert child.returncode == 0, f'{name} exit={child.returncode}: {folder / (name + ".stderr")}:1'
+        except SystemExit:
+            if child is not None and child.poll() is None: stop_phase(child)
+            raise
         finally:
             timing['finished'] = time.time()
             timing['queue_seconds'] = (timing['started'] if timing['started'] is not None else timing['finished']) - timing['queued']
@@ -2667,7 +2673,10 @@ class Runner:
                 parameter='/sort_result' if grouping else '/compare_with_locale', mode='variable',
                 variable=dict(kind='control', input=0, name='Flag', type='boolean', is_null=False), source=dict(type='variables.user', output=4))]
         write(folder / 'expected.json', expected)
-        command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', MODEL, '--dangerously-skip-permissions']
+        model_id = self.env.get('RUN_CHECK_MODEL') or MODEL
+        variant = self.env.get('RUN_CHECK_VARIANT')
+        command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', model_id, '--dangerously-skip-permissions']
+        if variant: command += ['--variant', variant]
         if session: command += ['--session', session]
         # Initial requests need their inputs even when the prose omits names.
         # Continuations only admit new, explicitly requested files (r3/r4).
@@ -2742,6 +2751,7 @@ class Runner:
         (folder / 'task.md').write_text(prompt)
         env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile), LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG='1', LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE='1', LOGINOM_AI_AGENT_PURE='1')
         if spec.get('two_turn'):
+            assert not variant, 'TWO_TURN_VARIANT_UNSUPPORTED'
             assert session is None, 'TWO_TURN_REQUIRES_FRESH_CHAT'
             # Unique physical name prevents collisions with prior attempts (#1157).
             source = workspace / 'rows.csv'
@@ -2753,16 +2763,21 @@ class Runner:
             second += '\n' + prompt[prompt.rfind('\nСохрани пакет как '):]
             config_path = profile / 'config/loginom-ai-agent.json'
             config = read(config_path)
-            config['model'] = MODEL
+            config['model'] = model_id
             write(config_path, config)
             (profile / 'state').mkdir(exist_ok=True)
             write(profile / 'state/model.json', dict(recent=[], favorite=[], variant={}))
             write(folder / 'two-turn.json', dict(executable=str(command[0]), workspace=str(workspace),
-                  profile=str(profile), folder=str(folder), kind=spec['two_turn'], prompts=[first, second], model=MODEL, daemon_pid=daemon_pid()))
+                  profile=str(profile), folder=str(folder), kind=spec['two_turn'], prompts=[first, second], model=model_id, daemon_pid=daemon_pid()))
             self.phase('model', [sys.executable, '-B', REPO / 'scripts/node-acceptance/run-check-two-turn.py',
                        folder / 'two-turn.json'], folder, timeout=1800, env=env, cwd=workspace)
         else:
             self.phase('model', command + ['--', prompt], folder, timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace)
+        if getattr(self, 'auth_source', None):
+            try: (profile / 'data/auth.json').unlink(missing_ok=True)
+            except OSError as error:
+                self.current['oauth_cleanup_error'] = str(error)
+                raise
         events = list(records(folder / 'model.stdout'))
         session = next(e['sessionID'] for _, e in events if e.get('sessionID'))
         replies = model_replies(events)
@@ -3516,6 +3531,9 @@ class Runner:
                 return
             account = read(Path(self.options['pair']) / 'worker.json')
             login = pair_login(account, 'worker.json')
+            model_id = self.env.get('RUN_CHECK_MODEL') or MODEL
+            variant = self.env.get('RUN_CHECK_VARIANT')
+            auth = self.auth_source
             for r in self.report['runs']:
                 self.current = r
                 if time.time() >= self.deadline:
@@ -3525,15 +3543,22 @@ class Runner:
                 folder = self.out / r['scenario']
                 folder.mkdir()
                 profile, workspace = folder / 'profile', folder / 'workspace'
+                auth_path = profile / 'data/auth.json'
                 workspace.mkdir()
-                r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp', model=MODEL)
+                r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp', model=model_id)
+                if variant: r['variant'] = variant
                 env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile))
                 try:
                     if r['scenario'] in D87 and not self.options.get('case_root'):
                         self.prepared_case = self.prepare_d87(r['scenario'], folder)
                     self.phase('setup', [build / 'bin/loginom-ai-agent-cli', 'loginom', 'setup', '--headless', '--stdin-json', '--format', 'json'], folder, timeout=180, env=env, stdin=json.dumps(dict(url=login['url'], username=login['username'], password=login['password'])))
                     assert read(folder / 'setup.stdout').get('browser', {}).get('state') == 'verified', 'SETUP_NOT_VERIFIED'
-                    write(profile / 'config/loginom-ai-agent.json', dict(model=MODEL))
+                    if auth:
+                        with auth.open('rb') as source, os.fdopen(
+                            os.open(auth_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600), 'wb'
+                        ) as target:
+                            shutil.copyfileobj(source, target)
+                    write(profile / 'config/loginom-ai-agent.json', dict(model=model_id))
                     case = r['scenario']
                     spec = scenario(case, self.options.get('case_root'), cases=self.options.get('cases'))
                     if spec.get('fs_case') == 'paths':
@@ -3592,6 +3617,16 @@ class Runner:
                     else:
                         self.failure(r, error, folder)
                 finally:
+                    if auth:
+                        try:
+                            if profile.exists():
+                                try: auth_path.unlink(missing_ok=True)
+                                finally: shutil.rmtree(profile)
+                        except OSError as error:
+                            r['oauth_cleanup_error'] = str(error)
+                            if r['status'] != 'FAIL': self.failure(r, error, folder)
+                        else:
+                            r.pop('profile', None)
                     if r.get('dataset'):
                         try: self.cleanup_d87(folder, login, build)
                         except Exception as error:
@@ -3610,7 +3645,10 @@ class Runner:
 def main():
     os.umask(0o077)
     args = arguments()
-    if args.command == '_worker': return Runner(args.directory.resolve()).run()
+    if args.command == '_worker':
+        signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+        source = sys.stdin.buffer.read()
+        return Runner(args.directory.resolve(), auth_source=Path(os.fsdecode(source)) if source else None).run()
     if args.command == 'wait':
         end = time.monotonic() + args.timeout
         while True:
@@ -3624,11 +3662,26 @@ def main():
                 print(f"{ready}/{len(report['runs'])} готово, идёт {current}")
                 return 2
             time.sleep(min(1, max(0, end - time.monotonic())))
+    # Chromium also puts its Unix singleton socket under TMPDIR. Keep the
+    # default short enough even when the checkout is in a deep task directory.
+    out = (args.out or Path.home() / '.cache/loginom-runs' / str(time.time_ns())).expanduser().resolve()
+    if any((parent / '.git').exists() for parent in (out, *out.parents)):
+        raise ValueError('Result directory must be outside Git checkout')
+    auth = os.environ.pop('RUN_CHECK_AUTH', None)
+    if auth:
+        auth_path = Path(auth).expanduser().resolve()
+        if not auth_path.is_file() or not os.access(auth_path, os.R_OK):
+            raise ValueError('RUN_CHECK_AUTH must point to a readable file')
+    variant = os.environ.get('RUN_CHECK_VARIANT')
     head = git('rev-parse', '--verify', args.head + '^{commit}')
     names = scenario_names(args.scenarios, args.case_root)
     assert 'types300' not in names or args.cold, 'TYPES300_COLD_REQUIRED'
     for name in names:
         spec = scenario(name, args.case_root, cases=args.cases)
+        base = spec['base']
+        if variant and (spec.get('two_turn') or
+                        isinstance(base, str) and scenario(base, args.case_root, cases=args.cases).get('two_turn')):
+            raise ValueError('TWO_TURN_VARIANT_UNSUPPORTED')
         if spec.get('generated'): continue
         assert spec['prompt'].is_file(), 'Scenario prompt missing'
         assert args.case_root or spec.get('oracle', spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
@@ -3640,11 +3693,6 @@ def main():
     if build:
         meta = read(build / 'cli-manifest.json')['metadata']
         assert meta['sourceCommit'] == head and meta['sourceDirty'] is False, 'Build SHA/cleanliness mismatch'
-    # Chromium also puts its Unix singleton socket under TMPDIR. Keep the
-    # default short enough even when the checkout is in a deep task directory.
-    out = (args.out or Path.home() / '.cache/loginom-runs' / str(time.time_ns())).expanduser().resolve()
-    if not args.case_root and any(name in D87 for name in names) and (out == REPO or REPO in out.parents):
-        raise ValueError('D87 result directory and generated data must be outside Git checkout')
     out.mkdir(parents=True)
     temporary = out / 'tmp'
     temporary.mkdir()
@@ -3652,13 +3700,18 @@ def main():
     # Set this before spawning so direct children (including oracles) inherit it.
     env = {k: v for k, v in os.environ.items() if not k.startswith('CODEX_')}
     env.update(TMPDIR=str(temporary), TMP=str(temporary), TEMP=str(temporary))
+    if auth:
+        print('Warning: do not run scenarios in parallel with the same OAuth file. '
+              'Refresh-token rotation can invalidate copies; the source is not updated.', file=sys.stderr)
     request = vars(args) | {'pair': str(pair), 'build': str(build) if build else None, 'out': str(out),
                             'cases': str(args.cases.expanduser().resolve()) if args.cases else None,
                             'case_root': str(args.case_root.expanduser().resolve()) if args.case_root else None}
     write(out / 'request.json', request)
     write(out / 'results.json', {'head': head, 'tree': git('rev-parse', head + '^{tree}'), 'started': time.time(), 'phase': 'build', 'runs': [{'scenario': n, 'status': 'PENDING'} for n in names]})
     with (out / 'worker.log').open('wb') as log:
-        child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '_worker', str(out)], env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
+        child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '_worker', str(out)], env=env, stdin=subprocess.PIPE if auth else subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
+        if auth:
+            with child.stdin as channel: channel.write(os.fsencode(auth_path))
     write(out / 'worker.json', {'pid': child.pid})
     print(out)
     return 0

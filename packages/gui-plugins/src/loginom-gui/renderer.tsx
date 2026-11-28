@@ -43,6 +43,20 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       </Suspense>
     ),
   })
+  const Catalog = lazy(() => import("./catalog-page"))
+
+  ctx.add(Page, {
+    id: "catalog",
+    nav: {},
+    get title() {
+      return ctx.t("catalog.title")
+    },
+    render: () => (
+      <Suspense>
+        <Catalog />
+      </Suspense>
+    ),
+  })
   ctx.add(SettingsPage, {
     id: "loginom",
     icon: "arrow-up-right",
