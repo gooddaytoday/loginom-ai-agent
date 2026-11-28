@@ -208,6 +208,11 @@ already registered tool names and withdraws the renderer when the plugin unloads
 their own row in grouped timelines. The renderer receives live data, including partial input. The timeline shows a tool
 error card if rendering throws and retries rendering at the next call status.
 
+Built-ins can also register `TurnPresentation` with `ctx.add(TurnPresentation, { describe })`. The callback
+receives the assistant messages for a turn and either its current todos or elapsed duration. It can return a
+localized plan or summary for both timelines. The window host accepts registrations only from built-in plugins.
+The timeline owns disclosure, detail presets and navigation to hidden activity.
+
 [Lifetimes](#lifetimes) shows `createKeyed` in files.
 
 ```ts

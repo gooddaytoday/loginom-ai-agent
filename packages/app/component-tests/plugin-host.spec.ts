@@ -194,6 +194,26 @@ for (const registry of ["page", "question.renderer"]) {
   })
 }
 
+story("a third-party plugin cannot register a turn presentation with a public registry token", async ({ page }) => {
+  const result = await page.evaluate(async (fixture) => {
+    const { mountPluginHost, Registry, until } = await import(fixture)
+    const host = mountPluginHost()
+
+    try {
+      host.load((ctx: Context) =>
+        ctx.add(Registry.define("turn.presentation"), { describe: () => ({ kind: "summary", label: "Custom turn" }) }),
+      )
+      await until(() => host.status() === "failed" || host.status() === "active")
+
+      return { status: host.status(), presentations: host.entries("turn.presentation") }
+    } finally {
+      host.unmount()
+    }
+  }, fixture)
+
+  expect(result).toEqual({ status: "failed", presentations: 0 })
+})
+
 story("a plugin that finishes loading after the host unmounts is never set up", async ({ page }) => {
   const setups = await page.evaluate(async (fixture) => {
     const { mountPluginHost } = await import(fixture)

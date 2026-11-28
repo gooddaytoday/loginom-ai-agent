@@ -23,10 +23,12 @@ const lists = {
   packageVariables: ['usages', 'defaults', 'definitions'],
 };
 
+const utf8 = new TextEncoder();
+
 export function loginomMetadataBytes(value) {
   try {
     const json = JSON.stringify(value);
-    if (json !== undefined) return Buffer.byteLength(json, 'utf8');
+    if (json !== undefined) return utf8.encode(json).byteLength;
   } catch { /* A field that cannot cross IPC does not have a byte budget. */ }
   return Infinity;
 }

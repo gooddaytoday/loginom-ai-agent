@@ -28,6 +28,7 @@ import {
   Page,
   QuestionRenderer,
   ToolRenderer,
+  TurnPresentation,
   type BuiltinCatalog,
   type BuiltinContext,
 } from "@opencode/plugin/gui/builtin"
@@ -840,6 +841,9 @@ function createHost(input: HostInput) {
 
         if (registry.id === BuiltinProviderSetup.id && !input.builtins?.has(plugin))
           throw new Error("Only built-in plugins can add provider setup forms")
+
+        if (registry.id === TurnPresentation.id && !input.builtins?.has(plugin))
+          throw new Error("Only built-in plugins can add turn presentations")
 
         let active = toolRenderer
         let claimed: string | undefined

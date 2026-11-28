@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show, type Accessor, type JSX } from "solid-js"
-import { Predicate } from "effect"
+import { Predicate, Schema } from "effect"
 import { abort } from "@opencode/util/abort"
 import { createAnimatedPresence } from "@/runtime/animated-presence"
 import type { SessionMessageUser } from "@opencode/client/promise"
@@ -16,6 +16,9 @@ import { PluginSlot } from "@/runtime/plugin/render"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useSettings } from "@/settings/model"
 import { useServer } from "@/runtime/server/current"
+import { useServerSDK } from "@/runtime/server/client"
+import { Persist, persisted } from "@/runtime/persistence/storage"
+import { Persistence } from "@/runtime/persistence/schema"
 import { useWorkspaceLocation } from "@/workspaces/location"
 import { Timeline } from "@opencode/session-ui/timeline/projection"
 import { createSessionTimelineRowRenderer } from "@opencode/session-ui/timeline/row"
@@ -24,6 +27,7 @@ import { getReadyMarkdown, preloadMarkdown } from "@opencode/session-ui/markdown
 import { createTimelineController, type TimelineController, type TimelineSessionSource } from "./controller"
 import type { TimelineFollow } from "./follow"
 import { createTimelineVirtualizer, type TimelineRouteReveal } from "./virtualizer"
+import { createTurnPresentation, TurnPresentationRow, type TurnDisclosure } from "./turn-presentation"
 import { createSelectedEffect } from "./selected-effect"
 import { containsDirectory } from "@opencode/util/path"
 import { isWorkspaceDirectory } from "@/workspaces/paths"
@@ -101,18 +105,36 @@ type MessageTimelineProps = {
   search?: JSX.Element
 }
 
+const TurnDisclosureSchema = Persistence.struct({ open: Persistence.array(Schema.String) })
+
 export function MessageTimeline(props: MessageTimelineProps) {
   const settings = useSettings()
+  const server = useServerSDK()
+
+  const [state, setState] = persisted(
+    Persist.serverScoped(server.scope, props.view.directory, props.session.identity.sessionID(), "turn-disclosure"),
+    TurnDisclosureSchema,
+    { open: [] },
+  )
+
+  const turnDisclosure: TurnDisclosure = {
+    open: (id) => state.open.includes(id),
+    setOpen: (id, open) =>
+      setState("open", (ids) => (open ? [...new Set([...ids, id])] : ids.filter((item) => item !== id))),
+  }
 
   // The New timeline experiment builds its own projection and rows, so turning it on or off mounts the timeline again.
   return (
-    <Show when={settings.general.newTimeline()} fallback={<MountedTimeline {...props} next={false} />}>
-      <MountedTimeline {...props} next />
+    <Show
+      when={settings.general.newTimeline()}
+      fallback={<MountedTimeline {...props} next={false} turnDisclosure={turnDisclosure} />}
+    >
+      <MountedTimeline {...props} next turnDisclosure={turnDisclosure} />
     </Show>
   )
 }
 
-function MountedTimeline(props: MessageTimelineProps & { next: boolean }) {
+function MountedTimeline(props: MessageTimelineProps & { next: boolean; turnDisclosure: TurnDisclosure }) {
   const controller = createTimelineController({
     session: props.session,
     active: () => props.active !== false,
@@ -142,6 +164,7 @@ function MountedTimeline(props: MessageTimelineProps & { next: boolean }) {
 function MessageTimelineView(
   props: MessageTimelineProps & {
     next: boolean
+    turnDisclosure: TurnDisclosure
     data: TimelineController["data"]
     action: TimelineController["action"]
     title: TimelineController["title"]
@@ -158,7 +181,8 @@ function MessageTimelineView(
   const parentID = props.data.parentID
   const parentTitle = props.data.parentTitle
   const childTitle = props.data.childTitle
-  const projection = props.data.projection
+  const turns = createTurnPresentation(props.data.projection, props.turnDisclosure, props.data.timelineDetail)
+  const projection = turns.projection
   const sessionDirectory = createMemo(() => props.session.data.info()?.location.directory ?? sdk().directory)
 
   const project = createMemo(() => {
@@ -201,6 +225,7 @@ function MessageTimelineView(
     presentationKey: () => `${props.next ? "next:" : ""}${JSON.stringify(props.data.timelineDetail())}`,
     keepsDisclosure: props.next,
     projection,
+    revealActivity: projection.revealActivity,
     showHeader,
     follow: props.follow,
     scroll: () => props.scroll,
@@ -214,6 +239,7 @@ function MessageTimelineView(
     onHistoryScroll: props.onHistoryScroll,
     canRenderImmediately: (row, disclosure) => {
       if (
+        Predicate.isTagged(row, "TurnPresentation") ||
         Predicate.isTagged(row, "TurnGap") ||
         Predicate.isTagged(row, "TurnDivider") ||
         Predicate.isTagged(row, "CompactionQueued") ||
@@ -321,6 +347,7 @@ function MessageTimelineView(
     actions: props.actions,
     timelineDetail: props.data.timelineDetail,
     disclosure: virtualized.disclosure,
+    activityOpen: (id: string) => (turns.description(id)?.kind === "summary" && turns.open(id) ? true : undefined),
     centered: () => props.centered,
     padding: turnPadding,
     anchor: props.anchor,
@@ -559,7 +586,33 @@ function MessageTimelineView(
       renderRow={(row, onSizeChange) => (
         <Show
           when={Predicate.isTagged(row(), "Activity")}
-          fallback={<rowRenderer.Row row={row} onSizeChange={onSizeChange} />}
+          fallback={(() => {
+            const current = row()
+
+            if (Predicate.isTagged(current, "TurnPresentation"))
+              return (
+                <Show when={turns.description(current.userMessageID)}>
+                  {(value) => (
+                    <TurnPresentationRow
+                      row={current}
+                      value={value()}
+                      open={turns.open(current.userMessageID)}
+                      forcedOpen={turns.forcedOpen()}
+                      toggle={() =>
+                        props.turnDisclosure.setOpen(
+                          current.userMessageID,
+                          !props.turnDisclosure.open(current.userMessageID),
+                        )
+                      }
+                      padding={turnPadding}
+                      centered={props.centered}
+                    />
+                  )}
+                </Show>
+              )
+
+            return <rowRenderer.Row row={row} onSizeChange={onSizeChange} />
+          })()}
         >
           {(_) => {
             // This row sits above input still waiting for delivery. Until live status first shows, it takes no room,
