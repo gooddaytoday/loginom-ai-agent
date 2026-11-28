@@ -78,6 +78,7 @@ export {
 } from "@opencode/plugin/gui"
 
 export { Schema }
+
 export { BuiltinSlot } from "@opencode/plugin/gui/builtin"
 
 type PluginHost = ReturnType<typeof usePluginHost>
@@ -585,6 +586,8 @@ export function mountDashboard(initialLink: typeof Schema.Json.Type) {
       </MemoryRouter>
     ),
   })
+
+  host.release()
 
   return {
     drafts,

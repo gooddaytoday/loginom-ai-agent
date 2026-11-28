@@ -134,7 +134,7 @@ story("the host reserves mobile header contributions and timeline navigation API
       const host = mountPluginHost({ builtins: new Set(builtin ? ["fixture"] : []) })
       await until(() => host.count() === 1)
       let api: { openPage: boolean; timeline: boolean } | undefined
-      host.load((ctx) => {
+      host.load((ctx: Context) => {
         api = { openPage: "openPage" in ctx.layout, timeline: "timeline" in ctx }
         ctx.add(mobile, { at: "session.header.mobile", render: () => null })
       })
@@ -1103,6 +1103,7 @@ story(
 story("the new-session slot renders nothing without a plugin", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {
     const { mountPlugins, BuiltinSlot, until } = await import(fixture)
+
     const host = mountPlugins({
       definitions: [
         {
@@ -1113,16 +1114,19 @@ story("the new-session slot renders nothing without a plugin", async ({ page }) 
         },
       ],
     })
+
     try {
       const heading = () => host.container.querySelector('[data-testid="draft-heading"]')
       await until(() => heading()?.textContent === "Draft heading")
       host.define([])
       await until(() => heading()?.textContent === "")
+
       return { elements: heading()?.childElementCount, errors: host.escaped() }
     } finally {
       host.unmount()
     }
   }, fixture)
+
   expect(result).toEqual({ elements: 0, errors: [] })
 })
 

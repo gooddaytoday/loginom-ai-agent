@@ -148,7 +148,7 @@
 
 ## CAT-17 Открытие страницы встроенного плагина по ссылке
 
-- **C4.4.** `app/src/runtime/plugin/host-apis.tsx` и `plugin/src/gui/builtin.ts`: внутренний `router.openPage` открывает страницу самого плагина; публичный SDK не меняется. Продуктовая страница и предпросмотр — в `gui-plugins/src/loginom-gui/`, доставка — CAT-09. `app/component-tests/plugin-host.{fixture.tsx,spec.ts}` проверяют ссылку Studio, привязку ошибки к ссылке и черновик чата. Политика `merge` для шва, `fork-owned` для экрана.
+- **C4.4.** `app/src/runtime/plugin/host-apis.tsx` и `plugin/src/gui/builtin.ts`: внутренний `router.openPage` открывает страницу самого плагина. Для схемы C3 хост предоставляет `layout.openPage` в контексте встроенных плагинов. `app/src/runtime/plugin/host-apis.tsx` учитывается по CAT-17 перед CAT-14 и CAT-21. Продуктовая страница и предпросмотр — в `gui-plugins/src/loginom-gui/`, доставка — CAT-09. `app/component-tests/plugin-host.{fixture.tsx,spec.ts}` проверяют ссылку Studio, привязку ошибки к ссылке и черновик чата. Политика `merge` для шва, `fork-owned` для экрана.
 
 ## CAT-10 Веб-приложение, UI-кит, UI сессии
 
