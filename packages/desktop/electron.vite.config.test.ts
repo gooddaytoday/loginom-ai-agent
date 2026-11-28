@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { generateKeyPairSync } from "node:crypto"
 import { existsSync } from "node:fs"
 import path from "node:path"
 import { MainConfigFactory } from "electron-vite"
@@ -62,8 +63,7 @@ test("minifies only builds, previews onboarding only in development, and ships s
   expect(existsSync(path.resolve(import.meta.dirname, root, publicDir, "oc-theme-preload.js"))).toBe(true)
 })
 
-// Loginom AI Agent (B4.12): Product.updateFeed in main is the build's LOGINOM_AI_AGENT_UPDATE_FEED and nothing else, the
-// same input electron-builder writes into app-update.yml. Without it the updater is off; there is no fallback feed.
+// Loginom AI Agent: the S3/mirror endpoint and app-update.yml use the same build input.
 test.each([
   { build: "no feed", feed: undefined, define: "null" },
   { build: "an empty feed", feed: "", define: "null" },
@@ -85,6 +85,33 @@ test.each([
     delete process.env.LOGINOM_AI_AGENT_UPDATE_FEED
 
     if (previous !== undefined) process.env.LOGINOM_AI_AGENT_UPDATE_FEED = previous
+  }
+})
+
+test("injects product GitHub endpoints but never fixture trust into a release build", async () => {
+  const key = generateKeyPairSync("ed25519").publicKey.export({ format: "pem", type: "spki" }).toString()
+  const env = {
+    LOGINOM_AI_AGENT_UPDATE_GITHUB_API: " https://api.example.test/releases ",
+    LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: " https://download.example.test/assets/ ",
+    LOGINOM_AI_AGENT_UPDATE_TEST_BUILD: "1",
+    LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY: key,
+    GITHUB_ACTIONS: "true",
+    GITHUB_WORKFLOW_REF: "owner/repo/.github/workflows/release.yml@refs/tags/v0.5.0",
+  }
+  const previous = Object.keys(env).map((key) => [key, process.env[key]] as const)
+  Object.assign(process.env, env)
+  try {
+    const release = (await load("build")).config.main?.define
+    expect(release?.LOGINOM_AI_AGENT_UPDATE_GITHUB_API).toBe(JSON.stringify(env.LOGINOM_AI_AGENT_UPDATE_GITHUB_API.trim()))
+    expect(release?.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD).toBe(JSON.stringify(env.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD.trim()))
+    expect(release?.LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY).toBe("null")
+    process.env.GITHUB_WORKFLOW_REF = "owner/repo/.github/workflows/loginom-windows.yml@refs/heads/fixture"
+    expect((await load("build")).config.main?.define?.LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY).toBe(JSON.stringify(key))
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
   }
 })
 
