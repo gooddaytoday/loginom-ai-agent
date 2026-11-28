@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { dict } from "./i18n/ru"
+import { dict } from "./i18n/step-ru"
 import { decodeFacts, failureTitle, loginomStepPhrase } from "./step-phrase"
 import { Option } from "effect"
 

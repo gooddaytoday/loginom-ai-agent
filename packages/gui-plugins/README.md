@@ -775,7 +775,7 @@ export const builtins = compose({
   "microsoft-office": microsoftOffice,
   sources,
   goal,
-  "loginom-gui": loginomGui,
+  "loginom-gui": loginom,
 })
 ```
 
@@ -801,9 +801,12 @@ export const builtins = compose({
   "microsoft-office": { ...microsoftOffice, windowEntry: eager(microsoftOfficeRenderer) },
   sources: { ...sources, windowEntry: eager(sourcesRenderer) },
   goal: { ...goal, windowEntry: eager(goalRenderer) },
-  "loginom-gui": { ...loginomGui, windowEntry: eager(loginomVerified) },
+  "loginom-gui": { ...loginom, windowEntry: eager(loginomRenderer) },
 })
 ```
+
+The Loginom connection page manages the desktop sidecar’s profile. The web page uses its own origin and can use a single
+local service in development. If neither target is available, the page shows that the service is unavailable.
 
 Your own plugin takes the same steps:
 

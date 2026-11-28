@@ -163,7 +163,7 @@ test.describe("application verification", () => {
             textPart("prt_verification_answer", reply),
           ]),
         ],
-        rpc: ({ rpcID, method, body }) => {
+        onRpc: ({ rpcID, method, body }) => {
           if (rpcID !== "loginom.appVerified" || method !== "summary") return
           requests.push(body)
 
