@@ -1071,6 +1071,32 @@ story(
   },
 )
 
+story("the new-session slot renders nothing without a plugin", async ({ page }) => {
+  const result = await page.evaluate(async (fixture) => {
+    const { mountPlugins, BuiltinSlot, until } = await import(fixture)
+    const host = mountPlugins({
+      definitions: [
+        {
+          id: "fixture",
+          windowEntry: async () => ({
+            default: (ctx: Context) => void ctx.add(BuiltinSlot, { at: "session.new.heading", render: () => "Draft heading" }),
+          }),
+        },
+      ],
+    })
+    try {
+      const heading = () => host.container.querySelector('[data-testid="draft-heading"]')
+      await until(() => heading()?.textContent === "Draft heading")
+      host.define([])
+      await until(() => heading()?.textContent === "")
+      return { elements: heading()?.childElementCount, errors: host.escaped() }
+    } finally {
+      host.unmount()
+    }
+  }, fixture)
+  expect(result).toEqual({ elements: 0, errors: [] })
+})
+
 story("a contribution that throws renders nothing and records the error; the others stay", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {
     const { mountPlugins, until, Slot } = await import(fixture)

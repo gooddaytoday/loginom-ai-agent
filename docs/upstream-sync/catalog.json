@@ -122,6 +122,19 @@
       ]
     },
     {
+      "id": "CAT-16",
+      "title": "New-session GUI slot (C1.3)",
+      "paths": [
+        "packages/app/src/new-session/composer-adapter.ts", "packages/app/src/new-session/screen.tsx",
+        "packages/app/src/new-session/view.tsx", "packages/app/src/composer/composer.tsx",
+        "packages/app/src/composer/editor/editor.tsx",
+        "packages/app/src/shell/tabs/schema.ts", "packages/app/src/shell/tabs/tabs.test.ts",
+        "packages/app/e2e/regression/new-session.spec.ts",
+        "packages/app/e2e/utils/app-direction.html", "packages/app/e2e/utils/app-direction.fixture.tsx",
+        "packages/app/e2e/utils/direction.ts"
+      ]
+    },
+    {
       "id": "CAT-17",
       "title": "Built-in plugin page navigation for dashboard links",
       "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
