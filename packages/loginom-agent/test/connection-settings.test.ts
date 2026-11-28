@@ -10,7 +10,8 @@ test("the settings RPC emits only the display status, even for a migrated addres
     username: "analyst",
     folder: "/analyst",
     hasPassword: true,
-    state: "ready",
+    state: "pending",
+    application: { state: "pending", tasks: 2 },
     password: "synthetic-password",
     apiKey: "synthetic-key",
   }))
@@ -24,7 +25,8 @@ test("the settings RPC emits only the display status, even for a migrated addres
       username: "analyst",
       folder: "/analyst",
       hasPassword: true,
-      state: "ready",
+      state: "pending",
+      application: { state: "pending", tasks: 2 },
       failed: false,
     },
   })

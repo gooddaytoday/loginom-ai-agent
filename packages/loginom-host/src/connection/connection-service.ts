@@ -23,6 +23,7 @@ export async function connectionService(
   store: ReturnType<typeof connectionStore>,
   runtime: ConnectionRuntime,
   recovery?: Pick<Awaited<ReturnType<typeof recoveryStore>>, "pending" | "acknowledge">,
+  onApplication?: Loginom.ConnectionApplicationListener,
 ) {
   // Both Desktop and CLI cross this boundary before preparing any runtime.
   await store.initialize()
@@ -33,6 +34,7 @@ export async function connectionService(
     generation: number
     setupRequired?: true
     pending?: ActiveConnection
+    applied?: true
     browser: Loginom.BrowserStatus
     pendingBrowser?: Loginom.BrowserStatus
     phase: Loginom.View["state"]
@@ -55,9 +57,9 @@ export async function connectionService(
       timer: ReturnType<typeof setTimeout>
     }
   >()
-  const leases = new Map<string, { generation: number; recovery: boolean; active: boolean }>()
-  const turns = new Set<string>()
-  let applyAfter = new Set<string>()
+  const leases = new Map<string, { generation: number; task: string; recovery: boolean; active: boolean }>()
+  const turns = new Map<string, string>()
+  let applyAfter = new Map<string, string>()
   const checks = new Map<AbortController, Promise<void | Loginom.BrowserStatus>>()
   const switching = new AbortController()
   function loadProfile() {
@@ -112,11 +114,18 @@ export async function connectionService(
     if (state.failure === "LOGINOM_STORE_READ_FAILED") throw Error(state.failure)
   }
 
-  function observeReadiness(handle: RuntimeHandle) {
+  function finishApplication(candidate: ActiveConnection, outcome: "applied" | "failed") {
+    if (state.closing || state.revision !== candidate.revision) return
+    if (outcome === "applied") state.applied = true
+    onApplication?.(outcome, { revision: candidate.revision, generation: candidate.generation })
+  }
+
+  function observeReadiness(handle: RuntimeHandle, candidate?: ActiveConnection) {
     const ready = () => {
       state.readiness = "ready"
       state.phase = state.pending ? "pending" : "ready"
       if (!state.failure) state.setupRequired = undefined
+      if (candidate) finishApplication(candidate, "applied")
     }
     if (!handle.ready) return ready()
     state.readiness = "starting"
@@ -129,8 +138,9 @@ export async function connectionService(
       () => {
         if (state.closing || state.handle !== handle) return
         state.readiness = "recoverable-error"
-        state.failure ??= "LOGINOM_RUNTIME_START_FAILED"
+        if (!state.pending) state.failure ??= "LOGINOM_RUNTIME_START_FAILED"
         state.phase = state.pending ? "pending" : "recoverable-error"
+        if (candidate) finishApplication(candidate, "failed")
       },
     )
   }
@@ -148,6 +158,12 @@ export async function connectionService(
   }
   function view(): Loginom.View {
     const current = state.active
+    let application: Loginom.View["application"]
+    if (state.pending) {
+      const tasks = new Set(applyAfter.values())
+      for (const lease of leases.values()) if (lease.active) tasks.add(lease.task)
+      application = { state: "pending", tasks: tasks.size }
+    } else if (state.applied) application = { state: "applied" }
     return {
       revision: state.revision,
       generation: current?.generation ?? 0,
@@ -158,6 +174,7 @@ export async function connectionService(
       hasPassword: !!current?.password,
       browser: { ...state.browser },
       state: recovery?.pending().length ? "recoverable-error" : state.phase,
+      ...(application ? { application } : {}),
       ...(recovery?.pending().length ? { recoveries: recovery.pending() } : {}),
       ...(state.failure ? { failure: state.failure } : {}),
     }
@@ -168,11 +185,12 @@ export async function connectionService(
       () => "LOGINOM_PENDING_CLEAR_FAILED" as const,
     )
   }
-  async function failPending(failure: string) {
+  async function failPending(candidate: ActiveConnection, failure: string) {
     state.failure = (await discardPending()) ?? failure
     state.pending = undefined
     state.pendingBrowser = undefined
     state.phase = state.handle ? state.readiness : "recoverable-error"
+    finishApplication(candidate, "failed")
   }
   function progress() {
     if (
@@ -202,6 +220,7 @@ export async function connectionService(
         await prepared?.close().catch(() => undefined)
         if (!cancelled)
           await failPending(
+            candidate,
             error instanceof Error && error.message === "LOGINOM_RUNTIME_TIMEOUT"
               ? error.message
               : "LOGINOM_RUNTIME_START_FAILED",
@@ -215,6 +234,7 @@ export async function connectionService(
         await next.close().catch(() => undefined)
         return
       }
+      let durable = true
       const committed = await store
         .staged(candidate.generation)
         .then((previous) => {
@@ -238,7 +258,7 @@ export async function connectionService(
           async () => {
             // A directory fsync can fail after rename has already changed the active pointer.
             // Keep the live runtime aligned with that pointer; report the durability failure.
-            state.failure = "LOGINOM_STORE_WRITE_FAILED"
+            durable = false
             const persisted = await store.read().catch(() => undefined)
             return (
               persisted?.generation === candidate.generation &&
@@ -252,7 +272,7 @@ export async function connectionService(
         )
       if (!committed) {
         await next.close().catch(() => undefined)
-        await failPending("LOGINOM_STORE_WRITE_FAILED")
+        await failPending(candidate, "LOGINOM_STORE_WRITE_FAILED")
         return
       }
       const previous = state.handle
@@ -263,9 +283,11 @@ export async function connectionService(
       state.pending = undefined
       // Finish the store writes before a window can observe successful activation.
       await store.clearPending().catch(() => {
-        state.failure = "LOGINOM_STORE_WRITE_FAILED"
+        durable = false
       })
-      observeReadiness(next)
+      state.failure = durable ? undefined : "LOGINOM_STORE_WRITE_FAILED"
+      observeReadiness(next, durable ? candidate : undefined)
+      if (!durable) finishApplication(candidate, "failed")
       await previous?.close().catch(() => undefined)
     })().finally(() => {
       state.applying = undefined
@@ -413,13 +435,14 @@ export async function connectionService(
         state.writing = false
       }
       state.failure = undefined
+      state.applied = undefined
       state.generation = candidate.generation
       state.revision = candidate.revision
       state.pending = candidate
       state.pendingBrowser = validation.browser
       state.phase = "pending"
       // Even a turn without a Loginom lease must finish before this generation can activate.
-      applyAfter = new Set(turns)
+      applyAfter = new Map(turns)
       progress()
       return view()
     },
@@ -455,8 +478,8 @@ export async function connectionService(
       }
     },
     api,
-    turn(id: string, active: boolean) {
-      if (active) turns.add(id)
+    turn(id: string, task: string, active: boolean) {
+      if (active) turns.set(id, task)
       else {
         turns.delete(id)
         applyAfter.delete(id)
@@ -467,7 +490,7 @@ export async function connectionService(
       if (state.closing || generation !== state.active?.generation) return
       state.browser = { ...browser }
     },
-    acquire(run: string) {
+    acquire(run: string, task = run) {
       if (
         state.closing ||
         state.pending ||
@@ -478,7 +501,7 @@ export async function connectionService(
         leases.has(run)
       )
         return
-      const lease = { generation: state.active.generation, recovery: false, active: true }
+      const lease = { generation: state.active.generation, task, recovery: false, active: true }
       leases.set(run, lease)
       return {
         generation: lease.generation,

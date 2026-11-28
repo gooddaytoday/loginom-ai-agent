@@ -1,5 +1,5 @@
 import { SettingsPage, type Plugin } from "@opencode/plugin/gui"
-import { builtinContext, Page, subscribeBuiltinDeepLinks } from "@opencode/plugin/gui/builtin"
+import { builtinContext, Page, QuestionRenderer, subscribeBuiltinDeepLinks } from "@opencode/plugin/gui/builtin"
 import { dashboardLinkChannel } from "@loginom-ai-agent/product/dashboard-link"
 import { Option, Schema } from "effect"
 import { lazy, onCleanup, Show, Suspense } from "solid-js"
@@ -7,6 +7,7 @@ import { unwrap } from "solid-js/store"
 import { DashboardLink } from "./contract"
 import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
 import type definition from "./index"
+import { LoginomRepeatDock } from "./repeat-dock"
 import { registerStartScreen } from "./start-screen"
 
 const decodeLink = Schema.decodeUnknownOption(DashboardLink)
@@ -41,6 +42,11 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
         <Settings />
       </Suspense>
     ),
+  })
+
+  ctx.add(QuestionRenderer, {
+    matches: (request) => request.metadata?.loginomRepeat === true,
+    render: (props) => <LoginomRepeatDock {...props} />,
   })
 
   if (!ctx.desktop) return

@@ -216,6 +216,7 @@ export async function createLoginomHost(options: {
   browserRecovery?: boolean
   // The Node entry may wrap replacement preparation in a CON-08 fixture build.
   prepareConnectionSwitch?: (prepare: () => Promise<RuntimeHandle>, signal: AbortSignal) => Promise<RuntimeHandle>
+  onConnectionApplication?: Loginom.ConnectionApplicationListener
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
@@ -600,6 +601,7 @@ export async function createLoginomHost(options: {
       },
     },
     journal,
+    options.onConnectionApplication,
   )
   const dashboardOperations = new Map<AbortController, Promise<unknown>>()
   function dashboardOperation(operation: DashboardStorageOperation, input: DashboardRead | DashboardPublish | DashboardDelete, signal?: AbortSignal) {
