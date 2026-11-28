@@ -11,6 +11,7 @@ export const LOGINOM_METADATA_FIELD_MAX_BYTES: Readonly<{
   packageAccess: number
   packageVariables: number
   agentCopy: number
+  error: number
 }>
 
 type Identity = { operationId: string; state: "running" | "settled" }

@@ -11,6 +11,7 @@ export const LOGINOM_METADATA_FIELD_MAX_BYTES = Object.freeze({
   packageAccess: 4 * 1024,
   packageVariables: 8 * 1024,
   agentCopy: 8 * 1024,
+  error: 4 * 1024,
 });
 
 const lists = {

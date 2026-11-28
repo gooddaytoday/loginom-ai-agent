@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {win32} from 'node:path';
 import test from 'node:test';
 import {nodeResultReply} from '../lib/node-result-reply.mjs';
 import {loginomFeedMetadata} from '../lib/user-results.mjs';
@@ -162,6 +163,21 @@ test('node errors retain native attribution and mask credentials without changin
   assert.equal(metadata.ports, undefined);
   assert.ok(before.includes('credential-example'));
   assert.equal(reply.content[0].text, before);
+});
+
+for (const [message, expected] of [
+  ['ODBC: pWd={sample-first;sample-second,sample-third}}sample-last};UID=reader', 'ODBC: [redacted];UID=reader'],
+  ['ODBC: PWD={sample-first}};sample-last', 'ODBC: [redacted]'],
+  [`Файлы «${win32.join('C:\\', 'Users', 'Example Name', 'input.csv')}» и “${win32.join('D:\\', 'Users', 'Second Name', 'output.csv')}” недоступны`,
+    'Файлы «[путь скрыт]» и “[путь скрыт]” недоступны'],
+]) test(`v1 metadata sanitizes native diagnostics: ${expected}`, () => {
+  const tool = 'dock_node_wait';
+  const failure = {code:'NODE_EXECUTION_FAILED', message, native:{source:'native_group_error_details', message}};
+  const reply = nodeResultReply(receipt({status:'FAILED', failure}), {userProfile:true, tool});
+  const metadata = withLoginomMetadata(reply, {receipt:loginomFeedMetadata(reply, {tool})})._meta.loginom;
+  assert.equal(metadata.error.message, expected);
+  assert.equal(metadata.error.attribution, 'after_launch');
+  assert.equal(metadata.error.node, undefined);
 });
 
 test('projection masks credential columns and recognizable tokens but preserves nulls', () => {

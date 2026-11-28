@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { withLoginomMetadata } from "../../loginom-runtime/client/lib/loginom-feed-metadata.mjs"
 import { dockToolResult } from "../src/dock"
-import type { LoginomMetadataFields } from "../src/loginom-metadata"
+import { decodeLoginomMetadata, type LoginomMetadataFields } from "../src/loginom-metadata"
 
 const receipt = { operation_id: "operation", state: "settled", status: "SUCCEEDED" }
 const node = { guid: "node-guid", label: "Фильтр", type: "transform.filter_data" }
@@ -48,12 +48,30 @@ test("Dock keeps the native error and the original model error text", async () =
       message: "Ошибка Loginom",
       source: "loginom",
       attribution: "verified_node",
+      node: { document_id: "pkg", workflow_id: "module", node_id: "fc94c88b-6b37-451b-9d57-a9378122d8a3" },
     },
   }
   await expect(dockToolResult(reply(failure, loginom), 4)).rejects.toMatchObject({
     message: JSON.stringify(failure),
     metadata: { generation: 4, loginom, isError: true },
   })
+})
+
+test("v1 drops invalid or oversized native error fields without discarding the receipt", () => {
+  const failure = { ...feed, status: "FAILED" }
+  const error = {
+    code: "NODE_EXECUTION_FAILED",
+    message: "Ошибка Loginom",
+    source: "loginom",
+    attribution: "verified_node",
+    node: { document_id: "pkg", workflow_id: "module", node_id: "fc94c88b-6b37-451b-9d57-a9378122d8a3" },
+  }
+  const expected = { ...failure, dropped: ["error"] }
+  expect(decodeLoginomMetadata({ ...failure, error: { ...error, message: "Ж".repeat(2200) } })).toEqual(expected)
+  expect(decodeLoginomMetadata({ ...failure, error: { ...error, attribution: "after_launch" } })).toEqual(expected)
+  expect(
+    decodeLoginomMetadata({ ...failure, error: { ...error, node: { ...error.node, document_id: "x".repeat(129) } } }),
+  ).toEqual(expected)
 })
 
 test("Dock retains all scenario 10 fields written by independent feed producers", async () => {

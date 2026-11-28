@@ -7,7 +7,7 @@ import {javascriptContextReceiptSchema,javascriptContextReply} from '../../lib/j
 import {createRedactor} from '../../lib/redact.mjs';
 import { createArtifactStore } from '../../lib/artifacts.mjs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, win32 } from 'node:path';
 import { Client as ProtocolClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import * as workspace from '../../lib/workspace.mjs';
@@ -139,16 +139,22 @@ test('MCP application refusals remain typed normal content and the same connecti
       return;
     }
     bridge = await starting;
+    const odbc='ODBC: PWD={sample-first;sample-second,sample-third}}sample-last};UID=reader';
+    const profile=`Файл «${win32.join('C:\\','Users','Example Name','input.csv')}» недоступен`;
     await recordExecution({operation_id:'journal-native-error',phase:'node_execution_error_toast_observed',failure:{message:'Safe failure'},
-      native_processes:{processes:[{error_details:'Console: '+connectionValue+'; https://example.test/private-path'},{error_details:'Short: '+shortValue}]},
-      outcome:{output:{ui:{dialogs:[{error_toast:{kind:'error',message:'Toast: '+connectionValue}}]}}}});
+      native_processes:{processes:[{error_details:'Console: '+connectionValue+'; https://example.test/private-path'},
+        {error_details:'Short: '+shortValue},{error_details:odbc}]},
+      outcome:{output:{ui:{dialogs:[{error_toast:{kind:'error',message:`Toast: ${connectionValue}; ${odbc}; ${profile}`}}]}}}});
     const journal=await readFile(join(directory,'execution-events.jsonl'),'utf8');
     const evidence=journal.trim().split('\n').map(line=>JSON.parse(line)).find(event=>event.operation_id==='journal-native-error');
     assert.ok(evidence,'the native observation must be durable');
     assert.equal(evidence.failure.message,'Safe failure');
     assert.equal(evidence.native_processes.processes[0].error_details,'Console: [redacted]; [URL скрыт]');
     assert.equal(evidence.native_processes.processes[1].error_details,'[сообщение скрыто]');
-    assert.equal(evidence.outcome.output.ui.dialogs[0].error_toast.message,'Toast: [redacted]');
+    assert.equal(evidence.native_processes.processes[2].error_details,'ODBC: [redacted];UID=reader');
+    assert.equal(evidence.outcome.output.ui.dialogs[0].error_toast.message,
+      'Toast: [redacted]; ODBC: [redacted];UID=reader; Файл «[путь скрыт]» недоступен');
+    assert.doesNotMatch(journal,/sample-(?:first|second|third|last)|Example Name/);
     assert.ok(!journal.includes(connectionValue));
     assert.ok(!journal.includes(shortValue));
     if (fault) { assert.equal(failures, 1); assert.equal(diagnostics.length, 1); assert.equal(diagnostics[0].retry, true); }

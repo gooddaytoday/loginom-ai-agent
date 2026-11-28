@@ -122,7 +122,8 @@ export function selectFailedExecutionChild(execution,snapshot,expected) {
     &&state.state==='failed'&&state.terminal===true&&state.can_cancel===false&&state.source==='native_progress_record',
     'Requested child must have its own verified terminal failure');
   if(expected)requireValue(child.process_id===expected.process_id&&child.record_id===expected.record_id
-    &&child.parent_id===expected.parent_id&&child.error_details===expected.error_details,
+    &&child.parent_id===expected.parent_id&&child.error_details===expected.error_details
+    &&child.error_details_omitted===expected.error_details_omitted,
     'Pinned failed child identity or error changed');
   return structuredClone(child);
 }

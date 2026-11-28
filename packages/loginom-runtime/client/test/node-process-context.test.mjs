@@ -80,9 +80,23 @@ test('the v1 native error cannot expose a password spanning the old 1000-charact
  assert.equal(metadata.error.attribution,'after_launch');
  assert.equal(metadata.error.node,undefined);
  assert.doesNotMatch(JSON.stringify(metadata),/fixture-/);
- failed.data.ErrorDetails='x'.repeat(4097);
- const oversized=await readNodeProcesses(f.page,{},f.readNode);
- assert.equal(oversized.processes.find(process=>process.process_id==='2').error_details,undefined);
+});
+test('oversized console diagnostics preserve the verified terminal failure without publishing raw text',async()=>{
+ const f=fixture(),baseline=captureExecutionBaseline(await readNodeProcesses(f.page,{},f.readNode),f.node);
+ const raw='synthetic-detail-'.repeat(300);
+ f.root.childNodes.push({isModel:true,internalId:103,childNodes:[],data:{id:'2',loaded:true,Status:42,
+  ErrorDetails:raw,ProgressBarCls:'bg-progress-ptpsError',CanCancelProcess:false}});
+ const snapshot=await readNodeProcesses(f.page,{},f.readNode);
+ const execution=verifyFailedExecution(identifyNewExecution(baseline,snapshot),snapshot);
+ assert.equal(execution.status,'failed');
+ assert.equal(execution.error.code,'NODE_EXECUTION_FAILED');
+ const reply={structuredContent:{result_version:'user-v1',operation_id:'oversized',state:'settled',status:'FAILED',
+   execution,error:execution.error},content:[]};
+ const {error}=withLoginomMetadata(reply,{receipt:loginomFeedMetadata(reply,{tool:'dock_node_wait'})})._meta.loginom;
+ assert.equal(error.attribution,'after_launch');
+ assert.equal(error.message,'[сообщение слишком длинное]');
+ assert.equal(error.node,undefined);
+ assert.doesNotMatch(JSON.stringify(snapshot),/synthetic-detail/);
 });
 for(const [name,mutate] of Object.entries({
  hidden_console:f=>f.left.hidden=true,loading_store:f=>f.store.isLoading=()=>true,

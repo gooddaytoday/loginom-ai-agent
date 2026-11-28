@@ -115,6 +115,17 @@ test('failed child proof uses native owner and own error, while ordinary group r
  const ordinary=verifyFailedExecution(e,s);assert.equal(ordinary.owner_verified,undefined);assert.equal(ordinary.error.message,'Aggregated dependency error');
 });
 
+test('omitted diagnostics preserve a terminal child failure with independently verified ownership',()=>{
+ const {s,e,show}=failedChildFixture();
+ const message='[сообщение слишком длинное]';
+ for(const process of s.processes.slice(1))Object.assign(process,{error_details:message,error_details_omitted:true});
+ const child=selectFailedExecutionChild(e,s);
+ const result=verifyFailedChildExecution(e,s,child,show);
+ assert.equal(result.status,'failed');assert.equal(result.owner_verified,true);
+ assert.equal(result.error.message,message);assert.deepEqual(result.error.native.node,e.node);
+ assert.throws(()=>verifyFailedChildExecution(e,s,child,{...show,verified:false}),/Show Node proof/);
+});
+
 for(const [name,change] of Object.entries({
  upstream_only:f=>delete f.s.processes[2].owner,
  single_foreign_child:f=>f.s.processes[2].owner.node_id='upstream',

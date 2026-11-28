@@ -252,7 +252,7 @@ export const LoginomMetadata = Schema.Struct({ ...identity.fields, ...optional }
   Schema.makeFilter(
     (metadata) =>
       Object.entries(LOGINOM_METADATA_FIELD_MAX_BYTES).every(([key, limit]) => {
-        const value = metadata[key as keyof typeof extensionFields]
+        const value = metadata[key as keyof typeof LOGINOM_METADATA_FIELD_MAX_BYTES]
         return value === undefined || loginomMetadataBytes(value) <= limit
       }),
     { expected: "Loginom metadata fields within their UTF-8 JSON byte budgets" },
@@ -273,7 +273,7 @@ const decodeBlock = Schema.decodeUnknownOption(LoginomMetadata)
 const fieldDecoders = Object.entries(rawFields).map(([key, schema]) => ({
   key,
   decode: Schema.decodeUnknownOption(schema),
-  limit: LOGINOM_METADATA_FIELD_MAX_BYTES[key as Extension],
+  limit: LOGINOM_METADATA_FIELD_MAX_BYTES[key as keyof typeof LOGINOM_METADATA_FIELD_MAX_BYTES],
 }))
 
 function readFields(value: object, extensionOnly = false) {
