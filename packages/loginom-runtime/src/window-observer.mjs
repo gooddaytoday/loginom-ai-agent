@@ -42,7 +42,9 @@ export function observeLoginomWindow({ page, openedAt, busy, readPackage, publis
     }
     if (stopped) return
     if (!busy()) {
-      packageInfo = await readPackage().catch(() => null)
+      // Undefined means the current package could not be observed.
+      const observed = await readPackage().catch(() => undefined)
+      if (observed !== undefined) packageInfo = observed
       update()
     }
     if (!stopped) timer = setTimeout(sample, interval).unref()

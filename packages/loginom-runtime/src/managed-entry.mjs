@@ -287,10 +287,11 @@ async function handle(message) {
           busy: () => !!state.controller || state.bridge.hasActiveWork(),
           async readPackage() {
             // C3.5 owns the live package-open observation.
-            const read = state.packageStateRead ??= state.bridge.packageState?.(state.browser, !!state.controller)
+            const read = state.packageStateRead ??= state.bridge.packageState?.(state.browser, false)
               .finally(() => { state.packageStateRead = undefined })
             const observation = await read
-            if (observation?.open !== true) return null
+            if (observation?.open === false) return null
+            if (observation?.open !== true) return
             const path = observation.path
             const prepared = session.metadata.workspacePreparation?.state?.package_ref
             const name = (prepared?.path === path ? prepared?.name : undefined) ?? path?.split("/").at(-1) ?? null

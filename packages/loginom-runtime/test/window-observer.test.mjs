@@ -71,3 +71,52 @@ test("a headed window reports package, minimize, busy and native close on the sa
   assert.equal(snapshots.length, count)
   assert.equal(detach.mock.callCount(), 1)
 })
+
+test("an unreadable package keeps its last name and path until closure is confirmed", async (t) => {
+  const controller = new AbortController()
+  const deadline = setTimeout(() => controller.abort(Error("Package observation timed out")), 5000)
+  t.after(() => {
+    clearTimeout(deadline)
+    controller.abort()
+  })
+  const page = new EventEmitter()
+  page.isClosed = () => false
+  page.context = () => ({
+    async newCDPSession() {
+      return { send: async () => ({ bounds: { windowState: "normal" } }), detach: async () => {} }
+    },
+  })
+  const events = new EventEmitter()
+  const next = (event) => once(events, event, { signal: controller.signal })
+  const packageInfo = { name: "Sales", path: "/user/Sales.lgp" }
+  const confirmation = Promise.withResolvers()
+  const reads = [
+    async () => packageInfo,
+    async () => undefined,
+    async () => { throw Error("Browser read failed") },
+    async () => {
+      events.emit("waitingForClose")
+      return confirmation.promise
+    },
+  ]
+  const snapshots = []
+  const waitingForClose = next("waitingForClose")
+  observeLoginomWindow({
+    page,
+    openedAt: 123,
+    busy: () => false,
+    readPackage: () => reads.shift()?.() ?? Promise.resolve(undefined),
+    publish(snapshot) {
+      snapshots.push(snapshot)
+      events.emit("snapshot", snapshot)
+    },
+    signal: controller.signal,
+  }, 1)
+  await waitingForClose
+  const empty = { openedAt: 123, state: "open", package: null }
+  assert.deepEqual(snapshots, [empty, { ...empty, package: packageInfo }])
+
+  const closed = next("snapshot")
+  confirmation.resolve(null)
+  assert.deepEqual(await closed, [empty])
+})
