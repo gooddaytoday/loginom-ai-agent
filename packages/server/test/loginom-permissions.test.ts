@@ -351,6 +351,44 @@ describe("loginom.product permissions (B2.6a)", () => {
   )
 
   it.live(
+    "limits permission reply notices to 2000 Unicode characters before settling the request",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const notice = "я".repeat(1999) + "📝"
+        for (const endpoint of ["reply", "conversation"] as const) {
+          const sessionID = yield* test.create(`notice length (${endpoint})`)
+          const request = yield* test.ask(sessionID, { action: "edit", resources: ["file.md"] })
+          expect(request.effect).toBe("ask")
+          const send = (text: string) =>
+            endpoint === "reply"
+              ? test.call(`/api/session/${sessionID}/permission/${request.id}/reply`, { decision: "once", notice: text })
+              : test.conversation(sessionID, request.id, text)
+
+          const rejected = yield* send(notice + "!")
+          expect(rejected.status).toBe(400)
+          expect(rejected.body).toMatchObject(
+            endpoint === "reply"
+              ? { _tag: "InvalidRequestError", kind: "Payload" }
+              : { _tag: "RpcError", type: "rpc.invalid_input" },
+          )
+          expect(rejected.body.message).toContain("notice")
+          expect(rejected.body.message).toContain("2000")
+          expect((yield* test.open(sessionID)).map((item) => item.id)).toEqual([request.id])
+          expect(yield* test.sessions.messages({ sessionID })).toEqual([])
+
+          const accepted = yield* send(notice)
+          expect(accepted.status).toBe(endpoint === "reply" ? 204 : 200)
+          expect(yield* test.open(sessionID)).toEqual([])
+          expect(yield* test.sessions.messages({ sessionID })).toContainEqual(
+            expect.objectContaining({ description: notice }),
+          )
+        }
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
     "removes only the conversation grants belonging to a deleted session",
     () =>
       Effect.gen(function* () {

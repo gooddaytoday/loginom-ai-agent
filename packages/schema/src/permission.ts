@@ -42,6 +42,8 @@ export interface Request extends Schema.Schema.Type<typeof Request> {}
 export const Reply = Schema.Literals(["once", "always", "reject"]).annotate({ identifier: "Permission.Reply" })
 export type Reply = typeof Reply.Type
 
+export const NoticeMaxLength = 2000
+
 const Asked = ephemeral({ type: "permission.asked", schema: Request.fields })
 const Replied = ephemeral({
   type: "permission.replied",

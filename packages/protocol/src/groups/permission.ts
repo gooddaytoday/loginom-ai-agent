@@ -144,7 +144,11 @@ export const makePermissionGroup = <
         payload: Schema.Struct({
           decision: Permission.Reply,
           message: Schema.String.pipe(Schema.optional),
-          notice: Schema.String.pipe(Schema.optional),
+          notice: Schema.String.check(
+            Schema.isMaxCodePoints(Permission.NoticeMaxLength, {
+              message: `notice must be at most ${Permission.NoticeMaxLength} characters`,
+            }),
+          ).pipe(Schema.optional),
         }),
         success: HttpApiSchema.NoContent,
         error: [SessionNotFoundError, PermissionNotFoundError],

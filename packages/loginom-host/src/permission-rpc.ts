@@ -1,3 +1,5 @@
+import { Permission } from "@opencode/schema/permission"
+
 // «Разрешать в этом разговоре» (B2.6a): the answer to one open request that also allows its kind for the rest of the
 // session. Used by the permission dock.
 export const PermissionConversation = {
@@ -9,7 +11,7 @@ export const PermissionConversation = {
         properties: {
           sessionID: { type: "string" },
           requestID: { type: "string" },
-          notice: { type: "string" },
+          notice: { type: "string", maxLength: Permission.NoticeMaxLength },
         },
         required: ["sessionID", "requestID"],
         additionalProperties: false,
