@@ -255,16 +255,31 @@ export async function dockTools(input: {
           return { admissionID, name, target }
         })()
       : undefined
+    const artifactTarget = name === "dock_artifact_deliver"
+      ? await (async () => {
+          call.signal.throwIfAborted()
+          const { artifact_id, upload_grant_id } = args
+          if (typeof artifact_id !== "string" || typeof upload_grant_id !== "string")
+            throw Error("LOGINOM_INPUT_INVALID")
+          // The runtime resolves the same immutable, session-scoped grant at dispatch.
+          return lease.artifactUploadTarget(artifact_id, upload_grant_id).catch((error) => {
+            throw Error(hostErrorText(error))
+          })
+        })()
+      : undefined
+    const uploadTarget = packagePermission
+      ? { name: packagePermission.name, destination: packagePermission.target.destination }
+      : artifactTarget
     // The resource tells the product's permission kinds apart (B2.6a): an uploaded local package is a save, an export
     // node writes outside the package.
     const nodeType = name === "dock_node_apply" ? (args.target as { type?: unknown } | undefined)?.type : undefined
-    const resource = localPackage ? "local_package" : typeof nodeType === "string" ? nodeType : "*"
+    const resource = localPackage ? "local_package" : artifactTarget?.destination ?? (typeof nodeType === "string" ? nodeType : "*")
     await input.files.ask(call, {
       action: key,
       resources: [resource],
-      save: ["*"],
-      ...(packagePermission
-        ? { metadata: { input: { Файл: packagePermission.name, "Место назначения": packagePermission.target.destination } } }
+      save: [artifactTarget?.destination ?? "*"],
+      ...(uploadTarget
+        ? { metadata: { input: { Файл: uploadTarget.name, "Место назначения": uploadTarget.destination } } }
         : {}),
     }).catch((error) => {
       throw packagePath ? permissionFailure(resolve(directory, packagePath), error) : error

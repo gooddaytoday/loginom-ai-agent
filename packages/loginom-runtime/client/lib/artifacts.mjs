@@ -299,6 +299,11 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
       }
       return structuredClone(descriptor);
     },
+    getUploadTarget(artifactId,grantId) {
+      const descriptor=this.getUploadGrant(artifactId,grantId);
+      const name=references.has(artifactId)?descriptor.name:descriptor.name.replace(/^[a-f0-9]{64}-\d+-/,'');
+      return {name,destination:descriptor.upload.destination};
+    },
     async resolve(artifactId) {
       const descriptor=entries.get(artifactId);
       if (!descriptor) throw new Error('Artifact was not admitted in this session');

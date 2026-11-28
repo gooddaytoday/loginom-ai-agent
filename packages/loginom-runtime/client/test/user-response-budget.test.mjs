@@ -60,6 +60,22 @@ test('compact JS delivery bounds only analytical rows and inspection preserves t
  assert.deepEqual(result,before);
 });
 
+test('an oversized delivery retains its verified transfer receipt and reuse flag',()=>{
+ for(const reused of [undefined,true]){
+  const output={status:'SUCCEEDED',upload_operation_id:'deliver:upload',destination:'/user/sales.csv',
+    upload_completion_verified:true,cleanup_complete:true,reused};
+  const result={operation_id:'deliver',upload_operation_id:'deliver:upload',state:'settled',
+    outcome:{...output,diagnostics:'x'.repeat(50000)}};
+  const reply=nodeResultReply(result,{userProfile:true,tool:'dock_artifact_delivery_status'});
+  assert.equal(reply.isError,true);
+  assert.equal(JSON.parse(reply.content[0].text).error.code,'USER_RESPONSE_BUDGET');
+  assert.ok(bytes(reply)<=46000);
+  assert.deepEqual(JSON.parse(JSON.stringify(reply.structuredContent)),JSON.parse(JSON.stringify({
+    operation_id:'deliver',state:'settled',status:'SUCCEEDED',output,
+  })));
+ }
+});
+
 test('only user-v1 wait removes the structured table copy and retains the declared output schema',()=>{
  const result={operation_id:'large-js',attempt:1,state:'settled',outcome:{status:'SUCCEEDED',effect_possible:true,
   cleanup_complete:true,action_key:'node.apply',phase:'read',output:{configuration:{verified:true,readback:{kind:'javascript'}},

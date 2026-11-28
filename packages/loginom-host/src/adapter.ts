@@ -133,6 +133,13 @@ export async function acquire(session: string) {
         ),
       )
     },
+    async artifactUploadTarget(artifactId: string, grantId: string) {
+      return queued(async () =>
+        Schema.decodeUnknownSync(Schema.Struct({ name: Schema.NonEmptyString, destination: Schema.NonEmptyString }))(
+          await connection.request("artifactUploadTarget", { run, artifactId, grantId }, undefined, observe),
+        ),
+      )
+    },
     async call(
       name: string,
       args: unknown,

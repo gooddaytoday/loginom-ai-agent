@@ -101,12 +101,11 @@ const deliveryTools = new Set([
 
 export function verifiedUpload(
   tool: string,
-  result: { structuredContent?: unknown; content: readonly Record<string, unknown>[] },
+  result: { structuredContent?: unknown },
 ) {
-  const first = result.content[0]
   const isPackage = tool === "dock_prepare"
   const proof = isPackage
-    ? Option.getOrUndefined(packageUpload(Option.getOrUndefined(fromJSON(first?.text))))?.local_package_upload
+    ? Option.getOrUndefined(packageUpload(result.structuredContent))?.local_package_upload
     : deliveryTools.has(tool)
       ? Option.getOrUndefined(artifactUpload(result.structuredContent))?.output
       : undefined

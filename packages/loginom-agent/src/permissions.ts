@@ -79,11 +79,11 @@ export const table: readonly Entry[] = [
 ]
 
 /** The product's defaults as rules. */
-export const rules: Permission.Ruleset = table.map((entry) => ({
-  action: entry.action,
-  resource: entry.resource,
-  effect: entry.effect,
-}))
+export const rules: Permission.Ruleset = [
+  ...table.map(({ action, resource, effect }) => ({ action, resource, effect })),
+  // File delivery has its own ordinary permission outside the package-save grant.
+  { action: "loginom_dock_artifact_deliver", resource: "*", effect: "ask" },
+]
 
 /** An agent's rules with the defaults right after OpenCode's catch-all allow, or first when it has none. */
 export function withDefaults(permissions: readonly Permission.Rule[]) {

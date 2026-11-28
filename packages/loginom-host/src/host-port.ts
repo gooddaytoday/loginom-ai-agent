@@ -23,6 +23,7 @@ const PackageInput = Schema.Struct({
   target: Schema.optional(Schema.Struct({ generation: Schema.Int, destination: Schema.NonEmptyString })),
 })
 const PackagePreview = Schema.Struct({ admissionID: Schema.NonEmptyString, name: Schema.NonEmptyString })
+const ArtifactPreview = Schema.Struct({ artifactId: Schema.NonEmptyString, grantId: Schema.NonEmptyString })
 const PackageAdmission = Schema.Tuple([
   Schema.Struct({ artifact_id: Schema.NonEmptyString, upload: Schema.Struct({ grant_id: Schema.NonEmptyString }) }),
 ])
@@ -387,11 +388,14 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         !knowledgeTools.has(input.name) &&
         input.name !== diagnosticTool.name
       const referenceCall = ["referenceReserve", "referenceAdmit", "referenceDiscard"].includes(data.method)
+      const artifactPreview = data.method === "artifactUploadTarget"
       if (
-        (data.method === "admit" || referenceCall || browserCall) &&
+        (data.method === "admit" || referenceCall || artifactPreview || browserCall) &&
         (run.applyingScope ||
           run.scope?.profile !== "loginom-automation" ||
-          ((data.method === "admit" || referenceCall) && !service.hasRuntime(run.lease?.generation ?? -1, run.chat)) ||
+          ((data.method === "admit" || referenceCall || artifactPreview) &&
+            !service.hasRuntime(run.lease?.generation ?? -1, run.chat)) ||
+          (artifactPreview && !run.catalog.has("dock_artifact_deliver")) ||
           (browserCall &&
             "name" in input &&
             typeof input.name === "string" &&
@@ -505,6 +509,14 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             },
             lease.generation,
           )
+          return
+        }
+        if (artifactPreview) {
+          const target = Schema.decodeUnknownSync(ArtifactPreview)(input)
+          const lease = await connectionLease(input.run, run)
+          if (!service.hasRuntime(lease.generation, run.chat)) throw Error("LOGINOM_SCOPE_DENIED")
+          const runtime = await service.runtime(lease.generation, run.chat)
+          reply({ id: data.id, result: await runtime.request("artifactUploadTarget", target) }, lease.generation)
           return
         }
         if (referenceCall) {

@@ -81,6 +81,15 @@ test('host startup upload grant binds artifact, exact Loginom destination and ex
       assert.throws(()=>store.getUploadGrant(artifactId,grantId),/not authorized/);
     const other=await createArtifactStore({directory:join(directory,'other')});
     assert.throws(()=>other.getUploadGrant(descriptor.artifact_id,descriptor.upload.grant_id),/not authorized/);
+    const stagedName=`${'a'.repeat(64)}-0-sales.tsv`;
+    const [staged]=await admitStartupArtifacts(store,[{
+      ...request,name:stagedName,upload:{directory:'/test/данные',overwrite:'reject'},
+    }]);
+    assert.deepEqual(store.getUploadTarget(staged.artifact_id,staged.upload.grant_id),{
+      name:'sales.tsv',destination:'/test/данные/'+stagedName,
+    });
+    assert.throws(()=>store.getUploadTarget(staged.artifact_id,descriptor.upload.grant_id),/not authorized/);
+    assert.throws(()=>other.getUploadTarget(staged.artifact_id,staged.upload.grant_id),/not authorized/);
     const replace=await store.admit({...request,upload:{directory:'/analyst',overwrite:'replace'}});
     assert.equal(replace.upload.destination,'/analyst/Продажи.csv');
     assert.equal(replace.upload.overwrite,'replace');

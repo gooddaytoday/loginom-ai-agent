@@ -347,6 +347,16 @@ async function handle(message) {
       send({ id: message.id, result })
       return
     }
+    if (message.operation === "artifactUploadTarget") {
+      const { artifactId, grantId } = message.input
+      try {
+        send({ id: message.id, result: state.session.artifactStore.getUploadTarget(artifactId, grantId) })
+      } catch (error) {
+        if (error.code !== "ARTIFACT_GRANT_NOT_FOUND") throw error
+        throw Error("LOGINOM_INPUT_INVALID")
+      }
+      return
+    }
     if (message.operation === "list") {
       send({
         id: message.id,

@@ -132,7 +132,8 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
 function deliveredUpload(result,outcome) {
   if(!result.upload_operation_id||result.state!=='settled'||outcome?.status!=='SUCCEEDED'||outcome.upload_completion_verified!==true
     ||outcome.upload_operation_id!==result.upload_operation_id)return null;
-  return {instruction:`To use this file as a node source, use upload_operation_id "${result.upload_operation_id}" (output.upload_operation_id), `
+  const reuse=outcome.reused===true?'The existing server copy was verified and reused. ':'';
+  return {instruction:reuse+`To use this file as a node source, use upload_operation_id "${result.upload_operation_id}" (output.upload_operation_id), `
     +`not the delivery operation_id "${result.operation_id}".`};
 }
 

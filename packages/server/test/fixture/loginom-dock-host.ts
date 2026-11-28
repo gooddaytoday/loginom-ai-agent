@@ -16,6 +16,7 @@ export function scriptedHost(
   options: {
     catalog?: (generation: number) => Tool[]
     call?: (request: Record<string, unknown>) => unknown
+    artifactUploadTarget?: { name: string; destination: string }
     acquire?: () => string | undefined
     tools?: () => string | undefined
     /** Runs start with a browser runtime, as after `dock_prepare`. */
@@ -46,6 +47,7 @@ export function scriptedHost(
     if (request.method === "release" || request.method === "interrupt") return reply(true)
     if (request.method === "packageUploadTarget")
       return reply({ generation: state.generation, destination: `/user/${"a".repeat(64)}-0-${input.name}` })
+    if (request.method === "artifactUploadTarget") return reply(options.artifactUploadTarget)
     if (request.method === "scope") {
       const mode = input.mode
       const scope = input.scope as Scope

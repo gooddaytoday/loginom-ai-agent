@@ -629,7 +629,10 @@ describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () =
         }
         const host = scriptedHost({
           catalog: () => [prepare],
-          call: () => ({ content: [{ type: "text", text: JSON.stringify({ local_package_upload: receipt }) }] }),
+          call: () => ({
+            content: [{ type: "text", text: JSON.stringify({ prepared: true }) }],
+            structuredContent: { local_package_upload: receipt },
+          }),
         })
         const test = yield* boot(host)
         const bytes = Buffer.from("LGP package bytes")
@@ -680,6 +683,45 @@ describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () =
         if (combined.state.status !== "error" || other.state.status !== "error") throw Error("expected failures")
         expect(combined.state.error.message).toContain("local_package_path requires open_package without package_path")
         expect(other.state.error.message).toContain("local_package_path requires a .lgp file")
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "the data-file delivery permission identifies the granted file and exact destination",
+    () =>
+      Effect.gen(function* () {
+        const name = "sales.tsv"
+        const destination = `/user/${"a".repeat(64)}-0-${name}`
+        const args = { artifact_id: "input-artifact", upload_grant_id: "input-grant", operation_id: "delivery" }
+        const host = scriptedHost({
+          prepared: true,
+          artifactUploadTarget: { name, destination },
+          catalog: () => [{
+            name: "dock_artifact_deliver",
+            inputSchema: {
+              type: "object",
+              properties: Object.fromEntries(Object.keys(args).map((key) => [key, { type: "string" }])),
+              required: Object.keys(args),
+            },
+          }],
+        })
+        const test = yield* boot(host)
+        const id = yield* test.create("tabular file delivery", true)
+        yield* test.wizard(id, script({ tool: "loginom_dock_artifact_deliver", input: args }, { text: "end" }), false)
+        const pending = yield* test.question(id)
+        expect(pending).toMatchObject({
+          action: "loginom_dock_artifact_deliver",
+          resources: [destination],
+          metadata: { input: { Файл: name, "Место назначения": destination } },
+        })
+        expect(host.requests("artifactUploadTarget")).toMatchObject([
+          { artifactId: args.artifact_id, grantId: args.upload_grant_id },
+        ])
+        expect(host.requests("call")).toHaveLength(0)
+        expect((yield* test.call(`/api/session/${id}/permission/${pending.id}/reply`, { decision: "once" })).status).toBe(204)
+        yield* test.sessions.wait(id)
+        expect(host.requests("call")).toMatchObject([{ name: "dock_artifact_deliver", args }])
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )

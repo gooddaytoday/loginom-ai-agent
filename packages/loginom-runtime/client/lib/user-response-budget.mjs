@@ -40,7 +40,7 @@ function describeRecovery(description,modes,refresh) {
 
 // The consumer reads joined text, while MCP also transports its escaped copy
 // and structuredContent. Check the final reply without changing any receipt.
-export function boundedUserToolReply(reply,{tool,operationId,modes,refresh}={}) {
+export function boundedUserToolReply(reply,{tool,operationId,modes,refresh,retainedStructuredContent}={}) {
  const text=reply.content.flatMap(block=>block.type==='text'?[block.text]:[]).join('\n\n');
  const wireBytes=Buffer.byteLength(JSON.stringify(reply),'utf8');
  const textBytes=Buffer.byteLength(text,'utf8'),lines=text.split('\n').length;
@@ -65,5 +65,8 @@ export function boundedUserToolReply(reply,{tool,operationId,modes,refresh}={}) 
        ?'Read the retained preparation receipt without the input artifact list or knowledge bundle. Do not repeat preparation to retrieve node cards; request selected node_types and modes through dock_action_describe.'
        :'Inspect the original operation. A local full receipt is not model delivery; obtain smaller analytical output only after effects are reconciled.'}
        :{instruction:'Request a smaller reply. This delivery refusal does not establish the state of any browser effect.'}};
- return {...textReply(refusal),isError:true};
+ const limited={...textReply(refusal),isError:true};
+ if(!retainedStructuredContent)return limited;
+ const withReceipt={...limited,structuredContent:retainedStructuredContent};
+ return Buffer.byteLength(JSON.stringify(withReceipt),'utf8')<=USER_PREVIEW_WIRE_BUDGET?withReceipt:limited;
 }

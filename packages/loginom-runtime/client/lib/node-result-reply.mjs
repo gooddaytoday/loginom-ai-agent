@@ -19,5 +19,15 @@ export function nodeResultReply(result,{userProfile=false,tool}={}) {
   const error=Error('Exact full result exceeds the 1 MiB serialized MCP limit; no table was delivered. The original node checkpoint is retained.');
   error.code='EXACT_FULL_SERIALIZATION_LIMIT';throw error;
  }
- return userProfile?boundedUserToolReply(reply):reply;
+ const proof=delivered.output;
+ const verifiedDelivery=tool?.startsWith('dock_artifact_deliver')&&delivered.state==='settled'
+  &&delivered.status==='SUCCEEDED'&&proof?.status==='SUCCEEDED'&&proof.upload_completion_verified===true
+  &&proof.cleanup_complete===true;
+ const retainedStructuredContent=verifiedDelivery?{
+  operation_id:delivered.operation_id,state:delivered.state,status:delivered.status,output:{
+   status:proof.status,upload_operation_id:proof.upload_operation_id,destination:proof.destination,
+   upload_completion_verified:true,cleanup_complete:true,bytes_source:proof.bytes_source,reused:proof.reused,
+  },
+ }:undefined;
+ return userProfile?boundedUserToolReply(reply,{retainedStructuredContent}):reply;
 }

@@ -572,8 +572,11 @@ export async function createBridge(config, session, { browserTransport: managedB
             // reply. Geometry duplicates those identities and is diagnostic;
             // retain its full receipt locally without spending delivery space.
             if(preparationRequest.intent==='open_package')delete delivered.workspace.browser_geometry;
-            const budget={tool:'dock_prepare',operationId:preparationRequest.operation_id};
-            let reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},budget);
+            const structuredContent=localPackageUpload?{local_package_upload:localPackageUpload}:undefined;
+            const budget={tool:'dock_prepare',operationId:preparationRequest.operation_id,retainedStructuredContent:structuredContent};
+            const prepareReply=()=>boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}],
+              ...(structuredContent?{structuredContent}:{})},budget);
+            let reply=prepareReply();
             if(first&&ready&&reply.isError===true){
               // Preparation is a discovery step. Node rules/schemas are still
               // required through describe before apply; do not let the number
@@ -581,7 +584,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               delivered.knowledge={...bundle,node_types:bundle.node_types.map(node=>({
                 type:node.type,candidate_node_apply_available:node.candidate_node_apply_available,modes:node.modes}))};
               delivered.next_step={tool:'dock_action_describe',instruction:'The preparation catalog lists types and modes only. Request selected node_types and modes for complete semantics, rules and parameter schemas before applying nodes.'};
-              reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},budget);
+              reply=prepareReply();
             }
             if (ready && reply.isError !== true) userBundleDelivered = true;
             undeliveredDraft = ready && reply.isError === true && workspace?.created_draft === true
@@ -927,13 +930,16 @@ export async function createBridge(config, session, { browserTransport: managedB
         });
       } catch (error) {
         const message = config.apiKey ? String(error.message).replaceAll(config.apiKey, '[redacted]') : String(error.message);
-        if(localPackageUpload)return boundedUserToolReply({isError:true,content:[{type:'text',text:JSON.stringify({
-          code:'LOCAL_PACKAGE_OPEN_UNCONFIRMED',message,prepared:false,local_package_upload:localPackageUpload,
-          workspace:session.metadata.workspacePreparation?.state??null,
-          next_step:{tool:'dock_prepare',arguments:{intent:'open_package',operation_id:request.params.arguments?.operation_id??'prepare',
-            package_path:localPackageUpload.destination},
-            instruction:'Continue with this confirmed server copy and the original operation ID. Reconcile the original opening receipt; never repeat an uncertain open or upload the local file again.'},
-        })}]},{tool:'dock_prepare'});
+        if(localPackageUpload){
+          const structuredContent={local_package_upload:localPackageUpload};
+          return boundedUserToolReply({isError:true,structuredContent,content:[{type:'text',text:JSON.stringify({
+            code:'LOCAL_PACKAGE_OPEN_UNCONFIRMED',message,prepared:false,local_package_upload:localPackageUpload,
+            workspace:session.metadata.workspacePreparation?.state??null,
+            next_step:{tool:'dock_prepare',arguments:{intent:'open_package',operation_id:request.params.arguments?.operation_id??'prepare',
+              package_path:localPackageUpload.destination},
+              instruction:'Continue with this confirmed server copy and the original operation ID. Reconcile the original opening receipt; never repeat an uncertain open or upload the local file again.'},
+          })}]},{tool:'dock_prepare',retainedStructuredContent:structuredContent});
+        }
         if(userProfile&&request.params.name==='dock_prepare'&&message.startsWith('UNKNOWN_PREPARED_WORKFLOW:')
           &&!clipboardUncertain&&heldLeases.size===0&&!actionRuntime?.hasUnsettledWork()) {
           const next_step={tool:'dock_prepare',arguments:{intent:'open_package',

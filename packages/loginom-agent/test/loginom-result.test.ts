@@ -27,9 +27,17 @@ test("the feed gets the verified destination and display name from the upload re
     operationId: "delivery:upload",
     upload: { name: "sales.csv", folder: "/user/data", destination },
   })
-  expect(verifiedUpload("dock_prepare", reply({
-    local_package_upload: { ...proof, destination: "/user/Demo.lgp" },
-  }))?.upload).toEqual({ name: "Demo.lgp", folder: "/user", destination: "/user/Demo.lgp" })
+  const local_package_upload = { ...proof, destination: "/user/Demo.lgp" }
+  const limited = {
+    ...reply({ result_delivery: "refused", error: { code: "USER_RESPONSE_BUDGET" } }),
+    isError: true,
+    structuredContent: { local_package_upload },
+  }
+  expect(verifiedUpload("dock_prepare", limited)?.upload).toEqual({
+    name: "Demo.lgp", folder: "/user", destination: "/user/Demo.lgp",
+  })
+  const textOnly = { ...reply({ local_package_upload }), structuredContent: undefined }
+  expect(verifiedUpload("dock_prepare", textOnly)).toBeUndefined()
   for (const structuredContent of [
     { state: "running", status: "SUCCEEDED", output: proof },
     { state: "settled", status: "SUCCEEDED", output: { ...proof, upload_completion_verified: false } },
@@ -37,7 +45,7 @@ test("the feed gets the verified destination and display name from the upload re
     { state: "settled", status: "SUCCEEDED", output: { ...proof, reused: true } },
     { state: "settled", status: "SUCCEEDED", output: { destination } },
   ])
-    expect(verifiedUpload("dock_artifact_deliver", { content: [], structuredContent })).toBeUndefined()
+    expect(verifiedUpload("dock_artifact_deliver", { structuredContent })).toBeUndefined()
 })
 
 test("control summaries use only top-level receipts and preserve text-only delivery", () => {

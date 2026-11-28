@@ -26,7 +26,8 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     &&proof?.bytes_verified===true&&proof.upload_completion_verified===true&&proof.destination===artifact.upload.destination
     &&proof.bytes===artifact.bytes&&proof.sha256===artifact.sha256,'Final transfer proof mismatch');
   const result={status:'SUCCEEDED',upload_operation_id:job.uploadId,destination:proof.destination,bytes:proof.bytes,sha256:proof.sha256,
-    verification_id:proof.verification_id,cleanup_complete:true,upload_completion_verified:true};
+    verification_id:proof.verification_id,cleanup_complete:true,upload_completion_verified:true,
+    ...(outcome.output.existing_file_reused===true?{reused:true}:{})};
   await acknowledge(job,'artifact_delivery_completed',{result});job.outcome=result;job.phase='completed';job.error=null;
  };
  async function run(job,artifact,signal,resumeId=null) {

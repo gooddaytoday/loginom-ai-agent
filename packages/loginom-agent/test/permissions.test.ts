@@ -102,7 +102,7 @@ describe("permission kinds", () => {
     ] as [string, string[]?][])
       expect(effect(action, resources)).toBe("ask")
     expect(effect("shell")).toBe("deny")
-    expect(rules).toHaveLength(table.length)
+    expect(rules).toContainEqual({ action: "loginom_dock_artifact_deliver", resource: "*", effect: "ask" })
   })
 
   test("the defaults sit right after OpenCode's catch-all allow, below every later rule", () => {

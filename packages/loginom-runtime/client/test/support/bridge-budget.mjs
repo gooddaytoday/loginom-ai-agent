@@ -258,6 +258,7 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
    assert.deepEqual(delivered.knowledge,retained.knowledge);
    assert.deepEqual(delivered.input_artifacts,retained.input_artifacts);
    assert.deepEqual(delivered.local_package_upload,retained.local_package_upload);
+   assert.deepEqual(prepared.structuredContent,{local_package_upload:retained.local_package_upload});
    assert.equal(delivered.workspace.browser_geometry,undefined);
    assert.deepEqual(retained.workspace.browser_geometry.workflow_ref,retained.workspace.workflow_ref);
    assert.equal(retained.workspace.browser_geometry.observed.document_id,documentId);

@@ -15,6 +15,7 @@ test('folder navigation reobserves after a proven no-effect stale epoch with a n
  };
  const result=await f.service.deliver(request);
  assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(f.calls.filter(x=>x==='upload').length,1);
+ assert.equal(result.outcome.reused,undefined);
  assert.equal(attempts.length,3);assert.notEqual(attempts[0].id,attempts[1].id);
  assert.notEqual(attempts[0].observation,attempts[1].observation);assert.notEqual(attempts[0].ref,attempts[1].ref);
 });
@@ -392,6 +393,13 @@ test('delivery returns from a different storage branch before entering the grant
 for(const comparison of ['equal','different','unreadable','uncertain'])test('reject delivery compares the existing file without overwriting: '+comparison,async()=>{
  const f=fixture();f.artifact.upload.overwrite='reject';
  f.runtime.uploadDeliveredArtifact=async()=>{f.calls.push('upload');return {status:'FAILED',cleanup_complete:true,output:{upload_submitted:false,conflict_rejected:true}};};
+ const inspect=f.runtime.inspect;
+ f.runtime.inspect=async options=>{
+  const receipt=await inspect(options);
+  receipt.output.outcome.output.upload_submitted=false;
+  receipt.output.outcome.output.existing_file_reused=true;
+  return receipt;
+ };
  const verify=f.runtime.verifyDeliveredArtifact;
  f.runtime.verifyDeliveredArtifact=async options=>{
   if(comparison==='equal')return verify(options);
@@ -402,7 +410,11 @@ for(const comparison of ['equal','different','unreadable','uncertain'])test('rej
  const first=f.service.deliver(request),result=await first;
  assert.equal(result.state,'settled');assert.equal(f.service.busy,false);assert.equal(f.service.deliver(request),first);
  assert.equal(f.calls.filter(c=>c==='upload').length,1);
- if(comparison==='equal')assert.equal(result.outcome.status,'SUCCEEDED');
+ if(comparison==='equal'){
+  assert.equal(result.outcome.status,'SUCCEEDED');
+  assert.equal(result.outcome.reused,true);
+  assert.equal(f.service.status(request.operation_id).outcome.reused,true);
+ }
  else if(comparison==='uncertain'){assert.equal(result.outcome.status,'AMBIGUOUS');assert.equal(f.service.unsettled,true);}
  else {
   assert.equal(result.phase,'rejected');assert.equal(result.outcome.code,'UPLOAD_PATH_CONFLICT');

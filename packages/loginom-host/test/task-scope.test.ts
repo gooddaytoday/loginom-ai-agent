@@ -39,7 +39,7 @@ async function fixture(configured = false, admissionResult?: unknown) {
         appendFileSync(${JSON.stringify(marker)}, JSON.stringify({ operation: 'start', pid: process.pid }) + '\\n');
         send({ protocol: 1, generation: message.input.generation, chat: message.input.chat, ready: true });
       }
-      if (message.operation === 'list') send({ prepared, tools: ['dock_prepare','dock_node_wait'].map(name => ({ name, inputSchema: { type: 'object' } })) });
+      if (message.operation === 'list') send({ prepared, tools: ['dock_prepare','dock_node_wait','dock_artifact_deliver'].map(name => ({ name, inputSchema: { type: 'object' } })) });
       if (message.operation === 'work') {
         if (!holdWork) send(work);
         if (holdWork) {
@@ -62,6 +62,11 @@ async function fixture(configured = false, admissionResult?: unknown) {
       if (message.operation === 'admit') {
         appendFileSync(${JSON.stringify(marker)}, JSON.stringify({ operation: 'admit', ...message.input }) + '\\n');
         send(${JSON.stringify(admissionResult) ?? "undefined"} ?? message.input.files.map((file, index) => ({ artifact_id: 'artifact-' + index, name: file.name, upload: { grant_id: 'grant-' + index } })));
+      }
+      if (message.operation === 'artifactUploadTarget') {
+        if (message.input.artifactId === 'sales' && message.input.grantId === 'sales-grant')
+          send({ name: 'sales.csv', destination: '/user/sales.csv' });
+        else process.send({ id: message.id, error: 'LOGINOM_INPUT_INVALID' });
       }
       if (message.operation === 'call') {
         appendFileSync(${JSON.stringify(marker)}, JSON.stringify({ operation: 'call', ...message.input }) + '\\n');
@@ -296,6 +301,30 @@ test("private package input is rejected before startup or input staging outside 
     await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
     expect(await readdir(f.root)).not.toContain("runtime")
     expect(await readdir(f.root)).not.toContain("inputs")
+    expect(await readdir(join(f.root, "recovery"))).toEqual([])
+  } finally {
+    await f.close()
+  }
+})
+
+test("upload permission can inspect a grant only in a prepared automation run", async () => {
+  const f = await fixture(true)
+  try {
+    const preview = { run: "one", artifactId: "sales", grantId: "sales-grant" }
+    await expect(f.client.request("artifactUploadTarget", preview)).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    await f.scope("bind", "loginom-automation")
+    await expect(f.client.request("artifactUploadTarget", preview)).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    await f.call("dock_prepare")
+    await f.client.request("tools", { run: "one" })
+    await expect(f.client.request("artifactUploadTarget", preview)).resolves.toEqual({
+      name: "sales.csv", destination: "/user/sales.csv",
+    })
+    await expect(f.client.request("artifactUploadTarget", { ...preview, grantId: "other" })).rejects.toThrow(
+      "LOGINOM_INPUT_INVALID",
+    )
+    expect((await readFile(f.marker, "utf8")).trim().split("\n").map((entry) => JSON.parse(entry).operation)).toEqual([
+      "start", "call",
+    ])
     expect(await readdir(join(f.root, "recovery"))).toEqual([])
   } finally {
     await f.close()
