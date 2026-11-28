@@ -72,6 +72,7 @@ const boot = (
   extra: (ctx: PluginContext) => Effect.Effect<void, never, Scope.Scope> = () => Effect.void,
   policies?: readonly Record<string, unknown>[],
   persisted?: string,
+  beforeGrantWrite?: Effect.Effect<void>,
 ) =>
   Effect.gen(function* () {
     const dir = persisted ?? (yield* tmpdirScoped("loginom-permissions-")).path
@@ -123,6 +124,24 @@ const boot = (
             Layer.succeed(SessionRunnerModel.Service, { resolve: () => Effect.succeed(model) }),
           ),
           ...(policies ? [Config.node.replace(Config.configured({ claude: false, system }))] : []),
+          ...(beforeGrantWrite
+            ? [
+                KV.node.replace(
+                  KV.node.mapLayer((base) =>
+                    Layer.effect(
+                      KV.Service,
+                      Effect.map(KV.Service, (kv) => ({
+                        ...kv,
+                        set: (key, value) =>
+                          key.includes(":permission/conversation/")
+                            ? beforeGrantWrite.pipe(Effect.andThen(kv.set(key, value)))
+                            : kv.set(key, value),
+                      })),
+                    ).pipe(Layer.provide(base)),
+                  ),
+                ),
+              ]
+            : []),
         ],
       ).pipe(Layer.provide(HttpServer.layerServices)),
     )
@@ -419,6 +438,56 @@ describe("loginom.product permissions (B2.6a)", () => {
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
+
+  for (const write of ["fails", "succeeds"] as const) {
+    it.live(
+      `reports the actual grant outcome when the tool is cancelled and the write ${write}`,
+      () =>
+        Effect.gen(function* () {
+          const writing = yield* Deferred.make<void>()
+          const release = yield* Deferred.make<void>()
+          const gate = Deferred.succeed(writing, undefined).pipe(Effect.andThen(Deferred.await(release)))
+          const test = yield* boot({}, undefined, undefined, undefined, gate)
+          const sessionID = yield* test.create("cancel while storing the grant")
+          const filename = "cancelled.md"
+          if (write === "fails")
+            yield* test.db.run(sql`CREATE TRIGGER fail_conversation_grant BEFORE INSERT ON kv
+              WHEN NEW.key GLOB '*:permission/conversation/*'
+              BEGIN SELECT RAISE(ABORT, 'forced grant write failure'); END`)
+
+          const running = yield* test
+            .prompt(sessionID, script({ tool: "write", input: { path: filename, content: "never written" } }))
+            .pipe(Effect.forkScoped)
+          const request = yield* until(() => test.open(sessionID).pipe(Effect.map((items) => items[0])))
+          const reply = yield* test
+            .conversation(sessionID, request.id, "Allowed in this conversation", "Allowed once")
+            .pipe(Effect.forkScoped)
+          try {
+            yield* Deferred.await(writing)
+            yield* test.sessions.interrupt(sessionID)
+            expect(yield* test.open(sessionID)).toEqual([])
+          } finally {
+            yield* Deferred.succeed(release, undefined)
+          }
+
+          const result = yield* Fiber.join(reply)
+          yield* Fiber.join(running)
+          if (write === "fails") {
+            expect(result).toMatchObject({ status: 400, body: { type: "request_closed" } })
+            expect(yield* test.conversationGrants(sessionID)).toEqual([])
+          } else {
+            expect(result).toEqual({ status: 200, body: { output: { kind: "write" } } })
+            expect(yield* test.conversationGrants(sessionID)).toHaveLength(1)
+          }
+          expect(yield* Effect.promise(() => Bun.file(path.join(test.dir, filename)).exists())).toBe(false)
+          expect((yield* test.sessions.messages({ sessionID })).some((message) => message.type === "system")).toBe(false)
+          expect((yield* test.ask(sessionID, { action: "edit", resources: [filename] })).effect).toBe(
+            write === "fails" ? "ask" : "allow",
+          )
+        }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+      timeout,
+    )
+  }
 
   it.live(
     "limits permission reply notices to 2000 Unicode characters before settling the request",

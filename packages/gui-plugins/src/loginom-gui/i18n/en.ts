@@ -156,6 +156,7 @@ export default {
   permissionOnce: "Allow once",
   permissionConversation: "Allow in this conversation",
   permissionConversationNotSaved: "Could not save permission for this conversation. The action was allowed once.",
+  permissionRequestClosed: "The permission request closed before your response could be applied.",
   permissionDeny: "Decline",
   permissionInstead: "Or say what to do instead",
   permissionSend: "Send",

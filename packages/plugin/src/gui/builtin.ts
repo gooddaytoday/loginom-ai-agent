@@ -654,11 +654,11 @@ export interface PermissionDockInput {
   readonly directory: string
   /** Localized description, when the application recognizes the tool. */
   readonly description?: string
-  /** Close the prompt after the server accepts the response. */
+  /** Close the prompt after the server accepts the response or confirms the request has closed. */
   readonly confirm: () => void
 }
 
-/** Replaces the pending permission prompt in the composer. The first matching contribution is used. */
+/** Built-in plugins can replace the permission prompt in the composer. The first matching contribution is used. */
 export const PermissionDock = Registry.define<{
   /** Local contribution id. */
   id: string

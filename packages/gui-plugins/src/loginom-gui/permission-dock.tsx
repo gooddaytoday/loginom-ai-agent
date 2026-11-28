@@ -23,6 +23,8 @@ const isNotice = Schema.is(Schema.String.check(Schema.isMaxCodePoints(Permission
 
 const isUnsavedGrant = Schema.is(Schema.Struct({ saved: Schema.Literal(false) }))
 
+const isClosedRequest = Schema.is(Schema.Struct({ type: Schema.Literal("request_closed") }))
+
 const traces = { once: "traceOnce", reject: "traceDeny", conversation: "traceConversation" } as const
 
 export default function PermissionPrompt(props: PermissionDockInput) {
@@ -78,10 +80,15 @@ export default function PermissionPrompt(props: PermissionDockInput) {
           ctx.toast.show({ variant: "error", title: ctx.t("permissionConversationNotSaved") })
       } else await props.client.permission.reply({ ...target, decision, message }, options)
     } catch (error) {
-      if (!ctx.signal.aborted)
+      if (ctx.signal.aborted) return
+
+      if (isClosedRequest(error)) {
+        ctx.toast.show({ variant: "error", title: ctx.t("permissionRequestClosed") })
+      } else {
         setState((current) => permissionTransition(current, decodeFailure(error) ? "not_grantable" : "failed"))
 
-      return
+        return
+      }
     }
 
     if (ctx.signal.aborted) return

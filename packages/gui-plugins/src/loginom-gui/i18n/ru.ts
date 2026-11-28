@@ -162,6 +162,7 @@ export default {
   permissionOnce: "Разрешить один раз",
   permissionConversation: "Разрешать в этом разговоре",
   permissionConversationNotSaved: "Разрешение на разговор не сохранилось. Действие разрешено один раз.",
+  permissionRequestClosed: "Запрос разрешения уже закрыт. Ваш ответ не применён.",
   permissionDeny: "Отклонить",
   permissionInstead: "Или скажите, что сделать иначе",
   permissionSend: "Отправить",

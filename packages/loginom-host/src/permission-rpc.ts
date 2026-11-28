@@ -22,6 +22,7 @@ export const PermissionConversation = {
       // The terminal (В-31) and a request the product does not ask by default are answered one at a time.
       errors: {
         not_grantable: { type: "object", properties: { action: { type: "string" } }, required: ["action"] },
+        request_closed: { type: "object", properties: { requestID: { type: "string" } }, required: ["requestID"] },
       },
     },
   },

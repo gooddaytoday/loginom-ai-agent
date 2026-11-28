@@ -1,6 +1,7 @@
 export * as Permission from "./permission.js"
 
 import { makeLocationNode } from "@opencode/util/effect/app-node"
+import type { ReplyNotice } from "@opencode/plugin/permission"
 import { Context, Deferred, Effect, Layer, Schema } from "effect"
 import { Permission } from "@opencode/schema/permission"
 import { SessionEvent } from "@opencode/schema/session-event"
@@ -119,7 +120,7 @@ export interface Interface {
   readonly assertNotDenied: (input: AssertInput) => Effect.Effect<void, BlockedError | SessionErrors.NotFoundError>
   /** True only when the rules already allow the request; never asks the user. */
   readonly allows: (input: AssertInput) => Effect.Effect<boolean, SessionErrors.NotFoundError>
-  readonly reply: (input: ReplyInput, resolveNotice?: Effect.Effect<string | undefined>) => Effect.Effect<void, NotFoundError>
+  readonly reply: (input: ReplyInput, resolveNotice?: Effect.Effect<ReplyNotice>) => Effect.Effect<void, NotFoundError>
   readonly get: (id: ID) => Effect.Effect<Request | undefined>
   readonly forSession: (sessionID: SessionSchema.ID) => Effect.Effect<ReadonlyArray<Request>>
   readonly list: () => Effect.Effect<ReadonlyArray<Request>>
@@ -308,14 +309,16 @@ const layer = Layer.effect(
       return (yield* evaluateInput(input)).effect === "allow"
     })
 
-    const prepareReplyNotice = (request: Request, notice: Effect.Effect<string | undefined>) =>
+    const prepareReplyNotice = (request: Request, notice: Effect.Effect<ReplyNotice>) =>
       Effect.gen(function* () {
-        const description = yield* notice
-        if (description === undefined || isReplyNotice(description)) return description
+        const resolved = yield* notice
+        const description = typeof resolved === "string" ? resolved : resolved?.notice
+        const persisted = typeof resolved === "object" && resolved?.persisted === true
+        if (description === undefined || isReplyNotice(description)) return { description, persisted }
         yield* Effect.logWarning(`Permission reply notice exceeds ${Permission.NoticeMaxLength} Unicode code points`, {
           requestID: request.id,
         })
-        return undefined
+        return { persisted }
       }).pipe(
         Effect.catchCause((cause) =>
           Effect.logWarning("Could not prepare permission reply notice", { requestID: request.id, cause }).pipe(
@@ -362,7 +365,7 @@ const layer = Layer.effect(
         })
       })
 
-    const reply = Effect.fn("Permission.reply")((input: ReplyInput, resolveNotice?: Effect.Effect<string | undefined>) =>
+    const reply = Effect.fn("Permission.reply")((input: ReplyInput, resolveNotice?: Effect.Effect<ReplyNotice>) =>
       Effect.uninterruptible(
         Effect.gen(function* () {
           const existing = pending.get(input.requestID)
@@ -381,8 +384,10 @@ const layer = Layer.effect(
             )
           }
           const notice = yield* prepareReplyNotice(existing.request, resolveNotice ?? Effect.succeed(input.notice))
-          // A cancellation after the claim cannot undo an approval already saved.
-          if (closed || pending.get(input.requestID) !== existing) return
+          if (closed || pending.get(input.requestID) !== existing) {
+            if (resources?.length || notice?.persisted) return
+            return yield* new NotFoundError({ requestID: input.requestID })
+          }
           yield* settle(existing, input.reply, input.message)
 
           if (input.reply === "reject") {
@@ -401,7 +406,7 @@ const layer = Layer.effect(
               yield* settle(item, "always")
             }
           }
-          yield* publishReplyNotice(existing.request, notice)
+          yield* publishReplyNotice(existing.request, notice?.description)
         }),
       ),
     )

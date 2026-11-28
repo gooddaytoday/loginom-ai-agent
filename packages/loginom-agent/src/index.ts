@@ -557,25 +557,31 @@ export default Plugin.define({
         const key = conversationKey(input.sessionID, entry.kind)
         let saved = false
         // Only the client whose reply was accepted can grant this kind for the conversation.
-        await ctx.permission.reply(
-          { sessionID: input.sessionID, requestID: input.requestID, decision: "once" },
-          {
-            resolveNotice: async () => {
-              try {
-                await ctx.storage.set(key, true)
-              } catch {
-                return input.onceNotice ?? "Вы разрешили один раз."
-              }
-              // Deletion can run while the RPC checks policy or writes the grant.
-              await ctx.session.get({ sessionID: input.sessionID }).catch(async (error) => {
-                await ctx.storage.remove(key)
-                throw error
-              })
-              saved = true
-              return input.notice
+        try {
+          await ctx.permission.reply(
+            { sessionID: input.sessionID, requestID: input.requestID, decision: "once" },
+            {
+              resolveNotice: async () => {
+                try {
+                  await ctx.storage.set(key, true)
+                } catch {
+                  return input.onceNotice ?? "Вы разрешили один раз."
+                }
+                // Deletion can run while the RPC checks policy or writes the grant.
+                await ctx.session.get({ sessionID: input.sessionID }).catch(async (error) => {
+                  await ctx.storage.remove(key)
+                  throw error
+                })
+                saved = true
+                return { persisted: true, notice: input.notice }
+              },
             },
-          },
-        )
+          )
+        } catch (error) {
+          if (error instanceof Object && "_tag" in error && error._tag === "Permission.NotFoundError")
+            return call.error("request_closed", "Permission request is no longer pending", { requestID: input.requestID })
+          throw error
+        }
         if (!saved) return { kind: entry.kind, saved: false }
         // Other covered requests may already have been answered or cancelled.
         const open = await ctx.permission.list({ sessionID: input.sessionID }).catch(() => [])

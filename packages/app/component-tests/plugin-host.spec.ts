@@ -160,14 +160,16 @@ story("a restored plugin page shows a loader while waiting for settings and whil
   await host.evaluate((host) => host.unmount())
 })
 
-for (const registry of ["page", "question.renderer"]) {
+for (const registry of ["page", "question.renderer", "permission-dock"]) {
   story(`a third-party plugin cannot register ${registry} with a public registry token`, async ({ page }) => {
     const result = await page.evaluate(async ({ fixture, registry }) => {
       const { mountPluginHost, Registry, until } = await import(fixture)
       const host = mountPluginHost()
 
       const contribution =
-        registry === "page" ? { id: "overview", title: "Third-party page" } : { matches: () => true, render: () => null }
+        registry === "page"
+          ? { id: "overview", title: "Third-party page" }
+          : { id: "third-party", waiting: "", matches: () => true, render: () => null }
 
       try {
         host.load((ctx: Context) => ctx.add(Registry.define(registry), contribution))

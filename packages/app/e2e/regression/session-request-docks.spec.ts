@@ -1,6 +1,7 @@
 import type { OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
 import { expect, test, type Page } from "@playwright/test"
 import { Option, Schema } from "effect"
+import { RpcError } from "../../../protocol/src/errors"
 import { SERVER, sessionHref } from "../utils/app"
 import { installSseTransport } from "../utils/sse-transport"
 import { expectSessionTitle } from "../utils/waits"
@@ -632,8 +633,20 @@ function mockServer(page: Page, requests: Pick<WorkspaceInput, "sessionPermissio
 
 const decodeNotice = Schema.decodeUnknownOption(Schema.Struct({ notice: Schema.String }))
 
-for (const decision of ["once", "conversation", "conversation-save-failed", "reject", "feedback"] as const) {
-  test(`answers package permission with ${decision} and records it in the conversation`, async ({ page }, info) => {
+for (const decision of [
+  "once",
+  "conversation",
+  "conversation-save-failed",
+  "conversation-closed",
+  "reject",
+  "feedback",
+] as const) {
+  const name =
+    decision === "conversation-closed"
+      ? "dismisses a cancelled permission without reporting a one-time approval"
+      : `answers package permission with ${decision} and records it in the conversation`
+
+  test(name, async ({ page }, info) => {
     const id = "per_save_package"
     const replies: unknown[] = []
 
@@ -694,6 +707,22 @@ for (const decision of ["once", "conversation", "conversation-save-failed", "rej
     await page.route("**/api/rpc/loginom.permission/conversation**", async (route) => {
       const body = route.request().postDataJSON()
       grants.push(body)
+
+      if (decision === "conversation-closed") {
+        const error = new RpcError({
+          type: "request_closed",
+          message: "Permission request is no longer pending",
+          data: { requestID: id },
+        })
+
+        await route.fulfill({
+          status: 400,
+          json: Schema.encodeSync(Schema.toCodecJson(RpcError))(error),
+        })
+
+        return
+      }
+
       const failed = decision === "conversation-save-failed"
 
       if (failed) {
@@ -737,13 +766,22 @@ for (const decision of ["once", "conversation", "conversation-save-failed", "rej
       await dock.getByRole("button", { name: "Разрешить один раз" }).click()
       await expect(page.getByText(/^Вы разрешили один раз:/)).toBeVisible()
       expect(replies).toEqual([{ decision: "once", notice: `Вы разрешили один раз: ${action}` }])
-    } else if (decision === "conversation" || decision === "conversation-save-failed") {
+    } else if (
+      decision === "conversation" ||
+      decision === "conversation-save-failed" ||
+      decision === "conversation-closed"
+    ) {
       await dock.getByRole("button", { name: /^Разрешать в этом разговоре/ }).click()
 
       if (decision === "conversation-save-failed") {
         await expect(page.getByText(/^Вы разрешили один раз:/)).toBeVisible()
         await expect(page.getByText(/^Вы разрешили в этом разговоре:/)).toHaveCount(0)
-        await expect(page.getByText("Разрешение на разговор не сохранилось. Действие разрешено один раз.")).toBeVisible()
+        await expect(
+          page.getByText("Разрешение на разговор не сохранилось. Действие разрешено один раз."),
+        ).toBeVisible()
+      } else if (decision === "conversation-closed") {
+        await expect(page.getByText("Запрос разрешения уже закрыт. Ваш ответ не применён.")).toBeVisible()
+        await expect(page.getByText(/Вы разрешили|Действие разрешено один раз/)).toHaveCount(0)
       } else {
         await expect(page.getByText(/^Вы разрешили в этом разговоре:/)).toBeVisible()
       }
@@ -800,7 +838,6 @@ for (const decision of ["once", "conversation", "conversation-save-failed", "rej
     }
   })
 }
-
 
 test("explains a policy lock and lets the user retry a one-time answer", async ({ page }) => {
   const replies: unknown[] = []

@@ -2,7 +2,7 @@ import type { PermissionApi } from "@opencode/client/promise/api"
 import type { Agent } from "@opencode/schema/agent"
 import type { Permission } from "@opencode/schema/permission"
 import type { Session } from "@opencode/schema/session"
-import type { AssertInput } from "../permission.js"
+import type { AssertInput, ReplyNotice } from "../permission.js"
 import type { Hooks } from "./registration.js"
 
 export interface PermissionEvaluation {
@@ -28,7 +28,7 @@ export type PermissionDomain = Pick<PermissionApi, "list" | "get"> & {
     input: Parameters<Reply>[0],
     options?: Parameters<Reply>[1] & {
       /** Resolves the history notice after the reply is claimed and before the tool resumes. Overrides `input.notice`. */
-      readonly resolveNotice?: () => Promise<string | undefined>
+      readonly resolveNotice?: () => Promise<ReplyNotice>
     },
   ) => ReturnType<Reply>
   /**
