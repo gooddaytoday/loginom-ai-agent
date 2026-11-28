@@ -36,6 +36,8 @@ export function createWebPlatform(version: string) {
         onClick?.()
         notification.close()
       }
+
+      return true
     },
   }
 

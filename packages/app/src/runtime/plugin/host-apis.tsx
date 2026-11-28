@@ -1141,14 +1141,15 @@ export function createPluginAttachment(apis: HostApis) {
           return playSoundById(allowed.id)
         }),
       allowed.notification &&
-        global.notifications.system(key, () => {
-          result.notification = true
-
-          return platform.notify(
+        global.notifications.system(key, async () => {
+          const sent = await platform.notify(
             options.title,
             options.message,
             session && (() => openSession(session, { focus: true })),
           )
+          result.notification = sent === true
+
+          return sent
         }),
     ])
 

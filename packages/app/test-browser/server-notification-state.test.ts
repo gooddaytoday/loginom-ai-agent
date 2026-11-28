@@ -76,6 +76,8 @@ beforeAll(async () => {
         descriptions.push(description)
 
         if (onClick) clicks.push(onClick)
+
+        return true
       },
     }),
   }))
@@ -294,7 +296,7 @@ test.each([
         },
       },
       data: { session: { get: () => session, family: () => [session.id], status: () => "idle" } },
-      coordinator: { system: async (_id: string, fn: () => Promise<void>) => fn() },
+      coordinator: { system: async (_id: string, fn: NotificationDelivery) => fn() },
     })
 
     return dispose
@@ -329,13 +331,12 @@ test.each([
 const systemNotificationCases = [
   { title: undefined, expected: "Разговор", change: undefined },
   { title: "Test session", expected: "Test session", change: undefined },
-  { title: 'Review "/home/user/private/Quarterly report.xlsx"', expected: "Quarterly report.xlsx", change: undefined },
-  { title: String.raw`C:\Projects\Private\Monthly report.xlsx`, expected: "Monthly report.xlsx", change: undefined },
-  { title: "Check ./private/report.csv before sending", expected: "report.csv", change: undefined },
-  { title: "D:review-fixture.lgp", expected: "review-fixture.lgp", change: undefined },
-  { title: "Review (D:review-fixture.lgp) before sending", expected: "review-fixture.lgp", change: undefined },
-  { title: 'Review "D:Quarterly report.lgp" before sending', expected: "Quarterly report.lgp", change: undefined },
-  { title: String.raw`Compare private\report.csv before release`, expected: "report.csv", change: undefined },
+  { title: String.raw`C:\Quarterly Reports\results.lgp`, expected: "Разговор", change: undefined },
+  { title: "Open /review/[2026]/results.lgp", expected: "Разговор", change: undefined },
+  { title: String.raw`Compare Quarterly Reports\results.lgp`, expected: "Разговор", change: undefined },
+  { title: "Review file:///review/Quarterly%20Reports/results.lgp", expected: "Разговор", change: undefined },
+  { title: "D:review-fixture.lgp", expected: "Разговор", change: undefined },
+  { title: "Review (D:review-fixture.lgp) before sending", expected: "Разговор", change: undefined },
   { title: "Пароль — fixture-only", expected: "Разговор", change: undefined },
   { title: "Check PWD|fixture-only", expected: "Разговор", change: undefined },
   { title: "fixture-only (ключ)", expected: "Разговор", change: undefined },

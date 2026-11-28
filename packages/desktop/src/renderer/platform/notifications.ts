@@ -44,5 +44,7 @@ export function createDesktopNotify(api: DesktopNotifyAPI): Platform["notify"] {
       onClick?.()
       notification.close()
     }
+
+    return true
   }
 }

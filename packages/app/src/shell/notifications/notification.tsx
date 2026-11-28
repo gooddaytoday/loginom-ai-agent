@@ -1,7 +1,6 @@
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js"
 import { Schema } from "effect"
 import { isSessionNotFoundError, type SessionInfo } from "@opencode/client/promise"
-import { getFilename, parsePathLineSuffix } from "@opencode/util/path"
 import type { ServerSDK } from "@/runtime/server/client"
 import type { Data } from "@opencode/client/solid"
 import { usePlatform } from "@/runtime/platform/platform"
@@ -51,31 +50,20 @@ function systemNotificationDescription(title: string | undefined, fallback: stri
     // Conversation titles can contain literal percent signs.
   }
 
-  // Check the entire title before extracting a filename. A credential marker can occur inside a path or a word.
+  if (/[\\/]|(?:^|[^\p{L}\p{N}])[a-z]:/iu.test(text)) return fallback
+
+  // A credential marker can occur anywhere, including inside a word.
   if (/пароль|password|pwd|passwd|token|токен|ключ|key|secret|api|authorization|cookie/i.test(text)) return fallback
 
   // Credential formats that do not need a label.
   if (
-    /\bbearer\s+[\w./+=-]{8,}|\b[a-z][\w+.-]*:\/\/[^/\s]*@/i.test(text) ||
+    /\bbearer\s+[\w.+=-]{8,}/i.test(text) ||
     /\b(?:sk-|gh[pousr]_|github_pat_|glpat-|xox[baprs]-|AIza|AKIA)[\w-]{12,}|\beyJ[\w-]+\.[\w-]+\.[\w-]+/.test(text)
   ) {
     return fallback
   }
 
-  const quotedPath = text.match(/(["'`])((?:[a-z]:[^"'`]+|[^"'`]*[\\/][^"'`]*))\1/i)?.[2]
-
-  const barePath = /^(?:[a-z]:[\\/]|[\\/]|~\/)/i.test(text)
-    ? text
-    : text.match(/\b[a-z]:[^\s"'`()<>[\]{},;]+|[^\s"'`()<>[\]{},;]*[\\/][^\s"'`()<>[\]{},;]*/i)?.[0]
-
-  const path = quotedPath ?? barePath
-
-  if (path === undefined) return original
-
-  const pathname = /^[a-z][\w+.-]*:\/\//i.test(path) ? (URL.parse(path)?.pathname ?? "") : path.replace(/^[a-z]:/i, "")
-  const filename = getFilename(parsePathLineSuffix(pathname).path).trim()
-
-  return filename && !/^(?:\.{1,2}|[a-z]:)$/i.test(filename) ? filename : fallback
+  return original
 }
 
 export function openNotificationSession(tabs: NotificationTabs, server: ServerConnection.Key, sessionID: string) {

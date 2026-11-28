@@ -65,9 +65,11 @@ describe("desktop notifications", () => {
       },
     })
 
-    await notify("Response ready", "Refactor auth flow", () => {
+    const sent = await notify("Response ready", "Refactor auth flow", () => {
       events.push("session.select")
     })
+
+    expect(sent).toBe(true)
 
     const notification = created[0]
     expect(notification).toBeDefined()
@@ -139,7 +141,7 @@ describe("desktop notifications", () => {
       setWindowFocus: async () => {},
     })
 
-    await notify("Response ready", "Active session")
+    expect(await notify("Response ready", "Active session")).toBeUndefined()
     expect(events).toEqual([])
     expect(created).toEqual([])
   })

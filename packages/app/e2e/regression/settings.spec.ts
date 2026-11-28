@@ -560,6 +560,64 @@ test("decision notifications share a setting and open the conversation with the 
     .toEqual(["Question requires an answer", "Input requested", "Allow writing to the package?", "Turn finished"])
 })
 
+test("a second page delivers a notification when the first closes the conversation tab", async ({ page, context }) => {
+  const second = await context.newPage()
+  const firstRecorded = await recordNotifications(page)
+  const secondRecorded = await recordNotifications(second)
+  const firstEvents = await installSseTransport(page, { server: SERVER })
+  const secondEvents = await installSseTransport(second, { server: SERVER })
+  const input = {
+    name: "Shared conversation",
+    seed: { settings: { notifications: { turnFinished: true }, sounds: { agentEnabled: false } } },
+  }
+
+  const { session } = await openSession(page, input)
+  await openSession(second, input)
+  await Promise.all([firstEvents.waitForConnection(), secondEvents.waitForConnection()])
+
+  const idle: OpenCodeEvent = {
+    type: "session.status",
+    id: "evt_shared_conversation_idle",
+    created: 1700000001000,
+    data: { sessionID: session.id, status: { type: "idle" } },
+  }
+  const tab = (window: Page) => window.locator(`[data-titlebar-tab-link][href="${sessionHref(session.id)}"]`)
+  const pending = () => page.evaluate(() => navigator.locks.query().then((state) => state.pending?.map((lock) => lock.name)))
+
+  // Hold system delivery long enough for both pages to receive the same event before the first tab closes.
+  await page.evaluate(() => {
+    const acquired = Promise.withResolvers<void>()
+    const released = Promise.withResolvers<void>()
+    window.addEventListener("test:release-notification-delivery", () => released.resolve(), { once: true })
+    void navigator.locks.request("opencode:notification-delivery", () => {
+      acquired.resolve()
+
+      return released.promise
+    })
+
+    return acquired.promise
+  })
+
+  try {
+    await firstEvents.send(idle)
+    await expect.poll(pending).toContain("opencode:notification-delivery")
+    await secondEvents.send(idle)
+    await expect.poll(pending).toContainEqual(expect.stringMatching(/:system:.*evt_shared_conversation_idle$/))
+    await page
+      .locator("[data-titlebar-tab-slot]")
+      .filter({ has: tab(page) })
+      .getByRole("button", { name: "Close tab" })
+      .click()
+    await expect(tab(page)).toHaveCount(0)
+    await expect(tab(second)).toBeVisible()
+  } finally {
+    await page.evaluate(() => window.dispatchEvent(new Event("test:release-notification-delivery")))
+  }
+
+  await expect.poll(() => secondRecorded.notifications).toEqual([{ title: "Turn finished", body: session.title }])
+  expect(firstRecorded.notifications).toEqual([])
+})
+
 for (const locale of ["en", "ar"]) {
   test(`background activity alignment stays physical and persists (${locale})`, async ({ page }) => {
     const id = "ses_activity_settings"

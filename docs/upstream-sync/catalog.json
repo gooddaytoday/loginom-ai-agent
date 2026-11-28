@@ -198,17 +198,22 @@
         "packages/app/src/runtime/i18n/en.ts",
         "packages/app/src/runtime/i18n/ru.ts",
         "packages/app/src/runtime/plugin/host-apis.tsx",
+        "packages/app/src/runtime/platform/platform.tsx",
+        "packages/app/src/runtime/platform/web.ts",
         "packages/app/src/settings/general/general.tsx",
         "packages/app/src/settings/model.test.ts",
         "packages/app/src/settings/model.tsx",
         "packages/app/src/settings/notifications/notifications.tsx",
         "packages/app/src/settings/search-catalog.ts",
         "packages/app/src/settings/search-results.test.ts",
+        "packages/app/src/shell/notifications/coordinator.ts",
         "packages/app/src/shell/notifications/notification.tsx",
         "packages/app/test-browser/server-notification-state.test.ts",
         "packages/core/test/session-run-coordinator.test.ts",
         "packages/core/test/session-runner.test.ts",
-        "packages/core/test/shell-restart.test.ts"
+        "packages/core/test/shell-restart.test.ts",
+        "packages/desktop/src/renderer/platform/notifications.test.ts",
+        "packages/desktop/src/renderer/platform/notifications.ts"
       ]
     },
     {
