@@ -70,7 +70,6 @@ export interface MockServerConfig {
   // Without it, writes answer 501 MockUnsupported.
   onFileWrite?: (input: { path: string; directory: string; body: string }) => void
   configEntries?: unknown[]
-  rpc?: (input: { id: string; method: string; payload: unknown }) => unknown | Promise<unknown>
   directory: string
   project: unknown
   // Replaces the `/api/project` inventory, which defaults to `[project]`. A location inside a listed project
@@ -1223,22 +1222,13 @@ function mockHandlers(
         },
         // The goal plugin's pill reads each routed session's goal; no scenario sets one.
         rpcCall: (ctx) =>
-          Effect.gen(function* () {
-            if (ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get") return { output: null }
-            const output = yield* Effect.promise(async () =>
-              config.rpc?.({
-                id: ctx.params.rpcID,
-                method: ctx.params.method,
-                payload: Schema.is(Schema.Struct({ input: Schema.Unknown }))(ctx.payload)
-                  ? ctx.payload.input
-                  : undefined,
-              }),
-            )
-            if (output !== undefined) return { output }
-            return yield* new MockUnsupported({
-              message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC`,
-            })
-          }),
+          ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get"
+            ? Effect.succeed({ output: null })
+            : Effect.fail(
+                new MockUnsupported({
+                  message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC`,
+                }),
+              ),
         sessionActive: () => {
           const status = resolve(config.sessionStatus ?? {})
 

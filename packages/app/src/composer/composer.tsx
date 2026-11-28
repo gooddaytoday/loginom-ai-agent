@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js"
 import { useNavigate } from "@solidjs/router"
 import { ComposerAddItem } from "@opencode/plugin/gui/builtin"
+import { Contribution } from "@/runtime/plugin/render"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Button } from "@opencode/ui/button"
@@ -38,13 +39,17 @@ export function Composer(props: {
   const host = useOptionalPluginHost()
   const navigate = host ? useNavigate() : undefined
   const addItems = createMemo(() => host?.items(ComposerAddItem) ?? [])
+
+  const addInput = (plugin: string, draft: ComposerModel) => ({
+    draft,
+    openPage: (id: string) => navigate?.(`/page/${encodeURIComponent(plugin)}/${encodeURIComponent(id)}`),
+  })
+
   const renderAddItems = () => (
     <For each={addItems()}>
       {(entry) => (
         <Menu.Item
-          onSelect={() =>
-            entry.value.run((id) => navigate?.(`/page/${encodeURIComponent(entry.plugin)}/${encodeURIComponent(id)}`))
-          }
+          onSelect={() => entry.value.run(addInput(entry.plugin, props.model))}
         >
           <Show when={entry.value.icon}>{(icon) => <Icon name={icon()} />}</Show>
           {entry.value.title}
@@ -79,6 +84,17 @@ export function Composer(props: {
 
   return (
     <div class="flex flex-col gap-3">
+      <Show when={!props.readOnly && props.model} keyed>
+        {(draft) => (
+          <For each={addItems()}>
+            {(entry) => (
+              <Show when={entry.value.renderSelection}>
+                {(render) => <Contribution plugin={entry.plugin}>{() => render()(addInput(entry.plugin, draft))}</Contribution>}
+              </Show>
+            )}
+          </For>
+        )}
+      </Show>
       <ComposerEditor
         controller={props.model}
         borderUnderlay={props.borderUnderlay}

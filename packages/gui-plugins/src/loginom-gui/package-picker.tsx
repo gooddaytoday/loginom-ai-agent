@@ -1,17 +1,25 @@
-import { createLatest, usePlugin } from "@opencode/plugin/gui"
-import { MAX_PACKAGE_BYTES } from "@loginom-ai-agent/loginom-host/package-upload"
+import { createKeyed, createLatest, usePlugin } from "@opencode/plugin/gui"
+import { MAX_PACKAGE_BYTES, PackageName } from "@loginom-ai-agent/loginom-host/package-upload"
 import { TextField } from "@opencode/ui/text-field"
 import { Schema } from "effect"
 import { createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js"
 import type { PackageInput } from "./contract"
 import type definition from "./index"
-import { matches, visible, type Folder, type Package, type Recent } from "./package-model"
-import { loginomClient, packageConnection } from "./package-rpc"
+import { transitionUpload, type UploadState } from "./machine"
+import { matches, visible, type Folder, type Listing, type Package, type Recent } from "./package-model"
+import { loginomServer, packageConnection } from "./package-rpc"
 
 const PERSONAL = "/user"
+
 const SHARED = "/common"
 
 const SessionLimit = Schema.is(Schema.Struct({ type: Schema.Literal("session_limit") }))
+
+const NameTaken = Schema.is(Schema.Struct({ type: Schema.Literal("name_taken") }))
+
+const isPackageName = Schema.is(PackageName)
+
+type Search = { text: string; controller: AbortController }
 
 export default function Picker(props: {
   title: string
@@ -27,96 +35,193 @@ export default function Picker(props: {
   const ui = ctx.ui
   const [trail, setTrail] = createSignal<readonly Folder[]>([{ name: "", path: PERSONAL }])
   const [query, setQuery] = createSignal("")
-  const [deep, setDeep] = createSignal<string>()
+  const [deep, setDeep] = createSignal<Search>()
+  const [searchResult, setSearchResult] = createSignal<Listing>()
+  const [searchStatus, setSearchStatus] = createSignal<"running" | "done" | "stopped" | "error" | "session_limit">("done")
   const [byName, setByName] = createSignal(false)
-  const [file, setFile] = createSignal<File | undefined>(props.initialFile)
-  const [fileError, setFileError] = createSignal<
-    "packages.invalidFile" | "packages.uploadFailed" | "packages.fileTooLarge"
-  >()
-  const [uploading, setUploading] = createSignal(false)
-  const [retry, setRetry] = createSignal(0)
-  const upload = new AbortController()
-  onCleanup(() => upload.abort())
+  const [uploadState, setUpload] = createSignal<UploadState>({ kind: "idle", file: props.initialFile })
+  const file = () => uploadState().file
+  const uploading = () => uploadState().kind === "uploading"
 
-  const client = createMemo(() => loginomClient(ctx))
-  const connection = createLatest(client, (current, signal) =>
-    packageConnection(current, AbortSignal.any([signal, AbortSignal.timeout(12_000)])),
+  const fileError = () => {
+    const state = uploadState()
+
+    return state.kind === "idle" ? state.failure : undefined
+  }
+
+  const [retry, setRetry] = createSignal(0)
+  const [retryStatus, setRetryStatus] = createSignal(0)
+  onCleanup(() => {
+    const state = uploadState()
+
+    if (state.kind === "uploading") state.attempt.abort()
+  })
+
+  const server = createMemo(() => loginomServer(ctx))
+
+  const connection = createLatest(
+    () => {
+      const current = server()
+
+      return current && { current, attempt: retryStatus() }
+    },
+    ({ current }, signal) => packageConnection(current, AbortSignal.any([signal, AbortSignal.timeout(12_000)])),
   )
-  const connected = () => (client() && !connection.loading && !connection.error ? connection.latest : undefined)
+
+  const connected = () => (server() && !connection.loading && !connection.error ? connection.latest : undefined)
+  const folder = () => trail().at(-1)?.path
+
   const listing = createLatest(
     () => {
       const current = connected()
-      const path = trail().at(-1)?.path
-      if (!current || !path || props.upload) return
-      return { current, path, search: deep(), attempt: retry() }
+      const path = folder()
+
+      if (!current || !path || props.upload || deep()) return
+
+      return { current, path, attempt: retry() }
     },
-    (input, signal) => {
-      const deadline = AbortSignal.any([signal, AbortSignal.timeout(input.search ? 180_000 : 145_000)])
-      return input.search
-        ? input.current.search(input.path, input.search, deadline)
-        : input.current.list(input.path, deadline)
+    ({ current, path }, signal) => current.list(path, AbortSignal.any([signal, AbortSignal.timeout(145_000)])),
+  )
+
+  createKeyed(
+    () => {
+      const current = connected()
+      const path = folder()
+      const search = deep()
+
+      if (current && path && search) return { current, path, search }
+    },
+    ({ current, path, search }) => {
+      const { controller, text } = search
+      const signal = controller.signal
+
+      if (signal.aborted) return setSearchStatus("stopped")
+      onCleanup(() => controller.abort())
+      void (async () => {
+        let cursor: string | undefined
+        let found: Listing = { folders: [], packages: [], slow: false }
+
+        try {
+          do {
+            const page = await current.search(path, text, cursor, AbortSignal.any([signal, AbortSignal.timeout(145_000)]))
+
+            if (signal.aborted) return
+            cursor = page.cursor
+            found = { folders: [], packages: [...found.packages, ...page.packages], slow: found.slow || page.slow }
+            setSearchResult(found)
+          } while (cursor)
+
+          setSearchStatus("done")
+        } catch (error) {
+          if (!signal.aborted) setSearchStatus(SessionLimit(error) ? "session_limit" : "error")
+        }
+      })()
     },
   )
 
+  function startSearch() {
+    setSearchResult(undefined)
+    setSearchStatus("running")
+    setDeep({ text: query().trim(), controller: new AbortController() })
+  }
+
+  function stopSearch() {
+    deep()?.controller.abort()
+    setSearchStatus("stopped")
+  }
+
   const rows = createMemo(() => {
-    const latest = listing.latest
-    return latest && !listing.loading && !listing.error
-      ? visible(latest, query(), byName(), ctx.locale.locale())
-      : undefined
+    const latest = deep() ? searchResult() : !listing.loading && !listing.error ? listing.latest : undefined
+
+    return latest && visible(latest, query(), byName(), ctx.locale.locale())
   })
+
   const recent = createMemo(() => {
     const current = connected()
+
     return current ? props.recent(current.key).filter((item) => matches(item.package.name, query())) : []
   })
+
   const listError = () => ctx.t(SessionLimit(listing.error) ? "packages.sessionLimit" : "packages.listFailed")
+
   const date = (value: number) =>
     Number.isFinite(value) ? new Intl.DateTimeFormat(ctx.locale.locale(), { dateStyle: "medium" }).format(value) : "—"
+
   const size = (bytes: number) => {
     const [value, unit] =
       bytes < 1024 ? [bytes, "byte"] : bytes < 1024 ** 2 ? [bytes / 1024, "kilobyte"] : [bytes / 1024 ** 2, "megabyte"]
+
     return new Intl.NumberFormat(ctx.locale.locale(), { maximumFractionDigits: 1, style: "unit", unit }).format(value)
   }
+
   const navigate = (next: readonly Folder[]) => {
     setDeep(undefined)
     setQuery("")
     setTrail(next)
   }
+
   const connect = () => {
     props.close()
     ctx.layout.settings("loginom")
   }
+
   const choose = (entry: Package) => props.select({ kind: "loginom", package: entry }, connected()?.key)
 
   function changeFile(input: HTMLInputElement) {
     const candidate = input.files?.item(0)
     input.value = ""
+
     if (!candidate) return
-    setFileError(undefined)
-    if (!/\.lgp$/i.test(candidate.name) || !candidate.size) return setFileError("packages.invalidFile")
+
+    if (!isPackageName(candidate.name) || !candidate.size) {
+      setUpload((state) => transitionUpload(state, { type: "reject", failure: "invalidFile" }))
+
+      return
+    }
+
     if (!props.upload) return props.select({ kind: "file", file: candidate })
-    if (candidate.size > MAX_PACKAGE_BYTES) return setFileError("packages.fileTooLarge")
-    setFile(candidate)
+
+    if (candidate.size > MAX_PACKAGE_BYTES) {
+      setUpload((state) => transitionUpload(state, { type: "reject", failure: "fileTooLarge" }))
+
+      return
+    }
+
+    setUpload((state) => transitionUpload(state, { type: "choose", file: candidate }))
   }
 
   async function copy() {
     const candidate = file()
     const current = connected()
-    if (!candidate || !current || uploading()) return
-    if (candidate.size > MAX_PACKAGE_BYTES) return setFileError("packages.fileTooLarge")
-    setUploading(true)
-    setFileError(undefined)
+
+    if (!candidate || !current || uploadState().kind !== "idle") return
+
+    if (candidate.size > MAX_PACKAGE_BYTES) {
+      setUpload((state) => transitionUpload(state, { type: "reject", failure: "fileTooLarge" }))
+
+      return
+    }
+
+    const attempt = new AbortController()
+    setUpload((state) => transitionUpload(state, { type: "start", attempt }))
+
     try {
-      const entry = await current.upload(candidate, AbortSignal.any([upload.signal, AbortSignal.timeout(150_000)]))
-      if (!upload.signal.aborted) props.select({ kind: "loginom", package: entry }, current.key)
-    } catch {
-      if (!upload.signal.aborted) setFileError("packages.uploadFailed")
-    } finally {
-      if (!upload.signal.aborted) setUploading(false)
+      const entry = await current.upload(candidate, AbortSignal.any([attempt.signal, AbortSignal.timeout(150_000)]))
+
+      if (attempt.signal.aborted) return
+      const state = setUpload((previous) => transitionUpload(previous, { type: "saved", attempt, entry }))
+
+      if (state.kind === "uploaded") props.select({ kind: "loginom", package: state.entry }, current.key)
+    } catch (error) {
+      if (attempt.signal.aborted) return
+      const failure = NameTaken(error) ? "nameTaken" : SessionLimit(error) ? "sessionLimit" : "uploadFailed"
+      setUpload((state) => transitionUpload(state, { type: "failed", attempt, failure }))
     }
   }
 
   function FileButton() {
     let input: HTMLInputElement | undefined
+
     return (
       <>
         <input ref={input} type="file" accept=".lgp" hidden onChange={(event) => changeFile(event.currentTarget)} />
@@ -230,17 +335,17 @@ export default function Picker(props: {
             </Show>
             <div
               class="min-h-20 max-h-[30vh] overflow-y-auto rounded-lg border border-border-weak-base"
-              aria-busy={listing.loading}
+              aria-busy={deep() ? searchStatus() === "running" : listing.loading}
               role="group"
               aria-label={ctx.t("packages.contents")}
             >
               <Switch>
-                <Match when={listing.loading}>
+                <Match when={!deep() && listing.loading}>
                   <p class="p-3" role="status">
                     {ctx.t("packages.loading")}
                   </p>
                 </Match>
-                <Match when={listing.error !== undefined}>
+                <Match when={!deep() && listing.error !== undefined}>
                   <div class="p-3">
                     <p role="alert">{listError()}</p>
                     <ui.Button onClick={() => setRetry(retry() + 1)}>{ctx.t("packages.retry")}</ui.Button>
@@ -260,7 +365,7 @@ export default function Picker(props: {
                       <For each={items().packages}>
                         {(entry) => <PackageRow entry={entry} detail={deep() ? entry.folder : undefined} meta />}
                       </For>
-                      <Show when={!items().folders.length && !items().packages.length}>
+                      <Show when={!items().folders.length && !items().packages.length && (!deep() || searchStatus() === "done")}>
                         <p class="p-3 text-text-weak">
                           {ctx.t(query().trim() ? "packages.notFound" : "packages.empty")}
                         </p>
@@ -282,11 +387,22 @@ export default function Picker(props: {
                 )}
               </Show>
               <Show when={query().trim() && !deep()}>
-                <button type="button" class="underline" onClick={() => setDeep(query().trim())}>
+                <button type="button" class="underline" onClick={startSearch}>
                   {ctx.t("packages.deepSearch")}
                 </button>
               </Show>
               <Show when={deep()}>
+                <Show when={searchStatus() === "running"}>
+                  <span role="status">{ctx.t("packages.searching")}</span>
+                  <button type="button" class="underline" onClick={stopSearch}>{ctx.t("packages.stopSearch")}</button>
+                </Show>
+                <Show when={searchStatus() === "stopped"}>
+                  <span role="status">{ctx.t("packages.searchStopped")}</span>
+                </Show>
+                <Show when={searchStatus() === "error" || searchStatus() === "session_limit"}>
+                  <span role="alert">{ctx.t(searchStatus() === "session_limit" ? "packages.sessionLimit" : "packages.searchFailed")}</span>
+                  <ui.Button onClick={startSearch}>{ctx.t("packages.retry")}</ui.Button>
+                </Show>
                 <button type="button" class="underline" onClick={() => setDeep(undefined)}>
                   {ctx.t("packages.thisFolder")}
                 </button>
@@ -304,7 +420,11 @@ export default function Picker(props: {
           <Show when={!props.upload && props.acceptsFile}>
             <FileButton />
           </Show>
-          <Show when={!connection.loading && !connected()}>
+          <Show when={connection.error}>
+            <span role="alert">{ctx.t("packages.statusFailed")}</span>
+            <ui.Button onClick={() => setRetryStatus(retryStatus() + 1)}>{ctx.t("packages.retry")}</ui.Button>
+          </Show>
+          <Show when={!connection.loading && !connection.error && !connected()}>
             <ui.Button onClick={connect}>{ctx.t("packages.connect")}</ui.Button>
           </Show>
           <Show when={connected() && props.showPage}>
@@ -323,7 +443,7 @@ export default function Picker(props: {
         <Show when={fileError()}>
           {(error) => (
             <p role="alert" class="text-text-danger-base">
-              {ctx.t(error())}
+              {ctx.t(`packages.${error()}`)}
             </p>
           )}
         </Show>

@@ -8,7 +8,7 @@ describe("package copy input", () => {
   test("accepts an ordinary package and rejects names that can escape or disguise it", () => {
     expect(Schema.is(UploadInput)(upload)).toBe(true)
     expect(validUpload(upload)).toBe(true)
-    for (const name of ["../file.lgp", "root\\file.lgp", "/user/file.lgp", "file.lgp\n", "file.lgp.txt"])
+    for (const name of ["../file.lgp", "root\\file.lgp", "/user/file.lgp", "file.lgp\n", "file.lgp.txt", "CON.lgp", "lpt1.backup.lgp"])
       expect(Schema.is(UploadInput)({ ...upload, name })).toBe(false)
   })
 

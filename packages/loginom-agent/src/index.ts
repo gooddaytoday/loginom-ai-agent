@@ -531,8 +531,12 @@ export default Plugin.define({
         try {
           const result = await ServiceHost.uploadPackage(input, call.signal)
           if (Schema.is(Package)(result)) return result
-        } catch {
+        } catch (error) {
           call.signal.throwIfAborted()
+          if (error instanceof Error && error.message === "LOGINOM_PACKAGE_UPLOAD_NAME_TAKEN")
+            return call.error("name_taken", "Package name is already in use")
+          if (error instanceof Error && error.message === "LOGINOM_SESSION_LIMIT")
+            return call.error("session_limit", "All Loginom sessions are in use")
         }
         return call.error("unavailable", "Package upload not confirmed")
       },

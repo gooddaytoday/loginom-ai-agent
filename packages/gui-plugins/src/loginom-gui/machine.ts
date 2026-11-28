@@ -8,9 +8,48 @@ import {
   type Validation,
 } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Schema } from "effect"
+import type { Package } from "./package-model"
+
+export type UploadFailure = "invalidFile" | "fileTooLarge" | "nameTaken" | "sessionLimit" | "uploadFailed"
+
+export type UploadState =
+  | { kind: "idle"; file?: File; failure?: UploadFailure }
+  | { kind: "uploading"; file: File; attempt: AbortController }
+  | { kind: "uploaded"; file: File; entry: Package }
+
+type UploadEvent =
+  | { type: "choose"; file: File }
+  | { type: "reject"; failure: UploadFailure }
+  | { type: "start"; attempt: AbortController }
+  | { type: "failed"; attempt: AbortController; failure: UploadFailure }
+  | { type: "saved"; attempt: AbortController; entry: Package }
+
+export function transitionUpload(state: UploadState, event: UploadEvent): UploadState {
+  if (state.kind === "uploaded") return state
+
+  if (state.kind === "uploading") {
+    if (event.type === "saved" && state.attempt === event.attempt)
+      return { kind: "uploaded", file: state.file, entry: event.entry }
+
+    if (event.type === "failed" && state.attempt === event.attempt)
+      return { kind: "idle", file: state.file, failure: event.failure }
+
+    return state
+  }
+
+  if (event.type === "choose") return { kind: "idle", file: event.file }
+
+  if (event.type === "reject") return { kind: "idle", failure: event.failure }
+
+  if (event.type === "start" && state.file) return { kind: "uploading", file: state.file, attempt: event.attempt }
+
+  return state
+}
 
 type Draft = { url: string; username: string; password: string; noPassword: boolean }
+
 type Form = { status: Status; draft: Draft }
+
 type State = { attempt: number } & (
   | { type: "unavailable" | "loading" | "disposed" }
   | (Form & { type: "editing"; issue?: Issue })
@@ -57,18 +96,25 @@ function draftCandidate(current: Form): Candidate | { issue: Issue } {
   const { status, draft } = current
   const url = draft.url.trim()
   const username = draft.username.trim()
+
   if (!Schema.is(Address)(url)) return { issue: !url && status.deviceOnly ? "deviceAddress" : "invalidAddress" }
+
   if (!username) return { issue: "invalidUsername" }
   const identity = { revision: status.revision, url, username }
+
   if (draft.noPassword) return { ...identity, password: { operation: "empty" } }
+
   if (draft.password) return { ...identity, password: { operation: "replace", value: draft.password } }
+
   if (preservesPassword(current)) return { ...identity, password: { operation: "preserve" } }
+
   return { issue: "passwordRequired" }
 }
 
 export function transition(state: State, event: Event): Transition {
   const attempt = state.attempt + 1
   const keep = { state, effects: [] }
+
   if (state.type === "disposed") return keep
 
   function save(current: Form, validationId: string) {
@@ -88,51 +134,70 @@ export function transition(state: State, event: Event): Transition {
     case "edit": {
       if (state.type !== "editing" && state.type !== "verified" && state.type !== "checking") return keep
       const draft = { ...state.draft, ...event.patch }
+
       if (draft.noPassword) draft.password = ""
+
       return {
         state: { type: "editing", attempt, draft, status: state.status },
         effects: state.type === "checking" ? [{ type: "cancel" }] : [],
       }
     }
+
     case "submit": {
       if (state.type !== "editing" && state.type !== "verified") return keep
+
       if (event.submit === "save" && state.type === "verified" && event.now < state.validation.expiresAt)
         return save(state, state.validation.validationId)
       const candidate = draftCandidate(state)
+
       if ("issue" in candidate) return failed(state, candidate.issue)
+
       return {
         state: { type: "checking", attempt, draft: state.draft, status: state.status, submit: event.submit },
         effects: [{ type: "check", attempt, input: candidate }],
       }
     }
+
     case "checked":
       if (state.type !== "checking" || event.attempt !== state.attempt) return keep
+
       if (event.result.ok) {
         const validation = event.result.value
+
         if (state.submit === "save") return save(state, validation.validationId)
+
         return {
           state: { type: "verified", attempt, draft: state.draft, status: state.status, validation },
           effects: [],
         }
       }
+
       return failed(state, event.result.issue)
     case "saved":
     case "status": {
       if (event.attempt !== state.attempt) return keep
+
       if (event.type === "saved" && state.type !== "saving") return keep
+
       if (event.type === "status" && state.type !== "loading" && state.type !== "applying") return keep
+
       if (!event.result.ok) {
         if (state.type === "saving") return failed(state, event.result.issue)
+
         return { state: { type: "unavailable", attempt }, effects: [] }
       }
+
       const status = event.result.value
+
       if (!status.failed && (status.state === "pending" || status.state === "starting")) {
         const draft = "draft" in state ? { ...state.draft, password: "" } : form(status).draft
+
         return {
           state: { type: "applying", attempt, status, draft },
           effects: [{ type: "status", attempt, delay: 1000 }],
         }
       }
+
       return { state: { type: "editing", attempt, ...form(status) }, effects: [] }
     }
   }
@@ -151,6 +216,7 @@ function failed(state: Form & { attempt: number }, issue: Issue): Transition {
 export function view(state: State) {
   const form = "draft" in state ? state : undefined
   const issue = state.type === "editing" ? state.issue : undefined
+
   return {
     draft: form?.draft,
     connected: form?.status.state === "ready" && !form.status.failed ? form.status : undefined,

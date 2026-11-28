@@ -99,15 +99,14 @@
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
     {
-      "id": "CAT-15",
-      "title": "Built-in plugin top-level pages and composer add items",
+      "id": "CAT-21",
+      "title": "Built-in plugin top-level pages",
       "paths": [
         "packages/app/src/shell/routes/routes.tsx", "packages/app/src/shell/state/layout.tsx",
         "packages/app/src/shell/state/layout.test.ts", "packages/app/vite.config.ts",
-        "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts",
-        "packages/app/src/composer/composer.tsx", "packages/app/src/composer/editor/editor.tsx",
-        "packages/app/src/runtime/plugin/host.tsx", "packages/app/e2e/utils/mock-server.ts",
-        "packages/plugin/src/gui/builtin.ts"
+        "packages/app/src/runtime/platform/pwa.ts", "packages/app/test-browser/pwa-route.test.ts",
+        "packages/app/src/runtime/plugin/pages.tsx",
+        "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
       ]
     },
     {

@@ -339,6 +339,7 @@ to the displayed repository or worktree instead of adding a second menu item.
 | `onIdle(fn)`                                            | Runs work while the main thread is idle, e.g. a lazy chunk's preload                           |
 | `BuiltinPanel`, `BuiltinPanelTab`                       | `legacy` stored keys of a panel; `first` and stable `dom` ids of a tab                         |
 | `BuiltinCommand`                                        | `follows`: share another command's shortcut inside `scope`                                     |
+| `ComposerAddItem`                                       | A menu item under the composer `+`, optionally with content above the current draft           |
 | `BuiltinStore`, `BuiltinStoreFrom`                      | Window stores imported from parts of the app's own keys                                        |
 | `builtinContext(ctx)`                                   | `ctx.desktop.forceFocus`, `ctx.locale.setDirection`                                            |
 | `builtinMainContext(ctx)`, `MainStoreFrom`, `Lifecycle` | Main stores imported from settings files or other namespaces, and `lifecycle.restart(handoff)` |
@@ -349,6 +350,14 @@ Each registry token has the same id as the public one, so the host reads every i
 ```ts
 i18n: builtinCatalog({ en, de: () => import("./i18n/de") }),
 ```
+
+For example, open a contributed page from the composer menu:
+
+```ts
+ctx.add(ComposerAddItem, { title: "Open assets", run: ({ openPage }) => openPage("assets") })
+```
+
+Use the `draft` identity passed to `run` and `renderSelection` to keep each composer's selection separate.
 
 ## Ipc: main ↔ window
 

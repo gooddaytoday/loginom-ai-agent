@@ -21,6 +21,9 @@ import {
   type Workspaces,
 } from "@opencode/plugin/gui"
 import type { BuiltinLayout, BuiltinLocale } from "@opencode/plugin/gui/builtin"
+
+export { ComposerAddItem } from "@opencode/plugin/gui/builtin"
+
 import {
   createComponent,
   createMemo,

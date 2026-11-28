@@ -18,6 +18,30 @@ import { expect, sourceURL, story } from "../../stories/playwright/story"
 
 const fixture = sourceURL(new URL("./plugin-host.fixture.tsx", import.meta.url))
 
+story("only built-ins may register composer attachment menu items", async ({ page }) => {
+  const result = await page.evaluate(async (source) => {
+    const { ComposerAddItem, mountPluginHost, until } = await import(source)
+    const counts = []
+
+    for (const builtin of [false, true]) {
+      const host = mountPluginHost({ builtins: new Set(builtin ? ["fixture"] : []) })
+
+      try {
+        await until(() => host.count() > 0)
+        host.load((ctx: Context) => { ctx.add(ComposerAddItem, { title: "Open assets", run: () => undefined }) })
+        await until(() => host.status() === (builtin ? "active" : "failed"))
+        counts.push(host.entries(ComposerAddItem.id))
+      } finally {
+        host.unmount()
+      }
+    }
+
+    return counts
+  }, fixture)
+
+  expect(result).toEqual([0, 1])
+})
+
 /** What the code block cases drive from the page. */
 type CodeBlocksHost = ReturnType<typeof mountCodeBlocks>
 
@@ -49,6 +73,7 @@ story(
 
       return mountPluginPages()
     }, fixture)
+
     const nav = page.getByRole("navigation", { name: "Plugin pages" })
     const entry = nav.getByRole("button", { name: "Example plugin page", exact: true })
 

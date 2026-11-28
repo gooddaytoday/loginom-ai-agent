@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { runInNewContext } from "node:vm"
+import { createContext, runInContext } from "node:vm"
 import { withPackageFolderSession, withPackageUploadSession } from "../src/package-folder.mjs"
 
 const origin = "https://stand.example.test"
@@ -66,8 +66,8 @@ function fixture() {
       this.FMainForm = null
     },
   }
-  const evaluate = (fn, input) => runInNewContext(`(${fn})(input)`, {
-    Date, atob, input, location: new URL(origin),
+  const scope = createContext({
+    Date, atob, location: new URL(origin),
     ReleaseObject: (value, awaited) => { assert.equal(awaited, true); released.push(value) },
     bg: {
       app: { Application: { FInstance: app } },
@@ -79,6 +79,7 @@ function fixture() {
       forEach: (items, cb) => items.forEach(cb),
     },
   })
+  const evaluate = async (fn, input) => runInContext(`(${fn})`, scope)(input)
   const page = {
     evaluate,
     locator: selector => ({ click: async () => {
@@ -171,7 +172,7 @@ test("uploads exact bytes as a copy and never overwrites an existing package", a
     const copy = (content) => withPackageUploadSession({
       login: f.login, origin, username, temporary: "fixture", upload: { name: "Продажи.lgp", content },
     })
-    if (exists) await assert.rejects(copy(Buffer.from("other").toString("base64")), { message: "LOGINOM_PACKAGE_UPLOAD_UNCONFIRMED" })
+    if (exists) await assert.rejects(copy(Buffer.from("other").toString("base64")), { message: "LOGINOM_PACKAGE_UPLOAD_NAME_TAKEN" })
     else assert.deepEqual({ ...(await copy(bytes.toString("base64"))) }, {
       kind: "package", name: "Продажи.lgp", path, sizeBytes: bytes.length, modifiedAt: date.toISOString(),
     })
@@ -179,4 +180,30 @@ test("uploads exact bytes as a copy and never overwrites an existing package", a
     assert.deepEqual(Buffer.concat(files.get(path)), bytes)
     assert.deepEqual(f.events, [["logout"], ["close browser"]])
   }
+})
+
+test("cancelling an active package write removes its temporary file and never moves it", async () => {
+  const f = fixture()
+  const abort = new AbortController()
+  const writing = Promise.withResolvers()
+  const release = Promise.withResolvers()
+  const staged = new Set()
+  Object.assign(f.storage, {
+    CreateFile(name) {
+      staged.add(name)
+      return { async WriteBuffer() { writing.resolve(); await release.promise } }
+    },
+    MoveFile() { assert.fail("cancelled upload moved its staged file") },
+    DeleteFile(name) { staged.delete(name) },
+  })
+  const pending = withPackageUploadSession({
+    login: f.login, origin, username, temporary: "abort", signal: abort.signal,
+    upload: { name: "Copy.lgp", content: Buffer.from("sample").toString("base64") },
+  })
+  await writing.promise
+  abort.abort(Error("cancelled"))
+  release.resolve()
+  await assert.rejects(pending, { message: "cancelled" })
+  assert.deepEqual([...staged], [])
+  assert.deepEqual(f.events, [["logout"], ["close browser"]])
 })

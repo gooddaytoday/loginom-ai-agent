@@ -30,6 +30,7 @@ Built-in features of the desktop and web app, each behind the GUI plugin SDK, `@
 
 - Host code must not name a plugin or know its internals: no plugin ids, command ids, DOM selectors, or stored key formats. When the host needs something from plugins, add a generic, documented field to the SDK (for example `PanelTab.file`, `Command.featured`, `Command.section`).
 - A plugin owns its settings: declare a store and render the toggle from your `SettingsPage`, as a page, a section on a host page (`page`), or rows in a host section (`section`). The host exposes no preferences of its own.
+- Only built-in plugins may contribute `ComposerAddItem`. For example, `ctx.add(ComposerAddItem, { title: "Open assets", run: ({ openPage }) => openPage("assets") })`. Use the supplied `draft` to scope a `renderSelection` to its own composer.
 - Accepted exceptions: the built-in lists, the keybind rename map in `packages/app/src/settings/keybinds/migration.ts`, the legacy `type: "browser"` comment decode in `packages/app/src/composer/schema.ts` (drafts and message metadata written before plugin notes), and the crash page's use of the updater contract.
 
 ## Lifetimes

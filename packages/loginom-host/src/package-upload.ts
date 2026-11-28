@@ -3,11 +3,12 @@ import { Schema } from "effect"
 import { Package, ReadFolder } from "./package-folder"
 
 export const MAX_PACKAGE_BYTES = 16 * 1024 * 1024
+export const PackageName = Schema.String.check(
+  Schema.isPattern(/^(?!(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³]) *(?:\.|$))[^./\\:*?"<>|\x00-\x1f\x7f][^/\\:*?"<>|\x00-\x1f\x7f]{0,169}\.lgp$(?![\s\S])/iu),
+)
 export const UploadInput = Schema.Struct({
   generation: ReadFolder.fields.generation,
-  name: Schema.String.check(
-    Schema.isPattern(/^[^./\\:*?"<>|\x00-\x1f\x7f][^/\\:*?"<>|\x00-\x1f\x7f]{0,169}\.lgp$(?![\s\S])/iu),
-  ),
+  name: PackageName,
   content: Schema.String.check(Schema.isMaxLength(4 * Math.ceil(MAX_PACKAGE_BYTES / 3))),
 })
 export type UploadInput = typeof UploadInput.Type
@@ -27,7 +28,11 @@ export const UploadRpc = Rpc.define({
         checkHook: () => "Invalid package upload",
       }),
       output: Schema.toStandardSchemaV1(Package),
-      errors: { unavailable: Schema.toStandardSchemaV1(Schema.Undefined) },
+      errors: {
+        name_taken: Schema.toStandardSchemaV1(Schema.Undefined),
+        session_limit: Schema.toStandardSchemaV1(Schema.Undefined),
+        unavailable: Schema.toStandardSchemaV1(Schema.Undefined),
+      },
     },
   },
   events: {},

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 import type { OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
+import { Schema } from "effect"
 import {
   NO_PROVIDER,
   REMOTE_SERVER,
@@ -29,12 +30,15 @@ const c = { id: "ses_tab_c", title: "Tab C session" }
 
 test.use({ serviceWorkers: "block" })
 
+const RpcError = Schema.TaggedStruct("RpcError", { type: Schema.String, message: Schema.String })
+
 for (const viewport of [
   { width: 1440, height: 900 },
   { width: 390, height: 844 },
 ]) {
   test(`Loginom package picker and page at ${viewport.width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport)
+
     const sales = {
       name: "Продажи.lgp",
       folder: "/user",
@@ -42,6 +46,7 @@ for (const viewport of [
       size: 24576,
       modified: "2026-11-25T12:00:00Z",
     }
+
     const archive = {
       name: "Архив.lgp",
       folder: "/user/Архив",
@@ -49,8 +54,10 @@ for (const viewport of [
       size: 4096,
       modified: "2026-11-24T12:00:00Z",
     }
+
     const first = { ...sales, name: "Баланс.lgp", path: "/user/Баланс.lgp", modified: "2026-11-21T12:00:00Z" }
     const copy = { ...first, name: "Копия.lgp", path: "/user/Копия.lgp", size: 4 }
+
     const entry = (item: typeof sales) => ({
       kind: "package",
       name: item.name,
@@ -58,10 +65,18 @@ for (const viewport of [
       modifiedAt: item.modified,
       sizeBytes: item.size,
     })
-    const calls: unknown[] = []
-    let connected = true
+
+    const calls: Schema.Json[] = []
+    let status: "ready" | "unconfigured" | "error" = "ready"
+    const nextSearchPage = Promise.withResolvers<void>()
+    const searchCursor = "380e21c6-581f-48d7-8dbd-978650e8c285"
+    const directory = "C:/OpenCode/Packages"
+    const payload = Schema.decodeUnknownSync(Schema.Struct({ input: Schema.Json }))
+    const filter = Schema.decodeUnknownSync(Schema.Struct({ folder: Schema.String, cursor: Schema.optionalKey(Schema.String) }))
+
     const workspace = await openSession(page, {
       name: "Packages",
+      directory,
       seed: { locale: "ru" },
       provider: {
         all: [
@@ -74,44 +89,62 @@ for (const viewport of [
         connected: ["test"],
         default: { providerID: "test", modelID: "test-model" },
       },
-      rpc(request) {
-        if (request.id === "loginom.connection" && request.method === "status")
-          return {
-            ok: true,
-            value: {
-              revision: 1,
-              generation: 1,
-              url: "https://loginom.test/",
-              username: "analyst",
-              folder: "/user",
-              hasPassword: false,
-              state: connected ? "ready" : "unconfigured",
-              failed: false,
-              deviceOnly: false,
-            },
-          }
-        if (request.id === "loginom.package-upload" && request.method === "upload") {
-          calls.push(request.payload)
-          return entry(copy)
+    })
+
+    await page.route(/\/api\/rpc\/loginom\.(?:connection|packages|package-upload)\//, async (route) => {
+      const url = new URL(route.request().url())
+      expect(url.searchParams.get("location[directory]")).toBe(directory)
+      const method = url.pathname.split("/").at(-1)
+      const answer = (output: Schema.Json) => route.fulfill({ json: { output } })
+
+      if (method === "status") {
+        if (status === "error")
+          return route.fulfill({ status: 400, json: RpcError.make({ type: "unavailable", message: "Unavailable" }) })
+
+        return answer({
+          ok: true,
+          value: {
+            revision: 1,
+            generation: 1,
+            url: "https://loginom.test/",
+            username: "analyst",
+            folder: "/user",
+            hasPassword: false,
+            state: status,
+            failed: false,
+            deviceOnly: false,
+          },
+        })
+      }
+
+      const { input } = payload(route.request().postDataJSON())
+      calls.push(input)
+
+      if (method === "upload") return answer(entry(copy))
+      const { folder, cursor } = filter(input)
+
+      if (method === "search") {
+        if (cursor) {
+          await nextSearchPage.promise
+
+          return answer({ folder: "/user/Архив", entries: [], slow: false })
         }
-        if (request.id !== "loginom.packages") return
-        calls.push(request.payload)
-        const input = request.payload
-        if (!input || typeof input !== "object" || !("folder" in input) || typeof input.folder !== "string") return
-        if (request.method === "search")
-          return "cursor" in input && input.cursor
-            ? { folder: "/user/Архив", entries: [entry(archive)], slow: false }
-            : { folder: "/user", entries: [], slow: false, cursor: "380e21c6-581f-48d7-8dbd-978650e8c285" }
-        if (request.method !== "list") return
-        if (input.folder === "/common") return { folder: "/common", entries: [], slow: false }
-        return {
-          folder: "/user",
-          entries: [{ kind: "folder", name: "Архив", path: "/user/Архив" }, entry(first), entry(sales)],
-          slow: false,
-        }
-      },
+
+        return answer({ folder: "/user/Архив", entries: [entry(archive)], slow: false, cursor: searchCursor })
+      }
+
+      if (method !== "list") return route.fallback()
+
+      if (folder === "/common") return answer({ folder, entries: [], slow: false })
+
+      return answer({
+        folder: "/user",
+        entries: [{ kind: "folder", name: "Архив", path: "/user/Архив" }, entry(first), entry(sales)],
+        slow: false,
+      })
     })
     await expect(workspace.editor).toBeEditable()
+    const draftUrl = page.url()
     await page
       .locator('[data-action="composer-attach"], [data-action="composer-attach-file"]')
       .filter({ visible: true })
@@ -134,13 +167,21 @@ for (const viewport of [
     await picker.getByRole("button", { name: "Искать и во вложенных папках" }).click()
     const result = picker.getByRole("button", { name: /Архив\.lgp/ })
     await expect(result).toContainText("/user/Архив")
-    expect(calls).toContainEqual({
+    await expect.poll(() => calls).toContainEqual({
       folder: "/user",
       text: "Архив",
       recursive: true,
-      cursor: "380e21c6-581f-48d7-8dbd-978650e8c285",
+      cursor: searchCursor,
     })
+    await picker.getByRole("button", { name: "Остановить" }).click()
+    nextSearchPage.resolve()
+    await expect(picker.getByText("Поиск остановлен.", { exact: false })).toBeVisible()
+    await expect(result).toBeVisible()
     await result.click()
+    await expect(page).toHaveURL(draftUrl)
+    await expect(page.getByText("Архив.lgp", { exact: true })).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath("composer-card.png") })
+    await page.getByRole("button", { name: "Схема пакета" }).click()
     await expect(page).toHaveURL(/\/page\/loginom-gui\/packages$/)
     await expect(page.getByRole("heading", { name: "Архив.lgp" })).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath("packages.png") })
@@ -155,7 +196,19 @@ for (const viewport of [
     await upload
       .locator('input[type="file"]')
       .setInputFiles({ name: "Копия.lgp", mimeType: "application/octet-stream", buffer: Buffer.from("demo") })
-    await upload.getByRole("button", { name: "Загрузить копию и открыть" }).click()
+    const uploadRoute = /\/api\/rpc\/loginom\.package-upload\/upload(?:\?|$)/
+    const uploadButton = upload.getByRole("button", { name: "Загрузить копию и открыть" })
+
+    for (const [type, message] of [
+      ["name_taken", "В «Моей папке» уже есть пакет с таким именем."],
+      ["session_limit", "Сейчас заняты все сессии Loginom вашей организации."],
+    ]) {
+      await page.route(uploadRoute, (route) => route.fulfill({ status: 400, json: RpcError.make({ type, message }) }), { times: 1 })
+      await uploadButton.click()
+      await expect(upload.getByRole("alert")).toContainText(message)
+    }
+
+    await uploadButton.click()
     await expect(page.getByRole("heading", { name: "Копия.lgp" })).toBeVisible()
     expect(calls).toContainEqual({ content: "ZGVtbw==", name: "Копия.lgp", generation: 1 })
     await page.reload()
@@ -165,8 +218,12 @@ for (const viewport of [
     await page.keyboard.press("Escape")
     await expect(picker).toBeHidden()
 
-    connected = false
+    status = "error"
     await page.getByRole("button", { name: "Из Loginom" }).click()
+    await expect(picker.getByRole("alert")).toHaveText("Не удалось проверить подключение к Loginom.")
+    await expect(picker.getByRole("button", { name: "Подключить Loginom" })).toHaveCount(0)
+    status = "unconfigured"
+    await picker.getByRole("button", { name: "Повторить" }).click()
     await expect(picker.getByRole("button", { name: "Подключить Loginom" })).toBeVisible()
     await expect(picker.getByRole("button", { name: "Файл .lgp с компьютера" })).toBeVisible()
     await expect(picker.getByRole("textbox")).toHaveCount(0)
@@ -192,15 +249,18 @@ for (const layout of ["horizontal", "vertical", "narrow"] as const) {
 
     const titlebar = page.locator('[data-slot="titlebar-v2"]')
     const tabDrawer = titlebar.getByRole("button", { name: "Tabs", exact: true })
+
     const surface =
       layout === "vertical"
         ? page.locator('[data-slot="vertical-tabs-sidebar"]')
         : narrow
           ? page.locator('[data-slot="mobile-tabs-drawer"]')
           : titlebar
+
     const entry = surface
       .getByRole("navigation", { name: "Plugin pages" })
       .getByRole("button", { name: "Example plugin page" })
+
     const heading = page.getByRole("heading", { name: "Example plugin page" })
     const href = "/page/%40acme%2Fopencode-gui/overview"
 
@@ -208,10 +268,12 @@ for (const layout of ["horizontal", "vertical", "narrow"] as const) {
     await entry.click()
     await expectPath(page, href)
     await expect(heading).toBeVisible()
+
     if (narrow) await expect(surface).toBeHidden()
 
     await page.reload()
     await expect(heading).toBeVisible()
+
     if (narrow) await tabDrawer.click()
     await expect(entry).toHaveAttribute("aria-current", "page")
     await surface.getByRole("button", { name: "New session", exact: true }).click()
