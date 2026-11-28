@@ -160,7 +160,8 @@
       "id": "CAT-22",
       "title": "Stored turn history for server plugins (S10-9)",
       "paths": [
-        "packages/core/src/plugin/host.ts", "packages/core/test/plugin/turn-messages.test.ts",
+        "packages/core/src/plugin/host.ts", "packages/core/test/plugin/host.ts",
+        "packages/core/test/plugin/turn-messages.test.ts",
         "packages/plugin/src/effect/session.ts", "packages/plugin/src/promise/session.ts",
         "packages/plugin/src/promise/adapter.ts"
       ]
