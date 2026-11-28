@@ -166,10 +166,14 @@
         "packages/app/src/composer/model.ts", "packages/app/src/composer/request.ts",
         "packages/app/src/composer/schema.ts", "packages/app/src/composer/submit.ts",
         "packages/app/src/shell/notifications/notification.tsx", "packages/app/src/shell/tabs/tabs.tsx",
-        "packages/app/src/session/timeline/cursor.ts",
+        "packages/app/src/session/route.tsx", "packages/app/src/session/timeline/cursor.ts",
+        "packages/core/src/plugin/product.ts", "packages/core/src/session/inbox.ts",
+        "packages/core/src/session/runner/llm.ts", "packages/core/test/session-runner.test.ts",
+        "packages/schema/src/session-event.ts", "packages/protocol/openapi.json",
+        "packages/client/src/effect/api/api.ts", "packages/client/src/promise/generated/types.ts",
         "packages/gui-plugins/README.md", "packages/gui-plugins/AGENTS.md",
         "packages/app/component-tests/plugin-host.spec.ts", "packages/app/component-tests/plugin-host.fixture.tsx",
-        "packages/app/e2e/regression/composer.spec.ts", "packages/app/e2e/utils/windows-menu.fixture.tsx"
+        "packages/app/e2e/regression/composer.spec.ts", "packages/app/e2e/regression/session-queue.spec.ts", "packages/app/e2e/utils/windows-menu.fixture.tsx"
       ]
     },
     { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },

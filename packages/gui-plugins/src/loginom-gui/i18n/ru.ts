@@ -4,7 +4,7 @@ export default {
   "node.missingPackage": "Не удалось проверить, какой пакет Loginom привязан к разговору.",
   "node.stalePackage": "Состояние пакета устарело. Повторите отправку, когда открытый пакет можно будет проверить.",
   "node.differentConversation": "Этот узел Loginom добавлен из другого разговора. Уберите узел, чтобы отправить сообщение.",
-  "node.sourceUnavailable": "Исходный сервер недоступен.",
+  "node.sourceUnavailable": "Не удалось открыть исходный разговор.",
   startExamples: "Примеры задач",
   startDismiss: "Скрыть примеры задач",
   startProject: "Проект: {{name}}",

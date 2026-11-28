@@ -483,6 +483,8 @@ export interface BuiltinTabs extends Tabs {
       readonly focus?: boolean
       /** With focus, reveals this message in the session timeline. */
       readonly messageID?: string
+      /** With focus, reports that the requested session could not be opened. */
+      readonly onUnavailable?: () => void
     },
   ): void
 }

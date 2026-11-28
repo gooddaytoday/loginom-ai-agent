@@ -1,4 +1,4 @@
-import { ErrorBoundary, createEffect, createMemo, Match, on, Show, Switch, type ParentProps } from "solid-js"
+import { ErrorBoundary, createEffect, createMemo, Match, on, onCleanup, Show, Switch, type ParentProps } from "solid-js"
 import { Title } from "@solidjs/meta"
 import { useParams } from "@solidjs/router"
 import { createStore } from "solid-js/store"
@@ -16,6 +16,7 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { DESKTOP_NATIVE_ENGLISH } from "@/runtime/i18n/desktop-native"
 import { useNotification } from "@/shell/notifications/notification"
 import { ComposerPersistenceProvider } from "@/composer/persistence"
+import { usePluginAttachment } from "@/runtime/plugin/attachment"
 import { useData, useServer } from "@/runtime/server/current"
 import { ServerConnection } from "@/runtime/server/registry"
 import { useSettingsCommand } from "@/settings/command"
@@ -55,6 +56,18 @@ export function TargetSessionRouteContent() {
   )
 
   const view = createMemo(() => sessionRouteView(resolution(), server.health))
+  const attachment = usePluginAttachment()
+
+  onCleanup(
+    attachment.routeFailure(() => {
+      const result = view()
+
+      if (result.type === "idle" || result.type === "resolving" || result.type === "preparing" || result.type === "ready")
+        return
+
+      return `${server.key}\n${result.sessionID}`
+    }),
+  )
   const viewed = createMemo(() => viewedSessionID(view()))
   const title = createMemo(() => sessionDocumentTitle(view()))
   const modelDirectory = createMemo(() => sessionModelDirectory(resolution()))

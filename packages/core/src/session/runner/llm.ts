@@ -33,6 +33,8 @@ import { PersistentPty } from "../../persistent-pty/index.js"
 import { ToolOutput } from "../../tool-output.js"
 import { Plugin } from "../../plugin.js"
 import { PluginHooks } from "../../plugin/hooks.js"
+import { PluginProduct } from "../../plugin/product.js"
+import { Rpc } from "../../rpc.js"
 import { MAX_STEPS_PROMPT } from "./max-steps.js"
 
 const CONTINUE_AFTER_OUTPUT_LIMIT =
@@ -52,6 +54,7 @@ const layer = Layer.effect(
     const compaction = yield* SessionCompaction.Service
     const plugins = yield* Plugin.Service
     const hooks = yield* PluginHooks.Service
+    const rpc = yield* Rpc.Service
     const jobs = yield* Job.Service
     const title = yield* SessionTitle.Service
     const steps = yield* SessionStep.make
@@ -196,6 +199,7 @@ const layer = Layer.effect(
                     bus,
                     sessionID,
                     entering && !continuing ? promotable : "steer",
+                    (metadata) => PluginProduct.checkPromptDelivery(rpc, sessionID, metadata),
                   )
                   // A control admitted during context preparation owns this boundary.
                   if (promoted === undefined) return undefined
@@ -462,6 +466,7 @@ export const node = makeLocationNode({
     SessionCompaction.node,
     Plugin.node,
     PluginHooks.node,
+    Rpc.node,
     Job.node,
     SessionTitle.node,
     Snapshot.node,

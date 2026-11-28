@@ -1,13 +1,26 @@
 import type { NodeContext } from "../node-context"
 
-type State = { type: "idle" } | { type: "awaiting"; context: NodeContext; sessionKey: string; tabOpened: boolean }
+type State =
+  | { type: "idle" }
+  | { type: "awaiting"; attempt: string; context: NodeContext; sessionKey: string; tabOpened: boolean }
 
 type Event =
-  | { type: "requested"; context: NodeContext; mounted?: string; tabs: readonly string[]; serverListed: boolean }
+  | {
+      type: "requested"
+      attempt: string
+      context: NodeContext
+      mounted?: string
+      tabs: readonly string[]
+      serverListed: boolean
+    }
+  | { type: "open.failed"; attempt: string }
   | { type: "mounted"; sessionKey: string }
   | { type: "tabs.changed"; tabs: readonly string[] }
 
-type Effect = { type: "open" | "attach"; context: NodeContext } | { type: "unavailable" }
+type Effect =
+  | { type: "open"; context: NodeContext; attempt?: string }
+  | { type: "attach"; context: NodeContext }
+  | { type: "unavailable" }
 
 type Transition = { state: State; effects: Effect[] }
 
@@ -21,8 +34,14 @@ export function transitionNodeDraft(state: State, event: Event): Transition {
 
     if (event.mounted !== key)
       return {
-        state: { type: "awaiting", context, sessionKey: key, tabOpened: event.tabs.includes(key) },
-        effects: [{ type: "open", context }],
+        state: {
+          type: "awaiting",
+          attempt: event.attempt,
+          context,
+          sessionKey: key,
+          tabOpened: event.tabs.includes(key),
+        },
+        effects: [{ type: "open", context, attempt: event.attempt }],
       }
 
     const effects: Effect[] = [{ type: "attach", context }]
@@ -33,6 +52,11 @@ export function transitionNodeDraft(state: State, event: Event): Transition {
   }
 
   if (state.type === "idle") return { state, effects: [] }
+
+  if (event.type === "open.failed")
+    return event.attempt === state.attempt
+      ? { state: initialNodeDraft, effects: [{ type: "unavailable" }] }
+      : { state, effects: [] }
 
   if (event.type === "mounted")
     return event.sessionKey === state.sessionKey

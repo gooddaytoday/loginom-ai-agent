@@ -1,5 +1,15 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
-import { NO_PROVIDER, SERVER, T0, expectPath, holdRoute, pageMessagesFrom, provider, sessionHref } from "../utils/app"
+import {
+  NO_PROVIDER,
+  SERVER,
+  T0,
+  expectPath,
+  holdRoute,
+  pageMessagesFrom,
+  provider,
+  session,
+  sessionHref,
+} from "../utils/app"
 import { mockWorkspace, openDraft, openSession } from "../utils/workspace"
 import { mockPluginsActivating, type MockServerConfig } from "../utils/mock-server"
 import { nodeFixture } from "../utils/loginom-node-fixture"
@@ -136,6 +146,7 @@ for (const width of [1280, 390]) {
     await view.editor.press("Enter")
     await expect.poll(() => prompts.length).toBe(1)
     expect(prompts[0]?.sessionID).toBe(source.sessionID)
+    expect(prompts[0]?.body.metadata).toMatchObject({ comments: [{ origin: "loginom-gui", data: expect.any(String) }] })
     expect(prompts[0]?.body.text).toBe(
       text +
         '\nThe user referenced Loginom node {"package":"Продажи.lgp","path":"/Команда/Продажи.lgp","guid":"{e9bd5bda-1245-43b0-acbe-d81c405077b1}","name":"Расчёт выручки","intent":"edit"}.',
@@ -150,7 +161,7 @@ for (const width of [1280, 390]) {
     await openPackage()
     const unavailable = page.getByRole("button", { name: "Позвать агента с недоступного сервера", exact: true })
     await unavailable.click()
-    await expect(page.getByText("Исходный сервер недоступен.")).toBeVisible()
+    await expect(page.getByText("Не удалось открыть исходный разговор.")).toBeVisible()
     await expect(unavailable).toBeVisible()
     await showTabs()
     await sourceTab.click()
@@ -161,6 +172,31 @@ for (const width of [1280, 390]) {
     expect(creates).toBe(0)
   })
 }
+
+test("a refused Loginom conversation does not attach the old node on a later visit", async ({ page }) => {
+  const other = { id: "ses_node_other", title: "Другой разговор" }
+  const source = nodeFixture.source
+  const view = await openSession(page, {
+    name: "LoginomNodeRefusal",
+    sessions: [other],
+    seed: { locale: "ru", storage: { "opencode.e2e.loginom-node": "1" } },
+  })
+  const tabs = page.locator('[data-slot="titlebar-v2"]')
+  await tabs.getByRole("button", { name: "Тестовый пакет", exact: true }).click()
+  await page.getByRole("button", { name: "Спросить агента", exact: true }).click()
+  await expect(page).toHaveURL((url) => url.pathname === sessionHref(source.sessionID))
+  await expect(page.getByText("Не удалось открыть исходный разговор.")).toBeVisible()
+
+  await tabs.locator(`[data-titlebar-tab-link][href="${sessionHref(other.id)}"]`).click()
+  await expect(view.editor).toBeEditable()
+  view.sessions.push(
+    session({ id: source.sessionID, title: "Продажи", projectID: view.projectID, directory: view.directory }),
+  )
+  await tabs.locator(`[data-titlebar-tab-link][href="${sessionHref(source.sessionID)}"]`).click()
+  await expectSessionTitle(page, "Продажи")
+  await expect(view.editor).toBeEditable()
+  await expect(page.getByRole("group", { name: "Расчёт выручки · Продажи.lgp", exact: true })).toHaveCount(0)
+})
 
 test("a third-party GUI can attach ordinary notes and focus tabs without structured note or message access", async ({
   page,

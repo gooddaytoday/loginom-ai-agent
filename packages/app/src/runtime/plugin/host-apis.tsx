@@ -52,6 +52,7 @@ import { useDirectoryPicker } from "@/workspaces/selection/picker"
 import { SessionRouteKey, SessionStateKey, type ServerScope } from "@/runtime/server/scope"
 import { findSessionTab, tabKey, useTabs, type Tab } from "@/shell/tabs/tabs"
 import { openNotificationSession } from "@/shell/notifications/notification"
+import { SESSION_RESOLUTION_TIMEOUT_MS } from "@/session/resolution-machine"
 import { playSoundById } from "@/shell/notifications/sound"
 import { showToast } from "@/shell/notifications/toast"
 import { useCurrentRoute, useLayout } from "@/shell/state/layout"
@@ -406,7 +407,7 @@ export function createHostApis() {
       open: (session, options) => {
         const allowed = builtin || !options ? options : { focus: options.focus }
 
-        write((value) => value.tabs.open(session, allowed))
+        write((value) => value.tabs.open(session, allowed), builtin ? options?.onUnavailable : undefined)
       },
       focus: (key) => write((value) => value.tabs.focus(key)),
       move: (key, index) => write((value) => value.tabs.move(key, index)),
@@ -1071,23 +1072,65 @@ export function createPluginAttachment(apis: HostApis) {
 
   const findTab = (key: string) => tabs.store.find((tab) => tabKey(tab) === key)
 
-  // Opens a session as the session list and the app's notifications do; an unlisted server opens nothing.
+  const [failedRoute, setFailedRoute] = createSignal<Accessor<string | undefined>>()
+  const pendingOpens = new Set<{ key: string; finish: (available: boolean) => void }>()
+
+  const settleOpens = (key: string | undefined, available: boolean) => {
+    if (!key) return
+    for (const pending of pendingOpens) {
+      if (pending.key === key) pending.finish(available)
+    }
+  }
+
+  createEffect(() => {
+    const failed = failedRoute()?.()
+    const mounted = current()?.key
+
+    untrack(() => {
+      settleOpens(failed, false)
+      settleOpens(mounted, true)
+    })
+  })
+  onCleanup(() => pendingOpens.forEach((pending) => pending.finish(false)))
+
+  const watchOpen = (key: string, unavailable: () => void) => {
+    const pending = { key, finish }
+    const timer = setTimeout(() => finish(false), SESSION_RESOLUTION_TIMEOUT_MS)
+
+    function finish(available: boolean) {
+      if (!pendingOpens.delete(pending)) return
+      clearTimeout(timer)
+      if (!available) unavailable()
+    }
+
+    pendingOpens.add(pending)
+  }
+
+  // Opens a session as the session list and the app's notifications do.
   const openSession: BuiltinTabs["open"] = (session, options) => {
     const conn = servers.list.find((item) => ServerConnection.key(item) === session.server)
 
-    if (!conn) return
+    if (!conn) return options?.onUnavailable?.()
     const key = ServerConnection.key(conn)
     const shown = findSessionTab(tabs.store, key, session.id)
 
-    // A tab that already routes the session, e.g. a subagent opened from its parent's tab, keeps its route.
-    if (shown?.type === "session" && shown.routeSessionId === session.id) {
-      if (options?.focus) tabs.select(shown, options)
+    const routesSession = shown?.type === "session" && shown.routeSessionId === session.id
+
+    if (!options?.focus) {
+      if (!routesSession) tabs.addSessionTab({ server: key, sessionId: session.id })
 
       return
     }
+    if (options.onUnavailable) watchOpen(`${key}\n${session.id}`, options.onUnavailable)
 
-    if (!options?.focus) return void tabs.addSessionTab({ server: key, sessionId: session.id })
-    openNotificationSession(tabs, key, session.id, options)
+    // A tab that already routes the session, e.g. a subagent opened from its parent's tab, keeps its route.
+    if (routesSession) tabs.select(shown, options)
+    else openNotificationSession(tabs, key, session.id, options)
+
+    untrack(() => {
+      settleOpens(failedRoute()?.(), false)
+      settleOpens(current()?.key, true)
+    })
   }
 
   const shell: BuiltinTabs = {
@@ -1300,6 +1343,14 @@ export function createPluginAttachment(apis: HostApis) {
 
       return () => {
         if (mountedScreen() === value) setMountedScreen(undefined)
+      }
+    },
+    /** Reports terminal route failures that never mount a session screen. */
+    routeFailure(failure: Accessor<string | undefined>) {
+      setFailedRoute(() => failure)
+
+      return () => {
+        if (failedRoute() === failure) setFailedRoute(undefined)
       }
     },
     /** A session screen mounted: `Sessions.current` reads its object for the routed session. */

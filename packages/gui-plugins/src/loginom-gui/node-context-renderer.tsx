@@ -2,6 +2,7 @@ import { createKeyed, type Plugin } from "@opencode/plugin/gui"
 import { builtinContext, ComposerNoteHandler, type BuiltinComposerNote } from "@opencode/plugin/gui/builtin"
 import { Icon } from "@opencode/ui/icon"
 import { Option, Schema } from "effect"
+import { uuid } from "@opencode/util/uuid"
 import { createSignal, Show, untrack } from "solid-js"
 import { LoginomNodeDraft } from "./contract"
 import type definition from "./index"
@@ -53,7 +54,16 @@ export const registerNodeContext: Plugin.Setup<typeof definition> = (ctx) => {
         return void ctx.toast.show({ variant: "error", title: ctx.t("node.sourceUnavailable") })
       const source = effect.context.source
 
-      builtin.tabs.open({ server: source.serverID, id: source.sessionID }, { focus: true, messageID: source.messageID })
+      const attempt = effect.attempt
+
+      builtin.tabs.open(
+        { server: source.serverID, id: source.sessionID },
+        {
+          focus: true,
+          messageID: source.messageID,
+          onUnavailable: attempt === undefined ? undefined : () => dispatch({ type: "open.failed", attempt }),
+        },
+      )
     })
   }
 
@@ -71,6 +81,7 @@ export const registerNodeContext: Plugin.Setup<typeof definition> = (ctx) => {
     attach(context) {
       dispatch({
         type: "requested",
+        attempt: uuid(),
         context,
         mounted: ctx.sessions.current()?.key,
         tabs: openTabs(),

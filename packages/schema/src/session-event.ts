@@ -230,7 +230,7 @@ export type InboxEnqueued = typeof InboxEnqueued.Type
 export const InboxCancelled = Event.durable({
   type: "session.inbox.cancelled",
   ...options,
-  schema: InboxRef,
+  schema: { ...InboxRef, reason: Schema.String.pipe(optional) },
 })
 export type InboxCancelled = typeof InboxCancelled.Type
 

@@ -221,6 +221,20 @@ function userRow(page: Page, messageID: string) {
   )
 }
 
+test("explains a Loginom package rejection from the server and keeps the next queued prompt", async ({ page }) => {
+  const mock = createQueueMock(["Inspect the sales node", "Next plain prompt"])
+  const view = await openQueue(page, mock, "queue")
+  await expect(view.rows).toHaveCount(2)
+
+  const [rejected] = mock.rows.splice(0, 1)
+  const reason = "The Loginom package changed, closed, or could not be verified before delivery."
+  mock.emit("session.inbox.cancelled", { sessionID, inboxID: rejected.id, reason })
+
+  await expect(page.getByText(reason, { exact: true })).toBeVisible()
+  await expect(view.rows.locator('[data-action="session-queue-edit"]')).toHaveText(["Next plain prompt"])
+  await expect(page.getByText("Inspect the sales node", { exact: true })).toHaveCount(0)
+})
+
 test("follow-up preference controls Enter while Mod+Enter uses the alternate delivery", async ({ page }) => {
   const mock = createQueueMock([])
   const view = await openQueue(page, mock, "queue")

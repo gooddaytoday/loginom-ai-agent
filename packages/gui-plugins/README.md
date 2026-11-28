@@ -178,8 +178,13 @@ unavailable handler blocks sending and leaves the draft in the composer. The mod
 data stays in the draft and message metadata.
 
 When a note action starts outside the conversation, `builtinContext(ctx).tabs.open` can focus the existing session
-and reveal an optional `messageID`. Check that the server is listed and wait for the matching mounted session before
-writing to its composer. The public composer accepts ordinary notes and the public tab API focuses sessions.
+and reveal an optional `messageID`. Wait for the matching mounted session before writing to its composer.
+With focus, `onUnavailable` reports a terminal route failure or an open that timed out. Match that result to the
+request that started it so a later visit cannot attach a canceled note. The public composer accepts ordinary notes
+and the public tab API focuses sessions.
+
+When a note depends on state that can change while a prompt waits in the durable inbox, the server must check it
+again at delivery. The Loginom product check reads the current package in the receiving session's Location.
 
 ### Quoting selected content
 

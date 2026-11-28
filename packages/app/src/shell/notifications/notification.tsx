@@ -3,6 +3,7 @@ import { Schema } from "effect"
 import { isSessionNotFoundError, type SessionInfo } from "@opencode/client/promise"
 import type { ServerSDK } from "@/runtime/server/client"
 import type { Data } from "@opencode/client/solid"
+import { showToast } from "@/shell/notifications/toast"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useLanguage } from "@/runtime/i18n/language"
 import { projectSettingsKey, useSettings } from "@/settings/model"
@@ -408,6 +409,16 @@ export function createServerNotificationState(input: {
   }
 
   const unsub = input.sdk.event.listen((event) => {
+    if (event.type === "session.inbox.cancelled" && event.data.reason) {
+      showToast({
+        variant: "error",
+        title: language.t("prompt.toast.promptSendFailed.title"),
+        description: event.data.reason,
+      })
+
+      return
+    }
+
     if (event.type === "session.deleted") {
       updateManual(event.data.sessionID, false)
 

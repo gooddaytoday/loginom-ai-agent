@@ -833,7 +833,11 @@ export type ExperimentalSessionLogOutput =
           readonly location?:
             | { readonly directory: AbsolutePath; readonly workspaceID?: Workspace.ID | undefined }
             | undefined
-          readonly data: { readonly sessionID: Session.ID; readonly inboxID: SessionMessage.ID }
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly inboxID: SessionMessage.ID
+            readonly reason?: string | undefined
+          }
         }
       | {
           readonly id: Event.ID

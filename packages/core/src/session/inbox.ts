@@ -561,36 +561,43 @@ const publishMutation = <A, E, R>(input: PendingRef, effect: Effect.Effect<A, E,
     Effect.catchDefect((defect) => (defect instanceof LifecycleConflict ? Effect.fail(defect) : Effect.die(defect))),
   )
 
+type CheckDelivery = (metadata: SessionStored.UserPayload["metadata"]) => Effect.Effect<string | undefined>
+
 const publish = Effect.fn("SessionInbox.publish")(function* (
   db: DatabaseService,
   bus: Bus.Interface,
   sessionID: SessionSchema.ID,
   rows: ReadonlyArray<typeof SessionInboxTable.$inferSelect>,
+  check?: CheckDelivery,
 ) {
-  yield* Effect.forEach(
-    rows,
-    (row) => {
-      if (row.type !== "move" && row.type !== "user" && row.type !== "synthetic")
-        return Effect.die(new LifecycleConflict({ id: row.id }))
-      return bus
-        .publish(SessionEvent.InboxDelivered, {
-          sessionID,
-          inboxID: row.id,
-        })
-        .pipe(
-          Effect.catchDefect((defect) =>
-            defect instanceof LifecycleConflict
-              ? promotedFromMessage(db, sessionID, row.id, row.delivery).pipe(
-                  Effect.flatMap((stored) => (stored !== undefined ? Effect.void : Effect.die(defect))),
-                  Effect.orDie,
-                )
-              : Effect.die(defect),
-          ),
-        )
-    },
-    { discard: true },
-  )
-  return rows.length
+  let count = 0
+  for (const row of rows) {
+    if (row.type !== "move" && row.type !== "user" && row.type !== "synthetic")
+      return yield* Effect.die(new LifecycleConflict({ id: row.id }))
+    const reason =
+      check && row.type === "user" && "metadata" in row.payload ? yield* check(row.payload.metadata) : undefined
+    if (reason !== undefined) {
+      yield* bus.publish(SessionEvent.InboxCancelled, { sessionID, inboxID: row.id, reason })
+      continue
+    }
+    yield* bus
+      .publish(SessionEvent.InboxDelivered, {
+        sessionID,
+        inboxID: row.id,
+      })
+      .pipe(
+        Effect.catchDefect((defect) =>
+          defect instanceof LifecycleConflict
+            ? promotedFromMessage(db, sessionID, row.id, row.delivery).pipe(
+                Effect.flatMap((stored) => (stored !== undefined ? Effect.void : Effect.die(defect))),
+                Effect.orDie,
+              )
+            : Effect.die(defect),
+        ),
+      )
+    count++
+  }
+  return count
 })
 
 /**
@@ -604,6 +611,7 @@ export const promote = Effect.fn("SessionInbox.promote")(function* (
   bus: Bus.Interface,
   sessionID: SessionSchema.ID,
   scope: Promotable,
+  check?: CheckDelivery,
 ) {
   return yield* serialized(
     sessionID,
@@ -611,14 +619,14 @@ export const promote = Effect.fn("SessionInbox.promote")(function* (
       const steers = yield* pendingSteers(db, sessionID)
       if (steers.length > 0 || scope === "steer") {
         if (steers.length > 0 && isControl(steers[0])) return undefined
-        return yield* publish(db, bus, sessionID, beforeControl(steers))
+        return yield* publish(db, bus, sessionID, beforeControl(steers), check)
       }
 
       const queued = yield* firstQueued(db, sessionID)
       if (!queued) return 0
       if (isControl(queued)) return undefined
-      const promoted = yield* publish(db, bus, sessionID, [queued])
-      return promoted + (yield* publish(db, bus, sessionID, beforeControl(yield* pendingSteers(db, sessionID))))
+      const promoted = yield* publish(db, bus, sessionID, [queued], check)
+      return promoted + (yield* publish(db, bus, sessionID, beforeControl(yield* pendingSteers(db, sessionID)), check))
     }),
   )
 })
