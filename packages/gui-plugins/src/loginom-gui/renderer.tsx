@@ -19,12 +19,14 @@ import { LoginomRepeatDock } from "./repeat-dock"
 import { registerStartScreen } from "./start-screen"
 import { registerSystemProxy } from "./system-proxy"
 import setupTurnPresentation from "./turn-presentation"
+import windowSetup from "./window-renderer"
 
 const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   setupTurnPresentation(ctx)
   registerStartScreen(ctx)
+  windowSetup(ctx)
 
   const ModelServer = lazy(() => import("./model-server"))
 

@@ -15,6 +15,7 @@ import { loginBrowser, loginomAddress, reauthenticateReloadedPage } from "./conn
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
+import { placeBrowserWindow, prepareBrowserWindow, showBrowserWindow } from "./browser-window.mjs"
 import { observeLoginomReplies, withStepProgress } from "../client/lib/step-progress.mjs"
 import { withLoginomMetadata } from "../client/lib/loginom-feed-metadata.mjs"
 
@@ -34,6 +35,12 @@ const state = {
   controller: undefined,
   session: undefined,
   browser: undefined,
+  windowPage: undefined,
+  windowBaseline: undefined,
+  windowPlacement: undefined,
+  windowAttempt: undefined,
+  windowRestore: undefined,
+  placingWindow: undefined,
   browserProfile: undefined,
   browserServer: undefined,
   lastLoginomReplyAt: null,
@@ -141,7 +148,7 @@ process.on("message", (message) => {
     })
 })
 async function handle(message) {
-  if (!message || typeof message !== "object" || typeof message.id !== "string") return
+  if (!message || typeof message !== "object" || typeof message.id !== "string" || typeof message.operation !== "string") return
   try {
     if (state.closing && message.operation !== "close") throw Error("LOGINOM_RUNTIME_CLOSING")
     if (message.operation === "start") {
@@ -191,6 +198,8 @@ async function handle(message) {
         httpCachePath: validationHttpCache ? join(input.stateDir, "http-cache") : undefined,
         candidate: input.connection,
         headless: input.headless === true,
+        desktopWindow: input.desktopWindow,
+        windowBounds: input.windowBounds,
         signal: state.startupController.signal,
         deadline,
         onPhase: startupPhase,
@@ -206,6 +215,10 @@ async function handle(message) {
       const { createSession } = await import("../client/lib/session.mjs")
       const { createBridge } = await import("../client/lib/bridge.mjs")
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:browserDownloadsPath(directory),
+        onWindowPage: input.desktopWindow ? async (page) => {
+          state.windowPage = page
+          state.windowBaseline = await prepareBrowserWindow(page, login.windowBounds, state.startupController.signal)
+        } : undefined,
         onContextCreated: context => {
           state.browser = context
           observeLoginomReplies(context, new URL(input.connection.url).origin, () => {
@@ -243,6 +256,7 @@ async function handle(message) {
       }
       const session = await createSession(config, {
         headless: input.headless === true,
+        desktopWindow: input.desktopWindow,
         managed: { directory, browserPath: resources.browserPath, browserRoot: resources.browserRoot },
       })
       state.session = session
@@ -298,6 +312,49 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (message.operation === "showWindow") {
+      send({ id: message.id, result: await showBrowserWindow(state.windowPage, process.platform, state.startupController.signal) })
+      return
+    }
+    if (message.operation === "placeWindow") {
+      if (state.windowPlacement === null) {
+        send({ id: message.id, result: "moved" })
+        return
+      }
+      if (state.placingWindow) {
+        send({ id: message.id, result: "unchanged" })
+        return
+      }
+      const placing = placeBrowserWindow(state.windowPage, message.input, {
+        baseline: state.windowBaseline,
+        confirmed: state.windowPlacement,
+        attempted: state.windowAttempt,
+        restoring: state.windowRestore,
+        onBaseline: observed => { state.windowBaseline = observed },
+        onAttempt: expected => { state.windowAttempt = expected },
+        onRestore: transition => { state.windowRestore = transition },
+        mayPlace: () => !state.controller && !state.bridge.hasActiveWork(),
+        shutdown: state.startupController.signal,
+      })
+      state.placingWindow = placing
+      try {
+        const result = await placing
+        if (result === "moved") state.windowPlacement = null
+        else if (typeof result !== "string") state.windowPlacement = result
+        if (state.windowPlacement !== undefined) {
+          state.windowAttempt = undefined
+          state.windowRestore = undefined
+        }
+        send({ id: message.id, result: typeof result === "string" ? result : "placed" })
+      } finally {
+        state.placingWindow = undefined
+      }
+      return
+    }
+    if (state.placingWindow && (message.operation === "call" || message.operation.startsWith("dashboard"))) {
+      await state.placingWindow
+      if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
+    }
     if (message.operation === "write-outcome.prepare") {
       if (state.controller) throw Error("LOGINOM_CALL_BUSY")
       const { writeIntent } = await import("../client/lib/write-outcome.mjs")

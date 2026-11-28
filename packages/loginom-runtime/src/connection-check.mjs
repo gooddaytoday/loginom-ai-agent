@@ -416,7 +416,7 @@ function loginFailure(error, candidate, phase, duration, elapsed) {
   }
 }
 
-export async function loginBrowser({ browserPath, profile, candidate, httpCachePath, headless = false, keepOpen = false, signal, onContextCreated, downloadsPath,
+export async function loginBrowser({ browserPath, profile, candidate, httpCachePath, headless = false, keepOpen = false, signal, onContextCreated, onWindowPage, downloadsPath, desktopWindow, windowBounds,
   deadline = Date.now() + 150_000, onRetry, onPhase, validationLogout = false }) {
   signal?.throwIfAborted()
   const phase = onPhase ?? (async () => {})
@@ -424,7 +424,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
   await phase({ phase: "browser.dependencies", status: "starting" })
   const { chromium } = require("playwright-core")
   await phase({ phase: "browser.dependencies", status: "ready", duration_ms: Math.round(performance.now() - dependenciesStarted) })
-  const launch = browserLaunch(headless)
+  const launch = browserLaunch(headless, process.platform, process.env, desktopWindow, windowBounds)
   const profileStarted = performance.now()
   await phase({ phase: "browser.profile", status: "starting" })
   await prepareBrowserProfile(profile)
@@ -509,6 +509,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
     const loginStarted = performance.now()
     await phase({ phase: "login", status: "starting", attempt: attempt + 1 })
     const page = context.pages()[0] ?? (await context.newPage())
+    if (!headless) await onWindowPage?.(page)
     const result = await loginPage(page, candidate, { deadline, themeState, onThemeReload: record, onPhase: phase,
       sameOrigin: validationLogout })
       .then(async result => {

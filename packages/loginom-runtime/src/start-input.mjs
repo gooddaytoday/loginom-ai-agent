@@ -1,4 +1,5 @@
 import { isAbsolute } from "node:path"
+import { validWindowBounds } from "./browser-window.mjs"
 
 // Mirrors the acceptanceCleanupPackage check in ../client/lib/config.mjs. The
 // managed entry builds its config directly, so the guard must be repeated here.
@@ -18,6 +19,11 @@ export function validateStartInput(input) {
   )
     throw Error("LOGINOM_START_INVALID")
   if (input.startupDeadline !== undefined && (!Number.isSafeInteger(input.startupDeadline) || input.startupDeadline <= 0))
+    throw Error("LOGINOM_START_INVALID")
+  if (input.desktopWindow !== undefined && (typeof input.desktopWindow !== "boolean" ||
+      (input.desktopWindow && input.validation === true)))
+    throw Error("LOGINOM_START_INVALID")
+  if (input.windowBounds !== undefined && (!input.desktopWindow || input.headless || !validWindowBounds(input.windowBounds)))
     throw Error("LOGINOM_START_INVALID")
   // Acceptance-only: the exact saved package the bridge closes during shutdown.
   const cleanup = input.acceptanceCleanupPackage ?? null

@@ -6,6 +6,7 @@ import { hostError, hostException } from "./errors"
 import { runtimeNoProxyKey } from "./system-proxy/environment"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { recordLocalDiagnostics } from "../../loginom-runtime/client/lib/local-diagnostics.mjs"
+import type { WindowBounds } from "./browser-window"
 
 export type Launch = {
   node: string
@@ -22,6 +23,8 @@ export type Launch = {
   validationHttpCache?: boolean
   validationLogout?: boolean
   headless?: boolean
+  desktopWindow?: boolean
+  windowBounds?: WindowBounds
   environment?: NodeJS.ProcessEnv
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
   // its own shutdown (bridge acceptanceCleanupPackage). Product code never sets it.

@@ -28,6 +28,21 @@ test('browser launch normalizes headed DPI without incompatible viewport emulati
   assert.equal(browserLaunch(false, 'linux', {}).args.length,3);
 });
 
+test('Desktop launches a normal window in physical bounds and retains device scale 1', () => {
+  assert.deepEqual(browserLaunch(false, 'win32', {}, true), {
+    args:['--force-device-scale-factor=1'], viewport:null, windowMode:'normal',
+  });
+  const linux = {XDG_CURRENT_DESKTOP:'GNOME'};
+  assert.deepEqual(browserLaunch(false, 'linux', linux, true), {
+    args:['--force-device-scale-factor=1'], viewport:null, windowMode:'normal',
+  });
+  for (const platform of ['win32', 'linux', 'darwin'])
+    assert.deepEqual(browserLaunch(false, platform, {}, true, { x: -1200, y: 50, width: 600, height: 900 }), {
+      args:['--force-device-scale-factor=1','--window-position=-1200,50','--window-size=600,900'], viewport:null, windowMode:'normal',
+    });
+  assert.deepEqual(browserLaunch(true, 'win32', {}, true), browserLaunch(true, 'win32', {}));
+});
+
 test('headed launch keeps the Files refresh control visible without a window manager', {
   skip: !process.env.LOGINOM_DOCK_TEST_BROWSER || process.env.LOGINOM_DOCK_TEST_HEADED !== '1',
   timeout: 30000,

@@ -3,6 +3,7 @@ import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } fro
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { tmpdir } from "node:os"
 import { createHash, randomUUID } from "node:crypto"
+import { setTimeout } from "node:timers/promises"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
@@ -19,6 +20,7 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
+import { startupWindowBounds, type WindowBounds, type WindowPlacement } from "./browser-window"
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
 export async function verifyInstallationResources(options: {
@@ -211,6 +213,7 @@ export async function createLoginomHost(options: {
   codec: CredentialCodec
   environment?: NodeJS.ProcessEnv
   headless?: boolean
+  desktopWindow?: boolean
   preflightHeadless?: boolean
   strictRecovery?: boolean
   desktopWriteOutcomes?: boolean
@@ -464,6 +467,8 @@ export async function createLoginomHost(options: {
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
     // Mutate cache state only after the existing resource-verification admission.
     const httpCache = validationHttpCache && await prepareValidationCache(connection)
+    const desktopWindow = purpose === "chat" && options.desktopWindow === true && !options.headless
+    const windowBounds = desktopWindow ? await startupWindowBounds(root, chat) : undefined
     return supervise(
       {
         node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
@@ -478,6 +483,8 @@ export async function createLoginomHost(options: {
         validationLogout,
         // CLI supplies its explicit browser policy for background launches too.
         headless: purpose === "chat" ? options.headless === true : (options.preflightHeadless ?? true),
+        desktopWindow,
+        windowBounds,
         closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
         browserRecovery: !validation && options.browserRecovery === true,
         environment,
@@ -662,6 +669,19 @@ export async function createLoginomHost(options: {
     resourceController.abort()
     for (const controller of dashboardOperations.keys()) controller.abort(new Error("DASHBOARD_CANCELLED"))
   }
+  async function windowRequest(sessionID: string, operation: "placeWindow" | "showWindow", bounds?: WindowBounds) {
+    if (options.headless) return "no-window"
+    const { generation } = await service.api.status()
+    const current = generations.get(generation)
+    const chat = createHash("sha256").update(sessionID).digest("hex")
+    const child = current?.children.get(chat)
+    if (!child || stale.has(chat) || lost.has(chat)) return "no-window"
+    const runtime = await Promise.race([child.catch(() => undefined), setTimeout(250, "starting" as const, { ref: false })])
+    if (current?.children.get(chat) !== child || stale.has(chat) || lost.has(chat) || !runtime) return "no-window"
+    if (runtime === "starting") return runtime
+    return runtime.request(operation, bounds, 2700).catch(() => operation === "placeWindow" ? "layout-unavailable" : "manual")
+  }
+
   async function checkStepState(chat: string, operationId: string, originalGeneration?: number, owner?: string): Promise<typeof StepCheckResult.Type | "owner_lost"> {
     const unavailable = { state: "unavailable", retryAvailable: false } as const
     const unavailableOwner = owner === undefined ? unavailable : "owner_lost"
@@ -895,6 +915,12 @@ export async function createLoginomHost(options: {
     },
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true
+    },
+    placeWindow({ sessionID, bounds }: WindowPlacement) {
+      return windowRequest(sessionID, "placeWindow", bounds)
+    },
+    showWindow(sessionID: string) {
+      return windowRequest(sessionID, "showWindow")
     },
     checkStepState,
     async workState(generation: number, chat: string) {
