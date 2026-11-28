@@ -707,7 +707,9 @@ cold reader verifies modification time, size and SHA-256 for the reopened file
 before executing or reading any port. A direct cold-reader call with
 `case_port_node_ids` also requires a Save version. A missing or changed version
 reports `UNKNOWN`. After a cold reader fails, queued reads that did not run
-report `UNKNOWN` as well. Unconfirmed shutdown makes affected turns `UNKNOWN`.
+report `UNKNOWN` as well. If SIGTERM cancels the chain, all pending reads
+report `UNKNOWN` with reason `LIVE_CHAIN_CANCELLED`. Unconfirmed shutdown makes
+affected turns `UNKNOWN`.
 `results.json` records all observed closure failure codes in `live_cleanup_errors`.
 The runner removes the temporary login configuration and closes the reader
 before any manual edit or continuation.

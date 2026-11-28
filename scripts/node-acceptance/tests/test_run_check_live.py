@@ -1,7 +1,9 @@
 from concurrent.futures import ThreadPoolExecutor
 import errno
+from io import BytesIO
 import os
 import runpy
+import signal
 import socket
 import subprocess
 import sys
@@ -574,6 +576,92 @@ class LiveChainTest(unittest.TestCase):
             for turn in remaining:
                 self.assertEqual((turn['status'], turn['csv'], turn['readback_reason']),
                                  ('UNKNOWN', 'UNKNOWN', 'CASE_PORT_READBACK_SKIPPED'))
+
+    def test_sigterm_finalizes_pending_readbacks_in_worker_report(self):
+        module = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'run-check.py'))
+        Runner, write, main = module['Runner'], module['write'], module['main']
+        readbacks = Runner.complete_live_port_readbacks
+
+        class InterruptOnUnpack(tuple):
+            def __iter__(self):
+                signal.raise_signal(signal.SIGTERM)
+                return super().__iter__()
+
+        for interrupted_at in ('during close', 'before traversal', 'first entry', 'second entry'):
+            with self.subTest(interrupted_at=interrupted_at), TemporaryDirectory() as directory:
+                root = Path(directory)
+                cases, pair = root / 'cases', root / 'pair'
+                pair.mkdir()
+                write(pair / 'worker.json', dict(url='https://example.invalid', username='worker',
+                                                password='synthetic', package_directory='/worker'))
+                names = ('first', 'second', 'third')
+                for index, name in enumerate(names):
+                    case = cases / name
+                    case.mkdir(parents=True)
+                    (case / 'task.md').write_text(name)
+                    write(case / 'case.json', dict(base=names[index - 1]) if index else {})
+                build = root / 'build'
+                resources = build / 'resources/loginom'
+                resources.mkdir(parents=True)
+                (resources / 'chromium').touch()
+                write(resources / 'resource-manifest.json', dict(browser='chromium'))
+                write(root / 'request.json', dict(pair=str(pair), cases=str(cases), cold=False, live_chain=True))
+                write(root / 'results.json', dict(started=time.time(), phase='setup', head='fixture', tree='fixture',
+                                                  runs=[dict(scenario='third', status='PENDING')]))
+                version = dict(mtime='2026-11-28T00:00:00.000Z', size=100, hash='a' * 64)
+                live = Mock(profile=root / 'third/profile', previous_acks=set(), saved=dict(file_version=version),
+                            turn_log=root / 'third/turns.jsonl', port_readbacks=[])
+                live.segment_attempts.return_value = []
+                live.remaining_browsers.return_value = set()
+
+                def close():
+                    live.child = None
+                    if interrupted_at == 'during close':
+                        signal.raise_signal(signal.SIGTERM)
+
+                def complete(runner, live, **options):
+                    if interrupted_at == 'before traversal':
+                        signal.raise_signal(signal.SIGTERM)
+                    return readbacks(runner, live, **options)
+
+                def setup(_phase, _command, folder, **_options):
+                    (folder / 'profile/config').mkdir(parents=True)
+                    write(folder / 'setup.stdout', dict(browser=dict(state='verified')))
+
+                def model(runner, _case, stage, _profile, _workspace, package, login, build, *_args, **_options):
+                    entry = (stage, package, login, build, version)
+                    if (stage.name, interrupted_at) in [('first', 'first entry'), ('second', 'second entry')]:
+                        entry = InterruptOnUnpack(entry)
+                    runner.current['csv'] = 'pending native port readback'
+                    live.port_readbacks.append(entry)
+                    return 'chat', dict(outputs=[]), None, None
+
+                live.close.side_effect = close
+                handlers = {signum: signal.getsignal(signum) for signum in (signal.SIGINT, signal.SIGTERM)}
+                original_umask = os.umask(0o077)
+                try:
+                    with patch('run_check_live.LiveChain', return_value=live), \
+                            patch.object(sys, 'argv', ['run-check.py', '_worker', str(root)]), \
+                            patch.object(sys, 'stdin', Mock(buffer=BytesIO())), \
+                            patch.object(Runner, 'build', return_value=build), patch.object(Runner, 'phase', side_effect=setup), \
+                            patch.object(Runner, 'complete_live_port_readbacks', complete), \
+                            patch.object(Runner, 'model', model), patch.object(Runner, 'case_port_readback', return_value=None) as reader:
+                        main()
+                finally:
+                    os.umask(original_umask)
+                    for signum, handler in handlers.items():
+                        signal.signal(signum, handler)
+
+                report = json.loads((root / 'results.json').read_text())
+                self.assertEqual(report['phase'], 'complete')
+                result = report['runs'][0]
+                self.assertEqual((result['failure_class'], result['csv']), ('LIVE_CHAIN_CANCELLED', 'UNKNOWN'))
+                completed = 1 if interrupted_at == 'second entry' else 0
+                self.assertEqual(reader.call_count, completed)
+                self.assertEqual([turn['status'] for turn in result['turns'][:completed]], ['PASS'] * completed)
+                for turn in result['turns'][completed:]:
+                    self.assertEqual((turn['status'], turn['csv'], turn['readback_reason']),
+                                     ('UNKNOWN', 'UNKNOWN', 'LIVE_CHAIN_CANCELLED'))
 
     def test_save_version_requires_a_successful_receipt_for_this_operation_and_path(self):
         version = dict(mtime='2026-11-28T00:00:00.000Z', size=100, hash='a' * 64)

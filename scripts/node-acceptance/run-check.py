@@ -31,6 +31,7 @@ SCENARIOS = {
 }
 D76_STATUS = 'PASS с ограничением платформы D76'
 EVIDENCE_UNMOVED = 'EVIDENCE_UNMOVED'
+PENDING_PORT_READBACK = 'pending native port readback'
 MAX_CASE_TURNS = 8
 # Owner decisions 16.11 logreg-{partition,kfold}-csv-by-name: native warm/reopen order differs.
 CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential', 'logreg-partition-column', 'logreg-validation-kfold')
@@ -3637,8 +3638,8 @@ class Runner:
                 if live:
                     version = saved_file_version(live.turn_saved)
                     if live.child is not None:
+                        self.current['csv'] = PENDING_PORT_READBACK
                         live.port_readbacks.append((folder, package, login, build, version))
-                        self.current['csv'] = 'pending native port readback'
                         return session, expected, None, None
                 else:
                     from run_check_live import package_save_states
@@ -4113,62 +4114,68 @@ class Runner:
             raise
         finally:
             self.current['cleanup'] = cleanup
-            if cleanup == 'FAIL' and self.current.get('csv') == 'pending native port readback':
-                self.current['csv'] = 'UNKNOWN'
             for turn in self.current['turns']:
                 if turn.get('cleanup') == 'pending live shutdown':
                     turn['cleanup'] = cleanup
                     if cleanup == 'FAIL' and turn['status'] == 'PASS':
                         turn.update(status='UNKNOWN', failure_class='LIVE_CHAIN_SHUTDOWN_UNCONFIRMED')
             self.closing_live = False
-            cancelled = not cancellation_pending and getattr(self, 'cancel_requested', False)
-            if cleanup == 'FAIL' or cancelled:
-                self.complete_live_port_readbacks(live, skip_reason='CASE_PORT_READBACK_CLOSE_UNCONFIRMED'
-                                                 if cleanup == 'FAIL' else 'CASE_PORT_READBACK_SKIPPED')
-            if cancelled:
+            cancelled = getattr(self, 'cancel_requested', False)
+            if cancelled or cleanup == 'FAIL' or not verify_ports:
+                reason = ('LIVE_CHAIN_CANCELLED' if cancelled else 'CASE_PORT_READBACK_CLOSE_UNCONFIRMED'
+                          if cleanup == 'FAIL' else 'CASE_PORT_READBACK_SKIPPED')
+                self.finish_pending_port_readbacks(self.current, reason)
+                live.port_readbacks.clear()
+            if cancelled and not cancellation_pending:
                 raise InterruptedError('LIVE_CHAIN_CANCELLED')
 
-        self.complete_live_port_readbacks(live, skip_reason=None if verify_ports else 'CASE_PORT_READBACK_SKIPPED')
+        self.complete_live_port_readbacks(live)
 
-    def complete_live_port_readbacks(self, live, *, skip_reason):
+    @staticmethod
+    def finish_port_readback(turn, reason):
+        if reason is None:
+            turn['csv'] = '— (native outputs PASS)'
+            return
+        outcome = dict(csv='UNKNOWN', readback_reason=reason)
+        if turn['status'] in ('PASS', 'PENDING') or turn.get('failure_class') == 'LIVE_CHAIN_CANCELLED':
+            outcome.update(status='UNKNOWN', failure_class=reason)
+        turn.update(outcome)
+
+    def finish_pending_port_readbacks(self, result, reason):
+        for turn in result.get('turns', ()):
+            if turn.get('csv') == PENDING_PORT_READBACK:
+                self.finish_port_readback(turn, reason)
+        if result.get('csv') == PENDING_PORT_READBACK:
+            result['csv'] = 'UNKNOWN'
+
+    def complete_live_port_readbacks(self, live):
         if not live.port_readbacks:
             return
         turns = self.current['turns']
         turns_by_case = {turn['case']: turn for turn in turns}
-        readbacks = iter(live.port_readbacks)
-
-        def finish(turn, reason):
-            turn['csv'] = 'UNKNOWN' if reason else '— (native outputs PASS)'
-            if reason:
-                turn['readback_reason'] = reason
-                if turn['status'] == 'PASS':
-                    turn.update(status='UNKNOWN', failure_class=reason)
 
         try:
             final_version = saved_file_version(live.saved)
-            for stage, package, login, build, version in readbacks:
+            for stage, package, login, build, version in live.port_readbacks:
                 turn = turns_by_case[stage.name]
-                reason = skip_reason
-                if not reason:
-                    if version is None or final_version is None:
-                        reason = 'CASE_PORT_SAVE_VERSION_UNKNOWN'
-                    elif version != final_version:
-                        reason = 'CASE_PORT_SAVE_VERSION_CHANGED'
-                    else:
-                        try:
-                            reason = self.case_port_readback(stage, package, login, build, version=version)
-                        except InterruptedError:
-                            finish(turn, 'CASE_PORT_READBACK_INTERRUPTED')
-                            raise
-                        except Exception as error:
-                            turn.update(status='UNKNOWN' if isinstance(error, TimeoutError) else 'FAIL', csv='FAIL',
-                                        failure_class=str(error).split(':')[0] or type(error).__name__)
-                            raise
-                finish(turn, reason)
+                if version is None or final_version is None:
+                    reason = 'CASE_PORT_SAVE_VERSION_UNKNOWN'
+                elif version != final_version:
+                    reason = 'CASE_PORT_SAVE_VERSION_CHANGED'
+                else:
+                    try:
+                        reason = self.case_port_readback(stage, package, login, build, version=version)
+                    except InterruptedError:
+                        raise
+                    except Exception as error:
+                        turn.update(status='UNKNOWN' if isinstance(error, TimeoutError) else 'FAIL', csv='FAIL',
+                                    failure_class=str(error).split(':')[0] or type(error).__name__)
+                        raise
+                self.finish_port_readback(turn, reason)
         finally:
-            # A failed cold reader may have left a lock on the package.
-            for stage, *_ in readbacks:
-                finish(turns_by_case[stage.name], 'CASE_PORT_READBACK_SKIPPED')
+            # A cancelled or failed cold reader may have left a lock on the package.
+            reason = 'LIVE_CHAIN_CANCELLED' if getattr(self, 'cancel_requested', False) else 'CASE_PORT_READBACK_SKIPPED'
+            self.finish_pending_port_readbacks(self.current, reason)
             if live.port_readbacks[-1][0].name == turns[-1]['case']:
                 self.current['csv'] = turns[-1]['csv']
             live.port_readbacks.clear()
@@ -4430,6 +4437,9 @@ class Runner:
             for r in self.report['runs']:
                 if r['status'] == 'PENDING': self.failure(r, error, self.out)
         finally:
+            if getattr(self, 'cancel_requested', False):
+                for r in self.report['runs']:
+                    self.finish_pending_port_readbacks(r, 'LIVE_CHAIN_CANCELLED')
             self.report.update(finished=time.time(), phase='complete')
             self.save()
 
