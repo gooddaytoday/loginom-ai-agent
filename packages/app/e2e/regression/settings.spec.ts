@@ -259,19 +259,28 @@ async function loginomApplication(page: Page, outcome: "applied" | "failed") {
   const notice = settings.getByRole("status")
   await expect(address).toHaveValue(oldUrl)
   await address.fill(newUrl)
+
+  // Freeze before Save so each clock step starts exactly one status poll.
+  const now = await page.evaluate(() => Date.now())
+  await page.clock.pauseAt(now + 1_000)
   await settings.getByRole("button", { name: "Сохранить", exact: true }).click()
   await expect(notice).toHaveText("Новые параметры применятся после завершения 2 задач")
 
-  // Control status polling so the page sees the new generation before its catalog is ready.
-  const now = await page.evaluate(() => Date.now())
-  await page.clock.pauseAt(now + 1_000)
+  async function pollStatus(duration: number) {
+    const [response] = await Promise.all([
+      page.waitForResponse((response) => new URL(response.url()).pathname === "/api/rpc/loginom.connection/status"),
+      page.clock.fastForward(duration),
+    ])
+    expect(response.ok()).toBe(true)
+  }
+
   tasks = 1
-  await page.clock.fastForward(16_000)
+  await pollStatus(16_000)
   await expect(notice).toHaveText("Новые параметры применятся после завершения 1 задачи")
 
   generation = 2
   state = "starting"
-  await page.clock.fastForward(1_000)
+  await pollStatus(1_000)
   await expect(notice).toHaveText("Применяем подключение…")
   await expect(notice.getByText("Применено", { exact: true })).toHaveCount(0)
 

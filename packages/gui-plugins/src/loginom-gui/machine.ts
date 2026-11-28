@@ -40,6 +40,7 @@ type Effect =
 type Transition = { state: State; effects: Effect[] }
 
 const applicationWait = 15_000
+const applicationPollDelay = 1_000
 
 export const initial: State = { type: "unavailable", attempt: 0 }
 
@@ -158,8 +159,8 @@ export function transition(state: State, event: Event): Transition {
       if (!event.result.ok) {
         if (state.type === "saving" && event.result.issue === "saveFailed") return refresh(state, attempt, "saveFailed")
         if (state.type === "loading") return { state: { type: "unavailable", attempt }, effects: [] }
-        if (state.type === "applying" && event.now >= state.until)
-          return { state: { type: "editing", attempt, status: state.status, draft: state.draft }, effects: [] }
+        if (state.type === "applying")
+          return pollApplication({ ...state, attempt }, event.now, event.result.issue)
         if ("draft" in state)
           return failed(state, state.type === "refreshing" ? (state.issue ?? event.result.issue) : event.result.issue)
         return keep
@@ -179,19 +180,19 @@ export function transition(state: State, event: Event): Transition {
           state.type === "applying" && !waitingTasks(state.status) && !waitingTasks(status)
             ? state.until
             : event.now + applicationWait
-        const remaining = until - event.now
-        if (remaining > 1000) {
-          return {
-            state: { type: "applying", attempt, status, draft: pendingDraft, until, edited },
-            effects: [{ type: "status", attempt, delay: 1000, timeout: remaining - 1000 }],
-          }
-        }
-        return { state: { type: "editing", attempt, status, draft: pendingDraft }, effects: [] }
+        return pollApplication({ type: "applying", attempt, status, draft: pendingDraft, until, edited }, event.now)
       }
       const issue = state.type === "refreshing" && !recovered ? state.issue : undefined
       return { state: { type: "editing", attempt, status, draft, issue }, effects: [] }
     }
   }
+}
+
+function pollApplication(state: Extract<State, { type: "applying" }>, now: number, issue?: Issue): Transition {
+  const { attempt, status, draft, until } = state
+  const timeout = until - now - applicationPollDelay
+  if (timeout <= 0) return { state: { type: "editing", attempt, status, draft, issue }, effects: [] }
+  return { state, effects: [{ type: "status", attempt, delay: applicationPollDelay, timeout }] }
 }
 
 function waitingTasks(status: Status) {
@@ -236,7 +237,7 @@ export function view(state: State) {
     draft: form?.draft,
     connected: form?.status.state === "ready" && !form.status.failed ? form.status : undefined,
     message: message(state),
-    waitingTasks: form && !form.status.failed ? waitingTasks(form.status) : 0,
+    waitingTasks: state.type === "applying" ? waitingTasks(state.status) : 0,
     fieldErrors: {
       url: issue === "invalidAddress" || issue === "loginUnavailable" ? issue : undefined,
       username: issue === "invalidUsername" ? issue : undefined,
