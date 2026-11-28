@@ -27,7 +27,10 @@ export interface Interface {
     sessionID: SessionSchema.ID,
     options?: { readonly continuation?: boolean },
   ) => Effect.Effect<void, SessionRunner.RunError>
-  /** Registers newly recorded work. A queued prompt waits for an active execution to succeed. */
+  /**
+   * Registers new work. Queued prompts admitted before a stop wait for success.
+   * Those admitted after the stop was accepted can wake a new turn when cleanup finishes.
+   */
   readonly wake: (sessionID: SessionSchema.ID, scope?: "queue") => Effect.Effect<void>
   /**
    * Interrupt active work owned by this process. Idle interruption is a no-op. Resolves once
