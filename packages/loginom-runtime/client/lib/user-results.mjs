@@ -220,7 +220,7 @@ function projectSavedPackageGraph(graph, text) {
     Number(labelsWithChanges.has(right.node_id)) - Number(labelsWithChanges.has(left.node_id)));
   for (const change of graph.changes.slice(0, 16)) {
     const {kind, node_id:nodeId, endpoints, label, before, saved, observed_before_save:observedBeforeSave, repair} = change;
-    append(result.changes, endpoints ? {kind, endpoints} : {kind, nodeId, label:label && safe(label), before:safe(before),
+    append(result.changes, endpoints ? {kind, endpoints} : kind === 'node_added' ? {kind, nodeId} : {kind, nodeId, label:label && safe(label), before:safe(before),
       ...(saved === undefined ? {} : {saved:safe(saved)}),
       ...(repair ? {observedBeforeSave:safe(observedBeforeSave), repair:{label:repair.label, prompt:safe(repair.prompt)}} : {})});
   }

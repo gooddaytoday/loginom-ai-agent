@@ -98,50 +98,49 @@ export async function readSaveGraph(budgetMs) {
 
 async function inSavedFileTab(page, options) {
   const owner = await page.evaluateHandle(options => {
-    const app = globalThis.bg?.app, prep = globalThis.__loginomDockPreparationV1;
-    const form = app?.Application?.FInstance?.FMainForm, workspace = form?.Items?.Workspace;
-    const card = workspace?.getActiveTab(), connection = form?.FMapTree?.FServerConnection;
-    let pack = card?.Controller?.Node?.data?.node;
-    for (let depth = 0; pack && !(pack instanceof app.PackageTreeNode) && depth < 32; depth++) pack = pack.ParentNode;
-    const verify = () => {
-      if (location.origin !== options.origin || app?.Version !== options.build || app.Version !== '7.4.2'
-        || globalThis.__loginomDockPreparationV1 !== prep || prep?.document !== document || prep.id !== options.documentId
-        || ![...prep.receipts.values()].some(receipt => receipt.phase === 'verified' && receipt.packageNode === pack
-          && JSON.parse(receipt.request).session === options.sessionId)
-        || form.FReconnecting === true || form.FMapTree.FServerConnection !== connection
-        || connection?.Connected !== true || connection.UserName !== options.account || connection.Session !== session
-        || !(pack instanceof app.PackageTreeNode) || pack.HasRunningNodes() !== false
-        || '/' + pack.PackageFileName.replaceAll('\\', '/').replace(/^\/+/, '') !== options.path
-        || !Array.from({length: form.FMapTree.PackageNodes.Count}, (_, index) => form.FMapTree.PackageNodes.Items(index)).includes(pack))
-        throw Error('Saved package owner changed');
-    };
-    const session = connection?.Session;
     const previousRead = globalThis.__loginomDockSavedFileReadV1;
     if (previousRead && !previousRead.released) throw Error('Previous saved package stream release is unconfirmed');
     const release = {token:options.token, document, released:false};
     globalThis.__loginomDockSavedFileReadV1 = release;
-    let cards;
     try {
+      const app = globalThis.bg?.app, prep = globalThis.__loginomDockPreparationV1;
+      const form = app?.Application?.FInstance?.FMainForm, workspace = form?.Items?.Workspace;
+      const card = workspace?.getActiveTab(), connection = form?.FMapTree?.FServerConnection;
+      const session = connection?.Session;
+      let pack = card?.Controller?.Node?.data?.node;
+      for (let depth = 0; pack && !(pack instanceof app.PackageTreeNode) && depth < 32; depth++) pack = pack.ParentNode;
+      const verify = () => {
+        if (location.origin !== options.origin || app?.Version !== options.build || app.Version !== '7.4.2'
+          || globalThis.__loginomDockPreparationV1 !== prep || prep?.document !== document || prep.id !== options.documentId
+          || ![...prep.receipts.values()].some(receipt => receipt.phase === 'verified' && receipt.packageNode === pack
+            && JSON.parse(receipt.request).session === options.sessionId)
+          || form.FReconnecting === true || form.FMapTree.FServerConnection !== connection
+          || connection?.Connected !== true || connection.UserName !== options.account || connection.Session !== session
+          || !(pack instanceof app.PackageTreeNode) || pack.HasRunningNodes() !== false
+          || '/' + pack.PackageFileName.replaceAll('\\', '/').replace(/^\/+/, '') !== options.path
+          || !Array.from({length: form.FMapTree.PackageNodes.Count}, (_, index) => form.FMapTree.PackageNodes.Items(index)).includes(pack))
+          throw Error('Saved package owner changed');
+      };
       verify();
-      cards = workspace.items?.items;
+      const cards = workspace.items?.items;
       if (!Array.isArray(cards) || cards.length > 32 || !cards.includes(card)) throw Error('Workspace tab inventory unavailable');
+      const initial = new Set(cards);
+      const isFiles = candidate => candidate?.Controller?.FController?.constructor?.name === 'FileStorageForm';
+      const inventory = () => {
+        const current = app.Application.FInstance.FMainForm.Items.Workspace;
+        if (current !== workspace || prep.document !== document) throw Error('Workspace changed during saved package read');
+        return current.items.items;
+      };
+      const openedFiles = () => {
+        const added = inventory().filter(candidate => !initial.has(candidate) && isFiles(candidate));
+        if (added.length > 1) throw Error('Ambiguous new Files tabs');
+        return added[0];
+      };
+      return {verify, workspace, card, isFiles, inventory, openedFiles, path: options.path, limit: options.limit, release};
     } catch (error) {
       release.released = true;
       throw error;
     }
-    const initial = new Set(cards);
-    const isFiles = candidate => candidate?.Controller?.FController?.constructor?.name === 'FileStorageForm';
-    const inventory = () => {
-      const current = app.Application.FInstance.FMainForm.Items.Workspace;
-      if (current !== workspace || prep.document !== document) throw Error('Workspace changed during saved package read');
-      return current.items.items;
-    };
-    const openedFiles = () => {
-      const added = inventory().filter(candidate => !initial.has(candidate) && isFiles(candidate));
-      if (added.length > 1) throw Error('Ambiguous new Files tabs');
-      return added[0];
-    };
-    return {verify, workspace, card, isFiles, inventory, openedFiles, path: options.path, limit: options.limit, release};
   }, options);
   const tab = page.locator('[data-tid='+JSON.stringify(options.tabTid)+']');
   let files, attempted = false, readerStarted = false;
@@ -301,6 +300,17 @@ export function savedPackageReleaseConfirmed(response) {
     && /^\{\s*"released"\s*:\s*true\s*\}$/.test(resultText(block).trim()));
 }
 
+export function savedPackageReadRejected(response) {
+  const [block, ...extra] = response?.content ?? [];
+  if (response?.isError !== true || extra.length || block?.type !== 'text') return false;
+  const [heading, error] = block.text.split('\n', 2);
+  return heading === '### Error' && [
+    'Tool "browser_run_code_unsafe" not found',
+    'Invalid arguments for tool "browser_run_code_unsafe":',
+    'Error: Tool "browser_run_code_unsafe" does not handle the modal state.',
+  ].includes(error);
+}
+
 const resultText = block => block.text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/)?.[1] ?? block.text;
 
 function parseSavedPackageRead(response) {
@@ -425,6 +435,7 @@ export function compareSavedPackageGraph({graphs, before, intendedLabels = new M
   })).filter(([source,,target]) => observed.has(source?.toLowerCase()) && observed.has(target?.toLowerCase())).map(edge));
   for (const [kind, left, right] of [['link_removed', oldLinks, savedLinks], ['link_added', savedLinks, oldLinks]])
     for (const link of left) if (!right.has(link)) changes.push({kind, endpoints:link.split('/')});
+  for (const id of observed.keys()) if (!expected.has(id)) changes.push({kind:'node_added', node_id:id});
   return {scope:'active_workflow', saved_labels:savedLabels, changes, unchecked_sorting:uncheckedSorting};
 }
 
@@ -434,11 +445,13 @@ export function savedGraphMessage(report, mask = value => value) {
   const renames = report.changes.filter(change => change.kind === 'node_renamed');
   const order = report.changes.some(change => change.kind.startsWith('sorting_'));
   const links = report.changes.some(change => change.kind.startsWith('link_'));
+  const added = report.changes.some(change => change.kind === 'node_added');
   return [...renames.slice(0, 3).map(rename => `В сохранённом пакете имя узла отличается: «${label(rename.before)}» → «${label(rename.saved)}».`),
     renames.length > 3 && `Другие отличия в именах: ${renames.length - 3}.`,
     order && 'В сохранённом пакете изменился порядок полей «Сортировки».',
     links && 'В сохранённом пакете изменились связи.',
-    !renames.length && !order && !links && (report.changes.length ? 'Сохранённый граф отличается.' : 'В проверенной части сохранённого графа расхождений нет.'),
+    added && 'В сохранённом графе есть узлы, которых не было на схеме до сохранения.',
+    !renames.length && !order && !links && !added && (report.changes.length ? 'Сохранённый граф отличается.' : 'В проверенной части сохранённого графа расхождений нет.'),
     report.changes.length > 0 && 'Дальше используйте имена из сохранённого пакета; не исправляйте автоматически.',
     report.unchecked_sorting.length > 0 && 'Порядок полей проверен не для всех узлов «Сортировки».',
   ].filter(Boolean).join(' ');

@@ -89,6 +89,10 @@ class ExternalClient {
     }
     else if(this.f.savedFixture && code.includes('function inSavedFileTab')){
       this.f.events.push('saved-file');
+      if(this.f.refuseSavedRead){
+        this.f.refuseSavedRead=false;
+        return {isError:true,content:[{type:'text',text:'### Error\nTool "browser_run_code_unsafe" not found'}]};
+      }
       if(this.f.savedReadLost)throw Error('Read timed out with native stream cleanup pending');
       value=this.f.fileMissing?{fileExists:false}:{fileExists:true,mtime:'2026-11-27T15:00:00.000Z',
         size:this.f.savedFixture.length,base64:this.f.savedFixture.toString('base64')};
@@ -518,13 +522,14 @@ test('unknown prepared workflow advises only the last confirmed Save of its own 
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
 });
 
-for(const {action_key,fileMissing} of [{action_key:'package.save_checkpoint'},{action_key:'package.save_as'},
-  {action_key:'package.save_checkpoint',fileMissing:true}])
- test('Save retains its receipt '+(fileMissing?'when listing confirms the file is absent: ':'and reads file evidence: ')+action_key,async t=>{
+for(const {action_key,fileMissing,refuseSavedRead} of [{action_key:'package.save_checkpoint'},{action_key:'package.save_as'},
+  {action_key:'package.save_checkpoint',fileMissing:true},{action_key:'package.save_checkpoint',refuseSavedRead:true}])
+ test('Save retains its receipt '+(refuseSavedRead?'after a browser refusal before the read: '
+   :fileMissing?'when listing confirms the file is absent: ':'and reads file evidence: ')+action_key,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-null-save-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
   const savedFixture=await readFile(new URL('../../../../../evals/fixtures/calibration/sales-by-category/reference.lgp',import.meta.url));
-  const f=current={scenario:'success',events:[],busy:false,saves:0,path,receipts:new Map(),catalog,savedFixture,fileMissing};
+  const f=current={scenario:'success',events:[],busy:false,saves:0,path,receipts:new Map(),catalog,savedFixture,fileMissing,refuseSavedRead};
   const password='loginom-fixture-password';
   if(action_key==='package.save_as') f.previousLabel='Я'.repeat(94)+password;
   const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
@@ -555,9 +560,9 @@ for(const {action_key,fileMissing} of [{action_key:'package.save_checkpoint'},{a
    assert.equal(saved.status,'SUCCEEDED');assert.match(saved.operation_id,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
    const {v,operationId,savedPackageGraph:report,evidence,receiptWindow}=response._meta.loginom;
    assert.equal(v,1);
-   assert.equal(report.status,fileMissing?'unavailable':'compared');
+   assert.equal(report.status,fileMissing||refuseSavedRead?'unavailable':'compared');
    assert.equal(operationId,saved.operation_id);
-   assert.deepEqual(evidence,fileMissing?[{kind:'saved',path}]:[{kind:'saved',path},
+   assert.deepEqual(evidence,fileMissing||refuseSavedRead?[{kind:'saved',path}]:[{kind:'saved',path},
      {kind:'savedFileRead',scope:'package',nodeCount:4,workflowGuidMatch:false,file:{mtime:'2026-11-27T15:00:00.000Z',size:10157,
        hash:'ad9e8e3b8e63597d724a26fc88f1fa17dc0c9b396ada0624a2756d13238b3790'}}]);
    assert.equal(receiptWindow.documentId,'own-doc');
@@ -565,10 +570,16 @@ for(const {action_key,fileMissing} of [{action_key:'package.save_checkpoint'},{a
    assert.equal(report.saveOperationId,saved.operation_id);
    assert.equal(report.packagePath,path);
    if(fileMissing)assert.ok(response.content.some(block=>block.text.includes('Квитанция Save остаётся')));
+   else if(refuseSavedRead){
+     assert.ok(response.content.some(block=>block.text.includes('Пакет сохранён, но')));
+     assert.ok(response.content.every(block=>!block.text.includes('SAVED_PACKAGE_READ_CLEANUP_PENDING')));
+     assert.equal(bridge.hasUnsettledWork(),false);
+   }
    else {
      assert.equal(report.renameAttribution,'unconfirmed');
      assert.equal(report.scope,'activeWorkflow');
      assert.deepEqual(report.savedLabels,[{nodeId:'770a65bc-5ea0-47f2-80f8-ab900e5e43c2',label:'По убыванию выручки'}]);
+     assert.ok(report.changes.some(change=>change.kind==='node_added'));
      const message=response.content.find(block=>block.text.startsWith('В сохранённом пакете имя узла отличается:'));
      assert.ok(message.text.includes('» → «По убыванию выручки»'));
      if(f.previousLabel){
@@ -588,6 +599,14 @@ for(const {action_key,fileMissing} of [{action_key:'package.save_checkpoint'},{a
    assert.equal(f.events.filter(event=>event==='saved-file').length,1);
    assert.equal(f.saves,1);
    let lastSave=saved;
+   if(refuseSavedRead){
+    const next=await client.callTool({name:'dock_action_run',arguments:{action_key,parameters:{path,conflict_policy:'replace'},operation_id:'after-refusal'}});
+    lastSave=JSON.parse(next.content[0].text);
+    assert.equal(lastSave.status,'SUCCEEDED');
+    assert.equal(next._meta.loginom.savedPackageGraph.status,'compared');
+    assert.equal(f.saves,2);
+    assert.equal(f.events.filter(event=>event==='saved-file').length,2);
+   }
    if(action_key==='package.save_as'){
     const save=operation_id=>client.callTool({name:'dock_action_run',arguments:{action_key,parameters:{path,conflict_policy:'replace'},operation_id}});
     f.savedReadLost=true;

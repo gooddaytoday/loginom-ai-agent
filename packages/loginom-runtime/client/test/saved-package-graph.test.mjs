@@ -7,6 +7,7 @@ import {compareSavedPackageGraph, makeSavedPackageGraphCode, makeSavedPackageRel
 
 const join = '4527f5b0-c77f-4fcc-91be-fccae0406581';
 const sortingNode = '4abeb776-ab7c-48ba-ba43-0858d760c9e1';
+const extraNode = '39cf4420-a2c9-4455-8868-ea2605be1ae7';
 const output = '4ba0e2c2-69ad-3a32-bbdc-75714efe7a51';
 const input = '9dc72a3f-56bf-3bfc-84ec-f979daf4da6b';
 const before = {
@@ -18,15 +19,15 @@ const mtime = '2026-11-27T15:00:00.000Z';
 const responseFor = value => ({content:[{type:'text',text:`### Result\n${JSON.stringify(value)}\n### Ran Playwright code`}]});
 const readResponse = bytes => responseFor({fileExists:true,mtime,size:bytes.length,base64:bytes.toString('base64')});
 
-async function fixture({label='Слияние', fixedOrder=true, linked=true, joinId=join}={}) {
+async function fixture({label='Слияние', fixedOrder=true, linked=true, joinId=join, extra=false}={}) {
   const columns = order => order.map(name => `<Item Name="${name}"/>`).join('');
   const archive = new ZipWriter(new Uint8ArrayWriter(), {useWebWorkers:false});
   await archive.add('Unit_0/Unit.xml', new TextReader(`<Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><WorkFlow>
-    <Nodes><Item Guid="${joinId}" DisplayName="${label}"/><Item Guid="${sortingNode}" DisplayName="Сортировка">
+    <Nodes>${joinId ? `<Item Guid="${joinId}" DisplayName="${label}"/>` : ''}<Item Guid="${sortingNode}" DisplayName="Сортировка">
       <Component><InputSockets><Item Name="DataSource"><Socket><DataSource><ColumnDefs>${columns(['Revenue', 'Region'])}</ColumnDefs></DataSource></Socket></Item></InputSockets>
       <OutputSockets><Item Name="DataSource"><Socket><DataSource SyncThroughColumns="${!fixedOrder}"><ColumnDefs>${fixedOrder ? columns(['Region', 'Revenue']) : ''}</ColumnDefs></DataSource></Socket></Item></OutputSockets>
       <Engine xsi:type="TBGSortingEngine"><SortingColumns>${columns(['Region', 'Revenue'])}</SortingColumns></Engine></Component>
-    </Item></Nodes><Links>${linked ? `<Item><SourcePort NodeGuid="${joinId}" PortGuid="${output}"/><TargetPort NodeGuid="${sortingNode}" PortGuid="${input}"/></Item>` : ''}</Links>
+    </Item>${extra ? `<Item Guid="${extraNode}" DisplayName="Новый узел"/>` : ''}</Nodes><Links>${linked ? `<Item><SourcePort NodeGuid="${joinId}" PortGuid="${output}"/><TargetPort NodeGuid="${sortingNode}" PortGuid="${input}"/></Item>` : ''}</Links>
     </WorkFlow></Unit>`));
   return readResponse(Buffer.from(await archive.close()));
 }
@@ -53,6 +54,15 @@ test('an earlier rename differs from agent intent without attributing it to Save
   assert.equal(report.changes[0].before, 'Слияние');
   assert.equal(report.changes[0].saved, 'Левое');
   assert.match(savedGraphMessage(report), /В сохранённом пакете имя узла отличается: «Слияние» → «Левое»/);
+});
+
+test('an extra unlinked GUID is reported as a saved graph difference', async () => {
+  const {graphs, evidence} = await readSavedPackageFacts({response:await fixture({extra:true}),before});
+  const report = {status:'compared', ...compareSavedPackageGraph({graphs,before})};
+  assert.equal(evidence.workflowGuidMatch,false);
+  assert.deepEqual(report.changes,[{kind:'node_added',node_id:extraNode}]);
+  assert.match(savedGraphMessage(report),/есть узлы, которых не было/);
+  assert.doesNotMatch(savedGraphMessage(report),/расхождений нет/);
 });
 
 test('saved autosync falls back to input order, exposing a lost custom output order', async () => {
@@ -94,8 +104,9 @@ test('Save compares Sorting against the native order after a manual edit', async
   liveKeys = ['Revenue','Region'];
   const edited = await snapshot(2000);
   assert.equal(held.size,0);
-  assert.deepEqual((await compare({graph:original,linked:false,fixedOrder:false})).changes.map(change=>change.kind),['sorting_field_order']);
-  const report = await compare({graph:edited,linked:false,fixedOrder:false});
+  const sortingOnly = {joinId:null,linked:false,fixedOrder:false};
+  assert.deepEqual((await compare({graph:original,...sortingOnly})).changes.map(change=>change.kind),['sorting_field_order']);
+  const report = await compare({graph:edited,...sortingOnly});
   assert.deepEqual(report.changes.map(change=>[change.kind,Array.from(change.before),change.saved]),
     [['sorting_key_order',['Revenue','Region'],['Region','Revenue']]]);
   assert.deepEqual(report.unchecked_sorting,[]);
@@ -140,7 +151,7 @@ test('saved-file read releases the file for the next Save and closes only its ow
     const execute=Function('return '+makeSavedPackageGraphCode({origin,path,tabTid,build:'7.4.2',documentId:'doc',sessionId:'session',account:'account',token}))();
     const releaseStatus=Function('return '+makeSavedPackageReleaseCode(token))();
     const noStream = ['missing','listing failed','access unknown'];
-    for (const scenario of ['success','read failed','return failed','read stalled','open stalled','release stalled','dispose stalled','existing',...noStream]) {
+    for (const scenario of ['success','owner check failed','read failed','return failed','read stalled','open stalled','release stalled','dispose stalled','existing',...noStream]) {
       await page.goto(origin);
       await page.evaluate(({scenario,path,tabTid})=>{
         const workflow=document.querySelector('[data-tid="'+tabTid+'"]');
@@ -194,7 +205,10 @@ test('saved-file read releases the file for the next Save and closes only its ow
           IsStreamReleased(){return !this.stream;}
         }
         const FMapTree={FServerConnection:{Connected:true,UserName:'account',Session:{}},PackageNodes:{Count:1,Items:()=>pack}};
-        const Workspace={getActiveTab:()=>active,items:{items:cards}};
+        const Workspace={getActiveTab(){
+          if(scenario==='owner check failed')throw Error('Owner check refused');
+          return active;
+        },items:{items:cards}};
         globalThis.bg={app:{Version:'7.4.2',PackageTreeNode,Application:{FInstance:{FMainForm:{Items:{Workspace},FMapTree}}}},
           TBGFileOpenMode:{fomRead:0},TBGFileInfoAttributes:{fiaNormalFilesOnly:1,fiaHidden:4},
           selectAllAsync:async rows=>accept=>accept(rows),forEach:(rows,accept)=>rows.forEach(accept),filestorage:{FileDownloader}};
@@ -207,7 +221,7 @@ test('saved-file read releases the file for the next Save and closes only its ow
         globalThis.finishRelease=()=>{finishRelease();};
         globalThis.finishDisposal=()=>{finishDisposal();};
       },{scenario,path,tabTid});
-      if (scenario.endsWith('failed') || scenario.endsWith('stalled')) await assert.rejects(execute(page), /Read refused|Listing refused|Timeout|timed out/);
+      if (scenario.endsWith('failed') || scenario.endsWith('stalled')) await assert.rejects(execute(page), /Owner check refused|Read refused|Listing refused|Timeout|timed out/);
       else if(noStream.includes(scenario)) assert.deepEqual(await execute(page), {fileExists:scenario==='missing'?false:null});
       else assert.deepEqual(await execute(page), {fileExists:true,mtime,size:1,base64:'Kg=='});
       const unsettled = ['open stalled','release stalled','dispose stalled'].includes(scenario);
@@ -221,7 +235,7 @@ test('saved-file read releases the file for the next Save and closes only its ow
       assert.deepEqual(await releaseStatus(page),{released:true},scenario);
       assert.equal(await page.evaluate(()=>globalThis.trySave()),'saved',scenario);
       assert.deepEqual(await page.evaluate(()=>globalThis.observedTabs()),{active:'workflow',files:scenario==='existing',
-        readStarted:scenario!=='open stalled'&&!noStream.includes(scenario)},scenario);
+        readStarted:!['open stalled','owner check failed',...noStream].includes(scenario)},scenario);
     }
   } finally { await browser.close(); }
 });

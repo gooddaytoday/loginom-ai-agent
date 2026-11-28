@@ -33,7 +33,7 @@ import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory, userActionKeys } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState,readSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
-import {compareSavedPackageGraph,makeSavedPackageGraphCode,makeSavedPackageReleaseCode,readSavedPackageFacts,savedGraphMessage,savedPackageReleaseConfirmed} from './saved-package-graph.mjs';
+import {compareSavedPackageGraph,makeSavedPackageGraphCode,makeSavedPackageReleaseCode,readSavedPackageFacts,savedGraphMessage,savedPackageReadRejected,savedPackageReleaseConfirmed} from './saved-package-graph.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
 import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
 import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
@@ -927,14 +927,16 @@ export async function createBridge(config, session, { browserTransport: managedB
                       path:admission.path,tabTid:workflow.tab_tid,documentId:prepared.document_id,sessionId:session.metadata.sessionId,account:savedState.account,token});
                     savedFileRead={token,operationId:savedOutcome.operation_id};
                     const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,{timeout:24000});
+                    if(savedPackageReadRejected(response)) savedFileRead=undefined;
                     const {graphs,evidence,fileExists}=await readSavedPackageFacts({response,before});
                     admission.savedFile={fileExists,evidence};
                     if(fileExists!==null) savedFileRead=undefined;
                     if(!graphs||!before) throw Error('Saved graph comparison unavailable');
                     const graph=compareSavedPackageGraph({graphs,before,intendedLabels});
                     admission.savedGraph={...identity,status:'compared',...graph};
-                  } catch {
-                    await savedFileReleased();
+                  } catch (error) {
+                    if(error instanceof McpError && error.code===ErrorCode.MethodNotFound) savedFileRead=undefined;
+                    else await savedFileReleased();
                     admission.savedGraph={...identity,status:'unavailable'};
                   }
                 } else if (savedFileRead) {

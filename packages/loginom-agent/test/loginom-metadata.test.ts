@@ -29,7 +29,7 @@ test("Dock forwards the runtime Save projection and its file proof alongside the
       saved: "Левое",
       observed_before_save: "Слияние",
       repair: { label: "Попросить исправить", prompt: "Проверить узел node-guid" },
-    }],
+    }, { kind: "node_added", node_id: "new-guid" }],
     saved_labels: [{ node_id: "node-guid", label: "Левое" }],
     unchecked_sorting: [],
   }
@@ -43,7 +43,10 @@ test("Dock forwards the runtime Save projection and its file proof alongside the
   expect(result.metadata?.loginom).toMatchObject({
     v: 1, operationId: "operation", state: "settled", kind: "save", busy,
     evidence: [{ kind: "saved", path }, savedFileRead],
-    savedPackageGraph: { scope: "activeWorkflow", savedLabels: [{ nodeId: "node-guid", label: "Левое" }], truncated: false },
+    savedPackageGraph: {
+      scope: "activeWorkflow", savedLabels: [{ nodeId: "node-guid", label: "Левое" }], truncated: false,
+      changes: expect.arrayContaining([{ kind: "node_added", nodeId: "new-guid" }]),
+    },
   })
   expect(result.content).toEqual(input.content[0].text)
 })

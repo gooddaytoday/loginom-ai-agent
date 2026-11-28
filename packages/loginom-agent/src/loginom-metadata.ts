@@ -49,6 +49,7 @@ const manualEdits = Schema.Array(
 
 const savedPackageIdentity = { saveOperationId: id, packagePath: Schema.String }
 const savedChange = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("node_added"), nodeId: id }),
   Schema.Struct({ kind: Schema.Literal("node_missing"), nodeId: id, before: Schema.String }),
   Schema.Struct({
     kind: Schema.Literal("node_renamed"),
