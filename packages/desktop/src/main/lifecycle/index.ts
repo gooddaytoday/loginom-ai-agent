@@ -1,19 +1,23 @@
 export * as ApplicationLifecycle from "./index"
 
-import { app, BrowserWindow } from "electron"
+import { app, BrowserWindow, dialog } from "electron"
 import type { Event } from "electron"
 import { Context, Effect, Layer } from "effect"
 import { DeepLinks } from "../deep-links"
 import { DashboardLinks } from "../loginom/dashboard-links"
+import { confirmPackageQuit } from "../loginom/quit-packages"
 import { DesktopLogging, scoped } from "../native/logging"
+import { nativeT } from "../native/translations"
+import { SidecarCredentials } from "../service/sidecar-credentials"
 import { DesktopStorage } from "../storage"
 import { safeWebContentsURL } from "../windows/state"
-import { getLastFocusedWindow, mainWindows } from "../windows"
+import { getLastFocusedWindow, getMainWindows, mainWindows } from "../windows"
 import type { Scope } from "@opencode/plugin/gui/host"
 import { protocolUrls, startupUrls } from "./deep-link"
 import { marks } from "./marks"
 import {
   createDriver,
+  needsQuitConfirmation,
   preventsQuit,
   quitsWhenAllWindowsClosed,
   restoresWindows,
@@ -55,15 +59,51 @@ const runtime = Layer.effect(
     // 60 s) and exit. `Service.stop` gives it 2 s to accept the request and 70 s to exit, then SIGTERM and SIGKILL for
     // 5 s each: 82 s, plus a service an attempt in flight was starting.
     const driver = createDriver({
-      stop: () =>
-        runPromise(
+      confirmExit: async () => {
+        const data = SidecarCredentials.get()
+
+        if (!data) return true
+
+        const { OpenCode } = await import("@opencode/client")
+        const authorization = SidecarCredentials.authorization(data, data.url)
+        const { rpc } = OpenCode.make({ baseUrl: data.url, headers: authorization ? { authorization } : {} })
+
+        const show = (options: Electron.MessageBoxOptions) => {
+          const parent = getLastFocusedWindow()
+
+          return parent ? dialog.showMessageBox(parent, options) : dialog.showMessageBox(options)
+        }
+
+        return confirmPackageQuit({
+          rpc,
+          ask: async (kind, choices) => {
+            const cancel = choices.indexOf("cancel")
+            const { response } = await show({
+              type: "warning",
+              defaultId: cancel,
+              cancelId: cancel,
+              message: nativeT(`desktop.loginom.quit.${kind}`),
+              buttons: choices.map((choice) => nativeT(`desktop.loginom.quit.${choice}`)),
+            })
+
+            return choices[response] ?? "cancel"
+          },
+          failed: async (decision) => {
+            await show({ type: "warning", message: nativeT(`desktop.loginom.quit.${decision}Failed`) })
+          },
+        })
+      },
+      stop: (): Promise<void> => {
+        if (!restoresWindows(driver.state())) for (const window of getMainWindows()) window.hide()
+        return runPromise(
           shutdown.stop.pipe(
             Effect.timeoutOrElse({
               duration: "90 seconds",
               orElse: () => Effect.logError("shutdown timed out, continuing anyway"),
             }),
           ),
-        ),
+        )
+      },
       resume: () =>
         runPromise(
           shutdown.resume.pipe(
@@ -88,11 +128,12 @@ const runtime = Layer.effect(
       },
     })
 
-    const relaunch = () => driver.dispatch({ type: "exit.requested", mode: "relaunch" })
+    const relaunch = () => driver.dispatch({ type: "exit.confirmation.requested", mode: "relaunch" })
 
     const windows = yield* mainWindows({
       appState: driver.state,
       relaunch,
+      requestQuit: () => app.quit(),
       sessionEnding: () => driver.dispatch({ type: "session.ending" }),
     })
 
@@ -146,6 +187,10 @@ const runtime = Layer.effect(
 
     const beforeQuit = (event: Event) => {
       if (preventsQuit(driver.state())) event.preventDefault()
+
+      if (needsQuitConfirmation(driver.state()))
+        return driver.dispatch({ type: "exit.confirmation.requested", mode: "quit" })
+
       driver.dispatch({ type: "before.quit" })
     }
 

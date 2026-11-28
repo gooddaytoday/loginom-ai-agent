@@ -26,6 +26,7 @@ type Started = {
   ready: Promise<Connection | undefined>
   connected?: boolean
   held: Map<Lease, string>
+  sessions: Set<string>
   closing?: Promise<void>
 }
 
@@ -76,6 +77,7 @@ export async function start(input: {
     directory,
     ready: Promise.resolve(undefined),
     held: new Map(),
+    sessions: new Set(),
   }
   current.ready = (connect?.() ?? Promise.resolve(undefined)).then(
     (connection) => {
@@ -140,6 +142,20 @@ export const dashboard = {
   },
 }
 
+export async function packageState(sessionID: string) {
+  const result = await request("package.state", { sessionID }).catch(() => null)
+  return result ?? { open: null, path: null, modified: null, modifiedDetectedAt: null, lastSave: null }
+}
+
+export async function packageInventory() {
+  const sessions = [...(state.current?.sessions ?? [])]
+  return sessions.length ? request("package.inventory", sessions) : []
+}
+
+export function packageAction(input: { sessionID: string; path: string | null; decision: "save" | "discard" | "clean"; close: boolean }) {
+  return request("package.action", input)
+}
+
 export const connectionSettings = {
   request,
   holdTurn() {
@@ -193,6 +209,7 @@ export async function acquire(session: string) {
     return undefined
   }
   current.held.set(lease, file)
+  current.sessions.add(session)
   return lease
 }
 

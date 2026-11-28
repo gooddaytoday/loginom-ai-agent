@@ -312,6 +312,25 @@ async function handle(message) {
       }
       return
     }
+    if (message.operation === "packageState") {
+      const read = state.packageStateRead ??= state.bridge.packageState(state.browser, !!state.controller || !!state.packageAction)
+        .finally(() => { state.packageStateRead = undefined })
+      send({ id: message.id, result: await read })
+      return
+    }
+    if (message.operation === "packageAction") {
+      if (state.controller || state.packageAction || state.packageReleased) throw Error("LOGINOM_REQUEST_INVALID")
+      state.packageAction = true
+      try {
+        await state.packageStateRead
+        const result = await state.bridge.packageAction(state.browser, message.input)
+        if (result.status === "closed") state.packageReleased = true
+        send({ id: message.id, result })
+      } finally {
+        state.packageAction = false
+      }
+      return
+    }
     if (message.operation === "work") {
       send({
         id: message.id,
@@ -360,7 +379,8 @@ async function handle(message) {
       send({ id: message.id, result: { interrupted: true } })
       return
     }
-    if (message.operation !== "call" || state.controller) throw Error("LOGINOM_REQUEST_INVALID")
+    if (message.operation !== "call" || state.controller || state.packageAction || state.packageReleased)
+      throw Error("LOGINOM_REQUEST_INVALID")
     if (message.input.packageArtifact !== undefined && message.input.name !== "dock_prepare")
       throw Error("LOGINOM_REQUEST_INVALID")
     const controller = new AbortController()

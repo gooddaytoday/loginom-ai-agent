@@ -5,18 +5,20 @@ import {withBrowserReceipt} from './executor.mjs';
 // Loginom's own close guard remains
 // enabled: CloseAllPackages(true, false) from E2E would bypass that guard.
 export function makePackageCleanupCode(options) {
-  const {sessionId, documentId, account, packagePath, loginomUrl, loginomBuild, tabTid, timeoutMs = 8000, diagnosticDiscard = false, diagnosticReadOnly = false, diagnosticWaitForIdle = false, unsavedDraft = false} = options;
+  const {sessionId, documentId, account, packagePath, loginomUrl, loginomBuild, tabTid, timeoutMs = 8000, userDecision = null, alreadyClosedOperationId = null, diagnosticDiscard = false, diagnosticReadOnly = false, diagnosticWaitForIdle = false, unsavedDraft = false} = options;
   if (![sessionId, documentId, account, tabTid].every(v => typeof v === 'string' && v.length > 0 && v.length <= 200)
       || (unsavedDraft ? packagePath !== null : typeof packagePath !== 'string' || !/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+\.lgp$/.test(packagePath)
       || packagePath.split('/').some(p => p === '.' || p === '..')) || loginomBuild !== '7.4.2'
       || typeof unsavedDraft !== 'boolean' || unsavedDraft && (diagnosticDiscard || diagnosticReadOnly || diagnosticWaitForIdle)
+      || ![null,'clean','save','discard'].includes(userDecision) || userDecision && diagnosticDiscard
+      || alreadyClosedOperationId !== null && (!userDecision || typeof alreadyClosedOperationId !== 'string' || !alreadyClosedOperationId)
       || typeof diagnosticReadOnly !== 'boolean' || typeof diagnosticDiscard !== 'boolean'
       || typeof diagnosticWaitForIdle !== 'boolean' || diagnosticWaitForIdle && !diagnosticDiscard
       || !Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 15000) throw Error('Exact isolated cleanup identity required');
   const url = new URL(loginomUrl);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw Error('Invalid cleanup origin');
   // Match the existing bridge cleanup call's 30000 ms budget, including dispatch.
-  return `async page=>(${closeOwnedPackage.toString()})(page,${JSON.stringify({sessionId, documentId, account, packagePath, origin:url.origin, loginomBuild, tabTid, timeoutMs, diagnosticDiscard, diagnosticReadOnly, diagnosticWaitForIdle, unsavedDraft})},${Date.now()+30000})`;
+  return `async page=>(${closeOwnedPackage.toString()})(page,${JSON.stringify({sessionId, documentId, account, packagePath, origin:url.origin, loginomBuild, tabTid, timeoutMs, userDecision, alreadyClosedOperationId, diagnosticDiscard, diagnosticReadOnly, diagnosticWaitForIdle, unsavedDraft})},${Date.now()+30000})`;
 }
 
 // Reconcile an unsuccessful Open or new draft without promoting prepare to
@@ -138,9 +140,9 @@ export function parsePackageCleanupResult(response, expected) {
         || value.session_id !== expected.sessionId || value.document_id !== expected.documentId
         || value.account !== expected.account || value.package_path !== expected.packagePath
         || typeof value.unsaved_changes_discarded !== 'boolean'
-        || (value.unsaved_changes_discarded && expected.diagnosticDiscard !== true)) continue;
+        || (value.unsaved_changes_discarded && expected.diagnosticDiscard !== true && expected.userDecision !== 'discard')) continue;
     if (value.status === 'SUCCEEDED' && (value.package_closed !== true || value.logged_out !== true
-        || value.packages_before !== 1 || value.packages_after !== 0 || value.reason !== null)) continue;
+        || value.packages_before !== (expected.alreadyClosedOperationId ? 0 : 1) || value.packages_after !== 0 || value.reason !== null)) continue;
     return value;
   }
   throw Error('Bound package cleanup receipt missing');
@@ -229,7 +231,8 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       const prep = globalThis.__loginomDockPreparationV1;
       const identity = JSON.stringify(o);
       const previous = globalThis.__loginomDockCleanupV1;
-      if (previous && (previous.identity !== identity || previous.document !== document)) return {reason:'CLEANUP_IDENTITY_CHANGED'};
+      if (previous && (previous.document !== document || previous.identity !== identity && !previous.userDecision && !o.userDecision))
+        return {reason:'CLEANUP_IDENTITY_CHANGED'};
       if (previous && previous.close_started !== false) return {reason:'CLEANUP_ALREADY_ATTEMPTED'};
       const ownReceipt = prep?.receipts instanceof Map && [...prep.receipts.values()].some(r => {
         try { return JSON.parse(r.request).session === o.sessionId; } catch { return false; }
@@ -240,13 +243,23 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       if (!m.FServerConnection.Connected) return {reason:'CONNECTION_DISCONNECTED'};
       // Retain the original native handles before any idle-wait. A replacement
       // session with the same account/package is not this cleanup's owner.
-      const state=previous??(globalThis.__loginomDockCleanupV1={identity,document,
+      const state=previous?.identity===identity?previous:(globalThis.__loginomDockCleanupV1={identity,document,userDecision:o.userDecision,
         connection:m.FServerConnection,serverSession:m.FServerConnection.Session,close_started:false,done:false,closed:false});
       const ownerBound=()=>state.connection===m.FServerConnection&&state.serverSession
         &&state.serverSession===m.FServerConnection.Session;
       if(!ownerBound())return {reason:'CLEANUP_SESSION_CHANGED'};
       const visible = e => !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height && getComputedStyle(e).visibility !== 'hidden';
       if (!o.failedOpenOperation&&[...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)) return {reason:'DIALOG_OR_OPERATION_OPEN'};
+      if (o.alreadyClosedOperationId) {
+        const prepared = prep.receipts.get(o.alreadyClosedOperationId);
+        if (m.PackageNodes?.Count !== 0 || !['verified','superseded'].includes(prepared?.phase)
+          || JSON.parse(prepared.request).session !== o.sessionId || !prepared.packageNode
+          || prepared.openConnection !== state.connection || prepared.openServerSession !== state.serverSession
+          || prepared.tab?.getAttribute('data-tid') !== o.tabTid || document.contains(prepared.tab))
+          return {reason:'ALREADY_CLOSED_OWNER_UNCONFIRMED'};
+        state.tab=prepared.tab;state.close_started=true;state.done=true;state.closed=true;state.result='absent';
+        return {started:true,packages_before:0,modified:false};
+      }
       // Absence is safe only after our OK, with the original empty inventory
       // and submitted Open still bound to these exact native session handles.
       if(o.failedOpenOperation&&state.open_error_dismiss_started&&m.PackageNodes?.Count===0) {
@@ -397,7 +410,7 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       if(!ownerBound())return {reason:'CLEANUP_SESSION_CHANGED'};
       const modified = await m.FServerConnection.Session.IsPackageModified(node.Package);
       if(!ownerBound())return {reason:'CLEANUP_SESSION_CHANGED'};
-      if (modified !== false && !(modified === true && o.diagnosticDiscard === true)) return {reason:'UNSAVED_CHANGES'};
+      if (modified !== false && !(modified === true && (o.diagnosticDiscard || o.userDecision === 'discard'))) return {reason:'UNSAVED_CHANGES'};
       // Recheck identity after the server read. The native BeforeClose handler
       // repeats lock/dirty checks and may show a prompt. Normal shutdown never
       // answers it; independent QA can explicitly discard its temporary views.
@@ -465,7 +478,7 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       const visible = e => !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height && getComputedStyle(e).visibility !== 'hidden';
       return state?.done || [...document.querySelectorAll('[role="dialog"],.x-message-box')].some(visible);
     }, undefined, {timeout:remaining()});
-    if (options.diagnosticDiscard === true && before.modified === true) {
+    if ((options.diagnosticDiscard || options.userDecision === 'discard') && before.modified === true) {
       receipt.stage = 'discard_prompt';
       const message = page.locator('[data-tid^="msgbox"][data-tid$="cnt;cnt;cmp"]:visible');
       const no = page.locator('[data-tid^="msgbox"][data-tid$="tlb;no"]:visible');
@@ -477,9 +490,14 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       // QA explicitly owns the temporary changes. Keep the exact account,
       // package and native node binding through the confirmation click.
       if (!await page.evaluate(o => {
-        const m = globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree;
+        const app = globalThis.bg?.app, m = app?.Application?.FInstance?.FMainForm?.FMapTree;
+        const state = globalThis.__loginomDockCleanupV1, prep = globalThis.__loginomDockPreparationV1;
         const n = m?.PackageNodes?.Count === 1 && m.PackageNodes.Items(0);
-        return n && '/'+n.PackageFileName.replaceAll('\\','/').replace(/^\/+/, '') === o.packagePath
+        const path = n?.PackageFileName ? '/'+n.PackageFileName.replaceAll('\\','/').replace(/^\/+/, '') : null;
+        return n && path === o.packagePath && location.origin === o.origin && app.Version === o.loginomBuild
+          && state?.document === document && prep?.id === o.documentId && document.contains(state.tab)
+          && state.connection === m.FServerConnection && state.serverSession === m.FServerConnection.Session
+          && [...prep.receipts.values()].some(r => r.packageNode === n && r.tab === state.tab)
           && m.FServerConnection.UserName === o.account && n.HasRunningNodes() === false;
       }, options)) return finish('BLOCKED','DIAGNOSTIC_PACKAGE_CHANGED');
       receipt.stage = 'discard_click';
@@ -560,7 +578,7 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
     if (await at('MF;cntMain;tlbMainToolbar;btnAvatar').isVisible()) return finish('BLOCKED', 'LOGOUT_UNCONFIRMED');
     receipt.logged_out = true;
     receipt.stage = 'complete';
-    return finish('SUCCEEDED', null, {packages_before:1, packages_after:0});
+    return finish('SUCCEEDED', null, {packages_before:before.packages_before, packages_after:0});
   } catch(error) {
     receipt.error=describeError(error,receipt.stage);
     receipt.failure_class=error?.name==='TimeoutError'?'ui_timeout':'step_failed';

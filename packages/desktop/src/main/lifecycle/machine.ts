@@ -14,6 +14,7 @@ export type Reply = { readonly resolve: () => void; readonly reject: (cause: unk
  */
 export type State =
   | { readonly status: "running"; readonly attempt: number }
+  | { readonly status: "confirming"; readonly attempt: number; readonly intent: ConfirmIntent }
   /** Every plugin but `keep` is stopping for a restart handoff; without `handoff` the app relaunches next. */
   | {
       readonly status: "suspending"
@@ -38,18 +39,24 @@ export type Event =
   | { readonly type: "plugins.resumed"; readonly attempt: number }
   /** A relaunch from the app, or a quit signal from the OS. */
   | { readonly type: "exit.requested"; readonly mode: ExitMode }
+  | { readonly type: "exit.confirmation.requested"; readonly mode: ExitMode }
+  | { readonly type: "exit.confirmation.completed"; readonly attempt: number; readonly approved: boolean }
   /** Windows logoff or shutdown (`session-end` on each window); Electron emits no `before-quit` for it. */
   | { readonly type: "session.ending" }
   | { readonly type: "before.quit" }
   | { readonly type: "will.quit" }
 
+type ConfirmIntent = Extract<Event, { type: "restart.requested" | "exit.confirmation.requested" }>
+
 export type RejectReason =
   | { readonly kind: "failed"; readonly error: unknown }
+  | { readonly kind: "cancelled" }
   | { readonly kind: "busy" }
   | { readonly kind: "quitting" }
 
 export type Command =
   | { readonly type: "stop-plugins"; readonly attempt: number }
+  | { readonly type: "confirm-exit"; readonly attempt: number }
   | { readonly type: "run-handoff"; readonly attempt: number; readonly handoff: Handoff }
   | { readonly type: "resume-plugins"; readonly attempt: number }
   | { readonly type: "resolve"; readonly reply: Reply }
@@ -63,9 +70,10 @@ export function initialState(): State {
 }
 
 export function transition(state: State, event: Event): Transition {
-  if (event.type === "restart.requested") return restartRequested(state, event)
-
   if (event.type === "exit.requested") return exitRequested(state, event.mode)
+
+  if (event.type === "restart.requested" || event.type === "exit.confirmation.requested")
+    return requestConfirmation(state, event)
 
   // The OS ends the session whatever the app asked for, so a pending relaunch becomes a quit.
   if (event.type === "session.ending")
@@ -84,7 +92,7 @@ export function transition(state: State, event: Event): Transition {
 }
 
 /** The app starts no plugin, and the windows that close are restored on the next launch. */
-export const isQuitting = (state: State) => state.status !== "running" && state.status !== "resuming"
+export const isQuitting = (state: State) => state.status !== "running" && state.status !== "resuming" && state.status !== "confirming"
 
 /** The scope a stop leaves running: the restart caller's, until the handoff settled. */
 export const keptScope = (state: State) =>
@@ -96,6 +104,8 @@ export const restoresWindows = (state: State) => state.status !== "stopping" && 
 /** Electron's `before-quit` waits for the plugins to stop first. */
 export const preventsQuit = (state: State) => state.status !== "handing-off" && state.status !== "quitting"
 
+export const needsQuitConfirmation = (state: State) => state.status === "running" || state.status === "confirming"
+
 /**
  * On macOS the app outlives its windows, except during a quit: Electron emits `window-all-closed` instead of `will-quit`
  * when it lost track of one, so finish it.
@@ -103,22 +113,17 @@ export const preventsQuit = (state: State) => state.status !== "handing-off" && 
 export const quitsWhenAllWindowsClosed = (state: State, platform: NodeJS.Platform) =>
   platform !== "darwin" || state.status === "stopping" || state.status === "quitting"
 
-function restartRequested(state: State, event: Extract<Event, { type: "restart.requested" }>): Transition {
-  if (state.status === "running")
-    return {
-      state: {
-        status: "suspending",
-        attempt: state.attempt + 1,
-        keep: event.keep,
-        handoff: event.handoff,
-        reply: event.reply,
-      },
-      commands: [{ type: "stop-plugins", attempt: state.attempt + 1 }],
-    }
+function requestConfirmation(state: State, intent: ConfirmIntent): Transition {
+  if (state.status === "running") {
+    const attempt = state.attempt + 1
+    return { state: { status: "confirming", attempt, intent }, commands: [{ type: "confirm-exit", attempt }] }
+  }
+
+  if (intent.type !== "restart.requested") return unchanged(state)
 
   const kind = state.status === "stopping" || state.status === "quitting" ? "quitting" : "busy"
 
-  return unchanged(state, [{ type: "reject", reply: event.reply, reason: { kind } }])
+  return unchanged(state, [{ type: "reject", reply: intent.reply, reason: { kind } }])
 }
 
 function exitRequested(state: State, mode: ExitMode): Transition {
@@ -151,6 +156,20 @@ function willQuit(state: State): Transition {
 
 function stepSettled(state: State, event: Extract<Event, { readonly attempt: number }>): Transition {
   if (state.status === "quitting" || state.attempt !== event.attempt) return unchanged(state)
+
+  if (event.type === "exit.confirmation.completed" && state.status === "confirming") {
+    const { intent, attempt } = state
+    if (!event.approved)
+      return unchanged(
+        { status: "running", attempt },
+        intent.type === "restart.requested" ? [{ type: "reject", reply: intent.reply, reason: { kind: "cancelled" } }] : [],
+      )
+    if (intent.type === "exit.confirmation.requested") return exitRequested(state, intent.mode)
+    return {
+      state: { status: "suspending", attempt, keep: intent.keep, handoff: intent.handoff, reply: intent.reply },
+      commands: [{ type: "stop-plugins", attempt }],
+    }
+  }
 
   if (event.type === "plugins.stopped" && state.status === "suspending") {
     if (state.handoff)
@@ -191,6 +210,9 @@ function stepSettled(state: State, event: Extract<Event, { readonly attempt: num
 
 /** Rejects the restart a quit supersedes; a resuming one already failed. */
 function superseded(state: State): Command[] {
+  if (state.status === "confirming" && state.intent.type === "restart.requested")
+    return [{ type: "reject", reply: state.intent.reply, reason: { kind: "quitting" } }]
+
   if (state.status === "resuming")
     return [{ type: "reject", reply: state.reply, reason: { kind: "failed", error: state.error } }]
 
@@ -209,6 +231,7 @@ function unchanged(state: State, commands: Command[] = []): Transition {
  * event. It holds no other state.
  */
 export function createDriver(input: {
+  readonly confirmExit: () => Promise<boolean>
   /** Stops every plugin but `keptScope`; never rejects. */
   readonly stop: () => Promise<void>
   /** Starts the plugins a handoff stopped again; never rejects. */
@@ -224,6 +247,13 @@ export function createDriver(input: {
   }
 
   const perform = (command: Command) => {
+    if (command.type === "confirm-exit") {
+      const complete = (approved: boolean) =>
+        dispatch({ type: "exit.confirmation.completed", attempt: command.attempt, approved })
+
+      return void input.confirmExit().then(complete, () => complete(false))
+    }
+
     if (command.type === "stop-plugins") {
       const done = () => dispatch({ type: "plugins.stopped", attempt: command.attempt })
 
@@ -264,6 +294,8 @@ export function createDriver(input: {
 
 function rejection(reason: RejectReason) {
   if (reason.kind === "failed") return reason.error
+
+  if (reason.kind === "cancelled") return new Error("Application restart was cancelled")
 
   if (reason.kind === "busy") return new Error("Application restart is already in progress")
 

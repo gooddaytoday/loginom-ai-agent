@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Scope } from "@opencode/plugin/gui/host"
 import {
+  createDriver,
   initialState,
   isQuitting,
   keptScope,
@@ -20,6 +21,8 @@ const reply = (): Reply => ({ resolve: () => {}, reject: () => {} })
 
 const handoff = () => {}
 
+const approved = (attempt: number): Event => ({ type: "exit.confirmation.completed", attempt, approved: true })
+
 /** Applies the events in order and returns the last state with every command they produced. */
 const replay = (events: readonly Event[], from = initialState()) =>
   events.reduce<Transition>(
@@ -32,6 +35,51 @@ const replay = (events: readonly Event[], from = initialState()) =>
   )
 
 describe("app lifecycle machine", () => {
+  test("an update waits for package confirmation and can retry after cancellation", async () => {
+    const first = Promise.withResolvers<boolean>()
+    const second = Promise.withResolvers<boolean>()
+    const events: string[] = []
+    const driver = createDriver({
+      confirmExit: () => {
+        const check = events.length === 0 ? first : second
+        events.push("confirm")
+        return check.promise
+      },
+      stop: async () => void events.push("stop"),
+      resume: async () => void events.push("resume"),
+      exit: () => void events.push("exit"),
+    })
+    const install = () => void events.push("install")
+
+    const cancelled = driver.restart(keep, install)
+    expect(events).toEqual(["confirm"])
+    first.resolve(false)
+    await expect(cancelled).rejects.toThrow("cancelled")
+    expect(driver.state().status).toBe("running")
+    expect(events).toEqual(["confirm"])
+
+    const retry = driver.restart(keep, install)
+    expect(events).toEqual(["confirm", "confirm"])
+    second.resolve(true)
+    await retry
+    expect(events).toEqual(["confirm", "confirm", "stop", "install"])
+  })
+
+  test("a Desktop exit keeps the service running until approved, and retries after cancellation", () => {
+    const request = { type: "exit.confirmation.requested", mode: "quit" } satisfies Event
+    const first = transition(initialState(), request)
+    expect(first.commands).toEqual([{ type: "confirm-exit", attempt: 1 }])
+    expect(isQuitting(first.state)).toBe(false)
+    expect(transition(first.state, request).commands).toEqual([])
+    const cancelled = transition(first.state, { type: "exit.confirmation.completed", attempt: 1, approved: false })
+    expect(cancelled.state.status).toBe("running")
+    expect(cancelled.commands).toEqual([])
+    const retry = transition(cancelled.state, request)
+    expect(transition(retry.state, { type: "exit.confirmation.completed", attempt: 1, approved: true }).commands).toEqual([])
+    expect(transition(retry.state, { type: "exit.confirmation.completed", attempt: 2, approved: true }).commands)
+      .toEqual([{ type: "stop-plugins", attempt: 3 }])
+  })
+
   test("a failed handoff starts the stopped plugins again before it rejects, and a retry stops them again", () => {
     const first = reply()
     const second = reply()
@@ -40,6 +88,12 @@ describe("app lifecycle machine", () => {
     const steps: { event: Event; state: State["status"]; commands: unknown[]; quitting: boolean; kept?: Scope }[] = [
       {
         event: { type: "restart.requested", keep, handoff, reply: first },
+        state: "confirming",
+        commands: [{ type: "confirm-exit", attempt: 1 }],
+        quitting: false,
+      },
+      {
+        event: approved(1),
         state: "suspending",
         commands: [{ type: "stop-plugins", attempt: 1 }],
         quitting: true,
@@ -66,6 +120,12 @@ describe("app lifecycle machine", () => {
       },
       {
         event: { type: "restart.requested", keep, handoff, reply: second },
+        state: "confirming",
+        commands: [{ type: "confirm-exit", attempt: 2 }],
+        quitting: false,
+      },
+      {
+        event: approved(2),
         state: "suspending",
         commands: [{ type: "stop-plugins", attempt: 2 }],
         quitting: true,
@@ -92,6 +152,7 @@ describe("app lifecycle machine", () => {
 
     const handingOff = replay([
       { type: "restart.requested", keep, handoff, reply: caller },
+      approved(1),
       { type: "plugins.stopped", attempt: 1 },
     ])
 
@@ -116,11 +177,13 @@ describe("app lifecycle machine", () => {
 
     const result = replay([
       { type: "restart.requested", keep, reply: caller },
+      approved(1),
       { type: "plugins.stopped", attempt: 1 },
     ])
 
     expect(result.state).toEqual({ status: "quitting" })
     expect(result.commands).toEqual([
+      { type: "confirm-exit", attempt: 1 },
       { type: "stop-plugins", attempt: 1 },
       { type: "resolve", reply: caller },
       { type: "exit", mode: "relaunch" },
@@ -147,16 +210,18 @@ describe("app lifecycle machine", () => {
   })
 
   const phases = [
-    { phase: "suspending", events: [], reason: { kind: "quitting" }, stale: { type: "plugins.stopped", attempt: 1 } },
+    { phase: "confirming", events: [], reason: { kind: "quitting" }, stale: approved(1) },
+    { phase: "suspending", events: [approved(1)], reason: { kind: "quitting" }, stale: { type: "plugins.stopped", attempt: 1 } },
     {
       phase: "handing-off",
-      events: [{ type: "plugins.stopped", attempt: 1 }],
+      events: [approved(1), { type: "plugins.stopped", attempt: 1 }],
       reason: { kind: "quitting" },
       stale: { type: "handoff.failed", attempt: 1, error: "late" },
     },
     {
       phase: "resuming",
       events: [
+        approved(1),
         { type: "plugins.stopped", attempt: 1 },
         { type: "handoff.failed", attempt: 1, error: "failed" },
       ],
@@ -234,11 +299,13 @@ describe("app lifecycle machine", () => {
   })
 
   test.each([
-    { phase: "suspending", events: [], kind: "busy" },
-    { phase: "handing-off", events: [{ type: "plugins.stopped", attempt: 1 }], kind: "busy" },
+    { phase: "confirming", events: [], kind: "busy" },
+    { phase: "suspending", events: [approved(1)], kind: "busy" },
+    { phase: "handing-off", events: [approved(1), { type: "plugins.stopped", attempt: 1 }], kind: "busy" },
     {
       phase: "resuming",
       events: [
+        approved(1),
         { type: "plugins.stopped", attempt: 1 },
         { type: "handoff.failed", attempt: 1, error: "failed" },
       ],
@@ -267,11 +334,12 @@ describe("app lifecycle machine", () => {
 
   test.each([
     { phase: "running", events: [], restores: true },
-    { phase: "suspending", events: [{ type: "restart.requested", keep, handoff, reply: reply() }], restores: true },
+    { phase: "suspending", events: [{ type: "restart.requested", keep, handoff, reply: reply() }, approved(1)], restores: true },
     {
       phase: "handing-off",
       events: [
         { type: "restart.requested", keep, handoff, reply: reply() },
+        approved(1),
         { type: "plugins.stopped", attempt: 1 },
       ],
       restores: true,
@@ -280,6 +348,7 @@ describe("app lifecycle machine", () => {
       phase: "resuming",
       events: [
         { type: "restart.requested", keep, handoff, reply: reply() },
+        approved(1),
         { type: "plugins.stopped", attempt: 1 },
         { type: "handoff.failed", attempt: 1, error: "failed" },
       ],
