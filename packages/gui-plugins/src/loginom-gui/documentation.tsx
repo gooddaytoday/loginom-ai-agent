@@ -1,230 +1,101 @@
-import {
-  documentName,
-  documentationPermissions,
-  Runner,
-  waitForRunner,
-  type Format,
-} from "@loginom-ai-agent/loginom-host/runner-rpc"
-import { usePlugin, type ServerRef } from "@opencode/plugin/gui"
-import { createMemo, createResource, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js"
-import {
-  documentationPrompt,
-  formats,
-  historyResult,
-  type ChatAction,
-  type Content,
-  type Outcome,
-  type Run,
-} from "./documentation-run"
+import { documentName, type Format } from "@loginom-ai-agent/loginom-host/runner-rpc"
+import { createLatest, usePlugin } from "@opencode/plugin/gui"
+import { createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js"
+import { formats, type ChatAction } from "./documentation-run"
+import { documentationDriver } from "./documentation-driver"
+import { initial, view, type State } from "./documentation-machine"
 import type definition from "./index"
 
 const steps = ["docs.parameters", "docs.access", "docs.execution", "docs.result"] as const
+
 const stages = ["docs.prepare", "docs.extract", "docs.draft", "docs.save"] as const
+
 const contents = ["brief", "detailed", "custom"] as const
 
 export default function Documentation(props: { onChatAction: (action: ChatAction) => void }) {
   const ctx = usePlugin<typeof definition>()
   const Button = ctx.ui.Button
-  const [step, setStep] = createSignal(0)
-  const [path, setPath] = createSignal("")
-  const [selected, setSelected] = createSignal<Format[]>(["pdf"])
-  const [content, setContent] = createSignal<Content>("brief")
-  const [description, setDescription] = createSignal("")
-  const [choice, setChoice] = createSignal<string>()
-  const [run, setRun] = createSignal<Run>()
-  const [evidence, setEvidence] = createSignal<ReturnType<typeof historyResult>>()
-  const [outcome, setOutcome] = createSignal<Outcome>()
-  const [checking, setChecking] = createSignal(false)
-  const [stopping, setStopping] = createSignal(false)
-  const [pickFailed, setPickFailed] = createSignal(false)
-  const [openFailed, setOpenFailed] = createSignal(false)
-  const cancel = new AbortController()
-  onCleanup(() => cancel.abort())
+  const [state, write] = createSignal<State>(initial)
+  const wizard = createMemo(() => view(state()))
+  const { dispatch, start, stop, check, dispose } = documentationDriver(state, write)
+  onCleanup(dispose)
 
   const server = createMemo(() => {
     const servers = ctx.servers.list().flatMap((id) => ctx.servers.get(id) ?? [])
+
     if (ctx.desktop) return servers.find((item) => item.builtin)
+
     const serving = ctx.servers.get(location.origin)
     const local = servers.filter((item) => item.local)
+
     return serving ?? (local.length === 1 ? local[0] : undefined)
   })
-  const [models] = createResource(
-    () => server()?.client,
-    async (client) => {
-      const result = await client.model.list({ types: ["chat"] }, { signal: cancel.signal }).catch(() => undefined)
-      return result?.data ?? []
+
+  const models = createLatest(
+    () => wizard().step === 1 && server(),
+    async (target, signal) => {
+      const result = await target.client.model.list(
+        { types: ["chat"] },
+        { signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]) },
+      )
+
+      return { serverID: target.id, entries: result.data ?? [] }
     },
   )
-  const model = () => models()?.find((item) => modelKey(item) === choice())
-  const canContinue = () =>
-    /\.lgp$/i.test(path().trim()) && selected().length > 0 && (content() !== "custom" || !!description().trim())
-  const report = () => Array.from(evidence()?.files ?? [])
-  const activeStage = () => (!run() ? 0 : (evidence()?.stage ?? 1))
 
-  let admitted = false
-  let interrupting: Promise<void> | undefined
-  let attempt = 0
+  const options = () =>
+    models.latest?.serverID === server()?.id && !models.loading && !models.error ? models.latest?.entries : undefined
+
+  const model = () => options()?.find((item) => modelKey(item) === wizard().form.model)
 
   function modelKey(item: { providerID: string; id: string }) {
     return `${item.providerID}/${item.id}`
   }
 
-  function finish(result: Outcome) {
-    if (cancel.signal.aborted) return
-    setOutcome(result)
-    setStep(3)
-  }
-
   async function pick() {
+    const previous = state()
+    dispatch({ type: "pick" })
+
+    if (state() === previous) return
+
     try {
-      setPickFailed(false)
       const [filename] = (await ctx.desktop?.pick({ title: ctx.t("docs.pick"), extensions: ["lgp"] })) ?? []
-      if (filename) setPath(filename)
+      dispatch({ type: "picked", path: filename })
     } catch {
-      setPickFailed(true)
-    }
-  }
-
-  async function start() {
-    const target = server()
-    const chosen = model()
-    if (step() !== 1 || !target || !chosen || !canContinue()) return
-    const client = target.client
-    const request = { signal: cancel.signal }
-    const input = { path: path().trim(), formats: selected(), content: content(), description: description().trim() }
-    const current = ++attempt
-    admitted = false
-    interrupting = undefined
-    setRun(undefined)
-    setEvidence(undefined)
-    setOutcome(undefined)
-    setOpenFailed(false)
-    setStopping(false)
-    setStep(2)
-    let started: Run | undefined
-    let submitted = false
-    try {
-      const runner = client.rpc(Runner)
-      await waitForRunner(() => runner.ready({}, request), cancel.signal)
-      if (stopping()) return finish("stopped")
-      const prepared = await runner.prepareDocumentation({ packagePath: input.path }, request)
-      if (stopping()) return finish("stopped")
-      const session = await client.session.create(
-        {
-          title: ctx.t("docs.title"),
-          agent: "build",
-          location: { directory: prepared.directory },
-          model: { id: chosen.id, providerID: chosen.providerID },
-          permissions: documentationPermissions(prepared.filename, input.formats),
-        },
-        request,
-      )
-      started = { ...prepared, server: target.id, sessionID: session.id, formats: input.formats }
-      setRun(started)
-      const targetOptions = { ...request, location: { directory: prepared.directory } }
-      await waitForRunner(() => runner.ready({}, targetOptions), cancel.signal)
-      if (stopping()) return finish("stopped")
-      submitted = true
-      const result = await runner.start(
-        {
-          sessionID: session.id,
-          profile: "package-docs",
-          documentationFile: prepared.filename,
-          customDocumentation: input.content === "custom",
-          text: documentationPrompt(prepared.filename, input.formats, input.content, input.description),
-        },
-        targetOptions,
-      )
-      if (!result.granted) return finish("failed")
-      admitted = true
-      if (stopping()) await stop()
-      if (step() !== 2) return
-      await observe(target, started, current)
-    } catch {
-      if (current === attempt) finish(submitted ? "unknown" : stopping() ? "stopped" : "failed")
-    }
-  }
-
-  async function observe(target: ServerRef, started: Run, current: number) {
-    const client = target.client
-    const input = { sessionID: started.sessionID }
-    const options = { signal: cancel.signal }
-    const refresh = async () => historyResult(started, await client.session.context(input, options))
-    const progress = setInterval(() => {
-      void refresh()
-        .then((value) => {
-          if (current === attempt && step() === 2) setEvidence(value)
-        })
-        .catch(() => undefined)
-    }, 1500)
-    try {
-      await client.experimental.session.wait(input, options)
-      const value = await refresh()
-      if (current !== attempt) return
-      setEvidence(value)
-      finish(value.outcome)
-    } finally {
-      clearInterval(progress)
-    }
-  }
-
-  async function stop() {
-    if (step() !== 2) return
-    setStopping(true)
-    const started = run()
-    if (!admitted || !started) return
-    const current = attempt
-    interrupting ??= (async () => {
-      try {
-        const target = ctx.servers.get(started.server)
-        if (!target) throw new Error("Unavailable")
-        await target.client.session.interrupt(
-          { sessionID: started.sessionID, resume: false },
-          { signal: cancel.signal },
-        )
-      } catch {
-        if (current === attempt && step() === 2) finish("unknown")
-      }
-    })()
-    await interrupting
-  }
-
-  async function checkState() {
-    const started = run()
-    const target = started && ctx.servers.get(started.server)
-    if (!started || !target || checking()) return
-    setChecking(true)
-    const current = ++attempt
-    try {
-      await observe(target, started, current)
-    } catch {
-      finish("unknown")
-    } finally {
-      setChecking(false)
+      dispatch({ type: "picked", error: true })
     }
   }
 
   function conversation(discuss = false) {
-    const started = run()
-    if (!started) return
-    if (discuss)
+    const run = wizard().run
+
+    if (!run) return
+
+    if (discuss) {
       props.onChatAction({
-        ...started,
+        ...run,
         kind: "discuss",
-        files: report().map(([format]) => documentName(started.filename, format)),
+        files: wizard().files.map(([format]) => documentName(run.filename, format)),
       })
-    ctx.tabs.open({ server: started.server, id: started.sessionID }, { focus: true })
+    }
+
+    ctx.tabs.open({ server: run.server, id: run.sessionID }, { focus: true })
   }
 
-  function openReport(format: Format, file: string) {
-    setOpenFailed(false)
+  async function openReport(format: Format, file: string) {
+    const current = state()
+
+    if (current.kind !== "result" || !current.run) return
+
+    dispatch({ type: "open", attempt: current.attempt })
+
     if (ctx.desktop) {
-      void ctx.desktop.launch(file).catch(() => setOpenFailed(true))
+      await ctx.desktop.launch(file).catch(() => dispatch({ type: "open", attempt: current.attempt, error: true }))
+
       return
     }
-    const started = run()
-    if (!started) return
-    props.onChatAction({ ...started, kind: "preview", file: documentName(started.filename, format) })
+
+    props.onChatAction({ ...current.run, kind: "preview", file: documentName(current.run.filename, format) })
     conversation()
   }
 
@@ -237,9 +108,9 @@ export default function Documentation(props: { onChatAction: (action: ChatAction
           <For each={steps}>
             {(label, index) => (
               <li
-                aria-current={step() === index() ? "step" : undefined}
+                aria-current={wizard().step === index() ? "step" : undefined}
                 class="rounded-md border border-border-weak-base px-2 py-2"
-                classList={{ "bg-surface-base-hover font-semibold": step() === index() }}
+                classList={{ "bg-surface-base-hover font-semibold": wizard().step === index() }}
               >
                 {index() + 1}. {ctx.t(label)}
               </li>
@@ -248,13 +119,13 @@ export default function Documentation(props: { onChatAction: (action: ChatAction
         </ol>
         <div class="mt-5 flex flex-col gap-5 rounded-lg border border-border-weak-base p-4 sm:p-5">
           <Switch>
-            <Match when={step() === 0}>
+            <Match when={wizard().step === 0}>
               <label class="flex flex-col gap-2">
                 {ctx.t("docs.package")}
                 <input
                   class="rounded border border-border-base bg-background-base p-2"
-                  value={path()}
-                  onInput={(event) => setPath(event.currentTarget.value)}
+                  value={wizard().form.path}
+                  onInput={(event) => dispatch({ type: "edit", form: { path: event.currentTarget.value } })}
                   placeholder={ctx.t("docs.pathHint")}
                 />
               </label>
@@ -263,7 +134,7 @@ export default function Documentation(props: { onChatAction: (action: ChatAction
                   <Button onClick={pick}>{ctx.t("docs.pick")}</Button>
                 </div>
               </Show>
-              <Show when={pickFailed()}>
+              <Show when={wizard().pickFailed}>
                 <p role="alert">{ctx.t("docs.pickFailed")}</p>
               </Show>
               <fieldset class="flex flex-wrap gap-4">
@@ -273,11 +144,16 @@ export default function Documentation(props: { onChatAction: (action: ChatAction
                     <label class="flex items-center gap-2">
                       <input
                         type="checkbox"
-                        checked={selected().includes(format)}
+                        checked={wizard().form.formats.includes(format)}
                         onChange={(event) =>
-                          setSelected((items) =>
-                            event.currentTarget.checked ? [...items, format] : items.filter((item) => item !== format),
-                          )
+                          dispatch({
+                            type: "edit",
+                            form: {
+                              formats: event.currentTarget.checked
+                                ? [...wizard().form.formats, format]
+                                : wizard().form.formats.filter((item) => item !== format),
+                            },
+                          })
                         }
                       />
                       {ctx.t(`docs.${format}`)}
@@ -293,27 +169,27 @@ export default function Documentation(props: { onChatAction: (action: ChatAction
                       <input
                         type="radio"
                         name="documentation-content"
-                        checked={content() === item}
-                        onChange={() => setContent(item)}
+                        checked={wizard().form.content === item}
+                        onChange={() => dispatch({ type: "edit", form: { content: item } })}
                       />
                       {ctx.t(`docs.${item}`)}
                     </label>
                   )}
                 </For>
               </fieldset>
-              <Show when={content() === "custom"}>
+              <Show when={wizard().form.content === "custom"}>
                 <label class="flex flex-col gap-2">
                   {ctx.t("docs.customLabel")}
                   <textarea
                     class="rounded border border-border-base bg-background-base p-2"
                     rows="3"
-                    value={description()}
-                    onInput={(event) => setDescription(event.currentTarget.value)}
+                    value={wizard().form.description}
+                    onInput={(event) => dispatch({ type: "edit", form: { description: event.currentTarget.value } })}
                   />
                 </label>
               </Show>
             </Match>
-            <Match when={step() === 1}>
+            <Match when={wizard().step === 1}>
               <p>{ctx.t("docs.oneRun")}</p>
               <div class="rounded-md bg-surface-base-hover p-3">
                 <h2 class="font-semibold">{ctx.t("docs.app")}</h2>
@@ -331,20 +207,20 @@ export default function Documentation(props: { onChatAction: (action: ChatAction
               </div>
               <div class="rounded-md border border-border-warning-base p-3">
                 <h2 class="font-semibold">{ctx.t("docs.modelSees")}</h2>
-                <p>{ctx.t(content() === "custom" ? "docs.modelCustom" : "docs.modelBody")}</p>
+                <p>{ctx.t(wizard().form.content === "custom" ? "docs.modelCustom" : "docs.modelBody")}</p>
                 <label class="mt-2 flex flex-col gap-2">
                   {ctx.t("docs.model")}
                   <select
                     class="rounded border border-border-base bg-background-base p-2"
-                    value={choice() ?? ""}
-                    onChange={(event) => setChoice(event.currentTarget.value)}
+                    value={wizard().form.model}
+                    onChange={(event) => dispatch({ type: "edit", form: { model: event.currentTarget.value } })}
                   >
                     <option value="" disabled>
                       {ctx.t(
-                        models.loading ? "docs.modelLoading" : models()?.length ? "docs.chooseModel" : "docs.noModel",
+                        models.loading ? "docs.modelLoading" : options()?.length ? "docs.chooseModel" : "docs.noModel",
                       )}
                     </option>
-                    <For each={models()}>
+                    <For each={options()}>
                       {(item) => (
                         <option value={modelKey(item)}>
                           {item.name} · {item.providerID}
@@ -356,38 +232,40 @@ export default function Documentation(props: { onChatAction: (action: ChatAction
                 <p class="mt-2">{ctx.t("docs.modelLocation")}</p>
               </div>
             </Match>
-            <Match when={step() === 2}>
+            <Match when={wizard().step === 2}>
               <ol class="flex flex-col gap-2" aria-label={ctx.t("docs.execution")}>
                 <For each={stages}>
                   {(label, index) => (
-                    <li aria-current={index() === activeStage() ? "step" : undefined}>
-                      {index() < activeStage() ? "✓" : `${index() + 1}.`} {ctx.t(label)}
+                    <li aria-current={index() === wizard().stage ? "step" : undefined}>
+                      {index() < wizard().stage ? "✓" : `${index() + 1}.`} {ctx.t(label)}
                     </li>
                   )}
                 </For>
               </ol>
               <details>
                 <summary>{ctx.t("docs.details")}</summary>
-                <Show when={run()}>
+                <Show when={wizard().run}>
                   <Button onClick={() => conversation()}>{ctx.t("docs.fullChat")}</Button>
                 </Show>
-                <p>{ctx.t(stages[activeStage()] ?? "docs.prepare")}</p>
+                <p>{ctx.t(stages[wizard().stage] ?? "docs.prepare")}</p>
               </details>
-              <p aria-live="polite">{ctx.t(stopping() ? "docs.stopping" : "docs.stopHint")}</p>
+              <p aria-live="polite">{ctx.t(wizard().stopping ? "docs.stopping" : "docs.stopHint")}</p>
             </Match>
-            <Match when={outcome()}>
+            <Match when={wizard().outcome}>
               {(result) => (
                 <div class="flex flex-col gap-3" role="status">
                   <h2 class="text-16-medium">{ctx.t(`docs.${result()}`)}</h2>
-                  <p>{ctx.t(`docs.${result()}Body`)}</p>
+                  <p>
+                    {ctx.t(result() === "stopped" && !wizard().run ? "docs.stoppedBeforeRun" : `docs.${result()}Body`)}
+                  </p>
                   <h3 class="font-semibold">{ctx.t("docs.checked")}</h3>
-                  <Show when={run()}>
+                  <Show when={wizard().run}>
                     <p>{ctx.t("docs.copyChecked")}</p>
                   </Show>
-                  <Show when={report().length > 0} fallback={<p>{ctx.t("docs.noFiles")}</p>}>
-                    <p>{ctx.t("docs.filesChecked")}</p>
+                  <Show when={wizard().files.length > 0} fallback={<p>{ctx.t("docs.noFiles")}</p>}>
+                    <p>{ctx.t(wizard().form.content === "custom" ? "docs.customChecked" : "docs.filesChecked")}</p>
                     <ul class="flex flex-col gap-2">
-                      <For each={report()}>
+                      <For each={wizard().files}>
                         {([format, file]) => (
                           <li class="break-all rounded-md border border-border-weak-base p-2">
                             <div>
@@ -398,7 +276,7 @@ export default function Documentation(props: { onChatAction: (action: ChatAction
                         )}
                       </For>
                     </ul>
-                    <Show when={openFailed()}>
+                    <Show when={wizard().openFailed}>
                       <p role="alert">{ctx.t("docs.openFailed")}</p>
                     </Show>
                   </Show>
@@ -410,34 +288,47 @@ export default function Documentation(props: { onChatAction: (action: ChatAction
       </div>
       <footer class="flex shrink-0 flex-wrap justify-end gap-2 border-t border-border-weak-base bg-background-base px-4 py-3 sm:px-8">
         <Switch>
-          <Match when={step() === 0}>
-            <Button variant="contrast" disabled={!canContinue()} onClick={() => setStep(1)}>
+          <Match when={wizard().step === 0}>
+            <Button variant="contrast" disabled={!wizard().canContinue} onClick={() => dispatch({ type: "next" })}>
               {ctx.t("docs.next")}
             </Button>
           </Match>
-          <Match when={step() === 1}>
-            <Button onClick={() => setStep(0)}>{ctx.t("docs.back")}</Button>
-            <Button variant="contrast" disabled={!model() || !server()} onClick={start}>
+          <Match when={wizard().step === 1}>
+            <Button onClick={() => dispatch({ type: "back" })}>{ctx.t("docs.back")}</Button>
+            <Button
+              variant="contrast"
+              disabled={!model() || !server()}
+              onClick={() => {
+                const target = server()
+                const chosen = model()
+
+                if (target && chosen) void start(target, chosen, ctx.t("docs.title"))
+              }}
+            >
               {ctx.t("docs.start")}
             </Button>
           </Match>
-          <Match when={step() === 2}>
-            <Button onClick={stop} disabled={stopping()}>
+          <Match when={wizard().step === 2}>
+            <Button onClick={() => stop((id) => ctx.servers.get(id))} disabled={wizard().stopping}>
               {ctx.t("docs.stop")}
             </Button>
           </Match>
-          <Match when={step() === 3}>
-            <Show when={run()}>
-              <Button onClick={() => conversation(outcome() === "ready")}>
-                {ctx.t(outcome() === "ready" ? "docs.discuss" : "docs.fullChat")}
+          <Match when={wizard().step === 3}>
+            <Show when={wizard().run}>
+              <Button onClick={() => conversation(wizard().outcome === "ready")}>
+                {ctx.t(wizard().outcome === "ready" ? "docs.discuss" : "docs.fullChat")}
               </Button>
             </Show>
             <Show
-              when={outcome() === "unknown"}
-              fallback={<Button onClick={() => setStep(0)}>{ctx.t("docs.again")}</Button>}
+              when={wizard().outcome === "unknown"}
+              fallback={<Button onClick={() => dispatch({ type: "again" })}>{ctx.t("docs.again")}</Button>}
             >
-              <Button variant="contrast" disabled={checking()} onClick={checkState}>
-                {ctx.t(checking() ? "docs.checking" : "docs.checkState")}
+              <Button
+                variant="contrast"
+                disabled={wizard().checking || !wizard().run}
+                onClick={() => check((id) => ctx.servers.get(id))}
+              >
+                {ctx.t(wizard().checking ? "docs.checking" : "docs.checkState")}
               </Button>
             </Show>
           </Match>

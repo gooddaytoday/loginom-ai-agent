@@ -235,6 +235,7 @@ const boot = Effect.gen(function* () {
     })
   return {
     dir,
+    llm,
     sessions,
     model: model.ref,
     client: OpenCode.make({
@@ -317,7 +318,7 @@ const withScript = <A, E, R>(content: string | undefined, body: Effect.Effect<A,
 
 describe("package_docs_run (B2.5c)", () => {
   it.live(
-    "the documentation wizard publishes its custom report with a scripted model and cannot edit the package",
+    "the documentation wizard publishes reports, discards unused copies and stops admitted runs",
     () =>
       Effect.gen(function* () {
         const home = (yield* tmpdirScoped("loginom-documentation-wizard-")).path
@@ -344,6 +345,7 @@ describe("package_docs_run (B2.5c)", () => {
           test.client.rpc(Runner).prepareDocumentation({ packagePath: fixture }, { location: { directory: test.dir } }),
         )
         const location = { directory: prepared.directory }
+        yield* Effect.promise(() => waitForRunner(() => test.client.rpc(Runner).ready({}, { location })))
         const copy = path.join(prepared.directory, prepared.filename)
         const hash = createHash("sha256").update(copy).digest("hex").slice(0, 8)
         const report = `# Памятка для коллеги\n\nПроверьте входные данные.\n`
@@ -356,7 +358,6 @@ describe("package_docs_run (B2.5c)", () => {
             permissions: documentationPermissions(prepared.filename, ["md"]),
           }),
         )
-        yield* Effect.promise(() => waitForRunner(() => test.client.rpc(Runner).ready({}, { location })))
         const result = yield* Effect.promise(() =>
           test.client.rpc(Runner).start(
             {
@@ -395,6 +396,51 @@ describe("package_docs_run (B2.5c)", () => {
         expect(yield* Effect.promise(() => fs.readFile(copy))).toEqual(
           yield* Effect.promise(() => fs.readFile(fixture)),
         )
+        expect((yield* test.llm.requests()).find((request) => request.tools.some((tool) => tool.name === "package_docs_run"))?.tools)
+          .not.toContainEqual(expect.objectContaining({ name: "question" }))
+
+        yield* Effect.promise(() =>
+          test.client.rpc(Runner).finishDocumentation({ directory: prepared.directory, keep: true }, { location: { directory: test.dir } }),
+        )
+        const unused = yield* Effect.promise(() =>
+          test.client.rpc(Runner).prepareDocumentation({ packagePath: fixture }, { location: { directory: test.dir } }),
+        )
+        yield* Effect.promise(() =>
+          test.client.rpc(Runner).finishDocumentation({ directory: unused.directory, keep: false }, { location: { directory: test.dir } }),
+        )
+        expect(yield* Effect.promise(() => fs.stat(unused.directory).then(() => true, () => false))).toBe(false)
+
+        const second = yield* Effect.promise(() =>
+          test.client.session.create({
+            title: "Остановить документирование",
+            agent: "build",
+            model: test.model,
+            location,
+            permissions: documentationPermissions(prepared.filename, ["pdf"]),
+          }),
+        )
+        const gate = yield* test.llm.gate()
+        yield* Effect.promise(() =>
+          test.client.rpc(Runner).start(
+            {
+              sessionID: second.id,
+              profile: "package-docs",
+              documentationFile: prepared.filename,
+              text: script({ tool: "package_docs_run", input: { operation: "emit", lgp: prepared.filename } }),
+            },
+            { location },
+          ),
+        )
+        yield* gate.started
+        const interrupted = yield* Effect.promise(() =>
+          test.client.session.interrupt({ sessionID: second.id, resume: false }),
+        )
+        expect(interrupted.interrupted).toBe(true)
+        yield* gate.release
+        yield* Effect.promise(() => test.client.experimental.session.wait({ sessionID: second.id }))
+        const stopped = yield* Effect.promise(() => test.client.session.context({ sessionID: second.id }))
+        expect(stopped.at(-1)).toMatchObject({ type: "idle", outcome: "interrupted" })
+        expect(yield* Effect.promise(() => fs.readdir(prepared.directory))).not.toContain("demo — описание.pdf")
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )

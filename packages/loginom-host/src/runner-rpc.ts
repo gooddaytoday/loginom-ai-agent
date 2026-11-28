@@ -32,6 +32,10 @@ export const Runner = Rpc.define({
       input: standard(Schema.Struct({ packagePath: Schema.String })),
       output: standard(Schema.Struct({ directory: Schema.String, filename: Schema.String })),
     },
+    finishDocumentation: {
+      input: standard(Schema.Struct({ directory: Schema.String, keep: Schema.Boolean })),
+      output: standard(Schema.Struct({})),
+    },
     start: {
       input: standard(
         Schema.Struct({

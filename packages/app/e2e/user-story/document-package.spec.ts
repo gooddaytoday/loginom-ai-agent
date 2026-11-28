@@ -5,8 +5,35 @@ async function open(page: Page, mode: Parameters<typeof mockDocumentPackage>[1])
   const fixture = await mockDocumentPackage(page, mode)
   await page.goto("/page/loginom-gui/document-package")
   await expect(page.getByRole("heading", { name: "Документировать пакет" })).toBeVisible()
+
   return fixture
 }
+
+test("the wizard leaves execution when the server silently stops responding", async ({ page }) => {
+  await page.addInitScript(() => {
+    const native = AbortSignal.timeout
+    AbortSignal.timeout = (milliseconds) => native(milliseconds === 300_000 ? 1_000 : milliseconds)
+  })
+  await open(page, "timeout")
+  await access(page)
+  await page.getByRole("button", { name: "Разрешить и запустить" }).click()
+  await expect(page.getByRole("heading", { name: "Нужно проверить состояние" })).toBeVisible()
+  await page.getByRole("button", { name: "Проверить состояние", exact: true }).click()
+  await expect(page.getByRole("heading", { name: "Готово", exact: true })).toBeVisible()
+})
+
+test("stopping before admission removes the unused session and package copy", async ({ page }) => {
+  const fixture = await open(page, "cancel-before-start")
+  await access(page)
+  await page.getByRole("button", { name: "Разрешить и запустить" }).click()
+  await fixture.creating
+  await page.getByRole("button", { name: "Остановить", exact: true }).click()
+  fixture.release()
+  await expect(page.getByRole("heading", { name: "Запуск остановлен" })).toBeVisible()
+  await fixture.removed
+  expect(await fixture.copyFinished).toMatchObject({ input: { keep: false } })
+  await expect(page.getByRole("button", { name: "Открыть полный разговор" })).toHaveCount(0)
+})
 
 async function access(page: Page) {
   await expect(page.getByRole("button", { name: "Далее" })).toBeDisabled()
@@ -65,18 +92,23 @@ for (const [mode, label] of [
 ] as const) {
   test(label, async ({ page }) => {
     const fixture = await open(page, mode)
+
     if (mode === "unconfirmed") {
       await page.getByRole("checkbox", { name: "Word" }).check()
       await page.getByRole("checkbox", { name: "Markdown" }).check()
     }
+
     await access(page)
     await page.getByRole("button", { name: "Разрешить и запустить" }).click()
+
     if (mode === "stopped") {
       await fixture.admitted
       await page.getByRole("button", { name: "Остановить", exact: true }).click()
       expect(await fixture.stopped).toBe("false")
     }
+
     await expect(page.getByRole("heading", { name: label, exact: true })).toBeVisible()
+
     if (mode === "unknown") {
       await expect(page.getByRole("button", { name: "Запустить ещё раз" })).toHaveCount(0)
       await page.getByRole("button", { name: "Проверить состояние", exact: true }).click()

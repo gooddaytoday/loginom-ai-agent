@@ -87,11 +87,14 @@ export default {
   "docs.failed": "Could not finish",
   "docs.failedBody": "No documents were created. Check the package path and model settings before trying again.",
   "docs.stopped": "Run stopped",
+  "docs.stoppedBeforeRun": "The agent did not start. The app discarded any temporary package copy and did not keep a conversation.",
   "docs.stoppedBody": "Previously saved documents were not removed. You can see what the agent completed.",
   "docs.checked": "What the app verified",
   "docs.copyChecked": "The app prepared a local copy for this conversation.",
   "docs.filesChecked":
     "The generator validated the draft and checked these files when it saved them. The app did not review the document content.",
+  "docs.customChecked":
+    "The generator checked that the draft was not empty and confirmed these files were saved. The app did not review the document content.",
   "docs.noFiles": "No confirmed files.",
   "docs.open": "Open",
   "docs.openFailed": "Could not open the document. Check that the file is still there.",

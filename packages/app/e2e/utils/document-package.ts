@@ -1,43 +1,90 @@
 import type { Page } from "@playwright/test"
+import { Match } from "effect"
 import { mockWorkspace } from "./workspace"
 
 const directory = "/fixture/Documents/Loginom AI Agent/Без проекта/Запуск"
+
 export const filename = "Учебный.lgp"
+
 export const sessionID = "ses_documentation_wizard"
+
 export const output = `${directory}/Учебный — описание.pdf`
+
 const model = { id: "test-model", modelID: "test-model", providerID: "test", name: "Test Model" }
 
 export async function mockDocumentPackage(
   page: Page,
-  mode: "ready" | "unconfirmed" | "unknown" | "failed" | "stopped",
+  mode: "ready" | "unconfirmed" | "unknown" | "failed" | "stopped" | "timeout" | "cancel-before-start",
 ) {
   await mockWorkspace(page, { name: "Documentation", seed: { locale: "ru" } })
   const admitted = Promise.withResolvers<unknown>()
   const stopped = Promise.withResolvers<unknown>()
+  const creating = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  const removed = Promise.withResolvers<void>()
+  const copyFinished = Promise.withResolvers<unknown>()
+  const waitRelease = Promise.withResolvers<void>()
   let waitCalls = 0
   await page.route(/\/api\/model(?:\?|$)/, (route) => route.fulfill({ json: { data: [model] } }))
   await page.route(/\/api\/rpc\/loginom\.runner\/ready(?:\?|$)/, (route) => route.fulfill({ json: { output: {} } }))
   await page.route(/\/api\/rpc\/loginom\.runner\/prepareDocumentation(?:\?|$)/, (route) =>
     route.fulfill({ json: { output: { directory, filename } } }),
   )
-  await page.route(/\/api\/session$/, (route) =>
-    route.request().method() === "POST" ? route.fulfill({ json: { data: { id: sessionID } } }) : route.fallback(),
-  )
+  await page.route(/\/api\/session$/, async (route) => {
+    if (route.request().method() !== "POST") return route.fallback()
+
+    if (mode === "cancel-before-start") {
+      creating.resolve()
+      await release.promise
+    }
+
+    return route.fulfill({ json: { data: { id: sessionID } } })
+  })
+  await page.route(new RegExp(`/api/session/${sessionID}(?:\\?|$)`), (route) => {
+    if (route.request().method() !== "DELETE") return route.fallback()
+
+    removed.resolve()
+
+    return route.fulfill({ status: 204 })
+  })
+  await page.route(/\/api\/rpc\/loginom\.runner\/finishDocumentation(?:\?|$)/, (route) => {
+    copyFinished.resolve(route.request().postDataJSON())
+
+    return route.fulfill({ json: { output: {} } })
+  })
   await page.route(/\/api\/rpc\/loginom\.runner\/start(?:\?|$)/, (route) => {
     admitted.resolve(route.request().postDataJSON())
+
     return route.fulfill({ json: { output: { granted: true } } })
   })
   await page.route(`**/api/experimental/session/${sessionID}/wait`, async (route) => {
-    if (mode === "unknown" && ++waitCalls === 1) return route.abort()
+    waitCalls += 1
+
+    if (mode === "unknown" && waitCalls === 1) return route.abort()
+
+    if (mode === "timeout") {
+      if (waitCalls === 1) await waitRelease.promise
+      else waitRelease.resolve()
+    }
+
     if (mode === "stopped") await stopped.promise
+
     return route.fulfill({ status: 204 })
   })
   await page.route(new RegExp(`/api/session/${sessionID}/interrupt(?:\\?|$)`), (route) => {
     stopped.resolve(new URL(route.request().url()).searchParams.get("resume"))
+
     return route.fulfill({ json: { interrupted: true } })
   })
   await page.route(`**/api/session/${sessionID}/context`, (route) => {
-    const complete = mode === "ready" || mode === "unknown" || mode === "unconfirmed"
+    const complete = mode === "ready" || mode === "unknown" || mode === "unconfirmed" || mode === "timeout"
+
+    const outcome = Match.value(mode).pipe(
+      Match.when("stopped", () => "interrupted"),
+      Match.when("failed", () => "failed"),
+      Match.orElse(() => "succeeded"),
+    )
+
     const assistant = {
       type: "assistant",
       content: [
@@ -58,14 +105,20 @@ export async function mockDocumentPackage(
           : []),
       ],
     }
+
     return route.fulfill({
       json: {
-        data: [
-          ...(mode === "failed" ? [] : [assistant]),
-          { type: "idle", outcome: mode === "stopped" ? "interrupted" : mode === "failed" ? "failed" : "succeeded" },
-        ],
+        data: [...(mode === "failed" ? [] : [assistant]), { type: "idle", outcome }],
       },
     })
   })
-  return { admitted: admitted.promise, stopped: stopped.promise }
+
+  return {
+    admitted: admitted.promise,
+    stopped: stopped.promise,
+    creating: creating.promise,
+    release: release.resolve,
+    removed: removed.promise,
+    copyFinished: copyFinished.promise,
+  }
 }

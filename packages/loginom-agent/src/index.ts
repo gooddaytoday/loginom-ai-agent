@@ -17,7 +17,7 @@ import { Dashboard } from "./dashboard"
 import { DashboardTarget } from "./dashboard-target"
 import { dashboardTools } from "./dashboard-tools"
 import { dockTools } from "./dock"
-import { prepareDocumentation } from "./documentation-run"
+import { discardDocumentation, prepareDocumentation } from "./documentation-run"
 import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
@@ -497,9 +497,21 @@ export default Plugin.define({
       await binding.fork(event.sessionID)
     })
 
+    const copies = new Map<string, Awaited<ReturnType<typeof prepareDocumentation>>>()
     await ctx.rpc.register(Runner, {
       ready: async () => ({}),
-      prepareDocumentation: ({ packagePath }) => prepareDocumentation(packagePath),
+      prepareDocumentation: async ({ packagePath }, call) => {
+        const copy = await prepareDocumentation(packagePath, undefined, call.signal)
+        copies.set(copy.directory, copy)
+        return copy
+      },
+      finishDocumentation: async ({ directory, keep }) => {
+        const copy = copies.get(directory)
+        if (!copy) throw new Error("PACKAGE_DOCS_COPY_NOT_OWNED")
+        if (!keep) await discardDocumentation(copy)
+        copies.delete(directory)
+        return {}
+      },
       start: async (input) => {
         if (
           input.documentationFile &&
