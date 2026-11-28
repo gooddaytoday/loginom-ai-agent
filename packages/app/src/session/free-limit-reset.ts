@@ -6,6 +6,7 @@ import { makeEventListener } from "@solid-primitives/event-listener"
 import { Persistence } from "@/runtime/persistence/schema"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import type { ServerScope } from "@/runtime/server/scope"
+import { transitionUnresolvedLimit, unresolvedLimitInitial } from "./free-limit-machine"
 
 const MAX_RETRY_AFTER_MS = 45 * 86_400_000
 
@@ -28,6 +29,7 @@ const Unresolved = Schema.Struct({
 const Entry = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("model"), refusal: Refusal }),
   Schema.Struct({ kind: Schema.Literal("unresolved"), failure: Unresolved }),
+  Schema.Struct({ kind: Schema.Literal("released") }),
 ])
 
 type LimitEntry = typeof Entry.Type
@@ -35,6 +37,8 @@ type LimitEntry = typeof Entry.Type
 const EntryJson = Schema.fromJsonString(Entry)
 const decodeEntry = Schema.decodeUnknownOption(EntryJson)
 const encodeEntry = Schema.encodeSync(EntryJson)
+
+const failureResetAt = (failure: typeof Unresolved.Type) => limitResetAt(failure.failedAt, failure.retryAfterMs)
 
 // When a usage limit resets, or undefined when the refusal's delay is missing or out of range.
 export function limitResetAt(created: number, retryAfterMs: number | undefined) {
@@ -90,11 +94,36 @@ export function createFreeModelLimits(scope: ServerScope) {
   } catch {}
 
   const [entries, setEntry] = createStore(initial)
-  const unresolved = createMemo(() =>
-    Object.values(entries).flatMap((entry) => (entry?.kind === "unresolved" ? [entry.failure] : [])),
-  )
   const clock = createLimitClock(() =>
-    Object.values(entries).map((entry) => (entry?.kind === "model" ? (entry.refusal.resetAt ?? undefined) : undefined)),
+    Object.values(entries).map((entry) => {
+      if (entry?.kind === "model") return entry.refusal.resetAt ?? undefined
+
+      if (entry?.kind === "unresolved") return failureResetAt(entry.failure)
+    }),
+  )
+  const unresolved = createMemo(() => {
+    const now = Math.max(clock(), Date.now())
+
+    return Object.values(entries).flatMap((entry) => {
+      if (entry?.kind !== "unresolved") return []
+
+      const state = transitionUnresolvedLimit(unresolvedLimitInitial, {
+        type: "clock",
+        now,
+        resetAt: failureResetAt(entry.failure),
+      })
+
+      return state.type === "checking" ? [entry.failure] : []
+    })
+  })
+  const canRetryUnresolved = createMemo(
+    () =>
+      unresolved().length > 0 &&
+      unresolved().every(
+        (failure) =>
+          transitionUnresolvedLimit(unresolvedLimitInitial, { type: "retry", resetAt: failureResetAt(failure) })
+            .type === "released",
+      ),
   )
 
   makeEventListener(window, "storage", (event) => {
@@ -157,6 +186,11 @@ export function createFreeModelLimits(scope: ServerScope) {
     failedAt: number,
     retryAfterMs?: number,
   ) {
+    const pendingKey = unresolvedKey(message.id)
+    const persistedPending = read(pendingKey)
+
+    if ((persistedPending ?? untrack(() => entries[pendingKey]))?.kind === "released") return true
+
     const key = modelKey(message.model)
 
     const refusal = {
@@ -167,14 +201,18 @@ export function createFreeModelLimits(scope: ServerScope) {
     }
 
     const saved = record(key, refusal)
-    const pendingKey = unresolvedKey(message.id)
-    const persistedPending = read(pendingKey)
 
     // Keep the connection-wide block recoverable when the model entry could not be saved.
     if (persistedPending && !saved) return false
     if (persistedPending || untrack(() => entries[pendingKey])) return write(pendingKey, undefined)
 
     return true
+  }
+
+  function releaseUnresolved(failure: typeof Unresolved.Type) {
+    const key = unresolvedKey(failure.messageID)
+
+    if ((read(key) ?? untrack(() => entries[key]))?.kind === "unresolved") write(key, { kind: "released" })
   }
 
   function limit(model: ModelRef) {
@@ -190,6 +228,15 @@ export function createFreeModelLimits(scope: ServerScope) {
     remember,
     limit,
     unresolved,
+    releaseUnresolved,
+    canRetryUnresolved,
+    allowUnresolvedRetry() {
+      if (!ready() || !canRetryUnresolved()) return false
+
+      for (const failure of unresolved()) releaseUnresolved(failure)
+
+      return true
+    },
     canSend: (model: ModelRef | undefined) => ready() && !unresolved().length && (!model || !limit(model)),
     rememberUnresolved(failure: typeof Unresolved.Type) {
       const key = unresolvedKey(failure.messageID)

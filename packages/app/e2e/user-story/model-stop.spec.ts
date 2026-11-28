@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 import type { OpenCodeEvent, SessionMessageAssistant, SessionMessageInfo } from "@opencode/client/promise"
-import { provider, seed, sessionHref } from "../utils/app"
+import { holdRoute, provider, seed, sessionHref } from "../utils/app"
 import { openSession } from "../utils/workspace"
 
 test.use({ locale: "ru-RU", timezoneId: "UTC", video: "off" })
@@ -264,9 +264,8 @@ test("blocks both sends after a model hits its daily limit in an unopened conver
   await expect(warning).toBeVisible()
   const draft = "Подготовь отчёт по таблице"
   await view.editor.fill(draft)
+  await expect(page.locator('[data-action="composer-submit"]')).toBeDisabled()
   await view.editor.press("Enter")
-  await expect(view.editor).toHaveText(draft)
-  await page.locator('[data-action="composer-submit"]').click()
   await expect(view.editor).toHaveText(draft)
   expect(prompts).toEqual([])
 
@@ -298,6 +297,7 @@ test("blocks both sends after a model hits its daily limit in an unopened conver
   await page.keyboard.press("Escape")
   await expect(dialog).toHaveCount(0)
   await expect(warning).toHaveCount(0)
+  await expect(page.locator('[data-action="composer-submit"]')).toBeEnabled()
   await view.editor.press("Enter")
   await expect.poll(() => prompts).toEqual([{ sessionID, text: draft }])
   await expect(view.editor).toHaveText("")
@@ -460,6 +460,7 @@ test("keeps an unidentified limit through failed lookups and a reload", async ({
   await expect(warning).toBeVisible()
   const draft = "Построй график"
   await view.editor.fill(draft)
+  await expect(page.locator('[data-action="composer-submit"]')).toBeDisabled()
   await view.editor.press("Enter")
   await expect(view.editor).toHaveText(draft)
   expect(prompts).toEqual([])
@@ -479,6 +480,83 @@ test("keeps an unidentified limit through failed lookups and a reload", async ({
   await view.editor.press("Enter")
   await expect.poll(() => prompts).toEqual([draft])
 })
+
+for (const release of ["reset", "deletion", "retry"] as const) {
+  test(`releases an unidentified daily limit after ${release}`, async ({ page }, testInfo) => {
+    if (release === "retry") await page.setViewportSize(narrowViewport)
+
+    const now = new Date("2026-11-27T02:00:00Z")
+    if (release === "reset") await page.clock.install({ time: now })
+    const directory = "C:/OpenCode/Unidentified limit release"
+    const otherSession = "ses_unidentified_release"
+    const failure = freeLimitFailure({
+      sessionID: otherSession,
+      directory,
+      messageID: "msg_unidentified_release",
+      model,
+      time: now.getTime(),
+      retryAfterMs: release === "reset" ? 3_600_000 : undefined,
+    })
+    const prompts: unknown[] = []
+    const view = await openSession(page, {
+      name: "Неопознанный лимит",
+      directory,
+      sessions: [
+        { id: sessionID, title: "Текущий разговор", model },
+        ...(release === "deletion" ? [] : [{ id: otherSession, title: "Фоновый разговор", model }]),
+      ],
+      provider: provider({ id: model.id, name: "Бесплатная модель" }),
+      pageMessages: () => ({ items: [] }),
+      onPrompt: ({ body }) => void prompts.push(body.text),
+    })
+
+    const warning = page.getByRole("status").filter({ hasText: "Модель не определена" })
+    const send = page.locator('[data-action="composer-submit"]')
+    const retry = warning.getByRole("button", { name: "Попробовать снова", exact: true })
+    const sessionRoute = (url: URL) => url.pathname === `/api/session/${otherSession}`
+    const deletion = release === "deletion" ? await holdRoute(page, sessionRoute, { method: "GET" }) : undefined
+
+    const failed = page.waitForResponse(
+      (response) => response.url().includes(failure.message.id) && response.status() === 404,
+    )
+    await view.push([failure.event])
+    await failed
+    await expect(warning).toBeVisible()
+    const draft = "Построй график"
+    await view.editor.fill(draft)
+    await expect(view.editor).toBeEditable()
+    await expect(send).toBeDisabled()
+    await view.editor.press("Enter")
+    await expect(view.editor).toHaveText(draft)
+    expect(prompts).toEqual([])
+
+    if (release === "reset") {
+      await expect(retry).toHaveCount(0)
+      const remaining = now.getTime() + 3_600_000 - (await page.evaluate(() => Date.now()))
+      await page.clock.fastForward(remaining - 10_000)
+      await expect(send).toBeDisabled()
+      await page.clock.fastForward(10_000)
+    } else if (deletion) {
+      await deletion.arrived
+      await expect(send).toBeDisabled()
+      deletion.release()
+    } else {
+      await expect(retry).toBeVisible()
+      await page.screenshot({ path: testInfo.outputPath("composer-unidentified-retry-390.png") })
+      await retry.click()
+    }
+
+    await expect(warning).toHaveCount(0)
+    if (deletion) expect(deletion.requests).toHaveLength(3)
+    if (release !== "retry") {
+      await expect(send).toBeEnabled()
+      await send.click()
+    }
+
+    await expect.poll(() => prompts).toEqual([draft])
+    await expect(view.editor).toHaveText("")
+  })
+}
 
 for (const action of ["provider.use", "integration.connect"] as const) {
   test(`directs users to the administrator when ${action} is restricted`, async ({ page }) => {

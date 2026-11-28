@@ -16,6 +16,7 @@ import {
   MockPtyFeatureUnsupported,
   MockPtyNotFound,
   MockServiceUnavailable,
+  MockSessionNotFound,
   MockShellNotFound,
   MockUnauthorized,
   MockUnsupported,
@@ -1296,7 +1297,7 @@ function mockHandlers(
 
             return session
               ? Effect.succeed({ data: currentSession(session, config.directory) })
-              : Effect.fail(new MockNotFound({ message: "Session not found" }))
+              : Effect.fail(new MockSessionNotFound({ sessionID: ctx.params.sessionID, message: "Session not found" }))
           }),
         sessionRemove: () => noContent,
         sessionShell: () => noContent,

@@ -53,6 +53,11 @@ export class MockNotFound extends Schema.TaggedError<MockNotFound>()("MockNotFou
   message: Schema.String,
 }) {}
 
+export class MockSessionNotFound extends Schema.TaggedError<MockSessionNotFound>()("SessionNotFoundError", {
+  sessionID: Schema.String,
+  message: Schema.String,
+}) {}
+
 export class MockBadRequest extends Schema.TaggedError<MockBadRequest>()("MockBadRequest", {
   message: Schema.String,
 }) {}
@@ -377,7 +382,7 @@ const Group = HttpApiGroup.make("mock")
     HttpApiEndpoint.get("sessionGet", "/api/session/:sessionID", {
       params: SessionParams,
       success: Json,
-      error: MockNotFound.pipe(HttpApiSchema.status(404)),
+      error: MockSessionNotFound.pipe(HttpApiSchema.status(404)),
     }),
   )
   .add(

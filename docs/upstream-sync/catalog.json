@@ -224,6 +224,8 @@
         "packages/session-ui/src/context/data.tsx",
         "packages/app/e2e/regression/composer.spec.ts",
         "packages/app/e2e/regression/timeline-stream.spec.ts",
+        "packages/app/e2e/utils/mock-api.ts",
+        "packages/app/e2e/utils/mock-server.ts",
         "packages/session-ui/src/timeline-next/row.tsx",
         "packages/session-ui/src/timeline/session-timeline-row.tsx"
       ]

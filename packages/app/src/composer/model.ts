@@ -301,11 +301,12 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
   }
 
   const { freeModelLimits } = server.ctx
+  const modelLimited = () => !freeModelLimits.canSend(selectedModel())
 
   const submission = createComposerSubmit({
     adapter,
     mode,
-    modelLimited: () => !freeModelLimits.canSend(selectedModel()),
+    modelLimited,
     commands: () => data.location.command.list({ directory: sdk().directory }),
     editor: () => editor,
     queueScroll: () => requestAnimationFrame(() => editor?.scrollIntoView({ block: "nearest" })),
@@ -539,7 +540,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
         stopping,
         held: () => submitView().held,
         busy: () => submitView().busy,
-        canSubmit: () => submitView().canSubmit,
+        canSubmit: () => submitView().canSubmit && (mode() === "shell" || !modelLimited()),
         working: adapter.working,
         queue: options?.queue,
         quote:
@@ -548,6 +549,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
                 available: () =>
                   available() &&
                   !adapter.controls().model.loading &&
+                  !modelLimited() &&
                   submitView().canSubmit &&
                   !options?.queue?.undoing(),
                 delivery: () => (adapter.working() ? (options?.queue?.alternate() ?? "steer") : undefined),
@@ -564,7 +566,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
           // the composer value as a new prompt. Enter keeps it queued in
           // place; the alternate action sends it as a steer.
           if (queue?.editing()) {
-            queue.confirmEdit(submitOptions?.alternate ? "steer" : "queue")
+            if (!modelLimited()) queue.confirmEdit(submitOptions?.alternate ? "steer" : "queue")
 
             return
           }
@@ -572,7 +574,8 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
           // With no draft to send, the explicit alternate shortcut acts on the next queued prompt.
           // Plain Enter, touch's primary send and an empty shell composer still do nothing.
           if (submitOptions?.alternate && mode() === "normal" && blank()) {
-            if (adapter.working() && submitView().canSubmit && prompt.context.items().length === 0) queue?.steerFirst()
+            if (adapter.working() && submitView().canSubmit && !modelLimited() && prompt.context.items().length === 0)
+              queue?.steerFirst()
 
             return
           }
@@ -588,7 +591,15 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     model: { get: () => adapter.controls().model },
     modelStatus: {
       get: () => {
-        if (freeModelLimits.unresolved().length) return { text: language.t("session.modelStop.limitUnresolved") }
+        if (freeModelLimits.unresolved().length)
+          return {
+            text: language.t("session.modelStop.limitUnresolved"),
+            retry: freeModelLimits.canRetryUnresolved()
+              ? () => {
+                  if (mode() === "normal" && freeModelLimits.allowUnresolvedRetry()) controller.submit()
+                }
+              : undefined,
+          }
 
         const model = selectedModel()
         const limit = model && freeModelLimits.limit(model)

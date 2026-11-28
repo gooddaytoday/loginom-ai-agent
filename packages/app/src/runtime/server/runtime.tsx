@@ -31,6 +31,11 @@ import { createData, createSessionRetention } from "@opencode/client/solid"
 import type { ServerScope } from "@/runtime/server/scope"
 import { createPermissionAutoApprover } from "@/session/requests/auto-approve"
 import { createFreeModelLimits } from "@/session/free-limit-reset"
+import {
+  transitionUnresolvedLimit,
+  unresolvedLimitInitial,
+  type UnresolvedLimitState,
+} from "@/session/free-limit-machine"
 import { createSessionMessageHandoffs } from "@/session/handoff"
 import { createServerNotificationState } from "@/shell/notifications/notification"
 import { createNotificationCoordinator } from "@/shell/notifications/coordinator"
@@ -45,7 +50,7 @@ import { showToast } from "@/shell/notifications/toast"
 import { formatServerError } from "./errors"
 import { useSettings } from "@/settings/model"
 import { timelinePreset } from "@opencode/session-ui/timeline/detail"
-import type { SessionInfo } from "@opencode/client/promise"
+import { isSessionNotFoundError, type SessionInfo } from "@opencode/client/promise"
 import { projectForSession } from "@/shell/layout/helpers"
 import { isProjectDirectory } from "@/workspaces/paths"
 import type { Project } from "@/runtime/server/types"
@@ -263,6 +268,7 @@ function createServerController(
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout> | undefined
     let delay = 1_000
+    let state: UnresolvedLimitState = unresolvedLimitInitial
 
     const resolve = async () => {
       const { sessionID, messageID, failedAt, retryAfterMs } = failure
@@ -272,6 +278,20 @@ function createServerController(
       if (controller.signal.aborted) return
 
       if (message?.type === "assistant" && freeModelLimits.remember(message, failedAt, retryAfterMs)) return
+
+      // Only the conversation endpoint can confirm deletion. A missing message can appear on a later read.
+      const conversationMissing =
+        !message &&
+        (await sdk.api.session.get({ sessionID }, { signal }).then(
+          () => false,
+          (error) => isSessionNotFoundError(error) && error.sessionID === sessionID,
+        ))
+
+      if (controller.signal.aborted) return
+
+      state = transitionUnresolvedLimit(state, { type: "lookup", conversationMissing })
+
+      if (state.type === "released") return freeModelLimits.releaseUnresolved(failure)
 
       timer = setTimeout(() => void resolve(), delay)
       delay = Math.min(delay * 2, 30_000)
