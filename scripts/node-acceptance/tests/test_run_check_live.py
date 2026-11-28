@@ -375,6 +375,7 @@ class LiveChainTest(unittest.TestCase):
                         return
                     if name == 'case-port-readback':
                         self.assertEqual(calls, ['setup', 'first', 'exit', 'case-port-readback'])
+                        (folder / 'case-port-readback').mkdir()
                         write(folder / 'case-port-readback/result.json', dict(status='PASS',
                             cleanup=dict(package_closed=True, logged_out=True), correspondence=[dict(node=dict(node_id='node'))]))
                         return
