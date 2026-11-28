@@ -12,6 +12,8 @@ import {withStorageIdentity} from '../lib/storage-policy.mjs';
 import {readPreparedNodeContext} from '../lib/node-context.mjs';
 import {readUserVariablesSnapshot} from '../lib/crosstable-variables.mjs';
 import {makePackageCleanupCode} from '../lib/package-cleanup.mjs';
+import {makeWorkspaceStepCode} from '../lib/workspace.mjs';
+import {readGraph} from '../lib/node-target-browser.mjs';
 
 test('a retained preparation cannot mask a settled node worker using the same ID',async()=>{
  const page=new Page(),receipt={status:'READY',operation_id:'shared'};
@@ -1390,6 +1392,29 @@ test('saved continuation returns current navigation with the same native workflo
  assert.equal(continuation.workflow_ref.workflow_id,'workflow');assert.equal(continuation.previous_workflow_ref.workflow_id,'workflow');
  assert.equal(continuation.previous_workflow_ref.navigation_path[2].label,'Draft');assert.equal(continuation.workflow_ref.navigation_path[2].label,'Saved');
  assert.equal(continuation.workflow_ref.tab_tid,continuation.previous_workflow_ref.tab_tid);
+});
+
+test('the next node step accepts the issued continuation after a keep-open Save',async()=>{
+ const page=await restSavePage([false],false);
+ const {session_id:sessionId,origin}=page.storageBinding;
+ const connection=page.app.Application.FInstance.FMainForm.FMapTree.FServerConnection;
+ const receipt=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ receipt.crumbs=page.context.document.querySelectorAll(`[data-tid^="${page.prefix};cnrNaviMode;b.s_"]`)
+  .map(element=>({tid:element.tid,label:element.textContent}));
+ receipt.stepSession={connection,nativeSession:connection.Session,account:connection.UserName};
+ page.context.location.pathname='/';
+ const path='/user/data/packages/continued.lgp';
+ const saved=await run(page,'package.save_checkpoint',{path,conflict_policy:'fail'});
+ assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));
+ assert.equal(saved.output.reopened,false);
+ const [continuation]=saved.output.workflow_continuations;
+ const step=async workflow_ref=>(await page.execute(makeWorkspaceStepCode({loginomUrl:origin,build,sessionId,
+  workflowRef:{document_id:continuation.document_id,...workflow_ref},readGraph,types:{}}))).output;
+ const next=await step(continuation.workflow_ref);
+ assert.equal(next.status,'READY',next.reason);
+ assert.equal(next.package_ref.path,path);
+ assert.deepEqual(next.workflow_ref,continuation.workflow_ref);
+ assert.equal((await step(continuation.previous_workflow_ref)).reason,'WORKFLOW_CHANGED');
 });
 
 test('saved continuation ends at its native workflow after a visible ExportCSV breadcrumb',async()=>{

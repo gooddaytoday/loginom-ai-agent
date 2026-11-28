@@ -1519,9 +1519,12 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     value = value.replaceAll('\\', '/').replace(/\/+/g, '/');
     return value.startsWith('/') ? value : '/' + value;
   };
-  const packageContinuations = async binding => page.evaluate(binding => {
+  const packageContinuations = async (binding, previous = null) => page.evaluate(({binding,previous}) => {
     const preparation=globalThis.__loginomDockPreparationV1, app=globalThis.bg?.app;
-    if(!preparation || preparation.document!==document)return [];
+    if(!preparation || preparation.document!==document){
+      if(previous?.length)throw Error('Saved continuation identities changed');
+      return [];
+    }
     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
     const tabs=exact(binding.tab_tid);
     if(tabs.length!==1 || !tabs[0].classList.contains('x-tab-active'))throw Error('Saved continuation tab changed');
@@ -1540,7 +1543,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       return component?.el?.dom===element&&component?._node?.data?.node===workflowNode;
     });
     const crumbs=elements.slice(0,elements.indexOf(workflowCrumbs[0])+1).map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
-    const result=new Map();
+    const result=new Map(),records=[];
     for(const record of preparation.receipts.values()) {
       if(record.phase!=='verified'||record.tab!==tabs[0]||typeof record.workflowId!=='string')continue;
       // An opened package may be copied before any node read populates this
@@ -1553,11 +1556,17 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       }
       if(record.packageNode!==packageNode||record.nodeTargetWorkflowNode!==workflowNode)throw Error('Saved continuation native identity changed');
       if(workflowCrumbs.length!==1||crumbs.length<3)throw Error('Saved continuation workflow breadcrumb unavailable');
+      records.push(record);
       result.set(record.workflowId,{document_id:preparation.id,workflow_ref:{...binding,workflow_id:record.workflowId,navigation_path:crumbs}});
       if(result.size>32)throw Error('Saved continuation bound exceeded');
     }
-    return [...result.values()];
-  },binding);
+    const continuations=[...result.values()];
+    if(!previous)return continuations;
+    const identity=({document_id,workflow_ref:{workflow_id,tab_tid,prefix}})=>({document_id,workflow_id,tab_tid,prefix});
+    if(JSON.stringify(previous.map(identity))!==JSON.stringify(continuations.map(identity)))throw Error('Saved continuation identities changed');
+    for(const record of records)record.crumbs=crumbs;
+    return continuations.map((value,index)=>({...value,previous_workflow_ref:previous[index].workflow_ref}));
+  },{binding,previous});
   const bindSavedContinuations = async (before, previous, mode) => page.evaluate(({previous,current,path,nativeNodes,binding,mode})=>{
       const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
       if(!binding)return [];
@@ -1843,18 +1852,14 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       let recovered=[];
       try { recovered=await bindSavedContinuations(before,[],'recover'); }
       catch { record('saved_reopen_recovery_refused'); }
-      let continuationsAfter = await packageContinuations(before.workflow_ref);
+      const continuationsAfter = await packageContinuations(before.workflow_ref);
       if(continuationsBefore.length && continuationsAfter.length
           && !same(continuationsBefore[0].workflow_ref.navigation_path,continuationsAfter[0].workflow_ref.navigation_path)) {
         await refreshSavedNavigation(continuationsAfter[0]);
         await ensureReady();
         if(!same(await graphSnapshot(workflow.prefix),before.graph))throw Error('Saved graph changed while refreshing navigation');
-        continuationsAfter=await packageContinuations(before.workflow_ref);
       }
-      const identity = value => ({document_id:value.document_id,workflow_id:value.workflow_ref.workflow_id,
-        tab_tid:value.workflow_ref.tab_tid,prefix:value.workflow_ref.prefix});
-      if(!recovered.length&&!same(continuationsBefore.map(identity),continuationsAfter.map(identity)))throw new Error('Saved continuation identities changed');
-      const continuations=recovered.length?recovered:continuationsAfter.map((value,i)=>({...value,previous_workflow_ref:continuationsBefore[i].workflow_ref}));
+      const continuations=recovered.length?recovered:await packageContinuations(before.workflow_ref,continuationsBefore);
       record('save_continuations_observed', { continuations,...(recovered.length?{recovered_reopen:true,native_identity_verified:true}:{}) });
       transientDialog = false; phase = 'verified';
       record('postcondition_verified', { proof: 'awaited_save_flow_same_open_workflow', package_path: actualPath,
