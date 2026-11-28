@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {runInNewContext} from 'node:vm';
 import { validateActionParameters } from '../lib/action-catalog.mjs';
 import { actions, selectors, build, Page, nodeParameters, linkPage, linkParameters, run, runtime } from './support/executor-fixture.mjs';
 import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from '../../tools/loginom-acceptance/javascript-persistence-save.mjs';
@@ -14,6 +16,26 @@ import {readUserVariablesSnapshot} from '../lib/crosstable-variables.mjs';
 import {makePackageCleanupCode} from '../lib/package-cleanup.mjs';
 import {makeWorkspaceStepCode} from '../lib/workspace.mjs';
 import {readGraph} from '../lib/node-target-browser.mjs';
+import {savedCopyDigest} from '../../src/saved-copy-readback.mjs';
+
+test('an independent readback opens only the exact saved package, in read mode',async()=>{
+ const saved=new Uint8Array([0,255,3]);
+ const target='/fixture/packages/target.lgp';
+ const opened=[];
+ const stream={Size:saved.length,ReadBuffer:async bytes=>bytes.set(saved)};
+ const storage={
+  GetFileInfo:async path=>path===target?{Size:saved.length}:null,
+  OpenFile:async (path,mode)=>{opened.push([path,mode]);return stream;},
+ };
+ const connection={Connected:true,UserName:'fixture',Session:{get_FileStorage:async()=>storage}};
+ const page={evaluate:(read,path)=>runInNewContext(`(${read})(path)`,{path,btoa,ReleaseObject:async()=>{},bg:{
+  TBGFileOpenMode:{fomRead:'read'},app:{Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:connection}}}}},
+ }})};
+ const browser={pages:()=>[page]};
+ assert.equal(await savedCopyDigest(browser,target),createHash('sha256').update(saved).digest('hex'));
+ assert.equal(await savedCopyDigest(browser,'/fixture/packages/other.lgp'),null);
+ assert.deepEqual(opened,[[target,'read']]);
+});
 
 test('a retained preparation cannot mask a settled node worker using the same ID',async()=>{
  const page=new Page(),receipt={status:'READY',operation_id:'shared'};
@@ -122,6 +144,7 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
   if(mismatch)assert.equal(inspected.output.outcome.error.code,'SAVE_RESULT_MISMATCH');
   assert.equal(original.packageNode,oldPackage);assert.equal(page.saveWrites,1);
   if(mismatch){
+   assert.equal(page.saveWrites,1);
    const repeated=await engine.run(action,{path,conflict_policy:'fail'},{operationId:'lost-save'});
    assert.equal(repeated.status,'NOT_APPLIED');assert.equal(repeated.effect_possible,true);assert.equal(page.saveWrites,1);
   }

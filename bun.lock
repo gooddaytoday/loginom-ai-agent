@@ -184,6 +184,7 @@
       "dependencies": {
         "@opencode/protocol": "workspace:*",
         "@opencode/schema": "workspace:*",
+        "@opencode/util": "workspace:*",
       },
       "devDependencies": {
         "@effect/platform-node": "catalog:",
@@ -519,6 +520,7 @@
         "@zip.js/zip.js": "2.7.62",
         "effect": "catalog:",
         "htmlparser2": "8.0.2",
+        "https-proxy-agent": "7.0.6",
       },
       "devDependencies": {
         "@tsconfig/bun": "catalog:",
@@ -554,6 +556,9 @@
       "version": "0.1.0",
       "dependencies": {
         "acorn": "8.15.0",
+      },
+      "devDependencies": {
+        "yaml": "2.9.1",
       },
     },
     "packages/merman": {

@@ -41,6 +41,17 @@ story.beforeEach(async ({ mount }) => {
   await mount("ui-line-comment--editor")
 })
 
+story("only a built-in plugin can add a form to the provider dialog", async ({ page }) => {
+  const [builtin, thirdParty] = await page.evaluate(async (fixture) => {
+    const { canAddProviderSetup } = await import(fixture)
+
+    return [await canAddProviderSetup(true), await canAddProviderSetup(false)]
+  }, fixture)
+
+  expect(builtin).toBe(1)
+  expect(thirdParty).toBe(0)
+})
+
 for (const viewport of [
   { width: 1440, height: 900 },
   { width: 390, height: 844 },
@@ -160,23 +171,28 @@ story("a restored plugin page shows a loader while waiting for settings and whil
   await host.evaluate((host) => host.unmount())
 })
 
-story("a third-party plugin cannot register a page with a public registry token", async ({ page }) => {
-  const result = await page.evaluate(async (fixture) => {
-    const { mountPluginHost, Registry, until } = await import(fixture)
-    const host = mountPluginHost()
+for (const registry of ["page", "question.renderer"]) {
+  story(`a third-party plugin cannot register ${registry} with a public registry token`, async ({ page }) => {
+    const result = await page.evaluate(async ({ fixture, registry }) => {
+      const { mountPluginHost, Registry, until } = await import(fixture)
+      const host = mountPluginHost()
 
-    try {
-      host.load((ctx: Context) => ctx.add(Registry.define("page"), { id: "overview", title: "Third-party page" }))
-      await until(() => host.status() === "failed" || host.status() === "active")
+      const contribution =
+        registry === "page" ? { id: "overview", title: "Third-party page" } : { matches: () => true, render: () => null }
 
-      return { status: host.status(), pages: host.entries("page") }
-    } finally {
-      host.unmount()
-    }
-  }, fixture)
+      try {
+        host.load((ctx: Context) => ctx.add(Registry.define(registry), contribution))
+        await until(() => host.status() === "failed" || host.status() === "active")
 
-  expect(result).toEqual({ status: "failed", pages: 0 })
-})
+        return { status: host.status(), entries: host.entries(registry) }
+      } finally {
+        host.unmount()
+      }
+    }, { fixture, registry })
+
+    expect(result).toEqual({ status: "failed", entries: 0 })
+  })
+}
 
 story("a plugin that finishes loading after the host unmounts is never set up", async ({ page }) => {
   const setups = await page.evaluate(async (fixture) => {
@@ -1074,6 +1090,7 @@ story(
 story("the new-session slot renders nothing without a plugin", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {
     const { mountPlugins, BuiltinSlot, until } = await import(fixture)
+
     const host = mountPlugins({
       definitions: [
         {
@@ -1084,16 +1101,19 @@ story("the new-session slot renders nothing without a plugin", async ({ page }) 
         },
       ],
     })
+
     try {
       const heading = () => host.container.querySelector('[data-testid="draft-heading"]')
       await until(() => heading()?.textContent === "Draft heading")
       host.define([])
       await until(() => heading()?.textContent === "")
+
       return { elements: heading()?.childElementCount, errors: host.escaped() }
     } finally {
       host.unmount()
     }
   }, fixture)
+
   expect(result).toEqual({ elements: 0, errors: [] })
 })
 

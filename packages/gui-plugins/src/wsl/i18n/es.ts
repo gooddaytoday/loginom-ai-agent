@@ -21,12 +21,12 @@ export default {
   "onboarding.needAnotherDistroHint": "Instala una distribución de Linux desde el catálogo de WSL",
   "onboarding.wslNotInstalled.title": "WSL no está instalado",
   "onboarding.wslNotInstalled.description":
-    "Se necesita WSL (Subsistema de Windows para Linux) para que OpenCode pueda añadir un servidor WSL",
+    "Se necesita WSL (Subsistema de Windows para Linux) para que Loginom AI Agent pueda añadir un servidor WSL",
   "onboarding.wslUnavailable.title": "WSL no disponible",
-  "onboarding.wslUnavailable.description": "OpenCode no pudo comprobar WSL en este equipo.",
+  "onboarding.wslUnavailable.description": "Loginom AI Agent no pudo comprobar WSL en este equipo.",
   "onboarding.installWsl": "Instalar WSL",
   "onboarding.windowsRestartRequired":
-    "Reinicia Windows para terminar de instalar WSL y, después, vuelve a abrir OpenCode.",
+    "Reinicia Windows para terminar de instalar WSL y, después, vuelve a abrir Loginom AI Agent.",
   "onboarding.allDistrosAdded": "Ya se han añadido todas las distribuciones instaladas.",
   "onboarding.noDistros": "Aún no se han detectado distribuciones.",
   "onboarding.installDistro": "Instalar distribución",

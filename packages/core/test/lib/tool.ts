@@ -68,6 +68,7 @@ export const registerToolPlugin = <R>(
         hook: overrides.session?.hook ?? (() => Effect.succeed({ dispose: Effect.void })),
       },
       tool: {
+        ask: () => Effect.die("registerToolPlugin does not support tool forms"),
         transform: tools.transform,
         reload: tools.reload,
         list: tools.list,

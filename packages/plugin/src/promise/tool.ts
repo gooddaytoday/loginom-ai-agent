@@ -6,6 +6,7 @@ import type { Agent } from "@opencode/schema/agent"
 import type { Session } from "@opencode/schema/session"
 import type { SessionMessage } from "@opencode/schema/session-message"
 import type { Types } from "effect"
+import type { ToolForm, ToolFormResult, ToolInvocation } from "../effect/tool.js"
 import type { Hooks, Transform } from "./registration.js"
 
 export interface ToolContext extends Omit<Tool.Context, "progress" | "cancel"> {
@@ -70,6 +71,7 @@ interface ToolHooks {
 }
 
 export interface ToolDomain {
+  readonly ask: (form: ToolForm, context: ToolInvocation, signal: AbortSignal) => Promise<ToolFormResult>
   readonly transform: Transform<ToolEditor>
   readonly reload: () => Promise<void>
   /** Currently registered tools, after every transform, keyed by effective name. */

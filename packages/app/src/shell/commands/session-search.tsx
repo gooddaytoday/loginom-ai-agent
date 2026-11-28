@@ -1,10 +1,13 @@
 import { useDialog, useDialogLayer } from "@opencode/ui/context/dialog"
+import { displayName } from "@opencode/ui/project-avatar"
+import { getFilename } from "@opencode/util/path"
 import { createSignal, onCleanup, startTransition, untrack } from "solid-js"
 import { useGlobal } from "@/runtime/server/runtime"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { isServerFailed } from "@/runtime/server/health-machine"
 import { useTabs } from "@/shell/tabs/tabs"
+import { createProjectSessionActions } from "@/shell/tabs/project-sessions"
 import { createKnownServerSessions, createServerSessionEntries, type CommandPaletteEntry } from "./palette"
 import { CommandPaletteView } from "./dialog"
 import { errorMessage } from "@/shell/layout/helpers"
@@ -19,12 +22,33 @@ import {
 
 const RECENT_LIMIT = 10
 
+const SEARCH_FIELDS = ["title", "project"] as const
+
+const SEARCH_DEBOUNCE_MS = 300
+
+function rankConversationSearch(entries: CommandPaletteEntry[], query: string) {
+  const value = query.toLowerCase()
+
+  const rank = (entry: CommandPaletteEntry) => {
+    if (entry.type === "project") return 0
+
+    if (entry.title.toLowerCase().includes(value)) return 1
+
+    const project = entry.project ? displayName(entry.project) : getFilename(entry.directory ?? "")
+
+    return project.toLowerCase().includes(value) ? 2 : 3
+  }
+
+  return entries.toSorted((first, second) => rank(first) - rank(second) || (second.updated ?? 0) - (first.updated ?? 0))
+}
+
 export function DialogSessionSearch(props: { archived?: boolean }) {
   const dialog = useDialog()
   const layer = useDialogLayer()
   const global = useGlobal()
   const language = useLanguage()
   const tabs = useTabs()
+  const projectActions = createProjectSessionActions()
   const registry = useServers()
 
   const servers = registry.visible.filter((conn) => !isServerFailed(global.servers.health[ServerConnection.key(conn)]))
@@ -34,6 +58,8 @@ export function DialogSessionSearch(props: { archived?: boolean }) {
 
     if (!ctx) return []
 
+    const [promptSearchFailed, setPromptSearchFailed] = createSignal(false)
+
     const load = createServerSessionEntries({
       server: ServerConnection.key(conn),
       archived: props.archived,
@@ -42,14 +68,35 @@ export function DialogSessionSearch(props: { archived?: boolean }) {
         : createKnownServerSessions(() => ctx),
       apply: ctx.data.session.apply,
       projects: ctx.projects.list,
-      load: (search, signal) =>
-        ctx.sdk.api.session.list({ parentID: null, search, archived: !!props.archived, limit: 50 }, { signal }),
+      load: async (search, signal) => {
+        const filters = { parentID: null, search, archived: !!props.archived, limit: 50 }
+
+        if (!search || props.archived) return ctx.sdk.api.session.list(filters, { signal })
+
+        const fields = Array.from(search).length >= 3 ? [...SEARCH_FIELDS, "prompt" as const] : SEARCH_FIELDS
+
+        const results = await Promise.allSettled(
+          fields.map((searchField) => ctx.sdk.api.session.list({ ...filters, searchField }, { signal })),
+        )
+
+        if (!signal.aborted) {
+          setPromptSearchFailed(
+            results.some((result, index) => fields[index] === "prompt" && result.status === "rejected"),
+          )
+        }
+
+        const succeeded = results.filter((result) => result.status === "fulfilled")
+
+        if (succeeded.length === 0) throw new Error("Session search failed")
+
+        return { data: succeeded.flatMap((result) => result.value.data) }
+      },
       get: (sessionID, signal) => ctx.sdk.api.session.get({ sessionID }, { signal }),
       untitled: () => language.t("command.session.new"),
-      category: () => language.t(props.archived ? "sidebar.inbox.archived.title" : "command.category.session"),
-      recentCategory: () =>
-        language.t(props.archived ? "sidebar.inbox.archived.title" : "palette.group.recentSessions"),
+      category: () => language.t(props.archived ? "sidebar.inbox.archived.title" : "sidebar.search.conversations"),
+      recentCategory: () => language.t(props.archived ? "sidebar.inbox.archived.title" : "sidebar.search.recent"),
       recentLimit: RECENT_LIMIT,
+      debounceMs: props.archived ? undefined : SEARCH_DEBOUNCE_MS,
     })
 
     const tag = registry.tag(conn)
@@ -64,8 +111,34 @@ export function DialogSessionSearch(props: { archived?: boolean }) {
 
     return [
       {
-        items: (query: string) => format(load.items(query)),
-        search: (query: string, signal: AbortSignal) => load.search(query, signal).then(format),
+        items: (query: string) => [
+          ...(!query || props.archived
+            ? []
+            : ctx.projects.unique().flatMap((project): CommandPaletteEntry[] => {
+                const title = displayName(project)
+
+                if (!title.toLowerCase().includes(query.toLowerCase())) return []
+
+                return [
+                  {
+                    id: `project:${ServerConnection.key(conn)}:${project.worktree}`,
+                    type: "project",
+                    title,
+                    description: servers.length > 1 ? tag : undefined,
+                    category: language.t("home.projects"),
+                    project,
+                    server: ServerConnection.key(conn),
+                  },
+                ]
+              })),
+          ...format(load.items(query)),
+        ],
+        search: (query: string, signal: AbortSignal) => {
+          setPromptSearchFailed(false)
+
+          return load.search(query, signal).then(format)
+        },
+        promptSearchFailed,
       },
     ]
   })
@@ -140,6 +213,17 @@ export function DialogSessionSearch(props: { archived?: boolean }) {
   onCleanup(() => dispatch({ type: "disposed" }))
 
   const select = (item: CommandPaletteEntry | undefined) => {
+    if (item?.type === "project" && item.project) {
+      const conn = servers.find((conn) => ServerConnection.key(conn) === item.server)
+
+      if (!conn) return
+
+      dialog.close(layer?.id)
+      projectActions.openProjectNewSession(conn, item.project.worktree)
+
+      return
+    }
+
     if (!item?.sessionID || !item.server) return
     dispatch({
       type: "entry.selected",
@@ -153,9 +237,18 @@ export function DialogSessionSearch(props: { archived?: boolean }) {
   // Each server is its own source, so a slow or failing server never holds back or hides another's sessions.
   return (
     <CommandPaletteView
-      placeholder={language.t("home.sessions.search.placeholder")}
+      placeholder={language.t(props.archived ? "home.sessions.search.placeholder" : "sidebar.search.placeholder")}
       items={items}
       sources={loaders.map((loader) => loader.search)}
+      rank={props.archived ? undefined : rankConversationSearch}
+      keepPreviousWhileLoading={!props.archived}
+      statusMessage={
+        props.archived
+          ? undefined
+          : loaders.some((loader) => loader.promptSearchFailed())
+            ? language.t("sidebar.search.promptUnavailable")
+            : ""
+      }
       highlight={() => {}}
       select={select}
       close={() => dialog.close(layer?.id)}
