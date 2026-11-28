@@ -24,6 +24,19 @@ test.each([
   expect(loginomStepPhrase(copy, decodeFacts({ ...settled, ...facts }))).toBe(title)
 })
 
+test("uses a confirmed save when another evidence entry is invalid", () => {
+  const facts = decodeFacts({
+    ...settled,
+    kind: "save",
+    evidence: [
+      { kind: "tableRead", port: 0, portGuid: "output", rowsRead: 2, rowCount: 1 },
+      { kind: "saved", path: "/user/ABC-анализ.lgp" },
+    ],
+  })
+
+  expect(loginomStepPhrase(copy, facts)).toBe("Сохранил «ABC-анализ.lgp» в /user")
+})
+
 test("uses the same phrase inline and preserves the filename's case", () => {
   const facts = decodeFacts({
     ...settled,

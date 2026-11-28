@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { timelinePresets } from "@opencode/session-ui/timeline/detail"
-// Captured from the projection functions in #1471 (32f1f5fbe4), #1504 (d4c352d4fe) and #1484 (e743ae4ec0).
+// Captured from the projection functions in #1471 (c67339391b), #1504 (e887158b27) and #1484 (632435e9c0).
 import loginomReceipts from "../utils/loginom-feed-receipts.json" with { type: "json" }
 import {
   assistantMessage,

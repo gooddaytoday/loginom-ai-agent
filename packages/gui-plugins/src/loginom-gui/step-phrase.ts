@@ -1,3 +1,4 @@
+import { decodeLoginomMetadata, type LoginomMetadata } from "@loginom-ai-agent/loginom-agent/loginom-metadata"
 import { Option, Schema } from "effect"
 import type { Plugin } from "@opencode/plugin/gui"
 import { getDirectory, getFilename } from "@opencode/util/path"
@@ -9,26 +10,6 @@ const count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
 const positive = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
 
-const text = Schema.NonEmptyString
-
-const Facts = Schema.Struct({
-  v: Schema.Literal(1),
-  operationId: text,
-  state: Schema.Literals(["running", "settled"]),
-  status: Schema.optionalKey(Schema.Literals(["SUCCEEDED", "FAILED", "NOT_APPLIED", "AMBIGUOUS"])),
-  kind: Schema.optionalKey(text),
-  node: Schema.optionalKey(Schema.Struct({ guid: text, label: Schema.String, type: text })),
-  attempt: Schema.optionalKey(positive),
-  error: Schema.optionalKey(Schema.Struct({ code: Schema.String, message: Schema.String })),
-  ports: Schema.optionalKey(
-    Schema.Array(Schema.Struct({ index: count, guid: text, rowCount: count, columnCount: count })),
-  ),
-  files: Schema.optionalKey(Schema.Array(Schema.Struct({ artifactId: text, name: Schema.String, bytes: count }))),
-  evidence: Schema.optionalKey(Schema.Array(Schema.Unknown)),
-})
-
-const decodeSaved = Schema.decodeUnknownOption(Schema.Struct({ kind: Schema.Literal("saved"), path: text }))
-
 const Progress = Schema.Struct({
   version: Schema.Literal(1),
   phase: Schema.Literals(["waiting", "configuring", "executing", "reading"]),
@@ -38,16 +19,14 @@ const Progress = Schema.Struct({
   substep: Schema.NullOr(Schema.Struct({ kind: Schema.Literal("fields"), index: positive, total: positive })),
 })
 
-export const decodeFacts = Schema.decodeUnknownOption(Facts)
+export const decodeFacts = Option.liftNullishOr(decodeLoginomMetadata)
 
 export const decodeProgress = Schema.decodeUnknownOption(Progress)
 
-type Facts = Option.Option.Value<ReturnType<typeof decodeFacts>>
+type Facts = LoginomMetadata
 
 function savedPackage(facts: Facts) {
-  const saved = facts.evidence
-    ?.map((item) => Option.getOrUndefined(decodeSaved(item)))
-    .find((item) => item !== undefined)
+  const saved = facts.evidence?.find((item) => item.kind === "saved")
 
   if (!saved) return
 

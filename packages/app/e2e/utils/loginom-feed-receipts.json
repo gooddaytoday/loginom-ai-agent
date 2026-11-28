@@ -66,8 +66,19 @@
       {
         "kind": "saved",
         "path": "/user/ABC-анализ.lgp"
+      },
+      {
+        "kind": "reopenedGraphRead",
+        "nodeCount": 1,
+        "scope": "activeWorkflow"
       }
-    ]
+    ],
+    "receiptWindow": {
+      "runtimeId": "32ef40ff-08d2-476a-ad73-1ef3feb17ce8",
+      "documentId": "document",
+      "startSequence": 1,
+      "confirmedSequence": 2
+    }
   },
   "export": {
     "v": 1,
