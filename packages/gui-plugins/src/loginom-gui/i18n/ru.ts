@@ -62,7 +62,8 @@ export default {
   "catalog.use.skill": "Начать разговор",
   "catalog.use.scenario": "Открыть",
   "catalog.use.connection": "Подключить",
-  "catalog.explain.action": "Действие выполняет шаги с пакетом и даёт отчёт или новый файл.",
+  "catalog.explain.action":
+    "Действие выполняет шаги с пакетом и даёт отчёт или новый файл. Запрос можно проверить перед отправкой.",
   "catalog.explain.skill": "Навык — указания, которые помогают агенту справиться с задачей в разговоре.",
   "catalog.explain.scenario": "Копию готового сценария можно открыть и изменить в Loginom.",
   "catalog.explain.connection": "Подключение даёт агенту доступ к внешнему сервису.",
@@ -81,16 +82,16 @@ export default {
   "catalog.noResults": "Ничего не нашлось",
   "catalog.empty": "В этом разделе пока ничего нет",
   "catalog.reset": "Сбросить фильтры",
-  "catalog.draft": "Используй навык {{skill}}. ",
-  "catalog.chooseProject": "Откройте проект на сервере Loginom AI Agent, чтобы начать разговор с навыком.",
   "catalog.item.loginom-automation.title": "Построить сценарий Loginom",
+  "catalog.item.loginom-automation.draft": "Помоги построить сценарий Loginom.",
   "catalog.item.loginom-automation.description":
     "Создаёт, изменяет и выполняет сценарии в Loginom, проверяет результаты и сохраняет пакет.",
   "catalog.item.loginom-automation.can":
     "Подсказать агенту, как собрать сценарий с помощью разрешённых инструментов Loginom.",
   "catalog.item.loginom-automation.cannot": "Дать доступ к Loginom или расширить разрешения инструментов.",
   "catalog.item.loginom-automation.compatibility": "Loginom 7.4.2, управляемая среда выполнения и справка Loginom.",
-  "catalog.item.package-docs.title": "Документировать пакет",
+  "catalog.item.package-docs.title": "Документировать",
+  "catalog.item.package-docs.draft": "Документируй пакет Loginom.",
   "catalog.item.package-docs.description":
     "Описывает сценарий, модули и потоки данных локального пакета .lgp в PDF, Word или Markdown.",
   "catalog.item.package-docs.can": "Прочитать локальный пакет и создать документ встроенным генератором.",
@@ -98,13 +99,15 @@ export default {
   "catalog.item.package-docs.compatibility":
     "Нужны локальный пакет .lgp, встроенный генератор документов и справка Loginom.",
   "catalog.item.loginom-dashboard.title": "Создать дашборд",
+  "catalog.item.loginom-dashboard.draft": "Помоги создать дашборд Loginom.",
   "catalog.item.loginom-dashboard.description": "Создаёт черновик дашборда Loginom по образцу данных узла.",
   "catalog.item.loginom-dashboard.can":
     "Создать и изменить черновик. Опубликовать или удалить дашборд по вашей просьбе.",
   "catalog.item.loginom-dashboard.cannot":
     "Дать доступ к инструментам дашборда или опубликовать его без вашей просьбы.",
   "catalog.item.loginom-dashboard.compatibility": "Нужны инструменты для дашбордов Loginom.",
-  "catalog.item.package-linter.title": "Проверить пакет",
+  "catalog.item.package-linter.title": "Проверить",
+  "catalog.item.package-linter.draft": "Проверь качество пакета Loginom.",
   "catalog.item.package-linter.description":
     "Проверяет структуру, заметки и названия в локальном пакете .lgp и даёт рекомендации.",
   "catalog.item.package-linter.can": "Прочитать локальный пакет .lgp и сохранить рядом отчёт.",

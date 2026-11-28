@@ -62,7 +62,8 @@ export default {
   "catalog.use.skill": "Start conversation",
   "catalog.use.scenario": "Open",
   "catalog.use.connection": "Connect",
-  "catalog.explain.action": "An action runs steps on a package and produces a report or a new file.",
+  "catalog.explain.action":
+    "An action runs steps on a package and produces a report or a new file. You can review the request before sending it.",
   "catalog.explain.skill": "A skill gives the agent instructions it can follow during a conversation.",
   "catalog.explain.scenario": "You can open and edit a copy of a ready-made scenario in Loginom.",
   "catalog.explain.connection": "A connection gives the agent access to an external service.",
@@ -81,16 +82,15 @@ export default {
   "catalog.noResults": "Nothing matches your search",
   "catalog.empty": "There are no items in this section yet",
   "catalog.reset": "Reset filters",
-  "catalog.draft": "Use the {{skill}} skill. ",
-  "catalog.chooseProject":
-    "Open a project on the Loginom AI Agent server before starting a conversation with this skill.",
   "catalog.item.loginom-automation.title": "Build a Loginom scenario",
+  "catalog.item.loginom-automation.draft": "Help me build a Loginom scenario.",
   "catalog.item.loginom-automation.description":
     "Creates, changes and runs scenarios in Loginom, checks the results and saves the package.",
   "catalog.item.loginom-automation.can": "Guide the agent as it builds a scenario using the Loginom tools you allow.",
   "catalog.item.loginom-automation.cannot": "Grant access to Loginom or expand tool permissions.",
   "catalog.item.loginom-automation.compatibility": "Loginom 7.4.2 with the managed runtime and Loginom Help.",
-  "catalog.item.package-docs.title": "Document a package",
+  "catalog.item.package-docs.title": "Document",
+  "catalog.item.package-docs.draft": "Document a Loginom package.",
   "catalog.item.package-docs.description":
     "Describes the scenario, modules and data flows of a local .lgp package in PDF, Word or Markdown.",
   "catalog.item.package-docs.can": "Read a local package and create a document with the built-in generator.",
@@ -98,11 +98,13 @@ export default {
   "catalog.item.package-docs.compatibility":
     "Requires a local .lgp package, the built-in document generator and Loginom Help.",
   "catalog.item.loginom-dashboard.title": "Create a dashboard",
+  "catalog.item.loginom-dashboard.draft": "Help me create a Loginom dashboard.",
   "catalog.item.loginom-dashboard.description": "Creates a Loginom dashboard draft from sample data from a node.",
   "catalog.item.loginom-dashboard.can": "Create and edit drafts. Publish or delete a dashboard on your request.",
   "catalog.item.loginom-dashboard.cannot": "Grant access to dashboard tools or publish without your request.",
   "catalog.item.loginom-dashboard.compatibility": "Requires the Loginom dashboard tools.",
-  "catalog.item.package-linter.title": "Check a package",
+  "catalog.item.package-linter.title": "Check",
+  "catalog.item.package-linter.draft": "Check the quality of a Loginom package.",
   "catalog.item.package-linter.description":
     "Checks the structure, notes and names in a local .lgp package and gives recommendations.",
   "catalog.item.package-linter.can": "Read a local .lgp package and save a report beside it.",

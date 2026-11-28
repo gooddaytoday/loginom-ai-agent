@@ -104,6 +104,8 @@
       "paths": [
         "packages/app/src/shell/routes/routes.tsx", "packages/app/src/shell/state/layout.tsx",
         "packages/app/src/shell/state/layout.test.ts", "packages/app/vite.config.ts",
+        "packages/app/src/runtime/plugin/host-apis.tsx", "packages/plugin/src/gui/host-apis.ts",
+        "packages/ui/src/context/dialog.tsx",
         "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
       ]
     },

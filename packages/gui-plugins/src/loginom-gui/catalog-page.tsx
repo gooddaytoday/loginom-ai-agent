@@ -124,21 +124,6 @@ export default function CatalogPage() {
     reset()
   }
 
-  const target = () => {
-    const servers = ctx.servers.list().flatMap((id) => ctx.servers.get(id) ?? [])
-    const local = servers.filter((server) => server.local)
-
-    const server = ctx.desktop
-      ? servers.find((server) => server.builtin)
-      : (ctx.servers.get(location.origin) ?? (local.length === 1 ? local.at(0) : undefined))
-
-    if (!server?.connected) return
-
-    const project = server.data.project.list().at(0)
-
-    if (project) return { server: server.id, directory: project.canonical }
-  }
-
   const open = (item: (typeof bundledItems)[number]) => {
     ctx.dialogs.open((dialog) => (
       <CatalogDetail
@@ -147,16 +132,8 @@ export default function CatalogPage() {
         copy={copy(item)}
         close={dialog.close}
         use={() => {
-          const destination = target()
-
-          if (!destination) {
-            void ctx.dialogs.alert({ title: t("catalog.chooseProject") })
-
-            return
-          }
-
           dialog.close()
-          ctx.layout.draft({ ...destination, prompt: t("catalog.draft", { skill: item.id }) })
+          ctx.layout.draft({ prompt: t(`catalog.item.${item.id}.draft`) })
         }}
       />
     ))
@@ -261,7 +238,7 @@ export default function CatalogPage() {
                   </div>
                   <h2 class="text-16-medium text-v2-text-text-base">{copy(item).title}</h2>
                   <p class="flex-1 text-sm leading-5 text-v2-text-text-muted">{copy(item).description}</p>
-                  <p class="text-sm font-medium">{t("catalog.tier.loginom")}</p>
+                  <p class="text-sm font-medium">{t(`catalog.tier.${item.tier}`)}</p>
                   <p class="text-xs leading-4 text-v2-text-text-muted">{t("catalog.noEvidence")}</p>
                   <div class="flex flex-wrap items-center justify-between gap-2">
                     <ui.Button onClick={() => open(item)}>{t(`catalog.use.${item.kind}`)}</ui.Button>

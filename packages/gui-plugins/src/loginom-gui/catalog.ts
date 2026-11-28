@@ -17,11 +17,10 @@ export interface Item {
   installed: boolean
 }
 
-// The platform pins in product/loginom-catalogs.json describe executor primitives, not end-user actions.
-// These are the skills shipped under product/skills. The inventory test checks the list against the product.
+// Every bundled entry is backed by a shipped skill. The package actions are read-only workflows.
 export const bundledItems = [
   { id: "loginom-automation", tier: "loginom", kind: "skill", installed: true },
-  { id: "package-docs", tier: "loginom", kind: "skill", installed: true },
+  { id: "package-docs", tier: "loginom", kind: "action", installed: true },
   { id: "loginom-dashboard", tier: "loginom", kind: "skill", installed: true },
-  { id: "package-linter", tier: "loginom", kind: "skill", installed: true },
-] satisfies readonly Item[]
+  { id: "package-linter", tier: "loginom", kind: "action", installed: true },
+] as const satisfies readonly Item[]
