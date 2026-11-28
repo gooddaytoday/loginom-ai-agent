@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test"
 import type { SessionMessageAssistant, SessionMessageInfo, ShellInfo } from "@opencode/client/promise"
 import { timelinePresets } from "@opencode/session-ui/timeline/detail"
 import { createTwoFilesPatch } from "diff"
+import receipts from "../fixtures/loginom-feed-receipts.json" with { type: "json" }
 import { readSessionDraftText } from "../utils/drafts"
 import { holdRoute } from "../utils/app"
 import {
@@ -3407,7 +3408,7 @@ for (const width of [1280, 390]) {
   test(`Loginom shows live, completed and failed steps in both detail modes at ${width}px`, async ({
     page,
   }, testInfo) => {
-    const now = 1700000012000
+    const now = receipts.waiting.startedAt + 12000
     await page.clock.setFixedTime(now)
 
     await setupTimeline(page, {
@@ -3420,52 +3421,46 @@ for (const width of [1280, 390]) {
           [
             toolPart(
               "prt_loginom_import",
-              "loginom_dock_node_apply",
+              "loginom_dock_node_wait",
               "completed",
               {},
               {
                 title: "MODEL_GENERATED_TITLE",
                 output: "MODEL_GENERATED_RESULT",
                 metadata: {
-                  loginom: {
-                    v: 1,
-                    operationId: "import",
-                    state: "settled",
-                    status: "SUCCEEDED",
-                    kind: "import",
-                    sourceName: "sales-demo.csv",
-                    ports: [{ index: 0, guid: "table", rowCount: 2400, columnCount: 6 }],
-                  },
+                  loginom: width === 1280 ? receipts.output : receipts.node,
                 },
               },
             ),
             toolPart(
+              "prt_loginom_save",
+              "loginom_dock_action_run",
+              "completed",
+              {},
+              {
+                metadata: { loginom: receipts.save },
+              },
+            ),
+            toolPart(
               "prt_loginom_failure",
-              "loginom_dock_node_resume",
+              "loginom_dock_node_wait",
               "error",
               {},
               {
                 error: "RAW_TOOL_FAILURE",
                 metadata: {
-                  loginom: {
-                    v: 1,
-                    operationId: "build",
-                    state: "settled",
-                    status: "FAILED",
-                    kind: "build",
-                    attempt: 1,
-                    maxAttempts: 2,
-                    error: { message: "RAW_TIMEOUT", timeoutMs: 30000 },
-                  },
-                  loginomStep: {
-                    version: 1,
-                    phase: "reading",
-                    startedAt: now - 12000,
-                    lastReplyAt: null,
-                    stalledSince: null,
-                    substep: { kind: "fields", index: 7, total: 8 },
-                  },
+                  loginom: receipts.failure,
+                  loginomStep: receipts.reading,
                 },
+              },
+            ),
+            toolPart(
+              "prt_loginom_legacy_failure",
+              "loginom_dock_node_wait",
+              "error",
+              {},
+              {
+                error: "Loginom connection closed",
               },
             ),
             toolPart(
@@ -3474,17 +3469,7 @@ for (const width of [1280, 390]) {
               "running",
               {},
               {
-                metadata: {
-                  loginomStep: {
-                    version: 1,
-                    phase: "waiting",
-                    nodeType: "transform.group_data",
-                    startedAt: now - 12000,
-                    lastReplyAt: null,
-                    stalledSince: null,
-                    substep: null,
-                  },
-                },
+                metadata: { loginomStep: receipts.waiting },
               },
             ),
           ],
@@ -3498,20 +3483,45 @@ for (const width of [1280, 390]) {
     const imported = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_import")}"]`)
     const running = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_live")}"]`)
     const failure = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_failure")}"]`)
-    const details = imported.getByText("Выход 1: 2400 строк, 6 столбцов", { exact: true })
+    const saved = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_save")}"]`)
+    const legacyFailure = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_legacy_failure")}"]`)
+
+    const details = imported.getByText("Выход 1 · строк: 2400, столбцов: 1", { exact: true })
     const more = imported.getByLabel("Показать детали шага", { exact: true })
 
+    const legacyReason = legacyFailure.getByText("Loginom connection closed")
+
     await expect(brief).toHaveAttribute("aria-pressed", "true")
-    await expect(imported.getByText("Прочитал таблицу «sales-demo.csv»", { exact: true })).toBeVisible()
+    await expect(imported.getByText("Прочитал таблицу", { exact: true })).toBeVisible()
+    await expect(saved.getByText("Сохранил «ABC-анализ.lgp» в /user", { exact: true })).toBeVisible()
+    await expect(legacyFailure.getByText("Шаг Loginom", { exact: true })).toBeVisible()
+
+    if (width === 1280) {
+      const disclosure = legacyFailure.locator('[data-slot="collapsible-trigger"]')
+      await disclosure.click()
+      await expect(legacyReason).toBeVisible()
+      await disclosure.click()
+    } else {
+      await expect(legacyReason).toBeVisible()
+    }
+
     await expect(running.getByText("Жду Loginom 12 с", { exact: true })).toBeVisible()
     await expect(running.locator('[data-component="spinner"]')).toBeVisible()
-    await expect(failure).toHaveText(
-      "Не удалось собрать сценарий в Loginom · Loginom не ответил за 30 с · попытка 1 из 2",
-    )
+    await expect(
+      failure.getByText(
+        "Не удалось выполнить узел в Loginom · NODE_EXECUTION_FAILED — Loginom не ответил · попытка 1",
+        {
+          exact: true,
+        },
+      ),
+    ).toBeVisible()
     await expect(failure.locator('[data-component="spinner"]')).toHaveCount(0)
     await expect(more).toHaveText("…")
     await expect(details).toBeHidden()
-    await page.screenshot({ path: testInfo.outputPath(`loginom-${width}-compact.png`), animations: "disabled" })
+    await page.screenshot({
+      path: testInfo.outputPath(`loginom-${width}-compact.png`),
+      animations: "disabled",
+    })
 
     await more.click()
     await expect(details).toBeVisible()
@@ -3523,11 +3533,14 @@ for (const width of [1280, 390]) {
     await expect(details).toBeVisible()
     await expect(more).toHaveCount(0)
     await expect(failure.getByText("Поле 7 из 8")).toHaveCount(0)
-    await expect(page.getByText(/MODEL_GENERATED|RAW_TOOL_FAILURE|RAW_TIMEOUT/)).toHaveCount(0)
+    await expect(page.getByText(/MODEL_GENERATED|RAW_TOOL_FAILURE/)).toHaveCount(0)
     await expect
       .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("settings.v3") ?? "{}").general?.timelineDetail))
       .toEqual(timelinePresets[1].value)
-    await page.screenshot({ path: testInfo.outputPath(`loginom-${width}-detailed.png`), animations: "disabled" })
+    await page.screenshot({
+      path: testInfo.outputPath(`loginom-${width}-detailed.png`),
+      animations: "disabled",
+    })
   })
 }
 
@@ -3547,27 +3560,7 @@ test("Loginom updates the current step when live progress arrives", async ({ pag
   await expect(progress.getByText("Работаю в Loginom…", { exact: true })).toBeVisible()
 
   await timeline.send(
-    partUpdated(
-      toolPart(
-        id,
-        name,
-        "running",
-        {},
-        {
-          metadata: {
-            loginomStep: {
-              version: 1,
-              phase: "configuring",
-              nodeType: "transform.group_data",
-              startedAt: Date.now(),
-              lastReplyAt: null,
-              stalledSince: null,
-              substep: { kind: "fields", index: 2, total: 3 },
-            },
-          },
-        },
-      ),
-    ),
+    partUpdated(toolPart(id, name, "running", {}, { metadata: { loginomStep: receipts.configuring } })),
   )
   await expect(progress.getByText("Собираю сценарий в Loginom…", { exact: true })).toBeVisible()
 })

@@ -204,14 +204,15 @@ It then falls back to the quote's composer tile without closing the editor or di
 
 Built-in window plugins can import `ToolRenderer` from `@opencode/plugin/gui/builtin` and call
 `ctx.add(ToolRenderer, { tool, title, separate, render })` in setup for a tool they own. The host rejects native or
-already registered tool names and withdraws the renderer when the plugin unloads. A namespace such as `example_*`
-covers tools under that prefix. An exact name wins over prefixes. The longest prefix wins among matching prefixes.
-`separate: true` gives visible calls their own row in grouped timelines. The renderer receives live data, including
-partial input. Set `handlesFailure: true` to draw failures. The timeline shows a tool error card if rendering throws
-and retries rendering at the next call status.
+already registered tool names and withdraws the renderer when the plugin unloads. `separate: true` gives visible calls
+their own row in grouped timelines. The renderer receives live data, including partial input. The timeline shows a tool
+error card if rendering throws and retries rendering at the next call status. An exact tool name takes priority over
+namespace prefixes ending in `*`, and the longest matching prefix wins. A renderer can provide
+`handlesFailure(metadata)` to render failures with the facts it understands. The host keeps the standard error card for other failures.
 
 `builtinContext(ctx).timeline` reads and sets the app's saved Compact and Detailed presets. A built-in can use
 `BuiltinSlot` at `session.header.mobile` to put a control beside the session location on narrow screens.
+The host restricts the narrow-screen slot, timeline preset access and `ToolRenderer` to built-in plugins.
 `builtinContext(ctx).layout.openPage(id)` opens a page registered by that same built-in.
 
 [Lifetimes](#lifetimes) shows `createKeyed` in files.

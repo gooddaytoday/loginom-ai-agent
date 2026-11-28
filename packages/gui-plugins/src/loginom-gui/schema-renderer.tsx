@@ -7,7 +7,7 @@ import { copyText, isInvalidSession, readPackageCopy, samePackage } from "./copy
 import { transition, type Event, type Request, type State } from "./schema-machine"
 import type definition from "./index"
 import styles from "./schema.css?inline"
-import registerSteps from "./step"
+import registerSteps from "./step-renderer"
 
 const pageID = "package-schema"
 

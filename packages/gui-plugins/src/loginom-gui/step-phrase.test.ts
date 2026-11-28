@@ -1,76 +1,86 @@
 import { expect, test } from "bun:test"
-import { dict } from "./i18n/ru"
-import { decodeFacts, failureTitle, loginomStepPhrase } from "./step-phrase"
 import { Option } from "effect"
+import { dict } from "./i18n/ru"
+import { decodeFacts, failureReason, failureTitle, loginomStepPhrase } from "./step-phrase"
 
 function russianCopy() {
   const messages = new Map(Object.entries(dict))
 
-  const rules = new Intl.PluralRules("ru")
+  const t = (key: string, params?: Record<string, string | number | boolean>) =>
+    (messages.get(key) ?? key).replace(/{{(\w+)}}/g, (_, name: string) => String(params?.[name] ?? ""))
 
-  const copy = {
-    t: (key: string, params?: Record<string, string | number | boolean>) =>
-      (messages.get(key) ?? key).replace(/{{(\w+)}}/g, (_, name: string) => String(params?.[name] ?? "")),
-    plural: (key: string, count: number) => copy.t(`${key}.${rules.select(count)}`, { count }),
-  }
-
-  return copy
+  return { t }
 }
 
-const settled = { v: 1, state: "settled", status: "SUCCEEDED" }
+const settled = {
+  v: 1,
+  operationId: "operation",
+  state: "settled",
+  status: "SUCCEEDED",
+}
+
+const saved = {
+  ...settled,
+  kind: "save",
+  evidence: [
+    { kind: "saved", path: "/user/ABC-анализ.lgp" },
+    { kind: "savedGraphRead", nodeCount: 4, scope: "activeWorkflow" },
+  ],
+}
 
 test.each([
-  { facts: { kind: "import", sourceName: "sales-demo.csv" }, title: "Прочитал таблицу «sales-demo.csv»" },
-  { facts: { kind: "build", nodeCount: 4 }, title: "Собрал сценарий из 4 узлов" },
-  { facts: { kind: "build", nodeCount: 21 }, title: "Собрал сценарий из 21 узла" },
   {
-    facts: { kind: "save", package: { name: "ABC-анализ.lgp", directory: "/user" } },
-    title: "Сохранил «ABC-анализ.lgp» в /user",
+    facts: {
+      kind: "execute",
+      node: { guid: "node", label: "Импорт CSV", type: "imports.text" },
+      ports: [{ guid: "output", index: 0, rowCount: 2400, columnCount: 6 }],
+    },
+    title: "Прочитал таблицу",
   },
-  { facts: { kind: "unrecognized" }, title: "Выполнил шаг в Loginom" },
-])("formats $title from the receipt", ({ facts, title }) => {
+  {
+    facts: {
+      kind: "add",
+      node: { guid: "node", label: "Фильтр", type: "transform.filter_data" },
+    },
+    title: "Добавил узел «Фильтр»",
+  },
+  { facts: saved, title: "Сохранил «ABC-анализ.lgp» в /user" },
+  { facts: { kind: "build", nodeCount: 4 }, title: "Выполнил шаг в Loginom" },
+])("formats $title from confirmed receipt fields", ({ facts, title }) => {
   expect(loginomStepPhrase(russianCopy(), decodeFacts({ ...settled, ...facts }))).toBe(title)
 })
 
 test("uses the same phrase inline and preserves the filename's case", () => {
-  const facts = decodeFacts({ ...settled, kind: "import", sourceName: "Sales.csv" })
-  expect(loginomStepPhrase(russianCopy(), facts, { lowercase: true })).toBe("прочитал таблицу «Sales.csv»")
-})
-
-test("uses the C3.1 node and port facts to identify an import with a read result", () => {
-  const facts = decodeFacts({
-    ...settled,
-    operationId: "import",
-    kind: "execute",
-    node: { guid: "node", type: "imports.text", label: "CSV import node" },
-    ports: [{ guid: "output", index: 0, rowCount: 2400, columnCount: 6 }],
-  })
-
-  expect(loginomStepPhrase(russianCopy(), facts)).toBe("Прочитал таблицу")
+  expect(loginomStepPhrase(russianCopy(), decodeFacts(saved), { lowercase: true })).toBe(
+    "сохранил «ABC-анализ.lgp» в /user",
+  )
 })
 
 test("falls back for an older receipt and distinguishes pending work", () => {
   expect(loginomStepPhrase(russianCopy(), decodeFacts(undefined))).toBe("Выполнил шаг в Loginom")
-  expect(loginomStepPhrase(russianCopy(), decodeFacts({ v: 1, state: "running", kind: "build", nodeCount: 4 }))).toBe(
+  expect(loginomStepPhrase(russianCopy(), decodeFacts({ ...settled, state: "running" }))).toBe(
     "Получил промежуточный результат Loginom",
   )
 })
 
-test("only shows a retry limit and timeout duration when the failure receipt provides them", () => {
-  const failure = { v: 1, state: "settled", status: "FAILED", kind: "build", attempt: 1 }
-  expect(
-    failureTitle(
-      russianCopy(),
-      Option.getOrUndefined(
-        decodeFacts({
-          ...failure,
-          maxAttempts: 2,
-          error: { message: "Internal error", timeoutMs: 30_000 },
-        }),
-      ),
-    ),
-  ).toBe("Не удалось собрать сценарий в Loginom · Loginom не ответил за 30 с · попытка 1 из 2")
-  expect(failureTitle(russianCopy(), Option.getOrUndefined(decodeFacts(failure)))).toBe(
-    "Не удалось собрать сценарий в Loginom · попытка 1",
+test("uses the confirmed error code and short reason without inferring a retry limit", () => {
+  const facts = Option.getOrUndefined(
+    decodeFacts({
+      ...settled,
+      kind: "execute",
+      status: "FAILED",
+      ports: "invalid legacy value",
+      attempt: 1,
+      error: {
+        code: "NODE_EXECUTION_FAILED",
+        message: 'Loginom не ответил\n{"private":"raw"}',
+        source: "loginom",
+      },
+    }),
   )
+
+  expect(failureTitle(russianCopy(), facts)).toBe(
+    "Не удалось выполнить узел в Loginom · NODE_EXECUTION_FAILED — Loginom не ответил · попытка 1",
+  )
+  expect(failureReason(russianCopy(), undefined)).toBeUndefined()
 })

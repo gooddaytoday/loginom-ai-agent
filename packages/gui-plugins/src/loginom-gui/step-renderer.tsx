@@ -9,13 +9,14 @@ import { builtinContext, BuiltinSlot, ToolRenderer, type ToolRendererProps } fro
 import { readStepNode, type StepNode } from "./contract"
 import { copyText, readPackageCopy, samePackage } from "./copy"
 import type definition from "./index"
-import { decodeFacts, decodeProgress, failureTitle, loginomStepPhrase, stepDetails } from "./step-phrase"
+import { decodeFacts, decodeProgress, failureReason, failureTitle, loginomStepPhrase, stepDetails } from "./step-phrase"
 
 const modes = ["compact", "detailed"] as const
 
 type OpenNode = (session: MountedSession, node: StepNode) => void
 
 function registerSteps(ctx: Parameters<Plugin.Setup<typeof definition>>[0], openNode: OpenNode) {
+
   const timeline = builtinContext(ctx).timeline
 
   const renderDetail = () => (
@@ -46,10 +47,10 @@ function registerSteps(ctx: Parameters<Plugin.Setup<typeof definition>>[0], open
   ctx.add(ToolRenderer, {
     tool: "loginom_*",
     get title() {
-      return ctx.t("step.done")
+      return ctx.t("step.label")
     },
     separate: true,
-    handlesFailure: true,
+    handlesFailure: (metadata) => Boolean(failureReason(ctx, Option.getOrUndefined(decodeFacts(metadata.loginom)))),
     render: (props) => <Step {...props} openNode={openNode} />,
   })
 }
@@ -171,7 +172,10 @@ function Step(props: ToolRendererProps & { openNode: OpenNode }) {
   const title = () => {
     if (failed()) return failureTitle(ctx, facts())
 
-    if (!running()) return loginomStepPhrase(ctx, outcome(), { pending: props.metadata.loginomPending === true })
+    if (!running())
+      return loginomStepPhrase(ctx, outcome(), {
+        pending: props.metadata.loginomPending === true,
+      })
     const step = progress()
 
     if (!step) return ctx.t("step.running")
@@ -227,9 +231,7 @@ function Step(props: ToolRendererProps & { openNode: OpenNode }) {
               props.onOpenChange?.(next)
             }}
           >
-            <Show when={node()} fallback="…">
-              <Icon name={open() ? "chevron-up" : "chevron-down"} size="small" />
-            </Show>
+            …
           </button>
         </Show>
       </div>

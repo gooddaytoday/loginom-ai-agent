@@ -65,7 +65,7 @@ export type PeekMediaUrlFn = (uri: string, mime: string) => string | undefined
 /** A host-rendered tool card with its display title and a fallback supplied by the timeline. */
 export type ToolRenderContribution = {
   readonly title: string
-  readonly handlesFailure?: boolean
+  handlesFailure?(metadata: NonNullable<ToolProps["metadata"]>): boolean
   render(props: ToolProps, fallback: () => JSX.Element): JSX.Element
 }
 

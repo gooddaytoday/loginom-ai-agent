@@ -108,8 +108,11 @@ export interface ToolRenderer {
   readonly title: string
   /** Keep visible calls on their own rows, even when tool activity is grouped. */
   readonly separate?: boolean
-  /** Draw failed calls as well. Defaults to the timeline's standard tool error card. */
-  readonly handlesFailure?: boolean
+  /**
+   * Return true when the call metadata can explain a failure. The timeline otherwise uses its standard error card.
+   * @param metadata - The metadata recorded on the failed tool call.
+   */
+  handlesFailure?(metadata: ToolRendererProps["metadata"]): boolean
   /**
    * Draws a call under the plugin context. The host shows its tool error card if this throws.
    * @param props - Live call data and the timeline's display options.
