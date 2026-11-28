@@ -2,8 +2,10 @@ import { copyFile, realpath } from "node:fs/promises"
 import { join } from "node:path"
 import { expect } from "bun:test"
 import { Agent } from "@opencode/core/agent"
+import { Model } from "@opencode/core/model"
 import { PluginPromise } from "@opencode/core/plugin/promise"
 import { SdkPlugins } from "@opencode/core/plugin/sdk"
+import { Provider } from "@opencode/core/provider"
 import { Session } from "@opencode/core/session"
 import { Plugin } from "@opencode/plugin"
 import { Location } from "@opencode/schema/location"
@@ -40,7 +42,7 @@ it.live("routes the real variables RPC beside a package-access recheck peer afte
           },
         },
         events: {},
-      }, { recheck: async ({ packagePath }) => ({ kind: "unavailable", packagePath }) })
+      }, { recheck: async ({ packagePath }) => ({ kind: "unavailable" as const, packagePath }) })
     },
   })))
   yield* pluginsLoaded(context, directory)
@@ -48,7 +50,7 @@ it.live("routes the real variables RPC beside a package-access recheck peer afte
   const session = yield* Context.get(context, Session.Service).create({
     title: "Saved package variables",
     agent: Agent.ID.make("build"),
-    model: { providerID: "test", id: "fixture" },
+    model: { providerID: Provider.ID.make("test"), id: Model.ID.make("fixture") },
     location,
   })
   const handler = Context.get(context, HttpRouter.HttpRouter).asHttpEffect().pipe(HttpEffect.toWebHandlerWith(context))
