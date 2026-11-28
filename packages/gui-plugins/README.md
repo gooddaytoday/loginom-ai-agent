@@ -211,7 +211,9 @@ partial input. Set `handlesFailure: true` to draw failures. The timeline shows a
 and retries rendering at the next call status.
 
 `builtinContext(ctx).timeline` reads and sets the app's saved Compact and Detailed presets. A built-in can use
-`session.header.mobile` to put a control beside the session location on narrow screens.
+`session.header.mobile` to put a control beside the session location on narrow screens. The window host only
+exposes the timeline preset API to built-ins and only accepts tool renderers, top-level pages and narrow header
+contributions from its built-in list.
 
 [Lifetimes](#lifetimes) shows `createKeyed` in files.
 

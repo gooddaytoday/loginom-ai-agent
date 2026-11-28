@@ -60,7 +60,12 @@ export function setupSchemaView(ctx: Context) {
     builtinContext(ctx).layout.openPage(pageID)
   }
 
-  const [previewRequest, setPreviewRequest] = createSignal<{ session: MountedSession; revision: number }>()
+  const [previewRequest, setPreviewRequest] = createSignal<{
+    session: MountedSession
+    operationId: string
+    revision: number
+  }>()
+
   const previewed = new WeakMap<MountedSession, Set<string>>()
 
   const preview = createLatest(
@@ -69,20 +74,27 @@ export function setupSchemaView(ctx: Context) {
 
       if (request?.session === ctx.sessions.current()) return request
     },
-    async (request, signal) => ({
-      revision: request.revision,
-      ...(await read(requestFor(request.session), signal)),
-    }),
+    async (request, signal) => {
+      const result = await read(requestFor(request.session), signal)
+
+      if (result.snapshot && !signal.aborted) {
+        const operations = previewed.get(request.session) ?? new Set<string>()
+        operations.add(request.operationId)
+        previewed.set(request.session, operations)
+      }
+
+      return { revision: request.revision, ...result }
+    },
   )
 
   const inspect = (session: MountedSession, operationId: string) => {
-    const operations = previewed.get(session) ?? new Set<string>()
+    if (previewed.get(session)?.has(operationId)) return
 
-    if (operations.has(operationId)) return
+    const current = previewRequest()
 
-    operations.add(operationId)
-    previewed.set(session, operations)
-    setPreviewRequest((previous) => ({ session, revision: (previous?.revision ?? 0) + 1 }))
+    if (preview.loading && current?.session === session && current.operationId === operationId) return
+
+    setPreviewRequest((previous) => ({ session, operationId, revision: (previous?.revision ?? 0) + 1 }))
   }
 
   const nodeAction = (guid: string) => {

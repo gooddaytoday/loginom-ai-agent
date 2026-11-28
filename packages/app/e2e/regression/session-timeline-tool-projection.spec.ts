@@ -135,7 +135,7 @@ for (const mode of ["detailed", "compact"] as const) {
         return {
           output: {
             snapshot:
-              mode === "detailed"
+              mode === "detailed" && schemaReads > 1
                 ? {
                     source: "window",
                     scope: "active_workflow",
@@ -249,7 +249,15 @@ for (const mode of ["detailed", "compact"] as const) {
       }
 
       await expect.poll(() => schemaReads).toBe(1)
-      await expect(edits.getByRole("button", { name: "Фильтр", exact: true })).toBeVisible()
+      const filter = edits.getByRole("button", { name: "Фильтр", exact: true })
+      const compact = page.getByRole("button", { name: "Кратко", exact: true })
+      const detailed = page.getByRole("button", { name: "Подробно", exact: true })
+      await expect(filter).toHaveCount(0)
+      await compact.click()
+      await expect(compact).toHaveAttribute("aria-pressed", "true")
+      await detailed.click()
+      await expect(filter).toBeVisible()
+      await expect.poll(() => schemaReads).toBe(2)
       await expect(edits.getByRole("button", { name: "Сортировка", exact: true })).toHaveCount(0)
     } else {
       await expect(notice).toHaveText(

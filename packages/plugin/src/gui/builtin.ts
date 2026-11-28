@@ -389,7 +389,7 @@ export interface BuiltinTimeline {
   setDetail(mode: "compact" | "detailed"): void
 }
 
-/** The window context as the app's host builds it for every plugin, with the members only built-ins use. */
+/** The window context for built-in plugins, with the members reserved for them. */
 export interface BuiltinContext extends Context {
   /** Desktop-only abilities, `forceFocus` included; undefined on the web. */
   readonly desktop: BuiltinDesktop | undefined

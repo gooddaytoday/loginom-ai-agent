@@ -1,7 +1,7 @@
 import type { ToolSeparation } from "@opencode/session-ui/context"
 import type { SessionMessageAssistantTool, SessionMessageInfo, SessionStatus } from "@opencode/client/promise"
 import type { Context } from "@opencode/plugin/gui"
-import { ToolRenderer } from "@opencode/plugin/gui/builtin"
+import { BuiltinSlot, Page, ToolRenderer } from "@opencode/plugin/gui/builtin"
 import { DataProvider } from "@opencode/session-ui/context"
 import { timelinePresets } from "@opencode/session-ui/timeline/detail"
 import { createReactiveTimelineProjection } from "@opencode/session-ui/timeline/projection"
@@ -122,8 +122,22 @@ export function mountToolRendererHost(next: boolean) {
 }
 
 export async function checkToolRendererRegistration() {
-  const results = { duplicate: "", external: "", active: false, entries: 0 }
+  const results = {
+    duplicate: "",
+    external: "",
+    externalPage: "",
+    externalMobile: "",
+    externalTimeline: false,
+    builtinTimeline: false,
+    publicSlots: 0,
+    switchedSlots: 0,
+    active: false,
+    entries: 0,
+  }
+
+  const [externalAt, setExternalAt] = createSignal<"session.header" | "session.header.mobile">("session.header")
   const loadCompetitor = Promise.withResolvers<void>()
+  let visibleSlots = () => 0
 
   const host = mountPluginHost({
     builtins: new Set(["fixture", "competitor"]),
@@ -153,19 +167,41 @@ export async function checkToolRendererRegistration() {
             } catch (error) {
               results.external = String(error)
             }
+
+            try {
+              ctx.add(Page, { id: "test", title: "Test", render: () => null })
+            } catch (error) {
+              results.externalPage = String(error)
+            }
+
+            try {
+              ctx.add(BuiltinSlot, { at: "session.header.mobile", render: () => null })
+            } catch (error) {
+              results.externalMobile = String(error)
+            }
+
+            results.externalTimeline = "timeline" in ctx
+            ctx.add(BuiltinSlot, () => ({ at: externalAt(), render: () => null }))
+            visibleSlots = () => ctx.list(BuiltinSlot).length
           },
         }),
       },
     ],
   })
 
-  const setup = (ctx: Context) => void ctx.add(ToolRenderer, demoTool)
+  const setup = (ctx: Context) => {
+    results.builtinTimeline = "timeline" in ctx
+    ctx.add(ToolRenderer, demoTool)
+  }
 
   try {
     host.load(setup)
     await until(() => host.status() === "active")
     loadCompetitor.resolve()
     await until(() => host.status("competitor") === "active" && host.status("external") === "active")
+    results.publicSlots = visibleSlots()
+    setExternalAt("session.header.mobile")
+    results.switchedSlots = visibleSlots()
     host.disable()
     await until(() => host.entries(ToolRenderer.id) === 0)
     host.enable()

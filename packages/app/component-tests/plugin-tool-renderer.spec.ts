@@ -56,7 +56,7 @@ for (const next of [false, true]) {
   )
 }
 
-story("Only one built-in plugin can register a renderer for a tool", async ({ mount, page }) => {
+story("Only built-in plugins can use the private timeline surfaces", async ({ mount, page }) => {
   await mount("ui-line-comment--editor")
 
   const result = await page.evaluate(async (fixture) => {
@@ -68,6 +68,12 @@ story("Only one built-in plugin can register a renderer for a tool", async ({ mo
   expect(result).toEqual({
     duplicate: 'Error: A renderer is already registered for tool "loginom_demo"',
     external: "Error: Only built-in plugins can add tool renderers",
+    externalPage: "Error: Only built-in plugins can add pages",
+    externalMobile: "Error: Only built-in plugins can add narrow session header slots",
+    externalTimeline: false,
+    builtinTimeline: true,
+    publicSlots: 1,
+    switchedSlots: 0,
     active: true,
     entries: 1,
   })

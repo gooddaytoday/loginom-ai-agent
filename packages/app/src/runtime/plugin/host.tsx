@@ -23,7 +23,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import { LifetimeContext, liveAccessor, PluginContext, type Bridge, type Entry } from "@opencode/plugin/gui/host"
-import { ToolRenderer, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
+import { BuiltinSlot, Page, ToolRenderer, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
 import { Predicate } from "effect"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { pluralCategory, resolveTemplate } from "@opencode/ui/context/i18n"
@@ -805,6 +805,7 @@ function createHost(input: HostInput) {
     const stores: Stores = {}
 
     const gui = input.plugin?.(plugin)
+    const builtin = input.builtins?.has(plugin) === true
 
     const context = {
       id: plugin,
@@ -818,8 +819,14 @@ function createHost(input: HostInput) {
 
         const toolRenderer = registry.id === ToolRenderer.id
 
-        if (toolRenderer && !input.builtins?.has(plugin))
-          throw new Error("Only built-in plugins can add tool renderers")
+        if (toolRenderer && !builtin) throw new Error("Only built-in plugins can add tool renderers")
+
+        if (registry.id === Page.id && !builtin) throw new Error("Only built-in plugins can add pages")
+
+        const externalSlot = registry.id === BuiltinSlot.id && !builtin
+
+        const restrictedSlot = (value: T | undefined) =>
+          externalSlot && Predicate.hasProperty(value, "at") && value.at === "session.header.mobile"
 
         let active = toolRenderer
         let claimed: string | undefined
@@ -880,7 +887,19 @@ function createHost(input: HostInput) {
 
         // Validate the initial value in ctx.add, before installing the contribution.
         const initial = validate(reactive ? untrack(() => read?.()) : item)
-        const value = toolRenderer && read ? runWithOwner(owner, () => createMemo(() => validate(read()))) : read
+
+        if (restrictedSlot(initial)) throw new Error("Only built-in plugins can add narrow session header slots")
+
+        const value =
+          read && (toolRenderer || externalSlot)
+            ? runWithOwner(owner, () =>
+                createMemo(() => {
+                  const current = read()
+
+                  return restrictedSlot(current) ? undefined : validate(current)
+                }),
+              )
+            : read
 
         const key = `${plugin}/${++sequence.value}`
 
@@ -947,22 +966,24 @@ function createHost(input: HostInput) {
     Object.defineProperties(
       context,
       Object.fromEntries(
-        Object.entries(factories).map(([name, create]) => [
-          name,
-          {
-            enumerable: true,
-            get() {
-              if (!created.has(name)) created.set(name, create(plugin, root, typed, register, !gui))
+        Object.entries(factories)
+          .filter(([name]) => builtin || name !== "timeline")
+          .map(([name, create]) => [
+            name,
+            {
+              enumerable: true,
+              get() {
+                if (!created.has(name)) created.set(name, create(plugin, root, typed, register, !gui))
 
-              return created.get(name)
+                return created.get(name)
+              },
             },
-          },
-        ]),
+          ]),
       ),
     )
 
     // SAFETY: one implementation serves `Context` and every `SetupContext`: the declarations' records are built from
-    // the definition, and every HostApi is a getter defined above.
+    // the definition, and the required HostApis are getters defined above. Built-in-only getters use the allowlist.
     // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- see SAFETY above
     const typed = context as unknown as InstanceContext
 
