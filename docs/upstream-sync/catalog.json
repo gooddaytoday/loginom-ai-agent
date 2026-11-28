@@ -115,13 +115,17 @@
     {
       "id": "CAT-13",
       "title": "Product storage root and own background service (U5)",
+      "note": "C5.4: Desktop initialization starts the fork's proxy detection; background-service.ts consumes its environment at spawn. LAB-2276: Service discovery and stop distinguish an unreaped Linux process from a live service. Registration publication and conditional removal serialize through the same per-registration filesystem lock.",
       "paths": [
         "packages/util/src/global.ts", "packages/client/src/service-probe.ts", "packages/cli/src/services/service-config.ts",
         "packages/desktop/src/main/service/sidecar-probe.ts", "packages/desktop/src/main/service/background-service.ts",
+        "packages/desktop/src/main/lifecycle/desktop-initialization.ts",
         "packages/desktop/src/main/native/logging.ts", "packages/core/src/config/discovery.ts",
         "packages/process-daemon/src/daemon.rs", "packages/process-daemon/src/daemon/unix.rs", "packages/process-daemon/src/client.rs",
         "packages/server/src/process.ts", "packages/client/src/service-timing.ts", "packages/client/src/promise/service.ts",
-        "packages/client/src/effect/service.ts", "packages/cli/src/shutdown-deadline.ts",
+        "packages/client/src/effect/service.ts", "packages/client/src/service-registration-lock.ts",
+        "packages/client/package.json", "bun.lock", "packages/cli/src/services/service-registration.ts",
+        "packages/cli/src/shutdown-deadline.ts",
         "packages/server/test/process.test.ts", "packages/client/test/fixture/service.ts",
         "packages/client/test/fixture/service-timing.ts", "packages/client/test/promise-service.test.ts",
         "packages/client/test/service.test.ts", "packages/cli/test/service.test.ts",
@@ -155,7 +159,12 @@
         "packages/ui/src/i18n/en.ts"
       ]
     },
-    { "id": "CAT-09", "title": "Desktop main process, preload, renderer and window tests", "paths": ["packages/desktop/**"] },
+    {
+      "id": "CAT-09",
+      "title": "Desktop main process, preload, renderer and window tests",
+      "note": "Plugin inventory is ready without waiting for the bundled CLI; setup still resolves the CLI before starting a main plugin (LAB-2276).",
+      "paths": ["packages/desktop/**"]
+    },
     {
       "id": "CAT-21",
       "title": "Built-in plugin top-level pages",
@@ -201,7 +210,12 @@
       "paths": [
         "packages/schema/src/session.ts", "packages/core/src/session/store.ts", "packages/core/test/session-list.test.ts",
         "packages/protocol/openapi.json", "packages/client/src/effect/api/api.ts", "packages/client/src/effect/generated/client.ts"
-      ]
+      ],
+      "notes": {
+        "packages/app/src/shell/commands/session-search.tsx": "Keeps successful search results when a field fails. The palette displays an inline prompt search status (CAT-10).",
+        "packages/app/e2e/regression/command-palette.spec.ts": "Covers the sidebar Search entry and shortcut, with bounded title, project, and prompt searches and partial server failure (CAT-10).",
+        "packages/app/e2e/regression/home.spec.ts": "Covers title and project matches during a prompt search failure and clears the status after recovery."
+      }
     },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
     { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }
