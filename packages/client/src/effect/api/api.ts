@@ -134,6 +134,7 @@ export type SessionListInput = {
   readonly limit?: number | undefined
   readonly order?: "asc" | "desc" | undefined
   readonly search?: string | undefined
+  readonly searchField?: "title" | "project" | "prompt" | undefined
   readonly parentID?: Session.ID | null | undefined
   readonly archived?: boolean | undefined
   readonly directory?: AbsolutePath | undefined

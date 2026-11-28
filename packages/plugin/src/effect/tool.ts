@@ -1,3 +1,4 @@
+import type { Form } from "@opencode/schema/form"
 import { Tool } from "@opencode/schema/tool"
 import type { Agent } from "@opencode/schema/agent"
 import type { Session } from "@opencode/schema/session"
@@ -51,7 +52,13 @@ export interface ToolFailures extends Record<keyof ToolHooks, unknown> {
   readonly "execute.after": never
 }
 
+export type ToolForm = Omit<Form.Info, "sessionID">
+export type ToolInvocation = Pick<Tool.Context, "sessionID" | "agent" | "messageID" | "id">
+export type ToolFormResult = Exclude<Form.State, { status: "pending" }>
+
 export interface ToolDomain {
+  /** Ask for a decision within a running tool call, subject to the question permission. */
+  readonly ask: (form: ToolForm, context: ToolInvocation) => Effect.Effect<ToolFormResult, unknown>
   readonly transform: Transform<ToolEditor>
   readonly reload: () => Effect.Effect<void>
   /** Currently registered tools, after every transform, keyed by effective name. */
