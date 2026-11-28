@@ -226,7 +226,7 @@ test("Loginom: a checked write still waits for the operation's retry permission"
         ),
       ]),
     ],
-    pluginRpc(rpc, method, input) {
+    pluginRpc(rpc, method, input): Schema.Json | undefined {
       if (rpc === "loginom.connection" && method === "status") return connection(true)
 
       if (rpc === "loginom.write-outcome" && method === "check") {
@@ -294,7 +294,7 @@ for (const outcome of ["applied", "not_applied", "unknown"] as const) {
           ),
         ]),
       ],
-      pluginRpc(rpc, method, input) {
+      pluginRpc(rpc, method, input): Schema.Json | undefined {
         if (rpc === "loginom.connection" && method === "status") return connection(ready)
 
         if (rpc === "loginom.step" && method === "checkState" && outcome === "not_applied") {
