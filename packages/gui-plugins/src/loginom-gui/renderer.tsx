@@ -8,11 +8,13 @@ import { DashboardLink } from "./contract"
 import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
 import type definition from "./index"
 import { registerStartScreen } from "./start-screen"
+import { registerTimeline } from "./timeline"
 
 const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   registerStartScreen(ctx)
+  registerTimeline(ctx)
   const Catalog = lazy(() => import("./catalog-page"))
 
   ctx.add(Page, {
@@ -90,33 +92,35 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     ),
   })
 
-  onCleanup(subscribeBuiltinDeepLinks(dashboardLinkChannel, (data) => {
-    const decoded = decodeLink(data)
+  onCleanup(
+    subscribeBuiltinDeepLinks(dashboardLinkChannel, (data) => {
+      const decoded = decodeLink(data)
 
-    if (Option.isNone(decoded)) return
+      if (Option.isNone(decoded)) return
 
-    const link = decoded.value
+      const link = decoded.value
 
-    if ("code" in link) {
-      const issue =
-        link.code === "DASHBOARD_SNAPSHOT_UNAVAILABLE" || link.code === "DASHBOARD_SNAPSHOT_INVALID"
-          ? "dashboardSnapshotGone"
-          : link.code === "LOGINOM_CONFIG_REQUIRED"
-            ? "dashboardConnect"
-            : "dashboardOpenFailed"
+      if ("code" in link) {
+        const issue =
+          link.code === "DASHBOARD_SNAPSHOT_UNAVAILABLE" || link.code === "DASHBOARD_SNAPSHOT_INVALID"
+            ? "dashboardSnapshotGone"
+            : link.code === "LOGINOM_CONFIG_REQUIRED"
+              ? "dashboardConnect"
+              : "dashboardOpenFailed"
 
-      if (router.path().split("?")[0] === `/page/${ctx.id}/dashboard`) {
-        if (dashboard.dispatch({ type: "link.failed", id: link.id, issue })) return
+        if (router.path().split("?")[0] === `/page/${ctx.id}/dashboard`) {
+          if (dashboard.dispatch({ type: "link.failed", id: link.id, issue })) return
+        }
+
+        ctx.toast.show({ variant: "error", title: ctx.t(issue) })
+
+        return
       }
 
-      ctx.toast.show({ variant: "error", title: ctx.t(issue) })
-
-      return
-    }
-
-    dashboard.dispatch({ type: "link.opened", link })
-    router.openPage("dashboard")
-  }))
+      dashboard.dispatch({ type: "link.opened", link })
+      router.openPage("dashboard")
+    }),
+  )
 }
 
 export default setup

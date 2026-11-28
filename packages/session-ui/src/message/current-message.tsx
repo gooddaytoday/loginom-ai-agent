@@ -65,6 +65,7 @@ export function SessionAssistantContent(props: {
   message: SessionMessageAssistant
   content: SessionMessageAssistant["content"][number]
   contentID: string
+  turnID?: string
   showAssistantCopyPartID?: string | null
   turnDurationMs?: number | null
   turnTokensPerSecond?: number
@@ -109,6 +110,9 @@ export function SessionAssistantContent(props: {
         {(tool) => (
           <ToolDisplay
             id={props.contentID}
+            call={
+              props.turnID ? { turnID: props.turnID, messageID: props.message.id, toolCallID: tool().id } : undefined
+            }
             tool={tool().name}
             input={currentToolInput(tool())}
             metadata={currentToolMetadata(tool())}

@@ -1146,6 +1146,7 @@ export interface ToolProps {
   metadata: Record<string, unknown>
   tool: string
   sessionID?: string
+  call?: { turnID: string; messageID: string; toolCallID: string }
   output?: string
   status?: string
   hideDetails?: boolean
@@ -1209,7 +1210,7 @@ export function useToolDisplayRenderer(
     )
   })
 
-  return { render, title: () => item()?.title }
+  return { render, title: () => item()?.title, handlesFailure: () => item()?.handlesFailure === true }
 }
 
 export function FileTool(props: ToolProps & { title: string; count: number; children?: JSX.Element }) {
@@ -1424,7 +1425,7 @@ export function ToolDisplay(
               </>
             )}
           </Match>
-          <Match when={error()}>
+          <Match when={!renderer.handlesFailure() && error()}>
             {(error) => {
               const cleaned = error().replace("Error: ", "")
 

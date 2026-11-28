@@ -204,9 +204,18 @@ It then falls back to the quote's composer tile without closing the editor or di
 
 Built-in window plugins can import `ToolRenderer` from `@opencode/plugin/gui/builtin` and call
 `ctx.add(ToolRenderer, { tool, title, separate, render })` in setup for a tool they own. The host rejects native or
-already registered tool names and withdraws the renderer when the plugin unloads. `separate: true` gives visible calls
-their own row in grouped timelines. The renderer receives live data, including partial input. The timeline shows a tool
-error card if rendering throws and retries rendering at the next call status.
+already registered tool names and withdraws the renderer when the plugin unloads. A namespace such as `example_*`
+covers tools under that prefix. An exact name wins over prefixes. The longest prefix wins among matching prefixes.
+`separate: true` gives visible calls their own row in grouped timelines. The renderer receives live data, including
+partial input. Set `handlesFailure: true` to draw failures. The timeline shows a tool error card if rendering throws
+and retries rendering at the next call status. In a turn, `props.call` identifies the user message, assistant message
+and original tool call. A renderer can use those identities to group its own disclosures or ask for a read tied to
+the recorded call. Standalone tool displays can omit it.
+
+`builtinContext(ctx).timeline` reads and sets the app's saved Compact and Detailed presets.
+`BuiltinSlot` at `session.header.mobile` places a control beside the session location on narrow screens. The
+host exposes the timeline preset API only to built-ins and checks the mobile slot at registration, including
+reactive contributions. The public `session.header` slot stays available.
 
 [Lifetimes](#lifetimes) shows `createKeyed` in files.
 
@@ -485,7 +494,7 @@ A built-in always runs, whatever setting is saved under its id, so Extensions â€
 - **The lint bans raw effects.** `createEffect`, `createRenderEffect` and `createComputed` may not be imported in `packages/gui-plugins/src`; the SDK (`packages/plugin/src/gui`) wraps them. An escape hatch needs an `oxlint-disable` comment with a reason.
 - **Suspense only on first load.** Wrap each `lazy()` component in its own `<Suspense>`, read async data through `.latest` or `createLatest`, and never read a refetching resource in render: it blanks the nearest boundary.
 - **Stable objects.** Return the same object from `Panel.list` and reactive contributions while nothing changed, so the host never remounts.
-- **No timeline work.** `session.header` is the only timeline surface, besides `CodeBlock` and `CodeBlockAction` content, which the host renders only for a complete fenced block of a language you list.
+- **Public timeline surfaces.** `session.header` is the only timeline surface, besides `CodeBlock` and `CodeBlockAction` content, which the host renders only for a complete fenced block of a language you list.
 - **No module state.** Keep state inside setup; module state survives a reload and leaks across windows.
 
 ## Testing

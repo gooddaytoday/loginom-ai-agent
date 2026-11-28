@@ -93,7 +93,8 @@ Read [You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-a
   - Give a fallback the area's size when the area has fixed geometry, so nothing shifts; leave it empty otherwise.
   - Make a state change that may suspend inside `startTransition`, so the current content stays until the next is ready.
 - Return stable objects from `Panel.list` and reactive contributions, so the host never remounts a trigger or a panel.
-- Never add work to timeline rows. The session header slot is the only timeline surface, besides `CodeBlock` and `CodeBlockAction` content: the host renders it only for a complete fenced block of a language a plugin lists, and blocks of other languages cost a set lookup.
+- Public timeline surfaces are `session.header`, `CodeBlock` and `CodeBlockAction`. The host renders code contributions only for a complete fenced block of a language the plugin lists.
+- Built-ins can register `ToolRenderer` for their own tools and fill `BuiltinSlot` at `session.header.mobile`. The host checks both at registration and exposes the saved preset through `builtinContext(ctx).timeline` only to built-ins. `ToolRendererProps.call` carries transcript identities when the display belongs to a turn. Keep reads for optional detail behind a user action and tie them to the recorded call.
 
 ## Localization
 

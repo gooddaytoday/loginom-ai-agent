@@ -78,6 +78,7 @@ export {
 } from "@opencode/plugin/gui"
 
 export { Schema }
+
 export { BuiltinSlot } from "@opencode/plugin/gui/builtin"
 
 type PluginHost = ReturnType<typeof usePluginHost>
@@ -139,6 +140,7 @@ function fakeApis(storage: (plugin: string) => Storage): HostApiFactories {
     sessions: () => ({ list: () => [], current: () => undefined }),
     screen: () => ({ current: () => undefined }),
     layout: () => layout,
+    timeline: () => ({ detail: () => "compact", setDetail() {} }),
     storage,
     system: () => ({ copy: async () => {}, save: async () => false, openExternal() {} }),
     embeds: () => ({ View: () => null, capture: async () => undefined }),
@@ -622,6 +624,7 @@ function standIn(overrides: Partial<Interface>): Interface {
       scroll: { get: () => undefined, set() {} },
     },
     settings() {},
+    timeline: { detail: () => "compact", setDetail() {} },
     project() {},
     draft() {},
     command() {},
