@@ -15,6 +15,7 @@ import {createActionCatalogFixture} from './action-catalog-fixture.mjs';
 const target={profile_id:'test',loginom_build:'7.4.2',platform:'macos',browser:'chromium'};
 const path='/test-2/packages/result.lgp';
 const f={stateReads:0,modified:false};
+let reopenSavedPackage;
 class ExternalClient {
   constructor(identity){this.browser=identity.name==='loginom-dock-browser';}
   async connect(t){this.transport=t;}
@@ -24,7 +25,17 @@ class ExternalClient {
     if(!this.browser)return {content:[{type:'text',text:f.catalog.files.get(request.arguments.uris[0])}]};
     const code=request.arguments.code;
     let value;
-    if(code.includes('async function prepareWorkspace'))value={status:'READY',authenticated:true,target_verified:true,
+    if(code.includes('"recoveryAccount":"test-2"')){
+      const {operationId,packagePath}=JSON.parse(code.slice(code.lastIndexOf('(page, {')+7,-1));
+      assert.equal(packagePath,path);
+      value={status:'READY',authenticated:true,target_verified:true,target,loginom_account:'test-2',
+        document_id:'reopened-doc',operation_id:operationId,created_draft:false,effect_possible:true,
+        workflow_ref:{tab_tid:'reopened-tab',prefix:'own',workflow_id:'reopened-workflow',navigation_path:[]},
+        package_ref:{path,persisted:true,read_only:false}};
+    } else if(code.includes("action_key:'workspace.reload_graph'"))
+      value={status:'SUCCEEDED',action_key:'workspace.reload_graph',action_revision:'1',operation_id:'reload',
+        phase:'observed',effect_possible:false,error:null,trace:[],output:{package_modified:false}};
+    else if(code.includes('async function prepareWorkspace'))value={status:'READY',authenticated:true,target_verified:true,
       target,loginom_account:'test-2',document_id:'own-doc',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:{path:null}};
     else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'own-doc'}};
     else if(code.includes('browser_recovery_page'))
@@ -44,16 +55,19 @@ mock.module('@modelcontextprotocol/sdk/client/stdio.js',{namedExports:{StdioClie
 mock.module('@modelcontextprotocol/sdk/client/streamableHttp.js',{namedExports:{StreamableHTTPClientTransport:ExternalTransport}});
 mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExports:{...workspace,
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
-mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>({
-  tools:executor.executorTools,describe:()=>({actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){},hasUnsettledWork:()=>false,hasActiveWork:()=>false,async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
-  run:async(key,parameters,{operationId})=>{
-    f.saved={status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};
-    return f.lost?{...f.saved,status:'AMBIGUOUS',output:{}}:f.saved;
-  },
-  inspect:async({operationId})=>({status:'SUCCEEDED',action_key:'operation.inspect',operation_id:operationId,
-    output:{state:'resolved',cleanup_confirmed:true,outcome:f.saved}}),
-  browserRecoveryBasis(){throw Error('No browser recovery trigger for this operation');},
-})}});
+mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:options=>{
+  reopenSavedPackage=options.reopenNodePackage;
+  return {
+    tools:executor.executorTools,describe:()=>({actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){},hasUnsettledWork:()=>false,hasActiveWork:()=>false,async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
+    run:async(key,parameters,{operationId})=>{
+      f.saved={status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};
+      return f.lost?{...f.saved,status:'AMBIGUOUS',output:{}}:f.saved;
+    },
+    inspect:async({operationId})=>({status:'SUCCEEDED',action_key:'operation.inspect',operation_id:operationId,
+      output:{state:'resolved',cleanup_confirmed:true,outcome:f.saved}}),
+    browserRecoveryBasis(){throw Error('No browser recovery trigger for this operation');},
+  };
+}}});
 const {createBridge}=await import('../../lib/bridge.mjs');
 
 for(const modified of [false,true])
@@ -104,17 +118,34 @@ test('inspection of an ambiguous Save delivers the original saved-package follow
     artifactStore:{list:()=>[],async releaseUploads(){}}};
   const bridge=await createBridge({resources:resources.resources,actionManifestUri:f.catalog.manifestUri,actionManifestSha256:f.catalog.manifestSha256,
     mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
-    loginomUrl:'http://loginom.invalid/app',replayBootstrap:false,replayLoginUser:null,browserRecovery:true},session,{browserTransport:new ExternalTransport()});
+    loginomUrl:'http://loginom.invalid/app',replayBootstrap:false,replayLoginUser:null,browserRecovery:true,
+    storageDirectories:{inputs:'/test-2/inputs',packages:'/test-2/packages',exports:'/test-2/exports'}},session,
+  {browserTransport:new ExternalTransport(),reauthenticateReload:async()=>true});
   const client=new AgentClient({name:'reconciled-save',version:'1'});
   try{
     const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
     await client.callTool({name:'dock_prepare',arguments:{}});
     await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path,conflict_policy:'replace'},operation_id:'own-save'}});
+    const browser = { pages: () => [] };
+    assert.equal((await bridge.packageState(browser, false)).lastSave, null);
+    const beforeConfirmation = Date.now();
     const inspected=await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:'own-save'}});
     const blocks=inspected.content.map(c=>{try{return JSON.parse(c.text);}catch{return {};}});
     assert.equal(blocks[0].action_key,'operation.inspect');
     const state=blocks.find(v=>v.kind==='dock_saved_package_state');
     assert.equal(state?.save_operation_id,'own-save',JSON.stringify(inspected));
+    const { lastSave } = await bridge.packageState(browser, false);
+    assert.equal(lastSave?.path, path);
+    assert.ok(lastSave.confirmedAt >= beforeConfirmation && lastSave.confirmedAt <= Date.now());
     assert.equal(state.package_path,path);assert.equal(state.modified,false);assert.equal(f.stateReads,2);
+    await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:'own-save'}});
+    assert.deepEqual((await bridge.packageState(browser, false)).lastSave, lastSave);
+
+    const reopened=await reopenSavedPackage({documentId:'own-doc',deadline:Date.now()+5000});
+    assert.equal(reopened.ref?.document_id,'reopened-doc',JSON.stringify(reopened));
+    await reopened.publish(async()=>{});
+    assert.equal(session.metadata.workspacePreparation.state.package_ref.path,path);
+    assert.equal(session.metadata.workspacePreparation.state.document_id,'reopened-doc');
+    assert.deepEqual((await bridge.packageState(browser, false)).lastSave,lastSave);
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
 });

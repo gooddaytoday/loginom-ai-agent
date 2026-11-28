@@ -142,6 +142,11 @@ export const dashboard = {
   },
 }
 
+export async function packageState(sessionID: string) {
+  const result = await request("package.state", { sessionID }).catch(() => null)
+  return result ?? { open: null, path: null, modified: null, modifiedDetectedAt: null, lastSave: null, staleForSeconds: null }
+}
+
 export const connectionSettings = {
   request,
   onApplication(listener: Loginom.ConnectionApplicationListener) {

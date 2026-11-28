@@ -24,6 +24,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "managed-work-entry-"))
   const work = join(directory, "work.json")
+  const snapshotRelease = join(directory, "release-snapshot")
   const src = join(directory, "runtime/src")
   const files = {
     "runtime/src/managed-entry.mjs": await readFile(
@@ -94,13 +95,17 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
        export const admitStartupArtifacts=artifacts.admitStartupArtifacts;
        export const artifactFailure=artifacts.artifactFailure ?? (()=>null);`,
     "runtime/client/lib/bridge.mjs": `
-      import { readFileSync } from 'node:fs';
+      import { existsSync, readFileSync } from 'node:fs';
       const work = () => JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8'));
       export async function createBridge() { return {
         server: { connect: async () => {} }, close: async () => ({
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
+        async packageState(_context, busy) {
+          while (!busy && !existsSync(${JSON.stringify(snapshotRelease)})) await new Promise(resolve => setTimeout(resolve, 5));
+          return { staleForSeconds: busy ? 2 : null };
+        },
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
           return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
@@ -176,11 +181,18 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       recoveryPending: false,
       activeWork: false,
     })
+    const pendingSnapshot = runtime.request("packageState")
     const call = runtime
       .request("call", { name: "fixture", arguments: { hold: true } })
       .catch((error: unknown) => error)
-    expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: true })
-    expect(await runtime.request("interrupt")).toEqual({ interrupted: true })
+    try {
+      expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: true })
+      expect(await runtime.request("packageState", undefined, 1000)).toEqual({ staleForSeconds: 2 })
+    } finally {
+      await Bun.write(snapshotRelease, "")
+      expect(await runtime.request("interrupt")).toEqual({ interrupted: true })
+    }
+    expect(await pendingSnapshot).toEqual({ staleForSeconds: null })
     expect(await call).toMatchObject({ message: "LOGINOM_RUNTIME_FAILED" })
     expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: false })
   } finally {

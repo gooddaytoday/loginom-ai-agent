@@ -312,6 +312,16 @@ async function handle(message) {
       }
       return
     }
+    if (message.operation === "packageState") {
+      if (state.controller || state.bridge.hasActiveWork()) {
+        send({ id: message.id, result: await state.bridge.packageState(state.browser, true) })
+        return
+      }
+      const read = state.packageStateRead ??= state.bridge.packageState(state.browser, false)
+        .finally(() => { state.packageStateRead = undefined })
+      send({ id: message.id, result: await read })
+      return
+    }
     if (message.operation === "work") {
       send({
         id: message.id,

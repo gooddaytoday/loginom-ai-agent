@@ -2,7 +2,7 @@ import { inputStore, type InputFile } from "./inputs"
 import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { tmpdir } from "node:os"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
@@ -320,6 +320,7 @@ export async function createLoginomHost(options: {
       },
     )
   type Runtime = Awaited<ReturnType<typeof supervise>>
+  const readyRuntimes = new WeakMap<Promise<Runtime>, Runtime>()
   function retain(generation: { children: Map<string, Promise<Runtime>> }, chat: string, child: Promise<Runtime>) {
     const tracked = child.then((runtime) => {
       const closing: { requested: boolean; promise?: Promise<void> } = { requested: false }
@@ -329,7 +330,7 @@ export async function createLoginomHost(options: {
         lost.add(chat)
         generation.children.delete(chat)
       })
-      return {
+      const ready = {
         ...runtime,
         close() {
           closing.requested = true
@@ -340,6 +341,8 @@ export async function createLoginomHost(options: {
           return closing.promise
         },
       }
+      readyRuntimes.set(tracked, ready)
+      return ready
     })
     generation.children.set(chat, tracked)
     tracked.catch(() => {
@@ -808,6 +811,23 @@ export async function createLoginomHost(options: {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
       return inputs.admit(`${generation}:${chat}`, userMessage, files, `/${current.connection.username}`)
+    },
+    async packageState(sessionID: string) {
+      const chat = createHash("sha256").update(sessionID).digest("hex")
+      const { generation } = await service.api.status()
+      if (lost.has(chat) || stale.has(chat)) return null
+      const child = generations.get(generation)?.children.get(chat)
+      if (!child) {
+        if ([...generations.values()].some((entry) => entry.children.has(chat))) return null
+        return { open: false, path: null, modified: null, modifiedDetectedAt: null, lastSave: null, staleForSeconds: null }
+      }
+      const ready = readyRuntimes.get(child)
+      if (!ready) return null
+      const result = await ready.request("packageState", undefined, 5000).catch(() => null)
+      if ((await service.api.status()).generation !== generation || generations.get(generation)?.children.get(chat) !== child
+        || lost.has(chat) || stale.has(chat))
+        return null
+      return result
     },
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true

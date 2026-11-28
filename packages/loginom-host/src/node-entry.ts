@@ -140,6 +140,13 @@ async function dispatch(message: unknown) {
       reply({ id: message.id, result })
       return
     }
+    if (message.method === "package.state") {
+      if (!input || typeof input !== "object" || !("sessionID" in input) || typeof input.sessionID !== "string")
+        throw new Error("LOGINOM_INPUT_INVALID")
+      const result = await state.host.packageState(input.sessionID)
+      reply({ id: message.id, result })
+      return
+    }
     if (!message.method.startsWith("connection.")) {
       events.emit("message", { data: message })
       return
