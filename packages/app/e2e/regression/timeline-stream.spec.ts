@@ -3428,7 +3428,7 @@ for (const width of [1280, 390]) {
                 title: "MODEL_GENERATED_TITLE",
                 output: "MODEL_GENERATED_RESULT",
                 metadata: {
-                  loginom: width === 1280 ? receipts.output : receipts.node,
+                  loginom: receipts.output,
                 },
               },
             ),
@@ -3487,6 +3487,7 @@ for (const width of [1280, 390]) {
     const legacyFailure = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_legacy_failure")}"]`)
 
     const details = imported.getByText("Выход 1 · строк: 2400, столбцов: 1", { exact: true })
+    const tableRead = imported.getByText("Выход 1 · прочитано 1 из 2400 строк", { exact: true })
     const more = imported.getByLabel("Показать детали шага", { exact: true })
 
     const legacyReason = legacyFailure.getByText("Loginom connection closed")
@@ -3518,6 +3519,7 @@ for (const width of [1280, 390]) {
     await expect(failure.locator('[data-component="spinner"]')).toHaveCount(0)
     await expect(more).toHaveText("…")
     await expect(details).toBeHidden()
+    await expect(tableRead).toBeHidden()
     await page.screenshot({
       path: testInfo.outputPath(`loginom-${width}-compact.png`),
       animations: "disabled",
@@ -3531,6 +3533,9 @@ for (const width of [1280, 390]) {
     await full.click()
     await expect(full).toHaveAttribute("aria-pressed", "true")
     await expect(details).toBeVisible()
+    await expect(saved.getByText("В перечитанном сценарии · узлов: 2", { exact: true })).toBeVisible()
+
+    await expect(tableRead).toBeVisible()
     await expect(more).toHaveCount(0)
     await expect(failure.getByText("Поле 7 из 8")).toHaveCount(0)
     await expect(page.getByText(/MODEL_GENERATED|RAW_TOOL_FAILURE/)).toHaveCount(0)
@@ -3553,7 +3558,7 @@ test("Loginom updates the current step when live progress arrives", async ({ pag
   await expect(page.getByRole("button", { name: "Остановить", exact: true })).toBeVisible()
 
   const id = "prt_loginom_progress"
-  const name = "loginom_dock_node_apply"
+  const name = "loginom_dock_node_wait"
   const progress = page.locator(`[data-timeline-part-id="${id}"]`)
 
   await timeline.send(partUpdated(toolPart(id, name, "streaming", {})))
@@ -3563,4 +3568,8 @@ test("Loginom updates the current step when live progress arrives", async ({ pag
     partUpdated(toolPart(id, name, "running", {}, { metadata: { loginomStep: receipts.configuring } })),
   )
   await expect(progress.getByText("Собираю сценарий в Loginom…", { exact: true })).toBeVisible()
+
+  await timeline.send(partUpdated(toolPart(id, name, "completed", {}, { metadata: { loginom: receipts.node } })))
+  await expect(progress.getByText("Прочитал таблицу", { exact: true })).toBeVisible()
+  await expect(progress.locator('[data-component="spinner"]')).toHaveCount(0)
 })

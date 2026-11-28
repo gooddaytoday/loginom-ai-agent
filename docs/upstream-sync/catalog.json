@@ -165,7 +165,6 @@
         "packages/session-ui/src/tools/tool-renderer.tsx",
         "packages/ui/src/i18n/en.ts",
         "packages/app/src/session/screen.tsx",
-        "packages/app/src/runtime/plugin/host-apis.tsx",
         "packages/app/src/session/timeline/tool-renderers.tsx",
         "packages/app/component-tests/tool-renderer.fixture.tsx",
         "packages/app/component-tests/plugin-host.spec.ts",
@@ -214,7 +213,10 @@
     {
       "id": "CAT-17",
       "title": "Built-in plugin page navigation for dashboard links",
-      "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
+      "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"],
+      "notes": {
+        "packages/app/src/runtime/plugin/host-apis.tsx": "C3.18 (CAT-14): attach the built-in timeline preset to the window host."
+      }
     },
     {
       "id": "CAT-10",

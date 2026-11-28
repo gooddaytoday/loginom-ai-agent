@@ -1,14 +1,16 @@
 {
   "sources": {
-    "node, failure": "#1471 32f1f5fbe451c71425473cb01087937c686a4a2d: nodeResultReply, loginomFeedMetadata, withLoginomMetadata",
-    "output": "#1504 d4c352d4fed848b23ea69177aab99258444dab6d: nodeResultReply, loginomFeedMetadata",
-    "save": "#1484 e743ae4ec038199a57ac877b13de93e116b1c446: loginomSaveMetadata",
-    "waiting, configuring, reading": "#1471 32f1f5fbe451c71425473cb01087937c686a4a2d: withStepProgress"
+    "node, failure": "#1471 c67339391b7faacd6d96b2628eaebc3c76a58259: nodeResultReply, loginomFeedMetadata",
+    "output": "#1504 e887158b278e68369950078ff137099851e02ace: nodeResultReply, loginomFeedMetadata",
+    "save": "#1484 632435e9c0a3a14b7d7099440a1a44406add82b8: loginomSaveMetadata",
+    "node, output, failure, save": "#1471 c67339391b7faacd6d96b2628eaebc3c76a58259: withLoginomMetadata, decodeLoginomMetadata",
+    "waiting, configuring, reading": "#1471 c67339391b7faacd6d96b2628eaebc3c76a58259: withStepProgress"
   },
   "node": {
     "v": 1,
     "operationId": "import",
     "state": "settled",
+    "kind": "execute",
     "attempt": 1,
     "status": "SUCCEEDED",
     "phase": "node_ready",
@@ -24,7 +26,6 @@
     "limitations": [
       "Output port 0: only 1 of 2400 rows returned. Do not report unseen rows or a complete ranking from this preview. Compute report statistics in nodes and request the needed output."
     ],
-    "kind": "execute",
     "ports": [
       {
         "index": 0,
@@ -43,9 +44,9 @@
             [
               {
                 "type": "string",
+                "is_null": false,
                 "value": "A",
-                "precision": "source_text",
-                "is_null": false
+                "precision": "source_text"
               }
             ]
           ],
@@ -58,6 +59,17 @@
     "v": 1,
     "operationId": "import",
     "state": "settled",
+    "kind": "execute",
+    "evidence": [
+      {
+        "kind": "tableRead",
+        "port": 0,
+        "portGuid": "table-port",
+        "rowsRead": 1,
+        "rowCount": 2400,
+        "executionId": "exec"
+      }
+    ],
     "attempt": 1,
     "status": "SUCCEEDED",
     "phase": "node_ready",
@@ -73,7 +85,6 @@
     "limitations": [
       "Output port 0: only 1 of 2400 rows returned. Do not report unseen rows or a complete ranking from this preview. Compute report statistics in nodes and request the needed output."
     ],
-    "kind": "execute",
     "ports": [
       {
         "index": 0,
@@ -92,41 +103,25 @@
             [
               {
                 "type": "string",
+                "is_null": false,
                 "value": "A",
-                "precision": "source_text",
-                "is_null": false
+                "precision": "source_text"
               }
             ]
           ],
           "sampleComplete": false
-        },
-        "details": {
-          "delivered": {
-            "kind": "preview"
-          },
-          "sampleLimitation": "more_rows_not_delivered"
         }
       }
     ],
-    "evidence": [
-      {
-        "kind": "tableRead",
-        "port": 0,
-        "portGuid": "table-port",
-        "rowsRead": 1,
-        "rowCount": 2400,
-        "executionId": "exec"
-      }
-    ],
-    "outputConfiguration": {
-      "kind": "unavailable",
-      "reason": "configuration_not_confirmed"
-    }
+    "dropped": [
+      "outputConfiguration"
+    ]
   },
   "failure": {
     "v": 1,
     "operationId": "failure",
     "state": "settled",
+    "kind": "execute",
     "attempt": 1,
     "status": "FAILED",
     "phase": "node_ready",
@@ -149,14 +144,12 @@
       "message": "Loginom не ответил",
       "source": "loginom",
       "attribution": "verified_node"
-    },
-    "kind": "execute"
+    }
   },
   "save": {
     "v": 1,
     "operationId": "save",
     "state": "settled",
-    "status": "SUCCEEDED",
     "kind": "save",
     "evidence": [
       {
@@ -164,11 +157,18 @@
         "path": "/user/ABC-анализ.lgp"
       },
       {
-        "kind": "savedGraphRead",
+        "kind": "reopenedGraphRead",
         "nodeCount": 2,
         "scope": "activeWorkflow"
       }
-    ]
+    ],
+    "receiptWindow": {
+      "runtimeId": "32ef40ff-08d2-476a-ad73-1ef3feb17ce8",
+      "documentId": "document",
+      "startSequence": 1,
+      "confirmedSequence": 2
+    },
+    "status": "SUCCEEDED"
   },
   "waiting": {
     "version": 1,

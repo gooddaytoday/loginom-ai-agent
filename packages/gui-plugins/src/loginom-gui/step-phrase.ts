@@ -1,5 +1,6 @@
 import { Effect, Option, Schema } from "effect"
 import type { Plugin } from "@opencode/plugin/gui"
+import type { LoginomMetadata } from "../../../loginom-agent/src/loginom-metadata"
 import type definition from "./index"
 
 type Copy = Pick<Parameters<Plugin.Setup<typeof definition>>[0], "t">
@@ -13,7 +14,14 @@ const text = Schema.NonEmptyString
 const displayField = <S extends Schema.Constraint>(schema: S) =>
   Schema.catchDecoding<Schema.optional<S>>(() => Effect.succeed(Option.none()))(Schema.optional(schema))
 
-// The timeline reads only the display fields of the Loginom metadata v1 receipt.
+type ReceiptFields = Pick<
+  LoginomMetadata,
+  "v" | "operationId" | "state" | "status" | "kind" | "node" | "attempt" | "error" | "ports" | "files"
+>
+
+type Evidence = NonNullable<LoginomMetadata["evidence"]>[number]
+
+// Keep the browser decoder limited to display fields. The producer enforces the full receipt and its byte budget.
 const Receipt = Schema.Struct({
   v: Schema.Literal(1),
   operationId: text,
@@ -41,9 +49,33 @@ const Receipt = Schema.Struct({
   ),
   files: displayField(Schema.Array(Schema.Struct({ artifactId: text, name: Schema.String, bytes: count }))),
   evidence: displayField(Schema.Array(Schema.Unknown)),
-})
+}) satisfies Schema.Decoder<ReceiptFields>
 
-const decodeSaved = Schema.decodeUnknownOption(Schema.Struct({ kind: Schema.Literal("saved"), path: text }))
+const Saved = Schema.Struct({
+  kind: Schema.Literal("saved"),
+  path: text,
+}) satisfies Schema.Decoder<Extract<Evidence, { kind: "saved" }>>
+
+const TableRead = Schema.Struct({
+  kind: Schema.Literal("tableRead"),
+  port: count,
+  portGuid: text,
+  rowsRead: count,
+  rowCount: count,
+  executionId: Schema.optional(text),
+}).check(Schema.makeFilter((read) => read.rowsRead <= read.rowCount)) satisfies Schema.Decoder<
+  Extract<Evidence, { kind: "tableRead" }>
+>
+
+const ReopenedGraphRead = Schema.Struct({
+  kind: Schema.Literal("reopenedGraphRead"),
+  nodeCount: count,
+  scope: Schema.Literals(["activeWorkflow", "package"]),
+}) satisfies Schema.Decoder<Extract<Evidence, { kind: "reopenedGraphRead" }>>
+
+const decodeSaved = Schema.decodeUnknownOption(Saved)
+
+const decodeDetailEvidence = Schema.decodeUnknownOption(Schema.Union([TableRead, ReopenedGraphRead]))
 
 const Progress = Schema.Struct({
   version: Schema.Literal(1),
@@ -185,6 +217,20 @@ export function stepDetails(copy: Copy, facts?: Facts) {
 
   const path = savedPath(facts)
 
+  const evidence = (facts.evidence ?? []).flatMap((entry) => {
+    const decoded = decodeDetailEvidence(entry)
+
+    if (Option.isNone(decoded)) return []
+
+    const fact = decoded.value
+
+    if (fact.kind === "tableRead") {
+      return [copy.t("field.tableRead", { port: fact.port + 1, read: fact.rowsRead, total: fact.rowCount })]
+    }
+
+    return [copy.t(`field.reopenedGraphRead.${fact.scope}`, { count: fact.nodeCount })]
+  })
+
   return [
     ...(facts.node?.label ? [copy.t("field.node", { name: facts.node.label })] : []),
     ...(path ? [copy.t("field.package", { path })] : []),
@@ -195,6 +241,7 @@ export function stepDetails(copy: Copy, facts?: Facts) {
         columns: columnCount,
       }),
     ),
+    ...evidence,
     ...(facts.files ?? []).map((file) => copy.t("field.file", file)),
   ]
 }
