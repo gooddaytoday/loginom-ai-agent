@@ -17,6 +17,9 @@ async function packageFixture(variables?: string) {
           <Item Name="limit" DataType="dtInteger" OriginType="iotCustom"><DefaultValue Value="12"/></Item>
         </Elements></Variables></Socket></Item></InputSockets>
       </Component></Item>
+      <Item Guid="other" DisplayName="Другой"><Component>
+        <Engine TableName="%INPUT%"/><InputSockets><Item Name="ControlVariables" Guid="control"/></InputSockets>
+      </Component></Item>
       <Item Guid="submodel" DisplayName="Ветка"><Component><Engine xsi:type="TBGModelGenericComponentEngine">
         <ModelUnit><WorkFlow><Nodes><Item Guid="export" DisplayName="Экспорт"><Component>
           <Engine TableName="rows_%limit%" Query="%NOT_A_TEMPLATE%"/>
@@ -29,7 +32,8 @@ async function packageFixture(variables?: string) {
     </OutputSockets></Component></Item></ServiceNodes>
     <ServiceLinks>
       <Item><SourcePort NodeGuid="variables" PortGuid="package"/><TargetPort NodeGuid="import" PortGuid="control"/></Item>
-      <Item><SourcePort NodeGuid="variables" PortGuid="user"/><TargetPort NodeGuid="export" PortGuid="control"/></Item>
+      <Item><SourcePort NodeGuid="variables" PortGuid="user"/><TargetPort NodeGuid="other" PortGuid="control"/></Item>
+      <Item><SourcePort NodeGuid="variables" PortGuid="package"/><TargetPort NodeGuid="export" PortGuid="control"/></Item>
     </ServiceLinks>
     <Annotations><Item Text="%NOTE%"/></Annotations></WorkFlow></Unit>`), options)
   return zip.close()
@@ -55,6 +59,7 @@ test("uses the local workflow's package port links and keeps local control bindi
     usages: [
       { kind: "template", scope: "package", name: "INPUT", module: "Unit_0", branch: [], nodeID: "import", nodeLabel: "Импорт", parameter: "FileName" },
       { kind: "binding", scope: "control", name: "limit", module: "Unit_0", branch: [], nodeID: "import", nodeLabel: "Импорт", parameter: "Limit.Engine.Root." },
+      { kind: "template", scope: "control", name: "INPUT", module: "Unit_0", branch: [], nodeID: "other", nodeLabel: "Другой", parameter: "TableName" },
       { kind: "template", scope: "control", name: "limit", module: "Unit_0", branch: ["Ветка"], nodeID: "export", nodeLabel: "Экспорт", parameter: "TableName" },
     ],
   })

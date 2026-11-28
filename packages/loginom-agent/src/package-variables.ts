@@ -47,6 +47,7 @@ export const packageVariablesRpc = {
   },
   events: {},
 }
+
 export function packageVariablesHandler(input: {
   directory: string
   sessionDirectory(sessionID: string): Promise<string | undefined>
@@ -56,6 +57,7 @@ export function packageVariablesHandler(input: {
     if (await input.sessionDirectory(sessionID) !== input.directory)
       return call.error("invalid_session", "The conversation is unavailable in this location", {})
     if (localPath === undefined) return { snapshot: null, reason: "server_snapshot_unavailable" }
+    call.signal.throwIfAborted()
 
     let bytes: Uint8Array
     try {

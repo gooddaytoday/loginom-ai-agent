@@ -143,16 +143,10 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     loginomUrl: 'https://loginom.invalid/?testable=true', mode: 'executor-replay', resultProfile: 'user-v1',
     actionManifestUri: catalog.manifestUri, actionManifestSha256: catalog.manifestSha256,
     storageDirectories:{inputs:'/user',packages:'/user',exports:'/user'} };
-  const bridge = await createBridge(config, session, {
-    reauthenticateReload:async options=>{
-      reloadLogins.push(options);
-      return true;
-    },
-    presentNodeReply:async (reply, project)=>{
-      const loginom=project({});
-      return loginom ? {...reply,_meta:{...reply._meta,loginom}} : reply;
-    },
-  });
+  const bridge = await createBridge(config, session, {reauthenticateReload:async options=>{
+    reloadLogins.push(options);
+    return true;
+  }});
   const client = new Client({ name: 'unit-agent', version: '1' });
   try {
     const [agent, server] = InMemoryTransport.createLinkedPair();
@@ -489,7 +483,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       {artifactID:artifact.artifact_id,uploadGrantID:artifact.upload.grant_id},{signal:new AbortController().signal});
     assert.notEqual(local.isError,true,JSON.stringify(local));
     assert.deepEqual(local._meta?.loginom,{
-      v:1,operationId:expectedOperation,state:'settled',status:'SUCCEEDED',
+      v:1,operationId:expectedOperation,state:'settled',
       packageVariables:{source:'saved',state:'deferred'},
     });
     const opened=JSON.parse(local.content[0].text);
@@ -512,6 +506,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const resumed=await client.callTool({name:openRefusal.next_step.tool,arguments:openRefusal.next_step.arguments});
     assert.notEqual(resumed.isError,true,JSON.stringify(resumed));
     assert.equal(JSON.parse(resumed.content[0].text).prepared,true);
+    assert.equal(resumed._meta?.loginom?.packageVariables,undefined);
     assert.equal(packageDeliveries.length,deliveriesBefore,'server-path continuation must not upload again');
     const opening=browserCalls.filter(call=>call.arguments.code.includes('async function prepareWorkspace(')).at(-1);
     assert.match(opening.arguments.code,/"recoverOnly":false/);

@@ -29,6 +29,7 @@ import { createRecoveryContext } from './recovery-context.mjs';
 import { outcomeVerification } from './outcome-verification.mjs';
 import { createHostArtifactAdmission, codexInputIdentity } from './host-artifacts.mjs';
 import { compactActionResult, compactNodeRequestFailure, userResultSchema, compactKnowledgeBundle, loginomFeedMetadata } from './user-results.mjs';
+import { withLoginomMetadata } from './loginom-feed-metadata.mjs';
 import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory, userActionKeys } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
@@ -586,10 +587,11 @@ export async function createBridge(config, session, { browserTransport: managedB
             if (ready && reply.isError !== true) userBundleDelivered = true;
             undeliveredDraft = ready && reply.isError === true && workspace?.created_draft === true
               && preparationRequest.intent === 'new_draft' ? session.metadata.workspacePreparation.identity : null;
-            if (ready && localPackageUpload && reply.isError !== true && presentNodeReply)
-              return presentNodeReply(reply, () => loginomFeedMetadata(reply, {
-                tool: 'dock_prepare', localPackageOperationId: preparationRequest.operation_id,
-              }));
+            if (ready && localPackageUpload && reply.isError !== true)
+              return withLoginomMetadata(reply, {
+                operationId: preparationRequest.operation_id, state: 'settled',
+                packageVariables: {source: 'saved', state: 'deferred'},
+              });
             return reply;
           }
           return { content: [{ type: 'text', text: JSON.stringify({
