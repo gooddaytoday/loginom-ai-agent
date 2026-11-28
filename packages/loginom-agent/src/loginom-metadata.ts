@@ -1,9 +1,90 @@
 import { Schema } from "effect"
-import { Busy } from "@loginom-ai-agent/loginom-host/step-progress"
+import {
+  LOGINOM_METADATA_FIELD_MAX_BYTES,
+  LOGINOM_METADATA_MAX_BYTES,
+  loginomMetadataBytes,
+} from "../../loginom-runtime/client/lib/loginom-feed-metadata.mjs"
 
 const count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
-const maxBytes = 16 * 1024
-const utf8 = new TextEncoder()
+const id = Schema.NonEmptyString
+const stepId = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_.:-]{1,128}$/))
+const busy = Schema.Struct({
+  version: Schema.Literal(1),
+  windowId: Schema.String.check(Schema.isUUID()),
+  operationId: stepId,
+  active: Schema.Boolean,
+})
+const step = Schema.Struct({
+  outcome: Schema.Literals(["completed", "not_applied", "check_required"]),
+  retryAvailable: Schema.Boolean,
+  reason: Schema.optional(Schema.Literals(["unknown_write", "graph_conflict", "partial_effect"])),
+  persistence: Schema.Literals(["saved_through", "step_unsaved", "unknown"]),
+  save: Schema.NullOr(
+    Schema.Struct({
+      operationId: stepId,
+      path: Schema.String,
+      throughStep: Schema.Struct({ operationId: stepId, label: Schema.String.check(Schema.isMaxLength(240)) }),
+    }),
+  ),
+})
+
+const position = Schema.Struct({ x: Schema.Finite, y: Schema.Finite })
+const graphNode = Schema.Struct({ guid: id, label: Schema.String, type: id, position })
+const graphLink = Schema.Struct({ source: id, output: id, target: id, input: id })
+const manualEdits = Schema.Array(
+  Schema.Union([
+    Schema.Struct({ kind: Schema.Literals(["node_added", "node_removed"]), node: graphNode }),
+    Schema.Struct({ kind: Schema.Literal("node_renamed"), guid: id, from: Schema.String, to: Schema.String }),
+    Schema.Struct({ kind: Schema.Literal("node_moved"), guid: id, label: Schema.String, from: position, to: position }),
+    Schema.Struct({
+      kind: Schema.Literals(["link_added", "link_removed"]),
+      link: graphLink,
+      sourceLabel: Schema.String,
+      targetLabel: Schema.String,
+    }),
+  ]),
+)
+
+const savedPackageIdentity = { saveOperationId: id, packagePath: Schema.String }
+const savedChange = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("node_missing"), nodeId: id, before: Schema.String }),
+  Schema.Struct({
+    kind: Schema.Literal("node_renamed"),
+    nodeId: id,
+    before: Schema.String,
+    saved: Schema.String,
+    observedBeforeSave: Schema.String,
+    repair: Schema.Struct({ label: Schema.String, prompt: Schema.String }),
+  }),
+  Schema.Struct({
+    kind: Schema.Literals(["sorting_key_order", "sorting_field_order"]),
+    nodeId: id,
+    label: Schema.String,
+    before: Schema.Array(Schema.String),
+    saved: Schema.Array(Schema.String),
+  }),
+  Schema.Struct({ kind: Schema.Literals(["link_added", "link_removed"]), endpoints: Schema.Tuple([id, id, id, id]) }),
+])
+const savedPackageGraph = Schema.Union([
+  Schema.Struct({ ...savedPackageIdentity, status: Schema.Literal("unavailable") }),
+  Schema.Struct({
+    ...savedPackageIdentity,
+    status: Schema.Literal("compared"),
+    scope: Schema.Literal("active_workflow"),
+    savedLabels: Schema.Array(Schema.Struct({ nodeId: id, label: Schema.String })).check(Schema.isMaxLength(32)),
+    changes: Schema.Array(savedChange).check(Schema.isMaxLength(16)),
+    uncheckedSorting: Schema.Array(id).check(Schema.isMaxLength(32)),
+    truncated: Schema.optional(Schema.Boolean),
+    renameAttribution: Schema.Literals(["unconfirmed", "observed_during_save"]),
+  }),
+])
+
+type Field = keyof typeof LOGINOM_METADATA_FIELD_MAX_BYTES
+const fieldBudget = (field: Field) =>
+  Schema.makeFilter((value) => loginomMetadataBytes(value) <= LOGINOM_METADATA_FIELD_MAX_BYTES[field], {
+    expected: `${field} within its UTF-8 JSON byte budget`,
+  })
+
 const cell = Schema.Struct({
   type: Schema.String,
   is_null: Schema.optional(Schema.Boolean),
@@ -17,57 +98,17 @@ const cell = Schema.Struct({
   non_finite: Schema.optional(Schema.String),
 })
 
-const savedPackageGraph = Schema.Union([
-  Schema.Struct({ status: Schema.Literal("unavailable"), packagePath: Schema.NonEmptyString }),
-  Schema.Struct({
-    status: Schema.Literal("compared"),
-    packagePath: Schema.NonEmptyString,
-    scope: Schema.Literal("active_workflow"),
-    renameAttribution: Schema.Literals(["observed_during_save", "unconfirmed"]),
-    changes: Schema.Array(
-      Schema.Union([
-        Schema.Struct({
-          kind: Schema.Literal("node_renamed"),
-          nodeId: Schema.NonEmptyString,
-          before: Schema.String,
-          saved: Schema.String,
-          observedBeforeSave: Schema.String,
-          repair: Schema.Struct({ label: Schema.Literal("Попросить исправить"), prompt: Schema.String }),
-        }),
-        Schema.Struct({ kind: Schema.Literal("node_missing"), nodeId: Schema.NonEmptyString, before: Schema.String }),
-        Schema.Struct({
-          kind: Schema.Literals(["sorting_key_order", "sorting_field_order"]),
-          nodeId: Schema.NonEmptyString,
-          label: Schema.String,
-          before: Schema.Array(Schema.String),
-          saved: Schema.Array(Schema.String),
-        }),
-        Schema.Struct({
-          kind: Schema.Literals(["link_removed", "link_added"]),
-          endpoints: Schema.Tuple([Schema.String, Schema.String, Schema.String, Schema.String]),
-        }),
-      ]),
-    ).check(Schema.isMaxLength(16)),
-    savedLabels: Schema.Array(Schema.Struct({ nodeId: Schema.NonEmptyString, label: Schema.String })).check(
-      Schema.isMaxLength(32),
-    ),
-    uncheckedSorting: count,
-    truncated: Schema.Boolean,
-  }),
-]).check(
-  Schema.makeFilter((graph) => utf8.encode(JSON.stringify(graph)).byteLength <= 8 * 1024, {
-    expected: "Saved package graph of at most 8 KiB in UTF-8 JSON",
-  }),
-)
-
 export const LoginomMetadata = Schema.Struct({
   v: Schema.Literal(1),
   operationId: Schema.NonEmptyString,
   attempt: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
   kind: Schema.optional(Schema.Literals(["add", "configure", "execute", "export", "read"])),
   state: Schema.Literals(["running", "settled"]),
-  busy: Schema.optional(Busy),
-  savedPackageGraph: Schema.optional(savedPackageGraph),
+  busy: Schema.optional(busy.check(fieldBudget("busy"))),
+  step: Schema.optional(step.check(fieldBudget("step"))),
+  manualEdits: Schema.optional(manualEdits.check(fieldBudget("manualEdits"))),
+  verificationStale: Schema.optional(Schema.Boolean.check(fieldBudget("verificationStale"))),
+  savedPackageGraph: Schema.optional(savedPackageGraph.check(fieldBudget("savedPackageGraph"))),
   status: Schema.optional(Schema.Literals(["SUCCEEDED", "FAILED", "NOT_APPLIED", "AMBIGUOUS"])),
   phase: Schema.optional(Schema.String),
   node: Schema.optional(
@@ -118,7 +159,7 @@ export const LoginomMetadata = Schema.Struct({
     Schema.Array(Schema.Struct({ artifactId: Schema.NonEmptyString, name: Schema.String, bytes: count })),
   ),
 }).check(
-  Schema.makeFilter((metadata) => utf8.encode(JSON.stringify(metadata)).byteLength <= maxBytes, {
+  Schema.makeFilter((metadata) => loginomMetadataBytes(metadata) <= LOGINOM_METADATA_MAX_BYTES, {
     expected: "Loginom metadata of at most 16 KiB in UTF-8 JSON",
   }),
 )

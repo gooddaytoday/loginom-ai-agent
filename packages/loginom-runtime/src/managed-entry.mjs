@@ -17,6 +17,7 @@ import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
 import { observeLoginomReplies, withStepProgress } from "../client/lib/step-progress.mjs"
 import { createProtectedOperation } from "./protected-operation.mjs"
+import { withLoginomMetadata } from "../client/lib/loginom-feed-metadata.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -262,10 +263,15 @@ async function handle(message) {
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
         presentNodeReply: async (reply, project) => {
           const outputFiles = await session.artifactStore.outputFiles(reply.structuredContent)
-          let loginom
-          try { loginom = project({ outputFiles, knownSecrets, busy: state.protectedOperation.snapshot() }) } catch {}
-          return outputFiles.length || loginom ? { ...reply, _meta: { ...reply._meta,
-            ...(loginom ? { loginom } : {}), ...(outputFiles.length ? { outputFiles } : {}) } } : reply
+          let result = reply
+          try {
+            const projection = project({ outputFiles, knownSecrets, busy: state.protectedOperation.snapshot() })
+            if (projection) {
+              const { busy, savedPackageGraph, ...receipt } = projection
+              result = withLoginomMetadata(reply, { receipt, busy, savedPackageGraph })
+            }
+          } catch {}
+          return outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result
         },
         startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {
           state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error,

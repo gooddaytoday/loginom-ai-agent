@@ -79,6 +79,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       new URL("../../loginom-runtime/client/lib/step-progress.mjs", import.meta.url),
       "utf8",
     ),
+    "runtime/client/lib/loginom-feed-metadata.mjs": await readFile(
+      new URL("../../loginom-runtime/client/lib/loginom-feed-metadata.mjs", import.meta.url),
+      "utf8",
+    ),
     "runtime/client/lib/catalog.mjs": await readFile(
       new URL("../../loginom-runtime/client/lib/catalog.mjs", import.meta.url),
       "utf8",
@@ -98,6 +102,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
        export const artifactFailure=artifacts.artifactFailure ?? (()=>null);`,
     "runtime/client/lib/bridge.mjs": `
       import { readFileSync } from 'node:fs';
+      import { withLoginomMetadata } from './loginom-feed-metadata.mjs';
       import { loginomFeedMetadata } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/user-results.mjs", import.meta.url).href)};
       const work = () => JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8'));
       export let protect;
@@ -111,7 +116,9 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         applyWithScanReceipt: async reply => {
           const end = await protectOperation(reply.structuredContent.operation_id);
           await end();
-          return presentNodeReply(reply, options => loginomFeedMetadata(reply, {...options, tool:'dock_node_apply'}));
+          return presentNodeReply(
+            withLoginomMetadata(reply, {operationId:reply.structuredContent.operation_id, state:'settled', verificationStale:true}),
+            options => loginomFeedMetadata(reply, {...options, tool:'dock_node_apply'}));
         },
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
@@ -230,6 +237,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
             operationId: "test-operation",
             busy,
             node: { label: "test node" },
+            verificationStale: true,
             ports: [
               {
                 preview: {
@@ -339,6 +347,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       lease: async () => run,
       task: async () => messageID,
       failure: () => undefined,
+      wrap: (tool) => tool,
     })
     await dock.refresh(sessionID, "loginom-automation", undefined)
     type Editor = Parameters<NonNullable<typeof captured.transform>>[0]

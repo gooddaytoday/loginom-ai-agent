@@ -1,4 +1,5 @@
 import vm from 'node:vm';
+import {withLoginomMetadata} from '../../lib/loginom-feed-metadata.mjs';
 import {makePackageCleanupCode} from '../../lib/package-cleanup.mjs';
 import test, {mock} from 'node:test';
 import assert from 'node:assert/strict';
@@ -509,7 +510,12 @@ for(const action_key of ['package.save_checkpoint','package.save_as'])
   const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
    mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
    loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session,{
-   presentNodeReply:(reply, project) => ({...reply,_meta:{loginom:project({})}}),
+   presentNodeReply:(reply, project) => {
+     const projection=project({});
+     if(!projection)return reply;
+     const {savedPackageGraph,...receipt}=projection;
+     return withLoginomMetadata(reply,{receipt,savedPackageGraph});
+   },
   });
   const client=new AgentClient({name:'null-save',version:'1'});
   try{
@@ -528,6 +534,7 @@ for(const action_key of ['package.save_checkpoint','package.save_as'])
    const {operationId,savedPackageGraph:report}=response._meta.loginom;
    assert.equal(report.status,'compared');
    assert.equal(operationId,saved.operation_id);
+   assert.equal(report.saveOperationId,saved.operation_id);
    assert.equal(report.packagePath,path);
    assert.deepEqual(report.savedLabels,[{nodeId:'770a65bc-5ea0-47f2-80f8-ab900e5e43c2',label:'По убыванию выручки'}]);
    assert.ok(response.content.some(block=>block.text.includes('«Сортировка» → «По убыванию выручки»')));

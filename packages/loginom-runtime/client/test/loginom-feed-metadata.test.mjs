@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {nodeResultReply} from '../lib/node-result-reply.mjs';
 import {loginomFeedMetadata} from '../lib/user-results.mjs';
+import {withLoginomMetadata} from '../lib/loginom-feed-metadata.mjs';
 
 const node = {document_id:'document', workflow_id:'workflow', node_id:'node-guid'};
 const facts = {kind:'execute', node:{ref:node, label:'Фильтр', type:'transform.filter_data'}};
@@ -13,6 +14,55 @@ const receipt = ({ports, artifacts, failure, warnings=['Read limitation'], statu
   operation_id:'operation', attempt:1, state:'settled', outcome:{status, action_key:'node.apply', phase:'node_ready',
     effect_possible:true, cleanup_complete:true, error:failure, output:{node, execution, configuration:{status:'applied'},
       output:{...(ports && {ports}), ...(artifacts && {file_artifacts:artifacts})}, warnings}},
+});
+
+test('feed producers compose one operation block without replacing the reply or other fields', () => {
+  const tool = 'dock_node_wait';
+  const reply = {...nodeResultReply(receipt(), {userProfile:true, tool}), _meta: {outputFiles: []}};
+  const busy = {version:1, windowId:'32ef40ff-08d2-476a-ad73-1ef3feb17ce8', operationId:'operation', active:false};
+  const withBusy = withLoginomMetadata(reply, {operationId:'operation', state:'running', busy});
+  const projection = loginomFeedMetadata(reply, {tool, facts});
+  const withReceipt = withLoginomMetadata(withBusy, {receipt:projection});
+  const combined = withLoginomMetadata(withReceipt, {verificationStale:false});
+  assert.deepEqual(combined, {...reply, _meta:{...reply._meta, loginom:{...projection, busy, verificationStale:false}}});
+  assert.equal(withLoginomMetadata(combined, {operationId:'another', verificationStale:true}), combined);
+  assert.deepEqual(withBusy._meta.loginom, {v:1, operationId:'operation', state:'running', busy});
+});
+
+test('feed drops over-limit fields individually and preserves the other fields', () => {
+  const reply = {content:[{type:'text', text:'original'}]};
+  const identity = {operationId:'operation', state:'settled'};
+  const busy = {version:1, windowId:'32ef40ff-08d2-476a-ad73-1ef3feb17ce8', operationId:'operation', active:true};
+  const step = {outcome:'completed', retryAvailable:false, persistence:'saved_through',
+    save:{operationId:'save', path:'Ж'.repeat(1024), throughStep:{operationId:'operation', label:'Фильтр'}}};
+  const manualEdits = [{kind:'node_renamed', guid:'node', from:'Фильтр', to:'Ж'.repeat(2048)}];
+  const savedPackageGraph = {saveOperationId:'save', packagePath:'Ж'.repeat(4096), status:'unavailable'};
+  const result = withLoginomMetadata(reply, {...identity, busy, step, manualEdits, savedPackageGraph, verificationStale:true});
+  assert.deepEqual(result._meta.loginom, {v:1, ...identity, busy, verificationStale:true});
+  assert.equal(withLoginomMetadata(result, {busy:{...busy, operationId:'a'.repeat(256)}, verificationStale:'invalid'}), result);
+});
+
+test('feed makes space for a new field by reducing the preview before declining an update', () => {
+  const tool = 'dock_node_wait';
+  const warnings = Array.from({length:6}, (_, index) => index+'Ж'.repeat(999));
+  const sample = port(Array.from({length:10}, (_, index) => [cell(index+'Ю'.repeat(499))]));
+  const reply = nodeResultReply(receipt({ports:[sample], warnings}), {userProfile:true, tool});
+  const projection = loginomFeedMetadata(reply, {tool, facts});
+  const base = withLoginomMetadata(reply, {receipt:projection});
+  const manualEdits = [{kind:'node_renamed', guid:'node', from:'Фильтр', to:'Ж'.repeat(1000)}];
+  assert.ok(Buffer.byteLength(JSON.stringify({...projection, manualEdits})) > 16 * 1024);
+  const result = withLoginomMetadata(base, {manualEdits});
+  const metadata = result._meta.loginom;
+  const {preview} = metadata.ports[0];
+  assert.ok(preview.sample.length > 0 && preview.sample.length < projection.ports[0].preview.sample.length);
+  assert.deepEqual(preview.sample, projection.ports[0].preview.sample.slice(0, preview.sample.length));
+  assert.equal(preview.sampleComplete, false);
+  assert.deepEqual(metadata.manualEdits, manualEdits);
+  assert.deepEqual(metadata.limitations, warnings);
+  assert.ok(Buffer.byteLength(JSON.stringify(metadata)) <= 16 * 1024);
+  const savedPackageGraph = {saveOperationId:'save', packagePath:'Ж'.repeat(1500), status:'unavailable'};
+  assert.equal(withLoginomMetadata(result, {savedPackageGraph}), result);
+  assert.deepEqual(base._meta.loginom, projection);
 });
 
 test('configuration keeps the model text and exposes only the observed node and signals', () => {
