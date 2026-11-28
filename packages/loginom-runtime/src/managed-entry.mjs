@@ -87,11 +87,11 @@ const send = (message, disconnect = false) => {
       stop(error ? 1 : 0)
     })
 }
-function close() {
+function close(deadline) {
   if (state.closing) return state.closing
   state.controller?.abort()
   state.startupController.abort(Error("LOGINOM_HOST_CLOSED"))
-  state.closing = closeManagedResources(state, requests)
+  state.closing = closeManagedResources(state, requests, { deadline })
   return state.closing
 }
 const stop = (exitCode = 0) => {
@@ -279,7 +279,7 @@ async function handle(message) {
       return
     }
     if (message.operation === "close") {
-      await close()
+      await close(message.input?.deadline)
       send({ id: message.id, result: { closed: true } }, true)
       return
     }
@@ -479,6 +479,8 @@ async function handle(message) {
       state.startupCleanupFailed = true
     const code = /^(?:LOGINOM|DASHBOARD)_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
     send({ id: message.id, ...(artifactFailure(error) ?? { error: code }),
+      ...(message.operation === "close" && code === "LOGINOM_RUNTIME_CLEANUP_FAILED" && error.audit_error
+        ? { audit_error: error.audit_error } : {}),
       ...(message.operation === "start" ? { startupDiagnostics: state.startupDiagnostics.splice(0) } : {}) }, message.operation === "close")
     if (message.operation === "start") {
       // Clean up immediately, but keep IPC until the owner requests an acknowledged close.

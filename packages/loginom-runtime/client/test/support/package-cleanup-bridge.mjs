@@ -2,17 +2,20 @@ import vm from 'node:vm';
 import {makePackageCleanupCode} from '../../lib/package-cleanup.mjs';
 import test, {mock} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,readFile,rm,mkdir} from 'node:fs/promises';
+import {mkdtemp,readFile,writeFile,rm,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {Client as AgentClient} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import * as executor from '../../lib/executor.mjs';
+import * as journal from '../../lib/execution-journal.mjs';
 import * as workspace from '../../lib/workspace.mjs';
 import {serverDownloadTools} from '../../lib/storage-policy.mjs';
 import {createBundledSkillFixture} from './bundled-skill-fixture.mjs';
 import {createActionCatalogFixture} from './action-catalog-fixture.mjs';
 import {Page,runtime} from './executor-fixture.mjs';
+import {createHash} from 'node:crypto';
+import {createArtifactStore} from '../../lib/artifacts.mjs';
 import {closeManagedResources} from '../../../src/managed-resources-close.mjs';
 import {createServer} from 'node:http';
 import {chromium} from 'playwright-core';
@@ -99,6 +102,7 @@ class ExternalClient {
       this.f.cleanupOptions=options;
       value={version:1,session_id:'own-session',document_id:'own-doc',status:this.f.scenario.endsWith('native-blocked')?'BLOCKED':'SUCCEEDED',package_closed:!this.f.scenario.endsWith('native-blocked'),
         logged_out:!this.f.scenario.endsWith('native-blocked'),account:'test-2',package_path:this.f.path,unsaved_changes_discarded:false,packages_before:1,packages_after:0,reason:null};
+      if(this.f.nativeAuditError)value.audit_error=this.f.nativeAuditError;
       // Mirrors the native tab guard (package-cleanup.mjs: no own receipt for this node and tab).
       if(this.f.activeTab&&options.tabTid!==this.f.activeTab)value={...value,status:'BLOCKED',package_closed:false,logged_out:false,
         packages_after:1,reason:'TAB_IDENTITY_CHANGED'};
@@ -119,8 +123,27 @@ mock.module('@modelcontextprotocol/sdk/client/stdio.js',{namedExports:{StdioClie
 mock.module('@modelcontextprotocol/sdk/client/streamableHttp.js',{namedExports:{StreamableHTTPClientTransport:ExternalTransport}});
 mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExports:{...workspace,
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
+mock.module(new URL('../../lib/execution-journal.mjs',import.meta.url).href,{namedExports:{...journal,createExecutionJournal:options=>{
+  const f=current,record=journal.createExecutionJournal(options);
+  if(!f.afterArtifactRecord)return record;
+  let pending=Promise.resolve();
+  return event=>{
+    const next=pending.then(async()=>{
+      f.beforeArtifactRecord?.(event);
+      const saved=await record(event);
+      await f.afterArtifactRecord(event);
+      return saved;
+    });
+    pending=next.catch(()=>{});
+    return next;
+  };
+}}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:options=>{
   const f=current;
+  if(f.artifactBrowser){
+    f.artifactRuntime=executor.createActionRuntime({...options,execute:f.artifactBrowser,now:f.artifactNow});
+    return f.artifactRuntime;
+  }
   if(f.stoppedImport){
     const node={document_id:'own-doc',workflow_id:'own-workflow',node_id:'source'};
     const graph={complete:true,document_id:'own-doc',nodes:[],links:[],foreign_links:[]};
@@ -431,6 +454,168 @@ for(const scenario of ['opened-clean','opened-read-only','opened-dirty','opened-
     }
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
+
+for(const fault of ['cancelled','unknown','wrong-bytes','changed-mtime','late-hash','late-ack','stalled-ack','stalled-terminal','terminal-error','stalled-close-audit'])test('CLI shutdown after pending upload verification: '+fault,async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'cleanup-upload-'));
+  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+  const f=current={scenario:'opened-clean',events:[],saves:0,path,catalog};
+  const store=await createArtifactStore({directory:join(directory,'input')});
+  if(fault==='cancelled')f.nativeAuditError={code:'ARTIFACT_DELIVERY_AUDIT_DEADLINE',detail:'browser-only-marker'};
+  const sourcePath=join(directory,'input.csv'),contents='value\n42\n';
+  await writeFile(sourcePath,contents);
+  const artifact=await store.admit({sourcePath,name:'input.csv',bytes:Buffer.byteLength(contents),
+    sha256:createHash('sha256').update(contents).digest('hex'),upload:{directory:'/test-2',overwrite:'replace'}});
+  const page=new Page(),prefix=page.prefix,nav=prefix+';NavigationBar;NavigationPanel';
+  const fileTid=prefix+';FileStorageForm;colName_input.csv';
+  const addedControls=[nav,prefix+';FileStorageForm;pnlFileStorage;tbl'].map(tid=>({tid,ref:page.uiReference(tid),kind:'region'}));
+  let downloads=0,uploads=0,cancelledReceipt,shutdownDeadline,clock=Date.now();
+  const initialVersion={bytes:artifact.bytes,mtime:'2026-11-28T00:00:00.000Z'};
+  const ack=Promise.withResolvers();
+  let reachedAck=false;
+  const stalledCloseAudit=fault==='stalled-close-audit';
+  const stalled=['stalled-ack','stalled-terminal','stalled-close-audit'].includes(fault);
+  const auditError=fault==='stalled-terminal'?{code:'ARTIFACT_DELIVERY_AUDIT_DEADLINE'}:
+    fault==='terminal-error'?{code:'ARTIFACT_DELIVERY_AUDIT_WRITE_FAILED',phase:'verification_completed'}:
+    stalledCloseAudit?{code:'CLEANUP_AUDIT_DEADLINE'}:null;
+  f.artifactNow=stalled?Date.now:()=>clock;
+  f.beforeArtifactRecord=event=>{
+    if(fault==='terminal-error'&&event.phase==='verification_completed')throw Object.assign(Error('Private journal write failed'),{code:'EIO'});
+  };
+  f.afterArtifactRecord=async event=>{
+    const heldPhase=fault==='stalled-terminal'?'artifact_delivery_completed':'artifact_delivery_verification_proof';
+    if(stalledCloseAudit?event.event!=='managed_saved_package_cleanup':
+      event.phase!==heldPhase&&!(fault==='late-ack'&&event.phase==='artifact_delivery_completed'))return;
+    reachedAck=true;
+    if(fault==='late-ack')clock=shutdownDeadline+1;
+    if(stalled)await ack.promise;
+  };
+  const stageDownload=store.stageDownload;
+  store.stageDownload=async id=>{
+    const lease=await stageDownload(id);
+    return {...lease,verify:async name=>{
+      const proof=await lease.verify(name);
+      if(fault==='late-hash')clock=shutdownDeadline+1;
+      return proof;
+    }};
+  };
+  const receipt=(action_key,operation_id,fields)=>({action_key,operation_id,action_revision:'1',phase:'observed',
+    status:'SUCCEEDED',effect_possible:false,cleanup_complete:true,output:{},trace:[],error:null,...fields});
+  f.artifactBrowser=async code=>{
+    if(code.includes('"receipt_read":true'))return receipt('operation.inspect','delivery:upload',
+      {output:{state:'completed',receipt:cancelledReceipt}});
+    if(code.includes('function browserArtifactUpload')){
+      uploads++;
+      return receipt('artifact.upload','delivery:upload',{phase:'submitted',status:'AMBIGUOUS',effect_possible:true,
+        error:{code:'UPLOAD_SERVER_VERIFICATION_REQUIRED',message:'Pending verification'},output:{upload_submitted:true}});
+    }
+    if(code.includes('function discoverArtifactAndDownload')){
+      downloads++;
+      const id=downloads===1?'delivery:verify':'delivery:shutdown-verify';
+      if(downloads===1){
+        cancelledReceipt=receipt('artifact.download',id,{status:'AMBIGUOUS',phase:'downloading',
+          effect_possible:true,cleanup_complete:fault!=='unknown',error:{code:'DOWNLOAD_BROWSER_CALL_FAILED',message:'Download unavailable'},
+          trace:fault==='unknown'?[]:[{event:'download_cancelled_confirmed'}]});
+        if(fault==='cancelled')throw Error('Original download reply lost');
+        return cancelledReceipt;
+      }
+      shutdownDeadline=Number(code.match(/"deadline_at":(\d+)/)[1]);
+      const downloadPath=JSON.parse(code.match(/"download_path":("(?:[^"\\]|\\.)*")/)[1]);
+      const observationId=JSON.parse(code.match(/"observation_id":("[^"]+")/)[1]);
+      const fileRef=page.uiReference(fileTid);
+      await writeFile(downloadPath,fault==='wrong-bytes'?'value\n43\n':contents);
+      return receipt('artifact.download',id,{phase:'downloaded',effect_possible:true,
+        output:{artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,upload_operation_id:'delivery:upload',
+          destination:artifact.upload.destination,suggested_name:'input.csv',download_completed:true,
+          bytes_verification_required:true,file_ref:fileRef,observation_id:observationId},
+        trace:[{event:'artifact_file_discovered',file_ref:fileRef,file_tid:fileTid,directory:artifact.upload.directory,
+          document:'fixture-document',active_tab_ref:'storage-tab',workflow_ref:page.uiSnapshot().workflow_ref},
+          {event:'artifact_file_version_verified',before:initialVersion,
+            after:fault==='changed-mtime'?{...initialVersion,mtime:'2026-11-28T00:00:01.000Z'}:initialVersion}]});
+    }
+    const output={...page.uiSnapshot(),active_tab_ref:'storage-tab',file_storage:{status:'observed',directory:artifact.upload.directory},
+      observation_root:{ref:page.uiReference(nav)}};
+    output.ui.elements=addedControls;
+    return receipt('workspace.ui','observe',{output});
+  };
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:store};
+  const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+    mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+    loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+  const client=new AgentClient({name:'upload-cleanup',version:'1'});
+  t.after(async()=>{ack.resolve();try{await client.close();await bridge.close();}finally{await rm(directory,{recursive:true,force:true});}});
+  const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+  const prepared=await client.callTool({name:'dock_prepare',arguments:{intent:'open_package',package_path:path}});
+  assert.notEqual(prepared.isError,true,JSON.stringify(prepared));
+  const delivery=await client.callTool({name:'dock_artifact_deliver',arguments:{operation_id:'delivery',
+    artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,budget_ms:120000}});
+  assert.equal(delivery.structuredContent?.status,'AMBIGUOUS',JSON.stringify(delivery));
+  const inspected=await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:'delivery:upload'}});
+  assert.equal(JSON.parse(inspected.content[0].text).output.state,'pending');
+  const managed={bridge,client,session};
+  const expectAuditFailure=error=>{
+    assert.equal(error.code,'LOGINOM_RUNTIME_CLEANUP_FAILED');
+    assert.deepEqual(error.audit_error,auditError);
+    return true;
+  };
+  if(fault==='cancelled')await closeManagedResources(managed,[]);
+  else if(stalled){
+    const started=performance.now();
+    const closing=closeManagedResources(managed,[],stalledCloseAudit?{deadline:Date.now()+2000}:undefined);
+    let timer;
+    try{
+      await assert.rejects(Promise.race([closing,new Promise((_,reject)=>{
+        timer=setTimeout(()=>reject(Error('Close still waits for the journal after its budget')),stalledCloseAudit?3000:9000);
+      })]),auditError?expectAuditFailure:/LOGINOM_RUNTIME_CLEANUP_FAILED/);
+      assert.equal(reachedAck,true);
+      t.diagnostic(`Close refused after ${Math.round(performance.now()-started)} ms with journal acknowledgement still blocked`);
+      if(!stalledCloseAudit)assert.equal(bridge.hasUnsettledWork(),true);
+    }finally{
+      clearTimeout(timer);
+      ack.resolve();
+      await closing.catch(()=>{});
+      await f.artifactRuntime.closeArtifactDeliveries();
+    }
+  }
+  else await assert.rejects(closeManagedResources(managed,[]),auditError?expectAuditFailure:/LOGINOM_RUNTIME_CLEANUP_FAILED/);
+  const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
+  assert.equal(cleanup.status,fault==='cancelled'?'SUCCEEDED':'BLOCKED');
+  assert.equal(cleanup.reason,fault==='cancelled'?null:auditError?'CLEANUP_EVIDENCE_UNCONFIRMED':'CLEANUP_OR_OPERATION_UNCONFIRMED');
+  assert.equal(cleanup.package_closed===true,fault==='cancelled'||stalledCloseAudit);
+  assert.equal(cleanup.logged_out===true,fault==='cancelled'||stalledCloseAudit);
+  assert.deepEqual(cleanup.audit_error,auditError??undefined);
+  if(auditError){
+    const resourceRecords=(await readFile(join(directory,'resource-close.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
+    const completion=resourceRecords.find(event=>event.stage==='complete');
+    assert.equal(completion?.status,'rejected');
+    assert.equal(completion?.code,'LOGINOM_RUNTIME_CLEANUP_FAILED');
+    assert.deepEqual(completion?.audit_error,auditError);
+  }
+  if(auditError||['cancelled','late-ack','stalled-ack'].includes(fault)){
+    const journalText=await readFile(join(directory,'execution-events.jsonl'),'utf8');
+    assert.doesNotMatch(journalText,/browser-only-marker/);
+    const records=journalText.trim().split('\n').map(JSON.parse);
+    const terminal=records.filter(event=>['transfer_completed','verification_completed','artifact_delivery_completed'].includes(event.phase)
+      &&['delivery','delivery:upload','delivery:shutdown-verify'].includes(event.operation_id));
+    const completed=['transfer_completed','verification_completed','artifact_delivery_completed'];
+    const expected=fault==='cancelled'||fault==='stalled-terminal'||stalledCloseAudit?completed:fault==='terminal-error'?completed.filter(phase=>phase!=='verification_completed'):[];
+    assert.deepEqual(terminal.map(event=>[event.phase,(event.outcome??event.result)?.status]),expected.map(phase=>[phase,'SUCCEEDED']));
+    if(fault==='terminal-error'){
+      const closeAudit=records.find(event=>event.event==='managed_saved_package_cleanup');
+      assert.deepEqual(closeAudit?.cleanup?.audit_error,auditError);
+      assert.equal(closeAudit?.cleanup?.status,'BLOCKED');
+    }
+    const proof=records.find(event=>event.phase==='artifact_delivery_verification_proof'&&event.operation_id==='delivery');
+    assert.equal(proof?.proof?.verification_id,'delivery:shutdown-verify');
+    assert.equal(proof.deadline_at,shutdownDeadline);
+    assert.equal(proof.proof.status,undefined);
+    assert.ok(terminal.every(event=>records.indexOf(event)>records.indexOf(proof)));
+  }
+  const final=await f.artifactRuntime.inspect({operationId:'delivery:upload'});
+  assert.equal(final.output.state,fault==='cancelled'||auditError?'resolved':'pending');
+  assert.equal(uploads,1);
+  assert.equal(downloads,fault==='unknown'?1:2);
+});
 
 test('unknown prepared workflow advises only the last confirmed Save of its own bridge',async t=>{
   const directory=await mkdtemp(join(tmpdir(),'prepared-workflow-hint-'));

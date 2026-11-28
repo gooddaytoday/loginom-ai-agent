@@ -233,6 +233,13 @@ export async function discoverArtifactAndDownload(page,task,ui,download,reveal,w
  const readDirectory=()=>ui(page,{...base,mode:'observe',root_ref:task.snapshot.observation_root.ref});
  const suffix=task.artifact.name.replace(/\s/g,'_').replace(/,/g,''),prefix=task.snapshot.workflow_ref.prefix;
  const tid=prefix+';FileStorageForm;colName_'+suffix,gridTid=prefix+';FileStorageForm;pnlFileStorage;tbl';
+ const fileVersion=(snapshot,ref)=>{
+  const files=snapshot.ui.elements.filter(e=>e.ref===ref&&e.tid===tid&&e.label===task.artifact.name);
+  const entry=files.length===1&&files[0].storage_entry;
+  return entry?.kind==='file'&&entry.bytes_source==='native_file_store'&&entry.path===task.artifact.upload.destination
+    &&Number.isSafeInteger(entry.bytes)&&entry.bytes>=0&&typeof entry.mtime==='string'&&entry.mtime.length>0&&entry.mtime.length<=128
+    ?{bytes:entry.bytes,mtime:entry.mtime}:null;
+ };
  // Artifact verification already owns a 60-second browser budget. Leave a
  // small transport margin, but allow slow Windows/Loginom uploads to publish
  // their final size instead of imposing a separate short discovery timeout.
@@ -312,13 +319,35 @@ export async function discoverArtifactAndDownload(page,task,ui,download,reveal,w
      if(refreshes>=20||!await refreshDirectory())return result('DISCOVERY_FILE_SIZE_CHANGED');
      continue;
     }
+    const beforeVersion=task.shutdown_verification?fileVersion(observed.output,ref):null;
+    if(task.shutdown_verification&&!beforeVersion)return result('DISCOVERY_FILE_VERSION_UNAVAILABLE');
     trace.push({event:'artifact_file_size_verified',bytes:task.artifact.bytes});
     trace.push({event:'artifact_file_discovered',file_ref:ref,file_tid:tid,directory:task.artifact.upload.directory,scrolls:trace.length,document:observed.output.dom_epoch.document,workflow_ref:observed.output.workflow_ref,active_tab_ref:observed.output.active_tab_ref});
-    const read=p=>ui(p,{...base,mode:'observe',root_ref:ref,download_toast_observation:true});
+    const read=async p=>{
+     const current=await ui(p,{...base,mode:'observe',root_ref:ref,download_toast_observation:true});
+     if(beforeVersion&&current.status==='SUCCEEDED'&&!same(fileVersion(current.output,ref),beforeVersion))
+      return {...current,status:'NOT_APPLIED',error:{code:'DISCOVERY_FILE_VERSION_CHANGED'}};
+     return current;
+    };
     const act=(p,snapshot)=>ui(p,{...base,mode:'act',snapshot,action:{verb:'double_click',ref}});
     uncertain=true;const outcome=await download(page,{...task,file_ref:ref,snapshot:observed.output},read,act,reveal);
-    uncertain=false;return {...outcome,status:moved&&outcome.status==='NOT_APPLIED'?'AMBIGUOUS':outcome.status,
-      effect_possible:moved||outcome.effect_possible,trace:[...trace,...outcome.trace]};
+    uncertain=false;
+    trace.push(...outcome.trace);
+    if(beforeVersion&&outcome.status==='SUCCEEDED'){
+     // Refresh the same FileStore before accepting its post-copy version.
+     // Re-reading the cached row alone misses replacements by another session.
+     moved=true;
+     if(!await refreshDirectory())return result('DISCOVERY_FILE_VERSION_CHANGED');
+     const current=await ui(page,{...base,mode:'observe',discover_roots:true,storage_name:task.artifact.name});
+     const rows=current.status==='SUCCEEDED'?current.output.ui.elements.filter(e=>e.tid===tid):[];
+     if(rows.length!==1||Date.now()>=deadline)return result('DISCOVERY_FILE_VERSION_CHANGED');
+     const after=await ui(page,{...base,mode:'observe',root_ref:rows[0].ref});
+     const afterVersion=after.status==='SUCCEEDED'&&context(after.output)?fileVersion(after.output,rows[0].ref):null;
+     if(Date.now()>=deadline||!same(beforeVersion,afterVersion))return result('DISCOVERY_FILE_VERSION_CHANGED');
+     trace.push({event:'artifact_file_version_verified',before:beforeVersion,after:afterVersion});
+    }
+    return {...outcome,status:moved&&outcome.status==='NOT_APPLIED'?'AMBIGUOUS':outcome.status,
+      effect_possible:moved||outcome.effect_possible,trace};
    }
    if(readiness.empty_native_store){
     trace.push({event:'artifact_empty_directory_pending',load_count:readiness.load_count});
@@ -381,13 +410,20 @@ export function makeArtifactDiscoveryDownloadCode(options,{download,reveal}) {
 
 // The discovered reference did not exist at lease preparation. Accept it only
 // through the pinned discovery receipt bound to that preparation's native context.
-export function verifiedDiscoveryReference(artifact,binding,raw) {
+export function verifiedDiscoveryReference(artifact,binding,raw,requireVersion=false) {
  const matches=raw.trace?.filter(e=>e.event==='artifact_file_discovered')??[];
  const proof=matches[0],tid=binding?.workflow_ref?.prefix+';FileStorageForm;colName_'+artifact.name.replace(/\s/g,'_').replace(/,/g,'');
  if(matches.length!==1||!/^ui-[a-zA-Z0-9-]{1,124}$/.test(proof.file_ref)||proof.file_ref!==raw.output?.file_ref
    ||proof.file_tid!==tid||proof.directory!==artifact.upload.directory||proof.document!==binding.document
    ||proof.active_tab_ref!==binding.active_tab_ref||JSON.stringify(proof.workflow_ref)!==JSON.stringify(binding.workflow_ref))
   throw Error('Discovered download reference is not bound to the prepared destination');
+ if(requireVersion){
+  const versions=raw.trace.filter(e=>e.event==='artifact_file_version_verified');
+  const {before,after}=versions[0]??{};
+  if(versions.length!==1||before?.bytes!==artifact.bytes||after?.bytes!==artifact.bytes
+    ||typeof before.mtime!=='string'||before.mtime.length===0||before.mtime.length>128||after.mtime!==before.mtime)
+   throw Error('Discovered download has no matching native file version');
+ }
  return proof.file_ref;
 }
 

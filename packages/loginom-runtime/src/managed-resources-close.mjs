@@ -3,16 +3,16 @@ import { join } from "node:path"
 
 // A fulfilled bridge reply can still report retained resources. It must not
 // become a successful private close ACK or erase the profile used for recovery.
-export async function closeManagedResources(state, requests) {
+export async function closeManagedResources(state, requests, { deadline } = {}) {
   // Snapshot synchronously: the caller registers the close request itself only
   // after this function yields. It must never become part of its own drain.
   const admitted = [...requests]
   // Private stage evidence only; a diagnostic write cannot certify or prevent
   // cleanup. Never persist exception messages or browser/credential contents.
-  const record = async (stage, status) => {
+  const record = async (stage, status, details = {}) => {
     if (!state.session?.directory) return
     await appendFile(join(state.session.directory, "resource-close.jsonl"),
-      JSON.stringify({ version: 1, stage, status, recorded_at: new Date().toISOString() }) + "\n",
+      JSON.stringify({ version: 1, stage, status, recorded_at: new Date().toISOString(), ...details }) + "\n",
       { mode: 0o600 }).catch(() => undefined)
   }
   await record("drain", "started")
@@ -22,14 +22,17 @@ export async function closeManagedResources(state, requests) {
   const results = await Promise.allSettled([Promise.resolve().then(() => state.client?.close())])
   await record("client", results[0].status)
   let packageCleanupFailed = false
+  let closeFailure
   if (state.bridge) {
     await record("bridge", "started")
-    const bridge = await Promise.allSettled([Promise.resolve().then(() => state.bridge.close())])
+    const bridge = await Promise.allSettled([Promise.resolve().then(() => state.bridge.close({ deadline }))])
     await record("bridge", bridge[0].status)
+    const auditError = bridge[0].value?.package_cleanup?.audit_error
+    if (auditError) closeFailure = { code: "LOGINOM_RUNTIME_CLEANUP_FAILED", audit_error: auditError }
     if (bridge[0].status !== "fulfilled" || bridge[0].value?.browser_transport_closed !== true
       || bridge[0].value.browser_process_terminated !== true || bridge[0].value.clipboard_leases_retained !== 0) {
-      await record("bridge_ack", "rejected")
-      throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      await record("bridge_ack", "rejected", closeFailure)
+      throw Object.assign(Error("LOGINOM_RUNTIME_CLEANUP_FAILED"), closeFailure)
     }
     await record("bridge_ack", "fulfilled")
     const cleanup = bridge[0].value.package_cleanup
@@ -46,8 +49,8 @@ export async function closeManagedResources(state, requests) {
   // Closing the browser releases resources; it cannot certify native package
   // closure. Keep the profile and failed ACK available for ordinary recovery.
   if (packageCleanupFailed) {
-    await record("complete", "rejected")
-    throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    await record("complete", "rejected", closeFailure)
+    throw Object.assign(Error("LOGINOM_RUNTIME_CLEANUP_FAILED"), closeFailure)
   }
   if (state.browserProfile) {
     await record("profile", "started")

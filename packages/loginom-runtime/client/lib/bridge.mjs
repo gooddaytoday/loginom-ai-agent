@@ -1035,15 +1035,42 @@ export async function createBridge(config, session, { browserTransport: managedB
       },
       hasActiveWork: () => !clipboardUncertain && (!!actionRuntime?.hasActiveWork() || recovery.unsettled()),
       cancelArtifactDeliveries: () => actionRuntime?.cancelArtifactDeliveries(),
-      hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0, close() {
+      hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0, close({deadline}={}) {
       shutdownStarted = true;
       closing ??= (async () => {
+        const normalCleanup = config.closeSavedPackageOnShutdown === true;
+        // Use one cutoff for the shutdown journal waits. The delivery retry
+        // can spend at most its shorter 8 s allowance on its own audit.
+        const closeBudget=normalCleanup||config.acceptanceCleanupPackage?45000:15000;
+        const closeDeadline=performance.now()+Math.min(closeBudget,Number.isSafeInteger(deadline)?deadline-Date.now():Infinity);
+        let auditDeadline=closeDeadline;
+        const writeCloseAudit=async event=>{
+          const deadlineError=Error('CLEANUP_AUDIT_DEADLINE');
+          const remaining=auditDeadline-performance.now();
+          if(remaining<=0)throw deadlineError;
+          let timer;
+          try {
+            await Promise.race([recordExecution(event),new Promise((_,reject)=>{timer=setTimeout(()=>reject(deadlineError),remaining);})]);
+            if(performance.now()>=auditDeadline)throw deadlineError;
+          } finally {clearTimeout(timer);}
+        };
         let lifecycleCleanupFailed=false;
-        for(const cleanup of [()=>actionRuntime?.closeArtifactDeliveries(),()=>actionRuntime?.closeNodeOperations?.(),
-          ()=>actionRuntime?.cleanupServerCache(),()=>recovery.close()]){
+        let artifactVerificationExpired=false;
+        let auditError=null;
+        try {
+          const delivery=await actionRuntime?.closeArtifactDeliveries({
+            verifyCancelled:normalCleanup&&!recovery.unsettled()&&!clipboardUncertain&&heldLeases.size===0,
+            closeDeadline,
+          });
+          artifactVerificationExpired=delivery?.verificationDeadlineElapsed===true;
+          lifecycleCleanupFailed=artifactVerificationExpired;
+          auditError=delivery?.auditError??null;
+          if(auditError)auditDeadline=Math.min(auditDeadline,delivery.auditDeadline);
+        } catch {lifecycleCleanupFailed=true;}
+        for(const cleanup of [()=>actionRuntime?.closeNodeOperations?.(),()=>actionRuntime?.cleanupServerCache(),()=>recovery.close()]){
           try{await cleanup();}catch{lifecycleCleanupFailed=true;}
         }
-        if(config.storageDirectories&&actionRuntime){
+        if(config.storageDirectories&&actionRuntime&&!artifactVerificationExpired&&!auditError){
           // Diagnostics are read without the connection guard, including after
           // a disconnect. They never certify package or transport cleanup.
           try{
@@ -1063,10 +1090,9 @@ export async function createBridge(config, session, { browserTransport: managedB
               }`,
             }},undefined,{timeout:1000});
             const timeline=parseCapabilityResult(response,{redactor}).output.timeline;
-            if(timeline)await recordExecution({phase:'native_connection_timeline',timeline});
+            if(timeline)await writeCloseAudit({phase:'native_connection_timeline',timeline});
           }catch{ /* Diagnostic availability cannot change shutdown. */ }
         }
-        const normalCleanup = config.closeSavedPackageOnShutdown === true;
         // MCP cancellation settles the caller before the admitted browser task.
         // Read its final receipt only after that task has left the shared gate.
         if (normalCleanup && session.metadata.workspaceReady !== true
@@ -1124,7 +1150,8 @@ export async function createBridge(config, session, { browserTransport: managedB
         const saveOperationId = normalCleanup ? lastSavedPackage?.operation_id : savedPackages.get(packagePath);
         let cleanup;
         if (packagePath || normalCleanup) {
-          if (lifecycleCleanupFailed) cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'};
+          if (auditError) cleanup = {status:'BLOCKED', reason:'CLEANUP_EVIDENCE_UNCONFIRMED'};
+          else if (lifecycleCleanupFailed) cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'};
           else if (!prepared?.attempted) cleanup = {status:'SKIPPED_UNPREPARED', session_id:session.metadata.sessionId};
           else {
             try {
@@ -1170,7 +1197,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                   const accepted = bound?.status === 'READY' && bound.effect_possible === false && bound.created_draft === false
                     && bound.document_id === prepared.state.document_id && bound.loginom_account === prepared.state.loginom_account
                     && bound.package_ref?.path === packagePath && bound.package_ref.persisted === true;
-                  await recordExecution({phase:'reopened_package_cleanup_binding', package_path:packagePath, accepted, state:bound});
+                  await writeCloseAudit({phase:'reopened_package_cleanup_binding', package_path:packagePath, accepted, state:bound});
                   if (!accepted) return {status:'BLOCKED', reason:'REOPENED_PACKAGE_UNBOUND'};
                   tabTid = bound.workflow_ref.tab_tid;
                 }
@@ -1192,12 +1219,22 @@ export async function createBridge(config, session, { browserTransport: managedB
           cleanup = {...cleanup, session_id:session.metadata.sessionId,
             save_operation_id:saveOperationId ?? null,
             ...(normalCleanup ? {package_path:packagePath ?? null, policy:unsavedDraft?'unsaved_draft':openedPackage||failedOpen?'opened_saved_package':'last_confirmed_own_save'} : {})};
+          // The browser can report native cleanup, but only the host records its audit verdict.
+          delete cleanup.audit_error;
+          if(auditError)cleanup.audit_error=auditError;
+          const saveCleanup=()=>writeFile(join(session.directory,normalCleanup?'saved-package-cleanup.json':'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
+          let receiptSaved=false;
           try {
-            await writeFile(join(session.directory,normalCleanup?'saved-package-cleanup.json':'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
-            await recordExecution({event:normalCleanup?'managed_saved_package_cleanup':config.acceptanceCleanupPackage?'isolated_package_cleanup':'saved_package_cleanup', cleanup});
+            await saveCleanup();
+            receiptSaved=true;
+            // Expired verification or terminal audit can still occupy the queue.
+            if(!artifactVerificationExpired&&auditError?.code!=='ARTIFACT_DELIVERY_AUDIT_DEADLINE')
+              await writeCloseAudit({event:normalCleanup?'managed_saved_package_cleanup':config.acceptanceCleanupPackage?'isolated_package_cleanup':'saved_package_cleanup', cleanup});
           } catch (error) {
             if (config.acceptanceCleanupPackage) throw error;
-            cleanup = {...cleanup, status:'BLOCKED', reason:'CLEANUP_EVIDENCE_UNCONFIRMED'};
+            auditError??={code:error.message==='CLEANUP_AUDIT_DEADLINE'?'CLEANUP_AUDIT_DEADLINE':'CLEANUP_AUDIT_WRITE_FAILED'};
+            cleanup = {...cleanup, status:'BLOCKED', reason:'CLEANUP_EVIDENCE_UNCONFIRMED',audit_error:auditError};
+            if(receiptSaved)await saveCleanup().catch(()=>{});
           }
           if (config.acceptanceCleanupPackage && !['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) return {
             browser_transport_closed:false, browser_process_terminated:false, clipboard_leases_retained:heldLeases.size,
