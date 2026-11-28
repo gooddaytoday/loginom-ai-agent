@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runInNewContext, createContext, runInContext } from 'node:vm';
 import { makeWorkspacePrepareCode, makeWorkspaceBootstrapCode, makeWorkspaceStepCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace } from '../lib/workspace.mjs';
+import {readGraph} from '../lib/node-target-browser.mjs';
+import {NODE_TYPES} from '../lib/node-contracts.mjs';
 import {prepareTool} from '../lib/skill.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
 import { createSerialGate } from '../lib/clipboard.mjs';
@@ -642,6 +644,80 @@ for(const [edit, apply] of [
   assert.equal(later.package_ref.path,edit==='save the package'?'/user/manual.lgp':null);
   if(edit==='save the package')assert.equal(later.workflow_ref.navigation_path[2].label,'Manual');
   assert.equal(fixture.events.filter(e=>e==='create_draft').length,1);
+});
+
+test('package schema observes unsaved graph edits and keeps native node and port GUIDs without gestures', async()=>{
+  const fixture=pageFixture({authenticated:true,nativeWorkflow:true});
+  const prepared=await execute(fixture);
+  const tab=fixture.tabs.at(-1);
+  const shapes=new Map(), elements=[];
+  const add=(guid,label,direction,portGuid)=>{
+    const cell={geometry:{x:60,y:80}};
+    const node={FGuid:guid,FIconCls:'bg-vendor-icon-calcdata',FCell:cell};
+    const port={FGuid:portGuid,data:{},parent:node,FType:direction==='Input'?0:1,FSubType:1,
+      FCell:{parent:cell,visible:true}};
+    node.FPorts=[{FCollection:[port]}];
+    node.FLabel={parent:node,FCell:{parent:cell,visible:false},FRawValue:label};
+    const prefix=prepared.workflow_ref.prefix+';Graph;';
+    const body=()=>prefix+node.FLabel.FRawValue;
+    const shape=tid=>({getAttribute:tid,getBoundingClientRect:()=>({width:10,height:10})});
+    const insert=(cell,tid)=>{
+      const entry=shape(tid);
+      elements.push(entry);
+      shapes.set(cell,{shape:{node:entry}});
+    };
+    insert(cell,body);
+    insert(port.FCell,()=>body()+';'+direction+'_Data-0');
+    return node;
+  };
+  const source=add('48FC4BE7-DCBE-4621-91D7-86D822FD3292','Source','Output','source-port');
+  const target=add('320790e8-3d1c-4612-b1b3-86c025cddb81','Target','Input','target-port');
+  const query=fixture.context.document.querySelectorAll;
+  fixture.context.document.querySelectorAll=selector=>{
+    if(selector==='[role="dialog"],.bg-mask-message,.x-mask-msg')return query('[role="dialog"]');
+    return [...query(selector),...elements.filter(element=>selector==='[data-tid='+JSON.stringify(element.getAttribute())+']')];
+  };
+  Object.assign(tab.model,{FCreateDraggedNodeStarted:false,FDraggingOverGraph:false});
+  Object.assign(tab.model.FDiagram,{FNodes:{FCollection:[source,target]},FLinks:{FCollection:[{
+    FSourcePort:source.FPorts[0].FCollection[0],FTargetPort:target.FPorts[0].FCollection[0],
+  }]}});
+  tab.graph.contains=element=>elements.includes(element);
+  tab.graph.querySelectorAll=()=>elements;
+  tab.model.FDiagram.FmxGraph.view={getState:cell=>shapes.get(cell)};
+  const events=[...fixture.events];
+  const snapshot=async(details=true)=>{
+    const read=runInNewContext(makeWorkspaceStepCode({loginomUrl:'http://loginom.example/app',build,
+      sessionId:'standalone',workflowRef:{...prepared.workflow_ref,document_id:prepared.document_id},
+      readGraph,types:NODE_TYPES,snapshotOnly:true,snapshotDetails:details}));
+    return JSON.parse(JSON.stringify((await read(fixture.page)).output.snapshot??null));
+  };
+  const before=await snapshot();
+  source.FLabel.FRawValue='Renamed';
+  source.FCell.geometry.x=120;
+  const after=await snapshot();
+  assert.equal(after.name,'Draft');
+  assert.equal(after.document,prepared.document_id);
+  assert.equal(after.workflow,prepared.workflow_ref.workflow_id);
+  assert.deepEqual(after.nodes.map(n=>n.guid),before.nodes.map(n=>n.guid));
+  assert.deepEqual(after.nodes.find(n=>n.guid===source.FGuid),{
+    guid:source.FGuid,label:'Renamed',type:'transform.calculator',position:{x:120,y:80},
+    ports:[{direction:'output',index:0,name:'Output_Data-0',kind:'data',guid:'source-port'}],
+  });
+  assert.deepEqual(after.links,before.links);
+  assert.deepEqual(after.links,[{source:source.FGuid,output:'source-port',target:target.FGuid,input:'target-port'}]);
+  const step=await snapshot(false);
+  assert.deepEqual(step.links,after.links);
+  assert.deepEqual(step.nodes,after.nodes.map(({guid,type,label,position})=>({guid,type,label,position})));
+  fixture.setBlocked(true);
+  assert.equal(await snapshot(),null);
+  fixture.setBlocked(false);
+  fixture.openFiles();
+  assert.equal(await snapshot(),null);
+  fixture.activate(tab);
+  const main=fixture.context.bg.app.Application.FInstance.FMainForm;
+  main.FMapTree.FServerConnection.Session={};
+  assert.equal(await snapshot(),null);
+  assert.deepEqual(fixture.events,events);
 });
 
 test('repeat dock_prepare accepts a manually saved draft with the same native owner', async()=>{

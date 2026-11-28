@@ -95,6 +95,16 @@ export class MockUnsupported extends Schema.TaggedError<MockUnsupported>()("Mock
   message: Schema.String,
 }) {}
 
+export class MockRpcError extends Schema.TaggedError<MockRpcError>()(
+  "RpcError",
+  {
+    type: Schema.String,
+    message: Schema.String,
+    data: Schema.optional(Schema.Unknown),
+  },
+  { httpApiStatus: 400 },
+) {}
+
 const Unsupported = MockUnsupported.pipe(HttpApiSchema.status(501))
 
 const PersistentPtyUnavailable = MockServiceUnavailable.pipe(HttpApiSchema.status(503))
@@ -370,7 +380,7 @@ const Group = HttpApiGroup.make("mock")
       params: { rpcID: Schema.String, method: Schema.String },
       payload: JsonPayload,
       success: Json,
-      error: [Unsupported, MockServiceUnavailable.pipe(HttpApiSchema.status(503))],
+      error: [Unsupported, MockRpcError, MockServiceUnavailable.pipe(HttpApiSchema.status(503))],
     }),
   )
   .add(

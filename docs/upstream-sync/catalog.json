@@ -135,6 +135,9 @@
       "id": "CAT-14",
       "title": "Built-in GUI tool renderers (C3.0, accepted timeline row exception)",
       "paths": [
+        "packages/app/e2e/regression/session-timeline-tool-projection.spec.ts",
+        "packages/app/e2e/utils/mock-api.ts", "packages/app/e2e/utils/mock-server.ts",
+        "packages/app/e2e/utils/timeline.ts",
         "packages/app/component-tests/plugin-host.fixture.tsx",
         "packages/app/src/runtime/plugin/host.tsx",
         "packages/app/src/runtime/plugin/render.tsx",

@@ -9,6 +9,7 @@ import {
 
 export {
   inspectReferenceFile,
+  openReferenceFile,
   verifyReferenceFile,
   referenceUploadBudget,
 } from "../../loginom-runtime/client/lib/file-reference.mjs"

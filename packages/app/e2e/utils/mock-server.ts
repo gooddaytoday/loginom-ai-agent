@@ -15,6 +15,7 @@ import {
   MockNotFound,
   MockPtyFeatureUnsupported,
   MockPtyNotFound,
+  MockRpcError,
   MockServiceUnavailable,
   MockShellNotFound,
   MockUnauthorized,
@@ -106,7 +107,7 @@ export interface MockServerConfig {
     method: string
     directory: string | null
     body: unknown
-  }) => { output: unknown } | { unavailable: true } | undefined
+  }) => { output: unknown } | { unavailable: true } | MockRpcError | undefined
   events?: () => OpenCodeEvent[]
   eventRetry?: number
   // Idle event streams send a comment every 15 s like the real server. Set false only to test the client's stall watchdog.
@@ -1252,6 +1253,7 @@ function mockHandlers(
             directory: url.searchParams.get("location[directory]"),
             body: ctx.payload,
           })
+          if (response instanceof MockRpcError) return Effect.fail(response)
           if (response && "unavailable" in response)
             return Effect.fail(new MockServiceUnavailable({ message: "RPC unavailable" }))
           if (response) return Effect.succeed(response)
