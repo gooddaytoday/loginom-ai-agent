@@ -1,41 +1,13 @@
 import { Option, Schema } from "effect"
-import { LoginomEvidence, LoginomMetadata } from "./loginom-metadata"
+import { Definition, type gap, Report, request, type summaryFact } from "./app-verified-contract"
+import { LoginomMetadata } from "./loginom-metadata"
 
-const request = Schema.Struct({ sessionID: Schema.NonEmptyString, promptID: Schema.NonEmptyString })
-const source = Schema.Struct({
-  operationId: Schema.NonEmptyString,
-  attempt: Schema.optional(Schema.Int),
-  messageID: Schema.String,
-  toolCallID: Schema.String,
-  nodeGuid: Schema.optional(Schema.String),
-})
-const summaryFact = Schema.Struct({
-  evidence: LoginomEvidence,
-  source,
-  relativeToSave: Schema.optional(
-    Schema.Struct({
-      timing: Schema.Literals(["before", "after"]),
-      source,
-    }),
-  ),
-})
-const reason = Schema.Literals([
-  "promptUnavailable",
-  "noTableReadReceipt",
-  "unreadTableRows",
-  "noExecutionReceipt",
-  "noSaveReceipt",
-  "noReopenedGraphReadReceipt",
-  "noSavedVersionExecutionReceipt",
-])
-const gap = Schema.Struct({ reason, status: Schema.Literals(["notRequested", "unconfirmed"]) })
-const report = Schema.Struct({ facts: Schema.Array(summaryFact), notVerified: Schema.Array(gap) })
-const schema = (value: typeof request | typeof report) =>
+const schema = (value: typeof request | typeof Report) =>
   Schema.toJsonSchemaDocument(value, { referencePolicy: () => undefined }).schema
 
 export const appVerifiedRpc = {
-  id: "loginom.appVerified",
-  methods: { summary: { input: schema(request), output: schema(report) } },
+  id: Definition.id,
+  methods: { summary: { input: schema(request), output: schema(Report) } },
   events: {},
 } as const
 
@@ -59,10 +31,10 @@ type Message = {
 type Location = { directory: string; workspaceID?: string }
 type SummarySessions = {
   get(input: { sessionID: string }): Promise<{ id: string; location: Location }>
-  context(input: { sessionID: string }): Promise<readonly Message[]>
+  turn(input: { sessionID: string; promptID: string }): Promise<readonly Message[]>
 }
 
-const unavailable = (): typeof report.Type => ({
+const unavailable = (): typeof Report.Type => ({
   facts: [],
   notVerified: [{ reason: "promptUnavailable", status: "unconfirmed" }],
 })
@@ -77,15 +49,15 @@ export function appVerifiedHandler(sessions: SummarySessions, location: Location
       session.location.workspaceID !== location.workspaceID
     )
       return unavailable()
-    return appVerifiedSummary(await sessions.context({ sessionID }), promptID)
+    return appVerifiedSummary(await sessions.turn({ sessionID, promptID }), promptID)
   }
 }
 
-export function appVerifiedSummary(messages: readonly Message[], promptID: string): typeof report.Type {
+export function appVerifiedSummary(messages: readonly Message[], promptID: string): typeof Report.Type {
   const start = messages.findIndex((message) => message.type === "user" && message.id === promptID)
   if (start === -1) return unavailable()
 
-  const requested = new Set<typeof reason.Type>()
+  const requested = new Set<typeof gap.Type.reason>()
   const facts = new Map<
     string,
     {

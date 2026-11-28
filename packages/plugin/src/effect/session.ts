@@ -8,7 +8,7 @@ import type { SessionInbox } from "@opencode/schema/session-inbox"
 import type { SessionError } from "@opencode/schema/session-error"
 import type { SessionMessage } from "@opencode/schema/session-message"
 import type { TokenUsage } from "@opencode/schema/token-usage"
-import type { JsonSchema, Types } from "effect"
+import type { Effect, JsonSchema, Types } from "effect"
 import type { ModelHooks } from "./registration.js"
 
 export interface SessionPrompt {
@@ -235,5 +235,7 @@ export type SessionDomain = Pick<
   | "context"
 > &
   Pick<ExperimentalSessionApi<unknown>, "wait" | "instructions"> & {
+    /** Reads the persisted transcript from a user message up to the next user message, including compacted history. */
+    readonly turn: (input: { readonly sessionID: Session.ID; readonly promptID: SessionMessage.ID }) => Effect.Effect<readonly SessionMessage.Info[], unknown>
     readonly hook: ModelHooks<SessionHooks>
   }

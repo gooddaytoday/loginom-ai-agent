@@ -49,6 +49,7 @@ story(
 
       return mountPluginPages()
     }, fixture)
+
     const nav = page.getByRole("navigation", { name: "Plugin pages" })
     const entry = nav.getByRole("button", { name: "Example plugin page", exact: true })
 
@@ -119,6 +120,33 @@ story("a third-party plugin cannot register a page with a public registry token"
   }, fixture)
 
   expect(result).toEqual({ status: "failed", pages: 0 })
+})
+
+story("only a built-in can register a turn result renderer", async ({ page }) => {
+  const result = await page.evaluate(async (fixture) => {
+    const { mountPluginHost, Registry, until } = await import(fixture)
+    const register = (ctx: Context) => ctx.add(Registry.define("session.turn.result"), { render: () => "Turn result" })
+
+    const inspect = async (builtins?: ReadonlySet<string>) => {
+      const host = mountPluginHost({ builtins })
+
+      try {
+        host.load(register)
+        await until(() => host.status() === "failed" || host.status() === "active")
+
+        return { status: host.status(), renderers: host.entries("session.turn.result") }
+      } finally {
+        host.unmount()
+      }
+    }
+
+    return { external: await inspect(), builtin: await inspect(new Set(["fixture"])) }
+  }, fixture)
+
+  expect(result).toEqual({
+    external: { status: "failed", renderers: 0 },
+    builtin: { status: "active", renderers: 1 },
+  })
 })
 
 story("a plugin that finishes loading after the host unmounts is never set up", async ({ page }) => {

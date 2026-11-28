@@ -143,6 +143,7 @@ export interface Interface {
   }) => Effect.Effect<SessionEnvironment.Variables | undefined, NotFoundError>
   readonly view: (input: { sessionID: SessionSchema.ID; idle: number }) => Effect.Effect<void, NotFoundError>
   readonly remove: (sessionID: SessionSchema.ID) => Effect.Effect<void, NotFoundError>
+  readonly turn: SessionStore.Interface["turn"]
   readonly messages: (
     input: SessionStore.MessagesInput,
   ) => Effect.Effect<SessionMessage.Info[], NotFoundError | MessageDecodeError>
@@ -440,6 +441,7 @@ const layer = Layer.effect(
           },
         }
       }),
+      turn: store.turn,
       messages: Effect.fn("Session.messages")(function* (input) {
         yield* result.get(input.sessionID)
         return yield* store.messages(input)

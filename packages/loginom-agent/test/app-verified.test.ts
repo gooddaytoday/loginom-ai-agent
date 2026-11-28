@@ -143,8 +143,8 @@ test("summary RPC reads only the exact session in its Location", async () => {
     appVerifiedHandler(
       {
         get: async () => session,
-        context: async ({ sessionID }) => {
-          expect(sessionID).toBe(input.sessionID)
+        turn: async (turn) => {
+          expect(turn).toEqual(input)
           return [user("prompt"), step("save", "save-op", saved)]
         },
       },

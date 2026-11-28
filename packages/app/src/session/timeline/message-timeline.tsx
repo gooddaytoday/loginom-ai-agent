@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, onCleanup, Show, type Accessor, type JSX } from "solid-js"
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, type Accessor, type JSX } from "solid-js"
 import { Predicate } from "effect"
 import { abort } from "@opencode/util/abort"
 import { createAnimatedPresence } from "@/runtime/animated-presence"
@@ -12,7 +12,9 @@ import { InlineInput } from "@opencode/ui/inline-input"
 import { Keybind } from "@opencode/ui/keybind"
 import { TextShimmer } from "@opencode/ui/text-shimmer"
 import type { BackgroundTask, MountedSession, SessionScreen } from "@opencode/plugin/gui"
-import { PluginSlot } from "@/runtime/plugin/render"
+import { TurnResultRenderer } from "@opencode/plugin/gui/builtin"
+import { usePluginHost } from "@/runtime/plugin/host"
+import { Contribution, PluginSlot } from "@/runtime/plugin/render"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useSettings } from "@/settings/model"
 import { useServer } from "@/runtime/server/current"
@@ -301,6 +303,8 @@ function MessageTimelineView(
 
   const settings = useSettings()
 
+  const pluginHost = usePluginHost()
+
   const rowInput = {
     foldUserMessages: settings.general.foldUserMessages,
     sessionID: () => sessionID()!,
@@ -335,19 +339,24 @@ function MessageTimelineView(
         keyed
       >
         {(promptID) => (
-          <PluginSlot
-            at="session.turn.result"
-            input={{
-              get session() {
-                return props.view
-              },
-              promptID,
-              get messages() {
-                return projection.assistantMessagesByParent().get(promptID) ?? []
-              },
-              revealTool: virtualized.revealPart,
-            }}
-          />
+          <For each={pluginHost.items(TurnResultRenderer)}>
+            {(item) => (
+              <Contribution plugin={item.plugin}>
+                {() =>
+                  item.value.render({
+                    get session() {
+                      return props.view
+                    },
+                    promptID,
+                    get messages() {
+                      return projection.assistantMessagesByParent().get(promptID) ?? []
+                    },
+                    revealTool: virtualized.revealPart,
+                  })
+                }
+              </Contribution>
+            )}
+          </For>
         )}
       </Show>
     ),

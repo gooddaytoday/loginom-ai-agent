@@ -1,6 +1,11 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import type { SessionMessageAssistant, SessionMessageInfo, ShellInfo } from "@opencode/client/promise"
-import type { Fact, Reason } from "@opencode/schema/loginom-app-verified"
+import { Schema } from "effect"
+import { appVerifiedSummary } from "../../../loginom-agent/src/app-verified"
+import { request as verificationRequest } from "../../../loginom-agent/src/app-verified-contract"
+import { nodeResultReply } from "../../../loginom-runtime/client/lib/node-result-reply.mjs"
+import { loginomFeedMetadata, loginomSaveMetadata } from "../../../loginom-runtime/client/lib/user-results.mjs"
+import { withLoginomMetadata } from "../../../loginom-runtime/client/lib/loginom-feed-metadata.mjs"
 import { timelinePresets } from "@opencode/session-ui/timeline/detail"
 import { createTwoFilesPatch } from "diff"
 import { readSessionDraftText } from "../utils/drafts"
@@ -48,126 +53,235 @@ const completed = {
 } satisfies SessionMessageAssistant
 
 test.describe("application verification", () => {
-  type Step = { evidence: Fact["evidence"]; tool: string; phrase: string }
+  const path = "/user/Продажи и прибыль.lgp"
+  const readTitle = "Прочитаны строки таблицы · 12 из 80"
+  const resultTitle = "Прочитаны строки результата · 80 из 80"
+  const runTitle = "Запуск в рабочем пакете завершён"
+  const saveTitle = `Пакет сохранён по пути ${path}`
+  const graphTitle = "Схема сохранённого пакета перечитана · узлов 4"
+  const decodeCall = Schema.decodeUnknownSync(Schema.Struct({ input: verificationRequest }))
 
-  const read = {
-    evidence: { kind: "tableRead", port: 0, portGuid: "result-port", rowsRead: 12, rowCount: 80 },
-    tool: "loginom_dock_node_read",
-    phrase: "Прочитаны строки таблицы · 12 из 80",
-  } satisfies Step
+  const decodeMetadata = Schema.decodeUnknownSync(
+    Schema.fromJsonString(Schema.Record(Schema.String, Schema.MutableJson)),
+  )
 
-  const run = {
-    evidence: { kind: "executed", executionId: "execution-1", scope: "workspace" },
-    tool: "loginom_dock_node_apply",
-    phrase: "Запуск в рабочем пакете завершён",
-  } satisfies Step
+  function nodeStep(kind: "read" | "execute", counts?: { read: number; total: number }) {
+    const tool = kind === "read" ? "dock_node_read" : "dock_node_apply"
+    const node = { document_id: "document", workflow_id: "workflow", node_id: "filter" }
 
-  const save = {
-    evidence: { kind: "saved", path: "/user/Продажи и прибыль.lgp" },
-    tool: "loginom_dock_save",
-    phrase: "Пакет сохранён по пути /user/Продажи и прибыль.lgp",
-  } satisfies Step
+    const execution =
+      kind === "execute"
+        ? { status: "completed", execution_id: "execution-1" }
+        : { status: "not_requested", execution_id: null }
 
-  const reread = {
-    evidence: { kind: "savedGraphRead", nodeCount: 4, scope: "activeWorkflow" },
-    tool: "loginom_dock_save",
-    phrase: "Схема сохранённого пакета перечитана · узлов 4",
-  } satisfies Step
+    const ports = counts && [
+      {
+        port: 0,
+        port_guid: "filter-output",
+        fresh: true,
+        execution_id: execution.execution_id,
+        schema: [{ index: 0, name: "Value", label: "Значение", type: "string" }],
+        row_count: counts.total,
+        sample: Array.from({ length: counts.read }, (_, value) => [
+          { type: "string", value: String(value), is_null: false },
+        ]),
+        sample_complete: counts.read === counts.total,
+      },
+    ]
 
-  const completeRead = {
-    ...read,
-    evidence: { ...read.evidence, rowsRead: 80, executionId: "execution-1" },
-    phrase: "Прочитаны строки результата · 80 из 80",
+    const reply = nodeResultReply(
+      {
+        operation_id: kind,
+        attempt: 1,
+        state: "settled",
+        outcome: {
+          status: "SUCCEEDED",
+          action_key: "node.apply",
+          phase: "node_ready",
+          effect_possible: true,
+          cleanup_complete: true,
+          output: { node, execution, output: { ports } },
+        },
+      },
+      { userProfile: true, tool },
+    )
+
+    const receipt = loginomFeedMetadata(reply, {
+      tool,
+      facts: {
+        kind,
+        node: { ref: node, label: "Фильтр", type: "transform.filter_data" },
+        launchedExecutionId: execution.execution_id,
+      },
+    })
+
+    const projected = withLoginomMetadata(reply, { receipt })
+
+    return toolPart(
+      `prt_verification_${kind}`,
+      `loginom_${tool}`,
+      "completed",
+      kind === "execute" ? { finish: "execute" } : {},
+      { metadata: decodeMetadata(JSON.stringify({ generation: 1, loginom: projected._meta?.loginom })) },
+    )
+  }
+
+  function saveStep(reopened: boolean) {
+    const action = reopened ? "package.save_as" : "package.save_checkpoint"
+
+    const receipt = loginomSaveMetadata({
+      operation_id: "save",
+      status: "SUCCEEDED",
+      action_key: action,
+      output: { package_ref: { path, active_identity: path }, reopened },
+      trace: [
+        {
+          event: "reopened_package_observed",
+          actual_path: path,
+          path_matches: true,
+          graph_matches: true,
+          graph: { nodes: [{}, {}, {}, {}] },
+        },
+      ],
+    })
+
+    return toolPart(
+      "prt_verification_save",
+      "loginom_dock_action_run",
+      "completed",
+      { action_key: action },
+      {
+        metadata: decodeMetadata(JSON.stringify({ generation: 1, loginom: receipt })),
+      },
+    )
   }
 
   const scenarios = [
     {
       name: "read without running",
-      verifyScroll: true,
-      steps: [read],
-      reasons: ["unreadTableRows", "noExecutionReceipt", "noSaveReceipt"],
-      unchecked: "Не проверено · строки за пределами выборки · запуск не подтверждён · сохранение не подтверждено",
-      width: 1280,
+      kind: "read",
+      phrases: [readTitle],
+      unchecked: "строки за пределами выборки · запуск в рабочем пакете (не было запроса)",
+      scroll: true,
     },
     {
       name: "run without reading",
-      steps: [run],
-      reasons: ["noTableReadReceipt", "noSaveReceipt"],
-      unchecked: "Не проверено · строки таблицы не прочитаны · сохранение не подтверждено",
-      width: 1280,
+      kind: "run",
+      phrases: [runTitle],
+      unchecked: "чтение таблицы (не было запроса)",
     },
     {
       name: "save without running",
-      steps: [save],
-      reasons: ["noTableReadReceipt", "noExecutionReceipt", "noSavedGraphReadReceipt"],
-      unchecked: "Не проверено · строки таблицы не прочитаны · запуск не подтверждён · содержимое сохранённого пакета",
-      width: 390,
+      kind: "save",
+      phrases: [saveTitle],
+      unchecked: "запуск в рабочем пакете (не было запроса)",
+      narrow: true,
       screenshot: true,
     },
     {
-      name: "all facts on desktop",
-      steps: [run, completeRead, save, reread],
-      reasons: [],
-      width: 1280,
+      name: "all available facts on desktop",
+      kind: "all",
+      phrases: [runTitle, resultTitle, saveTitle, graphTitle],
+      unchecked: "запуск сохранённой версии (не было запроса)",
       screenshot: true,
     },
     {
-      name: "all facts on narrow screens",
-      steps: [run, completeRead, save, reread],
-      reasons: [],
-      width: 390,
+      name: "all available facts on narrow screens",
+      kind: "all",
+      phrases: [runTitle, resultTitle, saveTitle, graphTitle],
+      unchecked: "запуск сохранённой версии (не было запроса)",
+      narrow: true,
     },
     {
       name: "turn without Loginom",
-      steps: [],
-      reasons: ["noExecutionReceipt"],
-      width: 1280,
+      kind: "none",
+      phrases: [],
+    },
+    {
+      name: "old turn after compaction",
+      kind: "read",
+      phrases: [readTitle],
+      compacted: true,
+    },
+    {
+      name: "RPC failure can be retried independently of verification gaps",
+      kind: "run",
+      phrases: [runTitle],
+      retry: true,
     },
   ] satisfies {
     name: string
-    steps: Step[]
-    reasons: Reason[]
+    kind: "read" | "run" | "save" | "all" | "none"
+    phrases: string[]
     unchecked?: string
-    width: number
+    scroll?: boolean
+    narrow?: boolean
     screenshot?: boolean
-    verifyScroll?: boolean
+    compacted?: boolean
+    retry?: boolean
   }[]
 
   for (const scenario of scenarios) {
     test(scenario.name, async ({ page }, testInfo) => {
-      const steps = scenario.steps.map((step, index) => ({ ...step, id: `prt_verification_${index}` }))
+      const steps = (() => {
+        switch (scenario.kind) {
+          case "read":
+            return [nodeStep("read", { read: 12, total: 80 })]
+          case "run":
+            return [nodeStep("execute")]
+          case "save":
+            return [saveStep(false)]
+          case "all":
+            return [nodeStep("execute", { read: 80, total: 80 }), saveStep(true)]
+          case "none":
+            return []
+        }
+      })()
 
-      const facts: Fact[] = steps.map((step) => ({
-        evidence: step.evidence,
-        source: { messageID: assistantID, toolCallID: step.id, operationId: step.id },
-      }))
-
-      const requests: unknown[] = []
       const answer = "Итог работы с таблицей готов."
 
-      const reply = scenario.verifyScroll
+      const reply = scenario.scroll
         ? [...Array.from({ length: 38 }, (_, i) => `Пояснение ${i + 1} о ходе работы.`), answer].join("\n\n")
         : answer
 
+      const history: SessionMessageInfo[] = [
+        userMessage([userText("Проверь, что удалось сделать с таблицей.")]),
+        assistantMessage([...steps, textPart("prt_verification_answer", reply)]),
+      ]
+
+      if (scenario.compacted) {
+        history.push(
+          {
+            type: "compaction",
+            id: "msg_verification_compaction",
+            time: { created: 1700000003000 },
+            reason: "manual",
+            status: "completed",
+            summary: "Сохранён конспект разговора.",
+          },
+          userMessage([userText("Следующий вопрос.")], { id: "msg_verification_next", created: 1700000004000 }),
+        )
+      }
+
+      const width = scenario.narrow ? 390 : 1280
+      const requests: { sessionID: string; promptID: string }[] = []
+      let unavailable = scenario.retry === true
+
       await setupTimeline(page, {
         locale: "ru",
-        viewport: { width: scenario.width, height: 900 },
+        viewport: { width, height: 900 },
         settings: {
-          newTimeline: scenario.width === 390,
-          timelineDetail: scenario.verifyScroll ? timelinePresets[0].value : timelinePresets[2].value,
+          newTimeline: scenario.narrow === true,
+          timelineDetail: scenario.scroll ? timelinePresets[0].value : timelinePresets[2].value,
         },
-        messages: [
-          userMessage([userText("Проверь, что удалось сделать с таблицей.")]),
-          assistantMessage([
-            ...steps.map((step) => toolPart(step.id, step.tool, "completed", {})),
-            textPart("prt_verification_answer", reply),
-          ]),
-        ],
+        sessionMessages: history,
         onRpc: ({ rpcID, method, body }) => {
           if (rpcID !== "loginom.appVerified" || method !== "summary") return
-          requests.push(body)
 
-          return { output: { facts, notVerified: scenario.reasons } }
+          const { input } = decodeCall(body)
+          requests.push(input)
+
+          return unavailable ? { unavailable: true } : { output: appVerifiedSummary(history, input.promptID) }
         },
       })
 
@@ -181,28 +295,40 @@ test.describe("application verification", () => {
         return
       }
 
-      await expect(card.getByRole("button")).toHaveText(steps.map((step) => step.phrase))
+      if (scenario.retry) {
+        const failure = page.getByText("Не удалось загрузить проверку", { exact: true })
+        await expect(failure).toBeVisible()
+        await expect(page.getByText("Не проверено", { exact: true })).toHaveCount(0)
+        unavailable = false
+        await page.getByRole("button", { name: "Повторить", exact: true }).click()
+        await expect(failure).toHaveCount(0)
+      }
+
+      const facts = card.getByRole("button")
+      await expect(facts).toHaveText(scenario.phrases)
       expect(requests.length).toBeGreaterThan(0)
 
-      for (const request of requests) expect(request).toEqual({ input: { sessionID, promptID: userID } })
+      for (const request of requests) expect(request).toEqual({ sessionID, promptID: userID })
 
-      if (scenario.unchecked) await expect(card.getByText(scenario.unchecked, { exact: true })).toBeVisible()
-      else await expect(card.getByText("Не проверено", { exact: true })).toHaveCount(0)
+      if (scenario.unchecked) {
+        await expect(card.getByText("Не проверено", { exact: true })).toBeVisible()
+        await expect(card).toContainText(scenario.unchecked)
+      }
 
       if (scenario.screenshot && testInfo.repeatEachIndex === 0) {
         await expect(card).toBeInViewport({ ratio: 1 })
-        const path = testInfo.outputPath(`loginom-app-verified-${scenario.width}.png`)
+        const path = testInfo.outputPath(`loginom-app-verified-${width}.png`)
         await page.screenshot({ path, animations: "disabled" })
-        await testInfo.attach(`Проверено приложением · ${scenario.width} px`, { path, contentType: "image/png" })
+        await testInfo.attach(`Проверено приложением · ${width} px`, { path, contentType: "image/png" })
       }
 
-      for (const step of steps) {
-        const tool = page.locator(`[data-timeline-part-id="${step.id}"]`)
+      const step = steps[0]
 
-        if (scenario.verifyScroll) await expect(tool).not.toBeInViewport()
-
-        await card.getByRole("button", { name: step.phrase, exact: true }).click()
-        await expect(tool).toBeInViewport()
+      if (step && scenario.scroll) {
+        const row = page.locator(`[data-timeline-part-id="${step.id}"]`)
+        await expect(row).not.toBeInViewport()
+        await card.getByRole("button", { name: readTitle, exact: true }).click()
+        await expect(row).toBeInViewport()
       }
     })
   }

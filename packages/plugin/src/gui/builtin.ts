@@ -170,22 +170,35 @@ export interface Page {
  */
 export const Page = Registry.define<Page>("page")
 
+/** The transcript and navigation for the end of a settled turn. */
+export interface TurnResultProps {
+  /** The session that owns the turn. */
+  readonly session: MountedSession
+  /** The user message that started the turn. */
+  readonly promptID: string
+  /** Assistant messages associated with the prompt, in transcript order. */
+  readonly messages: readonly SessionMessageAssistant[]
+  /**
+   * Reveals a tool call in the same timeline. Returns whether the call is in the timeline.
+   * @param id - The tool call's transcript ID.
+   */
+  revealTool(id: string): boolean
+}
+
+/** A built-in plugin's optional content under the last assistant row of a settled turn. */
+export interface TurnResultRenderer {
+  /**
+   * Renders in the plugin's contribution boundary.
+   * @param props - The settled turn's input.
+   */
+  render(props: TurnResultProps): JSX.Element
+}
+
+/** Registry of turn-result renderers. The host rejects registration from external plugins. */
+export const TurnResultRenderer = Registry.define<TurnResultRenderer>("session.turn.result")
+
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
-  /** Content under the final answer of a completed turn. */
-  readonly "session.turn.result": {
-    /** The session that owns the turn. */
-    readonly session: MountedSession
-    /** The user message that started the turn. */
-    readonly promptID: string
-    /** Assistant messages associated with the prompt, in transcript order. */
-    readonly messages: readonly SessionMessageAssistant[]
-    /**
-     * Reveals a tool call in the same timeline. Returns whether the call is in the timeline.
-     * @param id - The tool call's transcript ID.
-     */
-    revealTool(id: string): boolean
-  }
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */
   readonly "session.location.branch.menu": SlotMap["session.location.menu"]
   /** Items after the host's copy and reveal actions in the session directory's path submenu. Requires an owning screen. */

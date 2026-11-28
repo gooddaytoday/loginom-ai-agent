@@ -117,6 +117,58 @@ const insertAssistant = (input: {
   })
 
 describe("SessionStore", () => {
+  it.effect("reads an old prompt and its assistant messages after compaction", () =>
+    Effect.gen(function* () {
+      const bus = yield* seedSessions([
+        { id: "ses_history", updated: 1 },
+        { id: "ses_other", updated: 1 },
+      ])
+      const db = (yield* Database.Service).db
+      const store = yield* SessionStore.Service
+      const sessionID = Session.ID.make("ses_history")
+      const other = Session.ID.make("ses_other")
+      const promptID = SessionMessage.ID.make("msg_old_prompt")
+      const nextID = SessionMessage.ID.make("msg_next_prompt")
+
+      yield* db
+        .insert(SessionMessageTable)
+        .values([
+          {
+            id: promptID,
+            session_id: sessionID,
+            type: "user",
+            seq: -2,
+            time_created: 1,
+            time_updated: 1,
+            data: { text: "Read the table", time: { created: 1 } },
+          },
+          {
+            id: nextID,
+            session_id: sessionID,
+            type: "user",
+            seq: 10_000,
+            time_created: 4,
+            time_updated: 4,
+            data: { text: "Next question", time: { created: 4 } },
+          },
+        ])
+        .run()
+      yield* insertAssistant({ sessionID, id: "msg_old_answer", seq: -1, text: "Old result", completed: true })
+      yield* bus.publish(SessionEvent.Compaction.Started, { sessionID, reason: "manual" })
+      yield* bus.publish(SessionEvent.Compaction.Ended, { sessionID, reason: "manual", text: "Summary" })
+      yield* insertAssistant({ sessionID, id: "msg_next_answer", seq: 10_001, text: "Next result", completed: true })
+
+      expect((yield* store.context(sessionID)).map((message) => message.id)).not.toContain(promptID)
+
+      const turn = yield* store.turn({ sessionID, promptID })
+      expect(turn.filter((message) => message.type !== "compaction").map((message) => message.id)).toEqual([
+        promptID,
+        SessionMessage.ID.make("msg_old_answer"),
+      ])
+      expect(yield* store.turn({ sessionID: other, promptID })).toEqual([])
+    }),
+  )
+
   it.effect("lists by updated time and ID with exclusive two-item pages in either direction", () =>
     Effect.gen(function* () {
       yield* seedSessions([

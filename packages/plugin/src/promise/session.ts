@@ -235,5 +235,7 @@ export type SessionDomain = Pick<
   | "context"
 > &
   Pick<ExperimentalSessionApi, "wait" | "instructions"> & {
+    /** Reads the persisted transcript from a user message up to the next user message, including compacted history. */
+    readonly turn: (input: { readonly sessionID: string; readonly promptID: string }) => Promise<readonly SessionMessage.Info[]>
     readonly hook: ModelHooks<SessionHooks>
   }

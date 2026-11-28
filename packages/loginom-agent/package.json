@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./host": "./src/host.ts",
+    "./app-verified-contract": "./src/app-verified-contract.ts",
     "./loginom-metadata": "./src/loginom-metadata.ts"
   },
   "scripts": {

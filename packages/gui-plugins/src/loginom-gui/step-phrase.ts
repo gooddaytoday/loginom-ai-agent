@@ -1,6 +1,6 @@
 import { Option, Schema } from "effect"
 import type { Plugin } from "@opencode/plugin/gui"
-import type { LoginomEvidence } from "@opencode/schema/loginom-app-verified"
+import type { LoginomEvidence } from "@loginom-ai-agent/loginom-agent/loginom-metadata"
 import type definition from "./index"
 
 type Copy = Pick<Parameters<Plugin.Setup<typeof definition>>[0], "t" | "plural">
@@ -74,7 +74,7 @@ function completedTitle(copy: Copy, input: PhraseFact, pending = false) {
         return copy.t("verified.executed")
       case "saved":
         return copy.t("verified.saved", { path: input.path })
-      case "savedGraphRead":
+      case "reopenedGraphRead":
         return copy.t("verified.savedGraphRead", { nodeCount: input.nodeCount })
     }
   }

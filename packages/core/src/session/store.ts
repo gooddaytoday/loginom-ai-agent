@@ -1,6 +1,6 @@
 export * as SessionStore from "./store.js"
 
-import { and, asc, desc, eq, gt, isNotNull, isNull, like, lt, notInArray, or, sql, type SQL } from "drizzle-orm"
+import { and, asc, desc, eq, gt, gte, isNotNull, isNull, like, lt, notInArray, or, sql, type SQL } from "drizzle-orm"
 import { Context, Effect, Layer, Schema } from "effect"
 import { Project } from "@opencode/schema/project"
 import { Workspace } from "@opencode/schema/workspace"
@@ -51,9 +51,12 @@ export type MessagesInput = {
   }
 }
 
+export type TurnInput = { readonly sessionID: Session.ID; readonly promptID: SessionMessage.ID }
+
 export interface Interface {
   readonly get: (sessionID: Session.ID) => Effect.Effect<Session.Info | undefined>
   readonly list: (input?: ListInput) => Effect.Effect<Session.Info[]>
+  readonly turn: (input: TurnInput) => Effect.Effect<SessionMessage.Info[], MessageDecodeError>
   readonly messages: (input: MessagesInput) => Effect.Effect<SessionMessage.Info[], MessageDecodeError>
   readonly context: (sessionID: Session.ID) => Effect.Effect<SessionMessage.Info[], MessageDecodeError>
   /**
@@ -191,6 +194,35 @@ const layer = Layer.effect(
           Effect.orDie,
         )
         return (direction === "previous" ? rows.toReversed() : rows).map((row) => fromRow(row))
+      }),
+      turn: Effect.fn("SessionStore.turn")(function* ({ sessionID, promptID }: TurnInput) {
+        const prompt = yield* messageRow(promptID)
+        if (prompt?.session_id !== sessionID || prompt.type !== "user") return []
+
+        const session = eq(SessionMessageTable.session_id, sessionID)
+        const next = yield* db
+          .select({ seq: SessionMessageTable.seq })
+          .from(SessionMessageTable)
+          .where(and(session, eq(SessionMessageTable.type, "user"), gt(SessionMessageTable.seq, prompt.seq)))
+          .orderBy(asc(SessionMessageTable.seq))
+          .get()
+          .pipe(Effect.orDie)
+
+        const rows = yield* db
+          .select()
+          .from(SessionMessageTable)
+          .where(
+            and(
+              session,
+              gte(SessionMessageTable.seq, prompt.seq),
+              next ? lt(SessionMessageTable.seq, next.seq) : undefined,
+            ),
+          )
+          .orderBy(asc(SessionMessageTable.seq))
+          .all()
+          .pipe(Effect.orDie)
+
+        return yield* SessionHistory.decodeMessageRows(db, rows)
       }),
       messages: Effect.fn("SessionStore.messages")(function* (input) {
         return yield* SessionHistory.decodeMessageRows(db, yield* messageRows(input))

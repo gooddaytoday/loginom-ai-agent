@@ -1,3 +1,5 @@
+import { Session } from "@opencode/schema/session"
+import { SessionMessage } from "@opencode/schema/session-message"
 import { Tool } from "@opencode/schema/tool"
 import type { Rpc } from "@opencode/schema/rpc"
 import type { OpenCodeEvent } from "@opencode/client"
@@ -647,6 +649,8 @@ export function fromPromise(plugin: Plugin) {
             move: adaptApiMethod(SessionEndpoints["session.move"], host.session.move),
             wait: adaptApiMethod(SessionEndpoints["session.wait"], host.session.wait),
             context: adaptApiMethod(SessionEndpoints["session.context"], host.session.context),
+            turn: async ({ sessionID, promptID }) =>
+              run(host.session.turn({ sessionID: Session.ID.make(sessionID), promptID: SessionMessage.ID.make(promptID) })),
             instructions: {
               entry: {
                 list: adaptApiMethod(

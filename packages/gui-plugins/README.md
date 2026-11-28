@@ -295,6 +295,11 @@ session context plus its `label` and `icon`; one contribution owns it. Without a
 static location row. Use it to attach location actions directly
 to the displayed repository or worktree instead of adding a second menu item.
 
+`TurnResultRenderer` from `@opencode/plugin/gui/builtin` adds content below the last assistant row of a settled
+turn in either timeline. The host accepts registrations from built-ins and runs each renderer in its plugin's
+contribution boundary. Renderers receive the mounted session, prompt ID, associated assistant messages, and
+`revealTool` for navigation to a tool call. Check the turn for relevant tool calls before requesting plugin data.
+
 ### Host APIs
 
 | Property                     | Type ([window](../plugin/src/gui/host-apis.ts), [main](../plugin/src/gui/main.ts)) | What it does                                                     |
