@@ -570,6 +570,20 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
       ),
     )
     .add(
+      HttpApiEndpoint.put("session.inbox.edit", "/api/session/:sessionID/inbox/:inboxID", {
+        params: { sessionID: Session.ID, inboxID: SessionMessage.ID },
+        payload: Schema.Struct({ ...PromptInput.Prompt.fields, metadata: SessionInbox.UserPayload.fields.metadata }),
+        success: HttpApiSchema.NoContent,
+        error: [ConflictError, InvalidRequestError, SessionNotFoundError, LocationNotFoundError],
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "session.inbox.edit",
+          summary: "Edit queued prompt",
+          description: "Replace a still-queued user prompt's contents in its existing FIFO position.",
+        }),
+      ),
+    )
+    .add(
       HttpApiEndpoint.patch("session.inbox.update", "/api/session/:sessionID/inbox/:inboxID", {
         params: { sessionID: Session.ID, inboxID: SessionMessage.ID },
         payload: Schema.Struct({ delivery: SessionInbox.Delivery }),
