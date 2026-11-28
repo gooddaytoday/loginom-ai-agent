@@ -42,6 +42,7 @@ export function TargetSessionRouteContent() {
   const data = useData()
   const server = useServer()
   const tabs = useTabs()
+
   const toolRenderers = createToolRenderers(() => {
     const messages = data.session.message.list(params.id)
     const reverted = data.session.get(params.id)?.revert?.messageID

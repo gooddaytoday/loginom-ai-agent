@@ -36,14 +36,14 @@ describe("pluralCategory", () => {
 describe("dynamic source copy", () => {
   test("keeps runtime copy for English locale tags", () => {
     expect(
-      i18n("en-US", "Dictionary copy").tDynamic("dialog.usageExceeded.freeTier.title", "Runtime {{name}}", {
+      i18n("en-US", "Dictionary copy").tDynamic("ui.sessionTurn.status.thinkingWithTopic", "Runtime {{name}}", {
         name: "copy",
       }),
     ).toBe("Runtime copy")
   })
 
   test("uses dictionary copy for non-English locales", () => {
-    expect(i18n("fr", "Texte traduit").tDynamic("dialog.usageExceeded.freeTier.title", "Runtime copy")).toBe(
+    expect(i18n("fr", "Texte traduit").tDynamic("ui.sessionTurn.status.thinkingWithTopic", "Runtime copy")).toBe(
       "Texte traduit",
     )
   })

@@ -1,7 +1,7 @@
 import { connectionRequiredTool, type Status } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Product } from "@loginom-ai-agent/product"
 import { ComposerPill, createKeyed, SettingsPage, type MountedSession, type Plugin } from "@opencode/plugin/gui"
-import { ToolRenderer } from "@opencode/plugin/gui/builtin"
+import { Page as PluginPage, ToolRenderer } from "@opencode/plugin/gui/builtin"
 import { lazy, onCleanup, onMount, Show, Suspense } from "solid-js"
 import type definition from "./index"
 import { profileService } from "./target"
@@ -9,11 +9,25 @@ import { profileService } from "./target"
 const publicAddress = new URL(Product.connection.url).href
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
+  const Catalog = lazy(() => import("./catalog-page"))
+  ctx.add(PluginPage, {
+    id: "catalog",
+    nav: {},
+    get title() {
+      return ctx.t("catalog.title")
+    },
+    render: () => (
+      <Suspense>
+        <Catalog />
+      </Suspense>
+    ),
+  })
   const Page = lazy(() => import("./page"))
   const service = profileService(ctx, activated)
   const { server, client, page, dispatch } = service
   const current = ctx.sessions.current
   const matches = (session: MountedSession | undefined) => !!session && session.server.id === server()?.id
+
   const publicStand = () => {
     const status = page().status
 
@@ -27,8 +41,13 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
   }
 
   let settingsOpen = false
+
   let intent:
-    | { source: "settings" | "card" | "pill"; client: ReturnType<typeof client>; session?: MountedSession }
+    | ({ client: ReturnType<typeof client> } & (
+        | { source: "settings"; session: MountedSession }
+        | { source: "card"; session: MountedSession; latest: () => boolean }
+        | { source: "pill" }
+      ))
     | undefined
 
   const refresh = () => {
@@ -38,6 +57,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
   createKeyed(
     () => {
       const session = current()
+
       return matches(session) ? session?.visit : undefined
     },
     () => {
@@ -64,15 +84,20 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
   function activated(status: Status) {
     const action = intent
     intent = undefined
+
     if (!action || action.client !== client() || ctx.signal.aborted) return
 
     ctx.toast.show({ title: ctx.t("connectedTo", { url: status.url }) })
+
     if (action.source === "settings") ctx.commands.run("common.goBack")
 
+    if (action.source === "pill") return
     const session = action.session
-    if (!session || (action.source === "card" && session.visit !== current()?.visit)) return
+
+    if (action.source === "card" && (session.visit !== current()?.visit || !action.latest())) return
 
     const target = session.server.client
+
     if (target !== action.client || !target) return
 
     void target.session
@@ -82,10 +107,10 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       })
   }
 
-  function connect(session?: MountedSession) {
+  function connect(card?: { session: MountedSession; latest: () => boolean }) {
     if (!publicStand() || page().connected || page().busy) return
 
-    intent = { source: session ? "card" : "pill", client: client(), session }
+    intent = card ? { ...card, source: "card", client: client() } : { source: "pill", client: client() }
     dispatch({
       type: "edit",
       patch: { url: Product.connection.url, username: Product.connection.username, password: "", noPassword: true },
@@ -105,10 +130,12 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
           service={service}
           onOpen={() => {
             settingsOpen = true
+
             if (intent?.source === "settings") return
 
             intent = undefined
             dispatch({ type: "reset" })
+
             if (client()) dispatch({ type: "refresh" })
           }}
           onClose={() => {
@@ -134,7 +161,10 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
           fallback={<p class="text-13-regular text-text-base">{ctx.t("connectedTrace")}</p>}
         >
           <Show when={props.latest}>
-            <section class="grid min-w-0 gap-3 rounded-lg border border-border-base p-4" aria-label={ctx.t("connectTitle")}>
+            <section
+              class="grid min-w-0 gap-3 rounded-lg border border-border-base p-4"
+              aria-label={ctx.t("connectTitle")}
+            >
               <h3 class="text-14-medium text-text-strong">{ctx.t("connectTitle")}</h3>
               <Show when={publicStand()}>
                 <p class="text-13-regular text-text-base">{ctx.t("publicStandDescription")}</p>
@@ -145,7 +175,9 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
                     variant="contrast"
                     disabled={page().busy}
                     onClick={() => {
-                      if (props.latest) connect(current())
+                      const session = current()
+
+                      if (props.latest && session && matches(session)) connect({ session, latest: () => props.latest })
                     }}
                   >
                     {ctx.t(page().checking ? "checking" : page().saving ? "saving" : "connectPublic")}
@@ -154,7 +186,9 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
                 <ctx.ui.Button
                   disabled={page().busy || !page().status}
                   onClick={() => {
-                    if (props.latest) openSettings(current())
+                    const session = current()
+
+                    if (props.latest && session && matches(session)) openSettings(session)
                   }}
                 >
                   {ctx.t("ownServer")}
@@ -169,7 +203,11 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
                   (page().message !== "disconnected" && page().message)
                 }
               >
-                {(message) => <p role="status" class="text-12-regular text-text-base">{ctx.t(message())}</p>}
+                {(message) => (
+                  <p role="status" class="text-12-regular text-text-base">
+                    {ctx.t(message())}
+                  </p>
+                )}
               </Show>
             </section>
           </Show>
@@ -201,6 +239,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
             disabled={page().busy}
             onClick={() => {
               input.close()
+
               if (direct()) connect()
               else openSettings()
             }}

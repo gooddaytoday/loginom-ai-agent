@@ -7,6 +7,7 @@ export const connectionRequiredTool = "loginom_connection_required"
 export const Status = Loginom.View.mapFields((fields) => ({
   ...Struct.pick(fields, ["revision", "generation", "url", "username", "folder", "hasPassword", "state"]),
   failed: Schema.Boolean,
+  deviceOnly: Schema.Boolean,
 }))
 export const Address = Schema.String.check(
   Schema.makeFilter((value) => {
@@ -35,6 +36,7 @@ export type Validation = typeof Validation.Type
 export const Issue = Schema.Literals([
   "unavailable",
   "invalidAddress",
+  "deviceAddress",
   "invalidUsername",
   "passwordRequired",
   "credentialsRejected",

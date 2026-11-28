@@ -308,6 +308,52 @@ const boot = (
 
 describe("loginom.product Dock catalog (B2.5d, 0.4 toolContributor)", () => {
   it.live(
+    "offers the connection card before package work, including after a recoverable disconnect",
+    () =>
+      Effect.gen(function* () {
+        const host = scriptedHost()
+        const card = "loginom_connection_required"
+        let state: "unconfigured" | "recoverable-error" | "ready" = "unconfigured"
+        const app = yield* boot({
+          ...host,
+          connect: async () => ({
+            ...(await host.connect()),
+            async request(method: string) {
+              if (method !== "connection.status") return
+              return {
+                revision: 0,
+                generation: 0,
+                url: "https://app.loginom.ai/",
+                username: "user",
+                folder: "/user",
+                hasPassword: false,
+                state,
+              }
+            },
+          }),
+        })
+        const session = yield* app.create("connect Loginom")
+        yield* app.prompt(session, script({ text: "A normal answer" }))
+        const [first] = yield* app.requests(session)
+        expect(first.tools.map((tool) => tool.name)).toContain(card)
+        expect(system(first)).toContain(`call ${card} first`)
+        expect(yield* app.calls(session)).toEqual([])
+
+        state = "recoverable-error"
+        yield* app.prompt(session, script({ tool: card }, { text: "Waiting for Loginom" }))
+        expect(yield* app.calls(session)).toMatchObject([
+          { name: card, state: { status: "completed", metadata: { connectionRequired: true } } },
+        ])
+
+        state = "ready"
+        yield* app.prompt(session, script({ text: "Ready" }))
+        const latest = (yield* app.requests(session)).at(-1)
+        expect(latest?.tools.map((tool) => tool.name)).not.toContain(card)
+      }),
+    timeout,
+  )
+
+  it.live(
     "the default profile receives only the read-only local tools; automation the whole catalog without the host token",
     () =>
       Effect.gen(function* () {
@@ -322,7 +368,9 @@ describe("loginom.product Dock catalog (B2.5d, 0.4 toolContributor)", () => {
         expect(system(plain)).toContain("Loginom is available through the bundled loginom_* tools.")
         // 0.4.2: quality reviews go to package-linter, scenario documentation stays with package-docs.
         expect(system(plain)).toContain("use package-linter if available")
-        expect(system(plain)).toContain("If package-linter is unavailable, report that it is missing; do not substitute package-docs")
+        expect(system(plain)).toContain(
+          "If package-linter is unavailable, report that it is missing; do not substitute package-docs",
+        )
         expect(system(plain)).toContain("other than quality assessment or linting, always activate package-docs")
 
         const automation = yield* test.create("automation")

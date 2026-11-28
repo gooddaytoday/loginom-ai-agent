@@ -23,7 +23,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import { LifetimeContext, liveAccessor, PluginContext, type Bridge, type Entry } from "@opencode/plugin/gui/host"
-import { ToolRenderer, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
+import { Page, ToolRenderer, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
 import { Predicate } from "effect"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { pluralCategory, resolveTemplate } from "@opencode/ui/context/i18n"
@@ -72,6 +72,7 @@ import {
   type PluginHostEffect,
   type PluginHostEvent,
 } from "./instance-machine"
+import { nativeToolNames } from "./native-tool-names"
 import { createStartupGate } from "./startup"
 import { createSessionStore, whenLoaded } from "./stores"
 
@@ -129,50 +130,8 @@ type HostState = {
   contracts: Record<string, number | undefined>
 }
 
-// How long a plugin may load its window entry and global stores before it fails.
-const activationTimeout = 30_000
-
-// OpenCode's own tool names, including names found in older transcripts.
-const nativeToolNames = new Set([
-  "apply_patch",
-  "bash",
-  "browser",
-  "edit",
-  "execute",
-  "experimental_image_generate",
-  "glob",
-  "grep",
-  "list",
-  "opencode_artifact_create",
-  "opencode_artifact_delete",
-  "opencode_artifact_read",
-  "opencode_artifact_update",
-  "opencode_list_mcp_resources",
-  "opencode_models",
-  "opencode_read_mcp_resource",
-  "opencode_schedule_create",
-  "opencode_schedule_delete",
-  "opencode_schedule_list",
-  "opencode_schedule_pause",
-  "opencode_schedule_resume",
-  "opencode_session_move",
-  "opencode_session_rename",
-  "opencode_watch_mcp_event",
-  "opencode_worktree_create",
-  "opencode_worktree_list",
-  "opencode_worktree_remove",
-  "patch",
-  "question",
-  "read",
-  "shell",
-  "skill",
-  "subagent",
-  "task",
-  "todowrite",
-  "webfetch",
-  "websearch",
-  "write",
-])
+// Give Desktop's 30 s port handshake time to finish, with 15 s of headroom for store reads.
+const activationTimeout = 45_000
 
 type Stores = Record<string, Persisted<object> | ((session: SessionRef) => Persisted<object>)>
 
@@ -230,6 +189,7 @@ function createHost(input: HostInput) {
   const owner = getOwner()
   const provided = new Map<string, { live: Live<unknown> & { readonly status: "active" } }>()
   const generations = new Map<string, number>()
+  const toolRendererNames = new Set<string>()
 
   // Entries are indexed by registry and contracts versioned by token, so a change wakes only its own readers.
   const [state, setState] = createStore<HostState>({ entries: {}, contracts: {} })
@@ -861,14 +821,37 @@ function createHost(input: HostInput) {
         if (toolRenderer && !input.builtins?.has(plugin))
           throw new Error("Only built-in plugins can add tool renderers")
 
+        if (registry.id === Page.id && !input.builtins?.has(plugin))
+          throw new Error("Only built-in plugins can add pages")
+
+        let active = toolRenderer
+        let claimed: string | undefined
+
+        const releaseName = () => {
+          if (claimed === undefined) return
+          toolRendererNames.delete(claimed)
+          claimed = undefined
+        }
+
         const validate = (value: T | undefined) => {
-          if (
-            toolRenderer &&
-            Predicate.hasProperty(value, "tool") &&
-            Predicate.isString(value.tool) &&
-            nativeToolNames.has(value.tool)
-          )
-            throw new Error(`Cannot register a renderer for native tool "${value.tool}"`)
+          if (!active) return value
+
+          const name = Predicate.hasProperty(value, "tool") && Predicate.isString(value.tool) ? value.tool : undefined
+
+          if (name === claimed) return value
+
+          if (name !== undefined) {
+            if (nativeToolNames.has(name)) throw new Error(`Cannot register a renderer for native tool "${name}"`)
+
+            if (toolRendererNames.has(name)) throw new Error(`A renderer is already registered for tool "${name}"`)
+          }
+
+          releaseName()
+
+          if (name !== undefined) {
+            toolRendererNames.add(name)
+            claimed = name
+          }
 
           return value
         }
@@ -878,27 +861,33 @@ function createHost(input: HostInput) {
         // oxlint-disable-next-line anti-slop/no-runtime-typeof -- see SAFETY above
         const reactive = typeof item === "function"
 
+        const owner = getOwner() ?? root
+
         const read = reactive
-          ? runWithOwner(getOwner() ?? root, () => {
+          ? runWithOwner(owner, () => {
               // SAFETY: the function branch above is the registry's reactive form.
               const getValue = item as () => T | undefined
 
-              return createMemo(toolRenderer ? () => validate(getValue()) : getValue)
+              return createMemo(getValue)
             })
           : undefined
 
-        const fixed = reactive ? undefined : validate(item)
+        // Validate the initial value in ctx.add, before installing the contribution.
+        const initial = validate(reactive ? untrack(() => read?.()) : item)
+        const value = toolRenderer && read ? runWithOwner(owner, () => createMemo(() => validate(read()))) : read
 
         const key = `${plugin}/${++sequence.value}`
 
         setState("entries", registry.id, (entries = []) => [
           ...entries,
-          { key, registry: registry.id, plugin, value: read ?? (() => fixed) },
+          { key, registry: registry.id, plugin, value: value ?? (() => initial) },
         ])
 
-        return register(() =>
-          setState("entries", registry.id, (entries = []) => entries.filter((entry) => entry.key !== key)),
-        )
+        return register(() => {
+          active = false
+          releaseName()
+          setState("entries", registry.id, (entries = []) => entries.filter((entry) => entry.key !== key))
+        })
       },
       list,
       provide<T>(token: Contract<T> | Ipc, impl: T) {

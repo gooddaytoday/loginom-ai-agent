@@ -12,12 +12,16 @@ export function profileService(
 ) {
   const server = createMemo(() => {
     const servers = ctx.servers.list().flatMap((id) => ctx.servers.get(id) ?? [])
+
     if (ctx.desktop) return servers.find((item) => item.builtin)
     const serving = ctx.servers.get(location.origin)
+
     if (serving) return serving
     const local = servers.filter((item) => item.local)
+
     if (local.length === 1) return local.at(0)
   })
+
   const client = () => server()?.client
   const [state, setState] = createSignal(initial)
   const page = createMemo(() => view(state()))
@@ -33,11 +37,14 @@ export function profileService(
   function run(effect: ReturnType<typeof transition>["effects"][number]) {
     if (effect.type === "activated") {
       onActivated(effect.status)
+
       return
     }
+
     if (effect.type === "cancel") {
       clearTimeout(timer)
       controller?.abort()
+
       return
     }
 
@@ -49,13 +56,16 @@ export function profileService(
       const signal = AbortSignal.any([canceled, AbortSignal.timeout(deadline)])
       const target = untrack(server)
       const current = target?.client
+
       const directory =
         target?.data.location.default().directory ||
         (await current?.location.get({}, { signal }).catch(() => undefined))?.directory
+
       if (canceled.aborted) return
 
       const rpc = current?.rpc(ConnectionSettingsRpc)
       const options = directory ? { location: { directory }, signal } : undefined
+
       switch (effect.type) {
         case "status": {
           const result = options && (await rpc?.status({}, options).catch(() => undefined))
@@ -67,11 +77,13 @@ export function profileService(
           })
           break
         }
+
         case "check": {
           const result = options && (await rpc?.check(effect.input, options).catch(() => undefined))
           dispatch({ type: "checked", attempt: effect.attempt, result: result ?? { ok: false, issue: "unavailable" } })
           break
         }
+
         case "save": {
           const result = options && (await rpc?.save(effect.input, options).catch(() => undefined))
           dispatch({
@@ -84,10 +96,13 @@ export function profileService(
         }
       }
     }
+
     if (effect.type === "status" && effect.delay) {
       timer = setTimeout(() => void request(), effect.delay)
+
       return
     }
+
     void request()
   }
 

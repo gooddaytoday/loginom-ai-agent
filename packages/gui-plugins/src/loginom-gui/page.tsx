@@ -6,11 +6,7 @@ import { onCleanup, onMount, Show } from "solid-js"
 import type definition from "./index"
 import type { profileService } from "./target"
 
-export default function Page(props: {
-  service: ReturnType<typeof profileService>
-  onOpen(): void
-  onClose(): void
-}) {
+export default function Page(props: { service: ReturnType<typeof profileService>; onOpen(): void; onClose(): void }) {
   const ctx = usePlugin<typeof definition>()
   const ui = ctx.ui
   const { page, dispatch } = props.service
