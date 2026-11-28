@@ -15,6 +15,10 @@ const CopyPath = Schema.Struct({
 
 export type CopyPath = typeof CopyPath.Type
 
+export type PackageCopy = CopyPath | "workspaceUnavailable" | null
+
+export const isInvalidSession = Schema.is(Schema.Struct({ type: Schema.Literal("invalid_session") }))
+
 export function samePackage(path: CopyPath, workflow: Pick<CopyPath, "document_id" | "workflow_id">) {
   return path.document_id === workflow.document_id
     && (path.workflow_id === workflow.workflow_id || path.workflow_ids?.includes(workflow.workflow_id) === true)
@@ -25,6 +29,7 @@ const PackageState = Rpc.define({
   methods: {
     snapshot: {
       input: Schema.toStandardSchemaV1(Schema.Struct({ sessionID: Schema.NonEmptyString })),
+      errors: { invalid_session: Schema.toStandardSchemaV1(Schema.Struct({})) },
       output: Schema.toStandardSchemaV1(Schema.Struct({ copy: Schema.optionalKey(Schema.NullOr(CopyPath)) })),
     },
   },
@@ -34,18 +39,21 @@ const PackageState = Rpc.define({
 export async function readPackageCopy(
   ctx: Context,
   request: { serverID: string; sessionID: string; directory: string },
-) {
+): Promise<PackageCopy> {
   const server = ctx.servers.get(request.serverID)
 
   if (!server) return null
   const signal = AbortSignal.any([ctx.signal, AbortSignal.timeout(6000)])
 
-  const state = await server.client
-    .rpc(PackageState)
-    .snapshot({ sessionID: request.sessionID }, { location: { directory: request.directory }, signal })
-    .catch(() => undefined)
+  try {
+    const state = await server.client
+      .rpc(PackageState)
+      .snapshot({ sessionID: request.sessionID }, { location: { directory: request.directory }, signal })
 
-  return signal.aborted ? null : (state?.copy ?? null)
+    return signal.aborted ? null : (state.copy ?? null)
+  } catch (error) {
+    return !signal.aborted && isInvalidSession(error) ? "workspaceUnavailable" : null
+  }
 }
 
 export async function copyText(ctx: Context, text: string) {

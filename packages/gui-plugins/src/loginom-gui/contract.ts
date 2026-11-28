@@ -122,6 +122,7 @@ export const PackageSchema = Rpc.define({
           source: Schema.optionalKey(Schema.Literals(["saved", "window"])),
         }),
       ),
+      errors: { invalid_session: Schema.toStandardSchemaV1(Schema.Struct({})) },
       output: Schema.toStandardSchemaV1(
         Schema.Struct({ snapshot: Schema.NullOr(snapshot), reason: Schema.optionalKey(Schema.Literal("saveRequired")) }),
       ),

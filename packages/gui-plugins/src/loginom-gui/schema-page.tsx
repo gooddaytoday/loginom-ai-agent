@@ -1,6 +1,6 @@
 import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
-import type { CopyPath } from "./copy"
+import type { PackageCopy } from "./copy"
 import { createMemo, createSignal, For, onCleanup, Show, type Accessor } from "solid-js"
 import type { Node, Port } from "./contract"
 import { buildDiagram, cardHeight, cardWidth, componentKey, nativePortKey, type Diagram } from "./graph"
@@ -150,10 +150,19 @@ function NodeDetails(props: { diagram: Diagram; index: number; t: Translate }) {
   )
 }
 
-function PackagePath(props: { value?: CopyPath | null; t: Translate; copy: (text: string) => void }) {
+function PackagePath(props: { value?: PackageCopy; t: Translate; copy: (text: string) => void }) {
+  const path = () => props.value === "workspaceUnavailable" ? null : props.value
+
   return (
     <div class="loginom-schema-section loginom-schema-title">
-      <Show when={props.value} fallback={<span class="loginom-schema-muted">{props.t("copy.pathUnavailable")}</span>}>
+      <Show
+        when={path()}
+        fallback={
+          <span class="loginom-schema-muted">
+            {props.t(props.value === "workspaceUnavailable" ? "target.workspaceUnavailable" : "copy.pathUnavailable")}
+          </span>
+        }
+      >
         {(value) => (
           <span class="min-w-0">
             <Show when={value().lastSave}>
@@ -167,9 +176,11 @@ function PackagePath(props: { value?: CopyPath | null; t: Translate; copy: (text
         type="button"
         size="small"
         variant="ghost"
-        disabled={!props.value}
+        disabled={!path()}
         onClick={() => {
-          if (props.value) props.copy(props.value.path)
+          const value = path()
+
+          if (value) props.copy(value.path)
         }}
       >
         <Icon name="copy" size="small" />
@@ -183,7 +194,7 @@ function WorkflowView(props: {
   state: Ready
   dispatch: (event: Event) => void
   t: Translate
-  packageCopy?: CopyPath | null
+  packageCopy?: PackageCopy
   copyText: (text: string) => void
 }) {
   const snapshot = () => props.state.snapshot
@@ -282,7 +293,7 @@ function WorkflowView(props: {
           )}
         </Show>
       </header>
-      <Show when={snapshot().source === "window" && props.packageCopy !== undefined}>
+      <Show when={props.packageCopy !== undefined}>
         <PackagePath value={props.packageCopy} t={props.t} copy={props.copyText} />
       </Show>
       <Show when={crumbs().length > 0}>
@@ -480,7 +491,7 @@ export default function SchemaPage(props: {
   t: Translate
   retry: () => void
   back: () => void
-  packageCopy: Accessor<CopyPath | null | undefined>
+  packageCopy: Accessor<PackageCopy | undefined>
   copyText: (text: string) => void
 }) {
   const missing = () => {

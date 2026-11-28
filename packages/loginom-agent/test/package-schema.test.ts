@@ -151,10 +151,10 @@ test("package RPCs confine window, path and saved snapshots to the full Location
       const packageState = "loginom.package-state/snapshot"
       const own = { sessionID: session.id }
       const foreign = { sessionID: otherWorkspaceChat.id }
-      const empty = { status: 200, body: { output: { snapshot: null } } }
-      expect(yield* call(other, schema, { ...own, source: "window" })).toEqual(empty)
-      expect(yield* call(project, schema, foreign)).toEqual(empty)
-      expect((yield* call(project, packageState, foreign)).body).toMatchObject({ type: "invalid_session" })
+      const denied = { status: 400, body: { type: "invalid_session" } }
+      expect(yield* call(other, schema, { ...own, source: "window" })).toMatchObject(denied)
+      expect(yield* call(project, schema, foreign)).toMatchObject(denied)
+      expect(yield* call(project, packageState, foreign)).toMatchObject(denied)
       expect(requests).toEqual([])
 
       const locations = Context.get(context, LocationServiceMap.Service)
@@ -164,7 +164,9 @@ test("package RPCs confine window, path and saved snapshots to the full Location
         const workspaceOwn = { sessionID: ownWorkspaceChat.id }
 
         for (const chat of [foreign, own]) {
-          expect(yield* rpc.call("loginom.package", "schema", chat)).toEqual({ snapshot: null })
+          expect(yield* rpc.call("loginom.package", "schema", chat).pipe(Effect.flip)).toMatchObject({
+            type: "invalid_session",
+          })
           expect(yield* rpc.call("loginom.package-state", "snapshot", chat).pipe(Effect.flip)).toMatchObject({
             type: "invalid_session",
           })

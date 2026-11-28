@@ -63,8 +63,15 @@ function StepActions(props: { node: StepNode; openNode: OpenNode }) {
     if (path.loading) return
     const current = path()
 
-    if (current && samePackage(current, props.node))
-      return current
+    if (current && current !== "workspaceUnavailable" && samePackage(current, props.node)) return current
+  }
+
+  const copyBadge = () => {
+    if (path.loading) return ctx.t("copy.loading")
+
+    if (path() === "workspaceUnavailable") return ctx.t("target.workspaceUnavailable")
+
+    if (copy()?.lastSave) return ctx.t("copy.lastSave")
   }
 
   const showNode = () => {
@@ -95,7 +102,7 @@ function StepActions(props: { node: StepNode; openNode: OpenNode }) {
           <Menu.Content>
             <Menu.Item
               disabled={!copy()}
-              badge={path.loading ? ctx.t("copy.loading") : copy()?.lastSave ? ctx.t("copy.lastSave") : undefined}
+              badge={copyBadge()}
               onSelect={() => {
                 const current = copy()
 

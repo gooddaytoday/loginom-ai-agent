@@ -168,7 +168,8 @@ export function openLoginomSchemaConversation(page: Page, source: "saved" | "win
 
 export type NodeLinksFixture = {
   packageState: "saved" | "draft" | "dirty" | "resaved"
-  graph?: "submodel" | "parent" | "removed" | "other"
+  graph?: "submodel" | "parent" | "removed" | "savedRemoved" | "other"
+  copyFromOtherPackage?: boolean
   newTimeline?: boolean
 }
 
@@ -182,7 +183,7 @@ export async function openLoginomNodeConversation(page: Page, options: NodeLinks
   const selectedNode = { ...node, position: point(405, 100) }
   const sameName = { ...node, guid: id(9), position: point(25, 30) }
   const foreign = options.graph === "other"
-  const parent = options.graph === "parent"
+  const parent = options.graph === "parent" || options.graph === "savedRemoved"
 
   const snapshot = {
     ...windowSnapshot,
@@ -244,7 +245,13 @@ export async function openLoginomNodeConversation(page: Page, options: NodeLinks
         if (step && parent) {
           if (packageState === "dirty") return { output: { snapshot: null, reason: "saveRequired" } }
 
-          const workflow = { ...root, nodes: [...root.nodes, sameName] }
+          const workflow = {
+            ...root,
+            nodes: [...root.nodes, sameName],
+            submodels: options.graph === "savedRemoved"
+              ? root.submodels.map((model) => ({ ...model, nodes: model.nodes.filter((entry) => entry.guid !== node.guid) }))
+              : root.submodels,
+          }
 
           return { output: { snapshot: { ...saved, workflows: [workflow], target: binding } } }
         }
@@ -256,6 +263,7 @@ export async function openLoginomNodeConversation(page: Page, options: NodeLinks
         const dirty = packageState === "dirty"
         const draft = packageState === "draft"
         const path = draft ? null : `/analyst/Пакеты/${packageName()}`
+        const workflowID = options.copyFromOtherPackage ? "other-package" : snapshot.workflow.workflow_id
 
         return {
           output: {
@@ -267,8 +275,8 @@ export async function openLoginomNodeConversation(page: Page, options: NodeLinks
             copy: path
               ? {
                   document_id: target.document_id,
-                  workflow_id: snapshot.workflow.workflow_id,
-                  workflow_ids: parent ? [target.workflow_id, snapshot.workflow.workflow_id] : [snapshot.workflow.workflow_id],
+                  workflow_id: workflowID,
+                  workflow_ids: parent && !options.copyFromOtherPackage ? [target.workflow_id, workflowID] : [workflowID],
                   path,
                   lastSave: dirty,
                 }

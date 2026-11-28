@@ -209,6 +209,7 @@ export const dict = {
   "target.removed": "The node is no longer in this workflow.",
   "target.saveRequired": "Only a different diagram snapshot is available for this step. Save the package and try again.",
   "target.otherSnapshot": "Only a different diagram snapshot is available for this step.",
+  "target.workspaceUnavailable": "Unavailable in this workspace",
   "target.unavailable": "The diagram for this step is unavailable.",
   "detail.label": "Timeline detail",
   "detail.compact": "Brief",

@@ -41,7 +41,7 @@ for (const width of [1280, 390]) {
   })
 }
 
-test("opens the saved submodel from a step after returning to the parent workflow", async ({ page }) => {
+test("opens the saved submodel from a step after returning to the parent workflow", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 900 })
   await openLoginomNodeConversation(page, { packageState: "saved", graph: "parent" })
   const graph = page.getByRole("region", { name: "Схема пакета", exact: true })
@@ -59,6 +59,48 @@ test("opens the saved submodel from a step after returning to the parent workflo
   await expect(page.getByText("Продажи.lgp › Контроль качества", { exact: true })).toBeVisible()
   await expect(node).toHaveAttribute("aria-pressed", "true")
   await expect(node).toBeFocused()
+
+  await page.evaluate(() => navigator.clipboard.writeText(""))
+  const copyPath = page.getByRole("button", { name: "Скопировать путь" })
+  await expect(copyPath).toBeEnabled()
+  await page.screenshot({ path: testInfo.outputPath("loginom-saved-submodel-1280.png"), animations: "disabled" })
+  await copyPath.click()
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe("/analyst/Пакеты/Продажи.lgp")
+})
+
+test("a saved submodel refuses the path of a different package in the same document", async ({ page }) => {
+  await openLoginomNodeConversation(page, { packageState: "saved", graph: "parent", copyFromOtherPackage: true })
+  await page.getByRole("button", { name: "Показать на схеме" }).click()
+  await expect(page.getByText("Сохранённый файл", { exact: true })).toBeVisible()
+  await expect(page.getByText("Путь пакета недоступен", { exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Скопировать путь", exact: true })).toBeDisabled()
+})
+
+test("explains why schema and path are unavailable in an explicit workspace", async ({ page }) => {
+  await openLoginomNodeConversation(page, { packageState: "saved" })
+  await page.route(/\/api\/rpc\/loginom\.package(?:\/schema|-state\/snapshot)(?:\?|$)/, (route) => {
+    if (route.request().method() !== "POST") return route.fallback()
+
+    return route.fulfill({
+      status: 400,
+      headers: { "access-control-allow-origin": "*" },
+      json: { type: "invalid_session", message: "The conversation is unavailable in this location", data: {} },
+    })
+  })
+
+  const message = "Недоступно в этом рабочем пространстве"
+  await page.getByRole("button", { name: "Действия шага" }).click()
+  const copyPath = page.getByRole("menuitem", { name: /Скопировать путь/ })
+  await expect(copyPath.getByText(message, { exact: true })).toBeVisible()
+  await expect(copyPath).toBeDisabled()
+  await page.keyboard.press("Escape")
+
+  await page.getByRole("button", { name: "Схема пакета", exact: true }).click()
+  await expect(page.getByRole("status").filter({ hasText: message })).toBeVisible()
+  await expect(page.getByText("Для этого разговора нет доступной схемы пакета.")).toHaveCount(0)
+  await page.getByRole("button", { name: "Вернуться к разговору" }).click()
+  await page.getByRole("button", { name: "Показать на схеме" }).click()
+  await expect(page.getByRole("status").filter({ hasText: message })).toBeVisible()
 })
 
 test("requires saving before opening a departed submodel after an unsaved edit", async ({ page }) => {
@@ -117,6 +159,7 @@ for (const packageState of ["dirty", "resaved"] as const) {
 
 for (const [graph, message] of [
   ["removed", "Узел удалён из этой схемы."],
+  ["savedRemoved", "Узел удалён из этой схемы."],
   ["other", "Для этого шага доступен только другой снимок схемы."],
 ] as const) {
   test(`reports a node reference with graph state ${graph} without selecting a namesake`, async ({ page }) => {

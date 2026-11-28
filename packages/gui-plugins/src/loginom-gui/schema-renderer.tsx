@@ -3,7 +3,7 @@ import { Page, builtinContext } from "@opencode/plugin/gui/builtin"
 import { Button } from "@opencode/ui/button"
 import { createResource, createSignal, lazy, onCleanup, Show, Suspense, untrack } from "solid-js"
 import { PackageSchema, readFinding } from "./contract"
-import { copyText, readPackageCopy, samePackage } from "./copy"
+import { copyText, isInvalidSession, readPackageCopy, samePackage } from "./copy"
 import { transition, type Event, type Request, type State } from "./schema-machine"
 import type definition from "./index"
 import styles from "./schema.css?inline"
@@ -45,7 +45,10 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       return server.client.rpc(PackageSchema).schema(input, { location: { directory: request.directory }, signal })
     }).then(
       ({ snapshot, reason }) => dispatch({ type: "loaded", request, snapshot, reason }),
-      () => dispatch({ type: "failed", request }),
+      (error) => {
+        if (isInvalidSession(error)) dispatch({ type: "loaded", request, snapshot: null, reason: "workspaceUnavailable" })
+        else dispatch({ type: "failed", request })
+      },
     )
   }
 
@@ -83,7 +86,8 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
         () => {
           const current = state()
 
-          if (current.status === "ready" && current.snapshot.source === "window") return current.request
+          if (current.status === "ready" && (current.snapshot.source === "window" || current.snapshot.target))
+            return current.request
 
           if (current.status === "empty" && !current.request.finding) return current.request
         },
@@ -98,8 +102,12 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
 
         if (current.status === "empty" && !current.request.finding) return path ?? null
 
-        if (current.status === "ready" && current.snapshot.source === "window") {
-          const workflow = current.snapshot.workflow
+        if (current.status === "ready") {
+          const workflow = current.snapshot.source === "window" ? current.snapshot.workflow : current.snapshot.target
+
+          if (!workflow) return
+
+          if (path === "workspaceUnavailable") return path
 
           return path && samePackage(path, workflow) ? path : null
         }

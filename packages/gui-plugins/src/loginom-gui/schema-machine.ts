@@ -9,12 +9,12 @@ export type Request = { sessionID: string; serverID: string; directory: string }
 export type State =
   | { status: "closed" }
   | { status: "loading" | "empty" | "failed"; request: Request }
-  | { status: "missing"; request: Request; reason: "unavailable" | "otherSnapshot" | "saveRequired" | "removed" }
+  | { status: "missing"; request: Request; reason: "unavailable" | "otherSnapshot" | "saveRequired" | "removed" | "workspaceUnavailable" }
   | { status: "ready"; request: Request; snapshot: Snapshot; path: readonly Workflow[]; selected?: number }
 
 export type Event =
   | { type: "open"; request: Request }
-  | { type: "loaded"; request: Request; snapshot: Snapshot | null; reason?: "saveRequired" }
+  | { type: "loaded"; request: Request; snapshot: Snapshot | null; reason?: "saveRequired" | "workspaceUnavailable" }
   | { type: "failed"; request: Request }
   | { type: "close" }
   | { type: "module"; workflow: Workflow }
@@ -52,6 +52,8 @@ export function transition(state: State, event: Event): State {
       const { request } = state
       const { finding, node } = request
 
+      if (event.reason === "workspaceUnavailable") return { status: "missing", request, reason: event.reason }
+
       if (node) {
         if (!snapshot) return { status: "missing", request, reason: event.reason ?? "unavailable" }
 
@@ -61,7 +63,9 @@ export function transition(state: State, event: Event): State {
 
           const [match, duplicate] = findNodes(snapshot.workflows, node.node_id)
 
-          if (!match || duplicate) return { status: "missing", request, reason: "unavailable" }
+          if (!match) return { status: "missing", request, reason: "removed" }
+
+          if (duplicate) return { status: "missing", request, reason: "unavailable" }
 
           return { status: "ready", request, snapshot, ...match }
         }

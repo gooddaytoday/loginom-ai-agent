@@ -216,6 +216,7 @@ export const dict = {
   "target.removed": "Узел удалён из этой схемы.",
   "target.saveRequired": "Для этого шага доступен только другой снимок схемы. Сохраните пакет и попробуйте снова.",
   "target.otherSnapshot": "Для этого шага доступен только другой снимок схемы.",
+  "target.workspaceUnavailable": "Недоступно в этом рабочем пространстве",
   "target.unavailable": "Схема для этого шага недоступна.",
   "detail.label": "Подробность ленты",
   "detail.compact": "Кратко",
@@ -262,6 +263,6 @@ export const dict = {
   "failure.withReason": "{{action}} · {{reason}}",
   "failure.withAttempt": "{{action}} · {{attempt}}",
   "failure.withReasonAndAttempt": "{{action}} · {{reason}} · {{attempt}}",
-} satisfies Record<keyof typeof en | "step.build.few" | "step.build.many", string>
+} satisfies Record<keyof typeof en | "step.build.few" | "step.build.many" | "waitingTasks.few" | "waitingTasks.many", string>
 
 export default dict

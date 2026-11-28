@@ -26,6 +26,7 @@ const rpc = {
         required: ["sessionID"],
         additionalProperties: false,
       },
+      errors: { invalid_session: { type: "object", additionalProperties: false } },
       output: {
         type: "object",
         properties: {
@@ -67,9 +68,11 @@ export async function registerPackageSchema(
   ownsSession: (sessionID: string) => Promise<boolean>,
 ) {
   await ctx.rpc.register(rpc, {
-    async schema(value, { signal }) {
+    async schema(value, { error, signal }) {
       const input = Schema.decodeUnknownSync(Request)(value)
-      if (!(await ownsSession(input.sessionID))) return { snapshot: null }
+      const denied = () => error("invalid_session", "The conversation is unavailable in this location", {})
+
+      if (!(await ownsSession(input.sessionID))) return denied()
       signal.throwIfAborted()
 
       const window =
@@ -91,7 +94,7 @@ export async function registerPackageSchema(
               return attached && savedPackageSchema(attached.name, attached.bytes)
             })().catch(() => null))
       signal.throwIfAborted()
-      if (!(await ownsSession(input.sessionID))) return { snapshot: null }
+      if (!(await ownsSession(input.sessionID))) return denied()
 
       if (snapshot && typeof snapshot === "object" && "source" in snapshot && snapshot.source === "save_required")
         return { snapshot: null, reason: "saveRequired" }
