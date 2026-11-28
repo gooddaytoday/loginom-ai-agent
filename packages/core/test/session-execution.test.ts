@@ -1409,8 +1409,18 @@ describe("SessionRestart background recovery", () => {
       const jobs = yield* Job.Service
       const parent = Session.ID.make("ses_subagent_left_parent")
       const child = Session.ID.make("ses_subagent_left_child")
-      yield* seedSessions(database, [parent], { time_suspended: Date.now() })
-      yield* seedSessions(database, [child], { parent_id: parent, time_suspended: Date.now() })
+      const claimedAt = Date.now()
+      yield* seedSessions(database, [parent], { time_suspended: claimedAt })
+      yield* seedSessions(database, [child], { parent_id: parent, time_suspended: claimedAt })
+      const assistantMessageID = SessionMessage.ID.create()
+      const stepStartedAt = Date.now()
+      yield* bus.publish(SessionEvent.Step.Started, {
+        sessionID: parent,
+        assistantMessageID,
+        agent: Agent.ID.make("build"),
+        model: { id: ID.make("fixture"), providerID: Provider.ID.make("test") },
+        started: stepStartedAt,
+      })
       yield* jobs.start({
         id: child,
         type: "subagent",
@@ -1448,8 +1458,13 @@ describe("SessionRestart background recovery", () => {
       // Neither turn ran; both ended interrupted, with no restart notice, and their claims are released.
       expect(drained).toEqual([])
       expect(interrupted.map((event) => event.data)).toEqual([
-        { sessionID: child, reason: "user" },
-        { sessionID: parent, reason: "user" },
+        { sessionID: child, reason: "restart", lastKnown: { at: claimedAt } },
+        { sessionID: parent, reason: "restart", lastKnown: { at: expect.any(Number), stepID: assistantMessageID } },
+      ])
+      expect(interrupted[1]?.data.lastKnown?.at).toBeGreaterThanOrEqual(stepStartedAt)
+      const store = yield* SessionStore.Service
+      expect(yield* store.messages({ sessionID: parent, type: "idle" })).toMatchObject([
+        { interruption: { reason: "restart", lastKnown: interrupted[1]?.data.lastKnown } },
       ])
       expect(notices).toEqual([])
       expect(yield* claims(database)).toEqual({ [parent]: false, [child]: false })

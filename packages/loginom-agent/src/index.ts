@@ -3,6 +3,7 @@
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
+import { ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
@@ -10,6 +11,7 @@ import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
+import { connectionSettings } from "./connection-settings"
 import { Dashboard } from "./dashboard"
 import { DashboardTarget } from "./dashboard-target"
 import { dashboardTools } from "./dashboard-tools"
@@ -172,16 +174,18 @@ export default Plugin.define({
     // running execution and its lease. A plugin that is disposed releases what it still holds. Without a ready Host the
     // lease is `undefined`. A failed record write only loses that lease: the event loop below must keep running to
     // release the others.
-    const leases = new Map<string, Promise<ServiceHost.Lease | undefined>>()
+    const runs = new Map<string, { lease: Promise<ServiceHost.Lease | undefined>; endTurn: () => Promise<void> }>()
     // Why the Host refused a session's lease; the model is told (B2.5d).
     const refused = new Map<string, string>()
     // A dashboard session never leases the Host (0.4 `turnLifecycle.acquireRun`): without a lease it has no Dock
     // catalog and no Loginom hints either.
     const hold = (sessionID: string) => {
-      if (dashboard()) return Promise.resolve(undefined)
-      const current =
-        leases.get(sessionID) ??
-        ServiceHost.acquire(sessionID).then(
+      const current = runs.get(sessionID)
+      if (current) return current.lease
+      const endTurn = ServiceHost.connectionSettings.holdTurn()
+      const lease = dashboard()
+        ? Promise.resolve(undefined)
+        : ServiceHost.acquire(sessionID).then(
           (lease) => {
             refused.delete(sessionID)
             return lease
@@ -191,18 +195,19 @@ export default Plugin.define({
             return undefined
           },
         )
-      leases.set(sessionID, current)
-      return current
+      runs.set(sessionID, { lease, endTurn })
+      return lease
     }
     const drop = async (sessionID: string) => {
-      const current = leases.get(sessionID)
-      leases.delete(sessionID)
+      const current = runs.get(sessionID)
+      runs.delete(sessionID)
       refused.delete(sessionID)
       offered.delete(sessionID)
       deleted.delete(sessionID)
       dock.forget(sessionID)
-      const lease = await current
+      const lease = await current?.lease
       if (lease) await ServiceHost.release(lease).catch(() => undefined)
+      await current?.endTurn()
     }
 
     // The task's user message, which a Host input belongs to: the latest admitted prompt, as for grants. A session this
@@ -227,7 +232,7 @@ export default Plugin.define({
         })
         return
       }
-      const lease = await leases.get(event.sessionID)
+      const lease = await runs.get(event.sessionID)?.lease
       await lease
         ?.call(
           "dock_browser_recovery",
@@ -514,6 +519,7 @@ export default Plugin.define({
         return { granted: true }
       },
     })
+    await ctx.rpc.register(ConnectionSettingsRpc, connectionSettings())
     await ctx.rpc.register(preflight, {
       check: async (value) => {
         const code = await ServiceHost.preflight((value as { automation: boolean }).automation)
@@ -524,6 +530,11 @@ export default Plugin.define({
     await ctx.rpc.register(DashboardTarget.rpc, {
       prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),
       find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),
+      preview: async (value, call) => {
+        if (!Dashboard.isWork(ctx.location.directory)) return {}
+        const url = await drafts.preview((value as { id: string }).id, call.signal)
+        return url ? { url } : {}
+      },
     })
     await ctx.rpc.register(packageVariablesRpc, {
       variables: packageVariablesHandler({
@@ -574,7 +585,7 @@ export default Plugin.define({
 
     return async () => {
       stop.abort()
-      await Promise.all([...leases.keys()].map(drop))
+      await Promise.all([...runs.keys()].map(drop))
       await drafts.close()
     }
   },
