@@ -180,6 +180,7 @@ export function createPromptController(input: {
   return {
     controller: {
       ...interaction,
+      draft: {},
       model: { selection: modelSelection, providerName: storyComposerModel.provider.name, paid: true, loading: false },
     } satisfies ComposerModel,
     setValue(value: string) {

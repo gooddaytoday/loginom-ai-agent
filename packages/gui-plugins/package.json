@@ -8,6 +8,7 @@
   "exports": {
     "./renderer": "./src/renderer.ts",
     "./main": "./src/main.ts",
+    "./loginom-gui/contract": "./src/loginom-gui/contract.ts",
     "./terminal": "./src/terminal/index.ts",
     "./debug/options": "./src/debug/options.ts"
   },
@@ -23,6 +24,7 @@
     "@betteroffice/xlsx": "0.3.0",
     "@effect/platform-node": "catalog:",
     "@kobalte/core": "catalog:",
+    "@loginom-ai-agent/loginom-agent": "workspace:*",
     "@loginom-ai-agent/loginom-host": "workspace:*",
     "@loginom-ai-agent/product": "workspace:*",
     "@opencode/client": "workspace:*",

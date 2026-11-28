@@ -346,6 +346,7 @@ to the displayed repository or worktree instead of adding a second menu item.
 | `BuiltinPanel`, `BuiltinPanelTab`                       | `legacy` stored keys of a panel; `first` and stable `dom` ids of a tab                         |
 | `Page`                                                  | Top-level plugin pages with optional navigation entries                                        |
 | `BuiltinCommand`                                        | `follows`: share another command's shortcut inside `scope`                                     |
+| `ComposerAddItem`                                       | A menu item under the composer `+`, optionally with content above the current draft           |
 | `BuiltinStore`, `BuiltinStoreFrom`                      | Window stores imported from parts of the app's own keys                                        |
 | `builtinContext(ctx)`                                   | `ctx.desktop.forceFocus`, `ctx.locale.setDirection`                                            |
 | `builtinMainContext(ctx)`, `MainStoreFrom`, `Lifecycle` | Main stores imported from settings files or other namespaces, and `lifecycle.restart(handoff)` |
@@ -356,6 +357,14 @@ Registry tokens that extend a public registry share its id, so the host reads ev
 ```ts
 i18n: builtinCatalog({ en, de: () => import("./i18n/de") }),
 ```
+
+For example, open a contributed page from the composer menu:
+
+```ts
+ctx.add(ComposerAddItem, { title: "Open assets", run: ({ openPage }) => openPage("assets") })
+```
+
+Use `ComposerAddItem` to extend the `+` menu. The opaque `draft` identity passed to `run` and `renderSelection` survives editor remounts and can key a `WeakMap` for draft-specific selection. The Loginom GUI provides one `PackagePicker` contract for opening the package dialog.
 
 ## Ipc: main ↔ window
 

@@ -1,10 +1,14 @@
-import { Show, createEffect, createMemo, createSignal, onCleanup, untrack, type JSX } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, untrack, type JSX } from "solid-js"
+import { useNavigate } from "@solidjs/router"
+import { ComposerAddItem } from "@opencode/plugin/gui/builtin"
+import { Contribution } from "@/runtime/plugin/render"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Button } from "@opencode/ui/button"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { Icon } from "@opencode/ui/icon"
 import { Keybind } from "@opencode/ui/keybind"
+import { Menu } from "@opencode/ui/menu"
 import { Slash } from "@opencode/ui/slash"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { ComposerEditor } from "./editor/editor"
@@ -12,6 +16,7 @@ import { DialogSelectModel, ModelSelectorDrawer } from "@/providers/models/selec
 import { DialogSelectModelUnpaid } from "@/providers/models/unpaid"
 import { formatKeybind, useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
+import { useOptionalPluginHost } from "@/runtime/plugin/host"
 import type { ComposerModel } from "./model"
 import type { ComposerModelLabel } from "./model-label"
 import {
@@ -35,6 +40,27 @@ export function Composer(props: {
   const dialog = useDialog()
   const command = useCommand()
   const language = useLanguage()
+  const host = useOptionalPluginHost()
+  const navigate = host ? useNavigate() : undefined
+  const addItems = createMemo(() => host?.items(ComposerAddItem) ?? [])
+
+  const addInput = (plugin: string, draft: ComposerModel) => ({
+    draft: draft.draft,
+    openPage: (id: string) => navigate?.(`/page/${encodeURIComponent(plugin)}/${encodeURIComponent(id)}`),
+  })
+
+  const renderAddItems = () => (
+    <For each={addItems()}>
+      {(entry) => (
+        <Menu.Item
+          onSelect={() => entry.value.run(addInput(entry.plugin, props.model))}
+        >
+          <Show when={entry.value.icon}>{(icon) => <Icon name={icon()} />}</Show>
+          {entry.value.title}
+        </Menu.Item>
+      )}
+    </For>
+  )
 
   const modelName = () => {
     const preview = props.model.model.preview
@@ -62,6 +88,17 @@ export function Composer(props: {
 
   return (
     <div class="flex flex-col gap-3">
+      <Show when={!props.readOnly && props.model} keyed>
+        {(draft) => (
+          <For each={addItems()}>
+            {(entry) => (
+              <Show when={entry.value.renderSelection}>
+                {(render) => <Contribution plugin={entry.plugin}>{() => render()(addInput(entry.plugin, draft))}</Contribution>}
+              </Show>
+            )}
+          </For>
+        )}
+      </Show>
       <ComposerEditor
         controller={props.model}
         borderUnderlay={props.borderUnderlay}
@@ -70,6 +107,7 @@ export function Composer(props: {
         modelControlsVisible={!props.model.model.loading || !!props.model.model.preview}
         attachKeybind={command.keybindParts("file.attach")}
         attachShortcut={command.keybind("file.attach")}
+        addItems={addItems().length ? renderAddItems : undefined}
         alternateKeybind={[formatKeybind("mod", language.t), "↵"]}
         queueFirstKeybind={[formatKeybind("alt", language.t), "↵"]}
         queueFirstLabel={language.t("session.queue.first")}

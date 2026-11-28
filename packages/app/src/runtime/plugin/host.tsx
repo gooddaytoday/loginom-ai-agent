@@ -23,7 +23,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import { LifetimeContext, liveAccessor, PluginContext, type Bridge, type Entry } from "@opencode/plugin/gui/host"
-import { Page, ToolRenderer, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
+import { ComposerAddItem, Page, ToolRenderer, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
 import { Predicate } from "effect"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { pluralCategory, resolveTemplate } from "@opencode/ui/context/i18n"
@@ -144,8 +144,12 @@ const inactive = {
 
 const HostContext = createContext<ReturnType<typeof createHost>>()
 
+export function useOptionalPluginHost() {
+  return useContext(HostContext)
+}
+
 export function usePluginHost() {
-  const host = useContext(HostContext)
+  const host = useOptionalPluginHost()
 
   if (!host) throw new Error("Plugin host is unavailable")
 
@@ -820,6 +824,9 @@ function createHost(input: HostInput) {
 
         if (toolRenderer && !input.builtins?.has(plugin))
           throw new Error("Only built-in plugins can add tool renderers")
+
+        if (registry.id === ComposerAddItem.id && !input.builtins?.has(plugin))
+          throw new Error("Only built-in plugins can add composer menu items")
 
         if (registry.id === Page.id && !input.builtins?.has(plugin))
           throw new Error("Only built-in plugins can add pages")

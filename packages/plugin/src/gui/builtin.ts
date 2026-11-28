@@ -207,6 +207,48 @@ export interface Page {
  */
 export const Page = Registry.define<Page>("page")
 
+/** The current composer and navigation available to an attachment menu entry. */
+export interface ComposerAddInput {
+  /** Opaque identity of this composer draft, stable across editor remounts and suitable as a WeakMap key. */
+  readonly draft: object
+  /**
+   * Opens a registered page of the same plugin.
+   *
+   * @param id - ID of the contributed page.
+   */
+  openPage(id: string): void
+}
+
+/** An entry supplied by a built-in plugin to the composer attachment menu. */
+export interface ComposerAddItem {
+  /** Label shown in the menu. */
+  readonly title: string
+  /** Optional icon shown beside the label. */
+  readonly icon?: IconName
+  /**
+   * Runs when the user picks the entry.
+   *
+   * @param input - The draft and its page navigation.
+   */
+  run(input: ComposerAddInput): void
+  /**
+   * Renders draft-specific content above the composer.
+   *
+   * @param input - The same draft and navigation passed to the menu action.
+   */
+  renderSelection?(input: ComposerAddInput): JSX.Element
+}
+
+/**
+ * The registry of additional composer attachment menu entries for built-in plugins.
+ *
+ * @example
+ * ```ts
+ * ctx.add(ComposerAddItem, { title: "Open assets", run: ({ openPage }) => openPage("assets") })
+ * ```
+ */
+export const ComposerAddItem = Registry.define<ComposerAddItem>("composer-add-item")
+
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */
