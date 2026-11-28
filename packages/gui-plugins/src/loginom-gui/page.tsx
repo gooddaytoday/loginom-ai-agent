@@ -47,9 +47,25 @@ export default function Page() {
     }
 
     const request = async () => {
+      const current = untrack(state)
+      const startup = effect.type === "status" && current.type === "loading" ? current : undefined
+      const now = Date.now()
+
+      if (startup && now >= startup.until) {
+        dispatch({ type: "status", attempt: effect.attempt, now, result: { ok: false, issue: "unavailable" } })
+
+        return
+      }
+
       controller = new AbortController()
       const timeout = effect.type === "check" ? 245_000 : 12_000
-      const deadline = effect.type === "status" ? Math.min(timeout, effect.timeout ?? timeout) : timeout
+
+      const deadline = startup
+        ? Math.min(timeout, startup.until - now)
+        : effect.type === "status"
+          ? Math.min(timeout, effect.timeout ?? timeout)
+          : timeout
+
       const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(deadline)])
       const server = untrack(service)
 
@@ -65,7 +81,7 @@ export default function Page() {
         case "status": {
           // A cold Location can answer the inventory before the product RPC is callable.
           const plugin =
-            untrack(state).type === "loading" && options
+            startup && options
               ? await server?.client.plugin
                   .list({ location: options.location }, { signal })
                   .then(({ data }) => data.find((entry) => entry.id === "loginom.product")?.state.status ?? "starting")
@@ -116,7 +132,7 @@ export default function Page() {
     void request()
   }
 
-  const reload = () => dispatch({ type: "target", available: !!client() })
+  const reload = () => dispatch({ type: "target", available: !!client(), now: Date.now() })
   createKeyed(
     client,
     (target) => {
@@ -225,7 +241,7 @@ export default function Page() {
                 </ui.Button>
               </Show>
               <Show when={page().retry}>
-                <ui.Button onClick={() => dispatch({ type: "refresh" })}>{ctx.t("retry")}</ui.Button>
+                <ui.Button onClick={() => dispatch({ type: "refresh", now: Date.now() })}>{ctx.t("retry")}</ui.Button>
               </Show>
             </div>
           </Show>

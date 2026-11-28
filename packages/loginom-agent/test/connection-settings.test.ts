@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { NodeHostStartupError } from "@loginom-ai-agent/loginom-host/node-client"
 import { ConnectionSettingsRpc, type Candidate, type Issue } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { connectionSettings } from "../src/connection-settings"
 import { ServiceHost, type Connection } from "../src/host"
@@ -33,6 +34,27 @@ test("the settings RPC answers while the Host handshake is pending", async () =>
     expect(await settings.status()).toMatchObject({ ok: true, value: { state: "ready", username: "analyst" } })
   } finally {
     handshake.resolve(connection)
+    await ServiceHost.close()
+    await rm(data, { recursive: true, force: true })
+  }
+})
+
+test.each([
+  ["LOGINOM_HOST_TIMEOUT", "LOGINOM_HOST_TIMEOUT"],
+  ["private startup detail", "LOGINOM_HOST_REQUEST_FAILED"],
+])("the settings RPC reports a rejected handshake with a safe reason (%s)", async (message, reason) => {
+  const data = await mkdtemp(join(tmpdir(), "settings-handshake-"))
+  const handshake = Promise.withResolvers<Connection>()
+  await ServiceHost.start({ data, connect: () => handshake.promise })
+  try {
+    handshake.reject(new NodeHostStartupError(new Error(message), true))
+    await handshake.promise.catch(() => undefined)
+
+    const result = await connectionSettings().status()
+    const unavailable = { ok: false, issue: "unavailable", reason } as const
+    expect(result).toEqual(unavailable)
+    expect(await ConnectionSettingsRpc.methods.status.output["~standard"].validate(result)).toEqual({ value: unavailable })
+  } finally {
     await ServiceHost.close()
     await rm(data, { recursive: true, force: true })
   }

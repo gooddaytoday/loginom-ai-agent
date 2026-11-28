@@ -15,7 +15,7 @@ type Form = { status: Status; draft: Draft }
 
 type State = { attempt: number } & (
   | { type: "unavailable" | "disposed" }
-  | { type: "loading"; until?: number }
+  | { type: "loading"; until: number; starting: boolean }
   | (Form & { type: "editing"; issue?: Issue })
   | (Form & { type: "checking"; submit: "check" | "save" })
   | (Form & { type: "verified"; validation: Validation })
@@ -25,9 +25,9 @@ type State = { attempt: number } & (
 )
 
 type Event =
-  | { type: "target"; available: boolean }
+  | { type: "target"; available: boolean; now: number }
   | { type: "disposed" }
-  | { type: "refresh" }
+  | { type: "refresh"; now: number }
   | { type: "application"; revision: number; generation: number }
   | { type: "edit"; patch: Partial<Draft> }
   | { type: "submit"; submit: "check" | "save"; now: number }
@@ -107,10 +107,13 @@ export function transition(state: State, event: Event): Transition {
       return { state: { type: "disposed", attempt }, effects: [{ type: "cancel" }] }
     case "target":
       return event.available
-        ? { state: { type: "loading", attempt }, effects: [{ type: "cancel" }, { type: "status", attempt }] }
+        ? {
+            state: { type: "loading", attempt, until: event.now + startupWait, starting: false },
+            effects: [{ type: "cancel" }, { type: "status", attempt }],
+          }
         : { state: { type: "unavailable", attempt }, effects: [{ type: "cancel" }] }
     case "refresh":
-      if (state.type === "unavailable") return transition(state, { type: "target", available: true })
+      if (state.type === "unavailable") return transition(state, { type: "target", available: true, now: event.now })
 
       if (state.type !== "editing") return keep
 
@@ -186,22 +189,25 @@ export function transition(state: State, event: Event): Transition {
         state.type !== "refreshing"
       )
         return keep
+
+      if (state.type === "loading" && event.now >= state.until)
+        return { state: { type: "unavailable", attempt }, effects: [] }
+
       const reply = event.result
       const hostStarting = "state" in reply
       const result = hostStarting ? ({ ok: false, issue: "unavailable" } as const) : reply
 
       if (
         state.type === "loading" &&
-        (hostStarting || (result.ok && result.value.state === "starting" && !result.value.failed))
+        (hostStarting ||
+          (result.ok &&
+            result.value.state === "starting" &&
+            !result.value.failed &&
+            result.value.application?.state !== "pending"))
       ) {
-        const until = state.until ?? event.now + startupWait
-        const timeout = until - event.now - statusPollDelay
-
-        if (timeout <= 0) return { state: { type: "unavailable", attempt }, effects: [] }
-
         return {
-          state: { type: "loading", attempt, until },
-          effects: [{ type: "status", attempt, delay: statusPollDelay, timeout }],
+          state: { ...state, attempt, starting: true },
+          effects: [{ type: "status", attempt, delay: Math.min(statusPollDelay, state.until - event.now) }],
         }
       }
 
@@ -279,7 +285,7 @@ function failed(state: Form & { attempt: number }, issue: Issue): Transition {
 function message(state: State) {
   if (state.type === "disposed") return
 
-  if (state.type === "loading") return state.until === undefined ? "loading" : "serviceStarting"
+  if (state.type === "loading") return state.starting ? "serviceStarting" : "loading"
 
   if (state.type === "refreshing") return "loading"
 
