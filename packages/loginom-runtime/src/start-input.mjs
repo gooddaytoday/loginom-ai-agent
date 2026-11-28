@@ -33,6 +33,9 @@ export function validateStartInput(input) {
   const validationHttpCache = input.validationHttpCache === undefined ? false : input.validationHttpCache
   if (typeof validationHttpCache !== "boolean" || (validationHttpCache && (input.validation !== true || input.chat === "readiness")))
     throw Error("LOGINOM_START_INVALID")
+  const validationLogout = input.validationLogout === undefined ? false : input.validationLogout
+  if (typeof validationLogout !== "boolean" || (validationLogout && (input.validation !== true || input.chat === "readiness")))
+    throw Error("LOGINOM_START_INVALID")
   if (
     cleanup !== null &&
     (typeof cleanup !== "string" ||
@@ -41,5 +44,5 @@ export function validateStartInput(input) {
       cleanup.split("/").some((segment) => segment === "." || segment === ".."))
   )
     throw Error("LOGINOM_START_INVALID")
-  return { acceptanceCleanupPackage: cleanup, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache }
+  return { acceptanceCleanupPackage: cleanup, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache, validationLogout }
 }

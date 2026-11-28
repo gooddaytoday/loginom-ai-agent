@@ -2,6 +2,7 @@ import { existsSync, readdirSync } from "node:fs"
 import path from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import type { WindowSnapshot } from "../../shared/ipc-transport"
+import { pendingLegacyStores } from "./legacy-files"
 import { migrateDatabase } from "./migration"
 import { readEnableState } from "../plugin/enable-state"
 
@@ -13,12 +14,16 @@ export function readWindowSnapshot(userData: string, names: readonly string[]): 
   if (!existsSync(file)) return { storage: {}, plugins: [] }
 
   try {
-    const legacy = readdirSync(userData).some((name) => name === "default.dat" || /^opencode\..+\.dat$/.test(name))
     const db = new DatabaseSync(file)
 
     try {
       migrateDatabase(db)
 
+      const files = readdirSync(userData, { withFileTypes: true }).flatMap((entry) =>
+        entry.isDirectory() ? [] : [entry.name],
+      )
+
+      const legacy = pendingLegacyStores(db, files).length > 0
       const rows = db.prepare("SELECT key, value FROM state WHERE name = ?")
 
       return {

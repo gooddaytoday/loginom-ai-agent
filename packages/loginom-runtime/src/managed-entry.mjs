@@ -149,7 +149,7 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
+      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache, validationLogout } = validateStartInput(input)
       state.owner = { chat: input.chat, generation: input.generation }
       state.startupStateDir = input.stateDir
       state.startupStarted = performance.now()
@@ -198,7 +198,7 @@ async function handle(message) {
           clientRevision: resources.manifestHash, actionManifestDigest: resources.manifest.actionManifestSha256 } }),
       }
       if (input.validation === true) {
-        await loginBrowser(login)
+        await loginBrowser({ ...login, validationLogout })
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
