@@ -32,6 +32,7 @@ const Query = Schema.Struct({
   parentID: Schema.optional(Schema.String),
   archived: Schema.optional(Schema.String),
   search: Schema.optional(Schema.String),
+  searchField: Schema.optional(Schema.Literals(["title", "project", "prompt"])),
   order: Schema.optional(Schema.String),
   cursor: Schema.optional(Schema.String),
   limit: Schema.optional(Schema.NumberFromString),
@@ -359,7 +360,7 @@ const Group = HttpApiGroup.make("mock")
     HttpApiEndpoint.get("sessionList", "/api/session", {
       query: Query,
       success: Json,
-      error: MockBadRequest.pipe(HttpApiSchema.status(400)),
+      error: [MockBadRequest.pipe(HttpApiSchema.status(400)), MockInternal.pipe(HttpApiSchema.status(500))],
     }),
   )
   .add(HttpApiEndpoint.post("sessionCreate", "/api/session", { payload: JsonPayload, success: Json }))
@@ -369,7 +370,7 @@ const Group = HttpApiGroup.make("mock")
       params: { rpcID: Schema.String, method: Schema.String },
       payload: JsonPayload,
       success: Json,
-      error: Unsupported,
+      error: [Unsupported, MockServiceUnavailable.pipe(HttpApiSchema.status(503))],
     }),
   )
   .add(

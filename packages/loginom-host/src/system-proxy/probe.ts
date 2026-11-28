@@ -6,28 +6,32 @@ export function probeProxyPort(host: string, port: number, timeoutMs = 1000): Pr
   return probeSocket(host, port, timeoutMs, true)
 }
 
-export async function probeProxyUrl(url: string, timeoutMs = 1000): Promise<ProbeStatus> {
+export async function probeProxyUrl(url: string, timeoutMs = 1000, signal?: AbortSignal): Promise<ProbeStatus> {
   if (!URL.canParse(url)) return "other"
   const parsed = new URL(url)
   const secure = parsed.protocol === "https:"
   const host = parsed.hostname.replace(/^\[|\]$/g, "")
   const port = Number(parsed.port) || (secure ? 443 : 80)
   // TLS-прокси ждёт рукопожатие и молчит на открытый CONNECT, поэтому для него проверяем только TCP.
-  return probeSocket(host, port, timeoutMs, !secure)
+  return probeSocket(host, port, timeoutMs, !secure, signal)
 }
 
-function probeSocket(host: string, port: number, timeoutMs: number, handshake: boolean): Promise<ProbeStatus> {
+function probeSocket(host: string, port: number, timeoutMs: number, handshake: boolean, signal?: AbortSignal): Promise<ProbeStatus> {
+  if (signal?.aborted) return Promise.resolve("timeout")
   return new Promise((resolve) => {
     let settled = false
     const finish = (status: ProbeStatus) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
+      signal?.removeEventListener("abort", abort)
       socket.destroy()
       resolve(status)
     }
     const socket = connect({ host, port })
-    const timer = setTimeout(() => finish("timeout"), timeoutMs)
+    const abort = () => finish("timeout")
+    const timer = setTimeout(abort, timeoutMs)
+    signal?.addEventListener("abort", abort, { once: true })
     socket.once("error", (error: NodeJS.ErrnoException) => finish(error.code === "ECONNREFUSED" ? "closed" : "other"))
     socket.once("end", () => finish("other"))
     socket.once("close", () => finish("other"))

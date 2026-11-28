@@ -22,10 +22,19 @@ export async function restLinkCapability(page,t,readValidation){
   const edgeTid=t.workflow_ref.prefix+';Graph;'+nodes[0].tid+'|Output_Connection-0|'+nodes[1].tid+'|Input_Connection-0';
   need(await page.locator('[data-tid*="|Input_Connection-0"]').evaluateAll((es,p)=>es.every(e=>!e.getAttribute('data-tid').endsWith(p.suffix)||e.getAttribute('data-tid')===p.tid),{tid:edgeTid,suffix:'|'+nodes[1].tid+'|Input_Connection-0'}),'connection input is occupied');
   if(await find(edgeTid).count()===1)return {verified:true,cleanup_complete:true,effect_possible:false,node_context:{...t.node,verified:true}};
-  const point=async tid=>{need(await find(tid).count()===1,'port is ambiguous');return find(tid).evaluate(e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);if(!(r.width>0&&r.height>0&&hit&&(e===hit||e.contains(hit))))throw Error('REST link port is covered');return{x,y};});};
-  const source=await point(sourceTid),target=await point(targetTid);
-  need(Date.now()<t.deadline,'deadline elapsed');await page.mouse.move(source.x,source.y);effect=true;held=true;await page.mouse.down();await page.mouse.move(target.x,target.y,{steps:16});
   const parameters={source_port:{kind:'connection',index:0},target_port:{kind:'connection',index:0}};
+  // Read both owned ports again after a transient blocker before starting the drag.
+  const reachabilityDeadline=Math.min(t.deadline,Date.now()+500);
+  const readPoints=()=>readValidation(page,context,parameters,true);
+  let points=await readPoints();
+  while((!points.source||!points.target)&&Date.now()<reachabilityDeadline){
+   await page.waitForTimeout(Math.min(50,reachabilityDeadline-Date.now()));
+   if(Date.now()>=t.deadline)break;
+   points=await readPoints();
+  }
+  const {source,target,blocked_ports}=points;
+  if(!source||!target)return {verified:false,cleanup_complete:true,effect_possible:false,error:'REST link port is covered',blocked_ports};
+  need(Date.now()<t.deadline,'deadline elapsed');await page.mouse.move(source.x,source.y);effect=true;held=true;await page.mouse.down();await page.mouse.move(target.x,target.y,{steps:16});
   let validation;
   do{need(Date.now()<t.deadline,'validation deadline elapsed');validation=await readValidation(page,context,parameters);need(validation.state!=='rejected','native compatibility rejected the ports');if(validation.state==='pending')await page.waitForTimeout(Math.min(50,t.deadline-Date.now()));}while(validation.state==='pending');
   const before=validation;

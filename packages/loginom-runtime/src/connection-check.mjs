@@ -2,7 +2,7 @@ import { createRequire } from "node:module"
 import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { browserDownloadScript } from "../client/lib/browser-downloads.mjs"
-import { browserLaunch } from "../client/lib/browser-launch.mjs"
+import { browserLaunch, prepareBrowserProfile } from "../client/lib/browser-launch.mjs"
 import { createRedactor } from "../client/lib/redact.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
 import { connectionTimelineScript } from "../client/lib/connection-recovery.mjs"
@@ -164,7 +164,7 @@ function trackPageNetwork(page) {
 
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
-export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase, reload, signal } = {}) {
+export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase, reload, signal, sameOrigin = false } = {}) {
   const started = performance.now()
   let phase = "goto", phaseStarted = started, original
   const emit = async event => { try { await onPhase?.(event) } catch { /* Diagnostics cannot change login. */ } }
@@ -245,6 +245,8 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     }
     await network.close()
     phase = "form"; phaseStarted = performance.now()
+    if (sameOrigin && new URL(page.url()).origin !== new URL(candidate.url).origin)
+      throw Error("LOGINOM_LOGIN_UNAVAILABLE")
     let alreadyAuthenticated = false
     if (reload) {
       const fresh = await observeReloadedLoginPage(page, candidate.url, reload)
@@ -415,7 +417,7 @@ function loginFailure(error, candidate, phase, duration, elapsed) {
 }
 
 export async function loginBrowser({ browserPath, profile, candidate, httpCachePath, headless = false, keepOpen = false, signal, onContextCreated, downloadsPath,
-  deadline = Date.now() + 150_000, onRetry, onPhase }) {
+  deadline = Date.now() + 150_000, onRetry, onPhase, validationLogout = false }) {
   signal?.throwIfAborted()
   const phase = onPhase ?? (async () => {})
   const dependenciesStarted = performance.now()
@@ -425,7 +427,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
   const launch = browserLaunch(headless)
   const profileStarted = performance.now()
   await phase({ phase: "browser.profile", status: "starting" })
-  await mkdir(profile, { recursive: true, mode: 0o700 })
+  await prepareBrowserProfile(profile)
   if (httpCachePath && !keepOpen) await mkdir(httpCachePath, { recursive: true, mode: 0o700 })
   await phase({ phase: "browser.profile", status: "ready", duration_ms: Math.round(performance.now() - profileStarted), http_cache: !!httpCachePath && !keepOpen })
   signal?.throwIfAborted()
@@ -506,7 +508,9 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
     if (onContextCreated) await onContextCreated(context)
     const loginStarted = performance.now()
     await phase({ phase: "login", status: "starting", attempt: attempt + 1 })
-    const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate, { deadline, themeState, onThemeReload: record, onPhase: phase })
+    const page = context.pages()[0] ?? (await context.newPage())
+    const result = await loginPage(page, candidate, { deadline, themeState, onThemeReload: record, onPhase: phase,
+      sameOrigin: validationLogout })
       .then(async result => {
         await phase({ phase: "login", status: "ready", attempt: attempt + 1, duration_ms: Math.round(performance.now() - loginStarted) })
         return result
@@ -516,6 +520,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
       })
     signal?.throwIfAborted()
     if (!keepOpen) {
+      if (validationLogout) await logoutValidation(page, candidate, deadline)
       await close()
       return result
     }
@@ -529,11 +534,31 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
       await record({ phase: "login_retry", attempt: 2, reason: error.message, login: error.cause?.login ?? null })
       continue
     }
-    if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED", "LOGINOM_FOCUS_SETUP_FAILED"].includes(error?.message)) throw error
+    if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED", "LOGINOM_FOCUS_SETUP_FAILED", "LOGINOM_LOGOUT_UNCONFIRMED"].includes(error?.message)) throw error
     throw Error("LOGINOM_LOGIN_UNAVAILABLE", error?.cause?.login ? { cause: error.cause } : undefined)
   } finally {
     clearTimeout(timer)
     signal?.removeEventListener("abort", cancel)
   }
+  }
+}
+
+// This context belongs to the check and has never opened a package.
+async function logoutValidation(page, candidate, deadline) {
+  const at = tid => page.locator(`[data-tid="${tid}"]`)
+  const timeout = () => {
+    const left = Math.min(10_000, deadline - Date.now())
+    if (left <= 0) throw Error("LOGINOM_LOGOUT_UNCONFIRMED")
+    return left
+  }
+  try {
+    if (new URL(page.url()).origin !== new URL(candidate.url).origin) throw Error("LOGINOM_LOGOUT_UNCONFIRMED")
+    const avatar = at("MF;cntMain;tlbMainToolbar;btnAvatar")
+    await avatar.click({ timeout: timeout() })
+    await at("MF;AppMenuForm;btnLogOut").click({ timeout: timeout() })
+    await at("LoginForm;Login;edtUsername").waitFor({ state: "visible", timeout: timeout() })
+    await avatar.waitFor({ state: "hidden", timeout: timeout() })
+  } catch {
+    throw Error("LOGINOM_LOGOUT_UNCONFIRMED")
   }
 }

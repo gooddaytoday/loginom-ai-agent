@@ -10,8 +10,9 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
-import { StepCheckRequest, StepCheckResult } from "@loginom-ai-agent/loginom-host/step-state"
+import type { Loginom } from "@loginom-ai-agent/loginom-host/loginom"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
+import { StepCheckRequest, StepCheckResult } from "@loginom-ai-agent/loginom-host/step-state"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { WriteOutcomeInput, WriteOutcomeResult } from "@loginom-ai-agent/loginom-host/write-outcomes"
 import { Option, Schema } from "effect"
@@ -20,7 +21,7 @@ export type Lease = NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>
 export type Connection = {
   port: Port
   close(): Promise<void>
-  request?: (method: string, input: unknown) => Promise<unknown>
+  request?: (method: string, input: unknown, timeout?: number, signal?: AbortSignal) => Promise<unknown>
 }
 
 type Started = {
@@ -32,6 +33,7 @@ type Started = {
 }
 
 const state: { current?: Started } = {}
+const applicationListeners = new Set<Loginom.ConnectionApplicationListener>()
 const decodeRecord = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ session: Schema.String, pid: Schema.Number })),
 )
@@ -49,7 +51,11 @@ const decodePublication = Schema.decodeUnknownOption(Schema.NullOr(PublicationSo
  * The Node host comes from `resources` and starts in the background, so the server does not wait for its handshake.
  * `connect` replaces it in tests. A file system failure here only leaves the server without leases, never stops it.
  */
-export async function start(input: { data: string; resources?: string; connect?: () => Promise<Connection> }) {
+export async function start(input: {
+  data: string
+  resources?: string
+  connect?: () => Promise<Connection>
+}) {
   if (state.current && !state.current.closing) throw Error("LOGINOM_HOST_ALREADY_STARTED")
   await state.current?.closing
   const root = join(input.data, "loginom")
@@ -70,7 +76,11 @@ export async function start(input: { data: string; resources?: string; connect?:
       }),
   ).then((sessions) => sessions.flat())
   const connect = input.connect ?? (input.resources ? nodeHost(root, input.resources) : undefined)
-  const current: Started = { directory, ready: Promise.resolve(undefined), held: new Map() }
+  const current: Started = {
+    directory,
+    ready: Promise.resolve(undefined),
+    held: new Map(),
+  }
   current.ready = (connect?.() ?? Promise.resolve(undefined)).then(
     (connection) => {
       if (connection && current.closing) return connection.close().then(() => undefined)
@@ -140,11 +150,27 @@ export async function checkStepState(input: typeof StepCheckRequest.Type): Promi
     .catch(() => ({ state: "unavailable", retryAvailable: false }))
 }
 
-async function request(method: string, input: unknown) {
+export const connectionSettings = {
+  request,
+  onApplication(listener: Loginom.ConnectionApplicationListener) {
+    applicationListeners.add(listener)
+    return () => applicationListeners.delete(listener)
+  },
+  holdTurn(session: string) {
+    const id = randomUUID()
+    const held = request("connection.settings.turn", { id, session, active: true }).catch(() => undefined)
+    return async () => {
+      await held
+      await request("connection.settings.turn", { id, session, active: false }).catch(() => undefined)
+    }
+  },
+}
+
+async function request(method: string, input: unknown, timeout?: number, signal?: AbortSignal) {
   const current = state.current
   const connection = await current?.ready
   if (!connection?.request || current?.closing) throw new Error("LOGINOM_HOST_NOT_READY")
-  return connection.request(method, input)
+  return connection.request(method, input, timeout, signal)
 }
 
 export async function checkWriteOutcome(input: typeof WriteOutcomeInput.Type): Promise<typeof WriteOutcomeResult.Type> {
@@ -215,6 +241,7 @@ function nodeHost(root: string, resources: string) {
       entry: join(resources, "host", "node-host.mjs"),
       root,
       resources,
+      onConnectionApplication: (outcome, event) => applicationListeners.forEach((listener) => listener(outcome, event)),
       // As the Desktop Host of 0.4, the user sees the browser at work. The product CLI's `run --headless` reaches only the
       // private server of that run (B2.7a4b): the profile's service started its Host before, for every client. Strict
       // recovery holds for a server of a CLI profile started with it, as for each process of 0.4's CLI; never for

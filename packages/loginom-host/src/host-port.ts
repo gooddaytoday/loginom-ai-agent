@@ -68,6 +68,10 @@ export type HostPort = {
   start(): void
 }
 
+export function chatId(session: string) {
+  return createHash("sha256").update(session).digest("hex")
+}
+
 export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<typeof createLoginomHost>>) {
   const owner = randomUUID()
   const runs = new Map<
@@ -177,7 +181,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       )
         throw new Error("LOGINOM_CONNECTION_NOT_READY")
     }
-    const lease = service.acquire(`${owner}:${id}`)
+    const lease = service.acquire(`${owner}:${id}`, run.chat)
     if (!lease) throw new Error("LOGINOM_CONNECTION_NOT_READY")
     run.lease = lease
     return lease
@@ -263,7 +267,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           acquiring.has(input.run)
         )
           throw new Error("LOGINOM_RUN_INVALID")
-        const chat = createHash("sha256").update(input.session).digest("hex")
+        const chat = chatId(input.session)
         if (service.recoveries.has(chat) || service.journal.pending().length)
           throw new Error("LOGINOM_RECOVERY_REQUIRED")
         if ([...runs.values()].some((run) => run.chat === chat) || [...acquiring.values()].includes(chat))

@@ -101,6 +101,13 @@ export interface MockServerConfig {
   onMessage?: (input: { sessionID: string; messageID: string }) => void
   onRevertStage?: (input: { sessionID: string; messageID: string }) => void
   onSession?: (sessionID: string) => void
+  promptSearchFailures?: () => boolean
+  onRpc?: (request: {
+    rpcID: string
+    method: string
+    directory: string | null
+    body: unknown
+  }) => { output: unknown } | { unavailable: true } | undefined
   events?: () => OpenCodeEvent[]
   eventRetry?: number
   // Idle event streams send a comment every 15 s like the real server. Set false only to test the client's stall watchdog.
@@ -1184,6 +1191,9 @@ function mockHandlers(
             })),
           ),
         sessionList: (ctx) => {
+          if (ctx.query.searchField === "prompt" && config.promptSearchFailures?.())
+            return Effect.fail(new MockInternal({ message: "Prompt search failed" }))
+
           const sessions = config.sessions
             .filter(
               (session) =>
@@ -1202,13 +1212,31 @@ function mockHandlers(
               (session) =>
                 !!currentSession(session, config.directory).time.archived === (ctx.query.archived === "true"),
             )
-            .filter((session) =>
-              ctx.query.search === undefined
-                ? true
-                : String(session.title ?? "")
-                    .toLowerCase()
-                    .includes(ctx.query.search.toLowerCase()),
-            )
+            .filter((session) => {
+              const search = ctx.query.search?.toLowerCase()
+
+              if (!search) return true
+
+              if (ctx.query.searchField === "prompt") {
+                return config
+                  .pageMessages(session.id, Number.MAX_SAFE_INTEGER)
+                  .items.some((item) => item.type === "user" && item.text.toLowerCase().includes(search))
+              }
+
+              if (ctx.query.searchField === "project") {
+                const result = [config.project, ...(config.projects ? resolve(config.projects) : [])]
+                  .flatMap((item) => Option.toArray(decodeProject(item)))
+                  .find((item) => item.id === session.projectID)
+
+                const label = result?.name || result?.worktree?.split(/[/\\]/).filter(Boolean).at(-1)
+
+                return !!label?.toLowerCase().includes(search)
+              }
+
+              return String(session.title ?? "")
+                .toLowerCase()
+                .includes(search)
+            })
 
           const ordered = ctx.query.order === "asc" ? sessions : sessions.toReversed()
           const offset = Number(ctx.query.cursor ?? 0)
@@ -1221,14 +1249,22 @@ function mockHandlers(
           })
         },
         // The goal plugin's pill reads each routed session's goal; no scenario sets one.
-        rpcCall: (ctx) =>
-          ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get"
-            ? Effect.succeed({ output: null })
-            : Effect.fail(
-                new MockUnsupported({
-                  message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC`,
-                }),
-              ),
+        rpcCall: (ctx) => {
+          const url = new URL(ctx.request.url, config.server ?? SERVER)
+          const response = config.onRpc?.({
+            ...ctx.params,
+            directory: url.searchParams.get("location[directory]"),
+            body: ctx.payload,
+          })
+          if (response && "unavailable" in response)
+            return Effect.fail(new MockServiceUnavailable({ message: "RPC unavailable" }))
+          if (response) return Effect.succeed(response)
+          if (ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get")
+            return Effect.succeed({ output: null })
+          return Effect.fail(
+            new MockUnsupported({ message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC` }),
+          )
+        },
         sessionActive: () => {
           const status = resolve(config.sessionStatus ?? {})
 
@@ -1616,6 +1652,7 @@ const decodeJsonObject = Schema.decodeUnknownOption(Schema.JsonObject)
 const decodeProject = Schema.decodeUnknownOption(
   Schema.Struct({
     id: lenient(Schema.String),
+    name: lenient(Schema.String),
     worktree: lenient(Schema.String),
     canonical: lenient(Schema.String),
     sandboxes: lenient(Schema.Array(Schema.String)),

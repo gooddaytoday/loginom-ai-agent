@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm"
+import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql } from "drizzle-orm"
 import { Message } from "@opencode/ai/effect"
 import { Effect, Option, Schema } from "effect"
 import type { Model } from "@opencode/schema/model"
@@ -12,7 +12,7 @@ import { Instructions } from "../instructions/index.js"
 import { InstructionState } from "./instruction-state.js"
 import { SessionBlob } from "./blob.js"
 import { SessionRecentText } from "./recent-text.js"
-import { SessionMessageTable, SessionPartTable } from "./sql.js"
+import { SessionMessageTable, SessionPartTable, SessionTable } from "./sql.js"
 import { SessionStored } from "./stored.js"
 
 type DatabaseService = Database.Interface["db"]
@@ -382,6 +382,94 @@ export const incompleteAssistants = Effect.fn("SessionHistory.incompleteAssistan
     .all()
     .pipe(Effect.orDie)
   return yield* decodeMessageRows(db, rows)
+})
+
+/** Whether the unfinished claim crossed its first input or model boundary before recovery. */
+export const hasExecutionProgress = Effect.fnUntraced(function* (db: DatabaseService, sessionID: SessionSchema.ID) {
+  const claim = yield* db
+    .select({ started: SessionTable.time_suspended })
+    .from(SessionTable)
+    .where(eq(SessionTable.id, sessionID))
+    .get()
+    .pipe(Effect.orDie)
+  if (claim?.started == null) return false
+
+  const previousIdle = db
+    .select({ seq: SessionMessageTable.seq })
+    .from(SessionMessageTable)
+    .where(and(eq(SessionMessageTable.session_id, sessionID), eq(SessionMessageTable.type, "idle")))
+    .orderBy(desc(SessionMessageTable.seq))
+    .limit(1)
+  // Use the projection because embedded servers may have durable event logging disabled.
+  // A restart notice is visible in history before the runner resumes, but is not a delivery.
+  const progress = yield* db
+    .select({ id: SessionMessageTable.id })
+    .from(SessionMessageTable)
+    .where(
+      and(
+        eq(SessionMessageTable.session_id, sessionID),
+        gte(SessionMessageTable.time_created, claim.started),
+        gt(SessionMessageTable.seq, sql<number>`coalesce((${previousIdle}), -1)`),
+        or(
+          inArray(SessionMessageTable.type, ["user", "assistant"]),
+          and(
+            eq(SessionMessageTable.type, "synthetic"),
+            sql`json_extract(${SessionMessageTable.data}, '$.metadata.notice') is not 'restart'`,
+          ),
+        ),
+      ),
+    )
+    .limit(1)
+    .get()
+    .pipe(Effect.orDie)
+  return progress !== undefined
+})
+
+export const lastKnownActivity = Effect.fnUntraced(function* (db: DatabaseService, sessionID: SessionSchema.ID) {
+  const claim = yield* db
+    .select({ started: SessionTable.time_suspended, busy: SessionTable.time_busy })
+    .from(SessionTable)
+    .where(eq(SessionTable.id, sessionID))
+    .get()
+    .pipe(Effect.orDie)
+  if (claim?.started == null) return
+
+  // A claim spans each resume of the same turn. The idle boundary also excludes earlier turns with the same timestamp.
+  const boundary = yield* db
+    .select({ seq: SessionMessageTable.seq })
+    .from(SessionMessageTable)
+    .where(and(eq(SessionMessageTable.session_id, sessionID), eq(SessionMessageTable.type, "idle")))
+    .orderBy(desc(SessionMessageTable.seq))
+    .get()
+    .pipe(Effect.orDie)
+  const step = yield* db
+    .select({
+      id: SessionMessageTable.id,
+      created: SessionMessageTable.time_created,
+      updated: SessionMessageTable.time_updated,
+    })
+    .from(SessionMessageTable)
+    .where(
+      and(
+        eq(SessionMessageTable.session_id, sessionID),
+        eq(SessionMessageTable.type, "assistant"),
+        gte(SessionMessageTable.time_created, claim.started),
+        boundary && gt(SessionMessageTable.seq, boundary.seq),
+      ),
+    )
+    .orderBy(desc(SessionMessageTable.seq))
+    .get()
+    .pipe(Effect.orDie)
+  const started = Math.max(claim.started, claim.busy ?? 0)
+  if (!step) return { at: started }
+
+  const parts = yield* db
+    .select({ updated: sql<number | null>`max(${SessionPartTable.time_updated})` })
+    .from(SessionPartTable)
+    .where(eq(SessionPartTable.message_id, step.id))
+    .get()
+    .pipe(Effect.orDie)
+  return { at: Math.max(started, step.created, step.updated, parts?.updated ?? 0), stepID: step.id }
 })
 
 /** The id and text of the session's first user message. */

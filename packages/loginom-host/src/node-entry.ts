@@ -4,7 +4,7 @@ import { isAbsolute } from "node:path"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
 import { createLoginomHost } from "./host"
-import { loginomHostPort, type HostPort } from "./host-port"
+import { chatId, loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
 import { DashboardRead } from "./dashboard"
@@ -15,6 +15,7 @@ if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
 const events = new EventEmitter()
 const operations = new Set<Promise<void>>()
+const settingsChecks = new Map<string, AbortController>()
 const stopped = Promise.withResolvers<void>()
 const state: {
   starting?: Promise<void>
@@ -33,10 +34,17 @@ const port: HostPort = {
 }
 const candidate = Schema.decodeUnknownOption(Loginom.Candidate)
 const save = Schema.decodeUnknownOption(Loginom.Save)
+const turn = Schema.decodeUnknownOption(
+  Schema.Struct({ id: Schema.String, session: Schema.NonEmptyString, active: Schema.Boolean }),
+)
 const cancel = Schema.decodeUnknownOption(Loginom.Cancel)
 const recover = Schema.decodeUnknownOption(Loginom.AcknowledgeRecovery)
 
 process.on("message", (message: unknown) => {
+  if (message && typeof message === "object" && "cancel" in message && typeof message.cancel === "string") {
+    settingsChecks.get(message.cancel)?.abort()
+    return
+  }
   const operation = dispatch(message)
   operations.add(operation)
   void operation
@@ -105,7 +113,7 @@ async function dispatch(message: unknown) {
         ("browserRecovery" in input && typeof input.browserRecovery !== "boolean")
       )
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
-      const options = {
+      const options: Parameters<typeof createLoginomHost>[0] = {
         root: input.root,
         resources: input.resources,
         headless: input.headless,
@@ -119,6 +127,7 @@ async function dispatch(message: unknown) {
         browserRecovery: "browserRecovery" in input && input.browserRecovery === true,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
+        onConnectionApplication: (outcome, data) => reply({ event: `connection.${outcome}`, data }),
       }
       state.starting = createLoginomHost(options).then(async (host) => {
         state.host = host
@@ -142,6 +151,19 @@ async function dispatch(message: unknown) {
     }
     if (!message.method.startsWith("connection.")) {
       events.emit("message", { data: message })
+      return
+    }
+    if (message.method === "connection.settings.check") {
+      const value = candidate(input)
+      if (Option.isNone(value)) throw new Error("LOGINOM_CANDIDATE_INVALID")
+      const controller = new AbortController()
+      settingsChecks.set(message.id, controller)
+      try {
+        const result = await state.host.api.check(value.value, true, controller.signal)
+        reply({ id: message.id, result })
+      } finally {
+        settingsChecks.delete(message.id)
+      }
       return
     }
     const result = await management(message.method, input, state.host)
@@ -195,19 +217,28 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
     state.setupVerified = true
     return { verified: true }
   }
+  if (method === "connection.settings.turn") {
+    const value = turn(input)
+    if (Option.isNone(value)) throw new Error("LOGINOM_INPUT_INVALID")
+    host.turn(value.value.id, chatId(value.value.session), value.value.active)
+    return {}
+  }
   if (method === "connection.check") {
     const value = candidate(input)
     if (Option.isNone(value)) throw new Error("LOGINOM_CANDIDATE_INVALID")
     return host.api.check(value.value)
   }
-  if (method === "connection.save") {
+  if (method === "connection.save" || method === "connection.settings.save") {
     const value = save(input)
     if (Option.isNone(value)) throw new Error("LOGINOM_SAVE_INVALID")
-    // Setup prepares resources before check mints its five-minute token.
-    // No hashing may consume that validation lifetime between check and save.
-    if (!state.setupVerified) throw new Error("LOGINOM_RUNTIME_START_FAILED")
-    state.setupVerified = false
-    await host.api.save(value.value)
+    const settings = method === "connection.settings.save"
+    if (!settings) {
+      // CLI setup verifies resources explicitly before check mints its token.
+      if (!state.setupVerified) throw new Error("LOGINOM_RUNTIME_START_FAILED")
+      state.setupVerified = false
+    }
+    const saved = await host.api.save(value.value, settings)
+    if (settings) return saved
     await host.settled()
     return host.api.status()
   }

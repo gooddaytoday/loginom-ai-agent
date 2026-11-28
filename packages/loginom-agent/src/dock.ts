@@ -76,6 +76,7 @@ export async function dockTools(input: {
   ready: () => boolean
   failure: (sessionID: string) => string | undefined
   task: (sessionID: string) => Promise<string>
+  wrap: (tool: Info) => Info
 }) {
   const plugin = input.plugin
   // Every Dock tool of the current connection generation that a session of this Location was offered. A new generation
@@ -87,7 +88,9 @@ export async function dockTools(input: {
   // The task and profile each Host run is bound to; a new run is bound to nothing.
   const bound = new WeakMap<Lease, { task: string; profile: Profile }>()
 
-  await plugin.tool.transform((editor) => registry.tools.forEach((definition) => editor.add(tool(definition))))
+  await plugin.tool.transform((editor) =>
+    registry.tools.forEach((definition) => editor.add(input.wrap(tool(definition)))),
+  )
 
   // A run serves one task with one profile (`loginom-host/src/host-port.ts`). Its first binding may name the task's
   // profile, as 0.4 bound the profile it derived from history; a later task binds as `default` and then requests and

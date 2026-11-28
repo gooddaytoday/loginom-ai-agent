@@ -26,6 +26,7 @@
     "test:unit:watch": "bun test --conditions=solid --watch --isolate --preload ../ui/test/solid-jsx.ts --preload ./happydom.ts ./src",
     "test:e2e": "playwright test",
     "test:e2e:built": "PLAYWRIGHT_BUILD=1 playwright test",
+    "test:e2e:gate:b": "playwright test --config playwright.gate-b.config.ts",
     "test:e2e:local": "playwright test",
     "test:components": "playwright test --config playwright.components.config.ts",
     "test:components:ui": "playwright test --config playwright.components.config.ts --ui",
