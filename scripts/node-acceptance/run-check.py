@@ -2566,6 +2566,7 @@ class Runner:
                 if role:
                     match = re.search(r'^VmRSS:\s+(\d+) kB$', (proc / 'status').read_text(), re.M)
                     if match: totals[role] += int(match[1]) * 1024
+            except InterruptedError: raise  # SIGTERM must reach the live-chain handler.
             except (OSError, ValueError): pass  # A child may exit between /proc reads.
         return totals
 
@@ -4203,6 +4204,8 @@ class Runner:
         try:
             prune(runtime)
             runtime.rename(destination)
+        except InterruptedError:
+            raise
         except OSError as error:
             # A failed rename leaves the only receipts in place. Remove the rest of the profile.
             self.current.update(status=EVIDENCE_UNMOVED, status_before_evidence_failure=self.current.get('status'),
@@ -4420,6 +4423,8 @@ class Runner:
                                                 shutil.rmtree(profile)
                                             elif auth_path.parent.is_dir():
                                                 shutil.rmtree(auth_path.parent)
+                            except InterruptedError:
+                                raise
                             except OSError as error:
                                 r['oauth_cleanup_error'] = str(error)
                                 if r['status'] not in ('FAIL', EVIDENCE_UNMOVED): self.failure(r, error, folder)
