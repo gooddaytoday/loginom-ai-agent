@@ -185,6 +185,7 @@ async function handle(message) {
         process.platform === "win32" ? await mkdtemp(join(tmpdir(), "lb")) : join(directory, "browser-profile")
       state.browserProfile = process.platform === "win32" ? browserProfile : undefined
       await startupPhase({ phase: "runtime.profile", status: "ready", duration_ms: Math.round(performance.now() - profileStarted) })
+      const knownSecrets = [input.connection.apiKey, input.connection.password]
       const login = {
         browserPath: resources.browserPath,
         profile: browserProfile,
@@ -195,7 +196,7 @@ async function handle(message) {
         signal: state.startupController.signal,
         deadline,
         onPhase: startupPhase,
-        onRetry: createExecutionJournal({ directory, metadata: { sessionId: input.chat,
+        onRetry: createExecutionJournal({ directory, knownSecrets, metadata: { sessionId: input.chat,
           clientRevision: resources.manifestHash, actionManifestDigest: resources.manifest.actionManifestSha256 } }),
       }
       if (input.validation === true) {
@@ -256,7 +257,6 @@ async function handle(message) {
       )
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
-      const knownSecrets = [input.connection.apiKey, input.connection.password]
       state.protectedOperation = createProtectedOperation(authenticated.context, new URL(input.connection.url).origin)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
         protectOperation: state.protectedOperation.begin,
@@ -265,12 +265,12 @@ async function handle(message) {
           const outputFiles = await session.artifactStore.outputFiles(reply.structuredContent)
           let result = reply
           try {
-            const projection = project({ outputFiles, knownSecrets, busy: state.protectedOperation.snapshot() })
-            if (projection) {
-              const { busy, savedPackageGraph, ...receipt } = projection
-              result = withLoginomMetadata(reply, { receipt, busy, savedPackageGraph })
-            }
-          } catch {}
+            const receipt = project({ outputFiles, knownSecrets, busy: state.protectedOperation.snapshot() })
+            if (receipt) result = withLoginomMetadata(reply, { receipt })
+          } catch (error) {
+            await login.onRetry({ phase: "feed_projection_failed", error: startupDiagnostic(error, knownSecrets) })
+              .catch(() => { session.metadata.localDiagnosticsIncomplete = true })
+          }
           return outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result
         },
         startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {

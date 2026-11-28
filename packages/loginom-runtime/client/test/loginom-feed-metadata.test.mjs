@@ -16,6 +16,49 @@ const receipt = ({ports, artifacts, failure, warnings=['Read limitation'], statu
       output:{...(ports && {ports}), ...(artifacts && {file_artifacts:artifacts})}, warnings}},
 });
 
+test('reading existing output proves sample coverage, not a new execution', () => {
+  const tool = 'dock_node_read';
+  const sample = {...port([[cell('first')], [cell('second')]]), row_count:12, sample_complete:false};
+  const reply = nodeResultReply(receipt({ports:[sample]}), {userProfile:true, tool});
+  assert.deepEqual(loginomFeedMetadata(reply, {tool, facts:{...facts, kind:'read'}}).evidence, [
+    {kind:'tableRead', port:0, portGuid:'port-0', rowsRead:2, rowCount:12, executionId:'exec'},
+  ]);
+});
+
+test('read evidence counts only delivered rows after the model budget, not the native or feed sample', () => {
+  const tool = 'dock_node_wait';
+  const sample = {...port(Array.from({length:50}, (_, index) => [cell(index+'Ж'.repeat(1100))])),
+    row_count:500, sample_complete:false};
+  const reply = nodeResultReply(receipt({ports:[sample]}), {userProfile:true, tool});
+  const deliveredRows = JSON.parse(reply.content[0].text).output.ports[0].sample.length;
+  assert.ok(deliveredRows > 10 && deliveredRows < 50);
+  const metadata = loginomFeedMetadata(reply, {tool, facts:{...facts, readPorts:[sample]}});
+  assert.ok(metadata.ports[0].preview.sample.length < deliveredRows);
+  assert.deepEqual(metadata.evidence, [
+    {kind:'tableRead', port:0, portGuid:'port-0', rowsRead:deliveredRows, rowCount:500, executionId:'exec'},
+  ]);
+});
+
+test('completed launch proves execution even when no output was requested', () => {
+  const tool = 'dock_node_wait';
+  const reply = nodeResultReply(receipt(), {userProfile:true, tool});
+  assert.deepEqual(loginomFeedMetadata(reply, {tool, facts:{...facts, launchedExecutionId:'exec'}}).evidence, [
+    {kind:'executed', executionId:'exec', scope:'activeWorkflow'},
+  ]);
+  assert.equal(loginomFeedMetadata(reply, {tool, facts:{...facts, launchedExecutionId:'another-exec'}}).evidence, undefined);
+});
+
+test('save proves only the path unless the reopened workflow graph was checked', () => {
+  const path = '/analyst/result.lgp';
+  const save = {operation_id:'save', status:'SUCCEEDED', action_key:'package.save_checkpoint',
+    output:{package_ref:{path, active_identity:path}, reopened:false}};
+  assert.deepEqual(loginomSaveMetadata(save).evidence, [{kind:'saved', path}]);
+  assert.deepEqual(loginomSaveMetadata({...save, output:{...save.output, reopened:true}, trace:[
+    {event:'reopened_package_observed', actual_path:path, path_matches:true, graph_matches:true, graph:{nodes:['first','second']}},
+  ]}).evidence, [{kind:'saved', path}, {kind:'reopenedGraphRead', nodeCount:2, scope:'activeWorkflow'}]);
+  assert.equal(loginomSaveMetadata({...save, status:'AMBIGUOUS'}), undefined);
+});
+
 test('feed producers compose one operation block without replacing the reply or other fields', () => {
   const tool = 'dock_node_wait';
   const reply = {...nodeResultReply(receipt(), {userProfile:true, tool}), _meta: {outputFiles: []}};
@@ -38,11 +81,14 @@ test('feed drops over-limit fields individually and preserves the other fields',
   const manualEdits = [{kind:'node_renamed', guid:'node', from:'Фильтр', to:'Ж'.repeat(2048)}];
   const savedPackageGraph = {saveOperationId:'save', packagePath:'Ж'.repeat(4096), status:'unavailable'};
   const result = withLoginomMetadata(reply, {...identity, busy, step, manualEdits, savedPackageGraph, verificationStale:true});
-  assert.deepEqual(result._meta.loginom, {v:1, ...identity, busy, verificationStale:true});
-  assert.equal(withLoginomMetadata(result, {busy:{...busy, operationId:'a'.repeat(256)}, verificationStale:'invalid'}), result);
+  assert.deepEqual(result._meta.loginom, {v:1, ...identity, busy, verificationStale:true, manualEdits:[],
+    omitted:{manualEdits:1}, dropped:['step', 'savedPackageGraph']});
+  const updated = withLoginomMetadata(result, {busy:{...busy, operationId:'a'.repeat(256)}, verificationStale:'invalid'});
+  assert.deepEqual(updated._meta.loginom, {...result._meta.loginom,
+    dropped:['step', 'savedPackageGraph', 'busy', 'verificationStale']});
 });
 
-test('feed makes space for a new field by reducing the preview before declining an update', () => {
+test('feed reduces previews and limitations before dropping scenario facts', () => {
   const tool = 'dock_node_wait';
   const warnings = Array.from({length:6}, (_, index) => index+'Ж'.repeat(999));
   const sample = port(Array.from({length:10}, (_, index) => [cell(index+'Ю'.repeat(499))]));
@@ -61,63 +107,31 @@ test('feed makes space for a new field by reducing the preview before declining 
   assert.deepEqual(metadata.limitations, warnings);
   assert.ok(Buffer.byteLength(JSON.stringify(metadata)) <= 16 * 1024);
   const savedPackageGraph = {saveOperationId:'save', packagePath:'Ж'.repeat(1500), status:'unavailable'};
-  assert.equal(withLoginomMetadata(result, {savedPackageGraph}), result);
+  const extended = withLoginomMetadata(result, {savedPackageGraph})._meta.loginom;
+  assert.deepEqual(extended.savedPackageGraph, savedPackageGraph);
+  assert.deepEqual(extended.manualEdits, manualEdits);
+  assert.equal(extended.omitted.previewRows, projection.ports[0].preview.sample.length);
+  assert.deepEqual(extended.limitations, warnings.slice(0, -extended.omitted.limitations));
+  assert.ok(Buffer.byteLength(JSON.stringify(extended)) <= 16 * 1024);
   assert.deepEqual(base._meta.loginom, projection);
 });
 
-test('reading existing output proves sample coverage, not a new execution', () => {
-  const tool = 'dock_node_read';
-  const sample = {...port([[cell('first')], [cell('second')]]), row_count:12, sample_complete:false};
-  const reply = nodeResultReply(receipt({ports:[sample]}), {userProfile:true, tool});
-  assert.deepEqual(loginomFeedMetadata(reply, {tool, facts:{...facts, kind:'read'}}).evidence, [
-    {kind:'tableRead', port:0, portGuid:'port-0', rowsRead:2, rowCount:12, executionId:'exec'},
-  ]);
-});
-
-test('completed launch proves execution even when no output was requested', () => {
-  const tool = 'dock_node_wait';
-  const reply = nodeResultReply(receipt(), {userProfile:true, tool});
-  assert.deepEqual(loginomFeedMetadata(reply, {tool, facts:{...facts, launchedExecutionId:'exec'}}).evidence, [
-    {kind:'executed', executionId:'exec', scope:'workspace'},
-  ]);
-  assert.equal(loginomFeedMetadata(reply, {tool, facts:{...facts, launchedExecutionId:'another-exec'}}).evidence, undefined);
-});
-
-test('save proves only the path unless the reopened workflow graph was checked', () => {
-  const path = '/analyst/result.lgp';
-  const save = {operation_id:'save', status:'SUCCEEDED', action_key:'package.save_checkpoint',
-    output:{package_ref:{path, active_identity:path}, reopened:false}};
-  assert.deepEqual(loginomSaveMetadata(save).evidence, [{kind:'saved', path}]);
-  assert.deepEqual(loginomSaveMetadata({...save, output:{...save.output, reopened:true}, trace:[
-    {event:'reopened_package_observed', actual_path:path, path_matches:true, graph_matches:true, graph:{nodes:['first','second']}},
-  ]}).evidence, [{kind:'saved', path}, {kind:'savedGraphRead', nodeCount:2, scope:'activeWorkflow'}]);
-  assert.equal(loginomSaveMetadata({...save, status:'AMBIGUOUS'}), undefined);
-});
-
-test('save evidence composes with all available feed fields and redacts both paths', () => {
-  const path = '/analyst/private-account/result.lgp';
-  const save = {operation_id:'save',status:'SUCCEEDED',action_key:'package.save_checkpoint',
-    output:{package_ref:{path,active_identity:path}}};
-  const savedFileRead = {kind:'savedFileRead',scope:'package',nodeCount:4,workflowGuidMatch:null,
-    file:{mtime:'2026-11-27T15:00:00.000Z',size:10157,hash:'a'.repeat(64)}};
-  const savedGraph = {save_operation_id:'save',package_path:path,status:'unavailable'};
-  const runtimeId = '32ef40ff-08d2-476a-ad73-1ef3feb17ce8';
-  const busy = {version:1,windowId:runtimeId,operationId:'save',active:false};
-  const receiptWindow = {documentId:'doc',runtimeId,startSequence:1,confirmedSequence:2};
-  const options = {tool:'dock_action_run',save,savedFileRead,savedPackageGraph:savedGraph,busy,receiptWindow,knownSecrets:['private-account']};
-  const reply = {content:[{type:'text',text:'receipt'}]};
-  const {busy:signal,savedPackageGraph,...projection} = loginomFeedMetadata(reply, options);
-  const step = {outcome:'completed',retryAvailable:false,persistence:'not_saved'};
-  const manualEdits = [{kind:'node_renamed',guid:'node',from:'old',to:'new'}];
-  const first = withLoginomMetadata(reply,{receipt:projection,busy:signal,savedPackageGraph});
-  const result = withLoginomMetadata(first,{step,manualEdits,verificationStale:false});
-  assert.deepEqual(result._meta.loginom,{v:1,operationId:'save',state:'settled',status:'SUCCEEDED',kind:'save',
-    evidence:[{kind:'saved',path:'/analyst/[redacted]/result.lgp'},savedFileRead],receiptWindow,busy,
-    savedPackageGraph:{saveOperationId:'save',packagePath:'/analyst/[redacted]/result.lgp',status:'unavailable'},
-    step,manualEdits,verificationStale:false});
-  const otherGraph = {...savedGraph,save_operation_id:'another-save'};
-  assert.deepEqual(loginomFeedMetadata(reply,{...options,savedPackageGraph:otherGraph}).evidence,
-    [{kind:'saved',path:'/analyst/[redacted]/result.lgp'}]);
+test('a nearly full receipt keeps a prefix of manual edits and counts all omitted entries', () => {
+  const limitations = Array.from({length:8}, (_, index) => index+'Ж'.repeat(910));
+  const receipt = {operationId:'operation', state:'settled', limitations};
+  const reply = withLoginomMetadata({content:[]}, {receipt});
+  const manualEdits = Array.from({length:12}, (_, index) => ({
+    kind:'node_renamed', guid:'node-'+index, from:'Фильтр', to:'Ж'.repeat(220),
+  }));
+  const result = withLoginomMetadata(reply, {manualEdits, verificationStale:true})._meta.loginom;
+  assert.equal(result.verificationStale, true);
+  assert.ok(result.manualEdits.length > 0 && result.manualEdits.length < manualEdits.length);
+  assert.deepEqual(result.manualEdits, manualEdits.slice(0, result.manualEdits.length));
+  assert.equal(result.omitted.manualEdits, manualEdits.length - result.manualEdits.length);
+  assert.ok(result.omitted.limitations > 0);
+  assert.equal(result.omitted.limitations, limitations.length - result.limitations.length);
+  assert.equal(result.dropped, undefined);
+  assert.ok(Buffer.byteLength(JSON.stringify(result)) <= 16 * 1024);
 });
 
 test('configuration keeps the model text and exposes only the observed node and signals', () => {

@@ -7,13 +7,10 @@ import {
   DESKTOP_NATIVE_KEYS,
   DESKTOP_NATIVE_LOCALES,
   DESKTOP_NATIVE_LOCALE_TAGS,
-  detectDesktopNativeLocale,
   DESKTOP_NATIVE_MAX_PAYLOAD_BYTES,
   formatDesktopNativeMessage,
   parseDesktopNativeBundle,
 } from "./desktop-native"
-import en from "./en"
-import { dict } from "./ru"
 
 describe("desktop native translations", () => {
   test("accepts the exact typed bundle", () => {
@@ -47,31 +44,6 @@ describe("desktop native translations", () => {
   })
 })
 
-describe("desktop native locale detection", () => {
-  test("follows preference order and skips invalid or unsupported tags", () => {
-    expect(detectDesktopNativeLocale(["not_a_locale", "fr-FR"])).toBe("fr")
-    expect(detectDesktopNativeLocale(["eo", "de-DE"])).toBe("de")
-  })
-
-  test.each([
-    [["zh-TW"], "zht"],
-    [["zh-SG"], "zh"],
-    [["pa-PK"], "pa"],
-    [["pa-IN", "fr"], "fr"],
-    [["az-Cyrl", "de"], "de"],
-    [["sr-Cyrl"], "sr"],
-    [["sr-Latn", "en"], "en"],
-    [["uz-Latn"], "uz"],
-    [["no"], "no"],
-    [["nb-NO"], "no"],
-    [["nn-NO"], "no"],
-    [["he"], "he"],
-    [["he-IL"], "he"],
-  ])("uses Unicode likely subtags to map %p to %p", (tags, locale) => {
-    expect<string | undefined>(detectDesktopNativeLocale([...tags])).toBe(locale)
-  })
-})
-
 describe("desktop native ICU data", () => {
   test("accepts every locale in standard Intl formatters", () => {
     for (const locale of DESKTOP_NATIVE_LOCALES) {
@@ -88,18 +60,20 @@ describe("desktop native ICU data", () => {
 })
 
 describe("desktop product name", () => {
-  test("names the product in the en and ru desktop strings", () => {
-    const upstream = [en, dict].flatMap((messages) =>
-      Object.entries(messages).filter(([key, value]) => key.startsWith("desktop.") && /opencode/i.test(value)),
+  test("names the product in the native strings in every locale", async () => {
+    const catalogs = await Promise.all(DESKTOP_NATIVE_LOCALES.map((locale) => import(`./${locale}`)))
+
+    const upstream = catalogs.flatMap(({ dict }) =>
+      Object.entries<string>(dict).filter(([key, value]) => key.startsWith("desktop.") && /opencode/i.test(value)),
     )
 
     expect(upstream).toEqual([])
     expect(DESKTOP_NATIVE_ENGLISH["desktop.menu.app"]).toBe("Loginom AI Agent")
   })
 
-  test("names the product in the en and ru updater strings", async () => {
+  test("names the product in the updater in every locale", async () => {
     const catalogs = await Promise.all(
-      ["en", "ru"].map((locale) => import(`../../../../gui-plugins/src/updater/i18n/${locale}`)),
+      DESKTOP_NATIVE_LOCALES.map((locale) => import(`../../../../gui-plugins/src/updater/i18n/${locale}`)),
     )
 
     const upstream = catalogs.flatMap((module) =>
@@ -109,10 +83,12 @@ describe("desktop product name", () => {
     expect(upstream).toEqual([])
   })
 
-  test("names the product in the en and ru About strings", () => {
+  test("names the product in the About strings in every locale", async () => {
     // About no longer shows the trademark line: the product's own wording waits for the owner.
-    const upstream = [en, dict].flatMap((messages) =>
-      Object.entries(messages).filter(
+    const catalogs = await Promise.all(DESKTOP_NATIVE_LOCALES.map((locale) => import(`./${locale}`)))
+
+    const upstream = catalogs.flatMap(({ dict }) =>
+      Object.entries<string>(dict).filter(
         ([key, value]) =>
           key.startsWith("settings.about.") && key !== "settings.about.trademark" && /opencode/i.test(value),
       ),

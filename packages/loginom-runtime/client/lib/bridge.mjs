@@ -28,7 +28,7 @@ import {javascriptContextReceiptSchema} from './javascript-context-read.mjs';
 import { createRecoveryContext } from './recovery-context.mjs';
 import { outcomeVerification } from './outcome-verification.mjs';
 import { createHostArtifactAdmission, codexInputIdentity } from './host-artifacts.mjs';
-import { compactActionResult, compactNodeRequestFailure, userResultSchema, compactKnowledgeBundle, loginomFeedMetadata } from './user-results.mjs';
+import { compactActionResult, compactNodeRequestFailure, userResultSchema, compactKnowledgeBundle, loginomFeedMetadata, loginomSaveMetadata } from './user-results.mjs';
 import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory, userActionKeys } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
@@ -152,9 +152,8 @@ export async function createBridge(config, session, { browserTransport: managedB
   const heldLeases = new Set();
   const savedPackages = new Map();
   const saveAdmissions = new Map();
-  const receiptRuntimeId=randomUUID();
-  let receiptSequence=0;
-  const nextReceiptSequence=()=>++receiptSequence;
+  let receiptOrdinal = 0;
+  const receiptSequence = {id:randomUUID(),next:()=>++receiptOrdinal};
   let lastSavedPackage = null;
   let ownedUnsavedDraft = null;
   // Save As closes the package and reopens it in a new tab. Until a new
@@ -270,9 +269,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       pinnedActions = pinned;
       recoveryContext = createRecoveryContext({ remote, pinned, knownSecrets: [config.apiKey] });
       Object.assign(session.metadata, pinned.pins);
-      actionRuntime = createActionRuntime({ pinned,
-        protectOperation,
-        receiptRuntimeId,nextReceiptSequence,
+      actionRuntime = createActionRuntime({ pinned, receiptSequence, protectOperation,
         cacheDirectory:join(session.directory,'server-cache'),
         ...(replay?createCandidateNodeSupport({targetOrigin:config.loginomUrl?new URL(config.loginomUrl).origin:undefined,targetBuild:pinned.compatibility?.loginom_build,storageDirectories:config.storageDirectories,redactor}):{}),
         getStorageBinding: () => session.metadata.storageBinding ?? null,
@@ -399,7 +396,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         : 'Call dock_prepare for scenario work after skill activation. It returns dynamic readiness, input artifacts and local skill pins. Dock provides shared knowledge and a local browser. Source files and live DOM take precedence over recalled context. All clipboard copy/paste must use dock_clipboard_transfer so other Dock sessions cannot overwrite it during the operation. The installed native adapter activates shared session archiving after successful preparation. Check dock_diagnostics for actual archive activation and delivery state.'),
     });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [...structuredClone(catalog.tools), ...recovery.listTools(browserTools)] }));
-    const callTool = async (request, extra, privatePackage=null, scanReceipt=undefined) => {
+    const callTool = async (request, extra, privatePackage=null, scanReceipt=undefined, projectSave) => {
       if (shutdownStarted) throw new McpError(ErrorCode.InvalidRequest, 'Dock shutdown has started');
       if (recovery.owns(request.params.name)) {
         requirePreparedWorkspace(session.metadata);
@@ -772,7 +769,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             const operationId=saveRequest&&args.operation_id===undefined?randomUUID():args.operation_id;
             const newSave=saveRequest&&!saveAdmissions.has(operationId);
             const saveAdmission=newSave?{
-              sequence:nextReceiptSequence(),action_key:args.action_key,path:args.parameters?.path,
+              sequence:receiptSequence.next(),action_key:args.action_key,path:args.parameters?.path,
               document_id:session.metadata.workspacePreparation?.state?.document_id}:null;
             const outcome = request.params.name === 'dock_workspace_observe' ? await actionRuntime.observe({ signal: extra.signal, scope: args.scope, cursor: args.cursor, rootRef: args.root_ref, observationId: args.observation_id, storageName: args.storage_name })
               : request.params.name === 'dock_operation_inspect' ? await actionRuntime.inspect({ operationId: args.operation_id, signal: extra.signal })
@@ -802,7 +799,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               &&outcome.output.cleanup_confirmed===true&&outcome.output.outcome?.operation_id===args.operation_id
                 ?outcome.output.outcome:null;
             const admission=confirmedSave&&saveAdmissions.get(confirmedSave.operation_id);
-            if(admission&&confirmedSave.status==='SUCCEEDED')admission.confirmedSequence??=nextReceiptSequence();
+            if(admission&&confirmedSave.status==='SUCCEEDED')admission.confirmed??=receiptSequence.next();
             // Reconciliation confirms the original admission, not a new Save.
             // An older receipt can never supersede a later confirmed mutation.
             if(admission&&confirmedSave.status==='SUCCEEDED'&&confirmedSave.action_key===admission.action_key
@@ -941,11 +938,10 @@ export async function createBridge(config, session, { browserTransport: managedB
               // Knowledge/journal failure cannot erase a completed browser receipt.
               reply.content.push({ type: 'text', text: 'Recovery context unavailable; keep the operation receipt and inspect the actual state.' });
             }
-            if(userProfile&&presentNodeReply&&confirmedSave)
-              return presentNodeReply(reply,options=>loginomFeedMetadata(reply,{...options,tool:request.params.name,save:confirmedSave,
-                savedPackageGraph,savedFileRead:savedPackageGraph&&admission?.savedFile?.evidence,
-                receiptWindow:admission&&{documentId:admission.document_id,runtimeId:receiptRuntimeId,
-                  startSequence:admission.sequence,confirmedSequence:admission.confirmedSequence}}));
+            if(userProfile && confirmedSave)projectSave?.(options=>loginomSaveMetadata(confirmedSave,{...options,
+              savedPackageGraph,savedFileRead:admission?.savedFile?.evidence,
+              receiptWindow:admission&&{runtimeId:receiptSequence.id,documentId:admission.document_id,
+                startSequence:admission.sequence,confirmedSequence:admission.confirmed}}));
             return reply;
           });
         }
@@ -1010,9 +1006,11 @@ export async function createBridge(config, session, { browserTransport: managedB
       return presentNodeReply(reply,options=>loginomFeedMetadata(reply,{...options,tool,facts}));
     };
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-      const reply=await callTool(request,extra);
+      let saveProjection;
+      const reply=await callTool(request,extra,null,undefined,project=>{saveProjection=project;});
       const delivered=userProfile && ['local','action'].includes(catalog.routes.get(request.params.name))
         ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
+      if(saveProjection&&presentNodeReply)return presentNodeReply(delivered,saveProjection);
       return presentDeliveredNode(delivered,request.params.name);
     });
     return { server, catalog,

@@ -512,6 +512,7 @@ export function fromPromise(plugin: Plugin) {
             scan: (options) => run(host.storage.scan(options)),
           },
           tool: {
+            ask: (form, context, signal) => Effect.runPromiseWith(runtime)(host.tool.ask(form, context), { signal }),
             reload: () => run(host.tool.reload()),
             list: () =>
               run(host.tool.list()).then((tools) =>
@@ -647,6 +648,7 @@ export function fromPromise(plugin: Plugin) {
             move: adaptApiMethod(SessionEndpoints["session.move"], host.session.move),
             wait: adaptApiMethod(SessionEndpoints["session.wait"], host.session.wait),
             context: adaptApiMethod(SessionEndpoints["session.context"], host.session.context),
+            turnMessages: (input) => run(host.session.turnMessages(input)),
             instructions: {
               entry: {
                 list: adaptApiMethod(

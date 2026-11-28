@@ -4,6 +4,7 @@ import { Plugin } from "@opencode/plugin/effect"
 import type { IntegrationMethodRegistration } from "@opencode/plugin/effect/integration"
 import { EventManifest } from "@opencode/schema/event-manifest"
 import type { Event } from "@opencode/schema/event"
+import type { SessionMessage } from "@opencode/schema/session-message"
 import { ServerConfig } from "@opencode/schema/mcp"
 import { App } from "../app.js"
 import { Effect, Schema, Stream } from "effect"
@@ -12,6 +13,7 @@ import { Artifact } from "../artifact.js"
 import { AISDK } from "../aisdk.js"
 import { Command } from "../command.js"
 import { Credential } from "../credential.js"
+import { Form } from "../form.js"
 import { Bus } from "../bus.js"
 import { Integration } from "../integration.js"
 import { IntegrationConnection } from "../integration/connection.js"
@@ -67,6 +69,7 @@ export const make = Effect.fn("PluginHost.make")(function* (plugin: Pick<Interfa
   const rpc = yield* Rpc.Service
   const skill = yield* Skill.Service
   const tools = yield* Tool.Service
+  const forms = yield* Form.Service
   const vcs = yield* Vcs.Service
   const websearch = yield* WebSearch.Service
   const generate = yield* Generate.Service
@@ -500,6 +503,16 @@ export const make = Effect.fn("PluginHost.make")(function* (plugin: Pick<Interfa
       hook: (name, callback) => hooks.register("shell", name, callback),
     },
     tool: {
+      ask: (form, call) =>
+        permission.assert({ action: "question", resources: ["*"], ...Permission.invocation(call) }).pipe(
+          Effect.andThen(
+            forms.ask({
+              ...form,
+              sessionID: call.sessionID,
+              metadata: { ...form.metadata, tool: { messageID: call.messageID, id: call.id } },
+            }),
+          ),
+        ),
       transform: tools.transform,
       reload: tools.reload,
       list: tools.list,
@@ -607,6 +620,30 @@ export const make = Effect.fn("PluginHost.make")(function* (plugin: Pick<Interfa
           .pipe(Effect.map((interrupted) => ({ interrupted }))),
       wait: (input) => sessions.wait(input.sessionID),
       context: (input) => sessions.context(input.sessionID),
+      turnMessages: Effect.fn(function* ({
+        sessionID,
+        promptID,
+      }: Parameters<Plugin.Context["session"]["turnMessages"]>[0]) {
+        const prompt = yield* sessions.message({ sessionID, messageID: promptID })
+        if (prompt?.type !== "user") return []
+        const turn: SessionMessage.Info[] = [prompt]
+        let anchor = prompt.id
+        const limit = 64
+        while (true) {
+          const page = yield* sessions.messages({
+            sessionID,
+            limit,
+            order: "asc",
+            cursor: { id: anchor, direction: "next" },
+          })
+          for (const message of page) {
+            if (message.type === "user") return turn
+            turn.push(message)
+            anchor = message.id
+          }
+          if (page.length < limit) return turn
+        }
+      }),
       instructions: {
         entry: {
           list: Effect.fn(function* (input) {
@@ -647,6 +684,7 @@ export const requirements = LayerNode.group([
   Rpc.node,
   Skill.node,
   Tool.node,
+  Form.node,
   Vcs.node,
   WebSearch.node,
   Worktree.node,

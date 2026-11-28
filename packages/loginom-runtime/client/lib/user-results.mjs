@@ -203,14 +203,13 @@ export function compactKnowledgeBundle(description) {
 
 const FEED_PREVIEW_MAX_BYTES = 12 * 1024;
 const SAVED_GRAPH_MAX_BYTES = LOGINOM_METADATA_FIELD_MAX_BYTES.savedPackageGraph;
-const SAVE_ACTIONS = ['package.save_as', 'package.save_checkpoint'];
 
 function projectSavedPackageGraph(graph, knownSecrets) {
   const {text} = createRedactor(knownSecrets);
   const packagePath = text(graph.package_path).toWellFormed();
   const identity = {saveOperationId:graph.save_operation_id, packagePath};
   if (graph.status === 'unavailable') return {status:'unavailable', ...identity};
-  const result = {status:'compared', ...identity, scope:'active_workflow', renameAttribution:graph.rename_attribution,
+  const result = {status:'compared', ...identity, scope:'activeWorkflow', renameAttribution:graph.rename_attribution,
     changes:[], savedLabels:[], uncheckedSorting:[], truncated:true};
   const safe = value => Array.isArray(value) ? value.map(safe) : text(value).toWellFormed();
   const append = (target, value) => {
@@ -238,37 +237,32 @@ const validReceiptWindow = window => typeof window?.documentId === 'string' && w
   && Number.isSafeInteger(window.startSequence) && window.startSequence > 0
   && Number.isSafeInteger(window.confirmedSequence) && window.confirmedSequence > window.startSequence;
 
-export function loginomSaveMetadata(outcome, {knownSecrets = [], receiptWindow, savedFileRead} = {}) {
+function busyFor(busy, operationId) {
+  return busy?.version === 1 && busy.operationId === operationId
+    && /^[A-Za-z0-9_.:-]{1,128}$/.test(busy.operationId)
+    && typeof busy.active === 'boolean' && typeof busy.windowId === 'string'
+    && /^[0-9a-f-]{36}$/.test(busy.windowId)
+    ? {version:1, windowId:busy.windowId, operationId:busy.operationId, active:busy.active} : undefined;
+}
+
+export function loginomSaveMetadata(outcome, {knownSecrets = [], receiptWindow, savedPackageGraph, savedFileRead, busy} = {}) {
   const path = outcome.output?.package_ref?.path;
-  if (outcome.status !== 'SUCCEEDED' || !SAVE_ACTIONS.includes(outcome.action_key)
+  if (outcome.status !== 'SUCCEEDED' || !['package.save_as', 'package.save_checkpoint'].includes(outcome.action_key)
       || !outcome.operation_id || typeof path !== 'string' || !path || path !== outcome.output.package_ref.active_identity) return;
   const graph = outcome.trace?.findLast(item => item.event === 'reopened_package_observed'
     && item.actual_path === path && item.path_matches === true && item.graph_matches === true)?.graph;
   const evidence = [{kind:'saved', path:[...createRedactor(knownSecrets).text(path).toWellFormed()].slice(0, 1000).join('')}];
   if (outcome.output.reopened === true && Array.isArray(graph?.nodes))
-    evidence.push({kind:'savedGraphRead', nodeCount:graph.nodes.length, scope:'activeWorkflow'});
-  if (savedFileRead) evidence.push(savedFileRead);
+    evidence.push({kind:'reopenedGraphRead', nodeCount:graph.nodes.length, scope:'activeWorkflow'});
+  const matchesSave = savedPackageGraph?.save_operation_id === outcome.operation_id && savedPackageGraph.package_path === path;
+  if (matchesSave && savedFileRead) evidence.push(savedFileRead);
   return {v:1, operationId:outcome.operation_id, state:'settled', status:'SUCCEEDED', kind:'save', evidence,
+    busy:busyFor(busy, outcome.operation_id),
+    ...(matchesSave && {savedPackageGraph:projectSavedPackageGraph(savedPackageGraph, knownSecrets)}),
     ...(validReceiptWindow(receiptWindow) && {receiptWindow})};
 }
 
-export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts, busy, save, savedPackageGraph, savedFileRead, receiptWindow}) {
-  const busyFor = operationId => busy?.version === 1 && busy.operationId === operationId
-    && /^[A-Za-z0-9_.:-]{1,128}$/.test(busy.operationId)
-    && typeof busy.active === 'boolean' && typeof busy.windowId === 'string'
-    && /^[0-9a-f-]{36}$/.test(busy.windowId)
-    ? {version:1, windowId:busy.windowId, operationId:busy.operationId, active:busy.active} : undefined;
-  if (['dock_action_run', 'dock_operation_inspect'].includes(tool) && SAVE_ACTIONS.includes(save?.action_key)) {
-    const signal = tool === 'dock_action_run' ? busyFor(save.operation_id) : undefined;
-    const matchesSave = save.status === 'SUCCEEDED' && savedPackageGraph?.save_operation_id === save.operation_id
-      && savedPackageGraph.package_path === save.output?.package_ref?.path;
-    const graph = matchesSave ? projectSavedPackageGraph(savedPackageGraph, knownSecrets) : undefined;
-    const bounded = graph && loginomMetadataBytes(graph) <= SAVED_GRAPH_MAX_BYTES ? graph : undefined;
-    const receipt = loginomSaveMetadata(save, {knownSecrets, receiptWindow, savedFileRead:matchesSave ? savedFileRead : undefined});
-    if (receipt || signal || bounded) return {v:1, operationId:save.operation_id, state:'settled', status:save.status,
-      ...receipt, ...(signal ? {busy:signal} : {}), ...(bounded ? {savedPackageGraph:bounded} : {})};
-    return;
-  }
+export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts, busy}) {
   const receipt = reply.structuredContent;
   if (!['dock_node_apply', 'dock_node_wait', 'dock_node_status', 'dock_node_read', 'dock_node_resume', 'dock_node_cancel', 'dock_node_stop', 'dock_node_delete'].includes(tool)
       || receipt?.result_version !== 'user-v1' || !['running', 'settled'].includes(receipt.state)
@@ -289,7 +283,7 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
   const succeeded = state === 'settled' && receipt.status === 'SUCCEEDED' && !reply.isError;
   const result = {
     v: 1, operationId: receipt.operation_id, state,
-    busy: busyFor(receipt.operation_id),
+    busy: busyFor(busy, receipt.operation_id),
     attempt: receipt.attempt, status: state === 'settled' ? receipt.status : undefined,
     phase: text(receipt.phase ?? receipt.progress?.pending_phase, 128),
     node: typeof guid === 'string' && guid && label !== undefined && type ? {guid, label, type} : undefined,
@@ -345,18 +339,17 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
   const evidence = [];
   if (state === 'settled' && execution?.status === 'completed' && result.executionId
       && matchingFacts?.launchedExecutionId === result.executionId) {
-    evidence.push({kind:'executed', executionId:result.executionId, scope:'workspace'});
-    if (validReceiptWindow(matchingFacts.executionWindow))
-      result.receiptWindow = matchingFacts.executionWindow;
+    evidence.push({kind:'executed', executionId:result.executionId, scope:'activeWorkflow'});
   }
-  if (succeeded) for (const port of matchingFacts?.readPorts ?? ports ?? []) {
-    if (!boundTable(port)) continue;
-    const rowsRead = port.read_coverage?.rows_read ?? port.sample?.length;
+  for (const {port} of tables) {
+    const rowsRead = port.sample?.length;
     if (!safeCount(rowsRead) || rowsRead > port.row_count) continue;
     evidence.push({kind:'tableRead', port:port.port, portGuid:port.port_guid, rowsRead, rowCount:port.row_count,
       executionId:result.executionId});
   }
-  if (evidence.length) result.evidence = evidence;
+  const receiptWindow = evidence.some(fact => fact.kind === 'executed')
+    && safeCount(matchingFacts?.executionWindow?.confirmedSequence) ? matchingFacts.executionWindow : undefined;
+  const withEvidence = () => evidence.length ? {...result, evidence, ...(receiptWindow && {receiptWindow})} : result;
 
   // Reserve space for the receipt and table summaries before adding rows.
   let blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
@@ -369,12 +362,8 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
     delete result[key];
     blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
   }
-  while (blockRemaining < 0 && result.evidence?.length) {
-    result.evidence.pop();
-    blockRemaining = FEED_MAX_BYTES - bytes(result);
-  }
   if (blockRemaining < 0) return;
-  if (!result.ports) return result;
+  if (!result.ports) return withEvidence();
 
   let previewRemaining = FEED_PREVIEW_MAX_BYTES;
   const previewKeyBytes = ',"preview":'.length;
@@ -411,5 +400,5 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
     blockRemaining -= previewBytes + previewKeyBytes;
     table.preview = preview;
   }
-  return result;
+  return withEvidence();
 }

@@ -146,6 +146,7 @@ export function host(overrides: Overrides = {}): Plugin.Context {
       hook: () => Effect.die("unused shell.hook"),
     },
     tool: overrides.tool ?? {
+      ask: () => Effect.die("unused tool.ask"),
       transform: () => Effect.die("unused tool.transform"),
       reload: () => Effect.die("unused tool.reload"),
       list: () => Effect.die("unused tool.list"),
@@ -194,6 +195,7 @@ export function host(overrides: Overrides = {}): Plugin.Context {
       interrupt: overrides.session?.interrupt ?? (() => Effect.die("unused session.interrupt")),
       wait: overrides.session?.wait ?? (() => Effect.die("unused session.wait")),
       context: overrides.session?.context ?? (() => Effect.die("unused session.context")),
+      turnMessages: overrides.session?.turnMessages ?? (() => Effect.die("unused session.turnMessages")),
       instructions: overrides.session?.instructions ?? {
         entry: {
           list: () => Effect.die("unused session.instructions.entry.list"),

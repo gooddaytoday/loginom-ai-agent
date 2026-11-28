@@ -2,15 +2,15 @@
 // reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host itself belongs to the server process
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
-import { Definition as ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
+import { ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
-import { appVerifiedRpc, appVerifiedSummary, decodeAppVerifiedRequest } from "./app-verified"
+import { appVerifiedHandler, appVerifiedRpc } from "./app-verified"
 import { BrowserRecovery } from "./browser-recovery"
 import { connectionSettings } from "./connection-settings"
 import { Dashboard } from "./dashboard"
@@ -341,7 +341,10 @@ export default Plugin.define({
     // `package-docs` grant.
     const profiles = join(Global.Path.data, "file-profiles")
     const files = await localFiles(ctx, profiles)
-    const repeats = repeatGuard(async () => (await ctx.tool.list()).find((tool) => tool.id === "question"))
+    const repeats = repeatGuard({
+      ask: ctx.tool.ask,
+      interrupt: (sessionID) => ctx.session.interrupt({ sessionID }),
+    })
     await ctx.tool.transform((editor) => {
       editor.add(
         repeats.wrap(
@@ -426,7 +429,7 @@ export default Plugin.define({
       hide(event)
     })
     await ctx.tool.hook("execute.before", async (event) => {
-      if (!repeats.tracks(event.tool)) repeats.reset(event.sessionID)
+      repeats.before(event.sessionID, event.tool)
       await bound(event.sessionID)
       if (!permits(profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
@@ -508,10 +511,7 @@ export default Plugin.define({
     })
 
     await ctx.rpc.register(appVerifiedRpc, {
-      summary: async (value) => {
-        const { sessionID, promptID } = decodeAppVerifiedRequest(value)
-        return appVerifiedSummary(await ctx.session.context({ sessionID }), promptID)
-      },
+      summary: appVerifiedHandler(ctx.session, ctx.location),
     })
     await ctx.rpc.register(runner, {
       start: async (value) => {
@@ -536,6 +536,11 @@ export default Plugin.define({
     await ctx.rpc.register(DashboardTarget.rpc, {
       prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),
       find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),
+      preview: async (value, call) => {
+        if (!Dashboard.isWork(ctx.location.directory)) return {}
+        const url = await drafts.preview((value as { id: string }).id, call.signal)
+        return url ? { url } : {}
+      },
     })
     await ctx.rpc.register(permission, {
       conversation: async (value, call) => {

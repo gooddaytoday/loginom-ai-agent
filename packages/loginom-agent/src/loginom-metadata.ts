@@ -1,8 +1,10 @@
-import { Schema } from "effect"
+import { SessionID } from "@opencode/schema/session-id"
+import { Option, Schema } from "effect"
 import {
   LOGINOM_METADATA_FIELD_MAX_BYTES,
   LOGINOM_METADATA_MAX_BYTES,
   loginomMetadataBytes,
+  withLoginomMetadata,
 } from "../../loginom-runtime/client/lib/loginom-feed-metadata.mjs"
 
 const count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
@@ -65,25 +67,19 @@ const savedChange = Schema.Union([
   }),
   Schema.Struct({ kind: Schema.Literals(["link_added", "link_removed"]), endpoints: Schema.Tuple([id, id, id, id]) }),
 ])
+const graphScope = Schema.Literals(["activeWorkflow", "package"])
 const savedPackageGraph = Schema.Union([
   Schema.Struct({ ...savedPackageIdentity, status: Schema.Literal("unavailable") }),
   Schema.Struct({
     ...savedPackageIdentity,
     status: Schema.Literal("compared"),
-    scope: Schema.Literal("active_workflow"),
-    savedLabels: Schema.Array(Schema.Struct({ nodeId: id, label: Schema.String })).check(Schema.isMaxLength(32)),
-    changes: Schema.Array(savedChange).check(Schema.isMaxLength(16)),
-    uncheckedSorting: Schema.Array(id).check(Schema.isMaxLength(32)),
-    truncated: Schema.optional(Schema.Boolean),
+    scope: graphScope,
+    savedLabels: Schema.Array(Schema.Struct({ nodeId: id, label: Schema.String })),
+    changes: Schema.Array(savedChange),
+    uncheckedSorting: Schema.Array(id),
     renameAttribution: Schema.Literals(["unconfirmed", "observed_during_save"]),
   }),
 ])
-
-type Field = keyof typeof LOGINOM_METADATA_FIELD_MAX_BYTES
-const fieldBudget = (field: Field) =>
-  Schema.makeFilter((value) => loginomMetadataBytes(value) <= LOGINOM_METADATA_FIELD_MAX_BYTES[field], {
-    expected: `${field} within its UTF-8 JSON byte budget`,
-  })
 
 const cell = Schema.Struct({
   type: Schema.String,
@@ -102,107 +98,211 @@ export const LoginomEvidence = Schema.Union([
   Schema.Struct({
     kind: Schema.Literal("tableRead"),
     port: count,
-    portGuid: Schema.NonEmptyString,
+    portGuid: id,
     rowsRead: count,
     rowCount: count,
-    executionId: Schema.optional(Schema.NonEmptyString),
+    executionId: Schema.optional(id),
   }).check(Schema.makeFilter((read) => read.rowsRead <= read.rowCount)),
-  Schema.Struct({
-    kind: Schema.Literal("executed"),
-    executionId: Schema.NonEmptyString,
-    scope: Schema.Literal("workspace"),
-  }),
-  Schema.Struct({ kind: Schema.Literal("saved"), path: Schema.NonEmptyString }),
+  Schema.Struct({ kind: Schema.Literal("executed"), executionId: id, scope: graphScope }),
+  Schema.Struct({ kind: Schema.Literal("saved"), path: id }),
+  Schema.Struct({ kind: Schema.Literal("reopenedGraphRead"), nodeCount: count, scope: graphScope }),
   Schema.Struct({
     kind: Schema.Literal("savedFileRead"),
     nodeCount: count,
     scope: Schema.Literal("package"),
-    workflowGuidMatch: Schema.Union([Schema.Boolean, Schema.Null]),
+    workflowGuidMatch: Schema.NullOr(Schema.Boolean),
     file: Schema.Struct({
       mtime: Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)),
       size: Schema.Int.check(Schema.isGreaterThan(0)),
       hash: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/)),
     }),
   }),
+])
+const receiptWindow = Schema.Struct({
+  runtimeId: Schema.String.check(Schema.isUUID()),
+  documentId: id,
+  startSequence: Schema.Int.check(Schema.isGreaterThan(0)),
+  confirmedSequence: count,
+}).check(Schema.makeFilter((window) => window.startSequence < window.confirmedSequence))
+
+const packagePath = Schema.String.check(
+  Schema.isMaxLength(1024),
+  Schema.isPattern(/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+\.lgp$/i),
+  Schema.makeFilter((path) => !path.split("/").some((part) => part === "." || part === "..")),
+)
+const packageAccess = Schema.Union([
+  Schema.Struct({ packagePath, kind: Schema.Literals(["unavailable", "writable", "other_loginom_session"]) }),
+  Schema.Struct({ packagePath, kind: Schema.Literal("other_conversation"), sessionId: SessionID }),
   Schema.Struct({
-    kind: Schema.Literal("savedGraphRead"),
-    nodeCount: count,
-    scope: Schema.Literal("activeWorkflow"),
+    packagePath,
+    kind: Schema.Literal("read_only"),
+    lockMarker: Schema.Literals(["not_observed", "unknown"]),
   }),
 ])
-
-export const LoginomMetadata = Schema.Struct({
-  v: Schema.Literal(1),
-  operationId: Schema.NonEmptyString,
-  attempt: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
-  kind: Schema.optional(Schema.Literals(["add", "configure", "execute", "export", "read", "save"])),
-  state: Schema.Literals(["running", "settled"]),
-  busy: Schema.optional(busy.check(fieldBudget("busy"))),
-  step: Schema.optional(step.check(fieldBudget("step"))),
-  manualEdits: Schema.optional(manualEdits.check(fieldBudget("manualEdits"))),
-  verificationStale: Schema.optional(Schema.Boolean.check(fieldBudget("verificationStale"))),
-  savedPackageGraph: Schema.optional(savedPackageGraph.check(fieldBudget("savedPackageGraph"))),
-  status: Schema.optional(Schema.Literals(["SUCCEEDED", "FAILED", "NOT_APPLIED", "AMBIGUOUS"])),
-  phase: Schema.optional(Schema.String),
-  node: Schema.optional(
-    Schema.Struct({ guid: Schema.NonEmptyString, label: Schema.String, type: Schema.NonEmptyString }),
-  ),
-  executionId: Schema.optional(Schema.String),
-  executionStatus: Schema.optional(
-    Schema.Literals(["not_requested", "pending", "completed", "cancelled", "unknown", "failed"]),
-  ),
-  effectPossible: Schema.optional(Schema.Boolean),
-  cleanupComplete: Schema.optional(Schema.Boolean),
-  limitations: Schema.optional(Schema.Array(Schema.String)),
-  evidence: Schema.optional(Schema.Array(LoginomEvidence)),
-  receiptWindow: Schema.optional(
+const coverage = Schema.Literals(["complete", "partial", "unavailable"])
+const packageVariables = Schema.Struct({
+  source: Schema.Literal("saved"),
+  definitionsCoverage: coverage,
+  defaultsCoverage: coverage,
+  usagesCoverage: Schema.Literal("partial"),
+  definitions: Schema.NullOr(Schema.Array(Schema.Struct({ name: Schema.String, type: Schema.String }))),
+  defaults: Schema.NullOr(Schema.Array(Schema.Struct({ name: Schema.String, value: Schema.String }))),
+  usages: Schema.Array(
     Schema.Struct({
-      documentId: Schema.NonEmptyString,
-      runtimeId: Schema.String.check(Schema.isUUID()),
-      startSequence: Schema.Int.check(Schema.isGreaterThan(0)),
-      confirmedSequence: count,
-    }).check(Schema.makeFilter((window) => window.startSequence < window.confirmedSequence)),
-  ),
-  nextStep: Schema.optional(Schema.Struct({ tool: Schema.optional(Schema.String), instruction: Schema.String })),
-  ports: Schema.optional(
-    Schema.Array(
-      Schema.Struct({
-        index: count,
-        guid: Schema.NonEmptyString,
-        rowCount: count,
-        columnCount: count,
-        preview: Schema.optional(
-          Schema.Struct({
-            schema: Schema.Array(
-              Schema.Struct({
-                index: count,
-                name: Schema.String,
-                label: Schema.optional(Schema.String),
-                type: Schema.String,
-                data_kind: Schema.optional(Schema.String),
-              }),
-            ),
-            sample: Schema.Array(Schema.Array(cell)).check(Schema.isMaxLength(10)),
-            sampleComplete: Schema.Boolean,
-          }),
-        ),
-      }),
-    ),
-  ),
-  error: Schema.optional(
-    Schema.Struct({
-      code: Schema.String,
-      message: Schema.String,
-      source: Schema.Literals(["loginom", "runtime", "host"]),
-      attribution: Schema.optional(Schema.Literals(["verified_node", "after_launch"])),
+      name: Schema.String,
+      kind: Schema.Literals(["template", "binding"]),
+      scope: Schema.Literals(["package", "control", "unknown"]),
+      module: Schema.String,
+      branch: Schema.Array(Schema.String),
+      nodeId: Schema.String,
+      nodeLabel: Schema.String,
+      parameter: Schema.String,
     }),
   ),
-  files: Schema.optional(
-    Schema.Array(Schema.Struct({ artifactId: Schema.NonEmptyString, name: Schema.String, bytes: count })),
+})
+const agentCopy = Schema.Struct({ originalPath: packagePath, path: packagePath })
+
+const identity = Schema.Struct({
+  v: Schema.Literal(1),
+  operationId: id,
+  state: Schema.Literals(["running", "settled"]),
+})
+const extensionFields = {
+  kind: Schema.Literals(["add", "configure", "execute", "export", "read", "save"]),
+  busy,
+  step,
+  manualEdits,
+  verificationStale: Schema.Boolean,
+  savedPackageGraph,
+  evidence: Schema.Array(LoginomEvidence),
+  receiptWindow,
+  packageAccess,
+  packageVariables,
+  agentCopy,
+}
+const fields = {
+  ...extensionFields,
+  attempt: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
+  status: Schema.Literals(["SUCCEEDED", "FAILED", "NOT_APPLIED", "AMBIGUOUS"]),
+  phase: Schema.String,
+  node: Schema.Struct({ guid: Schema.NonEmptyString, label: Schema.String, type: Schema.NonEmptyString }),
+  executionId: Schema.String,
+  executionStatus: Schema.Literals(["not_requested", "pending", "completed", "cancelled", "unknown", "failed"]),
+  effectPossible: Schema.Boolean,
+  cleanupComplete: Schema.Boolean,
+  limitations: Schema.Array(Schema.String),
+  nextStep: Schema.Struct({ tool: Schema.optional(Schema.String), instruction: Schema.String }),
+  ports: Schema.Array(
+    Schema.Struct({
+      index: count,
+      guid: Schema.NonEmptyString,
+      rowCount: count,
+      columnCount: count,
+      preview: Schema.optional(
+        Schema.Struct({
+          schema: Schema.Array(
+            Schema.Struct({
+              index: count,
+              name: Schema.String,
+              label: Schema.optional(Schema.String),
+              type: Schema.String,
+              data_kind: Schema.optional(Schema.String),
+            }),
+          ),
+          sample: Schema.Array(Schema.Array(cell)).check(Schema.isMaxLength(10)),
+          sampleComplete: Schema.Boolean,
+        }),
+      ),
+    }),
   ),
-}).check(
+  error: Schema.Struct({
+    code: Schema.String,
+    message: Schema.String,
+    source: Schema.Literals(["loginom", "runtime", "host"]),
+    attribution: Schema.optional(Schema.Literals(["verified_node", "after_launch"])),
+  }),
+  files: Schema.Array(Schema.Struct({ artifactId: Schema.NonEmptyString, name: Schema.String, bytes: count })),
+}
+const diagnostics = {
+  dropped: Schema.Array(Schema.Literals(Object.keys(fields) as (keyof typeof fields)[])),
+  omitted: Schema.Record(Schema.String.check(Schema.isMaxLength(64)), count),
+}
+const rawFields = { ...fields, ...diagnostics }
+const optional = Object.fromEntries(
+  Object.entries(rawFields).map(([key, schema]) => [key, Schema.optional(schema)]),
+) as {
+  [K in keyof typeof rawFields]: Schema.optional<(typeof rawFields)[K]>
+}
+
+export const LoginomMetadata = Schema.Struct({ ...identity.fields, ...optional }).check(
   Schema.makeFilter((metadata) => loginomMetadataBytes(metadata) <= LOGINOM_METADATA_MAX_BYTES, {
     expected: "Loginom metadata of at most 16 KiB in UTF-8 JSON",
   }),
+  Schema.makeFilter(
+    (metadata) =>
+      Object.entries(LOGINOM_METADATA_FIELD_MAX_BYTES).every(([key, limit]) => {
+        const value = metadata[key as keyof typeof extensionFields]
+        return value === undefined || loginomMetadataBytes(value) <= limit
+      }),
+    { expected: "Loginom metadata fields within their UTF-8 JSON byte budgets" },
+  ),
 )
 export type LoginomMetadata = typeof LoginomMetadata.Type
+
+type Extension = keyof typeof extensionFields
+export type LoginomMetadataFields = Partial<Pick<LoginomMetadata, Extension>>
+export type LoginomMetadataInput = {
+  toolCallId: string
+  host?: unknown
+  agent?: LoginomMetadataFields
+}
+
+const decodeIdentity = Schema.decodeUnknownOption(identity)
+const decodeBlock = Schema.decodeUnknownOption(LoginomMetadata)
+const fieldDecoders = Object.entries(rawFields).map(([key, schema]) => ({
+  key,
+  decode: Schema.decodeUnknownOption(schema),
+  limit: LOGINOM_METADATA_FIELD_MAX_BYTES[key as Extension],
+}))
+
+function readFields(value: object, extensionOnly = false) {
+  const accepted: Record<string, unknown> = {}
+  const dropped: string[] = []
+  for (const { key, decode, limit } of fieldDecoders) {
+    if (extensionOnly && !Object.hasOwn(extensionFields, key)) continue
+    if (!Object.hasOwn(value, key)) continue
+    const field = (value as Record<string, unknown>)[key]
+    if (field === undefined) continue
+    const decoded = decode(field)
+    if (
+      Option.isSome(decoded) &&
+      (limit !== undefined ||
+        Array.isArray(decoded.value) ||
+        loginomMetadataBytes(decoded.value) <= LOGINOM_METADATA_MAX_BYTES)
+    ) {
+      accepted[key] = decoded.value
+    } else if (Object.hasOwn(fields, key)) {
+      dropped.push(key)
+    }
+  }
+  return { accepted, dropped }
+}
+
+export function decodeLoginomMetadata(value: unknown, input?: LoginomMetadataInput): LoginomMetadata | undefined {
+  const base = Option.getOrUndefined(decodeIdentity(value))
+  let result: { _meta?: Record<string, unknown> } = {}
+  if (base && typeof value === "object" && value !== null) {
+    const { accepted, dropped } = readFields(value)
+    result = withLoginomMetadata(result, { receipt: { ...base, ...accepted }, dropped })
+  }
+  for (const source of [input?.host, input?.agent]) {
+    if (typeof source !== "object" || source === null) continue
+    const { accepted, dropped } = readFields(source, true)
+    result = withLoginomMetadata(result, {
+      ...accepted,
+      ...(base ? {} : { operationId: input?.toolCallId, state: "settled" }),
+      dropped,
+    })
+  }
+  return Option.getOrUndefined(decodeBlock(result._meta?.loginom))
+}

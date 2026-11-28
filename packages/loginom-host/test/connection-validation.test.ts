@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { Schema } from "effect"
 import { Loginom } from "../src/loginom"
+import { once } from "node:events"
 import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -9,10 +10,12 @@ import { watch } from "node:fs"
 import { createLoginomHost } from "../src/host"
 import { cliCredentials } from "../src/connection/cli-credentials"
 import { credentials } from "../src/connection/credentials"
+import { connectionService } from "../src/connection/connection-service"
 import { connectionStore } from "../src/connection/connection-store"
 import { writeHelp } from "../../loginom-runtime/client/test/support/help-fixture.mjs"
 import { launchNodeHost } from "../src/node-client"
-import { stageHeldKnowledge } from "./fixtures/knowledge"
+import { stageHeldKnowledge, waitForKnowledge } from "./fixtures/knowledge"
+import { hasConnectionFixture, loginomConnectionFixture } from "./fixtures/loginom-connection"
 
 async function buildNodeHost(output: string) {
   // Isolate Bun.build: repeated in-process builds in Bun's test runner can fail
@@ -25,6 +28,8 @@ async function buildNodeHost(output: string) {
   expect({ code: await child.exited, error: await error }).toEqual({ code: 0, error: "" })
   return join(output, "node-host.mjs")
 }
+
+const diagnosticKey = "synthetic-knowledge-key"
 
 // "held" keeps the Help catalog pending in a stub entry; the other modes run the
 // real entry over <resources>/help, absent or with a changed page.
@@ -59,7 +64,9 @@ async function fixture(
     import {join} from 'node:path';
     let starting;
     function ready() {
-      process.send(${JSON.stringify(error)} ? {id:starting.id,error:${JSON.stringify(error)}}
+      process.send(${JSON.stringify(error)} ? {id:starting.id,error:${JSON.stringify(error)},startupDiagnostics:[{
+        error:{message:'Fixture rejected ' + starting.input.connection.password + ' apiKey=' + ${JSON.stringify(diagnosticKey)}}
+      }]}
         : {id:starting.id,result:{protocol:1,generation:starting.input.generation,checked:true,ready:true,chat:starting.input.chat}});
     }
     process.on('SIGUSR1', ready);
@@ -461,7 +468,9 @@ test("settings reject a bad password through Node IPC without creating an active
       headless: true,
     })
     try {
-      await expect(host.request("connection.settings.check", f.candidate)).rejects.toThrow("LOGINOM_LOGIN_REJECTED")
+      await expect(host.request("connection.settings.check", f.candidate)).rejects.toThrow("LOGINOM_URL_INVALID")
+      const candidate = { ...f.candidate, url: "http://loginom.example/" }
+      await expect(host.request("connection.settings.check", candidate)).rejects.toThrow("LOGINOM_LOGIN_REJECTED")
       expect(await host.request("connection.status", {})).toMatchObject({ revision: 0, generation: 0 })
     } finally {
       await host.close()
@@ -470,6 +479,115 @@ test("settings reject a bad password through Node IPC without creating an active
     await f.close()
   }
 })
+
+test.each(["LOGINOM_KNOWLEDGE_AUTH_FAILED", "LOGINOM_LOGIN_UNAVAILABLE", "LOGINOM_LOGIN_REJECTED"])(
+  "settings preserve the active connection and redact diagnostics when validation fails with %s",
+  async (error) => {
+    const scenario = await fixture(error)
+    try {
+      const root = join(scenario.root, "service")
+      const store = connectionStore(
+        join(root, "connection"),
+        cliCredentials(process.platform, { root, resources: scenario.resources }),
+      )
+      const original = {
+        generation: 1,
+        revision: 1,
+        url: "https://active.example/app/",
+        username: "analyst",
+        apiKey: "",
+        password: "fixture-stored-password",
+      }
+      await store.stage(original)
+      await store.activate(original.generation)
+      const host = await launchNodeHost({
+        node: process.env.LOGINOM_AI_AGENT_TEST_NODE!,
+        entry: await buildNodeHost(scenario.root),
+        root,
+        resources: scenario.resources,
+        headless: true,
+      })
+      try {
+        const candidate = { ...scenario.candidate, url: "http://loginom.example/", revision: 1 }
+        await expect(host.request("connection.settings.check", candidate)).rejects.toThrow(error)
+        expect(await host.request("connection.status", {})).toMatchObject({
+          revision: 1,
+          generation: 1,
+          url: original.url,
+          username: original.username,
+          hasPassword: true,
+        })
+        expect(await store.read()).toEqual(original)
+        expect(await store.pending()).toBeUndefined()
+        const log = await readFile(join(root, "validation", "startup-failures.jsonl"), "utf8")
+        expect(log).toContain(error)
+        expect(log).toContain("Fixture rejected [redacted]")
+        expect(log).not.toContain(scenario.candidate.password.value)
+        expect(log).not.toContain(diagnosticKey)
+      } finally {
+        await host.close()
+      }
+    } finally {
+      await scenario.close()
+    }
+  },
+  15_000,
+)
+
+test.each([
+  ["keep", { operation: "preserve" }, "fixture-stored-password"],
+  ["replace", { operation: "replace", value: "fixture-new-password" }, "fixture-new-password"],
+  ["passwordless", { operation: "empty" }, ""],
+] satisfies [string, typeof Loginom.PasswordEdit.Type, string][])(
+  "settings use and persist the selected password operation after restart: %s",
+  async (_operation, password, expectedPassword) => {
+    const directory = await mkdtemp(join(tmpdir(), "connection-password-"))
+    const codec = credentials("linux")
+    const store = connectionStore(directory, codec)
+    const original = {
+      generation: 1,
+      revision: 1,
+      url: "https://loginom.example/app/",
+      username: "analyst",
+      apiKey: "",
+      password: "fixture-stored-password",
+    }
+    try {
+      await store.stage(original)
+      await store.activate(original.generation)
+      const service = await connectionService(store, {
+        async check(candidate) {
+          if (candidate.password !== expectedPassword) throw new Error("LOGINOM_LOGIN_REJECTED")
+          return { state: "verified" }
+        },
+        async prepare() {
+          return { async close() {} }
+        },
+      })
+      try {
+        await service.settled()
+        const { revision, url, username } = original
+        const { validationId } = await service.api.check({ revision, url, username, password }, true)
+        expect(await store.read()).toEqual(original)
+        await service.api.save({ revision, validationId }, true)
+        await service.settled()
+        expect(await service.api.status()).toMatchObject({ generation: 2, hasPassword: expectedPassword !== "" })
+      } finally {
+        await service.close()
+      }
+      const reopened = connectionStore(directory, codec)
+      expect(await reopened.read()).toEqual({
+        ...original,
+        generation: 2,
+        revision: 2,
+        urlSource: "explicit",
+        password: expectedPassword,
+      })
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+)
 
 test("settings save waits for the current turn, including first setup, and survives a Host restart", async () => {
   const f = await fixture("")
@@ -487,7 +605,7 @@ test("settings save waits for the current turn, including first setup, and survi
   try {
     const host = await launchNodeHost(options)
     try {
-      const candidate = { ...f.candidate, url: "http://loginom.example" }
+      const candidate = { ...f.candidate, url: "http://loginom.example/" }
       const legacy = readCheck(await host.request("connection.check", candidate))
       await expect(host.request("connection.settings.save", { revision: 0, validationId: legacy.validationId }))
         .rejects.toThrow("LOGINOM_VALIDATION_EXPIRED")
@@ -525,3 +643,230 @@ test("settings save waits for the current turn, including first setup, and survi
     await f.close()
   }
 }, 30_000)
+
+
+test("settings Save acknowledges persistence while activation is still blocked", async () => {
+  const f = await fixture("")
+  const root = join(f.root, "service")
+  const gate = join(f.root, "allow-activation")
+  try {
+    const host = await launchNodeHost({
+      node: process.env.LOGINOM_AI_AGENT_TEST_NODE!,
+      entry: await buildNodeHost(f.root),
+      root,
+      resources: f.resources,
+      headless: true,
+    })
+    try {
+      const candidate = { ...f.candidate, url: "http://loginom.example/" }
+      const { validationId } = Schema.decodeUnknownSync(Loginom.Validation)(
+        await host.request("connection.settings.check", candidate),
+      )
+      // Hold the knowledge startup for the new generation after validation completed.
+      const entry = join(f.resources, "runtime/src/knowledge-entry.mjs")
+      await rm(entry)
+      await writeFile(entry, `
+        import { existsSync } from 'node:fs';
+        process.on('message', message => {
+          if (message.operation === 'start') {
+            const timer = setInterval(() => {
+              if (!existsSync(${JSON.stringify(gate)})) return;
+              clearInterval(timer);
+              process.send({id:message.id,result:{protocol:1,generation:message.input.generation,started:true}});
+            }, 10);
+          }
+          if (message.operation === 'list') process.send({id:message.id,result:{tools:[]}});
+          if (message.operation === 'interrupt') process.send({id:message.id,result:{interrupted:true}});
+          if (message.operation === 'close') process.send({id:message.id,result:{closed:true}},()=>process.disconnect());
+        });
+      `)
+      expect(await host.request("connection.settings.save", { revision: 0, validationId }, 2000))
+        .toMatchObject({ revision: 1, generation: 0, state: "starting" })
+      const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources: f.resources }))
+      expect(await store.pending()).toMatchObject({ revision: 1, url: candidate.url, username: candidate.username })
+    } finally {
+      await writeFile(gate, "")
+      await host.close()
+    }
+  } finally {
+    await f.close()
+  }
+}, 15_000)
+
+test("aborting a settings check stops its browser without closing the node Host", async () => {
+  const f = await fixture("", "shipped", true)
+  try {
+    const host = await launchNodeHost({
+      node: process.env.LOGINOM_AI_AGENT_TEST_NODE!,
+      entry: await buildNodeHost(f.root),
+      root: join(f.root, "service"),
+      resources: f.resources,
+      headless: true,
+    })
+    const started = Promise.withResolvers<void>()
+    const watcher = watch(join(f.marker, ".."), (_, name) => {
+      if (name === "browser-validation") started.resolve()
+    })
+    const controller = new AbortController()
+    const candidate = { ...f.candidate, url: "http://loginom.example/" }
+    const checking = host.request("connection.settings.check", candidate, 30_000, controller.signal)
+    try {
+      await Promise.race([
+        started.promise,
+        checking.then(() => { throw Error("Expected a pending browser check") }),
+      ])
+      const { pid } = JSON.parse(await readFile(f.marker, "utf8"))
+      controller.abort()
+      await expect(checking).rejects.toMatchObject({ name: "AbortError" })
+      const deadline = Date.now() + 5000
+      while (runtimeAlive(pid) && Date.now() < deadline) await Bun.sleep(25)
+      expect(runtimeAlive(pid)).toBe(false)
+      expect(await host.request("connection.status", {})).toMatchObject({ revision: 0, generation: 0 })
+    } finally {
+      controller.abort()
+      watcher.close()
+      await host.close()
+      await checking.catch(() => undefined)
+    }
+  } finally {
+    await f.close()
+  }
+}, 15_000)
+
+function runtimeAlive(pid: number) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+test.skipIf(!hasConnectionFixture)(
+  "CON-02: settings Check signs in and out without contacting the unavailable file service",
+  async () => {
+    const f = await loginomConnectionFixture()
+    try {
+      const host = await launchNodeHost({
+        node: f.node,
+        entry: await buildNodeHost(f.directory),
+        root: f.root,
+        resources: f.resources,
+        headless: true,
+      })
+      try {
+        const before = await host.request("connection.status", {})
+        const denied = await fetch(new URL("/files/first-user", f.url))
+        expect(denied.status).toBe(503)
+        const start = f.requests.length
+        const checked = await host.request("connection.settings.check", {
+          revision: 0,
+          url: f.url,
+          username: "first-user",
+          password: { operation: "replace", value: "fixture-password" },
+        })
+        expect(checked).toMatchObject({ validationId: expect.any(String), browser: { state: "verified" } })
+        expect(await host.request("connection.status", {})).toEqual(before)
+        expect(f.logins.map((login) => login.username)).toEqual(["first-user"])
+        expect(f.requests.slice(start).map(({ method, path }) => [method, path])).toEqual([
+          ["GET", "/app/"],
+          ["POST", "/login"],
+          ["GET", "/live"],
+          ["POST", "/logout"],
+        ])
+      } finally {
+        await host.close()
+      }
+    } finally {
+      await f.close()
+    }
+  },
+  60_000,
+)
+
+test.skipIf(!hasConnectionFixture)(
+  "CON-05: saving a different user closes the old browser and isolates cookie, storage and file root",
+  async () => {
+    const f = await loginomConnectionFixture()
+    try {
+      const host = await createLoginomHost({
+        root: f.root,
+        resources: f.resources,
+        codec: credentials("linux"),
+        headless: true,
+      })
+      try {
+        const chat = "same-chat"
+        const check = (revision: number, username: string) =>
+          host.api.check(
+            {
+              revision,
+              url: f.url,
+              username,
+              password: { operation: "replace", value: "fixture-password" },
+            },
+            true,
+          )
+        const first = await check(0, "first-user")
+        await host.api.save({ revision: 0, validationId: first.validationId }, true)
+        await waitForKnowledge(host)
+        expect(await host.api.status()).toMatchObject({ generation: 1, username: "first-user", folder: "/first-user" })
+        const oldRuntime = await host.runtime(1, chat)
+        const oldSession = f.logins.at(-1)
+        if (!oldSession) throw Error("The first browser did not authenticate")
+        const oldStream = f.sessions.get(oldSession.cookie)
+        expect(oldSession.username).toBe("first-user")
+        if (!oldStream) throw Error("The first authenticated browser session did not start")
+
+        const second = await check(1, "second-user")
+        expect(oldStream.destroyed).toBe(false)
+        const closed = once(oldStream, "close", { signal: AbortSignal.timeout(15_000) })
+        const activation = (async () => {
+          await host.api.save({ revision: 1, validationId: second.validationId }, true)
+          await waitForKnowledge(host)
+        })()
+        const [exit] = await Promise.all([oldRuntime.exited, closed, activation])
+        expect(exit).toEqual({ code: 0, signal: null })
+        expect(await host.api.status()).toMatchObject({
+          generation: 2,
+          username: "second-user",
+          folder: "/second-user",
+        })
+        const afterSave = f.requests.length
+        const newRuntime = await host.runtime(2, chat)
+        expect(f.logins.map((login) => login.username)).toEqual([
+          "first-user",
+          "first-user",
+          "second-user",
+          "second-user",
+        ])
+        const newSession = f.logins.at(-1)
+        if (!newSession) throw Error("The second browser did not authenticate")
+        expect(newSession.cookie).not.toBe(oldSession.cookie)
+        expect(newSession).toMatchObject({ previousLocalOwner: "", previousSessionOwner: "" })
+        expect(f.requests.slice(afterSave)).toEqual([
+          { method: "GET", path: "/app/", cookie: "" },
+          { method: "POST", path: "/login", cookie: "" },
+          { method: "GET", path: "/live", cookie: newSession.cookie },
+        ])
+
+        const files = await host.inputs(2, chat, "fixture-message", [
+          { name: "sample.csv", data: Buffer.from("id\n1\n").toString("base64") },
+        ])
+        expect(await newRuntime.request("admit", { userMessage: "fixture-message", files })).toEqual([
+          expect.objectContaining({
+            upload: expect.objectContaining({
+              directory: "/second-user",
+              destination: expect.stringMatching(/^\/second-user\/[^/]+-sample\.csv$/),
+            }),
+          }),
+        ])
+      } finally {
+        await host.close()
+      }
+    } finally {
+      await f.close()
+    }
+  },
+  60_000,
+)

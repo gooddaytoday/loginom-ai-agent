@@ -6,7 +6,6 @@
 // a tool the registry does not have. So the plugin keeps the tools of the current connection generation in its registry
 // (`registry`), reloads it when the catalog changes, and each session sees only what its own Host run offers
 // (`catalogs`); the access gate (B2.2) still decides by the task's profile.
-import { randomUUID } from "node:crypto"
 import { mkdir, writeFile } from "node:fs/promises"
 import { extname, join, resolve } from "node:path"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
@@ -18,12 +17,12 @@ import { Identifier } from "@opencode/schema/identifier"
 import type { Model } from "@opencode/schema/model"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
-import { Option, Schema } from "effect"
+import { Schema } from "effect"
 import { local, type Profile } from "./access"
 import { exactScanReceipt } from "./file-profile-core"
 import type { ServiceHost } from "./host"
 import { permissionFailure, type localFiles } from "./local-file"
-import { LoginomMetadata } from "./loginom-metadata"
+import { decodeLoginomMetadata, type LoginomMetadataInput } from "./loginom-metadata"
 import { loginomResultState, loginomResultSummary } from "./loginom-result"
 
 type Lease = ServiceHost.Lease
@@ -47,7 +46,6 @@ const Reply = Schema.Struct({
 })
 const decodeCatalog = Schema.decodeUnknownSync(Catalog)
 const decodeReply = Schema.decodeUnknownSync(Reply)
-const decodeMetadata = Schema.decodeUnknownOption(LoginomMetadata)
 
 // The product's own tools that 0.4 offered only beside a prepared Dock: the catalog then describes Dock actions.
 const prepared = ["loginom_file_admit", "loginom_file_profile", "loginom_file_scan", "loginom_file_sample"]
@@ -262,7 +260,7 @@ export async function dockTools(input: {
           if (extname(source.file.name).toLowerCase() !== ".lgp")
             throw Error("local_package_path requires a .lgp file. Путь: " + source.sourcePath)
           delete forwarded.local_package_path
-          if (forwarded.operation_id === undefined) forwarded.operation_id = randomUUID()
+          if (forwarded.operation_id === undefined) forwarded.operation_id = call.id
           return { admissionID: JSON.stringify(["local-file", call.messageID, call.id]), file: source.file }
         })()
       : undefined
@@ -301,7 +299,10 @@ export async function dockTools(input: {
       .catch((error) => {
         throw Error(hostErrorText(error))
       })
-    return dockToolResult(result, lease.generation)
+    return dockToolResult(result, lease.generation, {
+      toolCallId: call.id,
+      host: result._meta?.loginomFields,
+    })
   }
 
   // Inline attachments of the session's user messages reach a Dock call as eager admissions, as 0.4 admitted `data:`
@@ -323,7 +324,11 @@ export async function dockTools(input: {
   }
 }
 
-export async function dockToolResult(result: typeof Reply.Type, generation: Lease["generation"]): Promise<Tool.Result> {
+export async function dockToolResult(
+  result: typeof Reply.Type,
+  generation: Lease["generation"],
+  feed?: LoginomMetadataInput,
+): Promise<Tool.Result> {
   const text = result.content
     .flatMap((block) => (block.type === "text" && typeof block.text === "string" ? [block.text] : []))
     .join("\n\n")
@@ -336,7 +341,7 @@ export async function dockToolResult(result: typeof Reply.Type, generation: Leas
     summary && outputPath
       ? `${summary}\n\nTable data and verbose details were omitted by the backend response limit. The complete original result is retained at ${outputPath}. Do not infer unread data or repeat mutations solely to retrieve omitted text.`
       : text
-  const loginom = Option.getOrUndefined(decodeMetadata(result._meta?.loginom))
+  const loginom = decodeLoginomMetadata(result._meta?.loginom, feed)
   const metadata = { generation, ...(loginom ? { loginom } : {}) }
   if (state === "failed")
     throw new Tool.Error({ message: content || "LOGINOM_TOOL_FAILED", metadata: { ...metadata, isError: true } })

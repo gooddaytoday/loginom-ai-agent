@@ -5,18 +5,25 @@ import { Loginom } from "./loginom"
 export const Status = Loginom.View.mapFields((fields) => ({
   ...Struct.pick(fields, ["revision", "generation", "url", "username", "folder", "hasPassword", "state"]),
   failed: Schema.Boolean,
-  deviceOnly: Schema.Boolean,
 }))
 export const Address = Schema.String.check(
   Schema.makeFilter((value) => {
     if (!URL.canParse(value)) return "Invalid Loginom address"
     const url = new URL(value)
     return (
-      (["http:", "https:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash) ||
-      "Invalid Loginom address"
+      (["http:", "https:"].includes(url.protocol) && url.href === settingsAddress(value)) || "Invalid Loginom address"
     )
   }),
 )
+export function settingsAddress(value: string) {
+  const url = new URL(value)
+  url.username = ""
+  url.password = ""
+  url.search = ""
+  url.hash = ""
+  return url.href
+}
+
 const Candidate = Loginom.Candidate.mapFields((fields) => Struct.omit(fields, ["apiKey"]))
 const Validation = Loginom.Validation.mapFields((fields) => Struct.pick(fields, ["validationId", "expiresAt"]))
 export type Status = typeof Status.Type
@@ -26,9 +33,9 @@ export type Validation = typeof Validation.Type
 export const Issue = Schema.Literals([
   "unavailable",
   "invalidAddress",
-  "deviceAddress",
   "invalidUsername",
   "passwordRequired",
+  "knowledgeAuthFailed",
   "credentialsRejected",
   "loginUnavailable",
   "logoutUnconfirmed",
@@ -49,7 +56,7 @@ const safeInput = {
   })["~standard"],
 }
 
-export const Definition = Rpc.define({
+export const ConnectionSettingsRpc = Rpc.define({
   id: "loginom.connection",
   methods: {
     status: { input: Schema.toStandardSchemaV1(Schema.Struct({})), output: result(Status) },
@@ -59,5 +66,5 @@ export const Definition = Rpc.define({
   events: {},
 })
 
-export type StatusResult = typeof Definition.methods.status.output.Type
-export type CheckResult = typeof Definition.methods.check.output.Type
+export type StatusResult = typeof ConnectionSettingsRpc.methods.status.output.Type
+export type CheckResult = typeof ConnectionSettingsRpc.methods.check.output.Type
