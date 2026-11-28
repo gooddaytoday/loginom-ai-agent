@@ -1004,7 +1004,9 @@ export function SessionCompactionMessage(props: { message: SessionMessageCompact
       }
     >
       <div data-component="session-compaction-message">
-        <CompactionDivider label={i18n.t("ui.messagePart.compaction.started")} />
+        <Show when={props.message.status !== "completed" || !data.hideCompletedCompactionStart}>
+          <CompactionDivider label={i18n.t("ui.messagePart.compaction.started")} />
+        </Show>
         <Show when={summary().trim()}>
           <div data-component="text-part" data-timeline-part-id={props.message.id}>
             <div data-slot="text-part-body">
@@ -1029,7 +1031,7 @@ export function SessionCompactionMessage(props: { message: SessionMessageCompact
         </Show>
         <Show when={props.message.status !== "running"}>
           <div class="py-2">
-            <TimelineSeparator label={label()} />
+            <TimelineSeparator label={label()} wrap />
           </div>
         </Show>
         <Show when={error()}>
@@ -1087,7 +1089,7 @@ function QuietCompaction(props: { id: string; created: number; running: boolean;
           type="button"
           data-slot="session-compaction-divider"
           data-state={props.running ? "running" : "done"}
-          class="flex h-8 w-full items-center gap-3 text-v2-text-text-faint"
+          class="flex min-h-8 w-full items-center gap-3 text-v2-text-text-faint"
           disabled={!expandable()}
           aria-busy={props.running}
           aria-expanded={expandable() ? open() : undefined}
@@ -1100,10 +1102,10 @@ function QuietCompaction(props: { id: string; created: number; running: boolean;
           </span>
           <span
             data-slot="session-compaction-label"
-            class="relative flex shrink-0 whitespace-nowrap text-[13px] font-[440] leading-text-compact tracking-[-0.04px]"
+            class="relative flex min-w-0 text-[13px] font-[440] leading-text-compact tracking-[-0.04px] [overflow-wrap:anywhere]"
           >
             <span>{label().stem}</span>
-            <span data-slot="session-compaction-ending" class="grid justify-items-start">
+            <span data-slot="session-compaction-ending" class="grid min-w-0 justify-items-start">
               <span data-slot="session-compaction-running">{label().ending.running}</span>
               <span data-slot="session-compaction-done">{label().ending.done}</span>
             </span>

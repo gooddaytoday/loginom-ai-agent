@@ -8,6 +8,7 @@ export function TimelineSeparator(props: {
   tooltip?: string
   providerID?: string
   variant?: string
+  wrap?: boolean
 }) {
   const gradient =
     "linear-gradient(90deg, color-mix(in srgb, var(--v2-border-border-base) 0%, transparent) 0%, color-mix(in srgb, var(--v2-border-border-strong) 100%, transparent) 70%)"
@@ -15,8 +16,12 @@ export function TimelineSeparator(props: {
     <bdi
       data-slot="session-timeline-notice-label"
       dir="auto"
-      class="block truncate"
-      classList={{ "shrink-0": !!props.value }}
+      class="block"
+      classList={{
+        truncate: !props.wrap,
+        "text-center [overflow-wrap:anywhere]": !!props.wrap,
+        "shrink-0": !!props.value,
+      }}
       title={props.tooltip ? undefined : props.label}
     >
       {props.label}
@@ -24,7 +29,10 @@ export function TimelineSeparator(props: {
   )
 
   return (
-    <div class="flex h-8 w-full items-center gap-3 text-v2-text-text-faint">
+    <div
+      class="flex w-full items-center gap-3 text-v2-text-text-faint"
+      classList={{ "h-8": !props.wrap, "min-h-8": !!props.wrap }}
+    >
       <span class="h-px min-w-0 flex-1" style={{ "background-image": gradient }} />
       <span class="flex min-w-0 items-center gap-1 text-[13px] font-[440] leading-text-compact tracking-[-0.04px]">
         <Show when={props.providerID}>

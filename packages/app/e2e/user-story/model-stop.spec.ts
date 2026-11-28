@@ -8,6 +8,7 @@ test.use({ locale: "ru-RU", timezoneId: "UTC", video: "off" })
 const model = { providerID: "opencode", id: "free-test" }
 
 const sessionID = "ses_model_stop"
+const narrowViewport = { width: 390, height: 844 }
 
 function history(
   type: string,
@@ -41,10 +42,7 @@ function history(
   ]
 }
 
-for (const viewport of [
-  { width: 1440, height: 900 },
-  { width: 390, height: 844 },
-]) {
+for (const viewport of [{ width: 1440, height: 900 }, narrowViewport]) {
   test(`continues after the free limit at ${viewport.width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport)
     const now = new Date("2026-11-27T02:00:00Z")
@@ -147,24 +145,18 @@ for (const viewport of [
   })
 }
 
-for (const [type, reason, same, details] of [
+for (const [type, reason, same] of [
   ["provider.quota", "закончились средства", false],
   ["provider.auth", "ключ не подошёл", false],
   ["provider.no-route", "модель недоступна", true],
   ["provider.invalid-request", "запрос отклонён", true],
-  [
-    "provider.invalid-request",
-    "Разговор не помещается в модель",
-    true,
-    { status: 400, response: { body: '{"error":{"code":"context_length_exceeded"}}' } },
-  ],
 ] as const) {
   test(`shows the recovery options for ${type}: ${reason}`, async ({ page }) => {
     await openSession(page, {
       name: "Сбой модели",
       sessions: [{ id: sessionID, title: "Обработка таблицы", model, outcome: "failed" }],
       provider: provider({ id: model.id, name: "Тестовая модель" }),
-      pageMessages: () => ({ items: history(type, Date.now(), details) }),
+      pageMessages: () => ({ items: history(type, Date.now()) }),
     })
     const stop = page.locator('[data-component="model-stop"]')
     await expect(stop).toContainText(`Ход остановлен: ${reason}`)
@@ -174,28 +166,83 @@ for (const [type, reason, same, details] of [
   })
 }
 
-test("shows a completed compaction in the timeline", async ({ page }) => {
-  const messages: SessionMessageInfo[] = [
-    { type: "user", id: "msg_001", time: { created: Date.now() }, text: "Обработай таблицу" },
-    {
-      type: "compaction",
-      id: "msg_002",
-      time: { created: Date.now() },
-      status: "completed",
-      reason: "auto",
-      summary: "Таблица прочитана.",
-    },
-  ]
-
-  await openSession(page, {
-    name: "Сжатие",
-    sessions: [{ id: sessionID, title: "Обработка таблицы", model }],
-    pageMessages: () => ({ items: messages }),
+test("offers another model when the context overflows at 390px", async ({ page }, testInfo) => {
+  await page.setViewportSize(narrowViewport)
+  const messages = history("provider.invalid-request", Date.now(), {
+    status: 400,
+    message: "Please reduce the length of the messages",
   })
-  await expect(
-    page.getByText("Сжал начало разговора — дальше агент помнит его кратко", { exact: true }).first(),
-  ).toBeVisible()
+  await openSession(page, {
+    name: "Длинный разговор",
+    sessions: [{ id: sessionID, title: "Обработка таблицы", model, outcome: "failed" }],
+    provider: provider({ id: model.id, name: "Тестовая модель" }, { id: "large-test", name: "Модель с большим окном" }),
+    pageMessages: (_id, limit, _before, type) => ({
+      items: messages.filter((message) => !type || message.type === type).slice(-limit),
+    }),
+  })
+
+  const stop = page.locator('[data-component="model-stop"]')
+  const warning = "Разговор не помещается в модель — начните новый разговор или выберите модель с большим окном"
+  await expect(stop.getByRole("status")).toContainText(warning)
+  await expect(stop.getByRole("button", { name: "Продолжить с этой же" })).toHaveCount(0)
+  await expect(stop.getByRole("button", { name: "Скопировать текст ошибки" })).toBeVisible()
+  await stop.getByText("Продолжить с другой моделью", { exact: true }).click()
+  await expect(stop.getByRole("button", { name: "Модель с большим окном" })).toBeVisible()
+  await expect(stop.getByRole("button", { name: "Тестовая модель" })).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath("context-overflow-390.png") })
 })
+
+for (const backgroundCompaction of [false, true]) {
+  test(`shows the full ${backgroundCompaction ? "background" : "regular"} compaction notice at 390px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(narrowViewport)
+    const messages: SessionMessageInfo[] = [
+      { type: "user", id: "msg_001", time: { created: Date.now() }, text: "Обработай таблицу" },
+      {
+        type: "compaction",
+        id: "msg_002",
+        time: { created: Date.now() - 5000 },
+        status: "completed",
+        reason: "auto",
+        summary: "Таблица прочитана.",
+      },
+    ]
+
+    await openSession(page, {
+      name: "Сжатие",
+      sessions: [{ id: sessionID, title: "Обработка таблицы", model }],
+      configEntries: [{ type: "document", info: { experimental: { background_compaction: backgroundCompaction } } }],
+      seed: { settings: { general: { newTimeline: backgroundCompaction } } },
+      pageMessages: () => ({ items: messages }),
+    })
+
+    const compaction = page.locator('[data-component="session-compaction-message"]')
+    const text = "Сжал начало разговора — дальше агент помнит его кратко"
+    if (backgroundCompaction) await compaction.getByRole("button", { name: text }).click()
+    const notice = compaction.getByText(text, { exact: true })
+    await expect(compaction.getByText("Таблица прочитана.", { exact: true })).toBeVisible()
+    await expect(compaction.getByText("Начата компактизация сессии", { exact: true })).toHaveCount(0)
+    await expect(notice).toHaveCount(1)
+    await expect(notice).toBeInViewport({ ratio: 1 })
+    await expect
+      .poll(() =>
+        notice.evaluate((element) => {
+          const box = element.getBoundingClientRect()
+          const textRange = document.createRange()
+          textRange.selectNodeContents(element)
+          return Array.from(textRange.getClientRects()).every(
+            (line) => line.left >= box.left - 1 && line.right <= box.right + 1,
+          )
+        }),
+      )
+      .toBe(true)
+    await page.screenshot({
+      animations: "disabled",
+      path: testInfo.outputPath(`compaction-${backgroundCompaction ? "background" : "regular"}-390.png`),
+    })
+  })
+}
 
 for (const tabLayout of ["horizontal", "vertical"]) {
   test(`marks a model stop without opening its history in ${tabLayout} layout`, async ({ page }) => {

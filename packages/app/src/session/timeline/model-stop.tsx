@@ -1,6 +1,11 @@
 import { Option, Schema } from "effect"
 import { For, Show, createSignal } from "solid-js"
-import type { ModelRef, SessionMessageAssistant, SessionMessageInfo, SessionMessageUser } from "@opencode/client/promise"
+import type {
+  ModelRef,
+  SessionMessageAssistant,
+  SessionMessageInfo,
+  SessionMessageUser,
+} from "@opencode/client/promise"
 import { useLanguage } from "@/runtime/i18n/language"
 import { Button } from "@opencode/ui/button"
 import { TextShimmer } from "@opencode/ui/text-shimmer"
@@ -27,14 +32,65 @@ const stopReasons = {
 
 type StopReason = (typeof stopReasons)[keyof typeof stopReasons] | "session.modelStop.overflow"
 
+// Keep the text matcher in sync with isContextOverflow in packages/ai/src/provider-error.ts.
+const contextOverflowPatterns = [
+  /prompt is too long/i,
+  /input is too long for (?:the )?(?:requested|selected) model/i,
+  /too large for the model'?s configured input limit/i,
+  /exceeded this model context window limit/i,
+  /exceeds the context window/i,
+  /exceeds (?:the )?(?:model'?s )?maximum context length(?: of [\d,]+ tokens?|\s*\([\d,]+\))/i,
+  /input token count.*exceeds the maximum/i,
+  /number of input tokens exceeds maximum length/i,
+  /tokens in request more than max tokens allowed/i,
+  /maximum prompt length is \d+/i,
+  /reduce the length of the messages/i,
+  /requested input length \d+ exceeds maximum input length/i,
+  /maximum context length is \d+ tokens/i,
+  /exceeds (?:the )?maximum allowed input length of [\d,]+ tokens?/i,
+  /input(?: \(\d+ tokens\))? is longer than the model'?s context length/i,
+  /exceeds the limit of \d+/i,
+  /exceeds the available context size/i,
+  /greater than the context length/i,
+  /`inputs` tokens \+ `max_new_tokens` must be <= \d+/i,
+  /context window exceeds limit/i,
+  /context window exceeded/i,
+  /exceeded model token limit/i,
+  /context[_ ]length[_ ]exceeded/i,
+  /context length is only \d+ tokens/i,
+  /input length.*exceeds.*context length/i,
+  /prompt (?:too long|exceeds max length|超长)/i,
+  /too large for model with \d+ maximum context length/i,
+  /prompt has [\d,]+ tokens?, but the configured context size is [\d,]+ tokens?/i,
+  /model_context_window_exceeded/i,
+  /range of input length should be/i,
+  /too many tokens/i,
+  /token limit exceeded/i,
+  /request_too_large/i,
+]
+
+const contextOverflowExclusions = [
+  /^(throttling error|service unavailable):/i,
+  /rate limit/i,
+  /too many requests/i,
+  /max[_ ]tokens must be less than/i,
+  /too many tokens(?: per day)?, please wait/i,
+]
+
 export function stopReason(error: SessionMessageAssistant["error"]): StopReason | undefined {
-  if (error?.type === "provider.invalid-request") {
-    const text = [error.message, error.response?.body].join("\n")
+  if (
+    error?.type === "provider.invalid-request" &&
+    (error.status === undefined || (error.status >= 400 && error.status < 500))
+  ) {
+    const text = [error.message, error.response?.body].filter(Boolean).join("\n")
 
     if (
       /\b(?:context_length_exceeded|model_context_window_exceeded|request_too_large)\b/i.test(text) ||
       (error.status !== 429 &&
-        /prompt (?:is )?too long|exceeds? (?:the )?(?:model'?s )?(?:maximum context length|context window)|context window exceeded|exceeded (?:this model )?context window|configured context size|input length.*exceeds.*context length/i.test(text))
+        !/\bthrottlingexception\b/i.test(text) &&
+        !contextOverflowExclusions.some((pattern) => pattern.test(text)) &&
+        (contextOverflowPatterns.some((pattern) => pattern.test(text)) ||
+          /^4(?:00|13)\s*(status code)?\s*\(no body\)/i.test(text)))
     )
       return "session.modelStop.overflow"
   }
@@ -92,10 +148,7 @@ export function ModelStop(props: {
   const reason = () => language.t(props.reason)
 
   const same = () =>
-    props.model &&
-    (props.reason === "session.modelStop.noRoute" ||
-      props.reason === "session.modelStop.invalid" ||
-      props.reason === "session.modelStop.overflow")
+    props.reason === "session.modelStop.noRoute" || props.reason === "session.modelStop.invalid"
       ? props.model
       : undefined
 

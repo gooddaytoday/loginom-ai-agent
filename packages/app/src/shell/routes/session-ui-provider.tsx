@@ -271,6 +271,7 @@ export function SessionUIProvider(
         onNavigateToSession={navigateToSession}
         onSessionHref={href}
         backgroundCompaction={backgroundCompaction()}
+        hideCompletedCompactionStart
       >
         <MarkdownProvider
           readImage={readImage()}

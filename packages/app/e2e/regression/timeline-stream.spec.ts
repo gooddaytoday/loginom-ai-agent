@@ -1508,6 +1508,7 @@ test.describe("background work", () => {
 
 test.describe("compaction", () => {
   test("renders compaction progress, summary, and outcome in order", async ({ page }) => {
+    await page.setViewportSize({ width: 480, height: 900 })
     const timeline = await setupTimeline(page, {
       settings: { timelineDetail: { ...detailed, notices: { placement: "separate" } } },
       sessionMessages: [user, completed],
@@ -1523,7 +1524,6 @@ test.describe("compaction", () => {
     await expect(page.getByRole("button", { name: "Stop", exact: true })).toBeVisible()
     await expect(page.locator('[data-component="session-working"]')).toHaveCount(0)
 
-    await page.setViewportSize({ width: 480, height: 900 })
     await expect(compaction.getByText("Session compaction started", { exact: true })).toBeInViewport()
 
     await timeline.send(compactionDelta({ sessionID, text: "## Checkpoint\n\nStreamed implementation details." }))
@@ -1551,7 +1551,7 @@ test.describe("compaction", () => {
     )
     await expect(compaction).toContainText("Final implementation details.")
     await expect(compaction).not.toContainText("Streamed implementation details.")
-    await expect(compaction.getByText("Session compaction started", { exact: true })).toBeVisible()
+    await expect(compaction.getByText("Session compaction started", { exact: true })).toHaveCount(0)
     await expect(compaction.getByText("Session compacted", { exact: true })).toBeVisible()
     await expect
       .poll(async () => {

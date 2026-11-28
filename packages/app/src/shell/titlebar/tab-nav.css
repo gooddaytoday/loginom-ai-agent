@@ -84,8 +84,7 @@
 
 @media (hover: hover) {
   [data-titlebar-tab]:not(:where([data-slot="mobile-tabs-drawer"] *)):is(:hover, :has(:focus-visible))
-    [data-slot="tab-close"]:has(> button)
-    [data-slot="tab-status"] {
+    [data-slot="tab-close"]:has(> button) [data-slot="tab-status"] {
     opacity: 0;
   }
 }
@@ -517,9 +516,7 @@
   filter: none;
 }
 
-[data-shortcut-hints]
-  [data-titlebar-tab]
-  [data-slot="project-avatar-initial"]:has(~ [data-slot="project-avatar-label"]),
+[data-shortcut-hints] [data-titlebar-tab] [data-slot="project-avatar-initial"]:has(~ [data-slot="project-avatar-label"]),
 [data-shortcut-hints] [data-titlebar-tab] [data-slot="tab-icon-face"]:has(~ [data-slot="tab-shortcut-face"]) {
   opacity: 0;
   transform: translateY(-6px);
