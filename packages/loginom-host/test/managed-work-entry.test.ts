@@ -160,14 +160,14 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     await Bun.write(target, contents)
   }
   await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false }))
-  const start = (generation: number) => supervise({
+  const start = (generation: number, url = "http://example.test") => supervise({
     node,
     entry: join(src, "managed-entry.mjs"),
     resources: directory,
     stateDir: join(directory, "state"),
     generation,
     chat: "chat",
-    connection: { url: "http://example.test", username: "user", apiKey: "fixture", password: "" },
+    connection: { url, username: "user", apiKey: "fixture", password: "" },
     environment: {},
   })
   const runtime = await start(1)
@@ -210,7 +210,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
   } finally {
     await runtime.close()
     expect(await runtime.exited).toEqual({ code: 0, signal: null })
-    const updated = await start(2)
+    const updated = await start(2, "http://example.test/?testable=true")
     try {
       expect(await updated.request("packageCopy", { action: "save-version" })).toEqual({
         output: { path: "/user/Plan.lgp", backupPath: "/user/Plan — до правки.lgp" },

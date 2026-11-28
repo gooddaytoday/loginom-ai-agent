@@ -220,7 +220,7 @@ async function handle(message) {
       state.owner.origin = address.origin
       state.owner.pathname = address.pathname
       state.owner.account = input.connection.username
-      const copyScope = createHash("sha256").update(JSON.stringify([loginomUrl, state.owner.account])).digest("hex")
+      const copyScope = createHash("sha256").update(JSON.stringify([address.origin, address.pathname, state.owner.account])).digest("hex")
       const config = {
         resources: input.resources,
         // Preparation must bind to the same canonical path used by private login.
