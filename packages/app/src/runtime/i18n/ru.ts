@@ -112,6 +112,7 @@ export const dict = {
   "command.palette": "Палитра команд",
   "sidebar.search": "Поиск",
   "sidebar.search.placeholder": "Название, проект или слова из запроса",
+  "sidebar.search.promptUnavailable": "Поиск по тексту запросов сейчас недоступен.",
   "sidebar.search.conversations": "Разговоры",
   "sidebar.search.recent": "Недавние разговоры",
 

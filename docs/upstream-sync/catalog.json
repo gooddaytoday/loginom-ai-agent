@@ -3,7 +3,7 @@
   "against": "a6b15d33daf6ab7d35569f6d711fdb630b9f04e7",
   "entries": [
     {
-      "id": "CAT-15",
+      "id": "CAT-28",
       "title": "Tool decision forms and timeline groups (C3 B6)",
       "paths": [
         "packages/core/src/plugin/host.ts",
@@ -115,9 +115,11 @@
     {
       "id": "CAT-13",
       "title": "Product storage root and own background service (U5)",
+      "note": "C5.4: Desktop initialization starts the fork's proxy detection; background-service.ts consumes its environment at spawn.",
       "paths": [
         "packages/util/src/global.ts", "packages/client/src/service-probe.ts", "packages/cli/src/services/service-config.ts",
         "packages/desktop/src/main/service/sidecar-probe.ts", "packages/desktop/src/main/service/background-service.ts",
+        "packages/desktop/src/main/lifecycle/desktop-initialization.ts",
         "packages/desktop/src/main/native/logging.ts", "packages/core/src/config/discovery.ts",
         "packages/process-daemon/src/daemon.rs", "packages/process-daemon/src/daemon/unix.rs", "packages/process-daemon/src/client.rs",
         "packages/server/src/process.ts", "packages/client/src/service-timing.ts", "packages/client/src/promise/service.ts",
@@ -187,14 +189,25 @@
       "title": "Built-in plugin page navigation for dashboard links",
       "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
     },
-    { "id": "CAT-10", "title": "Web app, UI kit, session UI and Loginom localization", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
+    {
+      "id": "CAT-10",
+      "title": "Web app, UI kit, session UI and Loginom localization",
+      "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"],
+      "notes": {
+        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events."
+      }
+    },
     {
       "id": "CAT-15",
       "title": "Conversation search fields and sidebar shortcut (C1.5)",
       "paths": [
         "packages/schema/src/session.ts", "packages/core/src/session/store.ts", "packages/core/test/session-list.test.ts",
         "packages/protocol/openapi.json", "packages/client/src/effect/api/api.ts", "packages/client/src/effect/generated/client.ts"
-      ]
+      ],
+      "notes": {
+        "packages/app/src/shell/commands/session-search.tsx": "Keeps successful search results when a field fails. The palette displays an inline prompt search status (CAT-10).",
+        "packages/app/e2e/regression/home.spec.ts": "Covers title and project matches during a prompt search failure and clears the status after recovery."
+      }
     },
     {
       "id": "CAT-22",
