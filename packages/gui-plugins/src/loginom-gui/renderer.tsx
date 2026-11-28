@@ -17,6 +17,7 @@ import PermissionPrompt from "./permission-dock"
 import { permissionDescription } from "./permission-model"
 import { LoginomRepeatDock } from "./repeat-dock"
 import { registerStartScreen } from "./start-screen"
+import { registerSystemProxy } from "./system-proxy"
 
 const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
@@ -67,6 +68,8 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
   })
 
   if (!ctx.desktop) return
+
+  registerSystemProxy(ctx)
 
   const Dashboard = lazy(() => import("./dashboard"))
   const router = builtinContext(ctx).router
