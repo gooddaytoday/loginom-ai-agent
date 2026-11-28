@@ -29,7 +29,7 @@ export function start(
     recovery,
     notificationID,
     background: true,
-    run: execution.resume(id).pipe(
+    run: execution.resume(id, { continuation: notificationID !== undefined }).pipe(
       // Only an explicit caller cancel releases the child's claim. A server shutdown
       // interrupts this job but must leave the child resumable on the next start.
       Effect.onInterrupt(() =>
