@@ -51,6 +51,8 @@ export interface ReplyInput {
   readonly notice?: string
 }
 
+const isReplyNotice = Schema.is(Schema.String.check(Schema.isMaxCodePoints(Permission.NoticeMaxLength)))
+
 export interface AskResult {
   readonly id: ID
   readonly effect: Permission.Effect
@@ -129,7 +131,7 @@ interface Pending {
   readonly request: Request
   readonly agent?: Agent.ID
   readonly deferred: Deferred.Deferred<void, DeclinedError | CorrectedError>
-  saving: boolean
+  claimed: boolean
 }
 
 const layer = Layer.effect(
@@ -233,7 +235,7 @@ const layer = Layer.effect(
       Effect.uninterruptible(
         Effect.gen(function* () {
           const deferred = yield* Deferred.make<void, DeclinedError | CorrectedError>()
-          const item: Pending = { request, agent, deferred, saving: false }
+          const item: Pending = { request, agent, deferred, claimed: false }
           if (closed) {
             yield* Deferred.fail(deferred, new DeclinedError())
             return item
@@ -281,7 +283,7 @@ const layer = Layer.effect(
               Effect.catchTag("Permission.DeclinedError", (error) => Effect.die(error)),
               Effect.ensuring(
                 Effect.sync(() => {
-                  pending.delete(item.request.id)
+                  if (pending.get(item.request.id) === item) pending.delete(item.request.id)
                 }),
               ),
             )
@@ -305,6 +307,22 @@ const layer = Layer.effect(
       if (closed) return false
       return (yield* evaluateInput(input)).effect === "allow"
     })
+
+    const prepareReplyNotice = (request: Request, notice: Effect.Effect<string | undefined>) =>
+      Effect.gen(function* () {
+        const description = yield* notice
+        if (description === undefined || isReplyNotice(description)) return description
+        yield* Effect.logWarning(`Permission reply notice exceeds ${Permission.NoticeMaxLength} Unicode code points`, {
+          requestID: request.id,
+        })
+        return undefined
+      }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("Could not prepare permission reply notice", { requestID: request.id, cause }).pipe(
+            Effect.as(undefined),
+          ),
+        ),
+      )
 
     const publishReplyNotice = (request: Request, description?: string) => {
       if (!description) return Effect.void
@@ -331,76 +349,59 @@ const layer = Layer.effect(
       )
     }
 
+    const settle = (item: Pending, reply: Reply, message?: string) =>
+      Effect.gen(function* () {
+        pending.delete(item.request.id)
+        if (reply === "reject")
+          yield* Deferred.fail(item.deferred, message ? new CorrectedError({ feedback: message }) : new DeclinedError())
+        else yield* Deferred.succeed(item.deferred, undefined)
+        yield* bus.publish(Permission.Event.Replied, {
+          sessionID: item.request.sessionID,
+          requestID: item.request.id,
+          reply,
+        })
+      })
+
     const reply = Effect.fn("Permission.reply")((input: ReplyInput, resolveNotice?: Effect.Effect<string | undefined>) =>
       Effect.uninterruptible(
         Effect.gen(function* () {
           const existing = pending.get(input.requestID)
-          if (!existing || existing.saving || closed) return yield* new NotFoundError({ requestID: input.requestID })
+          if (!existing || existing.claimed || closed) return yield* new NotFoundError({ requestID: input.requestID })
+          existing.claimed = true
 
           const resources = input.reply === "always" ? existing.request.save : undefined
           if (resources?.length) {
-            // Keep the prompt available for a retry if writing the approval fails. A competing reply cannot claim it
-            // while the write is running.
-            existing.saving = true
+            // Keep the prompt available for a retry if writing the approval fails.
             yield* saved.add({ projectID: location.project.id, action: existing.request.action, resources }).pipe(
               Effect.onError(() =>
                 Effect.sync(() => {
-                  existing.saving = false
+                  existing.claimed = false
                 }),
               ),
             )
-            if (closed || pending.get(input.requestID) !== existing)
-              return yield* new NotFoundError({ requestID: input.requestID })
           }
-          pending.delete(input.requestID)
-          yield* bus.publish(Permission.Event.Replied, {
-            sessionID: existing.request.sessionID,
-            requestID: existing.request.id,
-            reply: input.reply,
-          })
+          const notice = yield* prepareReplyNotice(existing.request, resolveNotice ?? Effect.succeed(input.notice))
+          // A cancellation after the claim cannot undo an approval already saved.
+          if (closed || pending.get(input.requestID) !== existing) return
+          yield* settle(existing, input.reply, input.message)
 
           if (input.reply === "reject") {
-            yield* Deferred.fail(
-              existing.deferred,
-              input.message ? new CorrectedError({ feedback: input.message }) : new DeclinedError(),
-            )
-            for (const [id, item] of pending) {
-              if (item.request.sessionID !== existing.request.sessionID || item.saving) continue
-              pending.delete(id)
-              yield* bus.publish(Permission.Event.Replied, {
-                sessionID: item.request.sessionID,
-                requestID: item.request.id,
-                reply: "reject",
-              })
+            for (const item of pending.values()) {
+              if (item.request.sessionID !== existing.request.sessionID || item.claimed) continue
               // Feedback applies to the whole batch, so parallel asks don't end the step.
-              yield* Deferred.fail(
-                item.deferred,
-                input.message ? new CorrectedError({ feedback: input.message }) : new DeclinedError(),
-              )
+              yield* settle(item, "reject", input.message)
             }
-            yield* publishReplyNotice(existing.request, resolveNotice ? yield* resolveNotice : input.notice)
-            return
-          }
-
-          yield* Deferred.succeed(existing.deferred, undefined)
-
-          if (resources?.length) {
+          } else if (resources?.length) {
             for (const [id, item] of pending) {
-              if (item.saving) continue
+              if (item.claimed) continue
               const result = yield* evaluateInput({ ...item.request, agent: item.agent }).pipe(
                 Effect.catchTag("Session.NotFoundError", () => Effect.undefined),
               )
-              if (result?.effect !== "allow" || item.saving || pending.get(id) !== item) continue
-              pending.delete(id)
-              yield* bus.publish(Permission.Event.Replied, {
-                sessionID: item.request.sessionID,
-                requestID: item.request.id,
-                reply: "always",
-              })
-              yield* Deferred.succeed(item.deferred, undefined)
+              if (result?.effect !== "allow" || item.claimed || pending.get(id) !== item) continue
+              yield* settle(item, "always")
             }
           }
-          yield* publishReplyNotice(existing.request, resolveNotice ? yield* resolveNotice : input.notice)
+          yield* publishReplyNotice(existing.request, notice)
         }),
       ),
     )

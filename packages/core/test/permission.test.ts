@@ -25,12 +25,8 @@ const current = Layer.succeed(
   Location.Service,
   Location.Service.of(location({ directory: AbsolutePath.make("/project") })),
 )
-const it = testEffect(
-  AppNodeBuilder.build(
-    LayerNode.group([Database.node, Bus.node, SessionStore.node, PermissionSaved.node, Agent.node, Permission.node]),
-    [Location.node.replace(current)],
-  ),
-)
+const nodes = LayerNode.group([Database.node, Bus.node, SessionStore.node, PermissionSaved.node, Agent.node, Permission.node])
+const it = testEffect(AppNodeBuilder.build(nodes, [Location.node.replace(current)]))
 
 function setup(rules: Permission.Ruleset = [], sessionID = Session.ID.make("ses_test")) {
   return Effect.gen(function* () {
@@ -393,6 +389,86 @@ describe("Permission", () => {
               ),
             ).toBe(true)
         }
+      }),
+    )
+  }
+
+  for (const length of [2000, 2001]) {
+    it.effect(`waits for the claimed reply to prepare a ${length}-character receipt before resuming the tool`, () =>
+      Effect.gen(function* () {
+        yield* setup()
+        const bus = yield* Bus.Service
+        const notices: string[] = []
+        yield* bus.project(SessionEvent.PermissionReplied, ({ data }) =>
+          Effect.sync(() => {
+            notices.push(data.description)
+          }),
+        )
+        const { service, fiber, request } = yield* waitForRequest()
+        const preparing = yield* Deferred.make<void>()
+        const release = yield* Deferred.make<void>()
+        const text = "📝".repeat(length)
+        const reply = yield* service
+          .reply(
+            { requestID: request.id, reply: "once", notice: "unused static receipt" },
+            Deferred.succeed(preparing, undefined).pipe(Effect.andThen(Deferred.await(release)), Effect.as(text)),
+          )
+          .pipe(Effect.forkScoped)
+
+        try {
+          yield* Deferred.await(preparing)
+          const competing = yield* service.reply({ requestID: request.id, reply: "reject" }).pipe(Effect.flip)
+          expect(competing).toBeInstanceOf(Permission.NotFoundError)
+          expect(fiber.pollUnsafe()).toBeUndefined()
+          expect(notices).toEqual([])
+        } finally {
+          yield* Deferred.succeed(release, undefined)
+        }
+
+        yield* Fiber.join(fiber)
+        yield* Fiber.join(reply)
+        expect(yield* service.list()).toEqual([])
+        expect(notices).toEqual(length === 2000 ? [text] : [])
+      }),
+    )
+  }
+
+  {
+    const writing = Deferred.makeUnsafe<void>()
+    const release = Deferred.makeUnsafe<void>()
+    const gatedSave = PermissionSaved.node.replace(
+      PermissionSaved.node.mapLayer((base) =>
+        Layer.effect(
+          PermissionSaved.Service,
+          Effect.map(PermissionSaved.Service, (saved) => ({
+            ...saved,
+            add: (input) =>
+              Deferred.succeed(writing, undefined).pipe(
+                Effect.andThen(Deferred.await(release)),
+                Effect.andThen(saved.add(input)),
+              ),
+          })),
+        ).pipe(Layer.provide(base)),
+      ),
+    )
+    const withGatedSave = testEffect(AppNodeBuilder.build(nodes, [Location.node.replace(current), gatedSave]))
+
+    withGatedSave.effect("accepts a saved project approval when the tool is cancelled during the write", () =>
+      Effect.gen(function* () {
+        yield* setup()
+        const { service, fiber, request } = yield* waitForRequest({ save: ["src/*"] })
+        const reply = yield* service.reply({ requestID: request.id, reply: "always" }).pipe(Effect.forkScoped)
+
+        try {
+          yield* Deferred.await(writing)
+          yield* Fiber.interrupt(fiber)
+          expect(yield* service.get(request.id)).toBeUndefined()
+        } finally {
+          yield* Deferred.succeed(release, undefined)
+        }
+
+        yield* Fiber.join(reply)
+        expect(yield* service.ask(assertion({ resources: ["src/next.ts"] }))).toMatchObject({ effect: "allow" })
       }),
     )
   }

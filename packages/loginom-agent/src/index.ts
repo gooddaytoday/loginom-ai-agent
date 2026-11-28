@@ -577,9 +577,9 @@ export default Plugin.define({
           },
         )
         if (!saved) return { kind: entry.kind, saved: false }
-        // Answer the session's other open requests now covered by the grant.
-        const open = await ctx.permission.list({ sessionID: input.sessionID })
-        await Promise.all(
+        // Other covered requests may already have been answered or cancelled.
+        const open = await ctx.permission.list({ sessionID: input.sessionID }).catch(() => [])
+        await Promise.allSettled(
           open
             .filter((item) => {
               const other = classify(item.action, item.resources)

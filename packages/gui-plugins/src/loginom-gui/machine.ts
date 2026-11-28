@@ -42,6 +42,7 @@ type Effect =
 type Transition = { state: State; effects: Effect[] }
 
 const applicationWait = 15_000
+
 const applicationPollDelay = 1_000
 
 export const initial: State = { type: "unavailable", attempt: 0 }
@@ -187,8 +188,10 @@ export function transition(state: State, event: Event): Transition {
         if (state.type === "saving" && event.result.issue === "saveFailed") return refresh(state, attempt, "saveFailed")
 
         if (state.type === "loading") return { state: { type: "unavailable", attempt }, effects: [] }
+
         if (state.type === "applying")
           return pollApplication({ ...state, attempt }, event.now, event.result.issue)
+
         if ("draft" in state)
           return failed(state, state.type === "refreshing" ? (state.issue ?? event.result.issue) : event.result.issue)
 
@@ -214,6 +217,7 @@ export function transition(state: State, event: Event): Transition {
           state.type === "applying" && !waitingTasks(state.status) && !waitingTasks(status)
             ? state.until
             : event.now + applicationWait
+
         return pollApplication({ type: "applying", attempt, status, draft: pendingDraft, until, edited }, event.now)
       }
 
@@ -227,7 +231,9 @@ export function transition(state: State, event: Event): Transition {
 function pollApplication(state: Extract<State, { type: "applying" }>, now: number, issue?: Issue): Transition {
   const { attempt, status, draft, until } = state
   const timeout = until - now - applicationPollDelay
+
   if (timeout <= 0) return { state: { type: "editing", attempt, status, draft, issue }, effects: [] }
+
   return { state, effects: [{ type: "status", attempt, delay: applicationPollDelay, timeout }] }
 }
 
@@ -255,6 +261,7 @@ function message(state: State) {
   if (state.type === "loading" || state.type === "refreshing") return "loading"
 
   if (state.type === "unavailable") return "serviceUnavailable"
+
   if (state.type === "verified") return "verified"
 
   if (!("status" in state)) return

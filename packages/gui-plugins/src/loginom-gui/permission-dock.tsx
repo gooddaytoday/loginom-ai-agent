@@ -20,6 +20,7 @@ const decodeInput = Schema.decodeUnknownOption(Schema.Record(Schema.String, Sche
 const isString = Schema.is(Schema.String)
 
 const isNotice = Schema.is(Schema.String.check(Schema.isMaxCodePoints(Permission.NoticeMaxLength)))
+
 const isUnsavedGrant = Schema.is(Schema.Struct({ saved: Schema.Literal(false) }))
 
 const traces = { once: "traceOnce", reject: "traceDeny", conversation: "traceConversation" } as const

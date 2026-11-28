@@ -81,7 +81,7 @@
         "packages/client/src/effect/api/api.ts", "packages/client/src/effect/generated/client.ts",
         "packages/client/src/promise/generated/client.ts", "packages/client/src/promise/generated/types.ts",
         "packages/plugin/src/effect/permission.ts", "packages/plugin/src/promise/permission.ts",
-        "packages/plugin/src/promise/adapter.ts"
+        "packages/plugin/src/promise/adapter.ts", "packages/plugin/README.md"
       ]
     },
     {

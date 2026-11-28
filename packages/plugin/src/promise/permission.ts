@@ -27,7 +27,7 @@ export type PermissionDomain = Pick<PermissionApi, "list" | "get"> & {
   readonly reply: (
     input: Parameters<Reply>[0],
     options?: Parameters<Reply>[1] & {
-      /** Resolves the history notice after the reply has been accepted. Overrides `input.notice`. */
+      /** Resolves the history notice after the reply is claimed and before the tool resumes. Overrides `input.notice`. */
       readonly resolveNotice?: () => Promise<string | undefined>
     },
   ) => ReturnType<Reply>
