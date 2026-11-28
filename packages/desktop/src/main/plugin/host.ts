@@ -1,5 +1,4 @@
 import { app, BrowserWindow } from "electron"
-import { builtins } from "@opencode/gui-plugins/main"
 import {
   pluginIdAvailable,
   runsOn,
@@ -184,6 +183,7 @@ const os = Match.value(process.platform).pipe(
  * reach its Ipcs over the bridge and main scopes state and events by `caller.window`.
  */
 export function createHost(input: {
+  readonly builtins: readonly Entry[]
   readonly db: Database
   readonly state: StateStore
   readonly cli: () => Promise<Cli>
@@ -203,7 +203,7 @@ export function createHost(input: {
     data: Data,
   ) => void
 }) {
-  const definitions: readonly Entry[] = builtins
+  const definitions = input.builtins
   const local = definitions.filter((definition) => runsOn(definition, os))
 
   const manager = createManager(

@@ -1,5 +1,5 @@
 import { createMemo, createSignal, onCleanup, runWithOwner, untrack } from "solid-js"
-import type { FormInfo } from "@opencode/client/promise"
+import type { FormAnswer, FormInfo } from "@opencode/client/promise"
 import type { ServerSDK } from "@/runtime/server/client"
 import { ScopedKey } from "@/runtime/server/scope"
 import { showToast } from "@/shell/notifications/toast"
@@ -117,11 +117,14 @@ export function createQuestionDock(input: {
     input: (text: string) => dispatch({ type: "custom.input", text, multiple: questions()[tab()]?.multiple === true }),
     selectCustom: () => dispatch({ type: "custom.select", multiple: questions()[tab()]?.multiple === true }),
     deselectCustom: () => dispatch({ type: "custom.deselect" }),
-    reply() {
+    reply(answer?: FormAnswer) {
       const current = untrack(dockState)
 
       if (current.status !== "answering") return
-      dispatch({ type: "send", action: { type: "reply", answer: buildFormAnswer(questions(), current.drafts) } })
+      dispatch({
+        type: "send",
+        action: { type: "reply", answer: answer ?? buildFormAnswer(questions(), current.drafts) },
+      })
     },
     dismiss: () => dispatch({ type: "send", action: { type: "dismiss" } }),
   }
