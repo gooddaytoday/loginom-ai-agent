@@ -169,7 +169,9 @@ export const packageFolders = {
   },
   async read(input: ReadFolder, signal: AbortSignal) {
     signal.throwIfAborted()
-    return decodeFolderListings(await request("packages.list", input, undefined, signal), input)
+    const reply = await request("packages.list", input, undefined, signal)
+    signal.throwIfAborted()
+    return decodeFolderListings(reply, input)
   },
 }
 

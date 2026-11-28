@@ -47,6 +47,7 @@ export function decodeFolderListings(value: unknown, { folder, query }: ReadFold
 }
 
 export function packageConnectionError({ state, failure }: { state?: string; failure?: string }) {
+  if (state === "ready") return
   if (failure === "LOGINOM_RUNTIME_START_FAILED" || failure === "LOGINOM_STORE_READ_FAILED") return failure
   if (state === "unconfigured") return "LOGINOM_CONFIG_REQUIRED"
   if (state === "recoverable-error") return "LOGINOM_RECOVERY_REQUIRED"

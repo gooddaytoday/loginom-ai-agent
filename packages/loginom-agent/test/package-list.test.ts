@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { packageListHandlers } from "../src/package-list"
-import type { FolderListing, ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
+import { type FolderListing, packageConnectionError, type ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
 
 const folder = (name: string, path: string): FolderListing["entries"][number] => ({ kind: "folder", name, path })
 const pkg = (name: string, path: string) => ({
@@ -42,8 +42,13 @@ function fixture() {
       { folder: "/user/two", slow: false, entries: [pkg("Годовые продажи.lgp", "/user/two/Годовые продажи.lgp")] },
     ],
   ])
+  const view: { state: string; failure?: string } = { state: "ready" }
   const host = {
-    generation: async () => 11,
+    async generation() {
+      const reason = packageConnectionError(view)
+      if (reason) throw Error(reason)
+      return 11
+    },
     async read(input: ReadFolder, signal: AbortSignal) {
       signal.throwIfAborted()
       requests.push(input)
@@ -55,7 +60,7 @@ function fixture() {
       return { listings, truncated: false }
     },
   }
-  return { rpc: packageListHandlers(host), host, table, requests }
+  return { rpc: packageListHandlers(host), host, table, requests, view }
 }
 
 test("list reads only the requested folder", async () => {
@@ -137,21 +142,32 @@ test("a session limit produces the approved client message", async () => {
   })
 })
 
-for (const [code, type] of [
-  ["LOGINOM_CONFIG_REQUIRED", "not_connected"],
-  ["LOGINOM_RECOVERY_REQUIRED", "recovering"],
-  ["LOGINOM_CONNECTION_NOT_READY", "connecting"],
-  ["LOGINOM_RUNTIME_START_FAILED", "connection_failed"],
-  ["LOGINOM_STORE_READ_FAILED", "connection_failed"],
+for (const { state, failure, type } of [
+  { state: "unconfigured", type: "not_connected" },
+  { state: "recoverable-error", type: "recovering" },
+  { state: "starting", type: "connecting" },
+  { state: "pending", type: "connecting" },
+  { state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED", type: "connection_failed" },
+  { state: "recoverable-error", failure: "LOGINOM_STORE_READ_FAILED", type: "connection_failed" },
 ]) {
-  test(`list and search expose ${type} separately`, async () => {
+  test(`list and search expose ${state} ${failure ?? ""} as ${type}`, async () => {
     const f = fixture()
-    f.host.generation = async () => { throw Error(code) }
+    f.view.state = state
+    f.view.failure = failure
     await expect(f.rpc.list({ folder: "/user" }, call())).rejects.toMatchObject({ type })
     await expect(f.rpc.search({ folder: "/user", text: "", recursive: true }, call())).rejects.toMatchObject({ type })
     expect(f.requests).toEqual([])
   })
 }
+
+test("a failed settings change leaves the ready connection usable for the picker", async () => {
+  const f = fixture()
+  f.view.failure = "LOGINOM_RUNTIME_START_FAILED"
+  const listing = f.table.get("/user")
+  if (!listing) throw Error("Expected fixture folder")
+  expect(await f.rpc.list({ folder: "/user" }, call())).toEqual(listing)
+  expect(f.requests).toHaveLength(1)
+})
 
 test("a cursor expires when the connection generation changes", async () => {
   const f = fixture()
