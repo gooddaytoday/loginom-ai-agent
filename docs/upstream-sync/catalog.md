@@ -150,6 +150,8 @@
 
 - **C4.4.** `app/src/runtime/plugin/host-apis.tsx` и `plugin/src/gui/builtin.ts`: внутренний `router.openPage` открывает страницу самого плагина; публичный SDK не меняется. Продуктовая страница и предпросмотр — в `gui-plugins/src/loginom-gui/`, доставка — CAT-09. `app/component-tests/plugin-host.{fixture.tsx,spec.ts}` проверяют ссылку Studio, привязку ошибки к ссылке и черновик чата. Политика `merge` для шва, `fork-owned` для экрана.
 
+- **C3.18.** Здесь также учитывается ограниченный встроенными плагинами `builtinContext(ctx).timeline` в `app/src/runtime/plugin/host-apis.tsx`. Остальные швы ленты входят в CAT-14.
+
 ## CAT-10 Веб-приложение, UI-кит, UI сессии
 
 - **Вход OpenCode Console из Desktop (C5.6, В-97 п. 1).** `packages/app/src/providers/connect/controller.ts` передаёт браузеру адрес устройства от сервера без подмены `client_id` и добавления `return_window`. Вход завершается опросом сервера, без ссылки возврата. При обновлении не возвращать переписывание адреса для Desktop; сценарий проверяют `packages/app/e2e/regression/settings.spec.ts` и Desktop-фикстура `packages/app/e2e/utils/settings-wsl.fixture.tsx`. Регистрация только `loginom-ai-agent://` не менялась; в `packages/desktop/README.md` (CAT-09) указана фактическая схема.

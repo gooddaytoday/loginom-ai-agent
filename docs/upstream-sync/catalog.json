@@ -106,7 +106,6 @@
         "packages/session-ui/src/tools/tool-renderer.tsx",
         "packages/ui/src/i18n/en.ts",
         "packages/app/src/session/screen.tsx",
-        "packages/app/src/runtime/plugin/host-apis.tsx",
         "packages/app/src/session/timeline/tool-renderers.tsx",
         "packages/app/component-tests/tool-renderer.fixture.tsx",
         "packages/app/component-tests/plugin-host.spec.ts",
@@ -146,7 +145,7 @@
     },
     {
       "id": "CAT-17",
-      "title": "Built-in plugin page navigation for dashboard links",
+      "title": "Built-in plugin host APIs for dashboard links and timeline preferences",
       "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
     },
     { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
