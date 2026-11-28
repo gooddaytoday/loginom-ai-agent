@@ -70,13 +70,15 @@ export function registerPackageCopy(
     const { code, data } = result.value.failure
     switch (code) {
       case "package_busy": {
-        const access = await visiblePackageAccess(data, (id) => ctx.session.get({ sessionID: id }))
-        const visible = Schema.decodeUnknownOption(CopyBusy)(access)
-        return call.error("package_busy", "Пакет занят.", Option.getOrElse(visible, () => ({
-          packagePath: data.packagePath,
-          kind: "read_only" as const,
-          lockMarker: "unknown" as const,
-        })))
+        if (data.kind !== "other_conversation") return call.error("package_busy", "Пакет занят.", data)
+        const access = await visiblePackageAccess(
+          { packagePath: data.packagePath, kind: data.kind, sessionId: data.sessionID },
+          (id) => ctx.session.get({ sessionID: id }),
+        )
+        const visible = access?.kind === "other_conversation"
+          ? data
+          : { packagePath: data.packagePath, kind: "read_only", lockMarker: "unknown" } as const
+        return call.error("package_busy", "Пакет занят.", visible)
       }
       case "path_exists": return call.error(code, "Пакет с таким именем уже существует.", data)
       case "access_denied": return call.error(code, "Нет прав для изменения пакета.", {})

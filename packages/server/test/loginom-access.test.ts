@@ -12,6 +12,7 @@ import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { define } from "@opencode/plugin/effect/plugin"
 import { Form } from "@opencode/schema/form"
 import { Location } from "@opencode/schema/location"
+import { Rpc } from "@opencode/schema/rpc"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Skill } from "@opencode/schema/skill"
 import { Global } from "@opencode/util/global"
@@ -303,6 +304,7 @@ const boot = (
       )
     return {
       sessions,
+      directory,
       create,
       prompt,
       wizard,
@@ -331,6 +333,35 @@ const dashboardWork = Effect.acquireRelease(
   }),
   (folder) => Effect.promise(() => fs.rm(folder, { recursive: true, force: true })),
 ).pipe(Effect.map((folder) => path.join(folder, "work")))
+
+it.live(
+  "package access and package schema answer under separate public RPC IDs",
+  () =>
+    Effect.gen(function* () {
+      const schemaRpc = Rpc.define({
+        id: "loginom.package",
+        methods: { schema: { input: Schema.Struct({}), output: Schema.String } },
+        events: {},
+      })
+      const test = yield* boot(
+        (ctx) => ctx.rpc.register(schemaRpc, { schema: () => Effect.succeed("schema response") }).pipe(Effect.orDie),
+        { catalog: "missing" },
+      )
+      const sessionID = yield* test.create("package access")
+      yield* test.skills
+      const packagePath = "/user/shared/plan.lgp"
+      const at = `location[directory]=${encodeURIComponent(test.directory)}`
+      const access = yield* test.post(`/api/rpc/loginom.package-access/recheck?${at}`, {
+        input: { sessionID, packagePath },
+      })
+      expect(access.status).toBe(200)
+      expect(yield* Effect.promise(() => access.json())).toEqual({ output: { kind: "unavailable", packagePath } })
+      const schema = yield* test.post(`/api/rpc/loginom.package/schema?${at}`, { input: {} })
+      expect(schema.status).toBe(200)
+      expect(yield* Effect.promise(() => schema.json())).toEqual({ output: "schema response" })
+    }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+  timeout,
+)
 
 describe("loginom.product access and tool gate (G1)", () => {
   it.live(

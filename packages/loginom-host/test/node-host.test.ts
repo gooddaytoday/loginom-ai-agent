@@ -173,7 +173,7 @@ test("package recheck distinguishes a live app conversation, an external marker 
           return;
         }
         case 'call':
-          return send({result:{content:[],_meta:{existing:true}}, recoveryPending:false,
+          return send({result:{content:[],_meta:{existing:true,loginomFields:{verificationStale:true,agentCopy:{originalPath:'/original.lgp',path:packagePath}}}}, recoveryPending:false,
             ...(!writer && {packagePath})});
         case 'packageCopy': {
           if (m.input.action === 'discard') return send({ failure: { code:'not_applied', data:{} } });
@@ -220,7 +220,7 @@ test("package recheck distinguishes a live app conversation, an external marker 
     expect(await recheck()).toEqual({ packagePath, kind: "unavailable" })
     await setPackages(packagePath, "present")
     await prepare(writer)
-    const owned = { packagePath, kind: "other_conversation", sessionID: writer }
+    const owned = { packagePath, kind: "other_conversation", sessionId: writer }
     await host.request("acquire", { run: reader, session: reader })
     try {
       expect(await host.request("packageCopy", { run: reader, action: "discard" }))
@@ -228,11 +228,18 @@ test("package recheck distinguishes a live app conversation, an external marker 
       expect(await host.request("packageCopy", { run: reader, action: "save-version" }))
         .toEqual({ failure: { code: "state_check_required", data: {} } })
       expect(await host.request("packageCopy", {run:reader, action:"replace-original", confirmed:true}))
-        .toEqual({failure:{code:"package_busy", data:owned}})
+        .toEqual({failure:{code:"package_busy", data:{packagePath, kind:"other_conversation", sessionID:writer}}})
     } finally {
       await host.request("release", { run: reader })
     }
-    expect(await prepare(reader)).toEqual({ content: [], _meta: { existing: true, packageAccess: owned } })
+    expect(await prepare(reader)).toEqual({
+      content: [],
+      _meta: { existing: true, loginomFields: {
+        verificationStale: true,
+        agentCopy: { originalPath: "/original.lgp", path: packagePath },
+        packageAccess: owned,
+      } },
+    })
     const pending = prepare(starting)
     try {
       const signal = AbortSignal.timeout(2_000)

@@ -853,7 +853,7 @@ export async function createLoginomHost(options: {
       if ((await service.api.status()).generation !== generation || !live(chat, current)) return unavailable
       const holders = owners.filter((peer) => peer.writes && live(peer.key, peer.child))
       const holder = holders.length === 1 ? holders[0] : undefined
-      if (holder) return { packagePath, kind: "other_conversation", sessionID: holder.id }
+      if (holder) return { packagePath, kind: "other_conversation", sessionId: holder.id }
       const lockMarker = observed?.lockMarker ?? "unknown"
       if (observedBusy || lockMarker === "present") return { packagePath, kind: "other_loginom_session" }
       return { packagePath, kind: "read_only", lockMarker }

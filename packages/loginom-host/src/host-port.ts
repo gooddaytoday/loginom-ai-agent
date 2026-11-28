@@ -397,7 +397,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
               ? await service.packageAccess(candidate, lease.generation, true).catch(() => undefined)
               : undefined
             if (access?.kind === "other_conversation") {
-              reply({ id: data.id, result: { failure: { code: "package_busy", data: access } } }, lease.generation)
+              const dataForCopy = { packagePath: access.packagePath, kind: access.kind, sessionID: access.sessionId }
+              reply({ id: data.id, result: { failure: { code: "package_busy", data: dataForCopy } } }, lease.generation)
               return
             }
           }
@@ -736,7 +737,12 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           const body = result.result
           if (packageAccess && body && typeof body === "object") {
             const meta = "_meta" in body && body._meta && typeof body._meta === "object" ? body._meta : {}
-            reply({ id: data.id, result: { ...body, _meta: { ...meta, packageAccess } } }, lease.generation)
+            const fields =
+              "loginomFields" in meta && meta.loginomFields && typeof meta.loginomFields === "object"
+                ? meta.loginomFields
+                : {}
+            const enriched = { ...body, _meta: { ...meta, loginomFields: { ...fields, packageAccess } } }
+            reply({ id: data.id, result: enriched }, lease.generation)
           } else {
             reply({ id: data.id, result: body }, lease.generation)
           }

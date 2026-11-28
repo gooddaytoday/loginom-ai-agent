@@ -53,6 +53,15 @@ export const rpc = {
       },
       output: { type: "object", properties: { found: { type: "boolean" } }, required: ["found"] },
     },
+    preview: {
+      input: {
+        type: "object",
+        properties: { id: { type: "string" } },
+        required: ["id"],
+        additionalProperties: false,
+      },
+      output: { type: "object", properties: { url: { type: "string" } }, additionalProperties: false },
+    },
   },
   events: {},
 } as const

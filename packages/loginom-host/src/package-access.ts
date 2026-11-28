@@ -17,6 +17,6 @@ export const PackageObservation = Schema.NullOr(Schema.Struct({
 export const PackageAccess = Schema.Union([
   Schema.Struct({ packagePath: PackagePath, kind: Schema.Literals(["unavailable", "writable", "other_loginom_session"]) }),
   Schema.Struct({ packagePath: PackagePath, kind: Schema.Literal("read_only"), lockMarker: Schema.Literals(["not_observed", "unknown"]) }),
-  Schema.Struct({ packagePath: PackagePath, kind: Schema.Literal("other_conversation"), sessionID: SessionID }),
+  Schema.Struct({ packagePath: PackagePath, kind: Schema.Literal("other_conversation"), sessionId: SessionID }),
 ])
 export type PackageAccess = typeof PackageAccess.Type

@@ -35,4 +35,3 @@ export const CopyReply = Schema.Union([
 export const CopyVersion = Schema.Struct({ path: PackagePath, name: Schema.NonEmptyString })
 export const CopyReplacement = Schema.Struct({ path: PackagePath, backupPath: PackagePath })
 export const CopyRestore = Schema.Struct({ path: PackagePath })
-export const AgentCopy = Schema.Struct({ originalPath: PackagePath, path: PackagePath })
