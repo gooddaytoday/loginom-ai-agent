@@ -204,12 +204,11 @@ export function compactKnowledgeBundle(description) {
 const FEED_PREVIEW_MAX_BYTES = 12 * 1024;
 const SAVED_GRAPH_MAX_BYTES = LOGINOM_METADATA_FIELD_MAX_BYTES.savedPackageGraph;
 
-function projectSavedPackageGraph(graph, knownSecrets) {
-  const {text} = createRedactor(knownSecrets);
+function projectSavedPackageGraph(graph, text) {
   const packagePath = text(graph.package_path).toWellFormed();
   const identity = {saveOperationId:graph.save_operation_id, packagePath};
   if (graph.status === 'unavailable') return {status:'unavailable', ...identity};
-  const result = {status:'compared', ...identity, scope:'activeWorkflow', renameAttribution:graph.rename_attribution,
+  const result = {status:'compared', ...identity, scope:'activeWorkflow', renameAttribution:'unconfirmed',
     changes:[], savedLabels:[], uncheckedSorting:[], truncated:true};
   const safe = value => Array.isArray(value) ? value.map(safe) : text(value).toWellFormed();
   const append = (target, value) => {
@@ -245,20 +244,24 @@ function busyFor(busy, operationId) {
     ? {version:1, windowId:busy.windowId, operationId:busy.operationId, active:busy.active} : undefined;
 }
 
-export function loginomSaveMetadata(outcome, {knownSecrets = [], receiptWindow, savedPackageGraph, savedFileRead, busy} = {}) {
+export function loginomSaveMetadata(outcome, {knownSecrets = [], receiptWindow, savedPackageGraph, savedFileRead, busy,
+  maskSavedGraph = createRedactor(knownSecrets, {minimumLength:1}).text} = {}) {
+  if (!['package.save_as', 'package.save_checkpoint'].includes(outcome.action_key) || !outcome.operation_id) return;
+  const signal = busyFor(busy, outcome.operation_id);
+  const receipt = {v:1, operationId:outcome.operation_id, state:'settled', status:outcome.status,
+    ...(signal && {busy:signal})};
   const path = outcome.output?.package_ref?.path;
-  if (outcome.status !== 'SUCCEEDED' || !['package.save_as', 'package.save_checkpoint'].includes(outcome.action_key)
-      || !outcome.operation_id || typeof path !== 'string' || !path || path !== outcome.output.package_ref.active_identity) return;
+  if (outcome.status !== 'SUCCEEDED' || typeof path !== 'string' || !path || path !== outcome.output.package_ref.active_identity)
+    return signal ? receipt : undefined;
   const graph = outcome.trace?.findLast(item => item.event === 'reopened_package_observed'
     && item.actual_path === path && item.path_matches === true && item.graph_matches === true)?.graph;
-  const evidence = [{kind:'saved', path:[...createRedactor(knownSecrets).text(path).toWellFormed()].slice(0, 1000).join('')}];
+  const evidence = [{kind:'saved', path:[...maskSavedGraph(path).toWellFormed()].slice(0, 1000).join('')}];
   if (outcome.output.reopened === true && Array.isArray(graph?.nodes))
     evidence.push({kind:'reopenedGraphRead', nodeCount:graph.nodes.length, scope:'activeWorkflow'});
   const matchesSave = savedPackageGraph?.save_operation_id === outcome.operation_id && savedPackageGraph.package_path === path;
   if (matchesSave && savedFileRead) evidence.push(savedFileRead);
-  return {v:1, operationId:outcome.operation_id, state:'settled', status:'SUCCEEDED', kind:'save', evidence,
-    busy:busyFor(busy, outcome.operation_id),
-    ...(matchesSave && {savedPackageGraph:projectSavedPackageGraph(savedPackageGraph, knownSecrets)}),
+  return {...receipt, kind:'save', evidence,
+    ...(matchesSave && {savedPackageGraph:projectSavedPackageGraph(savedPackageGraph, maskSavedGraph)}),
     ...(validReceiptWindow(receiptWindow) && {receiptWindow})};
 }
 
@@ -281,9 +284,10 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
   const execution = receipt.execution ?? receipt.progress?.execution;
   const state = receipt.state;
   const succeeded = state === 'settled' && receipt.status === 'SUCCEEDED' && !reply.isError;
+  const signal = busyFor(busy, receipt.operation_id);
   const result = {
     v: 1, operationId: receipt.operation_id, state,
-    busy: busyFor(busy, receipt.operation_id),
+    ...(signal && {busy:signal}),
     attempt: receipt.attempt, status: state === 'settled' ? receipt.status : undefined,
     phase: text(receipt.phase ?? receipt.progress?.pending_phase, 128),
     node: typeof guid === 'string' && guid && label !== undefined && type ? {guid, label, type} : undefined,

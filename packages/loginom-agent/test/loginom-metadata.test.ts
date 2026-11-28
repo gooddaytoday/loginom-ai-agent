@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 import { withLoginomMetadata } from "../../loginom-runtime/client/lib/loginom-feed-metadata.mjs"
+import { loginomSaveMetadata } from "../../loginom-runtime/client/lib/user-results.mjs"
 import { dockToolResult } from "../src/dock"
 import type { LoginomMetadataFields } from "../src/loginom-metadata"
 
@@ -12,31 +13,37 @@ const reply = (value: typeof receipt, loginom?: unknown) => ({
   _meta: { loginom },
 })
 
-test("Dock forwards the saved graph in v1 alongside the busy signal", async () => {
+test("Dock forwards the runtime Save projection and its file proof alongside the graph and busy signal", async () => {
+  const path = "/account/saved.lgp"
+  const savedFileRead = { kind: "savedFileRead", nodeCount: 2, scope: "package", workflowGuidMatch: true,
+    file: { mtime: "2026-11-27T15:00:00.000Z", size: 1024, hash: "b".repeat(64) } }
+  const busy = { version: 1, operationId: "operation", windowId: "09a4db75-00cf-4ee0-912d-c252afbaba0f", active: false }
   const savedPackageGraph = {
     status: "compared",
-    saveOperationId: "operation",
-    packagePath: "/account/saved.lgp",
-    scope: "active_workflow",
-    renameAttribution: "observed_during_save",
+    save_operation_id: "operation",
+    package_path: path,
     changes: [{
       kind: "node_renamed",
-      nodeId: "node-guid",
+      node_id: "node-guid",
       before: "Слияние",
       saved: "Левое",
-      observedBeforeSave: "Слияние",
+      observed_before_save: "Слияние",
       repair: { label: "Попросить исправить", prompt: "Проверить узел node-guid" },
     }],
-    savedLabels: [{ nodeId: "node-guid", label: "Левое" }],
-    uncheckedSorting: [],
-    truncated: false,
+    saved_labels: [{ node_id: "node-guid", label: "Левое" }],
+    unchecked_sorting: [],
   }
-  const busy = { version: 1, operationId: "operation", windowId: "09a4db75-00cf-4ee0-912d-c252afbaba0f", active: false }
-  const { node: _node, ...save } = feed
-  const loginom = { ...save, busy, savedPackageGraph }
-  const input = reply(receipt, loginom)
+  const input = withLoginomMetadata(reply(receipt), { receipt: loginomSaveMetadata({
+    operation_id: "operation", action_key: "package.save_checkpoint", status: "SUCCEEDED",
+    output: { package_ref: { path, active_identity: path } },
+  }, { busy, savedPackageGraph, savedFileRead }) })
   const result = await dockToolResult(input, 1)
-  expect(result.metadata?.loginom).toEqual(loginom)
+  expect(result.metadata?.loginom).toEqual(input._meta.loginom)
+  expect(result.metadata?.loginom).toMatchObject({
+    v: 1, operationId: "operation", state: "settled", kind: "save", busy,
+    evidence: [{ kind: "saved", path }, savedFileRead],
+    savedPackageGraph: { scope: "activeWorkflow", savedLabels: [{ nodeId: "node-guid", label: "Левое" }], truncated: false },
+  })
   expect(result.content).toEqual(input.content[0].text)
 })
 

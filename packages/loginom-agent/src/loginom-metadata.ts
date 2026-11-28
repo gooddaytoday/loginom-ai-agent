@@ -78,6 +78,7 @@ const savedPackageGraph = Schema.Union([
     changes: Schema.Array(savedChange),
     uncheckedSorting: Schema.Array(id),
     renameAttribution: Schema.Literals(["unconfirmed", "observed_during_save"]),
+    truncated: Schema.optional(Schema.Boolean),
   }),
 ])
 

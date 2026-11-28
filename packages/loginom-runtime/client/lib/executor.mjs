@@ -1785,7 +1785,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       throw new Error('Cannot save the package while a process is running or its nodes are locked. No save request was sent.');
     if (!same(staged, before)) throw Error('Package changed after save preflight');
     const captureSaveGraph = async () => {
-      try { saveGraph = await page.evaluate(readSaveGraph); }
+      try { saveGraph = await page.evaluate(readSaveGraph, Math.min(2000, Math.max(0, remaining() - 1000))); }
       catch { saveGraph = null; }
     };
     await captureSaveGraph();
@@ -3810,8 +3810,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     nodeApplyStatus:id=>sourceReads.has(id)?sourceReads.status(id):nodeJobs.status(id),
     nodeApplyWorkflow:id=>nodeJobs.workflow(id),
     savedGraphBefore: id => operations.get(id)?.saveGraph,
-    saveNodeIntent(documentId, workflowId) {
-      const sorting=new Map(), intendedLabels=new Map();
+    saveNodeLabels(documentId, workflowId) {
+      const intendedLabels=new Map();
       for(const operation of operations.values()) {
         const {result,request}=operation.nodeApply??{};
         const node=result?.node;
@@ -3819,12 +3819,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           ||node?.document_id!==documentId||node.workflow_id!==workflowId)continue;
         const id=node.node_id.toLowerCase();
         if(typeof request?.target?.label==='string')intendedLabels.set(id,request.target.label);
-        const readback=result.configuration?.readback;
-        if(readback?.kind==='sorting')sorting.set(id,{
-          keys:readback.keys.map(field=>field.name),fields:readback.output_mapping.fields.filter(field=>!field.excluded).map(field=>field.name),
-        });
       }
-      return {sorting,intendedLabels};
+      return intendedLabels;
     },
     waitNodeApply:(id,options)=>sourceReads.has(id)?sourceReads.wait(id,options):nodeJobs.wait(id,options),
     cancelNodeApply:id=>sourceReads.has(id)?sourceReads.cancel(id):nodeJobs.cancel(id),
@@ -4906,7 +4902,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }});
   // Internal delivery calls retain the original runtime methods. The returned
   // facade prevents a second caller from changing UI between transfer stages.
-  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','nodeApplyWorkflow','savedGraphBefore','saveNodeIntent','waitNodeApply']);
+  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','nodeApplyWorkflow','savedGraphBefore','saveNodeLabels','waitNodeApply']);
   const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply','deleteNode']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{
