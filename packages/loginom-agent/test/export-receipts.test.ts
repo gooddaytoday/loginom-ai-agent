@@ -1,9 +1,8 @@
 import { expect, test } from "bun:test"
-import type { SessionDomain } from "@opencode/plugin/promise/session"
 import { Session } from "@opencode/schema/session"
 import { SessionMessage } from "@opencode/schema/session-message"
-import { Schema } from "effect"
-import { exportMetadata, turnExports } from "../src/export-receipts"
+import { exportMetadata, exportReceipts } from "../src/export-receipts"
+import { temporaryData } from "./fixture/temporary-data"
 
 const node = { document_id: "doc", workflow_id: "workflow", node_id: "node" }
 const artifact = {
@@ -37,45 +36,19 @@ test("an artifact not bound to the completed execution is not a confirmed export
   expect(exportMetadata("file_sample", receipt)).toBeUndefined()
 })
 
-test("the next prompt in a transcript without idle markers does not inherit the preceding export", async () => {
-  const time = { created: 1 }
-  const id = SessionMessage.ID.make("msg_current")
-  const decode = Schema.decodeUnknownSync(Schema.Array(SessionMessage.Info))
-  const history = decode([
-    { type: "user", id: "msg_previous", time, text: "Export" },
-    {
-      type: "assistant",
-      id: "msg_export",
-      time,
-      agent: "build",
-      model: { id: "test-model", providerID: "test" },
-      content: [
-        {
-          type: "tool",
-          id: "export",
-          name: "loginom_dock_node_wait",
-          time,
-          state: {
-            status: "completed",
-            input: {},
-            content: [{ type: "text", text: "Done" }],
-            metadata: { loginom: { export: { ...artifact, name: "отчёт.txt", node } } },
-          },
-        },
-      ],
-    },
-    { type: "user", id, time, text: "Next task" },
-  ])
-  const read: SessionDomain["history"] = async ({ type, cursor, limit = 2 }) => {
-    const anchor = history.findIndex((message) => message.id === cursor?.id)
-    const previous = cursor?.direction === "previous"
-    const page = (previous ? history.slice(0, anchor) : history.slice(anchor + 1)).filter(
-      (message) => !type || message.type === type,
-    )
-    return previous ? page.slice(-limit) : page.slice(0, limit)
-  }
+test("the first confirming turn keeps the receipt after reopening the store", async () => {
+  await using temp = await temporaryData()
   const sessionID = Session.ID.create()
-  const signal = new AbortController().signal
-  expect((await turnExports(read, { sessionID, messageID: history[0].id }, signal))?.files).toHaveLength(1)
-  expect(await turnExports(read, { sessionID, messageID: id }, signal)).toEqual({ files: [] })
+  const first = SessionMessage.ID.make("msg_first")
+  const repeated = SessionMessage.ID.make("msg_repeated")
+  const { execution_id, freshness_basis, ...file } = artifact
+  const receipt = { ...file, name: "отчёт.txt", node }
+  expect(exportReceipts(temp.directory).record(sessionID, first, receipt)).toBe(true)
+
+  const reopened = exportReceipts(temp.directory)
+  expect(reopened.record(sessionID, repeated, { ...receipt, artifact_id: "another-cache" })).toBe(false)
+  expect(reopened.turn({ sessionID, messageID: first })).toEqual({ files: [receipt] })
+  expect(reopened.turn({ sessionID, messageID: repeated })).toEqual({ files: [] })
+  reopened.remove(sessionID)
+  expect(reopened.turn({ sessionID, messageID: first })).toBeUndefined()
 })

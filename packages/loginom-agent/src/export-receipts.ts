@@ -1,4 +1,6 @@
-import type { SessionDomain } from "@opencode/plugin/promise/session"
+import { Database } from "bun:sqlite"
+import { existsSync, mkdirSync } from "node:fs"
+import { join } from "node:path"
 import { NonNegativeInt } from "@opencode/schema/schema"
 import { Session } from "@opencode/schema/session"
 import { SessionMessage } from "@opencode/schema/session-message"
@@ -16,9 +18,8 @@ const file = Schema.Struct({
   sha256: Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u)),
   verification_id: Schema.NonEmptyString,
 })
-const exportRecord = Schema.Struct({ ...file.fields, name: Schema.NonEmptyString, node })
-const metadata = Schema.Struct({ export: exportRecord })
-const decodeMetadata = Schema.decodeUnknownOption(metadata)
+export const ExportRecord = Schema.Struct({ ...file.fields, name: Schema.NonEmptyString, node })
+const storedReceipt = Schema.decodeUnknownSync(Schema.fromJsonString(ExportRecord))
 const decodeResult = Schema.decodeUnknownOption(
   Schema.Struct({
     result_version: Schema.Literal("user-v1"),
@@ -48,7 +49,7 @@ const decodeResult = Schema.decodeUnknownOption(
 
 const dockTools = new Set(["dock_node_apply", "dock_node_wait", "dock_node_status"])
 
-export function exportMetadata(tool: string, structuredContent: unknown): typeof metadata.Type | undefined {
+export function exportMetadata(tool: string, structuredContent: unknown) {
   if (!dockTools.has(tool)) return undefined
   const result = decodeResult(structuredContent)
   if (Option.isNone(result)) return undefined
@@ -56,6 +57,8 @@ export function exportMetadata(tool: string, structuredContent: unknown): typeof
   const [artifact] = receipt.output.file_artifacts
   if (artifact.execution_id !== receipt.execution.execution_id) return undefined
   return {
+    operationId: receipt.operation_id,
+    state: receipt.state,
     export: {
       artifact_id: artifact.artifact_id,
       destination: artifact.destination,
@@ -75,45 +78,74 @@ export const exportReceiptsRpc = {
   methods: {
     turn: {
       input: Schema.toStandardSchemaV1(turnInput),
-      output: Schema.toStandardSchemaV1(Schema.Struct({ files: Schema.Array(exportRecord) })),
+      output: Schema.toStandardSchemaV1(Schema.Struct({ files: Schema.Array(ExportRecord) })),
       errors: { not_found: Schema.toStandardSchemaV1(Schema.Undefined) },
     },
   },
   events: {},
 }
 
-export async function turnExports(
-  history: SessionDomain["history"],
-  { sessionID, messageID }: typeof turnInput.Type,
-  signal: AbortSignal,
-) {
-  const previous = { id: messageID, direction: "previous" as const }
-  const [idle] = await history({ sessionID, type: "idle", limit: 1, cursor: previous })
-  const modern = idle !== undefined || (await history({ sessionID, type: "idle", limit: 1 })).length > 0
-  const [start] = modern ? [idle] : await history({ sessionID, type: "user", limit: 1, cursor: previous })
-  const files = new Map<string, typeof exportRecord.Type>()
-  let after = start?.id
-  let found = false
-  while (true) {
-    signal.throwIfAborted()
-    const page = await history({ sessionID, ...(after && { cursor: { id: after, direction: "next" } }) })
-    const last = page.at(-1)
-    if (!last) return found ? { files: [...files.values()] } : undefined
-    for (const message of page) {
-      if (message.type === "idle" || (!modern && found && message.type === "user"))
-        return found ? { files: [...files.values()] } : undefined
-      if (message.type === "user" && message.id === messageID) found = true
-      if (message.type !== "assistant" || (!modern && !found)) continue
-      for (const part of message.content) {
-        if (part.type !== "tool" || part.state.status !== "completed" || !part.name.startsWith("loginom_")) continue
-        if (!dockTools.has(part.name.slice("loginom_".length))) continue
-        const decoded = decodeMetadata(part.state.metadata?.loginom)
-        if (Option.isNone(decoded)) continue
-        const receipt = decoded.value.export
-        const key = JSON.stringify([receipt.verification_id, receipt.artifact_id])
-        if (!files.has(key)) files.set(key, receipt)
-      }
+export function exportReceipts(directory: string) {
+  const path = join(directory, "exports.sqlite")
+  function open() {
+    mkdirSync(directory, { recursive: true, mode: 0o700 })
+    const database = new Database(path)
+    try {
+      database.exec(`
+        PRAGMA busy_timeout = 5000;
+        PRAGMA foreign_keys = ON;
+        CREATE TABLE IF NOT EXISTS turns (
+          session TEXT NOT NULL, message TEXT NOT NULL, PRIMARY KEY (session, message)
+        );
+        CREATE TABLE IF NOT EXISTS receipts (
+          session TEXT NOT NULL, message TEXT NOT NULL, verification TEXT NOT NULL, receipt TEXT NOT NULL,
+          UNIQUE (session, verification), FOREIGN KEY (session, message) REFERENCES turns ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS receipts_turn ON receipts (session, message);
+      `)
+      return database
+    } catch (error) {
+      database.close()
+      throw error
     }
-    after = last.id
+  }
+  const register = (database: Database, sessionID: string, messageID: string) =>
+    database.run("INSERT OR IGNORE INTO turns VALUES (?, ?)", [sessionID, messageID])
+  return {
+    start(sessionID: string, messageID: string) {
+      using database = open()
+      register(database, sessionID, messageID)
+    },
+    record(sessionID: string, messageID: string, receipt: typeof ExportRecord.Type) {
+      using database = open()
+      return database.transaction(() => {
+        register(database, sessionID, messageID)
+        return (
+          database.run("INSERT OR IGNORE INTO receipts VALUES (?, ?, ?, ?)", [
+            sessionID,
+            messageID,
+            receipt.verification_id,
+            JSON.stringify(receipt),
+          ]).changes !== 0
+        )
+      })()
+    },
+    turn({ sessionID, messageID }: typeof turnInput.Type) {
+      if (!existsSync(path)) return undefined
+      using database = new Database(path, { readonly: true })
+      if (!database.query("SELECT 1 FROM turns WHERE session = ? AND message = ?").get(sessionID, messageID))
+        return undefined
+      const rows = database
+        .query<{ receipt: string }, [string, string]>(
+          "SELECT receipt FROM receipts WHERE session = ? AND message = ? ORDER BY rowid",
+        )
+        .all(sessionID, messageID)
+      return { files: rows.map(({ receipt }) => storedReceipt(receipt)) }
+    },
+    remove(sessionID: string) {
+      if (!existsSync(path)) return
+      using database = open()
+      database.run("DELETE FROM turns WHERE session = ?", [sessionID])
+    },
   }
 }

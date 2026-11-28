@@ -16,6 +16,7 @@ import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
 import { observeLoginomReplies, withStepProgress } from "../client/lib/step-progress.mjs"
+import { withLoginomMetadata } from "../client/lib/loginom-feed-metadata.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -253,8 +254,17 @@ async function handle(message) {
       )
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
+      const knownSecrets = [input.connection.apiKey, input.connection.password]
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
+        presentNodeReply: async (reply, project) => {
+          const outputFiles = await session.artifactStore.outputFiles(reply.structuredContent)
+          let result = reply
+          try {
+            result = withLoginomMetadata(reply, { receipt: project({ outputFiles, knownSecrets }) })
+          } catch {}
+          return outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result
+        },
         startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {
           state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error,
             [input.connection.apiKey, input.connection.password, input.connection.username]) })
@@ -384,7 +394,8 @@ async function handle(message) {
         : message.input.scanReceipt !== undefined
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
           : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options))
-      const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
+      const outputFiles = result._meta?.loginom && Array.isArray(result._meta.outputFiles)
+        ? result._meta.outputFiles : await state.session.artifactStore.outputFiles(result.structuredContent)
       send({
         id: message.id,
         result: {

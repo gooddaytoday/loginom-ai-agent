@@ -563,10 +563,11 @@ describe("loginom.product Dock catalog (B2.5d, 0.4 toolContributor)", () => {
 
 describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () => {
   it.live(
-    "projects verified exports into tool metadata and returns distinct receipts for each turn",
+    "keeps the write outcome beside the export and reports the file only in its first confirming turn",
     () =>
       Effect.gen(function* () {
         const destination = "/server/exports/отчёт.csv"
+        const step = { outcome: "completed", retryAvailable: false, persistence: "step_unsaved", save: null }
         const expected = (id: string) => ({
           artifact_id: `artifact-${id}`,
           verification_id: `${id}:export-download`,
@@ -611,7 +612,11 @@ describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () =
               ? reply
               : {
                   ...reply,
-                  _meta: { outputFiles: [{ artifact_id: file.artifact_id, path: "/runtime/private.csv", name }] },
+                  _meta: {
+                    loginom: { v: 1, operationId: id, state: "settled", status: "SUCCEEDED" },
+                    loginomStep: { v: 1, operationId: id, state: "settled", step },
+                    outputFiles: [{ artifact_id: file.artifact_id, path: "/runtime/private.csv", name }],
+                  },
                 }
           },
         })
@@ -619,23 +624,26 @@ describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () =
         const id = yield* test.create("exports")
         const call = (action: string, id: string) => ({ tool: `loginom_dock_node_${action}`, input: { path: id } })
         yield* test.wizard(id, script(call("apply", "first"), call("wait", "first"), call("status", "first")))
+        yield* test.wizard(id, script(call("status", "first")))
         yield* test.wizard(id, script(call("apply", "second"), call("wait", "third"), call("status", "third")))
         yield* test.wizard(id, script(call("read", "sample")))
 
         const calls = yield* test.calls(id)
-        expect(calls.map((part) => part.state.status)).toEqual(Array(7).fill("completed"))
-        expect(calls.map((part) => part.state.status === "completed" && part.state.metadata?.loginom)).toEqual([
-          undefined,
-          ...["first", "first", "second", "third", "third"].map((key) => ({ export: expected(key) })),
-          undefined,
-        ])
+        expect(calls.map((part) => part.state.status)).toEqual(Array(8).fill("completed"))
+        const feed = calls.map((part) => part.state.status === "completed" && part.state.metadata?.loginom)
+        expect(feed[1]).toEqual({
+          v: 1, operationId: "first", state: "settled", status: "SUCCEEDED", step, export: expected("first"),
+        })
+        expect(feed[3]).toEqual({ v: 1, operationId: "first", state: "settled", status: "SUCCEEDED", step })
+        expect(feed.filter((item) => item && typeof item === "object" && "export" in item)).toHaveLength(3)
+        expect(feed[7]).toBeUndefined()
         const messages = yield* test.sessions.messages({ sessionID: id, order: "asc", type: "user" })
         yield* test.sessions.compact({ sessionID: id })
         yield* test.sessions.wait(id)
         expect((yield* test.sessions.context(id)).some((message) => message.id === messages[0].id)).toBe(false)
         const turn = (messageID: string, sessionID = id) =>
           test.call("/api/rpc/loginom.exports/turn", { input: { sessionID, messageID } })
-        for (const [index, files] of [[expected("first")], [expected("second"), expected("third")], []].entries()) {
+        for (const [index, files] of [[expected("first")], [], [expected("second"), expected("third")], []].entries()) {
           expect(yield* turn(messages[index].id)).toEqual({ status: 200, body: { output: { files } } })
         }
         const other = yield* test.create("another conversation")

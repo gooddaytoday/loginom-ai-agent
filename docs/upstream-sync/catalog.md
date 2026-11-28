@@ -116,10 +116,9 @@
 - **Проверка при обновлении.** `native-tool-names.test.ts` сверяет зарезервированные имена с классической и новой лентами и с TUI. `loginom-tool-projection.test.ts` проверяет группировку в Compact и Detailed. `plugin-tool-renderer.spec.ts` проверяет обе ленты с `loginom_demo`, отказы при регистрации, повторную регистрацию после выгрузки и восстановление строки после ошибки отрисовки.
 - **Политика.** `merge` для точек подключения и руководства. `apply-identity.py --check` проверяет имена продукта, которые также принадлежат этой записи по первому совпадению путей: `DESKTOP_NATIVE_ENGLISH` в `session/route.tsx` (CAT-10) и `loginom-ai-agent.settings` в `gui/builtin.ts` (CAT-12).
 
-## CAT-15 История сессии для серверных плагинов (C3.13)
+## CAT-15 Серверная приёмка подтверждённых экспортов (C3.13)
 
-- `session.history` читает сохранённые сообщения постранично и только из Location плагина. В отличие от `session.context`, сжатие контекста не скрывает уже записанные результаты. Публичный API истории и контракты Dock не меняются.
-- `loginom.exports.turn` выдаёт сводку подтверждённых экспортов по ID пользовательского сообщения: одна запись на квитанцию, `files: []` при отсутствии. Локальные пути и байты в этот RPC не входят. Проверка — `packages/server/test/loginom-dock-catalog.test.ts`.
+- `loginom.exports.turn` читает журнал плагина Loginom, не меняя API сессии OpenCode: одна квитанция относится к первому подтвердившему её ходу. Локальные пути и байты в RPC не входят. Проверки — `packages/server/test/loginom-dock-catalog.test.ts` и `packages/server/test/loginom-local-file.test.ts`.
 
 ## CAT-09 Desktop: главный процесс, preload, renderer
 

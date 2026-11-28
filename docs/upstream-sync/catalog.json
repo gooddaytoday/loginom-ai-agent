@@ -109,11 +109,8 @@
     },
     {
       "id": "CAT-15",
-      "title": "Location-scoped transcript reads for server plugins (C3.13)",
+      "title": "Server acceptance tests for confirmed exports (C3.13)",
       "paths": [
-        "packages/core/src/plugin/host.ts", "packages/plugin/src/effect/session.ts",
-        "packages/plugin/src/promise/session.ts", "packages/plugin/src/promise/adapter.ts",
-        "packages/core/test/plugin/host.ts",
         "packages/server/test/loginom-dock-catalog.test.ts", "packages/server/test/loginom-local-file.test.ts"
       ]
     },
