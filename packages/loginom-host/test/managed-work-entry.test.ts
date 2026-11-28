@@ -61,7 +61,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       export const loginBrowser = async ({ onContextCreated, onWindowPage }) => {
         const context = Object.assign(new EventEmitter(), { pages: () => [], close: async () => {} });
         onContextCreated?.(context);
-        let bounds = { left: 800, top: 0, width: 800, height: 900, windowState: 'normal' };
+        let bounds = { left: 0, top: 0, width: 1600, height: 900, windowState: 'maximized' };
         let startupRead = true;
         let stall = true;
         let refusal = true;
@@ -78,6 +78,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
             }
             if (method === 'Browser.getWindowBounds') return { bounds };
             if (method === 'Browser.setWindowBounds') {
+              if (input.bounds.windowState === 'normal') {
+                bounds = { left: 680, top: 45, width: 860, height: 800, windowState: 'normal' };
+                return;
+              }
               if (stall) {
                 stall = false;
                 await new Promise(() => {});

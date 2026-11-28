@@ -38,6 +38,7 @@ const state = {
   windowBaseline: undefined,
   windowPlacement: undefined,
   windowAttempt: undefined,
+  windowRestore: undefined,
   placingWindow: undefined,
   browserProfile: undefined,
   browserServer: undefined,
@@ -315,8 +316,10 @@ async function handle(message) {
         baseline: state.windowBaseline,
         confirmed: state.windowPlacement,
         attempted: state.windowAttempt,
+        restoring: state.windowRestore,
         onBaseline: observed => { state.windowBaseline = observed },
         onAttempt: expected => { state.windowAttempt = expected },
+        onRestore: transition => { state.windowRestore = transition },
         mayPlace: () => !state.controller && !state.bridge.hasActiveWork(),
         shutdown: state.startupController.signal,
       })
@@ -325,7 +328,10 @@ async function handle(message) {
         const result = await placing
         if (result === "moved") state.windowPlacement = null
         else if (typeof result !== "string") state.windowPlacement = result
-        if (state.windowPlacement !== undefined) state.windowAttempt = undefined
+        if (state.windowPlacement !== undefined) {
+          state.windowAttempt = undefined
+          state.windowRestore = undefined
+        }
         send({ id: message.id, result: typeof result === "string" ? result : "placed" })
       } finally {
         state.placingWindow = undefined

@@ -45,6 +45,10 @@ import { apply, bundled, hub } from "./skills"
 
 export { Dashboard }
 export { registerWindowRpc } from "./browser-window"
+export { modelServerHandlers } from "./model-server"
+export { modelServerFetch } from "./model-server-network"
+export { isModelServerID } from "@loginom-ai-agent/loginom-host/model-server-id"
+export { ModelServerRpc } from "@loginom-ai-agent/loginom-host/model-server-rpc"
 
 // The wizard's RPC: grant a profile to one prompt and admit it. The UI is stage C.
 const runner = {

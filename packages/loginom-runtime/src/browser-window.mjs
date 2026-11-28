@@ -94,16 +94,18 @@ export async function prepareBrowserWindow(page, rect, shutdown) {
   return readWindowBounds(page, signal);
 }
 
-export function placeBrowserWindow(page, rect, { baseline, confirmed, attempted, onBaseline, onAttempt, mayPlace, shutdown } = {}) {
+export function placeBrowserWindow(page, rect, { baseline, confirmed, attempted, restoring, onBaseline, onAttempt, onRestore, mayPlace, shutdown } = {}) {
   if (!validWindowBounds(rect)) return 'layout-unavailable';
   const signal = deadline(shutdown);
   return withWindow(page, 'layout-unavailable', async (send, windowId, bounds) => {
     const requested = {left:rect.x, top:rect.y, width:rect.width, height:rect.height};
     const expected = {...requested, windowState:'normal'};
-    const previous = confirmed ?? baseline;
+    const previous = confirmed ?? (restoring === 'requested' ? baseline : restoring ?? baseline);
     if (!baseline) onBaseline?.(bounds);
     const recovered = !confirmed && attempted && matches(bounds, attempted);
-    if (!recovered && previous && !matches(bounds, previous, 0)) return 'moved';
+    const restored = restoring === 'requested' && bounds.windowState === 'normal';
+    if (!recovered && !restored && previous && !matches(bounds, previous, 0)) return 'moved';
+    if (restored) onRestore?.(bounds);
     if (mayPlace && !mayPlace()) return 'unchanged';
     if (matches(bounds, expected)) return bounds;
     if (confirmed || recovered) return 'unchanged';
@@ -115,8 +117,12 @@ export function placeBrowserWindow(page, rect, { baseline, confirmed, attempted,
       }
     };
     if (bounds.windowState !== 'normal') {
+      signal.throwIfAborted();
+      onRestore?.('requested');
       await send('Browser.setWindowBounds', {windowId, bounds:{windowState:'normal'}});
-      if (!await waitForBounds(bounds => bounds.windowState === 'normal')) return 'layout-unavailable';
+      const normal = await waitForBounds(bounds => bounds.windowState === 'normal');
+      if (!normal) return 'layout-unavailable';
+      onRestore?.(normal);
     }
     signal.throwIfAborted();
     onAttempt?.(expected);

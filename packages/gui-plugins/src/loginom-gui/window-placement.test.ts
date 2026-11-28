@@ -100,7 +100,7 @@ test("preserves both instructions when placement and focus are unavailable", () 
   expect(windowFeedback("no-window", "layout-unavailable")).toEqual({ focus: "no-window" })
 })
 
-test("does not resize Desktop on retry after the user restores it while Chromium is placing", async () => {
+test("does not prompt for a retry or resize Desktop after the user restores it while Chromium is placing", async () => {
   const placement = windowPlacement()
   const reply = Promise.withResolvers<"placed">()
   let desktop = full
@@ -119,7 +119,7 @@ test("does not resize Desktop on retry after the user restores it while Chromium
   const first = placement.show(options)
   desktop = { ...full, app: restored, maximized: false }
   reply.resolve("placed")
-  expect(await first).toBe("split-incomplete")
+  expect(windowFeedback("focused", await first)).toEqual({ focus: "focused" })
   expect(await placement.show(options)).toBeUndefined()
   expect(desktop.app).toEqual(restored)
 })

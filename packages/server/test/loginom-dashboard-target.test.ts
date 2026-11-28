@@ -195,9 +195,9 @@ describe("loginom.dashboard (B2.9h)", () => {
         const directory: string = created.body.output.directory
         expect(directory.startsWith(Dashboard.root() + path.sep)).toBe(true)
         expect(Dashboard.isWork(directory)).toBe(true)
-        expect(yield* Effect.promise(() => fs.readdir(path.join(directory, "src")))).toEqual(
-          yield* Effect.promise(() => fs.readdir(path.join(template, "src"))),
-        )
+        const sources = yield* Effect.promise(() => fs.readdir(path.join(directory, "src")))
+        const templateSources = yield* Effect.promise(() => fs.readdir(path.join(template, "src")))
+        expect(sources.sort()).toEqual(templateSources.sort())
         // Desktop's new dashboard: the Host was asked its status only, Studio its snapshot only.
         expect(methods(test.script.log)).toEqual(["connection.status"])
         expect(test.seen).toEqual([`/dashboard/snapshots/${desktop.id}`])

@@ -108,7 +108,7 @@ async function launch(t, { failStartup = false, missingCli = false } = {}) {
   const page = await app.firstWindow({ timeout })
   page.setDefaultTimeout(timeout)
 
-  return { page, servicePids }
+  return { app, page, home, servicePids }
 }
 
 test(
@@ -214,6 +214,53 @@ test("startup-failure: the window explains why the local service did not start",
   await expectWindow(page.getByRole("textbox", { name: /^(Error Details|Детали ошибки)$/ })).toHaveValue(
     new RegExp(startupFailure),
   )
+})
+
+test("the conversation command reaches Loginom through the Desktop window IPC", async (t) => {
+  const { app, page, home } = await launch(t)
+  const info = page.waitForRequest((request) => new URL(request.url()).pathname === "/api/info")
+  await page.reload()
+  const request = await info
+  const authorization = await request.headerValue("authorization")
+  const title = "Loginom window IPC fixture"
+  const response = await page.request.post(new URL("/api/session", request.url()).href, {
+    headers: authorization ? { authorization } : {},
+    data: { title, agent: "build", location: { directory: home } },
+  })
+  expect(response.ok()).toBe(true)
+  const { data: conversation } = await response.json()
+
+  await app.evaluate(() => {
+    const fetchFromMain = globalThis.fetch
+    globalThis.loginomWindowShows = []
+    globalThis.fetch = async (input, options) => {
+      const response = await fetchFromMain(input, options)
+      const url = new URL(input instanceof Request ? input.url : input)
+      if (url.pathname === "/api/rpc/loginom.window/show") {
+        globalThis.loginomWindowShows.push({
+          directory: url.searchParams.get("location[directory]"),
+          input: JSON.parse(options.body).input,
+          status: response.status,
+        })
+      }
+
+      return response
+    }
+  })
+
+  await page.getByRole("button", { name: title }).click()
+  await expectWindow(page.getByRole("heading", { name: title })).toBeVisible()
+  await page.keyboard.press("ControlOrMeta+Shift+P")
+  const palette = page.getByRole("dialog")
+  await palette.getByRole("combobox").fill("Loginom")
+  await palette.getByRole("option", { name: /Show Loginom Window|Показать окно Loginom/ }).click()
+
+  await expectWindow(
+    page.getByText(/There is no Loginom window for this conversation yet|Для этого разговора пока нет окна Loginom/),
+  ).toBeVisible()
+  expect(await app.evaluate(() => globalThis.loginomWindowShows)).toEqual([
+    { directory: home, input: { sessionID: conversation.id, location: { directory: home } }, status: 200 },
+  ])
 })
 
 test("plugin inventory is available even when the local CLI cannot start", async (t) => {

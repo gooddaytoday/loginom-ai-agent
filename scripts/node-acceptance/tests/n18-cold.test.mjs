@@ -9,12 +9,13 @@ const source=readFileSync(new URL('../cold-check.mjs',import.meta.url),'utf8');
 const branch=source.match(/  for \(const want of expected\.nodes\) \{[\s\S]*?\n  \}/)?.[0];
 assert.ok(branch);
 const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
-const check=new AsyncFunction('graph','expected','load','channelFor','record','verifyN18JavascriptStep',branch);
+const check=new AsyncFunction('graph','expected','load','channelFor','record','verifyN18JavascriptStep','state',branch);
 const node={document_id:'doc',workflow_id:'flow',node_id:'calc'};
 const graph=(...types)=>({nodes:types.map(type=>({type,ref:{...node,node_id:type==='transform.calculator'?'calc':type}})),links:[{source:'imports.text',output:0,target:'calc',input:0}]});
 const expected=(alternative=true)=>({n18_javascript_step:true,nodes:[{type:'imports.text'},{type:'programming.javascript',...(alternative?{alternative_types:['transform.calculator'],alternative_syntax:'javascript'}:{})},{type:'exports.text'}]});
 function fixture({syntax='javascript',stage='calculator',change=()=>{},closed={},nextError,dynamic=false,persistentConflict=false,execution={status:'completed',verified:true,owner_verified:true}}={}){
  const calls=[],records=[],executions=[];
+ const coldState={};
  let materialized=false;
  const selected={prepared_node_context:{...node,verified:true,surface:'graph'},wizard:{status:'absent'}};
  const state={loginom_build:'7.4.2',prepared_node_context:{...node,verified:true,surface:'wizard'},wizard:{status:'observed',stage,root_tid:'wizard',root_ref:'wizard-ref',owner_context:{status:'observed'}},ui:{dialogs:[],masks:[],elements:[{tid:'wizard;btnNext',ref:'next',enabled:true,allowed_actions:['wizard_step']},{tid:'wizard;btnClose',ref:'close',allowed_actions:['click']}]},node_calculator:{verified:true,inventory_complete:true,mode:'expression',syntax,node_context:{...node,verified:true}}};
@@ -48,11 +49,13 @@ function fixture({syntax='javascript',stage='calculator',change=()=>{},closed={}
    }},options);
    calls.push('cancel');return {verified:true,cleanup_complete:true,settings_applied:false,draft_discarded:true,node_context:{...node,verified:true},...closed};}}
  };
- return {calls,records,state,baseline,executions,run:(g,e=expected())=>check(g,e,async name=>{assert.ok(modules[name]);return modules[name];},ref=>{if(ref.node_id==='imports.text')return importChannel;assert.deepEqual(ref,node);return channel;},async value=>records.push(value),verifyN18JavascriptStep)};
+ return {calls,records,state,baseline,executions,coldState,
+  run:(g,e=expected())=>check(g,e,async name=>{assert.ok(modules[name]);return modules[name];},ref=>{if(ref.node_id==='imports.text')return importChannel;assert.deepEqual(ref,node);return channel;},async value=>records.push(value),verifyN18JavascriptStep,coldState)};
 }
 const observed=()=>graph('imports.text','transform.calculator','transform.sorting','exports.text');
 test('legacy exact JavaScript graph remains accepted without an alternative',async()=>{
  const f=fixture();await f.run(graph('imports.text','programming.javascript','exports.text'),expected(false));assert.deepEqual(f.calls,[]);
+ assert.equal(f.coldState.executionDispatched,undefined);
 });
 test('observed Calculator route still fails without approved opt-in',async()=>{
  await assert.rejects(fixture().run(observed(),expected(false)),/COLD_NODE_TYPE_MISSING:programming.javascript/);
@@ -92,6 +95,7 @@ test('unverified upstream execution refuses before opening the Calculator',async
  const f=fixture({execution:{status:'completed',verified:true,owner_verified:false}});
  await assert.rejects(f.run(observed()),/COLD_N18_IMPORT_EXECUTION_UNCONFIRMED/);
  assert.deepEqual(f.calls,[]);assert.deepEqual(f.records,[]);
+ assert.equal(f.coldState.executionDispatched,true);
 });
 test('input_mapping still requires independent JavaScript readback after Next',async()=>{
  const f=fixture({stage:'input_mapping',syntax:'expression'});

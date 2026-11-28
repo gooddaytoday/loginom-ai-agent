@@ -3,12 +3,68 @@
 
 import type { FormAnswer, FormInfo } from "@opencode/client/promise"
 import type { Schema } from "effect"
+import type { OpenCodeClient, OpenCodeEvent, RpcCallOptions } from "@opencode/client/promise"
 import type { Context } from "./context.js"
 import { Registry, type Catalog, type Messages, type Persisted, type StoreDeclaration, type StoreFrom } from "./core.js"
 import type { Desktop, Layout, Locale, StorageScope, StoreOptions } from "./host-apis.js"
 import type { MainContext } from "./main.js"
 import type { Command, IconName, Panel, PanelTab, SlotMap } from "./registries.js"
 import { type JSX } from "solid-js"
+
+/** Host capabilities for a built-in form in the provider dialog. */
+export interface ProviderSetupProps {
+  /** Client for the server whose provider profile the form edits. */
+  readonly client: OpenCodeClient
+  /** Location where the dialog was opened, or the server's default Location. */
+  readonly location: RpcCallOptions["location"]
+  /** Refreshes the catalog and selects a model after the form saves a provider. */
+  readonly onConnected: (
+    providerID: string,
+    models: readonly string[],
+    selected: string,
+    signal: AbortSignal,
+  ) => Promise<void>
+}
+
+/** A form that connects a provider not yet present in the integration catalog. */
+export interface ProviderSetup {
+  /** Stable identifier for the setup action. */
+  readonly id: string
+  /** Localized label for the action and dialog. */
+  readonly title: string
+  /** Reports whether to list this action first, initially and on changes until the dialog aborts the signal. */
+  readonly preferFirst?: (
+    client: () => OpenCodeClient,
+    directory: string | undefined,
+    signal: AbortSignal,
+    report: (first: boolean) => void,
+    listen: (handler: (event: OpenCodeEvent) => void) => VoidFunction,
+  ) => Promise<void>
+  /** Identifies configured providers to place alongside the action in Settings. */
+  readonly matchesProvider?: (id: string) => boolean
+  /** Removal action for providers that own a profile entry rather than just a credential. */
+  readonly removal?: {
+    /** Localized label for the removal button. */
+    readonly title: string
+    /** Runs confirmation and removal, returning true only when the server confirmed it. */
+    readonly run: (
+      client: OpenCodeClient,
+      provider: {
+        /** ID sent to the server. */
+        readonly id: string
+        /** Name shown in confirmation. */
+        readonly name: string
+      },
+      directory: string | undefined,
+      signal: AbortSignal,
+    ) => Promise<boolean>
+  }
+  /** Renders the form inside the host's provider dialog. */
+  readonly render: (props: ProviderSetupProps) => JSX.Element
+}
+
+/** Setup actions contributed by the app's built-in plugins. */
+export const BuiltinProviderSetup = Registry.define<ProviderSetup>("builtin-provider-setup")
 
 type BuiltinDeepLink = { readonly channel: string; readonly data: typeof Schema.Json.Type }
 

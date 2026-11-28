@@ -39,7 +39,10 @@ export function windowPlacement() {
       const placed = await options.place(plan)
       const current = options.current()
 
-      if (current) state = transition(state, { type: "observed", current })
+      if (!current) return
+      state = transition(state, { type: "observed", current })
+
+      if (state.type === "manual") return
 
       if (placed === "moved") {
         state = transition(state, { type: "browser-moved" })
@@ -57,7 +60,7 @@ export function windowPlacement() {
         return
       }
 
-      if (!current || !same(before, current)) return "split-incomplete"
+      if (!same(before, current)) return "split-incomplete"
 
       state = transition(state, { type: "browser-placed", sessionID, plan })
 
@@ -73,7 +76,7 @@ export function windowPlacement() {
 
       if (after) state = transition(state, { type: resized ? "resized" : "observed", current: after })
 
-      if (!resized) return "split-incomplete"
+      if (!resized && pending(state)) return "split-incomplete"
     },
   }
 }
