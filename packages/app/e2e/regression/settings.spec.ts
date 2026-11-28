@@ -209,8 +209,9 @@ for (const width of [1280, 390]) {
       await settings.getByRole("tab", { name: "Permissions", exact: true }).click()
     }
 
-    const write = settings.getByRole("combobox", { name: "Create and change project files", exact: true })
-    const writeRow = settings.locator('[data-component="settings-row"]').filter({ has: write })
+    const writeControl = { name: "Create and change project files", exact: true }
+    const write = settings.getByRole("combobox", writeControl)
+    const writeRow = settings.locator('[data-component="settings-row"]').filter({ has: page.getByRole("combobox", writeControl) })
     const overridden = writeRow.getByText("Other profile rules override your choice: Ask.", { exact: true })
     await expect(write).toHaveValue("ask")
     await expect(settings.getByText("In this workspace: Denied", { exact: true })).toBeVisible()
