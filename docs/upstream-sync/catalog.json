@@ -115,9 +115,11 @@
     {
       "id": "CAT-13",
       "title": "Product storage root and own background service (U5)",
+      "note": "C5.4: Desktop initialization starts the fork's proxy detection; background-service.ts consumes its environment at spawn.",
       "paths": [
         "packages/util/src/global.ts", "packages/client/src/service-probe.ts", "packages/cli/src/services/service-config.ts",
         "packages/desktop/src/main/service/sidecar-probe.ts", "packages/desktop/src/main/service/background-service.ts",
+        "packages/desktop/src/main/lifecycle/desktop-initialization.ts",
         "packages/desktop/src/main/native/logging.ts", "packages/core/src/config/discovery.ts",
         "packages/process-daemon/src/daemon.rs", "packages/process-daemon/src/daemon/unix.rs", "packages/process-daemon/src/client.rs",
         "packages/server/src/process.ts", "packages/client/src/service-timing.ts", "packages/client/src/promise/service.ts",

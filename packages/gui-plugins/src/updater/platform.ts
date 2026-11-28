@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
-import { app, autoUpdater, net, shell } from "electron"
+import { app, autoUpdater, net, shell, type AuthInfo } from "electron"
 import pkg from "electron-updater"
-import { Effect } from "effect"
+import { Effect, Match } from "effect"
 import { Product } from "@loginom-ai-agent/product"
 import { redactUpdateMessage } from "@loginom-ai-agent/product/update-signature"
 import {
@@ -18,6 +18,7 @@ import {
   type UpdateSource,
 } from "./signed-feed"
 import type { Platform } from "./machine"
+import { updateProxy } from "./proxy"
 
 const updateClient = pkg.autoUpdater
 
@@ -27,14 +28,41 @@ const restartTimeout = 10_000
 
 const unpackTimeout = 120_000
 
-export const make = Effect.fn("Updater.platform")(function* (sources: readonly UpdateSource[]) {
+export const make = Effect.fn("Updater.platform")(function* (
+  sources: readonly UpdateSource[],
+  systemProxyEnabled: () => boolean,
+) {
   const currentVersion = app.getVersion()
   const mode = updateMode(process.platform, process.env.APPIMAGE)
   const preferArm64 = process.platform === "win32" && app.runningUnderARM64Translation
-  const file =
-    process.platform === "darwin" ? "latest-mac.yml" : process.platform === "linux" ? "latest-linux.yml" : "latest.yml"
+
+  const file = Match.value(process.platform).pipe(
+    Match.when("darwin", () => "latest-mac.yml"),
+    Match.when("linux", () => "latest-linux.yml"),
+    Match.orElse(() => "latest.yml"),
+  )
+
   const runFork = Effect.runForkWith(yield* Effect.context())
   const safe = (values: unknown[]) => values.map((value) => redactUpdateMessage(String(value)))
+  let credentials: ReturnType<typeof updateProxy>["credentials"] | undefined
+
+  const login = (auth: AuthInfo, callback: (username: string, password: string) => void) => {
+    const selected = credentials?.(auth)
+
+    if (selected) return callback(selected.username, selected.password)
+
+    // SAFETY: Electron's ClientRequest login callback accepts zero arguments to cancel authentication.
+    const cancel = callback as () => void
+    cancel()
+  }
+
+  yield* Effect.acquireRelease(
+    Effect.sync(() => updateClient.on("login", login)),
+    () =>
+      Effect.sync(() => {
+        updateClient.off("login", login)
+      }),
+  )
   updateClient.logger = {
     info: (...args) => runFork(Effect.logInfo(...safe(args))),
     warn: (...args) => runFork(Effect.logWarning(...safe(args))),
@@ -48,24 +76,30 @@ export const make = Effect.fn("Updater.platform")(function* (sources: readonly U
   updateClient.autoInstallOnAppQuit = false
   updateClient.disableWebInstaller = true
   updateClient.disableDifferentialDownload = true
+
   const read = (url: string, timeout?: number) =>
     readUpdateBytes(
       url,
       (url) => {
         const request = net.request({ url, session: updateClient.netSession, redirect: "manual" })
+        request.on("login", login)
         let redirects = 0
         request.on("redirect", (_status, _method, location) => {
           if (++redirects > 5 || !URL.canParse(location) || new URL(location).protocol !== "https:") {
             request.emit("error", Error("LOGINOM_UPDATE_REDIRECT_INVALID"))
+
             return
           }
+
           request.followRedirect()
         })
+
         return request
       },
       timeout,
     )
-  const failure = (error: unknown) => Error(redactUpdateMessage(error instanceof Error ? error.message : String(error)))
+
+  const failure = (message: string) => Error(redactUpdateMessage(message))
   let approved: Awaited<ReturnType<typeof checkAutomaticUpdate>>
   let notification: ReturnType<typeof updateNotificationLink> | undefined
 
@@ -74,8 +108,15 @@ export const make = Effect.fn("Updater.platform")(function* (sources: readonly U
       try: async (signal) => {
         approved = undefined
         notification = undefined
+        const proxy = updateProxy(process.env, systemProxyEnabled())
+
+        credentials = proxy.credentials
+        await updateClient.netSession.setProxy(proxy.config)
+        await updateClient.netSession.closeAllConnections()
+        signal.throwIfAborted()
         const selected = await loadSignedUpdate({ sources, file, currentVersion, read })
         signal.throwIfAborted()
+
         if (
           !selected ||
           compareUpdateVersions(selected.signed.version, currentVersion) <= 0 ||
@@ -86,19 +127,23 @@ export const make = Effect.fn("Updater.platform")(function* (sources: readonly U
         if (mode === "notify") {
           const extension = process.platform === "darwin" ? /\.(dmg|zip)$/i : /\.deb$/i
           const installer = selected.signed.files.find((candidate) => extension.test(candidate.url))
+
           if (!installer) throw Error("LOGINOM_UPDATE_TARGET_INVALID")
+
           if (!(await updateClient.isUserWithinRollout(selected.signed))) return undefined
           signal.throwIfAborted()
           notification = updateNotificationLink(selected, installer.url)
+
           return { mode: "external", version: selected.signed.version, url: notification.url } as const
         }
 
         const candidate = await checkAutomaticUpdate(updateClient, selected, preferArm64)
         signal.throwIfAborted()
         approved = candidate
+
         if (approved) return { mode: "restart", version: approved.info.version } as const
       },
-      catch: failure,
+      catch: (error) => failure(error instanceof Error ? error.message : String(error)),
     }),
     stageUpdate: () =>
       Effect.tryPromise({
@@ -107,6 +152,7 @@ export const make = Effect.fn("Updater.platform")(function* (sources: readonly U
             throw Error("LOGINOM_UPDATE_MANIFEST_MISMATCH")
           const { selected, info } = approved
           matchUpdateManifest(selected.signed, info)
+
           return downloadSignedUpdate(
             updateClient,
             selected,
@@ -120,7 +166,7 @@ export const make = Effect.fn("Updater.platform")(function* (sources: readonly U
             preferArm64,
           )
         },
-        catch: failure,
+        catch: (error) => failure(error instanceof Error ? error.message : String(error)),
       }).pipe(Effect.flatMap(unpackInstaller)),
     externalInstall:
       mode === "notify"
@@ -128,9 +174,10 @@ export const make = Effect.fn("Updater.platform")(function* (sources: readonly U
             Effect.tryPromise({
               try: () => {
                 if (!notification) throw Error("LOGINOM_UPDATE_TARGET_INVALID")
+
                 return shell.openExternal(notification.resolve(url))
               },
-              catch: failure,
+              catch: (error) => failure(error instanceof Error ? error.message : String(error)),
             })
         : undefined,
     installAndRestart,
