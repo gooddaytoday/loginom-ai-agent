@@ -362,6 +362,12 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         return
       }
       if (run.scope?.profile === "loginom-dashboard" && data.method === "call") throw new Error("LOGINOM_SCOPE_DENIED")
+      if (data.method === "busy") {
+        const generation = run.lease?.generation ?? (await service.api.status()).generation
+        const state = await service.workState(generation, run.chat)
+        reply({ id: data.id, result: state.busy ?? null }, generation)
+        return
+      }
       const browserCall =
         data.method === "call" &&
         "name" in input &&
