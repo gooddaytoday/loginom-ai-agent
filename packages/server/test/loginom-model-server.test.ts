@@ -1,7 +1,10 @@
 import { expect } from "bun:test"
+import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { OpenCode } from "@opencode/client/promise"
-import { Effect, Schedule } from "effect"
+import { LayerNode } from "@opencode/util/effect/layer-node"
+import { FSUtil } from "@opencode/util/fs-util"
+import { Deferred, Effect, Fiber, Layer, Schedule } from "effect"
 import { ModelServerRpc } from "../../loginom-host/src/model-server-rpc"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
@@ -22,8 +25,16 @@ const fixture = (ids: readonly string[]) =>
           if (path === "/v1/models") return Response.json({ data: ids.map((id) => ({ id })) })
           if (path === "/v1/chat/completions") {
             const body = await request.json()
-            if (body?.model !== ids[0] || !JSON.stringify(body?.messages).includes("Fixture only"))
+            const messages = JSON.stringify(body?.messages)
+            if (body?.model !== ids[0] || !messages?.includes("Fixture only"))
               return new Response(null, { status: 400 })
+            if (messages.includes("Fixture only: rejected")) {
+              const key = request.headers.get("authorization")?.slice("Bearer ".length)
+              const message = `Fixture rejected credential ${key}`
+              return messages.includes("(plain)")
+                ? new Response(message, { status: 401 })
+                : Response.json({ error: { message } }, { status: 401 })
+            }
             const chunk = (delta: object, finish_reason: "stop" | null) =>
               `data: ${JSON.stringify({ id: "fixture", object: "chat.completion.chunk", created: 0, model: ids[0], choices: [{ index: 0, delta, finish_reason }] })}\n\n`
             return new Response(
@@ -54,7 +65,7 @@ it.live(
         ),
       )
       const fixtureKey = "fixture-secret-not-an-api-key"
-      const first = yield* fixture(["alpha", "beta", "alpha", fixtureKey, "{env:HOME}", "__proto__"])
+      const first = yield* fixture(["alpha", "beta", "model", "alpha", "{env:HOME}", "__proto__"])
       const second = yield* fixture(["alpha"])
       const routes = yield* serveRoutes({
         database: { path: ":memory:" },
@@ -117,15 +128,15 @@ it.live(
           if (!saved.ok) throw new Error(`Local model server save failed: ${saved.issue}`)
           return saved.value.providerID
         })
-      const firstID = yield* add(first.address, ["alpha", "beta"], fixtureKey)
+      const firstID = yield* add(first.address, ["alpha", "beta", "model"], fixtureKey)
       const secondID = yield* add(second.address, ["alpha"])
       expect(firstID).not.toBe(secondID)
       expect(first.requests.at(-1)).toEqual({ path: "/v1/models", authorization: `Bearer ${fixtureKey}` })
       expect(second.requests.at(-1)).toEqual({ path: "/v1/models", authorization: null })
 
-      const nextKey = "fixture-replacement-key"
+      const nextKey = 'fixture-replacement-"key"'
       const reconnected = yield* Effect.promise(() =>
-        rpc.save({ address: `${first.address}/`, key: nextKey, models: ["alpha", "beta"] }, options),
+        rpc.save({ address: `${first.address}/`, key: nextKey, models: ["alpha", "beta", "model"] }, options),
       )
       expect(reconnected).toEqual({ ok: true, value: { providerID: firstID } })
       const credentials = () =>
@@ -151,10 +162,10 @@ it.live(
 
       const catalog = yield* Effect.promise(() => client.model.list({ location })).pipe(
         Effect.map((result) => result.data.filter((model) => [firstID, secondID].includes(model.providerID))),
-        Effect.repeat({ until: (models) => models.length === 3, times: 50, schedule: Schedule.spaced(40) }),
+        Effect.repeat({ until: (models) => models.length === 4, times: 50, schedule: Schedule.spaced(40) }),
       )
       expect(catalog.map((model) => `${model.providerID}/${model.id}`).sort()).toEqual(
-        [`${firstID}/alpha`, `${firstID}/beta`, `${secondID}/alpha`].sort(),
+        [`${firstID}/alpha`, `${firstID}/beta`, `${firstID}/model`, `${secondID}/alpha`].sort(),
       )
       for (const [id, target, authorization] of [
         [firstID, first, `Bearer ${nextKey}`],
@@ -166,6 +177,35 @@ it.live(
           ),
         ).toEqual({ text: "Local fixture response" })
         expect(target.requests.at(-1)).toEqual({ path: "/v1/chat/completions", authorization })
+      }
+
+      for (const format of ["json", "plain"]) {
+        const rejected = yield* Effect.promise(() =>
+          routes.fetch("http://opencode.local/api/experimental/generate/text", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              model: { providerID: firstID, id: "alpha" },
+              prompt: `Fixture only: rejected (${format})`,
+            }),
+          }),
+        )
+        expect(rejected.status).toBe(502)
+        const error = yield* Effect.promise(() => rejected.text())
+        expect(error).toContain("Fixture rejected credential [redacted]")
+        expect(error).not.toContain("fixture-replacement-")
+      }
+
+      for (const key of ["a", "1"]) {
+        expect(yield* Effect.promise(() => rpc.discover({ address: first.address, key }, options))).toEqual({
+          ok: true,
+          value: ["alpha", "beta", "model"],
+        })
+        expect(
+          yield* Effect.promise(() =>
+            rpc.save({ address: first.address, key, models: ["alpha", "beta", "model"] }, options),
+          ),
+        ).toEqual({ ok: true, value: { providerID: firstID } })
       }
 
       const redirectAddress = new URL("/redirect", first.server.url).href
@@ -203,6 +243,86 @@ it.live(
       expect(after).not.toContain(secondID)
       expect(after).toMatch(/"existing":\s*\{\s*"name": "Existing"\s*\}/u)
       expect(after).toContain("// Keep this comment")
+    }),
+  20_000,
+)
+
+it.live(
+  "preserves a model server and a shell update written concurrently from different Locations",
+  () =>
+    Effect.gen(function* () {
+      const { path } = yield* tmpdirScoped("loginom-model-server-concurrent-")
+      const modelDirectory = join(path, "model-location")
+      const shellDirectory = join(path, "shell-location")
+      yield* Effect.promise(() => Promise.all([mkdir(modelDirectory), mkdir(shellDirectory)]))
+      const config = join(path, "loginom-ai-agent.jsonc")
+      yield* Effect.promise(() => Bun.write(config, '{\n  // keep this comment\n  "shell": "bash"\n}\n'))
+      const shellWrite = yield* Deferred.make<void>()
+      const releaseShell = yield* Deferred.make<void>()
+      const delayedFilesystem = Layer.effect(
+        FSUtil.Service,
+        Effect.gen(function* () {
+          const fs = yield* FSUtil.Service
+          return FSUtil.Service.of({
+            ...fs,
+            writeWithDirs: (target, content, mode) => {
+              const write = fs.writeWithDirs(target, content, mode)
+              return target === config && typeof content === "string" && !content.includes('"providers"')
+                ? Deferred.succeed(shellWrite, undefined).pipe(
+                    Effect.andThen(Deferred.await(releaseShell)),
+                    Effect.andThen(write),
+                  )
+                : write
+            },
+          })
+        }),
+      ).pipe(Layer.provide(LayerNode.compile(FSUtil.node)))
+      const routes = yield* serveRoutes(
+        {
+          database: { path: ":memory:" },
+          config: { directory: path, project: false, claude: false },
+          fs: { filewatcher: false },
+          models: { fetch: false },
+        },
+        [FSUtil.node.replace(delayedFilesystem)],
+      )
+      yield* routes.pluginsLoaded(modelDirectory)
+      yield* routes.pluginsLoaded(shellDirectory)
+      const client = OpenCode.make({
+        baseUrl: "http://opencode.local",
+        fetch: Object.assign(
+          (input: RequestInfo | URL, init?: RequestInit) => routes.handler(new Request(input, init)),
+          { preconnect: fetch.preconnect },
+        ),
+      })
+      const endpoint = new URL("http://opencode.local/api/experimental/config")
+      endpoint.searchParams.set("location[directory]", shellDirectory)
+      const shell = yield* Effect.promise(() =>
+        routes.fetch(endpoint, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ shell: "zsh" }),
+        }),
+      ).pipe(Effect.forkScoped)
+      yield* Deferred.await(shellWrite)
+      const provider = yield* Effect.promise(() =>
+        client
+          .rpc(ModelServerRpc)
+          .save(
+            { address: "http://127.0.0.1:41234/v1", models: ["alpha"] },
+            { location: { directory: modelDirectory } },
+          ),
+      ).pipe(Effect.forkScoped({ startImmediately: true }))
+
+      yield* Fiber.await(provider).pipe(Effect.timeoutOption("1 second"))
+      yield* Deferred.succeed(releaseShell, undefined)
+      const saved = yield* Fiber.join(provider)
+      expect((yield* Fiber.join(shell)).status).toBe(204)
+      if (!saved.ok) throw new Error(`Concurrent model server save failed: ${saved.issue}`)
+      const text = yield* Effect.promise(() => Bun.file(config).text())
+      expect(text).toContain('"shell": "zsh"')
+      expect(text).toContain(`"${saved.value.providerID}"`)
+      expect(text).toContain("// keep this comment")
     }),
   20_000,
 )

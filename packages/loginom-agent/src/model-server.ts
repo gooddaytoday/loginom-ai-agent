@@ -9,7 +9,7 @@ import { resolveModelServer } from "./model-server-network"
 
 const response = Schema.Struct({ data: Schema.Array(Schema.Struct({ id: Schema.String })) })
 
-function addressOf(address: string, key?: string) {
+function addressOf(address: string) {
   const url = URL.parse(address.trim())
   if (
     !url ||
@@ -19,8 +19,7 @@ function addressOf(address: string, key?: string) {
     /[?#]|\{(?:env|file):/u.test(url.href)
   )
     return
-  const baseURL = url.href.replace(/\/+$/u, "")
-  if (!key || !baseURL.includes(key)) return baseURL
+  return url.href.replace(/\/+$/u, "")
 }
 
 async function readModels(reply: Response) {
@@ -36,7 +35,7 @@ async function readModels(reply: Response) {
   return Schema.decodeUnknownSync(response)(JSON.parse(text + decoder.decode())).data
 }
 
-const usable = (id: string, key?: string) => Schema.is(ModelID)(id) && (!key || !id.includes(key))
+const usable = Schema.is(ModelID)
 const providerIDFor = (address: string) => `${providerPrefix}${createHash("sha256").update(address).digest("hex")}`
 
 export function modelServerHandlers(options: {
@@ -51,7 +50,7 @@ export function modelServerHandlers(options: {
   return {
     discover: (input) =>
       Effect.gen(function* () {
-        const baseURL = addressOf(input.address, input.key)
+        const baseURL = addressOf(input.address)
         if (!baseURL) return { ok: false, issue: "modelServerAddressInvalid" }
         if (!(yield* options.allowed(providerIDFor(baseURL)))) return { ok: false, issue: "modelServerDenied" }
         return yield* Effect.promise(async (signal) => {
@@ -64,10 +63,7 @@ export function modelServerHandlers(options: {
               headers: input.key ? { Authorization: `Bearer ${input.key}` } : undefined,
             })
             const entries = await readModels(reply)
-            const models = [...new Set(entries.map((entry) => entry.id).filter((id) => usable(id, input.key)))].slice(
-              0,
-              4096,
-            )
+            const models = [...new Set(entries.map((entry) => entry.id).filter(usable))].slice(0, 4096)
             if (models.length === 0) return { ok: false, issue: "modelServerNoModels" } as const
             return { ok: true, value: models } as const
           } catch {
@@ -77,9 +73,9 @@ export function modelServerHandlers(options: {
       }),
     save: (input) =>
       Effect.gen(function* () {
-        const baseURL = addressOf(input.address, input.key)
+        const baseURL = addressOf(input.address)
         if (!baseURL) return { ok: false, issue: "modelServerAddressInvalid" }
-        if (!input.models.every((id) => usable(id, input.key))) return { ok: false, issue: "modelServerSaveFailed" }
+        if (!input.models.every(usable)) return { ok: false, issue: "modelServerSaveFailed" }
         const verdict = yield* Effect.tryPromise({
           try: (signal) =>
             resolveModelServer(baseURL, AbortSignal.any([signal, AbortSignal.timeout(10_000)])),

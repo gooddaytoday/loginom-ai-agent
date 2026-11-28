@@ -115,7 +115,20 @@ export const modelServerFetch = Object.assign(
     const request = input instanceof Request ? new Request(input, init) : new Request(input.toString(), init)
     const target = await resolveModelServer(request.url, request.signal)
     if (!target.ok) throw new Error("Model server address is not allowed")
-    return target.request(request)
+    const reply = await target.request(request)
+    const key = request.headers.get("authorization")?.match(/^Bearer (.+)$/iu)?.[1]
+    if (!key || reply.status < 400 || !reply.body) return reply
+
+    const text = await reply.text()
+    let body = text
+    try {
+      body = JSON.stringify(JSON.parse(text))
+    } catch {}
+    const mask = "[redacted]".includes(key) ? "…" : "[redacted]"
+    body = body.replaceAll(JSON.stringify(key).slice(1, -1), mask).replaceAll(key, mask)
+    const headers = new Headers(reply.headers)
+    headers.delete("content-length")
+    return new Response(body, { status: reply.status, statusText: reply.statusText, headers })
   },
   { preconnect: fetch.preconnect },
 )

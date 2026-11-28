@@ -8,6 +8,7 @@ import { Context, Effect, FiberMap, Layer, Option, PubSub, Ref, Schema, Semaphor
 import { Directory, Document, Info, type Patch, type Entry, Event } from "@opencode/schema/config"
 import { Credential } from "./credential.js"
 import { Bus } from "./bus.js"
+import { KeyedMutex } from "./effect/keyed-mutex.js"
 import { Watcher } from "./filesystem/watcher.js"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Global } from "@opencode/util/global"
@@ -33,6 +34,8 @@ export function latest<K extends keyof Info>(entries: readonly Entry[], key: K):
 type ProfilePatch = Partial<Patch> & {
   readonly providers?: Readonly<Record<string, NonNullable<Info["providers"]>[string] | undefined>>
 }
+
+const profileWrites = KeyedMutex.makeUnsafe<string>()
 
 export interface Interface {
   /** Returns location config documents and discovery sources from lowest to highest priority. */
@@ -138,7 +141,6 @@ export const layer = (options?: Options) =>
       // Integrations set their documents from outside this layer, so their reloads run with its services.
       const context = yield* Effect.context<FSUtil.Service | Global.Service | Location.Service>()
       const reloadLock = Semaphore.makeUnsafe(1)
-      const updateLock = Semaphore.makeUnsafe(1)
       const decodeOptions = { errors: "all", onExcessProperty: "ignore" } as const
       const decodeInfo = Schema.decodeUnknownOption(Info, decodeOptions)
       const parseInfo = Effect.fn("Config.parseInfo")(function* (text: string, source: string) {
@@ -478,9 +480,10 @@ export const layer = (options?: Options) =>
         return (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "loginom-ai-agent.jsonc")
       })
 
-      const update = Effect.fn("Config.update")(
-        function* (patch: ProfilePatch) {
-          const filepath = yield* profilePath()
+      const update = Effect.fn("Config.update")(function* (patch: ProfilePatch) {
+        const filepath = yield* profilePath()
+        const target = yield* fs.resolve(filepath)
+        yield* Effect.gen(function* () {
           const text = (yield* fs.readFileStringSafe(filepath)) ?? "{}\n"
           const updated = yield* Effect.try({
             try: () => {
@@ -495,10 +498,9 @@ export const layer = (options?: Options) =>
             catch: (cause) => new FSUtil.FileSystemError({ method: "config.update", cause }),
           })
           yield* fs.writeWithDirs(filepath, updated.endsWith("\n") ? updated : `${updated}\n`)
-          yield* requestReload
-        },
-        (effect) => updateLock.withPermit(effect),
-      )
+        }).pipe(profileWrites.withLock(target))
+        yield* requestReload
+      })
 
       return Service.of({
         entries: Effect.fnUntraced(function* () {
