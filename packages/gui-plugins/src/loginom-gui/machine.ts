@@ -16,24 +16,29 @@ type State = { attempt: number } & (
   | (Form & { type: "editing"; issue?: Issue })
   | (Form & { type: "checking"; submit: "check" | "save" })
   | (Form & { type: "verified"; validation: Validation })
-  | (Form & { type: "saving" | "applying" })
+  | (Form & { type: "saving" })
+  | (Form & { type: "refreshing"; issue?: Issue; edited: boolean })
+  | (Form & { type: "applying"; until: number; edited: boolean })
 )
 
 type Event =
   | { type: "target"; available: boolean }
   | { type: "disposed" }
+  | { type: "refresh" }
   | { type: "edit"; patch: Partial<Draft> }
   | { type: "submit"; submit: "check" | "save"; now: number }
-  | { type: "status" | "saved"; attempt: number; result: StatusResult }
+  | { type: "status" | "saved"; attempt: number; result: StatusResult; now: number }
   | { type: "checked"; attempt: number; result: CheckResult }
 
 type Effect =
   | { type: "cancel" }
-  | { type: "status"; attempt: number; delay?: number }
+  | { type: "status"; attempt: number; delay?: number; timeout?: number }
   | { type: "check"; attempt: number; input: Candidate }
   | { type: "save"; attempt: number; input: { revision: number; validationId: string } }
 
 type Transition = { state: State; effects: Effect[] }
+
+const applicationWait = 15_000
 
 export const initial: State = { type: "unavailable", attempt: 0 }
 
@@ -48,16 +53,20 @@ function preservesPassword({ status, draft }: Form) {
   return (
     status.hasPassword &&
     draft.username.trim() === status.username &&
-    URL.canParse(draft.url) &&
-    new URL(draft.url).href === status.url
+    URL.canParse(draft.url.trim()) &&
+    new URL(draft.url.trim()).href === status.url
   )
+}
+
+function waiting(status: Status) {
+  return !status.failed && (status.state === "pending" || status.state === "starting")
 }
 
 function draftCandidate(current: Form): Candidate | { issue: Issue } {
   const { status, draft } = current
   const url = draft.url.trim()
   const username = draft.username.trim()
-  if (!Schema.is(Address)(url)) return { issue: !url && status.deviceOnly ? "deviceAddress" : "invalidAddress" }
+  if (!Schema.is(Address)(url)) return { issue: "invalidAddress" }
   if (!username) return { issue: "invalidUsername" }
   const identity = { revision: status.revision, url, username }
   if (draft.noPassword) return { ...identity, password: { operation: "empty" } }
@@ -85,10 +94,16 @@ export function transition(state: State, event: Event): Transition {
       return event.available
         ? { state: { type: "loading", attempt }, effects: [{ type: "cancel" }, { type: "status", attempt }] }
         : { state: { type: "unavailable", attempt }, effects: [{ type: "cancel" }] }
+    case "refresh":
+      if (state.type === "unavailable") return transition(state, { type: "target", available: true })
+      if (state.type !== "editing") return keep
+      return refresh(state, attempt)
     case "edit": {
-      if (state.type !== "editing" && state.type !== "verified" && state.type !== "checking") return keep
+      if (!("draft" in state) || state.type === "saving") return keep
       const draft = { ...state.draft, ...event.patch }
       if (draft.noPassword) draft.password = ""
+      if (state.type === "applying") return { state: { ...state, draft, edited: true }, effects: [] }
+      if (state.type === "refreshing") return { state: { ...state, draft, edited: true }, effects: [] }
       return {
         state: { type: "editing", attempt, draft, status: state.status },
         effects: state.type === "checking" ? [{ type: "cancel" }] : [],
@@ -120,32 +135,71 @@ export function transition(state: State, event: Event): Transition {
     case "status": {
       if (event.attempt !== state.attempt) return keep
       if (event.type === "saved" && state.type !== "saving") return keep
-      if (event.type === "status" && state.type !== "loading" && state.type !== "applying") return keep
+      if (
+        event.type === "status" &&
+        state.type !== "loading" &&
+        state.type !== "applying" &&
+        state.type !== "refreshing"
+      )
+        return keep
       if (!event.result.ok) {
-        if (state.type === "saving") return failed(state, event.result.issue)
-        return { state: { type: "unavailable", attempt }, effects: [] }
+        if (state.type === "saving" && event.result.issue === "saveFailed") return refresh(state, attempt, "saveFailed")
+        if (state.type === "loading") return { state: { type: "unavailable", attempt }, effects: [] }
+        if (state.type === "applying" && event.now >= state.until)
+          return { state: { type: "editing", attempt, status: state.status, draft: state.draft }, effects: [] }
+        if ("draft" in state)
+          return failed(state, state.type === "refreshing" ? (state.issue ?? event.result.issue) : event.result.issue)
+        return keep
       }
       const status = event.result.value
-      if (!status.failed && (status.state === "pending" || status.state === "starting")) {
-        const draft = "draft" in state ? { ...state.draft, password: "" } : form(status).draft
-        return {
-          state: { type: "applying", attempt, status, draft },
-          effects: [{ type: "status", attempt, delay: 1000 }],
+      const recovered =
+        state.type === "refreshing" && state.issue === "saveFailed" && state.status.revision !== status.revision
+      const edited =
+        (state.type === "applying" && state.edited) || (state.type === "refreshing" && (state.edited || !recovered))
+      const draft = "draft" in state && edited ? state.draft : form(status).draft
+      if (waiting(status)) {
+        const pendingDraft =
+          state.type === "saving" || (recovered && !edited) ? { ...state.draft, password: "" } : draft
+        const until = state.type === "applying" ? state.until : event.now + applicationWait
+        const remaining = until - event.now
+        if (remaining > 1000) {
+          return {
+            state: { type: "applying", attempt, status, draft: pendingDraft, until, edited },
+            effects: [{ type: "status", attempt, delay: 1000, timeout: remaining - 1000 }],
+          }
         }
+        return { state: { type: "editing", attempt, status, draft: pendingDraft }, effects: [] }
       }
-      return { state: { type: "editing", attempt, ...form(status) }, effects: [] }
+      const issue = state.type === "refreshing" && !recovered ? state.issue : undefined
+      return { state: { type: "editing", attempt, status, draft, issue }, effects: [] }
     }
+  }
+}
+
+function refresh(state: Form, attempt: number, issue?: Issue): Transition {
+  return {
+    state: { type: "refreshing", attempt, status: state.status, draft: state.draft, issue, edited: false },
+    effects: [{ type: "status", attempt }],
   }
 }
 
 function failed(state: Form & { attempt: number }, issue: Issue): Transition {
   return {
-    state:
-      issue === "unavailable"
-        ? { type: "unavailable", attempt: state.attempt }
-        : { type: "editing", attempt: state.attempt, draft: state.draft, status: state.status, issue },
+    state: { type: "editing", attempt: state.attempt, draft: state.draft, status: state.status, issue },
     effects: [],
   }
+}
+
+function message(state: State) {
+  if (state.type === "disposed") return
+  if (state.type === "loading" || state.type === "refreshing") return "loading"
+  if (state.type === "unavailable") return "serviceUnavailable"
+  if (state.type === "applying") return state.status.state === "pending" ? "pending" : "starting"
+  if (state.type === "verified") return "verified"
+  if (!("status" in state)) return
+  if (state.status.failed) return "activationFailed"
+  if (waiting(state.status)) return "applicationPaused"
+  if (state.status.state !== "ready") return "disconnected"
 }
 
 export function view(state: State) {
@@ -154,44 +208,30 @@ export function view(state: State) {
   return {
     draft: form?.draft,
     connected: form?.status.state === "ready" && !form.status.failed ? form.status : undefined,
-    message:
-      state.type === "disposed"
-        ? undefined
-        : state.type === "loading"
-          ? "loading"
-          : state.type === "unavailable"
-            ? "serviceUnavailable"
-            : state.type === "applying"
-              ? state.status.state === "pending"
-                ? "pending"
-                : "starting"
-              : state.type === "verified"
-                ? "verified"
-                : form?.status.failed
-                  ? "activationFailed"
-                  : form?.status.state === "ready"
-                    ? undefined
-                    : "disconnected",
-    deviceOnly: form?.status.deviceOnly ?? false,
+    message: message(state),
     fieldErrors: {
-      url: issue === "invalidAddress" || issue === "loginUnavailable" || issue === "deviceAddress" ? issue : undefined,
+      url: issue === "invalidAddress" || issue === "loginUnavailable" ? issue : undefined,
       username: issue === "invalidUsername" ? issue : undefined,
       password: issue === "passwordRequired" || issue === "credentialsRejected" ? issue : undefined,
     },
     issue:
+      issue === "unavailable" ||
       issue === "changed" ||
       issue === "expired" ||
       issue === "saveFailed" ||
-      issue === "knowledgeAuthFailed" ||
       issue === "checkFailed" ||
       issue === "logoutUnconfirmed"
         ? issue
         : undefined,
     passwordSaved: form && preservesPassword(form),
-    readOnly: state.type === "saving" || state.type === "applying",
-    busy: state.type === "checking" || state.type === "saving" || state.type === "applying",
+    readOnly: state.type === "saving",
+    busy:
+      state.type === "checking" || state.type === "saving" || state.type === "applying" || state.type === "refreshing",
     checking: state.type === "checking",
     saving: state.type === "saving",
-    retry: state.type === "unavailable" || issue === "changed" || issue === "saveFailed",
+    retry:
+      state.type === "unavailable" ||
+      (state.type === "editing" &&
+        (waiting(state.status) || issue === "unavailable" || issue === "changed" || issue === "saveFailed")),
   }
 }

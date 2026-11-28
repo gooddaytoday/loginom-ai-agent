@@ -48,6 +48,15 @@ test("restores the last PWA route including query and hash without adding histor
   expect(window.history.state).toEqual({ retained: true })
 })
 
+test("restores a saved plugin page with encoded segments, query, and hash", () => {
+  const route = "/page/%40acme%2Fplugin/overview?view=summary#details"
+  localStorage.setItem(key, route)
+
+  restorePwaRoute()
+
+  expect(window.location.pathname + window.location.search + window.location.hash).toBe(route)
+})
+
 test("preserves explicit launch routes, queries, and hashes", () => {
   localStorage.setItem(key, "/server/local/session/saved")
 
@@ -65,6 +74,9 @@ test("ignores missing, invalid, external, and auth-bearing saved routes", () => 
 
   for (const value of [
     "/removed-route",
+    "/page/plugin",
+    "/page/plugin/overview/extra",
+    "/page/plugin/overview?auth_token=secret",
     "https://example.com/new-session",
     "//example.com/new-session",
     "http://[",

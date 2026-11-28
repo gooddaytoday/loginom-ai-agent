@@ -1,5 +1,4 @@
 import type { Page } from "@playwright/test"
-import type { Schema } from "effect"
 import { NO_PROVIDER } from "./app"
 import type { MockServerConfig } from "./mock-server"
 import { mockWorkspace } from "./workspace"
@@ -13,7 +12,7 @@ export async function openLoginomSettings(page: Page, onRpc: MockServerConfig["o
   return page.getByRole("tabpanel", { name: "Loginom", exact: true }).locator("form")
 }
 
-export function loginomSettingsFixture(issue?: "knowledgeAuthFailed" | "loginUnavailable" | "credentialsRejected") {
+export function loginomSettingsFixture(issue?: "loginUnavailable" | "credentialsRejected") {
   const checks: unknown[] = []
   const saves: unknown[] = []
   const status = {
@@ -25,21 +24,22 @@ export function loginomSettingsFixture(issue?: "knowledgeAuthFailed" | "loginUna
     hasPassword: true,
     state: "ready",
     failed: false,
-    deviceOnly: false,
   }
-  const onRpc: MockServerConfig["onRpc"] = ({ id, method, body }): Schema.Json | undefined => {
-    if (id !== "loginom.connection") return
+  const onRpc: MockServerConfig["onRpc"] = ({ rpcID, method, body }) => {
+    if (rpcID !== "loginom.connection") return
     switch (method) {
       case "status":
-        return { ok: true, value: status }
+        return { output: { ok: true, value: status } }
       case "check":
         checks.push(body)
-        return issue
-          ? { ok: false, issue, message: `Fixture diagnostic: ${loginomDiagnosticKey}` }
-          : { ok: true, value: { validationId: "fixture-validation", expiresAt: Date.now() + 60_000 } }
+        return {
+          output: issue
+            ? { ok: false, issue, message: `Fixture diagnostic: ${loginomDiagnosticKey}` }
+            : { ok: true, value: { validationId: "fixture-validation", expiresAt: Date.now() + 60_000 } },
+        }
       case "save":
         saves.push(body)
-        return { ok: true, value: { ...status, generation: 5, revision: 8, hasPassword: false } }
+        return { output: { ok: true, value: { ...status, generation: 5, revision: 8, hasPassword: false } } }
     }
   }
   return { onRpc, checks, saves }

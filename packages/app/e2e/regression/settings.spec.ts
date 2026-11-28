@@ -55,7 +55,6 @@ function open(page: Page, input: Partial<WorkspaceInput> = {}) {
 const loginomPassword = "fixture-wrong-password"
 
 for (const [issue, text, address] of [
-  ["knowledgeAuthFailed", "The knowledge service rejected its access key.", loginomAddress],
   [
     "loginUnavailable",
     "The Loginom sign-in page is unavailable. Check the address and network.",
@@ -138,6 +137,63 @@ const patched = (page: Page) =>
   page.waitForRequest(
     (request) => request.method() === "PATCH" && new URL(request.url()).pathname === `/api/project/${projectID}`,
   )
+
+test("Loginom settings use the service Location and recover an unconfirmed Save", async ({ page }) => {
+  const serviceDirectory = "/service"
+  const loginom = "https://loginom.example/app/"
+  let username = "user"
+  let revision = 0
+  const checks: unknown[] = []
+  await mockWorkspace(page, {
+    name: "Loginom",
+    sessions: [],
+    directory: serviceDirectory,
+    provider: NO_PROVIDER,
+    onRpc: (request) => {
+      if (request.rpcID !== "loginom.connection") return
+      expect(request.directory).toBe(serviceDirectory)
+      switch (request.method) {
+        case "status":
+          return {
+            output: {
+              ok: true,
+              value: {
+                revision,
+                generation: revision,
+                url: loginom,
+                username,
+                folder: `/${username}`,
+                hasPassword: false,
+                failed: false,
+                state: revision ? "ready" : "unconfigured",
+              },
+            },
+          }
+        case "check":
+          checks.push(request.body)
+          return { output: { ok: true, value: { validationId: "checked", expiresAt: 4102444800000 } } }
+        case "save":
+          expect(request.body).toMatchObject({ input: { revision: 0, validationId: "checked" } })
+          username = "analyst"
+          revision = 1
+          return { unavailable: true }
+      }
+    },
+  })
+  await page.goto("/settings?tab=loginom")
+  const settings = page.getByRole("tabpanel", { name: "Loginom", exact: true })
+  const user = settings.getByRole("textbox", { name: "Username" })
+  await expect(user).toHaveValue("user")
+  await user.fill("analyst")
+  await settings.getByRole("button", { name: "Save", exact: true }).click()
+  await expect(settings.getByText("Connected as analyst · folder /analyst")).toBeVisible()
+  await settings.getByRole("button", { name: "Check", exact: true }).click()
+  await expect(settings.getByText("Checked, not yet saved")).toBeVisible()
+  expect(checks).toMatchObject([
+    { input: { revision: 0, url: loginom, username: "analyst" } },
+    { input: { revision: 1, url: loginom, username: "analyst" } },
+  ])
+})
 
 test("settings has its own route and returns through app history", async ({ page }) => {
   const { settings } = await open(page)
@@ -1890,6 +1946,59 @@ test("providers: OpenCode Console signs in from its method list", async ({ page,
   await expect(signIn.getByRole("group", { name: "Device code: ABCD-EFGH", exact: true })).toBeVisible()
   await expect(signIn.getByRole("button", { name: "Copy sign-in link", exact: true })).toBeVisible()
 })
+
+for (const width of [1280, 480]) {
+  test(`providers: Desktop completes device sign-in without a Console return link (${width}px)`, async ({
+    page,
+    context,
+  }) => {
+    const url = "https://auth.example.test/device?user_code=ABCD-EFGH&client_id=opencode-cli"
+    let authorized = false
+    await context.route("https://auth.example.test/**", (route) => route.fulfill({ body: "Device sign-in" }))
+    await mockOpenCodeServer(page, {
+      directory,
+      project: project({ id: projectID, directory, name: "Settings demo" }),
+      provider: () =>
+        authorized
+          ? {
+              all: [{ id: "console-google", integrationID: "opencode", name: "Workspace / Google", models: {} }],
+              connected: ["console-google"],
+              default: {},
+            }
+          : NO_PROVIDER,
+      sessions: [],
+      pageMessages: () => ({ items: [] }),
+      integrations: consoleIntegrations,
+      onIntegrationOAuth: () => ({ url }),
+      onIntegrationOAuthStatus: () => (authorized ? "complete" : "pending"),
+    })
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto(`/e2e/utils/settings-wsl.html?${new URLSearchParams({ server: SERVER, mode: "ready" })}`)
+
+    const settings = page.getByTestId("settings-screen")
+
+    if (width === 480) {
+      await settings.getByRole("button", { name: "Preferences", exact: true }).click()
+      await page.getByRole("menuitemradio", { name: "Providers", exact: true }).click()
+    } else {
+      await settings.getByRole("tab", { name: "Providers", exact: true }).click()
+    }
+
+    await settings
+      .locator(".settings-provider-row", { hasText: "OpenCode Console" })
+      .getByRole("button", { name: "Connect", exact: true })
+      .click()
+    const methods = page.getByRole("dialog", { name: "Connect OpenCode Console", exact: true })
+    const popup = context.waitForEvent("page")
+    await methods.getByRole("button", { name: "OpenCode Console account", exact: true }).click()
+    await expect(await popup).toHaveURL(url)
+
+    const signIn = page.getByRole("dialog", { name: "Connecting to OpenCode Console", exact: true })
+    await expect(signIn.getByRole("group", { name: "Device code: ABCD-EFGH", exact: true })).toBeVisible()
+    authorized = true
+    await expect(page.getByText("OpenCode Console connected", { exact: true })).toBeVisible()
+  })
+}
 
 test("providers: OpenCode Go connects with its own methods, not the Console sign-in", async ({ page }) => {
   const attempts: string[] = []
