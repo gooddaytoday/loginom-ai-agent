@@ -1,5 +1,5 @@
 import { SettingsPage, type Plugin } from "@opencode/plugin/gui"
-import { builtinContext, Page, subscribeBuiltinDeepLinks } from "@opencode/plugin/gui/builtin"
+import { builtinContext, Page, QuestionRenderer, subscribeBuiltinDeepLinks } from "@opencode/plugin/gui/builtin"
 import { dashboardLinkChannel } from "@loginom-ai-agent/product/dashboard-link"
 import { Option, Schema } from "effect"
 import { lazy, onCleanup, Show, Suspense } from "solid-js"
@@ -7,14 +7,17 @@ import { unwrap } from "solid-js/store"
 import { DashboardLink } from "./contract"
 import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
 import type definition from "./index"
-import windowSetup from "./window-renderer"
+import { LoginomRepeatDock } from "./repeat-dock"
 import { registerStartScreen } from "./start-screen"
+import { registerSystemProxy } from "./system-proxy"
+import windowSetup from "./window-renderer"
 
 const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   registerStartScreen(ctx)
   windowSetup(ctx)
+
   const Catalog = lazy(() => import("./catalog-page"))
 
   ctx.add(Page, {
@@ -45,7 +48,14 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     ),
   })
 
+  ctx.add(QuestionRenderer, {
+    matches: (request) => request.metadata?.loginomRepeat === true,
+    render: (props) => <LoginomRepeatDock {...props} />,
+  })
+
   if (!ctx.desktop) return
+
+  registerSystemProxy(ctx)
 
   const Dashboard = lazy(() => import("./dashboard"))
   const router = builtinContext(ctx).router

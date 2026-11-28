@@ -21,12 +21,12 @@ export default {
   "onboarding.needAnotherDistroHint": "WSL katalogidan Linux distributivini o'rnating",
   "onboarding.wslNotInstalled.title": "WSL o'rnatilmagan",
   "onboarding.wslNotInstalled.description":
-    "OpenCode WSL serverini qoʻshishdan oldin WSL (Linux uchun Windows quyi tizimi) talab qilinadi.",
+    "Loginom AI Agent WSL serverini qoʻshishdan oldin WSL (Linux uchun Windows quyi tizimi) talab qilinadi.",
   "onboarding.wslUnavailable.title": "WSL mavjud emas",
-  "onboarding.wslUnavailable.description": "OpenCode WSL ni ushbu mashinada tasdiqlay olmadi.",
+  "onboarding.wslUnavailable.description": "Loginom AI Agent WSL ni ushbu mashinada tasdiqlay olmadi.",
   "onboarding.installWsl": "WSL-ni o'rnating",
   "onboarding.windowsRestartRequired":
-    "WSL-ni o'rnatishni tugatish uchun Windows-ni qayta ishga tushiring, so'ngra OpenCode-ni qayta oching.",
+    "WSL-ni o'rnatishni tugatish uchun Windows-ni qayta ishga tushiring, so'ngra Loginom AI Agent-ni qayta oching.",
   "onboarding.allDistrosAdded": "Barcha o'rnatilgan tarqatishlar allaqachon qo'shilgan.",
   "onboarding.noDistros": "Hali hech qanday tarqatish aniqlanmadi.",
   "onboarding.installDistro": "Distroni o'rnating",
