@@ -82,28 +82,39 @@ test("8 · Сбои", async ({ page, baseURL }, info) => {
       await gateScreenshot(page, info, "08-write-unconfirmed")
       expect(await gate.status()).toMatchObject({
         calls: ["dock_prepare", "dock_workspace_observe", "dock_action_run"],
+        saveBrowserCalls: ["prepare:gate-write", "apply:gate-write"],
       })
       await gate.editor.fill(gatePrompts.check)
       await gate.submit.click()
       await expect(page.getByText("Проверка подтвердила сохранение пакета Продажи.lgp.", { exact: true })).toBeVisible()
       expect(await gate.status()).toMatchObject({
         calls: ["dock_prepare", "dock_workspace_observe", "dock_action_run", "dock_operation_inspect"],
+        saveBrowserCalls: ["prepare:gate-write", "apply:gate-write", "receipt:gate-write"],
       })
     })
-    await test.step("Остановить третий одинаковый вызов до обращения в Loginom", async () => {
+    await test.step("LAB-2235 · свернуть повторы в одну строку и остановить третий вызов", async () => {
+      const question = page.locator('[data-component="dock-prompt"][data-kind="question"]')
+      const repeats = page.locator('[data-component="tool-group-row"]')
+      await expect(repeats).toHaveCount(0)
       await gate.editor.fill(gatePrompts.repeat)
       await gate.submit.click()
-      const question = page.locator('[data-component="dock-prompt"][data-kind="question"]')
       await expect(
-        question.getByText("Агент снова делает одно и то же: применяет настройки узла Loginom", { exact: true }),
+        question.getByText(
+          "Агент собирается в третий раз вызвать применение настроек узла Loginom с теми же параметрами.",
+          { exact: true },
+        ),
       ).toBeVisible()
+      await expect(repeats).toHaveCount(1)
+      await expect(repeats).toHaveText("Агент дважды вызвал применение настроек узла Loginom с теми же параметрами")
       const before = ["dock_prepare", "dock_workspace_observe", "dock_action_run", "dock_operation_inspect"]
       const stoppedCalls = [...before, "dock_action_describe", "dock_node_apply", "dock_node_apply"]
       expect((await gate.status()).calls).toEqual(stoppedCalls)
       await gateScreenshot(page, info, "08-repeat-question")
-      await question.getByRole("radio", { name: /^Остановить/ }).click()
-      await question.getByRole("button", { name: "Submit", exact: true }).click()
-      await expect(page.getByText("Третий вызов остановлен по вашему выбору.", { exact: true })).toBeVisible()
+      await question.getByRole("button", { name: "Остановить", exact: true }).click()
+      await expect(question).toHaveCount(0)
+      await expect(gate.editor).toBeEditable()
+      await expect(gate.submit).toBeDisabled()
+      await expect(repeats).toHaveCount(1)
       expect((await gate.status()).calls).toEqual(stoppedCalls)
     })
     await test.step.skip(
@@ -140,10 +151,6 @@ test("8 · Сбои", async ({ page, baseURL }, info) => {
       },
     )
     await test.step.skip("LAB-2196 · пакет в другом разговоре, Studio или осиротевшей сессии", async () => {})
-    await test.step.skip(
-      "LAB-2235 · свернуть одинаковые вызовы в одну строку ленты и связать её с вопросом",
-      async () => {},
-    )
     await test.step.skip("LAB-2165, LAB-2200 · лимит модели и уведомления", async () => {})
   })
 })

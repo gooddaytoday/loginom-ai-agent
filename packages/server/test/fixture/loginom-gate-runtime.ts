@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
 import { assertActionOutcome, validateActionParameters } from "../../../loginom-runtime/client/lib/action-catalog.mjs"
-import { executorTools } from "../../../loginom-runtime/client/lib/executor.mjs"
+import { createActionRuntime, executorTools } from "../../../loginom-runtime/client/lib/executor.mjs"
 import { deliveryApiTools, dispatchNodeApi, nodeApiTools } from "../../../loginom-runtime/client/lib/node-api.mjs"
 import { validateNodeApplyRequest } from "../../../loginom-runtime/client/lib/node-apply.mjs"
 import { describeNodeTypes } from "../../../loginom-runtime/client/lib/node-contracts.mjs"
@@ -9,7 +9,7 @@ import { createNodeOperationRunner } from "../../../loginom-runtime/client/lib/n
 import { nodeResultReply } from "../../../loginom-runtime/client/lib/node-result-reply.mjs"
 import { createCandidateNodeSupport } from "../../../loginom-runtime/client/lib/node-support.mjs"
 import { createSkillLoader, prepareTool } from "../../../loginom-runtime/client/lib/skill.mjs"
-import { requireStorageDestination } from "../../../loginom-runtime/client/lib/storage-policy.mjs"
+import { createStorageBinding, requireStorageDestination } from "../../../loginom-runtime/client/lib/storage-policy.mjs"
 import { verifyTextImportSource } from "../../../loginom-runtime/client/lib/text-import-node.mjs"
 import { compactActionResult } from "../../../loginom-runtime/client/lib/user-results.mjs"
 import {
@@ -21,6 +21,7 @@ import {
 import { parseWorkspacePreparation, workspaceObserveTool } from "../../../loginom-runtime/client/lib/workspace.mjs"
 import actionCatalog from "../../../loginom-runtime/executor/catalog-releases/2026.11.16-rest-save-linux-candidate/actions.json"
 import catalogManifest from "../../../loginom-runtime/executor/catalog-releases/2026.11.16-rest-save-linux-candidate/manifest.json"
+import selectorCatalog from "../../../loginom-runtime/executor/catalog-releases/2026.11.16-rest-save-linux-candidate/selectors.json"
 import { gateGraph, output } from "./loginom-gate-graph"
 import {
   doc,
@@ -36,7 +37,8 @@ import {
 const targetOrigin = "https://loginom.invalid"
 const targetBuild = catalogManifest.compatibility.loginom_build
 const storage = { packages: "/gate", inputs: "/gate", exports: "/gate" }
-const actions = new Map<string, object>(actionCatalog.actions.map((action) => [action.action_key, action]))
+const actions = new Map(actionCatalog.actions.map((action) => [action.action_key, action]))
+const selectors = new Map(selectorCatalog.selectors.map((selector) => [selector.symbol, selector]))
 const checkpoint = actionCatalog.actions.find((action) => action.action_key === "package.save_checkpoint")!
 const fixtureTools = [
   prepareTool,
@@ -60,19 +62,55 @@ const success = (action_key: string, operation_id: string, output: object, phase
   trace: [],
   output,
 })
-const failure = (
-  action: ReturnType<typeof success>,
-  status: "FAILED" | "AMBIGUOUS",
-  code: string,
-  message: string,
-) => ({
-  ...action,
-  status,
-  phase: "failed",
-  effect_possible: status === "AMBIGUOUS",
-  cleanup_complete: status !== "AMBIGUOUS",
-  error: { code, message },
-})
+const saveBrowser = () => {
+  const calls: string[] = []
+  const completed = new Map<string, ReturnType<typeof success>>()
+  return {
+    calls,
+    async execute(code: string) {
+      // The executor embeds the operation ID and phase in the browser request.
+      const operation = /"operation_id":"([a-zA-Z0-9_.:-]+)"/.exec(code)?.[1]
+      assert(operation, "The browser request must identify the Save operation")
+      if (code.includes('"receipt_read":true')) {
+        calls.push(`receipt:${operation}`)
+        const receipt = completed.get(operation)
+        return success(
+          "operation.inspect",
+          operation,
+          receipt ? { state: "completed", receipt } : { state: "missing" },
+          "observed",
+        )
+      }
+
+      if (code.includes('"mode":"prepare"')) {
+        calls.push(`prepare:${operation}`)
+        return {
+          ...success(checkpoint.action_key, operation, {}, "prepared"),
+          status: "NOT_APPLIED",
+          checkpoint: { workflow_ref: workflowRef, path: packagePath },
+        }
+      }
+
+      assert(code.includes('"mode":"apply"'), "Expected the browser Save capability")
+      calls.push(`apply:${operation}`)
+      assert(!completed.has(operation), "Save may reach the browser only once")
+      const outcome = {
+        ...success(checkpoint.action_key, operation, {
+          package_ref: { kind: "package", path: packagePath, active_identity: packagePath },
+          save_completed: true,
+          reopened: false,
+          workflow_preserved: true,
+          persisted_content_verified: false,
+        }),
+        effect_possible: true,
+      }
+      completed.set(operation, outcome)
+      if (operation === "gate-write") throw Error("Browser transport disconnected after Save")
+      return outcome
+    },
+  }
+}
+
 const admission = {
   artifact_id: "artifact-1",
   name: salesFile,
@@ -92,7 +130,26 @@ export function gateRuntime(resources: string, graph?: ReturnType<typeof gateGra
   let prepared = false
   let admitted = false
   let reads = 0
-  let uncertain: ReturnType<typeof success> | undefined
+  const browser = saveBrowser()
+  const saveRuntime = createActionRuntime({
+    pinned: { actions, selectors, pins: {}, compatibility: catalogManifest.compatibility },
+    execute: browser.execute,
+    allowCandidate: true,
+    targetOrigin,
+    // @ts-expect-error The untyped executor infers its null callback default as the only return type.
+    getStorageBinding: () =>
+      createStorageBinding({
+        sessionId: "gate-session",
+        origin: targetOrigin,
+        build: targetBuild,
+        documentId: doc,
+        account: "gate",
+        directories: storage,
+      }),
+  })
+  assert("run" in saveRuntime && typeof saveRuntime.run === "function")
+  assert("inspect" in saveRuntime && typeof saveRuntime.inspect === "function")
+  const { run, inspect } = saveRuntime
   const uploads: { operation_id: string; artifact: typeof admission; outcome: ReturnType<typeof success> }[] = []
   const jobs = createNodeOperationRunner({
     validate: (request: Record<string, unknown>, { fresh }: { fresh: boolean }) =>
@@ -156,6 +213,7 @@ export function gateRuntime(resources: string, graph?: ReturnType<typeof gateGra
   }
   return {
     catalog: () => fixtureTools,
+    saveBrowserCalls: browser.calls,
     admit(files: { name: string; data?: string }[]) {
       assert.deepEqual(files, [{ name: salesFile, data: Buffer.from(salesCsv).toString("base64") }])
       admitted = true
@@ -245,50 +303,17 @@ export function gateRuntime(resources: string, graph?: ReturnType<typeof gateGra
           "observed",
         )
         if (reads > 1)
-          receipt = failure(
-            success("workspace.observe", receipt.operation_id, {}),
-            "FAILED",
-            "LOGINOM_UNAVAILABLE",
-            "Loginom недоступен.",
-          )
+          receipt = {
+            ...success("workspace.observe", receipt.operation_id, {}, "failed"),
+            status: "FAILED",
+            error: { code: "LOGINOM_UNAVAILABLE", message: "Loginom недоступен." },
+          }
       } else if (name === "dock_action_run") {
         assert(typeof args.operation_id === "string" && args.action_key === checkpoint.action_key)
-        assert(!uncertain, "Save was still awaiting reconciliation")
-        const parameters = args.parameters as { path: string }
-        requireStorageDestination(parameters.path, storage, "packages")
-        const saved = {
-          package_ref: { kind: "package", path: parameters.path, active_identity: parameters.path },
-          save_completed: true,
-          reopened: false,
-          workflow_preserved: true,
-          persisted_content_verified: false,
-        }
-        validateActionParameters(checkpoint.output_schema, saved)
-        receipt = { ...success(checkpoint.action_key, args.operation_id, saved), effect_possible: true }
-        if (args.operation_id === "gate-write") {
-          uncertain = receipt
-          receipt = failure(
-            success(receipt.action_key, receipt.operation_id, {}),
-            "AMBIGUOUS",
-            "SAVE_UNCONFIRMED",
-            "Ответ на запись потерян.",
-          )
-        }
+        receipt = await run(args.action_key, args.parameters, { operationId: args.operation_id })
       } else {
-        assert(name === "dock_operation_inspect" && uncertain && args.operation_id === uncertain.operation_id)
-        receipt = success(
-          "operation.inspect",
-          uncertain.operation_id,
-          {
-            operation_id: uncertain.operation_id,
-            state: "resolved",
-            effect_state: "verified",
-            cleanup_confirmed: true,
-            outcome: uncertain,
-          },
-          "observed",
-        )
-        uncertain = undefined
+        assert(name === "dock_operation_inspect" && typeof args.operation_id === "string")
+        receipt = await inspect({ operationId: args.operation_id })
       }
       return jsonReply(compactActionResult(assertActionOutcome(receipt)))
     },

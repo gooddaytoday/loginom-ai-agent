@@ -176,8 +176,8 @@ await Effect.runPromise(
           assert.equal(results[0]?.result.type, "error")
           return TestLLM.text(turn.reply, crypto.randomUUID())
         }
-        const repeatStop = turn.repeatStop ?? false
-        assert.equal(results.length, turn.calls.length + Number(repeatStop))
+        assert(!turn.repeatStop, "Stopping the repeat must end the turn without another model response")
+        assert.equal(results.length, turn.calls.length)
         for (const [index, call] of turn.calls.entries()) {
           const name = `loginom_${call.name}`
           const part = results[index]
@@ -188,11 +188,6 @@ await Effect.runPromise(
           const receipt = result.type === "error" ? toolFailure(result.value).error.message : result.value
           assert(typeof receipt === "string", JSON.stringify(result))
           assert.partialDeepStrictEqual(JSON.parse(receipt.split("\n\n")[0]), call.expected)
-        }
-        if (repeatStop) {
-          const stopped = results.at(-1)?.result
-          assert(stopped?.type === "error")
-          assert(JSON.stringify(stopped.value).includes("Пользователь остановил повторный вызов."))
         }
         return TestLLM.text(turn.reply, crypto.randomUUID())
       })
@@ -254,6 +249,7 @@ await Effect.runPromise(
           if (url.pathname === "/__gate" && request.method === "GET")
             return Response.json({
               waitingRead,
+              saveBrowserCalls: runtime.saveBrowserCalls,
               calls: host.requests("call").map((call) => call.name),
               graph: graph?.snapshot(),
             })

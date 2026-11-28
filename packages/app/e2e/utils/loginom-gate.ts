@@ -30,6 +30,7 @@ const readReady = Schema.decodeUnknownSync(
 const readStatus = Schema.decodeUnknownSync(
   Schema.Struct({
     waitingRead: Schema.Boolean,
+    saveBrowserCalls: Schema.Array(Schema.String),
     calls: Schema.Array(Schema.String),
     graph: Schema.optional(Schema.Struct({ links: Schema.Array(Schema.String), resultRows: Schema.Number })),
   }),
@@ -130,7 +131,7 @@ async function openGate(page: Page, ready: ReturnType<typeof readReady>, appOrig
   const local = [appOrigin, ready.origin].map((origin) => RegExp.escape(origin)).join("|")
   await page.route(new RegExp(`^(?!(?:${local})/)https?://`), (route) => route.abort("blockedbyclient"))
   await seed(page, {
-    locale: scenario === "7" ? "ru" : "en",
+    locale: scenario === "7" || scenario === "8" ? "ru" : "en",
     servers: [ready.origin],
     tabs: [{ session: ready.session, server: ready.origin }],
     settings: { general: { followUpBehavior: "queue" } },
