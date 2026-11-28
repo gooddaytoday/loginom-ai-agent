@@ -3,11 +3,16 @@ import path from "node:path"
 import { pathToFileURL } from "node:url"
 import { describe, expect } from "bun:test"
 import { Agent } from "@opencode/core/agent"
+import { Bus } from "@opencode/core/bus"
+import { Database } from "@opencode/core/database/database"
 import { llmClient } from "@opencode/core/effect/app-node-platform"
 import { Flag } from "@opencode/core/flag"
 import { SdkPlugins } from "@opencode/core/plugin/sdk"
 import { Schedule } from "@opencode/core/schedule"
 import { Session } from "@opencode/core/session"
+import { SessionRestart } from "@opencode/core/session/execution/restart"
+import { SessionInbox } from "@opencode/core/session/inbox"
+import { SessionTable } from "@opencode/core/session/sql"
 import { Tool } from "@opencode/core/tool"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { define } from "@opencode/plugin/effect/plugin"
@@ -17,6 +22,7 @@ import { Permission } from "@opencode/schema/permission"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Skill } from "@opencode/schema/skill"
 import { Global } from "@opencode/util/global"
+import { eq } from "drizzle-orm"
 import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, Schema, type Scope, Stream } from "effect"
 import { HttpEffect, HttpRouter, HttpServer } from "effect/http"
 import { LanguageModel, LLMClient, type LLMRequest } from "../../ai/src/effect"
@@ -313,6 +319,7 @@ const boot = (
         ),
       )
     return {
+      context,
       sessions,
       create,
       prompt,
@@ -736,12 +743,14 @@ describe("loginom.product access and tool gate (G1)", () => {
         // A fork of a granted session runs without the grant. A synthetic message wakes it without a prompt, and the
         // same kind of message keeps the parent's grant: it is not a new task.
         const original = yield* test.create("original")
-        yield* test.wizard(original, "loginom-automation", script({ tool: probe }, { text: "end" }))
+        yield* test.prompt(original, script({ tool: probe }, { text: "end" }), ["loginom-automation"])
         const fork = yield* test.sessions.fork({ sessionID: original })
         yield* test.sessions.synthetic({ sessionID: fork.id, text: script({ tool: probe }, { text: "end" }) })
         yield* until(() => Effect.succeed(test.answered.includes(`${fork.id} end`) ? true : undefined))
         yield* test.sessions.wait(fork.id)
         expect(test.ran(fork.id)).toBe(0)
+        yield* test.prompt(fork.id, script({ tool: probe }, { text: "own prompt" }), ["loginom-automation"])
+        expect(test.ran(fork.id)).toBe(1)
         yield* test.sessions.synthetic({
           sessionID: original,
           text: script({ tool: probe }, { text: "synthetic end" }),
@@ -991,6 +1000,88 @@ describe("loginom.product access and tool gate (G1)", () => {
         expect(names(first)).toContain(tool)
         expect(host.requests("call").map((input) => input.name)).toEqual(["dock_node_apply"])
         expect(yield* restarted.sessions.inbox(queued.sessionID)).toEqual([])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "a newer steer revokes a queued grant even when its delivery is still being prepared",
+    () =>
+      Effect.gen(function* () {
+        const started = yield* Deferred.make<void>()
+        const release = yield* Deferred.make<void>()
+        const test = yield* boot((ctx) =>
+          ctx.session
+            .hook("experimental.tools.prepare", () =>
+              Effect.gen(function* () {
+                if (yield* Deferred.succeed(started, undefined)) yield* Deferred.await(release)
+              }),
+            )
+            .pipe(Effect.asVoid),
+        )
+        const sessionID = yield* test.create("new steer at delivery")
+        const row = yield* test.sessions.prompt({
+          sessionID,
+          text: script({ tool: probe }, { text: "queued end" }),
+          skills: [{ id: Skill.ID.make("loginom-automation") }],
+          delivery: "queue",
+          resume: false,
+        })
+        const run = yield* test.sessions.resume(sessionID).pipe(Effect.forkScoped)
+        yield* Deferred.await(started)
+        expect((yield* test.sessions.context(sessionID)).findLast((message) => message.type === "user")?.id).toBe(
+          row.id,
+        )
+        yield* test.sessions.prompt({ sessionID, text: script({ text: "steer end" }) })
+        yield* Deferred.succeed(release, undefined)
+        yield* Fiber.join(run)
+        yield* test.sessions.wait(sessionID)
+        expect(test.answered).toContain(`${sessionID} steer end`)
+        const [first] = yield* test.requests(sessionID)
+        expect(first).toBeDefined()
+        expect(names(first)).not.toContain(probe)
+        expect(test.ran(sessionID)).toBe(0)
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "recovers the delivered grant after a restart before the first model request",
+    () =>
+      Effect.gen(function* () {
+        const directory = (yield* tmpdirScoped("loginom-delivery-restart-")).path
+        const tool = "loginom_dock_node_apply"
+        const row = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const test = yield* boot(undefined, { directory })
+            const sessionID = yield* test.create("delivered before shutdown")
+            const row = yield* test.sessions.prompt({
+              sessionID,
+              text: script({ tool, input: { path: "node" } }, { text: "recovered" }),
+              skills: [{ id: Skill.ID.make("loginom-automation") }],
+              delivery: "queue",
+              resume: false,
+            })
+            const { db } = Context.get(test.context, Database.Service)
+            yield* db.update(SessionTable).set({ time_suspended: Date.now() }).where(eq(SessionTable.id, sessionID))
+            yield* SessionInbox.promote(db, Context.get(test.context, Bus.Service), sessionID, "input")
+            expect(yield* test.sessions.inbox(sessionID)).toEqual([])
+            expect((yield* test.sessions.context(sessionID)).findLast((message) => message.type === "user")?.id).toBe(
+              row.id,
+            )
+            expect(yield* test.requests(sessionID)).toEqual([])
+            return row
+          }),
+        )
+        const host = scriptedHost({ catalog: () => [dockTool("dock_node_apply")] })
+        const restarted = yield* boot(undefined, { directory, host })
+        yield* Context.get(restarted.context, SessionRestart.Service).resumeSuspendedSessions
+        yield* until(() => Effect.succeed(restarted.answered.includes(`${row.sessionID} recovered`) ? true : undefined))
+        yield* restarted.sessions.wait(row.sessionID)
+        const [first] = yield* restarted.requests(row.sessionID)
+        expect(names(first)).toContain(tool)
+        expect(host.requests("call").map((input) => input.name)).toEqual(["dock_node_apply"])
+        expect(restarted.answered).toContain(`${row.sessionID} recovered`)
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )

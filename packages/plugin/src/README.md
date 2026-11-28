@@ -127,9 +127,10 @@ The `session.prompt` hook has an optional `event.operation` in both SDKs. The se
 new prompt and `"edit"` when a queued prompt is replaced in place. Hooks can still validate or transform an edit,
 but should not repeat side effects that belong to a new task. Treat a missing value as a normal submission.
 
-Use `session.prompt.delivered` for work that must wait until a user prompt becomes visible to the runner.
-It runs before the model step and reports the last user prompt of a delivered batch, with the final delivery mode,
-prepared skill IDs, and read-only metadata from the inbox row. It does not run for synthetic or control inputs.
+`session.experimental.activePrompt({ sessionID })` reads the latest delivered user prompt's ID, skills and metadata,
+the locally completed tool calls since that prompt, and whether a user steer is pending. It reads the durable history even
+when the model window has been compacted. Use `session.experimental.tools.prepare` to refresh dynamic direct tools
+before a primary request takes its tool snapshot, including after a restart or on a retry.
 In primary and compaction hooks, a user message that only carries stored metadata can have empty content. It is
 omitted from the model request unless a hook supplies content.
 

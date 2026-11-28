@@ -7,9 +7,8 @@ import type { Session } from "@opencode/schema/session"
 import type { SessionInbox } from "@opencode/schema/session-inbox"
 import type { SessionError } from "@opencode/schema/session-error"
 import type { SessionMessage } from "@opencode/schema/session-message"
-import type { Skill } from "@opencode/schema/skill"
 import type { TokenUsage } from "@opencode/schema/token-usage"
-import type { JsonSchema, Types } from "effect"
+import type { Effect, JsonSchema, Types } from "effect"
 import type { ModelHooks } from "./registration.js"
 
 export interface SessionPrompt {
@@ -21,12 +20,16 @@ export interface SessionPrompt {
   delivery: SessionInbox.Delivery
 }
 
-export interface SessionPromptDelivered {
+export interface SessionToolsPrepare {
   readonly sessionID: Session.ID
-  readonly messageID: SessionMessage.ID
-  readonly delivery: SessionInbox.Delivery
-  readonly skillIDs: ReadonlyArray<Skill.ID>
-  readonly metadata?: Readonly<Record<string, unknown>>
+  readonly model: Model.Ref
+}
+
+export interface SessionActivePrompt {
+  readonly user?: Pick<SessionMessage.User, "id" | "skills" | "metadata">
+  readonly tools: ReadonlyArray<{ readonly name: string; readonly input: Readonly<Record<string, unknown>> }>
+  readonly steering: boolean
+  readonly inherited: boolean
 }
 
 /** Request overrides. Typed keys are generation settings; any other key is a provider option. */
@@ -211,7 +214,7 @@ export interface SessionIdle {
 export interface SessionHooks {
   readonly fork: { readonly sessionID: Session.ID }
   readonly prompt: SessionPrompt
-  readonly "prompt.delivered": SessionPromptDelivered
+  readonly "experimental.tools.prepare": SessionToolsPrepare
   readonly context: SessionContext
   readonly compaction: SessionCompaction
   readonly generate: SessionGenerate
@@ -247,4 +250,7 @@ export type SessionDomain = Pick<
 > &
   Pick<ExperimentalSessionApi<unknown>, "wait" | "instructions"> & {
     readonly hook: ModelHooks<SessionHooks>
+    readonly experimental: {
+      readonly activePrompt: (input: { sessionID: Session.ID }) => Effect.Effect<SessionActivePrompt, unknown>
+    }
   }

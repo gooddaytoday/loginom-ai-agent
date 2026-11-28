@@ -195,6 +195,9 @@ export function host(overrides: Overrides = {}): Plugin.Context {
       interrupt: overrides.session?.interrupt ?? (() => Effect.die("unused session.interrupt")),
       wait: overrides.session?.wait ?? (() => Effect.die("unused session.wait")),
       context: overrides.session?.context ?? (() => Effect.die("unused session.context")),
+      experimental: overrides.session?.experimental ?? {
+        activePrompt: () => Effect.die("unused session.experimental.activePrompt"),
+      },
       instructions: overrides.session?.instructions ?? {
         entry: {
           list: () => Effect.die("unused session.instructions.entry.list"),

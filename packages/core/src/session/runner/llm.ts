@@ -190,20 +190,12 @@ const layer = Layer.effect(
               }
               const ready = yield* restore(
                 Effect.gen(function* () {
-                  let selected = yield* prepareContext(sessionID)
-                  const observesDelivery = yield* hooks.has("session", "prompt.delivered")
+                  const selected = yield* prepareContext(sessionID)
                   const promoted = yield* SessionInbox.promote(
                     db,
                     bus,
                     sessionID,
                     entering && !continuing ? promotable : "steer",
-                    observesDelivery
-                      ? (prompt) =>
-                          Effect.gen(function* () {
-                            yield* hooks.trigger("session", "prompt.delivered", { sessionID, ...prompt })
-                            selected = yield* context.select(sessionID)
-                          })
-                      : undefined,
                   )
                   // A control admitted during context preparation owns this boundary.
                   if (promoted === undefined) return undefined
