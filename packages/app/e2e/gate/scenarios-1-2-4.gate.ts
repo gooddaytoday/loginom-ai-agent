@@ -1,13 +1,21 @@
 import { expect, test } from "@playwright/test"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
-import { draftHref } from "../utils/app"
+import { sessionHref } from "../utils/app"
 import { gateEditor, gateScreenshot, sendGatePrompt, withGate } from "../utils/gate"
-import { gateLoginom, gateMessageContents, gateScenarios, gateToolReceipts } from "../utils/gate-scenarios"
+import {
+  gateLoginom,
+  gateMessageContents,
+  gateModelID,
+  gateScenarios,
+  gateToolReceipts,
+  salesPackage,
+  wizardDocumentation,
+} from "../utils/gate-scenarios"
 import { APP_READY_TIMEOUT } from "../utils/waits"
 
 test("Сценарий 1. Первый запуск", async ({ page, baseURL }, info) => {
-  await withGate(page, baseURL, "first", async ({ url, requests, calls }) => {
+  await withGate(page, baseURL, "first", async ({ url, loginomURL, requests }) => {
     await test.step("В новом разговоре модель уже выбрана", async () => {
       await expect(gateEditor(page)).toBeEditable({ timeout: APP_READY_TIMEOUT })
       await expect(page.locator('[data-action="composer-model"]:visible')).toContainText("Тестовая модель")
@@ -22,16 +30,20 @@ test("Сценарий 1. Первый запуск", async ({ page, baseURL }, 
       const settings = page.getByRole("tabpanel", { name: "Loginom", exact: true })
       const address = settings.getByRole("textbox", { name: "Адрес", exact: true })
       await expect(settings.getByRole("status")).toHaveText("Не подключён")
-      await address.fill(gateLoginom.url)
+      await address.fill(loginomURL)
       await settings.getByRole("textbox", { name: "Пользователь", exact: true }).fill(gateLoginom.username)
-      await settings.getByRole("checkbox", { name: "Пароль не нужен", exact: true }).check()
+      await settings.getByRole("checkbox", { name: "Пароль не нужен", exact: true }).press("Space")
+      await settings.getByLabel("Пароль", { exact: true }).fill(gateLoginom.password)
       await settings.getByRole("button", { name: "Проверить", exact: true }).click()
       await expect(settings.getByRole("status")).toContainText("Проверено, ещё не сохранено")
       await settings.getByRole("button", { name: "Сохранить", exact: true }).click()
-      await expect(settings.getByRole("status")).toHaveText(
-        `Подключён как ${gateLoginom.username} · папка ${gateLoginom.folder}`,
-      )
-      await expect(address).toHaveValue(gateLoginom.url)
+      const connected = settings
+        .getByRole("status")
+        .getByText(`Подключён как ${gateLoginom.username} · папка ${gateLoginom.folder}`, { exact: true })
+      await expect(connected).toBeVisible()
+      await page.reload()
+      await expect(address).toHaveValue(loginomURL)
+      await expect(connected).toBeVisible()
       await gateScreenshot(page, info, "1-loginom-settings")
       await page.goBack()
     })
@@ -43,7 +55,6 @@ test("Сценарий 1. Первый запуск", async ({ page, baseURL }, 
       await sendGatePrompt(page, prompt)
       await expect(page.getByText(answer, { exact: true })).toBeVisible()
       expect(JSON.stringify(requests)).toContain(prompt)
-      expect(calls).toEqual([])
       await gateScreenshot(page, info, "1-first-answer")
     })
   })
@@ -89,61 +100,89 @@ test("Сценарий 2. Описать пакет для коллеги", asyn
       })
       await gateScreenshot(page, info, "2-documentation-in-chat")
     })
-    await test.step.skip("LAB-2177 / LAB-2178 · Выбрать пакет «Качество данных» из Loginom", async () => {
-      await page.goto(new URL(draftHref("gate-documentation-wizard"), url).href)
-      await page.getByRole("button", { name: "Документировать", exact: true }).click()
-      await page.getByText(/^Качество данных(?:\.lgp)?$/).click()
+    await test.step.skip("LAB-2177 (#1472) / LAB-2178 (#1486) · Выбрать исходный пакет из Loginom", async () => {
+      await page.goto(new URL("/page/loginom-gui/packages", url).href)
+      await expect(page.getByRole("heading", { name: "Пакеты", exact: true })).toBeVisible()
+      await page.getByRole("button", { name: "Из Loginom", exact: true }).click()
+      const picker = page.getByRole("dialog")
+      const packageName = path.basename(gateLoginom.documentationPath)
+      await picker
+        .getByRole("button")
+        .filter({ has: page.getByText(packageName, { exact: true }) })
+        .click()
+      await expect(picker).toBeHidden()
+      await expect(page.getByRole("heading", { name: packageName, exact: true })).toBeVisible()
+      await expect(page.getByText(`/user/${packageName}`, { exact: true })).toBeVisible()
     })
-    const wizardPDF = "Качество данных — описание.pdf"
-    const wizardWord = "Качество данных — описание.docx"
-    await test.step.skip("LAB-2179 · Добавить Word, прочитать «Доступ» и разрешить запуск мастера", async () => {
+    await test.step.skip("LAB-2179 (#1490) · Запустить мастер и обсудить оба отчёта в разговоре запуска", async () => {
+      await page.goto(new URL("/page/loginom-gui/document-package", url).href)
+      await page
+        .getByLabel("Локальный пакет (.lgp)")
+        .fill(path.join(directory, path.basename(gateLoginom.documentationPath)))
       await page.getByRole("checkbox", { name: "Word" }).check()
-      await page.getByRole("button", { name: "Далее: доступ" }).click()
-      await expect(page.getByText("Сначала приложение", { exact: true })).toBeVisible()
-      await expect(page.getByText(/Скачает «Качество данных\.lgp» из вашей папки Loginom/)).toBeVisible()
-      await expect(page.getByRole("heading", { name: /Агент сможет$/ })).toBeVisible()
-      await expect(page.getByText(/Прочитать файл «Качество данных\.lgp»/)).toBeVisible()
-      await expect(page.getByText(`Создать документы «${wizardPDF}», «${wizardWord}»`, { exact: false })).toBeVisible()
-      await expect(page.getByRole("heading", { name: /Агент не сможет$/ })).toBeVisible()
-      await expect(page.getByText("Подключаться к Loginom и открывать браузер", { exact: true })).toBeVisible()
-      await expect(page.getByText("Что увидит модель:", { exact: true })).toBeVisible()
-      await expect(page.getByText(/структура пакета и настройки узлов/)).toBeVisible()
-      await page.getByRole("button", { name: "Разрешить и запустить" }).click()
+      await page.getByRole("button", { name: "Далее", exact: true }).click()
+      const access = [
+        [
+          "Сначала приложение",
+          "Приложение скопирует выбранный .lgp в папку запуска. Генератор работает только с файлом на компьютере: для пакета из Loginom приложение должно заранее скачать копию, не агент. Пока выберите уже скачанный файл.",
+        ],
+        [
+          "Агент сможет",
+          "Прочитать копию, пользоваться встроенной справкой, заполнить черновик и сохранить документы в папке запуска.",
+        ],
+        [
+          "Агент не сможет",
+          "Изменять исходный пакет, подключаться к Loginom, открывать браузер и сайты или запускать программы.",
+        ],
+        [
+          "Что увидит модель",
+          "Модель увидит имя и структуру пакета, результат генератора, параметры действия и служебный контекст разговора.",
+        ],
+      ] as const
+      for (const [heading, content] of access) {
+        const block = page.getByRole("heading", { name: heading, exact: true }).locator("..")
+        await expect(block.locator("p")).toHaveText(content)
+      }
+      const start = page.getByRole("button", { name: "Разрешить и запустить", exact: true })
+      await expect(start).toBeDisabled()
+      await page.getByRole("combobox", { name: "Модель", exact: true }).selectOption(gateModelID)
+      const created = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/session" &&
+          response.request().method() === "POST" &&
+          response.ok(),
+      )
+      await start.click()
+      const { data: session }: { data: { id: string } } = await (await created).json()
+      const outcome = page.getByRole("main").getByRole("status").getByRole("heading", { level: 2 })
+      await expect(outcome).toBeVisible({ timeout: 90_000 })
+      expect(await outcome.textContent()).toBe("Готово")
+      await expect(page.getByRole("heading", { name: "Что проверило приложение", exact: true })).toBeVisible()
+      const files = [wizardDocumentation.pdf, wizardDocumentation.word]
+      for (const filename of files) await expect(page.getByText(filename, { exact: false })).toBeVisible()
+      await page.getByRole("button", { name: "Обсудить в чате", exact: true }).click()
+      await expect(page).toHaveURL(new URL(sessionHref(session.id, url), url).href)
+      await expect(page.getByText(wizardDocumentation.answer, { exact: true })).toBeVisible()
+      const attachments = page.locator('[data-component="composer-attachments"]')
+      for (const filename of files) await expect(attachments.getByText(filename, { exact: true })).toBeVisible()
     })
-    await test.step.skip(
-      "LAB-2179 · Увидеть результат мастера «Проверено приложением» и открыть «Обсудить в чате»",
-      async () => {
-        await expect(page.getByText(/^Проверено приложением:?$/)).toBeVisible()
-        await page.getByRole("button", { name: "Обсудить в чате" }).click()
-        await expect(page).toHaveURL(/\/new-session\?draftId=/)
-        await expect(gateEditor(page)).toContainText("Разберём результат запуска")
-        const attachments = page.locator('[data-component="composer-attachments"]')
-        await expect(attachments.getByText(wizardPDF, { exact: true })).toBeVisible()
-        await expect(attachments.getByText(wizardWord, { exact: true })).toBeVisible()
-      },
-    )
   })
 })
 
 test("Сценарий 4. Правила отдела", async ({ page, baseURL }, info) => {
-  await withGate(page, baseURL, "instructions", async ({ url, requests, calls }) => {
+  await withGate(page, baseURL, "instructions", async ({ url, requests, openedPackages }) => {
     const rules =
       "Узлы называй по смыслу, по-русски. Перед расчётом выручки — проверка пустых значений. В каждом модуле — заметка: что делает и кто отвечает."
-    const receipt = { operation_id: "gate-read-sales", package_path: "/user/Продажи.lgp", status: "SUCCEEDED" }
+    const receipt = expect.objectContaining({
+      prepared: true,
+      workspace: expect.objectContaining({
+        operation_id: salesPackage.operationID,
+        status: "READY",
+        package_ref: expect.objectContaining({ path: salesPackage.path, name: salesPackage.name, persisted: true }),
+      }),
+    })
     const readingRequest = () =>
-      requests.find((request) =>
-        gateToolReceipts(request).some(
-          (reply) =>
-            !!reply &&
-            typeof reply === "object" &&
-            "operation_id" in reply &&
-            reply.operation_id === receipt.operation_id &&
-            "package_path" in reply &&
-            reply.package_path === receipt.package_path &&
-            "status" in reply &&
-            reply.status === receipt.status,
-        ),
-      )
+      requests.find((request) => gateToolReceipts(request).some((reply) => receipt.asymmetricMatch(reply)))
     await test.step.skip("LAB-2174 (#1454) · Сохранить правила отдела в настройках инструкций", async () => {
       await page.goto(new URL("/settings?tab=instructions", url).href)
       const settings = page.getByRole("tabpanel", { name: "Инструкции", exact: true })
@@ -159,9 +198,9 @@ test("Сценарий 4. Правила отдела", async ({ page, baseURL }
     await test.step("Дымовая проверка чтения пакета «Продажи» в новом разговоре", async () => {
       const { prompt, answer } = gateScenarios.instructions
       await sendGatePrompt(page, prompt)
+      await expect.poll(() => requests.flatMap(gateToolReceipts), { timeout: 90_000 }).toContainEqual(receipt)
       await expect(page.getByText(answer, { exact: true })).toBeVisible()
-      await expect.poll(readingRequest).toBeDefined()
-      expect(calls).toEqual([expect.objectContaining({ intent: "open_package", package_path: receipt.package_path })])
+      expect(openedPackages).toEqual([salesPackage.path])
       await gateScreenshot(page, info, "4-sales-review")
     })
     await test.step.skip("LAB-2174 (#1454) · Модель получила сохранённые правила в новом разговоре", async () => {

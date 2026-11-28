@@ -9,7 +9,7 @@ import { draftHref, seed } from "./app"
 import { gatePassword, type GateScenario } from "./gate-scenarios"
 import { APP_READY_TIMEOUT } from "./waits"
 
-type Gate = { url: string; directory: string; requests: unknown[]; calls: unknown[] }
+type Gate = { url: string; loginomURL: string; directory: string; requests: unknown[]; openedPackages: string[] }
 
 export async function withGate(
   page: Page,
@@ -38,16 +38,26 @@ export async function withGate(
       stderr += chunk
     })
     const requests: unknown[] = []
-    const calls: unknown[] = []
-    const ready = Promise.withResolvers<string>()
+    const openedPackages: string[] = []
+    const ready = Promise.withResolvers<Pick<Gate, "url" | "loginomURL">>()
     child.on("message", (message: unknown) => {
       if (typeof message !== "object" || !message || !("kind" in message)) return
-      if (message.kind === "ready" && "url" in message && typeof message.url === "string") ready.resolve(message.url)
+      if (
+        message.kind === "ready" &&
+        "url" in message &&
+        typeof message.url === "string" &&
+        "loginomURL" in message &&
+        typeof message.loginomURL === "string"
+      ) {
+        ready.resolve({ url: message.url, loginomURL: message.loginomURL })
+      }
       if (message.kind === "model" && "body" in message) requests.push(message.body)
-      if (message.kind === "host" && "args" in message) calls.push(message.args)
+      if (message.kind === "package-opened" && "path" in message && typeof message.path === "string") {
+        openedPackages.push(message.path)
+      }
     })
     try {
-      const url = await Promise.race([
+      const { url, loginomURL } = await Promise.race([
         ready.promise,
         exited.then(([code]) => {
           throw Error(`Gate backend exited (${code})\n${stderr}`)
@@ -71,7 +81,7 @@ export async function withGate(
         tabs: [{ draft: "gate", directory, server: url }],
       })
       await page.goto(new URL(draftHref("gate"), url).href)
-      await run({ url, directory, requests, calls })
+      await run({ url, loginomURL, directory, requests, openedPackages })
     } finally {
       if (child.connected) child.disconnect()
       await exited
