@@ -4,7 +4,7 @@ export default {
   "node.missingPackage": "Could not verify the Loginom package linked to this conversation.",
   "node.stalePackage": "The package state is out of date. Try again when the open package can be verified.",
   "node.differentConversation": "This Loginom node belongs to another conversation. Remove the node to send.",
-  "node.sourceUnavailable": "The server for the original conversation is unavailable.",
+  "node.sourceUnavailable": "The original server is unavailable.",
   startExamples: "Example tasks",
   startDismiss: "Hide example tasks",
   startProject: "Project: {{name}}",

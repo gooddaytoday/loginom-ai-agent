@@ -63,18 +63,6 @@ for (const width of [1280, 390]) {
       await tabs.getByRole("button", { name: "Тестовый пакет", exact: true }).click()
     }
 
-    await openPackage()
-    const unavailable = page.getByRole("button", { name: "Позвать агента с недоступного сервера", exact: true })
-    await unavailable.click()
-    await expect(page.getByText("Сервер исходного разговора недоступен.")).toBeVisible()
-    await expect(unavailable).toBeVisible()
-    await showTabs()
-    await tabs.locator(`[data-titlebar-tab-link][href="${sessionHref(source.sessionID)}"]`).click()
-    await expectPath(page, sessionHref(source.sessionID))
-    const chip = page.getByRole("group", { name: "Расчёт выручки · Продажи.lgp", exact: true })
-    await expect(view.editor).toBeEditable()
-    await expect(chip).toHaveCount(0)
-
     const origin = page.getByText("Подготовь отчёт", { exact: true })
     await expect(page.getByText("Уточнение 26", { exact: true })).toBeInViewport()
 
@@ -85,6 +73,7 @@ for (const width of [1280, 390]) {
     await page.getByRole("button", { name: "Спросить агента", exact: true }).click()
     await expect(page).toHaveURL((url) => url.pathname === sessionHref(source.sessionID))
     await expect(origin).toBeInViewport()
+    const chip = page.getByRole("group", { name: "Расчёт выручки · Продажи.lgp", exact: true })
     await expect(chip).toBeVisible()
     await expect(view.editor).toHaveText(text)
     expect(prompts).toEqual([])
@@ -157,6 +146,19 @@ for (const width of [1280, 390]) {
       expect(request).toEqual({ body: { input: { sessionID: source.sessionID } }, directory: view.directory })
     expect(creates).toBe(0)
     await expect(chip).toHaveCount(0)
+
+    await openPackage()
+    const unavailable = page.getByRole("button", { name: "Позвать агента с недоступного сервера", exact: true })
+    await unavailable.click()
+    await expect(page.getByText("Исходный сервер недоступен.")).toBeVisible()
+    await expect(unavailable).toBeVisible()
+    await showTabs()
+    await sourceTab.click()
+    await expectPath(page, sessionHref(source.sessionID))
+    await expect(view.editor).toBeEditable()
+    await expect(chip).toHaveCount(0)
+    expect(prompts).toHaveLength(1)
+    expect(creates).toBe(0)
   })
 }
 
