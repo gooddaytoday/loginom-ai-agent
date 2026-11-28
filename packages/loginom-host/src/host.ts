@@ -1,5 +1,5 @@
 import { inputStore, type InputFile } from "./inputs"
-import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
+import { appendFile, mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
@@ -17,7 +17,7 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
-import { decodeFolderListing, type FolderListing, ReadFolder } from "./package-folder"
+import { decodeFolderListings, type FolderListing, ReadFolder } from "./package-folder"
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
 export async function verifyInstallationResources(options: {
@@ -366,7 +366,7 @@ export async function createLoginomHost(options: {
   async function launch(
     connection: ActiveConnection,
     chat: string,
-    purpose: "validation" | "dashboard" | "chat" | { packageFolder: string },
+    purpose: "validation" | "dashboard" | "chat" | { packageFolder: string; packageQuery?: string },
     signal?: AbortSignal,
     deadline?: number,
     validationHttpCache = false,
@@ -468,6 +468,7 @@ export async function createLoginomHost(options: {
         connection,
         validation,
         packageFolder,
+        packageQuery: typeof purpose === "object" ? purpose.packageQuery : undefined,
         validationHttpCache: httpCache,
         // CLI supplies its explicit browser policy for background launches too.
         headless: packageFolder !== undefined || (purpose === "chat" ? options.headless === true : (options.preflightHeadless ?? true)),
@@ -637,33 +638,61 @@ export async function createLoginomHost(options: {
       lease.release()
     }
   }
-  const packageReads = new Map<AbortController, Promise<FolderListing>>()
+  const packageState = join(root, "package-list")
+  let packageRead: { controller: AbortController; pending: Promise<readonly FolderListing[]> } | undefined
+  let packageCleanupFailed = false
+  async function retainPackageFailures() {
+    const recent = 10
+    const files = await readdir(packageState)
+    const failures = await Promise.all(files.filter(name => /^login-failure-[0-9a-f-]+\.json$/.test(name)).map(async name => {
+      const path = join(packageState, name)
+      return { path, time: (await stat(path)).mtimeMs }
+    }))
+    failures.sort((a, b) => b.time - a.time)
+    await Promise.all(failures.slice(recent).map(({ path }) => rm(path, { force: true })))
+    const log = join(packageState, "startup-failures.jsonl")
+    if (!files.includes("startup-failures.jsonl")) return
+    const lines = (await readFile(log, "utf8")).trimEnd().split("\n")
+    if (lines.length > recent) {
+      const temporary = log + ".tmp"
+      await writeFile(temporary, lines.slice(-recent).join("\n") + "\n", { mode: 0o600 })
+      await rename(temporary, log)
+    }
+  }
   async function performFolderRead(input: ReadFolder, signal: AbortSignal) {
     signal.throwIfAborted()
-    if (!Schema.is(ReadFolder)(input)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+    if (packageCleanupFailed) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
     const chat = randomUUID()
     const lease = service.acquire(chat)
-    if (!lease) throw Error("LOGINOM_CONNECTION_NOT_READY")
+    if (!lease) {
+      const { state } = await service.api.status()
+      if (state === "unconfigured") throw Error("LOGINOM_CONFIG_REQUIRED")
+      if (state === "recoverable-error") throw Error("LOGINOM_RECOVERY_REQUIRED")
+      throw Error("LOGINOM_CONNECTION_NOT_READY")
+    }
     let cleanupConfirmed = true
     try {
       const current = generations.get(input.generation)
       if (!current || lease.generation !== input.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
-      const runtime = await launch(current.connection, chat, { packageFolder: input.folder }, signal)
+      const runtime = await launch(current.connection, chat, { packageFolder: input.folder, packageQuery: input.query }, signal)
       cleanupConfirmed = false
       await runtime.close()
       cleanupConfirmed = true
       signal.throwIfAborted()
-      return decodeFolderListing("listing" in runtime.ready ? runtime.ready.listing : undefined, input.folder)
+      return decodeFolderListings("listings" in runtime.ready ? runtime.ready.listings : undefined, input)
     } catch (error) {
       if (error instanceof Error && error.message === "LOGINOM_RUNTIME_CLEANUP_FAILED") cleanupConfirmed = false
-      if (!cleanupConfirmed) shutdown.failed = true
+      if (!cleanupConfirmed) packageCleanupFailed = shutdown.failed = true
       throw error
     } finally {
       lease.release()
+      await retainPackageFailures().catch(() => undefined)
       if (cleanupConfirmed)
-        await rm(join(root, "package-list", "generations", String(lease.generation), "chats", chat), {
+        await rm(join(packageState, "generations", String(lease.generation), "chats", chat), {
           recursive: true,
           force: true,
+          maxRetries: 4,
+          retryDelay: 100,
         }).catch(() => {
           shutdown.failed = true
           throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
@@ -675,7 +704,7 @@ export async function createLoginomHost(options: {
     service.beginClose()
     resourceController.abort()
     for (const controller of dashboardOperations.keys()) controller.abort(new Error("DASHBOARD_CANCELLED"))
-    for (const controller of packageReads.keys()) controller.abort(new Error("LOGINOM_PACKAGE_FOLDER_CANCELLED"))
+    packageRead?.controller.abort(Error("LOGINOM_PACKAGE_FOLDER_CANCELLED"))
   }
   return {
     ...service,
@@ -711,12 +740,26 @@ export async function createLoginomHost(options: {
     },
     browserRecovery: options.browserRecovery === true,
     references,
-    readPackageFolder(input: ReadFolder, signal?: AbortSignal) {
+    async readPackageFolders(input: ReadFolder, signal?: AbortSignal) {
+      signal?.throwIfAborted()
+      if (!Schema.is(ReadFolder)(input)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      const previous = packageRead
+      previous?.controller.abort(Error("LOGINOM_PACKAGE_FOLDER_CANCELLED"))
       const controller = new AbortController()
-      const pending = performFolderRead(input, signal ? AbortSignal.any([signal, controller.signal]) : controller.signal)
-      packageReads.set(controller, pending)
-      void pending.finally(() => packageReads.delete(controller)).catch(() => undefined)
-      return pending
+      const reading = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
+      // The next login waits for the previous worker's checked logout and exit.
+      const pending = (async () => {
+        await previous?.pending.catch(() => undefined)
+        return performFolderRead(input, reading)
+      })()
+      packageRead = { controller, pending }
+      try {
+        const listings = await pending
+        reading.throwIfAborted()
+        return listings
+      } finally {
+        if (packageRead?.controller === controller) packageRead = undefined
+      }
     },
     async readDashboard(input: DashboardRead, signal?: AbortSignal): Promise<PublicationSource | null> {
       if (!Schema.is(DashboardRead)(input)) throw new Error("DASHBOARD_INPUT_INVALID")
@@ -747,7 +790,7 @@ export async function createLoginomHost(options: {
     async close() {
       beginClose()
       await verifiedResources
-      await Promise.allSettled([...dashboardOperations.values(), ...packageReads.values()])
+      await Promise.allSettled([...dashboardOperations.values(), packageRead?.pending])
       await service.close()
       // Startup failures and retired or unexpectedly exited children retain
       // cleanup uncertainty even if a later runtime succeeds.

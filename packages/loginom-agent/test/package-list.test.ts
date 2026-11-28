@@ -49,7 +49,7 @@ function fixture() {
       requests.push(input)
       const result = table.get(input.folder)
       if (!result) throw Error("private host error")
-      return result
+      return input.query === undefined ? [result] : [...table.values()].map(page => ({ ...page, entries: page.entries.filter(entry => entry.kind === "package") }))
     },
   }
   return { rpc: packageListHandlers(host), host, table, requests }
@@ -63,7 +63,7 @@ test("list reads only the requested folder", async () => {
   expect(f.requests).toEqual([{ folder: "/user", generation: 11 }])
 })
 
-test("search filters by name locally and only walks subfolders when requested", async () => {
+test("recursive search filters pages and reuses one host read for every cursor", async () => {
   const f = fixture()
   const input = { folder: "/user", text: " ПРОДАЖИ ", recursive: false }
   const expected = [pkg("Продажи.lgp", "/user/Продажи.lgp")]
@@ -82,14 +82,12 @@ test("search filters by name locally and only walks subfolders when requested", 
     entries: [pkg("Годовые продажи.lgp", "/user/two/Годовые продажи.lgp")],
     slow: false,
   })
-  expect(f.requests.map((x) => x.folder)).toEqual(["/user", "/user", "/user/one", "/user/two"])
+  expect(f.requests).toEqual([{ folder: "/user", generation: 11 }, { folder: "/user", generation: 11, query: input.text }])
 })
 
-test("canceling a recursive page aborts the current read and invalidates its continuation", async () => {
+test("canceling a recursive search aborts the host read", async () => {
   const f = fixture()
   const input = { folder: "/user", text: "", recursive: true }
-  const first = await f.rpc.search(input, call())
-  if (!("cursor" in first) || !first.cursor) throw Error("Expected cursor")
   const active = Promise.withResolvers<void>()
   const read = f.host.read
   f.host.read = async (input, signal) => {
@@ -100,13 +98,11 @@ test("canceling a recursive page aborts the current read and invalidates its con
     })
   }
   const stop = new AbortController()
-  const next = { ...input, cursor: first.cursor }
-  const pending = f.rpc.search(next, call(stop.signal))
+  const pending = f.rpc.search(input, call(stop.signal))
   await active.promise
   stop.abort(Error("user canceled"))
   await expect(pending).rejects.toThrow("user canceled")
-  await expect(f.rpc.search(next, call())).rejects.toMatchObject({ type: "search_expired" })
-  expect(f.requests.map((x) => x.folder)).toEqual(["/user", "/user/one"])
+  expect(f.requests).toHaveLength(1)
 })
 
 test("a session limit produces the approved client message", async () => {
@@ -118,4 +114,24 @@ test("a session limit produces the approved client message", async () => {
     type: "session_limit",
     message: "Сейчас заняты все сессии Loginom вашей организации",
   })
+})
+
+for (const [code, type] of [["LOGINOM_CONFIG_REQUIRED", "not_connected"], ["LOGINOM_RECOVERY_REQUIRED", "recovering"]]) {
+  test(`list and search expose ${type} separately`, async () => {
+    const f = fixture()
+    f.host.generation = async () => { throw Error(code) }
+    await expect(f.rpc.list({ folder: "/user" }, call())).rejects.toMatchObject({ type })
+    await expect(f.rpc.search({ folder: "/user", text: "", recursive: true }, call())).rejects.toMatchObject({ type })
+    expect(f.requests).toEqual([])
+  })
+}
+
+test("a cursor expires when the connection generation changes", async () => {
+  const f = fixture()
+  const input = { folder: "/user", text: "", recursive: true }
+  const first = await f.rpc.search(input, call())
+  if (!("cursor" in first) || !first.cursor) throw Error("Expected cursor")
+  f.host.generation = async () => 12
+  await expect(f.rpc.search({ ...input, cursor: first.cursor }, call())).rejects.toMatchObject({ type: "search_expired" })
+  expect(f.requests).toHaveLength(1)
 })

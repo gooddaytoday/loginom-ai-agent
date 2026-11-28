@@ -101,6 +101,16 @@ export async function launchNodeHost(
     start() {},
   }
   const client = transport(port)
+  let packageReads = 0
+  async function request(...args: Parameters<typeof client.request>) {
+    if (args[0] !== "packages.list") return client.request(...args)
+    packageReads++
+    try {
+      return await client.request(...args)
+    } finally {
+      packageReads--
+    }
+  }
   function waitForExit(timeout: number) {
     return new Promise<Awaited<typeof exited> | undefined>((resolve) => {
       const timer = setTimeout(() => resolve(undefined), Math.max(0, timeout))
@@ -113,13 +123,13 @@ export async function launchNodeHost(
   function close() {
     if (state.closing) return state.closing
     state.closing = (async () => {
-      // Saved-package cleanup needs the longer graceful budget without consuming
-      // the TERM/KILL and actual-exit observation allowance.
-      const deadline =
-        Date.now() + (timing.teardown ?? (input.closeSavedPackageOnShutdown === true ? 90_000 : 60_000))
+      // Saved-package cleanup and an in-flight picker login may need the longer
+      // graceful budget, without consuming the TERM/KILL observation allowance.
+      const longerCleanup = input.closeSavedPackageOnShutdown === true || packageReads > 0
+      const deadline = Date.now() + (timing.teardown ?? (longerCleanup ? 90_000 : 60_000))
       const gracefulDeadline = Math.min(
         deadline,
-        Date.now() + (timing.close ?? (input.closeSavedPackageOnShutdown === true ? 60_000 : 30_000)),
+        Date.now() + (timing.close ?? (longerCleanup ? 60_000 : 30_000)),
       )
       try {
         const result = await client
@@ -200,7 +210,7 @@ export async function launchNodeHost(
   return {
     port,
     exited,
-    request: client.request,
+    request,
     get alive() {
       return !state.closed
     },

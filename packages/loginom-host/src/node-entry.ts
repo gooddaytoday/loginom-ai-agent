@@ -145,7 +145,7 @@ async function dispatch(message: unknown) {
       const controller = new AbortController()
       folderReads.set(input.requestId, controller)
       try {
-        const result = await state.host.readPackageFolder(input, controller.signal)
+        const result = await state.host.readPackageFolders(input, controller.signal)
         reply({ id: message.id, result })
       } finally {
         folderReads.delete(input.requestId)

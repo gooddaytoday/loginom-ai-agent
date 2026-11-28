@@ -18,6 +18,7 @@ export type Launch = {
   actionManifestSha256?: string
   validation?: boolean
   packageFolder?: string
+  packageQuery?: string
   // Host-owned HTTP cache only; browser profiles and authentication remain fresh.
   validationHttpCache?: boolean
   headless?: boolean
@@ -118,14 +119,14 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
     { ...input, environment: undefined, protocol: 1 },
     Math.max(1, Math.min(input.validation ? 210_000 : 120_000, (input.startupDeadline ?? Infinity) - Date.now())),
     signal,
-    // Windows browser/resource teardown can outlast 5s even after native Close/logout.
-    // Leave headroom for the exit grace inside the outer Host's 30s close budget.
-    input.closeSavedPackageOnShutdown === true || input.acceptanceCleanupPackage ? 45_000 : 15_000,
+    // Picker cancellation may need to drain an in-flight login before native logout.
+    input.packageFolder !== undefined ? 50_000
+      : input.closeSavedPackageOnShutdown === true || input.acceptanceCleanupPackage ? 45_000 : 15_000,
   )
   const ready = runtime.ready
   if (
     input.packageFolder !== undefined
-      ? !("listing" in ready)
+      ? !("listings" in ready)
       : input.validation
         ? !("checked" in ready) || ready.checked !== true
         : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat

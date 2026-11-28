@@ -62,7 +62,11 @@ async function nativeRows(page, input) {
 // Open the same Files window as dock_storage_list, then let its controller
 // navigate and load its FileStore. Reading the store includes virtualized rows.
 async function filesRows(page, input) {
-  await page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnFilestorage"]').click({ timeout: 8000 })
+  const alreadyOpen = await page.evaluate(() => {
+    const workspace = globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace
+    return workspace?.getActiveTab?.()?.Controller?.FController?.constructor?.name === "FileStorageForm"
+  })
+  if (!alreadyOpen) await page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnFilestorage"]').click({ timeout: 8000 })
   const ready = await page.waitForFunction(({ origin, username }) => {
     const main = globalThis.bg?.app?.Application?.FInstance?.FMainForm
     const connection = main?.FMapTree?.FServerConnection
@@ -146,25 +150,50 @@ async function readPackageFolder(page, input, signal) {
   }
 }
 
-export async function withPackageFolderSession({ login, folder, origin, username, signal }) {
+export async function logoutPackageSession(page, { origin, username, required }, onPhase) {
+  const started = performance.now()
+  try {
+    const loggedOut = await bounded(() => page.evaluate(async ({ origin, username, required }) => {
+      const app = globalThis.bg?.app?.Application?.FInstance
+      const connection = app?.FServerConnection ?? app?.FMainForm?.FMapTree?.FServerConnection
+      if (location.origin !== origin) return false
+      if (connection?.Connected !== true) return required ? false : null
+      if (connection.UserName !== username) return false
+      await app.LogOut()
+      return !app.FServerConnection && !app.FMainForm
+    }, { origin, username, required }), 6000)
+    if (loggedOut === false) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    if (loggedOut) await onPhase?.({ phase: "packages.logout", status: "ready", duration_ms: Math.round(performance.now() - started) })
+  } catch {
+    throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+  }
+}
+
+export async function withPackageFolderSession({ login, folder, query, origin, username, signal, onPhase }) {
   const { context } = await login()
   const page = context.pages()[0]
   try {
     const started = performance.now()
-    const listing = await readPackageFolder(page, { folder, origin, username }, signal)
-    return { listing, readMs: Math.round(performance.now() - started) }
+    const listings = []
+    const pending = [folder]
+    const normalize = text => text.normalize("NFC").toLocaleLowerCase("ru")
+    const match = query === undefined ? undefined : normalize(query.trim())
+    while (pending.length) {
+      signal?.throwIfAborted()
+      const current = pending.pop()
+      const listing = await readPackageFolder(page, { folder: current, origin, username }, signal)
+      if (match === undefined) listings.push(listing)
+      else {
+        const directories = listing.entries.filter(entry => entry.kind === "folder")
+        for (const directory of directories.reverse()) pending.push(directory.path)
+        listings.push({ ...listing, entries: listing.entries.filter(entry =>
+          entry.kind === "package" && normalize(entry.name).includes(match)) })
+      }
+    }
+    return { listings, readMs: Math.round(performance.now() - started) }
   } finally {
     try {
-      const loggedOut = await bounded(() => page.evaluate(async ({ origin, username }) => {
-        const app = globalThis.bg?.app?.Application?.FInstance
-        const connection = app?.FMainForm?.FMapTree?.FServerConnection
-        if (location.origin !== origin || connection?.Connected !== true || connection.UserName !== username) return false
-        await app.LogOut()
-        return !app.FServerConnection && !app.FMainForm
-      }, { origin, username }), 6000)
-      if (!loggedOut) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
-    } catch {
-      throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      await logoutPackageSession(page, { origin, username, required: true }, onPhase)
     } finally {
       await context.close().catch(() => { throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED") })
     }

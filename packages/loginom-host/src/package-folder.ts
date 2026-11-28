@@ -23,17 +23,21 @@ export type FolderListing = typeof FolderListing.Type
 export const ReadFolder = Schema.Struct({
   folder: Folder,
   generation: Schema.Int.check(Schema.isGreaterThan(0)),
+  query: Schema.optional(Schema.String.check(Schema.isMaxLength(1024))),
 })
 export type ReadFolder = typeof ReadFolder.Type
 
-const decodeListing = Schema.decodeUnknownOption(FolderListing, { onExcessProperty: "error" })
-export function decodeFolderListing(value: unknown, folder: string): FolderListing {
-  const result = decodeListing(value)
-  if (
-    Option.isNone(result) ||
-    result.value.folder !== folder ||
-    result.value.entries.some((entry) => entry.name.includes("/") || entry.path !== folder + "/" + entry.name)
-  )
+const decodeListings = Schema.decodeUnknownOption(Schema.Array(FolderListing), { onExcessProperty: "error" })
+export function decodeFolderListings(value: unknown, { folder, query }: ReadFolder) {
+  const result = decodeListings(value)
+  if (Option.isNone(result) || result.value[0]?.folder !== folder || (query === undefined && result.value.length !== 1))
     throw Error("LOGINOM_REPLY_INVALID")
+  const seen = new Set<string>()
+  for (const page of result.value) {
+    if (seen.has(page.folder) || (page.folder !== folder && !page.folder.startsWith(folder + "/")) ||
+      page.entries.some((entry) => entry.name.includes("/") || entry.path !== page.folder + "/" + entry.name ||
+        (query !== undefined && entry.kind !== "package"))) throw Error("LOGINOM_REPLY_INVALID")
+    seen.add(page.folder)
+  }
   return result.value
 }

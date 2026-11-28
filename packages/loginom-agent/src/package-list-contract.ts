@@ -4,6 +4,9 @@ import { Schema } from "effect"
 
 const errors = {
   session_limit: Schema.toStandardSchemaV1(Schema.Undefined),
+  not_connected: Schema.toStandardSchemaV1(Schema.Undefined),
+  recovering: Schema.toStandardSchemaV1(Schema.Undefined),
+  cancelled: Schema.toStandardSchemaV1(Schema.Undefined),
   unavailable: Schema.toStandardSchemaV1(Schema.Undefined),
 }
 

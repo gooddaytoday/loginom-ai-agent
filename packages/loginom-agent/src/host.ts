@@ -10,7 +10,7 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
-import { decodeFolderListing, type ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
+import { decodeFolderListings, type ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { Option, Schema } from "effect"
@@ -37,7 +37,7 @@ const decodeRecord = Schema.decodeUnknownOption(
 const decodeStatus = Schema.decodeUnknownOption(
   Schema.Struct({ generation: Schema.Number, recoveries: Schema.optional(Schema.Array(Schema.String)) }),
 )
-const decodeView = Schema.decodeUnknownOption(Schema.Struct({ url: Schema.String, generation: Schema.Number }))
+const decodeView = Schema.decodeUnknownOption(Schema.Struct({ url: Schema.String, generation: Schema.Number, state: Schema.optional(Schema.String) }))
 const decodePublication = Schema.decodeUnknownOption(Schema.NullOr(PublicationSource), { onExcessProperty: "error" })
 
 /**
@@ -137,8 +137,10 @@ async function connectionView() {
 
 export const packageFolders = {
   async generation() {
-    const { generation } = await connectionView()
-    return generation
+    const view = await connectionView()
+    if (view.state === "unconfigured") throw Error("LOGINOM_CONFIG_REQUIRED")
+    if (view.state === "recoverable-error") throw Error("LOGINOM_RECOVERY_REQUIRED")
+    return view.generation
   },
   async read(input: ReadFolder, signal: AbortSignal) {
     signal.throwIfAborted()
@@ -153,7 +155,7 @@ export const packageFolders = {
     try {
       const result = await request("packages.list", { ...input, requestId })
       signal.throwIfAborted()
-      return decodeFolderListing(result, input.folder)
+      return decodeFolderListings(result, input)
     } finally {
       signal.removeEventListener("abort", cancel)
     }

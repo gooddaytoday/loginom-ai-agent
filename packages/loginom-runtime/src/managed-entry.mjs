@@ -147,6 +147,8 @@ async function handle(message) {
       const input = message.input
       const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
       const packageReader = input.packageFolder === undefined ? undefined : await import("./package-folder.mjs")
+      if (input.packageQuery !== undefined && (!packageReader || typeof input.packageQuery !== "string" || input.packageQuery.length > 1024))
+        throw Error("LOGINOM_START_INVALID")
       if (packageReader && (!packageReader.isPackageFolder(input.packageFolder) || input.validation === true
           || acceptanceCleanupPackage || closeSavedPackageOnShutdown || browserRecovery)) throw Error("LOGINOM_START_INVALID")
       state.owner = { chat: input.chat, generation: input.generation }
@@ -202,15 +204,18 @@ async function handle(message) {
         return
       }
       if (packageReader) {
-        const { listing, readMs } = await packageReader.withPackageFolderSession({
-          login: () => loginBrowser({ ...login, keepOpen: true, reportSessionLimit: true }),
+        const owner = { origin: new URL(input.connection.url).origin, username: input.connection.username }
+        const { listings, readMs } = await packageReader.withPackageFolderSession({
+          login: () => loginBrowser({ ...login, keepOpen: true, reportSessionLimit: true,
+            logoutOnLoginFailure: (page, required) => packageReader.logoutPackageSession(page, { ...owner, required }, startupPhase) }),
           folder: input.packageFolder,
-          origin: new URL(input.connection.url).origin,
-          username: input.connection.username,
+          query: input.packageQuery,
+          ...owner,
           signal: state.startupController.signal,
+          onPhase: startupPhase,
         })
         await startupPhase({ phase: "packages.read", status: "ready", duration_ms: readMs })
-        send({ id: message.id, result: { listing, protocol: 1, generation: input.generation } })
+        send({ id: message.id, result: { listings, protocol: 1, generation: input.generation } })
         return
       }
       // Connection validation and package listing do not load the executor.

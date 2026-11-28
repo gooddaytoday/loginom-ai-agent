@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import type { FolderListing } from "@loginom-ai-agent/loginom-host/package-folder"
 import type { RpcHandlers } from "@opencode/plugin/promise/rpc"
 import { ServiceHost } from "./host"
 import type { Definition, Search } from "./package-list-contract"
@@ -8,13 +9,21 @@ type Continuation = {
   folder: string
   text: string
   generation: number
-  pending: readonly string[]
+  pages: readonly FolderListing[]
+  index: number
   expires: number
-  reading: boolean
 }
 
 const normalize = (text: string) => text.normalize("NFC").toLocaleLowerCase("ru")
 const isCode = (error: unknown, code: string) => error instanceof Error && error.message === code
+
+function readError(cause: unknown) {
+  if (isCode(cause, "LOGINOM_SESSION_LIMIT")) return ["session_limit", ru.sessionLimit] as const
+  if (isCode(cause, "LOGINOM_CONFIG_REQUIRED")) return ["not_connected", ru.notConnected] as const
+  if (isCode(cause, "LOGINOM_RECOVERY_REQUIRED")) return ["recovering", ru.recovering] as const
+  if (isCode(cause, "LOGINOM_PACKAGE_FOLDER_CANCELLED")) return ["cancelled", ru.cancelled] as const
+  return ["unavailable", ru.unavailable] as const
+}
 
 export function packageListHandlers(host = ServiceHost.packageFolders): RpcHandlers<typeof Definition> {
   const continuations = new Map<string, Continuation>()
@@ -22,71 +31,46 @@ export function packageListHandlers(host = ServiceHost.packageFolders): RpcHandl
   return {
     async list({ folder }, { signal, error }) {
       try {
-        return await host.read({ folder, generation: await host.generation() }, signal)
+        const [listing] = await host.read({ folder, generation: await host.generation() }, signal)
+        if (!listing) throw Error("LOGINOM_REPLY_INVALID")
+        return listing
       } catch (cause) {
         signal.throwIfAborted()
-        return isCode(cause, "LOGINOM_SESSION_LIMIT")
-          ? error("session_limit", ru.sessionLimit)
-          : error("unavailable", ru.unavailable)
+        const [type, message] = readError(cause)
+        return error(type, message)
       }
     },
     async search({ folder, text, recursive, cursor }: Search, { signal, error }) {
       const query = normalize(text.trim())
       const continuation = cursor ? continuations.get(cursor) : undefined
-      if (
-        cursor &&
-        (!recursive ||
-          !continuation ||
-          continuation.folder !== folder ||
-          continuation.text !== query ||
-          continuation.expires <= Date.now() ||
-          continuation.reading)
-      )
-        return error("search_expired", ru.searchExpired)
-      if (continuation) continuation.reading = true
+      if (cursor && (!recursive || !continuation || continuation.folder !== folder || continuation.text !== query ||
+        continuation.expires <= Date.now())) return error("search_expired", ru.searchExpired)
+      if (cursor) continuations.delete(cursor)
       try {
         signal.throwIfAborted()
-        const generation = continuation?.generation ?? (await host.generation())
-        const [current, ...remaining] = continuation?.pending ?? [folder]
-        if (!current) return error("search_expired", ru.searchExpired)
-
-        const result = await host.read({ folder: current, generation }, signal)
+        const generation = await host.generation()
         signal.throwIfAborted()
-        const entries = result.entries
-          .filter((entry) => entry.kind === "package")
-          .filter((entry) => normalize(entry.name).includes(query))
-        const children = recursive
-          ? result.entries.filter((entry) => entry.kind === "folder").map((entry) => entry.path)
-          : []
-        const pending = [...children, ...remaining]
+        if (continuation && continuation.generation !== generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
+        const pages = continuation?.pages ?? await host.read({ folder, generation, ...(recursive ? { query: text } : {}) }, signal)
+        signal.throwIfAborted()
+        const index = continuation?.index ?? 0
+        const result = pages[index]
+        if (!result) throw Error("LOGINOM_REPLY_INVALID")
+        const entries = result.entries.filter((entry) => entry.kind === "package").filter((entry) => normalize(entry.name).includes(query))
+        if (index + 1 >= pages.length) return { folder: result.folder, entries, slow: result.slow }
 
-        if (cursor) continuations.delete(cursor)
-        if (!pending.length) return { folder: current, entries, slow: result.slow }
-        // Cursor state stays on the server and is bounded per Location.
         const next = randomUUID()
-        continuations.set(next, {
-          folder,
-          text: query,
-          generation,
-          pending,
-          expires: Date.now() + 5 * 60_000,
-          reading: false,
-        })
+        continuations.set(next, { folder, text: query, generation, pages, index: index + 1, expires: Date.now() + 5 * 60_000 })
         if (continuations.size > 64) {
           const oldest = continuations.keys().next().value
           if (oldest) continuations.delete(oldest)
         }
-        return { folder: current, entries, slow: result.slow, cursor: next }
+        return { folder: result.folder, entries, slow: result.slow, cursor: next }
       } catch (cause) {
-        if (signal.aborted && cursor) continuations.delete(cursor)
         signal.throwIfAborted()
-        if (continuation && isCode(cause, "LOGINOM_GENERATION_UNAVAILABLE"))
-          return error("search_expired", ru.searchExpired)
-        return isCode(cause, "LOGINOM_SESSION_LIMIT")
-          ? error("session_limit", ru.sessionLimit)
-          : error("unavailable", ru.unavailable)
-      } finally {
-        if (continuation) continuation.reading = false
+        if (continuation && isCode(cause, "LOGINOM_GENERATION_UNAVAILABLE")) return error("search_expired", ru.searchExpired)
+        const [type, message] = readError(cause)
+        return error(type, message)
       }
     },
   }

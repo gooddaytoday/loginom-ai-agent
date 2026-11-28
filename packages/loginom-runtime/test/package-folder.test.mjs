@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { runInNewContext } from "node:vm"
-import { withPackageFolderSession } from "../src/package-folder.mjs"
+import { logoutPackageSession, withPackageFolderSession } from "../src/package-folder.mjs"
 
 const origin = "https://stand.example.test"
 const folder = "/user"
@@ -94,14 +94,14 @@ function fixture() {
   const login = async () => ({
     context: { pages: () => [page], close: async () => { events.push(["close browser"]) } },
   })
-  return { events, fileList, released, form, app, read: (signal, path = folder) => withPackageFolderSession({
-    login, folder: path, origin, username, signal,
+  return { events, fileList, released, form, app, page, read: (signal, path = folder, query) => withPackageFolderSession({
+    login, folder: path, query, origin, username, signal,
   }) }
 }
 
 test("FileInfoList returns folders first, packages newest first and no native fields", async () => {
   const f = fixture()
-  const { listing } = await f.read()
+  const { listings: [listing] } = await f.read()
   assert.deepEqual(listing, { folder, entries: expected, slow: false })
   assert.deepEqual(f.events, [["directories", "/user/"], ["packages", "/user/", "*.lgp"], ["logout"], ["close browser"]])
   assert.equal(f.released.length, 2)
@@ -113,7 +113,7 @@ for (const [failure, reply] of [
 ]) test("uses the Files window when FileInfoList " + failure, async () => {
   const f = fixture()
   f.fileList.GetFileInfoItemsEx = reply
-  assert.deepEqual((await f.read()).listing, { folder, entries: expected, slow: true })
+  assert.deepEqual((await f.read()).listings[0], { folder, entries: expected, slow: true })
   assert.deepEqual(f.events, [["directories", "/user/"], ["open Files"], ["navigate in Files", "/user/"], ["logout"], ["close browser"]])
 })
 
@@ -121,7 +121,7 @@ test("empty shared folder is a valid response", async () => {
   const f = fixture()
   f.fileList.GetDirectoryItems = () => []
   f.fileList.GetFileInfoItemsEx = () => []
-  assert.deepEqual((await f.read(undefined, "/common")).listing, { folder: "/common", entries: [], slow: false })
+  assert.deepEqual((await f.read(undefined, "/common")).listings[0], { folder: "/common", entries: [], slow: false })
 })
 
 test("canceling a pending folder read still logs out and closes the browser", async () => {
@@ -142,4 +142,28 @@ test("a Files window for a different folder does not become a successful empty r
   f.form.SetCurrentDirLockWrapper = async () => {}
   await assert.rejects(f.read(), { message: "LOGINOM_PACKAGE_FOLDER_UNAVAILABLE" })
   assert.deepEqual(f.events, [["open Files"], ["logout"], ["close browser"]])
+})
+
+
+test("one authenticated session reads all 30 child folders and then logs out", async () => {
+  const f = fixture()
+  const folders = Array.from({ length: 30 }, (_, i) => `Folder ${String(i).padStart(2, "0")}`)
+  f.fileList.GetDirectoryItems = path => {
+    f.events.push(["directories", path])
+    return path === "/user/" ? folders.map(FileName => ({ FileName, Attributes: 4 })) : []
+  }
+  const { listings } = await f.read(undefined, "/user", "ПРОД")
+  assert.deepEqual(listings.map(page => page.folder), ["/user", ...folders.map(name => `/user/${name}`)])
+  assert.deepEqual(listings.map(page => page.entries.map(entry => entry.name)), listings.map(() => [newer.FileName]))
+  assert.equal(f.events.filter(([event]) => event === "directories").length, 31)
+  assert.deepEqual(f.events.filter(([event]) => event === "logout" || event === "close browser"), [["logout"], ["close browser"]])
+})
+
+
+test("logout after web authentication uses the owned connection before the workspace renders", async () => {
+  const f = fixture()
+  f.app.FMainForm = null
+  await logoutPackageSession(f.page, { origin, username, required: false })
+  assert.deepEqual(f.events, [["logout"]])
+  assert.equal(f.app.FServerConnection, null)
 })

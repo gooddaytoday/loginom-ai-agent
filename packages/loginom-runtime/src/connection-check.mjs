@@ -164,7 +164,7 @@ function trackPageNetwork(page) {
 
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
-export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase, reload, signal, reportSessionLimit = false } = {}) {
+export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase, reload, signal, onSubmit, reportSessionLimit = false } = {}) {
   const started = performance.now()
   let phase = "goto", phaseStarted = started, original
   const emit = async event => { try { await onPhase?.(event) } catch { /* Diagnostics cannot change login. */ } }
@@ -265,10 +265,19 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
         requireLoginAddress()
         if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password, { timeout: remaining(30_000) })
       })
+      let submitted = false
       await measure("login.submit", () => {
         requireLoginAddress()
+        signal?.throwIfAborted()
         if (reload) reload.loginSubmitted = true
-        return field("btnLogin").click({ timeout: remaining(30_000) })
+        if (onSubmit) {
+          onSubmit()
+          submitted = true
+        }
+        return field("btnLogin").click({ timeout: remaining(onSubmit ? 5000 : 30_000) })
+      }).catch(error => {
+        // A failed click can already have delivered the credential submission.
+        if (!submitted) throw error
       })
       const response = await measure("login.response", () => page.waitForFunction(function loginResponse() {
         const avatar = document.querySelector('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
@@ -281,7 +290,7 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
             const field = element && globalThis.Ext?.getCmp(element.id)
             return field?.isVisible?.(true) === true ? field.getActiveErrors?.() ?? [] : []
           }).filter(message => typeof message === "string" && message.trim().length > 0)
-          if (errors.some(message => /превышено количество сессий[, ]+допустимых по вашей лицензии/iu.test(message)))
+          if (errors.some(message => /превышено количество сессий[, ]+допустимых по вашей лицензии|(?:too many|no more) (?:concurrent |active )?sessions|(?:maximum|limit|exceed)[^.!?]*sessions|sessions[^.!?]*(?:license|licence|limit|exceed)/iu.test(message)))
             return "session_limit"
           return errors.length ? "rejected" : false
         } catch { return false }
@@ -420,7 +429,7 @@ function loginFailure(error, candidate, phase, duration, elapsed) {
 }
 
 export async function loginBrowser({ browserPath, profile, candidate, httpCachePath, headless = false, keepOpen = false, signal, onContextCreated, downloadsPath,
-  deadline = Date.now() + 150_000, onRetry, onPhase, reportSessionLimit = false }) {
+  deadline = Date.now() + 150_000, onRetry, onPhase, reportSessionLimit = false, logoutOnLoginFailure }) {
   signal?.throwIfAborted()
   const phase = onPhase ?? (async () => {})
   const dependenciesStarted = performance.now()
@@ -491,7 +500,10 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
   await phase({ phase: "browser.cdp", status: "ready", attempt: attempt + 1 })
   const closing = { promise: undefined }
   const close = () => closing.promise ??= context.close()
-  const cancel = () => { void close().catch(() => undefined) }
+  let submitted = false, authenticated = false, page
+  // After submission the browser owns a possibly admitted server session.
+  // Drain the login response and let the guarded logout run before closing it.
+  const cancel = () => { if (!submitted && !authenticated) void close().catch(() => undefined) }
   signal?.addEventListener("abort", cancel, { once: true })
   const timer = setTimeout(cancel, Math.max(1, deadline - Date.now()))
   try {
@@ -511,8 +523,11 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
     if (onContextCreated) await onContextCreated(context)
     const loginStarted = performance.now()
     await phase({ phase: "login", status: "starting", attempt: attempt + 1 })
-    const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate, { deadline, themeState, onThemeReload: record, onPhase: phase, reportSessionLimit })
+    page = context.pages()[0] ?? (await context.newPage())
+    const result = await loginPage(page, candidate, { deadline, themeState, onThemeReload: record, onPhase: phase, reportSessionLimit,
+      ...(logoutOnLoginFailure ? { signal, onSubmit: () => { submitted = true } } : {}) })
       .then(async result => {
+        authenticated = Boolean(logoutOnLoginFailure)
         await phase({ phase: "login", status: "ready", attempt: attempt + 1, duration_ms: Math.round(performance.now() - loginStarted) })
         return result
       }, async error => {
@@ -527,7 +542,14 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
     // MCP receives this same live context through its public contextGetter API.
     return { ...result, context }
   } catch (error) {
-    await close().catch(() => { throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED", error?.cause?.login ? { cause: error.cause } : undefined) })
+    try {
+      if (logoutOnLoginFailure && (submitted || authenticated)) {
+        const rejected = error?.message === "LOGINOM_LOGIN_REJECTED" || error?.message === "LOGINOM_SESSION_LIMIT"
+        await logoutOnLoginFailure(page, authenticated || !rejected)
+      }
+    } finally {
+      await close().catch(() => { throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED", error?.cause?.login ? { cause: error.cause } : undefined) })
+    }
     signal?.throwIfAborted()
     // Only a classified transient login failure may retry, after confirmed close.
     if (attempt === 0 && !themeState.failed && error?.message === "LOGINOM_LOGIN_UNAVAILABLE" && Date.now() < deadline) {

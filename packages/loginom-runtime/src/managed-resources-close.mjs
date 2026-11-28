@@ -51,7 +51,7 @@ export async function closeManagedResources(state, requests) {
   }
   if (state.browserProfile) {
     await record("profile", "started")
-    const removed = await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true })])
+    const removed = await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true, maxRetries: 4, retryDelay: 100 })])
     results.push(...removed)
     await record("profile", removed[0].status)
   }

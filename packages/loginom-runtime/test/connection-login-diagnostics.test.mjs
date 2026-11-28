@@ -263,8 +263,10 @@ test("an observed login form error remains rejected without retaining its text",
   })
 })
 
-test("the short session reports the Loginom license limit without copying the native message", async () => {
-  const native = "Превышено количество сессий, допустимых по вашей лицензии (private detail)"
+for (const native of [
+  "Превышено количество сессий, допустимых по вашей лицензии (private detail)",
+  "The maximum number of sessions allowed by your license has been exceeded (private detail)",
+]) test("the short session recognizes a localized license limit without copying the native message", async () => {
   const f = fixture(undefined, undefined, false, native)
   await assert.rejects(loginPage(f.page, candidate, { reportSessionLimit: true }), error => {
     assert.equal(error.message, "LOGINOM_SESSION_LIMIT")
