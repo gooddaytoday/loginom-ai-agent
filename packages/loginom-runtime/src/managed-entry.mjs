@@ -307,7 +307,6 @@ async function handle(message) {
       return
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
-    if (!state.client) throw Error("LOGINOM_NOT_READY")
     if (state.packageStorage) {
       if (message.operation !== "packageList" && message.operation !== "packageRead") throw Error("LOGINOM_REQUEST_INVALID")
       const result = message.operation === "packageList" ? await state.packageStorage.list(message.input)
@@ -315,6 +314,7 @@ async function handle(message) {
       send({ id: message.id, result })
       return
     }
+    if (!state.client) throw Error("LOGINOM_NOT_READY")
     if (["dashboardRead", "dashboardPublish", "dashboardVersions", "dashboardDelete"].includes(message.operation)) {
       if (message.operation === "dashboardVersions" || message.operation === "dashboardDelete") {
         if (message.input?.generation !== state.owner.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
