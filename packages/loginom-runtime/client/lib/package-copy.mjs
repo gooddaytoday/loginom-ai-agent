@@ -108,7 +108,7 @@ export function createPackageCopy({ file, root, storage, checkpoint, prepareSave
       await event(pending, 'package_copy_verified');
       await persist(next);
     } catch (error) {
-      if (error instanceof PackageCopyError && error.noEffect === true && !backupOnly) {
+      if (error instanceof PackageCopyError && error.noEffect === true) {
         await event(pending, 'package_copy_not_applied', {code:error.code});
         await persist(state);
         throw error;

@@ -397,7 +397,7 @@ export async function createBridge(config, session, { browserTransport: managedB
     });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [...structuredClone(catalog.tools), ...recovery.listTools(browserTools)] }));
     const stateCheck = () => new PackageCopyError('state_check_required');
-    const notApplied = () => new PackageCopyError('not_applied');
+    const notApplied = () => Object.assign(new PackageCopyError('not_applied'), {noEffect:true});
     const invokeCopyTool = (name, args, signal) =>
       callTool({params:{name,arguments:args}}, {signal}, null, undefined, true);
     const executePackageSave = async (kind, path, operationId, signal) => {
@@ -407,11 +407,12 @@ export async function createBridge(config, session, { browserTransport: managedB
       const outcome = JSON.parse(response.content[0].text);
       if (outcome.effect_possible === false && outcome.cleanup_complete === true && outcome.status !== 'SUCCEEDED')
         throw notApplied();
-      if (outcome.operation_id !== operationId || outcome.output?.package_ref?.path !== path
+      const admission = saveAdmissions.get(operationId);
+      if (!admission || outcome.operation_id !== operationId || outcome.output?.package_ref?.path !== path
           || outcomeVerification(outcome, pinnedActions.actions.get(kind)).domain_effect.state !== 'verified')
         throw stateCheck();
       await recordExecution({phase:'package_copy_save_receipt', operation_id:operationId, path,
-        runtime_instance_id:saveRuntimeId, sequence:saveAdmissions.get(operationId).sequence});
+        runtime_instance_id:saveRuntimeId, sequence:admission.sequence});
     };
     const copyStorage = packageCopy?.storage;
     const copies = packageCopy && createPackageCopy({
@@ -438,7 +439,8 @@ export async function createBridge(config, session, { browserTransport: managedB
         async function verify() {
           if ((await copyStorage.workspace(source))?.modified !== false
               || await copyStorage.digest(source) !== sourceHash || await copyStorage.digest(path) !== previous) throw notApplied();
-          if (await copyStorage.busy(path)) throw new PackageCopyError('package_busy', {packagePath:path, kind:'other_loginom_session'});
+          if (await copyStorage.busy(path)) throw Object.assign(
+            new PackageCopyError('package_busy', {packagePath:path, kind:'other_loginom_session'}), {noEffect:true});
         }
         await verify();
         return async id => {

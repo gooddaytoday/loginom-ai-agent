@@ -314,3 +314,23 @@ test('binary hashes are exact across chunks and oversized packages fail before p
   assert.equal(files.has(firstVersion), false);
   assert.equal(await server.guard(copy), copy);
 });
+
+test('a competing file at the chosen backup path leaves the next replacement available', async t => {
+  const {native, files, server, runtime} = await fixture(t);
+  const move = native.MoveFile.bind(native);
+  let contested = false;
+  native.MoveFile = (from, to, overwrite) => {
+    if (!contested && to === backupPath) {
+      contested = true;
+      files.set(to, 'other backup');
+    }
+    return move(from, to, overwrite);
+  };
+  await assert.rejects(server.execute('replace-original', {confirmed:true}), {code:'path_exists', data:{path:backupPath}});
+  assert.equal(files.get(original), 'original package');
+  const replacement = await runtime().execute('replace-original', {confirmed:true});
+  assert.equal(replacement.backupPath, '/user/Продажи — до правки 2.lgp');
+  assert.equal(files.get(backupPath), 'other backup');
+  assert.equal(files.get(replacement.backupPath), 'original package');
+  assert.equal(files.get(original), edited);
+});

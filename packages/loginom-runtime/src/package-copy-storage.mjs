@@ -21,7 +21,7 @@ export function packageCopyStorage(page, {url, account}) {
   }
   async function digest(path) {
     if (!await evaluate('exists', path)) return null;
-    const handle = await page.evaluateHandle(native, {...input, mode:'stream', path});
+    const handle = await page.evaluateHandle(native, {...input, mode:'stream', path, maxSize:MAX_PACKAGE_SIZE});
     try {
       const size = await handle.evaluate(value => value?.size);
       if (!Number.isSafeInteger(size) || size <= 0) throw uncertain();
@@ -125,7 +125,7 @@ export function packageCopyStorage(page, {url, account}) {
   };
 }
 
-async function native({origin, pathname, account, mode, path, target, discard, guard}) {
+async function native({origin, pathname, account, mode, path, target, discard, guard, maxSize}) {
   const app = globalThis.bg?.app;
   const form = app?.Application?.FInstance?.FMainForm;
   const map = form?.FMapTree;
@@ -199,6 +199,7 @@ async function native({origin, pathname, account, mode, path, target, discard, g
       if (!info) throw Error('File info unavailable');
       let size;
       try { size = await info.Size; } finally { await ReleaseObject(info, true); }
+      if (!Number.isSafeInteger(size) || size <= 0 || size > maxSize) return {size};
       const stream = await call('OpenFile', path, bg.TBGFileOpenMode.fomRead);
       return {size, stream, bound};
     }

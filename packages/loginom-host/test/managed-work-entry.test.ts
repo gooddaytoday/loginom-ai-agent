@@ -64,7 +64,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         const context = Object.assign(new EventEmitter(), { pages: () => [], close: async () => {} });
         onContextCreated?.(context);
         context.emit('response', { url: () => 'http://example.test/app/', fromServiceWorker: () => false });
-        return { context };
+        return { context, page: { async evaluate() { return true; } } };
       };
       export const reauthenticateReloadedPage = async () => { throw Error('work state fixture does not log in again'); };`,
     "runtime/client/package.json": JSON.stringify({ type: "module" }),
@@ -103,16 +103,23 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
        export const artifactFailure=artifacts.artifactFailure ?? (()=>null);`,
     "runtime/client/lib/bridge.mjs": `
       import { readFileSync } from 'node:fs';
+      import { mkdir, readFile, writeFile } from 'node:fs/promises';
+      import { dirname } from 'node:path';
       const work = () => JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8'));
-      export async function createBridge() { return {
+      export async function createBridge(_config, _session, { packageCopy }) { return {
         server: { connect: async () => {} }, close: async () => ({
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
         async packageCopy(action, input, signal) {
           signal.throwIfAborted();
+          if (action === 'save-version') return JSON.parse(await readFile(packageCopy.file, 'utf8'));
           if (action !== 'replace-original' || input.confirmed !== true) throw Error('unexpected copy action');
-          return { path:'/user/Plan.lgp', backupPath:'/user/Plan — до правки.lgp' };
+          if (!await packageCopy.storage.exists('/user/Plan.lgp')) throw Error('wrong Loginom window');
+          const replacement = { path:'/user/Plan.lgp', backupPath:'/user/Plan — до правки.lgp' };
+          await mkdir(dirname(packageCopy.file), { recursive:true });
+          await writeFile(packageCopy.file, JSON.stringify(replacement));
+          return replacement;
         },
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
@@ -153,16 +160,17 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     await Bun.write(target, contents)
   }
   await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false }))
-  const runtime = await supervise({
+  const start = (generation: number) => supervise({
     node,
     entry: join(src, "managed-entry.mjs"),
     resources: directory,
     stateDir: join(directory, "state"),
-    generation: 1,
+    generation,
     chat: "chat",
     connection: { url: "http://example.test", username: "user", apiKey: "fixture", password: "" },
     environment: {},
   })
+  const runtime = await start(1)
   try {
     expect(await readFile(join(src, "managed-entry.mjs"), "utf8")).toBe(
       await readFile(new URL("../../loginom-runtime/src/managed-entry.mjs", import.meta.url), "utf8"),
@@ -202,6 +210,14 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
   } finally {
     await runtime.close()
     expect(await runtime.exited).toEqual({ code: 0, signal: null })
+    const updated = await start(2)
+    try {
+      expect(await updated.request("packageCopy", { action: "save-version" })).toEqual({
+        output: { path: "/user/Plan.lgp", backupPath: "/user/Plan — до правки.lgp" },
+      })
+    } finally {
+      await updated.close()
+    }
   }
   // All error-producing admission, managed entry, supervision, HostPort,
   // transport and adapter code is production code. Only browser/Help are fixtures.
