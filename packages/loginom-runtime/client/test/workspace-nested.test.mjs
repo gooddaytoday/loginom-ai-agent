@@ -1,94 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
 import {setTimeout} from 'node:timers/promises';
-import {makeWorkspacePrepareCode} from '../lib/workspace.mjs';
+import {makeWorkspacePrepareCode,prepareWorkspaceSession} from '../lib/workspace.mjs';
 import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
 import {readPreparedNodeContext} from '../lib/node-context.mjs';
 import {Page} from './support/workspace-ui-fixture.mjs';
+import {nestedWorkspacePage} from './support/nested-workspace-page.mjs';
 
-// LAB-1543 DOM: entering keeps TF-1 and changes breadcrumbs; service GUIDs
-// repeat. Leaving can retain the selected owner's breadcrumb.
-function fixture({loseReply=false,foreignOwner=false,block=false,trialFail=null,loseDispatchReply=false,entryOnSelection=false,foreignSelection=false,playwrightErrors=false}={}) {
-  class PackageTreeNode {}; class WorkFlowTreeNode {}; class ModelForm {};
-  const prefix='MF;TF-1',tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';
-  const element=(tid,text='')=>({tid,textContent:text,isConnected:true,getAttribute:()=>tid,
-    getBoundingClientRect:()=>({width:20,height:20}),classList:{contains:()=>true},querySelectorAll:s=>s==='.maptree-icon-workflow'&&text==='Scenario'?[{}]:[]});
-  const tab=element(tabTid),root=element(prefix+';ModelForm;cmpDiagram');
-  const pkg=new PackageTreeNode();pkg.PackageFileName='/worker/nested.lgp';
-  const outer=Object.assign(new WorkFlowTreeNode(),{ParentNode:pkg});
-  const owner={FGuid:'supernode',ParentNode:outer};
-  const inner=Object.assign(new WorkFlowTreeNode(),{ParentNode:{ParentNode:owner}});
-  let current=outer,crumbs=['Server','Packages','Package','Module','Scenario'],clicks=0,masked=false;
-  const states=new Map(),nodes=[];
-  const add=(id,label,icon)=>{
-    const node={FGuid:id,FIconCls:icon,FCell:{geometry:{x:100,y:100}},FPorts:[],data:{}};
-    node.FLabel={parent:node,FCell:{parent:node.FCell,visible:true},FRawValue:label};
-    states.set(node.FCell,{shape:{node:element(prefix+';Graph;'+label)}});
-    states.set(node.FLabel.FCell,{text:{node:element(prefix+';Graph;'+label+';Label;Label',label)}});
-    nodes.push(node);return node;
-  };
-  const composite=add('supernode','Подмодель','bg-vendor-icon-modelgeneric');
-  owner.FModelNode=composite.data;
-  const service=add('repeated-guid','Переменные_сценария','bg-vendor-icon-user-variables');
-  const innerService=add('repeated-guid','Переменные_сценария','bg-vendor-icon-user-variables');
-  const calc=add('calc','Калькулятор','bg-vendor-icon-calcdata');
-  const input=add('input','Входной_узел','bg-vendor-icon-nullvendor');
-  const output=add('output','Выходной_узел','bg-vendor-icon-nullvendor');
-  const graph={container:root,view:{getState:cell=>states.get(cell)}};
-  root.contains=e=>[...states.values()].some(s=>s.shape?.node===e||s.text?.node===e);
-  root.querySelectorAll=()=>[];
-  const diagram={FmxGraph:graph,GenericInputNode:input,GenericOutputNode:output,get FIsSubmodel(){return current===inner;},
-    FNodes:{get FCollection(){return current===outer?[composite,service]:[calc,innerService,input,output];}}};
-  const model=Object.assign(new ModelForm(),{FDiagram:diagram});
-  const enter=element(prefix+';Graph;Подмодель;GenericEnterLabel;Label');
-  composite.FEnterLabel={parent:composite,FCell:{parent:composite.FCell}};
-  let entryVisible=!entryOnSelection,selections=0;
-  composite.FEnterLabel.FCell.visible=entryVisible;
-  if(entryVisible)states.set(composite.FEnterLabel.FCell,{text:{node:enter}});
-  const selection=element(prefix+';Graph;Подмодель;NodesControls');
-  composite.FControls={parent:foreignSelection?{}:composite,FCell:{parent:composite.FCell}};
-  states.set(composite.FControls.FCell,{shape:{node:selection}});
-  const leave=element(prefix+';Graph;LeaveSubmodelLabel;Label');
-  const crumbsNow=()=>crumbs.map((v,i)=>element(prefix+';cnrNaviMode;b.s_'+crumbs.slice(0,i+1).join('>'),v));
-  const all=()=>[tab,root,selection,...(current===outer?(entryVisible?[enter]:[]):[leave]),...crumbsNow(),...model.FDiagram.FNodes.FCollection.flatMap(n=>[states.get(n.FCell).shape.node,states.get(n.FLabel.FCell).text.node])];
-  const mask={...element('mask'),matches:()=>true};
-  const document={querySelectorAll:q=>q.startsWith('[data-tid^=')?crumbsNow():q.startsWith('[role=')?(masked||block?[mask]:[]):all().filter(e=>q==='[data-tid='+JSON.stringify(e.tid)+']')};
-  const ref={workflow_id:'outer',tab_tid:tabTid,prefix,navigation_path:crumbsNow().map(e=>({tid:e.tid,label:e.textContent}))};
-  const receipt={phase:'verified',workflowId:'outer',packageNode:pkg,tab,nodeTargetWorkflowNode:outer,crumbs:ref.navigation_path};
-  const preparation={id:'doc',document,receipts:new Map([['initial',receipt]])};
-  const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm};
-  const workspace={getActiveTab:()=>({Controller:{Node:{data:{get node(){return current===outer&&crumbs.length===6?owner:current;}}},FController:model}})};
-  app.Application={FInstance:{FMainForm:{Items:{Workspace:workspace},FMapTree:{FServerConnection:{UserName:'worker'}}}}};
-  const context=vm.createContext({document,location:{origin:'https://app.loginom.ai'},getComputedStyle:()=>({visibility:'visible'}),
-    __loginomDockPreparationV1:preparation,bg:{app}});
-  const page={evaluate:(fn,args)=>{
-      let value;
-      // Playwright rethrows a page error as "page.evaluate: Error: <message>\n    at ...".
-      try{value=vm.runInContext('('+fn.toString()+')('+JSON.stringify(args)+')',context);}
-      catch(error){if(playwrightErrors)throw Error('page.evaluate: Error: '+error.message+'\n    at eval (eval at evaluate (:291:30), <anonymous>:4:43)');throw error;}
-      if(loseDispatchReply&&args?.mode==='dispatch'){loseDispatchReply=false;throw Error('lost dispatch reply');}
-      return value;
-    },
-    locator:selector=>({hover:async()=>{
-      assert.equal(selector,'[data-tid='+JSON.stringify(prefix+';Graph;Подмодель')+']');
-      // Hover alone does not reveal the entry in the observed live DOM.
-    },click:async options=>{if(selector.includes('NodesControls')){if(!options?.trial){selections++;entryVisible=true;composite.FEnterLabel.FCell.visible=true;states.set(composite.FEnterLabel.FCell,{text:{node:enter}});}return;}if(options?.trial){
-      const failure=trialFail;trialFail=null;
-      if(failure==='throw')throw Error('locator.click: Timeout exceeded (trial)');
-      if(failure==='block')masked=true;
-      return;
-    }clicks++;if(selector.includes('GenericEnterLabel')){current=inner;crumbs.push('Подмодель','Модуль','Сценарий');if(foreignOwner)owner.FGuid='foreign';}else if(selector.includes('LeaveSubmodelLabel')){current=outer;crumbs=crumbs.slice(0,5).concat('Подмодель');}else if(selector.includes('cnrNaviMode'))crumbs=crumbs.slice(0,5);else throw Error('Unexpected click');masked=true;if(loseReply){loseReply=false;throw Error('lost click reply');}}}),
-    waitForTimeout:async()=>{masked=false;},mouse:{up:async()=>{}}};
-  const adapter=createNodeTargetBrowserAdapter({origin:'https://app.loginom.ai',build:'7.4.2',pinned:{},execute:code=>vm.runInNewContext('('+code+')')(page)});
-  const navigate=(wf,direction='enter',operationId='enter',{timeoutMs=120000,recoverOnly=false}={})=>vm.runInNewContext('('+makeWorkspacePrepareCode({
+function fixture(options) {
+  const browser=nestedWorkspacePage(options);
+  const adapter=createNodeTargetBrowserAdapter({origin:'https://app.loginom.ai',build:'7.4.2',pinned:{},execute:browser.execute});
+  const navigate=(wf,direction='enter',operationId='enter',{timeoutMs=120000,recoverOnly=false}={})=>browser.execute(makeWorkspacePrepareCode({
     loginomUrl:'https://app.loginom.ai/app/?testable=true',compatibility:{profile_id:'native',loginom_build:'7.4.2',platform:'linux',browser:'chromium'},
     intent:'existing_workflow',workflowRef:{...wf,document_id:'doc'},operationId,timeoutMs,recoverOnly,
     graphNavigation:{direction,...(direction==='enter'?{node_ref:{document_id:'doc',workflow_id:wf.workflow_id,node_id:'supernode'}}:{})},
-  })+')')(page);
-  return {navigate,ref,receipt,preparation,read:wf=>adapter.observe({document_id:'doc',workflow_ref:wf},Date.now()+2000),
-    context:wf=>readPreparedNodeContext(page,{document_id:'doc',workflow_ref:wf,node:{document_id:'doc',workflow_id:wf.workflow_id,node_id:'calc'}}),
-    unmask:()=>{masked=false;},clicks:()=>clicks,selections:()=>selections};
+  }));
+  return {...browser,navigate,read:wf=>adapter.observe({document_id:'doc',workflow_ref:wf},Date.now()+2000),
+    context:wf=>readPreparedNodeContext(browser.page,{document_id:'doc',workflow_ref:wf,node:{document_id:'doc',workflow_id:wf.workflow_id,node_id:'calc'}})};
 }
 
 test('NW1 fresh native Supernode renders entry only after owned selection (live DOM LAB-1615)',async()=>{
@@ -103,6 +31,68 @@ test('NW1 refuses a foreign selection overlay without selecting or navigating',a
   const result=await f.navigate(f.ref);
   assert.equal(result.status,'NOT_READY');assert.equal(result.effect_possible,false);
   assert.equal(f.clicks(),0);assert.equal(f.selections(),0);
+});
+
+for (const refused of [false, true]) {
+  test('prepare replays reordered request keys after ' + (refused ? 'a no-effect refusal' : 'verified navigation'), async () => {
+    const f = fixture({ entryOnSelection: refused, foreignSelection: refused });
+    const metadata = { skillRevision: 'skill' };
+    const request = {
+      operation_id: 'enter',
+      intent: 'existing_workflow',
+      package_path: null,
+      workflow_ref: { ...f.ref, document_id: 'doc' },
+      graph_navigation: { direction: 'enter', node_ref: { document_id: 'doc', workflow_id: 'outer', node_id: 'supernode' } },
+    };
+    const reordered = {
+      ...request,
+      workflow_ref: { ...request.workflow_ref, navigation_path: f.ref.navigation_path.map(({ tid, label }) => ({ label, tid })) },
+      graph_navigation: { node_ref: { node_id: 'supernode', workflow_id: 'outer', document_id: 'doc' }, direction: 'enter' },
+    };
+    const run = input => prepareWorkspaceSession({
+      metadata, request: input, assertAllowed() {}, assertTarget() {}, record: async () => {}, save: async () => {},
+      prepare: ({ recoverOnly }) => f.navigate(f.ref, 'enter', request.operation_id, { recoverOnly }),
+    });
+    const first = await run(request);
+    assert.equal(first.status, refused ? 'NOT_READY' : 'READY', first.reason);
+    const second = await run(reordered);
+    assert.equal(second.status, first.status, second.reason);
+    assert.equal(second.reason, first.reason);
+    assert.equal(metadata.workspacePreparation.identity, JSON.stringify(request));
+    if (!refused) {
+      assert.equal(second.replayed, true);
+      assert.equal(second.workflow_ref.workflow_id, first.workflow_ref.workflow_id);
+    }
+    assert.equal(f.clicks(), refused ? 0 : 1);
+    await assert.rejects(run({ ...reordered, workflow_ref: {
+      ...reordered.workflow_ref, navigation_path: [...reordered.workflow_ref.navigation_path].reverse(),
+    } }), /Preparation operation conflict/);
+    await assert.rejects(run({ ...reordered, graph_navigation: {
+      ...reordered.graph_navigation, node_ref: { ...reordered.graph_navigation.node_ref, node_id: 'other-node' },
+    } }), /Preparation operation conflict/);
+  });
+}
+
+// LAB-2054 (bh-i103): the real in-page refusal carries the proof the gate
+// needs, leaves the parent receipt verified, and admits a NEW existing_workflow.
+test('NW1 a no-effect selection refusal keeps the parent receipt and admits a NEW existing_workflow ID',async()=>{
+  const f=fixture({entryOnSelection:true,foreignSelection:true,playwrightErrors:true});
+  const metadata={skillRevision:'skill'},workflow_ref={...f.ref,document_id:'doc'};
+  const args={metadata,assertAllowed(){},assertTarget(){},record:async()=>{},save:async()=>{}};
+  const enter={operation_id:'enter',intent:'existing_workflow',package_path:null,workflow_ref,
+    graph_navigation:{direction:'enter',node_ref:{document_id:'doc',workflow_id:'outer',node_id:'supernode'}}};
+  const refused=await prepareWorkspaceSession({...args,request:enter,prepare:()=>f.navigate(f.ref)});
+  assert.equal(refused.status,'NOT_READY');assert.match(refused.reason,/Submodel selection control unavailable/);
+  assert.equal(refused.effect_possible,false);assert.equal(refused.verification_required,false);assert.ok(Array.isArray(refused.trace));assert.equal(refused.trace.length,0);
+  assert.equal(f.clicks(),0);assert.equal(f.selections(),0);
+  assert.deepEqual([...f.preparation.receipts.keys()],['initial']);assert.equal(f.receipt.phase,'verified');
+  await assert.rejects(prepareWorkspaceSession({...args,request:{operation_id:'draft',intent:'new_draft',package_path:null,workflow_ref:null},
+    prepare:()=>assert.fail('must not dispatch')}),/NEW operation_id, intent existing_workflow/);
+  let calls=0;
+  const parent={operation_id:'parent',intent:'existing_workflow',package_path:null,workflow_ref};
+  const ready=await prepareWorkspaceSession({...args,request:parent,prepare:async({recoverOnly})=>{calls++;assert.equal(recoverOnly,false);
+    return {status:'READY',effect_possible:false,created_draft:false,target:{},workflow_ref};}});
+  assert.equal(ready.status,'READY');assert.equal(calls,1);assert.equal(metadata.workspaceReady,true);
 });
 
 for(const trialFail of ['throw','block'])test('NW1 fresh selection is not repeated after refused navigation trial: '+trialFail,async()=>{

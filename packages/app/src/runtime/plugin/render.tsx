@@ -40,11 +40,15 @@ import { createLinkCheck } from "./link-check"
 
 /**
  * Renders one plugin contribution with its context and error isolation: a contribution that throws records the
- * error and renders nothing, then runs `failed`, and the rest of the window keeps working. Contributions render on
- * timeline rows only as code block content, for a block whose language a plugin claimed, once it is complete; the
- * session header slot is per timeline.
+ * error and renders the optional fallback, then runs `failed`. Timeline rows use this for complete code blocks
+ * and for tool calls claimed by a built-in plugin.
  */
-export function Contribution(props: { plugin: string; failed?: () => void; children: () => JSX.Element }) {
+export function Contribution(props: {
+  plugin: string
+  failed?: () => void
+  fallback?: () => JSX.Element
+  children: () => JSX.Element
+}) {
   const host = usePluginHost()
 
   return (
@@ -57,7 +61,7 @@ export function Contribution(props: { plugin: string; failed?: () => void; child
               props.failed?.()
             })
 
-            return null
+            return props.fallback?.()
           }}
         >
           {/* Untracked: a contribution renders once; its own reactivity updates it in place. */}

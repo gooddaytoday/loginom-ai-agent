@@ -28,12 +28,14 @@ test('saved keys-only grouping is preserved without any gesture',async()=>{
  assert.deepEqual(result.configuration.measures,[]);
 });
 
-test('keys-only output retains exact key source identity and requested order',()=>{
+test('keys-only output retains native order unless a mapping requests order',()=>{
  const sources=fields.map((f,index)=>({...f,record_id:'s'+index}));
  const native={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',source_fields:sources,
   target_fields:sources.map((source,index)=>({...source,index,record_id:'t'+index,source,inherited:false,excluded:false}))};
  assert.deepEqual(groupingOutputDefinitions(configuration).map(f=>f.name),['Key','Text']);
- assert.deepEqual(resolveGroupingOutput(configuration,parameters,native).fields.map(f=>f.source.record_id),['s0','s1']);
+ assert.deepEqual(resolveGroupingOutput(configuration,parameters,native),{fields:null});
+ const mapping={direction:'output',fields:configuration.keys.map(k=>({source:{kind:'configured_field',name:k.name}}))};
+ assert.deepEqual(resolveGroupingOutput(configuration,parameters,native,mapping).fields.map(f=>f.source.record_id),['s0','s1']);
  assert.deepEqual(resolveGroupingOutput(configuration,{},native),{fields:null});
  native.target_fields[1].source=sources[0];
  assert.throws(()=>resolveGroupingOutput(configuration,parameters,native),/identity differs/);

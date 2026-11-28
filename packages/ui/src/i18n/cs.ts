@@ -69,10 +69,6 @@ export const dict = {
   "ui.sessionTurn.retry.geminiHot": "gemini je teď příliš vytížené",
   "ui.sessionTurn.error.freeUsageExceeded": "Bezplatné využití překročeno",
   "ui.sessionTurn.error.addCredits": "Přidejte kredity",
-  "dialog.usageExceeded.freeTier.title": "Dosažen limit zdarma",
-  "dialog.usageExceeded.freeTier.description":
-    "Předplaťte si OpenCode Go za 10 USD měsíčně a získejte spolehlivý přístup k nejlepším modelům s otevřeným zdrojovým kódem.",
-  "dialog.usageExceeded.freeTier.actionLabel": "Přihlásit se k odběru",
   "ui.sessionTurn.status.delegating": "Delegování práce",
   "ui.sessionTurn.status.planning": "Plánování dalších kroků",
   "ui.sessionTurn.status.gatheringContext": "Zkoumání",

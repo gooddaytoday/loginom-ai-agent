@@ -14,6 +14,10 @@
     <script type="module">
       import { mount } from "./app-direction.fixture.tsx"
       const query = new URLSearchParams(location.search)
+      if (query.has("focus-card")) {
+        const { registerFocusCard } = await import("./focus-card.fixture.tsx")
+        registerFocusCard(query.get("server"))
+      }
       mount({
         server: query.get("server"),
         route: query.get("route"),
