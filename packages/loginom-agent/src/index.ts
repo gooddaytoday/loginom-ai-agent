@@ -2,9 +2,9 @@
 // reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host itself belongs to the server process
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
-import { Definition as ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { PermissionConversation } from "@loginom-ai-agent/loginom-host/permission-rpc"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
+import { ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
@@ -519,6 +519,11 @@ export default Plugin.define({
     await ctx.rpc.register(DashboardTarget.rpc, {
       prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),
       find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),
+      preview: async (value, call) => {
+        if (!Dashboard.isWork(ctx.location.directory)) return {}
+        const url = await drafts.preview((value as { id: string }).id, call.signal)
+        return url ? { url } : {}
+      },
     })
     await ctx.rpc.register(PermissionConversation, {
       conversation: async (value, call) => {
@@ -545,6 +550,8 @@ export default Plugin.define({
           return call.error("not_grantable", `the administrator's policy sets «${kinds[entry.kind]}»`, {
             action: request.action,
           })
+        // Only the client whose reply was accepted can grant this kind for the conversation.
+        await ctx.permission.reply({ ...input, decision: "once" })
         const key = conversationKey(input.sessionID, entry.kind)
         await ctx.storage.set(key, true)
         // Deletion can run while the RPC checks policy or writes the grant.
@@ -552,8 +559,7 @@ export default Plugin.define({
           await ctx.storage.remove(key)
           throw error
         })
-        // The request itself and the session's other open requests the grant now covers are answered once.
-        await ctx.permission.reply({ ...input, decision: "once" })
+        // Answer the session's other open requests now covered by the grant.
         const open = await ctx.permission.list({ sessionID: input.sessionID })
         await Promise.all(
           open

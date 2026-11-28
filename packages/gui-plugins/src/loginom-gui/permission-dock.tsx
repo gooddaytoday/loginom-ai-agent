@@ -1,6 +1,7 @@
 import { PermissionConversation } from "@loginom-ai-agent/loginom-host/permission-rpc"
 import { usePlugin } from "@opencode/plugin/gui"
 import type { PermissionDockInput } from "@opencode/plugin/gui/builtin"
+import { Permission } from "@opencode/schema/permission"
 import { Button } from "@opencode/ui/button"
 import { DockPrompt } from "@opencode/session-ui/dock-prompt"
 import { Option, Schema } from "effect"
@@ -18,6 +19,8 @@ const decodeInput = Schema.decodeUnknownOption(Schema.Record(Schema.String, Sche
 
 const isString = Schema.is(Schema.String)
 
+const isNotice = Schema.is(Schema.String.check(Schema.isMaxCodePoints(Permission.NoticeMaxLength)))
+
 const traces = { once: "traceOnce", reject: "traceDeny", conversation: "traceConversation" } as const
 
 export default function PermissionPrompt(props: PermissionDockInput) {
@@ -27,6 +30,9 @@ export default function PermissionPrompt(props: PermissionDockInput) {
   const [feedback, setFeedback] = createSignal("")
   const [state, setState] = createSignal(initialPermission)
   const pending = () => state().type === "pending"
+  const text = () => feedback().trim()
+  const feedbackNotice = (message: string) => ctx.t("traceInstead", { message })
+  const feedbackTooLong = () => !isNotice(feedbackNotice(text()))
 
   const details = Option.getOrUndefined(decodeDetails(request.metadata?.loginom))
   const path = details?.path
@@ -40,15 +46,16 @@ export default function PermissionPrompt(props: PermissionDockInput) {
 
   async function answer(decision: "once" | "conversation" | "reject", message?: string) {
     const next = permissionTransition(state(), "submit")
+    const notice = message ? feedbackNotice(message) : ctx.t(traces[decision], { action: description })
 
-    if (next === state()) return
+    if (next === state() || (message && !isNotice(notice))) return
+
     setState(next)
-    const notice = message ? ctx.t("traceInstead", { message }) : ctx.t(traces[decision], { action: description })
 
     const target = {
       sessionID: request.sessionID,
       requestID: request.id,
-      notice,
+      notice: isNotice(notice) ? notice : ctx.t(traces[decision], { action: ctx.t("permissionAction") }),
     }
 
     const options = { signal: ctx.signal }
@@ -157,9 +164,9 @@ export default function PermissionPrompt(props: PermissionDockInput) {
           class="flex flex-wrap gap-2 py-2"
           onSubmit={(event) => {
             event.preventDefault()
-            const text = feedback().trim()
+            const message = text()
 
-            if (text) void answer("reject", text)
+            if (message) void answer("reject", message)
           }}
         >
           <label class="flex min-w-0 flex-1 flex-col gap-1">
@@ -169,14 +176,21 @@ export default function PermissionPrompt(props: PermissionDockInput) {
               value={feedback()}
               onInput={(event) => setFeedback(event.currentTarget.value)}
               disabled={pending()}
+              aria-invalid={feedbackTooLong()}
+              aria-describedby={feedbackTooLong() ? "permission-feedback-limit" : undefined}
             />
+            <Show when={feedbackTooLong()}>
+              <span id="permission-feedback-limit" role="alert">
+                {ctx.t("permissionFeedbackTooLong", { max: Permission.NoticeMaxLength })}
+              </span>
+            </Show>
           </label>
           <Button
             class="self-end"
             type="submit"
             variant="neutral"
             size="normal"
-            disabled={pending() || !feedback().trim()}
+            disabled={pending() || !text() || feedbackTooLong()}
           >
             {ctx.t("permissionSend")}
           </Button>

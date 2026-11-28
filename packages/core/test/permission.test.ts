@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { Cause, Deferred, Effect, Fiber, Layer, Schema } from "effect"
+import { Cause, Deferred, Effect, Exit, Fiber, Layer, Schema } from "effect"
 import { Agent } from "@opencode/core/agent"
 import { Database } from "@opencode/core/database/database"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
@@ -17,7 +17,7 @@ import { SessionTable } from "@opencode/core/session/sql"
 import { SessionStore } from "@opencode/core/session/store"
 import { ShellParse } from "@opencode/core/shell/parse"
 import { SessionEvent } from "@opencode/schema/session-event"
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { location } from "./fixture/location"
 import { testEffect } from "./lib/effect"
 
@@ -396,6 +396,30 @@ describe("Permission", () => {
       }),
     )
   }
+
+  it.effect("keeps the tool's request answerable when saving an approval fails", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      const { service, fiber, request } = yield* waitForRequest({ save: ["src/*"] })
+      const { db } = yield* Database.Service
+      yield* Effect.acquireRelease(
+        db.run(sql`CREATE TRIGGER fail_permission BEFORE INSERT ON permission
+          BEGIN SELECT RAISE(ABORT, 'forced approval write failure'); END`),
+        () => db.run(sql`DROP TRIGGER fail_permission`).pipe(Effect.orDie),
+      )
+
+      const failed = yield* service.reply({ requestID: request.id, reply: "always" }).pipe(Effect.exit)
+      expect(Exit.isFailure(failed) && Cause.pretty(failed.cause)).toContain("forced approval write failure")
+      expect(yield* service.list()).toEqual([request])
+      const saved = yield* PermissionSaved.Service
+      expect(yield* saved.list()).toEqual([])
+
+      yield* service.reply({ requestID: request.id, reply: "once" })
+      yield* Fiber.join(fiber)
+      expect(yield* service.list()).toEqual([])
+      expect(yield* saved.list()).toEqual([])
+    }),
+  )
 
   it.effect("stores and removes saved resources for a project", () =>
     Effect.gen(function* () {

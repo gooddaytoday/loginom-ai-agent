@@ -15,7 +15,7 @@ import { useCommand } from "../../src/shell/commands/command"
  * mounts only when "Start app" is pressed, over its preloaded route, as the desktop shell mounts it once its server is up.
  * One plugin's load also waits for "Finish startup", so the attachment can mount before the routes render.
  */
-export function mount(input: { server: string; route: string; direction: Direction; held?: boolean }) {
+export function mount(input: { server: string; route: string; direction: Direction; held?: boolean; omitWindowPlugin?: string }) {
   const root = document.getElementById("root")
 
   if (!root) throw new Error("Missing fixture root")
@@ -68,6 +68,10 @@ export function mount(input: { server: string; route: string; direction: Directi
 
   function Startup() {
     const host = usePluginHost()
+    const omitted = host.definitions().find((item) => item.id === input.omitWindowPlugin)
+
+    if (omitted) host.reload(omitted.id, { ...omitted, windowEntry: undefined })
+
     const definition = host.definitions().find((item) => item.windowEntry)
     const load = definition?.windowEntry
 

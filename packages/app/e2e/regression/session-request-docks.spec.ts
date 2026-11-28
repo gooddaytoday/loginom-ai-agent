@@ -729,12 +729,24 @@ for (const decision of ["once", "conversation", "reject", "feedback"] as const) 
       expect(grants).toEqual([{ input: { sessionID, requestID: id, notice: `Вы разрешили в этом разговоре: ${action}` } }])
       expect(replies).toEqual([])
     } else if (decision === "feedback") {
-      await dock.getByRole("textbox", { name: "Или скажите, что сделать иначе" }).fill("Сохрани в другую папку")
-      await dock.getByRole("button", { name: "Отправить", exact: true }).click()
-      await expect(page.getByText("Вы попросили иначе: «Сохрани в другую папку»")).toBeVisible()
-      expect(replies).toEqual([
-        { decision: "reject", message: "Сохрани в другую папку", notice: "Вы попросили иначе: «Сохрани в другую папку»" },
-      ])
+      const feedback = dock.getByRole("textbox", { name: "Или скажите, что сделать иначе" })
+      const send = dock.getByRole("button", { name: "Отправить", exact: true })
+      const receipt = (message: string) => `Вы попросили иначе: «${message}»`
+      const message = "😀".repeat(2000 - [...receipt("")].length)
+      const tooLong = `${message}😀`
+      await feedback.fill(tooLong)
+      await expect(dock.getByRole("alert")).toHaveText(/Сократите указание.*2000/)
+      await expect(send).toBeDisabled()
+      await feedback.press("Enter")
+      await expect(feedback).toHaveValue(tooLong)
+      await expect(dock.getByRole("button", { name: "Отклонить" })).toBeEnabled()
+      expect(replies).toEqual([])
+
+      await feedback.fill(message)
+      await expect(dock.getByRole("alert")).toHaveCount(0)
+      await send.click()
+      await expect(page.getByText(receipt(message), { exact: true })).toBeVisible()
+      expect(replies).toEqual([{ decision: "reject", message, notice: receipt(message) }])
     } else {
       await dock.getByRole("button", { name: "Отклонить" }).click()
       await expect(page.getByText(/^Вы отклонили:/)).toBeVisible()

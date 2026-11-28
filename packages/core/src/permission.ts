@@ -129,6 +129,7 @@ interface Pending {
   readonly request: Request
   readonly agent?: Agent.ID
   readonly deferred: Deferred.Deferred<void, DeclinedError | CorrectedError>
+  saving: boolean
 }
 
 const layer = Layer.effect(
@@ -232,7 +233,7 @@ const layer = Layer.effect(
       Effect.uninterruptible(
         Effect.gen(function* () {
           const deferred = yield* Deferred.make<void, DeclinedError | CorrectedError>()
-          const item = { request, agent, deferred }
+          const item: Pending = { request, agent, deferred, saving: false }
           if (closed) {
             yield* Deferred.fail(deferred, new DeclinedError())
             return item
@@ -334,7 +335,23 @@ const layer = Layer.effect(
       Effect.uninterruptible(
         Effect.gen(function* () {
           const existing = pending.get(input.requestID)
-          if (!existing) return yield* new NotFoundError({ requestID: input.requestID })
+          if (!existing || existing.saving || closed) return yield* new NotFoundError({ requestID: input.requestID })
+
+          const resources = input.reply === "always" ? existing.request.save : undefined
+          if (resources?.length) {
+            // Keep the prompt available for a retry if writing the approval fails. A competing reply cannot claim it
+            // while the write is running.
+            existing.saving = true
+            yield* saved.add({ projectID: location.project.id, action: existing.request.action, resources }).pipe(
+              Effect.onError(() =>
+                Effect.sync(() => {
+                  existing.saving = false
+                }),
+              ),
+            )
+            if (closed || pending.get(input.requestID) !== existing)
+              return yield* new NotFoundError({ requestID: input.requestID })
+          }
           pending.delete(input.requestID)
           yield* bus.publish(Permission.Event.Replied, {
             sessionID: existing.request.sessionID,
@@ -348,7 +365,8 @@ const layer = Layer.effect(
               input.message ? new CorrectedError({ feedback: input.message }) : new DeclinedError(),
             )
             for (const [id, item] of pending) {
-              if (item.request.sessionID !== existing.request.sessionID) continue
+              if (item.request.sessionID !== existing.request.sessionID || item.saving) continue
+              pending.delete(id)
               yield* bus.publish(Permission.Event.Replied, {
                 sessionID: item.request.sessionID,
                 requestID: item.request.id,
@@ -359,35 +377,27 @@ const layer = Layer.effect(
                 item.deferred,
                 input.message ? new CorrectedError({ feedback: input.message }) : new DeclinedError(),
               )
-              pending.delete(id)
             }
             yield* publishReplyNotice(existing.request, input.notice)
             return
           }
 
-          const resources = input.reply === "always" ? existing.request.save : undefined
-          if (resources?.length) {
-            yield* saved.add({
-              projectID: location.project.id,
-              action: existing.request.action,
-              resources,
-            })
-          }
           yield* Deferred.succeed(existing.deferred, undefined)
 
           if (resources?.length) {
             for (const [id, item] of pending) {
+              if (item.saving) continue
               const result = yield* evaluateInput({ ...item.request, agent: item.agent }).pipe(
                 Effect.catchTag("Session.NotFoundError", () => Effect.undefined),
               )
-              if (result?.effect !== "allow") continue
+              if (result?.effect !== "allow" || item.saving || pending.get(id) !== item) continue
+              pending.delete(id)
               yield* bus.publish(Permission.Event.Replied, {
                 sessionID: item.request.sessionID,
                 requestID: item.request.id,
                 reply: "always",
               })
               yield* Deferred.succeed(item.deferred, undefined)
-              pending.delete(id)
             }
           }
           yield* publishReplyNotice(existing.request, input.notice)

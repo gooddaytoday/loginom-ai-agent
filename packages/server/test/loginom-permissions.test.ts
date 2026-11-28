@@ -17,7 +17,7 @@ import { define } from "@opencode/plugin/effect/plugin"
 import { Location } from "@opencode/schema/location"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Global } from "@opencode/util/global"
-import { Context, Effect, Fiber, Layer, Schema, type Scope } from "effect"
+import { Context, Deferred, Effect, Fiber, Layer, Schema, type Scope } from "effect"
 import { HttpEffect, HttpRouter, HttpServer } from "effect/http"
 import { LanguageModel, LLMClient, type LLMRequest } from "../../ai/src/effect"
 import { OpenAIChat } from "../../ai/src/protocols/openai-chat"
@@ -298,6 +298,38 @@ describe("loginom.product permissions (B2.6a)", () => {
         expect(names((yield* test.requests(shell))[0])).not.toContain("shell")
         expect(names((yield* test.requests(shell))[0])).toEqual(expect.arrayContaining(["read", "edit", "webfetch"]))
         expect(yield* Effect.promise(() => Bun.file(marker).exists())).toBe(false)
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "a decline that wins the reply race leaves no conversation grant",
+    () =>
+      Effect.gen(function* () {
+        const checkingPolicy = yield* Deferred.make<void>()
+        const continueGrant = yield* Deferred.make<void>()
+        let pauseChecks = false
+        const test = yield* boot({}, (ctx) =>
+          ctx.permission.hook("evaluate", () =>
+            pauseChecks
+              ? Deferred.succeed(checkingPolicy, undefined).pipe(Effect.andThen(Deferred.await(continueGrant)))
+              : Effect.void,
+          ),
+        )
+        const id = yield* test.create("competing answers")
+        const request = asked.find((item) => item.kind === "save")!
+        const pending = yield* test.ask(id, request)
+        expect(pending.effect).toBe("ask")
+        pauseChecks = true
+        const grant = yield* test.conversation(id, pending.id).pipe(Effect.forkScoped)
+        yield* Deferred.await(checkingPolicy)
+        const rejected = yield* test.reply(id, pending.id, "reject").pipe(
+          Effect.ensuring(Deferred.succeed(continueGrant, undefined)),
+        )
+        expect(rejected).toBe(204)
+        expect((yield* Fiber.join(grant)).status).toBeGreaterThanOrEqual(400)
+        expect(yield* test.conversationGrants(id)).toEqual([])
+        expect((yield* test.ask(id, request)).effect).toBe("ask")
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
