@@ -25,6 +25,7 @@ import { createStore } from "solid-js/store"
 import { LifetimeContext, liveAccessor, PluginContext, type Bridge, type Entry } from "@opencode/plugin/gui/host"
 import {
   Page,
+  PermissionDock,
   QuestionRenderer,
   ToolRenderer,
   type BuiltinCatalog,
@@ -833,6 +834,9 @@ function createHost(input: HostInput) {
 
         if (registry.id === QuestionRenderer.id && !input.builtins?.has(plugin))
           throw new Error("Only built-in plugins can add question renderers")
+
+        if (registry.id === PermissionDock.id && !input.builtins?.has(plugin))
+          throw new Error("Only built-in plugins can add permission docks")
 
         if (registry.id === Page.id && !input.builtins?.has(plugin))
           throw new Error("Only built-in plugins can add pages")

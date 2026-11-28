@@ -44,6 +44,8 @@ import { PlatformProvider, type Platform } from "@/runtime/platform/platform"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { ServerScope } from "@/runtime/server/scope"
 import { PluginHostProvider, usePluginHost, type HostApiFactories, type PluginInput } from "../src/runtime/plugin/host"
+import { SettingsProvider } from "../src/settings/model"
+import { SessionComposerRegion } from "../src/session/composer/session-composer-region"
 import { createHostApis } from "../src/runtime/plugin/host-apis"
 import type { Bridge, Entry, Installed } from "@opencode/plugin/gui/host"
 import { createRegion, RegionContent } from "../src/runtime/plugin/panels"
@@ -78,6 +80,7 @@ export {
 } from "@opencode/plugin/gui"
 
 export { Schema }
+
 export { BuiltinSlot } from "@opencode/plugin/gui/builtin"
 
 type PluginHost = ReturnType<typeof usePluginHost>
@@ -1197,4 +1200,55 @@ export function mountHostApis(input: { definitions: readonly Entry[] }) {
       container.remove()
     },
   }
+}
+
+export function mountPermissionComposer() {
+  const loginom = builtins.find((plugin) => plugin.id === "loginom-gui")
+
+  if (!loginom) throw new Error("Loginom GUI plugin is unavailable")
+  const client = OpenCode.make({ baseUrl: location.origin })
+
+  return mountPlugins({
+    definitions: [loginom],
+    builtins: new Set([loginom.id]),
+    surface: () => (
+      <SettingsProvider>
+        <SessionComposerRegion
+          composer={null}
+          subagent={null}
+          permission={{ client, directory: "/fixture", confirm: () => undefined }}
+          controller={{
+            centered: () => false,
+            child: () => false,
+            showComposer: () => false,
+            onResponseSubmit: () => undefined,
+            setDockRef: () => undefined,
+            state: {
+              blocked: () => true,
+              websearch: {
+                request: () => undefined,
+                options: () => [],
+                selected: () => undefined,
+                specific: () => false,
+                loading: () => false,
+                loadFailed: () => false,
+                failed: () => false,
+                optionUnavailable: () => false,
+                sending: () => false,
+                connected: () => false,
+                select: () => undefined,
+                retry: () => undefined,
+                submit: async () => undefined,
+              },
+              questionRequest: () => undefined,
+              elicitationRequest: () => undefined,
+              permissionRequest: () => ({ id: "per_fixture", sessionID: "ses_fixture", action: "edit", resources: ["test.md"] }),
+              permissionResponding: () => false,
+              decide: () => undefined,
+            },
+          }}
+        />
+      </SettingsProvider>
+    ),
+  })
 }

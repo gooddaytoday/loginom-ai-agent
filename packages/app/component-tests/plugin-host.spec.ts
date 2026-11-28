@@ -160,13 +160,16 @@ story("a restored plugin page shows a loader while waiting for settings and whil
   await host.evaluate((host) => host.unmount())
 })
 
-for (const registry of ["page", "question.renderer"]) {
+for (const registry of ["page", "question.renderer", "permission-dock"]) {
   story(`a third-party plugin cannot register ${registry} with a public registry token`, async ({ page }) => {
     const result = await page.evaluate(async ({ fixture, registry }) => {
       const { mountPluginHost, Registry, until } = await import(fixture)
       const host = mountPluginHost()
+
       const contribution =
-        registry === "page" ? { id: "overview", title: "Third-party page" } : { matches: () => true, render: () => null }
+        registry === "page"
+          ? { id: "overview", title: "Third-party page" }
+          : { id: "third-party", waiting: "", matches: () => true, render: () => null }
 
       try {
         host.load((ctx: Context) => ctx.add(Registry.define(registry), contribution))
@@ -1078,6 +1081,7 @@ story(
 story("the new-session slot renders nothing without a plugin", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {
     const { mountPlugins, BuiltinSlot, until } = await import(fixture)
+
     const host = mountPlugins({
       definitions: [
         {
@@ -1088,16 +1092,19 @@ story("the new-session slot renders nothing without a plugin", async ({ page }) 
         },
       ],
     })
+
     try {
       const heading = () => host.container.querySelector('[data-testid="draft-heading"]')
       await until(() => heading()?.textContent === "Draft heading")
       host.define([])
       await until(() => heading()?.textContent === "")
+
       return { elements: heading()?.childElementCount, errors: host.escaped() }
     } finally {
       host.unmount()
     }
   }, fixture)
+
   expect(result).toEqual({ elements: 0, errors: [] })
 })
 
@@ -2397,4 +2404,22 @@ story("code block content follows plugins that join and leave after the message 
   await host.evaluate((host) => host.define([]))
   await expect(root.getByTestId("chart")).toHaveCount(0)
   await expect(root.locator("pre code")).toHaveText("A,B")
+})
+
+
+story("falls back to the native permission dock when the Loginom plugin is disabled", async ({ page }) => {
+  const host = await page.evaluateHandle(async (fixture) => {
+    const { mountPermissionComposer } = await import(fixture)
+    const host = mountPermissionComposer()
+    host.release()
+
+    return host
+  }, fixture)
+
+  const dock = page.locator('[data-component="dock-prompt"][data-kind="permission"]')
+  await expect(dock.getByRole("button", { name: /Allow in this conversation/ })).toBeVisible()
+  await host.evaluate((fixture) => fixture.disable(["loginom-gui"]))
+  await expect(dock.getByText("Permission required")).toBeVisible()
+  await expect(dock.getByRole("button", { name: "Allow always" })).toBeVisible()
+  await expect(dock.getByRole("button", { name: /Allow in this conversation/ })).toHaveCount(0)
 })

@@ -1,6 +1,11 @@
+import type { OpenCodeClient } from "@opencode/client/promise"
+import { PermissionDock } from "@opencode/plugin/gui/builtin"
+import { useLanguage } from "@/runtime/i18n/language"
+import { usePluginHost } from "@/runtime/plugin/host"
+import { Contribution } from "@/runtime/plugin/render"
 import { createMemo, Show, type JSX } from "solid-js"
 import { SessionElicitationDock } from "@/session/requests/session-elicitation-dock"
-import { SessionPermissionDock } from "@/session/requests/session-permission-dock"
+import { permissionToolDescription, SessionPermissionDock } from "@/session/requests/session-permission-dock"
 import { SessionQuestionDock } from "@/session/requests/session-question-dock"
 import { questionMotion } from "@/session/requests/question-motion"
 import { useSettings } from "@/settings/model"
@@ -29,9 +34,16 @@ export function SessionComposerRegion(props: {
   above?: JSX.Element
   composer: JSX.Element
   subagent: JSX.Element
+  permission?: {
+    client: OpenCodeClient
+    directory: string
+    confirm: (requestID: string) => void
+  }
 }) {
   const controller = props.controller
   const settings = useSettings()
+  const host = props.permission && usePluginHost()
+  const language = useLanguage()
 
   const face = createMemo(() => {
     const websearch = controller.state.websearch.request()
@@ -82,16 +94,48 @@ export function SessionComposerRegion(props: {
                 </Grow>
 
                 <Grow when={current().permission} fade card class={controller.child() ? "mb-2" : undefined}>
-                  {(request) => (
-                    <SessionPermissionDock
-                      request={request}
-                      responding={controller.state.permissionResponding()}
-                      onDecide={(response) => {
-                        controller.onResponseSubmit()
-                        controller.state.decide(response)
-                      }}
-                    />
-                  )}
+                  {(request) => {
+                    const item = createMemo(() => {
+                      const permission = props.permission
+                      const entry = host?.items(PermissionDock).find((entry) => entry.value.matches(request))
+
+                      return permission && entry && { permission, entry }
+                    })
+
+                    return (
+                      <Show
+                        when={item()}
+                        keyed
+                        fallback={
+                          <SessionPermissionDock
+                            request={request}
+                            responding={controller.state.permissionResponding()}
+                            onDecide={(response) => {
+                              controller.onResponseSubmit()
+                              controller.state.decide(response)
+                            }}
+                          />
+                        }
+                      >
+                        {({ entry, permission }) => (
+                          <Contribution plugin={entry.plugin}>
+                            {() =>
+                              entry.value.render({
+                                request,
+                                client: permission.client,
+                                directory: permission.directory,
+                                description: permissionToolDescription(request.action, language.t),
+                                confirm: () => {
+                                  permission.confirm(request.id)
+                                  controller.onResponseSubmit()
+                                },
+                              })
+                            }
+                          </Contribution>
+                        )}
+                      </Show>
+                    )
+                  }}
                 </Grow>
 
                 <Show when={current().composer}>

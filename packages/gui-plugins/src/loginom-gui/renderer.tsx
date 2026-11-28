@@ -1,5 +1,11 @@
 import { SettingsPage, type Plugin } from "@opencode/plugin/gui"
-import { builtinContext, Page, QuestionRenderer, subscribeBuiltinDeepLinks } from "@opencode/plugin/gui/builtin"
+import {
+  builtinContext,
+  Page,
+  PermissionDock,
+  QuestionRenderer,
+  subscribeBuiltinDeepLinks,
+} from "@opencode/plugin/gui/builtin"
 import { dashboardLinkChannel } from "@loginom-ai-agent/product/dashboard-link"
 import { Option, Schema } from "effect"
 import { lazy, onCleanup, Show, Suspense } from "solid-js"
@@ -7,6 +13,8 @@ import { unwrap } from "solid-js/store"
 import { DashboardLink } from "./contract"
 import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
 import type definition from "./index"
+import PermissionPrompt from "./permission-dock"
+import { permissionDescription } from "./permission-model"
 import { LoginomRepeatDock } from "./repeat-dock"
 import { registerStartScreen } from "./start-screen"
 import { registerSystemProxy } from "./system-proxy"
@@ -28,6 +36,15 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
         <Catalog />
       </Suspense>
     ),
+  })
+
+  ctx.add(PermissionDock, {
+    id: "loginom",
+    matches: (request) => permissionDescription(request) !== undefined,
+    get waiting() {
+      return ctx.t("permissionWaiting")
+    },
+    render: (input) => <PermissionPrompt {...input} />,
   })
 
   const Settings = lazy(() => import("./page"))

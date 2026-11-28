@@ -12,3 +12,6 @@ export const AssertInput = Schema.Struct({
   source: Permission.Request.fields.source,
 })
 export interface AssertInput extends Schema.Schema.Type<typeof AssertInput> {}
+
+/** Return a string for a receipt, or mark the approval as persisted independently of the pending tool. */
+export type ReplyNotice = string | { readonly notice?: string; readonly persisted: true } | undefined

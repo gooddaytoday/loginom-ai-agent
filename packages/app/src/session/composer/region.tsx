@@ -561,6 +561,11 @@ export function ActiveSessionComposerRegion(props: {
   return (
     <SessionComposerRegion
       controller={props.model.region}
+      permission={{
+        client: server.api,
+        directory: location().directory,
+        confirm: props.model.region.state.confirmPermission,
+      }}
       subagent={
         <Show when={props.session.data.info()}>
           {(info) => (

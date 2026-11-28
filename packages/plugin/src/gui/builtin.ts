@@ -1,3 +1,4 @@
+import type { OpenCodeClient, PermissionRequest } from "@opencode/client/promise"
 // The parts of the SDK only the app's built-in plugins use, for workspace imports only: `tsconfig.build.json` leaves it
 // out of `dist`, and `script/pack.ts` exports it as `null`. Public SDK modules never import it.
 
@@ -642,3 +643,29 @@ export function builtinCatalog(catalog: BuiltinCatalog): Catalog {
   // SAFETY: both hosts read a catalog as `BuiltinCatalog` and call a locale's loader; only built-ins pass one.
   return catalog as Catalog
 }
+
+/** The pending request and its owning server, with a callback to close the prompt. */
+export interface PermissionDockInput {
+  /** The pending permission request, including the session that owns it. */
+  readonly request: PermissionRequest
+  /** The client connected to the server that owns the request. */
+  readonly client: OpenCodeClient
+  /** The workspace directory to use for location-scoped RPCs. */
+  readonly directory: string
+  /** Localized description, when the application recognizes the tool. */
+  readonly description?: string
+  /** Close the prompt after the server accepts the response or confirms the request has closed. */
+  readonly confirm: () => void
+}
+
+/** Built-in plugins can replace the permission prompt in the composer. The first matching contribution is used. */
+export const PermissionDock = Registry.define<{
+  /** Local contribution id. */
+  id: string
+  /** Whether the plugin provides the prompt for this request. */
+  matches: (request: PermissionRequest) => boolean
+  /** Localized status announced in the timeline while the prompt is pending. */
+  waiting: string
+  /** Render the prompt with the supplied server and response callback. */
+  render: (input: PermissionDockInput) => JSX.Element
+}>("permission-dock")

@@ -237,7 +237,8 @@ export function sessionEvent(message: SessionMessageInfo) {
     message.type === "agent-switched" ||
     message.type === "model-switched" ||
     message.type === "location-switched" ||
-    message.type === "compaction"
+    message.type === "compaction" ||
+    (message.type === "system" && message.metadata?.notice === "permission-replied")
   )
     return true
 

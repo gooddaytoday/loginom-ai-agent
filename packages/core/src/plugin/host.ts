@@ -450,10 +450,18 @@ export const make = Effect.fn("PluginHost.make")(function* (plugin: Pick<Interfa
       hook: (name, callback) => hooks.register("permission", name, callback),
       list: (input) => permission.forSession(input.sessionID),
       get: sessionPermission,
-      reply: (input) =>
+      reply: (input, resolveNotice) =>
         sessionPermission(input).pipe(
           Effect.andThen(() =>
-            permission.reply({ requestID: input.requestID, reply: input.decision, message: input.message }),
+            permission.reply(
+              {
+                requestID: input.requestID,
+                reply: input.decision,
+                message: input.message,
+                notice: input.notice,
+              },
+              resolveNotice,
+            ),
           ),
         ),
       // Plain rejections stay defects, as for built-in tools, so they end the step.

@@ -1,8 +1,10 @@
 export * as Permission from "./permission.js"
 
 import { makeLocationNode } from "@opencode/util/effect/app-node"
+import type { ReplyNotice } from "@opencode/plugin/permission"
 import { Context, Deferred, Effect, Layer, Schema } from "effect"
 import { Permission } from "@opencode/schema/permission"
+import { SessionEvent } from "@opencode/schema/session-event"
 import type { Tool } from "@opencode/schema/tool"
 import { Bus } from "./bus.js"
 import { Location } from "./location.js"
@@ -47,7 +49,10 @@ export interface ReplyInput {
   readonly requestID: ID
   readonly reply: Reply
   readonly message?: string
+  readonly notice?: string
 }
+
+const isReplyNotice = Schema.is(Schema.String.check(Schema.isMaxCodePoints(Permission.NoticeMaxLength)))
 
 export interface AskResult {
   readonly id: ID
@@ -115,7 +120,7 @@ export interface Interface {
   readonly assertNotDenied: (input: AssertInput) => Effect.Effect<void, BlockedError | SessionErrors.NotFoundError>
   /** True only when the rules already allow the request; never asks the user. */
   readonly allows: (input: AssertInput) => Effect.Effect<boolean, SessionErrors.NotFoundError>
-  readonly reply: (input: ReplyInput) => Effect.Effect<void, NotFoundError>
+  readonly reply: (input: ReplyInput, resolveNotice?: Effect.Effect<ReplyNotice>) => Effect.Effect<void, NotFoundError>
   readonly get: (id: ID) => Effect.Effect<Request | undefined>
   readonly forSession: (sessionID: SessionSchema.ID) => Effect.Effect<ReadonlyArray<Request>>
   readonly list: () => Effect.Effect<ReadonlyArray<Request>>
@@ -127,6 +132,7 @@ interface Pending {
   readonly request: Request
   readonly agent?: Agent.ID
   readonly deferred: Deferred.Deferred<void, DeclinedError | CorrectedError>
+  claimed: boolean
 }
 
 const layer = Layer.effect(
@@ -230,7 +236,7 @@ const layer = Layer.effect(
       Effect.uninterruptible(
         Effect.gen(function* () {
           const deferred = yield* Deferred.make<void, DeclinedError | CorrectedError>()
-          const item = { request, agent, deferred }
+          const item: Pending = { request, agent, deferred, claimed: false }
           if (closed) {
             yield* Deferred.fail(deferred, new DeclinedError())
             return item
@@ -278,7 +284,7 @@ const layer = Layer.effect(
               Effect.catchTag("Permission.DeclinedError", (error) => Effect.die(error)),
               Effect.ensuring(
                 Effect.sync(() => {
-                  pending.delete(item.request.id)
+                  if (pending.get(item.request.id) === item) pending.delete(item.request.id)
                 }),
               ),
             )
@@ -303,64 +309,104 @@ const layer = Layer.effect(
       return (yield* evaluateInput(input)).effect === "allow"
     })
 
-    const reply = Effect.fn("Permission.reply")((input: ReplyInput) =>
+    const prepareReplyNotice = (request: Request, notice: Effect.Effect<ReplyNotice>) =>
+      Effect.gen(function* () {
+        const resolved = yield* notice
+        const description = typeof resolved === "string" ? resolved : resolved?.notice
+        const persisted = typeof resolved === "object" && resolved?.persisted === true
+        if (description === undefined || isReplyNotice(description)) return { description, persisted }
+        yield* Effect.logWarning(`Permission reply notice exceeds ${Permission.NoticeMaxLength} Unicode code points`, {
+          requestID: request.id,
+        })
+        return { persisted }
+      }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("Could not prepare permission reply notice", { requestID: request.id, cause }).pipe(
+            Effect.as(undefined),
+          ),
+        ),
+      )
+
+    const publishReplyNotice = (request: Request, description?: string) => {
+      if (!description) return Effect.void
+      return Effect.gen(function* () {
+        let sessionID: SessionSchema.ID | undefined = request.sessionID
+        while (sessionID) {
+          const session: SessionSchema.Info | undefined = yield* sessions.get(sessionID)
+          if (!session) break
+          yield* bus.publish(SessionEvent.PermissionReplied, {
+            sessionID,
+            requestID: request.id,
+            description,
+          })
+          sessionID = session.parentID
+        }
+      }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("Could not record permission reply", {
+            sessionID: request.sessionID,
+            requestID: request.id,
+            cause,
+          }),
+        ),
+      )
+    }
+
+    const settle = (item: Pending, reply: Reply, message?: string) =>
+      Effect.gen(function* () {
+        pending.delete(item.request.id)
+        if (reply === "reject")
+          yield* Deferred.fail(item.deferred, message ? new CorrectedError({ feedback: message }) : new DeclinedError())
+        else yield* Deferred.succeed(item.deferred, undefined)
+        yield* bus.publish(Permission.Event.Replied, {
+          sessionID: item.request.sessionID,
+          requestID: item.request.id,
+          reply,
+        })
+      })
+
+    const reply = Effect.fn("Permission.reply")((input: ReplyInput, resolveNotice?: Effect.Effect<ReplyNotice>) =>
       Effect.uninterruptible(
         Effect.gen(function* () {
           const existing = pending.get(input.requestID)
-          if (!existing) return yield* new NotFoundError({ requestID: input.requestID })
-          yield* bus.publish(Permission.Event.Replied, {
-            sessionID: existing.request.sessionID,
-            requestID: existing.request.id,
-            reply: input.reply,
-          })
+          if (!existing || existing.claimed || closed) return yield* new NotFoundError({ requestID: input.requestID })
+          existing.claimed = true
+
+          const resources = input.reply === "always" ? existing.request.save : undefined
+          if (resources?.length) {
+            // Keep the prompt available for a retry if writing the approval fails.
+            yield* saved.add({ projectID: location.project.id, action: existing.request.action, resources }).pipe(
+              Effect.onError(() =>
+                Effect.sync(() => {
+                  existing.claimed = false
+                }),
+              ),
+            )
+          }
+          const notice = yield* prepareReplyNotice(existing.request, resolveNotice ?? Effect.succeed(input.notice))
+          if (closed || pending.get(input.requestID) !== existing) {
+            if (resources?.length || notice?.persisted) return
+            return yield* new NotFoundError({ requestID: input.requestID })
+          }
+          yield* settle(existing, input.reply, input.message)
 
           if (input.reply === "reject") {
-            yield* Deferred.fail(
-              existing.deferred,
-              input.message ? new CorrectedError({ feedback: input.message }) : new DeclinedError(),
-            )
-            pending.delete(input.requestID)
-            for (const [id, item] of pending) {
-              if (item.request.sessionID !== existing.request.sessionID) continue
-              yield* bus.publish(Permission.Event.Replied, {
-                sessionID: item.request.sessionID,
-                requestID: item.request.id,
-                reply: "reject",
-              })
+            for (const item of pending.values()) {
+              if (item.request.sessionID !== existing.request.sessionID || item.claimed) continue
               // Feedback applies to the whole batch, so parallel asks don't end the step.
-              yield* Deferred.fail(
-                item.deferred,
-                input.message ? new CorrectedError({ feedback: input.message }) : new DeclinedError(),
-              )
-              pending.delete(id)
+              yield* settle(item, "reject", input.message)
             }
-            return
+          } else if (resources?.length) {
+            for (const [id, item] of pending) {
+              if (item.claimed) continue
+              const result = yield* evaluateInput({ ...item.request, agent: item.agent }).pipe(
+                Effect.catchTag("Session.NotFoundError", () => Effect.undefined),
+              )
+              if (result?.effect !== "allow" || item.claimed || pending.get(id) !== item) continue
+              yield* settle(item, "always")
+            }
           }
-
-          if (input.reply === "always" && existing.request.save?.length) {
-            yield* saved.add({
-              projectID: location.project.id,
-              action: existing.request.action,
-              resources: existing.request.save,
-            })
-          }
-          yield* Deferred.succeed(existing.deferred, undefined)
-          pending.delete(input.requestID)
-          if (input.reply !== "always" || !existing.request.save?.length) return
-
-          for (const [id, item] of pending) {
-            const result = yield* evaluateInput({ ...item.request, agent: item.agent }).pipe(
-              Effect.catchTag("Session.NotFoundError", () => Effect.undefined),
-            )
-            if (result?.effect !== "allow") continue
-            yield* bus.publish(Permission.Event.Replied, {
-              sessionID: item.request.sessionID,
-              requestID: item.request.id,
-              reply: "always",
-            })
-            yield* Deferred.succeed(item.deferred, undefined)
-            pending.delete(id)
-          }
+          yield* publishReplyNotice(existing.request, notice?.description)
         }),
       ),
     )

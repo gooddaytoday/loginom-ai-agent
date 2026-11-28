@@ -487,7 +487,13 @@ export function fromPromise(plugin: Plugin) {
               register(host.permission.hook(name, (event) => Effect.promise(() => Promise.resolve(callback(event))))),
             list: adaptApiMethod(PermissionEndpoints["session.permission.list"], host.permission.list),
             get: adaptApiMethod(PermissionEndpoints["session.permission.get"], host.permission.get),
-            reply: adaptApiMethod(PermissionEndpoints["session.permission.reply"], host.permission.reply),
+            reply: (input, options) => {
+              const resolveNotice = options?.resolveNotice
+              return adaptApiMethod<PromiseContext["permission"]["reply"]>(
+                PermissionEndpoints["session.permission.reply"],
+                (decoded) => host.permission.reply(decoded, resolveNotice && Effect.promise(resolveNotice)),
+              )(input)
+            },
             assert: (input) =>
               run(Schema.decodeUnknownEffect(AssertInput)(input).pipe(Effect.flatMap(host.permission.assert))),
           },

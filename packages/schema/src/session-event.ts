@@ -119,6 +119,14 @@ export const Permissions = Event.durable({
 })
 export type Permissions = typeof Permissions.Type
 
+/** A user-facing receipt for a permission reply, without prompt or tool context. */
+export const PermissionReplied = Event.durable({
+  type: "session.permission.replied",
+  ...options,
+  schema: { ...Base, requestID: Permission.ID, description: Schema.String },
+})
+export type PermissionReplied = typeof PermissionReplied.Type
+
 export const Viewed = Event.durable({
   type: "session.viewed",
   ...options,
@@ -677,6 +685,7 @@ export const Definitions = Event.inventory(
   Renamed,
   MetadataUpdated,
   Permissions,
+  PermissionReplied,
   Viewed,
   Archived,
   Unarchived,

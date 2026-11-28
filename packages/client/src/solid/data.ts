@@ -982,6 +982,16 @@ export function createData(config: CreateDataInput) {
         }
         return
       }
+      case "session.permission.replied":
+        message.insert(event.data.sessionID, {
+          id: SessionMessage.ID.fromEvent(event.id),
+          type: "system",
+          text: "",
+          description: event.data.description,
+          metadata: { notice: "permission-replied" },
+          time: { created: event.created },
+        })
+        return
       case "session.instructions.updated":
         // Mirror the projector: the initial baseline and empty-rendering deltas carry no text
         // and produce no transcript message.

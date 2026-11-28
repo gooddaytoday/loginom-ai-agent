@@ -2,6 +2,7 @@
 // reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host itself belongs to the server process
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
+import { PermissionConversation } from "@loginom-ai-agent/loginom-host/permission-rpc"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Plugin } from "@opencode/plugin"
@@ -85,28 +86,6 @@ const preflight = {
 const token = "loginom.runner"
 // Permission request metadata key of the product's own check of the rules (B2.6b).
 const marker = "loginom.permission.probe"
-
-// «Разрешать в этом разговоре» (B2.6a): the answer to one open request that also allows its kind for the rest of the
-// session. The button is stage C.
-const permission = {
-  id: "loginom.permission",
-  methods: {
-    conversation: {
-      input: {
-        type: "object",
-        properties: { sessionID: { type: "string" }, requestID: { type: "string" } },
-        required: ["sessionID", "requestID"],
-        additionalProperties: false,
-      },
-      output: { type: "object", properties: { kind: { type: "string" } }, required: ["kind"] },
-      // The terminal (В-31) and a request the product does not ask by default are answered one at a time.
-      errors: {
-        not_grantable: { type: "object", properties: { action: { type: "string" } }, required: ["action"] },
-      },
-    },
-  },
-  events: {},
-} as const
 
 export default Plugin.define({
   id: "loginom.product",
@@ -247,10 +226,11 @@ export default Plugin.define({
 
     // Product permissions (B2.6a, `./permissions`): the defaults go into every agent's rules, the hook settles what rules
     // cannot express. It is registered before `localFiles`, whose rules-only check then still turns a remaining `ask`
-    // into `allow`. Conversation grants are memory only, keyed by the exact session ID, like access grants: a restart
-    // asks again, and a subagent's or a fork's session holds none.
+    // into `allow`. Core copies session.permissions into forks and children. The plugin store keeps each grant
+    // bound to the session that received it, even after a restart.
     const subagents = new Set<string>()
-    const conversation = new Map<string, Set<Kind>>()
+    const conversationPrefix = (sessionID: string) => `permission/conversation/${sessionID}/`
+    const conversationKey = (sessionID: string, kind: Kind) => conversationPrefix(sessionID) + kind
     // The product's own directories outside the project, which the agent reads without the «outside the project»
     // question (B2.6a2): the full text of a large tool result (`<data>/tool-output`, where OpenCode and `dock.ts` keep
     // it), the bundled skills' files and the `plan` agent's plans (the directory of `core/src/plugin/plan.ts`).
@@ -324,10 +304,16 @@ export default Plugin.define({
         return
       }
       const tool = event.source ? calls.get(`${event.source.messageID} ${event.source.id}`) : undefined
+      const entry = classify(event.action, event.resources)
+      const granted =
+        event.effect !== "deny" &&
+        entry &&
+        grantable(entry) &&
+        (await ctx.storage.get(conversationKey(event.sessionID, entry.kind))) === true
       const settled = settle(
         event,
         event.agent !== undefined && subagents.has(event.agent),
-        conversation.get(event.sessionID) ?? new Set(),
+        granted && entry ? new Set([entry.kind]) : new Set(),
         ownRead(tool, event, own),
       )
       event.effect = settled.effect
@@ -376,13 +362,17 @@ export default Plugin.define({
     const stop = new AbortController()
     void (async () => {
       const types = [
+        "session.deleted",
         "session.execution.started",
         "session.execution.succeeded",
         "session.execution.failed",
         "session.execution.interrupted",
       ] as const
       for await (const event of ctx.event.subscribe({ types: [...types], signal: stop.signal })) {
-        if (event.type === "session.execution.started") void hold(event.data.sessionID)
+        if (event.type === "session.deleted") {
+          const prefix = conversationPrefix(event.data.sessionID)
+          await Promise.allSettled(Object.keys(kinds).map((kind) => ctx.storage.remove(prefix + kind)))
+        } else if (event.type === "session.execution.started") void hold(event.data.sessionID)
         else {
           repeats.reset(event.data.sessionID)
           await drop(event.data.sessionID)
@@ -538,9 +528,14 @@ export default Plugin.define({
         return url ? { url } : {}
       },
     })
-    await ctx.rpc.register(permission, {
+    await ctx.rpc.register(PermissionConversation, {
       conversation: async (value, call) => {
-        const input = value as { sessionID: string; requestID: string }
+        const input = value as {
+          sessionID: string
+          requestID: string
+          notice?: string
+          onceNotice?: string
+        }
         const request = await ctx.permission.get(input)
         const entry = classify(request.action, request.resources)
         if (!entry || !grantable(entry))
@@ -559,15 +554,42 @@ export default Plugin.define({
           return call.error("not_grantable", `the administrator's policy sets «${kinds[entry.kind]}»`, {
             action: request.action,
           })
-        conversation.set(input.sessionID, new Set([...(conversation.get(input.sessionID) ?? []), entry.kind]))
-        // The request itself and the session's other open requests the grant now covers are answered once; nothing is
-        // saved for the project, unlike OpenCode's `always`.
-        const open = await ctx.permission.list({ sessionID: input.sessionID })
-        await Promise.all(
+        const key = conversationKey(input.sessionID, entry.kind)
+        let saved = false
+        // Only the client whose reply was accepted can grant this kind for the conversation.
+        try {
+          await ctx.permission.reply(
+            { sessionID: input.sessionID, requestID: input.requestID, decision: "once" },
+            {
+              resolveNotice: async () => {
+                try {
+                  await ctx.storage.set(key, true)
+                } catch {
+                  return input.onceNotice ?? "Вы разрешили один раз."
+                }
+                // Deletion can run while the RPC checks policy or writes the grant.
+                await ctx.session.get({ sessionID: input.sessionID }).catch(async (error) => {
+                  await ctx.storage.remove(key)
+                  throw error
+                })
+                saved = true
+                return { persisted: true, notice: input.notice }
+              },
+            },
+          )
+        } catch (error) {
+          if (error instanceof Object && "_tag" in error && error._tag === "Permission.NotFoundError")
+            return call.error("request_closed", "Permission request is no longer pending", { requestID: input.requestID })
+          throw error
+        }
+        if (!saved) return { kind: entry.kind, saved: false }
+        // Other covered requests may already have been answered or cancelled.
+        const open = await ctx.permission.list({ sessionID: input.sessionID }).catch(() => [])
+        await Promise.allSettled(
           open
             .filter((item) => {
               const other = classify(item.action, item.resources)
-              return item.id === request.id || (grantable(other) && other?.kind === entry.kind)
+              return grantable(other) && other?.kind === entry.kind
             })
             .map((item) => ctx.permission.reply({ sessionID: input.sessionID, requestID: item.id, decision: "once" })),
         )

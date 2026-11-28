@@ -272,6 +272,8 @@ export function createSessionRequestModel() {
       steer,
     },
     decide,
+    confirmPermission: (requestID: string) =>
+      setReplies((current) => pruneReplied({ ...current, [requestID]: { status: "replied" } })),
   }
 }
 

@@ -7,6 +7,16 @@ Authoring interfaces and runtime loader support for OpenCode V2 plugins:
 - `@opencode/plugin/rpc` — portable RPC contract definitions
 - `@opencode/plugin/tui` — terminal UI plugin API
 
+## Permission Reply Notices
+
+`ctx.permission.reply(input, { resolveNotice })` in the Promise API accepts an async callback. In the Effect API, pass the notice-producing Effect as the second argument. It supplies the history notice in place of `input.notice`.
+
+The host claims the reply before running `resolveNotice`. Competing replies receive `NotFound`. The resolver can persist the scope granted by this reply while the tool is still waiting, then return the notice for the outcome it saved. For example, a plugin can return a one-time approval notice when saving a session grant fails.
+
+After saving an approval, return `{ persisted: true, notice }` to acknowledge the saved rule even if the tool was cancelled during the write. A string or `undefined` leaves the outcome tied to the pending tool. If it was cancelled while the resolver ran, the reply fails with `NotFound` and no receipt is published.
+
+The host checks both forms of the notice against the same 2000 Unicode code point limit, settles the waiting tool, and publishes the history notice. A resolver failure or an oversized notice is logged and the history notice is omitted. The underlying permission decision still takes effect.
+
 ## Packaging And Runtime `effect`
 
 When the OpenCode CLI loads server or TUI plugins, it resolves imports of `effect`, exported `effect/*` subpaths, and `@opencode/plugin` entrypoints (including imports from dependencies inside a plugin's `node_modules`) to the host's runtime module instances so fibers, loggers, and `Schema` parsers share one copy.

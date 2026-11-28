@@ -6,6 +6,8 @@ import { Config } from "@opencode/core/config"
 import { Database } from "@opencode/core/database/database"
 import { llmClient } from "@opencode/core/effect/app-node-platform"
 import { Flag } from "@opencode/core/flag"
+import { KV } from "@opencode/core/kv"
+import { PluginHost } from "@opencode/core/plugin/host"
 import { SdkPlugins } from "@opencode/core/plugin/sdk"
 import { Schedule } from "@opencode/core/schedule"
 import { ScheduleTable } from "@opencode/core/schedule/sql"
@@ -15,7 +17,8 @@ import { define } from "@opencode/plugin/effect/plugin"
 import { Location } from "@opencode/schema/location"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Global } from "@opencode/util/global"
-import { Context, Effect, Fiber, Layer, Schema, type Scope } from "effect"
+import { sql } from "drizzle-orm"
+import { Context, Deferred, Effect, Fiber, Layer, Schema, type Scope } from "effect"
 import { HttpEffect, HttpRouter, HttpServer } from "effect/http"
 import { LanguageModel, LLMClient, type LLMRequest } from "../../ai/src/effect"
 import { OpenAIChat } from "../../ai/src/protocols/openai-chat"
@@ -68,9 +71,11 @@ const boot = (
   config: Record<string, unknown> = {},
   extra: (ctx: PluginContext) => Effect.Effect<void, never, Scope.Scope> = () => Effect.void,
   policies?: readonly Record<string, unknown>[],
+  persisted?: string,
+  beforeGrantWrite?: Effect.Effect<void>,
 ) =>
   Effect.gen(function* () {
-    const dir = (yield* tmpdirScoped("loginom-permissions-")).path
+    const dir = persisted ?? (yield* tmpdirScoped("loginom-permissions-")).path
     const global = path.join(dir, "global")
     const system = path.join(global, "system")
     const location = Location.Ref.make({ directory: AbsolutePath.make(dir) })
@@ -95,7 +100,7 @@ const boot = (
         {
           // Schedules are on by default in the dev channel; the project's own config file is read.
           app: { channel: "dev", version: "test" },
-          database: { path: ":memory:" },
+          database: { path: persisted ? path.join(dir, "service.sqlite") : ":memory:" },
           config: { claude: false },
           models: { fetch: false, snapshot: false },
           fs: { filewatcher: false, fff: false },
@@ -119,6 +124,24 @@ const boot = (
             Layer.succeed(SessionRunnerModel.Service, { resolve: () => Effect.succeed(model) }),
           ),
           ...(policies ? [Config.node.replace(Config.configured({ claude: false, system }))] : []),
+          ...(beforeGrantWrite
+            ? [
+                KV.node.replace(
+                  KV.node.mapLayer((base) =>
+                    Layer.effect(
+                      KV.Service,
+                      Effect.map(KV.Service, (kv) => ({
+                        ...kv,
+                        set: (key, value) =>
+                          key.includes(":permission/conversation/")
+                            ? beforeGrantWrite.pipe(Effect.andThen(kv.set(key, value)))
+                            : kv.set(key, value),
+                      })),
+                    ).pipe(Layer.provide(base)),
+                  ),
+                ),
+              ]
+            : []),
         ],
       ).pipe(Layer.provide(HttpServer.layerServices)),
     )
@@ -132,6 +155,9 @@ const boot = (
     )
     yield* Effect.forkScoped(Context.get(context, Schedule.Service).run)
     const sessions = Context.get(context, Session.Service)
+    const grants = PluginHost.storage(Context.get(context, KV.Service), "loginom.product")
+    const conversationGrants = (sessionID: string) =>
+      grants.scan({ prefix: `permission/conversation/${sessionID}/` }).pipe(Effect.map((result) => result.entries))
     const handler = Context.get(context, HttpRouter.HttpRouter)
       .asHttpEffect()
       .pipe(HttpEffect.toWebHandlerWith(context))
@@ -165,12 +191,18 @@ const boot = (
       call(`/api/session/${sessionID}/permission?${at}`).pipe(
         Effect.map((response) => response.body.data as { id: string; action: string; resources: string[] }[]),
       )
-    const reply = (sessionID: string, requestID: string, decision: "once" | "always" | "reject") =>
-      call(`/api/session/${sessionID}/permission/${requestID}/reply?${at}`, { decision }).pipe(
+    const reply = (
+      sessionID: string,
+      requestID: string,
+      decision: "once" | "always" | "reject",
+      message?: string,
+      notice?: string,
+    ) =>
+      call(`/api/session/${sessionID}/permission/${requestID}/reply?${at}`, { decision, message, notice }).pipe(
         Effect.map((response) => response.status),
       )
-    const conversation = (sessionID: string, requestID: string) =>
-      call(`/api/rpc/loginom.permission/conversation?${at}`, { input: { sessionID, requestID } })
+    const conversation = (sessionID: string, requestID: string, notice?: string, onceNotice?: string) =>
+      call(`/api/rpc/loginom.permission/conversation?${at}`, { input: { sessionID, requestID, notice, onceNotice } })
     const saved = call(`/api/permission/saved?${at}`).pipe(Effect.map((response) => response.body.data as unknown[]))
     const prompt = (sessionID: Session.ID, text: string) =>
       sessions.prompt({ sessionID, text }).pipe(Effect.andThen(sessions.wait(sessionID)))
@@ -232,6 +264,8 @@ const boot = (
       open,
       reply,
       conversation,
+      conversationGrants,
+      db: database.db,
       saved,
       call,
       prompt,
@@ -290,6 +324,38 @@ describe("loginom.product permissions (B2.6a)", () => {
   )
 
   it.live(
+    "a decline that wins the reply race leaves no conversation grant",
+    () =>
+      Effect.gen(function* () {
+        const checkingPolicy = yield* Deferred.make<void>()
+        const continueGrant = yield* Deferred.make<void>()
+        let pauseChecks = false
+        const test = yield* boot({}, (ctx) =>
+          ctx.permission.hook("evaluate", () =>
+            pauseChecks
+              ? Deferred.succeed(checkingPolicy, undefined).pipe(Effect.andThen(Deferred.await(continueGrant)))
+              : Effect.void,
+          ),
+        )
+        const id = yield* test.create("competing answers")
+        const request = asked.find((item) => item.kind === "save")!
+        const pending = yield* test.ask(id, request)
+        expect(pending.effect).toBe("ask")
+        pauseChecks = true
+        const grant = yield* test.conversation(id, pending.id).pipe(Effect.forkScoped)
+        yield* Deferred.await(checkingPolicy)
+        const rejected = yield* test.reply(id, pending.id, "reject").pipe(
+          Effect.ensuring(Deferred.succeed(continueGrant, undefined)),
+        )
+        expect(rejected).toBe(204)
+        expect((yield* Fiber.join(grant)).status).toBeGreaterThanOrEqual(400)
+        expect(yield* test.conversationGrants(id)).toEqual([])
+        expect((yield* test.ask(id, request)).effect).toBe("ask")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
     "«Разрешать в этом разговоре» answers the request and allows its kind in this session only, saving nothing",
     () =>
       Effect.gen(function* () {
@@ -333,6 +399,209 @@ describe("loginom.product permissions (B2.6a)", () => {
         expect((yield* test.conversation(id, first.id)).status).toBe(200)
         expect((yield* test.open(id)).map((item) => item.id)).toEqual([web.id])
         expect(second.effect).toBe("ask")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "answers once and records only the one-time receipt when saving the conversation grant fails",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const sessionID = yield* test.create("grant write fails")
+        const action = { action: "edit", resources: ["file.md"] }
+        const request = yield* test.ask(sessionID, action)
+        expect(request.effect).toBe("ask")
+        yield* Effect.acquireRelease(
+          test.db.run(sql`CREATE TRIGGER fail_conversation_grant BEFORE INSERT ON kv
+            WHEN NEW.key GLOB '*:permission/conversation/*'
+            BEGIN SELECT RAISE(ABORT, 'forced grant write failure'); END`),
+          () => test.db.run(sql`DROP TRIGGER fail_conversation_grant`).pipe(Effect.orDie),
+        )
+
+        const onceNotice = "Allowed once: " + "📝".repeat(1986)
+        const rejected = yield* test.conversation(sessionID, request.id, "Allowed for this conversation", onceNotice + "!")
+        expect(rejected.status).toBe(400)
+        expect(rejected.body.message).toContain("onceNotice")
+        expect(rejected.body.message).toContain("2000")
+        expect((yield* test.open(sessionID)).map((item) => item.id)).toEqual([request.id])
+        expect(yield* test.sessions.messages({ sessionID })).toEqual([])
+
+        const result = yield* test.conversation(sessionID, request.id, "Allowed for this conversation", onceNotice)
+        expect(result).toEqual({ status: 200, body: { output: { kind: "write", saved: false } } })
+        expect(yield* test.open(sessionID)).toEqual([])
+        expect(yield* test.sessions.messages({ sessionID })).toEqual([
+          expect.objectContaining({ type: "system", description: onceNotice }),
+        ])
+        expect(yield* test.conversationGrants(sessionID)).toEqual([])
+        expect((yield* test.ask(sessionID, action)).effect).toBe("ask")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  for (const write of ["fails", "succeeds"] as const) {
+    it.live(
+      `reports the actual grant outcome when the tool is cancelled and the write ${write}`,
+      () =>
+        Effect.gen(function* () {
+          const writing = yield* Deferred.make<void>()
+          const release = yield* Deferred.make<void>()
+          const gate = Deferred.succeed(writing, undefined).pipe(Effect.andThen(Deferred.await(release)))
+          const test = yield* boot({}, undefined, undefined, undefined, gate)
+          const sessionID = yield* test.create("cancel while storing the grant")
+          const filename = "cancelled.md"
+          if (write === "fails")
+            yield* test.db.run(sql`CREATE TRIGGER fail_conversation_grant BEFORE INSERT ON kv
+              WHEN NEW.key GLOB '*:permission/conversation/*'
+              BEGIN SELECT RAISE(ABORT, 'forced grant write failure'); END`)
+
+          const running = yield* test
+            .prompt(sessionID, script({ tool: "write", input: { path: filename, content: "never written" } }))
+            .pipe(Effect.forkScoped)
+          const request = yield* until(() => test.open(sessionID).pipe(Effect.map((items) => items[0])))
+          const reply = yield* test
+            .conversation(sessionID, request.id, "Allowed in this conversation", "Allowed once")
+            .pipe(Effect.forkScoped)
+          try {
+            yield* Deferred.await(writing)
+            yield* test.sessions.interrupt(sessionID)
+            expect(yield* test.open(sessionID)).toEqual([])
+          } finally {
+            yield* Deferred.succeed(release, undefined)
+          }
+
+          const result = yield* Fiber.join(reply)
+          yield* Fiber.join(running)
+          if (write === "fails") {
+            expect(result).toMatchObject({ status: 400, body: { type: "request_closed" } })
+            expect(yield* test.conversationGrants(sessionID)).toEqual([])
+          } else {
+            expect(result).toEqual({ status: 200, body: { output: { kind: "write" } } })
+            expect(yield* test.conversationGrants(sessionID)).toHaveLength(1)
+          }
+          expect(yield* Effect.promise(() => Bun.file(path.join(test.dir, filename)).exists())).toBe(false)
+          expect((yield* test.sessions.messages({ sessionID })).some((message) => message.type === "system")).toBe(false)
+          expect((yield* test.ask(sessionID, { action: "edit", resources: [filename] })).effect).toBe(
+            write === "fails" ? "ask" : "allow",
+          )
+        }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+      timeout,
+    )
+  }
+
+  it.live(
+    "limits permission reply notices to 2000 Unicode characters before settling the request",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const notice = "я".repeat(1999) + "📝"
+        for (const endpoint of ["reply", "conversation"] as const) {
+          const sessionID = yield* test.create(`notice length (${endpoint})`)
+          const request = yield* test.ask(sessionID, { action: "edit", resources: ["file.md"] })
+          expect(request.effect).toBe("ask")
+          const send = (text: string) =>
+            endpoint === "reply"
+              ? test.call(`/api/session/${sessionID}/permission/${request.id}/reply`, { decision: "once", notice: text })
+              : test.conversation(sessionID, request.id, text)
+
+          const rejected = yield* send(notice + "!")
+          expect(rejected.status).toBe(400)
+          expect(rejected.body).toMatchObject(
+            endpoint === "reply"
+              ? { _tag: "InvalidRequestError", kind: "Payload" }
+              : { _tag: "RpcError", type: "rpc.invalid_input" },
+          )
+          expect(rejected.body.message).toContain("notice")
+          expect(rejected.body.message).toContain("2000")
+          expect((yield* test.open(sessionID)).map((item) => item.id)).toEqual([request.id])
+          expect(yield* test.sessions.messages({ sessionID })).toEqual([])
+
+          const accepted = yield* send(notice)
+          expect(accepted.status).toBe(endpoint === "reply" ? 204 : 200)
+          expect(yield* test.open(sessionID)).toEqual([])
+          expect(yield* test.sessions.messages({ sessionID })).toContainEqual(
+            expect.objectContaining({ description: notice }),
+          )
+        }
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "removes only the conversation grants belonging to a deleted session",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const removed = yield* test.create("deleted conversation")
+        const retained = yield* test.create("retained conversation")
+        const edit = { action: "edit", resources: ["file.md"] }
+        const web = { action: "webfetch", resources: ["https://example.test"] }
+        for (const [sessionID, request] of [
+          [removed, edit],
+          [removed, web],
+          [retained, edit],
+        ] as const) {
+          const pending = yield* test.ask(sessionID, request)
+          expect((yield* test.conversation(sessionID, pending.id)).status).toBe(200)
+        }
+        expect(yield* test.conversationGrants(removed)).toHaveLength(2)
+
+        yield* test.sessions.remove(removed)
+        yield* until(() =>
+          test.conversationGrants(removed).pipe(Effect.map((entries) => (entries.length === 0 ? entries : undefined))),
+        )
+        expect(yield* test.conversationGrants(retained)).toHaveLength(1)
+        expect((yield* test.ask(retained, edit)).effect).toBe("allow")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "retains a grant and chronological receipts across service restart, with no grant in children or forks",
+    () =>
+      Effect.gen(function* () {
+        const dir = (yield* tmpdirScoped("loginom-permissions-restart-")).path
+        const edit = { action: "edit", resources: ["file.md"] }
+        const receipt = "You allowed editing in this conversation"
+        const childReceipt = "You declined the child's edit"
+        const parentID = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const test = yield* boot({}, undefined, undefined, dir)
+            const id = yield* test.create("original conversation")
+            yield* test.prompt(id, script({ text: "before the permission" }))
+            const first = yield* test.ask(id, edit)
+            expect(first.effect).toBe("ask")
+            expect((yield* test.conversation(id, first.id, receipt)).status).toBe(200)
+            const child = yield* test.sessions.create({ parentID: id })
+            const question = yield* test.ask(child.id, edit)
+            expect(question.effect).toBe("ask")
+            expect(yield* test.reply(child.id, question.id, "reject", undefined, childReceipt)).toBe(204)
+            const messages = yield* test.sessions.messages({ sessionID: child.id })
+            expect(messages).toContainEqual(expect.objectContaining({ description: childReceipt }))
+            yield* test.prompt(id, script({ text: "after the permission" }))
+            const context = JSON.stringify((yield* test.requests(id)).at(-1)?.messages)
+            expect(context).not.toContain(receipt)
+            expect(context).not.toContain(childReceipt)
+            return id
+          }),
+        )
+        const restarted = yield* boot({}, undefined, undefined, dir)
+        expect((yield* restarted.ask(parentID, edit)).effect).toBe("allow")
+        const fork = yield* restarted.sessions.fork({ sessionID: parentID })
+        expect((yield* restarted.ask(fork.id, edit)).effect).toBe("ask")
+        expect(yield* restarted.saved).toEqual([])
+        const messages = yield* restarted.sessions.messages({ sessionID: parentID })
+        const history = messages.map((message) => {
+          if (message.type === "user") return message.text
+          if (message.type === "system") return message.description
+          return undefined
+        })
+        expect(history.filter(Boolean).toReversed()).toEqual([
+          script({ text: "before the permission" }),
+          receipt,
+          childReceipt,
+          script({ text: "after the permission" }),
+        ])
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
@@ -615,6 +884,39 @@ describe("loginom.product permissions (B2.6a)", () => {
 })
 
 describe("loginom.product refusals of built-in tools (B2.6b, В-75)", () => {
+  it.live(
+    "permission feedback reaches the model and a revised write asks for approval again",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const id = yield* test.create("correct a permission")
+        const running = yield* test
+          .prompt(
+            id,
+            script(
+              { tool: "write", input: { path: "first.md", content: "draft" } },
+              { tool: "write", input: { path: "revised.md", content: "draft" } },
+              { text: "end" },
+            ),
+          )
+          .pipe(Effect.forkScoped)
+        const first = yield* until(() => test.open(id).pipe(Effect.map((items) => items[0])))
+        const feedback = "Use revised.md instead"
+        expect(first.resources).toEqual(["first.md"])
+        expect(yield* test.reply(id, first.id, "reject", feedback)).toBe(204)
+        const next = yield* until(() =>
+          test.open(id).pipe(Effect.map((items) => items.find((item) => item.id !== first.id))),
+        )
+        expect(next.resources).toEqual(["revised.md"])
+        expect(told((yield* test.requests(id)).at(-1)).join("\n")).toContain(feedback)
+        expect(yield* test.reply(id, next.id, "once")).toBe(204)
+        yield* Fiber.join(running)
+        expect(yield* Effect.promise(() => Bun.file(path.join(test.dir, "first.md")).exists())).toBe(false)
+        expect(yield* Effect.promise(() => Bun.file(path.join(test.dir, "revised.md")).text())).toBe("draft")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
   it.live(
     "«Отклонить» on a write and «Запрещено» for files, a site and a hidden tool: nothing is done, the model is told why, the turn goes on",
     () =>
