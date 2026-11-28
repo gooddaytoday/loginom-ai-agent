@@ -124,6 +124,7 @@ async function dispatch(message: unknown) {
       state.starting = createLoginomHost(options).then(async (host) => {
         state.host = host
         state.port = loginomHostPort(port, host)
+        events.once("close", host.onWindowsChanged(() => reply({ event: "windows.changed" })))
         await host.settled()
       })
       await state.starting
@@ -138,7 +139,8 @@ async function dispatch(message: unknown) {
       return
     }
     if (!message.method.startsWith("connection.")) {
-      events.emit("message", { data: message })
+      if (message.method === "windows.list") reply({ id: message.id, result: await state.host.listWindows() })
+      else events.emit("message", { data: message })
       return
     }
     if (message.method === "connection.settings.check") {

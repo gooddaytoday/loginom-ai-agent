@@ -16,6 +16,7 @@ import { LoginomHost } from "../src/adapter"
 import { HostTaskScope } from "../src/task-scope"
 import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
+import { WindowSnapshot } from "../src/windows"
 import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
 import { dockTools } from "../../loginom-agent/src/dock"
 
@@ -28,6 +29,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
   const files = {
     "runtime/src/managed-entry.mjs": await readFile(
       new URL("../../loginom-runtime/src/managed-entry.mjs", import.meta.url),
+      "utf8",
+    ),
+    "runtime/src/window-observer.mjs": await readFile(
+      new URL("../../loginom-runtime/src/window-observer.mjs", import.meta.url),
       "utf8",
     ),
     "runtime/src/start-input.mjs": await readFile(
@@ -54,9 +59,13 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       export const loginomAddress = value => value;
       export const loginBrowser = async ({ onContextCreated }) => {
         const context = Object.assign(new EventEmitter(), { pages: () => [], close: async () => {} });
+        const page = Object.assign(new EventEmitter(), { isClosed: () => false, context: () => context });
+        context.newCDPSession = async () => ({
+          send: async () => ({ bounds: { windowState: 'normal' } }), detach: async () => {},
+        });
         onContextCreated?.(context);
         context.emit('response', { url: () => 'http://example.test/app/', fromServiceWorker: () => false });
-        return { context };
+        return { context, page };
       };
       export const reauthenticateReloadedPage = async () => { throw Error('work state fixture does not log in again'); };`,
     "runtime/client/package.json": JSON.stringify({ type: "module" }),
@@ -101,6 +110,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
+        packageState: async () => ({ open: true, path: '/user/Sales.lgp' }),
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
           return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
@@ -140,6 +150,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     await Bun.write(target, contents)
   }
   await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false }))
+  const packageObserved = Promise.withResolvers<WindowSnapshot>()
   const runtime = await supervise({
     node,
     entry: join(src, "managed-entry.mjs"),
@@ -149,11 +160,16 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     chat: "chat",
     connection: { url: "http://example.test", username: "user", apiKey: "fixture", password: "" },
     environment: {},
+  }, undefined, (value) => {
+    if (Schema.is(WindowSnapshot)(value) && value.package) packageObserved.resolve(value)
   })
   try {
     expect(await readFile(join(src, "managed-entry.mjs"), "utf8")).toBe(
       await readFile(new URL("../../loginom-runtime/src/managed-entry.mjs", import.meta.url), "utf8"),
     )
+    expect(await packageObserved.promise).toEqual({
+      openedAt: expect.any(Number), state: "open", package: { name: "Sales.lgp", path: "/user/Sales.lgp" },
+    })
     for (const prepared of [false, true, false]) {
       await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared }))
       expect(await runtime.request("list")).toEqual({

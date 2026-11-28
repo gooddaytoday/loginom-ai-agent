@@ -8,6 +8,7 @@ import { createHook } from "node:async_hooks"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
 import { closeManagedResources } from "./managed-resources-close.mjs"
+import { observeLoginomWindow } from "./window-observer.mjs"
 import { dashboardStorage } from "./dashboard-storage.mjs"
 import { runtimeCallTimeout } from "./call-timeout.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
@@ -31,6 +32,7 @@ const state = {
   bridge: undefined,
   client: undefined,
   controller: undefined,
+  updateWindow: undefined,
   session: undefined,
   browser: undefined,
   browserProfile: undefined,
@@ -203,8 +205,10 @@ async function handle(message) {
       // Connection validation never needs the executor's large dependency tree.
       const { createSession } = await import("../client/lib/session.mjs")
       const { createBridge } = await import("../client/lib/bridge.mjs")
+      let openedAt
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:browserDownloadsPath(directory),
         onContextCreated: context => {
+          openedAt = Date.now()
           state.browser = context
           observeLoginomReplies(context, new URL(input.connection.url).origin, () => {
             state.lastLoginomReplyAt = Date.now()
@@ -276,6 +280,27 @@ async function handle(message) {
           clientRevision: session.metadata.clientRevision,
         },
       })
+      if (input.observeWindow === true && !login.headless) {
+        state.updateWindow = observeLoginomWindow({
+          page: authenticated.page,
+          openedAt,
+          busy: () => !!state.controller || state.bridge.hasActiveWork(),
+          async readPackage() {
+            // C3.5 owns the live package-open observation.
+            const read = state.packageStateRead ??= state.bridge.packageState?.(state.browser, false)
+              .finally(() => { state.packageStateRead = undefined })
+            const observation = await read
+            if (observation?.open === false) return null
+            if (observation?.open !== true) return
+            const path = observation.path
+            const prepared = session.metadata.workspacePreparation?.state?.package_ref
+            const name = (prepared?.path === path ? prepared?.name : undefined) ?? path?.split("/").at(-1) ?? null
+            return { name, path }
+          },
+          publish: windowSnapshot => send({ windowSnapshot }),
+          signal: state.startupController.signal,
+        })
+      }
       return
     }
     if (message.operation === "close") {
@@ -365,6 +390,7 @@ async function handle(message) {
       throw Error("LOGINOM_REQUEST_INVALID")
     const controller = new AbortController()
     state.controller = controller
+    state.updateWindow?.()
     try {
       // Allow the bounded owned read and cleanup to return before the outer IPC
       // deadlines. Other tools retain room for a 60-second dock_node_wait.
@@ -395,6 +421,7 @@ async function handle(message) {
       })
     } finally {
       state.controller = undefined
+      state.updateWindow?.()
     }
   } catch (error) {
     if (message.operation === "start" && state.startupStateDir) {

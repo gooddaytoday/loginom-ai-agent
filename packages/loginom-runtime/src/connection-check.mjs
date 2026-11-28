@@ -525,7 +525,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
       return result
     }
     // MCP receives this same live context through its public contextGetter API.
-    return { ...result, context }
+    return { ...result, context, page }
   } catch (error) {
     await close().catch(() => { throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED", error?.cause?.login ? { cause: error.cause } : undefined) })
     signal?.throwIfAborted()

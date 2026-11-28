@@ -15,6 +15,7 @@ for (const heldSocket of [true, false]) test(`checked managed close ${heldSocket
     await mkdir(join(directory, "src"), { recursive: true })
     await copyFile(new URL(`../src/${name}.mjs`, import.meta.url), join(directory, "src", `${name}.mjs`))
   }
+  await copyFile(new URL("../src/window-observer.mjs", import.meta.url), join(directory, "src/window-observer.mjs"))
   await mkdir(join(directory, "client/lib"), { recursive: true })
   for (const name of ["browser-downloads", "step-progress"])
     await copyFile(new URL(`../client/lib/${name}.mjs`, import.meta.url), join(directory, "client/lib", `${name}.mjs`))

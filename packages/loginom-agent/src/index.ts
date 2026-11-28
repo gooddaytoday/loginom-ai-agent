@@ -18,6 +18,7 @@ import { dashboardTools } from "./dashboard-tools"
 import { dockTools } from "./dock"
 import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
+import { windowsRpc } from "./windows-rpc"
 import { localFiles } from "./local-file"
 import { packageDocs } from "./package-docs"
 import {
@@ -572,7 +573,12 @@ export default Plugin.define({
       },
     })
 
+    const windows = await ctx.rpc.register(windowsRpc, { list: ServiceHost.windows.list })
+    const unsubscribeWindows = ServiceHost.windows.onChanged(() => {
+      void windows.events.emit("changed", {}).catch(() => undefined)
+    })
     return async () => {
+      unsubscribeWindows()
       stop.abort()
       await Promise.all([...runs.keys()].map(drop))
       await drafts.close()
