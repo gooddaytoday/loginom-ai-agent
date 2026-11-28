@@ -1,8 +1,12 @@
 import { expect } from "bun:test"
 import { Agent } from "@opencode/core/agent"
+import { LocationServiceMap } from "@opencode/core/location-service-map"
+import { Plugin } from "@opencode/core/plugin"
+import { Rpc } from "@opencode/core/rpc"
 import { Session } from "@opencode/core/session"
 import { Location } from "@opencode/schema/location"
 import { AbsolutePath } from "@opencode/schema/schema"
+import { WorkspaceID } from "@opencode/schema/workspace-id"
 import { Context, Effect } from "effect"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
@@ -47,12 +51,14 @@ it.live("serves package state only for a conversation in the requested Location"
     })
     yield* routes.pluginsLoaded(project)
     const sessions = Context.get(routes.context, Session.Service)
-    const create = (directory: string) => sessions.create({
-      agent: Agent.ID.make("build"),
-      location: Location.Ref.make({ directory: AbsolutePath.make(directory) }),
-    })
-    const own = yield* create(project)
-    const foreign = yield* create(otherProject)
+    const directory = AbsolutePath.make(project)
+    const workspace = Location.Ref.make({ directory, workspaceID: WorkspaceID.create() })
+    const otherWorkspace = Location.Ref.make({ directory, workspaceID: WorkspaceID.create() })
+    const create = (location: Location.Ref) => sessions.create({ agent: Agent.ID.make("build"), location })
+    const own = yield* create({ directory })
+    const foreign = yield* create({ directory: AbsolutePath.make(otherProject) })
+    const workspaceSession = yield* create(workspace)
+    const foreignWorkspaceSession = yield* create(otherWorkspace)
     const call = (sessionID: string) => Effect.promise(async () => {
       const response = await routes.fetch(
         `http://opencode.local/api/rpc/loginom.package-state/snapshot?location[directory]=${encodeURIComponent(project)}`,
@@ -66,7 +72,21 @@ it.live("serves package state only for a conversation in the requested Location"
     })
     expect(yield* call(own.id)).toEqual({ status: 200, body: { output: snapshot } })
     expect((yield* call(foreign.id)).body).toMatchObject({ type: "invalid_session" })
+    expect((yield* call(workspaceSession.id)).body).toMatchObject({ type: "invalid_session" })
     expect((yield* call("ses_missing")).body).toMatchObject({ type: "invalid_session" })
-    expect(calls).toEqual([{ method: "package.state", input: { sessionID: own.id } }])
+
+    const locations = Context.get(routes.context, LocationServiceMap.Service)
+    yield* Effect.gen(function* () {
+      yield* Plugin.awaitActivation
+      const rpc = yield* Rpc.Service
+      const read = (sessionID: string) => rpc.call("loginom.package-state", "snapshot", { sessionID })
+      expect(yield* read(workspaceSession.id)).toEqual(snapshot)
+      expect(yield* read(foreignWorkspaceSession.id).pipe(Effect.flip)).toMatchObject({ type: "invalid_session" })
+    }).pipe(Effect.provide(locations.get(workspace)))
+
+    expect(calls).toEqual([
+      { method: "package.state", input: { sessionID: own.id } },
+      { method: "package.state", input: { sessionID: workspaceSession.id } },
+    ])
   }),
 )

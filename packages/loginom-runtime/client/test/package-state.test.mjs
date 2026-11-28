@@ -46,10 +46,13 @@ function fixture() {
   const page = { url: () => origin, evaluate: (read, input) => runInNewContext(`(${read})(input)`, { ...globals, input, setTimeout, clearTimeout }) };
   const read = createPackageStateReader(metadata, origin, () => data.time);
   const snapshot = (save, busy) => read({ pages: () => [page] }, save, busy);
-  const stepRefresh = () => {
+  const stepRefresh = (tabTid = 'owned') => {
     const { phase, request, packageNode, stepSession } = receipt;
     globals.__loginomDockPreparationV1.receipts.set('refresh', { phase, request, packageNode, stepSession, stepRefresh: true });
-    metadata.workspacePreparation = { ...metadata.workspacePreparation, operation_id: 'refresh' };
+    metadata.workspacePreparation = {
+      operation_id: 'refresh',
+      state: { ...metadata.workspacePreparation.state, workflow_ref: { tab_tid: tabTid } },
+    };
   };
   return { snapshot, data, owned, packages, connection, page, stepRefresh };
 }
@@ -102,13 +105,13 @@ test('keeps open state when dirty status is unavailable and rejects a changed na
   });
 });
 
-test('reads the same package after existing_workflow replaces the preparation receipt', async () => {
+test('keeps the dirty timestamp when existing_workflow refreshes the receipt for another workflow tab', async () => {
   const { snapshot, data, owned, stepRefresh } = fixture();
   owned.PackageFileName = 'user/result.lgp';
   data.modified = true;
   const before = await snapshot();
   assert.equal(before.open, true);
-  stepRefresh();
+  stepRefresh('another-workflow');
   data.time = 200;
   assert.deepEqual(await snapshot(), before);
 });
@@ -133,16 +136,44 @@ test('returns the last confirmed observation with its age while the runtime is b
   });
 });
 
-test('bounds a stalled browser evaluation and permits the next read', async t => {
+test('an incomplete read preserves the last confirmed dirty state and its age', async () => {
+  const { snapshot, data } = fixture();
+  data.modified = true;
+  const confirmed = await snapshot();
+  data.time = 1600;
+  data.modified = undefined;
+  assert.deepEqual(await snapshot(), {
+    ...confirmed, modified: null, modifiedDetectedAt: null,
+  });
+  data.time = 2650;
+  assert.deepEqual(await snapshot(undefined, true), { ...confirmed, staleForSeconds: 2 });
+  data.modified = false;
+  await snapshot();
+  assert.equal((await snapshot(undefined, true)).modified, false);
+});
+
+test('times out a stalled evaluation and does not poll again until it settles', async t => {
   const { snapshot, page } = fixture();
   const evaluate = page.evaluate;
+  const blocked = Promise.withResolvers();
+  let evaluations = 0;
   t.mock.timers.enable({ apis: ['setTimeout'] });
-  page.evaluate = () => new Promise(() => {});
+  page.evaluate = () => {
+    evaluations++;
+    return blocked.promise;
+  };
+  const unknown = {
+    open: null, path: null, modified: null, modifiedDetectedAt: null, lastSave: null, staleForSeconds: null,
+  };
   const pending = snapshot();
   t.mock.timers.tick(4999);
-  assert.deepEqual(await pending, {
-    open: null, path: null, modified: null, modifiedDetectedAt: null, lastSave: null, staleForSeconds: null,
-  });
+  assert.deepEqual(await pending, unknown);
+  const retry = snapshot();
+  t.mock.timers.tick(4999);
+  assert.deepEqual(await retry, unknown);
+  assert.equal(evaluations, 1);
+  blocked.resolve(null);
+  await blocked.promise;
   page.evaluate = evaluate;
   assert.equal((await snapshot()).open, true);
 });

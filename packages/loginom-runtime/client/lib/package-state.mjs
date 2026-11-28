@@ -49,6 +49,7 @@ export async function readPackageState({ origin, build, documentId, operationId,
 
 export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
   const origin = loginomUrl && new URL(loginomUrl).origin;
+  let evaluation;
   let dirty;
   let lastConfirmed;
   return async (context, lastSavedPackage, busy) => {
@@ -63,20 +64,21 @@ export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
     const prepared = preparation?.state;
     let observation = null;
     if (!preparation && !busy) observation = { open: false, path: null, modified: null };
-    if (prepared && metadata.workspaceReady === true && origin && !busy) {
+    if (prepared && metadata.workspaceReady === true && origin && !busy && !evaluation) {
       const pages = context.pages().filter(page => URL.canParse(page.url()) && new URL(page.url()).origin === origin);
       if (pages.length === 1) {
         let timer;
         try {
+          evaluation = pages[0].evaluate(readPackageState, {
+            origin,
+            build: metadata.targetIdentity?.loginom_build,
+            documentId: prepared.document_id,
+            operationId: preparation.operation_id,
+            account: prepared.loginom_account,
+            sessionId: metadata.sessionId,
+          }).finally(() => { evaluation = undefined; });
           observation = await Promise.race([
-            pages[0].evaluate(readPackageState, {
-              origin,
-              build: metadata.targetIdentity?.loginom_build,
-              documentId: prepared.document_id,
-              operationId: preparation.operation_id,
-              account: prepared.loginom_account,
-              sessionId: metadata.sessionId,
-            }),
+            evaluation,
             // Bound the browser round trip, including time before page code can run.
             new Promise(resolve => { timer = setTimeout(resolve, 4000, null); }),
           ]);
@@ -89,7 +91,7 @@ export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
       if (metadata.workspacePreparation !== preparation || metadata.workspaceReady !== true) observation = null;
     }
 
-    const identity = JSON.stringify([prepared?.document_id, prepared?.workflow_ref?.tab_tid, observation?.path]);
+    const identity = JSON.stringify([prepared?.document_id, observation?.path]);
     if (observation?.open === false || observation?.modified === false) dirty = undefined;
     const at = now();
     if (observation?.modified === true && dirty?.identity !== identity) dirty = { identity, at };
@@ -101,7 +103,9 @@ export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
       lastSave,
       staleForSeconds: null,
     };
-    if (observation) lastConfirmed = { snapshot, at };
+    const cachedModified = lastConfirmed?.identity === identity ? lastConfirmed.snapshot.modified : null;
+    if (observation && (!observation.open || observation.modified !== null || cachedModified === null))
+      lastConfirmed = { snapshot, at, identity };
     return snapshot;
   };
 }
