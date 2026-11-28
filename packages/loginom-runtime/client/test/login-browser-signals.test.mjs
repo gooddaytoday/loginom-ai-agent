@@ -9,7 +9,7 @@ for(const keepOpen of [true,false])test('browser signal ownership follows keepOp
  const context={addInitScript:async()=>{},pages:()=>[{}],close:async()=>{closed++;}};
  const run=vm.runInNewContext('('+loginBrowser.toString()+')',{
   require:()=>({chromium:{launchPersistentContext:async(_path,options)=>{launched=options;return context;}}}),
-  browserLaunch:()=>({args:[],viewport:{width:1280,height:800}}),mkdir:async()=>{},
+  browserLaunch:()=>({args:[],viewport:{width:1280,height:800}}),prepareBrowserProfile:async()=>{},
   browserEnvironment:()=>({}),browserLoggingArguments:()=>[],browserDownloadScript:()=>'',connectionTimelineScript,
   setTimeout,clearTimeout,performance,loginPage:async()=>({authenticated:true}),process:{platform:'linux',env:{}},
  });
