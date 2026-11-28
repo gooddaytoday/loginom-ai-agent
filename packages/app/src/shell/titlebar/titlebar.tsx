@@ -14,10 +14,12 @@ import { usePlatform } from "@/runtime/platform/platform"
 import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
 import {
+  forgetNavigationWorkspace,
   hiddenWorkspace,
   PluginNavigation,
   registerNavigationWorkspace,
   useDiscardNavigationDraft,
+  useManagedNavigationConnection,
   useShellNavigation,
 } from "@/runtime/plugin/navigation"
 import { showToast } from "@/shell/notifications/toast"
@@ -86,6 +88,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
   const language = useLanguage()
   const settings = useSettings()
   const navigation = useShellNavigation()
+  const managedConnection = useManagedNavigationConnection()
   const newConversation = () => navigation()?.value.newSessionTitle ?? language.t("command.session.new")
 
   const openSettings = useSettingsDialog()
@@ -237,14 +240,6 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
             const currentTab = routeSync.currentTab
             const pluginPage = useActivePluginPage()
 
-            const managedConnection = createMemo(() => {
-              const server = currentTab()?.server ?? layout.home.selection().server
-              const connections = global.servers.list()
-              const conn = server ? connections.find((item) => ServerConnection.key(item) === server) : connections[0]
-
-              return conn?.type === "sidecar" && navigation() ? conn : undefined
-            })
-
             const openNavigationDraft = (
               server: ServerConnection.Key,
               draftID: string,
@@ -267,20 +262,40 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
                 })
 
               signal.addEventListener("abort", timedOut, { once: true })
-              void policy
-                .draft({
+              const forget = (directory: string) => forgetNavigationWorkspace(ctx, directory)
+
+              const open = async () => {
+                let hidden = hiddenWorkspace(ctx, directory, projectID)
+
+                if (directory && hidden === undefined) {
+                  await ctx.data.project.sync({ includeHidden: true }).catch(() => undefined)
+                  hidden = hiddenWorkspace(ctx, directory, projectID)
+                }
+
+                signal.throwIfAborted()
+
+                const chosen = await policy.draft({
                   directory,
                   draftID,
                   signal,
-                  hidden: hiddenWorkspace(ctx, directory, projectID),
-                  register: (input) => registerNavigationWorkspace(ctx, input, signal),
+                  hidden: hidden !== false,
+                  register: (input) => registerNavigationWorkspace(ctx, input),
+                  forget,
                 })
-                .then((directory) => {
+
+                try {
                   signal.throwIfAborted()
                   signal.removeEventListener("abort", timedOut)
 
-                  return tabs.newDraft({ server, directory, draftID }, "", model)
-                })
+                  await tabs.newDraft({ server, directory: chosen, draftID }, "", model)
+                } catch (error) {
+                  if (hidden !== false)
+                    await policy.discardDraft({ directory: chosen, forget: () => forget(chosen) }).catch(() => undefined)
+                  throw error
+                }
+              }
+
+              void open()
                 .catch(() => {
                   if (!signal.aborted) showToast({ variant: "error", title: language.t("common.requestFailed") })
                 })
@@ -396,6 +411,21 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
 
             const openNewTab = () => openDraft(uuid())
 
+            const mobileNewTab = (title: string) => (
+              <button
+                type="button"
+                data-action="mobile-tabs-new-session"
+                class="flex h-7 w-full shrink-0 items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-base hover:bg-v2-background-bg-layer-02 focus-visible:outline-none focus-visible:bg-v2-background-bg-layer-02"
+                onClick={() => {
+                  openNewTab()
+                  closeMobileTabs()
+                }}
+              >
+                <Icon name="plus" />
+                {title}
+              </button>
+            )
+
             const toggleHome = () => tabs.toggleHome({ home: layout.route().type === "home", current: currentTab() })
 
             const verticalTabStrip = (
@@ -478,7 +508,9 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
                 id: "home.toggle",
                 title: language.t("home.title"),
                 category: language.t("command.category.view"),
-                keybind: windows() || navigation()?.value.sidebarShortcut === "mod+b" ? "alt+home" : "mod+b",
+                keybind: windows() || (managedConnection() && navigation()?.value.sidebarShortcut === "mod+b")
+                  ? "alt+home"
+                  : "mod+b",
                 hidden: true,
                 onSelect: () => {
                   if (layout.route().type !== "home") layout.home.searchFocus.request()
@@ -712,6 +744,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
                       <MobileDrawerContent>
                         <MobileDrawerLabel class="sr-only">{language.t("titlebar.tabs")}</MobileDrawerLabel>
                         <div data-slot="mobile-tabs-drawer" data-corvu-no-drag>
+                          <Show when={managedConnection()}>{mobileNewTab(newConversation())}</Show>
                           <div data-slot="mobile-tabs-drawer-list">
                             <Show
                               when={managedConnection()}
@@ -739,18 +772,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
                               )}
                             </Show>
                           </div>
-                          <button
-                            type="button"
-                            data-action="mobile-tabs-new-session"
-                            class="flex h-7 w-full shrink-0 items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-base hover:bg-v2-background-bg-layer-02 focus-visible:outline-none focus-visible:bg-v2-background-bg-layer-02"
-                            onClick={() => {
-                              openNewTab()
-                              closeMobileTabs()
-                            }}
-                          >
-                            <Icon name="plus" />
-                            {managedConnection() ? newConversation() : language.t("command.session.new")}
-                          </button>
+                          <Show when={!managedConnection()}>{mobileNewTab(language.t("command.session.new"))}</Show>
                           <div class="flex shrink-0 flex-col gap-1 border-t border-v2-border-border-muted pt-2">
                             <PluginPageNav onNavigate={closeMobileTabs} />
                             <button

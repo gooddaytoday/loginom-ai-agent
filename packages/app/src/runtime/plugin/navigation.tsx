@@ -24,31 +24,67 @@ export function useShellNavigation() {
   return () => host.items(ShellNavigation)[0]
 }
 
-export function hiddenWorkspace(ctx: ServerCtx | undefined, directory: string | undefined, projectID?: string) {
-  if (!ctx) return false
+export function useManagedNavigationConnection() {
+  const navigation = useShellNavigation()
+  const global = useGlobal()
+  const layout = useLayout()
+  const tabs = useTabs()
 
-  if (projectID) return !!ctx.data.project.get(projectID)?.experimental?.hidden
+  return createMemo(() => {
+    if (!navigation()) return
 
-  if (!directory) return false
-  const current = ctx.data.location.info({ directory })
+    const route = layout.route()
+    let server = layout.home.selection().server
 
-  if (current) return !!ctx.data.project.get(current.project.id)?.experimental?.hidden
-  const key = pathKey(directory)
+    if (route.type === "session") server = route.server
 
-  return ctx.data.project
-    .list({ includeHidden: true })
-    .some((item) => item.experimental?.hidden && pathKey(item.canonical) === key)
+    if (route.type === "draft") {
+      const draft = tabs.store.find((tab) => tab.type === "draft" && tab.draftID === route.draftID)
+
+      if (!draft) return
+      server = draft.server
+    }
+
+    const connections = global.servers.list()
+    const conn = server ? connections.find((item) => ServerConnection.key(item) === server) : connections[0]
+
+    return conn?.type === "sidecar" ? conn : undefined
+  })
 }
 
-export async function registerNavigationWorkspace(
-  ctx: ServerCtx,
-  input: { directory: string; hidden: boolean },
-  signal?: AbortSignal,
-) {
-  const project = await ctx.sdk.api.experimental.project.register(
-    { directory: input.directory, experimental: { hidden: input.hidden } },
-    { signal },
-  )
+export function hiddenWorkspace(ctx: ServerCtx | undefined, directory: string | undefined, projectID?: string) {
+  if (!ctx || !directory) return
+
+  const id = projectID ?? ctx.data.location.info({ directory })?.project.id
+  const key = pathKey(directory)
+
+  const project =
+    (id ? ctx.data.project.get(id) : undefined) ??
+    ctx.data.project.list({ includeHidden: true }).find((item) => pathKey(item.canonical) === key)
+
+  return project ? project.experimental?.hidden === true : undefined
+}
+
+export async function forgetNavigationWorkspace(ctx: ServerCtx, directory: string) {
+  const signal = AbortSignal.timeout(10_000)
+  const key = pathKey(directory)
+  const matches = (project: { canonical: string }) => pathKey(project.canonical) === key
+
+  const project =
+    ctx.data.project.list({ includeHidden: true }).find(matches) ??
+    (await ctx.sdk.api.experimental.project.list({ signal })).find(matches)
+
+  if (!project?.experimental?.hidden) return
+
+  await ctx.sdk.api.experimental.project.forget({ projectID: project.id }, { signal })
+  ctx.data.project.forget(project.id)
+}
+
+export async function registerNavigationWorkspace(ctx: ServerCtx, input: { directory: string; hidden: boolean }) {
+  const project = await ctx.sdk.api.experimental.project.register({
+    directory: input.directory,
+    experimental: { hidden: input.hidden },
+  })
 
   ctx.data.project.remember(project)
 }
@@ -66,21 +102,7 @@ export function useDiscardNavigationDraft() {
     void policy
       .discardDraft({
         directory: tab.directory,
-        async forget() {
-          const signal = AbortSignal.timeout(10_000)
-          const directory = pathKey(tab.directory)
-
-          const project =
-            ctx.data.project.list({ includeHidden: true }).find((item) => pathKey(item.canonical) === directory) ??
-            (await ctx.sdk.api.experimental.project.list({ signal })).find(
-              (item) => pathKey(item.canonical) === directory,
-            )
-
-          if (!project?.experimental?.hidden) return
-
-          await ctx.sdk.api.experimental.project.forget({ projectID: project.id }, { signal })
-          ctx.data.project.forget(project.id)
-        },
+        forget: () => forgetNavigationWorkspace(ctx, tab.directory),
       })
       .catch(() => undefined)
   }

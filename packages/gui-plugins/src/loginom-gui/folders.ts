@@ -12,9 +12,31 @@ export const ManagedFolders = Ipc.define({
     discardDraft: { input: Schema.String, output: Schema.Boolean },
     project: { input: Schema.String, output: Schema.String },
     conversation: { input: Schema.String, output: Schema.String },
-    finish: { input: Schema.Struct({ directory: Schema.String, keep: Schema.Boolean }), output: Schema.Void },
+    finish: { input: Schema.Struct({ directory: Schema.String, keep: Schema.Boolean }), output: Schema.Boolean },
   },
 })
+
+export async function allocateManagedFolder(
+  pending: Promise<string>,
+  use: (directory: string) => Promise<void>,
+  release: (input: { directory: string; keep: boolean }) => Promise<boolean>,
+  forget?: (directory: string) => Promise<void>,
+) {
+  const directory = await pending
+
+  const finish = async (keep: boolean) => {
+    if (await release({ directory, keep })) await forget?.(directory)
+  }
+
+  try {
+    await use(directory)
+
+    return { directory, finish }
+  } catch (error) {
+    await finish(false).catch(() => undefined)
+    throw error
+  }
+}
 
 export function conversationTitle(prompt: string, fallback: string) {
   const line = prompt.trim().split(/\r?\n/, 1)[0] ?? ""

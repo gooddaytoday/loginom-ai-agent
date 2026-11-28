@@ -33,6 +33,21 @@ function hasCode(error: Error, codes: readonly string[]) {
   return "code" in error && codes.some((code) => code === error.code)
 }
 
+function removeEmptyFolder(directory: string) {
+  return rmdir(directory).then(
+    () => true,
+    (error) => {
+      if (!(error instanceof Error)) throw error
+
+      if (hasCode(error, ["ENOENT"])) return true
+
+      if (hasCode(error, ["ENOTEMPTY", "EEXIST"])) return false
+
+      throw error
+    },
+  )
+}
+
 export function managedFolders(documents: string, profile: string, today = () => new Date()) {
   const drafts = path.join(profile, "drafts")
   const allocations = new Set<string>()
@@ -59,18 +74,7 @@ export function managedFolders(documents: string, profile: string, today = () =>
       if (path.dirname(directory) !== drafts || !/^[a-z0-9-]{1,80}(?: \(\d+\))?$/i.test(path.basename(directory)))
         return false
 
-      return rmdir(directory).then(
-        () => true,
-        (error) => {
-          if (!(error instanceof Error)) throw error
-
-          if (hasCode(error, ["ENOENT"])) return true
-
-          if (hasCode(error, ["ENOTEMPTY", "EEXIST"])) return false
-
-          throw error
-        },
-      )
+      return removeEmptyFolder(directory)
     },
     project(title: string) {
       if (!title.trim()) throw new Error("Missing project name")
@@ -87,10 +91,9 @@ export function managedFolders(documents: string, profile: string, today = () =>
       return allocate(conversationsFolder, `${day} ${folderName(title)}`)
     },
     async finish({ directory, keep }: { directory: string; keep: boolean }) {
-      if (!allocations.delete(directory) || keep) return
-      await rmdir(directory).catch((error) => {
-        if (!(error instanceof Error) || !hasCode(error, ["ENOENT", "ENOTEMPTY", "EEXIST"])) throw error
-      })
+      if (!allocations.delete(directory) || keep) return false
+
+      return removeEmptyFolder(directory)
     },
   }
 }

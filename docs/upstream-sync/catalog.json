@@ -165,6 +165,7 @@
         "packages/app/src/shell/shell.tsx", "packages/app/src/shell/titlebar/titlebar.tsx",
         "packages/app/src/shell/titlebar/recently-closed-tabs-menu.tsx",
         "packages/app/src/shell/sidebar-peek.ts", "packages/app/src/shell/sidebar-toggle.tsx",
+        "packages/app/component-tests/plugin-graph.spec.ts",
         "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**"
       ]
     },

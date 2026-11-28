@@ -15,7 +15,7 @@ import { createMemo, lazy, onCleanup, Show, Suspense } from "solid-js"
 import { unwrap } from "solid-js/store"
 import { DashboardLink } from "./contract"
 import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
-import { availableProjectName, conversationTitle, ManagedFolders } from "./folders"
+import { allocateManagedFolder, availableProjectName, conversationTitle, ManagedFolders } from "./folders"
 import type definition from "./index"
 import { LoginomRepeatDock } from "./repeat-dock"
 import { ConversationSidebar, folderActivity, type SidebarText } from "./sidebar"
@@ -111,20 +111,6 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
   if (ctx.desktop) {
     const folders = ctx.main(ManagedFolders)
 
-    const allocate = async (pending: Promise<string>, use: (directory: string) => Promise<void>) => {
-      const directory = await pending
-      const finish = (keep: boolean) => folders.finish({ directory, keep })
-
-      try {
-        await use(directory)
-
-        return { directory, finish }
-      } catch (error) {
-        await finish(false).catch(() => undefined)
-        throw error
-      }
-    }
-
     ctx.add(ShellNavigation, {
       get newSessionTitle() {
         return ctx.t("newConversation")
@@ -141,43 +127,50 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
 
             const name = availableProjectName(requested, names)
 
-            const project = await allocate(folders.project(name), (directory) => {
-              signal.throwIfAborted()
+            const project = await allocateManagedFolder(
+              folders.project(name),
+              (directory) => {
+                signal.throwIfAborted()
 
-              return input.createProject({ directory, name, signal })
-            })
+                return input.createProject({ directory, name, signal })
+              },
+              folders.finish,
+            )
 
             void project.finish(true)
           }}
         />
       ),
-      async draft({ directory, draftID, hidden, register, signal }) {
+      async draft({ directory, draftID, hidden, register, forget, signal }) {
         if (directory && !hidden) return directory
 
-        const draft = await folders.draftDirectory(draftID)
+        const active = AbortSignal.any([signal, ctx.signal])
 
-        try {
-          signal.throwIfAborted()
-          ctx.signal.throwIfAborted()
-          await register({ directory: draft, hidden: true })
-          signal.throwIfAborted()
-          ctx.signal.throwIfAborted()
+        const draft = await allocateManagedFolder(
+          folders.draftDirectory(draftID),
+          async (directory) => {
+            active.throwIfAborted()
+            await register({ directory, hidden: true })
+            active.throwIfAborted()
+          },
+          ({ directory }) => folders.discardDraft(directory),
+          forget,
+        )
 
-          return draft
-        } catch (error) {
-          void folders.discardDraft(draft).catch(() => undefined)
-          throw error
-        }
+        return draft.directory
       },
       async discardDraft(input) {
         if (await folders.discardDraft(input.directory, { signal: ctx.signal })) await input.forget()
       },
-      prepare({ hidden, prompt, register }) {
+      prepare({ hidden, prompt, register, forget }) {
         if (!hidden) return
 
         return () =>
-          allocate(folders.conversation(conversationTitle(prompt, ctx.t("newConversation"))), (directory) =>
-            register({ directory, hidden: true }),
+          allocateManagedFolder(
+            folders.conversation(conversationTitle(prompt, ctx.t("newConversation"))),
+            (directory) => register({ directory, hidden: true }),
+            folders.finish,
+            forget,
           )
       },
     })

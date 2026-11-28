@@ -165,6 +165,7 @@ for (const registry of ["page", "question.renderer", "shell-navigation"]) {
     const result = await page.evaluate(async ({ fixture, registry }) => {
       const { mountPluginHost, Registry, until } = await import(fixture)
       const host = mountPluginHost()
+
       const contribution =
         registry === "page" ? { id: "overview", title: "Third-party page" } : { matches: () => true, render: () => null }
 

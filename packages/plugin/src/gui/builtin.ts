@@ -253,6 +253,8 @@ export type NavigationSession = {
 
 type RegisterWorkspace = (input: { directory: string; hidden: boolean }) => Promise<void>
 
+type ForgetWorkspace = (directory: string) => Promise<void>
+
 /** Live inventory and actions offered to the active navigation contribution. */
 export interface ShellNavigationInput {
   /** Visible projects used in this window's profile. */
@@ -333,6 +335,8 @@ export interface ShellNavigation {
     hidden: boolean
     /** Registers a workspace before the window opens it. */
     register: RegisterWorkspace
+    /** Removes failed hidden workspace metadata once its directory is gone. */
+    forget: ForgetWorkspace
   }): Promise<string>
   /**
    * Remove an unused private draft workspace; leave explicit project directories intact.
@@ -357,6 +361,8 @@ export interface ShellNavigation {
     prompt: string
     /** Registers a workspace before a session starts there. */
     register: RegisterWorkspace
+    /** Removes failed hidden workspace metadata once its directory is gone. */
+    forget: ForgetWorkspace
   }):
     | (() => Promise<{
         /** The actual workspace for the new session. */

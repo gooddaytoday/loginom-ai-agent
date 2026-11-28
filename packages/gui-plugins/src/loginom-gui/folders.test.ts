@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test"
 import { mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { availableProjectName, conversationTitle } from "./folders"
+import { allocateManagedFolder, availableProjectName, conversationTitle } from "./folders"
 import { managedFolders } from "./folders-main"
 
 const roots: string[] = []
@@ -88,4 +88,60 @@ test("closing a draft removes an empty private directory but leaves projects and
   expect(await readdir(path.dirname(draft))).toEqual(["with-file"])
   expect(await readdir(populated)).toEqual(["data.csv"])
   expect(await readdir(project)).toEqual([])
+})
+
+test("a failed conversation start forgets its hidden project after removing the folder", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "loginom-rollback-"))
+  roots.push(root)
+  const folders = managedFolders(root, path.join(root, "profile"))
+  const hidden = new Set<string>()
+
+  const workspace = await allocateManagedFolder(
+    folders.conversation("Failed session"),
+    async (directory) => void hidden.add(directory),
+    folders.finish,
+    async (directory) => {
+      await expect(stat(directory)).rejects.toMatchObject({ code: "ENOENT" })
+      hidden.delete(directory)
+    },
+  )
+
+  expect([...hidden]).toEqual([workspace.directory])
+
+  await workspace.finish(false)
+  expect([...hidden]).toEqual([])
+})
+
+test("a draft registration that completes after Ctrl+N times out is rolled back", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "loginom-drafts-"))
+  roots.push(root)
+  const folders = managedFolders(root, path.join(root, "profile"))
+  const hidden = new Set<string>()
+  const timeout = new AbortController()
+  const registered = Promise.withResolvers<void>()
+  const response = Promise.withResolvers<void>()
+
+  const attempt = allocateManagedFolder(
+    folders.draftDirectory("timed-out"),
+    async (directory) => {
+      hidden.add(directory)
+      registered.resolve()
+      await response.promise
+      timeout.signal.throwIfAborted()
+    },
+    ({ directory }) => folders.discardDraft(directory),
+    async (directory) => {
+      await expect(stat(directory)).rejects.toMatchObject({ code: "ENOENT" })
+      hidden.delete(directory)
+    },
+  ).then(
+    () => "opened",
+    (error) => (error instanceof DOMException ? error.name : "failed"),
+  )
+
+  await registered.promise
+  timeout.abort(new DOMException("Draft not opened", "TimeoutError"))
+  response.resolve()
+  expect(await attempt).toBe("TimeoutError")
+  expect([...hidden]).toEqual([])
 })
