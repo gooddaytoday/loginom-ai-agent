@@ -1,20 +1,22 @@
-import { CodeBlock, SettingsPage, Slot, Style, type MountedSession, type Plugin } from "@opencode/plugin/gui"
-import { Page, builtinContext } from "@opencode/plugin/gui/builtin"
-import { Button } from "@opencode/ui/button"
-import { createResource, createSignal, lazy, onCleanup, Show, Suspense, untrack } from "solid-js"
-import { PackageSchema, readFinding } from "./contract"
-import { copyText, readPackageCopy } from "./copy"
-import { transition, type Event, type Request, type State } from "./schema-machine"
+import { SettingsPage, type Plugin } from "@opencode/plugin/gui"
+import { builtinContext, Page, subscribeBuiltinDeepLinks } from "@opencode/plugin/gui/builtin"
+import { dashboardLinkChannel } from "@loginom-ai-agent/product/dashboard-link"
+import { Option, Schema } from "effect"
+import { lazy, onCleanup, Show, Suspense } from "solid-js"
+import { unwrap } from "solid-js/store"
+import { DashboardLink } from "./contract"
+import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
 import type definition from "./index"
-import styles from "./schema.css?inline"
-import registerSteps from "./step"
+import registerSchema from "./schema-renderer"
+import { registerStartScreen } from "./start-screen"
 
-const pageID = "package-schema"
-
-const SchemaPage = lazy(() => import("./schema-page"))
+const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
+  registerStartScreen(ctx)
+  registerSchema(ctx)
   const Catalog = lazy(() => import("./catalog-page"))
+
   ctx.add(Page, {
     id: "catalog",
     nav: {},
@@ -27,7 +29,9 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       </Suspense>
     ),
   })
-  const ConnectionPage = lazy(() => import("./page"))
+
+  const Settings = lazy(() => import("./page"))
+
   ctx.add(SettingsPage, {
     id: "loginom",
     icon: "arrow-up-right",
@@ -36,174 +40,85 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     },
     render: () => (
       <Suspense>
-        <ConnectionPage />
+        <Settings />
       </Suspense>
     ),
   })
 
-  ctx.add(Style, styles)
-  const [state, setState] = createSignal<State>({ status: "closed" })
-  const dispatch = (event: Event) => setState((current) => transition(current, event))
-  let controller: AbortController | undefined
+  if (!ctx.desktop) return
 
-  const close = () => {
-    controller?.abort()
-    dispatch({ type: "close" })
-  }
+  const Dashboard = lazy(() => import("./dashboard"))
+  const router = builtinContext(ctx).router
 
-  onCleanup(close)
+  const [store, setStore] = ctx.storage.memory<{ dashboard: DashboardState }>("dashboard", {
+    initial: { dashboard: { nextAttempt: 1 } },
+  })
 
-  const load = (request: Request) => {
-    controller?.abort()
-    controller = new AbortController()
-    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(request.node ? 24_000 : 15_000)])
-    dispatch({ type: "open", request })
-    void Promise.try(() => {
-      const server = ctx.servers.get(request.serverID)
+  const dashboard: DashboardStore = {
+    state: () => store.dashboard,
+    dispatch(event) {
+      const previous = unwrap(store.dashboard)
+      const next = transitionDashboard(previous, event)
 
-      if (!server) throw new Error("Server unavailable")
+      if (next === previous) return
 
-      const input = request.finding
-        ? { sessionID: request.sessionID, source: "saved" as const }
-        : request.node
-          ? { sessionID: request.sessionID, target: { document_id: request.node.document_id, workflow_id: request.node.workflow_id } }
-          : { sessionID: request.sessionID }
+      setStore((draft) => {
+        draft.dashboard = next
+      })
 
-      return server.client.rpc(PackageSchema).schema(input, { location: { directory: request.directory }, signal })
-    }).then(
-      ({ snapshot }) => dispatch({ type: "loaded", request, snapshot }),
-      () => dispatch({ type: "failed", request }),
-    )
-  }
-
-  const open = (session: MountedSession, target?: Pick<Request, "finding" | "node">) => {
-    const location = { sessionID: session.id, serverID: session.server.id, directory: session.directory }
-
-    const request = target?.finding
-      ? { ...location, finding: target.finding }
-      : target?.node
-        ? { ...location, node: target.node }
-        : location
-
-    load(request)
-    builtinContext(ctx).layout.openPage(pageID)
-  }
-
-  registerSteps(ctx, (session, node) => open(session, { node }))
-
-  const back = () => {
-    const current = untrack(state)
-
-    if (current.status === "closed") return
-    ctx.tabs.open({ server: current.request.serverID, id: current.request.sessionID }, { focus: true })
+      return next
+    },
   }
 
   ctx.add(Page, {
-    id: pageID,
+    id: "dashboard",
     get title() {
-      return ctx.t("schema")
+      return ctx.t("dashboard")
     },
-    render() {
-      onCleanup(close)
+    render: () => (
+      <Suspense>
+        <Show
+          when={dashboard.state().current?.link}
+          keyed
+          fallback={
+            <p class="p-4" role="status">
+              {ctx.t("dashboardOpenStudio")}
+            </p>
+          }
+        >
+          {(link) => <Dashboard link={link} dashboard={dashboard} />}
+        </Show>
+      </Suspense>
+    ),
+  })
 
-      const [copy] = createResource(
-        () => {
-          const current = state()
+  onCleanup(subscribeBuiltinDeepLinks(dashboardLinkChannel, (data) => {
+    const decoded = decodeLink(data)
 
-          if (current.status === "ready" && current.snapshot.source === "window") return current.request
+    if (Option.isNone(decoded)) return
 
-          if (current.status === "empty" && !current.request.finding) return current.request
-        },
-        (request) => readPackageCopy(ctx, request),
-      )
+    const link = decoded.value
 
-      const verifiedCopy = () => {
-        const current = state()
+    if ("code" in link) {
+      const issue =
+        link.code === "DASHBOARD_SNAPSHOT_UNAVAILABLE" || link.code === "DASHBOARD_SNAPSHOT_INVALID"
+          ? "dashboardSnapshotGone"
+          : link.code === "LOGINOM_CONFIG_REQUIRED"
+            ? "dashboardConnect"
+            : "dashboardOpenFailed"
 
-        if (copy.loading || copy.state === "unresolved") return
-        const path = copy()
-
-        if (current.status === "empty" && !current.request.finding) return path ?? null
-
-        if (current.status === "ready" && current.snapshot.source === "window") {
-          const workflow = current.snapshot.workflow
-
-          return path?.document_id === workflow.document_id && path.workflow_id === workflow.workflow_id ? path : null
-        }
+      if (router.path().split("?")[0] === `/page/${ctx.id}/dashboard`) {
+        if (dashboard.dispatch({ type: "link.failed", id: link.id, issue })) return
       }
 
-      return (
-        <Suspense fallback={<p role="status">{ctx.t("schemaLoading")}</p>}>
-          <SchemaPage
-            state={state}
-            t={ctx.t}
-            dispatch={dispatch}
-            retry={() => {
-              const current = untrack(state)
+      ctx.toast.show({ variant: "error", title: ctx.t(issue) })
 
-              if (current.status !== "closed") load({ ...current.request })
-            }}
-            back={back}
-            packageCopy={verifiedCopy}
-            copyText={(text) => void copyText(ctx, text)}
-          />
-        </Suspense>
-      )
-    },
-  })
+      return
+    }
 
-  ctx.add(Slot, {
-    at: "session.header",
-    render: (input) => (
-      <Button
-        type="button"
-        size="small"
-        variant="ghost"
-        aria-label={ctx.t("schema")}
-        title={ctx.t("schema")}
-        disabled={!input.active}
-        onClick={() => open(input.session)}
-      >
-        {input.compact ? "↗" : ctx.t("schema")}
-      </Button>
-    ),
-  })
-
-  ctx.add(Slot, {
-    at: "session.location.menu",
-    render: (input) => (
-      <Show when={ctx.layout.narrow()}>
-        <ctx.ui.MenuItem label={ctx.t("schema")} icon="branch" onSelect={() => open(input.session)} />
-      </Show>
-    ),
-  })
-
-  ctx.add(CodeBlock, {
-    languages: ["loginom-finding"],
-    render(block) {
-      const finding = readFinding(block.code)
-
-      if (!finding || !block.session) return
-
-      return (
-        <div class="flex flex-col items-start gap-2 p-3">
-          <p>{finding.text}</p>
-          <Button
-            type="button"
-            size="small"
-            variant="neutral"
-            onClick={() => {
-              const session = block.session
-
-              if (session) open(session, { finding })
-            }}
-          >
-            {ctx.t("showOnSchema")}
-          </Button>
-        </div>
-      )
-    },
-  })
+    dashboard.dispatch({ type: "link.opened", link })
+    router.openPage("dashboard")
+  }))
 }
 
 export default setup

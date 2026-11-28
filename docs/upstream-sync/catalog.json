@@ -126,12 +126,30 @@
         "packages/gui-plugins/src/browser/panel.fixture.tsx",
         "packages/app/src/shell/routes/routes.tsx", "packages/app/src/shell/state/layout.tsx",
         "packages/app/src/shell/state/layout.test.ts", "packages/app/vite.config.ts",
-        "packages/app/src/runtime/plugin/host-apis.tsx", "packages/plugin/src/gui/host-apis.ts",
+        "packages/plugin/src/gui/host-apis.ts",
         "packages/ui/src/context/dialog.tsx",
         "packages/app/src/runtime/platform/pwa.ts", "packages/app/test-browser/pwa-route.test.ts",
         "packages/app/src/runtime/plugin/pages.tsx",
         "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
       ]
+    },
+    {
+      "id": "CAT-16",
+      "title": "New-session GUI slot (C1.3)",
+      "paths": [
+        "packages/app/src/new-session/composer-adapter.ts", "packages/app/src/new-session/screen.tsx",
+        "packages/app/src/new-session/view.tsx", "packages/app/src/composer/composer.tsx",
+        "packages/app/src/composer/editor/editor.tsx",
+        "packages/app/src/shell/tabs/schema.ts", "packages/app/src/shell/tabs/tabs.test.ts",
+        "packages/app/e2e/regression/new-session.spec.ts",
+        "packages/app/e2e/utils/app-direction.html", "packages/app/e2e/utils/app-direction.fixture.tsx",
+        "packages/app/e2e/utils/direction.ts"
+      ]
+    },
+    {
+      "id": "CAT-17",
+      "title": "Built-in plugin page navigation for dashboard links",
+      "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
     },
     { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },

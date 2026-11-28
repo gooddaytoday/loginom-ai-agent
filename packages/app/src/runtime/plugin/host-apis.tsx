@@ -127,6 +127,7 @@ type Attached = {
   mode: Accessor<"light" | "dark">
   routing: Accessor<boolean>
   path: Accessor<string>
+  page: (plugin: string, id: string) => void
   keybind: (command: string) => readonly string[]
   matches: (command: string, event: KeyboardEvent) => boolean
   servers: Accessor<readonly string[]>
@@ -374,9 +375,10 @@ export function createHostApis() {
       font: () => current()?.font() ?? terminalFontFamily(undefined),
       mode: () => current()?.mode() ?? (systemDark() ? "dark" : "light"),
     }),
-    router: () => ({
+    router: (plugin) => ({
       routing: () => current()?.routing() ?? false,
       path: () => current()?.path() ?? "",
+      openPage: (id) => write((value) => value.page(plugin, id)),
     }),
     keybinds: () => ({
       keybind: (command) => current()?.keybind(command) ?? [],
@@ -1204,6 +1206,7 @@ export function createPluginAttachment(apis: HostApis) {
     font: () => terminalFontFamily(settings.appearance.terminalFont()),
     routing: useIsRouting(),
     path: () => `${location.pathname}${location.search}`,
+    page: (plugin, id) => navigate(`/page/${encodeURIComponent(plugin)}/${encodeURIComponent(id)}`),
     keybind: command.keybindParts,
     matches: command.matches,
     servers: () => global.servers.list().map(ServerConnection.key),
