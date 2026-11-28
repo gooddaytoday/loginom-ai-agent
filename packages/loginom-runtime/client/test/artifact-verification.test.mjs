@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
+import {mkdir,mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
 import {createArtifactStore} from '../lib/artifacts.mjs';
 import {Page,runtime} from './support/executor-fixture.mjs';
 
-async function fixture({submissionFailure=false,name='sales.csv',bytes=Buffer.from('abc'),conflict=false,uncleanUpload=false}={}) {
+async function fixture({submissionFailure=false,name='sales.csv',bytes=Buffer.from('abc'),conflict=false,uncleanUpload=false,browserDownloads=false}={}) {
   const directory=await mkdtemp(join(tmpdir(),'dock-verify-'));
   const sourcePath=join(directory,'source');await writeFile(sourcePath,bytes);
   const store=await createArtifactStore({directory:join(directory,'store')});
@@ -27,15 +27,16 @@ async function fixture({submissionFailure=false,name='sales.csv',bytes=Buffer.fr
     count:async()=>1,isVisible:async()=>true,isEnabled:async()=>true,locator:()=>input} : locator(selector);
   let event;page.downloadBytes=bytes;page.dropReply=false;
   const download={url:()=> 'https://loginom.invalid/download',suggestedFilename:()=>name,failure:async()=>null,cancel:async()=>{},
-    saveAs:async path=>{counts.downloads++;await writeFile(path,page.downloadBytes);}};
+    saveAs:async path=>{counts.downloads++;await page.beforeSave?.();await writeFile(path,page.downloadBytes);}};
   page.waitForEvent=async()=>new Promise(resolve=>{event=resolve;});
   const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);event(download);};
   const stage=store.stageDownload;store.stageDownload=async id=>{
+    if(page.downloadWriteError)throw Object.assign(Error('write failed in '+directory),{code:page.downloadWriteError});
     const lease=await stage(id);return {...lease,verify:async name=>{counts.verifications++;return lease.verify(name);},
       release:async()=>{if(page.failDownloadRelease)throw new Error('cleanup failed');return lease.release();}};
   };
   const events=[];
-  const rt=runtime(page,{artifactStore:store,onRecord:async record=>{
+  const rt=runtime(page,{artifactStore:store,...(browserDownloads?{cacheDirectory:join(directory,'server-cache')}:{}),onRecord:async record=>{
     if(page.failJournalPhase===record.phase){page.failJournalPhase=null;throw new Error('journal unavailable');}
     events.push(record);
   },execute:async code=>{
@@ -55,8 +56,64 @@ async function fixture({submissionFailure=false,name='sales.csv',bytes=Buffer.fr
     const row=await rt.observe();return {operationId:'upload',verificationId:'verify',observationId:row.output.observation_id,
       fileRef:row.output.ui.elements.find(item=>item.tid===tid).ref};
   };
-  return {rt,page,events,counts,request,artifact,cleanup:async()=>{await store.releaseUploads();await rm(directory,{recursive:true,force:true});}};
+  return {rt,page,events,counts,request,artifact,directory,cleanup:async()=>{await store.releaseUploads();await rm(directory,{recursive:true,force:true});}};
 }
+
+test('unwritable browser download storage refuses verification without a gesture or another upload',async t=>{
+ const f=await fixture({browserDownloads:true});t.after(f.cleanup);
+ const downloads=join(f.directory,'d');
+ await writeFile(downloads,'not a directory');
+ const result=await f.rt.verifyArtifact(await f.request());
+ assert.equal(result.error.code,'DOWNLOAD_LOCAL_STORAGE_UNAVAILABLE');
+ assert.match(result.error.message,/local download directory.*unavailable/i);
+ assert.doesNotMatch(result.error.message,/dock-verify-/);
+ assert.equal(result.status,'NOT_APPLIED');
+ assert.deepEqual(f.counts,{uploads:1,downloads:0,verifications:0});
+ assert.equal((await f.rt.inspect({operationId:'upload'})).output.state,'pending');
+ await rm(downloads);await mkdir(downloads);
+ assert.equal((await f.rt.verifyArtifact(await f.request())).status,'SUCCEEDED');
+ assert.deepEqual(f.counts,{uploads:1,downloads:1,verifications:1});
+});
+
+test('quota error creating the verification copy is reported without a path or a download gesture',async t=>{
+ const f=await fixture();t.after(f.cleanup);f.page.downloadWriteError='EDQUOT';
+ const result=await f.rt.verifyArtifact(await f.request());
+ assert.equal(result.error.code,'DOWNLOAD_LOCAL_STORAGE_UNAVAILABLE');
+ assert.match(result.error.message,/quota/i);
+ assert.doesNotMatch(result.error.message,/dock-verify-/);
+ assert.equal(result.status,'NOT_APPLIED');
+ assert.deepEqual(f.counts,{uploads:1,downloads:0,verifications:0});
+});
+
+for(const writable of [true,false])test('a canceled download names local storage only when a write actually fails: '+writable,async t=>{
+ const f=await fixture({browserDownloads:true});t.after(f.cleanup);
+ const downloads=join(f.directory,'d');
+ await mkdir(downloads);
+ f.page.beforeSave=async()=>{
+   if(!writable){await rm(downloads,{recursive:true});await writeFile(downloads,'not a directory');}
+   throw Error('download.saveAs: canceled');
+ };
+ const result=await f.rt.verifyArtifact(await f.request());
+ assert.equal(result.error.code,writable?'DOWNLOAD_BROWSER_CALL_FAILED':'DOWNLOAD_LOCAL_STORAGE_UNAVAILABLE');
+ assert.equal(result.status,'AMBIGUOUS');
+ assert.deepEqual(f.counts,{uploads:1,downloads:1,verifications:0});
+ const inspection=await f.rt.inspect({operationId:'upload'});
+ assert.equal(inspection.output.state,'pending');
+ assert.deepEqual(inspection.output.outcome.output.server_copy_verification.error,writable?undefined:result.error);
+});
+
+test('a lost browser reply retains a proven quota error after verification reconciliation',async t=>{
+ const f=await fixture();t.after(f.cleanup);f.page.dropReply=true;
+ f.page.beforeSave=async()=>{throw Object.assign(Error('Disk quota exceeded in '+f.directory),{code:'EDQUOT'});};
+ assert.equal((await f.rt.verifyArtifact(await f.request())).error.code,'BROWSER_CALL_UNCERTAIN');
+ const inspection=await f.rt.inspect({operationId:'upload'});
+ assert.equal(inspection.output.state,'pending');
+ const failure=inspection.output.outcome.output.server_copy_verification.error;
+ assert.equal(failure.code,'DOWNLOAD_LOCAL_STORAGE_UNAVAILABLE');
+ assert.match(failure.message,/quota/i);
+ assert.doesNotMatch(JSON.stringify(inspection),/dock-verify-/);
+ assert.deepEqual(f.counts,{uploads:1,downloads:1,verifications:0});
+});
 
 for(const content of ['abc','bad','longer'])test('current server bytes settle an owned reject conflict: '+content,async()=>{
  const f=await fixture({conflict:true});

@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import {randomUUID} from 'node:crypto';
 import { openArchive } from './archive.mjs';
 import { diagnoseConnection } from './diagnostics.mjs';
+import { browserDownloadEnvironment } from './browser-launch.mjs';
 import { actionDescribeTool, pinActionCatalog, assertCatalogTarget, validateActionParameters, BUNDLED_CATALOG_RELEASES } from './action-catalog.mjs';
 import { createActionRuntime, parseCapabilityResult } from './executor.mjs';
 import {createCandidateNodeSupport} from './node-support.mjs';
@@ -80,8 +81,8 @@ const diagnosticTool = {
   annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
 };
 
-export function browserProcessEnvironment(browserRoot, { platform = process.platform, environment = process.env } = {}) {
-  const inherited = { ...getDefaultEnvironment(), PLAYWRIGHT_BROWSERS_PATH: browserRoot };
+export function browserProcessEnvironment(browserRoot, { platform = process.platform, environment = process.env, profile } = {}) {
+  const inherited = { ...getDefaultEnvironment(), PLAYWRIGHT_BROWSERS_PATH: browserRoot, ...browserDownloadEnvironment(profile, platform) };
   // Linux needs the display connection, Chromium backend selection and desktop
   // identity. Browser launch arguments independently disable proxy discovery. Other
   // platforms retain the SDK environment and pinned browser path unchanged.
@@ -131,7 +132,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   const browserTransport = managedBrowserTransport ?? new StdioClientTransport({
     command: process.execPath,
     args: [session.browserCli, '--config', session.browserConfig],
-    env: browserProcessEnvironment(session.browserRoot),
+    env: browserProcessEnvironment(session.browserRoot, { profile: session.metadata.profile }),
     cwd: session.directory, stderr: 'pipe',
   });
   // The pinned SDK emits transport.onclose from the child-process 'close'

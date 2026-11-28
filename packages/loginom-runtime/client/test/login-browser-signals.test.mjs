@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {loginBrowser} from '../../src/connection-check.mjs';
+import {browserDownloadEnvironment} from '../lib/browser-launch.mjs';
 import {connectionTimelineScript} from '../lib/connection-recovery.mjs';
 
 for(const keepOpen of [true,false])test('browser signal ownership follows keepOpen='+keepOpen,async()=>{
@@ -10,7 +11,7 @@ for(const keepOpen of [true,false])test('browser signal ownership follows keepOp
  const run=vm.runInNewContext('('+loginBrowser.toString()+')',{
   require:()=>({chromium:{launchPersistentContext:async(_path,options)=>{launched=options;return context;}}}),
   browserLaunch:()=>({args:[],viewport:{width:1280,height:800}}),prepareBrowserProfile:async()=>{},
-  browserEnvironment:()=>({}),browserLoggingArguments:()=>[],browserDownloadScript:()=>'',connectionTimelineScript,
+  browserEnvironment:()=>({}),browserLoggingArguments:()=>[],browserDownloadScript:()=>'',browserDownloadEnvironment,connectionTimelineScript,
   setTimeout,clearTimeout,performance,loginPage:async()=>({authenticated:true}),process:{platform:'linux',env:{}},
  });
  const result=await run({browserPath:'/own/chromium',profile:'/own/profile',candidate:{url:'https://loginom.invalid'},headless:true,keepOpen,onRetry:async()=>{}});

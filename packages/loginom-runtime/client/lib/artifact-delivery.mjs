@@ -3,9 +3,13 @@ import {findNativeStorageRow} from './text-export-output.mjs';
 import {createHash} from 'node:crypto';
 import {referenceUploadBudget} from './file-reference.mjs';
 import {operationFailureDiagnostic} from './browser-failure.mjs';
+import {DOWNLOAD_LOCAL_STORAGE_UNAVAILABLE} from './browser-downloads.mjs';
 const requireValue=(value,message)=>{if(!value)throw Error(message);};
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const one=(values,message)=>{requireValue(values.length===1,message);return values[0];};
+const requireDownloadStorage=error=>{
+ if(error?.code===DOWNLOAD_LOCAL_STORAGE_UNAVAILABLE)throw Object.assign(Error(error.message),{code:error.code});
+};
 // Mirrors the executor's terminal answer for this upload state (LAB-2054).
 const UPLOAD_CLEANUP_BLOCKER='The original upload browser cleanup is unconfirmed; uploads cannot be restored or abandoned. '
  +'Do not resume, deliver, upload or download it again; report it as a blocker.';
@@ -156,6 +160,7 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
       verification_started:job.verificationStarted===true,deadline_at:job.deadline});
     inspected=await runtime.inspect({operationId:job.uploadId});
     await acknowledge(job,'artifact_delivery_resume_inspected',{resume_id:resumeId,inspection:inspected});
+    requireDownloadStorage(inspected.output?.outcome?.output?.server_copy_verification?.error);
     // Only the executor's settled verification without confirmed cleanup is
     // terminal (LAB-2054); a lost verification reply may still reconcile.
     job.uploadCleanupBlocked=cleanupBlocked(inspected);
@@ -329,13 +334,15 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
      };
     }}:{})});
    if(job.conflictRejected&&verification.status!=='SUCCEEDED'&&verification.cleanup_complete===true)job.verificationState='settled';
-   const lostVerification=!duringShutdown&&verification.error?.code==='BROWSER_CALL_UNCERTAIN';
+    requireDownloadStorage(verification.error);
+    const lostVerification=!duringShutdown&&verification.error?.code==='BROWSER_CALL_UNCERTAIN';
    requireValue(lostVerification||verification.status==='SUCCEEDED'&&verification.cleanup_complete===true&&verification.output?.bytes_verified===true,'Destination bytes require inspection');
    if(duringShutdown)return snapshot(job);
    // Verification owns its dispatched work through cleanup. Cancellation or
    // deadline expiry cannot discard its committed proof; only inspect it here.
    const final=await runtime.inspect({operationId:job.uploadId});
    if(lostVerification)await acknowledge(job,'artifact_delivery_verification_reconciled',{inspection:final});
+   requireDownloadStorage(final.output?.outcome?.output?.server_copy_verification?.error);
    await finish(job,artifact,final);
   } catch(error) {
    if(duringShutdown&&job.shutdownAuditPending)return snapshot(job);
@@ -385,7 +392,7 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     ? {code:'ARTIFACT_DESTINATION_UNAVAILABLE',message:String(error.message).slice(0,1000),
       artifact_id:artifact.artifact_id,input_artifact_admitted:true,directory:artifact.upload.directory,
       storage_entry:error.storage_entry,recovery:'Check the selected input directory and the signed-in Loginom account. The attachment was received; do not ask to attach it again.'}
-    : {code:error.code==='ARTIFACT_VERIFICATION_UNSUPPORTED'?error.code:'ARTIFACT_DELIVERY_INCOMPLETE',
+    : {code:['ARTIFACT_VERIFICATION_UNSUPPORTED',DOWNLOAD_LOCAL_STORAGE_UNAVAILABLE].includes(error.code)?error.code:'ARTIFACT_DELIVERY_INCOMPLETE',
       message:String(error.message).slice(0,1000),...(error.code!=null?{cause_code:String(error.code)}:{})};
    // Known navigation effects remain recorded, but an undelivered attachment
    // with no unknown child is a settled refusal, not an ambiguous transfer.

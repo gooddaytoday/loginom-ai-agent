@@ -457,6 +457,8 @@ for(const scenario of ['opened-clean','opened-read-only','opened-dirty','opened-
 
 for(const fault of ['cancelled','unknown','wrong-bytes','changed-mtime','late-hash','late-ack','stalled-ack','stalled-terminal','terminal-error','stalled-close-audit'])test('CLI shutdown after pending upload verification: '+fault,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-upload-'));
+  // A real session creates its private browser download directory (`session.mjs`).
+  await mkdir(join(directory,'d'),{recursive:true,mode:0o700});
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
   const f=current={scenario:'opened-clean',events:[],saves:0,path,catalog};
   const store=await createArtifactStore({directory:join(directory,'input')});

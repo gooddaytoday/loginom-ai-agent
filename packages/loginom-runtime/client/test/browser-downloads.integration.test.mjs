@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
+import {watch} from 'node:fs';
 import {mkdtemp, readFile, writeFile, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
@@ -9,6 +10,7 @@ import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {createConnection} from '@playwright/mcp';
 import {createSession} from '../lib/session.mjs';
+import {prepareBrowserProfile} from '../lib/browser-launch.mjs';
 import {loginBrowser} from '../../src/connection-check.mjs';
 import {browserProcessEnvironment} from '../lib/bridge.mjs';
 import {browserServerDownloadProgress} from '../lib/executor.mjs';
@@ -148,11 +150,12 @@ for (const owner of ['mcp', 'managed']) {
         await handles.server.connect(remote);
         await client.connect(local);
       } else {
+        await prepareBrowserProfile(config.browser.userDataDir, config.browser.launchOptions.downloadsPath);
         // Match the product's MCP-owned CLI path. The upstream in-process API
         // does not own browser disposal; managed callers close their context.
         handles.transport = new StdioClientTransport({command:process.execPath,
           args:[session.browserCli, '--config', session.browserConfig],
-          env:browserProcessEnvironment(session.browserRoot), cwd:session.directory, stderr:'pipe'});
+          env:browserProcessEnvironment(session.browserRoot,{profile:config.browser.userDataDir}), cwd:session.directory, stderr:'pipe'});
         handles.transport.stderr?.on('data', () => {});
         handles.transport.onclose = () => { handles.transportClosed = true; };
         await client.connect(handles.transport);
@@ -173,6 +176,8 @@ for (const owner of ['mcp', 'managed']) {
       const geometry=await code('async page => ({viewport:page.viewportSize(),dpr:await page.evaluate(()=>devicePixelRatio)})');
       assert.equal(geometry.dpr,1,'agent browser normalizes OS scale at default page zoom');
       assert.deepEqual(geometry.viewport,headless?{width:1280,height:800}:null);
+      const browserWrites=new Set();
+      if(process.platform==='linux')handles.downloadWatcher=watch(config.browser.launchOptions.downloadsPath, (_event, name)=>browserWrites.add(name));
       const downloaded = await code(`async page => {
         const started = Date.now();
         const events = [];
@@ -212,6 +217,9 @@ for (const owner of ['mcp', 'managed']) {
       assert.ok(downloaded.listeners > 0);
       assert.equal(downloaded.uploaded, 'value\n42\n');
       assert.equal(await readFile(join(session.metadata.artifacts, 'sales.csv'), 'utf8'), 'group;qty\nA;1\n');
+      if(process.platform==='linux')
+        assert.ok([...browserWrites].some(name=>name?.startsWith('.org.chromium.Chromium.')),
+          'Chromium must start the download in the private directory, before the .crdownload rename');
       // The same real Download is also saved by pinned MCP's automatic handler.
       // Exercise a failing destination while a second consumer still succeeds.
       for(const failFirst of [false,true]){
@@ -255,6 +263,7 @@ for (const owner of ['mcp', 'managed']) {
       assert.equal(uploaded.isError ?? false, false, JSON.stringify(uploaded));
       assert.equal(await code('async page => await page.locator("#chooser").evaluate(async input => await input.files[0].text())'), 'group;qty\nA;1\n');
     } finally {
+      handles.downloadWatcher?.close();
       try {
         if (handles.connected) {
           const closed = await client.callTool({name:'browser_close', arguments:{}}, undefined, {timeout:15000});

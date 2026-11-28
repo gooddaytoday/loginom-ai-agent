@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-export async function prepareBrowserProfile(profile) {
+export async function prepareBrowserProfile(profile, downloadsPath) {
   const directory = join(profile, 'Default');
   const path = join(directory, 'Preferences');
   await mkdir(directory, { recursive: true, mode: 0o700 });
@@ -14,7 +14,19 @@ export async function prepareBrowserProfile(profile) {
   preferences.credentials_enable_service = false;
   preferences.credentials_enable_autosignin = false;
   preferences.autofill = { ...preferences.autofill, profile_enabled: false, credit_card_enabled: false };
+  if (downloadsPath) {
+    await mkdir(downloadsPath, { recursive: true, mode: 0o700 });
+    if (process.platform === 'linux' && !/[\r\n]/.test(downloadsPath)) {
+      const config = browserDownloadEnvironment(profile).XDG_CONFIG_HOME;
+      await mkdir(config, { recursive: true, mode: 0o700 });
+      await writeFile(join(config, 'user-dirs.dirs'), `XDG_DOWNLOAD_DIR="${downloadsPath.replace(/["\\$`]/g, '\\$&')}"\n`, { mode: 0o600 });
+    }
+  }
   await writeFile(path, JSON.stringify(preferences), { mode: 0o600 });
+}
+
+export function browserDownloadEnvironment(profile, platform = process.platform) {
+  return profile && platform === 'linux' ? { XDG_CONFIG_HOME: join(profile, 'xdg') } : {};
 }
 
 // DOM coordinates remain CSS pixels. This policy removes OS DPI variation,

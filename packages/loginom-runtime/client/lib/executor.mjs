@@ -1,6 +1,6 @@
 import {browserFailureCategory,browserFailureDetails,operationFailureDiagnostic,downloadFailureDiagnostic} from './browser-failure.mjs';
 import {createRedactor} from './redact.mjs';
-import {browserDownloadsPath} from './browser-downloads.mjs';
+import {browserDownloadsPath,checkDownloadStorage,downloadStorageFailure,DOWNLOAD_LOCAL_STORAGE_UNAVAILABLE} from './browser-downloads.mjs';
 import {journalCopy} from './execution-journal.mjs';
 import {readSavedPackageState} from './package-persistence.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,requireServerDownloadFormat,serverDownloadTools,storageListPattern,listStorageDirectory,readStorageDestination} from './storage-policy.mjs';
@@ -17,7 +17,7 @@ import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.m
 import { NODE_ADD_ONLY_MODE, validateNodeTargetRequest } from './node-contracts.mjs';
 import { describeNodeTypes } from './node-contracts.mjs';
 import { randomUUID, createHash } from 'node:crypto';
-import {join} from 'node:path';
+import {dirname,join} from 'node:path';
 import { requireCapability } from './capability-registry.mjs';
 import { actionDescribeTool, actionRunTool, assertActionOutcome, validateActionParameters } from './action-catalog.mjs';
 import { makeWorkspaceUiCode, validateUiAction, uiActionSchema } from './workspace-ui.mjs';
@@ -350,6 +350,7 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
         received_bytes:Number.isSafeInteger(bytes)?bytes:null,chunks:blobs.length};
     },{origin:task.expected_origin,destination:destination.destination,name:task.artifact.name});}catch{}
     return {operation_id:task.operation_id,...causes[0],causes,
+      ...(browserStep==='download.saveAs'&&typeof error?.code==='string'?{save_error_code:error.code}:{}),
       failure_state:failure.state,download_failure:failure.value??null,
       cancelled:/cancel|abort/i.test(failure.value??'')||causes.some(c=>/cancel|abort/i.test(c.message)),
       received_bytes:progress?.bytes??native.received_bytes??null,native_receipt:native};
@@ -2204,6 +2205,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, getPreparationReceipt = () => null,
   browserRecovery = false, probePreparedPage, reopenNodePackage, cacheDirectory, serverSourceCache = true }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
+  const downloadDirectory=cacheDirectory&&browserDownloadsPath(dirname(cacheDirectory));
   const executeBrowser=execute;
   execute=async(...args)=>{
     let result;
@@ -2221,6 +2223,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(!value||typeof value!=='object')return;
       if((value.event==='download_browser_failure'||value.reason==='save_failed')&&Object.hasOwn(value,'private_download')){
         const cause=value.private_download;delete value.private_download;
+        const storageFailure=downloadStorageFailure({code:cause?.save_error_code});
+        if(storageFailure)value.storage_failure=storageFailure;
         diagnostics.push({phase:'download_browser_diagnostic',operation_id:cause?.operation_id,step:value.step,
           cause:downloadFailureDiagnostic(cause,redactor)});
       }
@@ -2295,7 +2299,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(!file)throw Error('LOGINOM_FILE_CHANGED');
       const options={operation_id,snapshot,file_ref:file.ref,artifact:{name:source.destination.slice(source.destination.lastIndexOf('/')+1)},
         server_source_binding:{...source,directory:source.destination.slice(0,source.destination.lastIndexOf('/'))},
-        download_path:path,browser_downloads_path:browserDownloadsPath(join(cacheDirectory,'..')),
+        download_path:path,browser_downloads_path:downloadDirectory,
         deadline_at:deadline,expected_origin:targetOrigin,expected_build:targetBuild};
       signal.throwIfAborted();
       const code=makeServerSourceDownloadCode(options);
@@ -2500,6 +2504,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }
     const artifact=operation.checkpoint.artifact;
     let outcome=attempt.byteOutcome ?? {...structuredClone(raw),action_key:'artifact.verify'};
+    if(!attempt.byteOutcome&&raw.error?.code==='DOWNLOAD_BROWSER_CALL_FAILED') {
+      const transfer=raw.trace.find(entry=>entry.event==='download_browser_failure'&&entry.step==='download.saveAs');
+      if(transfer){
+        const failure=transfer.storage_failure
+          ?? (downloadDirectory&&await checkDownloadStorage(downloadDirectory).catch(()=>null))
+          ?? await checkDownloadStorage(dirname(attempt.lease.path)).catch(()=>null);
+        if(failure)outcome.error=failure;
+      }
+    }
     if(!attempt.byteOutcome && raw.status==='SUCCEEDED') {
       const expected={artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,
         upload_operation_id:operation.id,destination:artifact.upload.destination,suggested_name:artifact.name,
@@ -2583,6 +2596,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     operation.transportUncertain=false;operation.cleanupConfirmed=raw.cleanup_complete===true;
     operation.outcome.output.server_copy_verification={verification_id:attempt.id,status:outcome.status,
       bytes_verified:outcome.output.bytes_verified===true,upload_completion_verified:false,
+      ...(outcome.error?.code===DOWNLOAD_LOCAL_STORAGE_UNAVAILABLE?{error:outcome.error}:{}),
       ...(outcome.output.bytes_verified ? {destination:artifact.upload.destination,bytes:artifact.bytes,sha256:artifact.sha256} : {})};
     if(!attempt.checkpoint.existing_file_check&&raw.status==='NOT_APPLIED' && raw.cleanup_complete===true)await attempt.lease.release();
     return outcome;
@@ -4391,11 +4405,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       running=true;
       try {
         if(duringShutdown){await operation.verification.lease.release();signal?.throwIfAborted();}
-        const lease=await artifactStore.stageDownload(operation.parameters.artifact_id);
-        const attempt={id:verificationId,signature,lease,...(duringShutdown?{acknowledgeShutdown,shutdownSignal:signal}:{}),action:{action_key:'artifact.verify',revision:'1',capability:'artifact.verify'},
+        const attempt={id:verificationId,signature,...(duringShutdown?{acknowledgeShutdown,shutdownSignal:signal}:{}),action:{action_key:'artifact.verify',revision:'1',capability:'artifact.verify'},
           parameters:{upload_operation_id:operationId,observation_id:observationId,file_ref:fileRef},checkpoint:{artifact:options.artifact,
             ...(existingFile?{existing_file_check:true}:{}),
-            ...(discover?{discovery:{workflow_ref:snapshot.workflow_ref,document:snapshot.dom_epoch.document,active_tab_ref:snapshot.active_tab_ref}}:{})},deadline:shutdownDeadline??now()+60000};
+            ...(discover?{discovery:{workflow_ref:snapshot.workflow_ref,document:snapshot.dom_epoch.document,active_tab_ref:snapshot.active_tab_ref}}:{})}};
+        const refuse=failure=>({...failed(attempt,failure.code,failure.message,'NOT_APPLIED'),phase:'preconditions',cleanup_complete:true});
+        const storageFailure=downloadDirectory&&await checkDownloadStorage(downloadDirectory);
+        if(storageFailure)return refuse(storageFailure);
+        signal?.throwIfAborted();
+        let lease;
+        try{lease=await artifactStore.stageDownload(operation.parameters.artifact_id);}
+        catch(error){const failure=downloadStorageFailure(error);if(failure)return refuse(failure);throw error;}
+        Object.assign(attempt,{lease,deadline:shutdownDeadline??now()+60000});
         try {signal?.throwIfAborted();await remember(attempt,'download_prepared');signal?.throwIfAborted();
           if(duringShutdown&&now()>=attempt.deadline)throw Error('Artifact verification deadline elapsed');}
         catch(error){await lease.release();throw error;}
