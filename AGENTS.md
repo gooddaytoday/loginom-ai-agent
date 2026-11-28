@@ -218,11 +218,13 @@ const table = sqliteTable("session", {
 - Each step is one explicit `llm.stream` call that continues from reloaded history. Do not add an in-memory tool loop.
 - Keep local Session drains process-local until clustering is implemented. `SessionRunCoordinator` joins explicit same-Session resumes, coalesces prompt wakeups, and allows different Sessions to run concurrently. A write-ahead execution claim marks a process-local busy period for restart recovery: terminal completion, failure, or user interruption releases it, while shutdown interruption and process death preserve it. Startup recovery resumes claimed Sessions with durable per-execution attempt accounting. Running subagent Jobs own recovery of the children they represent. The claim is a recovery marker, not clustered ownership, fencing, or an exactly-once guarantee.
 - Keep delivery vocabulary explicit. Prompts steer by default. At safe step boundaries, steered compaction takes priority up to the first steered move control; other steers retain enqueue order. At an idle boundary, steers take priority; otherwise exactly one queued item delivers before the runner reevaluates continuation. Inbox items may be cancelled or changed between queue and steer before delivery. Promoting new user input resets the selected agent's step allowance; a batch of steers resets it once.
+- A `queue` prompt admitted during an active turn waits for that turn to succeed. Failure or stop leaves undelivered rows in the inbox for a later wake. A `queue` prompt admitted after a stop is accepted wakes a new turn once cleanup finishes. On restart, recovery delivers the original input if the claim had not crossed its first delivery or model step. Otherwise it continues the claimed turn before promoting queued prompts.
 - One step is one logical LLM call; its durable record covers only the model-visible span. Do not write "provider turn", and do not use bare "turn" for a single call: "turn" is reserved for the future assistant-turn unit containing all steps from prompt promotion until the session would go idle.
 - Keep event replay ownership separate from clustered Session execution ownership.
 
 ## Loginom AI Agent: module map and current state
 
+- Product goal (owner decision 2026-11-25): stepwise building — the analyst builds the scenario piece by piece with manual edits in between, the agent does exactly the requested step, self-checks by running it and saves only on request, without weakening fail-closed protection. See [intent](docs/intent/stepwise-building.md).
 - In `loginom-cli`, implement the [standalone CLI design](docs/superpowers/specs/2026-09-17-loginom-cli-standalone-design.md), starting from `c37913ab5`. Desktop and CLI own independent profiles. On OpenCode 2 each product and profile runs its own background service with seam U5 (В-79, catalog CAT-13): its own registration file `service-<identity>.json` and an explicit port; a client finds only the service registered under its own identity. The service must stop with the application (В-87; v2.3.0 does not yet, B2.3b and B4 add it). The earlier shared-service CLI design is historical; do not introduce a service shared by Desktop and CLI, client leases, or Desktop profile migration.
 - Standalone executable: `loginom-ai-agent-cli`; keep the GUI launcher `loginom-ai-agent`. Track implementation and checks in the design's progress section and [standalone runbook](docs/testing/loginom-ai-agent/standalone-cli.md).
 
@@ -231,6 +233,7 @@ const table = sqliteTable("session", {
 - [Connection generations, credentials and recovery](packages/desktop/src/main/loginom/AGENTS.md)
 - [Runtime host and attachment admission](packages/loginom-host/AGENTS.md)
 - [Migrated Loginom client and browser runtime](packages/loginom-runtime/AGENTS.md)
+- The byte-exact 0.4.3 runtime guide refers to a v1 provider transform. In v2 use [provider schema utilities](packages/ai/src/protocols/utils/tool-schema.ts); the v1 structured-enum adapter is not ported (CAT-07). Do not weaken runtime action validation.
 - [Application settings and onboarding](packages/app/AGENTS.md)
 - [Shared UI and new-chat branding](packages/ui/AGENTS.md)
 - [Product plugin of the server: Loginom tools, dashboards, skills, permissions](packages/loginom-agent/AGENTS.md)

@@ -17,7 +17,7 @@ import { useSettings } from "@/settings/model"
 import { WindowsAppMenu } from "./windows-menu"
 import { createTitlebarHistory } from "./history"
 import { TitlebarTabStrip } from "@/shell/titlebar/tab-strip"
-import { macVerticalTrafficLights, SidebarToggle } from "@/shell/sidebar-toggle"
+import { macVerticalTrafficLights, SidebarSearchButton, SidebarToggle } from "@/shell/sidebar-toggle"
 import { SidebarInbox } from "@/shell/titlebar/inbox"
 import { SidebarCustomized, type SidebarStripGrouping } from "@/shell/titlebar/sidebar-customized"
 import { SidebarOrganized } from "@/shell/titlebar/sidebar-organized"
@@ -38,6 +38,7 @@ import { ActivityRing } from "@opencode/ui/activity-ring"
 import { RecentlyClosedTabsMenu } from "./recently-closed-tabs-menu"
 import { useSettingsDialog } from "@/settings/command"
 import { TitlebarItems, useTitlebarItems } from "@/runtime/plugin/titlebar-items"
+import { PluginPageNav, useActivePluginPage } from "@/runtime/plugin/pages"
 import { createRouteTabSync } from "./route-sync"
 import {
   INITIAL_MOBILE_TABS_STATE,
@@ -71,7 +72,7 @@ const macTrafficLightsTopClearance = 28
 // titlebar row stays 16px clear of it, as ChatGPT's phone header does. Without one, 8px matches the content gap below.
 const mobileTopClearance = "max(8px, min(16px, env(safe-area-inset-top, 0px) * 1000))"
 
-export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
+export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: number } }) {
   const platform = usePlatform()
   const command = useCommand()
   const language = useLanguage()
@@ -144,7 +145,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
 
   const titlebarItems = useTitlebarItems()
   const hideVerticalTitlebar = createMemo(() => !!props.verticalTabs && !windows())
-  const homeInSidebarHeader = () => !windows() && !macTrafficLights()
+  const homeInSidebarHeader = () => !windows() && !macTrafficLights() && (props.verticalTabs?.width ?? 0) >= 180
 
   command.register(() => [
     {
@@ -222,6 +223,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
             const preparing = routeSync.preparing
             const session = routeSync.session
             const currentTab = routeSync.currentTab
+            const pluginPage = useActivePluginPage()
 
             makeEventListener(window, SESSION_TABS_REMOVED_EVENT, (event) => {
               const detail = readSessionTabsRemovedDetail(event)
@@ -279,6 +281,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                 case "settings":
                 case "connect":
                 case "components":
+                case "page":
                 case "home": {
                   const selection = layout.home.selection()
 
@@ -383,48 +386,6 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
               </Show>
             )
 
-            const searchButton = (vertical = false) => (
-              <Show
-                when={vertical}
-                fallback={
-                  <Tooltip
-                    placement="bottom"
-                    value={
-                      <>
-                        {language.t("command.session.search")}
-                        <Keybind keys={command.keybindParts("sessions.search")} variant="neutral" />
-                      </>
-                    }
-                    class="shrink-0"
-                  >
-                    <IconButton
-                      type="button"
-                      variant="ghost-muted"
-                      size="large"
-                      class="!w-9 shrink-0"
-                      icon={<Icon name="magnifying-glass" />}
-                      onClick={() => command.trigger("sessions.search")}
-                      aria-label={language.t("command.session.search")}
-                    />
-                  </Tooltip>
-                }
-              >
-                <button
-                  type="button"
-                  data-titlebar-tab-action
-                  data-action="vertical-tabs-search"
-                  class="group flex h-7 w-full shrink-0 items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-faint hover:text-v2-text-text-base"
-                  onClick={() => command.trigger("sessions.search")}
-                >
-                  <Icon name="magnifying-glass" class="shrink-0" />
-                  <span class="min-w-0 truncate">{language.t("command.session.search")}</span>
-                  <div class="ms-auto hidden shrink-0 group-hover:block group-focus-visible:block" aria-hidden="true">
-                    <Keybind keys={command.keybindParts("sessions.search")} variant="neutral" dir="ltr" />
-                  </div>
-                </button>
-              </Show>
-            )
-
             command.register("titlebar-home", () => [
               {
                 id: "home.toggle",
@@ -439,9 +400,9 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
               },
               {
                 id: "sessions.search",
-                title: language.t("command.session.search"),
+                title: language.t("sidebar.search"),
                 category: language.t("command.category.session"),
-                keybind: "mod+shift+f",
+                keybind: "mod+k,mod+shift+f",
                 onSelect: async () => {
                   const { DialogSessionSearch } = await import("@/shell/commands/session-search")
                   void dialog.show(() => <DialogSessionSearch />)
@@ -551,6 +512,9 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
             })
 
             const currentTitle = () => {
+              if (layout.route().type === "page")
+                return pluginPage()?.value.title ?? language.t("plugin.page.unavailable")
+
               const tab = currentTab()
 
               if (!tab) return language.t("home.title")
@@ -573,8 +537,9 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
             return (
               <div
                 ref={titlebarRow}
-                class="h-full flex-1 overflow-hidden flex flex-row items-center gap-1.5 px-2 md:pe-3"
+                class="h-full flex-1 flex flex-row items-center gap-1.5 px-2 md:pe-3"
                 classList={{
+                  "overflow-hidden": !windows() || !props.verticalTabs,
                   "pt-[max(0px,calc(8px-env(safe-area-inset-top,0px)))]": !bottom() && !windows() && !mobileTop(),
                   "pb-[max(0px,calc(8px-var(--shell-safe-area-bottom,var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))))]":
                     bottom(),
@@ -588,14 +553,22 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                   <WindowsAppMenu command={command} platform={platform} />
                 </Show>
                 <Show when={windows() && props.verticalTabs}>
-                  <SidebarToggle />
+                  <div class="relative flex shrink-0 items-center">
+                    <div classList={{ "absolute z-40 start-0 top-full mt-1": !settings.appearance.sidebarOpen() }}>
+                      <SidebarSearchButton />
+                    </div>
+                    <SidebarToggle />
+                  </div>
                 </Show>
                 <Show when={!mobile() && !props.verticalTabs}>
                   {/* Pulls the first tab's avatar 10px from Search, past the row gap plus the tab's own inset. */}
                   <div class="-me-0.5 flex shrink-0 items-center gap-0.5">
                     {homeButton()}
-                    {searchButton()}
+                    <SidebarSearchButton />
                   </div>
+                </Show>
+                <Show when={mobile()}>
+                  <SidebarSearchButton />
                 </Show>
 
                 <Show
@@ -683,6 +656,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                             {language.t("command.session.new")}
                           </button>
                           <div class="flex shrink-0 flex-col gap-1 border-t border-v2-border-border-muted pt-2">
+                            <PluginPageNav onNavigate={closeMobileTabs} />
                             <button
                               type="button"
                               data-action="mobile-tabs-home"
@@ -730,6 +704,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                     when={props.verticalTabs}
                     fallback={
                       <>
+                        <PluginPageNav horizontal />
                         <TitlebarTabStrip
                           tabs={tabsStore}
                           currentTab={currentTab()}
@@ -795,18 +770,19 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                                 <Show when={homeInSidebarHeader()} fallback={<div class="flex-1" />}>
                                   <div class="min-w-0 flex-1">{homeButton(true)}</div>
                                 </Show>
+                                <SidebarSearchButton />
                                 <SidebarToggle handoff="out" />
                               </div>
                             </Show>
                             <div class="flex w-full shrink-0 flex-col gap-[3px]">
                               <Show when={!homeInSidebarHeader()}>{homeButton(true)}</Show>
-                              {searchButton(true)}
                               <RecentlyClosedTabsMenu
                                 vertical
                                 onNewTab={openNewTab}
                                 keybind={command.keybindParts("tab.new")}
                               />
                             </div>
+                            <PluginPageNav />
                             <div class="h-4 w-full shrink-0" aria-hidden="true" />
                             <div class="flex min-h-0 flex-1 flex-col gap-1">
                               <Switch fallback={verticalTabStrip()}>

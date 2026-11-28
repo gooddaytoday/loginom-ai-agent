@@ -55,7 +55,7 @@ import { terminalFontFamily, useSettings } from "@/settings/model"
 import { useSettingsSurface } from "@/settings/surface"
 import { formatKeybindParts, useCommand } from "@/shell/commands/command"
 import { createMediaQuery } from "@solid-primitives/media"
-import { useIsRouting, useLocation } from "@solidjs/router"
+import { useIsRouting, useLocation, useNavigate } from "@solidjs/router"
 import { useLanguage } from "@/runtime/i18n/language"
 import {
   createHostApiAttachState,
@@ -119,6 +119,7 @@ type Attached = {
   mode: Accessor<"light" | "dark">
   routing: Accessor<boolean>
   path: Accessor<string>
+  page: (plugin: string, id: string) => void
   keybind: (command: string) => readonly string[]
   matches: (command: string, event: KeyboardEvent) => boolean
   servers: Accessor<readonly string[]>
@@ -366,9 +367,10 @@ export function createHostApis() {
       font: () => current()?.font() ?? terminalFontFamily(undefined),
       mode: () => current()?.mode() ?? (systemDark() ? "dark" : "light"),
     }),
-    router: () => ({
+    router: (plugin) => ({
       routing: () => current()?.routing() ?? false,
       path: () => current()?.path() ?? "",
+      openPage: (id) => write((value) => value.page(plugin, id)),
     }),
     keybinds: () => ({
       keybind: (command) => current()?.keybind(command) ?? [],
@@ -523,6 +525,7 @@ export function createPluginAttachment(apis: HostApis) {
   const host = usePluginHost()
   const command = useCommand()
   const location = useLocation()
+  const navigate = useNavigate()
   const platform = usePlatform()
   const theme = useTheme()
   const menu = createSessionPanelMenu()
@@ -965,6 +968,20 @@ export function createPluginAttachment(apis: HostApis) {
 
   const listedServer = (id: string) => servers.list.find((conn) => ServerConnection.key(conn) === id)
 
+  const pickProjectDraft = (server: ServerConnection.Any, title?: string, prompt?: string) =>
+    picker({
+      server,
+      title,
+      onSelect: (value) => {
+        const directory = Array.isArray(value) ? value[0] : value
+
+        if (!directory) return
+        const key = ServerConnection.key(server)
+        void global.serverCtx(key)?.projects.add(directory)
+        void tabs.newDraft({ server: key, directory }, prompt)
+      },
+    })
+
   const dispatchProject = (event: ProjectRequestEvent) => {
     const next = transitionProjectRequest(untrack(projectState), event)
 
@@ -980,20 +997,7 @@ export function createPluginAttachment(apis: HostApis) {
       const server = untrack(() => listedServer(effect.server))
 
       if (!server) return
-      untrack(() =>
-        picker({
-          server,
-          title: effect.title,
-          onSelect: (value) => {
-            const directory = Array.isArray(value) ? value[0] : value
-
-            if (!directory) return
-            const key = ServerConnection.key(server)
-            void global.serverCtx(key)?.projects.add(directory)
-            void tabs.newDraft({ server: key, directory })
-          },
-        }),
-      )
+      untrack(() => pickProjectDraft(server, effect.title))
     })
   }
 
@@ -1165,14 +1169,30 @@ export function createPluginAttachment(apis: HostApis) {
     project: (server, title) =>
       dispatchProject({ type: "request", server, title, listed: !!untrack(() => listedServer(server)) }),
     draft: (input) => {
-      const server = servers.list.find((conn) => ServerConnection.key(conn) === input.server)
+      const selection = layout.home.selection()
 
-      if (server) void tabs.newDraft({ server: ServerConnection.key(server), directory: input.directory }, input.prompt)
+      const server = input.server
+        ? listedServer(input.server)
+        : ((selection.server && listedServer(selection.server)) || servers.visible[0])
+
+      if (!server) return
+      const key = ServerConnection.key(server)
+
+      const selected =
+        key === selection.server
+          ? global.serverCtx(key)?.projects.used().find((project) => project.worktree === selection.directory)
+          : undefined
+
+      const directory = input.directory ?? selected?.worktree
+
+      if (directory) return void tabs.newDraft({ server: key, directory }, input.prompt)
+      pickProjectDraft(server, undefined, input.prompt)
     },
     command: (id) => void run(id),
     font: () => terminalFontFamily(settings.appearance.terminalFont()),
     routing: useIsRouting(),
     path: () => `${location.pathname}${location.search}`,
+    page: (plugin, id) => navigate(`/page/${encodeURIComponent(plugin)}/${encodeURIComponent(id)}`),
     keybind: command.keybindParts,
     matches: command.matches,
     servers: () => global.servers.list().map(ServerConnection.key),

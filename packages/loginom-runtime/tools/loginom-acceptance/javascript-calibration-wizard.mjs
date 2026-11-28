@@ -1,4 +1,3 @@
-/* oxlint-disable no-restricted-globals -- Genuine reflection: these serialized page probes count own string and symbol keys of native Loginom objects. */
 // Serialized page capability: never invoke exception getters, formatters or RPC.
 // Storage fields are evidenced by WizardForm, BG_Exceptions and mscorlib.
 export function beginCalibrationWizard({id,stage,identity,deadline}){

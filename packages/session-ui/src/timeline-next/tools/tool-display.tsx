@@ -1,7 +1,8 @@
+import { ToolGroupRow } from "../../components/tool-group-row"
+import { toolGroupSummary } from "../../message/tool-group"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { createMemo, Match, Show, Switch, type Component } from "solid-js"
 import { Dynamic } from "solid-js/web"
-import { GenericTool } from "../../components/basic-tool"
 import { useData } from "../../context"
 import { stoppedShell } from "../../tools/run-machine"
 import {
@@ -10,7 +11,7 @@ import {
   toolErrorSubtitle,
   toolInput,
   toolMetadata,
-  ToolRegistry,
+  useToolDisplayRenderer,
   type ToolProps,
 } from "../../tools/tool-renderer"
 import { ErrorCard } from "./error-card"
@@ -57,18 +58,35 @@ export function ToolDisplay(props: ToolProps & { id: string; error?: string; sto
   const errorSubtitle = createMemo(() => toolErrorSubtitle(props, i18n))
   const error = createMemo(() => toolDisplayError(props))
   const stopped = createMemo(() => stoppedShell({ ...props, metadata: toolMetadata(props.metadata) }))
-  const render = createMemo(() => tools.get(props.tool) ?? ToolRegistry.render(props.tool) ?? GenericTool)
+
+  const renderer = useToolDisplayRenderer(
+    () => props.tool,
+    (title) => (
+      <ErrorCard
+        tool={props.tool}
+        title={title}
+        error={i18n.t("ui.toolErrorCard.rendererFailed")}
+        defaultOpen={props.defaultOpen}
+        open={props.open}
+        onOpenChange={props.onOpenChange}
+      />
+    ),
+    (name) => tools.get(name),
+  )
 
   return (
     <Show when={!hideQuestion()}>
       <div data-component="tool-part-wrapper" data-timeline-part-id={props.id}>
         <Switch>
+          <Match when={toolGroupSummary(props.metadata)}>
+            {(summary) => <ToolGroupRow summary={summary()} detail={error() ?? props.output} />}
+          </Match>
           <Match when={stopped()}>
-            {(stopped) => <Dynamic component={render()} {...props} output={stopped().output} />}
+            {(stopped) => <Dynamic component={renderer.render()} {...props} output={stopped().output} />}
           </Match>
           <Match when={props.stopped}>
             <Dynamic
-              component={render()}
+              component={renderer.render()}
               {...props}
               error={undefined}
               metadata={props.tool === "shell" ? { ...props.metadata, interrupted: true } : props.metadata}
@@ -90,6 +108,7 @@ export function ToolDisplay(props: ToolProps & { id: string; error?: string; sto
                 <ErrorCard
                   tool={props.tool}
                   error={error()}
+                  title={renderer.title()}
                   defaultOpen={props.defaultOpen}
                   open={props.open}
                   onOpenChange={props.onOpenChange}
@@ -110,7 +129,7 @@ export function ToolDisplay(props: ToolProps & { id: string; error?: string; sto
             }}
           </Match>
           <Match when={true}>
-            <Dynamic component={render()} {...props} />
+            <Dynamic component={renderer.render()} {...props} />
           </Match>
         </Switch>
       </div>

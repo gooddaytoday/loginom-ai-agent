@@ -10,7 +10,9 @@ import { Session } from "@opencode/core/session"
 import { Tool } from "@opencode/core/tool"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { define } from "@opencode/plugin/effect/plugin"
+import { Form } from "@opencode/schema/form"
 import { Location } from "@opencode/schema/location"
+import { Permission } from "@opencode/schema/permission"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Skill } from "@opencode/schema/skill"
 import { Global } from "@opencode/util/global"
@@ -26,7 +28,7 @@ import { ServiceHost } from "../../loginom-agent/src/host"
 import { temporaryData } from "../../loginom-agent/test/fixture/temporary-data"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { createEmbeddedRoutes } from "../src/routes"
-import { scriptedHost } from "./fixture/loginom-dock-host"
+import { dockTool, scriptedHost } from "./fixture/loginom-dock-host"
 import { pluginsLoaded } from "./fixture/routes"
 
 // Loginom access grants and the tool gate of the built-in product plugin `loginom.product` (guarantee G1, stage B2.2),
@@ -287,7 +289,45 @@ const boot = (
       Effect.flatMap((response) => Effect.promise(() => response.json())),
       Effect.map((body) => Schema.decodeUnknownSync(Schema.Struct({ data: Schema.Array(Skill.Info) }))(body).data),
     )
-    return { sessions, create, prompt, wizard, post, skills, requests, ran, answered, prompts, held, gate, resources }
+    const forms = (sessionID: Session.ID) =>
+      Effect.promise(async () => {
+        const response = await handler(new Request(`http://opencode.local/api/session/${sessionID}/form`))
+        expect(response.status).toBe(200)
+        return Schema.decodeUnknownSync(Schema.Struct({ data: Schema.Array(Form.Info) }))(await response.json()).data
+      })
+    const permissions = (sessionID: Session.ID) =>
+      Effect.promise(async () => {
+        const response = await handler(new Request(`http://opencode.local/api/session/${sessionID}/permission`))
+        expect(response.status).toBe(200)
+        return Schema.decodeUnknownSync(Schema.Struct({ data: Schema.Array(Permission.Request) }))(
+          await response.json(),
+        ).data
+      })
+    const deleteForm = (sessionID: Session.ID, formID: Form.ID, message: string) =>
+      handler(
+        new Request(
+          `http://opencode.local/api/session/${sessionID}/form/${formID}?message=${encodeURIComponent(message)}`,
+          { method: "DELETE" },
+        ),
+      )
+    return {
+      sessions,
+      create,
+      prompt,
+      wizard,
+      post,
+      forms,
+      permissions,
+      deleteForm,
+      skills,
+      requests,
+      ran,
+      answered,
+      prompts,
+      held,
+      gate,
+      resources,
+    }
   })
 
 // A dashboard's folder with its `work` folder, under the root the product plugin reads: the case's temporary data
@@ -303,6 +343,215 @@ const dashboardWork = Effect.acquireRelease(
 ).pipe(Effect.map((folder) => path.join(folder, "work")))
 
 describe("loginom.product access and tool gate (G1)", () => {
+  it.live(
+    "a stopped Loginom call keeps the partial result returned by the Host",
+    () =>
+      Effect.gen(function* () {
+        const started = Promise.withResolvers<void>()
+        const stopped = Promise.withResolvers<void>()
+        const partial = "partial work from Loginom"
+        const host = scriptedHost({
+          catalog: () => [dockTool("dock_node_apply")],
+          call: async () => {
+            started.resolve()
+            await stopped.promise
+            await Bun.sleep(50)
+            return { content: [{ type: "text", text: partial }] }
+          },
+          interrupt: () => stopped.resolve(),
+        })
+        const test = yield* boot(undefined, { catalog: "missing", host })
+        const sessionID = yield* test.create("cooperative stop")
+        const turn = yield* Effect.forkScoped(
+          test.wizard(
+            sessionID,
+            "loginom-automation",
+            script({ tool: "loginom_dock_node_apply", input: { path: "node" } }, { text: "must not continue" }),
+          ),
+        )
+        yield* Effect.promise(() => started.promise)
+        yield* test.sessions.interrupt(sessionID)
+        yield* Fiber.join(turn)
+        const messages = yield* test.sessions.messages({ sessionID })
+        const call = messages
+          .flatMap((message) => (message.type === "assistant" ? message.content : []))
+          .find((part) => part.type === "tool" && part.name === "loginom_dock_node_apply")
+        expect(call).toMatchObject({ state: { status: "completed", content: [{ type: "text", text: partial }] } })
+        expect(yield* test.requests(sessionID)).toHaveLength(1)
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "the third identical Loginom call pauses for a decision across waits and status checks",
+    () =>
+      Effect.gen(function* () {
+        const applyTool = dockTool("dock_node_apply")
+        const host = scriptedHost({
+          catalog: () => [
+            {
+              ...applyTool,
+              inputSchema: { type: "object", required: ["host_context_token"], additionalProperties: true },
+            },
+            ...["dock_prepare", "dock_node_wait", "dock_node_status", "dock_operation_inspect"].map((name) =>
+              dockTool(name),
+            ),
+          ],
+        })
+        const test = yield* boot(undefined, { catalog: "missing", host })
+        const sessionID = yield* test.create("repeats")
+        const other = yield* test.create("independent repeats")
+        const tool = "loginom_dock_node_apply"
+        const step = { tool, input: { parameters: { filter: { path: "one.csv", rows: 2 } }, operation_id: "one" } }
+        const reordered = { tool, input: { operation_id: "two", parameters: { filter: { rows: 2, path: "one.csv" } } } }
+        const third = { tool, input: { ...step.input, operation_id: "three" } }
+        const different = { tool, input: { ...step.input, parameters: { filter: { path: "two.csv", rows: 2 } } } }
+        const executed = () => host.requests("call").filter((input) => input.name === "dock_node_apply").length
+        const start = (...steps: Step[]) => test.wizard(sessionID, "loginom-automation", script(...steps))
+        const question = (id = sessionID) => until(() => test.forms(id).pipe(Effect.map((forms) => forms[0])))
+        const reply = (id: Form.ID, answer: Form.Answer) =>
+          test.post(`/api/session/${sessionID}/form/${id}/reply`, { answer })
+
+        const wait = { tool: "loginom_dock_node_wait", input: { path: "one" } }
+        const status = { tool: "loginom_dock_node_status", input: { path: "two" } }
+        const continued = yield* Effect.forkScoped(
+          start(step, wait, reordered, wait, status, third, { text: "continued" }),
+        )
+        const confirmation = yield* question()
+        expect(confirmation.metadata?.timelineGroup).toMatchObject({
+          attempt: 3,
+          formID: confirmation.id,
+          summary: "Агент дважды вызвал применение настроек узла Loginom с теми же параметрами",
+        })
+        expect(host.requests("call").map((input) => input.name)).toEqual([
+          "dock_node_apply",
+          "dock_node_wait",
+          "dock_node_apply",
+          "dock_node_wait",
+          "dock_node_status",
+        ])
+
+        const replies = yield* Effect.all(
+          [reply(confirmation.id, { decision: "continue" }), reply(confirmation.id, { decision: "continue" })],
+          { concurrency: "unbounded" },
+        )
+        expect(replies.some((response) => response.status === 204)).toBe(true)
+        yield* Fiber.join(continued)
+        expect(executed()).toBe(3)
+        expect(yield* test.forms(sessionID)).toEqual([])
+
+        yield* start(step, step, different, different, { text: "different paths" })
+        expect(executed()).toBe(7)
+        expect(yield* test.forms(sessionID)).toEqual([])
+
+        const hinted = yield* Effect.forkScoped(start(step, step, step, step, { text: "hinted" }))
+        const hintForm = yield* question()
+        expect(executed()).toBe(9)
+        expect((yield* reply(hintForm.id, { decision: "hint", hint: "Проверь только заголовок" })).status).toBe(204)
+        yield* Fiber.join(hinted)
+        expect(executed()).toBe(9)
+        expect(JSON.stringify(yield* test.requests(sessionID))).toContain("Проверь только заголовок")
+        expect(yield* test.forms(sessionID)).toEqual([])
+
+        const noninteractive = yield* Effect.forkScoped(
+          test.wizard(other, "loginom-automation", script(step, step, step, { text: "noninteractive" })),
+        )
+        const otherRepeat = yield* question(other)
+        const feedback =
+          "This non-interactive run cannot ask the user questions, so the question was cancelled. Continue without an answer; make reasonable assumptions and state them."
+        const cancelled = yield* Effect.promise(() => test.deleteForm(other, otherRepeat.id, feedback))
+        expect(cancelled.status).toBe(204)
+        yield* Fiber.join(noninteractive)
+        const otherMessages = JSON.stringify((yield* test.requests(other)).at(-1)?.messages)
+        expect(otherMessages).toContain("Остановлено: третий одинаковый вызов подряд")
+        expect(otherMessages).not.toContain("make reasonable assumptions")
+        expect(executed()).toBe(11)
+
+        const interrupted = yield* Effect.forkScoped(start(step, step, step, { text: "not executed" }))
+        yield* question()
+        const response = yield* test.post(`/api/session/${sessionID}/interrupt`, {})
+        expect(response.status).toBe(200)
+        yield* Fiber.join(interrupted)
+        expect(executed()).toBe(13)
+        expect(yield* test.forms(sessionID)).toEqual([])
+
+        const beforePolling = host.requests("call").length
+        const polling = ["dock_prepare", "dock_node_wait", "dock_operation_inspect"].flatMap((name) =>
+          Array.from({ length: 3 }, () => ({ tool: `loginom_${name}`, input: { path: "same" } })),
+        )
+        yield* start(step, step, ...polling, step, { text: "polling and repeated prepare never ask" })
+        expect(executed()).toBe(16)
+        for (const name of ["dock_prepare", "dock_node_wait", "dock_operation_inspect"])
+          expect(
+            host
+              .requests("call")
+              .slice(beforePolling)
+              .filter((input) => input.name === name),
+          ).toHaveLength(3)
+
+        const exportStep = { tool, input: { ...step.input, target: { type: "exports.csv" } } }
+        const exportRun = yield* Effect.forkScoped(
+          start(exportStep, exportStep, exportStep, { text: "permission refused" }),
+        )
+        const permission = () =>
+          until(() =>
+            test
+              .permissions(sessionID)
+              .pipe(Effect.map((requests) => requests.find((request) => request.action === tool))),
+          )
+        const decide = (id: string, decision: "once" | "reject") =>
+          test.post(`/api/session/${sessionID}/permission/${id}/reply`, { decision })
+        for (let previous = 0; previous < 2; previous++) {
+          expect((yield* decide((yield* permission()).id, "once")).status).toBe(204)
+          yield* until(() => Effect.succeed(executed() === 17 + previous ? true : undefined))
+        }
+        expect((yield* reply((yield* question()).id, { decision: "continue" })).status).toBe(204)
+        const afterConsent = yield* permission()
+        expect(afterConsent.resources).toEqual(["exports.csv"])
+        expect(executed()).toBe(18)
+        expect((yield* decide(afterConsent.id, "reject")).status).toBe(204)
+        yield* Fiber.join(exportRun)
+        expect(executed()).toBe(18)
+
+        const stopped = yield* Effect.forkScoped(start(step, reordered, third, { text: "stopped run resumed" }))
+        const repeat = yield* question()
+        const queued = yield* test.sessions.prompt({
+          sessionID,
+          text: script({ text: "queued run resumed" }),
+          delivery: "queue",
+        })
+        expect((yield* reply(repeat.id, { decision: "stop" })).status).toBe(204)
+        yield* Fiber.join(stopped)
+        expect(executed()).toBe(20)
+        expect(yield* test.forms(sessionID)).toEqual([])
+        expect((yield* test.sessions.inbox(sessionID)).map((item) => item.id)).toContain(queued.id)
+        expect(test.answered.join("\n")).not.toMatch(/stopped run resumed|queued run resumed/)
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "denying the repeat question blocks later identical calls before dispatch",
+    () =>
+      Effect.gen(function* () {
+        const host = scriptedHost({ catalog: () => [dockTool("dock_node_apply")] })
+        const test = yield* boot(undefined, { catalog: "missing", host })
+        const sessionID = yield* test.create("denied repeat question")
+        yield* test.sessions.setPermissions({
+          sessionID,
+          permissions: [{ action: "question", resource: "*", effect: "deny" }],
+        })
+        const apply = { tool: "loginom_dock_node_apply", input: { path: "same" } }
+
+        yield* test.wizard(sessionID, "loginom-automation", script(apply, apply, apply, apply, { text: "done" }))
+
+        expect(host.requests("call").map((input) => input.name)).toEqual(["dock_node_apply", "dock_node_apply"])
+        expect(yield* test.forms(sessionID)).toEqual([])
+        expect(JSON.stringify((yield* test.requests(sessionID)).at(-1)?.messages)).toContain("Остановлено")
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
   it.live(
     "S1: without a grant a Loginom tool is hidden and rejected, directly, from CodeMode and with permissive session rules",
     () =>

@@ -17,7 +17,7 @@ import {
 import { openFileLauncher, reviewTabs } from "../utils/side-panel"
 import { mockServers } from "../utils/mock-server"
 import { fixture, mockStressTimeline } from "../utils/session-fixture"
-import { fileNode, mockWorkspace, openSession } from "../utils/workspace"
+import { fileNode, mockWorkspace, newSessionLocation, openSession } from "../utils/workspace"
 import { expectSessionTitle } from "../utils/waits"
 import { openWithDirection } from "../utils/direction"
 
@@ -28,6 +28,52 @@ const b = { id: "ses_tab_b", title: "Tab B session" }
 const c = { id: "ses_tab_c", title: "Tab C session" }
 
 test.use({ serviceWorkers: "block" })
+
+for (const layout of ["horizontal", "vertical", "narrow"] as const) {
+  test(`a plugin page can open a new session in the ${layout} tab layout`, async ({ page }) => {
+    const narrow = layout === "narrow"
+    await page.setViewportSize(narrow ? { width: 390, height: 844 } : { width: 1440, height: 900 })
+    await mockWorkspace(page, {
+      name: "PluginPage",
+      provider: NO_PROVIDER,
+      seed: {
+        settings: { appearance: { tabLayout: narrow ? "horizontal" : layout } },
+        storage: { "opencode.e2e.page-plugin": "1" },
+      },
+    })
+    await page.goto("/")
+    const recent = page.getByRole("region", { name: "Recent sessions" })
+    await expect(recent.getByRole("button", { name: /PluginPage/ })).toBeVisible()
+
+    const titlebar = page.locator('[data-slot="titlebar-v2"]')
+    const tabDrawer = titlebar.getByRole("button", { name: "Tabs", exact: true })
+    const surface =
+      layout === "vertical"
+        ? page.locator('[data-slot="vertical-tabs-sidebar"]')
+        : narrow
+          ? page.locator('[data-slot="mobile-tabs-drawer"]')
+          : titlebar
+    const entry = surface
+      .getByRole("navigation", { name: "Plugin pages" })
+      .getByRole("button", { name: "Example plugin page" })
+    const heading = page.getByRole("heading", { name: "Example plugin page" })
+    const href = "/page/%40acme%2Fopencode-gui/overview"
+
+    if (narrow) await tabDrawer.click()
+    await entry.click()
+    await expectPath(page, href)
+    await expect(heading).toBeVisible()
+    if (narrow) await expect(surface).toBeHidden()
+
+    await page.reload()
+    await expect(heading).toBeVisible()
+    if (narrow) await tabDrawer.click()
+    await expect(entry).toHaveAttribute("aria-current", "page")
+    await surface.getByRole("button", { name: "New session", exact: true }).click()
+    await expect(page).toHaveURL(/\/new-session\?draftId=[^&]+$/)
+    await expect(newSessionLocation(page)).toContainText("PluginPage")
+  })
+}
 
 test("recently closed shows ten sessions and searches older closures in close order", async ({ page }) => {
   const sessions = Array.from({ length: 100 }, (_, index) => ({
@@ -945,7 +991,7 @@ test("vertical tabs resize, scroll, show shortcut hints, and navigate", async ({
   expect(gutter.x + gutter.width).toBe(chat.x)
 
   const actions = await Promise.all(
-    ["vertical-tabs-home", "vertical-tabs-search", "vertical-tabs-new-session"].map(async (action) => {
+    ["vertical-tabs-home", "vertical-tabs-new-session"].map(async (action) => {
       const box = await sidebar.locator(`[data-action="${action}"]`).boundingBox()
 
       if (!box) throw new Error(`${action} is not rendered`)
@@ -955,7 +1001,7 @@ test("vertical tabs resize, scroll, show shortcut hints, and navigate", async ({
   )
 
   const gaps = actions.slice(1).map((box, index) => box.y - (actions[index].y + actions[index].height))
-  expect(gaps).toEqual([3, 3])
+  expect(gaps).toEqual([3])
 
   const handle = sidebar.locator('[data-component="resize-handle"]')
 

@@ -16,10 +16,11 @@ for (const heldSocket of [true, false]) test(`checked managed close ${heldSocket
     await copyFile(new URL(`../src/${name}.mjs`, import.meta.url), join(directory, "src", `${name}.mjs`))
   }
   await mkdir(join(directory, "client/lib"), { recursive: true })
-  await copyFile(new URL("../client/lib/browser-downloads.mjs", import.meta.url), join(directory, "client/lib/browser-downloads.mjs"))
+  for (const name of ["browser-downloads", "step-progress"])
+    await copyFile(new URL(`../client/lib/${name}.mjs`, import.meta.url), join(directory, "client/lib", `${name}.mjs`))
   const files = {
     "src/resources.mjs": "export async function verifyResources() { return {manifestHash:'fixture',manifest:{}} }",
-    "src/connection-check.mjs": "export const loginomAddress=value=>value; export async function loginBrowser(){return {context:{close:async()=>{}}}}",
+    "src/connection-check.mjs": "export const loginomAddress=value=>value; export async function loginBrowser(){return {context:{close:async()=>{}}}} export async function reauthenticateReloadedPage(){throw Error('close fixture does not log in again')}",
     "client/package.json": '{"type":"module"}',
     "client/lib/session.mjs": `export async function createSession(config,{managed}) { return {
       directory:managed.directory,browserConfig:${JSON.stringify(join(directory, "browser.json"))},

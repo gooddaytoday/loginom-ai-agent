@@ -1,6 +1,7 @@
 // The parts of the SDK only the app's built-in plugins use, for workspace imports only: `tsconfig.build.json` leaves it
 // out of `dist`, and `script/pack.ts` exports it as `null`. Public SDK modules never import it.
 
+import type { FormAnswer, FormInfo } from "@opencode/client/promise"
 import type { Schema } from "effect"
 import type { Context } from "./context.js"
 import { Registry, type Catalog, type Messages, type Persisted, type StoreDeclaration, type StoreFrom } from "./core.js"
@@ -8,6 +9,44 @@ import type { Desktop, Layout, Locale, StorageScope, StoreOptions } from "./host
 import type { MainContext } from "./main.js"
 import type { Command, IconName, Panel, PanelTab, SlotMap } from "./registries.js"
 import { type JSX } from "solid-js"
+
+type BuiltinDeepLink = { readonly channel: string; readonly data: typeof Schema.Json.Type }
+
+type DeepLinkListener = (data: BuiltinDeepLink["data"]) => void
+
+const deepLinkListeners = new Map<string, DeepLinkListener>()
+
+const pendingDeepLinks = new Map<string, BuiltinDeepLink["data"][]>()
+
+/**
+ * Delivers opaque data in this Desktop renderer, buffering it until the built-in subscribes.
+ * @param link - The destination channel and its JSON payload.
+ */
+export function deliverBuiltinDeepLink(link: BuiltinDeepLink) {
+  const listener = deepLinkListeners.get(link.channel)
+
+  if (listener) return listener(link.data)
+
+  pendingDeepLinks.set(link.channel, [...(pendingDeepLinks.get(link.channel) ?? []), link.data])
+}
+
+/**
+ * Consumes a built-in channel's buffered and live deep links.
+ * @param channel - The channel the built-in owns.
+ * @param listener - Decodes and handles each payload.
+ * @returns Stops listening; later arrivals are buffered again.
+ */
+export function subscribeBuiltinDeepLinks(channel: string, listener: DeepLinkListener) {
+  deepLinkListeners.set(channel, listener)
+  const pending = pendingDeepLinks.get(channel)
+
+  pendingDeepLinks.delete(channel)
+  pending?.forEach(listener)
+
+  return () => {
+    if (deepLinkListeners.get(channel) === listener) deepLinkListeners.delete(channel)
+  }
+}
 
 /**
  * Runs fn when the main thread is idle (a short timeout where requestIdleCallback is missing, e.g. Safari). Load lazy
@@ -33,6 +72,91 @@ export function onIdle(fn: () => void) {
 
   return () => clearTimeout(id)
 }
+
+/** The live state and display options of a tool call in the timeline. */
+export interface ToolRendererProps {
+  /** The tool's name in the transcript. */
+  readonly tool: string
+  /** The registered display title, which can follow the window's locale. */
+  readonly title: string
+  /** The tool's input fields, including partial input while streaming. */
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- A renderer decodes the input for its own tool.
+  readonly input: Readonly<Record<string, unknown>>
+  /** Tool-specific data attached to this call. */
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- A renderer decodes the metadata for its own tool.
+  readonly metadata: Readonly<Record<string, unknown>>
+  /** The call's current status. */
+  readonly status?: string
+  /** The output text, once available. */
+  readonly output?: string
+  /** Whether disclosure starts open. */
+  readonly defaultOpen?: boolean
+  /** The current disclosure state, if controlled by the timeline. */
+  readonly open?: boolean
+  /** Saves the user's disclosure choice in the timeline. */
+  readonly onOpenChange?: (open: boolean) => void
+}
+
+/** A built-in plugin's renderer for one tool it owns. */
+export interface ToolRenderer {
+  /** The exact tool name in the transcript. OpenCode's own names are reserved. */
+  readonly tool: string
+  /** A display title. Use a getter for a localized title. */
+  readonly title: string
+  /** Keep visible calls on their own rows, even when tool activity is grouped. */
+  readonly separate?: boolean
+  /**
+   * Draws a call under the plugin context. The host shows its tool error card if this throws.
+   * @param props - Live call data and the timeline's display options.
+   */
+  render(props: ToolRendererProps): JSX.Element
+}
+
+/**
+ * The tool renderer registry for built-in plugins. Register once in setup; unloading the plugin withdraws the item.
+ * @example
+ * ```ts
+ * ctx.add(ToolRenderer, { tool: "example_action", title: ctx.t("action"), separate: true, render })
+ * ```
+ */
+export const ToolRenderer = Registry.define<ToolRenderer>("tool.renderer")
+
+/** Live question data and the host's draft and reply controls. */
+export interface QuestionRendererProps {
+  /** The open question and its server metadata. */
+  readonly request: FormInfo
+  /** Whether the host is settling a submitted reply. */
+  readonly busy: boolean
+  /** Text saved for this question while it remains open, including across dock remounts. */
+  readonly draft: string
+  /**
+   * Updates the saved text.
+   * @param text - The current text in the renderer's input.
+   */
+  setDraft(text: string): void
+  /**
+   * Submits the answer through the host's form controller.
+   * @param answer - The answer keyed by form field.
+   */
+  reply(answer: FormAnswer): void
+}
+
+/** A built-in plugin's renderer for questions it recognizes. */
+export interface QuestionRenderer {
+  /**
+   * Selects questions this plugin renders.
+   * @param request - The open question as published by the server.
+   */
+  matches(request: FormInfo): boolean
+  /**
+   * Draws the question in the composer dock.
+   * @param props - Live question data and the host's draft and reply controls.
+   */
+  render(props: QuestionRendererProps): JSX.Element
+}
+
+/** The registry of question renderers supplied by built-in plugins. */
+export const QuestionRenderer = Registry.define<QuestionRenderer>("question.renderer")
 
 /** A `Command` with the fields only built-ins set. */
 export interface BuiltinCommand extends Command {
@@ -96,6 +220,31 @@ export interface BuiltinPanel extends Panel {
  */
 export const BuiltinPanel = Registry.define<BuiltinPanel>("panel")
 
+/** A top-level page at `/page/<plugin>/<id>`. */
+export interface Page {
+  /** Nonempty page id within this plugin, used as a route segment. */
+  readonly id: string
+  /** Label shown in app navigation. */
+  readonly title: string
+  /** Lists the page in app navigation, lowest `order` first. */
+  readonly nav?: {
+    /** Sort position in app navigation; defaults to zero. */
+    readonly order?: number
+  }
+  /** Renders the page inside the plugin's contribution boundary. */
+  render(): JSX.Element
+}
+
+/**
+ * The registry of top-level pages contributed by built-in plugins.
+ *
+ * @example
+ * ```ts
+ * ctx.add(Page, { id: "overview", title: ctx.t("overview"), nav: {}, render: () => <Overview /> })
+ * ```
+ */
+export const Page = Registry.define<Page>("page")
+
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */
@@ -111,6 +260,31 @@ export interface BuiltinSlotMap extends SlotMap {
     readonly label: string
     /** The location icon: monitor for the local repository, worktree for a worktree. */
     readonly icon: IconName
+  }
+  /** Replaces the wordmark above the draft composer. */
+  readonly "session.new.heading": Record<string, never>
+  /** Replaces the empty normal-mode draft hint. */
+  readonly "session.new.composer.placeholder": Record<string, never>
+  /** Replaces the project picker's label and moves the picker into the composer toolbar. */
+  readonly "session.new.composer.project": {
+    /** Display name of the selected project. */
+    readonly project: string
+  }
+  /** Items at the end of the draft composer's Add menu. Render rows with `Ui.MenuItem`. */
+  readonly "session.new.composer.add.menu": Record<string, never>
+  /** Content below the draft composer and its location controls. */
+  readonly "session.new.below": {
+    /**
+     * Prefills the draft and tags its origin without submitting it.
+     * @param text - The replacement text, leaving attachments in place.
+     * @param origin - A plugin-prefixed identifier for the source of the text.
+     */
+    insertPrompt(text: string, origin: string): void
+    /**
+     * Listen for successful promotion of this draft. Returns a function that unregisters the listener.
+     * @param listener - Receives the origin captured at submit time, if any.
+     */
+    onStarted(listener: (origin: string | undefined) => void): () => void
   }
 }
 
@@ -297,6 +471,15 @@ export interface BuiltinContext extends Context {
   readonly locale: BuiltinLocale
   /** The session layout, with `command`. */
   readonly layout: BuiltinLayout
+  /** The app's route, with navigation to a built-in plugin's pages. */
+  readonly router: Context["router"] & {
+    /**
+     * Opens a top-level page contributed by the calling plugin. Waits for the app interface to mount.
+     *
+     * @param id - The page's id within the plugin, as registered with `Page`.
+     */
+    openPage(id: string): void
+  }
   /** Stores whose older homes may be parts of shared app keys. */
   readonly storage: BuiltinStorage
 }

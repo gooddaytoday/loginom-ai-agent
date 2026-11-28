@@ -1,4 +1,7 @@
 import {selectPreparedGraphNode,isPreparedBodyReplacement} from './node-graph-selection.mjs';
+import {NODE_TYPES} from './node-contracts.mjs';
+
+const joinDesignTitle=NODE_TYPES['transform.join_data'].title;
 
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const requireValue=(value,message)=>{if(!value)throw Error(message);};
@@ -41,8 +44,12 @@ export function wizardOpenBinding(state) {
  const controls=state.ui.elements.filter(e=>e.tid===n.tid+';Setting'&&e.wizard_open&&e.allowed_actions?.includes('begin_wizard'));
  requireValue(controls.length===1,'One prepared settings control is required');
  const labels=state.ui.elements.filter(e=>e.graph_node?.part==='label'&&e.tid===n.tid+';Label;Label');
+ const icon=labels.length===1&&labels[0].signature?.native_graph?.status==='non_script'?labels[0].signature.native_graph.icon:null;
+ const joinCaption=icon==='bg-vendor-icon-joindata'&&controls[0].wizard_open.node?.node_label==='Левое'
+  &&typeof labels[0].label==='string'&&labels[0].label.replace(/\s/g,'')==='Левое';
  return {...(labels.length===1&&typeof labels[0].label==='string'?{graph_label:labels[0].label}:{}),
-  ...(labels.length===1&&labels[0].signature?.native_graph?.status==='non_script'&&labels[0].signature.native_graph.icon==='bg-vendor-icon-variablestodata'?{variables_to_table:true}:{}),kind:'deactivation',node:{document_id:n.document_id,workflow_id:n.workflow_id,node_id:n.node_id},
+  ...(icon==='bg-vendor-icon-variablestodata'?{variables_to_table:true}:{}),...(joinCaption?{join_auto_caption:true}:{}),
+  kind:'deactivation',node:{document_id:n.document_id,workflow_id:n.workflow_id,node_id:n.node_id},
   graph_tid:n.tid,opening:structuredClone(controls[0].wizard_open)};
 }
 
@@ -98,40 +105,58 @@ export async function openPreparedWizard(channel) {
   &&s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid+';Setting'&&e.allowed_actions?.includes('begin_wizard'));
  // A cancelled wizard can still be redrawing the graph: a strict no-gesture
  // stale refusal may rebind the same native body once (isPreparedBodyReplacement).
- const selection=!settings(s)?await selectPreparedGraphNode(channel,s,'select prepared node before reopening settings',{refreshReplacedBody:true}):null;
- const now=()=>channel.now?.()??Date.now(),deadline=now()+15000;
- // A succeeded click can precede Loginom's asynchronous SVG replacement.
- // Only a proved new body of the same GUID permits one fresh selection;
- // missing controls or an uncertain receipt alone never authorize a click.
- const replaced=s=>s.wizard?.status==='absent'&&s.wizard_pending_owner?.status!=='observed'
-  &&selection?.receipt?.status==='SUCCEEDED'&&selection.receipt.cleanup_complete===true
-  &&isPreparedBodyReplacement({...selection,receipt:{output:s}});
- s=await channel.observe({condition:'prepared node settings available',ready:s=>settings(s)||replaced(s)});
  if(!settings(s)) {
-  requireValue(now()<deadline,'Prepared node settings deadline elapsed');
-  await selectPreparedGraphNode(channel,s,'select replaced prepared body before reopening settings');
-  requireValue(now()<deadline,'Prepared node settings deadline elapsed');
-  s=await channel.observe({condition:'prepared node settings available',timeoutMs:Math.min(15000,deadline-now()),ready:settings});
+  const selection=await selectPreparedGraphNode(channel,s,'select prepared node before reopening settings',{refreshReplacedBody:true});
+  const now=()=>channel.now?.()??Date.now(),deadline=now()+15000;
+  // A succeeded click can precede Loginom's asynchronous SVG replacement.
+  // Only a proved new body of the same GUID permits one fresh selection.
+  const replaced=s=>s.wizard?.status==='absent'&&s.wizard_pending_owner?.status!=='observed'
+   &&selection?.receipt?.status==='SUCCEEDED'&&selection.receipt.cleanup_complete===true
+   &&isPreparedBodyReplacement({...selection,receipt:{output:s}});
+  s=await channel.observe({condition:'prepared node settings available',ready:s=>settings(s)||replaced(s)});
+  if(!settings(s)) {
+   requireValue(now()<deadline,'Prepared node settings deadline elapsed');
+   await selectPreparedGraphNode(channel,s,'select replaced prepared body before reopening settings');
+   requireValue(now()<deadline,'Prepared node settings deadline elapsed');
+   s=await channel.observe({condition:'prepared node settings available',timeoutMs:Math.min(15000,deadline-now()),ready:settings});
+  }
  }
  const binding=wizardOpenBinding(s);
- await channel.perform({condition:'open settings of the prepared node',initialObservation:s,
+ const openingReceipt=await channel.perform({condition:'open settings of the prepared node',initialObservation:s,
   ready:s=>same(wizardOpenBinding(s),binding),identity:()=>binding,
   resolve:s=>({verb:'begin_wizard',ref:s.ui.elements.find(e=>e.tid===binding.graph_tid+';Setting').ref})});
- s=await channel.observe({condition:'prepared wizard or exact deactivation question',wizardConfirmation:binding,
-  ready:s=>s.wizard?.status==='observed'&&s.prepared_node_context?.surface==='wizard'
-    ||boundWizardDeactivationConfirmation(s,binding)});
+ const wizardReady=s=>s.wizard?.status==='observed'&&s.wizard.owner_context?.status==='observed'
+  &&s.prepared_node_context?.surface==='wizard';
+ // The local browser receipt contains the settled opening and workflow proof.
+ // Use it for verification only. Any later gesture still needs a new snapshot.
+ const openedByReceipt=receipt=>{
+  const observed=receipt?.output;
+  if(receipt?.status==='SUCCEEDED'&&receipt.action_key==='ui.act'&&receipt.action_revision==='1'
+   &&receipt.cleanup_complete===true&&observed?.gesture_applied===true&&wizardReady(observed)
+   &&observed.ui?.masks?.length===0&&observed.ui?.dialogs?.length===0
+   &&receipt.trace?.some(entry=>entry.event==='wizard_open_verified'&&entry.settings_applied===false
+    &&entry.wizard_root_ref===observed.wizard.root_ref&&same(entry.owner_node,observed.wizard.owner_context.node)
+    &&same(entry.workflow_path,binding.opening.workflow_path)))return observed;
+ };
+ s=openedByReceipt(openingReceipt)??await channel.observe({
+  condition:'prepared wizard or exact deactivation question',wizardConfirmation:binding,
+  ready:s=>wizardReady(s)||boundWizardDeactivationConfirmation(s,binding)});
  const deactivationRequired=s.wizard.status==='absent';
- if(deactivationRequired)await channel.perform({condition:'confirm only this node deactivation',initialObservation:s,
-  ready:s=>boundWizardDeactivationConfirmation(s,binding),identity:()=>binding,
-  resolve:s=>({verb:'confirm_wizard_deactivation',ref:s.ui.elements.find(e=>e.tid==='msgbox;tlb;yes').ref})});
- const after=await channel.observe({condition:'prepared node wizard opened',ready:s=>s.wizard?.status==='observed'
-  &&s.wizard.owner_context?.status==='observed'&&s.prepared_node_context?.surface==='wizard'});
+ if(deactivationRequired){
+  const confirmation=await channel.perform({condition:'confirm only this node deactivation',initialObservation:s,
+   ready:s=>boundWizardDeactivationConfirmation(s,binding),identity:()=>binding,
+   resolve:s=>({verb:'confirm_wizard_deactivation',ref:s.ui.elements.find(e=>e.tid==='msgbox;tlb;yes').ref})});
+  s=openedByReceipt(confirmation)??await channel.observe({condition:'prepared node wizard opened',ready:wizardReady});
+ }
+ const after=s;
  const owner=after.wizard.owner_context;
  const n=after.prepared_node_context,normalize=v=>typeof v==='string'?v.replace(/\s/g,''):'';
  const bound=n?.verified===true&&n.surface==='wizard'&&['document_id','workflow_id','node_id'].every(k=>typeof n[k]==='string'&&n[k]===binding.node[k]);
  const ownerMatches=owner.node.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+binding.opening.node.node_label
   ||normalize(binding.graph_label)!==''&&normalize(binding.graph_label)===normalize(owner.node.label)
-  ||binding.variables_to_table===true&&after.wizard.stage==='variables_to_table'&&owner.node.label==='Переменные в таблицу';
+  ||binding.variables_to_table===true&&after.wizard.stage==='variables_to_table'&&owner.node.label==='Переменные в таблицу'
+  ||binding.join_auto_caption===true&&after.wizard.stage==='join'&&owner.node.label===joinDesignTitle
+    &&owner.node.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+joinDesignTitle;
  requireValue(bound&&ownerMatches
   &&same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path),
   'Opened wizard owner differs from the prepared node');

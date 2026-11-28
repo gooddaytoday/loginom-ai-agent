@@ -1,12 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { createRedactor } from '../lib/redact.mjs';
-import { actionReply, browserProcessEnvironment } from '../lib/bridge.mjs';
+import { actionReply, browserProcessEnvironment, createBridge } from '../lib/bridge.mjs';
+import { ACTION_CATALOG_ROOT, BUNDLED_CATALOG_RELEASES } from '../lib/action-catalog.mjs';
+import { createArtifactStore } from '../lib/artifacts.mjs';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { getDefaultEnvironment, StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { createBundledSkillFixture } from './support/bundled-skill-fixture.mjs';
+import { nestedWorkspacePage } from './support/nested-workspace-page.mjs';
 
 const desktopEnvironment = { DISPLAY: ':98', XAUTHORITY: '/unit/Xauthority',
   XDG_RUNTIME_DIR: '/unit/runtime', WAYLAND_DISPLAY: 'wayland-test',
@@ -170,4 +182,81 @@ test('bridge keeps application feedback recoverable over the MCP protocol', asyn
   }
   assert.match(result.stdout, /pass 1/);
   assert.match(result.stdout, /fail 0/);
+});
+
+test('bridge replays dock_prepare with reordered graph_navigation keys', async t => {
+  const { resources } = await createBundledSkillFixture(t);
+  const directory = await mkdtemp(join(tmpdir(), 'dock-bridge-navigation-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const platform = { darwin: 'macos', win32: 'windows', linux: 'linux' }[process.platform];
+  const catalogRelease = `2026.11.16-rest-save-${platform}-candidate`;
+  const manifest = readFileSync(new URL(`${catalogRelease}/manifest.json`, BUNDLED_CATALOG_RELEASES), 'utf8');
+  const { compatibility } = JSON.parse(manifest);
+  const graph = nestedWorkspacePage({ entryOnSelection: true });
+  const documentId = graph.preparation.id;
+  const browser = new Server({ name: 'test-browser', version: '1' }, { capabilities: { tools: {} } });
+  browser.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: [{ name: 'browser_run_code_unsafe', inputSchema: { type: 'object' } }],
+  }));
+  browser.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
+    assert.equal(params.name, 'browser_run_code_unsafe');
+    const { code } = params.arguments;
+    let result;
+    if (code.includes('async function prepareWorkspace(')) {
+      // The page fixture starts with the parent workflow already bound.
+      result = { status: 'READY', target: compatibility, authenticated: true, created_draft: true,
+        effect_possible: true, document_id: documentId, loginom_account: 'worker', target_verified: true,
+        package_ref: { path: null, persisted: false }, workflow_ref: graph.ref };
+    } else if (code.includes('async function observeGeometry(')) {
+      result = { version: 1, source: 'prepare_same_browser_page', observed: { document_id: documentId } };
+    } else {
+      result = await graph.execute(code);
+    }
+    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+  });
+  const [browserTransport, browserServerTransport] = InMemoryTransport.createLinkedPair();
+  const [agentTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: 'test-agent', version: '1' });
+  let bridge;
+  try {
+    await browser.connect(browserServerTransport);
+    bridge = await createBridge({
+      resources, stateDir: directory, loginomUrl: 'https://app.loginom.ai/app/?testable=true',
+      mode: 'executor-replay', resultProfile: 'user-v1', bundledCatalog: true,
+      actionManifestUri: `${ACTION_CATALOG_ROOT}/releases/${catalogRelease}/manifest.json`,
+      actionManifestSha256: createHash('sha256').update(manifest).digest('hex'),
+    }, {
+      directory, metadata: { client: 'unit-test', clientRevision: 'd'.repeat(64), sessionId: 'navigation-replay' },
+      artifactStore: await createArtifactStore({ directory: join(directory, 'input') }), async save() {},
+    }, { browserTransport });
+    await Promise.all([bridge.server.connect(bridgeTransport), client.connect(agentTransport)]);
+    const prepare = async args => {
+      const reply = await client.callTool({ name: 'dock_prepare', arguments: args });
+      assert.notEqual(reply.isError, true, reply.content[0].text);
+      return JSON.parse(reply.content[0].text).workspace;
+    };
+
+    const draft = await prepare({ intent: 'new_draft' });
+    assert.equal(draft.status, 'READY', draft.reason);
+    const workflow_ref = { ...draft.workflow_ref, document_id: draft.document_id };
+    const request = { intent: 'existing_workflow', operation_id: 'enter', workflow_ref,
+      graph_navigation: { direction: 'enter', node_ref: {
+        document_id: draft.document_id, workflow_id: workflow_ref.workflow_id, node_id: 'supernode',
+      } } };
+    const entered = await prepare(request);
+    assert.equal(entered.status, 'READY', entered.reason);
+    assert.notEqual(entered.workflow_ref.workflow_id, workflow_ref.workflow_id);
+
+    const replayed = await prepare({ ...request, graph_navigation: { node_ref: {
+      node_id: 'supernode', workflow_id: workflow_ref.workflow_id, document_id: draft.document_id,
+    }, direction: 'enter' } });
+    assert.equal(replayed.status, 'READY', replayed.reason);
+    assert.equal(replayed.replayed, true);
+    assert.deepEqual(replayed.workflow_ref, entered.workflow_ref);
+    assert.equal(graph.clicks(), 1);
+  } finally {
+    await client.close();
+    await bridge?.close();
+    await browser.close();
+  }
 });
