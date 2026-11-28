@@ -187,7 +187,7 @@ try {
           db: database.db,
           state,
           builtins: withSystemProxy(builtins.filter((entry) => entry.id === "loginom-gui"), proxy),
-          cli: { version: "0.0.0", command: [], development: true },
+          cli: async () => ({ version: "0.0.0", command: [], development: true }),
           subscriptions: new Map(),
           servers: new Map(),
           appState: lifecycle.state,
