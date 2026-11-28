@@ -156,8 +156,12 @@ export async function connectionService(
       ...(state.failure ? { failure: state.failure } : {}),
     }
   }
-  function failPending(failure: string) {
-    state.failure = failure
+  async function failPending(failure: string) {
+    // A rejected replacement requires a new save, even after the Host restarts.
+    state.failure = await store.clearPending().then(
+      () => failure,
+      () => "LOGINOM_STORE_WRITE_FAILED",
+    )
     state.pending = undefined
     state.pendingBrowser = undefined
     state.phase = state.handle ? state.readiness : "recoverable-error"
@@ -183,9 +187,11 @@ export async function connectionService(
           }
         }
       } catch (error) {
+        const cancelled =
+          signal?.aborted && (error === signal.reason || (error instanceof Error && error.cause === signal.reason))
         await prepared?.close().catch(() => undefined)
-        if (!state.closing)
-          failPending(
+        if (!cancelled)
+          await failPending(
             error instanceof Error && error.message === "LOGINOM_RUNTIME_TIMEOUT"
               ? error.message
               : "LOGINOM_RUNTIME_START_FAILED",
@@ -236,9 +242,7 @@ export async function connectionService(
         )
       if (!committed) {
         await next.close().catch(() => undefined)
-        // A failed pointer commit requires a new save. Reopening keeps the active settings.
-        await store.clearPending().catch(() => undefined)
-        failPending("LOGINOM_STORE_WRITE_FAILED")
+        await failPending("LOGINOM_STORE_WRITE_FAILED")
         return
       }
       const previous = state.handle

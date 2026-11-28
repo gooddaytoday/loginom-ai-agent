@@ -42,9 +42,7 @@ if (import.meta.main) {
 
   // Loginom AI Agent (B4.8a): the background service starts its Host from the bundled Node and this entry (B2.3), as
   // the CLI artifact does (`build-cli.ts`). resource-manifest.json does not list it; the app checks it is there.
-  await buildNodeHost(join(destination, "host"), {
-    con08TestBuild: process.env.LOGINOM_AI_AGENT_CON08_TEST_BUILD === "1",
-  })
+  await buildNodeHost(join(destination, "host"), process.env)
   console.log(`Bundled Loginom ${process.platform}-${process.arch} runtime: ${result.files} verified resource files`)
 
   await writeUpdateS3Resource(resolve(import.meta.dir, "../resources/updates-s3.json"), process.env)

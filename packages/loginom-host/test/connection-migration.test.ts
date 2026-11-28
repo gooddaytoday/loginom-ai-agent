@@ -217,24 +217,31 @@ for (const [name, codec] of [
     })
   }
 
-  test(`${name}: explicit pending old-default choice survives failed preparation and restart`, async () => {
+  test(`${name}: explicit old-default choice requires another save after failed preparation and restart`, async () => {
     const f = await fixture(codec)
     try {
       await f.store.stage(original)
       await f.store.activate(1)
       const first = await f.start()
-      const validation = await first.api.check({
+      const input = {
         revision: 1, url: original.url, username: original.username,
-        apiKey: { operation: "preserve" }, password: { operation: "preserve" },
-      })
+        apiKey: { operation: "preserve" as const }, password: { operation: "preserve" as const },
+      }
+      const validation = await first.api.check(input)
       const prepare = f.runtime.prepare
       f.runtime.prepare = async () => { throw Error("unavailable") }
       await first.api.save({ revision: 1, validationId: validation.validationId })
       await first.settled()
-      expect(await f.store.pending()).toMatchObject({ url: original.url, urlSource: "explicit", generation: 2 })
+      expect(await first.api.status()).toMatchObject({ generation: 1, failure: "LOGINOM_RUNTIME_START_FAILED" })
+      expect(await f.store.pending()).toBeUndefined()
       await first.close()
       f.runtime.prepare = prepare
       const restarted = await f.start()
+      expect(await restarted.api.status()).toMatchObject({ url: original.url, generation: 1, state: "ready" })
+      expect(await f.store.read()).toEqual(original)
+      const retry = await restarted.api.check(input)
+      await restarted.api.save({ revision: 1, validationId: retry.validationId })
+      await restarted.settled()
       expect(await restarted.api.status()).toMatchObject({ url: original.url, generation: 2, state: "ready" })
       // The new generation does not carry the saved key forward; Help uses the built-in key.
       expect(await f.store.read()).toMatchObject({ url: original.url, urlSource: "explicit", apiKey: "", password: original.password })

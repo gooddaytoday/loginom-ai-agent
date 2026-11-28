@@ -67,10 +67,28 @@ beforeAll(async () => {
     }),
   )
   // Build in separate processes: Bun.build can reuse failed reads in the test runner.
-  for (const build of ["production", "fixture"]) {
+  for (const [build, workflow, job] of [
+    ["local", "", ""],
+    ["release", "loginom-release.yml", "con08-fixture"],
+    ["production", "loginom-windows.yml", "build-package-test"],
+    ["fixture", "loginom-windows.yml", "con08-fixture"],
+  ]) {
     const child = Bun.spawn(
       [process.execPath, join(import.meta.dir, "../script/build-node-host.ts"), join(directory, build)],
-      { env: { ...process.env, [flag]: build === "fixture" ? "1" : "0" }, stderr: "pipe" },
+      {
+        env: {
+          ...process.env,
+          [flag]: "1",
+          GITHUB_ACTIONS: workflow ? "true" : "false",
+          GITHUB_EVENT_NAME: "workflow_dispatch",
+          GITHUB_JOB: job,
+          GITHUB_REPOSITORY: "gooddaytoday/loginom-ai-agent",
+          GITHUB_WORKFLOW_REF: workflow
+            ? `gooddaytoday/loginom-ai-agent/.github/workflows/${workflow}@refs/heads/test`
+            : "",
+        },
+        stderr: "pipe",
+      },
     )
     const errors = new Response(child.stderr).text()
     expect({ code: await child.exited, errors: await errors }).toEqual({ code: 0, errors: "" })
@@ -176,38 +194,43 @@ test.each([
       expect(hostError(failure)).toBe(failure)
       expect(await f.store.read()).toEqual(original)
       expect(await Bun.file(f.fault).exists()).toBe(false)
-      if (fault === "before-activate") {
-        expect(await f.store.pending()).toBeUndefined()
-        expect(await f.store.staged(2)).toMatchObject({ url: replacement.url })
-      } else {
-        expect(await f.store.pending()).toMatchObject({ generation: 2, url: replacement.url })
-      }
+      expect(await f.store.pending()).toBeUndefined()
+      if (fault === "before-activate") expect(await f.store.staged(2)).toMatchObject({ url: replacement.url })
+      else expect(await f.store.staged(2)).toBeUndefined()
       expect(await openRun(owner, "after-failure")).toEqual({ generation: 1 })
       await readHelp(owner, "after-failure", 1)
       await owner.request("release", { run: "after-failure" })
 
-      const revision = fault === "before-activate" ? 1 : 2
-      if (fault === "before-activate") {
-        await owner.close()
-        owner = await f.launch()
-        expect(await owner.request("connection.ready", {})).toMatchObject({ generation: 1, url: original.url })
-      }
-      const retry = await validate(owner, revision)
+      await owner.close()
+      owner = await f.launch()
+      expect(await owner.request("connection.ready", {})).toMatchObject({
+        state: "ready",
+        generation: 1,
+        revision: 1,
+        url: original.url,
+      })
+      expect(await f.store.read()).toEqual(original)
+      expect(await openRun(owner, "after-restart")).toEqual({ generation: 1 })
+      await readHelp(owner, "after-restart", 1)
+      await owner.request("release", { run: "after-restart" })
+
+      const generation = fault === "before-activate" ? 3 : 2
+      const retry = await validate(owner, 1)
       const switched = await owner.request("connection.save", retry)
       expect(switched).toMatchObject({
         state: "ready",
-        generation: 3,
+        generation,
         url: replacement.url,
         username: replacement.username,
       })
       expect(switched).not.toHaveProperty("failure")
       expect(await f.store.read()).toMatchObject({
-        generation: 3,
+        generation,
         url: replacement.url,
         password: replacement.password.value,
       })
       await openRun(owner, "retried")
-      await readHelp(owner, "retried", 3)
+      await readHelp(owner, "retried", generation)
     } finally {
       await owner.close()
     }
@@ -217,7 +240,8 @@ test.each([
 
 test("production ignores the CON-08 marker and commits only after replacement readiness", async () => {
   const f = await profile("production-profile", "production")
-  expect(await Bun.file(join(directory, "production/node-host.mjs")).text()).not.toContain("con08-fault")
+  for (const build of ["local", "release", "production"])
+    expect(await Bun.file(join(directory, build, "node-host.mjs")).text()).not.toContain("con08-fault")
   const owner = await f.launch()
   try {
     await owner.request("connection.ready", {})

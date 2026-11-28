@@ -5,6 +5,10 @@ on:
   workflow_call:
   workflow_dispatch:
     inputs:
+      con08-fixture:
+        description: "Build an isolated CON-08 Desktop installer (never publish)"
+        type: boolean
+        default: false
       updater-fixtures:
         description: "Build isolated updater fixtures 0.4.0 and 0.4.1 (never publish)"
         type: boolean
@@ -53,13 +57,14 @@ jobs:
       - name: Verify fixture trust and updater behavior
         working-directory: packages/desktop
         run: |
-          export LOGINOM_AI_AGENT_TEST_NODE="$(command -v node)"
+          LOGINOM_AI_AGENT_TEST_NODE="$(command -v node)"
+          export LOGINOM_AI_AGENT_TEST_NODE
           bun test electron.vite.config.test.ts src/main/update-policy.test.ts src/main/update-sources.test.ts src/main/updater-controller.test.ts
           bun typecheck
 
   # loginom-ai-agent-pty.exe for the CLIs. The reusable workflow builds only the target asked for here.
   pty:
-    if: ${{ !inputs.updater-fixtures && (github.event_name != 'pull_request' || startsWith(github.head_ref, 'v040-batch-') || contains(fromJSON('["dev","loginom"]'), github.base_ref)) }}
+    if: ${{ !inputs.updater-fixtures && !inputs.con08-fixture && (github.event_name != 'pull_request' || startsWith(github.head_ref, 'v040-batch-') || contains(fromJSON('["dev","loginom"]'), github.base_ref)) }}
     uses: ./.github/workflows/loginom-pty.yml
     with:
       targets: '["x86_64-pc-windows-msvc"]'
@@ -68,7 +73,7 @@ jobs:
     # Owner decision v040-ci-platform-batches: pull requests build platform candidates only for integration
     # batches and release PRs; node PRs skip (a skipped job still satisfies required checks).
     needs: pty
-    if: ${{ !inputs.updater-fixtures && (github.event_name != 'pull_request' || startsWith(github.head_ref, 'v040-batch-') || contains(fromJSON('["dev","loginom"]'), github.base_ref)) }}
+    if: ${{ !inputs.updater-fixtures && !inputs.con08-fixture && (github.event_name != 'pull_request' || startsWith(github.head_ref, 'v040-batch-') || contains(fromJSON('["dev","loginom"]'), github.base_ref)) }}
     runs-on: windows-2022
     timeout-minutes: 120
     env:
@@ -406,6 +411,38 @@ jobs:
             ${{ env.LOGINOM_WINDOWS_OUTPUT }}/cli-installed-smoke.json
             ${{ env.LOGINOM_WINDOWS_OUTPUT }}/safe-storage-*.json
           if-no-files-found: warn
+          retention-days: 7
+
+  con08-fixture:
+    if: github.event_name == 'workflow_dispatch' && inputs.con08-fixture
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.19.0"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version-file: package.json
+      - uses: ./.github/actions/setup-loginom-inputs
+      - name: Build and verify the isolated CON-08 installer
+        shell: pwsh
+        env:
+          LOGINOM_AI_AGENT_CON08_TEST_BUILD: "1"
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'con08'
+          & ./script/build-windows.ps1 -Product Desktop -OutputDirectory $output -NodeSource $env:LOGINOM_AI_AGENT_NODE_SOURCE -BrowserSource $env:LOGINOM_AI_AGENT_BROWSER_SOURCE -Channel dev
+          $hostBundle = Join-Path $output 'desktop/win-unpacked/resources/loginom/host/node-host.mjs'
+          if (-not (Select-String -LiteralPath $hostBundle -Pattern 'con08-fault' -SimpleMatch -Quiet)) { throw 'CON-08 fixture missing' }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: loginom-con08-fixture
+          path: ${{ runner.temp }}/con08/desktop/*-win-x64.exe
+          if-no-files-found: error
           retention-days: 7
 
   updater-fixtures:

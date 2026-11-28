@@ -1,6 +1,13 @@
 import { isAbsolute, join } from "node:path"
 
-export async function buildNodeHost(output: string, options: { con08TestBuild?: boolean } = {}) {
+export async function buildNodeHost(output: string, env: NodeJS.ProcessEnv = {}) {
+  const con08TestBuild =
+    env.LOGINOM_AI_AGENT_CON08_TEST_BUILD === "1" &&
+    env.GITHUB_ACTIONS === "true" &&
+    env.GITHUB_EVENT_NAME === "workflow_dispatch" &&
+    env.GITHUB_JOB === "con08-fixture" &&
+    !!env.GITHUB_REPOSITORY &&
+    env.GITHUB_WORKFLOW_REF?.startsWith(`${env.GITHUB_REPOSITORY}/.github/workflows/loginom-windows.yml@`) === true
   if (!isAbsolute(output)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const result = await Bun.build({
     entrypoints: [join(import.meta.dir, "../src/node-entry.ts")],
@@ -9,7 +16,7 @@ export async function buildNodeHost(output: string, options: { con08TestBuild?: 
     target: "node",
     packages: "bundle",
     splitting: false,
-    define: { LOGINOM_AI_AGENT_CON08_TEST_BUILD: JSON.stringify(options.con08TestBuild === true) },
+    define: { LOGINOM_AI_AGENT_CON08_TEST_BUILD: JSON.stringify(con08TestBuild) },
     metafile: true,
   })
   if (!result.success) throw new AggregateError(result.logs, "LOGINOM_HOST_BUILD_FAILED")
@@ -20,5 +27,5 @@ export async function buildNodeHost(output: string, options: { con08TestBuild?: 
 
 if (import.meta.main) {
   if (!process.argv[2]) throw new Error("Provide an absolute host output directory")
-  await buildNodeHost(process.argv[2], { con08TestBuild: process.env.LOGINOM_AI_AGENT_CON08_TEST_BUILD === "1" })
+  await buildNodeHost(process.argv[2], process.env)
 }

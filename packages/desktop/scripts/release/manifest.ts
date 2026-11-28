@@ -1,3 +1,4 @@
+import { verifyProductionHost } from "../../../loginom-host/script/verify-production-host"
 import { Schema } from "effect"
 import { createHash } from "node:crypto"
 import { lstat, readdir, readFile, readlink, realpath, stat } from "node:fs/promises"
@@ -184,6 +185,7 @@ export async function verifyResourceTree(
     }
   }
   if (manifest.target === "linux-x64") await verifyProductSkills(directory)
+  await verifyProductionHost(await containedFile(directory, "host/node-host.mjs"))
   return { target: manifest.target, files: seen.size, node: manifest.node, browser: manifest.browser }
 }
 
