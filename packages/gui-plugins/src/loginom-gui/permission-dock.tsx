@@ -6,6 +6,7 @@ import { DockPrompt } from "@opencode/session-ui/dock-prompt"
 import { Option, Schema } from "effect"
 import { createSignal, For, Show } from "solid-js"
 import type definition from "./index"
+import { initialPermission, permissionTransition } from "./machine"
 import { conversationScope, packageLocation, permissionDescription } from "./permission-model"
 
 const decodeDetails = Schema.decodeUnknownOption(
@@ -24,9 +25,8 @@ export default function PermissionPrompt(props: PermissionDockInput) {
   const request = props.request
   const scope = conversationScope(request)
   const [feedback, setFeedback] = createSignal("")
-  const [pending, setPending] = createSignal(false)
-  const [failed, setFailed] = createSignal(false)
-  const [locked, setLocked] = createSignal(false)
+  const [state, setState] = createSignal(initialPermission)
+  const pending = () => state().type === "pending"
 
   const details = Option.getOrUndefined(decodeDetails(request.metadata?.loginom))
   const path = details?.path
@@ -39,9 +39,10 @@ export default function PermissionPrompt(props: PermissionDockInput) {
   const decodeFailure = Schema.is(Schema.Struct({ type: Schema.Literal("not_grantable") }))
 
   async function answer(decision: "once" | "conversation" | "reject", message?: string) {
-    if (pending()) return
-    setPending(true)
-    setFailed(false)
+    const next = permissionTransition(state(), "submit")
+
+    if (next === state()) return
+    setState(next)
     const notice = message ? ctx.t("traceInstead", { message }) : ctx.t(traces[decision], { action: description })
 
     const target = {
@@ -59,11 +60,8 @@ export default function PermissionPrompt(props: PermissionDockInput) {
           .conversation(target, { ...options, location: { directory: props.directory } })
       else await props.client.permission.reply({ ...target, decision, message }, options)
     } catch (error) {
-      if (!ctx.signal.aborted) {
-        if (decodeFailure(error)) setLocked(true)
-        else setFailed(true)
-        setPending(false)
-      }
+      if (!ctx.signal.aborted)
+        setState((current) => permissionTransition(current, decodeFailure(error) ? "not_grantable" : "failed"))
 
       return
     }
@@ -82,7 +80,7 @@ export default function PermissionPrompt(props: PermissionDockInput) {
           <Button variant="submit" size="normal" disabled={pending()} onClick={() => void answer("once")}>
             {ctx.t("permissionOnce")}
           </Button>
-          <Show when={!locked() && scope}>
+          <Show when={!state().locked && scope}>
             {(key) => (
               <Button variant="neutral" size="normal" disabled={pending()} onClick={() => void answer("conversation")}>
                 {ctx.t("permissionConversation")}
@@ -152,7 +150,7 @@ export default function PermissionPrompt(props: PermissionDockInput) {
             </For>
           </ul>
         </Show>
-        <Show when={!locked() && scope}>
+        <Show when={!state().locked && scope}>
           {(key) => <p class="m-0 py-2 text-text-weak">{ctx.t("permissionScope", { scope: ctx.t(key()) })}</p>}
         </Show>
         <form
@@ -183,10 +181,10 @@ export default function PermissionPrompt(props: PermissionDockInput) {
             {ctx.t("permissionSend")}
           </Button>
         </form>
-        <Show when={locked()}>
+        <Show when={state().locked}>
           <p role="alert">{ctx.t("permissionNotGrantable")}</p>
         </Show>
-        <Show when={failed()}>
+        <Show when={state().type === "failed"}>
           <p role="alert">{ctx.t("permissionFailed")}</p>
         </Show>
       </div>

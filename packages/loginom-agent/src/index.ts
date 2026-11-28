@@ -228,7 +228,8 @@ export default Plugin.define({
     // into `allow`. Core copies session.permissions into forks and children. The plugin store keeps each grant
     // bound to the session that received it, even after a restart.
     const subagents = new Set<string>()
-    const conversationKey = (sessionID: string, kind: Kind) => `permission/conversation/${sessionID}/${kind}`
+    const conversationPrefix = (sessionID: string) => `permission/conversation/${sessionID}/`
+    const conversationKey = (sessionID: string, kind: Kind) => conversationPrefix(sessionID) + kind
     // The product's own directories outside the project, which the agent reads without the «outside the project»
     // question (B2.6a2): the full text of a large tool result (`<data>/tool-output`, where OpenCode and `dock.ts` keep
     // it), the bundled skills' files and the `plan` agent's plans (the directory of `core/src/plugin/plan.ts`).
@@ -353,13 +354,17 @@ export default Plugin.define({
     const stop = new AbortController()
     void (async () => {
       const types = [
+        "session.deleted",
         "session.execution.started",
         "session.execution.succeeded",
         "session.execution.failed",
         "session.execution.interrupted",
       ] as const
       for await (const event of ctx.event.subscribe({ types: [...types], signal: stop.signal })) {
-        if (event.type === "session.execution.started") void hold(event.data.sessionID)
+        if (event.type === "session.deleted") {
+          const prefix = conversationPrefix(event.data.sessionID)
+          await Promise.allSettled(Object.keys(kinds).map((kind) => ctx.storage.remove(prefix + kind)))
+        } else if (event.type === "session.execution.started") void hold(event.data.sessionID)
         else await drop(event.data.sessionID)
       }
     })().catch(() => undefined)
@@ -530,7 +535,13 @@ export default Plugin.define({
           return call.error("not_grantable", `the administrator's policy sets «${kinds[entry.kind]}»`, {
             action: request.action,
           })
-        await ctx.storage.set(conversationKey(input.sessionID, entry.kind), true)
+        const key = conversationKey(input.sessionID, entry.kind)
+        await ctx.storage.set(key, true)
+        // Deletion can run while the RPC checks policy or writes the grant.
+        await ctx.session.get({ sessionID: input.sessionID }).catch(async (error) => {
+          await ctx.storage.remove(key)
+          throw error
+        })
         // The request itself and the session's other open requests the grant now covers are answered once.
         await ctx.permission.reply({ ...input, decision: "once" })
         const open = await ctx.permission.list({ sessionID: input.sessionID })

@@ -759,8 +759,10 @@ for (const decision of ["once", "conversation", "reject", "feedback"] as const) 
 }
 
 
-test("explains a policy lock and leaves a one-time answer available", async ({ page }) => {
+test("explains a policy lock and lets the user retry a one-time answer", async ({ page }) => {
+  const replies: unknown[] = []
   await mockServer(page, {
+    onPermissionReply: (reply) => replies.push(reply.body),
     sessionPermissions: {
       [sessionID]: [{ id: "per_locked", sessionID, action: "webfetch", resources: ["https://example.test"] }],
     },
@@ -776,6 +778,16 @@ test("explains a policy lock and leaves a one-time answer available", async ({ p
   await grant.click()
   await expect(dock.getByRole("alert")).toContainText("Administrator policy")
   await expect(grant).toHaveCount(0)
-  await expect(dock.getByRole("button", { name: "Allow once" })).toBeEnabled()
+  const once = dock.getByRole("button", { name: "Allow once" })
+  await expect(once).toBeEnabled()
   await expect(dock.getByRole("button", { name: "Decline" })).toBeEnabled()
+
+  await page.route(/\/permission\/per_locked\/reply(\?|$)/, (route) => route.fulfill({ status: 500 }), { times: 1 })
+  await once.click()
+  await expect(dock.getByRole("alert").filter({ hasText: "Could not submit the response" })).toBeVisible()
+  await expect(dock.getByRole("alert").filter({ hasText: "Administrator policy" })).toBeVisible()
+  await expect(grant).toHaveCount(0)
+  await once.click()
+  await expect(dock).toHaveCount(0)
+  expect(replies).toEqual([{ decision: "once", notice: "You allowed once: Fetch content from a URL" }])
 })

@@ -49,6 +49,7 @@ story(
 
       return mountPluginPages()
     }, fixture)
+
     const nav = page.getByRole("navigation", { name: "Plugin pages" })
     const entry = nav.getByRole("button", { name: "Example plugin page", exact: true })
 

@@ -305,26 +305,37 @@ const layer = Layer.effect(
       return (yield* evaluateInput(input)).effect === "allow"
     })
 
+    const publishReplyNotice = (request: Request, description?: string) => {
+      if (!description) return Effect.void
+      return Effect.gen(function* () {
+        let sessionID: SessionSchema.ID | undefined = request.sessionID
+        while (sessionID) {
+          const session: SessionSchema.Info | undefined = yield* sessions.get(sessionID)
+          if (!session) break
+          yield* bus.publish(SessionEvent.PermissionReplied, {
+            sessionID,
+            requestID: request.id,
+            description,
+          })
+          sessionID = session.parentID
+        }
+      }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("Could not record permission reply", {
+            sessionID: request.sessionID,
+            requestID: request.id,
+            cause,
+          }),
+        ),
+      )
+    }
+
     const reply = Effect.fn("Permission.reply")((input: ReplyInput) =>
       Effect.uninterruptible(
         Effect.gen(function* () {
           const existing = pending.get(input.requestID)
           if (!existing) return yield* new NotFoundError({ requestID: input.requestID })
           pending.delete(input.requestID)
-          if (input.notice) {
-            const description = input.notice
-            let sessionID: SessionSchema.ID | undefined = existing.request.sessionID
-            while (sessionID) {
-              const session: SessionSchema.Info | undefined = yield* sessions.get(sessionID)
-              if (!session) break
-              yield* bus.publish(SessionEvent.PermissionReplied, {
-                sessionID,
-                requestID: existing.request.id,
-                description,
-              })
-              sessionID = session.parentID
-            }
-          }
           yield* bus.publish(Permission.Event.Replied, {
             sessionID: existing.request.sessionID,
             requestID: existing.request.id,
@@ -350,32 +361,36 @@ const layer = Layer.effect(
               )
               pending.delete(id)
             }
+            yield* publishReplyNotice(existing.request, input.notice)
             return
           }
 
-          if (input.reply === "always" && existing.request.save?.length) {
+          const resources = input.reply === "always" ? existing.request.save : undefined
+          if (resources?.length) {
             yield* saved.add({
               projectID: location.project.id,
               action: existing.request.action,
-              resources: existing.request.save,
+              resources,
             })
           }
           yield* Deferred.succeed(existing.deferred, undefined)
-          if (input.reply !== "always" || !existing.request.save?.length) return
 
-          for (const [id, item] of pending) {
-            const result = yield* evaluateInput({ ...item.request, agent: item.agent }).pipe(
-              Effect.catchTag("Session.NotFoundError", () => Effect.undefined),
-            )
-            if (result?.effect !== "allow") continue
-            yield* bus.publish(Permission.Event.Replied, {
-              sessionID: item.request.sessionID,
-              requestID: item.request.id,
-              reply: "always",
-            })
-            yield* Deferred.succeed(item.deferred, undefined)
-            pending.delete(id)
+          if (resources?.length) {
+            for (const [id, item] of pending) {
+              const result = yield* evaluateInput({ ...item.request, agent: item.agent }).pipe(
+                Effect.catchTag("Session.NotFoundError", () => Effect.undefined),
+              )
+              if (result?.effect !== "allow") continue
+              yield* bus.publish(Permission.Event.Replied, {
+                sessionID: item.request.sessionID,
+                requestID: item.request.id,
+                reply: "always",
+              })
+              yield* Deferred.succeed(item.deferred, undefined)
+              pending.delete(id)
+            }
           }
+          yield* publishReplyNotice(existing.request, input.notice)
         }),
       ),
     )

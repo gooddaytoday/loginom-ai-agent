@@ -16,6 +16,7 @@ const fresh = {
 
 function form(status: Status = fresh) {
   const loaded = transition(initial, { type: "target", available: true }).state
+
   return transition(loaded, { type: "status", attempt: loaded.attempt, result: { ok: true, value: status } }).state
 }
 
@@ -38,11 +39,13 @@ test("an empty password belongs to the password field unless passwordless was se
 
 test("a rejected password stays on its field and allows another check", () => {
   const checking = check().state
+
   const rejected = transition(checking, {
     type: "checked",
     attempt: checking.attempt,
     result: { ok: false, issue: "credentialsRejected" },
   }).state
+
   expect(view(rejected)).toMatchObject({ fieldErrors: { password: "credentialsRejected" }, busy: false })
   expect(check(rejected).effects).toMatchObject([{ type: "check" }])
 })
@@ -70,18 +73,22 @@ test("Save checks first and reports pending activation until the service applies
   const checking = transition(form(), { type: "submit", submit: "save", now: 1000 }).state
   const saved = transition(checking, { type: "checked", attempt: checking.attempt, result: validation })
   expect(saved.effects).toMatchObject([{ type: "save", input: { validationId: "checked" } }])
+
   const pending = transition(saved.state, {
     type: "saved",
     attempt: saved.state.attempt,
     result: { ok: true, value: { ...fresh, revision: 1, state: "pending" } },
   })
+
   expect(view(pending.state)).toMatchObject({ message: "pending", readOnly: true })
   expect(pending.effects).toMatchObject([{ type: "status" }])
+
   const applied = transition(pending.state, {
     type: "status",
     attempt: pending.state.attempt,
     result: { ok: true, value: { ...fresh, revision: 1, generation: 1, state: "ready" } },
   }).state
+
   expect(view(applied)).toMatchObject({ connected: { username: "user", folder: "/user" }, readOnly: false })
 })
 
@@ -93,11 +100,13 @@ test("unavailable, changed targets and disposal ignore late completions", () => 
   expect(transition(gone, result).state).toBe(gone)
 
   const loading = transition(gone, { type: "target", available: true }).state
+
   const timedOut = transition(loading, {
     type: "status",
     attempt: loading.attempt,
     result: { ok: false, issue: "unavailable" },
   }).state
+
   expect(view(timedOut)).toMatchObject({ message: "serviceUnavailable", retry: true })
   const disposed = transition(loading, { type: "disposed" }).state
   expect(transition(disposed, result).state).toBe(disposed)

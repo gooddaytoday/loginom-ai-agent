@@ -10,7 +10,9 @@ import {
 import { Schema } from "effect"
 
 type Draft = { url: string; username: string; password: string; noPassword: boolean }
+
 type Form = { status: Status; draft: Draft }
+
 type State = { attempt: number } & (
   | { type: "unavailable" | "loading" | "disposed" }
   | (Form & { type: "editing"; issue?: Issue })
@@ -57,18 +59,25 @@ function draftCandidate(current: Form): Candidate | { issue: Issue } {
   const { status, draft } = current
   const url = draft.url.trim()
   const username = draft.username.trim()
+
   if (!Schema.is(Address)(url)) return { issue: !url && status.deviceOnly ? "deviceAddress" : "invalidAddress" }
+
   if (!username) return { issue: "invalidUsername" }
   const identity = { revision: status.revision, url, username }
+
   if (draft.noPassword) return { ...identity, password: { operation: "empty" } }
+
   if (draft.password) return { ...identity, password: { operation: "replace", value: draft.password } }
+
   if (preservesPassword(current)) return { ...identity, password: { operation: "preserve" } }
+
   return { issue: "passwordRequired" }
 }
 
 export function transition(state: State, event: Event): Transition {
   const attempt = state.attempt + 1
   const keep = { state, effects: [] }
+
   if (state.type === "disposed") return keep
 
   function save(current: Form, validationId: string) {
@@ -88,51 +97,70 @@ export function transition(state: State, event: Event): Transition {
     case "edit": {
       if (state.type !== "editing" && state.type !== "verified" && state.type !== "checking") return keep
       const draft = { ...state.draft, ...event.patch }
+
       if (draft.noPassword) draft.password = ""
+
       return {
         state: { type: "editing", attempt, draft, status: state.status },
         effects: state.type === "checking" ? [{ type: "cancel" }] : [],
       }
     }
+
     case "submit": {
       if (state.type !== "editing" && state.type !== "verified") return keep
+
       if (event.submit === "save" && state.type === "verified" && event.now < state.validation.expiresAt)
         return save(state, state.validation.validationId)
       const candidate = draftCandidate(state)
+
       if ("issue" in candidate) return failed(state, candidate.issue)
+
       return {
         state: { type: "checking", attempt, draft: state.draft, status: state.status, submit: event.submit },
         effects: [{ type: "check", attempt, input: candidate }],
       }
     }
+
     case "checked":
       if (state.type !== "checking" || event.attempt !== state.attempt) return keep
+
       if (event.result.ok) {
         const validation = event.result.value
+
         if (state.submit === "save") return save(state, validation.validationId)
+
         return {
           state: { type: "verified", attempt, draft: state.draft, status: state.status, validation },
           effects: [],
         }
       }
+
       return failed(state, event.result.issue)
     case "saved":
     case "status": {
       if (event.attempt !== state.attempt) return keep
+
       if (event.type === "saved" && state.type !== "saving") return keep
+
       if (event.type === "status" && state.type !== "loading" && state.type !== "applying") return keep
+
       if (!event.result.ok) {
         if (state.type === "saving") return failed(state, event.result.issue)
+
         return { state: { type: "unavailable", attempt }, effects: [] }
       }
+
       const status = event.result.value
+
       if (!status.failed && (status.state === "pending" || status.state === "starting")) {
         const draft = "draft" in state ? { ...state.draft, password: "" } : form(status).draft
+
         return {
           state: { type: "applying", attempt, status, draft },
           effects: [{ type: "status", attempt, delay: 1000 }],
         }
       }
+
       return { state: { type: "editing", attempt, ...form(status) }, effects: [] }
     }
   }
@@ -151,6 +179,7 @@ function failed(state: Form & { attempt: number }, issue: Issue): Transition {
 export function view(state: State) {
   const form = "draft" in state ? state : undefined
   const issue = state.type === "editing" ? state.issue : undefined
+
   return {
     draft: form?.draft,
     connected: form?.status.state === "ready" && !form.status.failed ? form.status : undefined,
@@ -192,5 +221,26 @@ export function view(state: State) {
     checking: state.type === "checking",
     saving: state.type === "saving",
     retry: state.type === "unavailable" || issue === "changed" || issue === "saveFailed",
+  }
+}
+
+type PermissionState = {
+  readonly type: "ready" | "pending" | "failed"
+  readonly locked: boolean
+}
+
+export const initialPermission: PermissionState = { type: "ready", locked: false }
+
+export function permissionTransition(
+  state: PermissionState,
+  event: "submit" | "failed" | "not_grantable",
+): PermissionState {
+  switch (event) {
+    case "submit":
+      return state.type === "pending" ? state : { ...state, type: "pending" }
+    case "failed":
+      return { ...state, type: "failed" }
+    case "not_grantable":
+      return { type: "ready", locked: true }
   }
 }

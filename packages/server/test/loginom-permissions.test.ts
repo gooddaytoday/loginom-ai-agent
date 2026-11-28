@@ -6,6 +6,8 @@ import { Config } from "@opencode/core/config"
 import { Database } from "@opencode/core/database/database"
 import { llmClient } from "@opencode/core/effect/app-node-platform"
 import { Flag } from "@opencode/core/flag"
+import { KV } from "@opencode/core/kv"
+import { PluginHost } from "@opencode/core/plugin/host"
 import { SdkPlugins } from "@opencode/core/plugin/sdk"
 import { Schedule } from "@opencode/core/schedule"
 import { ScheduleTable } from "@opencode/core/schedule/sql"
@@ -133,6 +135,9 @@ const boot = (
     )
     yield* Effect.forkScoped(Context.get(context, Schedule.Service).run)
     const sessions = Context.get(context, Session.Service)
+    const grants = PluginHost.storage(Context.get(context, KV.Service), "loginom.product")
+    const conversationGrants = (sessionID: string) =>
+      grants.scan({ prefix: `permission/conversation/${sessionID}/` }).pipe(Effect.map((result) => result.entries))
     const handler = Context.get(context, HttpRouter.HttpRouter)
       .asHttpEffect()
       .pipe(HttpEffect.toWebHandlerWith(context))
@@ -239,6 +244,7 @@ const boot = (
       open,
       reply,
       conversation,
+      conversationGrants,
       saved,
       call,
       prompt,
@@ -340,6 +346,35 @@ describe("loginom.product permissions (B2.6a)", () => {
         expect((yield* test.conversation(id, first.id)).status).toBe(200)
         expect((yield* test.open(id)).map((item) => item.id)).toEqual([web.id])
         expect(second.effect).toBe("ask")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "removes only the conversation grants belonging to a deleted session",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const removed = yield* test.create("deleted conversation")
+        const retained = yield* test.create("retained conversation")
+        const edit = { action: "edit", resources: ["file.md"] }
+        const web = { action: "webfetch", resources: ["https://example.test"] }
+        for (const [sessionID, request] of [
+          [removed, edit],
+          [removed, web],
+          [retained, edit],
+        ] as const) {
+          const pending = yield* test.ask(sessionID, request)
+          expect((yield* test.conversation(sessionID, pending.id)).status).toBe(200)
+        }
+        expect(yield* test.conversationGrants(removed)).toHaveLength(2)
+
+        yield* test.sessions.remove(removed)
+        yield* until(() =>
+          test.conversationGrants(removed).pipe(Effect.map((entries) => (entries.length === 0 ? entries : undefined))),
+        )
+        expect(yield* test.conversationGrants(retained)).toHaveLength(1)
+        expect((yield* test.ask(retained, edit)).effect).toBe("allow")
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )

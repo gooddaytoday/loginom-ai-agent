@@ -36,7 +36,8 @@
       "paths": [
         "packages/core/src/permission.ts", "packages/core/src/plugin/host.ts", "packages/core/src/session/message-updater.ts",
         "packages/core/src/session/projector.ts", "packages/core/src/session/runner/to-llm-message.ts",
-        "packages/schema/src/session-event.ts", "packages/protocol/src/groups/permission.ts", "packages/protocol/openapi.json",
+        "packages/core/test/permission.test.ts", "packages/schema/src/session-event.ts",
+        "packages/schema/test/event-manifest.test.ts", "packages/protocol/src/groups/permission.ts", "packages/protocol/openapi.json",
         "packages/server/src/handlers/permission.ts", "packages/server/test/loginom-permissions.test.ts",
         "packages/server/test/loginom-dock-catalog.test.ts", "packages/client/src/solid/data.ts",
         "packages/client/src/effect/api/api.ts", "packages/client/src/effect/generated/client.ts",

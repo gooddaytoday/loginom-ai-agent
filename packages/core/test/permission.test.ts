@@ -16,6 +16,7 @@ import { Session } from "@opencode/core/session"
 import { SessionTable } from "@opencode/core/session/sql"
 import { SessionStore } from "@opencode/core/session/store"
 import { ShellParse } from "@opencode/core/shell/parse"
+import { SessionEvent } from "@opencode/schema/session-event"
 import { eq } from "drizzle-orm"
 import { location } from "./fixture/location"
 import { testEffect } from "./lib/effect"
@@ -364,6 +365,37 @@ describe("Permission", () => {
       expect(yield* service.list()).toEqual([])
     }),
   )
+
+  for (const reply of ["once", "reject"] as const) {
+    it.effect(`settles ${reply} when recording the reply fails`, () =>
+      Effect.gen(function* () {
+        yield* setup()
+        const bus = yield* Bus.Service
+        let attempted = false
+        yield* bus.project(SessionEvent.PermissionReplied, () =>
+          Effect.sync(() => {
+            attempted = true
+          }).pipe(Effect.andThen(Effect.die(new Error("receipt write failed")))),
+        )
+        const { service, fiber, request } = yield* waitForRequest()
+        yield* service.reply({ requestID: request.id, reply, notice: "permission answered" })
+
+        const result = yield* Fiber.await(fiber)
+        expect(attempted).toBe(true)
+        expect(yield* service.get(request.id)).toBeUndefined()
+        if (reply === "once") expect(result._tag).toBe("Success")
+        else {
+          expect(result._tag).toBe("Failure")
+          if (result._tag === "Failure")
+            expect(
+              result.cause.reasons.some(
+                (reason) => Cause.isDieReason(reason) && reason.defect instanceof Permission.DeclinedError,
+              ),
+            ).toBe(true)
+        }
+      }),
+    )
+  }
 
   it.effect("stores and removes saved resources for a project", () =>
     Effect.gen(function* () {
