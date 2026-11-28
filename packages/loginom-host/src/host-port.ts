@@ -6,6 +6,7 @@ import { hostException, hostFailure } from "./errors"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 import { HostTaskScope } from "./task-scope"
 import { DashboardDelete, DashboardRead, DashboardPublish } from "./dashboard"
+import { PackageRecheck } from "./package-access"
 import { Schema } from "effect"
 import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
 import { browserRecoveryToolName, isBrowserRecoveryTool } from "../../loginom-runtime/client/lib/browser-recovery.mjs"
@@ -73,6 +74,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     string,
     {
       chat: string
+      sessionID: string
       lease?: NonNullable<ReturnType<typeof service.acquire>>
       calls: number
       dispatching: boolean
@@ -239,6 +241,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
           runs.set(input.run, {
             chat,
+            sessionID: input.session,
             calls: 0,
             dispatching: false,
             released: false,
@@ -607,7 +610,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             run.admitted.clear()
             run.catalog = new Set([prepareTool.name])
           }
-          const runtime = await service.runtime(lease.generation, run.chat, preparation)
+          const runtime = await service.runtime(lease.generation, run.chat, preparation, run.sessionID)
           if (packageAborted()) throw new Error("LOGINOM_RUN_ABORTED")
           const packageArtifact = packageAdmission
             ? await runtime.request("admit", packageAdmission).then((value) => {
@@ -683,7 +686,24 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             }
           }
           if (isBrowserRecoveryTool(input.name)) run.recovery = recoveryPhase(result.result, run.recovery)
-          reply({ id: data.id, result: result.result }, lease.generation)
+          const candidate = input.name === prepareTool.name && "packagePath" in result
+            ? { sessionID: run.sessionID, packagePath: result.packagePath }
+            : undefined
+          const packageAccess = Schema.is(PackageRecheck)(candidate)
+            ? await service.packageAccess(candidate, lease.generation).catch(() => undefined)
+            : undefined
+          const body = result.result
+          if (packageAccess && body && typeof body === "object") {
+            const meta = "_meta" in body && body._meta && typeof body._meta === "object" ? body._meta : {}
+            const fields =
+              "loginomFields" in meta && meta.loginomFields && typeof meta.loginomFields === "object"
+                ? meta.loginomFields
+                : {}
+            const enriched = { ...body, _meta: { ...meta, loginomFields: { ...fields, packageAccess } } }
+            reply({ id: data.id, result: enriched }, lease.generation)
+          } else {
+            reply({ id: data.id, result: body }, lease.generation)
+          }
         } catch (error) {
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE") throw error
           // A journal write failure precedes runtime dispatch and cannot establish
