@@ -134,6 +134,7 @@ export type SessionListInput = {
   readonly limit?: number | undefined
   readonly order?: "asc" | "desc" | undefined
   readonly search?: string | undefined
+  readonly searchField?: "title" | "project" | "prompt" | undefined
   readonly parentID?: Session.ID | null | undefined
   readonly archived?: boolean | undefined
   readonly directory?: AbsolutePath | undefined
@@ -311,6 +312,20 @@ export type SessionInboxCancelOperation<E = never> = (
   input: SessionInboxCancelInput,
 ) => Effect.Effect<SessionInboxCancelOutput, E>
 
+export type SessionInboxEditInput = {
+  readonly sessionID: Session.ID
+  readonly inboxID: SessionMessage.ID
+  readonly text: string
+  readonly files?: ReadonlyArray<PromptInput.FileAttachment> | undefined
+  readonly agents?: ReadonlyArray<AgentAttachment> | undefined
+  readonly skills?: ReadonlyArray<PromptInput.SkillAttachment> | undefined
+  readonly metadata?: { readonly [x: string]: unknown } | undefined
+}
+export type SessionInboxEditOutput = void
+export type SessionInboxEditOperation<E = never> = (
+  input: SessionInboxEditInput,
+) => Effect.Effect<SessionInboxEditOutput, E>
+
 export type SessionInboxUpdateInput = {
   readonly sessionID: Session.ID
   readonly inboxID: SessionMessage.ID
@@ -435,6 +450,7 @@ export interface SessionApi<E = never> {
   readonly inbox: {
     readonly list: SessionInboxListOperation<E>
     readonly cancel: SessionInboxCancelOperation<E>
+    readonly edit: SessionInboxEditOperation<E>
     readonly update: SessionInboxUpdateOperation<E>
   }
   readonly generate: SessionGenerateOperation<E>
@@ -819,6 +835,21 @@ export type ExperimentalSessionLogOutput =
             | { readonly directory: AbsolutePath; readonly workspaceID?: Workspace.ID | undefined }
             | undefined
           readonly data: { readonly sessionID: Session.ID; readonly inboxID: SessionMessage.ID }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.inbox.edited"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | { readonly directory: AbsolutePath; readonly workspaceID?: Workspace.ID | undefined }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly inboxID: SessionMessage.ID
+            readonly payload: SessionInbox.UserPayload
+          }
         }
       | {
           readonly id: Event.ID
@@ -2093,6 +2124,7 @@ export type EventSubscribeInput = {
         | "session.inbox.delivered"
         | "session.inbox.enqueued"
         | "session.inbox.cancelled"
+        | "session.inbox.edited"
         | "session.inbox.delivery.changed"
         | "session.execution.started"
         | "session.execution.succeeded"

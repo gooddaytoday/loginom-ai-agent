@@ -82,6 +82,7 @@ export function createNewSessionComposerAdapter(props: {
   root: () => string
   branch: () => string | undefined
   submitted: () => void
+  captureStarted: () => () => void
   mcp: DraftMcpControls
   start: NewSessionStartStore
 }) {
@@ -133,6 +134,7 @@ export function createNewSessionComposerAdapter(props: {
           toggling: !prepare && worktree !== "create" && props.mcp.toggling(directory),
         },
         (attempt) => {
+          const started = props.captureStarted()
           const pending = tabs.prepareSession(
             props.draftID,
             { server: server.key, sessionId: sessionID },
@@ -274,6 +276,7 @@ export function createNewSessionComposerAdapter(props: {
                 complete: () => pending.complete(submission.target()),
                 session: createdSession(effect.sessionID, effect.directory),
               })
+              started()
 
               return
             }

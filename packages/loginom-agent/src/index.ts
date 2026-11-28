@@ -340,7 +340,10 @@ export default Plugin.define({
     // `package-docs` grant.
     const profiles = join(Global.Path.data, "file-profiles")
     const files = await localFiles(ctx, profiles)
-    const repeats = repeatGuard(async () => (await ctx.tool.list()).find((tool) => tool.id === "question"))
+    const repeats = repeatGuard({
+      ask: ctx.tool.ask,
+      interrupt: (sessionID) => ctx.session.interrupt({ sessionID }),
+    })
     await ctx.tool.transform((editor) => {
       editor.add(
         repeats.wrap(
@@ -425,7 +428,7 @@ export default Plugin.define({
       hide(event)
     })
     await ctx.tool.hook("execute.before", async (event) => {
-      if (!repeats.tracks(event.tool)) repeats.reset(event.sessionID)
+      repeats.before(event.sessionID, event.tool)
       await bound(event.sessionID)
       if (!permits(profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
@@ -529,6 +532,11 @@ export default Plugin.define({
     await ctx.rpc.register(DashboardTarget.rpc, {
       prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),
       find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),
+      preview: async (value, call) => {
+        if (!Dashboard.isWork(ctx.location.directory)) return {}
+        const url = await drafts.preview((value as { id: string }).id, call.signal)
+        return url ? { url } : {}
+      },
     })
     await ctx.rpc.register(permission, {
       conversation: async (value, call) => {

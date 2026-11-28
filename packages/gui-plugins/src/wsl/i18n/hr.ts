@@ -21,12 +21,12 @@ export default {
   "onboarding.needAnotherDistroHint": "Instalirajte Linux distribuciju iz WSL kataloga",
   "onboarding.wslNotInstalled.title": "WSL nije instaliran",
   "onboarding.wslNotInstalled.description":
-    "WSL (Windows podsustav za Linux) je potreban prije nego što OpenCode može dodati WSL poslužitelj",
+    "WSL (Windows podsustav za Linux) je potreban prije nego što Loginom AI Agent može dodati WSL poslužitelj",
   "onboarding.wslUnavailable.title": "WSL nedostupan",
-  "onboarding.wslUnavailable.description": "OpenCode nije mogao potvrditi WSL na ovom stroju.",
+  "onboarding.wslUnavailable.description": "Loginom AI Agent nije mogao potvrditi WSL na ovom stroju.",
   "onboarding.installWsl": "Instalirajte WSL",
   "onboarding.windowsRestartRequired":
-    "Ponovo pokrenite Windows da dovršite instalaciju WSL, zatim ponovno otvorite OpenCode.",
+    "Ponovo pokrenite Windows da dovršite instalaciju WSL, zatim ponovno otvorite Loginom AI Agent.",
   "onboarding.allDistrosAdded": "Sve instalirane distribucije su već dodane.",
   "onboarding.noDistros": "Još nije otkrivena nijedna distribucija.",
   "onboarding.installDistro": "Instalirajte distro",

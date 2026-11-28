@@ -21,12 +21,12 @@ export default {
   "onboarding.needAnotherDistroHint": "WSL kataloğundan bir Linux dağıtımı kurun",
   "onboarding.wslNotInstalled.title": "WSL kurulu değil",
   "onboarding.wslNotInstalled.description":
-    "OpenCode'un WSL sunucusu ekleyebilmesi için önce WSL (Linux için Windows Alt Sistemi) kurulmalıdır",
+    "Loginom AI Agent'un WSL sunucusu ekleyebilmesi için önce WSL (Linux için Windows Alt Sistemi) kurulmalıdır",
   "onboarding.wslUnavailable.title": "WSL kullanılamıyor",
-  "onboarding.wslUnavailable.description": "OpenCode bu makinede WSL'yi doğrulayamadı.",
+  "onboarding.wslUnavailable.description": "Loginom AI Agent bu makinede WSL'yi doğrulayamadı.",
   "onboarding.installWsl": "WSL'yi kur",
   "onboarding.windowsRestartRequired":
-    "WSL kurulumunu tamamlamak için Windows'u yeniden başlatın, ardından OpenCode'u tekrar açın.",
+    "WSL kurulumunu tamamlamak için Windows'u yeniden başlatın, ardından Loginom AI Agent'u tekrar açın.",
   "onboarding.allDistrosAdded": "Kurulu tüm dağıtımlar zaten eklenmiş.",
   "onboarding.noDistros": "Henüz dağıtım algılanmadı.",
   "onboarding.installDistro": "Dağıtım kur",
