@@ -71,9 +71,11 @@ export function Composer(props: {
                 {language.t("session.modelStop.retryLimit")}
               </Button>
             </Show>
-            <Button size="small" variant="neutral" onClick={() => command.trigger("model.choose")}>
-              {language.t("session.modelStop.chooseAlternative")}
-            </Button>
+            <Show when={status().changeModel}>
+              <Button size="small" variant="neutral" onClick={() => command.trigger("model.choose")}>
+                {language.t("session.modelStop.chooseAlternative")}
+              </Button>
+            </Show>
           </div>
         )}
       </Show>

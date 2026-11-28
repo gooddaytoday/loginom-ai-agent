@@ -9,6 +9,7 @@ import {
   createRoot,
   createSignal,
   getOwner,
+  mapArray,
   onCleanup,
   untrack,
 } from "solid-js"
@@ -249,15 +250,42 @@ function createServerController(
         return
       }
 
-      // A failure can arrive for a session whose transcript has never been opened in this window.
-      void sdk.api.session.message
-        .get({ sessionID, messageID: assistantMessageID }, { signal: AbortSignal.timeout(10_000) })
-        .then((message) => {
-          if (message.type === "assistant") freeModelLimits.remember(message, created, error.retryAfterMs)
-        })
-        .catch(() => undefined)
+      freeModelLimits.rememberUnresolved({
+        sessionID,
+        messageID: assistantMessageID,
+        failedAt: created,
+        retryAfterMs: error.retryAfterMs,
+      })
     }),
   )
+
+  const resolveLimitFailures = mapArray(freeModelLimits.unresolved, (failure) => {
+    const controller = new AbortController()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let delay = 1_000
+
+    const resolve = async () => {
+      const { sessionID, messageID, failedAt, retryAfterMs } = failure
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)])
+      const message = await sdk.api.session.message.get({ sessionID, messageID }, { signal }).catch(() => undefined)
+
+      if (controller.signal.aborted) return
+
+      if (message?.type === "assistant" && freeModelLimits.remember(message, failedAt, retryAfterMs)) return
+
+      timer = setTimeout(() => void resolve(), delay)
+      delay = Math.min(delay * 2, 30_000)
+    }
+
+    onCleanup(() => {
+      controller.abort()
+      clearTimeout(timer)
+    })
+
+    void resolve()
+  })
+
+  createEffect(resolveLimitFailures)
 
   // Transcripts otherwise stay loaded for every session this window ever opened. Open tabs and the three most
   // recently viewed sessions keep theirs; any other session reloads its transcript when it is opened again.

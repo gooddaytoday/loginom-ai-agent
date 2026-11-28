@@ -16,6 +16,7 @@ export const dict = {
   "session.modelStop.chooseAlternative": "Change model",
   "session.modelStop.limitLabel": "Daily limit reached — resets at {{time}}",
   "session.modelStop.limitUnknown": "Daily limit reached",
+  "session.modelStop.limitUnresolved": "Daily limit reached. Model unknown, checking this connection…",
   "session.modelStop.retryLimit": "Try again",
   "session.modelStop.modelLimitUntil": "limit until {{time}}",
   "session.modelStop.modelLimitUnknown": "limit reached",

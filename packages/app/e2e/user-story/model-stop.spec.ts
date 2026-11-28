@@ -43,6 +43,42 @@ function history(
   ]
 }
 
+function freeLimitFailure(input: {
+  sessionID: string
+  directory: string
+  messageID: string
+  model: typeof model
+  time: number
+  retryAfterMs?: number
+}) {
+  const error = {
+    type: "provider.free-limit",
+    message: "Test provider refused the request",
+    status: 429,
+    retryAfterMs: input.retryAfterMs,
+  }
+  const message = {
+    type: "assistant",
+    id: input.messageID,
+    time: { created: input.time, completed: input.time },
+    model: input.model,
+    agent: "build",
+    content: [],
+    finish: "error",
+    error,
+  } satisfies SessionMessageAssistant
+  const event = {
+    id: `evt_${input.messageID}`,
+    created: input.time,
+    type: "session.step.failed",
+    location: { directory: input.directory },
+    durable: { aggregateID: input.sessionID, seq: 1, version: 1 },
+    data: { sessionID: input.sessionID, assistantMessageID: message.id, error },
+  } satisfies OpenCodeEvent
+
+  return { message, event }
+}
+
 for (const viewport of [{ width: 1440, height: 900 }, narrowViewport]) {
   test(`continues after the free limit at ${viewport.width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport)
@@ -322,6 +358,126 @@ test("holds a daily limit without a reset time until an explicit retry", async (
   await editor.fill(next)
   await editor.press("Enter")
   await expect.poll(() => prompts).toEqual([draft, next])
+})
+
+test("keeps limits for different models recorded in two tabs", async ({ page, context }) => {
+  const now = new Date("2026-11-27T02:00:00Z")
+  const secondPage = await context.newPage()
+  const prompts: string[] = []
+  await seed(secondPage, { locale: "ru" })
+  await Promise.all([page.clock.setFixedTime(now), secondPage.clock.setFixedTime(now)])
+
+  const open = async (tab: typeof page, selected: typeof model, suffix: string, retryAfterMs?: number) => {
+    const otherSession = `ses_background_${suffix}`
+    const directory = "C:/OpenCode/Two limit tabs"
+    const failure = freeLimitFailure({
+      sessionID: otherSession,
+      directory,
+      messageID: `msg_limit_${suffix}`,
+      model: selected,
+      time: now.getTime(),
+      retryAfterMs,
+    })
+    const view = await openSession(tab, {
+      name: "Две вкладки",
+      directory,
+      sessions: [
+        { id: `ses_draft_${suffix}`, title: `Запрос ${suffix}`, model: selected },
+        { id: otherSession, title: `Фоновый разговор ${suffix}`, model: selected },
+      ],
+      provider: provider({ id: model.id, name: "Бесплатная модель" }, { id: "second-test", name: "Вторая модель" }),
+      pageMessages: (id) => ({ items: id === otherSession ? [failure.message] : [] }),
+      onPrompt: ({ sessionID }) => void prompts.push(sessionID),
+    })
+
+    return { ...view, event: failure.event }
+  }
+
+  const first = await open(page, model, "a", 3_600_000)
+  const second = await open(secondPage, { ...model, id: "second-test" }, "b")
+  await first.push([first.event])
+  await expect(page.getByRole("status").filter({ hasText: "обновится в 03:00" })).toBeVisible()
+  await second.push([second.event])
+  await expect(secondPage.getByRole("status").filter({ hasText: "Дневной лимит исчерпан" })).toBeVisible()
+
+  const showBoth = async (tab: typeof page) => {
+    await tab.getByRole("button", { name: "Сменить модель", exact: true }).click()
+    const dialog = tab.getByRole("dialog")
+    await expect(dialog.locator('[data-option-key="opencode:free-test"]')).toContainText("лимит до 03:00")
+    await expect(dialog.locator('[data-option-key="opencode:second-test"]')).toContainText("лимит исчерпан")
+    await tab.keyboard.press("Escape")
+    await expect(dialog).toHaveCount(0)
+  }
+
+  await showBoth(page)
+  await page.reload()
+  await showBoth(page)
+  await first.editor.fill("Построй график")
+  await first.editor.press("Enter")
+  await expect(first.editor).toHaveText("Построй график")
+  expect(prompts).toEqual([])
+})
+
+test("keeps an unidentified limit through failed lookups and a reload", async ({ page }, testInfo) => {
+  await page.setViewportSize(narrowViewport)
+  const now = new Date("2026-11-27T02:00:00Z")
+  await page.clock.install({ time: now })
+  const directory = "C:/OpenCode/Unknown limit model"
+  const otherSession = "ses_unreadable_limit"
+  const failure = freeLimitFailure({
+    sessionID: otherSession,
+    directory,
+    messageID: "msg_unreadable_limit",
+    model: { ...model, id: "second-test" },
+    time: now.getTime(),
+  })
+  let readable = false
+  const prompts: unknown[] = []
+  const view = await openSession(page, {
+    name: "Модель не определена",
+    directory,
+    sessions: [
+      { id: sessionID, title: "Текущий разговор", model },
+      { id: otherSession, title: "Фоновый разговор", model: failure.message.model },
+    ],
+    provider: provider({ id: model.id, name: "Бесплатная модель" }, { id: "second-test", name: "Вторая модель" }),
+    pageMessages: () => ({ items: [] }),
+    message: () => (readable ? failure.message : undefined),
+    onPrompt: ({ body }) => void prompts.push(body.text),
+  })
+  const messageResponse = (status: number) =>
+    page.waitForResponse((response) => response.url().includes(failure.message.id) && response.status() === status)
+  const missing = messageResponse(404)
+  await view.push([failure.event])
+  await missing
+  const warning = page.getByRole("status").filter({ hasText: "Модель не определена" })
+  await expect(warning).toBeVisible()
+  await expect(warning).not.toContainText("обновится")
+
+  const missingAfterReload = messageResponse(404)
+  await page.reload()
+  await missingAfterReload
+  await expect(warning).toBeVisible()
+  const draft = "Построй график"
+  await view.editor.fill(draft)
+  await view.editor.press("Enter")
+  await expect(view.editor).toHaveText(draft)
+  expect(prompts).toEqual([])
+  await page.screenshot({ path: testInfo.outputPath("composer-limit-unidentified-390.png") })
+
+  readable = true
+  const found = messageResponse(200)
+  await page.clock.fastForward(10_000)
+  await found
+  await expect(warning).toHaveCount(0)
+  await page.locator('[data-action="composer-model"]').click()
+  const dialog = page.getByRole("dialog")
+  await expect(dialog.locator('[data-option-key="opencode:second-test"]')).toContainText("лимит исчерпан")
+  await expect(dialog.locator('[data-option-key="opencode:free-test"]')).not.toContainText("лимит")
+  await page.keyboard.press("Escape")
+  await expect(dialog).toHaveCount(0)
+  await view.editor.press("Enter")
+  await expect.poll(() => prompts).toEqual([draft])
 })
 
 for (const action of ["provider.use", "integration.connect"] as const) {

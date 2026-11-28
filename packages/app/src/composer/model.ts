@@ -38,7 +38,7 @@ import { parseClientSlashCommand } from "./client-slash-command"
 
 export type ComposerModel = ComposerEditorModel & {
   readonly model: ComposerControls["model"]
-  readonly modelStatus?: { text: string; retry?: () => void }
+  readonly modelStatus?: { text: string; changeModel?: true; retry?: () => void }
 }
 
 const sendFailedTitle = {
@@ -305,11 +305,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
   const submission = createComposerSubmit({
     adapter,
     mode,
-    modelLimited: () => {
-      const model = selectedModel()
-
-      return !!model && !freeModelLimits.canSend(model)
-    },
+    modelLimited: () => !freeModelLimits.canSend(selectedModel()),
     commands: () => data.location.command.list({ directory: sdk().directory }),
     editor: () => editor,
     queueScroll: () => requestAnimationFrame(() => editor?.scrollIntoView({ block: "nearest" })),
@@ -592,6 +588,8 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     model: { get: () => adapter.controls().model },
     modelStatus: {
       get: () => {
+        if (freeModelLimits.unresolved().length) return { text: language.t("session.modelStop.limitUnresolved") }
+
         const model = selectedModel()
         const limit = model && freeModelLimits.limit(model)
 
@@ -600,6 +598,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
         if (limit.resetAt === null)
           return {
             text: language.t("session.modelStop.limitUnknown"),
+            changeModel: true,
             retry: () => {
               const current = selectedModel()
 
@@ -608,7 +607,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
           }
         const time = new Intl.DateTimeFormat(language.locale(), { timeStyle: "short" }).format(limit.resetAt)
 
-        return { text: language.t("session.modelStop.limitLabel", { time }) }
+        return { text: language.t("session.modelStop.limitLabel", { time }), changeModel: true }
       },
     },
   })

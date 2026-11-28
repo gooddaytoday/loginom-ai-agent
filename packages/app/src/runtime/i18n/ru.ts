@@ -14,6 +14,7 @@ export const dict = {
   "session.modelStop.chooseAlternative": "Сменить модель",
   "session.modelStop.limitLabel": "Лимит на сегодня исчерпан — обновится в {{time}}",
   "session.modelStop.limitUnknown": "Дневной лимит исчерпан",
+  "session.modelStop.limitUnresolved": "Дневной лимит исчерпан. Модель не определена, проверяем подключение…",
   "session.modelStop.retryLimit": "Попробовать снова",
   "session.modelStop.modelLimitUntil": "лимит до {{time}}",
   "session.modelStop.modelLimitUnknown": "лимит исчерпан",
