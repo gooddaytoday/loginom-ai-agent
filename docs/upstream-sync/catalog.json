@@ -3,6 +3,38 @@
   "against": "a6b15d33daf6ab7d35569f6d711fdb630b9f04e7",
   "entries": [
     {
+      "id": "CAT-28",
+      "title": "Tool decision forms and timeline groups (C3 B6)",
+      "paths": [
+        "packages/core/src/plugin/host.ts",
+        "packages/core/test/lib/tool.ts",
+        "packages/core/test/plugin/host.ts",
+        "packages/core/test/plugin/plan.test.ts",
+        "packages/plugin/src/effect/tool.ts",
+        "packages/plugin/src/promise/adapter.ts",
+        "packages/plugin/src/promise/tool.ts",
+        "packages/plugin/src/gui/builtin.ts",
+        "packages/app/src/runtime/plugin/host.tsx",
+        "packages/app/src/session/requests/question-controller.ts",
+        "packages/app/src/session/requests/session-question-dock.tsx",
+        "packages/app/e2e/regression/loginom-repeat-question.spec.ts",
+        "packages/app/component-tests/plugin-host.spec.ts",
+        "packages/app/component-tests/plugin-host.fixture.tsx",
+        "packages/gui-plugins/AGENTS.md",
+        "packages/gui-plugins/README.md",
+        "packages/gui-plugins/src/loginom-gui/renderer.tsx",
+        "packages/gui-plugins/src/loginom-gui/repeat-dock.tsx",
+        "packages/server/test/loginom-access.test.ts",
+        "packages/tui/test/mini/blocker.responsive.test.tsx",
+        "packages/session-ui/src/components/tool-group-row.tsx",
+        "packages/session-ui/src/message/tool-group.ts",
+        "packages/session-ui/src/timeline/projection.ts",
+        "packages/session-ui/src/timeline-next/projection.ts",
+        "packages/session-ui/src/timeline-next/tools/tool-display.tsx",
+        "packages/session-ui/src/tools/tool-renderer.tsx"
+      ]
+    },
+    {
       "id": "CAT-01",
       "title": "Manifests and lockfile",
       "paths": ["bun.lock", "**/package.json"],
@@ -65,15 +97,35 @@
     },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7" },
     {
+      "id": "CAT-25",
+      "title": "Durable next-turn queue and atomic queued prompt edits (C3.15)",
+      "paths": [
+        "packages/core/src/session.ts", "packages/core/src/session/session.ts",
+        "packages/core/src/session/execution.ts", "packages/core/src/session/run-coordinator.ts",
+        "packages/core/src/session/runner/llm.ts", "packages/core/src/session/subagent-job.ts",
+        "packages/core/src/session/inbox.ts", "packages/core/src/session/projector.ts", "packages/core/src/session/store.ts",
+        "packages/core/src/session/message-updater.ts", "packages/core/test/session-runner.test.ts",
+        "packages/schema/src/session-event.ts", "packages/schema/test/event-manifest.test.ts",
+        "packages/protocol/openapi.json", "packages/client/src/effect/api/api.ts",
+        "packages/client/src/effect/generated/client.ts", "packages/server/test/media.test.ts",
+        "packages/client/src/solid/data.ts", "packages/client/test/solid-inbox-race.test.ts",
+        "packages/app/src/shell/notifications/notification.tsx", "packages/app/test-browser/server-notification-state.test.ts"
+      ]
+    },
+    {
       "id": "CAT-13",
       "title": "Product storage root and own background service (U5)",
+      "note": "C5.4: Desktop initialization starts the fork's proxy detection; background-service.ts consumes its environment at spawn. LAB-2276: Service discovery and stop distinguish an unreaped Linux process from a live service. Registration publication and conditional removal serialize through the same per-registration filesystem lock.",
       "paths": [
         "packages/util/src/global.ts", "packages/client/src/service-probe.ts", "packages/cli/src/services/service-config.ts",
         "packages/desktop/src/main/service/sidecar-probe.ts", "packages/desktop/src/main/service/background-service.ts",
+        "packages/desktop/src/main/lifecycle/desktop-initialization.ts",
         "packages/desktop/src/main/native/logging.ts", "packages/core/src/config/discovery.ts",
         "packages/process-daemon/src/daemon.rs", "packages/process-daemon/src/daemon/unix.rs", "packages/process-daemon/src/client.rs",
         "packages/server/src/process.ts", "packages/client/src/service-timing.ts", "packages/client/src/promise/service.ts",
-        "packages/client/src/effect/service.ts", "packages/cli/src/shutdown-deadline.ts",
+        "packages/client/src/effect/service.ts", "packages/client/src/service-registration-lock.ts",
+        "packages/client/package.json", "bun.lock", "packages/cli/src/services/service-registration.ts",
+        "packages/cli/src/shutdown-deadline.ts",
         "packages/server/test/process.test.ts", "packages/client/test/fixture/service.ts",
         "packages/client/test/fixture/service-timing.ts", "packages/client/test/promise-service.test.ts",
         "packages/client/test/service.test.ts", "packages/cli/test/service.test.ts",
@@ -107,7 +159,12 @@
         "packages/ui/src/i18n/en.ts"
       ]
     },
-    { "id": "CAT-09", "title": "Desktop main process, preload, renderer and window tests", "paths": ["packages/desktop/**"] },
+    {
+      "id": "CAT-09",
+      "title": "Desktop main process, preload, renderer and window tests",
+      "note": "Plugin inventory is ready without waiting for the bundled CLI; setup still resolves the CLI before starting a main plugin (LAB-2276).",
+      "paths": ["packages/desktop/**"]
+    },
     {
       "id": "CAT-21",
       "title": "Built-in plugin top-level pages",
@@ -139,7 +196,26 @@
       "title": "Built-in plugin page navigation for dashboard links",
       "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
     },
-    { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
+    {
+      "id": "CAT-10",
+      "title": "Web app, UI kit, session UI and Loginom localization",
+      "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"],
+      "notes": {
+        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events."
+      }
+    },
+    {
+      "id": "CAT-15",
+      "title": "Conversation search fields and sidebar shortcut (C1.5)",
+      "paths": [
+        "packages/schema/src/session.ts", "packages/core/src/session/store.ts", "packages/core/test/session-list.test.ts",
+        "packages/protocol/openapi.json", "packages/client/src/effect/api/api.ts", "packages/client/src/effect/generated/client.ts"
+      ],
+      "notes": {
+        "packages/app/src/shell/commands/session-search.tsx": "Keeps successful search results when a field fails. The palette displays an inline prompt search status (CAT-10).",
+        "packages/app/e2e/regression/home.spec.ts": "Covers title and project matches during a prompt search failure and clears the status after recovery."
+      }
+    },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
     { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }
   ]

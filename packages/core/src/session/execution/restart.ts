@@ -501,7 +501,7 @@ export const layer = (options?: Options) =>
             direct,
             Effect.fnUntraced(function* (sessionID) {
               suspended.delete(sessionID)
-              yield* execution.resume(sessionID).pipe(Effect.ignore, Effect.forkIn(scope))
+              yield* execution.resume(sessionID, { continuation: true }).pipe(Effect.ignore, Effect.forkIn(scope))
             }),
             { concurrency: "unbounded", discard: true },
           )
@@ -512,7 +512,10 @@ export const layer = (options?: Options) =>
           yield* Effect.forEach(
             resumable,
             Effect.fnUntraced(function* ({ background, recovery }) {
-              yield* SubagentJob.start(jobs, execution, recovery, background.notificationID)
+              yield* SubagentJob.start(jobs, execution, recovery, {
+                notificationID: background.notificationID,
+                continuation: true,
+              })
               suspended.delete(recovery.childSessionID)
             }),
             { discard: true },

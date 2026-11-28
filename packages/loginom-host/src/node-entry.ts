@@ -3,7 +3,7 @@ import { isAbsolute } from "node:path"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
 import { createLoginomHost } from "./host"
-import { loginomHostPort, type HostPort } from "./host-port"
+import { chatId, loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
 import { DashboardRead } from "./dashboard"
@@ -32,7 +32,9 @@ const port: HostPort = {
 }
 const candidate = Schema.decodeUnknownOption(Loginom.Candidate)
 const save = Schema.decodeUnknownOption(Loginom.Save)
-const turn = Schema.decodeUnknownOption(Schema.Struct({ id: Schema.String, active: Schema.Boolean }))
+const turn = Schema.decodeUnknownOption(
+  Schema.Struct({ id: Schema.String, session: Schema.NonEmptyString, active: Schema.Boolean }),
+)
 const cancel = Schema.decodeUnknownOption(Loginom.Cancel)
 const recover = Schema.decodeUnknownOption(Loginom.AcknowledgeRecovery)
 
@@ -108,7 +110,7 @@ async function dispatch(message: unknown) {
         ("browserRecovery" in input && typeof input.browserRecovery !== "boolean")
       )
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
-      const options = {
+      const options: Parameters<typeof createLoginomHost>[0] = {
         root: input.root,
         resources: input.resources,
         headless: input.headless,
@@ -121,6 +123,7 @@ async function dispatch(message: unknown) {
         browserRecovery: "browserRecovery" in input && input.browserRecovery === true,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
+        onConnectionApplication: (outcome, data) => reply({ event: `connection.${outcome}`, data }),
       }
       state.starting = createLoginomHost(options).then(async (host) => {
         state.host = host
@@ -197,7 +200,7 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
   if (method === "connection.settings.turn") {
     const value = turn(input)
     if (Option.isNone(value)) throw new Error("LOGINOM_INPUT_INVALID")
-    host.turn(value.value.id, value.value.active)
+    host.turn(value.value.id, chatId(value.value.session), value.value.active)
     return {}
   }
   if (method === "connection.check") {
