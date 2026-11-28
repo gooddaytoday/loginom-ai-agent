@@ -189,7 +189,7 @@ function TouchComposer(props: { state: State }) {
     },
   } satisfies ModelSelection
 
-  const model = { ...editor, model: { selection, paid: true, loading: false } } satisfies ComposerModel
+  const model = { ...editor, draft: {}, model: { selection, paid: true, loading: false } } satisfies ComposerModel
 
   onMount(() => props.state === "suggestions" && editor.openCommands())
 

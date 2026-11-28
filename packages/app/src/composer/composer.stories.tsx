@@ -282,6 +282,7 @@ function ComposerStory(props: {
 
   const model = {
     ...editor,
+    draft: {},
     model: { selection: modelSelection, paid: true, loading: false },
   } satisfies ComposerModel
 

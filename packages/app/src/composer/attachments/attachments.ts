@@ -38,6 +38,7 @@ export type ComposerAttachmentConfig = {
   getPathForFile?: (file: File) => string
   onDragCancel?: (callback: () => void) => () => void
   store?: (file: File) => Promise<{ id: string; url: string }>
+  referenceMime?: (filename: string) => string | undefined
 }
 
 export function createComposerAttachments(
@@ -72,10 +73,12 @@ export function createComposerAttachments(
   const add = async (file: File, target = capture(), clipboard = false) => {
     if (!target) return false
     // A binary data file keeps its type without sniffing, which would read its bytes.
-    const mime = binaryReferenceMime(file.name) ?? (await attachmentMime(file))
+    const referenceMime = input.referenceMime?.(file.name)
+    const mime = referenceMime ?? binaryReferenceMime(file.name) ?? (await attachmentMime(file))
     const destination = input.destination()
 
-    if (native(mime, destination.input) && file.size <= MAX_INLINE_BYTES) return addInline(file, mime, target, clipboard)
+    if (!referenceMime && native(mime, destination.input) && file.size <= MAX_INLINE_BYTES)
+      return addInline(file, mime, target, clipboard)
     const sourcePath = input.getPathForFile?.(file) || undefined
 
     if (destination.local && sourcePath) return addPath(target, { filename: file.name, mime, path: sourcePath })
@@ -272,7 +275,8 @@ export function createComposerAttachments(
             defaultPath: input.directory(),
             multiple: true,
             // A local server resolves the original path, so binary data files need no bytes.
-            reference: (name) => input.destination().local && Boolean(binaryReferenceMime(name)),
+            reference: (name) =>
+              input.destination().local && Boolean(input.referenceMime?.(name) ?? binaryReferenceMime(name)),
           },
           (file) => add(file),
         )

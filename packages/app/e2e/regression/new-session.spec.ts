@@ -65,6 +65,7 @@ for (const product of [true, false]) {
   test(`draft suggestions stay visible with the ${product ? "Loginom" : "stock"} start screen`, async ({ page }) => {
     const name = "DraftSuggestions"
     const files = Array.from({ length: 12 }, (_, index) => `file-${String(index + 1).padStart(2, "0")}.lgp`)
+
     const input = {
       name,
       findFiles: () => files,
@@ -147,7 +148,9 @@ test.describe("touch draft", () => {
 
     await examples.getByRole("button", { name: "Hide example tasks" }).tap()
     await expect(examples).toHaveCount(0)
-    await page.locator('[data-action="composer-attach"]').tap()
+    await expect(page.locator('[data-action="composer-attach"]')).toHaveCount(0)
+    await page.locator('[data-action="composer-attach-file"]').tap()
+    await expect(page.getByRole("menuitem", { name: "Package from Loginom…", exact: true })).toBeVisible()
     await page.getByRole("menuitem", { name: "Example tasks" }).tap()
     await expect(examples).toBeVisible()
     expect(errors).toEqual([])
@@ -158,11 +161,13 @@ test("Loginom examples fill the draft without starting a conversation and can be
   page,
 }) => {
   const creates: unknown[] = []
+
   const draft = await openDraft(page, {
     name: "LoginomExamples",
     seed: { locale: "ru" },
     onSessionCreate: (body) => void creates.push(body),
   })
+
   const examples = page.getByRole("region", { name: "Примеры задач" })
 
   await expect(page.getByText("Опишите задачу: собрать сценарий, разобрать пакет, проверить данные")).toBeVisible()
@@ -188,12 +193,15 @@ test("Loginom examples fill the draft without starting a conversation and can be
 
 test("Loginom examples stay until the third conversation started without a template", async ({ page }) => {
   const creates: string[] = []
+
   const draft = await openDraft(page, {
     name: "LoginomExampleProgress",
     onSessionCreate: (body) => void creates.push(String(body.id)),
     createdSessionTitle: "Started conversation",
   })
+
   const examples = page.getByRole("region", { name: "Example tasks" })
+
   const nextDraft = async (count: number) => {
     await submit(page).click()
     await expect.poll(() => creates).toHaveLength(count)
@@ -217,6 +225,7 @@ test("Loginom examples stay until the third conversation started without a templ
     await draft.editor.fill(`My own task ${count - 1}`)
     await nextDraft(count)
   }
+
   await expect(examples).toHaveCount(0)
   await page.locator('[data-action="composer-attach"]').click()
   await page.getByRole("menuitem", { name: "Example tasks" }).click()

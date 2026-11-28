@@ -92,6 +92,7 @@ function initialComposerStore(initial?: InitialPrompt): ComposerStore {
 
 // Named because `capture` returns the value itself: declaration emit cannot serialize the inferred cyclic type.
 export interface ComposerStateValue {
+  readonly identity: object
   readonly store: [Accessor<ComposerStore>, SetStoreFunction<ComposerStore>]
   readonly current: () => Prompt
   readonly cursor: () => ComposerStore["cursor"]
@@ -222,6 +223,7 @@ function createComposerStateValue(store: ComposerStore, setStore: SetStoreFuncti
     quoteSource,
     set: (prompt: Prompt, cursorPosition?: number) => actions.set(prompt, cursorPosition),
     reset: () => actions.reset(),
+    identity: {},
     capture: () => value,
   }
 

@@ -74,6 +74,7 @@ const MobilePanelDrawer = lazy(async () => {
 type ComposerMode = "normal" | "shell"
 
 const COMPOSER_SUGGESTION_MAX_HEIGHT = 320
+
 const COMPOSER_SUGGESTION_GAP = 8
 
 const COMPOSER_SUGGESTION_ROW_HEIGHT = 28
@@ -93,7 +94,8 @@ export type ComposerEditorProps = {
   borderUnderlay?: boolean
   class?: string
   modelControl?: JSX.Element
-  addMenu?: { render: () => JSX.Element }
+  customFile?: (file: ComposerAttachment) => boolean
+  addItems?: ComposerAddItems
   placeholder?: { render: () => JSX.Element }
   toolbar?: JSX.Element
   modelControlsVisible?: boolean
@@ -286,7 +288,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
         >
           <Show when={mode() === "normal"}>
             <ComposerAttachments
-              attachments={props.controller.attachments()}
+              attachments={props.controller
+                .attachments()
+                .filter((part) => part.type !== "path" || !props.customFile?.(part))}
               uploads={props.controller.uploads()}
               comments={props.controller.comments()}
               files={props.controller.files()}
@@ -465,7 +469,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         </div>
 
         <div class="flex h-11 shrink-0 items-center px-2" classList={{ hidden: touch() && mode() === "shell" }}>
-          <Show when={!touch() || props.addMenu}>
+          <Show when={!touch()}>
             <div
               class="flex shrink-0 items-center"
               aria-hidden={mode() === "shell"}
@@ -485,7 +489,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
                 onCommands={props.controller.openCommands}
                 onContext={props.controller.openContext}
                 onShell={props.controller.openShell}
-                extra={props.addMenu?.render}
+                addItems={props.addItems}
               />
             </div>
           </Show>
@@ -576,10 +580,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
         </div>
       </form>
       <Show when={touch()}>
-        <Show when={dock()} fallback={<ComposerEditorTouchBar controller={props.controller} />}>
+        <Show
+          when={dock()}
+          fallback={<ComposerEditorTouchBar controller={props.controller} addItems={props.addItems} />}
+        >
           {(mount) => (
             <Portal mount={mount()}>
-              <ComposerEditorTouchBar controller={props.controller} docked />
+              <ComposerEditorTouchBar controller={props.controller} addItems={props.addItems} docked />
             </Portal>
           )}
         </Show>
@@ -994,9 +1001,10 @@ function ComposerAttachments(props: {
   )
 }
 
+type ComposerAddItems = { render(): JSX.Element; replacesAttachment: boolean }
+
 function ComposerEditorAddMenu(props: {
   disabled?: boolean
-  extra?: () => JSX.Element
   title: string
   keybind?: string[]
   attachLabel: string
@@ -1008,6 +1016,7 @@ function ComposerEditorAddMenu(props: {
   onCommands: () => void
   onContext: () => void
   onShell: () => void
+  addItems?: ComposerAddItems
 }) {
   const focus = pointerFocusReturn()
 
@@ -1039,9 +1048,12 @@ function ComposerEditorAddMenu(props: {
             class="[&_[data-slot=menu-v2-item-shortcut]]:w-5 [&_[data-slot=menu-v2-item-shortcut]]:justify-center"
             style={{ "min-width": "180px" }}
           >
-            <Menu.Item onSelect={props.onAttach} shortcut={props.attachShortcut}>
-              {props.attachLabel}
-            </Menu.Item>
+            <Show when={!props.addItems?.replacesAttachment}>
+              <Menu.Item onSelect={props.onAttach} shortcut={props.attachShortcut}>
+                {props.attachLabel}
+              </Menu.Item>
+            </Show>
+            {props.addItems?.render()}
             <Menu.Separator />
             <Menu.Item onSelect={props.onCommands} shortcut="/">
               {props.commandsLabel}
@@ -1052,7 +1064,6 @@ function ComposerEditorAddMenu(props: {
             <Menu.Item onSelect={props.onShell} shortcut="!">
               {props.shellLabel}
             </Menu.Item>
-            {props.extra?.()}
           </Menu.Content>
         </Menu.Portal>
       </Menu>
@@ -1284,11 +1295,13 @@ function ComposerEditorPopover(props: {
   const listID = props.id ?? createUniqueId()
   const active = createSelector(() => props.activeID)
   let container: HTMLDivElement | undefined
+
   const [store, setStore] = createStore({
     maxHeight: COMPOSER_SUGGESTION_MAX_HEIGHT,
     spaceAbove: COMPOSER_SUGGESTION_MAX_HEIGHT,
     spaceBelow: 0,
   })
+
   const opensBelow = () => store.spaceAbove < store.maxHeight && store.spaceBelow > store.spaceAbove
 
   const resize = (height: number) =>
@@ -1340,6 +1353,7 @@ function ComposerEditorPopover(props: {
 
     if (!viewport || !(anchor instanceof HTMLElement)) {
       setStore({ spaceAbove: COMPOSER_SUGGESTION_MAX_HEIGHT, spaceBelow: 0 })
+
       return
     }
 
@@ -1627,7 +1641,11 @@ function ComposerEditorSubmitButton(props: {
 // The composer's actions on a touch device, where Return only adds a line: this bar is the one way to send, steer,
 // queue or stop, and every target is at least 44px. Docked, it spans the bottom of the shell, which is the top of the
 // keyboard while one is open. Buttons keep the editor focused so the keyboard stays open.
-function ComposerEditorTouchBar(props: { controller: ComposerEditorModel; docked?: boolean }) {
+function ComposerEditorTouchBar(props: {
+  controller: ComposerEditorModel
+  docked?: boolean
+  addItems?: ComposerAddItems
+}) {
   const i18n = useI18n()
   const view = props.controller.view
   const keep = (event: MouseEvent) => event.preventDefault()
@@ -1695,16 +1713,45 @@ function ComposerEditorTouchBar(props: { controller: ComposerEditorModel; docked
           </Button>
         }
       >
-        <IconButton
-          data-action="composer-attach-file"
-          variant="ghost-muted"
-          class="size-11 rounded-lg"
-          icon={<Icon name="plus" />}
-          aria-label={i18n.t("ui.promptInput.add")}
-          disabled={view.draftOnly}
-          onMouseDown={keep}
-          onClick={props.controller.attach}
-        />
+        <Show
+          when={props.addItems}
+          fallback={
+            <IconButton
+              data-action="composer-attach-file"
+              variant="ghost-muted"
+              class="size-11 rounded-lg"
+              icon={<Icon name="plus" />}
+              aria-label={i18n.t("ui.promptInput.add")}
+              disabled={view.draftOnly}
+              onMouseDown={keep}
+              onClick={props.controller.attach}
+            />
+          }
+        >
+          {(items) => (
+            <Menu gutter={6} modal={false} placement="top-start">
+              <Menu.Trigger
+                as={IconButton}
+                data-action="composer-attach-file"
+                type="button"
+                variant="ghost-muted"
+                class="size-11 rounded-lg"
+                icon={<Icon name="plus" />}
+                aria-label={i18n.t("ui.promptInput.add")}
+                disabled={view.draftOnly}
+                onMouseDown={keep}
+              />
+              <Menu.Portal>
+                <Menu.Content>
+                  <Show when={!items().replacesAttachment}>
+                    <Menu.Item onSelect={props.controller.attach}>{i18n.t("ui.promptInput.attachments")}</Menu.Item>
+                  </Show>
+                  {items().render()}
+                </Menu.Content>
+              </Menu.Portal>
+            </Menu>
+          )}
+        </Show>
         <For
           each={
             [

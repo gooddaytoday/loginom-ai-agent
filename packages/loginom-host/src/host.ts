@@ -17,6 +17,8 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
+import { decodeFolderListing, Package, ReadFolder } from "./package-folder"
+import { UploadInput, validUpload } from "./package-upload"
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
 export async function verifyInstallationResources(options: {
@@ -365,13 +367,14 @@ export async function createLoginomHost(options: {
   async function launch(
     connection: ActiveConnection,
     chat: string,
-    purpose: "validation" | "dashboard" | "chat",
+    purpose: "validation" | "dashboard" | "chat" | { packageFolder: string; upload?: UploadInput },
     signal?: AbortSignal,
     deadline?: number,
     validationHttpCache = false,
     validationLogout = false,
   ) {
     const validation = purpose === "validation"
+    const packageFolder = typeof purpose === "object" ? purpose.packageFolder : undefined
     const startupDeadline = deadline ?? Date.now() + (validation ? 210_000 : 120_000)
     signal?.throwIfAborted()
     const timeout = AbortSignal.timeout(Math.max(1, startupDeadline - Date.now()))
@@ -388,7 +391,7 @@ export async function createLoginomHost(options: {
             }),
       )
     const waitStarted = performance.now()
-    const stateDir = join(root, validation ? "validation" : "runtime")
+    const stateDir = join(root, validation ? "validation" : packageFolder !== undefined ? "package-list" : "runtime")
     const waitFailure = async (error: unknown): Promise<never> => {
       await mkdir(stateDir, { recursive: true, mode: 0o700 })
         .then(() =>
@@ -461,17 +464,19 @@ export async function createLoginomHost(options: {
         node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
         entry: join(resources, "runtime/src/managed-entry.mjs"),
         resources,
-        stateDir: join(root, validation ? "validation" : "runtime"),
+        stateDir,
         generation: connection.generation,
         chat,
         connection,
         validation,
+        packageFolder,
+        packageUpload: typeof purpose === "object" ? purpose.upload : undefined,
         validationHttpCache: httpCache,
         validationLogout,
         // CLI supplies its explicit browser policy for background launches too.
-        headless: purpose === "chat" ? options.headless === true : (options.preflightHeadless ?? true),
-        closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
-        browserRecovery: !validation && options.browserRecovery === true,
+        headless: packageFolder !== undefined || (purpose === "chat" ? options.headless === true : (options.preflightHeadless ?? true)),
+        closeSavedPackageOnShutdown: !validation && packageFolder === undefined && options.closeSavedPackageOnShutdown === true,
+        browserRecovery: !validation && packageFolder === undefined && options.browserRecovery === true,
         environment,
         actionManifestUri: manifest.actionManifestUri,
         actionManifestSha256: manifest.actionManifestSha256,
@@ -636,11 +641,52 @@ export async function createLoginomHost(options: {
       lease.release()
     }
   }
+  const packageReads = new Map<AbortController, Promise<unknown>>()
+  function packageStorage(input: ReadFolder | UploadInput, signal?: AbortSignal) {
+    const controller = new AbortController()
+    const pending = performPackageStorage(input, signal ? AbortSignal.any([signal, controller.signal]) : controller.signal)
+    packageReads.set(controller, pending)
+    void pending.finally(() => packageReads.delete(controller)).catch(() => undefined)
+    return pending
+  }
+  async function performPackageStorage(input: ReadFolder | UploadInput, signal: AbortSignal) {
+    signal.throwIfAborted()
+    const purpose = "folder" in input ? { packageFolder: input.folder } : { packageFolder: "/user", upload: input }
+    const chat = randomUUID()
+    const lease = service.acquire(chat)
+    if (!lease) throw Error("LOGINOM_CONNECTION_NOT_READY")
+    let cleanupConfirmed = true
+    try {
+      const current = generations.get(input.generation)
+      if (!current || lease.generation !== input.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
+      const runtime = await launch(current.connection, chat, purpose, signal)
+      cleanupConfirmed = false
+      await runtime.close()
+      cleanupConfirmed = true
+      signal.throwIfAborted()
+      return "listing" in runtime.ready ? runtime.ready.listing : "uploaded" in runtime.ready ? runtime.ready.uploaded : undefined
+    } catch (error) {
+      if (error instanceof Error && error.message === "LOGINOM_RUNTIME_CLEANUP_FAILED") cleanupConfirmed = false
+      if (!cleanupConfirmed) shutdown.failed = true
+      throw error
+    } finally {
+      lease.release()
+      if (cleanupConfirmed)
+        await rm(join(root, "package-list", "generations", String(lease.generation), "chats", chat), {
+          recursive: true,
+          force: true,
+        }).catch(() => {
+          shutdown.failed = true
+          throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+        })
+    }
+  }
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
   function beginClose() {
     service.beginClose()
     resourceController.abort()
     for (const controller of dashboardOperations.keys()) controller.abort(new Error("DASHBOARD_CANCELLED"))
+    for (const controller of packageReads.keys()) controller.abort(new Error("LOGINOM_PACKAGE_FOLDER_CANCELLED"))
   }
   return {
     ...service,
@@ -676,6 +722,17 @@ export async function createLoginomHost(options: {
     },
     browserRecovery: options.browserRecovery === true,
     references,
+    async readPackageFolder(input: ReadFolder, signal?: AbortSignal) {
+      if (!Schema.is(ReadFolder)(input)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      return decodeFolderListing(await packageStorage(input, signal), input.folder)
+    },
+    async uploadPackage(input: UploadInput, signal?: AbortSignal) {
+      if (!Schema.is(UploadInput)(input) || !validUpload(input)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      const result = await packageStorage(input, signal)
+      if (!Schema.is(Package)(result) || result.path !== `/user/${input.name}` || result.name !== input.name)
+        throw Error("LOGINOM_REPLY_INVALID")
+      return result
+    },
     async readDashboard(input: DashboardRead, signal?: AbortSignal): Promise<PublicationSource | null> {
       if (!Schema.is(DashboardRead)(input)) throw new Error("DASHBOARD_INPUT_INVALID")
       const result = await dashboardOperation("dashboardRead", input, signal)
@@ -705,7 +762,7 @@ export async function createLoginomHost(options: {
     async close() {
       beginClose()
       await verifiedResources
-      await Promise.allSettled([...dashboardOperations.values()])
+      await Promise.allSettled([...dashboardOperations.values(), ...packageReads.values()])
       await service.close()
       // Startup failures and retired or unexpectedly exited children retain
       // cleanup uncertainty even if a later runtime succeeds.

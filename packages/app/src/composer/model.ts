@@ -2,6 +2,7 @@ import { ImagePreview } from "@opencode/ui/image-preview"
 import { useDialog } from "@opencode/ui/context/dialog"
 import type { ReferenceInfo } from "@opencode/client/promise"
 import type { Links, MountedSession } from "@opencode/plugin/gui"
+import { ComposerFileType, type ComposerSlotInput } from "@opencode/plugin/gui/builtin"
 import { createComponent, createEffect, createMemo, on, onCleanup } from "solid-js"
 import { Predicate } from "effect"
 import type { ComposerSuggestion } from "./types"
@@ -12,6 +13,7 @@ import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePluginHost } from "@/runtime/plugin/host"
 import { usePluginAttachment } from "@/runtime/plugin/host-apis"
+import { usePluginPageNavigation } from "@/runtime/plugin/pages"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useWorkspaceLocation } from "@/workspaces/location"
 import { useData, useServer } from "@/runtime/server/current"
@@ -27,8 +29,8 @@ import { createKnownServerSessions, createServerSessionEntries } from "@/shell/c
 import { rankSessionTitle } from "./session-match"
 import { useTabs } from "@/shell/tabs/tabs"
 import type { ComposerAdapter, ComposerControls, ComposerQueue } from "./adapter"
-import { isAttachment } from "./prompt-parts"
-import { isCommentItem } from "./state"
+import { appendPrompt, isAttachment, promptLength } from "./prompt-parts"
+import { isCommentItem, type Prompt } from "./state"
 import type { PromptHistoryComment } from "./history/entry"
 import { createComposerHistory } from "./history/store"
 import { createComposerSubmit } from "./submit"
@@ -37,7 +39,12 @@ import { useAttachmentDestination } from "./attachments/destination"
 import { parseClientSlashCommand } from "./client-slash-command"
 
 export type ComposerModel = ComposerEditorModel & {
+  readonly draft: object
   readonly model: ComposerControls["model"]
+  readonly extension?: {
+    readonly input: ComposerSlotInput
+    customFile(file: { filename: string; mime: string }): boolean
+  }
 }
 
 const sendFailedTitle = {
@@ -55,7 +62,13 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     server.conn.type !== "plugin" || !server.conn.managed || server.ctx.sdk.connection.status() === "connected"
 
   const files = useFile()
-  const links = usePluginHost().links
+  const host = usePluginHost()
+  const links = host.links
+  const pages = usePluginPageNavigation()
+
+  const referenceMime = (filename: string) =>
+    host.items(ComposerFileType).find(({ value }) => value.matches(filename))?.value.mime
+
   const plugins = usePluginAttachment()
   const comments = useComments()
   const dialog = useDialog()
@@ -471,6 +484,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
       return () => command.trigger(selected.id, "slash")
     },
     attachments: {
+      referenceMime,
       picker: platform.openAttachmentPickerDialog,
       directory: () => sdk().directory,
       destination: useAttachmentDestination(adapter.controls),
@@ -574,7 +588,53 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     },
   })
 
-  Object.defineProperty(controller, "model", { get: () => adapter.controls().model })
+  const model = Object.assign(controller, { draft: prompt.identity })
+  Object.defineProperty(model, "model", { get: () => adapter.controls().model })
+
+  const extension: NonNullable<ComposerModel["extension"]> = {
+    customFile: (file) => referenceMime(file.filename) === file.mime,
+    input: {
+      get draftKey() {
+        return JSON.stringify([
+          server.key,
+          adapter.kind,
+          adapter.kind === "new-session" ? adapter.draftID : adapter.session().id,
+        ])
+      },
+      isNewSession: adapter.kind === "new-session",
+      get files() {
+        return controller.attachments().filter((part) => part.type === "path")
+      },
+      attach: (file) => (file ? controller.addAttachments([file]) : controller.attach()),
+      removeFile: controller.removeAttachment,
+      hasSkill: (id) => skills().some((entry) => entry.id === id),
+      ...pages,
+      appendSkillPrompt(skill, text) {
+        const entry = skills().find((item) => item.id === skill)
+
+        if (!entry) return
+
+        const current = prompt.current()
+        const content = `@${skill}`
+
+        const request: Prompt = [
+          {
+            type: "skill",
+            id: Skill.ID.make(entry.id),
+            name: Skill.Name.make(entry.name),
+            content,
+            start: 0,
+            end: content.length,
+          },
+          { type: "text", content: ` ${text}`, start: content.length, end: content.length + 1 + text.length },
+        ]
+
+        const next = promptLength(current) ? appendPrompt(current, request) : [...request, ...current.filter(isAttachment)]
+        prompt.set(next, promptLength(next))
+        controller.restoreFocus()
+      },
+    },
+  }
 
   command.register("composer-editor", () => [
     {
@@ -610,7 +670,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
   ])
 
   // SAFETY: the `model` getter defined on the controller above completes `ComposerModel`.
-  return controller as ComposerModel
+  return Object.assign(model, { extension }) as ComposerModel
 }
 
 function composerErrorMessage(language: ReturnType<typeof useLanguage>, cause: unknown) {

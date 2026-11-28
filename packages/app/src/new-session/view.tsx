@@ -83,7 +83,6 @@ export function NewSessionView(props: {
   const contributed = (at: BuiltinSlot["at"]) => host.items(BuiltinSlot).some((item) => item.value.at === at)
   const scrollable = () => contributed("session.new.below")
   const projectInToolbar = () => contributed("session.new.composer.project")
-  const addMenu = { render: () => <PluginSlot at="session.new.composer.add.menu" input={{}} /> }
   const placeholder = { render: () => <PluginSlot at="session.new.composer.placeholder" input={{}} /> }
 
   const [wordmark, setWordmark] = createSignal(createWordmarkState(false))
@@ -149,7 +148,6 @@ export function NewSessionView(props: {
                   <Composer
                     model={props.composer}
                     suggestionViewport={() => (scrollable() ? panel : undefined)}
-                    addMenu={contributed("session.new.composer.add.menu") ? addMenu : undefined}
                     placeholder={contributed("session.new.composer.placeholder") ? placeholder : undefined}
                     toolbar={
                       <Show when={projectInToolbar() && props.project.selected()}>
@@ -330,6 +328,7 @@ function NewSessionProjectPicker(props: { project: PromptProject; onClick: () =>
   const language = useLanguage()
   const command = useCommand()
   const name = () => displayName(props.project)
+
   const label = () => (
     <>
       <ProjectAvatar

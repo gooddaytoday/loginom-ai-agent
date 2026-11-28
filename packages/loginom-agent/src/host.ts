@@ -10,6 +10,9 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
+import { Loginom } from "@loginom-ai-agent/loginom-host/loginom"
+import { decodeFolderListing, type ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
+import type { UploadInput } from "@loginom-ai-agent/loginom-host/package-upload"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { Option, Schema } from "effect"
@@ -36,7 +39,9 @@ const decodeRecord = Schema.decodeUnknownOption(
 const decodeStatus = Schema.decodeUnknownOption(
   Schema.Struct({ generation: Schema.Number, recoveries: Schema.optional(Schema.Array(Schema.String)) }),
 )
-const decodeView = Schema.decodeUnknownOption(Schema.Struct({ url: Schema.String, generation: Schema.Number }))
+const decodeView = Schema.decodeUnknownOption(
+  Schema.Struct({ url: Schema.String, state: Loginom.State, generation: Schema.Number }),
+)
 const decodePublication = Schema.decodeUnknownOption(Schema.NullOr(PublicationSource), { onExcessProperty: "error" })
 
 /**
@@ -124,11 +129,7 @@ export async function preflight(automation: boolean) {
  * rejects with `LOGINOM_HOST_NOT_READY`.
  */
 export const dashboard = {
-  status: async () => {
-    const view = Option.getOrUndefined(decodeView(await request("connection.status", {})))
-    if (!view) throw new Error("LOGINOM_REPLY_INVALID")
-    return view
-  },
+  status: connectionView,
   settled: async () => {
     await state.current?.ready
   },
@@ -150,6 +151,47 @@ export const connectionSettings = {
       await request("connection.settings.turn", { id, active: false }).catch(() => undefined)
     }
   },
+}
+
+async function connectionView() {
+  const view = Option.getOrUndefined(decodeView(await request("connection.status", {})))
+  if (!view) throw new Error("LOGINOM_REPLY_INVALID")
+  return view
+}
+
+export const packageFolders = {
+  async generation() {
+    const { generation } = await connectionView()
+    return generation
+  },
+  async read(input: ReadFolder, signal: AbortSignal) {
+    return decodeFolderListing(await packageRequest("packages.list", input, signal), input.folder)
+  },
+}
+
+export async function uploadPackage(input: UploadInput, signal: AbortSignal) {
+  const view = await connectionView()
+  if (view.state !== "ready" || view.generation !== input.generation) throw Error("LOGINOM_CONNECTION_NOT_READY")
+  return packageRequest("packages.upload", input, signal)
+}
+
+async function packageRequest(method: "packages.list" | "packages.upload", input: ReadFolder | UploadInput, signal: AbortSignal) {
+    signal.throwIfAborted()
+    const current = state.current
+    const connection = await current?.ready
+    signal.throwIfAborted()
+    if (!connection?.request || current?.closing) throw Error("LOGINOM_HOST_NOT_READY")
+    const { request } = connection
+    const requestId = randomUUID()
+    const cancel = () => { void request("packages.cancel", { requestId }).catch(() => undefined) }
+    signal.addEventListener("abort", cancel, { once: true })
+    try {
+      const result = await request(method, { ...input, requestId }, 145_000)
+      signal.throwIfAborted()
+      return result
+    } finally {
+      signal.removeEventListener("abort", cancel)
+    }
 }
 
 async function request(method: string, input: unknown, timeout?: number, signal?: AbortSignal) {

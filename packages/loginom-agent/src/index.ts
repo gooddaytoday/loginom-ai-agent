@@ -3,17 +3,22 @@
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
+import { Package } from "@loginom-ai-agent/loginom-host/package-folder"
+import { UploadRpc } from "@loginom-ai-agent/loginom-host/package-upload"
 import { ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
+import { Schema } from "effect"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
 import { connectionSettings } from "./connection-settings"
 import { Dashboard } from "./dashboard"
 import { DashboardTarget } from "./dashboard-target"
+import { Definition as Packages } from "./package-list-contract"
+import { packageListHandlers } from "./package-list"
 import { dashboardTools } from "./dashboard-tools"
 import { dockTools } from "./dock"
 import { fileTools } from "./file-profile"
@@ -533,6 +538,22 @@ export default Plugin.define({
         if (!Dashboard.isWork(ctx.location.directory)) return {}
         const url = await drafts.preview((value as { id: string }).id, call.signal)
         return url ? { url } : {}
+      },
+    })
+    await ctx.rpc.register(Packages, packageListHandlers())
+    await ctx.rpc.register(UploadRpc, {
+      async upload(input, call) {
+        try {
+          const result = await ServiceHost.uploadPackage(input, call.signal)
+          if (Schema.is(Package)(result)) return result
+        } catch (error) {
+          call.signal.throwIfAborted()
+          if (error instanceof Error && error.message === "LOGINOM_PACKAGE_UPLOAD_NAME_TAKEN")
+            return call.error("name_taken", "Package name is already in use")
+          if (error instanceof Error && error.message === "LOGINOM_SESSION_LIMIT")
+            return call.error("session_limit", "All Loginom sessions are in use")
+        }
+        return call.error("unavailable", "Package upload not confirmed")
       },
     })
     await ctx.rpc.register(permission, {

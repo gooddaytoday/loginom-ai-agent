@@ -98,6 +98,7 @@ export function createNewSessionComposerAdapter(props: {
 
   const adapter: NewSessionComposerAdapter = {
     kind: "new-session",
+    draftID: props.draftID,
     state,
     ready: prompt.ready,
     controls,
@@ -123,6 +124,7 @@ export function createNewSessionComposerAdapter(props: {
         },
         (attempt) => {
           const started = props.captureStarted()
+
           const pending = tabs.prepareSession(
             props.draftID,
             { server: server.key, sessionId: sessionID },

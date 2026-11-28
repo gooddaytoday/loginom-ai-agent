@@ -109,6 +109,22 @@
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer and window tests", "paths": ["packages/desktop/**"] },
     {
+      "id": "CAT-23",
+      "title": "Built-in composer contributions (C4.5)",
+      "paths": [
+        "packages/app/src/composer/adapter.ts",
+        "packages/app/src/composer/attachments/attachments.ts",
+        "packages/app/src/composer/composer.tsx",
+        "packages/app/src/composer/editor/editor.tsx",
+        "packages/app/src/composer/model.ts",
+        "packages/app/src/composer/submit.test.ts",
+        "packages/app/src/runtime/plugin/host.tsx",
+        "packages/app/src/runtime/plugin/pages.tsx",
+        "packages/app/component-tests/plugin-graph.spec.ts",
+        "packages/app/e2e/regression/composer.spec.ts"
+      ]
+    },
+    {
       "id": "CAT-21",
       "title": "Built-in plugin top-level pages",
       "paths": [

@@ -139,6 +139,7 @@ export type ComposerSubmissionHandle = {
 
 export type NewSessionComposerAdapter = ComposerAdapterBase & {
   kind: "new-session"
+  draftID: string
   start: (
     selection: ComposerSelection,
     submission: ComposerSubmissionHandle,

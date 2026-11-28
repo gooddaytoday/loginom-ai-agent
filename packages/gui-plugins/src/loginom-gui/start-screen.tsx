@@ -1,5 +1,5 @@
 import type { Plugin } from "@opencode/plugin/gui"
-import { BuiltinSlot } from "@opencode/plugin/gui/builtin"
+import { BuiltinSlot, ComposerAddItem } from "@opencode/plugin/gui/builtin"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { For, Show, onCleanup } from "solid-js"
@@ -7,6 +7,7 @@ import type definition from "./index"
 import { LoginomWordmark } from "./wordmark"
 
 const exampleOrigin = "loginom-gui.example"
+
 const examples = [
   {
     title: "startAbc",
@@ -39,7 +40,6 @@ const examples = [
 ] as const
 
 export const registerStartScreen: Plugin.Setup<typeof definition> = (ctx) => {
-  const ui = ctx.ui
   const progress = ctx.stores.startExamples
   const visible = () => !progress.value.dismissed && progress.value.ownSessions < 3
 
@@ -76,16 +76,12 @@ export const registerStartScreen: Plugin.Setup<typeof definition> = (ctx) => {
     ),
   })
 
-  ctx.add(BuiltinSlot, {
-    at: "session.new.composer.add.menu",
-    render: () => (
-      <Show when={!visible()}>
-        <ui.MenuItem
-          label={ctx.t("startExamples")}
-          onSelect={() => progress.set({ dismissed: false, ownSessions: 0 })}
-        />
-      </Show>
-    ),
+  ctx.add(ComposerAddItem, {
+    get title() {
+      return ctx.t("startExamples")
+    },
+    when: (input) => input.isNewSession && !visible(),
+    run: () => progress.set({ dismissed: false, ownSessions: 0 }),
   })
 
   ctx.add(BuiltinSlot, {

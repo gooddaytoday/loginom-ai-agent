@@ -18,6 +18,51 @@ import { expect, sourceURL, story } from "../../stories/playwright/story"
 
 const fixture = sourceURL(new URL("./plugin-host.fixture.tsx", import.meta.url))
 
+for (const extension of ["menu item", "file type", "content above the editor"] as const) {
+  story(`only built-ins may register composer ${extension}`, async ({ page }) => {
+    const result = await page.evaluate(async ({ source, extension }) => {
+      const { BuiltinSlot, ComposerAddItem, ComposerFileType, mountPluginHost, until } = await import(source)
+
+      const contributions = {
+        "menu item": {
+          registry: ComposerAddItem,
+          item: { title: "Open assets", run: () => undefined },
+        },
+        "file type": {
+          registry: ComposerFileType,
+          item: { mime: "application/example", matches: (filename: string) => filename.endsWith(".example") },
+        },
+        "content above the editor": {
+          registry: BuiltinSlot,
+          item: { at: "composer.above", render: () => "Assets" },
+        },
+      }
+
+      const { registry, item } = contributions[extension]
+      const counts = []
+
+      for (const builtin of [false, true]) {
+        const host = mountPluginHost({ builtins: new Set(builtin ? ["fixture"] : []) })
+
+        try {
+          await until(() => host.count() > 0)
+          host.load((ctx: Context) => {
+            ctx.add(registry, item)
+          })
+          await until(() => host.status() === (builtin ? "active" : "failed"))
+          counts.push(host.entries(registry.id))
+        } finally {
+          host.unmount()
+        }
+      }
+
+      return counts
+    }, { source: fixture, extension })
+
+    expect(result).toEqual([0, 1])
+  })
+}
+
 /** What the code block cases drive from the page. */
 type CodeBlocksHost = ReturnType<typeof mountCodeBlocks>
 
@@ -1074,6 +1119,7 @@ story(
 story("the new-session slot renders nothing without a plugin", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {
     const { mountPlugins, BuiltinSlot, until } = await import(fixture)
+
     const host = mountPlugins({
       definitions: [
         {
@@ -1084,16 +1130,19 @@ story("the new-session slot renders nothing without a plugin", async ({ page }) 
         },
       ],
     })
+
     try {
       const heading = () => host.container.querySelector('[data-testid="draft-heading"]')
       await until(() => heading()?.textContent === "Draft heading")
       host.define([])
       await until(() => heading()?.textContent === "")
+
       return { elements: heading()?.childElementCount, errors: host.escaped() }
     } finally {
       host.unmount()
     }
   }, fixture)
+
   expect(result).toEqual({ elements: 0, errors: [] })
 })
 

@@ -51,6 +51,7 @@ export default function NewSessionPage(props: { draftId: string }) {
     captureStarted: () => {
       const origin = draftTab()?.promptOrigin
       const listeners = [...started]
+
       return () => listeners.forEach((listener) => listener(origin))
     },
     mcp,
@@ -131,6 +132,7 @@ export default function NewSessionPage(props: { draftId: string }) {
           }}
           onStarted={(listener) => {
             started.add(listener)
+
             return () => started.delete(listener)
           }}
         />
