@@ -74,29 +74,37 @@ test("saved schema keeps the file URL and explicit separator without inferring m
   expect(nodes[2]).not.toHaveProperty("text_import")
 })
 
-test("saved schema strips credentials, query and fragment from each text-import URL", async () => {
+test("saved schema omits URL secrets and discards the ambiguous tail after a query or fragment", async () => {
   const local = "data/Вход #1/*.csv"
   const sources = [
-    "https://fixture-sensitive-user:fixture-sensitive-password@example.invalid/orders.csv?token=fixture-sensitive-query#fixture-sensitive-fragment",
-    local,
-    "HTTP://example.invalid/clients.tsv?ticket=fixture-sensitive-ticket",
-    "https://[invalid]/malformed.csv?token=fixture-sensitive-malformed",
-  ].join("|")
-  const schema = await savedWithTextImports(`
-    <Item Name="Multiple sources">
-      <Component><Engine xsi:type="TBGImportTextFile" FileName="${sources}" DelimiterChar="&#9;"/></Component>
-    </Item>
-  `)
-  expect(JSON.stringify(schema)).not.toContain("fixture-sensitive")
-  expect(schema.workflows[0].nodes[0].text_import).toEqual({
-    file_or_url: [
-      "https://example.invalid/orders.csv",
+    [
       local,
-      "http://example.invalid/clients.tsv",
-      "[URL omitted]",
+      "https://fixture-sensitive-user:fixture-sensitive-password@example.invalid/orders.csv?token=part|fixture-sensitive-query#fixture-sensitive-fragment",
     ].join("|"),
-    column_separator: "\t",
-  })
+    "HTTP://example.invalid/clients.tsv#part|fixture-sensitive-fragment",
+    "https://fixture-sensitive-user|fixture-sensitive-password@example.invalid/customers.csv",
+    "https://[invalid]/malformed.csv?token=fixture-sensitive-malformed",
+    ["https://example.invalid/public.csv", local].join("|"),
+  ]
+  const schema = await savedWithTextImports(
+    sources
+      .map(
+        (source, index) => `
+    <Item Name="Import ${index}">
+      <Component><Engine xsi:type="TBGImportTextFile" FileName="${source}" DelimiterChar="&#9;"/></Component>
+    </Item>
+  `,
+      )
+      .join(""),
+  )
+  expect(JSON.stringify(schema)).not.toContain("fixture-sensitive")
+  expect(schema.workflows[0].nodes.map((node) => node.text_import)).toEqual([
+    { file_or_url: `${local}|https://example.invalid/orders.csv`, column_separator: "\t" },
+    { file_or_url: "http://example.invalid/clients.tsv", column_separator: "\t" },
+    { file_or_url: "[URL omitted]", column_separator: "\t" },
+    { file_or_url: "[URL omitted]", column_separator: "\t" },
+    { file_or_url: `https://example.invalid/public.csv|${local}`, column_separator: "\t" },
+  ])
 })
 
 test("saved schema reports grouping keys and measures and keeps the nested workflow keys", async () => {

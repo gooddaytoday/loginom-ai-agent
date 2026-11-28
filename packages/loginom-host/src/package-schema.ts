@@ -67,22 +67,32 @@ type SavedWorkflow = {
 }
 
 function redactTextImportSource(value: string) {
-  return value
-    .split("|")
-    .map((source) => {
-      const candidate = source.trim()
-      const url = URL.parse(candidate)
-      if (!url) return /^https?:/i.test(candidate) ? "[URL omitted]" : source
-      if (url.protocol !== "http:" && url.protocol !== "https:") return source
+  const sources = value.split("|")
+  const safeSources: string[] = []
+  for (const [index, source] of sources.entries()) {
+    const candidate = source.replace(/[\t\n\r]/g, "").trim()
+    const url = URL.parse(candidate)
+    if (url?.protocol !== "http:" && url?.protocol !== "https:" && !/^https?:/i.test(candidate)) {
+      safeSources.push(source)
+      continue
+    }
 
-      url.username = ""
-      url.password = ""
-      // A signed URL can carry credentials under arbitrary query parameter names.
-      url.search = ""
-      url.hash = ""
-      return url.href
-    })
-    .join("|")
+    // A pipe before the end of the authority can split the username or password.
+    const ambiguousAuthority = index < sources.length - 1 && !/^https?:[\\/]*[^\\/?#]+[\\/?#]/i.test(candidate)
+    if (!url || ambiguousAuthority) {
+      safeSources.push("[URL omitted]")
+      break
+    }
+
+    url.username = ""
+    url.password = ""
+    url.search = ""
+    url.hash = ""
+    safeSources.push(url.href)
+    // Any later pipe may be part of the query or fragment, including unknown secret parameters.
+    if (/[?#]/.test(candidate)) break
+  }
+  return safeSources.join("|")
 }
 
 function savedWorkflow(workflow: Workflow, key: string[], label: string): SavedWorkflow {
