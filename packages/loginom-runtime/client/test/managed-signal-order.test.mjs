@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {EventEmitter} from 'node:events';
 import vm from 'node:vm';
 import {closeManagedResources} from '../../src/managed-resources-close.mjs';
+import {runtimeExitTimeout,shortLoginShutdownTimeout} from '../../src/short-login-timeouts.mjs';
 
 const source=readFileSync(new URL('../../src/managed-entry.mjs',import.meta.url),'utf8');
 const body=source.slice(source.indexOf('const stop ='),source.indexOf('process.on("message"'));
@@ -30,7 +31,7 @@ for(const dirty of [false,true])test(signal+' orders native close/logout before 
    return {browser_transport_closed:true,browser_process_terminated:true,clipboard_leases_retained:0,
     package_cleanup:{policy,status:dirty?'BLOCKED':'SUCCEEDED',package_closed:!dirty,logged_out:!dirty}};}}};
  const finished=new Promise(resolve=>{done=resolve;});
- vm.runInNewContext(body,{state,process,terminalTrace:()=>{},close:()=>closeManagedResources(state,[]),
+ vm.runInNewContext(body,{runtimeExitTimeout,shortLoginShutdownTimeout,state,process,terminalTrace:()=>{},close:()=>closeManagedResources(state,[]),
   setTimeout:(fn,ms)=>{const timer={fn,ms,unref(){this.unreferenced=true;}};timers.push(timer);return timer;},clearTimeout:()=>{}});
  assert.equal(process.listenerCount(signal),1);
  process.emit(signal);process.emit(signal);await finished;
@@ -41,7 +42,7 @@ for(const dirty of [false,true])test(signal+' orders native close/logout before 
 test('signal cleanup budget records possible lock and closes only its own browser before failed exit',async()=>{
  const events=[],timers=[],process=new EventEmitter();process.exit=code=>events.push('exit:'+code);
  const state={browser:{close:async()=>events.push('browser')}};
- vm.runInNewContext(body,{state,process,terminalTrace:stage=>events.push(stage),close:()=>new Promise(()=>{}),
+ vm.runInNewContext(body,{runtimeExitTimeout,shortLoginShutdownTimeout,state,process,terminalTrace:stage=>events.push(stage),close:()=>new Promise(()=>{}),
   setTimeout:(fn,ms)=>{const timer={fn,ms,unref(){}};timers.push(timer);return timer;},clearTimeout:()=>{}});
  process.emit('SIGINT');assert.equal(events.includes('browser'),false);
  timers[0].fn();await new Promise(resolve=>setImmediate(resolve));
