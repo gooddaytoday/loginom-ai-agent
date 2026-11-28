@@ -168,6 +168,31 @@ describe("main plugin storage", () => {
     close(writer, reader)
   })
 
+  test.each([
+    { legacy: "stable", channel: "stable" },
+    { legacy: "unstable", channel: "unstable" },
+    { legacy: "beta", channel: null },
+  ])("imports the 0.4 updater preference $legacy as $channel", async ({ legacy, channel }) => {
+    const root = await directory()
+    const file = path.join(root, "state.sqlite")
+    const settings = settingsIn(root)
+    const oldFile = "loginom-ai-agent.updater"
+    settings(oldFile).set("channel", legacy)
+    const read = (db: Database) => createStorage(stateOf(db.db), settings, "updater", true).store("channel", {
+      schema: Schema.NullOr(Schema.Literals(["stable", "unstable"])),
+      initial: null,
+      from: { settings: "channel", file: oldFile },
+    }).value
+
+    const first = openDatabase(file)
+    expect(read(first)).toBe(channel)
+    close(first)
+    if (channel) settings(oldFile).delete("channel")
+    const reopened = openDatabase(file)
+    expect(read(reopened)).toBe(channel)
+    close(reopened)
+  })
+
   // The built-ins moved their main state into declared stores: each older home imports into the same row, byte for
   // byte (an unknown field included), and `remove` with the same `from` deletes every home it names.
   test.each<{ name: string; from: MainStoreFrom | readonly MainStoreFrom[]; seed: Seed; id: string; row: string }>([

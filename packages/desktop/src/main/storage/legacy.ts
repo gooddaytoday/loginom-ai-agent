@@ -1,5 +1,6 @@
 import { Effect, FileSystem, Option, Path, Schema } from "effect"
 import type { Database } from "./database"
+import { legacyStoreImportID, pendingLegacyStores } from "./legacy-files"
 import { state } from "./schema"
 
 const DRAFT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
@@ -21,11 +22,12 @@ export const importLegacyStores = Effect.fn("DesktopStorage.importLegacyStores")
 ) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
-  const names = (yield* fs.readDirectory(userData).pipe(Effect.orElseSucceed(() => []))).filter(isStoreFile)
+  const entries = yield* fs.readDirectory(userData).pipe(Effect.orElseSucceed(() => []))
+  const names = pendingLegacyStores(db.$client, entries).filter((entry) => entry.file === entry.name)
 
   const files = yield* Effect.forEach(
     names,
-    Effect.fnUntraced(function* (name) {
+    Effect.fnUntraced(function* ({ file: name }) {
       const file = path.join(userData, name)
       const stats = yield* fs.stat(file).pipe(Effect.orElseSucceed(() => undefined))
 
@@ -33,10 +35,14 @@ export const importLegacyStores = Effect.fn("DesktopStorage.importLegacyStores")
       const raw = yield* fs.readFileString(file).pipe(Effect.orElseSucceed(() => undefined))
 
       if (raw === undefined) return
+
       const entries = decode(raw)
 
       if (Option.isNone(entries)) {
-        yield* Effect.logWarning("legacy store is not readable, leaving it in place", { name })
+        const record = db.$client.prepare("INSERT OR IGNORE INTO migration (id, time_completed) VALUES (?, ?)")
+
+        if (record.run(legacyStoreImportID(name), Date.now()).changes)
+          yield* Effect.logWarning("legacy store has invalid data, leaving it in place", { name })
 
         return
       }
@@ -87,10 +93,6 @@ export const importLegacyStores = Effect.fn("DesktopStorage.importLegacyStores")
 
   return { imported: rows.length, removed: candidates.map((file) => file.name) }
 })
-
-function isStoreFile(name: string) {
-  return name === "default.dat" || /^opencode\..+\.dat$/.test(name)
-}
 
 function isDraft(name: string) {
   return name.startsWith("opencode.draft.")

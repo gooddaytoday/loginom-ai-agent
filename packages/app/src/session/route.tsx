@@ -32,6 +32,7 @@ import { SessionErrorFallback, SessionNotFoundPanel } from "./route-error"
 import { sessionDocumentTitle, sessionModelDirectory, sessionRouteView, viewedSessionID } from "./resolution-machine"
 import { createSessionResolution } from "./session-resolution"
 import { SessionScreenView } from "./screen"
+import { createToolRenderers } from "./timeline/tool-renderers"
 import { PreparingComposer } from "./preparing-composer"
 import { ComposerFocusProvider } from "./composer/focus"
 import { INITIAL_SESSION_VIEWED_STATE, transitionSessionViewed, type SessionViewedState } from "./viewed-machine"
@@ -41,6 +42,7 @@ export function TargetSessionRouteContent() {
   const data = useData()
   const server = useServer()
   const tabs = useTabs()
+  const toolRenderers = createToolRenderers()
 
   const resolution = createSessionResolution(
     () => params.id,
@@ -104,7 +106,7 @@ export function TargetSessionRouteContent() {
               {/* Not keyed: the session providers stay mounted while tabs switch between resolved sessions. */}
               <Match when={view().type === "ready"}>
                 <LocationProvider directory={directory()}>
-                  <SessionUIProvider directory={directory()} server={server.key}>
+                  <SessionUIProvider directory={directory()} server={server.key} toolRenderers={toolRenderers}>
                     <TargetSessionPage />
                   </SessionUIProvider>
                 </LocationProvider>
